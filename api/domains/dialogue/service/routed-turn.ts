@@ -3,20 +3,22 @@ import type { SpeechPreparation } from "../../delivery";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
-import type { AgentMessage } from "../contracts";
+import type { ReadToolName } from "../../capabilities";
+import type { NativeTool } from "../../../infrastructure/chat-stream";
+import type { AgentMessage, AgentToolCall } from "../contracts";
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput } from "./conversation-output";
+import { availableReadTools, readToolDefinitions } from "./executor-read";
 import type {
 	GenerationOutcome,
 	ToolExecutor,
 	ToolOutcome,
-} from "./generation-loop";
+} from "./executor-context";
 import { TOOL_NAMES, parseCall } from "./generation-tools";
-import { cloudHarness } from "./harness";
 import { INPUT_HEADINGS } from "./input-text";
 import { openIntentGate } from "./intent-gate";
 import { refusalText, toolResultText } from "./result-text";
-import { parseChoice } from "./routed-choice";
+import { parseChoice, strictChoiceSchema } from "./routed-choice";
 import { pendingTurn, requestTurn, type Step } from "./routed-steps";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 
@@ -40,6 +42,9 @@ export type RoutedTurnOptions = {
  * that said nothing to the user who spoke is one of them.
  */
 const CALL_FAILURES = new Set([
+	"local_timeout",
+	"network_unavailable",
+	"inference_failed",
 	"chat_output_empty",
 	"chat_stream_incomplete",
 	"chat_stream_too_large",
@@ -47,7 +52,19 @@ const CALL_FAILURES = new Set([
 	"chat_frame_too_large",
 	"chat_stream_error",
 	"system_text_copied",
+	// A talk call with the read tools: a call without its arguments, or a call made when none was offered.
+	"chat_tool_calls_invalid",
+	"chat_tool_calls_unexpected",
 ]);
+/**
+ * A model call that failed on its own (the stream's, the provider's or the connection's fault), not the run's: the
+ * turn still answers (a choice that failed leaves it to the talk turn; a talk that failed gets the host's words).
+ */
+const callFailed = (code: string) =>
+	CALL_FAILURES.has(code) ||
+	/^(cloud_http|cloud_agent|larm_inference|larm_control)_[a-z0-9_]+$/.test(
+		code,
+	);
 
 /**
  * One turn of the local harness (the local harness rebuild plan, section 4): the host routes it by what it holds
@@ -91,7 +108,7 @@ export async function runRoutedTurn(
 		if (step === "talk") await turn.talk();
 	} catch (error) {
 		const code = error instanceof Error ? error.message : "";
-		if (options.signal.aborted || turn.published() || !CALL_FAILURES.has(code))
+		if (options.signal.aborted || turn.published() || !callFailed(code))
 			throw error;
 		log.warn("dialogue.turn_failed", { kind, reason: code });
 		turn.answer(SAID_FAILED);
@@ -148,7 +165,7 @@ function createTurn(
 		outputLimit: input.harness.call.outputLimit,
 		reasoning: {
 			larm: input.harness.call.reasoning,
-			cloud: cloudHarness.call.reasoning,
+			cloud: input.harness.call.reasoning,
 		},
 		...(options.session?.context ? { context: options.session.context } : {}),
 		...(options.session?.refs ? { refs: options.session.refs } : {}),
@@ -156,9 +173,10 @@ function createTurn(
 
 	/** One model call on the run's request: a streamed reply (`onDelta`) or a silent choice (`outputSchema`). */
 	const call = (
-		messages: ChatMessage[],
+		messages: ChatMessage[] | AgentMessage[],
 		onDelta: ((text: string) => void) | undefined,
-		extra: Pick<CallSession, "outputSchema">,
+		extra: Pick<CallSession, "outputSchema" | "cloudOutputSchema">,
+		tools?: NativeTool[],
 	) => {
 		const stream = deps.larm.executeStream;
 		if (!input.requestId || !stream) throw new Error("routed_turn_unavailable");
@@ -167,11 +185,11 @@ function createTurn(
 			stream.call(
 				deps.larm,
 				input.requestId!,
-				messages,
+				messages as ChatMessage[],
 				signal,
 				onDelta,
 				onDelta ? options.preparation : undefined,
-				undefined,
+				tools,
 				{ ...session, ...extra },
 			),
 		);
@@ -218,11 +236,19 @@ function createTurn(
 		): Promise<ReturnType<typeof parseChoice> | "cut"> {
 			let answered: Receipt;
 			try {
-				answered = await call(messages, undefined, { outputSchema: schema });
+				answered = await call(messages, undefined, {
+					outputSchema: schema,
+					cloudOutputSchema: strictChoiceSchema(schema),
+				});
 			} catch (error) {
 				if (signal.aborted || !(error instanceof Error)) throw error;
-				if (error.message === "chat_output_empty") return null;
 				if (error.message === "chat_stream_incomplete") return "cut";
+				// The choice is the host's aid: a call that failed on its own leaves the turn to the talk turn.
+				if (callFailed(error.message)) {
+					if (error.message !== "chat_output_empty")
+						log.warn("dialogue.choice_failed", { reason: error.message });
+					return null;
+				}
 				throw error;
 			}
 			signal.throwIfAborted();
@@ -284,8 +310,12 @@ function createTurn(
 				: toolResultText("refused", { refused: true, issues: error.issues });
 		},
 
-		/** The talk turn: one streamed call with no tools; `notice` adds what the host found for it to tell. */
-		async talk(notice?: string) {
+		/**
+		 * The talk turn: one streamed call; `notice` adds what the host found for it to tell. On the user's words it may
+		 * call one read tool, and a second call answers with what was read (spec conversation-read-tools-design
+		 * 2026-10-31 §2); `tools: false` when the host has read for it already.
+		 */
+		async talk(notice?: string, { tools = true }: { tools?: boolean } = {}) {
 			const messages = notice
 				? withNotice(input.messages, notice)
 				: input.messages;
@@ -293,47 +323,86 @@ function createTurn(
 				input.harness.gates.systemCopy && messages[0]?.role === "system"
 					? messages[0].content
 					: undefined;
-			const reply = await deps.conversationAgent.respond({
-				messages: messages as AgentMessage[],
-				chat: {
-					async complete(_request, onDelta, chatSignal) {
-						const output = conversationOutput(
-							onDelta,
-							[],
-							system,
-							input.toolchainTitles,
-						);
-						// A port without the streamed call answers in one piece, as the agent loop's does.
-						if (!input.requestId || !deps.larm.executeStream) {
-							const text = await deps.larm.answer(messages, chatSignal);
-							output.delta(text);
-							return { text: output.finish(text), toolCalls: [] };
-						}
-						try {
-							const answered = await call(messages, output.delta, {});
-							chatSignal.throwIfAborted();
-							receipt = answered;
-							return {
-								text: output.finish(String(answered.value ?? "")),
-								toolCalls: [],
-							};
-						} catch (error) {
-							// A call that ended cleanly with nothing to say: the reply says nothing, as the system allows.
-							if (
-								!chatSignal.aborted &&
-								error instanceof Error &&
-								error.message === "chat_output_empty"
-							)
-								return { text: output.finish(""), toolCalls: [] };
-							throw error;
-						}
+			// Tool calls come back on the streamed call only; a port without it answers in one piece.
+			const reads =
+				tools &&
+				input.final.kind === "utterances" &&
+				input.requestId &&
+				deps.larm.executeStream
+					? deps.store.read((db) => availableReadTools(deps, db))
+					: [];
+			const act = this.act;
+			// What this talk spoke, and whether it read: a call that fails after a read gets the host's words after it.
+			let spoken = "";
+			let readMade = false;
+			let reply: Awaited<
+				ReturnType<DialogueDeps["conversationAgent"]["respond"]>
+			>;
+			try {
+				reply = await deps.conversationAgent.respond({
+					messages: messages as AgentMessage[],
+					chat: {
+						async complete(request, onDelta, chatSignal) {
+							const output = conversationOutput(onDelta, system);
+							// A port without the streamed call answers in one piece, as the agent loop's does.
+							if (!input.requestId || !deps.larm.executeStream) {
+								const text = await deps.larm.answer(messages, chatSignal);
+								output.delta(text);
+								return { text: output.finish(text), toolCalls: [] };
+							}
+							try {
+								const answered = await call(
+									request.messages as AgentMessage[],
+									output.delta,
+									{},
+									request.tools.map((tool) => ({
+										type: "function" as const,
+										function: tool,
+									})),
+								);
+								chatSignal.throwIfAborted();
+								receipt = answered;
+								return {
+									text: output.finish(String(answered.value ?? "")),
+									toolCalls: (answered.toolCalls ?? []).map((toolCall) => ({
+										id: toolCall.id,
+										name: toolCall.name,
+										arguments: toolCall.arguments,
+									})),
+								};
+							} catch (error) {
+								// A call that ended cleanly with nothing to say: the reply says nothing, as the system allows. So
+								// does the answer after a read that calls a tool again, when none is offered any more.
+								if (
+									!chatSignal.aborted &&
+									error instanceof Error &&
+									(error.message === "chat_output_empty" ||
+										(error.message === "chat_tool_calls_unexpected" &&
+											!request.tools.length))
+								)
+									return { text: output.finish(""), toolCalls: [] };
+								throw error;
+							}
+						},
 					},
-				},
-				tools: { tools: [], call: async () => ({ content: "" }) },
-				signal,
-				onDelta: delta,
-				maxToolCalls: 0,
-			});
+					tools: readToolPort(reads, act, () => {
+						readMade = true;
+					}),
+					signal,
+					onDelta: (text) => {
+						spoken += text;
+						delta(text);
+					},
+					maxToolCalls: reads.length ? 1 : 0,
+				});
+			} catch (error) {
+				const code = error instanceof Error ? error.message : "";
+				if (signal.aborted || !readMade || !callFailed(code)) throw error;
+				log.warn("dialogue.turn_failed", { kind: "talk", reason: code });
+				said = [said, spoken.trim()].filter(Boolean).join("\n");
+				this.speak(SAID_FAILED);
+				return;
+			}
 			// The user spoke and was told nothing: a failed reply, not silence (a notice may go unanswered).
 			if (
 				!reply.text.trim() &&
@@ -343,6 +412,48 @@ function createTurn(
 				throw new Error("chat_output_empty");
 			emotion = reply.emotion;
 			said = [said, reply.text].filter(Boolean).join("\n");
+		},
+	};
+}
+
+/**
+ * The talk turn's read tools (spec conversation-read-tools-design 2026-10-31): only those offered run, through the
+ * turn's executor; any other name, or arguments that are no object, is refused and never run.
+ */
+function readToolPort(
+	reads: readonly ReadToolName[],
+	act: Turn["act"],
+	onRead: () => void,
+) {
+	return {
+		tools: readToolDefinitions(reads),
+		async call(toolCall: AgentToolCall) {
+			let args: unknown;
+			try {
+				args = JSON.parse(toolCall.arguments || "{}");
+			} catch {
+				args = undefined;
+			}
+			if (
+				!(reads as string[]).includes(toolCall.name) ||
+				!args ||
+				typeof args !== "object" ||
+				Array.isArray(args)
+			)
+				return {
+					content: toolResultText("refused", {
+						refused: true,
+						code: "invalid_tool_call",
+					}),
+				};
+			onRead();
+			const read = await act(toolCall.name, args as Record<string, unknown>);
+			return {
+				content:
+					"refused" in read
+						? refusalText(read.refused.message, read.refused.repair ?? [])
+						: String((read.outcome.result as { text?: unknown }).text ?? ""),
+			};
 		},
 	};
 }

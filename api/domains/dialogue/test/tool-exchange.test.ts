@@ -1,7 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
 import type { ChatMessage } from "../service/context";
 import { carriedToolCalls } from "../service/tool-exchange";
-import { IMAGE, INSTANT, setup, type Harness } from "./generation.fixture";
+import {
+	IMAGE,
+	INSTANT,
+	choice,
+	setup,
+	type Harness,
+} from "./generation.fixture";
 
 /**
  * What a turn keeps of its searches and hand-overs (the tool-call reliability design, P1): the calls and the host's
@@ -43,13 +49,8 @@ const FOUND = {
 	})),
 };
 
-/** A routed turn's choice, as the model answers it (a JSON object held to the turn's schema). */
-const choice = (value: Record<string, unknown>) => ({
-	text: JSON.stringify(value),
-});
-
 test("a hand-over's search and delegation are kept with its announcement, the next local turn draws the words alone, and the background calls read the same prefix", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(
 		choice({
 			choice: IMAGE.id,
@@ -96,62 +97,39 @@ test("a hand-over's search and delegation are kept with its announcement, the ne
 	expect(background.messages.slice(0, prefix.length)).toEqual(prefix);
 });
 
-test("a confirmation's number and a refused call are kept; the memory and work tools are not", async () => {
-	h = await setup();
+test("a confirmation's number and a refused call are kept; the read is not", async () => {
+	h = await setup({
+		cards: [{ ...IMAGE, minImpact: "modify_existing" }, INSTANT],
+	});
 	h.state.steps.push(
-		{ calls: [{ name: "memory", args: { operation: "read", query: "壁紙" } }] },
-		// Not found first: the delegation is refused.
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "confirm",
-						toolchain: IMAGE.id,
-						request: "壁紙を差し替える",
-						impact: "modify_existing",
-					},
-				},
-			],
-		},
-		{
-			calls: [{ name: "find_toolchain", args: { query: "壁紙を差し替える" } }],
-		},
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "confirm",
-						toolchain: IMAGE.id,
-						request: "壁紙を差し替える",
-						impact: "modify_existing",
-					},
-				},
-			],
-		},
-		{ text: "差し替えてよいですか？" },
+		choice({ choice: "none" }),
+		{ calls: [{ name: "read_memory", args: { query: "壁紙" } }] },
+		{ text: "記憶にはありませんでした。" },
+		// The change of something that exists is refused until confirmed; the host then issues the confirmation.
+		choice({
+			choice: IMAGE.id,
+			say: "差し替えます。",
+			request: "壁紙を差し替える",
+		}),
 	);
-	await h.say("壁紙を差し替えて");
-	h.state.steps.push({ text: "わかりました。" });
-	await h.say("やっぱりやめておく");
-	const calls = kept("差し替えてよいですか？").toolCalls;
+	await h.say("壁紙のことを覚えてる？");
+	const statement = await h.say("壁紙を差し替えて");
+	const said = h.dialogue.answerText(statement.id)!;
+	expect(said).toContain("よろしいですか？");
+	expect(
+		kept("記憶にはありませんでした。").toolCalls.map((c) => c.name),
+	).toEqual(["find_toolchain"]);
+	const calls = kept(said).toolCalls;
 	expect(calls.map((c) => c.name)).toEqual([
-		"delegate",
 		"find_toolchain",
+		"delegate",
 		"delegate",
 	]);
 	expect(calls.map((c) => c.result)).toEqual([
-		'{"refused":true}',
 		JSON.stringify(FOUND),
+		'{"refused":true}',
 		'{"confirmation":"c1"}',
 	]);
-	// The cloud harness draws them as the native calls before the words they led to.
-	expect(
-		recent().flatMap(
-			(m) => m.tool_calls?.map((call) => call.function.name) ?? [],
-		),
-	).toEqual(["delegate", "find_toolchain", "delegate"]);
 });
 
 test("a result keeps only the candidates' names and the host's numbers, never an instant answer's text", () => {
@@ -224,7 +202,7 @@ test("a replayed call's arguments are always a JSON object, each text within its
 });
 
 test("a report keeps the notice of the work it told; the next local turn draws the words alone", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(
 		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
 	);

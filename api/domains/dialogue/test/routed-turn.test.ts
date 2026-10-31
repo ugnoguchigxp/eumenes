@@ -32,7 +32,7 @@ const assistantTexts = () =>
 		.map((m) => m.text);
 
 test("an instant toolchain answers from the inputs the one choice gave: the host says its answer", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(choice({ choice: INSTANT.id, inputs: { city: "東京" } }));
 	const run = await h.say("東京は今何時？");
 	expect(h.dialogue.answerText(run.id)).toBe("東京は12時です。");
@@ -44,7 +44,6 @@ test("an instant toolchain answers from the inputs the one choice gave: the host
 		"ask",
 		IMAGE.id,
 		INSTANT.id,
-		"memory.recall",
 		"memory.request",
 	]);
 	const input = chose!.messages.at(-1)!.content;
@@ -60,7 +59,7 @@ test("an instant toolchain answers from the inputs the one choice gave: the host
 });
 
 test("long words are searched by their head: the search's bound does not leave the choice without candidates", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(choice({ choice: INSTANT.id, inputs: { city: "東京" } }));
 	const run = await h.say(`東京は今何時？${"背景の説明です。".repeat(400)}`);
 	expect(h.dialogue.answerText(run.id)).toBe("東京は12時です。");
@@ -70,7 +69,7 @@ test("long words are searched by their head: the search's bound does not leave t
 });
 
 test("a choice the host cannot carry out is made once more with the reason, and a second failure gets the host's words", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(
 		choice({ choice: INSTANT.id, inputs: {} }),
 		choice({ choice: INSTANT.id, inputs: { city: "東京" } }),
@@ -92,7 +91,7 @@ test("a choice the host cannot carry out is made once more with the reason, and 
 });
 
 test("an answer that is no choice is not made again: the talk turn answers", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push({ text: "choose" }, { text: "はい。" });
 	const run = await h.say("こんにちは");
 	expect(h.dialogue.answerText(run.id)).toBe("はい。");
@@ -101,7 +100,7 @@ test("an answer that is no choice is not made again: the talk turn answers", asy
 });
 
 test("a talk cut before a word gets the host's words", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(choice({ choice: "none" }), {
 		fail: "chat_stream_incomplete",
 	});
@@ -113,7 +112,7 @@ test("a talk cut before a word gets the host's words", async () => {
 });
 
 test("a talk that tells the user who spoke nothing gets the host's words; each call of the turn ends only itself", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(choice({ choice: "none" }), { fail: "chat_output_empty" });
 	const run = await h.say("こんにちは");
 	expect(run.status).toBe("completed");
@@ -144,7 +143,7 @@ test("a pipeline is handed the user's words as its request: its branch has input
 			parse: (args) => ({ ok: true, value: args }),
 		},
 	};
-	h = await setup({ harness: "local", cards: [pipeline, INSTANT] });
+	h = await setup({ cards: [pipeline, INSTANT] });
 	h.state.steps.push(
 		choice({ choice: pipeline.id, say: "進めます。", inputs: { topic: "雨" } }),
 		choice({ choice: "none" }),
@@ -159,7 +158,7 @@ test("a pipeline is handed the user's words as its request: its branch has input
 });
 
 test("a question asked again keeps the whole request it asked about", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(choice({ choice: "ask", say: "何の絵にしましょうか？" }));
 	await h.say("絵を描いて");
 	h.state.steps.push(choice({ choice: "ask", say: "どんな猫ですか？" }));
@@ -174,7 +173,7 @@ test("a question asked again keeps the whole request it asked about", async () =
 });
 
 test("a long request asked about twice keeps the newest answer with the head of the request", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	const request = `絵を描いて。${"背景の説明です。".repeat(40)}`;
 	h.state.steps.push(choice({ choice: "ask", say: "何の絵にしましょうか？" }));
 	await h.say(request);
@@ -190,13 +189,14 @@ test("a long request asked about twice keeps the newest answer with the head of 
 	);
 });
 
-test("no candidate fits: the talk turn answers, on a system that names no toolchain or tool and the time alone of the state", async () => {
-	h = await setup({ harness: "local" });
+test("no candidate fits: the talk turn answers with only the read tools, on a system that names no toolchain and the time alone of the state", async () => {
+	h = await setup();
 	h.state.steps.push(choice({ choice: "none" }), { text: "こんにちは。" });
 	const run = await h.say("こんにちは");
 	expect(h.dialogue.answerText(run.id)).toBe("こんにちは。");
 	const talk = h.state.calls.at(-1)!;
-	expect(talk.tools).toEqual([]);
+	// The read tools this host has (spec conversation-read-tools-design 2026-10-31): no memory or agents here.
+	expect(talk.tools).toEqual(["read_history", "read_runs"]);
 	expect(talk.session?.outputSchema).toBeUndefined();
 	const system = talk.messages[0]!.content;
 	for (const word of [
@@ -206,7 +206,9 @@ test("no candidate fits: the talk turn answers, on a system that names no toolch
 		"delegate",
 	])
 		expect(system).not.toContain(word);
-	expect(system).toContain("この返事では、作業を始めることも");
+	expect(system).toContain(
+		"この返事でできるのは、読む道具が渡されているときに",
+	);
 	// Nor does it write what a toolchain makes: a page or a text it is asked for goes to a toolchain.
 	expect(system).toContain(
 		"文章・ページ・画面・コードなどの制作物は、この返事では書きません。",
@@ -216,7 +218,7 @@ test("no candidate fits: the talk turn answers, on a system that names no toolch
 });
 
 test("a hand-over is announced with the choice's say, and the record keeps those same words", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(
 		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
 	);
@@ -237,7 +239,6 @@ test("a hand-over is announced with the choice's say, and the record keeps those
 
 test("a change of something that exists is confirmed in the host's words; a yes approves it on the pending turn", async () => {
 	h = await setup({
-		harness: "local",
 		cards: [{ ...IMAGE, minImpact: "modify_existing" }, INSTANT],
 	});
 	h.state.steps.push(
@@ -274,7 +275,6 @@ test("a change of something that exists is confirmed in the host's words; a yes 
 
 test("a no on the pending turn closes the confirmation: the next turn has nothing pending", async () => {
 	h = await setup({
-		harness: "local",
 		cards: [{ ...IMAGE, minImpact: "modify_existing" }, INSTANT],
 	});
 	h.state.steps.push(
@@ -294,7 +294,7 @@ test("a no on the pending turn closes the confirmation: the next turn has nothin
 });
 
 test("a question back keeps the request it asked about; the answer goes to the request turn with both", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(choice({ choice: "ask", say: "何の絵にしましょうか？" }));
 	const asked = await h.say("絵を描いて");
 	expect(h.dialogue.answerText(asked.id)).toBe("何の絵にしましょうか？");
@@ -310,7 +310,7 @@ test("a question back keeps the request it asked about; the answer goes to the r
 });
 
 test("a memory request goes to the steward from the user's words, and the choice's say is said", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(
 		choice({
 			choice: "memory.request",
@@ -324,21 +324,8 @@ test("a memory request goes to the steward from the user's words, and the choice
 	expect(h.state.stewardRequests).toHaveLength(1);
 });
 
-test("a memory read is told by the talk turn, with what was found as the host's notice", async () => {
-	h = await setup({ harness: "local" });
-	h.state.steps.push(
-		choice({ choice: "memory.recall", query: "好きな食べ物" }),
-		{ text: "記憶にはありませんでした。" },
-	);
-	const run = await h.say("私の好きな食べ物って何だっけ");
-	expect(h.dialogue.answerText(run.id)).toBe("記憶にはありませんでした。");
-	expect(h.state.calls.at(-1)!.messages.at(-1)!.content).toContain(
-		"## Host notice\n利用者に聞かれて、覚えている記録を確かめましたが、見つかりませんでした。",
-	);
-});
-
 test("the talk turn's recent conversation is the last two of the user's utterances and the reply before them", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	for (let i = 1; i <= 4; i++) {
 		h.state.steps.push(choice({ choice: "none" }), { text: `a${i}` });
 		await h.say(`u${i}`);
@@ -351,7 +338,7 @@ test("the talk turn's recent conversation is the last two of the user's utteranc
 });
 
 test("finished work State still lists may be checked, never corrected: the check's record is what the talk turn tells", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(
 		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
 	);
@@ -393,7 +380,7 @@ test("finished work State still lists may be checked, never corrected: the check
 });
 
 test("the choice reads the user's earlier words of the talk window: a request carries the condition they point to", async () => {
-	h = await setup({ harness: "local" });
+	h = await setup();
 	h.state.steps.push(choice({ choice: "none" }), { text: "承知しました。" });
 	await h.say("好きな色は藍色です。");
 	h.state.steps.push(
@@ -412,7 +399,7 @@ test("the choice reads the user's earlier words of the talk window: a request ca
 });
 
 test("the choice reads `## Memory` as the talk turn shows it", async () => {
-	h = await setup({ harness: "local", memory: true });
+	h = await setup({ memory: true });
 	h.state.steps.push(choice({ choice: "none" }), { text: "はい。" });
 	const first = await h.say("好きな色は藍色です", "completed");
 	const saved = await saveItem(h.store, h.memory!, {
@@ -434,4 +421,22 @@ test("the choice reads `## Memory` as the talk turn shows it", async () => {
 	expect(input).toStartWith("## Memory\n");
 	expect(input).toContain(`- ${saved.text}`);
 	expect(input.indexOf("## Memory")).toBeLessThan(input.indexOf("## State"));
+});
+
+test("a choice the provider failed (a cloud error) leaves the turn to the talk turn; the cloud got the choice's strict form", async () => {
+	h = await setup();
+	h.state.steps.push(
+		{ fail: "cloud_http_429" },
+		{ text: "はい、どうしましたか。" },
+	);
+	const run = await h.say("猫の絵を描いて");
+	expect(run.status).toBe("completed");
+	expect(h.dialogue.answerText(run.id)).toBe("はい、どうしましたか。");
+	const [chose, talked] = h.state.calls.slice(-2);
+	expect(chose!.session?.outputSchema).toBeDefined();
+	expect(
+		(chose!.session as { cloudOutputSchema?: { type?: string } })
+			.cloudOutputSchema?.type,
+	).toBe("object");
+	expect(talked!.session?.outputSchema).toBeUndefined();
 });

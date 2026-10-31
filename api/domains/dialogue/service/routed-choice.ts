@@ -72,9 +72,11 @@ function branch(
 function candidateBranch(
 	candidate: ChoiceCandidate,
 	resources: readonly string[],
+	switching: string | null,
 ): Schema {
 	const choice = only(candidate.id);
-	if (candidate.execution === "instant")
+	// An instant answer and a read tool both take their inputs alone.
+	if (candidate.execution === "instant" || candidate.execution === "read")
 		return branch({ choice, inputs: candidate.inputs ?? ANY_OBJECT });
 	if (candidate.execution === "pipeline")
 		return branch({ choice, say: SAY, inputs: candidate.inputs ?? ANY_OBJECT });
@@ -94,18 +96,26 @@ function candidateBranch(
 			...(resources.length
 				? { refs: { type: "array", maxItems: 8, items: oneOf(resources) } }
 				: {}),
+			// The user's word that the suspended unsaved work may go: the switch this hand-over waits for.
+			...(candidate.id === switching
+				? { resolveUnsaved: only("discard") }
+				: {}),
 		},
-		["refs"],
+		["refs", "resolveUnsaved"],
 	);
 }
 
 /**
- * The request turn's schema: none, a question back, one branch per candidate (but those `excluded`), the memory
- * operations, and a correction or cancellation of each open TODO.
+ * The request turn's schema: none, a question back, one branch per candidate (but those `excluded`; a read tool the
+ * search offered is one), the memory request, and a correction or cancellation of each open TODO.
  */
 export function choiceSchema(
 	candidates: readonly ChoiceCandidate[],
-	{ todos, resources }: Pick<RoutedInput, "todos" | "resources">,
+	{
+		todos,
+		resources,
+		switching,
+	}: Pick<RoutedInput, "todos" | "resources" | "switching">,
 	excluded: ReadonlySet<string> = new Set(),
 ): Schema {
 	return {
@@ -114,8 +124,7 @@ export function choiceSchema(
 			branch({ choice: only("ask"), say: SAY }),
 			...candidates
 				.filter((candidate) => !excluded.has(candidate.id))
-				.map((candidate) => candidateBranch(candidate, resources)),
-			branch({ choice: only("memory.recall"), query: text(500) }),
+				.map((candidate) => candidateBranch(candidate, resources, switching)),
 			branch(
 				{
 					choice: only("memory.request"),
@@ -212,7 +221,6 @@ export function choiceMessages(input: {
 		...(shown.length
 			? [toolResultText("find_toolchain", { candidates: shown })]
 			: []),
-		`- memory.recall: ${systemContext("dialogue.contexts.local.memory-recall", {})}`,
 		`- memory.request: ${systemContext("dialogue.contexts.local.memory-request", {})}`,
 		...routed.todos.map(
 			(todo) =>
@@ -266,7 +274,11 @@ export function pendingMessages(
 	];
 }
 
-/** A choice call's answer: the object it returned, or null when it is not one with a `choice`. */
+/**
+ * A choice call's answer: the object it returned, or null when it is not one with a `choice`. A cloud provider's strict
+ * form (`strictChoiceSchema`) fills every field: the ones it left null are dropped, and inputs written as a JSON text
+ * are read back into their object.
+ */
 export function parseChoice(
 	value: unknown,
 ): (Record<string, unknown> & { choice: string }) | null {
@@ -276,10 +288,94 @@ export function parseChoice(
 	} catch {
 		return null;
 	}
-	return parsed &&
-		typeof parsed === "object" &&
-		!Array.isArray(parsed) &&
-		typeof (parsed as { choice?: unknown }).choice === "string"
-		? (parsed as Record<string, unknown> & { choice: string })
-		: null;
+	if (
+		!parsed ||
+		typeof parsed !== "object" ||
+		Array.isArray(parsed) ||
+		typeof (parsed as { choice?: unknown }).choice !== "string"
+	)
+		return null;
+	const chosen: Record<string, unknown> = {};
+	for (const [key, field] of Object.entries(parsed))
+		if (field !== null) chosen[key] = field;
+	if (typeof chosen.inputs === "string")
+		try {
+			chosen.inputs = JSON.parse(chosen.inputs);
+		} catch {
+			// Unreadable inputs are left as they are: the toolchain's own check refuses them.
+		}
+	return chosen as Record<string, unknown> & { choice: string };
+}
+
+/** A field in the strict form: no length ranges; an object the provider can not hold strictly as its JSON text. */
+function strictField(field: Schema): Schema {
+	if (Array.isArray(field.anyOf))
+		return { anyOf: (field.anyOf as Schema[]).map(strictField) };
+	if (field.type === "object")
+		return {
+			type: "string",
+			description: "選んだ担当の欄を、JSON の object の文字列で",
+		};
+	if (field.type === "array")
+		return { type: "array", items: strictField(field.items as Schema) };
+	const { minLength: _min, maxLength: _max, ...rest } = field;
+	return rest;
+}
+
+/** The variants of one field across the branches as one field: string enums merge, other differences become anyOf. */
+function mergedField(variants: readonly Schema[]): Schema {
+	const strict = variants.map(strictField);
+	const strings = strict.every((v) => v.type === "string" && !v.anyOf);
+	if (strings) {
+		if (strict.every((v) => Array.isArray(v.enum)))
+			return {
+				type: "string",
+				enum: [...new Set(strict.flatMap((v) => v.enum as string[]))],
+			};
+		if (strict.every((v) => !v.enum)) return { type: "string" };
+	}
+	const distinct = [
+		...new Map(strict.map((v) => [JSON.stringify(v), v])).values(),
+	];
+	return distinct.length === 1 ? distinct[0]! : { anyOf: distinct };
+}
+
+/** A field the answer may leave out, as a strict provider needs it: required, and null when not used. */
+function nullable(field: Schema): Schema {
+	if (Array.isArray(field.anyOf))
+		return { anyOf: [...(field.anyOf as Schema[]), { type: "null" }] };
+	if (Array.isArray(field.enum))
+		return {
+			...field,
+			type: [field.type, "null"],
+			enum: [...field.enum, null],
+		};
+	return { ...field, type: [field.type, "null"] };
+}
+
+/**
+ * A choice schema (`choiceSchema`, `pendingSchema`) in the form a cloud provider's strict structured output takes: one
+ * object holding every branch's fields side by side, `choice` required, every other field required and null when the
+ * choice does not use it, no additional properties and no length ranges. LARM keeps the branches; on the cloud the
+ * host's own checks hold what the branches held (a field of another branch is refused there).
+ */
+export function strictChoiceSchema(schema: Schema): Schema {
+	const branches = (schema.anyOf as Schema[] | undefined) ?? [schema];
+	const fields = new Map<string, Schema[]>();
+	for (const branch of branches)
+		for (const [key, field] of Object.entries(
+			(branch.properties ?? {}) as Record<string, Schema>,
+		))
+			fields.set(key, [...(fields.get(key) ?? []), field]);
+	const properties: Record<string, Schema> = {};
+	for (const [key, variants] of fields) {
+		const merged = mergedField(variants);
+		properties[key] = key === "choice" ? merged : nullable(merged);
+	}
+	return {
+		type: "object",
+		additionalProperties: false,
+		required: [...fields.keys()],
+		properties,
+	};
 }

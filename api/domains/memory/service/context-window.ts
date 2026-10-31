@@ -189,6 +189,23 @@ export type ReadItemsInput = {
 	limit: number;
 };
 
+/**
+ * What the read tool `read_memory` reads: the terms of a query (every current item without one), the items the
+ * conversation's input already shows, and how many items it returns.
+ */
+export type CheckItemsInput = {
+	query?: string;
+	shown?: ReadonlySet<string>;
+	limit: number;
+};
+
+/** That read: the current item count, how many of them match, and the first `limit` of those (as the profile shows them). */
+export type CheckedItems = {
+	total: number;
+	matched: number;
+	items: Array<Record<string, unknown>>;
+};
+
 /** Share of the character pairs of the query, or of the item, the other side must hold for a match. */
 const MATCH_SHARE = 0.5;
 
@@ -437,6 +454,37 @@ export function createContextWindowStore(deps: {
 					revision: item.revision,
 					...(input.shown.has(item.id) ? { inProfile: true } : {}),
 				}));
+		},
+		/**
+		 * The read tool `read_memory`'s read: how many current items the profile holds, and those matching the query
+		 * (every one without a query), the State items before the tendencies, each newest first. Items the input already
+		 * shows are marked `inProfile`. Nothing is added, strengthened or reordered by reading.
+		 */
+		checkItemsInTransaction(
+			db: Database,
+			input: CheckItemsInput,
+		): CheckedItems {
+			const { items } = currentItems(
+				db,
+				String(readSettings(db).revision),
+				Date.parse(clock()),
+			);
+			const grams = gramsOf(input.query ?? "");
+			const found = grams.size
+				? items.filter((item) => matchesQuery(grams, item.text))
+				: [...items];
+			const tendency = (item: ProfileItem) => Number(item.kind === "tendency");
+			return {
+				total: items.length,
+				matched: found.length,
+				items: found
+					.sort((a, b) => tendency(a) - tendency(b) || b.newness - a.newness)
+					.slice(0, input.limit)
+					.map((item) => ({
+						...profileItemFields(item),
+						...(input.shown?.has(item.id) ? { inProfile: true } : {}),
+					})),
+			};
 		},
 		/** Same transaction as the change itself: a run in flight that predates it is expired. */
 		recordImmediateInTransaction(

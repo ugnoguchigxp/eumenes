@@ -74,7 +74,7 @@ type Settled =
 			delegated?: NonNullable<Turn["delegated"]>;
 	  };
 
-const MEMORY_CHOICES = new Set(["memory.recall", "memory.request"]);
+const MEMORY_CHOICES = new Set(["memory.request"]);
 
 /** Carries a parsed choice out on the simulated host. */
 function settle(
@@ -205,20 +205,13 @@ export async function runRoutedTurn(
 	const talkTurn = async (): Promise<TurnResult> => {
 		try {
 			let heard = "";
-			const reply = await timed("talk", env.client, (detail) =>
-				env.client.stream(
-					talk,
-					env.settings,
-					callSignal(),
-					(delta) => {
-						arrived(detail, delta);
-						heard += delta;
-						if (env.copies?.(heard)) throw new Error("system_text_copied");
-					},
-					{ tools: false },
-				),
+			text = await timed("talk", env.client, (detail) =>
+				env.client.talk(talk, env.settings, callSignal(), (delta) => {
+					arrived(detail, delta);
+					heard += delta;
+					if (env.copies?.(heard)) throw new Error("system_text_copied");
+				}),
 			);
-			text = reply.text;
 			return done("answer");
 		} catch (error) {
 			text = (details.at(-1)?.text ?? "").slice(0, 200);
@@ -226,8 +219,6 @@ export async function runRoutedTurn(
 		}
 	};
 	if (!request) return talkTurn();
-	if (!env.client.decide)
-		return done("error", { error: "harness_decide_unsupported" });
 
 	const { routed, utterance, style } = request;
 	const query = routed.asked
@@ -245,7 +236,7 @@ export async function runRoutedTurn(
 		let raw: string;
 		try {
 			raw = await timed("choice", env.client, async (detail) => {
-				const answered = await env.client.decide!(
+				const answered = await env.client.decide(
 					choiceMessages({
 						style,
 						routed,

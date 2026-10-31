@@ -1,115 +1,109 @@
 /**
  * Fake conversation model and fake judge: they prove the pipeline runs and decide nothing. The model is scripted from
- * the case's own checks and answers through the production loop, so the conversation agent's reply loop, the fixed
- * tools and the host side of the tools are exercised without a provider.
+ * the case's own checks and answers through the product's routed turn, so the host's routing, the schema-bound choice
+ * and the host side of the operations are exercised without a provider.
  */
-import type { NativeToolCall } from "../../../../infrastructure/chat-stream";
 import type { InferencePort, Receipt } from "../../../inference";
 import type { ContextCase } from "./case-schema";
 import { type ConversationRunner, runConversation } from "./generation-runner";
 import type { JudgeFn } from "./judge";
 import type { EvalCard } from "./session";
 
-const call = (n: number, name: string, args: unknown): NativeToolCall => ({
-	id: `fixture-call-${n}`,
-	name,
-	arguments: JSON.stringify(args),
-});
+const WORDS = "承知しました。";
 
-/** The tool calls the scripted model makes, in rounds, before it answers: what the case's checks ask for. */
-function planOf(
-	testCase: ContextCase,
-	catalog: readonly EvalCard[],
-	documentText: string,
-): Array<[string, unknown]> {
-	const plan: Array<[string, unknown]> = [];
+type Schema = Record<string, unknown>;
+type Branch = { required?: string[]; properties: Record<string, Schema> };
+
+/** The values a branch's `choice` may take (the schema is `anyOf` of branches, as the routed turn builds it). */
+const choicesOf = (branch: Branch): string[] =>
+	(branch.properties.choice?.enum as string[] | undefined) ?? [];
+
+/** A value for each required field of a branch; `choice` is the one given. */
+function fill(branch: Branch, choice: string, input: string): Schema {
+	const out: Schema = {};
+	for (const key of branch.required ?? []) {
+		const property = branch.properties[key]!;
+		out[key] =
+			key === "choice"
+				? choice
+				: Array.isArray(property.enum)
+					? property.enum[0]
+					: property.type === "object"
+						? {}
+						: key === "request" || key === "text" || key === "query"
+							? input
+							: WORDS;
+	}
+	return out;
+}
+
+/** The choice the case's checks ask for, among the branches the turn offers; none (the talk turn) otherwise. */
+function choiceOf(testCase: ContextCase, schema: Schema): Schema {
+	const branches = (schema.anyOf ?? []) as Branch[];
+	const input = testCase.input ?? "確認";
 	const wants = (kind: string) =>
 		testCase.expect.checks.find((c) => c.kind === kind);
 	const delegated = wants("delegated");
 	const tool = wants("tool_called");
-	if (delegated?.kind === "delegated" && delegated.toolchain) {
-		const title =
-			catalog.find((card) => card.id === delegated.toolchain)?.title ??
-			delegated.toolchain;
-		// A toolchain the window already names (state.retained) needs no search.
-		if (!wants("tool_not_called"))
-			plan.push(["find_toolchain", { query: title }]);
-		plan.push([
-			"delegate",
-			{
-				mode: "execute",
-				toolchain: delegated.toolchain,
-				request: testCase.input ?? "確認",
-				announcement: "承知しました。",
-				impact: "none",
-			},
-		]);
-	} else if (tool?.kind === "tool_called" && tool.name === "work") {
-		const todo = (
-			JSON.parse(documentText) as {
-				state: {
-					todos: Array<{
-						id: string;
-						revision: number;
-						questionId?: string;
-					}>;
-				};
-			}
-		).state.todos[0];
-		if (todo)
-			plan.push([
-				"work",
-				todo.questionId
-					? {
-							todo: todo.id,
-							operation: "answer",
-							revision: todo.revision,
-							questionId: todo.questionId,
-							text: "承知しました。",
-						}
-					: { todo: todo.id, operation: "cancel", revision: todo.revision },
-			]);
-	} else if (tool?.kind === "tool_called" && tool.name === "find_toolchain")
-		plan.push(["find_toolchain", { query: testCase.input ?? "確認" }]);
-	else if (tool?.kind === "tool_called" && tool.name === "memory")
-		plan.push([
-			"memory",
-			{ operation: "read", query: testCase.input ?? "確認" },
-		]);
-	return plan;
+	const find = (accept: (branch: Branch, choice: string) => boolean) => {
+		for (const branch of branches)
+			for (const choice of choicesOf(branch))
+				if (accept(branch, choice)) return fill(branch, choice, input);
+		return null;
+	};
+	const picked =
+		delegated?.kind === "delegated" && delegated.toolchain
+			? find((_, choice) => choice === delegated.toolchain)
+			: tool?.kind === "tool_called" && tool.name === "work"
+				? // A question the work asked is answered; any other work is cancelled.
+					(find((_, choice) => choice === "answer") ??
+					find(
+						(branch, choice) =>
+							/^t\d+$/.test(choice) &&
+							(
+								branch.properties.operation?.enum as string[] | undefined
+							)?.includes("cancel") === true,
+					))
+				: tool?.kind === "tool_called" && tool.name === "memory"
+					? find((_, choice) => choice === "memory.request")
+					: null;
+	const branch = picked ?? { choice: "none" };
+	// A cancel or an amendment carries the operation the branch allows.
+	return branch.choice !== "answer" && /^t\d+$/.test(String(branch.choice))
+		? { ...branch, operation: "cancel" }
+		: branch;
 }
 
 /** A model that follows `testCase`'s plan, then answers with one short sentence (or stays silent). */
 function scriptedInference(
 	testCase: ContextCase,
-	catalog: readonly EvalCard[],
 ): Pick<InferencePort, "answer" | "executeStream"> {
 	const silent = testCase.expect.checks.some((c) => c.kind === "silent");
 	return {
-		answer: async () => "承知しました。",
-		executeStream: async (requestId, messages) => {
-			const plan = planOf(testCase, catalog, messages[1]!.content);
-			const round = messages.filter((m) => m.role === "tool").length;
-			const step = plan[round];
-			const value = silent ? "" : "承知しました。";
-			if (step)
-				return {
-					requestId,
-					attemptId: "fixture",
-					value: "",
-					toolCalls: [call(round, step[0], step[1])],
-				} satisfies Receipt;
-			// The answer is plain text, as the agent's reply is: no call closes it.
-			return {
+		answer: async () => WORDS,
+		executeStream: async (
+			requestId,
+			_messages,
+			_signal,
+			_onDelta,
+			_preparation,
+			_tools,
+			session,
+		) =>
+			({
 				requestId,
 				attemptId: "fixture",
-				value,
-			} satisfies Receipt;
-		},
+				// The silent choice is JSON held to the schema; the talk turn answers in plain words.
+				value: session?.outputSchema
+					? JSON.stringify(choiceOf(testCase, session.outputSchema))
+					: silent
+						? ""
+						: WORDS,
+			}) satisfies Receipt,
 	};
 }
 
-/** Answers through the production loop with the scripted model of each case. */
+/** Answers through the routed turn with the scripted model of each case. */
 export function createFixtureRunner(
 	cases: readonly ContextCase[],
 	catalog: readonly EvalCard[] = [],
@@ -118,9 +112,10 @@ export function createFixtureRunner(
 		const testCase = cases.find((c) => c.id === conversation.caseId);
 		if (!testCase) throw new Error("context_eval_fixture_case_unknown");
 		return runConversation({
-			inference: scriptedInference(testCase, catalog),
+			inference: scriptedInference(testCase),
 			input: conversation.input,
 			catalog,
+			persona: conversation.persona,
 			signal,
 		});
 	};

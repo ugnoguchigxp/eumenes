@@ -2,6 +2,9 @@ import { expect, test } from "bun:test";
 import {
 	choiceMessages,
 	choiceSchema,
+	parseChoice,
+	pendingSchema,
+	strictChoiceSchema,
 	type ChoiceCandidate,
 } from "../service/routed-choice";
 import { namedResources, namedTodos } from "../service/state-text";
@@ -41,14 +44,22 @@ test("the resources State names are its references, not the words of their label
 
 test("a hand-over's refs are the named resources; with none named the branch has no refs", () => {
 	expect(
-		refsOf(choiceSchema([MUSIC], { todos: [], resources: ["a3", "a4"] })),
+		refsOf(
+			choiceSchema([MUSIC], {
+				todos: [],
+				resources: ["a3", "a4"],
+				switching: null,
+			}),
+		),
 	).toEqual({
 		type: "array",
 		maxItems: 8,
 		items: { type: "string", enum: ["a3", "a4"] },
 	});
 	expect(
-		refsOf(choiceSchema([MUSIC], { todos: [], resources: [] })),
+		refsOf(
+			choiceSchema([MUSIC], { todos: [], resources: [], switching: null }),
+		),
 	).toBeUndefined();
 });
 
@@ -64,6 +75,7 @@ test("a general toolchain is marked so in its line, and the choice's rules put a
 			pending: { confirmations: [], questions: [] },
 			todos: [],
 			resources: [],
+			switching: null,
 		},
 		candidates: [
 			MUSIC,
@@ -93,6 +105,7 @@ test("the choice system leaves creation details to the toolchain and asks only w
 			pending: { confirmations: [], questions: [] },
 			todos: [],
 			resources: [],
+			switching: null,
 		},
 		candidates: [MUSIC],
 		utterance: "曲を作って",
@@ -124,7 +137,7 @@ test("every work may be checked; only open work may be corrected or cancelled, a
 		{ ref: 3, title: "朝の曲", open: false },
 	];
 	const branches = (
-		choiceSchema([], { todos, resources: [] }).anyOf as Array<{
+		choiceSchema([], { todos, resources: [], switching: null }).anyOf as Array<{
 			properties: {
 				choice: { enum: string[] };
 				operation?: { enum: string[] };
@@ -151,6 +164,7 @@ test("every work may be checked; only open work may be corrected or cancelled, a
 			pending: { confirmations: [], questions: [] },
 			todos,
 			resources: [],
+			switching: null,
 		},
 		candidates: [],
 		utterance: "さっきの曲はどうなった？",
@@ -178,6 +192,7 @@ test("a toolchain with saved items always names its target: new first, then the 
 			pending: { confirmations: [], questions: [] },
 			todos: [],
 			resources: [],
+			switching: null,
 		},
 		candidates: [MUSIC],
 		utterance: "イヤホンのランディングページを作ってみて",
@@ -195,7 +210,7 @@ test("a toolchain with saved items always names its target: new first, then the 
 					targets: [{ ref: "item-1", label: "保存済み1" }],
 				},
 			],
-			{ todos: [], resources: [] },
+			{ todos: [], resources: [], switching: null },
 		).anyOf as Array<{
 			required: string[];
 			properties: Record<string, { enum?: string[] }>;
@@ -203,4 +218,119 @@ test("a toolchain with saved items always names its target: new first, then the 
 	).find((branch) => branch.properties.choice?.enum?.[0] === "ui.compose")!;
 	expect(studio.required).toContain("target");
 	expect(studio.properties.target!.enum).toEqual(["new", "item-1"]);
+});
+
+/** Where a schema breaks a cloud provider's strict structured output: the paths of the broken points. */
+function strictBreaks(schema: Record<string, unknown>, path = "$"): string[] {
+	const breaks: string[] = [];
+	for (const key of ["minLength", "maxLength", "maxItems", "minItems"])
+		if (key in schema) breaks.push(`${path}.${key}`);
+	if (Array.isArray(schema.anyOf))
+		(schema.anyOf as Array<Record<string, unknown>>).forEach((s, i) =>
+			breaks.push(...strictBreaks(s, `${path}.anyOf[${i}]`)),
+		);
+	const types = [schema.type].flat();
+	if (types.includes("object")) {
+		const properties = (schema.properties ?? {}) as Record<
+			string,
+			Record<string, unknown>
+		>;
+		if (schema.additionalProperties !== false)
+			breaks.push(`${path}.additionalProperties`);
+		if (
+			JSON.stringify([...((schema.required as string[]) ?? [])].sort()) !==
+			JSON.stringify(Object.keys(properties).sort())
+		)
+			breaks.push(`${path}.required`);
+		for (const [key, field] of Object.entries(properties))
+			breaks.push(...strictBreaks(field, `${path}.${key}`));
+	}
+	if (types.includes("array") && schema.items)
+		breaks.push(
+			...strictBreaks(schema.items as Record<string, unknown>, `${path}[]`),
+		);
+	return breaks;
+}
+
+test("a cloud provider gets the choice in strict form: one object, every field required and nullable, no ranges; the host reads it back", () => {
+	const routed = {
+		todos: [
+			{ ref: 1, title: "調査", open: true },
+			{ ref: 3, title: "朝の曲", open: false },
+		],
+		resources: ["a2"],
+		switching: "studio",
+	};
+	const schema = choiceSchema(
+		[
+			MUSIC,
+			{
+				id: "weather",
+				title: "天気",
+				execution: "instant",
+				inputs: {
+					type: "object",
+					properties: { place: { type: "string", minLength: 1 } },
+					required: ["place"],
+				},
+			},
+			{
+				id: "studio",
+				title: "UI制作",
+				execution: "session",
+				targets: [{ ref: "item-1", label: "保存済み1" }],
+			},
+		],
+		routed,
+	);
+	const strict = strictChoiceSchema(schema);
+	expect(strict.anyOf).toBeUndefined();
+	expect(strictBreaks(strict)).toEqual([]);
+	const properties = strict.properties as Record<
+		string,
+		Record<string, unknown>
+	>;
+	expect(properties.choice).toEqual({
+		type: "string",
+		enum: [
+			"none",
+			"ask",
+			"music",
+			"weather",
+			"studio",
+			"memory.request",
+			"t1",
+			"t3",
+		],
+	});
+	expect(properties.target).toEqual({
+		type: ["string", "null"],
+		enum: ["new", "item-1", null],
+	});
+	// A toolchain's inputs go as the JSON text of their object.
+	expect(properties.inputs!.type).toEqual(["string", "null"]);
+	expect(
+		strictBreaks(
+			strictChoiceSchema(
+				pendingSchema({
+					confirmations: [
+						{ ref: 1, toolchain: "x", request: "y", target: null },
+					],
+					questions: [{ ref: 2, title: "z", question: "q" }],
+				}),
+			),
+		),
+	).toEqual([]);
+	// The answer fills every field: the nulls are dropped and the inputs read back into their object.
+	expect(
+		parseChoice(
+			JSON.stringify({
+				choice: "weather",
+				inputs: JSON.stringify({ place: "鎌倉" }),
+				say: null,
+				request: null,
+				target: null,
+			}),
+		),
+	).toEqual({ choice: "weather", inputs: { place: "鎌倉" } });
 });

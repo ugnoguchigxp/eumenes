@@ -2,7 +2,7 @@
 
 更新日: 2026年10月21日。ツールチェーンはデータドリブン形式（bundle＋登録adapter）で追加する。設計は[タイマー設計書](../spec/.archived/timer-data-driven-ui-acceptance-design-2026-10-13.md)、実装契約は[実装契約](../spec/.archived/timer-data-driven-implementation-contracts-2026-10-13.md)。
 
-移行状況: `timers.manage`（「タイマー」）が移行済み。楽曲生成**画面**は `music-screen.bundle.json` の単独公開artifactと登録adapterへ移し、ジャンル・雰囲気・楽器・テンポ・長さ・歌声の選択肢と初期値も画面定義へ登録した。生成・取消は既存の認証済み会話APIを使い、会話の `music.create` / `music.library` と音楽プレイリスト画面は旧形式のまま。物体認識**画面**も `object-recognition-screen.bundle.json` の単独公開artifactと登録adapterへ移し、会話の `object-recognition.manage` は旧形式のまま。Web検索・会話履歴・画像・Excalidraw・dotsも未移行。Claude Code（`claude-code.request`、画面 `terminals.workspace@2`）は新規にデータドリブン形式で追加した（[Claude Code 画面](terminals.md)）。旧形式の保守は[付録](#付録-旧形式固定runtime-mapの保守)、ツールチェーン全体の移行は[§6](#6-旧形式のツールチェーンを移行する)。
+移行状況: `timers.manage`（「タイマー」）が移行済み。楽曲生成**画面**は `music-screen.bundle.json` の単独公開artifactと登録adapterへ移し、ジャンル・雰囲気・楽器・テンポ・長さ・歌声の選択肢と初期値も画面定義へ登録した。生成・取消は既存の認証済み会話APIを使い、会話の `music.create` / `music.library` と音楽プレイリスト画面は旧形式のまま。物体認識**画面**も `object-recognition-screen.bundle.json` の単独公開artifactと登録adapterへ移し、会話の `object-recognition.manage` は旧形式のまま。Web検索・会話履歴・画像・Excalidrawも未移行。dots（`dots.delegate`、`dots-delegation.bundle.json`）は移行済み。Claude Code（`claude-code.request`、画面 `terminals.workspace@2`）は新規にデータドリブン形式で追加した（[Claude Code 画面](terminals.md)）。旧形式の保守は[付録](#付録-旧形式固定runtime-mapの保守)、ツールチェーン全体の移行は[§6](#6-旧形式のツールチェーンを移行する)。
 
 [作業規則](../AGENTS.md)を守る。依頼の解釈・担当選択・不足情報の判断はLLMに任せ、発話の語句・企業名・地域による振り分けを追加しない。コードで書くのは、登録済みの操作をdomainへ接続する型付きadapterだけにする。
 
@@ -38,7 +38,7 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 親は `find_toolchain` の候補（種類ごとの枠）からLLMが一つを選び、子の確定結果から次の能力を選ぶ。instantは登録済みの実引数schema、その他は `stepRequest` と `contextRefs` を使う。commandは既存の翻訳・snapshot・adapterを通す。非同期adapterは `execution.currentInTransaction` / `cancelInTransaction` と必要なwriter外の `stop` を実装し、受付を実行完了と扱わない。共通契約に接続できない能力は公開候補から除く。
 
-会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`work`・`respond` と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
+会話エージェントの固定ツール名 `memory`・`find_toolchain`・`delegate`・`work`・`respond`、会話の回の読む道具 `read_memory`・`read_history`・`read_runs`・`read_agents`・`read_world`（[設計](../spec/conversation-read-tools-design-2026-10-31.md)）と、制御名 `task_control`、`read_reference`、`ask_user`、`complete_task`、`report_partial` は通常のツールチェーン名として登録しない。`execute_task` はtask binding専用で、重複登録は拒否する。session型は公開状態と未保存確認を検査して会話へ引き継ぐ。親から隠れたsessionを開かない。
 
 開始・回答・訂正・取消・期限・再起動・忘却は [日常の複数操作担当](task-execution.md) を参照。数値上限と適合性の意味判断をadapter独自の処理で変更しない。
 
@@ -288,7 +288,7 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 | UI操作が `rejected`（HTTP 200） | `errorCode`（例 `revision_conflict`、domainの拒否） | 最新を読み直す。自動再送しない |
 | 422 `invalid_input` | actionの `inputSchemaRef`・`inputAdapterRef` | field errorを画面の言葉で示す |
 | 503 `artifact_unavailable`・`effect_mismatch` 等 | artifactの `adapterRef`・actionの `effect` と adapter操作の `effect` | 定義を揃える |
-| 質問に答えても進まない | `GET /api/toolchain-interactions/:id` の status・expiresAt・revision | 期限切れ・取消済み・古いrevisionは新しい依頼として扱う |
+| 質問に答えても進まない | ログ（`bun run logs -- --level warn`、対象の runId で絞る）の回答の拒否コード（期限切れ・取消済み・古いrevision） | 期限切れ・取消済み・古いrevisionは新しい依頼として扱う |
 
 ログは `bun run logs -- --level warn` から始め、runId・jobId・HTTPの `X-Request-Id` で絞る。通常ログへ会話本文・秘密・Provider生応答を保存しない。
 
@@ -484,13 +484,13 @@ LLMに表示の選択・構成を任せる場合は、公開済みview・source�
 
 作業記録には、再利用した部品、新設が必要だった理由、登録view、sourceと操作の接続、JSON例、確認した状態・操作、失敗と未確認を残す。音楽UIの実績とfixtureの制約は[OpenUI移行の検証記録](../spec/verification/music-openui-2026-10-11/README.md)を参照する。
 
-物体認識の登録例は `builtin/object-recognition.ts` と `builtin/object-recognition/SKILL.md`。既存command経路で入力画面・保存結果・取消を扱い、`object-recognition-workspace`をアーティファクト領域内に表示する。APIと検証入口は[物体認識](object-recognition.md)を参照。
+物体認識の登録例は `builtin/object-recognition.ts` と `builtin/object-recognition/SKILL-v2.md`。既存command経路で入力画面・保存結果・取消を扱い、`object-recognition-workspace`をアーティファクト領域内に表示する。APIと検証入口は[物体認識](object-recognition.md)を参照。
 
 Excalidrawの登録例は `builtin/excalidraw.ts` と `builtin/excalidraw/SKILL.md`。queueのplan/open二段階で結果を採用し、OpenUIの`drawing-workspace`とEumenesの認証済みWeb入口へ返す。sceneの正本は上流、Eumenesは図IDと版の参照を保持する。接続・API・配備前提は[Excalidraw連携](excalidraw.md)を参照する。
 
 ## 付録 旧形式（固定runtime map）の保守
 
-未移行のツールチェーン（Web検索・会話履歴・音楽・画像・Excalidraw・物体認識・dots）は、`seeds/toolchains.json` の定義と `runtime-meta.ts` の固定runtimeで動く。新規追加は本文の§3〜§5を使い、ここは既存の旧形式を移行までの間に直す場合だけに使う。移行は[§6](#6-旧形式のツールチェーンを移行する)。
+未移行のツールチェーン（Web検索・会話履歴・音楽・画像・Excalidraw・物体認識）は、`seeds/toolchains.json` の定義と `runtime-meta.ts` の固定runtimeで動く。新規追加は本文の§3〜§5を使い、ここは既存の旧形式を移行までの間に直す場合だけに使う。移行は[§6](#6-旧形式のツールチェーンを移行する)。
 
 ### 付録B 既存ツールを使うpackageを追加・改訂する
 
@@ -662,11 +662,11 @@ export const archiveBuiltins: Definition[] = [
 
 登録の正本は[registerRevision](../api/domains/capabilities/service/registry.ts)。同じ`kind:id@revision`で内容が変わると`capability_revision_conflict`になる。
 
-1. 公開済みの定義・Skill本文をそのまま残す。変更した定義を新revisionとして追加する。
-2. Skillをファイルから読む場合は版別ファイルを使い、旧定義が新しい本文を読むように変更しない。
+1. 変更した定義を新revisionとして追加する。置き換えた版はコードから外す。既存DBの行は履歴として registry が保持するが、外した版へは rollback しない（その版の入力検証・実行の対応がコードにない）。残す版の定義・Skill本文は1文字も変えない。
+2. Skillをファイルから読む場合は版別ファイルを使い、残す版が別の本文を読むように変更しない。
 3. 依存先が変わったpackageも新revisionにし、`dependencies`と各役割のrevision参照を揃える。
 4. schema変更はschemaHashにも影響する。同じschemaKeyが旧tool/packageにも使われている場合、そのvalidatorsを上書きすると旧定義まで変わる。旧schemaを残し、新schemaKey・新tool/package版を使う必要があるか確認する。
-5. 定義は依存順、同じIDの版は旧→新の順でseedする。Webのseedには既存旧版の保全処理があるが、全backend共通の移行機能だと仮定しない。
+5. 定義は依存順、同じIDの版は旧→新の順でseedする。旧版を保全する処理はseedにない。
 6. 新しい実行が選ぶ版を更新する。会話起動はstart-task、dotsはプロジェクト設定。実行中の固定参照を手動で書き換えない。
 7. backendを通常の起動経路で起動しseedする。API/CLIの一覧で登録を確認する。任意のpackageを追加する汎用PUT APIや、一覧だけで会話の起動先を更新する機能はない。
 

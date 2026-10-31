@@ -1,19 +1,18 @@
 import type { Receipt } from "../../inference";
 import { isSystemPrompt } from "../contracts";
 import type { DialogueDeps } from "./context";
-import type { ToolExecutor, ToolOutcome } from "./generation-loop";
 import { type MemoryArgs, type ParsedCall } from "./generation-tools";
 
 import {
 	createExecutorContext,
 	type ExecutorContext,
+	type ToolExecutor,
+	type ToolOutcome,
 } from "./executor-context";
 import { delegate } from "./executor-delegation";
 import { answered, find } from "./executor-search";
 import { work } from "./executor-work";
-
-/** Items one memory read returns at most. */
-const MEMORY_READ_LIMIT = 16;
+import { read } from "./executor-read";
 
 export async function memory(
 	x: ExecutorContext,
@@ -22,30 +21,7 @@ export async function memory(
 ): Promise<ToolOutcome> {
 	const { deps, input, current, acted, handle, actionKey } = x;
 	const { store } = deps;
-	if (args.operation === "read") {
-		return store.write((tx) => {
-			current(tx);
-			const items = deps.memory?.readItemsInTransaction(tx, {
-				query: args.query,
-				shown: new Set(input.memoryItemIds),
-				limit: MEMORY_READ_LIMIT,
-			});
-			if (!items) return { result: { available: false } };
-			// What was read is recorded by item; the query, the user's own words, is not kept.
-			acted(
-				tx,
-				`memory.read:${call.call.id}`,
-				{ action: "memory.read", found: items.map((item) => item.id) },
-				{ action: "memory.read" },
-			);
-			return {
-				result: {
-					items: items.map(({ id: _id, revision: _revision, ...item }) => item),
-				},
-			};
-		});
-	}
-	// A request stands on the user's own words: a generation without a new utterance cannot make one.
+	// Reading memory is the read tool `read_memory`'s. A request stands on the user's own words: a generation without a new utterance cannot make one.
 	const messageId =
 		input.final.kind === "utterances"
 			? input.final.messageIds.at(-1)
@@ -112,6 +88,8 @@ export function createGenerationExecutor(
 				return delegate(x, call, call.args, signal);
 			case "work":
 				return work(x, call, call.args);
+			default:
+				return read(x, call);
 		}
 	};
 	/**

@@ -96,6 +96,31 @@ export function sessionEvents(db: Database, sessionId: string): SessionEvent[] {
 	);
 }
 
+/** The steps recorded for one run (any session), oldest first: the read tool `read_agents` tells them. */
+export function sessionEventsOfRun(
+	db: Database,
+	runId: string,
+): SessionEvent[] {
+	return (
+		db
+			.query(
+				"SELECT run_id, kind, data_json FROM dialogue_specialist_events WHERE run_id = ? ORDER BY seq",
+			)
+			.all(runId) as Array<{
+			run_id: string;
+			kind: SessionEvent["kind"];
+			data_json: string;
+		}>
+	).map(
+		(row) =>
+			({
+				kind: row.kind,
+				runId: row.run_id,
+				...JSON.parse(row.data_json),
+			}) as SessionEvent,
+	);
+}
+
 /** A session row as dialogue stores it (the public `SpecialistSession` adds the domain's work state). */
 export type SessionRecord = {
 	id: string;

@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import {
 	ADAPTER,
+	choice,
 	BINDING,
 	PACKAGE,
 	REVISION,
@@ -19,19 +20,23 @@ afterEach(async () => {
 test("the offer comes from the catalog: bound chains by adapter availability, the rest by host capability", async () => {
 	const offered = async (available: boolean) => {
 		h = await setup({ available });
-		h.state.steps.push({
-			calls: [{ name: "find_toolchain", args: { query: "偽の操作" } }],
+		// The host searches with the user's words; the choice that follows then lets the talk turn answer.
+		h.state.steps.push(choice({ choice: "none" }), {
+			text: "見つかりました。",
 		});
-		h.speak("見つかりました。");
 		await h.say("偽の操作を開始して");
 		const routed = [...h.routed[0]!].sort();
 		await h.close();
 		h = undefined;
 		return routed;
 	};
-	// The research chain needs agents (present); the dots chain needs the delegation port (absent).
-	expect(await offered(true)).toEqual(["fake.manage", "research.web"]);
-	expect(await offered(false)).toEqual(["research.web"]);
+	// The research chain needs agents (present); the dots chain needs the delegation port (absent). The read tools
+	// this host has are offered beside them (spec conversation-read-tools-design 2026-10-31 §2.6).
+	const reads = ["read_agents", "read_history", "read_runs"];
+	expect(await offered(true)).toEqual(
+		["fake.manage", ...reads, "research.web"].sort(),
+	);
+	expect(await offered(false)).toEqual([...reads, "research.web"].sort());
 });
 
 test("a delegation to a command toolchain opens a command TODO and hands the run to the command job", async () => {
@@ -57,9 +62,10 @@ test("a delegation ends the generation: the model is not called again after the 
 	h.state.commands.push({ action: "clarify", question: "どれ" });
 	h.delegate("偽の操作を開始して");
 	await h.say("偽の操作を開始して");
-	// find_toolchain and delegate: the question the sub-agent asks is the agent's to say on its own opportunity.
-	expect(h.afterHandoverCalls).toEqual([]);
-	expect(h.calls).toHaveLength(2);
+	// Only the choice was made: the question the sub-agent asks is the agent's to say on its own opportunity.
+	expect(h.calls).toHaveLength(1);
+	expect(h.calls[0]!.session?.outputSchema).toBeDefined();
+	expect(h.state.steps).toEqual([]);
 });
 
 test("a command chain without a binding or with an unknown backend is refused before any execution", async () => {

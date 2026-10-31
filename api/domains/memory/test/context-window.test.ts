@@ -435,6 +435,47 @@ test("the memory tool's query matches a natural Japanese sentence by character p
 	]);
 });
 
+test("the read tool's memory read takes every current item without a query, matches by character pairs, and counts both", async () => {
+	const h = await setup();
+	const coffee = await h.remember("コーヒーが好き");
+	await h.remember("毎朝走っている", "habit", "毎朝走って");
+	const check = (query?: string, limit = 10, shown: string[] = []) =>
+		must(
+			h.memory.check({
+				...(query ? { query } : {}),
+				shown: new Set(shown),
+				limit,
+			}),
+		);
+	const texts = (checked: ReturnType<typeof check>) =>
+		checked.items.map((item) => item.text);
+	// Newest first; the limit bounds the items, not the counts.
+	expect(check()).toMatchObject({ total: 2, matched: 2 });
+	expect(texts(check())).toEqual(["毎朝走っている", "コーヒーが好き"]);
+	expect(check(undefined, 1)).toMatchObject({ total: 2, matched: 2 });
+	expect(texts(check(undefined, 1))).toEqual(["毎朝走っている"]);
+	expect(texts(check("私はコーヒーが好きでしたっけ"))).toEqual([
+		"コーヒーが好き",
+	]);
+	expect(check("全く関係のない話")).toEqual({
+		total: 2,
+		matched: 0,
+		items: [],
+	});
+	// As the profile shows an item: where it came from, and marked when the input shows it already.
+	expect(check("コーヒー", 10, [coffee.id]).items).toEqual([
+		{
+			id: coffee.id,
+			kind: "preference",
+			text: "コーヒーが好き",
+			source: "user_said",
+			inProfile: true,
+		},
+	]);
+	await h.memory.setEnabled(false);
+	expect(h.memory.check({ limit: 10 })).toBeNull();
+});
+
 test("a rolled-back rebuild is discarded: the next read uses the committed row", async () => {
 	const h = await setup();
 	await h.remember("コーヒーが好き");

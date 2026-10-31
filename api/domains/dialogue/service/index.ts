@@ -161,7 +161,6 @@ interface DialogueServiceOptions {
 	excalidraw?: ImagePort;
 	image?: ImagePort;
 	objectRecognition?: ObjectRecognitionPort;
-	delegation?: import("../contracts/delegation").DelegationPort;
 	worldContext?: WorldContextPort;
 	/** The conversation agent's opportunity when work changes. */
 	agency?: AgencyLayerPort;
@@ -209,7 +208,6 @@ export function createDialogueService({
 	memory,
 	steward,
 	agents,
-	delegation,
 	objectRecognition,
 	excalidraw,
 	image,
@@ -234,7 +232,6 @@ export function createDialogueService({
 		memory,
 		steward,
 		agents,
-		delegation,
 		objectRecognition,
 		excalidraw,
 		image,
@@ -245,6 +242,7 @@ export function createDialogueService({
 		toolchains,
 		resources,
 		specialist,
+		...(logFile ? { logFile } : {}),
 	};
 	const progress = createProgress(deps);
 	const intake = createIntake(deps);

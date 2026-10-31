@@ -25,7 +25,7 @@ test.each([1, 2])(
 				},
 			},
 		});
-		h = await setup({ harness: "local" });
+		h = await setup();
 		if (attempt === 2) {
 			h.state.steps.push({
 				text: JSON.stringify({ choice: INSTANT.id, inputs: {} }),
@@ -46,7 +46,7 @@ test.each([1, 2])(
 		).toHaveLength(attempt);
 		const talk = h.state.calls.at(-1)!;
 		expect(talk.session?.outputSchema).toBeUndefined();
-		expect(talk.tools).toEqual([]);
+		expect(talk.tools).toEqual(["read_history", "read_runs"]);
 		expect(talk.messages.at(-1)!.content).not.toContain("## Retry");
 		const choices = records.filter(
 			(record) => record.event === "dialogue.choice_made",

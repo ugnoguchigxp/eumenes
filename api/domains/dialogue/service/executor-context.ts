@@ -2,6 +2,8 @@ import type { Database } from "bun:sqlite";
 import type { ExchangeStep } from "./tool-exchange";
 import type { ToolchainCard } from "../../capabilities";
 import type { Receipt } from "../../inference";
+import type { DeliveryEmotion } from "../../delivery";
+import type { ParsedCall } from "./generation-tools";
 import { adoptMemoryWindow } from "./memory-window";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Run } from "../contracts";
@@ -11,6 +13,41 @@ import { byId } from "../repository";
 import type { DialogueDeps, GenerateInput } from "./context";
 import { operationRejection } from "./operation-authority";
 import { consumeAnswer } from "./result-intake";
+
+/** What one executed tool call gave the generation. */
+export type ToolOutcome = {
+	/** The tool's result. */
+	result: unknown;
+	/** A confirmation was issued (section 6.7): the reply is its question. */
+	confirmation?: true;
+	/** The work was handed over (the run now waits for it): the generation ends here, without speech of its own. */
+	end?: true;
+};
+
+/** Executes one call of a fixed tool; throws a `ValidationFailure` for a call the host refuses outright. */
+export type ToolExecutor = (
+	call: ParsedCall,
+	context: {
+		signal: AbortSignal;
+		receipt?: Receipt;
+		/** The searches and hand-overs this generation made before this call. */
+		exchange: readonly ExchangeStep[];
+	},
+) => Promise<ToolOutcome>;
+
+export type GenerationOutcome = {
+	/** The speech the generation ends with ("" when it said nothing). */
+	text: string;
+	receipt?: Receipt;
+	/** The feeling the agent said it with. */
+	emotion?: DeliveryEmotion;
+	/** Every executed call and its outcome, in order. */
+	executed: Array<{ call: ParsedCall; outcome: ToolOutcome }>;
+	/** The searches and hand-overs as the model made them, refused ones too: what later turns see of this one. */
+	exchange: ExchangeStep[];
+	/** A tool call handed the work over and ended the generation. */
+	ended: boolean;
+};
 
 /** Impacts, least first (the toolchain's declared least impact raises the estimate). */
 export const IMPACT_ORDER = [
@@ -58,6 +95,7 @@ export function candidateOf(
 		...(card.general ? { general: true as const } : {}),
 		...(produces.length ? { produces } : {}),
 		...(card.instant ? { inputs: card.instant.parameters } : {}),
+		...(card.read ? { inputs: card.read.parameters } : {}),
 		...(card.pipeline
 			? { inputs: card.pipeline.parameters, steps: card.pipeline.outline }
 			: {}),
@@ -88,6 +126,8 @@ export function createExecutorContext(
 		handover: Handover | null;
 		/** The instant toolchain that answered in this generation, with the inputs it was given. */
 		instant: { card: ToolchainCard; inputs: Record<string, unknown> } | null;
+		/** The read tool the search offered and this generation used, with its arguments. */
+		read: { card: ToolchainCard; inputs: Record<string, unknown> } | null;
 		/** The newest model call's receipt: its permission is checked again before every action. */
 		receipt: Receipt | undefined;
 		/** Each TODO's revision as the model last saw it (`<state>`, then the work tool's results). */
@@ -98,6 +138,7 @@ export function createExecutorContext(
 		search: null,
 		handover: null,
 		instant: null,
+		read: null,
 		receipt: undefined,
 		todoRevisions: new Map(Object.entries(input.todoRevisions)),
 		exchange: [],

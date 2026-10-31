@@ -1,3 +1,4 @@
+import { READ_TOOLS } from "../../domains/capabilities";
 import type { Hono } from "hono";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { Capabilities } from "../../domains/capabilities";
@@ -22,9 +23,11 @@ export function createSearchCheck(deps: {
 	return {
 		run() {
 			return deps.store.read((db) => {
-				const available = new Set(
-					deps.routing.catalogInTransaction(db).map((entry) => entry.id),
-				);
+				// The read tools are found by the same search (spec conversation-read-tools-design 2026-10-31 §2.6).
+				const available = new Set([
+					...deps.routing.catalogInTransaction(db).map((entry) => entry.id),
+					...READ_TOOLS.map((tool) => tool.name),
+				]);
 				const ranks: Record<string, number> = {};
 				const missed: Array<{
 					selectionId: string;

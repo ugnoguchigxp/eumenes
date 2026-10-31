@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/executor-read.ts
+text = '''これより前の会話は確かめていません。'''

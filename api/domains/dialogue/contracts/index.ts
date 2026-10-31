@@ -160,7 +160,23 @@ export interface WorldContextPort {
 		db: Database,
 		input: WorldContextNamesInput,
 	): string[];
+	/**
+	 * World's records for these names in the conversation's Scope (the read tool `read_world`, spec
+	 * conversation-read-tools-design 2026-10-31 §2.1); null while World cannot be read. Absent: the tool is not offered.
+	 */
+	recordsInTransaction?(
+		db: Database,
+		names: readonly string[],
+	): WorldRecords | null;
 }
+
+/** What `read_world` reads: targets found by the names with the claims around them, and documents that name them. */
+export type WorldRecords = {
+	/** At most five targets, each with the claims around it (snapshot, depth 1; at most twenty in all). */
+	entities: Array<{ name: string; claims: string[] }>;
+	/** At most three collected documents whose text holds one of the names: title and opening. */
+	documents: Array<{ title: string; opening: string }>;
+};
 
 /**
  * What the conversation agent (eumenes-agency, wired by the application) keeps of itself, for its context: its
@@ -204,8 +220,6 @@ export interface ConversationAgentSystem {
 	spokenReplyStyle?: string;
 	/** The leading emoji rule (section Emotion); absent when the setting is off. */
 	emotionRules?: string;
-	/** The tool-use rules every host shares (section Tools). */
-	toolRules: string;
 }
 
 export interface ConversationAgentPort {

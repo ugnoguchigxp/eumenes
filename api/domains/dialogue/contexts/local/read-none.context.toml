@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/executor-read.ts
+text = '''[[subject]]に当たる記録は見つかりませんでした。'''
+
+[variables.subject]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

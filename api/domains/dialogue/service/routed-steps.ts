@@ -5,7 +5,6 @@ import { IMPACT_ORDER, candidateOf } from "./executor-context";
 import { sessionTargetsInTransaction } from "./specialist-context";
 import { TOOL_NAMES } from "./generation-tools";
 import { lineText } from "./input-text";
-import { toolResultText } from "./result-text";
 import {
 	NEW_TARGET,
 	choiceMessages,
@@ -26,8 +25,6 @@ const SAID = {
 	approved: systemContext("dialogue.contexts.local.approved", {}),
 	declined: systemContext("dialogue.contexts.local.declined", {}),
 	answered: systemContext("dialogue.contexts.local.answered", {}),
-	recalled: systemContext("dialogue.contexts.local.recalled", {}),
-	notRecalled: systemContext("dialogue.contexts.local.not-recalled", {}),
 	checked: systemContext("dialogue.contexts.local.checked", {}),
 };
 const IMPACT_SAID: Record<string, string> = {
@@ -144,20 +141,6 @@ async function carryOut(
 		});
 		return "done";
 	}
-	if (choice === "memory.recall") {
-		const read = await turn.act(TOOL_NAMES.memory, {
-			operation: "read",
-			query: chosen.query,
-		});
-		if ("refused" in read) return { retry: turn.reasonOf(read.refused) };
-		const items = (read.outcome.result as { items?: unknown[] }).items ?? [];
-		await turn.talk(
-			items.length
-				? `${SAID.recalled}\n${toolResultText(TOOL_NAMES.memory, read.outcome.result)}`
-				: SAID.notRecalled,
-		);
-		return "done";
-	}
 	if (choice === "memory.request") {
 		const asked = await turn.act(TOOL_NAMES.memory, {
 			operation: "request",
@@ -198,6 +181,19 @@ async function carryOut(
 	}
 	const candidate = candidates.find((c) => c.id === choice);
 	if (!candidate) return { retry: "choice_not_offered" };
+	if (candidate.execution === "read") {
+		// The host reads; the talk turn tells it, with no tool of its own (spec conversation-read-tools-design §2.6).
+		const read = await turn.act(
+			candidate.id,
+			(chosen.inputs ?? {}) as Record<string, unknown>,
+		);
+		if ("refused" in read) return { retry: turn.reasonOf(read.refused) };
+		await turn.talk(
+			String((read.outcome.result as { text?: unknown }).text ?? ""),
+			{ tools: false },
+		);
+		return "done";
+	}
 	if (candidate.execution === "instant") {
 		const answered = await turn.act(TOOL_NAMES.delegate, {
 			mode: "execute",
@@ -233,6 +229,9 @@ async function carryOut(
 			: {}),
 		...(Array.isArray(chosen.refs) && chosen.refs.length
 			? { refs: chosen.refs }
+			: {}),
+		...(chosen.resolveUnsaved === "discard"
+			? { resolveUnsaved: "discard" as const }
 			: {}),
 		...(candidate.execution === "pipeline" && chosen.inputs
 			? { inputs: chosen.inputs }
@@ -347,8 +346,7 @@ function kindOfChoice(
 	candidates: readonly ChoiceCandidate[],
 ): string {
 	if (!choice) return "unreadable";
-	if (["none", "ask", "memory.recall", "memory.request"].includes(choice))
-		return choice;
+	if (["none", "ask", "memory.request"].includes(choice)) return choice;
 	if (/^t\d+$/.test(choice)) return "todo";
 	const candidate = candidates.find((c) => c.id === choice);
 	return candidate ? `toolchain_${candidate.execution ?? "work"}` : "unknown";

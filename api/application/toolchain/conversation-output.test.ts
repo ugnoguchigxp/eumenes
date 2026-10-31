@@ -1,3 +1,4 @@
+import { isReadToolName } from "../../domains/capabilities";
 import { afterEach, expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { utteranceOf } from "../toolchain/conversation-script.fixture";
@@ -52,9 +53,11 @@ test("voice does not display, persist or speak text-only control output: a reply
 					? JSON.stringify({ choice: "none" })
 					: f.model.answer(messages, signal, options),
 		answerStream: async (messages, signal, delta, options) => {
-			// The routed turn's talk call: the conversation's input, offering no tools.
+			// The routed turn's talk call: the conversation's input, offering the read tools only.
 			const talk =
-				!options?.tools?.length &&
+				(options?.tools ?? []).every((tool) =>
+					isReadToolName(tool.function.name),
+				) &&
 				!options?.jsonSchema &&
 				utteranceOf(messages) !== "";
 			if (talk) {

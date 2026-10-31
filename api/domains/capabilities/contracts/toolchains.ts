@@ -43,6 +43,7 @@ export type ToolchainRuntimeMeta = {
 	 * session: the conversation hands over to the package's specialist for several direct turns.
 	 * instant: the first round's function call carries the arguments and the adapter's sentence is the answer.
 	 * pipeline: the first round's function call carries the inputs and the host runs the fixed steps.
+	 * read: one of the conversation's read tools (no toolchain): the host reads, and the talk turn tells it.
 	 */
 	execution:
 		| "research"
@@ -54,16 +55,10 @@ export type ToolchainRuntimeMeta = {
 		| "music-create"
 		| "music-playback"
 		| "image"
-		| "excalidraw";
-	/** Runtime availability the host checks before offering the toolchain. */
-	requires?:
-		| "object-recognition"
-		| "timers"
-		| "music"
-		| "dots"
-		| "image"
 		| "excalidraw"
-		| "world";
+		| "read";
+	/** Runtime availability the host checks before offering the toolchain. */
+	requires?: "object-recognition" | "music" | "image" | "excalidraw" | "world";
 	/** The research route the agent runtime keeps for its existing contracts. */
 	route?: "web" | "history" | "world";
 	/**
@@ -98,6 +93,8 @@ export type ToolchainCard = {
 	produces?: string[];
 	/** Only redirects to toolchains active on this host; the caller drops ones it does not offer. */
 	redirects: Array<ToolchainRedirect & { functionName: string }>;
+	/** A read tool only (execution "read"): the JSON Schema (flat object) of its arguments. */
+	read?: { parameters: Record<string, unknown> };
 	/**
 	 * An instant-answer toolchain only (binding execution "instant"), filled by the host while it
 	 * finds the candidates: the arguments its first-round function takes besides the analysis.

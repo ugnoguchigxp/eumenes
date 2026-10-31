@@ -36,7 +36,11 @@ export function createInstantRouting(deps: {
 			const binding = found?.binding.document;
 			card = {
 				...card,
-				execution: binding?.execution ?? toolchainRuntimeOf(card.id)?.execution,
+				// A read tool's card keeps the execution the search gave it (it has no binding or runtime).
+				execution:
+					binding?.execution ??
+					toolchainRuntimeOf(card.id)?.execution ??
+					card.execution,
 			};
 			if (binding?.execution !== "instant") return [card];
 			const tool = binding.tools[0]!;

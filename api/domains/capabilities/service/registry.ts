@@ -8,6 +8,7 @@ import {
 	toolchainFunctionPattern,
 	toolchainImpacts,
 	validators,
+	isReadToolName,
 	type Definition,
 	type FixedDefinition,
 } from "../contracts";
@@ -20,10 +21,9 @@ import {
 export function registerRevision(
 	db: Database,
 	d: Definition,
-	origin: "builtin" | "learned" | "user",
+	origin: "builtin" | "user",
 	closure: (db: Database, revisionId: string) => FixedDefinition[],
 	now: () => number,
-	hasLearned: (db: Database) => boolean,
 ) {
 	if (d.schemaKey) {
 		const actual = hash(zSchema(d.schemaKey));
@@ -101,32 +101,15 @@ export function registerRevision(
 		digest,
 		now(),
 	);
-	if (hasLearned(db))
-		db.query(
-			"INSERT INTO capability_items(key,id,kind,active_revision_id,discovery_mode,origin) VALUES(?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET active_revision_id=excluded.active_revision_id,generation=generation+1",
-		).run(
-			key,
-			d.id,
-			d.kind,
-			rev,
-			origin === "learned" ? "route-only" : "catalog",
-			origin,
-		);
-	else if (origin === "learned") throw new Error("learned_migration_missing");
-	else
-		db.query(
-			"INSERT INTO capability_items(key,id,kind,active_revision_id) VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET active_revision_id=excluded.active_revision_id,generation=generation+1",
-		).run(key, d.id, d.kind, rev);
+	db.query(
+		"INSERT INTO capability_items(key,id,kind,active_revision_id,origin) VALUES(?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET active_revision_id=excluded.active_revision_id,generation=generation+1",
+	).run(key, d.id, d.kind, rev, origin);
 	for (const dependency of d.dependencies)
 		db.query("INSERT INTO capability_dependencies VALUES(?,?)").run(
 			rev,
 			dependency,
 		);
-	if (
-		origin === "learned" ||
-		d.kind === "requirement" ||
-		resourceDefinitionKinds.includes(d.kind)
-	)
+	if (d.kind === "requirement" || resourceDefinitionKinds.includes(d.kind))
 		return;
 	indexSearch(db, d);
 }
@@ -168,6 +151,8 @@ export function validateToolchain(
 			"complete_task",
 			"report_partial",
 		].includes(d.functionName) ||
+		// The conversation's read tools are the host's own, found by the same search.
+		isReadToolName(d.functionName) ||
 		!d.packageRevisionId ||
 		d.dependencies.length !== 1 ||
 		d.dependencies[0] !== d.packageRevisionId ||

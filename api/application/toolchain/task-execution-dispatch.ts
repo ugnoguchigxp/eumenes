@@ -77,6 +77,8 @@ export function taskExecutionDispatch(
 				} as const;
 			if (kind === "task" || kind === "pipeline")
 				throw new Error("recursive_execution_denied");
+			// A read tool is the conversation's own, never a step of a task.
+			if (kind === "read") throw new Error("capability_unavailable");
 			if (!host.media) throw new Error("capability_unavailable");
 			return {
 				kind: "media",

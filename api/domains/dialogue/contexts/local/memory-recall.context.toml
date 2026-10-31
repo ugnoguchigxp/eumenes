@@ -1,2 +1,0 @@
-# Source: api/domains/dialogue/service/routed-choice.ts
-text = '''記憶の確認。本人の趣向・事実・以前に話したことを、覚えている記録から確かめる。query に確かめたいことを書く。'''

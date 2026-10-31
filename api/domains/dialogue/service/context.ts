@@ -26,6 +26,7 @@ import type { ObjectRecognitionPort } from "../contracts/object-recognition";
 import type { CommandInteractions } from "./command-interactions";
 import type { ConversationHarness } from "./harness";
 import type { ResourceAccess, ResourceLedger } from "./resource-ledger";
+import type { ChatImage } from "../../inference";
 export const GENERATE_KIND = "dialogue.generate";
 /** A toolchain's command sub-agent: one typed operation from the conversation's request. */
 export const COMMAND_KIND = "dialogue.toolchain_command";
@@ -54,17 +55,11 @@ export const DEFAULT_DEADLINE_MS = RESEARCH_BUDGET.rootMilliseconds;
 export const TERMINAL = ["completed", "failed", "cancelled", "interrupted"];
 
 export type ChatMessage = {
-	role: "system" | "user" | "assistant" | "tool";
+	role: "system" | "user" | "assistant";
 	content: string;
 	attachments?: import("../../conversation/contracts").Attachment[];
 	sourceMessageId?: string;
-	images?: import("../../inference").ChatImage[];
-	tool_calls?: Array<{
-		id: string;
-		type: "function";
-		function: { name: string; arguments: string };
-	}>;
-	tool_call_id?: string;
+	images?: ChatImage[];
 };
 
 /** What the last message of a generation answers: the pending utterances, or a host notice. */
@@ -108,6 +103,11 @@ export type RoutedInput = {
 	todos: Array<{ ref: number; title: string; open: boolean }>;
 	/** The resources `## State` names (`a<n>`): the only ones a choice may hand over with its request. */
 	resources: string[];
+	/**
+	 * The toolchain a hand-over waits for the user's word on, because a suspended work is unsaved (`## State` says
+	 * 別の作業への切替の確認待ち): only its branch may carry `resolveUnsaved`.
+	 */
+	switching: string | null;
 };
 
 export interface GenerateInput {
@@ -128,8 +128,6 @@ export interface GenerateInput {
 	 * `## User`). Tool calls and results are added while it runs.
 	 */
 	messages: ChatMessage[];
-	/** The toolchain titles the system part lists: a reply may name them as they are (not a copy of the system). */
-	toolchainTitles?: string[];
 	/** The texts of the pending utterances `## User` shows, in receipt order. */
 	utterances: string[];
 	/** What a routed turn's choice calls read besides the talk input (the local harness rebuild plan, section 4). */
@@ -215,9 +213,10 @@ export type DialogueDeps = {
 	excalidraw?: ImagePort;
 	image?: ImagePort;
 	objectRecognition?: ObjectRecognitionPort;
-	delegation?: import("../contracts/delegation").DelegationPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	worldContext?: WorldContextPort;
+	/** The operational log file (`config.logFile`) the read tool `read_runs` reads warnings from; absent: none read. */
+	logFile?: () => string | undefined;
 	/** The agency layer: told when a TODO changed (its opportunity to report). */
 	agency?: AgencyLayerPort;
 	/** The conversation agent that answers every generation. */

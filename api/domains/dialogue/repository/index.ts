@@ -152,6 +152,22 @@ export function byId(db: Database, id: string): Run | null {
 		.get(id);
 	return row ? map(row as Record<string, unknown>) : null;
 }
+
+/** The conversation's newest runs but `excludeRunId`, newest first (the read tools' records of runs). */
+export function recentRuns(
+	db: Database,
+	conversationId: string,
+	excludeRunId: string,
+	limit: number,
+): Run[] {
+	return (
+		db
+			.query(
+				`SELECT ${columns} FROM dialogue_runs WHERE conversation_id = ? AND id <> ? ORDER BY created_at DESC, rowid DESC LIMIT ?`,
+			)
+			.all(conversationId, excludeRunId, limit) as Record<string, unknown>[]
+	).map((row) => map(row));
+}
 /** The conversation of the newest run: the one the user talked in last. */
 export function latestConversationId(db: Database): string | null {
 	const row = db

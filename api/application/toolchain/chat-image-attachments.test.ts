@@ -100,14 +100,21 @@ test("Eumenes upload, atomic acceptance, image-only streaming, ordered history r
 			.filter((r) => r.operation === "generate")
 			.map((r) => JSON.parse(r.body));
 		// Each turn (the local harness's routed turn, no judge saved) is a silent choice, then the talk call: the talk
-		// is a streamed generation on the talk system that offers no tools.
+		// is a streamed generation on the talk system that offers the read tools only.
 		expect(requests).toHaveLength(4);
 		const talks = (r: { messages: Array<{ content: unknown }> }) =>
 			typeof r.messages[0]?.content === "string" &&
 			(r.messages[0].content as string).startsWith("## Role");
 		const generation = requests.filter(talks);
 		expect(generation).toHaveLength(2);
-		expect(generation.map((r) => (r.tools ?? []).length)).toEqual([0, 0]);
+		const reads = ["read_history", "read_runs", "read_agents"];
+		expect(
+			generation.map((r) =>
+				(r.tools ?? []).map(
+					(t: { function: { name: string } }) => t.function.name,
+				),
+			),
+		).toEqual([reads, reads]);
 		expect(generation.map((r) => r.stream)).toEqual([true, true]);
 		// The choice reads no images: what it hands over names its resources by number.
 		expect(requests.filter((r) => !talks(r)).flatMap(imagesOf)).toEqual([]);

@@ -20,6 +20,9 @@ import {
 } from "../../../infrastructure/vector";
 import {
 	hash,
+	readToolParameters,
+	readToolRevisionId,
+	READ_TOOLS,
 	validators,
 	type FixedDefinition,
 	type FixedDocument,
@@ -45,6 +48,34 @@ export const CANDIDATE_SLOTS = {
 	near: 0.05,
 } as const;
 type CandidateKind = "dedicated" | "pipeline" | "general";
+
+/**
+ * The conversation's read tools as the search sees them (spec conversation-read-tools-design 2026-10-31 §2.6): in no
+ * catalog and with no package, their passages indexed and ranked with the toolchains' (in the dedicated slots).
+ */
+const readToolEntries: FixedDefinition[] = READ_TOOLS.map((tool) => ({
+	kind: "toolchain",
+	id: tool.name,
+	revision: tool.revision,
+	revisionId: readToolRevisionId(tool),
+	hash: "",
+	generation: 0,
+	title: tool.title,
+	summary: tool.description,
+	aliases: [],
+	tags: [],
+	useWhen: tool.useWhen,
+	avoidWhen: [],
+	dependencies: [],
+	examples: tool.examples,
+	functionName: tool.name,
+}));
+const readToolSchemas = new Map(
+	READ_TOOLS.map((tool) => [
+		readToolRevisionId(tool),
+		readToolParameters(tool.name),
+	]),
+);
 
 /** A pipeline by its stored binding, a general toolchain by its definition, any other dedicated. */
 function kindOf(db: Database, d: FixedDefinition): CandidateKind {
@@ -179,7 +210,7 @@ export function createToolchains(
 	}
 	function pendingVectorsInTransaction(db: Database, space: VectorSpace) {
 		const key = vectorSpaceKey(space);
-		return activeInTransaction(db).flatMap((d) =>
+		return [...activeInTransaction(db), ...readToolEntries].flatMap((d) =>
 			toolchainPassages(d).flatMap((text, item) => {
 				const row = db
 					.query(
@@ -204,7 +235,9 @@ export function createToolchains(
 	) {
 		const key = vectorSpaceKey(space);
 		const active = new Map(
-			activeInTransaction(db).map((d) => [d.revisionId, d] as const),
+			[...activeInTransaction(db), ...readToolEntries].map(
+				(d) => [d.revisionId, d] as const,
+			),
 		);
 		for (const row of rows) {
 			const d = active.get(row.revisionId);
@@ -241,7 +274,9 @@ export function createToolchains(
 			slots?: true;
 		},
 	): ToolchainCard[] {
-		const active = activeInTransaction(db).filter((d) => input.available(d.id));
+		const active = [...activeInTransaction(db), ...readToolEntries].filter(
+			(d) => input.available(d.id),
+		);
 		const similarity = input.vector
 			? similaritiesOf(
 					indexRows(db, vectorSpaceKey(input.vector.space)),
@@ -266,7 +301,8 @@ export function createToolchains(
 				: ranked.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
 			: input.strict
 				? []
-				: active;
+				: // Every available toolchain; the read tools are found by similarity only.
+					active.filter((d) => !readToolSchemas.has(d.revisionId));
 		const functionOf = new Map(active.map((d) => [d.id, d.functionName!]));
 		const producers = producersInTransaction(db);
 		return candidates.map((d, i) => ({
@@ -279,6 +315,12 @@ export function createToolchains(
 			...(d.minImpact ? { minImpact: d.minImpact } : {}),
 			...(d.general ? { general: true as const } : {}),
 			...(producers.has(d.id) ? { produces: producers.get(d.id)! } : {}),
+			...(readToolSchemas.has(d.revisionId)
+				? {
+						execution: "read" as const,
+						read: { parameters: readToolSchemas.get(d.revisionId)! },
+					}
+				: {}),
 			redirects: (d.redirects ?? []).flatMap((r) =>
 				functionOf.has(r.toolchainId)
 					? [
@@ -413,7 +455,9 @@ export function createToolchains(
 		) =>
 			rankPastRequests(
 				db,
-				activeInTransaction(db).filter((d) => input.available(d.id)),
+				[...activeInTransaction(db), ...readToolEntries].filter((d) =>
+					input.available(d.id),
+				),
 				input.queries,
 			),
 		resolveToolchainInTransaction: resolveInTransaction,

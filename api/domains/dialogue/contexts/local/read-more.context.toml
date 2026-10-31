@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/executor-read.ts
+text = '''ほかに[[count]]件あります。'''
+
+[variables.count]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

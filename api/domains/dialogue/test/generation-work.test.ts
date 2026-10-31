@@ -1,13 +1,18 @@
 import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { registerDialogue } from "..";
-import { toolFields } from "./tool-text.fixture";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { IMAGE, setup, type Harness } from "./generation.fixture";
+import {
+	IMAGE,
+	choice,
+	reply,
+	setup,
+	type Harness,
+} from "./generation.fixture";
 import { saveItem } from "./memory-seed";
 
 /**
- * The work the conversation agent does through its tools (the ContextWindow specification, sections 6.1, 6.7, 9
+ * The work the routed turn does through the host (a choice naming a TODO, a confirmation or the memory) (the ContextWindow specification, sections 6.1, 6.7, 9
  * and 14): checking a TODO, the confirmation an approval needs to have been heard, the archive of finished work with
  * its notice, the agency's spontaneous utterance and the memory read.
  */
@@ -16,19 +21,6 @@ afterEach(async () => {
 	await h?.close();
 	h = undefined;
 });
-
-/**
- * The JSON results of the tool messages of the nth model call's own turn (after its last user message), in order:
- * the recent conversation before it keeps earlier turns' searches and hand-overs.
- */
-function toolResults(call: number): Array<Record<string, unknown>> {
-	const messages = h!.state.calls[call]!.messages;
-	const last = messages.map((m) => m.role).lastIndexOf("user");
-	return messages
-		.slice(last + 1)
-		.filter((m) => m.role === "tool")
-		.map((m) => toolFields(m.content));
-}
 
 /** Marks a run as a voice run (the run's utterance): its speech then waits for the playback's report. */
 function markVoice(runId: string, utteranceId: string) {
@@ -39,97 +31,49 @@ function markVoice(runId: string, utteranceId: string) {
 	);
 }
 
-test("check reads a TODO's state and result into the tool result, and logs only the check", async () => {
+test("check reads a TODO's state and result into the talk turn's notice, and logs only the check", async () => {
 	h = await setup();
-	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "execute",
-						toolchain: IMAGE.id,
-						request: "猫の絵",
-						impact: "create",
-						announcement: "描きますね。",
-					},
-				},
-			],
-		},
-	);
-	const waiting = await h.say("猫の絵を描いて", "queued");
-	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
-	const [todo] = h.archived();
-	// The user asks later; the generation checks the TODO before it speaks.
-	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "work",
-					args: { todo: `t${todo!.ref}`, operation: "check" },
-				},
-			],
-		},
-		{ text: "猫の絵ができました。" },
-	);
-	await h.say("さっきの絵はどうなった？");
-	const checked = h.state.calls
-		.at(-1)!
-		.messages.filter((m) => m.role === "tool")
-		.at(-1)!.content;
+	const todo = await doneTodo("猫の絵", "猫");
+	// The user asks later; the choice checks the TODO and the talk turn tells what the check read.
+	h.state.steps.push(choice({ choice: `t${todo.ref}`, operation: "check" }), {
+		text: "猫の絵ができました。",
+	});
+	const run = await h.say("さっきの絵はどうなった？");
+	expect(h.dialogue.answerText(run.id)).toBe("猫の絵ができました。");
+	const checked = h.state.calls.at(-1)!.messages.at(-1)!.content;
 	// The check reads like the host notice: which work, how it ended, and its result as items.
-	expect(checked).toStartWith(
-		`- ok: true\nt${todo!.ref}「猫の絵」が終わりました（成功）。`,
-	);
+	expect(checked).toContain(`t${todo.ref}「猫の絵」が終わりました（成功）。`);
 	expect(checked).toContain("- title: 猫");
 	expect(h.log().some((e) => h!.fields(e).action === "work.check")).toBe(true);
 });
 
-test("a check of an unknown TODO is refused with todo_not_found and changes nothing", async () => {
+test("a check of an unknown TODO is refused with todo_not_found, is made again with that reason, and changes nothing", async () => {
 	h = await setup();
 	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "work",
-					args: { todo: "t99", operation: "check" },
-				},
-			],
-		},
-		{ text: "見つかりません。" },
+		choice({ choice: "t99", operation: "check" }),
+		choice({ choice: "t99", operation: "check" }),
 	);
 	const run = await h.say("さっきの仕事を見て");
 	expect(run.status).toBe("completed");
-	expect(toolResults(1)[0]).toEqual({ ok: false, code: "todo_not_found" });
+	expect(h.state.calls[1]!.messages.at(-1)!.content).toContain(
+		"## Retry\n前の選び方では頼めませんでした（todo_not_found",
+	);
+	expect(h.dialogue.answerText(run.id)).toBe(
+		"うまく頼めませんでした。もう一度言ってもらえますか。",
+	);
 	expect(
 		h.log().some((e) => h!.fields(e).action?.toString().startsWith("work.")),
 	).toBe(false);
 });
 
-test("a stale revision is refused with revision_stale and the current state, nothing is executed", async () => {
+test("a stale revision is refused and the host says it could not ask; nothing is executed", async () => {
 	h = await setup();
 	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "execute",
-						toolchain: IMAGE.id,
-						request: "猫の絵",
-						impact: "create",
-						announcement: "描きますね。",
-					},
-				},
-			],
-		},
+		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
 	);
 	const waiting = await h.say("猫の絵を描いて", "queued");
 	h.state.steps.push(
-		{ calls: [{ name: "work", args: { todo: "t1", operation: "cancel" } }] },
-		{ text: "確認します。" },
+		choice({ choice: "t1", operation: "cancel", say: "取り消しました。" }),
 	);
 	// The state of the call is fixed when it is made (revision 1). The model call is held, the TODO's revision moves on
 	// meanwhile (the owner's report bumps it; the job itself cannot run behind the held generation), and the cancel
@@ -146,39 +90,27 @@ test("a stale revision is refused with revision_stale and the current state, not
 	);
 	h.state.gate = null;
 	release();
-	await cancelling;
-	expect(toolResults(h.state.calls.length - 1)[0]).toMatchObject({
-		ok: false,
-		code: "revision_stale",
-		todo: "t1",
-		status: "todo",
-	});
+	const run = await cancelling;
+	// The cancel was not carried out, so the choice's `say` was not said: the host's words are.
+	expect(h.dialogue.answerText(run.id)).toBe(
+		"うまく頼めませんでした。もう一度言ってもらえますか。",
+	);
 	// Nothing is executed: the TODO is still open and the run it waits on still waits.
 	expect(h.todos()).toMatchObject([{ ref: 1, status: "todo" }]);
 	expect(h.dialogue.get(waiting.id)?.status).toBe("queued");
 });
 
 test("an approval is refused when the confirmation statement was not heard at all", async () => {
-	h = await setup({ autoStart: false });
+	h = await setup({
+		autoStart: false,
+		cards: [{ ...IMAGE, minImpact: "modify_existing" }],
+	});
 	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵の差替え" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "confirm",
-						toolchain: IMAGE.id,
-						request: "壁紙を差し替える",
-						impact: "modify_existing",
-						announcement: "差し替えてよいですか？",
-					},
-				},
-			],
-		},
-		{
-			text: "差し替えてよいですか？",
-		},
+		choice({
+			choice: IMAGE.id,
+			say: "差し替えます。",
+			request: "壁紙を差し替える",
+		}),
 	);
 	// The statement is spoken, so its delivery waits for the playback.
 	const confirmRun = await h.dialogue.submit({
@@ -192,53 +124,22 @@ test("an approval is refused when the confirmation statement was not heard at al
 	await h.store.write((db) =>
 		h!.dialogue.recordHeardInTransaction(db, confirmRun.id, "none"),
 	);
-	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "approve",
-						confirmation: "c1",
-						announcement: "差し替えます。",
-					},
-				},
-			],
-		},
-		{
-			text: "まだ確認できていません。",
-		},
-	);
+	h.state.steps.push(choice({ choice: "approve", confirmation: "c1" }));
 	const approval = await h.say("お願い", "completed");
-	expect(h.dialogue.answerText(approval.id)).toBe("まだ確認できていません。");
-	expect(toolResults(h.state.calls.length - 1)[0]).toEqual({
-		delegated: false,
-		code: "confirmation_not_heard",
-	});
+	// The approval did not hand the work over: the host says it could not.
+	expect(h.dialogue.answerText(approval.id)).toBe(
+		"うまく頼めませんでした。もう一度言ってもらえますか。",
+	);
 	expect(h.todos()).toEqual([]);
 });
 
 test("an irreversible confirmation heard only in part is not enough to approve", async () => {
-	h = await setup({ autoStart: false });
+	h = await setup({
+		autoStart: false,
+		cards: [{ ...IMAGE, minImpact: "irreversible" }],
+	});
 	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "削除" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "confirm",
-						toolchain: IMAGE.id,
-						request: "絵を削除する",
-						impact: "irreversible",
-						announcement: "削除してよいですか？",
-					},
-				},
-			],
-		},
-		{
-			text: "削除してよいですか？",
-		},
+		choice({ choice: IMAGE.id, say: "削除します。", request: "絵を削除する" }),
 	);
 	const confirmRun = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
@@ -256,52 +157,21 @@ test("an irreversible confirmation heard only in part is not enough to approve",
 			"削除して",
 		),
 	);
-	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "approve",
-						confirmation: "c1",
-						announcement: "消します。",
-					},
-				},
-			],
-		},
-		{
-			text: "もう一度確認します。",
-		},
+	h.state.steps.push(choice({ choice: "approve", confirmation: "c1" }));
+	const approval = await h.say("はい");
+	expect(h.dialogue.answerText(approval.id)).toBe(
+		"うまく頼めませんでした。もう一度言ってもらえますか。",
 	);
-	await h.say("はい");
-	expect(toolResults(h.state.calls.length - 1)[0]).toEqual({
-		delegated: false,
-		code: "confirmation_not_heard",
-	});
 	expect(h.todos()).toEqual([]);
 });
 
 /** A done image TODO: the delegating run is over (no generation for the result), the TODO archived with its notice. */
-async function doneTodo(request: string) {
+async function doneTodo(request: string, title = request) {
 	h!.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "execute",
-						toolchain: IMAGE.id,
-						request,
-						impact: "create",
-						announcement: "描きますね。",
-					},
-				},
-			],
-		},
+		choice({ choice: IMAGE.id, say: "描きますね。", request }),
 	);
 	const waiting = await h!.say(request + "を描いて", "queued");
-	await h!.finishImage(waiting.id, { state: "completed", title: request });
+	await h!.finishImage(waiting.id, { state: "completed", title });
 	return h!.archived().find((todo) => todo.title === request)!;
 }
 
@@ -328,7 +198,7 @@ async function speakVoice(text: string, utteranceId: string) {
 
 test("a partial playback records what was heard of the reply", async () => {
 	h = await setup();
-	h.state.steps.push({ text: "猫の絵ができました。" });
+	h.state.steps.push(...reply("猫の絵ができました。"));
 	const answered = await speakVoice("絵はできた？", "voice-partial");
 	await h.store.write((db) =>
 		h!.dialogue.recordHeardInTransaction(
@@ -408,21 +278,7 @@ test("clearing notification history keeps TODO results, archives every page, and
 test("the TODO screen's archive stops the run an open TODO waits on and archives it as cancelled, with no notice", async () => {
 	h = await setup();
 	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "execute",
-						toolchain: IMAGE.id,
-						request: "鳥の絵",
-						impact: "create",
-						announcement: "描きます。",
-					},
-				},
-			],
-		},
+		choice({ choice: IMAGE.id, say: "描きます。", request: "鳥の絵" }),
 	);
 	const waiting = await h.say("鳥の絵を描いて", "queued");
 	const [open] = h.todos();
@@ -449,7 +305,7 @@ test("the TODO screen's archive stops the run an open TODO waits on and archives
 
 test("an agency utterance is recorded as a spontaneous said event, and the next input carries it as the agent's", async () => {
 	h = await setup();
-	h.state.steps.push({ text: "はい。" });
+	h.state.steps.push(...reply("はい。"));
 	await h.store.write((db) =>
 		h!.dialogue.recordSpontaneousInTransaction(db, {
 			conversationId: "main",
@@ -467,18 +323,19 @@ test("an agency utterance is recorded as a spontaneous said event, and the next 
 		text: "そういえば、紅葉の見頃みたいですよ。",
 	});
 	// The next input shows it as the agent's own message of the recent conversation.
-	expect(h.state.calls[0]!.messages[2]).toEqual({
+	expect(h.state.calls.at(-1)!.messages[2]).toEqual({
 		role: "assistant",
 		content: "そういえば、紅葉の見頃みたいですよ。",
 	});
 });
 
-test("a memory read returns the long-term items that match, and logs the read", async () => {
+test("a memory read returns the long-term items that match, tells them to the talk call and logs the read", async () => {
 	h = await setup({ memory: true });
-	h.state.steps.push({ text: "はい。" });
+	h.state.steps.push(...reply("はい。"));
 	const first = await h.say("私は辛いものが好きです", "completed");
 	h.state.steps.push(
-		{ calls: [{ name: "memory", args: { operation: "read", query: "辛い" } }] },
+		choice({ choice: "none" }),
+		{ calls: [{ name: "read_memory", args: { query: "辛い" } }] },
 		{ text: "辛いものがお好きですね。" },
 	);
 	const saved = await saveItem(h.store, h.memory!, {
@@ -495,10 +352,12 @@ test("a memory read returns the long-term items that match, and logs the read", 
 	);
 	await h.say("私の好みは？");
 	const last = h.state.calls.at(-1)!;
-	const read = last.messages.filter((m) => m.role === "tool")[0]!.content;
+	const notice = last.messages.find(
+		(m) => (m.role as string) === "tool",
+	)!.content;
 	// The item is already in `## Memory`: the read says so beside its text.
-	expect(read).toStartWith(`- ${saved.text}（本人の発言`);
-	expect(read).toContain("「## Memory」にある");
+	expect(notice).toContain(`- ${saved.text}（本人の発言`);
+	expect(notice).toContain("「## Memory」にある");
 	expect(
 		last.messages.some(
 			(m) =>
@@ -506,17 +365,16 @@ test("a memory read returns the long-term items that match, and logs the read", 
 				m.content.includes(`- ${saved.text}`),
 		),
 	).toBe(true);
-	expect(
-		h.log().find((e) => h!.fields(e).action === "memory.read"),
-	).toBeDefined();
+	expect(h.log().find((e) => h!.fields(e).action === "read")).toBeDefined();
 });
 
 test("a memory not yet published is read with its text and not marked as shown", async () => {
 	h = await setup({ memory: true });
-	h.state.steps.push({ text: "はい。" });
+	h.state.steps.push(...reply("はい。"));
 	const first = await h.say("私は辛いものが好きです", "completed");
 	h.state.steps.push(
-		{ calls: [{ name: "memory", args: { operation: "read", query: "辛い" } }] },
+		choice({ choice: "none" }),
+		{ calls: [{ name: "read_memory", args: { query: "辛い" } }] },
 		{ text: "辛いものがお好きですね。" },
 	);
 	await saveItem(h.store, h.memory!, {
@@ -529,56 +387,37 @@ test("a memory not yet published is read with its text and not marked as shown",
 	});
 	// Not published yet: `## Memory` does not show it, so the read gives it whole and unmarked.
 	await h.say("私の好みは？");
-	const read = h.state.calls
+	const notice = h.state.calls
 		.at(-1)!
-		.messages.filter((m) => m.role === "tool")[0]!.content;
-	expect(read).toStartWith("- 辛いものが好き（本人の発言");
-	expect(read).not.toContain("「## Memory」にある");
+		.messages.find((m) => (m.role as string) === "tool")!.content;
+	expect(notice).toContain("- 辛いものが好き（本人の発言");
+	expect(notice).not.toContain("「## Memory」にある");
 });
 
 test("cancel of a waiting TODO from a later utterance ends the run it waits on, and the TODO is done as cancelled", async () => {
 	h = await setup();
 	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "execute",
-						toolchain: IMAGE.id,
-						request: "猫の絵",
-						impact: "create",
-						announcement: "描きますね。",
-					},
-				},
-			],
-		},
+		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
 	);
 	const waiting = await h.say("猫の絵を描いて", "queued");
 	const [todo] = h.todos();
 	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "work",
-					args: { todo: `t${todo!.ref}`, operation: "cancel" },
-				},
-			],
-		},
-		{ text: "取り消しました。" },
+		choice({
+			choice: `t${todo!.ref}`,
+			operation: "cancel",
+			say: "取り消しました。",
+		}),
 	);
 	const cancelling = await h.say("やっぱりやめて");
 	expect(h.dialogue.answerText(cancelling.id)).toBe("取り消しました。");
-	expect(toolResults(h.state.calls.length - 1)[0]).toMatchObject({
-		ok: true,
-		todo: `t${todo!.ref}`,
-		status: "done",
-		outcome: "cancelled",
-	});
 	expect(h.dialogue.get(waiting.id)?.status).toBe("cancelled");
 	// Cancelled work is not reported back: the TODO is archived at once.
 	expect(h.todos()).toEqual([]);
+	expect(h.archived()[0]).toMatchObject({
+		ref: todo!.ref,
+		status: "done",
+		outcome: "cancelled",
+	});
 });
 
 test("the TODO screen's page shows the whole request, the newest finished first, in the archive", async () => {
@@ -607,43 +446,33 @@ test("a finished TODO can still be checked: its result is read again, with room 
 	h = await setup();
 	const todo = await doneTodo("猫の絵");
 	expect(h.todos()).toEqual([]);
-	h.state.steps.push(
-		{
-			calls: [
-				{ name: "work", args: { todo: `t${todo.ref}`, operation: "check" } },
-			],
-		},
-		{ text: "猫の絵でした。" },
-	);
+	h.state.steps.push(choice({ choice: `t${todo.ref}`, operation: "check" }), {
+		text: "猫の絵でした。",
+	});
 	await h.say("さっきの絵、もう一度教えて");
-	const checked = h.state.calls
-		.at(-1)!
-		.messages.filter((m) => m.role === "tool")
-		.at(-1)!.content;
-	expect(checked).toStartWith(
-		`- ok: true\nt${todo.ref}「猫の絵」が終わりました`,
+	const [chose, talked] = h.state.calls.slice(-2);
+	expect(talked!.messages.at(-1)!.content).toContain(
+		`t${todo.ref}「猫の絵」が終わりました`,
 	);
-	// The state names it as notified, so the model knows the number to read.
-	const last = h.state.calls
-		.at(-1)!
-		.messages.filter((m) => m.role === "user")
-		.at(-1)!.content;
-	expect(last).toContain(`- t${todo.ref} 猫の絵 通知済み`);
+	// The state names it as notified, so the choice knows the number to read.
+	expect(chose!.messages.at(-1)!.content).toContain(
+		`- t${todo.ref} 猫の絵 通知済み`,
+	);
 });
 
 test("a spoken reply takes its place when adopted and keeps only what was heard; one not heard at all leaves the input", async () => {
 	h = await setup();
-	h.state.steps.push({ text: "猫の絵ができました。" });
+	h.state.steps.push(...reply("猫の絵ができました。"));
 	const cut = await speakVoice("絵はできた？", "voice-cut");
 	await h.store.write((db) =>
 		h!.dialogue.recordHeardInTransaction(db, cut.id, "partial", "猫の絵ができ"),
 	);
-	h.state.steps.push({ text: "はい。" });
+	h.state.steps.push(...reply("はい。"));
 	const lost = await speakVoice("本当？", "voice-lost");
 	await h.store.write((db) =>
 		h!.dialogue.recordHeardInTransaction(db, lost.id, "none"),
 	);
-	h.state.steps.push({ text: "どうぞ。" });
+	h.state.steps.push(...reply("どうぞ。"));
 	await h.say("次は？");
 	const messages = h.state.calls.at(-1)!.messages;
 	// The reply cut short is what was heard; the one not heard is gone, so the user's words before it join the last.

@@ -7,6 +7,7 @@
  * reads the results of the earlier steps from the messages, exactly as the real model would.
  */
 
+import { isReadToolName } from "../../domains/capabilities";
 import { INPUT_HEADINGS } from "../../domains/dialogue";
 
 /** A message as the generation loop keeps it: assistant tool calls and their tool results. */
@@ -348,15 +349,15 @@ function choiceOf(
 		return { choice: "approve", confirmation: a.confirmation };
 	if (round === "pending") return null;
 	if (call.name === "memory")
-		return a.operation === "read"
-			? { choice: "memory.recall", query: a.query }
-			: {
-					choice: "memory.request",
-					kind: a.kind,
-					what: a.what,
-					...(a.detail ? { detail: a.detail } : {}),
-					say: SAY,
-				};
+		return {
+			choice: "memory.request",
+			kind: a.kind,
+			what: a.what,
+			...(a.detail ? { detail: a.detail } : {}),
+			say: SAY,
+		};
+	// A read tool the search offered is chosen with its arguments as the inputs.
+	if (isReadToolName(call.name)) return { choice: call.name, inputs: a };
 	if (call.name !== "delegate") return null;
 	return {
 		choice: a.toolchain,

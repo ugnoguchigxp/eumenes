@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/executor-read.ts
+text = '''[[subject]]は今は読めません。'''
+
+[variables.subject]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

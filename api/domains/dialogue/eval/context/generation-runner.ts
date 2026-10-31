@@ -1,28 +1,31 @@
 /**
- * Runs one prepared generation through the production loop (`runGeneration`: the conversation agent answers, using
- * the fixed tools when the conversation calls for them). The model is whatever `inference` is (the live LARM
- * connection, or the scripted model of the fixture lane); the host side of the tools is an offline stand-in that
- * keeps the rules the model must meet (a toolchain that was offered, an announcement with a delegation, a
- * confirmation before a change) by refusing a call that breaks them, as the product does, and changes nothing: no
- * TODO is made, nothing is executed.
+ * Runs one prepared generation through the product's routed turn (`runRoutedTurn`: the host routes the turn, then the
+ * model talks or makes one choice held to a schema built from the turn's candidates). The model is whatever
+ * `inference` is (the live LARM connection, or the scripted model of the fixture lane); the host side of the
+ * operations (search, hand-over, confirmation, work, memory) is an offline stand-in that keeps the rules the choice
+ * must meet (a toolchain that was offered, an announcement with a hand-over, a confirmation before a change of a saved
+ * item) by refusing an operation that breaks them, as the product does, and changes nothing: no TODO is made, nothing
+ * is executed. Without a judge connection the routing is `free`: every turn of utterances is a request turn.
  */
-import { ValidationFailure } from "../../../../infrastructure/validation-log";
 import type { InferencePort } from "../../../inference";
 import type { DialogueDeps, GenerateInput } from "../../service/context";
-import {
-	type ToolExecutor,
-	type ToolOutcome,
-	runGeneration,
-} from "../../service/generation-loop";
-import { evalConversationAgent } from "./conversation-agent";
 import { TOOL_NAMES, toolRejection } from "../../service/generation-tools";
+import {
+	type RoutedTurnOptions,
+	runRoutedTurn,
+} from "../../service/routed-turn";
+import { evalConversationAgent } from "./conversation-agent";
 import type { Answer, ToolCallRecord } from "./checks";
-import type { EvalCard } from "./session";
+import type { EvalCard, Persona } from "./session";
+
+type ToolExecutor = RoutedTurnOptions["execute"];
 
 export type ConversationCall = {
 	caseId: string;
 	trial: number;
 	input: GenerateInput;
+	/** The persona the case sets: the choice call writes its `say` in its style. */
+	persona: Persona;
 };
 export type ConversationOutcome =
 	| { kind: "ok"; text: string; toolCalls: ToolCallRecord[] }
@@ -65,39 +68,30 @@ export function rankCandidates(
 }
 
 type DocumentView = {
-	/** The TODO numbers `## State` shows (`t<n>`) and their status words. */
-	todos: Array<{ id: string; status: string }>;
-	/** The confirmation numbers `## State` shows (`c<n>`). */
+	/** The work the choice calls read (`t<n>`), with the line `## State` shows for each. */
+	todos: Array<{ id: string; line: string }>;
+	/** The confirmation numbers the pending turn reads (`c<n>`). */
 	confirmations: string[];
-	/** Each TODO's result as the host notice shows it. */
-	resultText: Map<string, string>;
 };
 
-/** What the tools need to know of the input the model read: the TODOs, the confirmations, the results. */
+/** What the operations need to know of the input the choice calls read: the work and the open confirmations. */
 function viewOf(input: GenerateInput): DocumentView {
-	const last = input.messages.at(-1)?.content ?? "";
-	const resultText = new Map<string, string>();
-	for (const line of last.split("\n")) {
-		const result = /^(t\d+)「/.exec(line);
-		if (result) resultText.set(result[1]!, line);
-	}
-	const lines = last.split("\n");
+	const routed = input.routed;
+	const lines = (routed?.state ?? "").split("\n");
 	return {
-		todos: lines.flatMap((line) => {
-			const todo = /^- (t\d+) .* (実行中|質問待ち|通知済み|取消済み)/.exec(
-				line,
-			);
-			return todo ? [{ id: todo[1]!, status: todo[2]! }] : [];
-		}),
-		confirmations: lines.flatMap((line) => {
-			const confirmation = /^- (c\d+) 確認待ち/.exec(line);
-			return confirmation ? [confirmation[1]!] : [];
-		}),
-		resultText,
+		todos: (routed?.todos ?? []).map((todo) => ({
+			id: `t${todo.ref}`,
+			line:
+				lines.find((line) => line.startsWith(`- t${todo.ref} `))?.slice(2) ??
+				todo.title,
+		})),
+		confirmations: (routed?.pending.confirmations ?? []).map(
+			(c) => `c${c.ref}`,
+		),
 	};
 }
 
-/** The offline host side of the fixed tools. `ended` is set when a delegation handed the work over. */
+/** The offline host side of the operations. `ended` is set when a hand-over ended the turn. */
 function createEvalExecutor(
 	input: GenerateInput,
 	catalog: readonly EvalCard[],
@@ -105,16 +99,14 @@ function createEvalExecutor(
 ) {
 	const view = viewOf(input);
 	const offered = new Set(input.retained.map((entry) => entry.card.id));
-	const state = { ended: false, announcement: "" };
+	const state = { announcement: "" };
 	const need = (tool: string, path: string, reason: string) =>
 		toolRejection(reason, [{ tool, path, reason }]);
 	const execute: ToolExecutor = async (call) => {
 		record.push({ name: call.name, arguments: call.call.arguments });
 		switch (call.name) {
 			case "memory":
-				return call.args.operation === "read"
-					? { result: { items: [] } }
-					: { result: { accepted: true, requestId: "eval-memory-request" } };
+				return { result: { accepted: true, requestId: "eval-memory-request" } };
 			case "find_toolchain": {
 				const found = rankCandidates(catalog, call.args.query);
 				for (const card of found) offered.add(card.id);
@@ -136,7 +128,6 @@ function createEvalExecutor(
 						return {
 							result: { delegated: false, code: "confirmation_unknown" },
 						};
-					state.ended = true;
 					state.announcement = args.announcement ?? "";
 					return {
 						result: { delegated: true, todo: "eval-todo" },
@@ -145,21 +136,15 @@ function createEvalExecutor(
 				}
 				if (!offered.has(args.toolchain))
 					throw need(TOOL_NAMES.delegate, "toolchain", "toolchain_not_offered");
-				if (!args.announcement)
-					throw need(
-						TOOL_NAMES.delegate,
-						"announcement",
-						"announcement_required",
-					);
 				if (args.mode === "confirm")
 					return {
 						result: { confirmation: "eval-confirmation", expiresAt: "eval" },
 						confirmation: true,
 					};
-				if (args.impact === "modify_existing" || args.impact === "irreversible")
+				// A request that names a saved item changes something that exists: it is confirmed first.
+				if (args.target)
 					throw need(TOOL_NAMES.delegate, "mode", "confirmation_required");
-				state.ended = true;
-				state.announcement = args.announcement;
+				state.announcement = args.announcement ?? "";
 				return {
 					result: { delegated: true, todo: "eval-todo" },
 					end: true,
@@ -168,57 +153,62 @@ function createEvalExecutor(
 			case "work": {
 				const todo = view.todos.find((t) => t.id === call.args.todo);
 				if (!todo) return { result: { ok: false, code: "todo_not_found" } };
-				const line = view.resultText.get(todo.id);
-				return {
-					result: {
-						ok: true,
-						todo,
-						...(call.args.operation === "check" && line
-							? { result: line }
-							: {}),
-					},
-				} satisfies ToolOutcome;
+				// A check reads the record of the work; any other operation is taken.
+				return call.args.operation === "check"
+					? { result: todo.line }
+					: { result: { ok: true, todo: todo.id } };
 			}
+			default:
+				// The read tools find nothing in the evaluation's simulated host.
+				return { result: { text: "" } };
 		}
 	};
-	return { execute, state };
+	/** The user declines a confirmation: closed when it is one the input shows. */
+	const decline = async (ref: number) => view.confirmations.includes(`c${ref}`);
+	return { execute, decline, state };
 }
 
 /**
- * The generation of `input` against `inference`, as the host would carry it out. Output that breaks the generation
- * contract (control text in the speech) is a `contract_failure` (a model result, scored as a failure); any other
- * error is the caller's transport error.
+ * The turn of `input` against `inference`, as the host would carry it out. A call that fails on its output is the
+ * turn's own: the host says its fixed words, as in the product. Any other error is the caller's transport error.
  */
 export async function runConversation(options: {
 	inference: Pick<InferencePort, "answer" | "executeStream">;
 	input: GenerateInput;
 	catalog: readonly EvalCard[];
+	persona: Persona;
 	signal: AbortSignal;
 }): Promise<ConversationOutcome> {
-	const { input } = options;
+	const { input, inference } = options;
 	const record: ToolCallRecord[] = [];
-	const { execute, state } = createEvalExecutor(input, options.catalog, record);
+	const { execute, decline, state } = createEvalExecutor(
+		input,
+		options.catalog,
+		record,
+	);
+	// Only the ports the routed turn reads: the model, the persona the choice writes in, and the reply loop. The
+	// store is read for the persona alone, which the case decides.
 	const deps = {
-		larm: options.inference,
+		store: { read: <T>(read: (tx: never) => T) => read(undefined as never) },
+		larm: {
+			answer: inference.answer,
+			executeStream: inference.executeStream,
+			snapshotInTransaction: () => ({ general: options.persona }),
+		},
 		conversationAgent: evalConversationAgent,
 	} as unknown as DialogueDeps;
-	try {
-		const generated = await runGeneration(deps, input, {
-			signal: options.signal,
-			delta: () => {},
-			execute,
-		});
-		return {
-			kind: "ok",
-			// A delegation ended the generation: what the user hears is the announcement that went with it.
-			text: generated.ended ? state.announcement : generated.text,
-			toolCalls: record,
-		};
-	} catch (error) {
-		if (error instanceof ValidationFailure)
-			return { kind: "contract_failure", code: error.message };
-		throw error;
-	}
+	const generated = await runRoutedTurn(deps, input, {
+		signal: options.signal,
+		delta: () => {},
+		execute,
+		decline,
+	});
+	return {
+		kind: "ok",
+		// A hand-over ended the turn: what the user hears is the announcement that went with it.
+		text: generated.ended ? state.announcement : generated.text,
+		toolCalls: record,
+	};
 }
 
 /** What the scoring reads of an outcome that ran. */

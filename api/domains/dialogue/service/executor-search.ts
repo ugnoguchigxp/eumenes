@@ -3,11 +3,15 @@ import { getLogger } from "../../../infrastructure/logger";
 import { isSystemPrompt } from "../contracts";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import { availableToolchainsInTransaction } from "./delegate-conversation";
-import type { ToolOutcome } from "./generation-loop";
+import { availableReadTools } from "./executor-read";
 import { TOOL_NAMES, toolRejection, type ParsedCall } from "./generation-tools";
 import { sessionTargetsInTransaction } from "./specialist-context";
 
-import { type ExecutorContext, candidateOf } from "./executor-context";
+import {
+	type ExecutorContext,
+	type ToolOutcome,
+	candidateOf,
+} from "./executor-context";
 
 const log = getLogger("dialogue");
 /** What an instant toolchain's adapter may hand back as the answer. */
@@ -35,7 +39,11 @@ export async function find(
 			runId: run.id,
 			text: query,
 			...(vector ? { query: vector } : {}),
-			available: availableToolchainsInTransaction(deps, tx, run),
+			// The read tools are found by the same search (spec conversation-read-tools-design 2026-10-31 §2.6).
+			available: new Set([
+				...availableToolchainsInTransaction(deps, tx, run),
+				...availableReadTools(deps, tx),
+			]),
 			strict: true,
 		});
 		x.state.search = { route, ...(vector ? { query: vector } : {}) };
@@ -146,7 +154,8 @@ export function answered(
 	"runId"
 > {
 	const { input } = x;
-	const { instant } = x.state;
+	// An instant toolchain's answer, or a read the search offered, is that one's decision with its inputs.
+	const chosen = x.state.instant ?? x.state.read;
 	return {
 		conversationId: input.conversationId,
 		retrieval: x.state.search?.route.retrieval ?? "none",
@@ -158,14 +167,13 @@ export function answered(
 		})),
 		historyRefs:
 			x.state.search?.route.past.map((past) => past.selectionId) ?? [],
-		// An instant toolchain's answer is that toolchain's decision, with the inputs it was given.
-		...(instant
+		...(chosen
 			? {
 					decision: "toolchain" as const,
-					toolchainId: instant.card.id,
-					toolchainRevisionId: instant.card.revisionId,
-					functionName: instant.card.functionName,
-					request: JSON.stringify(instant.inputs),
+					toolchainId: chosen.card.id,
+					toolchainRevisionId: chosen.card.revisionId,
+					functionName: chosen.card.functionName,
+					request: JSON.stringify(chosen.inputs),
 				}
 			: { decision: refused ? ("rejected" as const) : ("answer" as const) }),
 		...(x.state.search?.query ? { query: x.state.search.query } : {}),

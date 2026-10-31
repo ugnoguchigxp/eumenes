@@ -1,10 +1,6 @@
 import { cliRun } from "./cli";
 export { cliRun };
-import {
-	recognitionManage,
-	recognitionManageV2,
-	recognitionCommand,
-} from "./object-recognition";
+import { recognitionManageV2, recognitionCommand } from "./object-recognition";
 export { recognitionCommand };
 import { drawingRequest, drawingPlan } from "./excalidraw";
 export { drawingRequest, drawingPlan };
@@ -78,14 +74,8 @@ export {
 };
 import { imageRequest, imagePlan } from "./image";
 export { imageRequest, imagePlan };
-import {
-	musicRequest,
-	musicPlan,
-	musicPlanV2,
-	musicPlanV3,
-	musicPlaybackPlan,
-} from "./music";
-export { musicRequest, musicPlan, musicPlanV2, musicPlanV3, musicPlaybackPlan };
+import { musicRequest, musicPlanV3 } from "./music";
+export { musicRequest, musicPlanV3 };
 import {
 	timerCancel,
 	timerCommand,
@@ -96,7 +86,6 @@ import {
 	timerTargetAnswer,
 } from "./timers";
 import { answerText, emptyInput } from "./inputs";
-export { timerResultContext } from "./timers";
 import { publicUrl } from "./public-url";
 import { toolchainRequest } from "./toolchains";
 import { stockQuote } from "./stock";
@@ -138,8 +127,9 @@ import {
 	browserTaskTarget,
 } from "./browser";
 export { stockQuote } from "./stock";
+export * from "./read-tools";
 export { musicPlaybackPlanV2, resourceRead };
-export { weatherPlace, weatherDays } from "./weather";
+export { weatherPlace } from "./weather";
 export { publicUrl };
 export const researchInput = z
 	.object({
@@ -148,30 +138,10 @@ export const researchInput = z
 		detail: z.enum(["brief", "normal"]).default("normal"),
 	})
 	.strict();
-import { lookupInput, lookupInputV1 } from "./lookup";
+import { lookupInput } from "./lookup";
 import type { ToolchainArtifact, ToolchainRedirect } from "./toolchains";
 export { lookupInput };
 const readInput = z.object({ url: publicUrl }).strict();
-const forecastInput = z
-	.object({
-		areaCode: z
-			.string()
-			.regex(/^\d{6}$/)
-			.describe(
-				"JMA forecast office: Tokyo 130000, Osaka 270000, Kanagawa 140000, Kyoto 260000, Aichi 230000, Fukuoka 400000, Hyogo 280000",
-			),
-	})
-	.strict();
-const quoteInput = z
-	.object({
-		symbol: z
-			.string()
-			.regex(/^[A-Z0-9.^-]{1,16}$/)
-			.describe(
-				"Ticker explicitly present in the current request, e.g. AAPL or 7203.T",
-			),
-	})
-	.strict();
 const savedFindInput = z
 	.object({
 		sourceRef: z.string().uuid(),
@@ -240,6 +210,7 @@ import {
 	dotsWorkAnswerV1,
 	dotsWorkStopV1,
 } from "./dots-work";
+import type { ResourceDefinitionData } from "./resource-kinds";
 export {
 	dotsWorkStartV1,
 	dotsWorkListV1,
@@ -298,25 +269,19 @@ export const validators = {
 	pipelineTargetRef,
 	uiResponseFields,
 	uiSubmitRequest,
-	recognitionManage,
 	recognitionManageV2,
 	drawingRequest,
 	drawingPlan,
 	imageRequest,
 	imagePlan,
 	musicRequest,
-	musicPlan,
-	musicPlanV2,
 	musicPlanV3,
-	musicPlaybackPlan,
 	dotsDelegation: z.strictObject({}),
 	find: savedFindInput,
 	readSaved: savedReadInput,
 	history: historyInput,
 	historySearch,
 	historyRead,
-	forecast: forecastInput,
-	quote: quoteInput,
 	research: researchInput,
 	guidedResearch: guidedResearchInput,
 	guidedCandidates: guidedResearchInput,
@@ -330,7 +295,6 @@ export const validators = {
 		})
 		.strict()
 		.refine((v) => !!v.url !== !!v.candidateRef),
-	lookup: lookupInputV1,
 	lookupV2: lookupInput,
 	read: readInput,
 	recipeFind: recipeFindInput,
@@ -409,7 +373,7 @@ export type Definition = {
 		| "resource-kind"
 		| "resource-actions";
 	requirementData?: import("./requirements").RequirementProfileData;
-	resourceKindData?: import("./resource-kinds").ResourceDefinitionData;
+	resourceKindData?: ResourceDefinitionData;
 	id: string;
 	revision: number;
 	title: string;
@@ -426,8 +390,6 @@ export type Definition = {
 	toolRevisionIds?: string[];
 	requiredSkillRevisionIds?: string[];
 	profileRevisionId?: string;
-	/** Learned definitions are route-only: never indexed, never listed, prepared by exact ID. */
-	discoveryMode?: "catalog" | "route-only";
 	/** Toolchain only: the function the conversation model calls. */
 	functionName?: string;
 	/** Toolchain only: representative requests; indexed and used as the routing evaluation set. */
@@ -457,10 +419,6 @@ export type Definition = {
 	bindingRevisionId?: string;
 	artifactRevisionId?: string;
 };
-export const learnedIdPattern = /^learned\.web\.[0-9a-f]{32}$/;
-export const learnedMaxBytes = 16384;
-export const commonSkillRevisionId = "skill:web.research@5";
-export const commonProfileRevisionId = "profile:web.research@1";
 export type FixedDefinition = Definition & {
 	revisionId: string;
 	hash: string;
@@ -493,5 +451,3 @@ export * from "./runtime-meta";
 export * from "./toolchains";
 export * from "./pipelines";
 export * from "./resource-kinds";
-
-export { dotsPackageInput } from "./dots";

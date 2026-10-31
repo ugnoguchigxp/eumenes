@@ -127,6 +127,8 @@ export interface ToolchainRoutingPort {
 	):
 		| {
 				selectionId: string;
+				/** The toolchain chosen (the read tools' records of runs name it). */
+				toolchainId: string | null;
 				request: string | null;
 				outcome: SelectionOutcome | null;
 				code: string | null;

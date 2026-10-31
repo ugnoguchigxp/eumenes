@@ -42,7 +42,6 @@ async function start(
 	judge: (input: IntentInput, signal: AbortSignal) => Promise<IntentJudgment>,
 ) {
 	h = await setup({
-		harness: "local",
 		settings: {
 			...settings({ mode: "larm-only" }),
 			intent: {
@@ -125,7 +124,7 @@ test("ruri takes a confident request to the request turn: the host searches with
 	});
 });
 
-test("ruri takes anything else to the talk turn: one streamed call with no tools and no choice", async () => {
+test("ruri takes anything else to the talk turn: one streamed call with the read tools only and no choice", async () => {
 	for (const [label, request] of [
 		["chat", 0.05],
 		["noise", 0.05],
@@ -138,7 +137,7 @@ test("ruri takes anything else to the talk turn: one streamed call with no tools
 		const run = await h!.say("こんばんは");
 		expect(h!.dialogue.answerText(run.id)).toBe("こんばんは。");
 		expect(h!.state.calls).toHaveLength(1);
-		expect(h!.state.calls[0]!.tools).toEqual([]);
+		expect(h!.state.calls[0]!.tools).toEqual(["read_history", "read_runs"]);
 		expect(h!.state.calls[0]!.session?.outputSchema).toBeUndefined();
 		expect(h!.state.calls[0]!.session?.toolChoice).toBeUndefined();
 		await waitFor(() => recorded(run.inputMessageId)[0]?.observedSearch === 0);

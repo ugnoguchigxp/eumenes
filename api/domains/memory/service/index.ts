@@ -52,6 +52,8 @@ import {
 import { guardContinuity } from "./continuity-guard";
 import {
 	createContextWindowStore,
+	type CheckedItems,
+	type CheckItemsInput,
 	type ReadItemsInput,
 	type WindowSnapshot,
 } from "./context-window";
@@ -475,6 +477,14 @@ export function createMemoryService(
 					? result.items.map((item) => toDto(db, item))
 					: [];
 			});
+		},
+		/** The read tool `read_memory`'s read, in a read of its own; null when memory is off or unhealthy. */
+		check(input: CheckItemsInput): CheckedItems | null {
+			return store.read((db) =>
+				healthy && readSettings(db).enabled
+					? windows.checkItemsInTransaction(db, input)
+					: null,
+			);
 		},
 		/** Active (or, with `includeInactive`, every live-status) State items of the profile, as the library holds them. */
 		stateItemsInTransaction: (
