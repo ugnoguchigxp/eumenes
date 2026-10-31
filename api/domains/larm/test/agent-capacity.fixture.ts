@@ -8,7 +8,7 @@ export const owner = (
 	conversationId = "conversation-a",
 	agentId: string = role,
 	branchId?: string,
-): LarmCallOptions => ({
+): Pick<LarmCallOptions, "sessionRole" | "taskId" | "agentSession"> => ({
 	sessionRole: role,
 	...(role === "subagent" ? { taskId: agentId } : {}),
 	agentSession: { conversationId, agentId, branchId },
@@ -45,8 +45,8 @@ export function capacityFixture() {
 		claimable: true,
 		polls: 0,
 		timeoutCreate: false,
-		wrongCapacity: false,
-		wrongClaimCapacity: false,
+		wrongCapacity: undefined as number | undefined,
+		wrongClaimCapacity: undefined as number | undefined,
 		credentialMs: 900000,
 		generationError: false,
 	};
@@ -88,7 +88,9 @@ export function capacityFixture() {
 				contractVersion: "agent-connection.v3",
 				catalogRevision: "fixture-revision",
 				requestedProfile: "fixture-profile",
-				profiles: [{ id: "fixture-agent-profile", providers: [provider(200000)] }],
+				profiles: [
+					{ id: "fixture-agent-profile", providers: [provider(200000)] },
+				],
 			});
 		if (path === "/v1/agent-connections") {
 			const body = JSON.parse(String(init?.body));
@@ -100,9 +102,7 @@ export function capacityFixture() {
 				binding = {
 					id,
 					client: body.client,
-					capacity: controls.wrongCapacity
-						? 131072
-						: (body.contextTokens ?? 131072),
+					capacity: controls.wrongCapacity ?? body.contextTokens ?? 131072,
 					expiresAt: Date.now() + 900000,
 					tokenVersion: 0,
 					released: false,
@@ -143,9 +143,7 @@ export function capacityFixture() {
 					...state(binding),
 					providers: [
 						{
-							...provider(
-								controls.wrongClaimCapacity ? 131072 : binding.capacity,
-							),
+							...provider(controls.wrongClaimCapacity ?? binding.capacity),
 							baseUrl: "http://127.0.0.1:9810/v1",
 							endpoint: "http://127.0.0.1:9810/v1/chat/completions",
 							credential: {

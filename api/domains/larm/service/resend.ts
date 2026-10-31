@@ -24,15 +24,17 @@ export class LarmCapacityBusy extends Error {
 export const isCapacityBusy = (e: unknown): e is LarmCapacityBusy =>
 	e instanceof LarmCapacityBusy;
 
-function retryAfter(headers: Headers) {
+/** LARM's Retry-After (seconds or an HTTP date) in ms, at most `limitMs`; null when absent or past. */
+export function retryAfter(
+	headers: Headers,
+	limitMs: number = LARM_RETRY_AFTER_LIMIT_MS,
+) {
 	const value = headers.get("retry-after")?.trim();
 	if (!value) return null;
 	const ms = /^\d+$/.test(value)
 		? Number(value) * 1000
 		: Date.parse(value) - Date.now();
-	return Number.isFinite(ms) && ms > 0
-		? Math.min(ms, LARM_RETRY_AFTER_LIMIT_MS)
-		: null;
+	return Number.isFinite(ms) && ms > 0 ? Math.min(ms, limitMs) : null;
 }
 const field = (value: unknown, key: string) =>
 	value && typeof value === "object" && key in value
@@ -117,10 +119,13 @@ export async function checkRefusal(
 
 /**
  * The lost-response rule: one more send, with the same Idempotency-Key, when no answer arrived. If that
- * send is refused for memory, the first may still have been accepted, so the loss is reported instead
- * of a wait.
+ * send is refused for memory, the first may still have been accepted: the loss is reported, unless
+ * `keyKept` (every later try sends the same key again, so a wait finds that request).
  */
-export async function sendAgainIfLost<T>(send: () => Promise<T>) {
+export async function sendAgainIfLost<T>(
+	send: () => Promise<T>,
+	keyKept = false,
+) {
 	try {
 		return await send();
 	} catch (error) {
@@ -132,7 +137,7 @@ export async function sendAgainIfLost<T>(send: () => Promise<T>) {
 		)
 			throw error;
 		return await send().catch((again: unknown) => {
-			throw isCapacityBusy(again) ? error : again;
+			throw isCapacityBusy(again) && !keyKept ? error : again;
 		});
 	}
 }

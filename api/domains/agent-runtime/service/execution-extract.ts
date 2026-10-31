@@ -158,6 +158,10 @@ export function executionExtract(
 				{
 					sessionRole: "subagent",
 					taskId: input.executionId,
+					agentSession: {
+						conversationId: input.sourceRefs.conversationId,
+						agentId: input.executionId,
+					},
 					refs: input.sourceRefs,
 					toolChoice: "required",
 					outputLimit: OUTPUT_TOKENS,

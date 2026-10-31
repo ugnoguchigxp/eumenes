@@ -1,0 +1,229 @@
+{
+  "startedAt": "2026-10-31T23:10:07.498Z",
+  "roles": [
+    {
+      "role": "sub",
+      "success": true,
+      "advertisedMaxTokens": 200000,
+      "allocatedMaxTokens": 131072,
+      "connectionId": "aconn_epoch-6a71e801-778f-4c8e-b469-eaf5668e85c2_34e9ae61-1a49-456d-98a5-9f4ebc9cc552",
+      "sameConnection": true,
+      "json": true,
+      "stream": true,
+      "streamDeltas": 1,
+      "retainedMs": 73027,
+      "requests": [
+        {
+          "contextTokens": null,
+          "providers": [
+            "llm"
+          ]
+        },
+        {
+          "contextTokens": null,
+          "providers": [
+            "llm"
+          ]
+        },
+        {
+          "contextTokens": null,
+          "providers": [
+            "llm"
+          ]
+        }
+      ],
+      "statuses": [
+        {
+          "operation": "catalog",
+          "status": 200,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "create",
+          "status": 201,
+          "maxTokens": 131072
+        },
+        {
+          "operation": "claim",
+          "status": 200,
+          "maxTokens": 131072
+        },
+        {
+          "operation": "status",
+          "status": 200,
+          "maxTokens": 131072
+        },
+        {
+          "operation": "count",
+          "status": 200,
+          "inputBudgetTokens": 129032,
+          "requestedOutputTokens": 64
+        },
+        {
+          "operation": "generate",
+          "status": 200,
+          "stream": false
+        },
+        {
+          "operation": "count",
+          "status": 200,
+          "inputBudgetTokens": 129064,
+          "requestedOutputTokens": 32
+        },
+        {
+          "operation": "generate",
+          "status": 200,
+          "stream": true
+        },
+        {
+          "operation": "status",
+          "status": 200,
+          "maxTokens": 131072
+        },
+        {
+          "operation": "create",
+          "status": 201,
+          "maxTokens": 131072
+        },
+        {
+          "operation": "status",
+          "status": 200,
+          "maxTokens": 131072
+        },
+        {
+          "operation": "create",
+          "status": 201,
+          "maxTokens": 131072
+        },
+        {
+          "operation": "status",
+          "status": 200,
+          "maxTokens": 131072
+        },
+        {
+          "operation": "release",
+          "status": 204
+        }
+      ]
+    },
+    {
+      "role": "main",
+      "success": true,
+      "advertisedMaxTokens": 200000,
+      "allocatedMaxTokens": 200000,
+      "connectionId": "aconn_epoch-6a71e801-778f-4c8e-b469-eaf5668e85c2_5be69384-cf26-4b45-bf91-c734e39d1d68",
+      "sameConnection": true,
+      "json": true,
+      "stream": true,
+      "streamDeltas": 1,
+      "retainedMs": 71158,
+      "requests": [
+        {
+          "contextTokens": 200000,
+          "providers": [
+            "llm"
+          ]
+        },
+        {
+          "contextTokens": 200000,
+          "providers": [
+            "llm"
+          ]
+        },
+        {
+          "contextTokens": 200000,
+          "providers": [
+            "llm"
+          ]
+        }
+      ],
+      "statuses": [
+        {
+          "operation": "catalog",
+          "status": 200,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "create",
+          "status": 201,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "claim",
+          "status": 200,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "status",
+          "status": 200,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "count",
+          "status": 200,
+          "inputBudgetTokens": 197960,
+          "requestedOutputTokens": 64
+        },
+        {
+          "operation": "generate",
+          "status": 200,
+          "stream": false
+        },
+        {
+          "operation": "count",
+          "status": 200,
+          "inputBudgetTokens": 197992,
+          "requestedOutputTokens": 32
+        },
+        {
+          "operation": "generate",
+          "status": 200,
+          "stream": true
+        },
+        {
+          "operation": "status",
+          "status": 200,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "create",
+          "status": 201,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "status",
+          "status": 200,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "create",
+          "status": 201,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "status",
+          "status": 200,
+          "maxTokens": 200000
+        },
+        {
+          "operation": "release",
+          "status": 204
+        }
+      ]
+    }
+  ],
+  "rejectedCapacity": [
+    {
+      "contextTokens": -1,
+      "status": 400,
+      "rejected": true,
+      "code": "invalid_request"
+    },
+    {
+      "contextTokens": 200001,
+      "status": 400,
+      "rejected": true,
+      "code": "context_capacity_unavailable"
+    }
+  ]
+}

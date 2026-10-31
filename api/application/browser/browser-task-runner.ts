@@ -542,6 +542,13 @@ function taskInference(ports: TaskRunnerPorts) {
 									.execution as ChildExecution,
 							),
 							taskId: input.taskId,
+							agentSession: {
+								conversationId: (
+									frozenSchema.parse(input.frozen ?? {})
+										.execution as ChildExecution
+								).source.conversationId,
+								agentId: input.taskId,
+							},
 						}
 					: { sessionRole: "subagent", taskId: input.taskId },
 			);

@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-31T23:18:40.724Z",
+  "lane": "live",
+  "creations": [
+    {
+      "id": "",
+      "requestedTokens": 200000,
+      "status": 503,
+      "bootEpoch": null
+    }
+  ],
+  "claims": [],
+  "generations": [],
+  "observations": [],
+  "passed": false,
+  "error": "larm_control_503"
+}

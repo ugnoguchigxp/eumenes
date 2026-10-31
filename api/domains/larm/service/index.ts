@@ -73,9 +73,19 @@ function assertSpeechSettings(config: LarmConfig) {
 	const speed = config.speed ?? 1;
 	if (!Number.isFinite(speed) || speed < 0.5 || speed > 2)
 		throw new Error("larm_tts_speed_invalid");
-	if (config.pitchScale !== undefined && (!Number.isFinite(config.pitchScale) || config.pitchScale < -0.15 || config.pitchScale > 0.15))
+	if (
+		config.pitchScale !== undefined &&
+		(!Number.isFinite(config.pitchScale) ||
+			config.pitchScale < -0.15 ||
+			config.pitchScale > 0.15)
+	)
 		throw new Error("larm_tts_pitch_invalid");
-	if (config.intonationScale !== undefined && (!Number.isFinite(config.intonationScale) || config.intonationScale < 0 || config.intonationScale > 2))
+	if (
+		config.intonationScale !== undefined &&
+		(!Number.isFinite(config.intonationScale) ||
+			config.intonationScale < 0 ||
+			config.intonationScale > 2)
+	)
 		throw new Error("larm_tts_intonation_invalid");
 }
 
@@ -345,6 +355,7 @@ export function createLarm(config: LarmConfig): LarmPort {
 				profile,
 				decisionModel: leasePort(leases).decisionModel(),
 				...(lease ? { connectionId: lease.id } : {}),
+				...(lease?.bootEpoch ? { bootEpoch: lease.bootEpoch } : {}),
 				providers: lease
 					? [...leases.providers().values()]
 							.filter(

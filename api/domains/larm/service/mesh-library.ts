@@ -19,7 +19,7 @@ import {
 	type MeshGenerationRequest,
 } from "../contracts/mesh";
 import { bytes, json } from "./playground-http";
-import { capacityRefusal } from "./resend";
+import { capacityRefusal, retryAfter } from "./resend";
 
 type Control = (
 	path: string,
@@ -43,7 +43,6 @@ export class MeshHttpError extends Error {
 }
 /** `submits`: only a submission is refused before LARM accepts it, so only it may become a wait. */
 async function refusal(r: Response, path: string, submits: boolean) {
-	const retry = Number(r.headers.get("retry-after"));
 	let reason: string | null = null;
 	try {
 		const body = await json(r);
@@ -60,11 +59,7 @@ async function refusal(r: Response, path: string, submits: boolean) {
 	} catch {
 		await r.body?.cancel().catch(() => {});
 	}
-	return new MeshHttpError(
-		r.status,
-		reason,
-		Number.isFinite(retry) && retry > 0 ? Math.min(retry, 600) * 1000 : null,
-	);
+	return new MeshHttpError(r.status, reason, retryAfter(r.headers, 600_000));
 }
 
 /**

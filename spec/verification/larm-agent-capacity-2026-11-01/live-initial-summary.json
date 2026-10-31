@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-31T23:13:51.057Z",
+  "source": "Summary of the first runner output captured in this chat; not raw Provider responses",
+  "llmClaimCapacities": [131072, 131072, 200000],
+  "additionalNonLlmClaimCount": 1,
+  "generations": [
+    { "status": 200, "stream": true, "hasCacheKey": true, "standardBody": true },
+    { "status": 200, "stream": true, "hasCacheKey": true, "standardBody": true },
+    { "status": 200, "stream": false, "hasCacheKey": true, "standardBody": true },
+    { "status": 200, "stream": true, "hasCacheKey": true, "standardBody": true }
+  ],
+  "observations": [
+    { "role": "main", "stream": false, "hasAnswer": true },
+    { "role": "subagent", "stream": true, "hasAnswer": true },
+    { "role": "subagent", "stream": true, "hasAnswer": true },
+    { "role": "main", "stream": true, "hasAnswer": true }
+  ],
+  "generationChecksPassed": true,
+  "originalRunnerPassed": false,
+  "originalRunnerIssue": "The initial aggregate counted a non-LLM scope as an LLM connection."
+}

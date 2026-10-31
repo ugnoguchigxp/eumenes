@@ -29,3 +29,7 @@ LARMの `/srv/ai/apps/local-LLM-harness/specs/mesh-resource-wait-investigation-2
 3. 実会話入口の結合試験でmain情報がLARMへ届くことを確認。larm/inference/dialogueと影響するagent/tool/voice domainのverifyを順に実行し、既存差分の失敗は分離して記録する。
 4. 保存設定の読み取り専用操作を使ったliveで容量・通常生成を確認する。サーバー起動・再起動、稼働中生成の停止は行わない。配備・稼働への反映はfixture/liveと分けて報告する。
 5. 差分を点検し、本文依存の判断、credential/本文ログ、無関係な変更が増えていないことを確認する。
+
+## 実装・検証結果
+
+指定した接続管理を実装し、対象domainのverify（backend 1616件・Web 95件）を通過した。実LARMの初回生成確認と追加再確認時の503、稼働backendへの反映未確認を区別した[受入記録](verification/larm-agent-capacity-2026-11-01/acceptance.md)を参照。サーバー操作は行っていない。

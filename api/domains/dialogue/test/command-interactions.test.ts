@@ -145,6 +145,7 @@ test("the command sub-agent runs as a sub-agent of its run, as one call", async 
 	expect(h.commandSessions[0]).toEqual({
 		sessionRole: "subagent",
 		taskId: first.id,
+		agentSession: { conversationId: "main", agentId: first.id },
 	});
 	// The command is one call: its session is released as the call ends.
 	await until(() => h!.releasedSessions.includes(first.id));

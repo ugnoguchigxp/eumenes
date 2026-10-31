@@ -14,14 +14,29 @@ export function createAgentLarm(
 ): LarmPort {
 	const root = createLarm(config);
 	const client = config.client ?? crypto.randomUUID();
-	const connections = new Map<string, LarmPort>();
+	const connections = new Map<
+		string,
+		{
+			owner: NonNullable<LarmCallOptions["agentSession"]>;
+			role: "main" | "sub";
+			client: string;
+			port: LarmPort;
+		}
+	>();
 	const lifetime = new AbortController();
 	const listeners = new Set<() => void>();
 	const yielding = createConversationYield();
 	let selected: LarmPort | undefined;
 	let retained = false;
 	let closed = false;
-	const notify = () => listeners.forEach((listener) => listener());
+	const notify = () =>
+		listeners.forEach((listener) => {
+			try {
+				listener();
+			} catch {
+				/* Independent observers. */
+			}
+		});
 	root.onChange?.(notify);
 	async function answer(
 		messages: Parameters<LarmPort["answer"]>[0],
@@ -42,21 +57,27 @@ export function createAgentLarm(
 			owner.agentId,
 			owner.branchId ?? null,
 		]);
-		let port = connections.get(key);
+		let port = connections.get(key)?.port;
 		if (!port) {
 			const opaque = (purpose: string) =>
 				createHash("sha256")
 					.update(JSON.stringify([client, purpose, key]))
 					.digest("hex");
+			const agentClient = `eumenes-${opaque("connection").slice(0, 40)}`;
 			port = createLarm({
 				...config,
-				client: `eumenes-${opaque("connection").slice(0, 40)}`,
+				client: agentClient,
 				connectionRole: role,
 				promptCacheKey: opaque("prompt-cache"),
 				keepAlive: role === "main" && config.keepAlive,
 			});
 			port.onChange?.(notify);
-			connections.set(key, port);
+			connections.set(key, {
+				owner: { ...owner },
+				role,
+				client: agentClient,
+				port,
+			});
 			if (role === "main" && retained) port.retain?.(true);
 		}
 		if (role === "main") selected = port;
@@ -88,12 +109,43 @@ export function createAgentLarm(
 		answerStream: answer,
 		connect: () => (selected ?? root).connect(),
 		probe: (signal) => (selected ?? root).probe!(signal),
-		llmContextWindow: () =>
-			selected?.llmContextWindow?.() ?? root.llmContextWindow?.() ?? null,
-		status: () => selected?.status() ?? root.status(),
-		inspect: () =>
-			selected?.inspect?.() ??
-			root.inspect?.() ?? { profile: config.profile ?? "", providers: [] },
+		llmContextWindow: () => selected?.llmContextWindow?.() ?? null,
+		status: () => ({
+			...(selected?.status() ?? root.status()),
+			capabilities: [
+				...new Set([
+					...(selected?.status().capabilities ?? []),
+					...root.status().capabilities,
+				]),
+			],
+		}),
+		inspect: () => {
+			const main = selected?.inspect?.(),
+				speech = root.inspect?.();
+			return {
+				...(main ?? speech ?? { profile: config.profile ?? "" }),
+				decisionModel: speech?.decisionModel,
+				providers: [
+					...(main?.providers.filter((p) => p.name === "llm") ?? []),
+					...(speech?.providers.filter((p) => !main || p.name !== "llm") ?? []),
+				],
+				agentConnections: [...connections.values()].map(
+					({ owner, role, client, port }) => ({
+						...owner,
+						role,
+						client,
+						requestedTokens: role === "main" ? 200000 : 131072,
+						connectionId: port.inspect?.().connectionId,
+						bootEpoch: port.inspect?.().bootEpoch,
+						state: port.status().state,
+					}),
+				),
+			};
+		},
+		transcribe(wav, signal, options) {
+			yielding.preempt();
+			return root.transcribe(wav, signal, options);
+		},
 		onChange(listener) {
 			listeners.add(listener);
 			return () => {
@@ -103,15 +155,15 @@ export function createAgentLarm(
 		retain(active) {
 			retained = active;
 			root.retain?.(active);
-			for (const [key, port] of connections)
-				if (JSON.parse(key)[0] === "main") port.retain?.(active);
+			for (const { role, port } of connections.values())
+				if (role === "main") port.retain?.(active);
 		},
 		async close(options) {
 			closed = true;
 			lifetime.abort(new Error("larm_closed"));
 			await Promise.all([
 				root.close(options),
-				...[...connections.values()].map((p) => p.close(options)),
+				...[...connections.values()].map(({ port }) => port.close(options)),
 			]);
 			connections.clear();
 			listeners.clear();

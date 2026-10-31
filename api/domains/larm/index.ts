@@ -50,8 +50,10 @@ export {
 	checkRefusal,
 	isCapacityBusy,
 	LarmCapacityBusy,
+	retryAfter,
 	sendAgainIfLost,
 } from "./service/resend";
+export { settleCapacityWait } from "./service/capacity-wait";
 export { silentWav, code as playgroundError } from "./service/playground-http";
 
 export { trackQuery, type TrackQuery } from "./contracts/music-library";

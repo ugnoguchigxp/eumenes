@@ -61,6 +61,21 @@ async function releaseConnection(current: Lease, control: Control) {
 	return current.release;
 }
 
+type LeaseManagerOptions = {
+	base: URL | undefined;
+	token: string | undefined;
+	profile: string;
+	audience: string;
+	client: string;
+	connectionRole?: "main" | "sub";
+	idleTimeoutMs: number;
+	/** Hold the connection, and its input cache, while the port is open. */
+	keepAlive?: boolean;
+	hostsFor: () => ProviderHosts;
+	control: Control;
+	lifetime: AbortController;
+};
+
 /**
  * The one shared connection of a port: creation, renewal, release and the status it reports.
  * Work borrows a provider of the lease through `withProvider`, which counts the use so the
@@ -78,21 +93,7 @@ export function createLeaseManager({
 	hostsFor,
 	control,
 	lifetime,
-}: {
-	base: URL | undefined;
-	token: string | undefined;
-	profile: string;
-	audience: string;
-	client: string;
-	connectionRole?: "main" | "sub";
-	idleTimeoutMs: number;
-	/** The connection is held while the port is open, as LARM's input cache lives on it (not only while a screen shows). */
-	keepAlive?: boolean;
-	hostsFor: () => ProviderHosts;
-	control: Control;
-	/** Aborted when the port closes. */
-	lifetime: AbortController;
-}) {
+}: LeaseManagerOptions) {
 	let lease: Lease | undefined;
 	let connecting: Promise<Lease> | undefined;
 	let lastError: string | undefined;

@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
 import { capacityFixture, messages, owner } from "./agent-capacity.fixture";
 import { createAgentLarm, createGenerationLanes } from "..";
+import { configureLogging } from "../../../infrastructure/logger";
 
 const signal = () => AbortSignal.timeout(5000);
 
@@ -85,19 +86,21 @@ test("connection and opaque cache identities follow conversation, agent, role an
 	}
 });
 
-test("main capacity mismatch in readiness or claim never reaches generation", async () => {
-	for (const wrong of ["wrongCapacity", "wrongClaimCapacity"] as const) {
-		const f = capacityFixture(),
-			p = f.port();
-		f.controls[wrong] = true;
-		try {
-			await expect(p.answer(messages, signal(), owner("main"))).rejects.toThrow(
-				"larm_agent_context_mismatch",
-			);
-			expect(f.generations).toHaveLength(0);
-			expect([...f.bindings.values()].every((b) => b.released)).toBeTrue();
-		} finally {
-			await p.close();
+test("main and sub capacity mismatch in readiness or claim never reaches generation", async () => {
+	for (const role of ["main", "subagent"] as const) {
+		for (const wrong of ["wrongCapacity", "wrongClaimCapacity"] as const) {
+			const f = capacityFixture(),
+				p = f.port();
+			f.controls[wrong] = role === "main" ? 131072 : 200000;
+			try {
+				await expect(p.answer(messages, signal(), owner(role))).rejects.toThrow(
+					"larm_agent_context_mismatch",
+				);
+				expect(f.generations).toHaveLength(0);
+				expect([...f.bindings.values()].every((b) => b.released)).toBeTrue();
+			} finally {
+				await p.close();
+			}
 		}
 	}
 });
@@ -168,7 +171,7 @@ test("generation lanes admit main plus two subagents, queue extras and remove ca
 	}
 });
 
-test("reclaim renews provider bearer before its own expiry; reconnect and boot changes retain role, capacity and cache identity", async () => {
+test("reclaim renews provider bearer before its own expiry; idle reconnect retains role, capacity and cache identity", async () => {
 	const f = capacityFixture(),
 		p = f.port();
 	try {
@@ -192,6 +195,77 @@ test("reclaim renews provider bearer before its own expiry; reconnect and boot c
 		}
 	} finally {
 		await p.close();
+	}
+});
+
+test("a boot epoch change retires the old binding before the next generation", async () => {
+	const f = capacityFixture(),
+		p = f.port();
+	try {
+		await p.answer(messages, signal(), owner("main"));
+		const before = f.generations[0]!;
+		f.bindings.get(before.id)!.epoch = "epoch-b";
+		await p.connect();
+		await p.answer(messages, signal(), owner("main"));
+		expect(f.generations[1]!.id).not.toBe(before.id);
+		expect(f.generations[1]!.body.prompt_cache_key).toBe(
+			before.body.prompt_cache_key,
+		);
+		expect(f.creates.at(-1)!.body.contextTokens).toBe(200000);
+		expect(p.inspect!().agentConnections![0]).toMatchObject({
+			role: "main",
+			requestedTokens: 200000,
+			bootEpoch: "epoch-a",
+			state: "ready",
+		});
+	} finally {
+		await p.close();
+	}
+});
+
+test("diagnostics expose role, capacity and connection state without bearer, cache key or conversation content", async () => {
+	const lines: string[] = [];
+	configureLogging({
+		level: "info",
+		destination: {
+			write: (line) => {
+				lines.push(line);
+			},
+		},
+	});
+	const f = capacityFixture(),
+		p = f.port();
+	try {
+		await p.answer(messages, signal(), owner("main"));
+		await p.answer(messages, signal(), owner("subagent"));
+		const entries = lines.map((line) => JSON.parse(line));
+		expect(
+			entries.some(
+				(e) =>
+					e.event === "larm.provider_claimed" &&
+					e.sessionRole === "main" &&
+					e.maxTokens === 200000,
+			),
+		).toBeTrue();
+		expect(
+			entries.some(
+				(e) =>
+					e.event === "larm.provider_claimed" &&
+					e.sessionRole === "sub" &&
+					e.maxTokens === 131072,
+			),
+		).toBeTrue();
+		const text = lines.join("");
+		for (const secret of [
+			messages[0]!.content,
+			"fixture-control-secret",
+			"fixture-provider-secret",
+			String(f.generations[0]!.body.prompt_cache_key),
+		])
+			expect(text).not.toContain(secret);
+	} finally {
+		await p.close();
+		configureLogging({ level: "silent" });
 	}
 });
 

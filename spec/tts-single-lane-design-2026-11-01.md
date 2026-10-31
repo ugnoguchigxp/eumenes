@@ -227,4 +227,8 @@ Web の試験は対象の試験ファイルを個別に実行する。fixture・
 
 `bun run verify -- --domain inference --domain voice-dialogue --domain settings --domain audio --domain dialogue --domain kanban --domain timers --domain terminals` は全13工程が pass（backend 1,103件・Web 258件成功、静的検査は選択domain内の違反0）。ただし並行作業のファイルが実行中に変わったため、run は `invalidated`（`verification-reports/runs/2026-10-31T22-36-06-487Z-…/report.json`）。範囲外の警告（size-budget 7・型 5・format 2・domain表 1）は並行作業の capacity wait の分。domain に属さない Web 試験は個別に実行し成功（`useScreenPresence`・通知・タイマー等 113件）。`web/src/workspace/shell-artifact.test.tsx` の1件と `client/test/settings-tasks.test.ts` の2件（`live` の期待値なし）は、今回変えていない経路の既存の失敗として残した。
 
-live・実機器: 未実施。backend と Web の再起動後、2つの画面を開いた状態で、自発発話・入力した質問・音声入力の返事・完了通知が各1回だけ、同じ声で、重ならずに聞こえることを確認する。
+live（2026-11-01 08:02 の再起動後、読み取りのみ）: 保存済みの読み上げ経路は `larm-only` に移行済み（ASR は `larm-preferred`、LLM は `cloud-only` のまま）。設定画面の公開版は `artifact:settings.ai-connections@9`、bundle の skip なし。未登録の画面IDで `GET /api/inference/screen/:id` は `playbackScreen:false`、`POST /api/voice/speech-claims` は 409（`not_playback_screen`、確保は記録されない）。開発Webは `screen-output.ts`・`useScreenSound.ts` を配信している。
+
+live（08:18 の再起動後）: LARM は ready に戻った。TODO の完了通知は 08:17:42（成功、完了音声あり）と 08:18:56（失敗、通知音のみ）で、確保はそれぞれ1回（別の画面ID）、拒否なし。この時点の画面は Brave と Cursor 内のブラウザーの2つ。利用者は 08:17:42 の完了音声が二重に聞こえたと報告したが、backend の確保は1回で、2回目は確保を通らない経路から鳴っている。Cursor の画面を閉じた後は Brave の1画面だけが接続している。発生元の画面は特定していない（各画面のコンソールの `eumenes.completion_audio` で追える）。
+
+実機器（初回の再起動時）: 再起動直後から LARM の接続がすべて `larm_claim_context_mismatch` で失敗している（`larm/service/connect.ts` の変更と未追跡の `context-capacity.ts`。並行作業の capacity wait の作業中のファイルで、本改修の対象外）。TTS は合成できず、新しい規則どおり発話しない。LARM の接続が戻った後、2つの画面を開いた状態で、自発発話・入力した質問・音声入力の返事・完了通知が各1回だけ、同じ声で、重ならずに聞こえることを確認する。

@@ -153,6 +153,18 @@ export interface LarmPort {
 		profile: string;
 		decisionModel?: string | null;
 		connectionId?: string;
+		bootEpoch?: string;
+		agentConnections?: Array<{
+			conversationId: string | null;
+			agentId: string;
+			branchId?: string;
+			role: "main" | "sub";
+			requestedTokens: number;
+			client: string;
+			connectionId?: string;
+			bootEpoch?: string;
+			state: LarmStatus["state"];
+		}>;
 		providers: Array<{
 			name: Capability | "tts-english";
 			model: string;

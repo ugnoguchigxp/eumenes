@@ -38,6 +38,10 @@ test("an instant toolchain answers from the inputs the one choice gave: the host
 	expect(h.dialogue.answerText(run.id)).toBe("東京は12時です。");
 	expect(h.state.calls).toHaveLength(1);
 	const [chose] = h.state.calls;
+	expect(chose!.session).toMatchObject({
+		sessionRole: "main",
+		agentSession: { conversationId: "main", agentId: "main" },
+	});
 	expect(chose!.tools).toEqual([]);
 	expect(offered(chose!.session?.outputSchema)).toEqual([
 		"none",
