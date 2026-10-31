@@ -170,7 +170,7 @@ test("reopening and seeding preserves disabled toolchains and explicitly publish
 			caps.publishToolchainRevisionInTransaction(
 				db,
 				"timers.manage",
-				"toolchain:timers.manage@2",
+				"toolchain:timers.manage@5",
 			);
 			caps.publishArtifactRevisionInTransaction(
 				db,

@@ -1,6 +1,5 @@
 import type { Database } from "bun:sqlite";
 import { systemCopyCheck } from "./conversation-output";
-import type { NativeTool } from "../../../infrastructure/chat-stream";
 import {
 	estimateTextTokens,
 	headWithin,
@@ -12,13 +11,10 @@ import { latestConversationId } from "../repository";
 import type { ChatMessage, DialogueDeps } from "./context";
 import { systemText } from "./context-system";
 import { conversationHasActiveRun } from "./active-run";
-import { toolchainTitlesInTransaction } from "./delegate-conversation";
-import { generationTools } from "./generation-tools";
 import { localHarness, type ConversationHarness } from "./harness";
 import { INPUT_HEADINGS, dataText, joinSections, section } from "./input-text";
 import { memoryItemLine } from "./result-text";
 import { stateLinesInTransaction, stateText } from "./state-text";
-import { exchangeMessages } from "./tool-exchange";
 
 /** Bounds of the recent conversation and its cuts (the conversation input specification, sections 6.1 and 6.1.1). */
 export const RECENT = {
@@ -40,29 +36,18 @@ export const RECENT = {
 export const MEMORY_TOKENS = 300;
 const MEMORY_KINDS = new Set(["preference", "habit", "tendency", "constraint"]);
 
-/** The system part of every call on the conversation's prompt (section 4), in the harness's sections. */
-export function conversationSystem(
-	deps: DialogueDeps,
-	tx: Database,
-	harness: ConversationHarness,
-): string {
+/** The system part of every call on the conversation's prompt (section 4). */
+export function conversationSystem(deps: DialogueDeps, tx: Database): string {
 	const persona = deps.larm.snapshotInTransaction?.(tx).general ?? {
 		agentName: "",
 		userName: "",
 		persona: "butler" as const,
 	};
-	return systemText(
-		persona,
-		deps.conversationAgent.system(),
-		toolchainTitlesInTransaction(deps, tx),
-		harness.system,
-		harness.systemTexts,
-	);
+	return systemText(persona, deps.conversationAgent.system());
 }
 
-/** What the cached prefix is fixed by: the system part and the tool definitions. */
-export const systemDigestOf = (system: string) =>
-	sha256Hex(system + JSON.stringify(generationTools));
+/** What the cached prefix is fixed by: the system part. */
+export const systemDigestOf = (system: string) => sha256Hex(system);
 
 /** What `## Memory` shows of a window: a cut is placed when it would show something else. */
 export const memoryDigestOf = (window: WindowSnapshot | null) =>
@@ -100,20 +85,8 @@ export function memoryLines(items: readonly ProfileItem[]): {
 	return { lines: shown.map(line), ids: shown.map((item) => item.id) };
 }
 
-/** An utterance's size in the recent conversation: its words, and the notice and tool calls the harness draws. */
-const utteranceTokens = (u: Utterance, history: HarnessHistory) =>
-	estimateTextTokens(u.text) +
-	(history.notices && u.notice ? estimateTextTokens(u.notice) : 0) +
-	(history.toolExchanges
-		? u.toolCalls.reduce(
-				(sum, call) =>
-					sum + estimateTextTokens(call.name + call.arguments + call.result),
-				0,
-			)
-		: 0);
-const tokensOf = (utterances: readonly Utterance[], history: HarnessHistory) =>
-	utterances.reduce((sum, u) => sum + utteranceTokens(u, history), 0);
-type HarnessHistory = ConversationHarness["history"];
+const tokensOf = (utterances: readonly Utterance[]) =>
+	utterances.reduce((sum, u) => sum + estimateTextTokens(u.text), 0);
 
 /** The utterances the recent conversation shows: from the agent's first one, those not waiting for an answer. */
 export function recentUtterances(
@@ -138,38 +111,18 @@ export function recentUtterances(
 }
 
 /**
- * The recent conversation as native messages: one per side's run of utterances, each utterance within its bound. An
- * agent's utterance that ended a turn with a search or a hand-over follows those calls and their results (the
- * tool-call reliability design, P1); the first call joins an agent's words just before it. The harness's history
- * flags leave out the exchanges and the notices.
+ * The recent conversation as native messages: one per side's run of utterances, each utterance within its bound. The
+ * searches, hand-overs and notices an utterance carries are not drawn: the talk turn reads the words only.
  */
 export function recentMessages(
 	utterances: readonly Utterance[],
-	history: ConversationHarness["history"],
 ): ChatMessage[] {
 	const messages: ChatMessage[] = [];
 	for (const u of utterances) {
 		const role = u.speaker === "user" ? "user" : "assistant";
 		const text = dataText(headWithin(u.text, RECENT.utteranceTokens).text);
-		const exchange = history.toolExchanges
-			? exchangeMessages(u.seq, u.toolCalls)
-			: [];
-		// A report follows the notice it answered (section 5.5 #4); at the very start it has nothing to follow.
-		if (history.notices && u.notice && messages.length) {
-			const notice = dataText(u.notice);
-			const before = messages.at(-1)!;
-			if (before.role === "user") before.content += `\n${notice}`;
-			else messages.push({ role: "user", content: notice });
-		}
 		const last = messages.at(-1);
-		if (exchange.length) {
-			const [first, ...rest] = exchange;
-			if (last && last.role === "assistant" && !last.tool_calls)
-				last.tool_calls = first!.tool_calls!;
-			else messages.push(first!);
-			messages.push(...rest, { role, content: text });
-		} else if (last && last.role === role && !last.tool_calls)
-			last.content += `\n${text}`;
+		if (last && last.role === role) last.content += `\n${text}`;
 		else messages.push({ role, content: text });
 	}
 	return messages;
@@ -194,7 +147,6 @@ function fixedCutReason(
 		systemDigest: string;
 		memoryDigest: string;
 		nowMs: number;
-		history: HarnessHistory;
 	},
 ): string | null {
 	// A gap comes first: it keeps nothing of what was said before, which serves every other reason too (a memory or
@@ -205,10 +157,7 @@ function fixedCutReason(
 	if (cut.due) return cut.due;
 	if (cut.systemDigest !== input.systemDigest) return "system_changed";
 	if (cut.memoryDigest !== input.memoryDigest) return "memory_changed";
-	if (
-		shown.length > RECENT.hardCount ||
-		tokensOf(shown, input.history) > RECENT.hardTokens
-	)
+	if (shown.length > RECENT.hardCount || tokensOf(shown) > RECENT.hardTokens)
 		return "over_limit";
 	return null;
 }
@@ -229,8 +178,6 @@ export function placeCutInTransaction(
 		window: WindowSnapshot | null;
 		nowMs: number;
 		pending: ReadonlySet<string>;
-		/** What the harness draws of the recent conversation: only that counts toward its limit. */
-		history: HarnessHistory;
 	},
 ): {
 	cut: ConversationCut;
@@ -267,7 +214,6 @@ export function placeCutInTransaction(
 		systemDigest,
 		memoryDigest: memoryDigestOf(window),
 		nowMs: input.nowMs,
-		history: input.history,
 	});
 	if (!reason) return { cut: existing, reason: null, window };
 	// Nothing said before a gap stays, nor what the context keeper made of it.
@@ -309,7 +255,7 @@ export function moveCutInTransaction(
 		{
 			seq: input.seq,
 			systemDigest: systemDigestOf(
-				input.system ?? conversationSystem(deps, tx, localHarness),
+				input.system ?? conversationSystem(deps, tx),
 			),
 			memoryDigest: memoryDigestOf(window),
 			at: new Date(input.nowMs).toISOString(),
@@ -354,7 +300,6 @@ export function clearRecentInTransaction(
 export type ConversationPrefix = {
 	/** System, `## Memory` (when there is a recent conversation to put it before) and the recent conversation. */
 	messages: ChatMessage[];
-	tools: NativeTool[];
 	/** `## Memory` when no recent conversation follows it: the last message starts with it instead. */
 	carry: string | null;
 	cut: ConversationCut | null;
@@ -396,9 +341,7 @@ export function conversationPrefixFrom(
 	// An utterance of the agent that copies the system part is not drawn: it was copied again turn after turn
 	// (section 5.5 #1). The generation's gate keeps new ones out; this keeps out those kept before it, and the
 	// agency's, which no generation gate checks.
-	const copies = history.copyFilter
-		? systemCopyCheck(input.system, toolchainTitlesInTransaction(deps, tx))
-		: null;
+	const copies = history.copyFilter ? systemCopyCheck(input.system) : null;
 	const after = store
 		.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
 		.filter((u) => !(copies && u.speaker === "agent" && copies(u.text)));
@@ -413,7 +356,7 @@ export function conversationPrefixFrom(
 		INPUT_HEADINGS.memory,
 		lines.length ? lines : ["- なし"],
 	);
-	const conversation = recentMessages(recent, history);
+	const conversation = recentMessages(recent);
 	const messages: ChatMessage[] = [{ role: "system", content: input.system }];
 	if (memory && conversation.length)
 		messages.push({ role: "user", content: memory });
@@ -432,8 +375,6 @@ export function conversationPrefixFrom(
 		);
 	return {
 		messages,
-		// A routed turn sends no tool definitions: the background calls share its prefix as it is.
-		tools: input.harness.turn === "routed" ? [] : generationTools,
 		carry: conversation.length || !lines.length ? null : memory,
 		cut,
 		recent,
@@ -505,7 +446,7 @@ export function backgroundPrefixInTransaction(
 	}
 	return conversationPrefixFrom(deps, tx, conversationId, {
 		harness: localHarness,
-		system: conversationSystem(deps, tx, localHarness),
+		system: conversationSystem(deps, tx),
 		window,
 		pending: pendingMessageIdsInTransaction(deps, tx, conversationId),
 	});
@@ -523,24 +464,14 @@ export function taskMessages(
 	]);
 }
 
-/** A message of a background call: the prefix's words and kept tool calls, and its task (no image, no attachment). */
-export type BackgroundMessage = Pick<
-	ChatMessage,
-	"role" | "content" | "tool_calls" | "tool_call_id"
->;
+/** A message of a background call: the prefix's words and its task (no image, no attachment). */
+export type BackgroundMessage = Pick<ChatMessage, "role" | "content">;
 
 /** A message as a background call sends it: what the conversation's own call sends of it, byte for byte. */
 export const backgroundMessage = ({
 	role,
 	content,
-	tool_calls,
-	tool_call_id,
-}: ChatMessage): BackgroundMessage => ({
-	role,
-	content,
-	...(tool_calls ? { tool_calls } : {}),
-	...(tool_call_id ? { tool_call_id } : {}),
-});
+}: ChatMessage): BackgroundMessage => ({ role, content });
 
 /**
  * A background call's whole input on the conversation's prompt (section 10): the shared prefix, then the last
@@ -553,7 +484,7 @@ export function backgroundTaskInTransaction(
 	conversationId: string,
 	task: string,
 	sections: ReadonlyArray<string | null> = [],
-): { messages: BackgroundMessage[]; tools: NativeTool[] } | null {
+): { messages: BackgroundMessage[] } | null {
 	const prefix = backgroundPrefixInTransaction(deps, tx, conversationId);
 	if (!prefix) return null;
 	const nowMs = Date.parse(deps.clock());
@@ -580,7 +511,6 @@ export function backgroundTaskInTransaction(
 		messages: taskMessages(prefix, [state, ...sections], task).map(
 			backgroundMessage,
 		),
-		tools: prefix.tools,
 	};
 }
 

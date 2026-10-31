@@ -1,4 +1,3 @@
-import { settings } from "./harness.fixture";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
@@ -9,7 +8,7 @@ import {
 	type ConversationEvent,
 } from "../../continuity";
 import { createConversationService } from "../../conversation";
-import type { InferencePort, Receipt } from "../../inference";
+import type { CallSession, InferencePort, Receipt } from "../../inference";
 import { createMemoryService, type MemoryService } from "../../memory";
 import { createQueue } from "../../queue";
 import { createDialogueService } from "..";
@@ -32,6 +31,16 @@ import { openDialogueStore } from "./store.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
 
 export { IMAGE, type Call, type Step };
+
+/** A routed turn's choice, as the model answers it (held to the schema the host built). */
+export const choice = (value: Record<string, unknown>): Step => ({
+	text: JSON.stringify(value),
+});
+/** The pending turn's choice that approves the open confirmation `c<ref>` or declines it. */
+export const approve = (ref = 1) =>
+	choice({ choice: "approve", confirmation: `c${ref}` });
+export const decline = (ref = 1) =>
+	choice({ choice: "decline", confirmation: `c${ref}` });
 
 export const REVISION = "toolchain:fake.studio@1";
 export const OTHER_REVISION = "toolchain:fake.other@1";
@@ -78,8 +87,6 @@ export type Options = {
 	limits?: SpecialistSet["timeLimits"];
 	/** The studio's agent settings: a work document makes the host offer doc.* tools. */
 	agent?: SpecialistSet["agent"];
-	/** The harness the conversation's runs are served by: `cloud` (default) or `local` (the routed turn). */
-	harness?: "cloud" | "local";
 };
 
 /** The fixture document's canonical text: the same value always gives the same text. */
@@ -134,6 +141,8 @@ export async function setup(options: Options = {}) {
 		works: new Map<string, Work>(),
 		invocations: [] as Array<Record<string, unknown>>,
 		endWorkFails: false,
+		/** The toolchains a search finds, by id; null: every card. */
+		found: null as string[] | null,
 		/** Saved items deleted since: no longer offered, and opening one is refused. */
 		gone: new Set<string>(),
 		/** A safe code the next operations are refused with. */
@@ -163,15 +172,6 @@ export async function setup(options: Options = {}) {
 			signal?.addEventListener("abort", () => reject(new Error("aborted")));
 		});
 	const larm = {
-		...(options.harness === "local"
-			? {}
-			: {
-					// The conversation is served by a cloud model: the agent's reply loop calls the tools itself.
-					snapshotFor: () => ({
-						...settings({ mode: "cloud-only" }),
-						voice: { autoSpeak: true },
-					}),
-				}),
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		captureInTransaction: () => {},
 		captureControlInTransaction: (
@@ -228,10 +228,12 @@ export async function setup(options: Options = {}) {
 			delta: ((text: string) => void) | undefined,
 			_preparation: unknown,
 			tools: Array<{ function: { name: string } }> | undefined,
+			session?: CallSession,
 		) => {
 			state.calls.push({
 				messages: messages.map((m) => ({ ...m })),
 				tools: (tools ?? []).map((t) => t.function.name),
+				...(session ? { session } : {}),
 			});
 			const step = state.steps.shift();
 			if (!step) throw new Error("fixture_step_missing");
@@ -483,7 +485,9 @@ export async function setup(options: Options = {}) {
 	const toolchains = {
 		embedQuery: async () => undefined,
 		routeInTransaction: () => ({
-			cards,
+			cards: state.found
+				? cards.filter((card) => state.found!.includes(card.id))
+				: cards,
 			past: [],
 			retrieval: "fts",
 		}),
@@ -577,30 +581,34 @@ export async function setup(options: Options = {}) {
 			}),
 		until: (check: () => boolean) => waitFor(check, { timeout: 4000 }),
 		/**
-		 * Script the conversation model to hand the next utterance to a session toolchain: it searches, then
-		 * delegates (execute) with the announcement that precedes the hand-over.
+		 * Script the routed turn's choice that hands the next utterance to a session toolchain: the host searches by
+		 * itself, then the one choice names the toolchain with the announcement that precedes the hand-over. A
+		 * toolchain with saved items always names its target (`new` unless one is given).
 		 */
 		handOver(
-			args: { request: string } & Record<string, unknown>,
+			args: { request: string; target?: string; resolveUnsaved?: "discard" },
 			toolchain: string = STUDIO.id,
 		) {
+			const target = args.target ?? (toolchain === STUDIO.id ? "new" : null);
 			state.steps.push(
-				{ calls: [{ name: "find_toolchain", args: { query: args.request } }] },
-				{
-					calls: [
-						{
-							name: "delegate",
-							args: {
-								mode: "execute",
-								toolchain,
-								impact: "create",
-								announcement: "担当に引き継ぎます。",
-								...args,
-							},
-						},
-					],
-				},
+				choice({
+					choice: toolchain,
+					say: "担当に引き継ぎます。",
+					request: args.request,
+					...(target ? { target } : {}),
+					...(args.resolveUnsaved
+						? { resolveUnsaved: args.resolveUnsaved }
+						: {}),
+				}),
 			);
+		},
+		/**
+		 * Script ordinary conversation turns, one per text: the request turn's choice is `none`, then the talk turn
+		 * answers (the host has no judgement to route by in these tests).
+		 */
+		talk(...texts: string[]) {
+			for (const text of texts)
+				state.steps.push(choice({ choice: "none" }), { text });
 		},
 		session: () => dialogue.specialistSession("main"),
 		rows: (sql: string, ...params: Array<string | number>) =>
@@ -617,6 +625,12 @@ export async function setup(options: Options = {}) {
 		},
 		fields(event: ConversationEvent) {
 			return JSON.parse(event.text ?? "{}") as Record<string, unknown>;
+		},
+		/** The index of the latest choice call (a routed turn's schema call): the one that reads the work's `## State`. */
+		lastChoice(): number {
+			for (let i = state.calls.length - 1; i >= 0; i--)
+				if (state.calls[i]!.session?.outputSchema) return i;
+			return -1;
 		},
 		/** The `## State` lines of the last message the nth conversation call received. */
 		stateOf(call: number): string[] {

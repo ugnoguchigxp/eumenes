@@ -98,7 +98,7 @@ ASR・テキストとも既存のチャット欄で依頼する。実際の処�
 | --- | --- |
 | 接続・切断・タブの切替・タブを閉じる・URLを開く・撮影の取消 | 共通の `POST /api/toolchain-actions`（受付と実行が一つの transaction） |
 | Braveのパスの保存 | `PUT /api/browser/setting` |
-| 接続・タブ・撮影の読取り | 画面のsource（`query:browser.workspace@1`）、`GET /api/browser/connection`、`GET /api/browser/tabs`、`GET /api/browser/captures` |
+| タブの読取り | 画面のsource（`query:browser.workspace@1`）、`GET /api/browser/tabs` |
 
 Braveとの通信（接続・タブの切替など）は書込み transaction の中では行わず、受け付けた transaction と同時に queue へ積まれて、commit 後に実行される。積まれてから60秒以内に実行されなかった操作は破棄する。
 

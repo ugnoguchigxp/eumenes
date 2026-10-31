@@ -32,4 +32,3 @@ export const deleteSchema = z.strictObject({
 });
 export type SaveInput = z.infer<typeof saveSchema>;
 export type DeleteInput = z.infer<typeof deleteSchema>;
-export const entriesSchema = z.object({ entries: z.array(entrySchema) });

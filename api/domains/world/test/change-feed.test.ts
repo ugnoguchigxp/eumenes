@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
-import type { ListChangesRequest, SourceAdapter, SourceChange } from "..";
-import { extractEventId } from "..";
+
 import {
 	ACCESS,
 	NOW,
@@ -31,6 +30,12 @@ import {
 	reopenLife,
 	type Life,
 } from "./lifecycle-fixture";
+import type {
+	ListChangesRequest,
+	SourceAdapter,
+	SourceChange,
+} from "../contracts";
+import { extractEventId } from "../service/extraction-intake";
 
 // P4-01: continuous input receipt and progress. A28 (gaps, duplicates, receipt
 // vs. application), A29 (forget/correction before pending extraction),

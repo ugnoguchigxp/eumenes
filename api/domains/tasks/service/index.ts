@@ -99,15 +99,6 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 		) {
 			return repo.conversation(db, conversationId, limit);
 		},
-		runtimeInTransaction: repo.runtime,
-		setRuntimeInTransaction(
-			tx: Database,
-			taskId: string,
-			refs: repo.TaskRuntimeRefs,
-		) {
-			core.requireTask(tx, taskId);
-			repo.setRuntime(tx, taskId, refs);
-		},
 		maintenance: () => store.write(maintenanceInTransaction),
 		async recover() {
 			return store.write(recoverInTransaction);

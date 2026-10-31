@@ -245,4 +245,3 @@ export function createCaptures(ctx: Ctx) {
 		},
 	};
 }
-export type Captures = ReturnType<typeof createCaptures>;

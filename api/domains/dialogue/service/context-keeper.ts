@@ -25,7 +25,6 @@ import {
 	conversationSystem,
 	taskMessages,
 } from "./conversation-input";
-import { localHarness } from "./harness";
 import { INPUT_HEADINGS, lineText, section } from "./input-text";
 import { memoryItemLine } from "./result-text";
 import { stateLinesInTransaction, stateText } from "./state-text";
@@ -129,7 +128,6 @@ type Prepared = {
 	revision: number;
 	cutSeq: number;
 	messages: Messages;
-	tools: import("../../../infrastructure/chat-stream").NativeTool[];
 };
 
 /**
@@ -345,7 +343,6 @@ function prepareKeeper(
 		revision: prefix.cut?.revision ?? 0,
 		cutSeq: prefix.cut?.seq ?? 0,
 		messages,
-		tools: prefix.tools,
 	};
 }
 
@@ -377,8 +374,6 @@ export async function warmConversation(
 				sessionRole: "auxiliary",
 				onConversation: true,
 				readAhead: true,
-				prefixTools: prompt.tools,
-				toolChoice: "none",
 			},
 		);
 		await store
@@ -461,11 +456,10 @@ export function createContextKeeper(
 				if (conversationHasActiveRun(db, conversationId)) return false;
 				const window = storedWindow(db, conversationId);
 				return !!placeCutInTransaction(deps, db, conversationId, {
-					system: conversationSystem(deps, db, localHarness),
+					system: conversationSystem(deps, db),
 					window,
 					nowMs: Date.parse(deps.clock()),
 					pending: pendingMessageIdsInTransaction(deps, db, conversationId),
-					history: localHarness.history,
 				}).reason;
 			})
 			.catch(() => false);
@@ -523,8 +517,6 @@ export function createContextKeeper(
 				{
 					sessionRole: "auxiliary",
 					onConversation: true,
-					prefixTools: prepared.tools,
-					toolChoice: "none",
 				},
 			);
 			abort.signal.throwIfAborted();
@@ -673,7 +665,6 @@ export function createContextKeeper(
 		},
 	};
 }
-export type ContextKeeper = ReturnType<typeof createContextKeeper>;
 
 const codeOf = (error: unknown) =>
 	error instanceof LlmJsonError

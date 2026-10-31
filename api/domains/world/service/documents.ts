@@ -12,7 +12,6 @@ import {
 	pageDocuments,
 	readDocument,
 	searchDocuments,
-	withdrawDocument,
 } from "../repository/documents";
 
 /** Host-owned reference material. Import is not extraction, adoption, or verification of external truth. */
@@ -48,8 +47,6 @@ export function createWorldDocuments(store: SqliteStore) {
 				return { status: "inserted" as const };
 			});
 		},
-		withdraw: (scope: WorldDocumentScope, id: string) =>
-			store.write((db) => withdrawDocument(db, scope, id)),
 		lookupInTransaction(db: Database, scope: WorldDocumentScope, raw: unknown) {
 			const input = worldDocumentsInput.parse(raw);
 			if (!!input.query === !!input.documentId)
@@ -107,12 +104,6 @@ export function createWorldDocuments(store: SqliteStore) {
 			return !!doc && !doc.withdrawn && doc.revision === revision;
 		},
 	};
-	return {
-		...api,
-		page: (scope: WorldDocumentScope, raw: unknown = {}) =>
-			store.readSnapshot((db) => api.pageInTransaction(db, scope, raw)),
-		lookup: (scope: WorldDocumentScope, raw: unknown) =>
-			store.readSnapshot((db) => api.lookupInTransaction(db, scope, raw)),
-	};
+	return api;
 }
 export type WorldDocuments = ReturnType<typeof createWorldDocuments>;

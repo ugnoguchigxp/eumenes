@@ -23,7 +23,6 @@ export const resourceDefinitionKinds: readonly Definition["kind"][] = [
 export function validateResourceDefinition(d: Definition) {
 	if (
 		d.dependencies.length ||
-		d.discoveryMode !== undefined ||
 		d.backend !== undefined ||
 		d.schemaKey !== undefined ||
 		d.body !== undefined

@@ -6,7 +6,8 @@ import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
 import { createContinuityService } from "../../continuity";
-import { createMemoryService, retireExchangeLedgerMigration } from "..";
+import { createMemoryService } from "..";
+import { retireExchangeLedgerMigration } from "../repository";
 import { memoryTestMigrations } from "./memory.fixture";
 
 const cleanups: Array<() => Promise<void> | void> = [];

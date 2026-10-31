@@ -1,9 +1,4 @@
-import {
-	musicPlan,
-	musicPlanV2,
-	musicPlanV3,
-	type Prepared,
-} from "../../capabilities";
+import { musicPlanV3, type Prepared } from "../../capabilities";
 import { z } from "zod";
 import { delegatedTaskRules } from "../../inference";
 /**
@@ -11,16 +6,10 @@ import { delegatedTaskRules } from "../../inference";
  * it). A local dense model reads the whole plan input without a cache hit: 45 s ran out before it answered.
  */
 export const PLAN_MS = 120_000;
-export const musicSchema = (prepared: Prepared) =>
-	prepared.package.revision >= 3
-		? musicPlanV3
-		: prepared.package.revision >= 2
-			? musicPlanV2
-			: musicPlan;
 export function musicContext(
 	prepared: Prepared,
 	request: unknown,
-	schema: z.ZodType = musicSchema(prepared),
+	schema: z.ZodType = musicPlanV3,
 ) {
 	const required = [
 		prepared.package.profileRevisionId,

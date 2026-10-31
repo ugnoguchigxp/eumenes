@@ -3,14 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	createTasks,
-	migrations,
-	type TaskFence,
-	type TaskKindDefinition,
-} from "..";
+import { createTasks, migrations, type TaskKindDefinition } from "..";
 import { createTaskSchema } from "../contracts";
 import { capacity, migration as initSql, putQuestion } from "../repository";
+import type { TaskFence } from "../types";
 
 const stores: SqliteStore[] = [],
 	dirs: string[] = [];
@@ -32,7 +28,7 @@ function setup(
 	stores.push(store);
 	const clock = { t: T0 };
 	const kind: TaskKindDefinition = {
-		kind: "coding",
+		kind: "orchestration",
 		version: 1,
 		available: () => true,
 		startInTransaction() {},
@@ -50,15 +46,16 @@ type Harness = ReturnType<typeof setup>;
 const input = () =>
 	createTaskSchema.parse({
 		requestId: crypto.randomUUID(),
-		kind: "coding",
+		kind: "orchestration",
 		version: 1,
 		title: "fixture task",
 		request: "implement the requested change",
 		completionConditions: ["checks pass"],
 		startMode: "start",
 		grant: {
-			workspaceId: "fixture-workspace",
-			operations: ["read", "edit", "check", "review"],
+			connectionRef: "fixture-connection",
+			projectRef: "fixture-project",
+			operations: ["read", "edit", "check"],
 			expiresAt: new Date(T0 + 365 * DAY).toISOString(),
 		},
 	});
@@ -168,8 +165,13 @@ test("work_task_storage stays equal to a full recount across every kind of write
 			state: "answered",
 			text: "which file? answered with a longer text",
 		} as never);
-		h.tasks.setRuntimeInTransaction(tx, t.id, { scheduleId: "s1" });
-		h.tasks.setRuntimeInTransaction(tx, t.id, { observeJobId: "j1" });
+		tx.query(
+			"INSERT INTO work_task_runtime(task_id,data_json) VALUES(?,?)",
+		).run(t.id, JSON.stringify({ scheduleId: "s1" }));
+		tx.query("UPDATE work_task_runtime SET data_json=? WHERE task_id=?").run(
+			JSON.stringify({ scheduleId: "s1", observeJobId: "j1" }),
+			t.id,
+		);
 	});
 	expect(h.store.read(capacity).bytes).toBe(recomputedBytes(h));
 	const current = h.tasks.get(a.taskId).task;
@@ -259,7 +261,7 @@ test("the kind-independent purge hook removes dependents even when no kind is re
 	await h.store.write((tx) =>
 		tx.query("INSERT INTO fx_child(task_id) VALUES(?)").run(done.taskId),
 	);
-	// A process without the coding kind (no runner configured) still owns the purge.
+	// A process without the task kind still owns the purge.
 	const bare = createTasks(h.store, {
 		now: () => h.clock.t,
 		purgeInTransaction: (tx, t) =>
@@ -274,7 +276,7 @@ test("the kind-independent purge hook removes dependents even when no kind is re
 });
 test("a task whose dependents were already purged is deleted without error, and a task with undeletable dependents stays", async () => {
 	const h = setup({}, (tx, t) => {
-		// Idempotent, like coding-supervision's purge: zero rows is not a failure.
+		// Idempotent: zero rows is not a failure.
 		tx.query("DELETE FROM fx_child WHERE task_id=?").run(t.id);
 	});
 	await h.store.write((tx) =>

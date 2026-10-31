@@ -78,7 +78,5 @@ export function createModel3dAssets(
 		},
 		content: (id: string, signal: AbortSignal) =>
 			larm().content(id, signalOf(signal, 120_000)),
-		source: (id: string, signal: AbortSignal) =>
-			larm().source(id, signalOf(signal, 30_000)),
 	};
 }

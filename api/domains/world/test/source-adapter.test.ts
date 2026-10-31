@@ -15,12 +15,8 @@ import {
 	retractionMigration,
 } from "../../conversation";
 import { PRINCIPAL, PROFILE_SCOPE } from "../../memory/contracts";
-import {
-	SourceAccessError,
-	SourceCursorError,
-	createConversationSourceAdapter,
-	deletionsFirst,
-} from "..";
+import { SourceCursorError, createConversationSourceAdapter } from "..";
+import { SourceAccessError, deletionsFirst } from "../service/source-adapter";
 
 const PURPOSE = "world.test";
 const access = (over: Partial<AccessContext> = {}): AccessContext => ({

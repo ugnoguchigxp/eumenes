@@ -6,12 +6,7 @@
  * model, no network, no browser.
  */
 import { expect, test } from "bun:test";
-import { Hono } from "hono";
-import {
-	createWorldClaims,
-	registerWorldClaims,
-	type WorldClaimsContext,
-} from "..";
+import { createWorldClaims, type WorldClaimsContext } from "..";
 import { recordAbandoned } from "../repository/guard";
 import {
 	NOW,
@@ -38,7 +33,6 @@ const CTX: WorldClaimsContext = {
 	principal: SCOPE.principal,
 	scopeKeys: [SCOPE.scopeKey],
 };
-const uuid = () => crypto.randomUUID();
 
 function build(life: Life, ctx: WorldClaimsContext = CTX) {
 	const claims = createWorldClaims({
@@ -49,16 +43,26 @@ function build(life: Life, ctx: WorldClaimsContext = CTX) {
 		readPurpose: PURPOSE,
 		now: () => NOW,
 	});
-	const app = new Hono();
-	registerWorldClaims(app, claims, () => ctx);
-	const call = async (method: "GET", path: string) => {
-		const response = await app.request(path, { method });
-		return {
-			status: response.status,
-			body: (await response.json().catch(() => null)) as any,
-		};
+	const statusOf = (code: string) =>
+		code === "world_disabled" ? 409 : code === "world_unavailable" ? 503 : 404;
+	const call = async (_method: "GET", url: string) => {
+		const { pathname, searchParams } = new URL(url, "http://local");
+		const scopeKey = searchParams.get("scopeKey");
+		const scope = scopeKey === null ? {} : { scopeKey };
+		if (pathname === "/api/world/status")
+			return { status: 200, body: claims.status(ctx) as any };
+		const detail = /^\/api\/world\/claims\/([^/]+)$/.exec(pathname);
+		const result =
+			pathname === "/api/world/claims"
+				? claims.list(ctx, scope)
+				: detail
+					? claims.detail(ctx, { ...scope, claimId: detail[1]! })
+					: claims.forgets(ctx, scope);
+		return result.status === "ok"
+			? { status: 200, body: result.value as any }
+			: { status: statusOf(result.code), body: { error: result.code } as any };
 	};
-	return { claims, app, call };
+	return { claims, call };
 }
 
 /** m1 (a person's statement), m2 (a later statement used as a reason), claims of each kind. */
@@ -477,39 +481,6 @@ test("World OFF (protect): reads answer world_disabled; the forget list still te
 		const status = await call("GET", "/api/world/status");
 		expect(status.body).toMatchObject({ enabled: false, usable: false });
 		expect((await call("GET", "/api/world/forgets")).status).toBe(200);
-	} finally {
-		await life.cleanup();
-	}
-});
-
-test("view only: the change routes do not exist over HTTP, the reads do", async () => {
-	const life = await openLife();
-	try {
-		await seed(life);
-		const { app } = build(life);
-		for (const action of ["correct", "retract", "forget"]) {
-			const response = await app.request(`/api/world/claims/${action}`, {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({
-					requestId: uuid(),
-					expectedRevision: 1,
-					target: { claimId: "claim-report" },
-				}),
-			});
-			expect(response.status).toBe(404);
-		}
-		// A claim is not changed by any other verb on a claim path either.
-		const put = await app.request("/api/world/claims/claim-report", {
-			method: "DELETE",
-		});
-		expect(put.status).toBe(404);
-		expect((await app.request("/api/world/claims")).status).toBe(200);
-		expect((await app.request("/api/world/claims/claim-report")).status).toBe(
-			200,
-		);
-		expect((await app.request("/api/world/forgets")).status).toBe(200);
-		expect((await app.request("/api/world/status")).status).toBe(200);
 	} finally {
 		await life.cleanup();
 	}

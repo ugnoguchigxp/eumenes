@@ -52,11 +52,6 @@ export const scheduleSchema = z.object({
 });
 export type ScheduleDto = z.infer<typeof scheduleSchema>;
 
-export const scheduleListSchema = z.object({
-	items: z.array(scheduleSchema),
-	nextCursor: z.string().nullable(),
-});
-
 const occurrenceSchema = z.object({
 	id: z.string(),
 	scheduleId: z.string(),
@@ -71,10 +66,6 @@ const occurrenceSchema = z.object({
 	createdAt: z.string(),
 });
 export type OccurrenceDto = z.infer<typeof occurrenceSchema>;
-export const occurrenceListSchema = z.object({
-	items: z.array(occurrenceSchema),
-	nextCursor: z.string().nullable(),
-});
 
 /** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
 export const errorStatus = {

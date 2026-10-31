@@ -3,13 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import {
-	createCapabilities,
-	migrations,
-	resourceKindBuiltins,
-	type Definition,
-} from "..";
+import { offlineBundleHost } from "../../../application/toolchain/toolchain-adapters";
+import { createCapabilities, migrations, type Definition } from "..";
 import type { ResourceKindRegistration } from "../contracts/resource-kinds";
+import { resourceKindBuiltins } from "../builtin/resource-kinds";
 
 const backends = new Set([
 	"web",
@@ -30,7 +27,10 @@ async function withCapabilities(
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-resource-kinds-"));
 	const store = openStore(join(dir, "db"), migrations);
 	try {
-		await run(createCapabilities(store, backends), store);
+		await run(
+			createCapabilities(store, backends, { bundleHost: offlineBundleHost }),
+			store,
+		);
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

@@ -25,9 +25,18 @@ import { migrations } from "../migrations";
 import {
 	createWorldAssembly,
 	defaultWorldJournalPath,
-	manualAccess,
 	resolveWorldCursorSecret,
+	WORLD_DEFAULT_SCOPE,
+	WORLD_MANUAL_PURPOSE,
 } from "./world";
+import type { ScopeRef } from "eumenes-world-model";
+
+/** The AccessContext request part for an explicit registration in `scope`. */
+export const manualAccess = (scope: ScopeRef = WORLD_DEFAULT_SCOPE) => ({
+	principal: scope.principal,
+	scopeKeys: [scope.scopeKey],
+	purpose: WORLD_MANUAL_PURPOSE,
+});
 
 export const WORLD_FIXTURE_TOKEN = "fixture-token-for-world-browser";
 const SCOPE = {
@@ -274,7 +283,6 @@ export async function worldHarness(options: WorldFixtureOptions = {}) {
 			scheduler: createScheduler(store, queue),
 			inference,
 			memory,
-			worldClaims: { claims: world.claims, context: world.claimsContext },
 		}),
 	});
 	queue.start();

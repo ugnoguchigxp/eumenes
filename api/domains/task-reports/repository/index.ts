@@ -65,20 +65,6 @@ export function supersedeQuestions(db: Database, taskId: string) {
 		"UPDATE task_report_outbox SET state='superseded' WHERE task_id=? AND kind='blocker' AND state='pending'",
 	).run(taskId);
 }
-export function list(
-	db: Database,
-	taskId: string,
-	after: number,
-	limit: number,
-): TaskReport[] {
-	return (
-		db
-			.query(
-				"SELECT data_json FROM task_reports WHERE task_id=? AND sequence>? ORDER BY sequence LIMIT ?",
-			)
-			.all(taskId, after, limit) as { data_json: string }[]
-	).map((r) => JSON.parse(r.data_json));
-}
 export function purge(db: Database, taskId: string) {
 	db.query("DELETE FROM task_report_outbox WHERE task_id=?").run(taskId);
 	db.query("DELETE FROM task_reports WHERE task_id=?").run(taskId);

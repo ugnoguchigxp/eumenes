@@ -1,7 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../../../infrastructure/logger";
-import { ActionRequestError, ACTION_POLICY } from "..";
+
 import { ARTIFACT_ID, HUB_ID, OTHER_REF, makeHarness } from "./action-fixture";
+import { ActionRequestError, ACTION_POLICY } from "../service/action-types";
 
 let h = makeHarness();
 afterEach(async () => {

@@ -149,11 +149,6 @@
 	padding: 0.5rem 0.75rem;
 	border-bottom: 1px solid var(--aui-ui-line);
 }
-.aui-ui-step {
-	color: var(--aui-ui-muted);
-	font-size: 0.75rem;
-	font-weight: 700;
-}
 .aui-ui-device {
 	display: flex;
 	gap: 3px;

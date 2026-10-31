@@ -176,33 +176,6 @@ test("old settings retain normal playback; speech adjustments validate and persi
 				.success,
 		).toBe(false);
 });
-test("coding supervision instruction approval defaults to on, including for saved documents without it", async () => {
-	const h = await setup();
-	expect(h.settings.get().codingSupervision.approveInstructions).toBe(true);
-	// A document saved before this setting existed still loads, with approval on.
-	const legacy = JSON.parse(JSON.stringify(h.settings.get()));
-	delete legacy.codingSupervision;
-	await h.store.write((db) => {
-		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
-			JSON.stringify(legacy),
-		);
-	});
-	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
-	expect(reopened.get().codingSupervision.approveInstructions).toBe(true);
-	const s = reopened.get();
-	s.codingSupervision.approveInstructions = false;
-	await reopened.apply({
-		requestId: crypto.randomUUID(),
-		expectedRevision: s.revision,
-		settings: s,
-		keys: [],
-	});
-	const again = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
-	expect(again.get().codingSupervision.approveInstructions).toBe(false);
-	expect(
-		settingsSchema.safeParse({ ...s, codingSupervision: { extra: 1 } }).success,
-	).toBe(false);
-});
 test("world.enabled defaults to false (also for saved documents without it), persists through apply and is what startup reads", async () => {
 	const h = await setup();
 	expect(h.settings.get().world).toEqual({

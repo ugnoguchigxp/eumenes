@@ -1,4 +1,3 @@
-import { settings } from "./harness.fixture";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
@@ -62,6 +61,20 @@ export type Step = {
 	/** The call fails with this code instead (`chat_output_empty`: it ended cleanly with nothing in it). */
 	fail?: string;
 };
+
+/** A routed turn's choice, as the model answers it (a call held to a schema answers JSON text). */
+export const choice = (value: Record<string, unknown>): Step => ({
+	text: JSON.stringify(value),
+});
+
+/**
+ * The steps a plain reply takes on the routed turn when no judge ran: the request turn's choice (`none`), then the
+ * talk call that says `text`.
+ */
+export const reply = (text: string): Step[] => [
+	choice({ choice: "none" }),
+	{ text },
+];
 
 export const IMAGE: ToolchainCard = {
 	revisionId: "toolchain:fake.image@1",
@@ -153,11 +166,6 @@ export type SetupOptions = {
 	settings?: unknown;
 	/** With `settings`: the run is not captured when it is accepted, so its prepare takes the request. */
 	lateCapture?: boolean;
-	/**
-	 * Without `settings`: the harness the runs are served by. `cloud` (default): the agent's reply loop that calls the
-	 * tools itself; `local`: the routed turn (the local harness rebuild plan). With `settings`, they decide it.
-	 */
-	harness?: "cloud" | "local";
 	/** The context keeper's inference and quiet wait; absent: no keeper runs. */
 	keeper?: NonNullable<Parameters<typeof createDialogueService>[0]["keeper"]>;
 };
@@ -235,15 +243,7 @@ export async function setup(options: SetupOptions = {}) {
 					snapshotFor: (_db: unknown, subject: string) =>
 						captured.get(subject) ?? null,
 				}
-			: options.harness === "local"
-				? {}
-				: {
-						// The settings a cloud conversation model is chosen by: the run is served by the cloud harness.
-						snapshotFor: () => ({
-							...settings({ mode: "cloud-only" }),
-							voice: { autoSpeak: true },
-						}),
-					}),
+			: {}),
 		llmContextWindowInTransaction: () => options.window,
 		setContextPolicyInTransaction: (
 			_db: unknown,

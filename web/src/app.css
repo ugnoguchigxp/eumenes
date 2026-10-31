@@ -574,13 +574,7 @@ select:focus-visible {
 	color: var(--foreground);
 	font-size: 0.68rem;
 }
-.status-ready,
-.status-completed,
-.status-listening {
-	color: var(--primary);
-}
 .status-failed,
-.status-error,
 .error {
 	color: var(--destructive);
 }

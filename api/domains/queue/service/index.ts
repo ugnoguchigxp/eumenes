@@ -1,11 +1,10 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { canonicalJson, sha256Hex } from "../../../infrastructure/digest";
-import type { AttemptDto, JobDto, JobList, QueueStatus } from "../contracts";
+import type { JobDto, JobList, QueueStatus } from "../contracts";
 import {
 	findByDedupe,
 	getJob,
 	insertJob,
-	listAttempts,
 	listJobs,
 	openCounts,
 	openTotal,
@@ -14,13 +13,7 @@ import {
 	finishJob,
 	endAttempt,
 } from "../repository";
-import type {
-	AttemptRecord,
-	EnqueueInput,
-	HandlerDefinition,
-	JobRecord,
-	Tx,
-} from "../types";
+import type { EnqueueInput, HandlerDefinition, JobRecord, Tx } from "../types";
 import { createRegistry } from "./registry";
 import { createRunner } from "./runner";
 import { resolveOptions, type RunnerOptions } from "./runner-options";
@@ -53,16 +46,6 @@ export function toDto(job: JobRecord): JobDto {
 		updatedAt: iso(job.updatedAtMs),
 		finishedAt: job.finishedAtMs === null ? null : iso(job.finishedAtMs),
 		revision: job.revision,
-	};
-}
-function attemptDto(a: AttemptRecord): AttemptDto {
-	return {
-		jobId: a.jobId,
-		attempt: a.attempt,
-		startedAt: iso(a.startedAtMs),
-		endedAt: a.endedAtMs === null ? null : iso(a.endedAtMs),
-		outcome: a.outcome,
-		errorCode: a.errorCode,
 	};
 }
 const canonical = (value: unknown) =>
@@ -225,9 +208,6 @@ export function createQueue(
 				nextCursor:
 					rows.length > size ? String(page.at(-1)?.createdSeq ?? "") : null,
 			};
-		},
-		listAttempts(jobId: string): AttemptDto[] {
-			return store.read((db) => listAttempts(db, jobId)).map(attemptDto);
 		},
 		cancelInTransaction,
 		flushCancellations(jobIds: string[]) {

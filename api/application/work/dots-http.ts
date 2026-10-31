@@ -23,13 +23,11 @@ import { dotsMcpSkill as coordinatorSkill } from "../../domains/capabilities";
 import type { DotsTasks } from "./dots-tasks";
 import type { createEvents } from "../../domains/dots";
 import { readBounded } from "../../infrastructure/bounded-read";
-import type { TasksService } from "../../domains/tasks";
 import { limitConcurrency } from "../../infrastructure/concurrency";
 export function registerDots(
 	app: Hono,
 	dots: DotsTasks,
 	events: ReturnType<typeof createEvents>,
-	tasks: TasksService,
 	verify = verifyAccess,
 	messages?: DotsMessages,
 ) {
@@ -75,11 +73,6 @@ export function registerDots(
 	app.post("/api/dots/tasks/:id/schedules", async (c) => {
 		const p = z.strictObject({ scheduleRef: ref }).parse(await json(c.req.raw));
 		return c.json(await dots.bindSchedule(c.req.param("id"), p.scheduleRef));
-	});
-	app.get("/api/dots/tasks/:id/snapshot", (c) => {
-		const { task: t } = tasks.get(c.req.param("id"));
-		if (t.kind !== "orchestration") throw new Error("dots_not_found");
-		return c.json(dots.taskSnapshot(t.grant.connectionRef, t.id));
 	});
 	app.get("/.well-known/oauth-protected-resource/mcp/dots/:owner", (c) => {
 		const oauth = dots.config

@@ -346,6 +346,7 @@ test("stored settings are migrated once: Managed Agents removed, auth filled, no
 	const legacy = JSON.parse(JSON.stringify(kept));
 	for (const c of legacy.connections) delete c.auth;
 	legacy.subagent = { resourceId: managedResource };
+	legacy.codingSupervision = { approveInstructions: true };
 	legacy.connections.push({
 		id: managed,
 		kind: "claude-managed-agents",
@@ -403,6 +404,7 @@ test("stored settings are migrated once: Managed Agents removed, auth filled, no
 	expect("resourceId" in migrated.agency).toBe(false);
 	expect(migrated.agency.idleSec).toBe(20);
 	expect("subagent" in migrated).toBe(false);
+	expect("codingSupervision" in migrated).toBe(false);
 	expect(h.settings.credential(migrated.connections[0]!)).toBe("sk-keep");
 	// Startup persists the migration once and drops the removed connection's secret.
 	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });

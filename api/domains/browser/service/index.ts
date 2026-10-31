@@ -21,7 +21,6 @@ import type {
 } from "../contracts/ports";
 import {
 	activeConnection,
-	listCaptures,
 	expireApprovals,
 	listTasks,
 	purgeEnded,
@@ -51,7 +50,7 @@ import { reconcileChecked, tabViews } from "./tabs";
 import { createTasks, type StartTaskInput } from "./tasks";
 
 export type { StartCaptureInput } from "./captures";
-export type { StartTaskInput, StartedTask } from "./tasks";
+export type { StartTaskInput } from "./tasks";
 export type { TaskApi, TaskStepRunner } from "./context";
 
 export function createBrowser(deps: {
@@ -303,8 +302,6 @@ export function createBrowser(deps: {
 		abortCapture: captures.abortRunning,
 		captureStatus: (owner: string, id: string) =>
 			store.read((db) => captures.status(db, owner, id)),
-		listCaptures: (owner: string) =>
-			store.read((db) => listCaptures(db, owner)),
 		...createHistoryApi(store),
 		startReplayInTransaction: replays.startInTransaction,
 		cancelReplayInTransaction: replays.cancelInTransaction,

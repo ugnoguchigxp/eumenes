@@ -1,2 +1,0 @@
-# Source: api/domains/dialogue/service/generation-loop.ts
-text = '''- この返事ではもうツールを使えません。ここまでにわかっていることだけで返事をします。'''

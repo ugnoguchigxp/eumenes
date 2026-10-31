@@ -18,7 +18,6 @@ import {
 	createWorldLifecycle,
 	createWorldService,
 	type LifecycleOptions,
-	type LifecyclePoint,
 	type WorldHostGate,
 	type WorldLifecycle,
 	type WorldService,
@@ -32,6 +31,7 @@ import {
 	memoryPolicyRevision,
 	type Harness,
 } from "./fixture";
+import type { LifecyclePoint } from "../service/lifecycle-types";
 
 /** A process crash, simulated by throwing from a lifecycle hook. */
 export class Crash extends Error {

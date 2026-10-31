@@ -55,7 +55,6 @@ export const messageReplyInput = z
 		(v) => new TextEncoder().encode(JSON.stringify(v)).length <= 49152,
 		"invalid_dots_message_size",
 	);
-export type MessageReply = z.infer<typeof messageReplyInput>;
 export type MessagingSetting = {
 	connectionRef: string;
 	enabled: boolean;
@@ -193,4 +192,3 @@ export const messagingViewSchema = z.object({
 	),
 	nextCursor: z.number().nullable(),
 });
-export type MessagingView = z.infer<typeof messagingViewSchema>;

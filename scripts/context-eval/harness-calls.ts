@@ -1,7 +1,7 @@
 /**
- * What the two kinds of measured turn share (`harness-turn.ts`, the agent's reply loop; `harness-routed.ts`, the
- * local harness's routed turn): the shape of a turn's result, the environment it runs on, the numbers the simulated
- * host names works by, and the recorder that times each model call and files its detail, also when the call fails.
+ * What the measured routed turn (`harness-routed.ts`) runs on: the shape of a turn's result, the environment it runs
+ * on, the numbers the simulated host names works by, and the recorder that times each model call and files its
+ * detail, also when the call fails.
  */
 import type { UtteranceToolCall } from "../../api/domains/conversation";
 import type { DocumentRefs } from "../../api/domains/dialogue/service/work-items";
@@ -35,11 +35,8 @@ export type TurnResult = Turn & {
 	hostSpoke: boolean;
 	/** What each model call did, in order. */
 	details: CallDetail[];
-	/**
-	 * Why the turn ended: an answer in words, a hand-over, a question back, a choice that could not be carried out,
-	 * an error, or (the reply loop) the rounds ran out.
-	 */
-	stop: "answer" | "handover" | "ask" | "check" | "error" | "rounds";
+	/** Why the turn ended: an answer in words, a hand-over, a question back, a choice that could not be carried out, or an error. */
+	stop: "answer" | "handover" | "ask" | "check" | "error";
 };
 
 /** What a turn runs on. */

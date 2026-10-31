@@ -1,12 +1,12 @@
 import {
 	LlmCallError,
 	LlmOutputError,
+	SystemContextConfigurationError,
 	type LlmPort,
 	type LlmRequest,
 	type LlmResult,
 } from "eumenes-agency";
 import { z } from "zod";
-import type { NativeTool } from "../../infrastructure/chat-stream";
 import type { InferencePort, Messages } from "../../domains/inference";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { LlmJsonError, parseLlmJson } from "../../infrastructure/llm-json";
@@ -51,17 +51,11 @@ export type AgencyLlmPortDeps = {
 		Pick<InferencePort, "rejectControlInTransaction">;
 	next(request: LlmRequest<unknown>): AgencyCallIdentity;
 	/**
-	 * The conversation's prompt with this call's `## Task` last (the prefix its generations share, then `## State`;
-	 * the conversation input specification, section 10). With one, the call runs on the conversation's connection;
-	 * absent or null, the call is its own system and prompt.
+	 * The conversation's reference data with this call's JSON in `## Task`. Its system is replaced with the exact
+	 * purpose-specific host system; no instruction is put in Task. With one, the call uses the conversation's
+	 * connection. Absent or null, only the Agency input JSON is sent as data.
 	 */
-	task?(
-		conversationId: string,
-		task: string,
-	): {
-		messages: Messages;
-		tools: NativeTool[];
-	} | null;
+	task?(conversationId: string, task: string): { messages: Messages } | null;
 	/** Token counts and model of the served attempt (the receipt carries none). Absent: zeros. */
 	attemptUsage?(attemptId: string): AgencyAttemptUsage | null;
 	nowMs?(): number;
@@ -97,6 +91,8 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 			signal: AbortSignal,
 		): Promise<LlmResult<T>> {
 			signal.throwIfAborted();
+			if (typeof request.system !== "string" || !request.system.trim())
+				throw new SystemContextConfigurationError(request.purpose);
 			const identity = deps.next(request);
 			const maxOutputTokens = Math.min(
 				BACKGROUND_OUTPUT_LIMIT,
@@ -129,33 +125,35 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 			const conversationId = identity.conversationId;
 			const prefix =
 				conversationId && deps.task
-					? deps.task(conversationId, `${request.system}\n\n${request.prompt}`)
+					? deps.task(conversationId, request.prompt)
 					: null;
+			const messages: Messages = [
+				{ role: "system", content: request.system },
+				...(prefix
+					? prefix.messages
+							.filter((message) => message.role !== "system")
+							.map((message) => ({ ...message }))
+					: [{ role: "user" as const, content: request.prompt }]),
+			];
 			const started = nowMs();
 			let receipt: Awaited<ReturnType<typeof inference.executeControl>>;
 			try {
 				receipt = await inference.executeControl(
 					requestId,
-					prefix
-						? prefix.messages
-						: [
-								{ role: "system", content: request.system },
-								{ role: "user", content: request.prompt },
-							],
+					messages,
 					AbortSignal.any([
 						signal,
 						AbortSignal.timeout(BACKGROUND_DEADLINE_MS),
 					]),
-					{ instructions: request.system, outputSchema },
+					undefined, // Use the native schema channel; ControlContract would append instructions to the system.
 					// Either way the agency yields: a call made for the user aborts it (`larm_preempted`).
 					prefix
 						? {
 								sessionRole: "auxiliary",
+								outputSchema,
 								onConversation: true,
-								prefixTools: prefix.tools,
-								toolChoice: "none",
 							}
-						: { sessionRole: "auxiliary", yields: true },
+						: { sessionRole: "auxiliary", yields: true, outputSchema },
 				);
 			} catch (error) {
 				return callError(error, signal);

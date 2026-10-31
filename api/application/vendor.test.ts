@@ -5,6 +5,7 @@ import { join } from "node:path";
 import agencyPkg from "eumenes-agency/package.json";
 import pkg from "eumenes-memory/package.json";
 import worldPkg from "eumenes-world-model/package.json";
+import worldDistribution from "eumenes-world-model/distribution-manifest.json";
 
 const root = join(import.meta.dir, "../..");
 const read = (path: string) => readFileSync(join(root, path));
@@ -48,6 +49,15 @@ test("the vendored world-model package matches its manifest, package.json, the l
 	];
 	expect(dependency).toBe(`file:vendor/world/${worldManifest.artifact}`);
 	expect(worldPkg.version).toBe(worldManifest.version);
+	expect(worldDistribution.source.sourceDigest).toBe(
+		worldManifest.sourceDigest,
+	);
+	expect(worldDistribution.source.gitCommit).toBe(
+		worldManifest.sourceGitCommit,
+	);
+	expect(worldDistribution.source.srcDirtyFiles).toBe(
+		worldManifest.srcDirtyFiles,
+	);
 	const lock = read("bun.lock").toString();
 	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
 	expect(lock).toContain(

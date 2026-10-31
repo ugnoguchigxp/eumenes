@@ -102,22 +102,19 @@ export type IntervalLifecycle = Lifecycle & {
 
 /**
  * A periodic job. `start` arms the interval (unref'd, so it never keeps the
- * process alive); `close` is `stop` followed by `idle`. By default a tick is
- * skipped while the previous one is still running; `exclusive: false` fires
- * every tick and does not track it. A rejection from `run` is logged here.
+ * process alive); `close` is `stop` followed by `idle`. A tick is skipped while
+ * the previous one is still running. A rejection from `run` is logged here.
  */
 export function intervalLifecycle(
 	name: string,
 	ms: number,
 	run: () => unknown,
 	options: {
-		exclusive?: boolean;
 		setTimer?: (callback: () => void, ms: number) => Timer;
 		clearTimer?: (timer: Timer) => void;
 	} = {},
 ): IntervalLifecycle {
 	const log = getLogger("server");
-	const exclusive = options.exclusive ?? true;
 	const set =
 		options.setTimer ?? ((callback, delay) => setInterval(callback, delay));
 	const clear =
@@ -125,14 +122,13 @@ export function intervalLifecycle(
 	let timer: Timer | undefined;
 	let busy: Promise<void> | null = null;
 	function tick() {
-		if (exclusive && busy) return;
+		if (busy) return;
 		const current = Promise.resolve()
 			.then(run)
 			.then(
 				() => undefined,
 				(error) => log.warn("server.interval_failed", { reason: name }, error),
 			);
-		if (!exclusive) return;
 		busy = current.finally(() => {
 			busy = null;
 		});

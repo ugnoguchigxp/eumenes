@@ -439,24 +439,6 @@ test("a call this domain makes think gets room for the thinking on its output li
 	]);
 });
 
-test("a main call may offer tools with toolChoice none: LARM gets the tools and the choice", async () => {
-	const larm = larmCalls("hello");
-	const h = await setup(
-		{ text: "cloud" },
-		{ mode: "larm-preferred", localStream: larm.localStream },
-	);
-	await h.inference.executeStream(
-		await h.request(),
-		messages,
-		new AbortController().signal,
-		() => {},
-		undefined,
-		tools,
-		{ sessionRole: "main", toolChoice: "none" },
-	);
-	expect(larm.options[0]).toMatchObject({ tools, toolChoice: "none" });
-});
-
 test("an output schema or a target on a non-main call is refused", async () => {
 	const h = await setup({ text: "answer" });
 	for (const session of [

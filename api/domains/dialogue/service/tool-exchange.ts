@@ -1,5 +1,4 @@
 import type { UtteranceToolCall } from "../../conversation";
-import type { ChatMessage } from "./context";
 import { TOOL_NAMES } from "./generation-tools";
 import type { DocumentRefs } from "./work-items";
 
@@ -111,31 +110,4 @@ export function carriedToolCalls(
 			arguments: carriedArguments(step.arguments),
 			result: JSON.stringify(carriedResult(step.name, step.result, refs)),
 		}));
-}
-
-/**
- * An utterance's tool calls as native messages, before its words: each call and its result. The call ids are the
- * utterance's place (`u<seq>-<n>`), so the recent conversation reads the same on every turn.
- */
-export function exchangeMessages(
-	seq: number,
-	toolCalls: readonly UtteranceToolCall[],
-): ChatMessage[] {
-	return toolCalls.flatMap((call, i): ChatMessage[] => {
-		const id = `u${seq}-${i + 1}`;
-		return [
-			{
-				role: "assistant",
-				content: "",
-				tool_calls: [
-					{
-						id,
-						type: "function",
-						function: { name: call.name, arguments: call.arguments },
-					},
-				],
-			},
-			{ role: "tool", tool_call_id: id, content: call.result },
-		];
-	});
 }

@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
-import { LlmCallError, LlmOutputError, type LlmRequest } from "eumenes-agency";
+import {
+	LlmCallError,
+	LlmOutputError,
+	SystemContextConfigurationError,
+	type LlmRequest,
+} from "eumenes-agency";
 import { z } from "zod";
 import type { InferencePort, Receipt } from "../../domains/inference";
 import {
@@ -27,6 +32,7 @@ function harness(
 			requestId: string;
 			messages: unknown;
 			control: unknown;
+			session: unknown;
 			signal: AbortSignal;
 		}[],
 		rejected: [] as string[],
@@ -45,8 +51,8 @@ function harness(
 				calls.captured.push(input);
 				return "req-1";
 			},
-			executeControl: async (requestId, messages, signal, control) => {
-				calls.executed.push({ requestId, messages, control, signal });
+			executeControl: async (requestId, messages, signal, control, session) => {
+				calls.executed.push({ requestId, messages, control, session, signal });
 				clock += 250;
 				return options.execute ? options.execute(signal) : receipt;
 			},
@@ -107,8 +113,10 @@ describe("agency LLM port", () => {
 			{ role: "system", content: "SYSTEM" },
 			{ role: "user", content: "PROMPT" },
 		]);
-		expect(executed.control).toEqual({
-			instructions: "SYSTEM",
+		expect(executed.control).toBeUndefined();
+		expect(executed.session).toEqual({
+			sessionRole: "auxiliary",
+			yields: true,
 			outputSchema: z.toJSONSchema(schema),
 		});
 		expect(result).toEqual({
@@ -314,21 +322,12 @@ describe("agency LLM port", () => {
 });
 
 describe("agency LLM port on the conversation's prompt", () => {
-	test("with the conversation's prefix the call sends it first, then its task, on the conversation's connection", async () => {
-		const tool = {
-			type: "function" as const,
-			function: {
-				name: "memory",
-				description: "",
-				parameters: { type: "object" },
-			},
-		};
+	test("the purpose system replaces the conversation system; only data goes into Task", async () => {
 		const prefix = {
 			messages: [
 				{ role: "system" as const, content: "会話の指示" },
 				{ role: "user" as const, content: "<memory>\nなし\n</memory>" },
 			],
-			tools: [tool],
 		};
 		const executed: Array<{ messages: unknown; session: unknown }> = [];
 		const asked: string[] = [];
@@ -359,7 +358,6 @@ describe("agency LLM port on the conversation's prompt", () => {
 						...prefix.messages,
 						{ role: "user", content: `## Task\n${task}` },
 					],
-					tools: prefix.tools,
 				};
 			},
 		});
@@ -369,14 +367,25 @@ describe("agency LLM port on the conversation's prompt", () => {
 		);
 		expect(asked).toEqual(["conv-1"]);
 		expect(executed[0]!.messages).toEqual([
-			...prefix.messages,
-			{ role: "user", content: "## Task\nSYSTEM\n\nPROMPT" },
+			{ role: "system", content: "SYSTEM" },
+			prefix.messages[1],
+			{ role: "user", content: "## Task\nPROMPT" },
 		]);
 		expect(executed[0]!.session).toEqual({
 			sessionRole: "auxiliary",
 			onConversation: true,
-			prefixTools: [tool],
-			toolChoice: "none",
+			outputSchema: z.toJSONSchema(schema),
 		});
 	});
+});
+
+test("missing host system never captures or calls inference", async () => {
+	for (const system of ["", " \n", undefined]) {
+		const h = harness();
+		await expect(
+			h.port.complete(request({ system }), new AbortController().signal),
+		).rejects.toBeInstanceOf(SystemContextConfigurationError);
+		expect(h.calls.captured).toHaveLength(0);
+		expect(h.calls.executed).toHaveLength(0);
+	}
 });

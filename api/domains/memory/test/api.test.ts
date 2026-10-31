@@ -2,15 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
-import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { configureLogging } from "../../../infrastructure/logger";
-import {
-	conversationQuerySchema,
-	memoryContextSchema,
-	memoryItemsSchema,
-	memoryTendenciesSchema,
-	shortTermSchema,
-} from "../contracts";
+import { memoryItemsSchema } from "../contracts";
 import { registerMemory } from "..";
 import { setupMemory, type MemoryHarness } from "./memory.fixture";
 
@@ -58,37 +51,19 @@ test("items carry their evidence, period and who asked for them", async () => {
 	).toBeNull();
 });
 
-test("short-term notes of the named conversation only; the conversation is required", async () => {
-	const { h, app } = await setup();
+test("short-term notes of the named conversation only; expired notes are not listed", async () => {
+	const { h } = await setup();
 	await h.note("c1", { kind: "goal", text: "Rust移行" });
 	await h.note("c2", { kind: "memo", text: "別の会話" });
-	const response = await app.request(
-		"/api/memory/short-term?conversationId=c1",
-	);
-	expect(response.status).toBe(200);
-	const { items } = shortTermSchema.parse(await response.json());
+	const items = h.memory.shortTerm("c1");
 	expect(items.map((i) => i.text)).toEqual(["Rust移行"]);
 	expect(items[0]).toMatchObject({ origin: "agent", expiresAt: null });
-	// No default conversation.
-	const missing = await app.request("/api/memory/short-term");
-	expect(missing.status).toBe(400);
-	expect(await missing.json()).toEqual({ error: "invalid_memory_input" });
-	expect((await app.request("/api/memory/context")).status).toBe(400);
-	expect(
-		conversationQuerySchema.safeParse({ conversationId: "" }).success,
-	).toBe(false);
-	// Expired notes are not listed.
 	await h.note("c1", { kind: "memo", text: "一週間のメモ" });
 	h.time.now = "2026-10-21T12:00:00.000Z";
-	const later = shortTermSchema.parse(
-		await (
-			await app.request("/api/memory/short-term?conversationId=c1")
-		).json(),
-	).items;
-	expect(later.map((i) => i.text)).toEqual(["Rust移行"]);
+	expect(h.memory.shortTerm("c1").map((i) => i.text)).toEqual(["Rust移行"]);
 });
 
-test("tendencies are listed; there is no route to change or delete them by hand", async () => {
+test("tendencies are listed; there is no route to read, change or delete them by hand", async () => {
 	const { h, app } = await setup();
 	const a = await h.seed("コーヒーが好き", "drink.coffee");
 	const b = await h.seed("毎朝走る", "run", "毎朝走る", "habit");
@@ -103,11 +78,10 @@ test("tendencies are listed; there is no route to change or delete them by hand"
 		},
 	]);
 	expect(added).toMatchObject({ status: "applied", op: "tendency_add" });
-	const listed = memoryTendenciesSchema.parse(
-		await (await app.request("/api/memory/tendencies")).json(),
-	).items;
+	const listed = h.memory.tendencies();
 	expect(listed).toMatchObject([{ text: "朝型", revision: 1 }]);
 	for (const [method, path, body] of [
+		["GET", "/api/memory/tendencies", undefined],
 		["DELETE", `/api/memory/tendencies/${listed[0]!.id}`, undefined],
 		["POST", "/api/memory/items", { nope: 1 }],
 		["POST", `/api/memory/items/${a.id}/stop`, { expectedRevision: 1 }],
@@ -126,49 +100,17 @@ test("tendencies are listed; there is no route to change or delete them by hand"
 		});
 		expect(response.status).toBe(404);
 	}
-	expect(
-		memoryTendenciesSchema.parse(
-			await (await app.request("/api/memory/tendencies")).json(),
-		).items,
-	).toHaveLength(1);
+	expect(h.memory.tendencies()).toHaveLength(1);
 });
 
-test("the context endpoint shows the profile with its estimated size, and is off when memory is", async () => {
-	const { h, app } = await setup();
-	await h.seed("コーヒーが好き", "drink.coffee");
-	await h.note("c1", { kind: "goal", text: "Rust移行" });
-	const response = await app.request("/api/memory/context?conversationId=c1");
-	const context = memoryContextSchema.parse(await response.json());
-	if ("disabled" in context && context.disabled) throw new Error("off");
-	if (!("profile" in context)) throw new Error("off");
-	expect(context).toMatchObject({ newMemories: 0 });
-	expect(context.profile.text).toContain("コーヒーが好き");
-	expect(context.profile.tokens).toBe(estimateTextTokens(context.profile.text));
-	// The short-term notes are the conversation's active memory, not part of the long-term window.
-	expect(context.profile.text).not.toContain("Rust移行");
-	await h.memory.setEnabled(false);
-	expect(
-		await (await app.request("/api/memory/context?conversationId=c1")).json(),
-	).toEqual({ disabled: true });
-});
-
-test("while the journal is inconsistent none of the new endpoints shows a body", async () => {
-	const { h, app } = await setup();
+test("while the journal is inconsistent none of the reads shows a body", async () => {
+	const { h } = await setup();
 	await h.seed("コーヒーが好き", "drink.coffee");
 	await h.note("c1", { kind: "goal", text: "Rust移行" });
 	writeFileSync(join(h.dir, "journal.jsonl"), "not json\n");
 	expect((await h.memory.recover()).healthy).toBe(false);
-	expect(
-		await (
-			await app.request("/api/memory/short-term?conversationId=c1")
-		).json(),
-	).toEqual({ items: [] });
-	expect(await (await app.request("/api/memory/tendencies")).json()).toEqual({
-		items: [],
-	});
-	expect(
-		await (await app.request("/api/memory/context?conversationId=c1")).json(),
-	).toEqual({ disabled: true });
+	expect(h.memory.shortTerm("c1")).toEqual([]);
+	expect(h.memory.tendencies()).toEqual([]);
 });
 
 test("a note that expires does not change the long-term window", async () => {

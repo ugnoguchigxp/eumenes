@@ -22,25 +22,11 @@ export function bundleFiles(): { name: string; raw: unknown }[] {
 		});
 }
 
-/** Function names of the toolchains shipped inside bundles (one per name across revisions). */
-export function bundleToolchainFunctions(): string[] {
-	const names = bundleFiles().flatMap(({ raw }) => {
-		const definitions = (raw as { definitions?: unknown })?.definitions;
-		return Array.isArray(definitions)
-			? definitions.flatMap((d: { kind?: unknown; functionName?: unknown }) =>
-					d?.kind === "toolchain" && typeof d.functionName === "string"
-						? [d.functionName]
-						: [],
-				)
-			: [];
-	});
-	return [...new Set(names)];
-}
-
 /**
  * A suspended bundle kept beside the shipped ones (`<name>.bundle.dormant.json`): never seeded, so its
  * toolchain is offered nowhere. Only the fixtures of the suspended implementation register it explicitly.
  */
+/** @public */
 export function dormantBundleFile(name: string): unknown {
 	return JSON.parse(
 		readFileSync(new URL(`${name}.bundle.dormant.json`, directory), "utf8"),

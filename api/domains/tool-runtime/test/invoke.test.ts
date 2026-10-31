@@ -5,8 +5,9 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	createCapabilities,
-	migration as capMigration,
+	migrations as capMigrations,
 } from "../../capabilities";
+import { webPackage, webPackageRevisionId } from "./web-package.fixture";
 import { createQueue, migration as queueMigration } from "../../queue";
 import {
 	createToolRuntime,
@@ -17,7 +18,7 @@ import {
 test("gateway refuses foreign refs and unselected URLs; idempotent invocation and rolled-back result is not exposed", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-tools-"));
 	const store = openStore(join(dir, "db"), [
-		capMigration,
+		...capMigrations,
 		queueMigration,
 		migration,
 	]);
@@ -46,16 +47,16 @@ test("gateway refuses foreign refs and unselected URLs; idempotent invocation an
 	const tools = createToolRuntime(store, caps, queue, adapter, () => time);
 	try {
 		await caps.seed();
+		await store.write((db) => {
+			for (const d of webPackage) caps.registerBuiltinInTransaction(db, d);
+		});
 		const owner = { rootRunId: "root", taskId: "child", cancelEpoch: 0 };
 		const refs = await store.write((db) => {
 			return tools.bind(
 				owner,
-				caps.prepareActiveByIdInTransaction(
-					db,
-					owner,
-					"package:web.research@9",
-					{ question: "天気" },
-				),
+				caps.prepareActiveByIdInTransaction(db, owner, webPackageRevisionId, {
+					question: "天気",
+				}),
 				Date.now() + 100000,
 			);
 		});
@@ -197,7 +198,7 @@ test("gateway refuses foreign refs and unselected URLs; idempotent invocation an
 test("superseded invocations leave observations but stay in the budget and the invocation list", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-tools-"));
 	const store = openStore(join(dir, "db"), [
-		capMigration,
+		...capMigrations,
 		queueMigration,
 		migration,
 		supersedeMigration,
@@ -226,16 +227,16 @@ test("superseded invocations leave observations but stay in the budget and the i
 	const tools = createToolRuntime(store, caps, queue, adapter, Date.now);
 	try {
 		await caps.seed();
+		await store.write((db) => {
+			for (const d of webPackage) caps.registerBuiltinInTransaction(db, d);
+		});
 		const owner = { rootRunId: "root", taskId: "child", cancelEpoch: 0 };
 		const refs = await store.write((db) =>
 			tools.bind(
 				owner,
-				caps.prepareActiveByIdInTransaction(
-					db,
-					owner,
-					"package:web.research@9",
-					{ question: "天気" },
-				),
+				caps.prepareActiveByIdInTransaction(db, owner, webPackageRevisionId, {
+					question: "天気",
+				}),
 				Date.now() + 100000,
 			),
 		);

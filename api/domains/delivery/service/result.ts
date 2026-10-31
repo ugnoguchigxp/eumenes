@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { emotionSchema } from "../contracts";
+import { emotionSchema, type Emotion } from "../contracts";
 const six = (value: z.ZodNumber) =>
 	z.object(
 		Object.fromEntries(
 			emotionSchema.options.map((key) => [key, value]),
-		) as Record<import("../contracts").Emotion, z.ZodNumber>,
+		) as Record<Emotion, z.ZodNumber>,
 	);
 const identitySchema = z.object({
 	model: z.string().max(200).optional(),

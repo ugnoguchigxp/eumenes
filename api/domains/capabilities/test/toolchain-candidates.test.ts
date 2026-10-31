@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
+import { offlineBundleHost } from "../../../application/toolchain/toolchain-adapters";
 import {
 	createCapabilities,
 	migrations,
@@ -31,6 +32,7 @@ for (const targetId of ["music.create", "image.create", "excalidraw.edit"])
 				"dots",
 				"object-recognition",
 			]),
+			{ bundleHost: offlineBundleHost },
 		);
 		try {
 			await caps.seed();
@@ -88,6 +90,7 @@ test("strict discovery has no all-catalog fallback and returns the top four", as
 			"dots",
 			"object-recognition",
 		]),
+		{ bundleHost: offlineBundleHost },
 	);
 	try {
 		await caps.seed();

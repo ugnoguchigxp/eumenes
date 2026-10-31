@@ -171,14 +171,11 @@ describe("toolchain-history client", () => {
 });
 
 describe("binary and stream clients: auth header", () => {
-	it("voiceAudio without an index, serviceArtifact and watchRun send the bearer token", async () => {
+	it("voiceAudio without an index and watchRun send the bearer token", async () => {
 		const bytes = stubFetch(() => new Response(new Uint8Array([1])));
 		await newClient().voiceAudio("u1");
 		expect(bytes[0]?.path).toBe("/api/voice/turns/u1/audio");
 		expect(bytes[0]?.headers.authorization).toBe("Bearer test-token");
-		const art = stubFetch(() => new Response("x"));
-		await newClient().serviceArtifact("sr1");
-		expect(art[0]?.headers.authorization).toBe("Bearer test-token");
 		const sse = stubFetch(
 			() =>
 				new Response(

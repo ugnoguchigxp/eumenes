@@ -11,17 +11,11 @@ const log = getLogger("server");
 function createIntervalWorkers(s: Services) {
 	// Toolchain and procedure passages are embedded in the background; retrieval falls back
 	// to full-text search while a vector is missing.
-	const googleMaintenance = intervalLifecycle(
-		"google_accounts",
-		60_000,
-		() => s.googleAccounts.maintain(),
-		{ exclusive: true },
+	const googleMaintenance = intervalLifecycle("google_accounts", 60_000, () =>
+		s.googleAccounts.maintain(),
 	);
-	const vectorRefresh = intervalLifecycle(
-		"toolchain_vectors",
-		600_000,
-		() => s.toolchain.refreshVectors(),
-		{ exclusive: true },
+	const vectorRefresh = intervalLifecycle("toolchain_vectors", 600_000, () =>
+		s.toolchain.refreshVectors(),
 	);
 	const reportDelivery = intervalLifecycle("task_report_delivery", 1000, () =>
 		s.store.write(s.deliverTaskReports),
@@ -51,15 +45,6 @@ function createIntervalWorkers(s: Services) {
 				.catch((error) =>
 					log.warn(
 						"dots.events_maintenance_failed",
-						{ reason: "maintenance_failed" },
-						error,
-					),
-				),
-			s.supervision
-				?.maintenance()
-				.catch((error) =>
-					log.warn(
-						"coding_supervision.maintenance_failed",
 						{ reason: "maintenance_failed" },
 						error,
 					),
@@ -95,12 +80,6 @@ function createIntervalWorkers(s: Services) {
 				),
 			),
 	);
-	const codingHeartbeat = intervalLifecycle(
-		"coding_heartbeat",
-		15_000,
-		() => s.codingExecution?.heartbeat(),
-		{ exclusive: false },
-	);
 	// Settles board runs whose result could not be applied, and prunes old runs (hourly).
 	const kanbanMaintenance = intervalLifecycle(
 		"kanban_maintenance",
@@ -118,18 +97,12 @@ function createIntervalWorkers(s: Services) {
 				),
 			),
 	);
-	const drawingMaintenance = intervalLifecycle(
-		"excalidraw_idle",
-		1000,
-		() => s.excalidraw.tick(),
-		{ exclusive: true },
+	const drawingMaintenance = intervalLifecycle("excalidraw_idle", 1000, () =>
+		s.excalidraw.tick(),
 	);
 	// Tasks and captures past their deadline end, and temp files no capture owns are removed.
-	const browserSweep = intervalLifecycle(
-		"browser_sweep",
-		30_000,
-		() => s.browser.service.sweep(),
-		{ exclusive: true },
+	const browserSweep = intervalLifecycle("browser_sweep", 30_000, () =>
+		s.browser.service.sweep(),
 	);
 	return {
 		googleMaintenance,
@@ -137,7 +110,6 @@ function createIntervalWorkers(s: Services) {
 		reportDelivery,
 		taskMaintenance,
 		storeRetention,
-		codingHeartbeat,
 		kanbanMaintenance,
 		timerMaintenance,
 		drawingMaintenance,
@@ -151,9 +123,9 @@ function createIntervalWorkers(s: Services) {
  * it, queue before the tasks it carries), start order (runners after every
  * recovery), and bring-up order for resources, which `closeAll` walks in
  * reverse so the shutdown order is exactly: commit/status subscriptions,
- * change stream, HTTP, timers, coding, in-flight maintenance (tasks, store retention,
+ * change stream, HTTP, timers, in-flight maintenance (tasks, store retention,
  * timers), world,
- * supervision, delegated, scheduler, service tests, voice, excalidraw, Claude Code sessions,
+ * scheduler, service tests, voice, excalidraw, Claude Code sessions,
  * agents, the browser (its MCP child), queue,
  * web research, dialogue, inference, datasets, store.
  */
@@ -164,7 +136,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		reportDelivery,
 		taskMaintenance,
 		storeRetention,
-		codingHeartbeat,
 		kanbanMaintenance,
 		timerMaintenance,
 		drawingMaintenance,
@@ -231,23 +202,11 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				await s.browser.service.sweep();
 			},
 		},
-		{ name: "delegated_recovery", recover: () => s.delegated.recover() },
+		{ name: "delegated_recovery", recover: () => s.delegated.tasks.recover() },
 		{ name: "dots_recovery", recover: () => s.dots.recover() },
 		{
 			name: "task_report_recovery",
 			recover: () => s.store.write(s.deliverTaskReports),
-		},
-		{
-			name: "coding_recovery",
-			recover: async () => {
-				await s.codingComposition?.coding.recover();
-			},
-		},
-		{
-			name: "supervision_recovery",
-			recover: async () => {
-				await s.supervision?.recover();
-			},
 		},
 		{ name: "timers_recovery", recover: () => s.timers.recover() },
 		{ name: "scheduler_recovery", recover: () => s.scheduler.recover() },
@@ -288,7 +247,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "scheduler_start", start: () => s.scheduler.start() },
 		{ name: "task_maintenance_start", start: () => taskMaintenance.start?.() },
 		{ name: "store_retention_start", start: () => storeRetention.start?.() },
-		{ name: "coding_heartbeat_start", start: () => codingHeartbeat.start?.() },
 		{
 			name: "timer_maintenance_start",
 			start: () => timerMaintenance.start?.(),
@@ -339,7 +297,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "service_tests", close: () => s.serviceTests.close() },
 		{ name: "scheduler", close: () => s.scheduler.close() },
 		{ name: "delegated", close: () => s.delegated.close() },
-		{ name: "supervision", close: () => s.supervision?.close() },
 		// World consumers stop before anything closes the store.
 		{ name: "world", close: () => s.world?.close() },
 		{ name: "task_maintenance", close: () => taskMaintenance.idle() },
@@ -348,16 +305,12 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		googleMaintenance,
 		{ name: "timer_maintenance", close: () => timerMaintenance.idle() },
 		{ name: "kanban_maintenance", close: () => kanbanMaintenance.idle() },
-		// Worker lease also expires independently if shutdown cannot deliver a stop.
-		{ name: "coding", close: () => s.codingComposition?.coding.close() },
-		{ name: "coding_execution", close: () => s.codingExecution?.shutdown() },
 		{
 			name: "timers",
 			close: () => {
 				reportDelivery.stop();
 				taskMaintenance.stop();
 				storeRetention.stop();
-				codingHeartbeat.stop();
 				timerMaintenance.stop();
 				kanbanMaintenance.stop();
 				browserSweep.stop();

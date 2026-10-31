@@ -6,7 +6,7 @@ import type { ConversationAgentPort } from "../../dialogue";
  * emotion), with no system text of its own, so a scripted model sees the host's prompt as it is.
  */
 export const testConversationAgent: ConversationAgentPort = {
-	system: () => ({ base: "", toolRules: "" }),
+	system: () => ({ base: "" }),
 	async respond(input) {
 		const reply = await runRespond({ ...input, emotion: false });
 		return { text: reply.text, ended: reply.ended };

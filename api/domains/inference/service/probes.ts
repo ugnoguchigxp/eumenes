@@ -72,13 +72,6 @@ export function createProbes({
 				throw new Error("permission_revoked");
 			return receipt.value;
 		},
-		async startProbe(target: string) {
-			const current = settings.get();
-			const id = crypto.randomUUID();
-			await store.write((db) => openProbe(db, id, target, current.revision));
-			launchProbe(id, target, current);
-			return { id };
-		},
 		/**
 		 * Register a probe inside the caller's writer transaction. The caller runs `launch` after
 		 * the commit; it does nothing when the registration was rolled back.

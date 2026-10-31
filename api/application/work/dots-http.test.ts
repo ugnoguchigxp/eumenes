@@ -12,7 +12,7 @@ async function setup() {
 	const f = await dotsFixture();
 	clean.push(f.close);
 	const app = new Hono();
-	registerDots(app, f.dots, f.events, f.tasks);
+	registerDots(app, f.dots, f.events);
 	return { ...f, app };
 }
 const version = "2026-07-28";

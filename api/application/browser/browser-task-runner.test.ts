@@ -521,15 +521,15 @@ test("an element capture inside the task is saved before the task finishes", asy
 	const { taskId } = await start(s);
 	await ended(s, taskId);
 	expect(s.service.taskStatus(OWNER, taskId).state).toBe("completed");
-	const [capture] = s.service.listCaptures(OWNER);
+	const stored = JSON.parse(s.service.taskRow(taskId)!.core_state_json!);
+	expect(stored.cited).toHaveLength(1);
+	const capture = s.service.captureStatus(OWNER, stored.cited[0]);
 	expect(capture).toMatchObject({
 		range: "element",
 		state: "local_ready",
 		taskId,
 	});
 	expect(s.driver.calls).toContain("screenshot");
-	const stored = JSON.parse(s.service.taskRow(taskId)!.core_state_json!);
-	expect(stored.cited).toEqual([capture!.captureId]);
 	// A task capture raises no separate notice: only the task's own result is announced.
 	expect(s.notices.map((n) => n.id)).toEqual([
 		`browser-task:${taskId}:completed`,

@@ -3,36 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import {
-	createCapabilities,
-	migration,
-	bytes,
-	hash,
-	zSchema,
-	type Definition,
-} from "..";
+import { createCapabilities, migrations, bytes, type Definition } from "..";
 import { builtins } from "../builtin/web-research";
-test("quick Web capability grants only lookup and read and preserves deep research tools", () => {
-	const quick = builtins.find(
-		(d) => d.kind === "package" && d.id === "web.quick",
-	);
-	expect(quick).toMatchObject({
-		revision: 1,
-		profileRevisionId: "profile:web.quick@1",
-		toolRevisionIds: ["tool:web.lookup@1", "tool:web.read@1"],
-	});
-	expect(quick!.dependencies).not.toContain("tool:web.find@1");
-	expect(quick!.dependencies).not.toContain("tool:web.read_saved@1");
-	expect(
-		builtins.find(
-			(d) =>
-				d.kind === "package" && d.id === "web.research" && d.revision === 9,
-		)?.toolRevisionIds,
-	).toContain("tool:web.read_saved@1");
-});
 test("5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-capabilities-"));
-	const store = openStore(join(dir, "db"), [migration]);
+	const store = openStore(join(dir, "db"), migrations);
 	const caps = createCapabilities(store, new Set(["fixture"]));
 	try {
 		await store.write((db) => {
@@ -66,7 +41,7 @@ test("5000 capability catalogue: bounded discovery, exact aliases, immutable rev
 					id: toolId,
 					kind: "tool",
 					title: `${topic}の公開情報取得 ${i}`,
-					schemaKey: "lookup",
+					schemaKey: "lookupV2",
 					backend: "fixture",
 				});
 				const d: Definition = {
@@ -181,8 +156,8 @@ test("5000 capability catalogue: bounded discovery, exact aliases, immutable rev
 }, 30000);
 test("builtin SKILL is mandatory; disabling survives seed and dependency failure hides package", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-capabilities-"));
-	const store = openStore(join(dir, "db"), [migration]);
-	const caps = createCapabilities(store);
+	const store = openStore(join(dir, "db"), migrations);
+	const caps = createCapabilities(store, new Set(["history"]));
 	try {
 		await caps.seed();
 		await expect(
@@ -198,13 +173,13 @@ test("builtin SKILL is mandatory; disabling survives seed and dependency failure
 					useWhen: [],
 					avoidWhen: [],
 					dependencies: [],
-					backend: "web",
-					schemaKey: "research",
+					backend: "history",
+					schemaKey: "history",
 				}),
 			),
 		).rejects.toThrow("invalid_capability_bundle");
 		await store.write((db) =>
-			caps.setEnabledInTransaction(db, "skill", "web.research", false),
+			caps.setEnabledInTransaction(db, "skill", "history.research", false),
 		);
 		await caps.seed();
 		await store.write((db) =>
@@ -212,8 +187,8 @@ test("builtin SKILL is mandatory; disabling survives seed and dependency failure
 				caps.searchInTransaction(
 					db,
 					{ taskId: "task", rootRunId: "root", cancelEpoch: 0 },
-					"調査",
-					["調査"],
+					"履歴",
+					["履歴"],
 					Date.now() + 10000,
 				),
 			).toHaveLength(0),
@@ -225,8 +200,8 @@ test("builtin SKILL is mandatory; disabling survives seed and dependency failure
 });
 test("revoking a dependency permanently invalidates already issued candidates, even after re-enabling", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-capabilities-"));
-	const store = openStore(join(dir, "db"), [migration]);
-	const caps = createCapabilities(store);
+	const store = openStore(join(dir, "db"), migrations);
+	const caps = createCapabilities(store, new Set(["history"]));
 	try {
 		await caps.seed();
 		await store.write((db) => {
@@ -234,27 +209,27 @@ test("revoking a dependency permanently invalidates already issued candidates, e
 			const old = caps.searchInTransaction(
 				db,
 				owner,
-				"調査",
-				["調査"],
+				"履歴",
+				["履歴"],
 				Date.now() + 10000,
 			)[0]!;
-			caps.setEnabledInTransaction(db, "skill", "web.research", false);
-			caps.setEnabledInTransaction(db, "skill", "web.research", true);
+			caps.setEnabledInTransaction(db, "skill", "history.research", false);
+			caps.setEnabledInTransaction(db, "skill", "history.research", true);
 			expect(() =>
 				caps.prepareInTransaction(db, owner, old.candidateRef, {
-					question: "東京の天気",
+					question: "前に決めた日",
 				}),
 			).toThrow("capability_ref_invalid");
 			const fresh = caps.searchInTransaction(
 				db,
 				owner,
-				"調査",
-				["調査"],
+				"履歴",
+				["履歴"],
 				Date.now() + 10000,
 			)[0]!;
 			expect(
 				caps.prepareInTransaction(db, owner, fresh.candidateRef, {
-					question: "東京の天気",
+					question: "前に決めた日",
 				}).dependencies.length,
 			).toBeGreaterThan(0);
 		});
@@ -264,159 +239,18 @@ test("revoking a dependency permanently invalidates already issued candidates, e
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
-test("builtin bundle upgrade preserves revision 1 fingerprints and activates a new revision for the larger input contract", async () => {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-capabilities-upgrade-"));
-	const store = openStore(join(dir, "db"), [migration]);
-	const caps = createCapabilities(store);
-	try {
-		await store.write((db) => {
-			// Only the originally deployed definitions (revision 3 packages / skill 2 are newer).
-			for (const definition of builtins.filter(
-				(d) =>
-					d.id != "web.quick" &&
-					d.id != "web.recipe" &&
-					d.id != "recipe.find" &&
-					d.revision < 3 &&
-					// The historical fixture predates the versioned search schema.
-					!(d.kind === "tool" && d.id === "web.lookup" && d.revision === 2) &&
-					!(d.kind === "skill" && d.revision === 2) &&
-					!(d.kind === "profile" && d.revision === 2),
-			))
-				caps.registerBuiltinInTransaction(db, { ...definition, revision: 1 });
-			// Represent the previously deployed 2,000-character schema fingerprint.
-			const oldSchema = zSchema("research");
-			(oldSchema.properties!.question as { maxLength: number }).maxLength =
-				2000;
-			for (const definition of builtins.filter(
-				(d) => d.kind === "package" && d.revision === 2,
-			)) {
-				const legacy = {
-					...definition,
-					revision: 1,
-					schemaHash: hash(oldSchema),
-				};
-				db.query(
-					"UPDATE capability_revisions SET definition_json=?,definition_hash=? WHERE id=?",
-				).run(
-					JSON.stringify(legacy),
-					hash(legacy),
-					`package:${definition.id}@1`,
-				);
-			}
-		});
-		const old = store.read((db) =>
-			db
-				.query(
-					"SELECT id,definition_hash FROM capability_revisions WHERE item_key LIKE 'package:%' ORDER BY id",
-				)
-				.all(),
-		);
-		await caps.seed();
-		expect(
-			store.read((db) =>
-				db
-					.query(
-						"SELECT id,definition_hash FROM capability_revisions WHERE item_key LIKE 'package:%' AND revision=1 AND item_key NOT IN ('package:web.quick','package:web.recipe') ORDER BY id",
-					)
-					.all(),
-			),
-		).toEqual(old);
-		await store.write((db) => {
-			const owner = { rootRunId: "root", taskId: "task", cancelEpoch: 0 };
-			const card = caps
-				.searchInTransaction(db, owner, "調査", ["調査"], Date.now() + 10000)
-				.find((card) => card.id === "web.research")!;
-			const prepared = caps.prepareInTransaction(db, owner, card.candidateRef, {
-				question: "東京の天気".repeat(500),
-			});
-			expect(prepared.package.revision).toBe(9);
-		});
-	} finally {
-		caps.close();
-		await store.close();
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
-test("deployed research skill v3 upgrades without a revision conflict and restart preserves hashes", async () => {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-capabilities-v3-upgrade-"));
-	let store = openStore(join(dir, "db"), [migration]);
-	let caps = createCapabilities(store);
-	try {
-		const v3 = builtins.find((d) => d.kind === "skill" && d.revision === 3)!;
-		// Fingerprint of the published definition, independent of the current file contents.
-		expect(hash(v3)).toBe(
-			"587d033849b45dcf4a13a26c7131ebe9ff93c26cd2cb959b2b7155b7962630b0",
-		);
-		await store.write((db) => {
-			for (const d of builtins.filter(
-				(d) =>
-					d.id !== "web.quick" &&
-					d.id !== "web.recipe" &&
-					d.id !== "recipe.find" &&
-					(d.kind === "package"
-						? d.revision <= (d.id === "web.read" ? 3 : 4)
-						: d.revision <= 3),
-			))
-				caps.registerBuiltinInTransaction(
-					db,
-					d === v3
-						? { ...d, body: "以前の導入時に保存されたWeb調査ルール" }
-						: d,
-				);
-		});
-		const old = store.read((db) =>
-			db
-				.query(
-					"SELECT id,definition_hash FROM capability_revisions ORDER BY id",
-				)
-				.all(),
-		);
-		await caps.seed();
-		caps.close();
-		await store.close();
-		store = openStore(join(dir, "db"), [migration]);
-		caps = createCapabilities(store);
-		await caps.seed();
-		for (const row of old as { id: string; definition_hash: string }[])
-			expect(
-				store.read((db) => caps.getDefinitionInTransaction(db, row.id)?.hash),
-			).toBe(row.definition_hash);
-		await store.write((db) => {
-			const owner = { rootRunId: "root", taskId: "task", cancelEpoch: 0 };
-			const card = caps
-				.searchInTransaction(db, owner, "調査", ["調査"], Date.now() + 10000)
-				.find((card) => card.id === "web.research")!;
-			const prepared = caps.prepareInTransaction(db, owner, card.candidateRef, {
-				question: "東京の天気",
-			});
-			expect(prepared.package.revision).toBe(9);
-			expect(prepared.package.requiredSkillRevisionIds).toEqual([
-				"skill:web.research@8",
-			]);
-			expect(
-				caps.getDefinitionInTransaction(db, "skill:web.research@6")?.body,
-			).toContain("不足項目");
-		});
-	} finally {
-		caps.close();
-		await store.close();
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
 test("seed still rejects a changed newest builtin revision", async () => {
 	const dir = mkdtempSync(
 		join(tmpdir(), "eumenes-capabilities-newest-conflict-"),
 	);
-	const store = openStore(join(dir, "db"), [migration]);
+	const store = openStore(join(dir, "db"), migrations);
 	const caps = createCapabilities(store);
 	try {
 		const latest = builtins.find(
-			(d) => d.kind === "skill" && d.revision === 8,
+			(d) => d.kind === "tool" && d.id === "web.lookup" && d.revision === 2,
 		)!;
 		await store.write((db) =>
-			caps.registerBuiltinInTransaction(db, { ...latest, body: "別の内容" }),
+			caps.registerBuiltinInTransaction(db, { ...latest, summary: "別の内容" }),
 		);
 		await expect(caps.seed()).rejects.toThrow("capability_revision_conflict");
 	} finally {
@@ -426,34 +260,34 @@ test("seed still rejects a changed newest builtin revision", async () => {
 	}
 });
 
-test("history and web catalogue selection can be enabled independently without editing archived revisions", async () => {
+test("history and timer catalogue selection can be enabled independently", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-history-rollout-")),
-		store = openStore(join(dir, "db"), [migration]);
-	const web = createCapabilities(store, new Set(["web", "history"]));
+		store = openStore(join(dir, "db"), migrations);
+	const both = createCapabilities(store, new Set(["timer", "history"]));
 	try {
-		await web.seed();
-		expect(web.list().items.some((p) => p.id === "history.research")).toBe(
+		await both.seed();
+		expect(both.list().items.some((p) => p.id === "history.research")).toBe(
 			true,
 		);
-		web.close();
+		both.close();
 		const history = createCapabilities(store, new Set(["history"]));
 		await history.seed();
 		expect(history.list().items.some((p) => p.id === "history.research")).toBe(
 			true,
 		);
-		expect(history.list().items.some((p) => p.id.startsWith("web."))).toBe(
+		expect(history.list().items.some((p) => p.id === "timers.manage")).toBe(
 			false,
 		);
 		history.close();
-		const onlyWeb = createCapabilities(store, new Set(["web"]));
-		await onlyWeb.seed();
-		expect(onlyWeb.list().items.some((p) => p.id === "history.research")).toBe(
-			false,
-		);
-		expect(onlyWeb.list().items.some((p) => p.id === "web.research")).toBe(
+		const onlyTimer = createCapabilities(store, new Set(["timer"]));
+		await onlyTimer.seed();
+		expect(
+			onlyTimer.list().items.some((p) => p.id === "history.research"),
+		).toBe(false);
+		expect(onlyTimer.list().items.some((p) => p.id === "timers.manage")).toBe(
 			true,
 		);
-		onlyWeb.close();
+		onlyTimer.close();
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

@@ -4,16 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	createGoalsService,
-	goalEpochOf,
-	goalRevisionOf,
-	goalSnapshot,
-	migrations,
-} from "..";
+import { createGoalsService, goalRevisionOf, migrations } from "..";
 import type { GoalAccess } from "..";
-import { goalHistory } from "../repository";
-import { goalRevisionOfUnscoped } from "../service";
+import { goalSnapshot } from "../service";
 import { Database } from "bun:sqlite";
 
 const alice: GoalAccess = { principal: "alice", scopeKeys: ["work"] };
@@ -38,6 +31,20 @@ function service() {
 		() => `g${++counter}`,
 	);
 }
+const goalHistory = (db: Database, goalId: string) =>
+	db
+		.query(
+			"SELECT revision, status FROM goals_history WHERE goal_id=? ORDER BY revision",
+		)
+		.all(goalId) as { revision: number; status: string }[];
+const goalEpochOf = (db: Database, principal: string, scopeKey: string) =>
+	(
+		db
+			.query(
+				"SELECT epoch FROM goals_scope_epochs WHERE principal=? AND scope_key=?",
+			)
+			.get(principal, scopeKey) as { epoch: number } | null
+	)?.epoch ?? 0;
 const snap = (access: GoalAccess) =>
 	store.readSnapshot((db) => goalSnapshot(db, access));
 
@@ -294,7 +301,7 @@ test("epoch and revision change on every visible change, enabling receipt invali
 		source: src("m1"),
 	});
 	const s1 = snap(alice);
-	const rev1 = store.read((db) => goalRevisionOfUnscoped(db, a.id));
+	const rev1 = store.read((db) => goalRevisionOf(db, a.id, alice));
 	expect(rev1).toMatchObject({ revision: 1, status: "adopted", scopeEpoch: 1 });
 	await goals.update(alice, a.id, {
 		expectedRevision: 1,
@@ -305,14 +312,14 @@ test("epoch and revision change on every visible change, enabling receipt invali
 	expect(s2.revision).toBe(s1.revision + 1);
 	expect(s2.digest).not.toBe(s1.digest);
 	// A receipt that recorded revision 1 / epoch 1 is now detectably stale.
-	const rev2 = store.read((db) => goalRevisionOfUnscoped(db, a.id));
+	const rev2 = store.read((db) => goalRevisionOf(db, a.id, alice));
 	expect(rev2?.revision).toBeGreaterThan(rev1?.revision ?? 0);
 	expect(rev2?.scopeEpoch).toBeGreaterThan(rev1?.scopeEpoch ?? 0);
 	await goals.withdraw(alice, a.id, { expectedRevision: 2, source: src("m3") });
 	const s3 = snap(alice);
 	expect(s3.state).toBe("absent");
 	expect(s3.revision).toBe(s2.revision + 1);
-	expect(store.read((db) => goalRevisionOfUnscoped(db, a.id))).toMatchObject({
+	expect(store.read((db) => goalRevisionOf(db, a.id, alice))).toMatchObject({
 		status: "withdrawn",
 		revision: 3,
 		scopeEpoch: 3,

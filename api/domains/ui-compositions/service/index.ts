@@ -19,7 +19,7 @@ import {
 	workStateInTransaction,
 } from "./work";
 
-export type { Caller, RejectedDraft } from "./shared";
+export type { Caller } from "./shared";
 
 export function createUiCompositions() {
 	return {

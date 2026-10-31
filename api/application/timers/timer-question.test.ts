@@ -56,7 +56,7 @@ test("the timer adapter issues its timers as the choices of a target question, a
 			h.store.read((db) =>
 				routing.bound!.questionChoicesInTransaction(
 					db,
-					"binding:timers.command@1",
+					"binding:timers.command@4",
 					TARGET,
 				),
 			),

@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { setup, type Harness } from "./generation.fixture";
+import { reply, setup, type Harness } from "./generation.fixture";
 
 let h: Harness | undefined;
 afterEach(async () => {
@@ -12,7 +12,7 @@ test("a conversation has an active run from acceptance until the run ends, and o
 	h = await setup({ autoStart: false });
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "お答えします。" });
+	h.state.steps.push(...reply("お答えします。"));
 	const active = (conversationId: string) =>
 		h!.store.read((db) =>
 			h!.dialogue.conversationHasActiveRunInTransaction(db, conversationId),

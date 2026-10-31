@@ -15,9 +15,10 @@ import {
 	type LarmPlayground,
 	type LarmTestTarget,
 } from "../../larm";
-import { createServiceTests, migration, registerServiceTests } from "..";
+import { createServiceTests, registerServiceTests } from "..";
 import { inputSchema, type StartTest } from "../contracts";
 import { waitFor } from "../../../infrastructure/wait-for";
+import { migration } from "../repository";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const c of cleanup.splice(0)) await c();
@@ -86,6 +87,18 @@ async function setup(overrides: Partial<LarmPlayground> = {}) {
 	});
 	return { service, store, settings, g, request };
 }
+type Harness = Awaited<ReturnType<typeof setup>>;
+async function launched<T extends { run: unknown; launch?: () => boolean }>(
+	accepted: T,
+) {
+	accepted.launch?.();
+	return accepted.run as ReturnType<Harness["service"]["run"]> & object;
+}
+const start = async (
+	h: Harness,
+	raw: Parameters<Harness["service"]["startInTransaction"]>[1],
+) =>
+	launched(await h.store.write((db) => h.service.startInTransaction(db, raw)));
 async function settled(h: Awaited<ReturnType<typeof setup>>, id: string) {
 	await waitFor(() => h.service.run(id)!.status !== "running");
 	return h.service.run(id)!;
@@ -99,8 +112,8 @@ test("idempotent acceptance, isolated results and no plaintext input persistence
 		},
 	});
 	const input = h.request();
-	const a = await h.service.start(input);
-	const b = await h.service.start(input);
+	const a = await start(h, input);
+	const b = await start(h, input);
 	expect(a.id).toBe(b.id);
 	expect((await settled(h, a.id)).text).toBe("private output");
 	expect(calls).toBe(1);
@@ -111,7 +124,7 @@ test("idempotent acceptance, isolated results and no plaintext input persistence
 	expect(persisted).not.toContain("private output");
 	expect(JSON.stringify(h.service.runs())).not.toContain("/v1/images");
 	await expect(
-		h.service.start({ ...input, input: { text: "different" } }),
+		start(h, { ...input, input: { text: "different" } }),
 	).rejects.toThrow("invalid_request_key");
 });
 test("busy rejection and cancelled late result never becomes a preview", async () => {
@@ -122,12 +135,10 @@ test("busy rejection and cancelled late result never becomes a preview", async (
 			return { text: "late" };
 		},
 	});
-	const a = await h.service.start(h.request());
+	const a = await start(h, h.request());
 	await waitFor(() => !!finish);
-	await expect(h.service.start(h.request())).rejects.toThrow(
-		"invalid_test_busy",
-	);
-	await h.service.cancel(a.id);
+	await expect(start(h, h.request())).rejects.toThrow("invalid_test_busy");
+	(await h.store.write((db) => h.service.cancelInTransaction(db, a.id)))();
 	finish();
 	const r = await settled(h, a.id);
 	expect(r.status).toBe("cancelled");
@@ -142,7 +153,7 @@ test("settings changes invalidate in-flight results and stale requests", async (
 		},
 	});
 	const old = h.request();
-	const a = await h.service.start(old);
+	const a = await start(h, old);
 	await waitFor(() => !!finish);
 	const s = h.settings.get();
 	s.larm.profile = "SAAA";
@@ -156,7 +167,7 @@ test("settings changes invalidate in-flight results and stale requests", async (
 	expect((await settled(h, a.id)).previewAvailable).toBe(false);
 	expect(h.service.catalog().stale).toBe(true);
 	await expect(
-		h.service.start({ ...old, requestKey: crypto.randomUUID() }),
+		start(h, { ...old, requestKey: crypto.randomUUID() }),
 	).rejects.toThrow("invalid_stale_settings");
 });
 test("artifact retry uses GET adapter only, not generation", async () => {
@@ -180,9 +191,11 @@ test("artifact retry uses GET adapter only, not generation", async () => {
 			return { bytes: new Uint8Array([1]), mime: "image/png" };
 		},
 	});
-	const a = await h.service.start(h.request());
+	const a = await start(h, h.request());
 	expect((await settled(h, a.id)).status).toBe("result-unavailable");
-	await h.service.retryArtifact(a.id);
+	await launched(
+		await h.store.write((db) => h.service.retryArtifactInTransaction(db, a.id)),
+	);
 	expect((await settled(h, a.id)).status).toBe("succeeded");
 	expect(generated).toBe(1);
 	expect(downloaded).toBe(1);
@@ -195,22 +208,21 @@ test("diagnostics persist individual Health states without generation", async ()
 			return { text: "bad" };
 		},
 	});
-	const a = await h.service.diagnose();
+	const a = await launched(
+		await h.store.write((db) => h.service.diagnoseInTransaction(db)),
+	);
 	const r = await settled(h, a.id);
 	expect(r.controlHealthy).toBe(true);
 	expect(r.health?.[0]?.state).toBe("on-demand");
 	expect(generated).toBe(0);
 });
-test("controller bounds uploads and rejects arbitrary URLs and unknown input fields", async () => {
+test("uploads are bounded and a start request refuses arbitrary URLs and unknown input fields", async () => {
 	const h = await setup();
 	const app = new Hono();
 	registerServiceTests(app, h.service);
-	const bad = await app.request("/api/service-tests/runs", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ ...h.request(), url: "https://evil.test" }),
-	});
-	expect(bad.status).toBe(400);
+	await expect(
+		start(h, { ...h.request(), url: "https://evil.test" } as never),
+	).rejects.toThrow("invalid_test_input");
 	expect(h.service.runs()).toHaveLength(0);
 	expect(() => h.service.upload(new Uint8Array(50))).toThrow("invalid_upload");
 	const upload = await app.request("/api/service-tests/uploads", {
@@ -218,8 +230,7 @@ test("controller bounds uploads and rejects arbitrary URLs and unknown input fie
 		body: new Uint8Array(silentWav()),
 	});
 	expect(upload.status).toBe(201);
-	const cat = await app.request("/api/service-tests/catalog");
-	const text = await cat.text();
+	const text = JSON.stringify(h.service.catalog());
 	expect(text).not.toContain("endpoint");
 	expect(text).not.toContain("selector");
 });

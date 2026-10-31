@@ -11,12 +11,14 @@ import { openStore, orderMigrations } from "../infrastructure/sqlite";
 import type { Migration } from "../infrastructure/sqlite";
 import { createHash } from "node:crypto";
 import { createConversationService } from "../domains/conversation";
-import { hostMigrations, legacyOrder, migrations } from "./migrations";
+import { legacyOrder, migrations } from "./migrations";
 import {
 	migrations as worldPackageMigrations,
 	readWorldSnapshot,
 } from "eumenes-world-model/sqlite";
 
+/** The original host block: the first 18 legacy migrations. */
+const hostMigrations = migrations.slice(0, 18);
 const sha256 = (sql: string) => createHash("sha256").update(sql).digest("hex");
 const ids = (list: readonly Migration[]) => list.map((m) => m.id);
 const indexOfId = (id: string) => migrations.findIndex((m) => m.id === id);
@@ -288,31 +290,6 @@ const GOLDEN: readonly (readonly [string, string])[] = [
 ];
 
 const legacyMigrations = migrations.filter((m) => legacyOrder.includes(m.id));
-/** What the old implementation did: an INTEGER-keyed table, SQL applied by position. */
-function buildPositionalDatabase(path: string, count = GOLDEN.length) {
-	const db = new Database(path, { create: true });
-	db.exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
-	db.exec(
-		"CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY)",
-	);
-	db.exec("ALTER TABLE schema_migrations ADD COLUMN checksum TEXT");
-	for (let i = 0; i < count; i++) {
-		const sql = legacyMigrations[i]!.sql;
-		db.transaction(() => {
-			db.exec(sql);
-			db.query(
-				"INSERT INTO schema_migrations (id, checksum) VALUES (?, ?)",
-			).run(i + 1, sha256(sql));
-		})();
-	}
-	return db;
-}
-const schemaDump = (db: Database) =>
-	db
-		.query(
-			"SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'schema_migrations%' AND name NOT LIKE 'sqlite_autoindex_schema_migrations%' ORDER BY type, name",
-		)
-		.all();
 const appliedRows = (db: Database) =>
 	db
 		.query("SELECT id, checksum FROM schema_migrations_v2 ORDER BY id")
@@ -327,112 +304,6 @@ test("GOLDEN: the legacy order and every deployed SQL string are byte-for-byte u
 		expect(sha256(migrations[i]!.sql)).toBe(checksum);
 	}
 	expect(new Set(legacyOrder).size).toBe(legacyOrder.length);
-});
-
-test("a database built by the old positional scheme opens, is moved to schema_migrations_v2, and applies nothing", async () => {
-	const dir = tmp("eumenes-positional-");
-	try {
-		const path = join(dir, "db.sqlite3");
-		const old = buildPositionalDatabase(path);
-		const dump = schemaDump(old);
-		const version = (
-			old.query("PRAGMA schema_version").get() as { schema_version: number }
-		).schema_version;
-		const legacyRows = old
-			.query("SELECT id, checksum FROM schema_migrations ORDER BY id")
-			.all() as { id: number; checksum: string }[];
-		old.close();
-		const store = openStore(path, legacyMigrations, { legacyOrder });
-		try {
-			expect(store.read(appliedRows)).toEqual(
-				legacyRows
-					.map((row) => ({
-						id: legacyOrder[row.id - 1]!,
-						checksum: row.checksum,
-					}))
-					.sort((a, b) => (a.id < b.id ? -1 : 1)),
-			);
-			// No migration SQL ran: the only DDL is the new bookkeeping table.
-			expect(store.read(schemaDump)).toEqual(dump);
-			expect(
-				store.read(
-					(db) =>
-						(
-							db.query("PRAGMA schema_version").get() as {
-								schema_version: number;
-							}
-						).schema_version,
-				),
-			).toBe(version + 1);
-			// The old table stays for rollback, untouched.
-			expect(
-				store.read(
-					(db) =>
-						(
-							db.query("SELECT COUNT(*) AS n FROM schema_migrations").get() as {
-								n: number;
-							}
-						).n,
-				),
-			).toBe(legacyOrder.length);
-		} finally {
-			await store.close();
-		}
-		// Reopening is a no-op again.
-		const again = openStore(path, legacyMigrations, { legacyOrder });
-		expect(again.read(appliedRows)).toHaveLength(legacyOrder.length);
-		await again.close();
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
-test("a partly migrated positional database applies only the missing migrations, in the legacy order", async () => {
-	const dir = tmp("eumenes-positional-partial-");
-	try {
-		const path = join(dir, "db.sqlite3");
-		buildPositionalDatabase(path, 30).close();
-		const store = openStore(path, legacyMigrations, { legacyOrder });
-		const upgraded = store.read(schemaDump);
-		expect(store.read(appliedRows).map((r) => r.id)).toEqual(
-			[...legacyOrder].sort(),
-		);
-		await store.close();
-		const fresh = openStore(join(dir, "fresh.sqlite3"), legacyMigrations);
-		expect(fresh.read(schemaDump)).toEqual(upgraded);
-		await fresh.close();
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
-test("a positional database with a row beyond the frozen order, or a pre-checksum row, is handled", async () => {
-	const dir = tmp("eumenes-positional-edge-");
-	try {
-		const ahead = join(dir, "ahead.sqlite3");
-		const db = buildPositionalDatabase(ahead);
-		db.query(
-			"INSERT INTO schema_migrations (id, checksum) VALUES (65, 'x')",
-		).run();
-		db.close();
-		expect(() => openStore(ahead, legacyMigrations, { legacyOrder })).toThrow(
-			"migration_unknown_applied:legacy/65",
-		);
-		const noChecksum = join(dir, "no-checksum.sqlite3");
-		const old = buildPositionalDatabase(noChecksum);
-		old.exec("UPDATE schema_migrations SET checksum = NULL");
-		old.close();
-		const store = openStore(noChecksum, legacyMigrations, { legacyOrder });
-		// Rows from before checksums trust the current definition once.
-		expect(store.read(appliedRows).map((r) => r.checksum)).toEqual(
-			GOLDEN.map(([id, checksum]) => [id, checksum] as const)
-				.sort(([a], [b]) => (a < b ? -1 : 1))
-				.map(([, checksum]) => checksum),
-		);
-		await store.close();
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
 });
 
 test("a database that holds a migration this code does not know refuses to start", async () => {
@@ -624,30 +495,6 @@ test("an applied migration that is rewritten later stops startup with its id onl
 		// The unchanged list still opens.
 		const again = openStore(path, original);
 		await again.close();
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
-test("a database from before checksums is backfilled once and then verified", async () => {
-	const dir = tmp("eumenes-checksum-legacy-");
-	try {
-		const path = join(dir, "db.sqlite3");
-		const list = ["CREATE TABLE a (x INTEGER)", "CREATE TABLE b (y INTEGER)"];
-		const legacy = new Database(path, { create: true });
-		legacy.exec(
-			"CREATE TABLE schema_migrations (id INTEGER PRIMARY KEY); INSERT INTO schema_migrations (id) VALUES (1),(2);" +
-				list.join(";"),
-		);
-		legacy.close();
-		const store = openStore(path, list);
-		const rows = store.read(appliedRows);
-		expect(rows.map((r) => r.id)).toEqual(["adhoc/0001", "adhoc/0002"]);
-		expect(rows.map((r) => r.checksum)).toEqual(list.map(sha256));
-		await store.close();
-		expect(() =>
-			openStore(path, [list[0]!, "CREATE TABLE b (y TEXT)"]),
-		).toThrow("migration_checksum_mismatch");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
@@ -1098,8 +945,8 @@ test("research/history metadata migrations append after the frozen legacy order 
 	const dir = tmp("eumenes-read-metadata-upgrade-");
 	try {
 		const path = join(dir, "db");
-		buildPositionalDatabase(path).close();
-		const store = openStore(path, migrations, { legacyOrder });
+		await openStore(path, legacyMigrations).close();
+		const store = openStore(path, migrations);
 		expect(store.read(appliedRows)).toHaveLength(migrations.length);
 		for (const [id, checksum] of GOLDEN)
 			expect(store.read(appliedRows).find((r) => r.id === id)?.checksum).toBe(
@@ -1116,7 +963,7 @@ test("research/history metadata migrations append after the frozen legacy order 
 				.some((r: any) => r.name === "exploration_json"),
 		).toBe(true);
 		await store.close();
-		const reopened = openStore(path, migrations, { legacyOrder });
+		const reopened = openStore(path, migrations);
 		expect(reopened.read(appliedRows)).toHaveLength(migrations.length);
 		await reopened.close();
 	} finally {

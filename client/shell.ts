@@ -1,4 +1,4 @@
-import { sessionSchema, sessionsSchema } from "../api/domains/shell/contracts";
+import { sessionSchema } from "../api/domains/shell/contracts";
 import { callJson, json, type Transport } from "./transport";
 
 type Size = { cols: number; rows: number };
@@ -6,8 +6,6 @@ const path = (id: string) => `/api/shell/sessions/${encodeURIComponent(id)}`;
 
 export function shellClient(transport: Transport) {
 	return {
-		shellSessions: async (signal?: AbortSignal) =>
-			callJson(transport, sessionsSchema, "/api/shell/sessions", { signal }),
 		startShell: async (input: { title?: string } & Size) =>
 			callJson(transport, sessionSchema, "/api/shell/sessions", json(input)),
 		restartShell: async (id: string, size: Size) =>

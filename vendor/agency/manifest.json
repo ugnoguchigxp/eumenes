@@ -1,12 +1,12 @@
 {
 	"package": "eumenes-agency",
-	"version": "0.0.1",
-	"artifact": "eumenes-agency-0.0.1-bf34e9de9e6f.tgz",
-	"sha256": "f653acdd209167e4683c01f84753d80550a260b98fdaa021284150d8af562f77",
-	"size": 76162,
+	"version": "0.1.1",
+	"artifact": "eumenes-agency-0.1.1-94ad302a4ca7.tgz",
+	"sha256": "c4c3b31fd3e9dbefdd05a29d111a0c8e20f6401f5afcf1ac520265a6c701a4f4",
+	"size": 83397,
 	"INSTRUCTION_VERSION": "p0e-instructions-13",
-	"HOST_RULES_VERSION": "host-rules-5",
-	"gitSha": "bf34e9de9e6fa5b860eb4c8a86224be36250aa54",
+	"HOST_RULES_VERSION": "host-rules-6",
+	"gitSha": "94ad302a4ca7dfc8b70308d567ecb3f2a73eface",
 	"dirty": false,
-	"builtAt": "2026-10-27T03:11:35.023Z"
+	"builtAt": "2026-10-31T01:59:48.468Z"
 }

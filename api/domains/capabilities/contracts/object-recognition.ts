@@ -1,9 +1,4 @@
 import { z } from "zod";
-export const recognitionManage = z.strictObject({
-	action: z.enum(["open", "read", "cancel"]),
-	id: z.string().max(200),
-	frameIndex: z.number().int().min(-1).max(59),
-});
 /** Revision 2 adds capture (camera/screen after the user agreed) and ask (a saved image on screen). */
 export const recognitionManageV2 = z.strictObject({
 	action: z.enum(["open", "read", "cancel", "capture", "ask"]),

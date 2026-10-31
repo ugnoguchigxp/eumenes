@@ -26,7 +26,7 @@ async function setup() {
 			modules: [
 				{
 					mount: (app) =>
-						registerDots(app, f.dots, f.events, f.tasks, undefined, messages),
+						registerDots(app, f.dots, f.events, undefined, messages),
 				},
 			],
 		});

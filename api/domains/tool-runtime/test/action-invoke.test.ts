@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	createCapabilities,
-	migration as capMigration,
+	migrations as capMigrations,
 } from "../../capabilities";
 import { createQueue, migration as queueMigration } from "../../queue";
 import {
@@ -13,13 +13,13 @@ import {
 	migrations,
 	type ActionAdapter,
 	type ActionEnvelope,
-	type CapabilityReads,
 } from "..";
+import type { CapabilityReads } from "../service/action-types";
 
 test("agent action invocation stores the adapter and operation of its binding and reads through them", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-action-invoke-"));
 	const store = openStore(join(dir, "db"), [
-		capMigration,
+		...capMigrations,
 		queueMigration,
 		...migrations,
 	]);

@@ -4,13 +4,9 @@ import {
 	INTERACTION_POLICY,
 	type InteractionAnswer,
 	type InteractionAnswerResult,
-	type InteractionView,
 } from "../contracts/command-interactions";
 import type { Run } from "../contracts";
-import { byId } from "../repository";
-import { endRun } from "./run-end";
 import {
-	OPEN_STATUSES,
 	bodyBytes,
 	eventByEventId,
 	interactionById,
@@ -231,60 +227,6 @@ export function createInteractionAnswers(
 		 * and the generation so a late answer or model result is refused, and stops a resumed
 		 * run still in flight. A timer already saved is not cancelled implicitly.
 		 */
-		async cancel(
-			interactionId: string,
-			body: { eventId: string; expectedRevision: number },
-		): Promise<InteractionView> {
-			const result = await store.write(
-				(
-					tx,
-				):
-					| { ok: true; view: InteractionView; jobId?: string }
-					| { ok: false; code: string } => {
-					const seen = eventByEventId(tx, body.eventId);
-					if (seen) {
-						if (seen.kind !== "cancel" || seen.interactionId !== interactionId)
-							return { ok: false, code: "request_conflict" };
-						return {
-							ok: true,
-							view: view(interactionById(tx, interactionId)!),
-						};
-					}
-					const row = interactionById(tx, interactionId);
-					if (!row) return { ok: false, code: "interaction_not_found" };
-					if (row.status === "cancelled") return { ok: true, view: view(row) };
-					if (!(OPEN_STATUSES as readonly string[]).includes(row.status))
-						return { ok: false, code: "interaction_closed" };
-					if (row.revision !== body.expectedRevision)
-						return { ok: false, code: "revision_conflict" };
-					const run = byId(tx, row.currentRunId);
-					const resumedRunActive =
-						row.status === "ready" &&
-						!!run &&
-						(run.status === "queued" || run.status === "running");
-					settle(tx, row, "cancelled", "interaction_cancelled");
-					addEvent(tx, row.id, "cancel", body.eventId, undefined);
-					let jobId: string | undefined;
-					if (resumedRunActive && run) {
-						if (run.jobId) {
-							queue.cancelInTransaction(tx, run.jobId, "cancel_requested");
-							jobId = run.jobId;
-						}
-						const current = byId(tx, run.id);
-						if (current)
-							endRun(deps, tx, current, "cancelled", "cancel_requested");
-					}
-					return {
-						ok: true,
-						view: view(interactionById(tx, row.id)!),
-						jobId,
-					};
-				},
-			);
-			if (!result.ok) throw new Error(result.code);
-			if (result.jobId) queue.flushCancellations([result.jobId]);
-			return result.view;
-		},
 	};
 }
 

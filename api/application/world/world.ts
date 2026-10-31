@@ -77,19 +77,12 @@ export function resolveWorldMode(store: SqliteStore): WorldMode {
 const WORLD_READ_PURPOSE = "dialogue.read";
 const WORLD_LIFECYCLE_PURPOSE = "world.lifecycle";
 /** Explicit registration of targets and structured claims by the host (the steward curates through `assembly.curation`). */
-const WORLD_MANUAL_PURPOSE = "world.manual";
+export const WORLD_MANUAL_PURPOSE = "world.manual";
 
 export const WORLD_DEFAULT_SCOPE: ScopeRef = {
 	principal: CONVERSATION_DEFAULT_PRINCIPAL,
 	scopeKey: CONVERSATION_DEFAULT_SCOPE,
 };
-
-/** The AccessContext request part for an explicit registration in `scope`. */
-export const manualAccess = (scope: ScopeRef = WORLD_DEFAULT_SCOPE) => ({
-	principal: scope.principal,
-	scopeKeys: [scope.scopeKey],
-	purpose: WORLD_MANUAL_PURPOSE,
-});
 
 const MIN_SECRET_CHARS = 32;
 /**

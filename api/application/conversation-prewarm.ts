@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import type { NativeTool } from "../infrastructure/chat-stream";
 import { getLogger } from "../infrastructure/logger";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import type { InferenceService, Messages } from "../domains/inference";
@@ -12,10 +11,7 @@ const PREWARM_DEADLINE_MS = 120_000;
 /** The fixed task of a prewarm: it reads the prefix and asks for nothing. */
 const PREWARM_TASK = "読むだけです。何も出力しません。";
 
-type Prompt = {
-	messages: Messages;
-	tools: NativeTool[];
-};
+type Prompt = { messages: Messages };
 
 /**
  * The cold-start prewarm (the ContextWindow layout specification, section 8.3): the latest conversation's prefix
@@ -71,8 +67,6 @@ export function createConversationPrewarm(deps: {
 					sessionRole: "auxiliary",
 					onConversation: true,
 					readAhead: true,
-					prefixTools: prepared.tools,
-					toolChoice: "none",
 				},
 			);
 			await store

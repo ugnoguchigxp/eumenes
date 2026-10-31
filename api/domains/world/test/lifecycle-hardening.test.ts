@@ -9,9 +9,6 @@ import { expect, test } from "bun:test";
 import { MemoryStoreError } from "eumenes-memory/sqlite";
 import {
 	createWorldLifecycle,
-	defaultMemoryPort,
-	readWorldJournal,
-	type ForgetReport,
 	type WorldApplyRequest,
 	type WorldService,
 } from "..";
@@ -36,6 +33,9 @@ import {
 	worldExternals,
 	type Life,
 } from "./lifecycle-fixture";
+import { defaultMemoryPort } from "../service/lifecycle-memory";
+import { readWorldJournal } from "../service/world-journal";
+import type { ForgetReport } from "../service/lifecycle-types";
 
 async function seed(life: Life) {
 	expect((await life.lifecycle.recoverWorld()).status).toBe("open");

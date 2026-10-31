@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { isBriefSpokenReply } from "../../delivery";
 import { parseSpecialistAction } from "../service/specialist-prompt";
-import { setup, type Harness } from "./generation.fixture";
+import { reply, setup, type Harness } from "./generation.fixture";
 
 /**
  * The brief spoken reply contract of the specialist's reply, and a display artifact's body, which is no speech.
@@ -46,21 +46,23 @@ test("brief speech is at most two sentences, keeping decimal values and links in
 test("a display artifact's body is not held to the speech contract", async () => {
 	h = await setup();
 	const content = "成果物の本文。".repeat(200);
-	h.state.steps.push({ text: content });
+	h.state.steps.push(...reply(content));
 	const run = await h.say("画面に表示する原稿を作って", "completed", {
 		presentation: "artifact",
 	});
 	expect(run.status).toBe("completed");
 	expect(h.dialogue.answerText(run.id)).toBe(content);
-	expect(h.state.calls).toHaveLength(1);
+	// The turn's choice, then its talk.
+	expect(h.state.calls).toHaveLength(2);
 });
 
 test("a long conversation answer is adopted as it is: the host neither repairs nor rejects it", async () => {
 	h = await setup();
 	const verbose =
 		"承知しました。説明します。まずはこちらです。最後に確認します。";
-	h.state.steps.push({ text: verbose });
+	h.state.steps.push(...reply(verbose));
 	const run = await h.say("説明して");
 	expect(h.dialogue.answerText(run.id)).toBe(verbose);
-	expect(h.state.calls).toHaveLength(1);
+	// The turn's choice, then its talk.
+	expect(h.state.calls).toHaveLength(2);
 });

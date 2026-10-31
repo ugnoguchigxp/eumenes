@@ -2,7 +2,6 @@ import { z } from "zod";
 import { artifactDefinitionV1 } from "../api/domains/capabilities/contracts";
 import {
 	interactionAnswer,
-	interactionCancel,
 	interactionQuestion,
 	interactionStatuses,
 	type InteractionAnswer,
@@ -243,13 +242,6 @@ export function toolchainActionsClient(transport: Transport) {
 				}),
 				{ signal },
 			)) as InteractionView[],
-		toolchainInteraction: async (id: string, signal?: AbortSignal) =>
-			(await callJson(
-				transport,
-				interactionView,
-				`/api/toolchain-interactions/${encodeURIComponent(id)}`,
-				{ signal },
-			)) as InteractionView,
 		answerToolchainInteraction: async (
 			id: string,
 			input: InteractionAnswer,
@@ -261,16 +253,5 @@ export function toolchainActionsClient(transport: Transport) {
 				`/api/toolchain-interactions/${encodeURIComponent(id)}/answers`,
 				{ ...json(interactionAnswer.parse(input)), signal },
 			)) as { interaction: InteractionView; runId: string; replay: boolean },
-		cancelToolchainInteraction: async (
-			id: string,
-			input: z.infer<typeof interactionCancel>,
-			signal?: AbortSignal,
-		) =>
-			(await callJson(
-				transport,
-				interactionView,
-				`/api/toolchain-interactions/${encodeURIComponent(id)}/cancel`,
-				{ ...json(interactionCancel.parse(input)), signal },
-			)) as InteractionView,
 	};
 }

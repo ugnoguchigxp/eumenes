@@ -6,7 +6,6 @@ import { openStore } from "../../infrastructure/sqlite";
 import { migrations } from "../migrations";
 import { offlineBundleHost } from "./toolchain-adapters";
 import {
-	builtinToolchainFunctions,
 	createCapabilities,
 	toolchainBuiltins,
 	toolchainPassages,
@@ -68,9 +67,6 @@ test("every builtin and bundled toolchain registers as a complete set with flat 
 		"docling",
 	]);
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
-	expect(active.map((d) => d.functionName).sort()).toEqual(
-		[...builtinToolchainFunctions].sort(),
-	);
 	for (const d of active) {
 		const set = store.read((db) =>
 			capabilities.toolchainSetInTransaction(db, d.revisionId),
@@ -96,8 +92,8 @@ test("a toolchain is offered only where its whole package is registered", async 
 });
 
 test("an incomplete set or a reused function name is refused at registration", async () => {
-	const { store, capabilities } = await setup(["web", "history"]);
-	const web = toolchainBuiltins.find((d) => d.id === "history.research")!;
+	const { store, capabilities } = await setup(["web", "history", "image"]);
+	const web = toolchainBuiltins.find((d) => d.id === "image.create")!;
 	const broken: Definition[] = [
 		{
 			...web,
@@ -115,7 +111,7 @@ test("an incomplete set or a reused function name is refused at registration", a
 			...web,
 			id: "web.twopackages",
 			functionName: "web_twopackages",
-			dependencies: [web.packageRevisionId!, "package:web.search@1"],
+			dependencies: [web.packageRevisionId!, "package:history.research@2"],
 		},
 	];
 	for (const d of broken)
@@ -147,6 +143,8 @@ test("without vectors every available toolchain is offered; with vectors the top
 			...toolchainBuiltins.map((d) => d.id),
 			"timers.manage",
 			"web.search",
+			"music.create",
+			"music.library",
 			"pipeline.studio",
 			// The dots delegation bundle (backend `dots`, offered by this setup).
 			"dots.delegate",

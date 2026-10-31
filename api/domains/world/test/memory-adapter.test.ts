@@ -5,15 +5,7 @@ import {
 	planForget,
 	registerExternalDependents,
 } from "eumenes-memory/sqlite";
-import {
-	MAX_DEPENDS_ON,
-	MemoryRegistrationRejected,
-	WORLD_PROVIDER_REF,
-	externalIdOf,
-	planDependents,
-	type SourceAdapter,
-	type VersionInputs,
-} from "..";
+
 import {
 	ACCESS,
 	NOW,
@@ -32,6 +24,15 @@ import {
 	withHarness,
 	worldEdges,
 } from "./fixture";
+import {
+	MAX_DEPENDS_ON,
+	MemoryRegistrationRejected,
+	externalIdOf,
+	planDependents,
+} from "../service/memory-adapter";
+import { WORLD_PROVIDER_REF } from "../contracts/host";
+import type { SourceAdapter } from "../contracts";
+import type { VersionInputs } from "../service/inputs";
 
 const memoryAccess = (db: Parameters<typeof probe>[0]) => ({
 	principal: SCOPE.principal,

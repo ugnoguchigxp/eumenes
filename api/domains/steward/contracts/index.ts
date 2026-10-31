@@ -1,6 +1,5 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
-import type { NativeTool } from "../../../infrastructure/chat-stream";
 
 /** The one queue job kind of the steward: one job is one step, one inference. */
 export const STEWARD_KIND = "steward.step.v1";
@@ -107,28 +106,19 @@ export const JOB_DEADLINE_MS = 15 * 60_000;
 
 // ---- ports the application provides (queue and inference are lower than the steward's callers) ----
 
-/** A message of a step's call; on the conversation's prompt, its prefix keeps the conversation's tool calls. */
+/** A message of a step's call. */
 export type ChatMessage = {
-	role: "system" | "user" | "assistant" | "tool";
+	role: "system" | "user" | "assistant";
 	content: string;
-	tool_calls?: Array<{
-		id: string;
-		type: "function";
-		function: { name: string; arguments: string };
-	}>;
-	tool_call_id?: string;
 };
 /**
  * A call on the conversation's prompt (the ContextWindow layout specification, section 8.2): it runs on the
- * conversation's connection with the conversation's tools (not to be called), so the shared prefix is read from
- * the cache, and it yields to the conversation (`larm_preempted`).
+ * conversation's connection, so the shared prefix is read from the cache, and it yields to the conversation (`larm_preempted`).
  */
 export type ConversationSession =
 	| {
 			sessionRole: "auxiliary";
 			onConversation: true;
-			prefixTools: NativeTool[];
-			toolChoice: "none";
 	  }
 	/** A call on a connection of its own: the host's own background work, it yields to calls made for the user. */
 	| { sessionRole: "auxiliary"; yields: true };

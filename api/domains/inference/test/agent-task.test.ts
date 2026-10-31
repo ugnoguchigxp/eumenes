@@ -1,20 +1,22 @@
 import { expect, test } from "bun:test";
 import {
-	parseTaskAction,
 	parseTaskState,
 	recordOutput,
 	recordToolResult,
 	resolveTaskPolicy,
 	rewriteReferences,
 	startTask,
-	taskCallsLeft,
-	taskCanCall,
 	taskControl,
 	taskMessages,
-	taskViolations,
 	type TaskState,
-	type TaskStep,
 } from "..";
+import {
+	parseTaskAction,
+	taskCallsLeft,
+	taskCanCall,
+	taskViolations,
+	type TaskStep,
+} from "../contracts/agent-task";
 
 const TOOLS = [
 	{ id: "page.click", description: "クリックする", inputSchema: {} },

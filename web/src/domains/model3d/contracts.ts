@@ -76,7 +76,6 @@ const focus = z.discriminatedUnion("kind", [
 		generationId: z.string(),
 	}),
 ]);
-export type Model3dFocus = z.infer<typeof focus>;
 
 /** The backend's data for the screen source (`query:model3d.workspace@1`). */
 export const model3dSourceData = z.looseObject({

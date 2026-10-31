@@ -7,7 +7,6 @@ export type {
 } from "./contracts";
 export {
 	intentLabels,
-	intentQuestion,
 	type IntentInput,
 	type IntentJudgment,
 	type IntentLabel,
@@ -18,7 +17,6 @@ export { createActivityRecorder } from "./service/activity";
 export {
 	createMonitoringClient,
 	MONITORING_BODY_LIMIT,
-	type MonitoringClient,
 	type MonitoringRead,
 } from "./service/monitoring";
 export type {
@@ -40,11 +38,7 @@ export type {
 export { findServiceTarget } from "./service/playground-select";
 export { silentWav, code as playgroundError } from "./service/playground-http";
 
-export {
-	trackQuery,
-	trackQueryParams,
-	type TrackQuery,
-} from "./contracts/music-library";
+export { trackQuery, type TrackQuery } from "./contracts/music-library";
 export { MusicLibraryError } from "./service/music-library";
 export { ImageImportError } from "./service/image-import";
 export { createLocalServices } from "./service/local-services";
@@ -53,26 +47,15 @@ export type {
 	LocalServicesPort,
 } from "./contracts/local-services";
 
-export {
-	createComputeClient,
-	ComputeHttpError,
-} from "./service/compute-client";
+export { createComputeClient } from "./service/compute-client";
 
-export {
-	createVisualPerception,
-	visualError,
-} from "./service/visual-perception";
+export { createVisualPerception } from "./service/visual-perception";
 export type {
 	PerceptionPort,
-	PerceptionResult,
-	PerceptionOptions,
+	/** @public */ PerceptionResult,
+	/** @public */ PerceptionOptions,
 	AnalysisRecord,
 	AnalysisCreate,
 } from "./contracts/visual-perception";
 
-export {
-	analysisCreate,
-	analysisErrors,
-	perceptionOptions,
-	perceptionResult,
-} from "./contracts/visual-perception";
+export { analysisCreate } from "./contracts/visual-perception";

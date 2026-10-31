@@ -53,10 +53,6 @@ export function timersClient(transport: Transport) {
 			),
 		cancelTimer: async (id: string, input: CancelTimerInput) =>
 			act(id, "cancel", input),
-		pauseTimer: async (id: string, input: CancelTimerInput) =>
-			act(id, "pause", input),
-		resumeTimer: async (id: string, input: CancelTimerInput) =>
-			act(id, "resume", input),
 		timerNotifications: async (
 			query: { cursor?: string; limit?: number } = {},
 			signal?: AbortSignal,

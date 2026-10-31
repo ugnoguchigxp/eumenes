@@ -22,8 +22,8 @@ import {
 	sourceKeyOf,
 	type WorldApplyRequest,
 	type WorldService,
-	type WorldServiceOptions,
 } from "..";
+import type { WorldServiceOptions } from "../service/world-service";
 
 export const PURPOSE = "world.test";
 /** Test-only cursor secret: the adapter has no default. */

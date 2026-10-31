@@ -3,7 +3,6 @@ import { z } from "zod";
 import { parseQuery } from "../../../infrastructure/http";
 import type { InferenceService } from "../service";
 import type { ConnectionModelsService } from "../service/connection-models";
-import { usagePageQuerySchema } from "../contracts";
 import { registerScreenPresence } from "./screen-presence";
 const modelsQuery = z.object({ refresh: z.literal("1").optional() });
 const voicesQuery = z.object({ language: z.enum(["ja", "en"]).optional() });
@@ -36,7 +35,6 @@ export function registerInference(
 				return c.json({ error: code }, modelListStatus(code));
 			}
 		});
-	app.get("/api/inference/status", (c) => c.json(service.status()));
 	app.get("/api/inference/larm", (c) => c.json(service.inspect()));
 	app.get("/api/inference/larm/profiles", async (c) =>
 		c.json(
@@ -56,32 +54,4 @@ export function registerInference(
 		);
 	});
 	app.get("/api/inference/usage", (c) => c.json(service.usage()));
-	app.get("/api/inference/usage/page", (c) => {
-		const query = parseQuery(c, usagePageQuerySchema, {
-			code: "invalid_request",
-		});
-		return query.ok ? c.json(service.usagePage(query.data)) : query.response;
-	});
-	app.get("/api/inference/probes", (c) => c.json(service.probes()));
-	app.post("/api/inference/probes", async (c) => {
-		const body = await c.req.text();
-		if (body.length > 2048) return c.json({ error: "invalid_body" }, 413);
-		let target: unknown;
-		try {
-			target = (JSON.parse(body) as { target?: unknown }).target;
-		} catch {
-			return c.json({ error: "invalid_json" }, 400);
-		}
-		if (typeof target !== "string" || target.length > 100)
-			return c.json({ error: "invalid_target" }, 400);
-		return c.json(await service.startProbe(target), 202);
-	});
-	app.get("/api/inference/probes/:id", (c) => {
-		const probe = service.getProbe(c.req.param("id"));
-		return probe ? c.json(probe) : c.json({ error: "not_found" }, 404);
-	});
-	app.post("/api/inference/probes/:id/cancel", (c) => {
-		service.cancelProbe(c.req.param("id"));
-		return c.json({ ok: true });
-	});
 }

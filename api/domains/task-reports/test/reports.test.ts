@@ -3,20 +3,35 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import { createTasks, migration as tasksMigration } from "../../tasks";
-import { createTaskReports, migration } from "..";
-import type { ReportBody } from "../contracts";
+import { createTasks, migrations as tasksMigrations } from "../../tasks";
+import { createTaskReports } from "..";
+import type { ReportBody, TaskReport } from "../contracts";
+import { migration } from "../repository";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const c of cleanup.splice(0)) await c();
 });
+const listReports = (
+	h: { store: ReturnType<typeof openStore>; id: string },
+	after = 0,
+	limit = 50,
+) =>
+	h.store.read((db) =>
+		(
+			db
+				.query(
+					"SELECT data_json FROM task_reports WHERE task_id=? AND sequence>? ORDER BY sequence LIMIT ?",
+				)
+				.all(h.id, after, limit) as { data_json: string }[]
+		).map((r) => JSON.parse(r.data_json) as TaskReport),
+	);
 async function setup() {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-reports-")),
-		store = openStore(join(dir, "db"), [tasksMigration, migration]),
+		store = openStore(join(dir, "db"), [...tasksMigrations, migration]),
 		tasks = createTasks(store, {
 			kinds: [
 				{
-					kind: "coding",
+					kind: "orchestration",
 					version: 1,
 					available: () => true,
 					startInTransaction: () => {},
@@ -28,14 +43,15 @@ async function setup() {
 	const t = await tasks.create(
 		{
 			requestId: crypto.randomUUID(),
-			kind: "coding",
+			kind: "orchestration",
 			version: 1,
 			title: "reports",
 			request: "report test",
 			completionConditions: ["complete"],
 			startMode: "register_only",
 			grant: {
-				workspaceId: "workspace",
+				connectionRef: "connection",
+				projectRef: "project",
 				operations: ["read"],
 				expiresAt: new Date(Date.now() + 3600000).toISOString(),
 			},
@@ -86,10 +102,10 @@ test("immutable report sequence and origin are deduplicated with a durable outbo
 	await h.store.write((db) =>
 		h.reports.appendInTransaction(db, h.id, "event:2", body()),
 	);
-	const page = h.reports.list(h.id, 0, 1);
-	expect(page.items[0]?.originConversationId).toBe("c1");
-	expect(page.nextCursor).toBe(1);
-	expect(h.reports.list(h.id, page.nextCursor!).items[0]?.sequence).toBe(2);
+	const page = listReports(h, 0, 1);
+	expect(page[0]?.originConversationId).toBe("c1");
+	expect(page[0]?.sequence).toBe(1);
+	expect(listReports(h, page[0]!.sequence)[0]?.sequence).toBe(2);
 	expect(
 		h.store.read((db) =>
 			db.query("SELECT state FROM task_report_outbox ORDER BY rowid").all(),
@@ -104,7 +120,7 @@ test("report and outbox roll back together, and contract size bounds are enforce
 			throw new Error("rollback");
 		}),
 	).rejects.toThrow("rollback");
-	expect(h.reports.list(h.id).items).toHaveLength(0);
+	expect(listReports(h)).toHaveLength(0);
 	for (const bad of [
 		{ ...body(), summary: "a".repeat(601) },
 		{ ...body(), facts: Array(9).fill("fact") },
@@ -115,7 +131,7 @@ test("report and outbox roll back together, and contract size bounds are enforce
 				h.reports.appendInTransaction(db, h.id, crypto.randomUUID(), bad),
 			),
 		).rejects.toThrow();
-	expect(h.reports.list(h.id).items).toHaveLength(0);
+	expect(listReports(h)).toHaveLength(0);
 });
 test("resolved blocker outbox is superseded without mutating the report", async () => {
 	const h = await setup();
@@ -159,7 +175,7 @@ test("resolved blocker outbox is superseded without mutating the report", async 
 	await h.store.write((db) =>
 		h.reports.supersedeQuestionsInTransaction(db, h.id),
 	);
-	const old = h.reports.list(h.id).items[0]!;
+	const old = listReports(h)[0]!;
 	expect(old.kind).toBe("blocker");
 	const t = h.tasks.get(h.id).task;
 	await h.tasks.stop(h.id, {

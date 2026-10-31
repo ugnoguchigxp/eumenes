@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { SourceRef } from "eumenes-memory";
 import { z } from "zod";
 import type {
 	CompareResult,
@@ -10,6 +11,7 @@ import type {
 	RelevanceResult,
 	ResearchGap,
 	ResourceState,
+	Evidence,
 } from "eumenes-world-model";
 
 /**
@@ -221,12 +223,10 @@ export type WorldQueryBasis = {
 	conditionEvaluation?: EvaluationResult;
 	evaluatedAt?: number;
 	refutations: { id: string; revision: number }[];
-	sources: {
-		namespace: string;
-		kind: string;
-		id: string;
-		revision: string;
-	}[];
+	/** Quoted evidence retains its byte range and quote digest separately from the version manifest. */
+	evidence: readonly Evidence[];
+	/** Full input version manifest; ranges belong to evidence, not version identity. */
+	sources: readonly SourceRef[];
 };
 
 type GapTaskLinkStatus =

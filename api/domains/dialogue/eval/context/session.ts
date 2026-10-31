@@ -15,7 +15,6 @@ import {
 	memoryDigestOf,
 	systemDigestOf,
 } from "../../service/conversation-input";
-import { cloudHarness } from "../../service/harness";
 import { createSessionContext } from "./session-context";
 import { writeEvent } from "./session-events";
 import { type GenerateRequest, generateIn, settleIn } from "./session-run";
@@ -79,9 +78,7 @@ export function createSession(
 				if (parts.length && newest)
 					ctx.conversation.input.writeCutInTransaction(db, CONVERSATION_ID, {
 						seq: newest.seq,
-						systemDigest: systemDigestOf(
-							conversationSystem(ctx.deps, db, cloudHarness),
-						),
+						systemDigest: systemDigestOf(conversationSystem(ctx.deps, db)),
 						memoryDigest: memoryDigestOf(
 							ctx.deps.memory?.windowForRunInTransaction(db, CONVERSATION_ID) ??
 								null,

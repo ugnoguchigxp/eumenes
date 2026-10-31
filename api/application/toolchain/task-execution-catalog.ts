@@ -24,7 +24,7 @@ export function taskChildContext(host: TaskExecutionHost) {
 				requires === "excalidraw"
 			)
 				return !!host.media?.available(requires);
-			if (requires === "object-recognition" || requires === "dots")
+			if (requires === "object-recognition")
 				return !!host.legacy?.availableInTransaction(
 					db,
 					requires,

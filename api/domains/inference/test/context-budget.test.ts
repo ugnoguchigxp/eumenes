@@ -4,10 +4,12 @@ import {
 	OUTPUT_RESERVE_DEFAULT_TOKENS,
 	SECTION_LIMITS,
 	TOKEN_ESTIMATE,
+	logTargets,
+} from "../../../infrastructure/context-budget";
+import {
 	estimateJsonTokens,
 	estimateMessageTokens,
 	estimateTextTokens,
-	logTargets,
 	planWindow,
 } from "..";
 

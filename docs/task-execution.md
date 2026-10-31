@@ -10,7 +10,7 @@
 
 親実行のIDと原発言の会話runを分離する。会話が回答を終えたり画面を離れたりしても親は継続できる。作業の操作は会話エージェントの仕事の操作（`work`の確認・回答・訂正・取消）で、hostが`workRef`、`expectedRevision`、action（status / answer / amend / cancel）に写す。回答には質問refと所有domainのschemaに一致する入力が必要で、別会話・古い版・回答済みの質問は再開できない。進捗照会は制御適用後の状態を返す。
 
-読み取りAPIは `GET /api/agent-executions?conversationId=…` と `GET /api/agent-executions/:id`。変更は既存の会話入口から行う。
+操作は既存の会話入口から行う。
 
 ## 子の実行と確認
 

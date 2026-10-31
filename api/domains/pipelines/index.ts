@@ -3,19 +3,8 @@ export {
 	type PipelineIssue,
 	type ToolchainLookup,
 } from "./service/check";
-export {
-	inputParameters,
-	parseInputs,
-	QUOTE_SUFFIX,
-	type InputIssue,
-} from "./service/inputs";
-export {
-	expand,
-	expandValue,
-	references,
-	type PipelineScope,
-	type StepValues,
-} from "./service/template";
+export { inputParameters, parseInputs } from "./service/inputs";
+export { expand, expandValue, type StepValues } from "./service/template";
 export {
 	runFixture,
 	startInputs,
@@ -23,19 +12,14 @@ export {
 	stepOutline,
 	valueFault,
 	valueSchemaJson,
-	type FixtureOutcome,
 } from "./service/values";
 export {
-	canonicalText,
+	/** @public */ canonicalText,
 	checkText,
 	flowOf,
 	pointerLines,
-	type DocumentIssue,
 } from "./service/document";
-export {
-	resolvePipelineMaterials,
-	type ResolvedPipelineMaterial,
-} from "./service/materials";
+export { resolvePipelineMaterials } from "./service/materials";
 export {
 	applySourceInTransaction,
 	beginTurnInTransaction,
@@ -51,9 +35,7 @@ export {
 	sessionOfWorkInTransaction,
 	workStateInTransaction,
 	type Caller,
-	type RejectedDraft,
 	type WorkReceipt,
-	type WorkState,
 } from "./service/works";
 export {
 	latestWork,
@@ -61,7 +43,4 @@ export {
 	studioRevision,
 	work as workRow,
 } from "./repository";
-export {
-	createPipelinesResourceAdapter,
-	PIPELINE_RESOURCE_KIND,
-} from "./service/resource-adapter";
+export { createPipelinesResourceAdapter } from "./service/resource-adapter";

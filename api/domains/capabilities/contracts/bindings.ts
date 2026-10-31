@@ -71,7 +71,6 @@ const agentTurnV1 = z.strictObject({
 		)
 		.optional(),
 });
-export type AgentTurnV1 = z.infer<typeof agentTurnV1>;
 
 /**
  * What a command binding sets for the single-shot task it starts after acceptance (spec
@@ -112,7 +111,6 @@ const timeLimitsV1 = z
 		(t) => t.inferenceMs <= t.turnMs && t.turnMs <= t.runMs,
 		"inferenceMs <= turnMs <= runMs",
 	);
-export type TimeLimits = z.infer<typeof timeLimitsV1>;
 
 /**
  * How the session's agent works (spec subagent-task-and-session-agents 2026-10-18 §10). `workspace` names

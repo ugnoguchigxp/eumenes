@@ -41,7 +41,7 @@ export function assembleAgency(
 				store,
 				inference,
 				next,
-				// The update and the decisions read the conversation's prompt and run on its connection.
+				// Share the conversation's reference data and route; the port supplies its exact purpose system.
 				task: (conversationId, task) =>
 					store.read((db) =>
 						dialogue().conversationTaskInTransaction(db, conversationId, task),

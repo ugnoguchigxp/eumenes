@@ -1,18 +1,7 @@
 import { expect, test } from "bun:test";
-import { estimateJsonTokens } from "../../inference";
-import { generationTools, parseCall } from "../service/generation-tools";
+import { parseCall } from "../service/generation-tools";
 
-test("the fixed tool definitions stay within the 2,000 estimated-token allowance (section 6.1)", () => {
-	expect(estimateJsonTokens(generationTools)).toBeLessThanOrEqual(2000);
-	expect(generationTools.map((tool) => tool.function.name)).toEqual([
-		"memory",
-		"find_toolchain",
-		"delegate",
-		"work",
-	]);
-});
-
-test("the compact definitions leave each mode's required fields to the host's check", () => {
+test("the argument schemas leave each mode's required fields to the host's check", () => {
 	const call = (name: string, args: unknown) => ({
 		id: "c1",
 		name,
@@ -35,9 +24,7 @@ test("the compact definitions leave each mode's required fields to the host's ch
 	).toBe("delegate");
 });
 
-test("the native delegate definition asks for impact; a call without it or the request is taken (the host fills or checks it), approve may carry it", () => {
-	const delegate = generationTools.find((t) => t.function.name === "delegate")!;
-	expect(delegate.function.parameters.required).toEqual(["mode", "impact"]);
+test("a delegate call without impact or the request is taken (the host fills or checks it); approve may carry it", () => {
 	const call = (args: unknown) => ({
 		id: "c1",
 		name: "delegate",

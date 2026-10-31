@@ -6,7 +6,6 @@ export {
 	vectorSpaceKey,
 	toolchainPassages,
 } from "./service/toolchains";
-export { migration, learnedMigration } from "./repository";
 export * from "./contracts";
 export { registerCapabilities } from "./controller";
 export { migrations } from "./repository";
@@ -16,30 +15,14 @@ export {
 	requirementValueMatches,
 } from "./service/requirement-schema";
 
-export { coordinatorSkill, dotsMcpSkill } from "./builtin/dots";
+export { dotsMcpSkill } from "./builtin/dots";
 
-export { imageBuiltins } from "./builtin/image";
-export { musicBuiltins } from "./builtin/music";
+export { /** @public */ imageBuiltins } from "./builtin/image";
 
-export { toolchainBuiltins } from "./builtin/toolchains";
-export { resourceKindBuiltins } from "./builtin/resource-kinds";
-export type {
-	ResourceActionName,
-	ResourceKindData,
-} from "./contracts/resource-kinds";
-import { toolchainBuiltins as registeredToolchains } from "./builtin/toolchains";
-import { bundleToolchainFunctions } from "./service/bundle-files";
-export { bundleFiles, dormantBundleFile } from "./service/bundle-files";
-/**
- * Function names of the builtin toolchains and of those shipped in bundles (for detecting
- * call syntax written as text).
- */
-export const builtinToolchainFunctions: readonly string[] = [
-	// A toolchain keeps its function name across revisions.
-	...new Set([
-		...registeredToolchains.map((d) => d.functionName!),
-		...bundleToolchainFunctions(),
-	]),
-];
+export { /** @public */ toolchainBuiltins } from "./builtin/toolchains";
+export {
+	/** @public */ bundleFiles,
+	/** @public */ dormantBundleFile,
+} from "./service/bundle-files";
 
 export { drawingRequest, drawingPlan } from "./contracts/excalidraw";

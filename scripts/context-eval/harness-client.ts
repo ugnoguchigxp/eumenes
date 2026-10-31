@@ -1,12 +1,9 @@
 /**
- * The model calls of the harness measurement, timed. A client answers one call of the conversation (messages in,
- * words and tool calls out) the way the product's call does, and records what the call cost. Two paths: the saved
- * LARM connection (`scripts/live-larm.ts`, in this process) and the Codex SDK path (`cloud-agents`); the Codex
- * model is only ever an argument of the run. Nothing here names a model or a profile.
+ * The model calls of the harness measurement, timed. A client answers one call of the routed turn (the talk call, or
+ * the silent choice held to a schema) the way the product's call does, and records what the call cost. It is the saved
+ * LARM connection (`scripts/live-larm.ts`, in this process). Nothing here names a model or a profile.
  */
-import type { NativeToolCall } from "../../api/infrastructure/chat-stream";
 import type { ChatMessage } from "../../api/domains/dialogue/service/context";
-import { generationTools } from "../../api/domains/dialogue/service/generation-tools";
 
 export type Reasoning = "off" | "low" | "medium" | "high";
 export const REASONINGS: readonly Reasoning[] = [
@@ -41,29 +38,25 @@ export type CallMetrics = {
 	tokensPerSecond: number | null;
 };
 
-/**
- * Which call of a turn a timed call was: a call of the reply loop (`single`), or a part of a routed turn: the silent
- * `choice` held to a schema, and the `talk` call that offers no tools.
- */
-export type CallKind = "single" | "choice" | "talk";
+/** Which call of a routed turn a timed call was: the silent `choice` held to a schema, or the `talk` call. */
+export type CallKind = "choice" | "talk";
 export type TaggedCall = { kind: CallKind; metrics: CallMetrics };
 
 export type ModelClient = {
 	connect(): Promise<void>;
 	close(): Promise<void>;
-	/** One streamed call with the fixed tools; `tools: false` sends none (the routed turn's talk call). */
-	stream(
+	/** The talk call: one streamed call that offers no tools; its words. */
+	talk(
 		messages: ChatMessage[],
 		settings: CallSettings,
 		signal: AbortSignal,
 		onDelta: (text: string) => void,
-		extra?: { tools?: false },
-	): Promise<{ text: string; toolCalls: NativeToolCall[] }>;
+	): Promise<string>;
 	/**
 	 * The silent choice call: strict JSON by `schema` and no native tools field (what may be chosen is the schema's
-	 * branches), as the app calls LARM for a schema. Absent on a path that cannot.
+	 * branches), as the app calls LARM for a schema.
 	 */
-	decide?(
+	decide(
 		messages: ChatMessage[],
 		settings: CallSettings,
 		signal: AbortSignal,
@@ -250,21 +243,8 @@ export async function createLarmClient(): Promise<ModelClient> {
 		connect: () => live.connect(),
 		close: () => live.close(),
 		take: timed.take,
-		async stream(messages, settings, signal, onDelta, extra) {
-			let toolCalls: NativeToolCall[] = [];
-			const text = await live.answerStream!(messages, signal, onDelta, {
-				...base(settings),
-				...(extra?.tools === false
-					? {}
-					: {
-							tools: generationTools,
-							onToolCalls: (calls: NativeToolCall[]) => {
-								toolCalls = calls;
-							},
-						}),
-			});
-			return { text, toolCalls };
-		},
+		talk: (messages, settings, signal, onDelta) =>
+			live.answerStream!(messages, signal, onDelta, base(settings)),
 		// Streamed like every call, but nothing flows to a speaker and the tools field is left out.
 		decide: (messages, settings, signal, schema) =>
 			live.answerStream!(messages, signal, () => {}, {
@@ -273,62 +253,5 @@ export async function createLarmClient(): Promise<ModelClient> {
 				jsonSchema: schema,
 				toolOutputFormat: "json-schema",
 			}),
-	};
-}
-
-/** The Codex SDK path the inference domain already has; `model` is the run's argument. */
-export async function createCodexClient(model: string): Promise<ModelClient> {
-	const { createCloudAgents } =
-		await import("../../api/domains/inference/adapters/cloud-agents");
-	const agents = createCloudAgents(process.env);
-	const done: CallMetrics[] = [];
-	return {
-		async connect() {},
-		async close() {},
-		async take() {
-			return done.splice(0);
-		},
-		async stream(messages, settings, signal, onDelta, extra) {
-			// The routed turn is the local harness's; the Codex path answers the cloud harness's reply loop only.
-			if (extra?.tools === false) throw new Error("harness_routed_unsupported");
-			if (settings.reasoning === "off")
-				throw new Error("harness_codex_reasoning_off_unsupported");
-			const startedAt = performance.now();
-			let firstContentMs: number | null = null;
-			const r = await agents.run({
-				kind: "codex-sdk",
-				model,
-				baseUrl: "",
-				credential: null,
-				messages,
-				tools: generationTools,
-				reasoningEffort: settings.reasoning,
-				signal,
-				onDelta: (delta) => {
-					if (firstContentMs === null && delta.trim())
-						firstContentMs = performance.now() - startedAt;
-					onDelta(delta);
-				},
-			});
-			const totalMs = performance.now() - startedAt;
-			const out = r.outputTokens ?? 0;
-			done.push({
-				startedAt,
-				firstContentMs,
-				model,
-				reasoningChars: 0,
-				firstTokenMs: null,
-				firstTextMs: firstContentMs ?? totalMs,
-				totalMs,
-				outputTokens: out,
-				tokensFrom: "usage",
-				promptTokens: r.inputTokens ?? null,
-				cachedPromptTokens: r.cacheReadTokens ?? null,
-				requestedLimit: null,
-				finishReason: null,
-				tokensPerSecond: out > 0 ? out / (totalMs / 1000) : null,
-			});
-			return { text: r.text, toolCalls: r.toolCalls ?? [] };
-		},
 	};
 }

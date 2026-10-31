@@ -28,7 +28,6 @@ export const monitoringHealthSchema = z.enum([
 	"disconnected",
 	"unknown",
 ]);
-export type MonitoringHealth = z.infer<typeof monitoringHealthSchema>;
 
 export const monitoringItemSchema = z.object({
 	/** Instance id chosen by the backend; never a Spatial shape sample id. */

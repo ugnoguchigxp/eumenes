@@ -4,7 +4,7 @@
  * public default.
  */
 import { expect, test } from "bun:test";
-import { WorldHostStateError, createConversationSourceAdapter } from "..";
+import { createConversationSourceAdapter } from "..";
 import { createConversationService } from "../../conversation";
 import { openStore } from "../../../infrastructure/sqlite";
 import { migrations } from "./migrations";
@@ -12,6 +12,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PURPOSE, TEST_CURSOR_SECRET, withHarness } from "./fixture";
+import { WorldHostStateError } from "../repository";
 
 test("World stays OFF and cannot be turned ON before the host recorded its initial sync", async () => {
 	await withHarness(

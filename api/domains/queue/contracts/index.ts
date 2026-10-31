@@ -50,16 +50,6 @@ export const jobListSchema = z.object({
 });
 export type JobList = z.infer<typeof jobListSchema>;
 
-export const attemptSchema = z.object({
-	jobId: z.string(),
-	attempt: z.number().int(),
-	startedAt: z.string(),
-	endedAt: z.string().nullable(),
-	outcome: z.string().nullable(),
-	errorCode: z.string().nullable(),
-});
-export type AttemptDto = z.infer<typeof attemptSchema>;
-
 export const queueStatusSchema = z.object({
 	lanes: z.record(
 		z.string(),
@@ -78,7 +68,3 @@ export const queueStatusSchema = z.object({
 	lastScanAt: z.string().nullable(),
 });
 export type QueueStatus = z.infer<typeof queueStatusSchema>;
-
-export const cancelBodySchema = z.object({
-	reason: z.string().max(200).optional(),
-});

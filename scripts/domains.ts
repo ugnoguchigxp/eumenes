@@ -176,17 +176,6 @@ export const domains = {
 		components: null,
 		depends: { api: ["tasks"], web: [], test: [] },
 	},
-	"coding-supervision": {
-		tier: 3,
-		backend: "api/domains/coding-supervision",
-		web: null,
-		components: null,
-		depends: {
-			api: ["coding", "inference", "queue", "task-reports", "tasks"],
-			web: [],
-			test: [],
-		},
-	},
 	coding: {
 		tier: 0,
 		backend: "api/domains/coding",
@@ -427,7 +416,7 @@ export const domains = {
 		backend: "api/domains/timers",
 		web: "web/src/domains/timers",
 		components: "web/src/components/domains/timers",
-		depends: { api: ["queue", "scheduler"], web: [], test: [] },
+		depends: { api: ["queue", "scheduler"], web: ["resources"], test: [] },
 	},
 	dialogue: {
 		tier: 5,

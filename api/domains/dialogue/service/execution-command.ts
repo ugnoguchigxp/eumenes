@@ -177,12 +177,8 @@ export function executionCommands(deps: DialogueDeps) {
 				requiresUnsavedConfirmation: work?.dirty === true,
 			};
 		},
-		legacyAvailableInTransaction(
-			db: Database,
-			kind: "object-recognition" | "dots",
-			_runId: string,
-		) {
-			return kind === "object-recognition" ? !!deps.objectRecognition : false;
+		legacyAvailableInTransaction(_db: Database, _runId: string) {
+			return !!deps.objectRecognition;
 		},
 		invokeLegacyInTransaction(
 			db: Database,
@@ -211,22 +207,6 @@ export function executionCommands(deps: DialogueDeps) {
 			}
 			throw new Error("adapter_unavailable");
 		},
-		legacyTaskInTransaction: (
-			db: Database,
-			conversationId: string,
-			taskId: string,
-		) =>
-			deps.delegation?.executionTaskInTransaction?.(db, conversationId, taskId),
-		cancelLegacyTaskInTransaction: (
-			db: Database,
-			conversationId: string,
-			taskId: string,
-		) =>
-			deps.delegation?.cancelExecutionTaskInTransaction?.(
-				db,
-				conversationId,
-				taskId,
-			),
 		validateAnswer(
 			set: BoundCommandSet | undefined,
 			schema: string,

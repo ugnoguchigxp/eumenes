@@ -6,28 +6,23 @@
  */
 import type { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
-import { Hono } from "hono";
-import { z } from "zod";
 import { createGoalsService } from "../../goals";
 import {
-	WORLD_QUERY_LIMITS,
-	WORLD_QUERY_MODES,
 	createWorldHostGate,
 	createWorldQuery,
-	createWorldQueryTool,
-	gapTaskKey,
-	gapTaskRequestId,
-	registerWorldQuery,
-	worldQueryToolSchema,
-	type GapTaskDecision,
-	type GapTaskPort,
-	type GapTaskRequest,
 	type WorldQueryContext,
-	type WorldQueryOptions,
 	type WorldQueryResult,
 } from "..";
 import { NOW, PURPOSE, SCOPE, withHarness, type Harness } from "./fixture";
 import { messageRef, relate } from "./query-fixture";
+import {
+	WORLD_QUERY_LIMITS,
+	WORLD_QUERY_MODES,
+	type GapTaskDecision,
+	type GapTaskPort,
+	type GapTaskRequest,
+} from "../contracts/query";
+import { gapTaskKey, type WorldQueryOptions } from "../service/world-query";
 
 const ctx: WorldQueryContext = {
 	principal: SCOPE.principal,
@@ -683,10 +678,7 @@ test("A47 Gap -> Task: no port means display only; no delegation means zero Task
 		expect(quiet.calls).toHaveLength(gaps.length);
 		expect(count(h, "host_probe")).toBe(gaps.length);
 
-		// 5. The Gap's request id is stable and well formed for a UUID-keyed Task entry.
-		const key = gapTaskKey(SCOPE, gaps[0]!.gapKey);
-		expect(gapTaskRequestId(key)).toBe(gapTaskRequestId(key));
-		expect(z.uuid().safeParse(gapTaskRequestId(key)).success).toBe(true);
+		// 5. The Gap's dedupe key is stable and distinct per gap and scope.
 		expect(gapTaskKey(SCOPE, "a")).not.toBe(gapTaskKey(SCOPE, "b"));
 		expect(gapTaskKey(SCOPE, "a")).not.toBe(
 			gapTaskKey({ ...SCOPE, scopeKey: "other" }, "a"),
@@ -727,22 +719,6 @@ test("A47 Gap -> Task: per-call link limit, all-or-nothing on a port failure, no
 		).rejects.toThrow("port_boom");
 		expect(count(h, "world_host_gap_task")).toBe(0);
 		expect(count(h, "host_probe")).toBe(0);
-
-		// The model-callable tool has no linkage in its vocabulary.
-		const spy = taskPort({ delegated: true });
-		const tool = createWorldQueryTool({
-			query: open(h, { gapTasks: spy.port }),
-			context: () => ctx,
-		});
-		expect(await tool.run({ mode: "gaps", linkGaps: true })).toEqual({
-			status: "rejected",
-			code: "invalid_request",
-		});
-		expect(JSON.stringify(z.toJSONSchema(worldQueryToolSchema))).not.toContain(
-			"linkGaps",
-		);
-		ok(await tool.run({ mode: "gaps" }));
-		expect(spy.calls).toHaveLength(0);
 	});
 });
 
@@ -764,88 +740,4 @@ test("a query never expands permissions or changes anything: every mode leaves a
 		expect(dump(h)).toEqual(before);
 		expect(spy.calls).toHaveLength(0);
 	});
-});
-
-test("the model tool binds the scope from the host, not from the model", async () => {
-	await withHarness(async (h) => {
-		await seedGraph(h);
-		let bound: WorldQueryContext = ctx;
-		const tool = createWorldQueryTool({
-			query: open(h),
-			context: () => bound,
-		});
-		expect(tool.id).toBe("world.query");
-		expect(tool.modes).toEqual(WORLD_QUERY_MODES);
-		expect(ok(await tool.run({ mode: "relevance", entityId: "A" })).mode).toBe(
-			"relevance",
-		);
-		// The model cannot name another principal or reach a scope the host did not bind.
-		expect(
-			await tool.run({ mode: "snapshot", principal: "someone-else" }),
-		).toEqual({ status: "rejected", code: "invalid_request" });
-		expect(await tool.run({ mode: "snapshot", scopeKey: "other" })).toEqual({
-			status: "rejected",
-			code: "not_available",
-		});
-		bound = { principal: SCOPE.principal, scopeKeys: [] };
-		expect(await tool.run({ mode: "snapshot" })).toEqual({
-			status: "rejected",
-			code: "not_available",
-		});
-	});
-});
-
-test("HTTP: status mapping, size and JSON limits; not-found and not-allowed are one answer", async () => {
-	await withHarness(async (h) => {
-		await seedGraph(h);
-		const app = new Hono();
-		registerWorldQuery(app, open(h), () => ctx);
-		const post = (body: string) =>
-			app.request("/api/world/query", { method: "POST", body });
-		const good = await post(
-			JSON.stringify({ mode: "relevance", entityId: "A" }),
-		);
-		expect(good.status).toBe(200);
-		expect(((await good.json()) as { status: string }).status).toBe("ok");
-		const unknown = await post(JSON.stringify({ mode: "sql" }));
-		expect(unknown.status).toBe(400);
-		expect(await unknown.json()).toEqual({
-			status: "rejected",
-			code: "unknown_mode",
-		});
-		const outside = await post(
-			JSON.stringify({ mode: "snapshot", scopeKey: "x" }),
-		);
-		expect(outside.status).toBe(404);
-		expect(await outside.json()).toEqual({
-			status: "rejected",
-			code: "not_available",
-		});
-		expect((await post("{not json")).status).toBe(400);
-		const big = await post(
-			JSON.stringify({ mode: "snapshot", pad: "x".repeat(70_000) }),
-		);
-		expect(big.status).toBe(400);
-		expect(await big.json()).toEqual({
-			status: "rejected",
-			code: "limit_exceeded",
-		});
-	});
-	await withHarness(
-		async (h) => {
-			const app = new Hono();
-			registerWorldQuery(app, open(h), () => ctx);
-			const off = await app.request("/api/world/query", {
-				method: "POST",
-				body: JSON.stringify({ mode: "snapshot" }),
-			});
-			expect(off.status).toBe(409);
-			expect(await off.json()).toEqual({
-				status: "disabled",
-				code: "world_disabled",
-			});
-		},
-		{},
-		{ enabled: false },
-	);
 });

@@ -6,15 +6,12 @@
 	"exports": {
 		"./contracts": "./src/contracts.ts",
 		"./client": "./src/client.ts",
-		"./host": "./src/host.ts",
 		"./sdk-contracts": "./src/sdk-contracts.ts",
 		"./sdk-client": "./src/sdk-client.ts",
 		"./sdk-schema": "./src/sdk-schema.ts",
 		"./sdk-daemon": "./src/sdk-daemon.ts"
 	},
 	"scripts": {
-		"start": "bun src/server.ts",
-		"admin": "bun src/admin.ts",
 		"sdk": "bun src/sdk-cli.ts",
 		"test": "bun test test"
 	},

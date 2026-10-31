@@ -18,7 +18,7 @@ const prepared = {
 	package: {
 		kind: "package",
 		id: "music.create",
-		revision: 2,
+		revision: 3,
 		profileRevisionId: "profile:music.fake@1",
 		requiredSkillRevisionIds: ["skill:music.fake@1"],
 	},
@@ -28,6 +28,7 @@ const prepared = {
 	],
 } as unknown as Prepared;
 const plan = {
+	task: "music",
 	title: "雨の本",
 	description: "静かな雨",
 	prompt: "soft piano, rain",
@@ -163,6 +164,7 @@ function setup(options: Options = {}) {
 		validateInTransaction: () => options.validate?.(),
 	} as unknown as Capabilities;
 	const gateway = {
+		musicProviders: async () => [],
 		catalog: async () => ({
 			targets: options.targets ?? [musicTarget, imageTarget],
 		}),
@@ -311,10 +313,18 @@ test("plan then generate stores the audio and exposes it only when completed", a
 	expect(h.executed).toEqual([
 		{
 			text: "soft piano, rain",
+			task: "music",
 			durationSeconds: 45,
 			instrumental: true,
 			lyrics: undefined,
 			language: undefined,
+			outputFormat: undefined,
+			quality: undefined,
+			bpm: undefined,
+			key: undefined,
+			timeSignature: undefined,
+			seed: undefined,
+			providerOptions: undefined,
 		},
 	]);
 	expect(h.music.audio(id)).toEqual({
@@ -410,7 +420,7 @@ test("list is scoped to the conversation, newest first and limited to eight", as
 test("a library track resolves to the generation that produced it", async () => {
 	const h = setup();
 	const id = await completed(h);
-	expect(h.music.trackGeneration("job-77")).toEqual({ id });
+	expect(h.music.trackGeneration("job-77")).toEqual({ id, task: "music" });
 	expect(h.music.trackGeneration("other-track")).toBeNull();
 	await h.queue.close(100);
 });
@@ -612,7 +622,6 @@ test("library routes validate input and map library errors", async () => {
 		remove: async (id: string) => {
 			calls.push(["remove", id]);
 		},
-		metadata: async (id: string) => ({ id }),
 		audio: async () => new Response("pcm", { status: 206 }),
 	};
 	const app = new Hono();

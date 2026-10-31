@@ -6,11 +6,7 @@ import {
 	queryInt,
 } from "../../../infrastructure/http";
 import type { ToolchainHistory } from "../service";
-import {
-	selectionPageQuerySchema,
-	recipePageQuerySchema,
-	recipeStateBody,
-} from "../contracts";
+import { recipeStateBody } from "../contracts";
 
 const pattern = /^[A-Za-z0-9._:-]{1,160}$/;
 const id = (v: string | undefined) =>
@@ -29,20 +25,6 @@ const listQuery = z.object({
  * middleware for `/api/*` before any handler here.
  */
 export function registerToolchainHistory(app: Hono, history: ToolchainHistory) {
-	app.get("/api/toolchain-history/selections/page", (c) => {
-		const query = parseQuery(c, selectionPageQuerySchema, {
-			code: "invalid_request",
-		});
-		return query.ok
-			? c.json(history.selectionPage(query.data))
-			: query.response;
-	});
-	app.get("/api/toolchain-history/recipes/page", (c) => {
-		const query = parseQuery(c, recipePageQuerySchema, {
-			code: "invalid_request",
-		});
-		return query.ok ? c.json(history.recipePage(query.data)) : query.response;
-	});
 	app.get("/api/toolchain-history/selections", (c) => {
 		const q = parseQuery(c, listQuery, { code: "invalid_request" });
 		if (!q.ok) return q.response;

@@ -1,4 +1,3 @@
-import type { ChatMessage } from "../../larm";
 import { controlInstructions, type ControlContract } from "./index";
 
 /**
@@ -7,6 +6,9 @@ import { controlInstructions, type ControlContract } from "./index";
  * retries a tool gets after a refusal. A session turn (dialogue) and a single-shot task (`agent-task.ts`) differ
  * in their actions and loops, not in these.
  */
+
+/** A message the agent core writes: plain text, never a tool call or a tool message. */
+export type AgentTextMessage = { role: "system" | "user"; content: string };
 
 /** A tool as the agent sees it in TOOLS. */
 export type AgentTool = {
@@ -38,14 +40,16 @@ export function agentControl(input: {
 		outputSchema: input.outputSchema,
 	};
 }
-export const agentSystemMessage = (control: ControlContract): ChatMessage => ({
+export const agentSystemMessage = (
+	control: ControlContract,
+): AgentTextMessage => ({
 	role: "system",
 	content: controlInstructions(control),
 });
 
 const TOOL_RESULT_MAX_CHARS = 96_000;
 /** The tool's result (or the host's refusal code) as the next input of the same run, enclosed as data. */
-export function toolResultMessage(result: unknown): ChatMessage {
+export function toolResultMessage(result: unknown): AgentTextMessage {
 	const json = JSON.stringify(result);
 	return {
 		role: "user",
@@ -71,7 +75,7 @@ export function rejectedOutputMessage(
 	violations: readonly unknown[],
 	/** Model calls the run has left after the rejected one. */
 	callsLeft: number,
-): ChatMessage {
+): AgentTextMessage {
 	return {
 		role: "user",
 		content:

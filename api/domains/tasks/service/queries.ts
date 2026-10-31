@@ -52,9 +52,6 @@ export function createTaskQueries(store: SqliteStore, core: TaskCore) {
 					task: t,
 					question: repo.openQuestion(tx, taskId),
 					availableActions: actions,
-					execution: null,
-					supervisor: null,
-					latestReport: null,
 				};
 			});
 		},

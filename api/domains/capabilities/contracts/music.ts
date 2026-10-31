@@ -8,13 +8,6 @@ export const musicPlan = z.strictObject({
 	prompt: z.string().trim().min(1).max(4000),
 	durationSeconds: z.number().positive().finite(),
 });
-/** V1 remains immutable for installed capability revisions and queued work. */
-export const musicPlanV2 = musicPlan.extend({
-	durationSeconds: z.number().int().min(1).max(600),
-	instrumental: z.boolean(),
-	lyrics: z.string().max(4000).optional(),
-	language: z.string().min(2).max(32).optional(),
-});
 /** V3 supports LARM's audio routing without interpreting prompt text in code. */
 export const musicPlanV3 = musicPlan
 	.omit({ durationSeconds: true })

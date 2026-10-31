@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { JobState } from "../contracts";
-import type { AttemptRecord, JobRecord } from "../types";
+import type { JobRecord } from "../types";
 
 export const migration = `
 CREATE TABLE queue_jobs (
@@ -355,23 +355,6 @@ export function listJobs(
 			)
 			.all(...params, limit) as Row[]
 	).map(map);
-}
-export function listAttempts(db: Database, jobId: string): AttemptRecord[] {
-	return (
-		db
-			.query(
-				"SELECT job_id, attempt, owner, started_at_ms, ended_at_ms, outcome, error_code FROM queue_attempts WHERE job_id=? ORDER BY attempt",
-			)
-			.all(jobId) as Row[]
-	).map((r) => ({
-		jobId: r.job_id as string,
-		attempt: r.attempt as number,
-		owner: r.owner as string,
-		startedAtMs: r.started_at_ms as number,
-		endedAtMs: r.ended_at_ms as number | null,
-		outcome: r.outcome as string | null,
-		errorCode: r.error_code as string | null,
-	}));
 }
 export function laneStats(db: Database, now: number) {
 	return db

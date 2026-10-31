@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
-import type { ComputeService } from "../../domains/compute";
+import type { ComputeService, JobView } from "../../domains/compute";
 import type { AdapterResult, DomainAdapter } from "../../domains/tool-runtime";
 import type { Database } from "bun:sqlite";
 
@@ -43,7 +43,7 @@ function result(
 	const receipt = value as {
 		action: string;
 		jobId: string;
-		job?: import("../../domains/compute").JobView;
+		job?: JobView;
 	};
 	const j = receipt.job;
 	const projected = JSON.stringify({

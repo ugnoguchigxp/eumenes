@@ -175,15 +175,4 @@ export function registerModel3d(app: Hono, s: Model3dService, owner: string) {
 			return failure(c, e);
 		}
 	});
-	app.get("/api/model3d/assets/:id/source", async (c) => {
-		const a = id(c);
-		if (!a.success) return c.json({ error: "invalid_model3d_id" }, 400);
-		try {
-			const content = await s.source(a.data, c.req.raw.signal);
-			const ext = content.mime.split("/")[1] ?? "img";
-			return media(content, `model-${a.data}-source.${ext}`);
-		} catch (e) {
-			return failure(c, e);
-		}
-	});
 }

@@ -1,6 +1,5 @@
 import type { Database } from "bun:sqlite";
 import type { ScopeRef } from "eumenes-world-model";
-import type { NativeTool } from "../../../infrastructure/chat-stream";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ContinuityService } from "../../continuity";
 import type { ConversationService } from "../../conversation";
@@ -93,7 +92,7 @@ export interface StewardDeps {
 				db: Database,
 				conversationId: string,
 				task: string,
-		  ) => { messages: ChatMessage[]; tools: NativeTool[] } | null)
+		  ) => { messages: ChatMessage[] } | null)
 		| undefined;
 	/** A conversation run is generating an answer now (upkeep waits for it); read in the caller's transaction. */
 	foregroundActive(db: Database, conversationId: string): boolean;

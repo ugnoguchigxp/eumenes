@@ -59,11 +59,6 @@ export function registerLibrary(app: Hono, s: MusicService) {
 		const g = s.trackGeneration(c.req.param("id"));
 		return g ? c.json(g) : c.json({ error: "music_generation_not_found" }, 404);
 	});
-	app.get("/api/music/tracks/:id/metadata", (c) =>
-		handle(c, async () =>
-			c.json(await s.library().metadata(c.req.param("id"), c.req.raw.signal)),
-		),
-	);
 	for (const method of ["put", "delete"] as const)
 		app[method]("/api/music/tracks/:id/favorite", (c) =>
 			handle(c, async () => {

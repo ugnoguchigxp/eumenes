@@ -14,7 +14,6 @@ import { configureLogging } from "../../../infrastructure/logger";
 import { createQueue, migration as queueMigration } from "../../queue";
 import {
 	createWebResearch,
-	migration,
 	createWebCache,
 	openWebCache,
 	registerWebResearch,
@@ -28,6 +27,7 @@ import {
 	type ResearchResult,
 } from "../contracts";
 import { waitFor } from "../../../infrastructure/wait-for";
+import { migration } from "../repository";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {

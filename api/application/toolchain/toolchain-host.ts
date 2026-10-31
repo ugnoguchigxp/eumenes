@@ -27,6 +27,7 @@ import { createWorldResearchPorts } from "../world/world-research-ports";
 import type { WorldAdapterPorts } from "../world/world-adapter";
 import type { WorldAssembly } from "../world/world";
 import type { UiCompositionsService } from "../../domains/ui-compositions";
+import type { LateResources } from "../resources/late";
 
 type SessionLive = (tx: Database, sessionId: string) => boolean;
 
@@ -157,7 +158,7 @@ export async function createHostToolchain(
 		webResearchEnabled?: boolean;
 		embed?: Embed;
 		/** The registry, ledger and screen commands, reached once the dialogue exists. */
-		resources?: import("../resources/late").LateResources;
+		resources?: LateResources;
 		/** This server's loopback URL for Claude Code hooks, and the change publisher. */
 		terminalHooks?: { baseUrl: string; publish: () => void };
 	},

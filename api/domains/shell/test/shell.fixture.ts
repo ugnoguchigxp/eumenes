@@ -3,12 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import type { SpawnPty } from "../../../infrastructure/pty";
-import {
-	migrations,
-	createShell,
-	type ShellOptions,
-	type EnqueueRun,
-} from "..";
+import { migrations, createShell } from "..";
+import type { ShellOptions } from "../service/types";
+import type { EnqueueRun } from "../contracts";
 export function fakePty(ignore = false) {
 	const spawned: Array<{
 		command: readonly string[];

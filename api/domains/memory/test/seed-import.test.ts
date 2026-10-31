@@ -7,18 +7,14 @@ import { openStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
 import { createContinuityService } from "../../continuity";
 import { createMemoryService } from "..";
-import {
-	memorySeedInputSchema,
-	parseMemorySeedJsonl,
-	seedStateText,
-	type MemorySeed,
-} from "../contracts";
+import { parseMemorySeedJsonl, type MemorySeed } from "../contracts";
 import { registerMemory } from "../controller";
 import {
 	setupMemory,
 	memoryTestMigrations,
 	type MemoryHarness,
 } from "./memory.fixture";
+import { memorySeedInputSchema, seedStateText } from "../contracts/seeds";
 
 const open: MemoryHarness[] = [];
 const extra: Array<() => Promise<void>> = [];

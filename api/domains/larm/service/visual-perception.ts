@@ -19,19 +19,6 @@ export class VisualPerceptionError extends Error {
 		super(code);
 	}
 }
-export function visualError(error: unknown): string {
-	if (error instanceof VisualPerceptionError) return error.code;
-	if (error instanceof DOMException && error.name === "TimeoutError")
-		return "analysis_timeout";
-	if (
-		error instanceof Error &&
-		/^(larm_http_\d{3}|invalid_[a-z_]+|provider_[a-z_]+|stale_catalog|deadline_exceeded|larm_[a-z_]+|analysis_[a-z_]+)$/.test(
-			error.message,
-		)
-	)
-		return error.message;
-	return "analysis_failed";
-}
 export function createVisualPerception(config: {
 	baseUrl?: string;
 	token?: string;

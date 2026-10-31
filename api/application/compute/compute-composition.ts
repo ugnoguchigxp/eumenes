@@ -2,7 +2,7 @@ import type { Config } from "../../infrastructure/config";
 import type { Core } from "../server-core";
 import type { ConversationService } from "../../domains/conversation";
 import type { ChildExecution } from "../../domains/tool-runtime";
-import { createCompute } from "../../domains/compute";
+import { createCompute, type JobView } from "../../domains/compute";
 import { createComputeClient } from "../../domains/larm";
 
 export function buildCompute(
@@ -36,7 +36,7 @@ export function buildCompute(
 export function computeAnnouncements(conversation: ConversationService) {
 	return (
 		db: import("bun:sqlite").Database,
-		job: import("../../domains/compute").JobView,
+		job: JobView,
 		conversationId: string,
 	) => {
 		const id = `compute-notice:${job.id}:${job.state}`;

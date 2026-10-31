@@ -145,10 +145,6 @@ export function createMusicLibrary(
 		async remove(id: string, signal: AbortSignal) {
 			await request(path(id), signal, { method: "DELETE" }, [204]);
 		},
-		async metadata(id: string, signal: AbortSignal) {
-			const t = await detail(id, signal);
-			return json(await request(publicUrl(t.metadataUrl).href, signal));
-		},
 		async audio(id: string, range: string | undefined, signal: AbortSignal) {
 			const t = await detail(id, signal);
 			const r = await request(

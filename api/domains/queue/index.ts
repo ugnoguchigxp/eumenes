@@ -1,5 +1,5 @@
 export { registerQueue } from "./controller";
-export { migration } from "./repository";
+export { /** @public */ migration } from "./repository";
 export type { QueueService } from "./service";
 export type { QueueStatus } from "./contracts";
 export { createQueue } from "./service";

@@ -1,10 +1,10 @@
 import { expect, test } from "vitest";
+import { type ArtifactTab } from "..";
 import {
-	type ArtifactTab,
 	emptyArtifactWorkspace,
 	maxArtifactTabs,
 	reduceArtifactWorkspace,
-} from "..";
+} from "../store";
 
 const tab = (id: string, content = id): ArtifactTab => ({
 	id,

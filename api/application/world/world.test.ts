@@ -25,12 +25,12 @@ import { migrations } from "../migrations";
 import {
 	createWorldAssembly,
 	defaultWorldJournalPath,
-	manualAccess,
 	resolveWorldCursorSecret,
 	resolveWorldMode,
 	WORLD_DEFAULT_SCOPE,
 	type WorldAssembly,
 } from "./world";
+import { manualAccess } from "./world-claims.fixture";
 import { assembleServerWorld } from "../server-world";
 import { waitFor } from "../../infrastructure/wait-for";
 

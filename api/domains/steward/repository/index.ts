@@ -600,25 +600,3 @@ export function listDecisions(
 			.all(conversationId, limit) as Record<string, unknown>[]
 	).map(mapDecision);
 }
-/** The saved-memory decisions that read one of these messages (the steps after it read them as context). */
-export function decisionsOfMessages(
-	db: Database,
-	conversationId: string,
-	step: StepId,
-	messageIds: readonly string[],
-	limit: number,
-): DecisionDto[] {
-	if (messageIds.length === 0) return [];
-	return (
-		db
-			.query(
-				`SELECT ${decisionColumns} FROM steward_decision WHERE conversation_id = ? AND step = ? AND error_code IS NULL
-				 AND id IN (SELECT decision_id FROM steward_decision_ref WHERE ref_type = 'message'
-				 AND ref_id IN (${marks(messageIds.length)})) ORDER BY id DESC LIMIT ?`,
-			)
-			.all(conversationId, step, ...messageIds, limit) as Record<
-			string,
-			unknown
-		>[]
-	).map(mapDecision);
-}

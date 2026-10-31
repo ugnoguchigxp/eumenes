@@ -5,15 +5,16 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	createCapabilities,
-	migration as capMigration,
+	migrations as capMigrations,
 } from "../../capabilities";
+import { webPackage, webPackageRevisionId } from "./web-package.fixture";
 import { createQueue, migration as queueMigration } from "../../queue";
 import { createToolRuntime, migrations, type ToolAdapter } from "..";
 
 test("failure-only partial reads retry on a new step without bypassing budget; usable partial bodies replay", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-read-retry-"));
 	const store = openStore(join(dir, "db"), [
-		capMigration,
+		...capMigrations,
 		queueMigration,
 		...migrations,
 	]);
@@ -34,15 +35,15 @@ test("failure-only partial reads retry on a new step without bypassing budget; u
 	const deadline = Date.now() + 100000;
 	try {
 		await caps.seed();
+		await store.write((db) => {
+			for (const d of webPackage) caps.registerBuiltinInTransaction(db, d);
+		});
 		const refs = await store.write((db) =>
 			tools.bind(
 				owner,
-				caps.prepareActiveByIdInTransaction(
-					db,
-					owner,
-					"package:web.research@9",
-					{ question: "本文を確認" },
-				),
+				caps.prepareActiveByIdInTransaction(db, owner, webPackageRevisionId, {
+					question: "本文を確認",
+				}),
 				deadline,
 			),
 		);

@@ -21,6 +21,7 @@ const request: RequestInput = {
 		pending: { confirmations: [], questions: [] },
 		todos: [],
 		resources: [],
+		switching: null,
 	},
 };
 const cards = Object.fromEntries(
@@ -49,7 +50,7 @@ async function choiceTurn(script: Array<string | Error>, talkError?: string) {
 	const replies = [...script];
 	const pending: CallMetrics[] = [];
 	const choices: ChatMessage[][] = [];
-	const streams: Array<{ tools?: false } | undefined> = [];
+	let streams = 0;
 	const client: ModelClient = {
 		async connect() {},
 		async close() {},
@@ -72,12 +73,12 @@ async function choiceTurn(script: Array<string | Error>, talkError?: string) {
 			if (reply instanceof Error) throw reply;
 			return reply;
 		},
-		async stream(_messages, _settings, _signal, onDelta, extra) {
-			streams.push(extra);
+		async talk(_messages, _settings, _signal, onDelta) {
+			streams++;
 			pending.push(metric(talkError ? null : "stop"));
 			if (talkError) throw new Error(talkError);
 			onDelta("決めきれませんでした。");
-			return { text: "決めきれませんでした。", toolCalls: [] };
+			return "決めきれませんでした。";
 		},
 	};
 	const result = await runRoutedTurn(
@@ -87,7 +88,7 @@ async function choiceTurn(script: Array<string | Error>, talkError?: string) {
 		1,
 		request,
 	);
-	return { result, choices, streams, client };
+	return { result, choices, streams };
 }
 
 test.each([false, true])(
@@ -99,7 +100,7 @@ test.each([false, true])(
 		]);
 		const attempts = afterRefusal ? 2 : 1;
 		expect(choices).toHaveLength(attempts);
-		expect(streams).toEqual([{ tools: false }]);
+		expect(streams).toBe(1);
 		expect(result).toMatchObject({
 			stop: "answer",
 			said: "決めきれませんでした。",
@@ -126,7 +127,7 @@ test("a talk failure after a cut remains an error, with both calls recorded", as
 		"chat_stream_too_large",
 	);
 	expect(choices).toHaveLength(1);
-	expect(streams).toHaveLength(1);
+	expect(streams).toBe(1);
 	expect(result).toMatchObject({
 		stop: "error",
 		error: "chat_stream_too_large",
@@ -157,35 +158,20 @@ test("an unreadable choice passes to talk and keeps its failed check", async () 
 });
 
 test("other choice errors end the turn without calling talk", async () => {
-	const { result, choices, streams, client } = await choiceTurn([
+	const { result, choices, streams } = await choiceTurn([
 		new Error("larm_unreachable"),
 	]);
 	expect(choices).toHaveLength(1);
-	expect(streams).toHaveLength(0);
+	expect(streams).toBe(0);
 	expect(result).toMatchObject({ stop: "error", error: "larm_unreachable" });
 	expect(result.details[0]!.error?.code).toBe("larm_unreachable");
-	const unsupported = await runRoutedTurn(
-		{
-			client: { ...client, decide: undefined },
-			settings: { reasoning: "low", outputLimit: 4096 },
-		},
-		[{ role: "user", content: request.utterance }],
-		cards,
-		1,
-		request,
-	);
-	expect(unsupported).toMatchObject({
-		stop: "error",
-		error: "harness_decide_unsupported",
-	});
-	expect(unsupported.details).toHaveLength(0);
 });
 
 test("after two host refusals the host says its fixed phrase and the step fails", async () => {
 	const rejected = JSON.stringify({ choice: "not.offered" });
 	const { result, choices, streams } = await choiceTurn([rejected, rejected]);
 	expect(choices).toHaveLength(2);
-	expect(streams).toHaveLength(0);
+	expect(streams).toBe(0);
 	expect(result.calls.map((call) => call.kind)).toEqual(["choice", "choice"]);
 	expect(result).toMatchObject({
 		stop: "check",

@@ -18,7 +18,6 @@ function harness(latest: string | null) {
 			{ role: "system" as const, content: "会話の指示" },
 			{ role: "user" as const, content: "## Memory\n- なし" },
 		],
-		tools: [],
 	};
 	const prewarm = createConversationPrewarm({
 		store,
@@ -62,7 +61,6 @@ function harness(latest: string | null) {
 			conversationId === "main"
 				? {
 						messages: [...prefix.messages, { role: "user", content: task }],
-						tools: prefix.tools,
 					}
 				: null,
 	});
@@ -83,7 +81,6 @@ test("the latest conversation's prefix is read by a one-token background call on
 			sessionRole: "auxiliary",
 			onConversation: true,
 			readAhead: true,
-			toolChoice: "none",
 		});
 		// A background subject: it never counts as the user's foreground work.
 		expect(call!.subject).toStartWith("background:prewarm:");

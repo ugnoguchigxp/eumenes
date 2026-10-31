@@ -1,6 +1,4 @@
 import { afterEach, expect, test } from "bun:test";
-import { toolFields } from "../tool-text.fixture";
-import type { NativeToolCall } from "../../../../infrastructure/chat-stream";
 import type { InferencePort, Receipt } from "../../../inference";
 import {
 	rankCandidates,
@@ -36,9 +34,12 @@ const open: Materialized[] = [];
 afterEach(async () => {
 	for (const m of open.splice(0)) await m.close();
 });
-const prepared = async (input: string | null = "こんにちは") => {
+const prepared = async (
+	input: string | null = "こんにちは",
+	over: Parameters<typeof makeCase>[2] = {},
+) => {
 	const m = await materialize(
-		makeCase("ctx-f1-dev-01", input),
+		makeCase("ctx-f1-dev-01", input, over),
 		await openSeedWiring(),
 		{ catalog },
 	);
@@ -46,193 +47,189 @@ const prepared = async (input: string | null = "こんにちは") => {
 	return m;
 };
 
-type Step = { text?: string; calls?: Array<[string, unknown]> };
-/** A model that answers the rounds of the generation in order, and records what it was sent. */
-function scripted(steps: Step[]) {
-	const seen: Array<Array<{ role: string; content: string }>> = [];
-	let round = 0;
+/** One call of the scripted model: a choice (JSON held to the schema it was sent) or the talk turn's words. */
+type Seen = {
+	messages: Array<{ role: string; content: string }>;
+	schema: Record<string, unknown> | undefined;
+};
+/** A model that answers the choice calls from `choices` and the talk calls from `talk`, and records what it was sent. */
+function scripted(script: { choices?: unknown[]; talk?: string }) {
+	const seen: Seen[] = [];
+	let choice = 0;
 	const inference: Pick<InferencePort, "answer" | "executeStream"> = {
 		answer: async () => "",
-		executeStream: async (requestId, messages) => {
-			seen.push(messages.map((m) => ({ role: m.role, content: m.content })));
-			const step = steps[Math.min(round, steps.length - 1)]!;
-			round++;
-			const toolCalls: NativeToolCall[] = (step.calls ?? []).map(
-				([name, args], i) => ({
-					id: `c${round}-${i}`,
-					name,
-					arguments: JSON.stringify(args),
-				}),
-			);
-			return {
-				requestId,
-				attemptId: "t",
-				value: step.text ?? "",
-				...(toolCalls.length ? { toolCalls } : {}),
-			} satisfies Receipt;
+		executeStream: async (
+			requestId,
+			messages,
+			_signal,
+			_onDelta,
+			_preparation,
+			_tools,
+			session,
+		) => {
+			seen.push({
+				messages: messages.map((m) => ({ role: m.role, content: m.content })),
+				schema: session?.outputSchema,
+			});
+			const value = session?.outputSchema
+				? JSON.stringify(
+						script.choices?.[
+							Math.min(choice++, (script.choices?.length ?? 1) - 1)
+						] ?? { choice: "none" },
+					)
+				: (script.talk ?? "");
+			return { requestId, attemptId: "t", value } satisfies Receipt;
 		},
 	};
-	return { inference, seen, rounds: () => round };
+	return { inference, seen };
 }
-const run = async (m: Materialized, steps: Step[]) => {
-	const model = scripted(steps);
+const run = async (m: Materialized, script: Parameters<typeof scripted>[0]) => {
+	const model = scripted(script);
 	const outcome = await runConversation({
 		inference: model.inference,
 		input: m.input,
 		catalog,
+		persona: m.persona,
 		signal: new AbortController().signal,
 	});
 	return { outcome, ...model };
 };
-test("a spoken answer is plain text and ends the generation in one round, with no tool call recorded", async () => {
-	const { outcome, rounds } = await run(await prepared(), [
-		{ text: "こんにちは。" },
-	]);
-	expect(outcome).toEqual({
-		kind: "ok",
-		text: "こんにちは。",
-		toolCalls: [],
+const names = (outcome: Awaited<ReturnType<typeof run>>["outcome"]) =>
+	outcome.kind === "ok" ? outcome.toolCalls.map((c) => c.name) : [];
+
+test("no request: the host searches with the user's words, the choice is none and the talk turn answers in plain words", async () => {
+	const { outcome, seen } = await run(await prepared(), {
+		choices: [{ choice: "none" }],
+		talk: "こんにちは。",
 	});
-	expect(rounds()).toBe(1);
+	expect(outcome).toMatchObject({ kind: "ok", text: "こんにちは。" });
+	expect(names(outcome)).toEqual(["find_toolchain"]);
+	// One silent choice held to a schema, then one talk call without one.
+	expect(seen.map((call) => call.schema !== undefined)).toEqual([true, false]);
 });
 
-test("a generation without an utterance may stay silent", async () => {
-	const { outcome } = await run(await prepared(null), [{ text: "" }]);
-	expect(outcome).toEqual({
-		kind: "ok",
-		text: "",
-		toolCalls: [],
+test("a generation without an utterance only talks, and may stay silent", async () => {
+	const { outcome, seen } = await run(await prepared(null), { talk: "" });
+	expect(outcome).toEqual({ kind: "ok", text: "", toolCalls: [] });
+	expect(seen).toHaveLength(1);
+	expect(seen[0]!.schema).toBeUndefined();
+});
+
+test("the choice reads the host's search: the candidates and the user's words, and its schema offers exactly them", async () => {
+	const { seen } = await run(await prepared("明日の天気を調べて"), {
+		choices: [{ choice: "none" }],
+		talk: "見つかりませんでした。",
 	});
+	const choice = seen[0]!;
+	const text = choice.messages.map((m) => m.content).join("\n");
+	expect(text).toContain("明日の天気を調べて");
+	expect(text).toContain("web_research");
+	const offered = (
+		choice.schema!.anyOf as Array<{
+			properties: { choice: { enum: string[] } };
+		}>
+	).flatMap((branch) => branch.properties.choice.enum);
+	expect(offered).toContain("web_research");
+	expect(offered).toContain("none");
 });
 
-test("the prepared messages lead every round, and the agent's system text is the agency's own", async () => {
-	const m = await prepared("明日の天気を調べて");
-	const { seen } = await run(m, [
-		{ calls: [["find_toolchain", { query: "天気" }]] },
-		{ text: "見つかりませんでした。" },
-	]);
-	expect(seen).toHaveLength(2);
-	expect(seen[1]!.slice(0, m.input.messages.length)).toEqual(seen[0]!);
-	// The agency's reply rules (not the retired classification) are the first part of the system message.
-	expect(seen[0]![0]!.content).not.toContain("respond");
-	expect(m.input.messages[0]!.content).toBe(seen[0]![0]!.content);
-});
-
-test("a search then a delegation to what it offered hands the work over: the announcement is what is heard", async () => {
-	const { outcome, rounds } = await run(await prepared("明日の天気を調べて"), [
-		{ calls: [["find_toolchain", { query: "天気を調べる" }]] },
-		{
-			calls: [
-				[
-					"delegate",
-					{
-						mode: "execute",
-						toolchain: "web_research",
-						request: "明日の天気を調べる",
-						announcement: "お調べします。",
-						impact: "none",
-					},
-				],
-			],
-		},
-		{ text: "ここには来ない" },
-	]);
-	expect(outcome).toMatchObject({ kind: "ok", text: "お調べします。" });
-	if (outcome.kind !== "ok") throw new Error("unreachable");
-	expect(outcome.toolCalls.map((c) => c.name)).toEqual([
-		"find_toolchain",
-		"delegate",
-	]);
-	// The generation ended with the handover: no third round.
-	expect(rounds()).toBe(2);
-});
-
-test("a delegation the host refuses is answered with its reason and the reply goes on: a toolchain nobody offered, a missing announcement, a change without confirmation", async () => {
-	const delegate = (args: Record<string, unknown>): Step => ({
-		calls: [
-			[
-				"delegate",
-				{
-					mode: "execute",
-					toolchain: "web_research",
-					request: "調べる",
-					impact: "none",
-					announcement: "調べます。",
-					...args,
-				},
-			],
+test("a choice of what the search offered hands the work over: the announcement is what is heard, and no talk call follows", async () => {
+	const { outcome, seen } = await run(await prepared("明日の天気を調べて"), {
+		choices: [
+			{
+				choice: "web_research",
+				say: "お調べします。",
+				request: "明日の天気を調べる",
+			},
 		],
+		talk: "ここには来ない",
 	});
-	const search: Step = { calls: [["find_toolchain", { query: "調べる" }]] };
-	// Nothing was searched in the first, so the toolchain was never offered.
-	const refusals: Array<[Step[], string]> = [
-		[[delegate({})], "toolchain_not_offered"],
-		[[search, delegate({ announcement: undefined })], "announcement_required"],
+	expect(outcome).toMatchObject({ kind: "ok", text: "お調べします。" });
+	expect(names(outcome)).toEqual(["find_toolchain", "delegate"]);
+	expect(seen).toHaveLength(1);
+});
+
+test("a choice the host refuses is made again once with its reason: a toolchain nobody offered, an announcement with no words", async () => {
+	const refusals: Array<[unknown, string]> = [
 		[
-			[search, delegate({ impact: "modify_existing" })],
-			"confirmation_required",
+			{ choice: "image_studio_x", say: "描きます。", request: "描く" },
+			"choice_not_offered",
+		],
+		[
+			{ choice: "web_research", say: "", request: "調べる" },
+			"invalid_tool_arguments",
 		],
 	];
-	for (const [before, code] of refusals) {
-		const m = await prepared("調べて");
-		const { outcome, seen } = await run(m, [
-			...before,
-			{ text: "お答えします。" },
-		]);
+	for (const [first, code] of refusals) {
+		const { outcome, seen } = await run(await prepared("調べて"), {
+			choices: [first, { choice: "none" }],
+			talk: "お答えします。",
+		});
 		expect(outcome).toMatchObject({ kind: "ok", text: "お答えします。" });
-		const tool = seen.at(-1)!.filter((message) => message.role === "tool");
-		expect(toolFields(tool.at(-1)!.content)).toMatchObject({ refused: true });
-		expect(tool.at(-1)!.content).toContain(code);
-		expect(
-			seen
-				.at(-1)!
-				.some((message) =>
-					message.content.includes("UNTRUSTED_REJECTED_OUTPUT"),
-				),
-		).toBe(false);
+		// The second choice read why the first could not be carried out.
+		const second = seen.filter((call) => call.schema)[1]!;
+		expect(second.messages.map((m) => m.content).join("\n")).toContain(code);
 	}
 });
 
-test("a change is refused without its confirmation; the confirmation is issued without executing", async () => {
-	const m = await prepared("設定を書き換えて");
-	const search: Step = { calls: [["find_toolchain", { query: "コード" }]] };
-	const call = (mode: string): Step => ({
-		calls: [
-			[
-				"delegate",
+test("a request that names a saved item is confirmed first: the confirmation is issued without executing, and the host says it", async () => {
+	const { outcome } = await run(await prepared("設定を書き換えて"), {
+		choices: [
+			{
+				choice: "web_research",
+				say: "書き換えます。",
+				request: "設定を書き換える",
+				target: "saved-item",
+			},
+		],
+	});
+	expect(names(outcome)).toEqual(["find_toolchain", "delegate", "delegate"]);
+	if (outcome.kind !== "ok") throw new Error("unreachable");
+	const modes = outcome.toolCalls
+		.filter((c) => c.name === "delegate")
+		.map((c) => JSON.parse(c.arguments!).mode);
+	expect(modes).toEqual(["execute", "confirm"]);
+	expect(outcome.text).toContain("Web調査");
+});
+
+test("an open confirmation is answered by the pending turn: approving hands the work over, declining closes it", async () => {
+	const over = {
+		seed: {
+			confirmations: [
 				{
-					mode,
 					toolchain: "web_research",
-					request: "設定を書き換える",
-					announcement: "設定を書き換えてよいですか。",
+					request: "調べる",
 					impact: "modify_existing",
 				},
 			],
-		],
+		},
+	} as never;
+	const approved = await run(await prepared("はい、お願いします", over), {
+		choices: [{ choice: "approve", confirmation: "c1" }],
 	});
-	const { outcome, seen } = await run(m, [
-		search,
-		call("execute"),
-		call("confirm"),
-		{ text: "設定を書き換えてよいですか。" },
-	]);
-	expect(outcome).toMatchObject({
-		kind: "ok",
-		text: "設定を書き換えてよいですか。",
+	expect(names(approved.outcome)).toEqual(["delegate"]);
+	expect(approved.outcome).toMatchObject({ kind: "ok" });
+	expect(approved.seen).toHaveLength(1);
+
+	const declined = await run(await prepared("やめておきます", over), {
+		choices: [{ choice: "decline", confirmation: "c1" }],
 	});
-	const results = seen
-		.at(-1)!
-		.filter((message) => message.role === "tool")
-		.map((message) => toolFields(message.content));
-	expect(results[1]).toMatchObject({ refused: true });
-	expect(results[2]).toMatchObject({ confirmation: "eval-confirmation" });
+	expect(names(declined.outcome)).toEqual([]);
+	expect(declined.outcome).toMatchObject({ kind: "ok" });
+	if (declined.outcome.kind === "ok")
+		expect(declined.outcome.text).not.toBe("");
 });
 
-test("control text in the speech is dropped from it, as in the product: the reply says nothing of it", async () => {
-	const { outcome } = await run(await prepared(), [
-		{ text: 'delegate({"mode":"execute"})' },
-	]);
-	expect(outcome).toMatchObject({ kind: "ok", text: "" });
+test("an answer that copies the system part is not heard: the host says its fixed words instead", async () => {
+	const m = await prepared();
+	const copy = m.input.messages[0]!.content;
+	const { outcome } = await run(m, {
+		choices: [{ choice: "none" }],
+		talk: copy,
+	});
+	if (outcome.kind !== "ok") throw new Error("unreachable");
+	expect(outcome.text).not.toBe("");
+	expect(outcome.text).not.toContain(copy.slice(0, 40));
 });
 
 test("the offline search ranks the catalog by shared character pairs, best first, at most four", () => {

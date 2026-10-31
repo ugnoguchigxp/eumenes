@@ -5,9 +5,7 @@ import {
 	createIdleScheduler,
 	emotionName,
 	reportedTodoIds,
-	respondSystemParts,
 	runRespond,
-	ttsUtteranceStyle,
 	type ActionTicket,
 	type AgencyRuntime,
 	type CallOutcome,
@@ -33,12 +31,20 @@ import type { Settings } from "../../domains/settings";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { getLogger } from "../../infrastructure/logger";
 import type { SqliteStore } from "../../infrastructure/sqlite";
-import { systemContext } from "../../infrastructure/system-context";
 import type { AgencyCallIdentity } from "./llm-port";
 import { selectMemoryTopics } from "./topics";
+import { agencyBackgroundSystem, agencyReplyParts } from "./system-context";
 import type { AgencyWork } from "./work";
 
 export type AgencySettings = Settings["agency"];
+type HostPersona = Pick<
+	Settings["general"],
+	"agentName" | "userName" | "persona"
+>;
+const samePersona = (a: HostPersona, b: HostPersona) =>
+	a.agentName === b.agentName &&
+	a.userName === b.userName &&
+	a.persona === b.persona;
 
 /** A conversation the user has not touched for this long, and is not the active one, is forgotten. */
 const IDLE_DROP_MS = 30 * 60_000;
@@ -49,9 +55,6 @@ const TOPICS_TTL_MS = 30_000;
 /** Outbox events read per pass. */
 const FEED_PAGE = 200;
 const LOG_REASON_CHARS = 120;
-/** A proactive utterance runs nothing: it is read aloud, and it never promises to make, look up, start or play. */
-const UTTERANCE_STYLE =
-	ttsUtteranceStyle + systemContext("dialogue.contexts.agency.utterance", {});
 export type AgencyHostDeps = {
 	store: Pick<SqliteStore, "read" | "write" | "onCommit">;
 	conversation: Pick<
@@ -65,9 +68,12 @@ export type AgencyHostDeps = {
 	/** `foregroundBusy()` serves the user right now (conversation answers, ASR, TTS); background calls never count. */
 	inference: { foregroundBusy(): boolean };
 	settings: {
-		get(): { agency: AgencySettings };
+		get(): { agency: AgencySettings; general: HostPersona };
 		/** The committed settings as the transaction sees them (the delivery fence reads this, not the cache). */
-		inTransaction(db: Database): { agency: AgencySettings };
+		inTransaction(db: Database): {
+			agency: AgencySettings;
+			general: HostPersona;
+		};
 		onChange(listener: () => void): () => void;
 	};
 	/** The user's State items are the topic material (hostTopics mode). */
@@ -149,6 +155,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 
 	const convs = new Map<string, Conv>();
 	let cfg: AgencySettings = deps.settings.get().agency;
+	let persona = deps.settings.get().general;
 	let cursor = 0;
 	let activeId: string | null = null;
 	let started = false;
@@ -262,7 +269,12 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			hostTopics: true,
 			hostTodos: true,
 			...(cfg.emotion ? { utteranceEmotion: true } : {}),
-			utteranceStyle: UTTERANCE_STYLE,
+			systemContext: {
+				update: (input) =>
+					agencyBackgroundSystem("update", input, persona, cfg.emotion),
+				select: (input) =>
+					agencyBackgroundSystem("select", input, persona, cfg.emotion),
+			},
 			...(interests.length > 0 ? { standingInterests: interests } : {}),
 			todos: () => todosNow(c),
 			tools: [],
@@ -481,11 +493,12 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			outcome = await store.write((db) => {
 				// Re-checked inside the writer transaction: the setting as committed (not the cached copy),
 				// and nothing may have been said since the opportunity.
-				const committed = deps.settings.inTransaction(db).agency;
+				const committed = deps.settings.inTransaction(db);
 				if (
 					text === "" ||
 					!on() ||
-					!sameSettings(committed, cfg) ||
+					!sameSettings(committed.agency, cfg) ||
+					!samePersona(committed.general, persona) ||
 					c.generation !== cy.mine ||
 					c.runtime !== cy.runtime ||
 					convs.get(c.id) !== c ||
@@ -847,10 +860,12 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	// ---- settings -----------------------------------------------------------
 
 	function applySettings() {
-		const next = deps.settings.get().agency;
-		const previous = cfg;
-		if (sameSettings(previous, next)) return;
+		const settings = deps.settings.get();
+		const next = settings.agency;
+		const nextPersona = settings.general;
+		if (sameSettings(cfg, next) && samePersona(persona, nextPersona)) return;
 		cfg = next;
+		persona = nextPersona;
 		// Applied immediately: whatever was in flight belongs to the old setting.
 		resetAll("settings.changed");
 		log.info("agency.settings_applied", {});
@@ -869,15 +884,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	 * context's `now.agency`, so the cached prefix holds) and one reply on the host's model call and tools.
 	 */
 	const conversationAgent: ConversationAgentPort = {
-		system: () =>
-			respondSystemParts({
-				interests: cfg.interests.map((text, index) => ({
-					id: `i${index + 1}`,
-					text,
-				})),
-				spoken: true,
-				emotion: cfg.emotion,
-			}),
+		system: () => agencyReplyParts(cfg),
 		async respond(input) {
 			const reply = await runRespond({ ...input, emotion: cfg.emotion });
 			return {
@@ -930,4 +937,3 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		},
 	};
 }
-export type AgencyHost = ReturnType<typeof createAgencyHost>;

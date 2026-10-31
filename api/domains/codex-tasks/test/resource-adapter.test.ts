@@ -9,8 +9,8 @@ import {
 	createCodexTasks,
 	createCodexTasksResourceAdapter,
 	migrations,
-	type CodexEnqueue,
 } from "..";
+import type { CodexEnqueue } from "../contracts";
 
 const stores: SqliteStore[] = [];
 const dirs: string[] = [];

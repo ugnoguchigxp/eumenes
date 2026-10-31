@@ -3,12 +3,12 @@ import { join } from "node:path";
 import type { LarmPort } from "../../larm";
 import { createInference, type InferenceService } from "../../inference";
 import { createSettings } from "../../settings";
-import { cloudHarness, harnessOf, routeConversation } from "../service/harness";
+import { routeConversation } from "../service/harness";
 import { settings } from "./harness.fixture";
 import { openDialogueStore, removeDialogueStore } from "./store.fixture";
 
 /**
- * A voice turn's llm request is captured under the utterance id and bound to its run: the run's harness is found
+ * A voice turn's llm request is captured under the utterance id and bound to its run: the run's route is found
  * from it by the run id, on the real inference service.
  */
 const cleanup: Array<() => Promise<void>> = [];
@@ -39,7 +39,7 @@ async function setup() {
 	return { store, inference };
 }
 
-test("the harness of a voice run is found from its bound llm request by the run id", async () => {
+test("the route of a voice run is found from its bound llm request by the run id", async () => {
 	const { store, inference } = await setup();
 	const snapshot = settings({ mode: "cloud-only" });
 	routeConversation(snapshot);
@@ -63,5 +63,4 @@ test("the harness of a voice run is found from its bound llm request by the run 
 		mode: "cloud-only",
 		cloudAllowed: true,
 	});
-	expect(harnessOf(found)).toBe(cloudHarness);
 });

@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureLogging } from "../../../infrastructure/logger";
 import type { CurationItem } from "../contracts";
-import { quoteMatchedOf } from "../repository";
 import { setupMemory, type MemoryHarness } from "./memory.fixture";
 
 const open: MemoryHarness[] = [];
@@ -45,7 +44,6 @@ test("a quote that is found becomes the evidence range; the result and provenanc
 	expect(itemOf(h, result.id).evidence).toEqual([
 		{ messageId: id, quote: "辛いものが好き" },
 	]);
-	expect(h.store.read((db) => quoteMatchedOf(db, result.id!))).toBe(true);
 	// Spaces, punctuation and width forms are forgiven; the range is the original slice.
 	const text = await h.say("user", "毎朝 5時に起きて、走って いる。");
 	const second = only(
@@ -79,7 +77,6 @@ test("a quote that is not found falls back to the whole user message and says so
 		expect(itemOf(h, result.id).evidence).toEqual([
 			{ messageId: id, quote: "私は辛いものが好きです" },
 		]);
-		expect(h.store.read((db) => quoteMatchedOf(db, result.id!))).toBe(false);
 	}
 });
 

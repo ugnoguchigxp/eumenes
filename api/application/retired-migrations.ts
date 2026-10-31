@@ -107,3 +107,54 @@ CREATE INDEX screen_commands_pending ON screen_commands(conversation_id, status,
 		sql: `DROP TABLE IF EXISTS screen_commands;`,
 	},
 ];
+
+/**
+ * The coding domain (the execution record of the Codex CLI runner that supervised the CLI directly) was retired
+ * on 2026-10-31 together with that runner, which was never enabled. The deployed migration is kept byte-for-byte;
+ * its tables hold no rows and are left in place.
+ */
+const codingInit = `
+CREATE TABLE coding_workspaces (id TEXT PRIMARY KEY, data_json TEXT NOT NULL);
+CREATE TABLE coding_workspace_reservations (workspace_id TEXT PRIMARY KEY REFERENCES coding_workspaces(id), execution_id TEXT NOT NULL);
+CREATE TABLE coding_executions (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, generation INTEGER NOT NULL, epoch INTEGER NOT NULL, spec_json TEXT NOT NULL, receipt_json TEXT, state TEXT NOT NULL, created_ms INTEGER NOT NULL, updated_ms INTEGER NOT NULL);
+CREATE INDEX coding_task_executions ON coding_executions(task_id,created_ms);
+CREATE TABLE coding_operations (id TEXT PRIMARY KEY, execution_id TEXT NOT NULL REFERENCES coding_executions(id), digest TEXT NOT NULL, spec_ref TEXT NOT NULL, state TEXT NOT NULL);
+CREATE TABLE coding_event_cursors (execution_id TEXT PRIMARY KEY REFERENCES coding_executions(id), seq INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE coding_evidence (execution_id TEXT NOT NULL REFERENCES coding_executions(id), seq INTEGER NOT NULL, data_json TEXT NOT NULL, PRIMARY KEY(execution_id,seq));
+`;
+export const retiredCodingMigrations: readonly Migration[] = [
+	{ id: "coding/0001-init", sql: codingInit },
+	{
+		id: "coding/0002-indexes",
+		after: ["coding/0001-init"],
+		sql: `
+CREATE INDEX coding_operations_execution ON coding_operations(execution_id);
+CREATE INDEX coding_executions_state ON coding_executions(state);
+CREATE INDEX coding_evidence_kind ON coding_evidence(execution_id, json_extract(data_json,'$.kind'), seq);
+`,
+	},
+];
+
+/**
+ * The coding-supervision domain (observation, decisions and steps for that runner) was retired on 2026-10-31
+ * with it. The deployed migration is kept byte-for-byte; its tables hold no rows and are left in place.
+ */
+const codingSupervisionInit = `
+CREATE TABLE coding_supervisors(task_id TEXT PRIMARY KEY REFERENCES work_tasks(id),data_json TEXT NOT NULL);
+CREATE TABLE coding_observations(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES work_tasks(id),fingerprint TEXT NOT NULL,created_ms INTEGER NOT NULL,data_json TEXT NOT NULL);
+CREATE TABLE coding_decisions(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES work_tasks(id),status TEXT NOT NULL,data_json TEXT NOT NULL);
+CREATE TABLE coding_steps(id TEXT PRIMARY KEY,task_id TEXT NOT NULL REFERENCES work_tasks(id),status TEXT NOT NULL,data_json TEXT NOT NULL);
+CREATE TABLE coding_supervision_budgets(task_id TEXT PRIMARY KEY REFERENCES work_tasks(id),decisions_used INTEGER NOT NULL,repair_loops INTEGER NOT NULL,blockers_json TEXT NOT NULL);
+`;
+export const retiredCodingSupervisionMigrations: readonly Migration[] = [
+	{ id: "coding-supervision/0001-init", sql: codingSupervisionInit },
+	{
+		id: "coding-supervision/0002-indexes",
+		after: ["coding-supervision/0001-init"],
+		sql: `
+CREATE INDEX coding_observations_task_created ON coding_observations(task_id, created_ms);
+CREATE INDEX coding_decisions_task ON coding_decisions(task_id);
+CREATE INDEX coding_steps_task ON coding_steps(task_id);
+`,
+	},
+];

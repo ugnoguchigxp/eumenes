@@ -34,8 +34,6 @@ import type {
 	WebArtifactAdapter,
 } from "./registry";
 
-export { findActionBinding } from "./screen-dispatch";
-
 import "./ToolchainArtifactHost.css";
 
 export type ToolchainArtifactHostProps = {

@@ -27,7 +27,6 @@ import { createVoiceDialogue } from "../domains/voice-dialogue";
 import type { Capabilities } from "../domains/capabilities";
 import { getLogger } from "../infrastructure/logger";
 import type { Config } from "../infrastructure/config";
-import { createDotsDialogue } from "./work/dots-dialogue";
 import { createSavedEmbedder } from "./world/larm-embedder";
 import {
 	createMonitoring,
@@ -253,7 +252,6 @@ export async function buildServices(
 		memory,
 		steward,
 		agents: enabled ? toolchain.agents : undefined,
-		delegation: createDotsDialogue({ tasks: delegated.tasks }),
 		...(world ? { worldContext: world.context } : {}),
 		...(toolchains
 			? {
@@ -355,7 +353,6 @@ export async function buildServices(
 					routing: toolchains,
 					inference,
 					service: pipelines,
-					agentSystem: agency.conversationAgent.system,
 					embedPassages: toolchain.embedPassages,
 				})
 			: undefined;

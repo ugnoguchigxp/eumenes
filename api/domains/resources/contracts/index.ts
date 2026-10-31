@@ -1,12 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 
-/**
- * Eumenes resource URIs (spec/resource-uri-implementation-plan-2026-10-25.md §2):
- * `eumenes://<kind>/<id>[?action=<action>]`. The stored form never carries `action`.
- */
-export const RESOURCE_SCHEME = "eumenes:";
-
 export const resourceActions = ["open", "play", "read"] as const;
 export type ResourceAction = (typeof resourceActions)[number];
 

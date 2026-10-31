@@ -71,7 +71,6 @@ const seriesDefinition = z.strictObject({
 	}),
 });
 const computedDefinition = z.union([expression, seriesDefinition]);
-export type ComputedDefinition = z.infer<typeof computedDefinition>;
 const atMost = (max: number) => (value: Record<string, unknown>) =>
 	Object.keys(value).length <= max;
 /** Held by the outermost layout only (checked by `validateComposition`). */

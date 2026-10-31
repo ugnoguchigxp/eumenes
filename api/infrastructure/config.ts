@@ -54,7 +54,6 @@ const schema = z.object({
 	EUMENES_ATTITUDE_DATASET: text,
 	EUMENES_MEMORY_JOURNAL: text,
 	EUMENES_WORLD_JOURNAL: text,
-	EUMENES_CODING_RUNNER_CONFIG: text,
 	EUMENES_RESEARCH_CODEX_EXECUTABLE: text,
 	EUMENES_WORLD_POLL_MS: integer(),
 	EUMENES_WORLD_CURSOR_SECRET: text,
@@ -62,7 +61,6 @@ const schema = z.object({
 	EUMENES_TOOLCHAIN_ENABLED: flag(true),
 	EUMENES_HISTORY_TOOLS_ENABLED: flag(true),
 	EUMENES_WEB_RESEARCH_TOOLS_ENABLED: flag(true),
-	EUMENES_DELEGATED_TASKS_ENABLED: flag(false),
 	EUMENES_API_TOKEN: text,
 });
 
@@ -81,7 +79,6 @@ export type Config = {
 	memoryJournalPath: string;
 	/** Undefined: the World journal sits beside the Memory journal. */
 	worldJournalPath: string | undefined;
-	codingRunnerConfig: string | undefined;
 	researchCodexExecutable: string;
 	/** Already clamped to the 1000 ms floor. */
 	worldPollMs: number | undefined;
@@ -91,7 +88,6 @@ export type Config = {
 	toolchainEnabled: boolean;
 	historyToolsEnabled: boolean;
 	webResearchToolsEnabled: boolean;
-	delegatedTasksEnabled: boolean;
 	env: Readonly<Record<string, string | undefined>>;
 };
 
@@ -140,7 +136,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		memoryJournalPath:
 			v.EUMENES_MEMORY_JOURNAL ?? join(dataDir, "memory-forget-journal.jsonl"),
 		worldJournalPath: v.EUMENES_WORLD_JOURNAL,
-		codingRunnerConfig: v.EUMENES_CODING_RUNNER_CONFIG,
 		researchCodexExecutable: v.EUMENES_RESEARCH_CODEX_EXECUTABLE ?? "codex",
 		worldPollMs:
 			v.EUMENES_WORLD_POLL_MS === undefined
@@ -151,7 +146,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		toolchainEnabled: v.EUMENES_TOOLCHAIN_ENABLED,
 		historyToolsEnabled: v.EUMENES_HISTORY_TOOLS_ENABLED,
 		webResearchToolsEnabled: v.EUMENES_WEB_RESEARCH_TOOLS_ENABLED,
-		delegatedTasksEnabled: v.EUMENES_DELEGATED_TASKS_ENABLED,
 		env,
 	};
 }

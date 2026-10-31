@@ -113,4 +113,3 @@ export function usePromptEdit({
 		send,
 	};
 }
-export type PromptEdit = ReturnType<typeof usePromptEdit>;

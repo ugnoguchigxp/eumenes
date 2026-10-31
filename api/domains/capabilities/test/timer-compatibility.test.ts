@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
-import { hash, timerResultContext, validators } from "../contracts";
+import { hash, validators } from "../contracts";
 import { zSchema } from "../service/schema";
+import { timerResultContext } from "../contracts/timers";
 
 test("timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state", () => {
 	// Captured from HEAD before the UI feature: stored capability revisions must still match.

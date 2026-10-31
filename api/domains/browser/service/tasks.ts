@@ -386,4 +386,3 @@ export function createTasks(
 		codeOf,
 	};
 }
-export type Tasks = ReturnType<typeof createTasks>;

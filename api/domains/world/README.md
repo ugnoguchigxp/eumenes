@@ -57,6 +57,14 @@ re-checked when the report is adopted (same revision, not ended, and its source 
 forget whose World tombstone is still pending cannot support a report). The old per-turn context broker and the
 usage receipts are gone; `service/usage-ledger.ts` only cleans rows older versions left.
 
+`world.query` keeps the complete input-version manifest (including representation and digest) and the
+original evidence refs (including byte ranges and quote digests). Research Sources retain the whole
+value, predicate, condition and valid time; they are fitted as whole items to the existing byte bounds.
+A bounded or omitted read stays partial. The updated package also supports exact assertion refs in
+the public Slice API; this is covered on the host store without adding a model-facing selector or
+changing the names-only conversation hint. See [the integration record](../../../spec/world-evidence-integration-2026-10-31.md)
+for fixed-fixture evidence and the remaining model-acceptance gate.
+
 ### Consumers
 
 `pump()` runs the conversation outbox consumer and the Memory change-feed
@@ -77,7 +85,7 @@ database refuses ON until `markInitialSyncComplete` was recorded. The initial
 sync drains both change feeds from the start (bounded, 2000 pages each) and
 records the flag only when both are drained. There is no HTTP route or UI.
 Explicit registration (targets, structured claims) by the host goes through
-`assembly.service.apply(...)` with `manualAccess()`. The steward curates conversation input through
+`assembly.service.apply(...)`. The steward curates conversation input through
 `assembly.curation` (below).
 
 ### Cursor secret
@@ -252,40 +260,36 @@ is the one product entry for World's pure reasoning. Read-only, enumerated:
   empty `ok` (no path found, never "no effect").
 - Claim text is reference data (`referenceOnly: true`) and a result grants nothing
   (`executionPermission: "none"`). Gaps are investigation candidates.
-- Gap -> Task: `linkGaps: true` (not in the model vocabulary) hands the first 5 Gaps to the
+- Gap -> Task: `linkGaps: true` hands the first 5 Gaps to the
   host's `GapTaskPort` in one writer transaction. The port checks delegation and budget and
   may deny; World keeps only `world_host_gap_task` (hashed Gap key -> task ref), so the same
   Gap never reaches the port twice. Without a port the answer is `taskLinkage:
   not_accepted`. **Task linkage is NOT accepted against the real Tasks domain**: its only
   kind is `coding` and needs a user-issued workspace grant that a Gap cannot supply; the
   port is tested with a fake host only.
-- `createWorldQueryTool` is the model-callable definition (id `world.query`); registering it
-  in the capability catalog / tool runtime is host wiring in those domains (not done).
-  `registerWorldQuery` (`controller/`) is `POST /api/world/query`, not mounted by default.
+- There is no model tool and no HTTP route for it; the host calls `createWorldQuery` directly.
 - Condition evaluation gets no observations here, so a condition on a measurement stays
   `unknown`; an `explicitly_unconditional` claim is satisfied.
 
 ## Grounded claim list (P5-02, view only)
 
 `createWorldClaims({ store, world, lifecycle, state, ... })`
-(`service/world-claims.ts`) behind `registerWorldClaims` (`controller/claims.ts`), mounted by
-`createApp({ worldClaims })` only when World is assembled (mode `protect` or `on`). With
-World OFF nothing is assembled and every `/api/world/*` route is a plain 404 (the bearer and
-origin checks of `/api/*` still come first). The Scope is bound by the host (`claimsContext`),
-never by a body or a query string.
+(`service/world-claims.ts`) is read by the World screen's adapter (`api/application/world/world-adapter.ts`)
+only when World is assembled (mode `protect` or `on`). There is no HTTP route for it. The Scope is bound by
+the host (`claimsContext`), never by a body or a query string.
 
-| Route | What |
+| Read | What |
 |---|---|
-| `GET /api/world/status` | mode, enabled, usable, gate, the granted Scopes |
-| `GET /api/world/claims[?scopeKey]` | list: target, claim, adoption, origin/evidence kinds, freshness, `tone` as SEPARATE fields; `complete:false` = a budget stopped the read; `stopped` = claims stopped by a changed source |
-| `GET /api/world/claims/:id[?scopeKey]` | detail: condition (`unknown` without observations, never assumed true), supports, refutations, source versions (current / changed / unavailable), history |
-| `GET /api/world/forgets[?scopeKey]` | the durable forget intake of the Scope (works with World OFF and with a closed gate): `pending`, `awaiting_confirmation`, `abandoned`, `complete`; only `complete` is "done" |
+| `status` | mode, enabled, usable, gate, the granted Scopes |
+| `list` | target, claim, adoption, origin/evidence kinds, freshness, `tone` as SEPARATE fields; `complete:false` = a budget stopped the read; `stopped` = claims stopped by a changed source |
+| `detail` | condition (`unknown` without observations, never assumed true), supports, refutations, source versions (current / changed / unavailable), history |
+| `forgets` | the durable forget intake of the Scope (works with World OFF and with a closed gate): `pending`, `awaiting_confirmation`, `abandoned`, `complete`; only `complete` is "done" |
 
 Claims are kept by the memory steward: the owner can look but not change them (plan G3), so there is no
-change route. A correction, retraction or forget of a claim is a steward operation (`service/curation-adopt.ts`).
+change operation. A correction, retraction or forget of a claim is a steward operation (`service/curation-adopt.ts`).
 
 - Unknown claim, Scope not granted, other principal, a closed gate and a forgotten claim are ONE
-  answer: `404 {error: "not_found"}`. World OFF is `409 world_disabled`.
+  answer: `not_found`. World OFF is `world_disabled`.
 - `claimTone`: only an adopted report/document is `adopted`; an adopted `model_hypothesis` is
   `hypothesis`, a `runtime_observation` is `measured`, and any unadopted claim is `candidate`.
 - A forget that stops while advancing is still accepted (the intake is durable) and shown as

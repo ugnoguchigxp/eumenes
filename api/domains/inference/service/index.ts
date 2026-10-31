@@ -65,8 +65,7 @@ const runControl = (env: Env, ...[id, m, s, c, session]: ControlArgs) =>
 		s,
 		undefined,
 		undefined,
-		// A call on the conversation's prompt sends its tools unchanged (not to be called) to keep the prefix.
-		session?.prefixTools,
+		undefined,
 		c,
 		undefined,
 		session,

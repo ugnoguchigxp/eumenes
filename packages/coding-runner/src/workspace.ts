@@ -1,22 +1,18 @@
 import {
 	existsSync,
 	lstatSync,
-	mkdirSync,
-	readdirSync,
 	readFileSync,
 	realpathSync,
 	readlinkSync,
-	statSync,
 	openSync,
 	closeSync,
 	constants,
 	fstatSync,
 	readSync,
 } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { spawnSync } from "node:child_process";
-import type { RunnerConfig } from "./config";
-import { atomicWrite, canonical, digest, optionalJson } from "./storage";
+import { canonical, digest } from "./storage";
 
 // The agent can write .git/config, hooks and attributes; host git never honours the code-running ones.
 const hardening = [
@@ -68,107 +64,6 @@ export function git(
 ) {
 	return gitBytes(path, args, env, input).toString();
 }
-type GitIntegrity = {
-	config: string | null;
-	worktreeGitDir: string | null;
-	worktreeConfig: string | null;
-	hooks: Array<{ name: string; digest: string }>;
-};
-const fileDigest = (path: string) =>
-	existsSync(path) ? digest(readFileSync(path)) : null;
-function integrityPath(config: RunnerConfig, workspaceId: string) {
-	return join(
-		config.spoolRoot,
-		"workspaces",
-		`${workspaceId}.git-integrity.json`,
-	);
-}
-function currentIntegrity(w: RunnerConfig["workspaces"][number]): GitIntegrity {
-	let worktreeGitDir: string | null = null;
-	const dotGit = join(w.path, ".git");
-	if (lstatSync(dotGit).isFile())
-		worktreeGitDir =
-			/^gitdir: (.+)$/m.exec(readFileSync(dotGit, "utf8"))?.[1] ?? "";
-	const hooksDir = join(w.commonGitDir, "hooks");
-	const hooks = existsSync(hooksDir)
-		? readdirSync(hooksDir)
-				.sort()
-				.map((name) => {
-					const full = join(hooksDir, name);
-					const stat = lstatSync(full);
-					return {
-						name,
-						digest: stat.isSymbolicLink()
-							? `symlink:${digest(readlinkSync(full))}`
-							: stat.isFile()
-								? digest(readFileSync(full))
-								: "not-a-file",
-					};
-				})
-		: [];
-	return {
-		config: fileDigest(join(w.commonGitDir, "config")),
-		worktreeGitDir,
-		worktreeConfig: worktreeGitDir
-			? fileDigest(
-					join(resolveGitDir(w.path, worktreeGitDir), "config.worktree"),
-				)
-			: null,
-		hooks,
-	};
-}
-/** A relative `gitdir:` in a worktree's .git file is relative to the worktree, not to this process. */
-function resolveGitDir(worktreePath: string, value: string) {
-	const absolute = resolve(worktreePath, value);
-	try {
-		return realpathSync(absolute);
-	} catch {
-		return absolute;
-	}
-}
-export type IntegrityChange = {
-	recorded: boolean;
-	config: "changed" | "same";
-	worktreeConfig: "changed" | "same";
-	hooks: { added: string[]; removed: string[]; changed: string[] };
-};
-/** What differs between the recorded and the current git state; digests themselves are not returned. */
-export function describeIntegrityChange(
-	config: RunnerConfig,
-	workspaceId: string,
-): IntegrityChange {
-	const w = config.workspaces.find((x) => x.id === workspaceId);
-	if (!w) throw new Error("runner_workspace_unregistered");
-	const recorded = optionalJson<GitIntegrity>(
-		integrityPath(config, workspaceId),
-	);
-	const now = currentIntegrity(w);
-	if (!recorded)
-		return {
-			recorded: false,
-			config: "same",
-			worktreeConfig: "same",
-			hooks: { added: [], removed: [], changed: [] },
-		};
-	const before = new Map(recorded.hooks.map((h) => [h.name, h.digest]));
-	const after = new Map(now.hooks.map((h) => [h.name, h.digest]));
-	return {
-		recorded: true,
-		config: recorded.config === now.config ? "same" : "changed",
-		worktreeConfig:
-			recorded.worktreeConfig === now.worktreeConfig &&
-			recorded.worktreeGitDir === now.worktreeGitDir
-				? "same"
-				: "changed",
-		hooks: {
-			added: [...after.keys()].filter((n) => !before.has(n)),
-			removed: [...before.keys()].filter((n) => !after.has(n)),
-			changed: [...after.keys()].filter(
-				(n) => before.has(n) && before.get(n) !== after.get(n),
-			),
-		},
-	};
-}
 // A clean or smudge filter would make host `git add` execute configured commands.
 function forbidFilters(file: string) {
 	let stat;
@@ -182,67 +77,6 @@ function forbidFilters(file: string) {
 	if (readFileSync(file, "utf8").includes("filter="))
 		throw new Error("runner_git_filter_forbidden");
 }
-/** Trusted host action: remember the git config/hooks state that later host git calls must still see. */
-export function recordGitIntegrity(config: RunnerConfig, workspaceId: string) {
-	const w = config.workspaces.find((x) => x.id === workspaceId);
-	if (!w) throw new Error("runner_workspace_unregistered");
-	mkdirSync(join(config.spoolRoot, "workspaces"), {
-		recursive: true,
-		mode: 0o700,
-	});
-	atomicWrite(integrityPath(config, workspaceId), currentIntegrity(w));
-}
-/** Throws runner_git_filter_forbidden when a filter attribute is configured. */
-export function assertNoGitFilters(config: RunnerConfig, workspaceId: string) {
-	const w = config.workspaces.find((x) => x.id === workspaceId);
-	if (!w) throw new Error("runner_workspace_unregistered");
-	forbidFilters(join(w.path, ".gitattributes"));
-	forbidFilters(join(w.commonGitDir, "info", "attributes"));
-}
-/** Fails closed when the sandboxed agent changed .git/config or hooks, or added a filter attribute. */
-export function verifyGitIntegrity(config: RunnerConfig, workspaceId: string) {
-	const w = config.workspaces.find((x) => x.id === workspaceId);
-	if (!w) throw new Error("runner_workspace_unregistered");
-	// Trust on first use: the first host git call records the state it is about to rely on.
-	const recorded = optionalJson<GitIntegrity>(
-		integrityPath(config, workspaceId),
-	);
-	if (!recorded) recordGitIntegrity(config, workspaceId);
-	else if (canonical(recorded) !== canonical(currentIntegrity(w)))
-		throw new Error("runner_git_config_tampered");
-	forbidFilters(join(w.path, ".gitattributes"));
-	forbidFilters(join(w.commonGitDir, "info", "attributes"));
-}
-export function workspace(config: RunnerConfig, workspaceId: string) {
-	const w = config.workspaces.find((x) => x.id === workspaceId);
-	if (!w) throw new Error("runner_workspace_unregistered");
-	if (
-		realpathSync(w.path) !== w.path ||
-		realpathSync(w.commonGitDir) !== w.commonGitDir
-	)
-		throw new Error("runner_workspace_changed");
-	verifyGitIntegrity(config, workspaceId);
-	const identity = statSync(w.commonGitDir);
-	if (
-		identity.dev !== w.repositoryIdentity.dev ||
-		identity.ino !== w.repositoryIdentity.ino
-	)
-		throw new Error("runner_repository_changed");
-	if (
-		git(w.path, [
-			"rev-parse",
-			"--path-format=absolute",
-			"--git-common-dir",
-		]).trim() !== w.commonGitDir
-	)
-		throw new Error("runner_repository_changed");
-	if (git(w.path, ["symbolic-ref", "--short", "HEAD"]).trim() !== w.branch)
-		throw new Error("runner_branch_changed");
-	if (git(w.path, ["rev-parse", `${w.baseSha}^{commit}`]).trim() !== w.baseSha)
-		throw new Error("runner_base_changed");
-	git(w.path, ["merge-base", "--is-ancestor", w.baseSha, "HEAD"]);
-	return w;
-}
 const lines = (output: string) => output.split("\0").filter(Boolean);
 export type WorkspaceSnapshot = {
 	workspaceId: string;
@@ -251,14 +85,6 @@ export type WorkspaceSnapshot = {
 	files: Array<{ path: string; mode: number; digest: string | null }>;
 	digest: string;
 };
-export function snapshot(
-	config: RunnerConfig,
-	workspaceId: string,
-): WorkspaceSnapshot {
-	return snapshotWorkspace(workspace(config, workspaceId));
-}
-
-/** Same bounded byte/escape checks for an already registered SDK workspace. */
 export function snapshotWorkspace(w: {
 	id: string;
 	path: string;

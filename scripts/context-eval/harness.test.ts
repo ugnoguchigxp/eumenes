@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { systemCopyCheck } from "../../api/domains/dialogue/service/conversation-output";
-import {
-	cloudHarness,
-	localHarness,
-} from "../../api/domains/dialogue/service/harness";
+import { localHarness } from "../../api/domains/dialogue/service/harness";
 import {
 	CHAINS,
 	candidatesFor,
@@ -31,16 +28,15 @@ import {
 	type StepRecord,
 	type Turn,
 } from "./harness-judge";
-import { cardOf, systemFieldsOf, titlesOf } from "./harness-source";
+import { cardOf, systemFieldsOf } from "./harness-source";
 import { parseOptions, planOf, startLog } from "./harness";
 
 const source: SystemSource = {
 	persona: { agentName: "", userName: "", persona: "butler" },
 	interests: [],
 	emotion: false,
-	titles: ["画像生成", "音楽・効果音制作"],
 };
-const system = buildSystem(source, localHarness);
+const system = buildSystem(source);
 const never = () => false;
 const ctx = { copies: never, lastAgent: "" };
 const turn = (extra: Partial<Turn>): Turn => ({
@@ -217,38 +213,20 @@ describe("composeInput", () => {
 			],
 		},
 	];
-	const compose = (
-		form: "current" | "empty" | "empty-last",
-		harness = localHarness,
-	) =>
+	const compose = (form: "current" | "empty" | "empty-last") =>
 		composeInput({
 			form,
-			harness,
+			harness: localHarness,
 			system,
 			log,
-			works: [{ ref: 1, title: "猫の絵", state: "running" }],
-			presented: null,
 			say: "カエルの絵を作って",
 		});
-	test("current: system, memory, the recent conversation (the cloud harness with its tool exchange), then State and User", () => {
-		const m = compose("current", cloudHarness);
+	test("current: system, memory, the recent conversation as words alone, then State (the today line) and User", () => {
+		const m = compose("current");
 		expect(m[0]).toEqual({ role: "system", content: system });
 		expect(m[1]).toEqual({ role: "user", content: "## Memory\n- なし" });
-		expect(m.map((x) => x.role)).toEqual([
-			"system",
-			"user",
-			"assistant",
-			"user",
-			"assistant",
-			"tool",
-			"assistant",
-			"tool",
-			"assistant",
-			"user",
-		]);
-		expect(m[4]!.tool_calls![0]!.id).toBe("u3-1");
 		expect(m.at(-1)!.content).toBe(
-			"## State\n今: 10-28（水）10:00\n仕事:\n- t1 猫の絵 実行中\n\n## User\nカエルの絵を作って",
+			"## State\n今: 10-28（水）10:00\n\n## User\nカエルの絵を作って",
 		);
 		for (let i = 1; i < m.length; i++)
 			if (m[i]!.role === "user") expect(m[i - 1]!.role).not.toBe("user");
@@ -275,7 +253,6 @@ describe("composeInput", () => {
 			"assistant",
 			"user",
 		]);
-		expect(cloudHarness.history.toolExchanges).toBe(true);
 	});
 	test("the agent's utterance that copies the system part is not drawn", () => {
 		const rule = system
@@ -291,8 +268,6 @@ describe("composeInput", () => {
 				{ role: "user", text: "もう一度" },
 				{ role: "agent", text: rule },
 			],
-			works: [],
-			presented: null,
 			say: "x",
 		});
 		expect(
@@ -307,17 +282,13 @@ describe("composeInput", () => {
 
 describe("startLog", () => {
 	const chain = CHAINS.find((c) => c.key === "answer-picture")!;
-	test("a routed run carries the planted question back as its ask step; the reply loop does not", () => {
-		const routed = startLog(chain, "routed").at(-1)!;
-		expect(routed.toolCalls).toEqual([
+	test("a planted question back carries its ask step; a planted line without one does not", () => {
+		const asked = startLog(chain).at(-1)!;
+		expect(asked.toolCalls).toEqual([
 			{ name: "ask", arguments: '{"request":"絵を描いて"}', result: "{}" },
 		]);
-		expect(startLog(chain).at(-1)!.toolCalls).toBeUndefined();
 		expect(
-			startLog(
-				CHAINS.find((c) => c.key === "answer-offer")!,
-				"routed",
-			).at(-1)!.toolCalls,
+			startLog(CHAINS.find((c) => c.key === "answer-offer")!).at(-1)!.toolCalls,
 		).toBeUndefined();
 	});
 });
@@ -361,15 +332,11 @@ describe("saved source", () => {
 			systemFieldsOf(JSON.stringify({ general: { persona: "x" } })),
 		).toThrow("harness_saved_persona_unreadable");
 	});
-	test("titles by id, once each; a card from a definition", () => {
+	test("a card from a definition", () => {
 		const row = (id: string, title: string) => ({
 			id,
 			definition: JSON.stringify({ title, summary: "s", useWhen: ["u", 2] }),
 		});
-		expect(titlesOf([row("b", "B"), row("a", "A"), row("c", "B")])).toEqual([
-			"A",
-			"B",
-		]);
 		expect(cardOf(row("a", "A"))).toEqual({
 			id: "a",
 			title: "A",
@@ -488,7 +455,7 @@ describe("timing and aggregation", () => {
 	});
 	const one = (
 		over: Partial<CallMetrics>,
-		kind: CallKind = "single",
+		kind: CallKind = "talk",
 	): TaggedCall => ({
 		kind,
 		metrics: call(over),
@@ -535,7 +502,6 @@ describe("timing and aggregation", () => {
 		pass: true,
 		why: "",
 		said: "",
-		turnMode: "single",
 		copyRun: null,
 		stop: "answer",
 		callTokens: [],
@@ -563,16 +529,13 @@ describe("timing and aggregation", () => {
 	test("the Markdown has the chain x form scores, the totals and the failures", () => {
 		const meta = {
 			startedAt: "2026-10-28T00:00:00.000Z",
-			client: "larm",
-			harness: "local",
 			reasoning: "medium",
 			outputLimit: 4096,
 			reps: 1,
 			probe: false,
-			turn: "single" as const,
 			chains: ["続けて頼む", "話の続き"],
 			forms: ["current", "empty"],
-			settings: null,
+			settings: "sha256:x",
 		};
 		const md = reportMarkdown(meta, [
 			record({}),
@@ -590,30 +553,17 @@ describe("timing and aggregation", () => {
 });
 
 describe("options and plan", () => {
-	test("defaults: the local harness on the saved LARM connection, today's form, every chain, one rep", () => {
+	test("defaults: the routed turn on the saved LARM connection, today's form, every chain, one rep", () => {
 		const o = parseOptions([]);
 		expect(o).toMatchObject({
-			client: "larm",
 			reps: 1,
 			probe: false,
 			dryRun: false,
 			reasoning: localHarness.call.reasoning,
 			reasoningOverridden: false,
-			turn: "routed",
 		});
-		expect(o.harness.name).toBe("local");
 		expect(o.forms).toEqual(["current"]);
 		expect(o.chains).toHaveLength(9);
-	});
-	test("the Codex path takes the cloud harness and needs a model; off is not available there", () => {
-		expect(() => parseOptions(["--client", "codex"])).toThrow("--model");
-		const o = parseOptions(["--client", "codex", "--model", "m"]);
-		expect(o).toMatchObject({ model: "m", reasoning: "low" });
-		expect(o.harness.name).toBe("cloud");
-		expect(() =>
-			parseOptions(["--client", "codex", "--model", "m", "--reasoning", "off"]),
-		).toThrow("not available");
-		expect(parseOptions(["--client", "codex", "--dry-run"]).dryRun).toBe(true);
 	});
 	test("a reasoning override, chain and form selection, and bad values", () => {
 		const o = parseOptions([

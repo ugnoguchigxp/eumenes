@@ -11,11 +11,7 @@ import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { buildWorldSlice, toSliceReceipt } from "eumenes-world-model";
 import type { WorldSnapshotResult } from "eumenes-world-model/sqlite";
-import {
-	MemoryRegistrationRejected,
-	WORLD_PROVIDER_REF,
-	externalIdOf,
-} from "..";
+
 import {
 	ACCESS,
 	NOW,
@@ -37,6 +33,11 @@ import {
 } from "./fixture";
 import { CONTRACT_VERSIONS } from "eumenes-memory";
 import { registerExternalDependents } from "eumenes-memory/sqlite";
+import {
+	MemoryRegistrationRejected,
+	externalIdOf,
+} from "../service/memory-adapter";
+import { WORLD_PROVIDER_REF } from "../contracts/host";
 
 const hasher = (bytes: Uint8Array) =>
 	createHash("sha256").update(bytes).digest("hex");

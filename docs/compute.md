@@ -35,7 +35,6 @@ PNG・SVG・CSV・JSONはbackendが取り込み、既存の認証付きAPIから
 
 | 操作 | API |
 | --- | --- |
-| 環境と可用性 | GET /api/compute/environment |
 | 一覧・状態 | GET /api/compute/jobs、GET /api/compute/jobs/:id |
 | 投入 | POST /api/compute/jobs（Idempotency-KeyにUUID） |
 | 取消・復旧照会 | POST /api/compute/jobs/:id/cancel、POST /api/compute/jobs/:id/reconcile |

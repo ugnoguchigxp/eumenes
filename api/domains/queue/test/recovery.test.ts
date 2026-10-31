@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -5,6 +6,15 @@ import { join } from "node:path";
 import { z } from "zod";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createQueue, migration } from "..";
+
+const listAttempts = (db: Database, jobId: string) =>
+	(
+		db
+			.query(
+				"SELECT outcome, ended_at_ms FROM queue_attempts WHERE job_id=? ORDER BY attempt",
+			)
+			.all(jobId) as { outcome: string | null; ended_at_ms: number | null }[]
+	).map((r) => ({ outcome: r.outcome, endedAtMs: r.ended_at_ms }));
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -70,9 +80,9 @@ test("process killed while a handler is running: restart marks it interrupted wi
 	expect(after?.state).toBe("interrupted");
 	expect(after?.errorCode).toBe("backend_restarted");
 	expect(
-		queue
-			.listAttempts(after?.id ?? "")
-			.map((a) => [a.outcome, a.endedAt !== null]),
+		store
+			.read((db) => listAttempts(db, after?.id ?? ""))
+			.map((a) => [a.outcome, a.endedAtMs !== null]),
 	).toEqual([["interrupted", true]]);
 	// not claimable again, and a second recover is a no-op
 	await queue.tick();

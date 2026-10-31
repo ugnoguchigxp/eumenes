@@ -3,15 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MemoryStoreError } from "eumenes-memory/sqlite";
-import {
-	WorldJournalCorruptError,
-	appendWorldJournal,
-	defaultMemoryPort,
-	readWorldJournal,
-	verifyWorldJournal,
-	type ForgetReport,
-	type LifecyclePoint,
-} from "..";
+
 import {
 	ACCESS,
 	NOW,
@@ -34,6 +26,14 @@ import {
 	worldExternals,
 	type Life,
 } from "./lifecycle-fixture";
+import {
+	WorldJournalCorruptError,
+	appendWorldJournal,
+	readWorldJournal,
+	verifyWorldJournal,
+} from "../service/world-journal";
+import { defaultMemoryPort } from "../service/lifecycle-memory";
+import type { ForgetReport, LifecyclePoint } from "../service/lifecycle-types";
 
 const must = <T>(value: T | { status: "rejected" }): T => {
 	if (typeof value === "object" && value !== null && "status" in value)

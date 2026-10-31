@@ -1,12 +1,9 @@
-import { settings } from "./harness.fixture";
 import { rmSync } from "node:fs";
-import { toolFields } from "./tool-text.fixture";
-import type { NativeToolCall } from "../../../infrastructure/chat-stream";
 import { waitFor } from "../../../infrastructure/wait-for";
 import type { ToolchainCard, ToolchainRuntimeMeta } from "../../capabilities";
 import { createContinuityService } from "../../continuity";
 import { createConversationService } from "../../conversation";
-import type { InferencePort, Receipt } from "../../inference";
+import type { CallSession, InferencePort, Receipt } from "../../inference";
 import { createQueue } from "../../queue";
 import { createDialogueService } from "..";
 import type {
@@ -60,38 +57,23 @@ export const card: ToolchainCard = {
 	score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
 };
 
-/** True when the newest message is the result of a tool call that handed the work over. */
-function afterHandover(messages: ChatMessage[]): boolean {
-	const last = messages.at(-1);
-	if (last?.role !== "tool") return false;
-	const call = messages
-		.flatMap((m) => (m.role === "assistant" ? (m.tool_calls ?? []) : []))
-		.find((c) => c.id === last.tool_call_id);
-	if (!call) return false;
-	const result = toolFields(last.content);
-	if (call.function.name === "delegate") return result.delegated === true;
-	return (
-		call.function.name === "work" &&
-		(JSON.parse(call.function.arguments) as { operation?: string })
-			.operation === "answer" &&
-		result.ok === true
-	);
-}
 export const until = (check: () => boolean, ms = 4000) =>
 	waitFor(check, { timeout: ms });
 export type Command = Record<string, unknown>;
-type Step = {
-	text?: string;
-	calls?: Array<{ name: string; args: Record<string, unknown> }>;
-};
+type Step = { text?: string };
+/** A routed turn's choice, as the model answers it (a talk call takes `{ text }` as it is). */
+export const choice = (value: Record<string, unknown>): Step => ({
+	text: JSON.stringify(value),
+});
 
 /**
  * A real store, queue, continuity and dialogue with a scripted conversation model, a scripted command sub-agent
  * and a fake bound command toolchain (one tool, its question schemas and an adapter outcome).
  *
- * The conversation model's calls come from `state.steps` (FIFO, as in the generation fixture); the command
- * sub-agent's replies come from `state.commands` (FIFO). A command run is reached through a delegate call of the
- * scripted conversation model (`asked`) or put on a run directly (`commandRun`).
+ * The conversation model's calls come from `state.steps` (FIFO, as in the generation fixture): a choice call of the
+ * routed turn (it carries `session.outputSchema`) takes `choice({...})`, a talk call takes `{ text }`. The command
+ * sub-agent's replies come from `state.commands` (FIFO). A command run is reached through a delegating choice of
+ * the scripted conversation model (`asked`) or put on a run directly (`commandRun`).
  */
 export async function setup(
 	options: {
@@ -131,9 +113,11 @@ export async function setup(
 		/** Host-issued choices per question schema ref. */
 		choices: {} as Record<string, Array<{ ref: string; label: string }>>,
 	};
-	const calls: Array<{ messages: ChatMessage[]; tools: string[] }> = [];
-	/** Indexes of the model calls made after a delegation or a command answer already handed the work over. */
-	const afterHandoverCalls: number[] = [];
+	const calls: Array<{
+		messages: ChatMessage[];
+		tools: string[];
+		session?: CallSession;
+	}> = [];
 	const commandPrompts: Array<Array<{ role: string; content: string }>> = [];
 	const commandSchemas: string[] = [];
 	const commandSessions: unknown[] = [];
@@ -147,11 +131,6 @@ export async function setup(
 	const settled: Array<{ outcome: string; code?: string | null }> = [];
 	const clock = () => new Date(Date.now() + state.offset).toISOString();
 	const larm = {
-		// The conversation is served by a cloud model: the agent's reply loop calls the tools itself.
-		snapshotFor: () => ({
-			...settings({ mode: "cloud-only" }),
-			voice: { autoSpeak: true },
-		}),
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		requestFor: (_db: unknown, runId: string) => `req:${runId}`,
 		llmContextWindowInTransaction: () => undefined,
@@ -192,32 +171,27 @@ export async function setup(
 			requestId: string,
 			messages: ChatMessage[],
 			signal: AbortSignal,
-			delta: (text: string) => void,
+			/** Absent for a silent call (a routed turn's choice). */
+			delta: ((text: string) => void) | undefined,
 			_preparation: unknown,
 			tools: Array<{ function: { name: string } }> | undefined,
+			session?: CallSession,
 		) => {
 			calls.push({
 				messages: messages.map((m) => ({ ...m })),
 				tools: (tools ?? []).map((t) => t.function.name),
+				...(session ? { session } : {}),
 			});
-			// A call right after a handover is not part of the script: the generation should have ended there.
-			const step = afterHandover(messages)
-				? (afterHandoverCalls.push(calls.length - 1), {} as Step)
-				: state.steps.shift();
+			const step = state.steps.shift();
 			if (!step) throw new Error("fixture_step_missing");
 			// Held after the call is recorded and its step taken: the state the call showed is fixed meanwhile.
 			if (state.modelGate) await state.modelGate;
 			signal.throwIfAborted();
-			if (step.text) delta(step.text);
+			if (step.text) delta?.(step.text);
 			return {
 				requestId,
 				attemptId: crypto.randomUUID(),
 				value: step.text ?? "",
-				toolCalls: (step.calls ?? []).map((call): NativeToolCall => ({
-					id: crypto.randomUUID(),
-					name: call.name,
-					arguments: JSON.stringify(call.args),
-				})),
 			} as Receipt;
 		},
 	} as unknown as InferencePort;
@@ -438,7 +412,6 @@ export async function setup(
 		state,
 		calls,
 		workChanged,
-		afterHandoverCalls,
 		commandPrompts,
 		commandSchemas,
 		commandSessions,
@@ -474,25 +447,12 @@ export async function setup(
 		speak(text: string) {
 			state.steps.push({ text });
 		},
-		/** Script the conversation model to find the command toolchain and delegate the request to it. */
+		/**
+		 * Script the conversation model's next call: the choice that hands the request to the command toolchain
+		 * (the host has searched with the user's words and offers it as a candidate).
+		 */
 		delegate(request: string, announcement = "担当に引き継ぎます。") {
-			state.steps.push(
-				{ calls: [{ name: "find_toolchain", args: { query: request } }] },
-				{
-					calls: [
-						{
-							name: "delegate",
-							args: {
-								mode: "execute",
-								toolchain: card.id,
-								request,
-								impact: "create",
-								announcement,
-							},
-						},
-					],
-				},
-			);
+			state.steps.push(choice({ choice: card.id, say: announcement, request }));
 		},
 		/** Submits an utterance and waits for its run to reach `status`. */
 		async say(text: string, status = "completed") {

@@ -1,10 +1,6 @@
 import { expect, test } from "vitest";
 import { ApiConnectionError, ApiError } from "../../client/transport";
-import {
-	describeConnectionState,
-	describeError,
-	describeTurnStatus,
-} from "./errorMessages";
+import { describeConnectionState, describeError } from "./errorMessages";
 
 test("known API codes become Japanese sentences", () => {
 	expect(describeError(new ApiError(409, "request_conflict"))).toContain(
@@ -35,8 +31,6 @@ test("snake_case codes are shown as a code; English text is not", () => {
 
 test("connection errors and statuses are translated", () => {
 	expect(describeError(new ApiConnectionError())).toContain("接続できません");
-	expect(describeTurnStatus("synthesizing")).toBe("音声を合成中");
-	expect(describeTurnStatus("new")).toBe("状態を確認中");
 	expect(describeConnectionState("ready")).toBe("接続済み");
 	expect(describeConnectionState("new")).toBe("状態を確認中");
 });

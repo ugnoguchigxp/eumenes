@@ -16,7 +16,14 @@ import { createResourceLedger } from "../service/resource-ledger";
 import { madeOf } from "../service/state-text";
 import { createWorkLedger } from "../service/work-ledger";
 import { recordWorkLinksInTransaction } from "../service/work-links";
-import { IMAGE, MUSIC, setup, type Harness } from "./generation.fixture";
+import {
+	IMAGE,
+	MUSIC,
+	choice,
+	reply,
+	setup,
+	type Harness,
+} from "./generation.fixture";
 import { fakeResources } from "./resource.fixture";
 import { openDialogueStore, removeDialogueStore } from "./store.fixture";
 
@@ -296,21 +303,11 @@ test("delegate refs: a number in the ledger becomes a reference with the owner's
 async function doneImage(resources: ReturnType<typeof fakeResources>) {
 	const uri = resources.make("image", "image_1", "夜のドライブ");
 	h!.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "execute",
-						toolchain: IMAGE.id,
-						request: "夜のドライブの絵",
-						impact: "create",
-						announcement: "描きますね。",
-					},
-				},
-			],
-		},
+		choice({
+			choice: IMAGE.id,
+			say: "描きますね。",
+			request: "夜のドライブの絵",
+		}),
 	);
 	const waiting = await h!.say("夜のドライブの絵を描いて", "queued");
 	const done = await h!.finishImage(waiting.id, {
@@ -321,9 +318,12 @@ async function doneImage(resources: ReturnType<typeof fakeResources>) {
 	return { uri, done };
 }
 
-/** The lines of `## State` in the last message of the newest model call. */
+/**
+ * The lines of `## State` in the last message of the newest turn's choice call (the talk turn shows the time alone,
+ * so the choice is where the TODOs and resources are named).
+ */
 const stateOfLastCall = () => {
-	const last = h!.state.calls.at(-1)!.messages.at(-1)!.content;
+	const last = h!.state.calls.at(-2)!.messages.at(-1)!.content;
 	const start = last.indexOf("## State\n") + "## State\n".length;
 	const end = last.indexOf("\n\n", start);
 	return last.slice(start, end < 0 ? undefined : end).split("\n");
@@ -356,14 +356,15 @@ test("a finished image TODO links its image, its notice and a message citing it 
 	};
 	expect(await get()).toEqual({ resources: [image], messages: [] });
 	// The conversation reads the numbers, never the URI.
-	h.state.steps.push({ text: "はい。" });
+	h.state.steps.push(...reply("はい。"));
 	await h.say("さっきの絵は？");
 	const lines = stateOfLastCall();
 	expect(lines).toContain("- t1 夜のドライブの絵 通知済み a1「夜のドライブ」");
 	expect(
 		h.state.calls
-			.at(-1)!
-			.messages.some((m) => m.content.includes("eumenes://")),
+			.slice(-2)
+			.flatMap((call) => call.messages)
+			.some((m) => m.content.includes("eumenes://")),
 	).toBe(false);
 	// A reply is not a report: its notice told the work, so no reply shows the image as a chip.
 	expect((await get()).messages).toEqual([]);
@@ -387,65 +388,53 @@ test("the resource on screen is shown in the state by its number and joins the l
 	const resources = fakeResources();
 	h = await setup({ resources: resources.access });
 	const uri = resources.make("music.track", "music_9", "日曜日の午後");
-	h.state.steps.push({ text: "いい曲ですね。" });
-	await h.dialogue.submit({
+	h.state.steps.push(...reply("いい曲ですね。"));
+	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
 		text: "これ好き",
 		viewing: { resource: uri },
 	});
-	await waitFor(() => h!.state.calls.length > 0);
+	await waitFor(() => h!.dialogue.get(run.id)?.status === "completed");
 	const last = h.state.calls[0]!.messages.at(-1)!.content;
 	expect(last).toContain("提示中:\n- a1 曲「日曜日の午後」（画面に表示中）");
 	expect(last).not.toContain("eumenes://");
 });
 
-test("find_toolchain tells what a toolchain makes, in the kinds' display names", async () => {
+test("the candidates tell what a toolchain makes, in the kinds' display names", async () => {
 	const resources = fakeResources();
 	h = await setup({
 		resources: resources.access,
 		cards: [{ ...IMAGE, produces: ["image"] }],
 	});
-	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "絵" } }] },
-		{ text: "探しました。" },
-	);
+	h.state.steps.push(...reply("探しました。"));
 	await h.say("絵を描ける？");
-	const result = h.state.calls
-		.at(-1)!
-		.messages.filter((m) => m.role === "tool")[0]!.content;
-	expect(result).toStartWith(`- ${IMAGE.id}: `);
-	expect(result).toContain("作るもの: 画像");
+	const candidates = h.state.calls[0]!.messages.at(-1)!.content;
+	expect(candidates).toContain(`- ${IMAGE.id}: `);
+	expect(candidates).toContain("作るもの: 画像");
 });
 
 test("delegate refs are refused for a number the conversation never saw, and handed over for one it did", async () => {
 	const resources = fakeResources({ [IMAGE.id]: ["image"] });
 	h = await setup({ resources: resources.access });
 	await doneImage(resources);
-	const request = (refs: string[]) => ({
-		calls: [
-			{
-				name: "delegate",
-				args: {
-					mode: "execute",
-					toolchain: IMAGE.id,
-					request: "a1の絵を元に描き直して",
-					impact: "create",
-					announcement: "描き直しますね。",
-					refs,
-				},
-			},
-		],
-	});
-	h.state.steps.push(request(["a7"]), { text: "番号が違いました。" });
-	await h.say("あの絵を描き直して");
-	const refused = h.state.calls
-		.at(-1)!
-		.messages.filter((m) => m.role === "tool")
-		.map((m) => m.content)
-		.join("\n");
-	expect(refused).toContain("unknown_resource");
-	expect(refused).not.toContain("eumenes://");
+	const request = (refs: string[]) =>
+		choice({
+			choice: IMAGE.id,
+			say: "描き直しますね。",
+			request: "a1の絵を元に描き直して",
+			refs,
+		});
+	// The refusal is told to the next choice as its reason; a choice refused twice leaves the host's words.
+	h.state.steps.push(request(["a7"]), request(["a7"]));
+	const refused = await h.say("あの絵を描き直して");
+	const retry = h.state.calls.at(-1)!.messages.at(-1)!.content;
+	expect(retry).toContain("## Retry");
+	expect(retry).toContain("unknown_resource");
+	expect(retry).not.toContain("eumenes://");
+	expect(h.dialogue.answerText(refused.id)).toBe(
+		"うまく頼めませんでした。もう一度言ってもらえますか。",
+	);
 	h.state.steps.push(request(["a1"]));
 	const waiting = await h.say("a1を描き直して", "queued");
 	expect(waiting.status).toBe("queued");
@@ -474,7 +463,7 @@ test("forgetting the messages a TODO came from empties its links and hides the r
 	expect(response).toEqual({ resources: [], messages: [] });
 	// A forgotten TODO's notice goes with it.
 	expect(h.notices()).toEqual({ notices: [], unread: 0 });
-	h.state.steps.push({ text: "はい。" });
+	h.state.steps.push(...reply("はい。"));
 	await h.say("さっきの絵は？");
 	expect(stateOfLastCall().some((line) => line.startsWith("a1 "))).toBe(false);
 	// A forgotten TODO is never named in the state, not even as notified.

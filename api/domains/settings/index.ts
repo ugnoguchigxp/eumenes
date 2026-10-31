@@ -1,5 +1,12 @@
-export { createSettings, defaults, type SettingsService } from "./service";
-export { migration, epochsMigration } from "./repository";
+export {
+	createSettings,
+	/** @public */ defaults,
+	type SettingsService,
+} from "./service";
+export {
+	/** @public */ migration,
+	/** @public */ epochsMigration,
+} from "./repository";
 export { registerSettings } from "./controller";
 export type { Settings, Purpose, Connection, Resource } from "./contracts";
 export { isAgentConnection } from "./contracts";

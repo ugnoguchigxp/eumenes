@@ -24,7 +24,6 @@ import {
 	withLastMessage,
 	type ConversationPrefix,
 } from "../../api/domains/dialogue/service/conversation-input";
-import { generationTools } from "../../api/domains/dialogue/service/generation-tools";
 import {
 	localHarness,
 	type ConversationHarness,
@@ -53,18 +52,13 @@ export type SystemSource = {
 	persona: PersonaSpec;
 	interests: readonly string[];
 	emotion: boolean;
-	/** The titles of the toolchains the host can hand work to, in the product's order. */
-	titles: readonly string[];
 };
 
 /** Every measured turn happens at this moment (Wednesday 10:00 in Asia/Tokyo), so the State line never moves. */
 export const NOW_MS = Date.UTC(2026, 9, 28, 1, 0, 0);
 
-/** The system part as the app builds it for the saved settings, in the harness's sections. */
-export function buildSystem(
-	source: SystemSource,
-	harness: ConversationHarness,
-): string {
+/** The system part as the app builds it for the saved settings. */
+export function buildSystem(source: SystemSource): string {
 	return systemText(
 		source.persona,
 		respondSystemParts({
@@ -75,9 +69,6 @@ export function buildSystem(
 			spoken: true,
 			emotion: source.emotion,
 		}),
-		source.titles,
-		harness.system,
-		harness.systemTexts,
 	);
 }
 
@@ -193,6 +184,8 @@ export function routedInputOf(s: {
 			open: state === "running",
 		})),
 		resources: namedResources(state),
+		// The harness keeps no specialist session: no switch waits for the user.
+		switching: null,
 	};
 }
 
@@ -239,16 +232,14 @@ export type Situation = {
 	harness: ConversationHarness;
 	system: string;
 	log: readonly Entry[];
-	works: readonly Work[];
-	presented: string | null;
 	say: string;
 };
 
 /**
- * The input of one step (for a routed harness, the talk turn's). `current` is the product's form (`## Memory`, the
- * recent conversation, then the last message); `empty` has neither the memory section nor the recent conversation;
- * `empty-last` is `empty` with the last words said as State lines. A routed harness's `## State` is the `今` line
- * alone: the works go to the choice input (`routedInputOf`) instead.
+ * The input of one step (the talk turn's). `current` is the product's form (`## Memory`, the recent conversation,
+ * then the last message); `empty` has neither the memory section nor the recent conversation; `empty-last` is
+ * `empty` with the last words said as State lines. `## State` is the `今` line alone: the works go to the choice
+ * input (`routedInputOf`) instead.
  */
 export function composeInput(s: Situation): ChatMessage[] {
 	const prefix: ConversationPrefix =
@@ -266,7 +257,6 @@ export function composeInput(s: Situation): ChatMessage[] {
 				)
 			: {
 					messages: [{ role: "system", content: s.system }],
-					tools: generationTools,
 					carry: null,
 					cut: null,
 					recent: [],
@@ -279,7 +269,6 @@ export function composeInput(s: Situation): ChatMessage[] {
 	const state = stateText([
 		`今: ${jstNowLine(NOW_MS)}`,
 		...(s.form === "empty-last" ? lastLines(s.log) : []),
-		...(s.harness.turn === "routed" ? [] : workLines(s.works, s.presented)),
 	]);
 	return withLastMessage(prefix, [
 		state,

@@ -15,6 +15,7 @@ const isObject = (v: unknown): v is Json =>
  * - The LARM sentence-language switch becomes `englishSpeechEnabled`; its classifier selector is dropped.
  * - The removed dedicated LLM selections (`subagent`, `agency.resourceId`) and the agency ON/OFF (`agency.enabled`: spontaneous speech is always on) are dropped: every inference
  *   other than World curation runs on the one LLM configured for the conversation.
+ * - The removed `codingSupervision` section (instruction approval for the retired CLI runner) is dropped.
  * It is idempotent: a migrated document passes through unchanged.
  */
 export function migrateStoredSettings(
@@ -22,7 +23,7 @@ export function migrateStoredSettings(
 	raw: unknown,
 ): { document: unknown; removedConnectionIds: string[] } {
 	if (isObject(raw)) {
-		const { subagent: _subagent, ...rest } = raw;
+		const { subagent: _subagent, codingSupervision: _coding, ...rest } = raw;
 		if (isObject(rest.agency)) {
 			const {
 				resourceId: _resourceId,

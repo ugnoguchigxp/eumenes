@@ -113,15 +113,6 @@ export function createCompute(deps: {
 		refresh,
 		commandInTransaction,
 		cancelInTransaction,
-		environment: () =>
-			store.read((db) => {
-				const env = savedEnvironment(db, deps.port()?.binding);
-				return {
-					available: !!env,
-					environment: env?.environment ?? null,
-					description: env?.description ?? null,
-				};
-			}),
 		submit: (
 			owner: string,
 			conversationId: string,

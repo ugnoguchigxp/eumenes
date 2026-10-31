@@ -31,13 +31,6 @@ export function musicClient(t: Transport) {
 				withQuery("/api/music/playlists", { conversationId }),
 				{ signal },
 			),
-		musicPlaylist: async (id: string, signal?: AbortSignal) =>
-			callJson(
-				t,
-				playlistRecord,
-				`/api/music/playlists/${encodeURIComponent(id)}`,
-				{ signal },
-			),
 		updateMusicPlaylist: async (
 			id: string,
 			value: z.infer<typeof playlistUpdate>,

@@ -30,4 +30,3 @@ export const imageImportReceipt = z.union([
 		}),
 	}),
 ]);
-export type ImageImportReceipt = z.infer<typeof imageImportReceipt>;

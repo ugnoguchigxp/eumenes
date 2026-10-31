@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { loadProcessConfig } from "../infrastructure/config";
 import { openStore } from "../infrastructure/sqlite";
 import { backupOnRequest } from "../infrastructure/sqlite/pre-migration-backup";
-import { legacyOrder, migrations } from "./migrations";
+import { migrations } from "./migrations";
 
 /** Explicit offline backup; does not start services or apply pending migrations. */
 export async function backupDatabaseOnRequest(filename: string) {
@@ -25,7 +25,6 @@ export async function backupDatabaseOnRequest(filename: string) {
 	const store = openStore(
 		path,
 		migrations.filter((m) => applied.has(m.id)),
-		{ legacyOrder },
 	);
 	try {
 		const backupPath = await store.maintenance!((db) =>

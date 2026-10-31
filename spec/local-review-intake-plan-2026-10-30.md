@@ -198,7 +198,7 @@ cloud の確認の文は LLM が書くので変えない。保存と承認の直
 土台は、アプリ全体の試験の土台（`api/application/toolchain/toolchain.fixture.ts` の `harness()`）。推論と埋め込みの差し込み口が既にある（§2 #7）。走らせ役は `scripts/context-eval/harness-accept.ts`、入口は今の `harness.ts`。
 
 ```
-bun scripts/context-eval/harness.ts --harness local --lane accept [--judge ruri|expect] [--chains <key,...>] [--reps <n>] [--dry-run]
+bun scripts/context-eval/harness.ts --lane accept [--judge ruri|expect] [--chains <key,...>] [--reps <n>] [--dry-run]
 ```
 
 ### 6.3 場面（作り直し計画 §8 の場面に足す）

@@ -4,7 +4,6 @@
 import { z } from "zod";
 
 export const MONITORING_VERSION = "larm-monitoring.v1" as const;
-export const MONITORING_RETENTION_MS = 600_000;
 export const monitoringIdSchema = z
 	.string()
 	.regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,191}$/);
@@ -442,12 +441,7 @@ export const monitoringErrorSchema = z
 			.strict(),
 	})
 	.strict();
-export type MonitoringSnapshot = z.infer<typeof monitoringSnapshotSchema>;
-export type MonitoringRuntime = z.infer<typeof monitoringRuntimeSchema>;
-export type MonitoringGpu = z.infer<typeof monitoringGpuSchema>;
 export type MonitoringEvent = z.infer<typeof monitoringEventSchema>;
-export type MonitoringCoverage = z.infer<typeof monitoringCoverageSchema>;
-export type MonitoringEvents = z.infer<typeof monitoringEventsSchema>;
 
 /** Zod refinements are also expressed in the published JSON Schema. */
 export function monitoringJsonSchema(
@@ -500,6 +494,7 @@ export function monitoringJsonSchema(
 	visit(result);
 	return result;
 }
+/** @public */
 export function monitoringContractJsonSchema() {
 	const result = {
 		$schema: "https://json-schema.org/draft/2020-12/schema",

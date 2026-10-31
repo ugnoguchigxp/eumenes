@@ -1,39 +1,35 @@
 {
-	"files": {},
+	"files": {
+		"api/application/agency/host.ts": 939
+	},
 	"functions": {
-		"api/application/work/delegated-tasks.ts#createDelegatedTasks": 400,
+		"api/application/agency/host.ts#createAgencyHost": 801,
+		"api/application/server-services.ts#buildServices": 348,
 		"api/domains/attitude-dataset/service/index.ts#createAttitudeDataset": 618,
-		"api/domains/capabilities/service/index.ts#createCapabilities": 379,
-		"api/domains/coding/service/index.ts#createCoding": 365,
-		"api/domains/dialogue/service/generation-handler.ts#createGenerationHandler": 317,
 		"api/domains/excalidraw/service/index.ts#createExcalidraw": 305,
-		"api/domains/excalidraw/service/operations.ts#registerDrawingOperations": 301,
-		"api/domains/inference/service/index.ts#createInference": 521,
-		"api/domains/larm/service/index.ts#createLarm": 346,
-		"api/domains/larm/service/playground.ts#createLarmPlayground": 661,
-		"api/domains/memory/service/index.ts#createMemoryService": 544,
+		"api/domains/inference/service/index.ts#createInference": 520,
+		"api/domains/larm/service/index.ts#createLarm": 344,
+		"api/domains/larm/service/playground.ts#createLarmPlayground": 522,
+		"api/domains/memory/service/index.ts#createMemoryService": 530,
 		"api/domains/queue/service/runner.ts#createRunner": 578,
 		"api/domains/scheduler/service/index.ts#createScheduler": 432,
-		"api/domains/service-tests/service/index.ts#createServiceTests": 492,
-		"api/domains/tool-runtime/service/index.ts#createToolRuntime": 461,
-		"api/domains/voice-dialogue/service/index.ts#createVoiceDialogue": 406,
-		"api/domains/web-research/service/index.ts#createWebResearch": 517,
+		"api/domains/service-tests/service/index.ts#createServiceTests": 467,
+		"api/domains/tool-runtime/service/index.ts#createToolRuntime": 456,
+		"api/domains/voice-dialogue/service/index.ts#createVoiceDialogue": 403,
+		"api/domains/web-research/service/index.ts#createWebResearch": 507,
 		"api/domains/web-research/service/saved-bodies.ts#createSavedBodies": 306,
-		"api/domains/world/service/runtime-adapter.ts#createRuntimeObservation": 484,
 		"api/domains/world/service/world-query.ts#createWorldQuery": 388,
 		"api/domains/world/service/world-service.ts#createWorldService": 326,
-		"packages/coding-runner/src/core.ts#createRunner": 395,
-		"packages/coding-runner/src/git-operations.ts#executeGit": 342,
-		"packages/coding-runner/src/worker.ts#runWorker": 333,
+		"packages/design-system/src/components/ImagePicker/ImagePicker.tsx#ImagePicker": 376,
 		"web/src/components/domains/timers/TimerNotifications.tsx#TimerNotifications": 312,
-		"web/src/domains/audio/controller/index.ts#createAudioController": 546,
+		"web/src/domains/audio/controller/index.ts#createAudioController": 540,
 		"web/src/domains/excalidraw/useDrawingEditor.ts#useDrawingEditor": 354,
-		"web/src/domains/voice-dialogue/hooks/index.ts#useVoiceDialogue": 562
+		"web/src/domains/object-recognition/use-recognition-runtime.ts#useRecognitionRuntime": 306,
+		"web/src/domains/voice-dialogue/hooks/index.ts#useVoiceDialogue": 506
 	},
 	"testFiles": {
-		"api/application/migrations.test.ts": 1125,
-		"api/application/settings/settings-adapter.test.ts": 1660,
-		"api/domains/settings/test/settings.test.ts": 1143,
+		"api/application/settings/settings-adapter.test.ts": 1649,
+		"api/domains/voice-dialogue/test/settings-integration.test.ts": 1001,
 		"web/src/domains/settings-data/settings.fixture.tsx": 1135
 	}
 }

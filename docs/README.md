@@ -40,8 +40,7 @@
 | 文書 | 内容 |
 | --- | --- |
 | [delegated-tasks.md](delegated-tasks.md) | 委任タスクの基盤 |
-| [coding-runner.md](coding-runner.md) | CLI runner の実装状況 |
-| [coding-supervision.md](coding-supervision.md) | CLI コーディングタスクの監督 |
+| [coding-runner.md](coding-runner.md) | Codex SDK runner（`packages/coding-runner`） |
 | [kanban.md](kanban.md) | タスクボードと会話からのカード操作。実 `claude` の通しと自然言語受入は未実施 |
 | [terminals.md](terminals.md) | Claude Code画面と作業依頼表。Kanbanと同じ送信経路 |
 

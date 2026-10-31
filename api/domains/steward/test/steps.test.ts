@@ -339,20 +339,11 @@ test("a step on its own prompt runs on a connection of its own and yields to the
 });
 
 test("a step reading the conversation runs on the conversation's prompt with its own task last, on the conversation's connection", async () => {
-	const tool = {
-		type: "function" as const,
-		function: {
-			name: "memory",
-			description: "",
-			parameters: { type: "object" },
-		},
-	};
 	const prefix = {
 		messages: [
 			{ role: "system" as const, content: "会話の指示" },
 			{ role: "user" as const, content: "<memory>\nなし\n</memory>" },
 		],
-		tools: [tool],
 	};
 	const h = await setupSteward({
 		conversationTask: (_db, _conversationId, task) => ({
@@ -360,7 +351,6 @@ test("a step reading the conversation runs on the conversation's prompt with its
 				...prefix.messages,
 				{ role: "user" as const, content: `## Task\n${task}` },
 			],
-			tools: prefix.tools,
 		}),
 	});
 	harnesses.push(h);
@@ -377,8 +367,6 @@ test("a step reading the conversation runs on the conversation's prompt with its
 	expect(call!.session).toEqual({
 		sessionRole: "auxiliary",
 		onConversation: true,
-		prefixTools: [tool],
-		toolChoice: "none",
 	});
 	// The answer is adopted as from the step's own prompt.
 	expect(h.memory.list().map((item) => item.text)).toEqual([

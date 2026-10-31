@@ -108,18 +108,3 @@ export function insertDocument(
 		doc.digest,
 	);
 }
-export function withdrawDocument(
-	db: Database,
-	scope: WorldDocumentScope,
-	id: string,
-) {
-	if (!db.inTransaction) throw new Error("transaction_required");
-	// Keep only the identity tombstone: re-import must never silently restore withdrawn text.
-	return (
-		db
-			.query(
-				`UPDATE world_host_document SET withdrawn=1, content='', title='', collection='', manifest_digest='' WHERE principal=?1 AND scope_key=?2 AND id=?3`,
-			)
-			.run(scope.principal, scope.scopeKey, id).changes > 0
-	);
-}

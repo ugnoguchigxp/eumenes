@@ -1,33 +1,5 @@
 [
 	{
-		"revision": 1,
-		"aliases": [],
-		"tags": [],
-		"kind": "toolchain",
-		"id": "object-recognition.manage",
-		"functionName": "object_recognition",
-		"title": "映っている物を調べる",
-		"avoidWhen": [],
-		"summary": "ブラウザのカメラ・選択した画像や短い動画の物体検出画面を開き、保存済みの物体名・座標・時刻を読む、解析を取消する実操作。OCRとは別",
-		"useWhen": [
-			"カメラに映っている物を調べたい",
-			"画像や動画の物体と位置を確認したい",
-			"物体認識の進捗確認・取消"
-		],
-		"examples": [
-			"カメラで映っている物を調べて",
-			"動画の1秒の時点の物体を教えて",
-			"この画像の物体検出を取消して"
-		],
-		"redirects": [],
-		"dependencies": ["package:object-recognition.manage@1"],
-		"packageRevisionId": "package:object-recognition.manage@1",
-		"artifact": {
-			"kind": "component",
-			"component": "ObjectRecognitionWorkspace"
-		}
-	},
-	{
 		"revision": 2,
 		"aliases": [],
 		"tags": [],
@@ -61,35 +33,6 @@
 		}
 	},
 	{
-		"revision": 1,
-		"aliases": [],
-		"tags": [],
-		"kind": "toolchain",
-		"id": "image.create",
-		"functionName": "image",
-		"title": "画像生成",
-		"summary": "LARMで新しい画像を生成する、画像の制作プロンプト編集画面を開く、保存済み画像の一覧を開く実操作。画面を開く依頼にもこの関数を実行する。自然文の返答だけでは画面は開かない",
-		"useWhen": [
-			"写真やイラストなどの画像を作ってほしい",
-			"画像の制作プロンプトを編集したい",
-			"以前に生成した画像を見たい"
-		],
-		"avoidWhen": ["参照画像を編集する"],
-		"redirects": [],
-		"examples": [
-			"夕焼けの海のイラストを作って",
-			"画像のプロンプト編集画面を開いて",
-			"前に作った画像を見せて",
-			"商品写真を1200×800のPNGで生成して"
-		],
-		"dependencies": ["package:image.create@1"],
-		"packageRevisionId": "package:image.create@1",
-		"artifact": {
-			"kind": "component",
-			"component": "ImageWorkspace"
-		}
-	},
-	{
 		"revision": 2,
 		"aliases": [],
 		"tags": [],
@@ -119,96 +62,6 @@
 		"artifact": {
 			"kind": "component",
 			"component": "ImageWorkspace"
-		}
-	},
-	{
-		"revision": 1,
-		"aliases": [],
-		"tags": [],
-		"kind": "toolchain",
-		"id": "history.research",
-		"functionName": "conversation_history",
-		"title": "会話履歴の確認",
-		"summary": "これまでの会話で誰が何を言ったかを保存済みの発言から確認する",
-		"useWhen": [
-			"以前の会話の内容を思い出したい",
-			"自分や相手が前に言ったことを確認したい"
-		],
-		"avoidWhen": ["Webの公開情報の確認"],
-		"redirects": [
-			{
-				"when": "公開情報の確認",
-				"toolchainId": "web.search"
-			}
-		],
-		"examples": [
-			"さっき何て言った？",
-			"前に話した旅行の予定を確認して",
-			"昨日おすすめしてくれた本は何だっけ"
-		],
-		"dependencies": ["package:history.research@2"],
-		"packageRevisionId": "package:history.research@2",
-		"artifact": {
-			"kind": "component",
-			"component": "ResearchTaskCard"
-		}
-	},
-	{
-		"revision": 1,
-		"aliases": [],
-		"tags": [],
-		"kind": "toolchain",
-		"id": "music.create",
-		"functionName": "music",
-		"title": "作曲",
-		"summary": "テーマや長さを指定して新しい曲を作り、プレイヤーで再生できるようにする",
-		"useWhen": ["新しい曲や歌を作ってほしい"],
-		"avoidWhen": ["保存済みの曲を聴く"],
-		"redirects": [
-			{
-				"when": "保存済みの曲を探して聴く",
-				"toolchainId": "music.library"
-			}
-		],
-		"examples": [
-			"雨の日のピアノ曲を作って",
-			"30秒の明るいBGMを作曲して",
-			"猫の歌を作って"
-		],
-		"dependencies": ["package:music.create@2"],
-		"packageRevisionId": "package:music.create@2",
-		"artifact": {
-			"kind": "component",
-			"component": "MusicArtifact"
-		}
-	},
-	{
-		"revision": 1,
-		"aliases": [],
-		"tags": [],
-		"kind": "toolchain",
-		"id": "music.library",
-		"functionName": "music_library",
-		"title": "音楽ライブラリ",
-		"summary": "保存済みの曲を探し、プレイリストとプレイヤーを開く",
-		"useWhen": ["保存済みの曲を聴きたい", "お気に入りやライブラリを開きたい"],
-		"avoidWhen": ["新しい曲を作る"],
-		"redirects": [
-			{
-				"when": "新しい曲を作る",
-				"toolchainId": "music.create"
-			}
-		],
-		"examples": [
-			"お気に入りの曲を流して",
-			"前に作った曲を聴かせて",
-			"音楽ライブラリを開いて"
-		],
-		"dependencies": ["package:music.playback@1"],
-		"packageRevisionId": "package:music.playback@1",
-		"artifact": {
-			"kind": "component",
-			"component": "LibraryArtifact"
 		}
 	},
 	{

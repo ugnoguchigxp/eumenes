@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import type { Definition } from "../contracts";
 
 const skill = readFileSync(
-	new URL("./timers/SKILL.md", import.meta.url),
+	new URL("./timers/SKILL.v2.md", import.meta.url),
 	"utf8",
 );
 const base = {
@@ -17,6 +17,7 @@ const base = {
 export const timerBuiltins: Definition[] = [
 	{
 		...base,
+		revision: 2,
 		kind: "skill",
 		id: "timers.manage",
 		title: "タイマー操作",
@@ -65,6 +66,7 @@ export const timerBuiltins: Definition[] = [
 	},
 	{
 		...base,
+		revision: 2,
 		kind: "package",
 		id: "timers.manage",
 		title: "タイマー",
@@ -76,13 +78,13 @@ export const timerBuiltins: Definition[] = [
 		schemaKey: "timerCommand",
 		dependencies: [
 			"profile:timers.manage@1",
-			"skill:timers.manage@1",
+			"skill:timers.manage@2",
 			"tool:timer.start@1",
 			"tool:timer.list@1",
 			"tool:timer.cancel@1",
 		],
 		profileRevisionId: "profile:timers.manage@1",
-		requiredSkillRevisionIds: ["skill:timers.manage@1"],
+		requiredSkillRevisionIds: ["skill:timers.manage@2"],
 		toolRevisionIds: [
 			"tool:timer.start@1",
 			"tool:timer.list@1",
@@ -90,19 +92,3 @@ export const timerBuiltins: Definition[] = [
 		],
 	},
 ];
-
-const previousSkill = timerBuiltins.find((d) => d.kind === "skill")!;
-timerBuiltins.push({
-	...previousSkill,
-	revision: 2,
-	body: readFileSync(new URL("./timers/SKILL.v2.md", import.meta.url), "utf8"),
-});
-const previousPackage = timerBuiltins.find((d) => d.kind === "package")!;
-timerBuiltins.push({
-	...previousPackage,
-	revision: 2,
-	dependencies: previousPackage.dependencies.map((id) =>
-		id === "skill:timers.manage@1" ? "skill:timers.manage@2" : id,
-	),
-	requiredSkillRevisionIds: ["skill:timers.manage@2"],
-});

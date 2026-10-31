@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { createLarmPlayground, trackQuery, trackQueryParams } from "..";
+import { createLarmPlayground, trackQuery } from "..";
+import { trackQueryParams } from "../contracts/music-library";
 test("Unicode query and cursor are encoded without changing conditions", () => {
 	const query = trackQuery.parse({
 		q: "明るい piano",

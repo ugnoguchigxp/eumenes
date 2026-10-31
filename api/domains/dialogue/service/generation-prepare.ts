@@ -4,7 +4,6 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { ConversationEvent } from "../../continuity";
 import {
 	REFERENCE_WINDOW_TOKENS,
-	estimateJsonTokens,
 	estimateMessageTokens,
 	estimateTextTokens,
 	planWindow,
@@ -12,6 +11,7 @@ import {
 import type { HandlerDefinition } from "../../queue";
 import type { Run } from "../contracts";
 import { byId, transition } from "../repository";
+import { liveSession } from "../repository/specialist";
 import { withAttachmentNotes } from "./attachment-context";
 import {
 	DEFAULT_DEADLINE_MS,
@@ -30,9 +30,7 @@ import {
 	withLastMessage,
 	type ConversationPrefix,
 } from "./conversation-input";
-import { toolchainTitlesInTransaction } from "./delegate-conversation";
-import { generationTools } from "./generation-tools";
-import { harnessOf, routeConversation } from "./harness";
+import { localHarness, routeConversation } from "./harness";
 import { INPUT_HEADINGS, dataText, lineText, section } from "./input-text";
 import {
 	consumeAnswer,
@@ -178,6 +176,31 @@ function triggerOf(
 
 /** How long after the agent asked back the user's next words are taken as the answer to it. */
 const ASKED_MS = 5 * 60 * 1000;
+/**
+ * The toolchains this generation may hand over to without a search: those of the work in progress, and the one a
+ * hand-over waits for the user's word on (unsaved work stands in its way). The answer to that question ("discard
+ * it") names nothing a search with its words would find.
+ */
+function retainedInTransaction(
+	deps: DialogueDeps,
+	tx: Database,
+	conversationId: string,
+): GenerateInput["retained"] {
+	const retained = deps.work?.retainedInTransaction(tx, conversationId) ?? [];
+	const switching = liveSession(tx, conversationId)?.pendingSwitch?.toolchainId;
+	if (!switching || retained.some((entry) => entry.card.id === switching))
+		return retained;
+	const revision = deps.toolchains
+		?.catalogInTransaction(tx)
+		.find((entry) => entry.id === switching)?.revisionId;
+	const card = revision
+		? deps.toolchains?.cardInTransaction(tx, revision)
+		: undefined;
+	return card
+		? [...retained, { card, summary: card.summary, last: "" }]
+		: retained;
+}
+
 /** The agent's last words a choice call reads, at most; and each of the user's earlier utterances. */
 const PREVIOUS_REPLY_CHARS = 200;
 
@@ -266,6 +289,8 @@ function routedInputInTransaction(
 			...finished,
 		],
 		resources: namedResources(input.state),
+		switching:
+			liveSession(tx, input.conversationId)?.pendingSwitch?.toolchainId ?? null,
 	};
 }
 
@@ -365,15 +390,11 @@ export function createPrepare(
 			}
 		}
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
-		// The harness follows the route the run captured and builds its input. A `larm-preferred` call that falls back
-		// to the cloud mid-run takes the cloud harness's call settings (the generation passes both).
-		const harness = harnessOf(larm.snapshotFor?.(tx, run.id) ?? null);
+		const harness = localHarness;
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
-		const system = conversationSystem(deps, tx, harness);
-		const routed = harness.turn === "routed";
-		const fixed =
-			tokens(system) + (routed ? 0 : estimateJsonTokens(generationTools));
+		const system = conversationSystem(deps, tx);
+		const fixed = tokens(system);
 		const plan = planWindow({ window: windowOf(deps, tx, run.id), fixed });
 		if (!plan.usable) {
 			endRun(deps, tx, current, "failed", "window_too_small");
@@ -386,7 +407,6 @@ export function createPrepare(
 			window,
 			nowMs,
 			pending: pendingIds,
-			history: harness.history,
 		});
 		window = placed.window;
 		if (placed.reason)
@@ -465,7 +485,7 @@ export function createPrepare(
 			refs,
 		});
 		// A routed turn talks on the time alone; its choice calls read the work and what is presented.
-		const state = stateText(routed ? stateLines.slice(0, 1) : stateLines);
+		const state = stateText(stateLines.slice(0, 1));
 		const messages = withLastMessage(
 			prefix,
 			[
@@ -493,9 +513,8 @@ export function createPrepare(
 				...(requestId ? { requestId } : {}),
 				harness,
 				messages,
-				toolchainTitles: toolchainTitlesInTransaction(deps, tx),
 				utterances: texts,
-				...(routed && final.kind === "utterances"
+				...(final.kind === "utterances"
 					? {
 							routed: routedInputInTransaction(deps, tx, {
 								conversationId,
@@ -526,7 +545,7 @@ export function createPrepare(
 						(row) => [row.id, row.revision],
 					),
 				),
-				retained: deps.work?.retainedInTransaction(tx, conversationId) ?? [],
+				retained: retainedInTransaction(deps, tx, conversationId),
 				sessionContext: { instructionCount: 1, historyCount: 0 },
 				...(window && memory
 					? {

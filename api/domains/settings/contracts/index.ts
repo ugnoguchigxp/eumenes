@@ -1,13 +1,11 @@
 import { z } from "zod";
 import { notificationSoundIds } from "./notification-sounds";
 export {
-	notificationSoundIds,
 	notificationSoundOptions,
 	defaultNotificationSound,
 	type NotificationSound,
 } from "./notification-sounds";
 import { spatialSettingsShape } from "./spatial";
-export { spatialControls } from "./spatial";
 import { endpoint, cloudEndpoint } from "./endpoints";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 export { cloudEndpoint } from "./endpoints";
@@ -313,13 +311,6 @@ export const settingsSchema = z
 			timeoutMs: 1500,
 			searchScore: 0.6,
 		}),
-		codingSupervision: z
-			.object({
-				/** Supervisor-generated instructions wait for user approval before reaching the CLI. */
-				approveInstructions: z.boolean().default(true),
-			})
-			.strict()
-			.default({ approveInstructions: true }),
 		world: z
 			.object({
 				/**

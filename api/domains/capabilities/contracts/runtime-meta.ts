@@ -50,8 +50,6 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	"browser.research": { operation: "child" },
 	"web.lookup": { operation: "search" },
 	"web.read": { operation: "read", urlScope: "request_or_observed" },
-	"web.forecast": { operation: "read" },
-	"web.quote": { operation: "read" },
 	"recipe.find": { operation: "recipe" },
 	"web.find": { operation: "saved_read", requiresSavedBody: true },
 	"web.read_saved": { operation: "saved_read", requiresSavedBody: true },

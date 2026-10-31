@@ -20,11 +20,15 @@ export const historyBuiltins: Definition[] = [
 	},
 	{
 		...common,
+		revision: 2,
 		kind: "skill",
 		id: "history.research",
 		title: "会話履歴参照",
 		summary: "段階取得と原文版検証",
-		body: readFileSync(new URL("./history/SKILL.md", import.meta.url), "utf8"),
+		body: readFileSync(
+			new URL("./history/SKILL.v2.md", import.meta.url),
+			"utf8",
+		),
 	},
 	{
 		...common,
@@ -46,6 +50,7 @@ export const historyBuiltins: Definition[] = [
 	},
 	{
 		...common,
+		revision: 2,
 		kind: "package",
 		id: "history.research",
 		title: "会話履歴の確認",
@@ -58,27 +63,12 @@ export const historyBuiltins: Definition[] = [
 		schemaKey: "history",
 		dependencies: [
 			"profile:history.research@1",
-			"skill:history.research@1",
+			"skill:history.research@2",
 			"tool:history.search@1",
 			"tool:history.read@1",
 		],
 		profileRevisionId: "profile:history.research@1",
-		requiredSkillRevisionIds: ["skill:history.research@1"],
+		requiredSkillRevisionIds: ["skill:history.research@2"],
 		toolRevisionIds: ["tool:history.search@1", "tool:history.read@1"],
 	},
 ];
-
-historyBuiltins.push({
-	...historyBuiltins.find((d) => d.kind === "skill")!,
-	revision: 2,
-	body: readFileSync(new URL("./history/SKILL.v2.md", import.meta.url), "utf8"),
-});
-const previous = historyBuiltins.find((d) => d.kind === "package")!;
-historyBuiltins.push({
-	...previous,
-	revision: 2,
-	dependencies: previous.dependencies.map((id) =>
-		id === "skill:history.research@1" ? "skill:history.research@2" : id,
-	),
-	requiredSkillRevisionIds: ["skill:history.research@2"],
-});

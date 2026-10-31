@@ -82,8 +82,6 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 				? {
 						sessionRole: "auxiliary",
 						onConversation: true,
-						prefixTools: prefix.tools,
-						toolChoice: "none",
 					}
 				: { sessionRole: "auxiliary", yields: true },
 		);

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { WorldHostStateError } from "..";
+
 import {
 	ACCESS,
 	NOW,
@@ -16,6 +16,7 @@ import {
 } from "./fixture";
 import { buildWorldSlice, toSliceReceipt } from "eumenes-world-model";
 import { createHash } from "node:crypto";
+import { WorldHostStateError } from "../repository";
 
 const hasher = (bytes: Uint8Array) =>
 	createHash("sha256").update(bytes).digest("hex");

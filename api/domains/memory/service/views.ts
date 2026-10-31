@@ -45,13 +45,6 @@ export function createMemoryViews(deps: {
 				})),
 			);
 		},
-		/** The conversation's ContextWindow as it would be read now (a write transaction: it may rebuild). */
-		context(conversationId: string): Promise<MemoryContextDto> {
-			return store.write((db): MemoryContextDto => {
-				if (!healthy() || !readSettings(db).enabled) return { disabled: true };
-				return contextOf(windows.readForRunInTransaction(db, conversationId));
-			});
-		},
 		/**
 		 * The ContextWindow last built for the conversation, read without building it (a read
 		 * connection cannot): `version` says which build it is. null when none was built yet.

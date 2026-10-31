@@ -19,10 +19,8 @@ export function appServices(s: Services) {
 		inference: s.inference,
 		connectionModels: s.connectionModels,
 		googleAccounts: s.googleAccounts,
-		ttsDictionary: s.ttsDictionary,
 		memory: s.memory,
 		steward: s.steward,
-		continuity: s.continuity,
 		webResearch: s.webResearch,
 		changes: s.changes,
 		serviceTests: s.serviceTests,
@@ -38,19 +36,9 @@ export function appServices(s: Services) {
 		compute: s.compute,
 		browser: s.browser.service,
 		tasks: s.delegated.tasks,
-		coding: s.codingComposition?.coding,
-		codingSupervision: s.supervision,
-		taskReports: s.taskReports,
 		dotsModule: {
 			mount: (app: import("hono").Hono) =>
-				registerDots(
-					app,
-					s.dots,
-					s.dotsEvents,
-					s.delegated.tasks,
-					undefined,
-					s.dotsMessages,
-				),
+				registerDots(app, s.dots, s.dotsEvents, undefined, s.dotsMessages),
 		},
 		toolchainHistory: s.toolchain.history,
 		timers: s.timers,
@@ -62,8 +50,7 @@ export function appServices(s: Services) {
 		// With World OFF nothing is assembled and the routes do not exist.
 		...(s.world
 			? {
-					worldClaims: {
-						claims: s.world.claims,
+					worldDocuments: {
 						documents: s.world.documents,
 						context: s.world.claimsContext,
 					},

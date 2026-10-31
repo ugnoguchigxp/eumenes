@@ -1,13 +1,8 @@
 import { expect, test } from "bun:test";
-import {
-	acceptedEmotion,
-	chooseSpeechDelivery,
-	deliveryState,
-	speechParameters,
-	speechQuestions,
-	type Emotion,
-} from "..";
+import { chooseSpeechDelivery, speechParameters, type Emotion } from "..";
 import { settle } from "../../../infrastructure/wait-for";
+import { acceptedEmotion } from "../contracts";
+import { deliveryState, speechQuestions } from "../service";
 const decision = (
 	emotion: string = "warmth",
 	probability = 0.9,

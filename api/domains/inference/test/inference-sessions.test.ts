@@ -397,3 +397,81 @@ test("a main call's reasoning reaches the LARM stream call, a call without one t
 			),
 		).rejects.toThrow("invalid_session_role");
 });
+
+test("native auxiliary control schemas keep the answer and subagent role restrictions", async () => {
+	let calls = 0;
+	const h = await setup({
+		local: async () => {
+			calls++;
+			return '{"ok":true}';
+		},
+	});
+	const signal = new AbortController().signal;
+	const outputSchema = {
+		type: "object",
+		properties: { ok: { type: "boolean" } },
+		required: ["ok"],
+		additionalProperties: false,
+	};
+	const request = (control: boolean) =>
+		h.store.write((db) => {
+			const deadline = Date.now() + 30000;
+			return control
+				? h.inference.captureBackgroundControlInTransaction(db, {
+						taskId: "fixture",
+						decisionId: crypto.randomUUID(),
+						authorityEpoch: 1,
+						executionGeneration: 1,
+						deadline,
+						taskDeadline: deadline,
+						maxOutputTokens: 100,
+						structuredOutput: true,
+					})
+				: h.inference.captureInTransaction(
+						db,
+						crypto.randomUUID(),
+						"llm",
+						deadline,
+					);
+		});
+	await expect(
+		h.inference.executeControl(
+			await request(true),
+			messages,
+			signal,
+			undefined,
+			{
+				sessionRole: "subagent",
+				taskId: "fixture",
+				outputSchema,
+			},
+		),
+	).rejects.toThrow("invalid_session_role");
+	await expect(
+		h.inference.executeStream(
+			await request(false),
+			messages,
+			signal,
+			() => {},
+			undefined,
+			undefined,
+			{
+				sessionRole: "auxiliary",
+				outputSchema,
+			},
+		),
+	).rejects.toThrow("invalid_session_role");
+	await expect(
+		h.inference.executeControl(
+			await request(true),
+			messages,
+			signal,
+			undefined,
+			{
+				sessionRole: "auxiliary",
+				outputSchema: [] as unknown as Record<string, unknown>,
+			},
+		),
+	).rejects.toThrow("invalid_output_contract");
+	expect(calls).toBe(0);
+});

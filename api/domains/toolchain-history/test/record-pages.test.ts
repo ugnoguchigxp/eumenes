@@ -2,14 +2,9 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Hono } from "hono";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { migrations as capabilities } from "../../capabilities";
-import {
-	createToolchainHistory,
-	migrations,
-	registerToolchainHistory,
-} from "..";
+import { createToolchainHistory, migrations } from "..";
 import { recipePageQuerySchema, selectionPageQuerySchema } from "../contracts";
 
 let store: SqliteStore, dir: string;
@@ -84,21 +79,15 @@ test("history and procedures have global literal search, API sorting, stable pag
 	expect(last.items).toHaveLength(5);
 	for (const row of last.items) await history.deleteRecipe(row.id);
 	expect(recipe({ pageIndex: 6 })).toMatchObject({ pageIndex: 5, total: 60 });
-	const app = new Hono();
-	registerToolchainHistory(app, history);
-	for (const endpoint of ["selections", "recipes"])
-		for (const raw of [
-			"sort=sql;injection",
-			"pageSize=0",
-			"pageIndex=-1",
-			"desc=evil",
-			"q=" + "x".repeat(201),
-		])
-			expect(
-				(await app.request(`/api/toolchain-history/${endpoint}/page?${raw}`))
-					.status,
-			).toBe(400);
-	expect(
-		(await app.request("/api/toolchain-history/selections/page")).status,
-	).toBe(200);
+	for (const raw of [
+		{ sort: "sql;injection" },
+		{ pageSize: 0 },
+		{ pageIndex: -1 },
+		{ desc: "evil" },
+		{ q: "x".repeat(201) },
+	]) {
+		expect(selectionPageQuerySchema.safeParse(raw).success).toBe(false);
+		expect(recipePageQuerySchema.safeParse(raw).success).toBe(false);
+	}
+	expect(selectionPageQuerySchema.safeParse({}).success).toBe(true);
 });

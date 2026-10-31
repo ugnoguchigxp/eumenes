@@ -1,9 +1,6 @@
 import { z } from "zod";
 import type { Effect } from "./index";
 
-/** Histories of finished browser work (spec browser-run-history-design-2026-10-27). */
-
-export const HISTORY_TITLE_CHARS = 60;
 export const HISTORY_REQUEST_CHARS = 400;
 export const HISTORY_VARIABLES = 5;
 export const HISTORY_STEPS = 12;

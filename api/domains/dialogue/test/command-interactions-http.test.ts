@@ -9,7 +9,7 @@ afterEach(async () => {
 	await h?.close();
 	h = undefined;
 });
-test("the HTTP routes answer, list and cancel interactions with the documented statuses", async () => {
+test("the HTTP routes answer and list interactions with the documented statuses", async () => {
 	h = await setup();
 	await h.asked();
 	const interaction = h.interaction()!;
@@ -46,11 +46,6 @@ test("the HTTP routes answer, list and cancel interactions with the documented s
 	expect(
 		((await listed.json()) as Array<{ id: string }>).map((i) => i.id),
 	).toEqual([interaction.id]);
-	expect((await app.request(base)).status).toBe(200);
-	expect(
-		(await app.request(`/api/toolchain-interactions/${crypto.randomUUID()}`))
-			.status,
-	).toBe(404);
 
 	expect((await post(`${base}/answers`, { nonsense: true })).status).toBe(400);
 	expect(
@@ -84,16 +79,6 @@ test("the HTTP routes answer, list and cancel interactions with the documented s
 	expect(replay.status).toBe(200);
 	expect(((await replay.json()) as { runId: string }).runId).toBe(result.runId);
 	expect((await post(`${base}/answers`, answer())).status).toBe(409);
-
-	expect((await post(`${base}/cancel`, { eventId: "x" })).status).toBe(400);
-	const cancelled = await post(`${base}/cancel`, {
-		eventId: crypto.randomUUID(),
-		expectedRevision: 1,
-	});
-	expect(cancelled.status).toBe(200);
-	expect(((await cancelled.json()) as { status: string }).status).toBe(
-		"cancelled",
-	);
 });
 test("the HTTP answer to an expired question is 410", async () => {
 	h = await setup();

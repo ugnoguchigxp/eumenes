@@ -40,7 +40,6 @@ export function resourcesSection(
 	].join("\n");
 }
 const VARIABLE_RESERVE_BYTES = 8192;
-export { commonRules } from "./worker-control";
 export function workerContext(
 	task: Task,
 	prepared: Prepared,

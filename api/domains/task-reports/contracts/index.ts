@@ -58,10 +58,6 @@ const taskReportSchema = reportBodySchema.safeExtend({
 	priority: z.enum(["normal", "high"]),
 });
 export type TaskReport = z.infer<typeof taskReportSchema>;
-export const reportListSchema = z.object({
-	items: z.array(taskReportSchema),
-	nextCursor: z.number().int().nullable(),
-});
 
 /** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
 export const errorStatus = {

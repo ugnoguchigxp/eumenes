@@ -64,8 +64,8 @@ const legacyToolchain: Definition = {
 		"タイマーあと何分？",
 		"パスタのタイマーを止めて",
 	],
-	dependencies: ["package:timers.manage@1"],
-	packageRevisionId: "package:timers.manage@1",
+	dependencies: ["package:timers.manage@2"],
+	packageRevisionId: "package:timers.manage@2",
 	functionName: "timer",
 	redirects: [],
 	artifact: { kind: "component", component: "TimerArtifact" },
@@ -245,10 +245,10 @@ test("old revisions keep their JSON and hash, and publication moves back and for
 			caps.publishToolchainRevisionInTransaction(
 				db,
 				"timers.manage",
-				"toolchain:timers.manage@3",
+				"toolchain:timers.manage@5",
 			),
 		);
-		expect(await active(store)).toBe("toolchain:timers.manage@3");
+		expect(await active(store)).toBe("toolchain:timers.manage@5");
 		await expect(
 			store.write((db) =>
 				caps.publishToolchainRevisionInTransaction(
@@ -258,7 +258,7 @@ test("old revisions keep their JSON and hash, and publication moves back and for
 				),
 			),
 		).rejects.toThrow("capability_not_found");
-		expect(await active(store)).toBe("toolchain:timers.manage@3");
+		expect(await active(store)).toBe("toolchain:timers.manage@5");
 	});
 });
 
@@ -276,7 +276,7 @@ test("rolling the pointer back to the unbound revision removes the chain from th
 			);
 		store.read((db) => {
 			expect(
-				caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@2"),
+				caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@5"),
 			).not.toBeNull();
 			expect(caps.artifactsInTransaction(db)).toHaveLength(1);
 		});
@@ -294,10 +294,10 @@ test("rolling the pointer back to the unbound revision removes the chain from th
 			expect(caps.artifactsInTransaction(db)).toEqual([]);
 		});
 		// A bound revision can be published again, and it is offered again.
-		await publish("toolchain:timers.manage@2");
+		await publish("toolchain:timers.manage@5");
 		store.read((db) => {
 			expect(
-				caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@2"),
+				caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@5"),
 			).not.toBeNull();
 			expect(caps.artifactsInTransaction(db)).toHaveLength(1);
 		});
@@ -351,16 +351,10 @@ test("the dry run lists every problem and writes nothing", async () => {
 		);
 		expect(clean.issues).toEqual([]);
 		expect(clean.registered).toEqual([
-			"binding:timers.command@1",
-			"binding:timers.command@2",
 			"binding:timers.command@3",
 			"binding:timers.command@4",
-			"artifact:timers.workspace@1",
 			"artifact:timers.workspace@2",
 			"artifact:timers.workspace@3",
-			"toolchain:timers.manage@2",
-			"toolchain:timers.manage@3",
-			"toolchain:timers.manage@4",
 			"toolchain:timers.manage@5",
 			"toolchain:timers.manage@6",
 		]);
@@ -435,7 +429,7 @@ test("each kind of reference problem is refused", async () => {
 			[
 				"function taken by another toolchain",
 				(b) => {
-					b.definitions[0].functionName = "conversation_history";
+					b.definitions[0].functionName = "image";
 				},
 				"duplicate_function",
 			],
@@ -464,10 +458,7 @@ test("each kind of reference problem is refused", async () => {
 				"dependency_cycle",
 			],
 		];
-		await createCapabilities(
-			store,
-			new Set(["web", "history", "timer"]),
-		).seed();
+		await createCapabilities(store, new Set(["web", "image", "timer"])).seed();
 		const before = await counts(store);
 		for (const [name, mutate, code] of cases) {
 			const bundle = bundleRaw();
@@ -517,7 +508,7 @@ test("documents are immutable: the same id with other content is a conflict, the
 		const first = await store.write((db) =>
 			caps.importBundleInTransaction(db, bundleRaw(), host()),
 		);
-		expect(first.registered).toHaveLength(12);
+		expect(first.registered).toHaveLength(6);
 		const again = await store.write((db) =>
 			caps.importBundleInTransaction(db, bundleRaw(), host()),
 		);
@@ -546,7 +537,7 @@ test("binding fields belong to toolchains only and need a matching binding", asy
 			avoidWhen: [],
 			dependencies: [],
 			body: "x",
-			bindingRevisionId: "binding:timers.command@1",
+			bindingRevisionId: "binding:timers.command@3",
 		};
 		await expect(
 			store.write((db) => caps.registerBuiltinInTransaction(db, profile)),
@@ -563,14 +554,14 @@ test("binding fields belong to toolchains only and need a matching binding", asy
 		const lonely = {
 			...legacyToolchain,
 			revision: 3,
-			bindingRevisionId: "binding:timers.command@1",
+			bindingRevisionId: "binding:timers.command@3",
 		};
 		await expect(
 			store.write((db) => caps.registerBuiltinInTransaction(db, lonely)),
 		).rejects.toThrow("invalid_toolchain");
 		const missing = {
 			...lonely,
-			artifactRevisionId: "artifact:timers.workspace@1",
+			artifactRevisionId: "artifact:timers.workspace@2",
 		};
 		await expect(
 			store.write((db) => caps.registerBuiltinInTransaction(db, missing)),
@@ -602,7 +593,7 @@ test("a bound tool is prepared with its own schema and only from an active packa
 		await expect(
 			prepare("tool:timer.start@1", { timerId: crypto.randomUUID() }),
 		).rejects.toThrow("invalid_capability_input");
-		await expect(prepare("tool:web.lookup@1", {})).rejects.toThrow(
+		await expect(prepare("tool:web.lookup@2", {})).rejects.toThrow(
 			"invalid_capability",
 		);
 		await expect(
@@ -646,8 +637,6 @@ test("a timer start without a duration is defined as the 3 minute default, not a
 					).j,
 				);
 			const body = (id: string): string => stored(id).body;
-			// Revision 1 is frozen and still asks; revision 2 starts with the default.
-			expect(body("skill:timers.manage@1")).toContain("一つだけ質問します");
 			const latest = body("skill:timers.manage@2");
 			expect(latest).not.toContain("質問します");
 			expect(latest).toContain("聞き返さず");
@@ -738,34 +727,23 @@ test("a bound toolchain is shown by its artifact registration: artifact is optio
 							.get(`toolchain:timers.manage@${n}`) as { j: string }
 					).j,
 				);
-			expect(rev(3)).not.toHaveProperty("artifact");
-			expect(rev(3).bindingRevisionId).toBe("binding:timers.command@2");
-			// Revision 2 shipped with the legacy field and is unchanged.
-			expect(rev(2).artifact).toEqual({
-				kind: "component",
-				component: "TimerArtifact",
-			});
+			expect(rev(5)).not.toHaveProperty("artifact");
+			expect(rev(5).bindingRevisionId).toBe("binding:timers.command@3");
 			expect(
 				(
-					caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@3")!
+					caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@5")!
 						.binding.document as { questions?: unknown }
 				).questions,
 			).toEqual([
 				{ inputSchemaRef: "builtin:timerDurationAnswer" },
 				{ inputSchemaRef: "builtin:timerTargetAnswer", choiceField: "timerId" },
 			]);
-			expect(
-				(
-					caps.toolchainBindingInTransaction(db, "toolchain:timers.manage@2")!
-						.binding.document as { questions?: unknown }
-				).questions,
-			).toBeUndefined();
 		});
 		const bound = {
 			...legacyToolchain,
 			revision: 14,
-			bindingRevisionId: "binding:timers.command@2",
-			artifactRevisionId: "artifact:timers.workspace@1",
+			bindingRevisionId: "binding:timers.command@3",
+			artifactRevisionId: "artifact:timers.workspace@2",
 		};
 		// Present, it is accepted and unused.
 		await store.write((db) => caps.registerBuiltinInTransaction(db, bound));
@@ -854,18 +832,18 @@ test("question schemas must be readable validators and the choice field one of t
 	});
 });
 
-test("an install already at revision 2 is upgraded to the latest, and revision 2 stays a valid rollback target", async () => {
+test("an install already at revision 5 is upgraded to the latest, and revision 5 stays a valid rollback target", async () => {
 	await fixture(async ({ store, caps }) => {
 		await createCapabilities(store, new Set(["timer"])).seed();
 		const v2 = bundleRaw();
-		v2.definitions = v2.definitions.filter((d: any) => d.revision === 2);
-		v2.bindings = v2.bindings.filter((b: any) => b.revision === 1);
+		v2.definitions = v2.definitions.filter((d: any) => d.revision === 5);
+		v2.bindings = v2.bindings.filter((b: any) => b.revision === 3);
 		await store.write((db) => caps.importBundleInTransaction(db, v2, host()));
-		expect(await active(store)).toBe("toolchain:timers.manage@2");
+		expect(await active(store)).toBe("toolchain:timers.manage@5");
 		const before = store.read((db) =>
 			db
 				.query(
-					"SELECT * FROM capability_revisions WHERE id='toolchain:timers.manage@2'",
+					"SELECT * FROM capability_revisions WHERE id='toolchain:timers.manage@5'",
 				)
 				.get(),
 		);
@@ -875,7 +853,7 @@ test("an install already at revision 2 is upgraded to the latest, and revision 2
 			store.read((db) =>
 				db
 					.query(
-						"SELECT * FROM capability_revisions WHERE id='toolchain:timers.manage@2'",
+						"SELECT * FROM capability_revisions WHERE id='toolchain:timers.manage@5'",
 					)
 					.get(),
 			),
@@ -888,17 +866,15 @@ test("an install already at revision 2 is upgraded to the latest, and revision 2
 					revisionId,
 				),
 			);
-		await publish("toolchain:timers.manage@2");
-		expect(await active(store)).toBe("toolchain:timers.manage@2");
+		await publish("toolchain:timers.manage@5");
+		expect(await active(store)).toBe("toolchain:timers.manage@5");
 		store.read((db) => {
 			expect(caps.artifactsInTransaction(db)).toHaveLength(1);
 			expect(
-				caps.toolchainSetInTransaction(db, "toolchain:timers.manage@2").binding
+				caps.toolchainSetInTransaction(db, "toolchain:timers.manage@5").binding
 					?.revisionId,
-			).toBe("binding:timers.command@1");
+			).toBe("binding:timers.command@3");
 		});
-		await publish("toolchain:timers.manage@3");
-		expect(await active(store)).toBe("toolchain:timers.manage@3");
 	});
 });
 
@@ -920,36 +896,36 @@ test("toolchain publication over HTTP is compare-and-set and can roll back", asy
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(body),
 			});
-		const to2 = {
-			revisionId: "toolchain:timers.manage@2",
+		const to5 = {
+			revisionId: "toolchain:timers.manage@5",
 			expectedActiveRevisionId: "toolchain:timers.manage@6",
 		};
 		// A stale expectation changes nothing.
 		expect(
 			(
 				await publish("timers.manage", {
-					...to2,
-					expectedActiveRevisionId: "toolchain:timers.manage@2",
+					...to5,
+					expectedActiveRevisionId: "toolchain:timers.manage@5",
 				})
 			).status,
 		).toBe(409);
 		expect(await active(store)).toBe("toolchain:timers.manage@6");
-		expect((await publish("timers.manage", to2)).status).toBe(200);
-		expect(await active(store)).toBe("toolchain:timers.manage@2");
+		expect((await publish("timers.manage", to5)).status).toBe(200);
+		expect(await active(store)).toBe("toolchain:timers.manage@5");
 		// The same request again is stale now.
-		expect((await publish("timers.manage", to2)).status).toBe(409);
+		expect((await publish("timers.manage", to5)).status).toBe(409);
 		expect(
 			(
 				await publish("timers.manage", {
 					revisionId: "toolchain:timers.manage@9",
-					expectedActiveRevisionId: "toolchain:timers.manage@2",
+					expectedActiveRevisionId: "toolchain:timers.manage@5",
 				})
 			).status,
 		).toBe(404);
-		expect((await publish("nothing", to2)).status).toBe(404);
+		expect((await publish("nothing", to5)).status).toBe(404);
 		expect((await publish("timers.manage", { revisionId: "x" })).status).toBe(
 			400,
 		);
-		expect(await active(store)).toBe("toolchain:timers.manage@2");
+		expect(await active(store)).toBe("toolchain:timers.manage@5");
 	});
 });

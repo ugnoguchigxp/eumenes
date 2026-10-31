@@ -54,12 +54,6 @@ export function locateQuoteSpan(
 	};
 }
 
-/** The exact substring of `text` the quote stands for, or null. */
-export function locateQuote(text: string, quote: string): string | null {
-	const span = locateQuoteSpan(text, quote);
-	return span ? text.slice(span.start, span.end) : null;
-}
-
 /** NFKC, no whitespace, no punctuation: the form two texts are compared in. */
 const codePoints = (text: string): string[] =>
 	Array.from(Array.from(text, (char) => fold(char).toLowerCase()).join(""));

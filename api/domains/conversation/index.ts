@@ -1,20 +1,17 @@
 export { registerConversation } from "./controller";
 export {
-	migration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
-	outboxMigration,
-	retractionMigration,
+	/** @public */ migration,
+	/** @public */ avatarMotionMigration,
+	/** @public */ answerDeliveryMigration,
+	/** @public */ outboxMigration,
+	/** @public */ retractionMigration,
 } from "./repository";
-export { inputMigration } from "./repository/input";
 export type {
 	ConversationCut,
 	ConversationState,
 	ConversationStateBody,
 	OutboxEvent,
-	StateItem,
 	Utterance,
-	UtteranceSpeaker,
 	UtteranceToolCall,
 } from "./contracts";
 export {

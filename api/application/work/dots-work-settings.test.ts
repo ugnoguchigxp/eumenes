@@ -133,7 +133,11 @@ test("disabled conversation delivery keeps the report inspectable without append
 				.get("conversation")
 				.messages.filter((m) => m.role === "assistant"),
 		).toHaveLength(0);
-		expect(f.reports.list(id).items).toHaveLength(1);
+		expect(
+			f.store.read((db) =>
+				db.query("SELECT 1 FROM task_reports WHERE task_id=?").all(id),
+			),
+		).toHaveLength(1);
 		expect(
 			f.store.readSnapshot((db) => f.reports.pendingInTransaction(db)),
 		).toHaveLength(0);

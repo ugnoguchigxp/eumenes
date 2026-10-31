@@ -2,6 +2,17 @@ import { afterEach, expect, spyOn, test } from "bun:test";
 import { WriterBusyError } from "../../../infrastructure/sqlite";
 import { cleanup, setup, probeRow } from "./inference.fixture";
 import { waitFor } from "../../../infrastructure/wait-for";
+const startProbe = async (
+	store: Awaited<ReturnType<typeof setup>>["store"],
+	inference: Awaited<ReturnType<typeof setup>>["inference"],
+	target: string,
+) => {
+	const registered = await store.write((db) =>
+		inference.startProbeInTransaction(db, target),
+	);
+	registered.launch();
+	return registered;
+};
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -12,7 +23,7 @@ test("a probe stuck running for over 10 minutes is marked probe_stale and a new 
 			.query("INSERT INTO inference_probes VALUES(?,?,'running',NULL,?,?)")
 			.run("old", "larm", settings.get().revision, Date.now() - 11 * 60_000),
 	);
-	const { id } = await inference.startProbe("larm");
+	const { id } = await startProbe(store, inference, "larm");
 	expect(probeRow(store, "old")).toEqual({
 		status: "failed",
 		error: "probe_stale",
@@ -85,7 +96,7 @@ test("a recent running probe still blocks a new one", async () => {
 			.query("INSERT INTO inference_probes VALUES(?,?,'running',NULL,?,?)")
 			.run("recent", "larm", settings.get().revision, Date.now() - 60_000),
 	);
-	await expect(inference.startProbe("larm")).rejects.toThrow(
+	await expect(startProbe(store, inference, "larm")).rejects.toThrow(
 		"invalid_probe_busy",
 	);
 	expect(probeRow(store, "recent")?.status).toBe("running");
@@ -101,7 +112,7 @@ test("the final probe status survives a momentarily full writer queue", async ()
 			? Promise.reject(new WriterBusyError())
 			: write(operation)) as typeof store.write);
 	try {
-		const { id } = await inference.startProbe("larm");
+		const { id } = await startProbe(store, inference, "larm");
 		await waitFor(() => probeRow(store, id)?.status === "succeeded");
 		expect(writes).toBeGreaterThanOrEqual(3);
 	} finally {

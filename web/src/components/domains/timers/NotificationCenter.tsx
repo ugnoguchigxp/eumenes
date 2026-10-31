@@ -36,7 +36,7 @@ export type TodoNoticeView = {
 import type { TimerNotificationDto } from "../../../../../api/domains/timers/contracts";
 import { Button, Drawer, NotificationCard } from "../../../design-system";
 import "./TimerNotifications.css";
-import { ArtifactIcon, KindIcon } from "../../../domains/resources/kind-icon";
+import { ArtifactIcon, KindIcon } from "../../../domains/resources";
 import { useNotificationBanners } from "./useNotificationBanners";
 
 function NotificationIcon({

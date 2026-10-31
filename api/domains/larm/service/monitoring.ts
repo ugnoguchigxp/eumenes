@@ -159,4 +159,3 @@ export function createMonitoringClient(config: {
 		},
 	};
 }
-export type MonitoringClient = ReturnType<typeof createMonitoringClient>;

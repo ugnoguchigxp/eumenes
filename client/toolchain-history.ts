@@ -2,8 +2,6 @@ import { z } from "zod";
 import type {
 	Recipe,
 	Selection,
-	SelectionPageQuery,
-	RecipePageQuery,
 } from "../api/domains/toolchain-history/contracts";
 import { callJson, json, withQuery, type Transport } from "./transport";
 
@@ -67,15 +65,6 @@ const recipeSchema: z.ZodType<Recipe> = z.object({
 	createdAt: z.number(),
 	updatedAt: z.number(),
 });
-const pageOf = <T extends z.ZodType>(item: T) =>
-	z.object({
-		items: z.array(item),
-		total: z.number(),
-		pageIndex: z.number(),
-		pageSize: z.number(),
-	});
-const selectionPageSchema = pageOf(selectionSchema);
-const recipePageSchema = pageOf(recipeSchema);
 const selectionListSchema = z.object({
 	items: z.array(selectionSchema),
 	nextCursor: z.number().nullable(),
@@ -94,21 +83,6 @@ export function toolchainHistoryClient(t: Transport) {
 		signal?: AbortSignal,
 	) => callJson(t, schema, path, { signal: requestSignal(signal) });
 	return {
-		toolchainSelectionsPage: (
-			query: SelectionPageQuery,
-			signal?: AbortSignal,
-		) =>
-			get(
-				selectionPageSchema,
-				withQuery("/api/toolchain-history/selections/page", query),
-				signal,
-			),
-		toolchainRecipesPage: (query: RecipePageQuery, signal?: AbortSignal) =>
-			get(
-				recipePageSchema,
-				withQuery("/api/toolchain-history/recipes/page", query),
-				signal,
-			),
 		toolchainSelections: (
 			query: {
 				runId?: string;

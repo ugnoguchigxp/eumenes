@@ -84,21 +84,28 @@ export function callOptionsFor(
 					},
 				}
 			: {}),
-		// A control call answers in JSON; tools it may not call (`none`) only keep the conversation's prefix.
+		// A control call without tools answers in JSON.
 		...(r.outputContract ||
 		r.session?.outputSchema ||
-		(r.row.mode === "control" && (!r.tools?.length || r.toolChoice === "none"))
+		(r.row.mode === "control" && !r.tools?.length)
 			? controlJsonOptions(
 					r.outputContract ??
 						(r.session?.outputSchema
-							? { instructions: "", outputSchema: r.session.outputSchema }
+							? {
+									instructions: "",
+									// A cloud provider takes the strict form when the caller gave one.
+									outputSchema:
+										(source === "cloud" && r.session.cloudOutputSchema) ||
+										r.session.outputSchema,
+								}
 							: r.control),
 					!!r.outputContract ||
 						!!r.session?.outputSchema ||
 						r.row.structuredOutput,
 				)
 			: {}),
-		...(r.outputContract || r.session?.outputSchema
+		// Every strict schema goes out in the provider's form (on LARM, without the length ranges its grammar fails on).
+		...(r.outputContract || r.session?.outputSchema || r.row.structuredOutput
 			? { toolOutputFormat: "json-schema" as const }
 			: {}),
 		...(r.row.mode === "control" && r.control?.reasoningEffort

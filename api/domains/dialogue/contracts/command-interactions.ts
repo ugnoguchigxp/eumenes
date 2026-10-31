@@ -73,11 +73,6 @@ export const interactionAnswer = z.strictObject({
 });
 export type InteractionAnswer = z.infer<typeof interactionAnswer>;
 
-export const interactionCancel = z.strictObject({
-	eventId: z.uuid(),
-	expectedRevision: z.number().int().min(0),
-});
-
 /** Answer accepted: the resumed run the host enqueued in the same transaction. */
 export type InteractionAnswerResult = {
 	interaction: InteractionView;

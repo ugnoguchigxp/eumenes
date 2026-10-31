@@ -1,6 +1,6 @@
 export {
 	createDocling,
-	type DoclingFetch,
+	/** @public */ type DoclingFetch,
 	type DoclingService,
 } from "./service";
 export { registerDocling } from "./controller";

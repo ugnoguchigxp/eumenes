@@ -25,7 +25,6 @@ export type {
 	ForgetReport,
 	ForgetRequest,
 	LifecycleOptions,
-	LifecyclePoint,
 	RecoverReport,
 } from "./lifecycle-types";
 

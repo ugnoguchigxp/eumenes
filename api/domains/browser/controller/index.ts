@@ -56,9 +56,6 @@ export function registerBrowser(app: Hono, s: BrowserService, owner: string) {
 			return failure(c, e);
 		}
 	});
-	app.get("/api/browser/connection", (c) =>
-		c.json(s.connection(), 200, noStore),
-	);
 	app.get("/api/browser/tabs", async (c) =>
 		c.json({ tabs: await s.refreshTabs() }, 200, noStore),
 	);
@@ -73,15 +70,6 @@ export function registerBrowser(app: Hono, s: BrowserService, owner: string) {
 			noStore,
 		);
 	});
-	app.get("/api/browser/tasks/:id", (c) => {
-		const t = id(c);
-		if (!t.success) return c.json({ error: "invalid_browser_id" }, 400);
-		try {
-			return c.json(s.taskStatus(owner, t.data), 200, noStore);
-		} catch (e) {
-			return failure(c, e);
-		}
-	});
 	app.get("/api/browser/histories", (c) =>
 		c.json({ histories: s.listHistories(owner) }, 200, noStore),
 	);
@@ -94,9 +82,6 @@ export function registerBrowser(app: Hono, s: BrowserService, owner: string) {
 			return failure(c, e);
 		}
 	});
-	app.get("/api/browser/captures", (c) =>
-		c.json({ captures: s.listCaptures(owner) }, 200, noStore),
-	);
 	app.get("/api/browser/captures/:id/content", async (c) => {
 		const k = id(c);
 		if (!k.success) return c.json({ error: "invalid_browser_id" }, 400);

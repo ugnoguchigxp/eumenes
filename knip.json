@@ -1,30 +1,48 @@
 {
 	"$schema": "https://unpkg.com/knip@6/schema.json",
 	"ignoreWorkspaces": ["packages/design-system"],
+	"ignoreExportsUsedInFile": true,
 	"workspaces": {
 		".": {
+			"playwright": false,
+			"vitest": false,
+			"bun": false,
+			"vite": false,
 			"entry": [
-				"scripts/*.ts",
-				"scripts/*/cli.ts",
-				"**/*.test.{ts,tsx}",
-				"**/*.fixture.ts",
-				"tests/browser/**/*.ts"
+				"web/src/main.tsx",
+				"api/domains/ocr/service/qr-decode.ts",
+				"web/src/domains/background/models/*.ts",
+				"scripts/**/*.{ts,tsx,mjs}",
+				"!scripts/**/*.test.{ts,mjs}"
 			],
 			"project": [
 				"api/**",
 				"web/src/**",
 				"client/**",
 				"cli/**",
-				"scripts/**",
-				"tests/**"
+				"!**/*.test.{ts,tsx}",
+				"!**/test/**",
+				"!**/*.fixture.{ts,tsx}",
+				"!**/fixtures/**",
+				"!**/fixture.ts",
+				"!**/fixtures.ts",
+				"!**/test-support.tsx",
+				"!**/eval/**"
+			],
+			"ignore": [
+				"api/infrastructure/wait-for.ts",
+				"api/application/work/dots-fixture.ts"
 			]
 		},
 		"packages/artifact-ui": {
-			"project": ["src/**"]
+			"project": ["src/**", "!src/**/*.test.{ts,tsx}"]
 		},
 		"packages/coding-runner": {
-			"entry": ["test/**/*.ts"],
-			"project": ["src/**", "test/**"]
+			"entry": ["src/sdk-transport.ts", "src/sdk-git-mcp.ts"],
+			"project": ["src/**"]
+		},
+		"packages/dots-mcp": {
+			"project": ["src/**"]
 		}
 	}
 }

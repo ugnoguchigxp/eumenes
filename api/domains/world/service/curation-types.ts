@@ -188,12 +188,6 @@ export type CurationOutputClaim = {
 	validUntil: string | null;
 };
 
-export type CurationOutput = {
-	entities: CurationOutputEntity[];
-	claims: CurationOutputClaim[];
-	changed?: boolean;
-};
-
 export type CurationElement = {
 	kind: "entity" | "claim";
 	/** Position in the output's `entities` or `claims`. */

@@ -1,8 +1,3 @@
-import { Codex } from "@openai/codex-sdk";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 export type CodexRuntime = {
 	command: string;
 	env: Record<string, string>;
@@ -53,47 +48,3 @@ export const disabledFeatures = Object.fromEntries(
 		"view_image",
 	].map((name) => [name, false]),
 );
-
-/** A Codex client without native tools, plugins, MCP, project docs or history.
- * `cwd` is a private temporary directory that receives the instructions and launcher. */
-export async function lockedCodex(
-	runtime: CodexRuntime,
-	cwd: string,
-	instructions: string,
-	auth?: { apiKey?: string; baseUrl?: string },
-	/** A host control task needs no Codex conversation, skills or environment narration. */
-	controlInstructions?: string,
-) {
-	const instructionsFile = join(cwd, "instructions.md");
-	await writeFile(instructionsFile, instructions, { mode: 0o600 });
-	const launcher = join(cwd, "codex-sdk-runtime");
-	await writeFile(
-		launcher,
-		`#!${process.execPath}\nimport { launchCodex } from ${JSON.stringify(fileURLToPath(new URL("./codex-launcher.ts", import.meta.url)))};\nlaunchCodex(${JSON.stringify(runtime.command)});\n`,
-		{ mode: 0o700 },
-	);
-	return new Codex({
-		codexPathOverride: launcher,
-		env: runtime.env,
-		...(auth?.apiKey ? { apiKey: auth.apiKey } : {}),
-		...(auth?.baseUrl ? { baseUrl: auth.baseUrl } : {}),
-		config: {
-			...(controlInstructions
-				? {
-						developer_instructions: controlInstructions,
-						include_permissions_instructions: false,
-						include_apps_instructions: false,
-						include_collaboration_mode_instructions: false,
-						include_environment_context: false,
-						skills: { include_instructions: false },
-					}
-				: {}),
-			features: { ...disabledFeatures, skip_host_skill_discovery: true },
-			tools: { view_image: false },
-			project_doc_max_bytes: 0,
-			history: { persistence: "none" },
-			model_instructions_file: instructionsFile,
-		},
-		configOverrides: ["mcp_servers={}"],
-	});
-}

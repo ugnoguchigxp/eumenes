@@ -1,9 +1,6 @@
 import {
-	memoryContextSchema,
 	memoryItemsSchema,
 	memoryStatusSchema,
-	memoryTendenciesSchema,
-	shortTermSchema,
 } from "../api/domains/memory/contracts";
 import {
 	decisionsResponseSchema,
@@ -49,24 +46,7 @@ export function memoryClient(t: Transport) {
 				)
 			).items,
 		/** Active, unexpired notes of one conversation (the caller always names it). */
-		memoryShortTerm: async (conversationId: string) =>
-			(
-				await callJson(
-					t,
-					shortTermSchema,
-					withQuery("/api/memory/short-term", { conversationId }),
-				)
-			).items,
-		memoryTendencies: async () =>
-			(await callJson(t, memoryTendenciesSchema, "/api/memory/tendencies"))
-				.items,
 		/** The ContextWindow as it would be read now; `{ disabled: true }` while memory is off or unhealthy. */
-		memoryContext: async (conversationId: string) =>
-			callJson(
-				t,
-				memoryContextSchema,
-				withQuery("/api/memory/context", { conversationId }),
-			),
 		/** What the steward decided in a conversation, newest first. */
 		stewardDecisions: async (conversationId: string, limit?: number) =>
 			(

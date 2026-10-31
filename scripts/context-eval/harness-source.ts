@@ -1,6 +1,6 @@
 /**
  * What the harness measurement reads from the app database, read-only: the saved persona and agency settings that fix
- * the system part, the titles of the toolchains it can hand work to, and the toolchain cards a search returns. The
+ * the system part, and the toolchain cards a search returns. The
  * database is opened read-only and only these fields are taken; no credential or connection is read.
  */
 import { Database } from "bun:sqlite";
@@ -11,7 +11,7 @@ import type { SystemSource } from "./harness-compose";
 const PERSONAS = ["butler", "maid", "strategist", "sage"] as const;
 
 /** The persona and agency fields of a stored settings document (the shape `settingsSchema` writes). */
-export function systemFieldsOf(document: string): Omit<SystemSource, "titles"> {
+export function systemFieldsOf(document: string): SystemSource {
 	const saved = JSON.parse(document) as {
 		general?: Record<string, unknown>;
 		agency?: Record<string, unknown>;
@@ -36,17 +36,6 @@ export function systemFieldsOf(document: string): Omit<SystemSource, "titles"> {
 }
 
 type ToolchainRow = { id: string; definition: string };
-
-/** The enabled toolchains' titles in the product's order (by id, repeated titles once). */
-export function titlesOf(rows: readonly ToolchainRow[]): string[] {
-	const titles = [...rows]
-		.sort((a, b) => a.id.localeCompare(b.id))
-		.flatMap((row) => {
-			const title = (JSON.parse(row.definition) as { title?: unknown }).title;
-			return typeof title === "string" ? [title] : [];
-		});
-	return [...new Set(titles)];
-}
 
 export function cardOf(row: ToolchainRow): Card {
 	const d = JSON.parse(row.definition) as Record<string, unknown>;
@@ -79,7 +68,7 @@ export function readSaved(dbPath: string): Saved {
 			)
 			.all() as ToolchainRow[];
 		return {
-			source: { ...systemFieldsOf(settings.document), titles: titlesOf(rows) },
+			source: systemFieldsOf(settings.document),
 			cards: Object.fromEntries(
 				rows
 					.filter((row) => CARD_IDS.includes(row.id))

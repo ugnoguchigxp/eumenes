@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { estimateMessageTokens } from "../../../inference";
 import type { GenerateInput } from "../../service/context";
 import type { ContextCase } from "./case-schema";
-import type { EvalCard } from "./session";
+import type { EvalCard, Persona } from "./session";
 import type { ConversationRunner } from "./generation-runner";
 import { type SeedWiring, materialize } from "./materialize";
 import { assertMessageInvariants } from "./message-invariants";
@@ -19,6 +19,7 @@ type Job = {
 	caseId: string;
 	trial: number;
 	input: GenerateInput;
+	persona: Persona;
 };
 
 export type RunOptions = {
@@ -62,6 +63,7 @@ export async function planJobs(
 					caseId: testCase.id,
 					trial,
 					input: m.input,
+					persona: m.persona,
 				});
 		} finally {
 			await m.close();
@@ -96,7 +98,12 @@ export async function executeRun(
 		const started = clock();
 		try {
 			const outcome = await options.runner(
-				{ caseId: job.caseId, trial: job.trial, input: job.input },
+				{
+					caseId: job.caseId,
+					trial: job.trial,
+					input: job.input,
+					persona: job.persona,
+				},
 				AbortSignal.timeout(options.timeoutMs ?? 120_000),
 			);
 			const latencyMs = Math.max(0, clock() - started);

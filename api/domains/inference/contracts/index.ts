@@ -4,7 +4,7 @@ import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
 export type { ChatImage } from "../../larm";
-export type { IntentInput, IntentJudgment, IntentLabel } from "../../larm";
+export type { IntentInput, IntentJudgment } from "../../larm";
 export type Messages = ChatMessage[];
 /** How much a model thinks before it answers (`off`: not at all). */
 export type ReasoningLevel = "off" | "low" | "medium" | "high";
@@ -98,8 +98,8 @@ export interface BackgroundControl {
  */
 export type CallSession = {
 	sessionRole?: "main" | "subagent" | "auxiliary";
-	/** `required`: the only valid output is a call of one of its tools. `none`: a call of `prefixTools` is not valid. */
-	toolChoice?: "required" | "none";
+	/** `required`: the only valid output is a call of one of its tools. */
+	toolChoice?: "required";
 	/**
 	 * A control call on the conversation's prompt (the ContextWindow layout specification, section 8.2): it is sent
 	 * on the conversation's own connection, so the shared prefix is read from its cache, and it yields to the
@@ -112,8 +112,6 @@ export type CallSession = {
 	 * LARM infers one call at a time, so it would otherwise hold the user's call behind it.
 	 */
 	yields?: true;
-	/** With `onConversation`: the conversation's tool definitions, sent unchanged to keep the prefix (`toolChoice: none`). */
-	prefixTools?: import("../../../infrastructure/chat-stream").NativeTool[];
 	/** This call's own bound on output tokens, below the request's: a call whose output is short by contract. */
 	outputLimit?: number;
 	/**
@@ -131,11 +129,18 @@ export type CallSession = {
 	 */
 	reasoning?: { larm: ReasoningLevel; cloud: ReasoningLevel };
 	/**
-	 * `main` only: the answer is one JSON value of this strict schema (the conversation's local decision call, the
+	 * `main` or an `auxiliary` control call: one JSON value of this strict schema, without appending to the system.
+	 * Used by host-owned Agency instructions and the conversation's decision call (the
 	 * conversation harness design, section 5.3). On LARM it is sent as the strict response format and the native tools
 	 * field is left out (the schema names the choices); a cloud attempt passes it as the output schema.
 	 */
 	outputSchema?: Record<string, unknown>;
+	/**
+	 * With `outputSchema`: the same answer's schema in the form a cloud provider's strict structured output takes (an
+	 * object at the root, every property required, nullable when optional, no additional properties). A cloud attempt
+	 * sends it instead; absent, the cloud gets `outputSchema` as it is.
+	 */
+	cloudOutputSchema?: Record<string, unknown>;
 	/**
 	 * `main` only: answer on the cloud without trying LARM first (a local answer failed the host's checks, section
 	 * 5.3). Allowed when the run's route lets a call fall back to the cloud or is cloud-only; otherwise the call fails
@@ -203,6 +208,8 @@ export interface InferencePort {
 			subject: string;
 			deadline: number;
 			maxOutputTokens: number;
+			/** The output schema goes to the provider as a strict schema. */
+			structuredOutput?: boolean;
 		},
 	): string;
 	executeControl?(
@@ -371,14 +378,6 @@ export const usageSchema = z.object({
 	providerDetails: z.array(exchangeSchema).optional(),
 });
 export type Usage = z.infer<typeof usageSchema>;
-export const probeSchema = z.object({
-	id: z.string(),
-	target: z.string(),
-	status: z.string(),
-	error: z.string().nullable(),
-	revision: z.number(),
-	created: z.number(),
-});
 export const larmDetailsSchema = z.object({
 	profile: z.string(),
 	connectionId: z.string().optional(),
@@ -426,7 +425,6 @@ export const connectionModelsSchema = z.object({
 	}),
 });
 export type ConnectionModels = z.infer<typeof connectionModelsSchema>;
-export const startedProbeSchema = z.object({ id: z.string() });
 export * from "./record-pages";
 export * from "./context-render";
 export * from "./context-budget";

@@ -1,14 +1,14 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { Definition, FixedDefinition } from "../contracts";
-export const migration = `
+const migration = `
 CREATE TABLE capability_items (key TEXT PRIMARY KEY,id TEXT NOT NULL,kind TEXT NOT NULL,active_revision_id TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1,generation INTEGER NOT NULL DEFAULT 0,UNIQUE(kind,id));
 CREATE TABLE capability_revisions (id TEXT PRIMARY KEY,item_key TEXT NOT NULL,revision INTEGER NOT NULL,definition_json TEXT NOT NULL,definition_hash TEXT NOT NULL,created_at_ms INTEGER NOT NULL,UNIQUE(item_key,revision));
 CREATE TABLE capability_dependencies (revision_id TEXT NOT NULL,dependency_revision_id TEXT NOT NULL,PRIMARY KEY(revision_id,dependency_revision_id));
 CREATE VIRTUAL TABLE capability_search USING fts5(key UNINDEXED,content,tokenize='trigram');
 `;
 /** Appended migration: never fold into the first one. */
-export const learnedMigration = `
+const learnedMigration = `
 ALTER TABLE capability_items ADD COLUMN discovery_mode TEXT NOT NULL DEFAULT 'catalog';
 ALTER TABLE capability_items ADD COLUMN origin TEXT NOT NULL DEFAULT 'builtin';
 CREATE INDEX capability_items_origin ON capability_items(origin,kind);
@@ -123,6 +123,13 @@ DELETE FROM capability_items WHERE key='toolchain:web.research.codex';`,
 DELETE FROM capability_search WHERE key IN (SELECT key FROM capability_items WHERE id='resources.manage' AND kind IN ('toolchain','package','profile','skill','tool'));
 DELETE FROM capability_items WHERE id='resources.manage' AND kind IN ('toolchain','package','profile','skill','tool');`,
 		after: ["capabilities/0008-retire-web-research-codex"],
+	},
+	{
+		// The 外部作業 settings screen held only the coding supervisor's confirmation, which is gone with the Codex CLI
+		// runner. Its revisions stay as history; the screen is no longer offered.
+		id: "capabilities/0010-retire-external-work",
+		sql: `DELETE FROM capability_artifact_pointers WHERE artifact_id='settings.external-work';`,
+		after: ["capabilities/0009-retire-resources-manage"],
 	},
 ];
 

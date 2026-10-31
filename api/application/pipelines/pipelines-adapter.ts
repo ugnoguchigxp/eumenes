@@ -50,9 +50,6 @@ const receiptSchema = z.strictObject({
 	revision: z.number().int(),
 	toolchainId: z.string().optional(),
 });
-export const pipelinesDomainSchemas = {
-	"domain:pipelines.receipt@1": receiptSchema,
-};
 
 /** The screen sends every value as a string; the revision becomes the operation's integer. */
 function revisionInput(raw: Record<string, unknown>) {

@@ -5,14 +5,15 @@ import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import {
 	createCapabilities,
-	migration as capMigration,
+	migrations as capMigrations,
 } from "../../capabilities";
+import { webPackage, webPackageRevisionId } from "./web-package.fixture";
 import { createQueue, migration as queueMigration } from "../../queue";
 import { createToolRuntime, migration, type ToolAdapter } from "..";
 test("one task filling its result-vault quota cannot make another task's settle fail", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-vault-"));
 	const store = openStore(join(dir, "db"), [
-		capMigration,
+		...capMigrations,
 		queueMigration,
 		migration,
 	]);
@@ -40,18 +41,18 @@ test("one task filling its result-vault quota cannot make another task's settle 
 	const tools = createToolRuntime(store, caps, queue, adapter, Date.now);
 	try {
 		await caps.seed();
+		await store.write((db) => {
+			for (const d of webPackage) caps.registerBuiltinInTransaction(db, d);
+		});
 		const bind = (taskId: string) => {
 			const owner = { rootRunId: "root", taskId, cancelEpoch: 0 };
 			return store.write((db) => ({
 				owner,
 				refs: tools.bind(
 					owner,
-					caps.prepareActiveByIdInTransaction(
-						db,
-						owner,
-						"package:web.research@9",
-						{ question: "天気" },
-					),
+					caps.prepareActiveByIdInTransaction(db, owner, webPackageRevisionId, {
+						question: "天気",
+					}),
 					Date.now() + 100000,
 				),
 			}));

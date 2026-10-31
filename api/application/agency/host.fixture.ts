@@ -7,6 +7,7 @@ import {
 	createConversationService,
 	migrations,
 } from "../../domains/conversation";
+import type { Settings } from "../../domains/settings";
 import type { MemoryItemDto } from "../../domains/memory";
 import { settle } from "../../infrastructure/wait-for";
 import { openStore } from "../../infrastructure/sqlite";
@@ -82,6 +83,7 @@ afterEach(async () => {
 export function harness(
 	options: {
 		settings?: Partial<AgencySettings>;
+		general?: Partial<Settings["general"]>;
 		select?: Reply;
 		update?: Reply;
 		memory?: MemoryItemDto[];
@@ -97,6 +99,13 @@ export function harness(
 	const conversation = createConversationService(store, {
 		requireOutbox: true,
 	});
+	let general: Pick<Settings["general"], "agentName" | "userName" | "persona"> =
+		{
+			agentName: "Eumenes",
+			userName: "",
+			persona: "butler",
+			...options.general,
+		};
 	let agency: AgencySettings = { ...baseSettings, ...options.settings };
 	const listeners = new Set<() => void>();
 	let now = T0;
@@ -114,8 +123,8 @@ export function harness(
 		conversation,
 		inference: { foregroundBusy: () => inference.busy },
 		settings: {
-			get: () => ({ agency }),
-			inTransaction: () => ({ agency }),
+			get: () => ({ agency, general }),
+			inTransaction: () => ({ agency, general }),
 			onChange: (listener) => {
 				listeners.add(listener);
 				return () => listeners.delete(listener);
@@ -196,11 +205,18 @@ export function harness(
 		setSelect: (reply: Reply) => {
 			select = reply;
 		},
+		setPersona: (over: Partial<typeof general>) => {
+			general = { ...general, ...over };
+			for (const listener of listeners) listener();
+		},
 		setAgency: (over: Partial<AgencySettings>) => {
 			agency = { ...agency, ...over };
 			for (const listener of listeners) listener();
 		},
 		/** The committed setting changes before the listeners hear of it. */
+		setPersonaUnannounced: (over: Partial<typeof general>) => {
+			general = { ...general, ...over };
+		},
 		setAgencyUnannounced: (over: Partial<AgencySettings>) => {
 			agency = { ...agency, ...over };
 		},

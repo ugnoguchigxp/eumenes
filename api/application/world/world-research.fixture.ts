@@ -40,9 +40,9 @@ import { fixtureDiscovery } from "../toolchain/discovery.fixture";
 import {
 	createWorldAssembly,
 	defaultWorldJournalPath,
-	manualAccess,
 	resolveWorldCursorSecret,
 } from "./world";
+import { manualAccess } from "./world-claims.fixture";
 
 /**
  * The World investigation, end to end on the real assembly (store, queue, World ON, the data-driven

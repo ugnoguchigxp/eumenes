@@ -45,11 +45,11 @@ import { migrations } from "../migrations";
 import {
 	createWorldAssembly,
 	defaultWorldJournalPath,
-	manualAccess,
 	resolveWorldCursorSecret,
 	type WorldAssembly,
 	type WorldAssemblyOptions,
 } from "./world";
+import { manualAccess } from "./world-claims.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 const SCOPE = {

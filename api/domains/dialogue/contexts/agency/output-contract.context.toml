@@ -1,0 +1,11 @@
+# Source: api/application/agency/system-context.ts
+text = '''
+出力契約（Eumenes が公開契約を確認して採用）:
+[[contract]]
+出力は指定された JSON Schema に従い、前置きや説明用の Markdown は付けません。'''
+
+[variables.contract]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

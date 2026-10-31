@@ -41,7 +41,6 @@ const rank = (kind: string) => {
 	return at < 0 ? PROFILE_KIND_ORDER.length : at;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 /** The Asia/Tokyo calendar day of an instant: absolute, never relative to now. */
 export function tokyoDay(ms: number): string {
@@ -49,7 +48,6 @@ export function tokyoDay(ms: number): string {
 }
 /** The last day a bound that ends at `untilMs` (exclusive) still holds. */
 export const lastTokyoDay = (untilMs: number) => tokyoDay(untilMs - 1);
-export { DAY_MS };
 
 /**
  * The items in the order the profile shows them: kinds in their fixed order; inside a kind the items of the

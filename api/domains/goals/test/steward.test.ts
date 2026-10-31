@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { createGoalsService, goalEpochOf, migrations } from "..";
+import { createGoalsService, migrations } from "..";
 import type { GoalAccess, GoalOp } from "..";
 
 const alice: GoalAccess = { principal: "alice", scopeKeys: ["work"] };
@@ -30,7 +30,17 @@ const apply = (goals: ReturnType<typeof service>, ops: GoalOp[], a = alice) =>
 	store.write((db) => goals.applyInTransaction(db, a, ops));
 const rows = (sql: string, ...args: string[]) =>
 	store.read((db) => db.query(sql).all(...args)) as Record<string, unknown>[];
-const epoch = () => store.read((db) => goalEpochOf(db, "alice", "work"));
+const epoch = () =>
+	store.read(
+		(db) =>
+			(
+				db
+					.query(
+						"SELECT epoch FROM goals_scope_epochs WHERE principal=? AND scope_key=?",
+					)
+					.get("alice", "work") as { epoch: number } | null
+			)?.epoch ?? 0,
+	);
 
 beforeEach(() => {
 	counter = 0;

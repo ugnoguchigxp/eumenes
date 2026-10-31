@@ -186,7 +186,6 @@ test("describePath accepts leaves and stable-id array elements and rejects objec
 		"$.larm.voice",
 		"$.voice.silenceMs",
 		"$.routes.llm.mode",
-		"$.codingSupervision.approveInstructions",
 		"$.resources[id=$target].voice",
 		"$.resources[id=$target].speed",
 		"$.connections[id=$target].name",

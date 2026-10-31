@@ -49,7 +49,7 @@ const TEXT_CHARS = 2000;
 function previousAgent(input: GenerateInput): string | null {
 	for (let i = input.messages.length - 1; i >= 0; i--) {
 		const m = input.messages[i]!;
-		if (m.role === "assistant" && !m.tool_calls && m.content.trim())
+		if (m.role === "assistant" && m.content.trim())
 			return m.content.trim().slice(-PREVIOUS_CHARS);
 	}
 	return null;
@@ -83,8 +83,7 @@ export async function openIntentGate(
 	signal: AbortSignal,
 ): Promise<IntentGate> {
 	// A generation without a final message (a decision-only fixture) has nothing to judge.
-	if (input.harness.name !== "local" || input.final?.kind !== "utterances")
-		return NO_GATE;
+	if (input.final?.kind !== "utterances") return NO_GATE;
 	const messageId = input.final.messageIds.at(-1);
 	const text = input.utterances?.at(-1)?.trim().slice(0, TEXT_CHARS);
 	const snapshot = deps.larm.snapshotInTransaction?.bind(deps.larm);

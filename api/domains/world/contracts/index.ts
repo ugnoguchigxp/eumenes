@@ -128,22 +128,5 @@ export type {
 	WorldStatus,
 	WorldUsageCheck,
 } from "./host";
-export { WORLD_RUNTIME_PURPOSE } from "./runtime";
-export type {
-	RuntimeLedgerPort,
-	RuntimeMeasurement,
-	RuntimeVerification,
-} from "./runtime";
-export {
-	WORLD_QUERY_LIMITS,
-	WORLD_QUERY_MODES,
-	worldQueryToolSchema,
-} from "./query";
-export type {
-	GapTaskDecision,
-	GapTaskPort,
-	GapTaskRequest,
-	WorldQueryContext,
-	WorldQueryResult,
-} from "./query";
+export type { WorldQueryContext, WorldQueryResult } from "./query";
 export * from "./view";

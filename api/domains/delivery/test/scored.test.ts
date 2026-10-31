@@ -3,9 +3,9 @@ import {
 	chooseSpeechDelivery,
 	decisionDetails,
 	emotionSchema,
-	acceptedEmotion,
 	type Emotion,
 } from "..";
+import { acceptedEmotion } from "../contracts";
 const ATTITUDE_MODEL = "attitude-test-model";
 function response(
 	top: Emotion = "warmth",

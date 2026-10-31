@@ -87,7 +87,6 @@ test("the keeper reads the shared prefix with its own sections under a strict sc
 		}),
 	]);
 	h = await setup({
-		harness: "local",
 		keeper: { inference: k.inference, quietMs: 10 },
 	});
 	await talk();
@@ -117,7 +116,6 @@ test("the keeper reads the shared prefix with its own sections under a strict sc
 test("with no cut point to offer, the keeper is not called while its state is held", async () => {
 	const k = keeperInference([]);
 	h = await setup({
-		harness: "local",
 		keeper: { inference: k.inference, quietMs: 10 },
 	});
 	await talk(2);
@@ -146,7 +144,6 @@ test("the keeper's provider schema keeps each op's shape and types, and leaves t
 test("the keeper offers the World names it reads inside one read transaction", async () => {
 	const k = keeperInference(['{"ops":[]}']);
 	h = await setup({
-		harness: "local",
 		keeper: { inference: k.inference, quietMs: 10 },
 		// World refuses a read outside a transaction, as its host repository does.
 		worldContext: {
@@ -174,7 +171,6 @@ test("a held state op that breaks a rule is only counted: the cut it chose is ta
 		}),
 	]);
 	h = await setup({
-		harness: "local",
 		keeper: { inference: k.inference, quietMs: 10 },
 	});
 	await talk();
@@ -195,7 +191,6 @@ test("a cut at a point it was not offered refuses the whole output", async () =>
 		JSON.stringify({ ops: [{ op: "cut_before", point: "k9" }] }),
 	]);
 	h = await setup({
-		harness: "local",
 		keeper: { inference: k.inference, quietMs: 10 },
 	});
 	await talk();
@@ -209,7 +204,6 @@ test("the keeper's cut moves the recent conversation, and the new prefix is read
 		JSON.stringify({ ops: [{ op: "cut_before", point: "k1" }] }),
 	]);
 	h = await setup({
-		harness: "local",
 		keeper: { inference: k.inference, quietMs: 10 },
 	});
 	await talk();
@@ -227,7 +221,6 @@ test("the keeper's cut moves the recent conversation, and the new prefix is read
 test("a user utterance stops the keeper of that conversation: the answer comes first", async () => {
 	const k = keeperInference([]);
 	h = await setup({
-		harness: "local",
 		keeper: { inference: k.inference, quietMs: 200 },
 	});
 	await talk(4);

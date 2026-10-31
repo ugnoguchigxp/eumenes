@@ -2,7 +2,11 @@ import { executionCallSession } from "../../tool-runtime";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
-import { musicRequest, type Prepared } from "../../capabilities";
+import {
+	musicPlaybackPlanV2,
+	musicRequest,
+	type Prepared,
+} from "../../capabilities";
 import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import { trackQuery, type TrackQuery } from "../../larm";
@@ -15,7 +19,7 @@ import {
 	playlists,
 } from "../repository/playlists";
 import { musicContext, PLAN_MS } from "./context";
-import { openedTracks, playbackSchemaOf } from "./playback-tracks";
+import { openedTracks } from "./playback-tracks";
 import type { createMusic } from "./index";
 import type { ChildExecution, ExecutionReference } from "../../tool-runtime";
 export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
@@ -86,11 +90,10 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 		async execute(input, { signal }) {
 			const library = deps.gateway().library;
 			const tags = await library.tags(signal);
-			const schema = playbackSchemaOf(input.prepared);
 			const context = musicContext(
 				input.prepared,
 				{ request: input.request, libraryTags: tags.tags },
-				schema,
+				musicPlaybackPlanV2,
 			);
 			const receipt = await inference.executeControl!(
 				input.requestId,
@@ -117,7 +120,7 @@ export function createPlayback(deps: Parameters<typeof createMusic>[0]) {
 			} catch {
 				throw new Error("music_playback_invalid_json");
 			}
-			const parsed = schema.safeParse(value);
+			const parsed = musicPlaybackPlanV2.safeParse(value);
 			if (!parsed.success) throw new Error("music_playback_invalid_contract");
 			const plan = parsed.data;
 			// The request's own tracks are opened as they are: no search, and each is checked against the library.

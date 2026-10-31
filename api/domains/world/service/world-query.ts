@@ -72,18 +72,6 @@ export function gapTaskKey(
 	)}`;
 }
 
-/**
- * A UUID derived from the dedupe key, for hosts whose Task entry wants a UUID
- * request id: the same key always yields the same id.
- */
-export function gapTaskRequestId(dedupeKey: string): string {
-	const hex = sha256Hex(dedupeKey);
-	const variant = ((Number.parseInt(hex[16] ?? "0", 16) & 0x3) | 0x8).toString(
-		16,
-	);
-	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
-}
-
 const reject = (code: WorldQueryRejection): WorldQueryResult => ({
 	status: "rejected",
 	code,
@@ -160,12 +148,8 @@ function basisOf(entry: ProjectionEntry, asOf: number): WorldQueryBasis {
 			id: ref.id,
 			revision: ref.revision,
 		})),
-		sources: entry.sources.map((source) => ({
-			namespace: source.namespace,
-			kind: source.kind,
-			id: source.id,
-			revision: source.revision,
-		})),
+		evidence: entry.assertion.evidence,
+		sources: entry.sources,
 	};
 }
 
@@ -619,4 +603,3 @@ export function createWorldQuery(options: WorldQueryOptions) {
 		},
 	};
 }
-export type WorldQuery = ReturnType<typeof createWorldQuery>;

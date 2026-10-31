@@ -29,7 +29,6 @@ export const executionControl = z.strictObject({
 	input: z.unknown().optional(),
 	request: z.string().trim().min(1).max(8000).optional(),
 });
-export type ExecutionControl = z.infer<typeof executionControl>;
 export type ExecutionStatus =
 	| "queued"
 	| "deciding"

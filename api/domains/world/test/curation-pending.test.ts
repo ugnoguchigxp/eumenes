@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { CurationOutput } from "..";
+
 import { addMessage, request } from "./fixture";
 import {
 	claimOf,
@@ -171,7 +171,7 @@ test("drain of a whole conversation settles every event once", async () => {
 			"applied",
 			"applied",
 		]);
-		const output: CurationOutput = { entities: [], claims: [] };
+		const output = { entities: [], claims: [] };
 		expect(output.claims).toEqual([]);
 	} finally {
 		await life.cleanup();

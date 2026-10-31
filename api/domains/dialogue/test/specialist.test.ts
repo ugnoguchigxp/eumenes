@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import {
 	OTHER,
+	approve,
+	choice,
 	OTHER_REVISION,
 	STUDIO,
 	STUDIO_ARTIFACT,
@@ -114,10 +116,11 @@ test("a session starts from the conversation's delegate, then talks directly: no
 	expect(h.work()[0]!.holder).toBeNull();
 });
 
-test("a hand-over to a session toolchain ends the generation: the model is called for the search and the delegation only", async () => {
+test("a hand-over to a session toolchain ends the generation: the model is called for the one choice only (the host searches itself)", async () => {
 	const h = await harness();
 	await startDirty(h);
-	expect(h.state.calls).toHaveLength(2);
+	expect(h.state.calls).toHaveLength(1);
+	expect(h.state.calls[0]!.session?.outputSchema).toBeDefined();
 });
 
 test("an utterance handed to the specialist is logged as said by the user, to the specialist, and is not pending for the conversation agent", async () => {
@@ -177,17 +180,18 @@ test("returning: unsaved work is suspended and the conversation agent takes over
 	expect(await h.session()).toMatchObject({ state: "suspended", dirty: true });
 	expect(h.work()[0]!.ended).toBe(false);
 	// The next utterance is the conversation agent's, with the record of the suspended work.
-	h.state.steps.push({ text: "天気は晴れです" });
+	h.talk("天気は晴れです");
 	const asked = await h.ask("今日の天気は？");
 	expect(asked.specialistSessionId).toBeNull();
 	expect(asked.status).toBe("completed");
-	const call = h.state.calls.length - 1;
-	expect(stateLine(h, call, "- 担当との作業 制作担当")).toMatch(
+	const choiceCall = h.lastChoice();
+	expect(stateLine(h, choiceCall, "- 担当との作業 制作担当")).toMatch(
 		/^- 担当との作業 制作担当「アンケート」保留中（未保存、/,
 	);
 	// The conversation shows its own hand-over; the words said to the specialist are the specialist's, not its.
-	expect(h.inputOf(call)).toContain("担当に引き継ぎます。");
-	expect(h.inputOf(call)).not.toContain("会話に戻って");
+	const talkCall = h.state.calls.length - 1;
+	expect(h.inputOf(talkCall)).toContain("担当に引き継ぎます。");
+	expect(h.inputOf(talkCall)).not.toContain("会話に戻って");
 });
 
 test("returning a clean work ends the session once and tells the conversation agent once", async () => {
@@ -200,22 +204,20 @@ test("returning a clean work ends the session once and tells the conversation ag
 	expect(await h.session()).toBeNull();
 	expect(h.state.calledPort).toContain("end:close");
 	expect(h.state.released).toHaveLength(1);
-	h.state.steps.push({ text: "はい" }, { text: "はい" });
+	h.talk("はい", "はい");
 	await h.ask("こんにちは");
-	expect(
-		stateLine(h, h.state.calls.length - 1, "- 担当との作業 制作担当"),
-	).toMatch(/終了（returned）$/);
+	expect(stateLine(h, h.lastChoice(), "- 担当との作業 制作担当")).toMatch(
+		/終了（returned）$/,
+	);
 	await h.ask("もう一度");
-	expect(
-		stateLine(h, h.state.calls.length - 1, "- 担当との作業"),
-	).toBeUndefined();
+	expect(stateLine(h, h.lastChoice(), "- 担当との作業")).toBeUndefined();
 });
 
 test("a request outside the specialist's scope is forwarded to the conversation agent once, as its own utterance", async () => {
 	const h = await harness();
 	await startDirty(h);
 	h.state.specialist.push(ret(true));
-	h.state.steps.push({ text: "明日は雨です" });
+	h.talk("明日は雨です");
 	const requestId = crypto.randomUUID();
 	const run = await h.dialogue.submit({
 		requestId,
@@ -229,7 +231,7 @@ test("a request outside the specialist's scope is forwarded to the conversation 
 	// The run is the conversation's again; its message is no longer kept from memory.
 	expect(done.specialistSessionId).toBeNull();
 	expect(h.blocked()).not.toContain(done.inputMessageId);
-	const call = h.state.calls.length - 1;
+	const call = h.lastChoice();
 	expect(h.userOf(call)).toBe("明日の天気を教えて");
 	expect(
 		stateLine(h, call, "- 担当 制作担当 が今回の発言を担当の外として戻した"),
@@ -252,11 +254,11 @@ test("a label longer than the old payload limit still reaches the conversation a
 	const title = "長い題名".repeat(300);
 	await startDirty(h, "アンケートを作って", title);
 	h.state.specialist.push(ret(true));
-	h.state.steps.push({ text: "明日は雨です" });
+	h.talk("明日は雨です");
 	const forwarded = await h.ask("明日の天気を教えて");
 	expect(forwarded.status).toBe("completed");
 	expect(
-		stateLine(h, h.state.calls.length - 1, "- 担当 制作担当 が今回の発言"),
+		stateLine(h, h.lastChoice(), "- 担当 制作担当 が今回の発言"),
 	).toContain(title);
 });
 
@@ -293,27 +295,49 @@ test("a hand-over to another toolchain while unsaved work stands waits for the u
 		workRevision: h.work()[0]!.revision,
 	});
 	expect(h.work()).toHaveLength(1);
-	// The model that asks is told what is at stake: the unsaved work's label.
+	// The talk that asks is told what is at stake: the unsaved work's label.
 	expect(
 		h.state.calls
 			.at(-1)!
 			.messages.map((m) => m.content)
 			.join("\n"),
 	).toContain("アンケート");
-	// A changed work needs a new decision: the old confirmation does not discard the new draft.
+	// A changed work needs a new decision: the word given for the old revision discards nothing.
 	h.work()[0]!.revision += 1;
+	// The answer's words find no toolchain: the one the switch waits for is offered all the same.
+	h.state.found = [];
 	h.handOver(
 		{ request: "別のものを作って", resolveUnsaved: "discard" },
 		OTHER.id,
 	);
 	h.state.steps.push({ text: "もう一度確認します" });
 	await h.ask("破棄していいよ");
+	// Only the toolchain the switch waits for may carry the user's word that the unsaved work may go.
+	const offered = (
+		h.state.calls[h.lastChoice()]!.session as {
+			outputSchema: {
+				anyOf: Array<{
+					properties: Record<string, { enum?: string[] }>;
+				}>;
+			};
+		}
+	).outputSchema.anyOf;
+	expect(
+		offered.find((b) => b.properties.choice?.enum?.[0] === "fake.other")!
+			.properties.resolveUnsaved!.enum,
+	).toEqual(["discard"]);
+	expect(
+		offered
+			.filter((b) => b.properties.choice?.enum?.[0] !== "fake.other")
+			.some((b) => b.properties.resolveUnsaved),
+	).toBe(false);
 	expect((await h.session())!.id).toBe(suspended.id);
 	expect((await h.session())!.pendingSwitch!.workRevision).toBe(
 		h.work()[0]!.revision,
 	);
 	expect(h.work()[0]!.ended).toBe(false);
-	// With the current revision confirmed the old work is dropped and the new specialist starts.
+	expect(h.state.calledPort).not.toContain("end:discard");
+	// With the current revision let go, the old work is dropped and the new specialist starts.
 	h.handOver(
 		{ request: "別のものを作って", resolveUnsaved: "discard" },
 		OTHER.id,
@@ -352,7 +376,7 @@ test("the same target resumes the suspended work instead of starting another", a
 test("a target the host did not issue is refused before anything starts", async () => {
 	const h = await harness();
 	h.handOver({ request: "直して", target: "item-9" });
-	h.state.steps.push({ text: "開けませんでした" });
+	h.talk("開けませんでした");
 	const run = await h.ask("直して");
 	expect(h.work()).toHaveLength(0);
 	expect(await h.session()).toBeNull();
@@ -362,41 +386,39 @@ test("a target the host did not issue is refused before anything starts", async 
 
 test("a saved item starts the session from it; the search offers exactly the issued items, and the screen's viewing is shown only when issued", async () => {
 	const h = await harness();
-	h.state.steps.push({ text: "見ています" });
+	h.talk("見ています");
 	await h.ask("これは何？", {
 		viewing: { artifactRevisionId: STUDIO_ARTIFACT, targetRef: "item-1" },
 	});
 	expect(stateLine(h, 0, "- 制作担当「")).toMatch(
 		/（画面に表示中、target item-1）$/,
 	);
-	h.state.steps.push({ text: "見えません" });
+	h.talk("見えません");
 	await h.ask("あれは？", {
 		viewing: { artifactRevisionId: STUDIO_ARTIFACT, targetRef: "item-9" },
 	});
-	expect(stateLine(h, 1, "- 制作担当「")).toBeUndefined();
+	expect(stateLine(h, h.lastChoice(), "- 制作担当「")).toBeUndefined();
 	h.handOver({ request: "これを直して", target: "item-1" });
-	h.state.specialist.push(reply("開きました"));
 	await h.ask("これを直して");
 	// The search result lists the studio's issued items as its targets.
-	const found = h.state.calls[3]!.messages.filter((m) => m.role === "tool")
-		.at(-1)!
-		.content.split("\n");
+	const found =
+		h.state.calls[h.lastChoice()]!.messages.at(-1)!.content.split("\n");
 	const line = (id: string) => found.find((l) => l.startsWith(`- ${id}: `))!;
 	expect(
 		[...line(STUDIO.id).matchAll(/(item-\d)「/g)].map((m) => m[1]),
 	).toEqual(["item-1", "item-2"]);
 	expect(line(OTHER.id)).not.toContain("target:");
+	// Changing a saved item is confirmed first; the approval starts the session from it.
+	expect(await h.session()).toBeNull();
+	h.state.steps.push(approve());
+	h.state.specialist.push(reply("開きました"));
+	await h.ask("お願い");
 	expect(await h.session()).toMatchObject({ label: "保存済み item-1" });
 	expect(h.work()[0]!.savedRef).toBe("item-1");
 });
 
-/** A routed turn's choice, as the model answers it. */
-const choice = (value: Record<string, unknown>) => ({
-	text: JSON.stringify(value),
-});
-
-test("local: a change of a saved item is confirmed naming the item, and the approval opens that same item", async () => {
-	const h = await harness({ harness: "local" });
+test("a change of a saved item is confirmed naming the item, and the approval opens that same item", async () => {
+	const h = await harness();
 	h.state.steps.push(
 		choice({
 			choice: STUDIO.id,
@@ -410,7 +432,7 @@ test("local: a change of a saved item is confirmed naming the item, and the appr
 		"制作担当に、保存済み2について「見出しを直す」を頼みます。今あるものを変えます。よろしいですか？",
 	);
 	expect(await h.session()).toBeNull();
-	h.state.steps.push(choice({ choice: "approve", confirmation: "c1" }));
+	h.state.steps.push(approve());
 	h.state.specialist.push(reply("開きました"));
 	await h.ask("お願い");
 	expect(h.state.calls.at(-1)!.messages.at(-1)!.content).toContain(
@@ -420,8 +442,8 @@ test("local: a change of a saved item is confirmed naming the item, and the appr
 	expect(h.work()[0]!.savedRef).toBe("item-2");
 });
 
-test("local: a request to make something new is handed to the specialist at once, on a new work", async () => {
-	const h = await harness({ harness: "local" });
+test("a request to make something new is handed to the specialist at once, on a new work", async () => {
+	const h = await harness();
 	h.state.steps.push(
 		choice({
 			choice: STUDIO.id,
@@ -438,15 +460,22 @@ test("local: a request to make something new is handed to the specialist at once
 	expect(h.state.specialistPrompts).toHaveLength(1);
 });
 
+/** The routed turn's choice that asks to change `target` in the studio (confirmed first). */
+const confirmOn = (target: string) =>
+	choice({
+		choice: STUDIO.id,
+		say: "直します。",
+		request: "見出しを直す",
+		target,
+	});
+
 test("a confirmation keeps its target: the same request on two items stays two confirmations, and the approved one opens its item", async () => {
 	const h = await harness();
-	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "見出しを直す" } }] },
-		confirmOn("item-1"),
-		confirmOn("item-2"),
-		{ text: "どちらも見出しを直してよろしいですか？" },
-	);
-	await h.ask("見出しを直して");
+	h.state.steps.push(confirmOn("item-1"));
+	await h.ask("保存済み1の見出しを直して");
+	// The second request comes while the first is open: the pending turn answers none, the request turn confirms.
+	h.state.steps.push(choice({ choice: "none" }), confirmOn("item-2"));
+	await h.ask("保存済み2も直して");
 	expect(
 		h.rows(
 			"SELECT ref, target, superseded_at AS superseded FROM dialogue_confirmations ORDER BY ref",
@@ -455,85 +484,41 @@ test("a confirmation keeps its target: the same request on two items stays two c
 		{ ref: 1, target: "item-1", superseded: null },
 		{ ref: 2, target: "item-2", superseded: null },
 	]);
-	h.state.steps.push({
-		calls: [
-			{
-				name: "delegate",
-				args: {
-					mode: "approve",
-					confirmation: "c2",
-					announcement: "担当に引き継ぎます。",
-				},
-			},
-		],
-	});
+	h.state.steps.push(approve(2));
 	h.state.specialist.push(reply("開きました"));
 	await h.ask("2つ目をお願い");
-	// The open confirmations name their items: the model tells the two apart.
-	expect(stateLine(h, 4, "- c1 ")).toContain("対象「保存済み1」");
-	expect(stateLine(h, 4, "- c2 ")).toContain("対象「保存済み2」");
+	// The open confirmations name their items: the choice tells the two apart.
+	const pending = h.state.calls.at(-1)!.messages.at(-1)!.content;
+	expect(pending).toContain(
+		"- c1 確認待ち: fake.studio「見出しを直す」 対象「保存済み1」",
+	);
+	expect(pending).toContain(
+		"- c2 確認待ち: fake.studio「見出しを直す」 対象「保存済み2」",
+	);
 	expect(await h.session()).toMatchObject({ label: "保存済み item-2" });
 	expect(h.work()[0]!.savedRef).toBe("item-2");
 });
 
-/** The conversation model's call that confirms a change of `target` in the studio. */
-const confirmOn = (target: string) => ({
-	calls: [
-		{
-			name: "delegate",
-			args: {
-				mode: "confirm",
-				toolchain: STUDIO.id,
-				request: "見出しを直す",
-				target,
-				impact: "modify_existing",
-			},
-		},
-	],
-});
-
 test("an item that is gone is refused when confirmed, and a confirmation whose item went since is closed before anything is announced", async () => {
 	const h = await harness();
-	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "見出しを直す" } }] },
-		confirmOn("item-9"),
-		confirmOn("item-2"),
-		{ text: "見出しを直してよろしいですか？" },
-	);
+	// The first choice names an item the host never issued: it is refused, and the choice made again names a real one.
+	h.state.steps.push(confirmOn("item-9"), confirmOn("item-2"));
 	await h.ask("見出しを直して");
-	const confirmed = h.state.calls
-		.at(-1)!
-		.messages.filter((m) => m.role === "tool")
-		.map((m) => m.content);
-	expect(confirmed[1]).toContain("target_not_found");
+	expect(h.state.calls.at(-1)!.messages.at(-1)!.content).toContain(
+		"target_not_found",
+	);
 	expect(
 		h.rows(
 			"SELECT ref, target, target_label AS label FROM dialogue_confirmations",
 		),
 	).toEqual([{ ref: 1, target: "item-2", label: "保存済み2" }]);
 	h.state.gone.add("item-2");
-	h.state.steps.push(
-		{
-			calls: [
-				{
-					name: "delegate",
-					args: {
-						mode: "approve",
-						confirmation: "c1",
-						announcement: "担当に引き継ぎます。",
-					},
-				},
-			],
-		},
-		{ text: "その項目はもうありません。" },
-	);
+	h.state.steps.push(approve());
 	const approved = await h.ask("お願い");
-	expect(
-		h.state.calls
-			.at(-1)!
-			.messages.filter((m) => m.role === "tool")
-			.at(-1)!.content,
-	).toContain("target_not_found");
+	// Nothing is announced: the host says it could not ask for it.
+	expect(h.answerText(approved.id)).toBe(
+		"うまく頼めませんでした。もう一度言ってもらえますか。",
+	);
 	expect(approved.announcement ?? null).toBeNull();
 	expect(
 		h.rows(
@@ -547,11 +532,7 @@ test("an item that is gone is refused when confirmed, and a confirmation whose i
 
 test("forgetting the words a confirmation came from clears its target with its request", async () => {
 	const h = await harness();
-	h.state.steps.push(
-		{ calls: [{ name: "find_toolchain", args: { query: "見出しを直す" } }] },
-		confirmOn("item-1"),
-		{ text: "見出しを直してよろしいですか？" },
-	);
+	h.state.steps.push(confirmOn("item-1"));
 	await h.ask("見出しを直して");
 	const [row] = h.rows(
 		"SELECT message_ids_json AS ids FROM dialogue_confirmations",

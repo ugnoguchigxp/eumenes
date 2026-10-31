@@ -17,7 +17,6 @@ import {
 	type ServiceCatalog,
 	type ServiceTarget,
 	type ServiceRun,
-	type StartTest,
 } from "../contracts";
 import { readRun, readRuns, updateRun, type RunRecord } from "../repository";
 import { diagnoseWork, startWork, type Work, type WorkDeps } from "./works";
@@ -351,11 +350,6 @@ export function createServiceTests(
 			launch: () => launchCommitted(record, work),
 		};
 	}
-	async function start(raw: StartTest) {
-		const accepted = await store.write((db) => startInTransaction(db, raw));
-		accepted.launch?.();
-		return accepted.run;
-	}
 	/**
 	 * The catalog is refreshed by the launched work, not before the run is recorded: the
 	 * writer transaction cannot wait for the network.
@@ -388,11 +382,6 @@ export function createServiceTests(
 			launch: () => launchCommitted(record, diagnoseWork(workDeps, record, s)),
 		};
 	}
-	async function diagnose() {
-		const accepted = await store.write((db) => diagnoseInTransaction(db));
-		accepted.launch?.();
-		return accepted.run;
-	}
 	/**
 	 * Mark the run as stopping; the returned function aborts it once the write commits. It
 	 * decides by the run's status, not its phase: a progress save between the commit and this
@@ -410,10 +399,6 @@ export function createServiceTests(
 			}
 			return true;
 		};
-	}
-	async function cancel(id: string) {
-		const stop = await store.write((db) => cancelInTransaction(db, id));
-		stop();
 	}
 	function retryArtifactInTransaction(db: Database, id: string): Accepted {
 		const r = readRun(db, id);
@@ -439,23 +424,12 @@ export function createServiceTests(
 				),
 		};
 	}
-	async function retryArtifact(id: string) {
-		const accepted = await store.write((db) =>
-			retryArtifactInTransaction(db, id),
-		);
-		accepted.launch?.();
-		return accepted.run;
-	}
 	return {
 		catalog,
 		refresh,
-		start,
 		startInTransaction,
-		diagnose,
 		diagnoseInTransaction,
-		cancel,
 		cancelInTransaction,
-		retryArtifact,
 		retryArtifactInTransaction,
 		runsInTransaction: (db: Database) => readRuns(db).map(publicRun),
 		runs: () => store.read((db) => readRuns(db)).map(publicRun),

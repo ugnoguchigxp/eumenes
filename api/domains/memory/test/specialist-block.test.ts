@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import { specialistBlockReasonMigration } from "..";
+import { specialistBlockReasonMigration } from "../repository";
 import {
 	memoryTestMigrations,
 	setupMemory,

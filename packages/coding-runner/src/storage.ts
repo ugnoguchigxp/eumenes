@@ -18,7 +18,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { id, canonicalJSON } from "./contracts";
+import { canonicalJSON } from "./contracts";
 
 export const digest = (value: string | Uint8Array) =>
 	createHash("sha256").update(value).digest("hex");
@@ -117,9 +117,6 @@ export function lock(path: string): () => void {
 		closeSync(fd);
 	};
 }
-export function runPath(root: string, executionId: string) {
-	return join(root, "runs", id.parse(executionId));
-}
 export function optionalJson<T>(path: string): T | null {
 	if (!existsSync(path)) return null;
 	return JSON.parse(readPrivate(path)) as T;
@@ -132,28 +129,4 @@ export function totalSize(root: string): number {
 		if (stat.isSymbolicLink()) throw new Error("runner_spool_symlink");
 		return sum + (stat.isDirectory() ? totalSize(path) : stat.size);
 	}, 0);
-}
-/** Throws runner_spool_symlink if anything under root is a symlink. */
-export function assertNoSymlinks(root: string): void {
-	totalSize(root);
-}
-const sizes = new Map<string, { at: number; bytes: number }>();
-/** Spool bytes, re-walked at most once per ttl; own writes are added incrementally. */
-export function spoolSize(
-	root: string,
-	now = Date.now(),
-	ttlMs = 60_000,
-): number {
-	const hit = sizes.get(root);
-	if (hit && now - hit.at < ttlMs) return hit.bytes;
-	const bytes = totalSize(root);
-	sizes.set(root, { at: now, bytes });
-	return bytes;
-}
-export function addSpoolBytes(root: string, bytes: number): void {
-	const hit = sizes.get(root);
-	if (hit) hit.bytes += bytes;
-}
-export function invalidateSpoolSize(root: string): void {
-	sizes.delete(root);
 }

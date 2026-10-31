@@ -4,14 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createQueue, migration as queueMigration } from "../../queue";
-import {
-	attemptTimeoutMigration,
-	createWebResearch,
-	migration,
-	type AcquisitionPort,
-} from "..";
+import { createWebResearch, type AcquisitionPort } from "..";
 import type { ResearchResult } from "../contracts";
 import { waitFor } from "../../../infrastructure/wait-for";
+import { attemptTimeoutMigration, migration } from "../repository";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {

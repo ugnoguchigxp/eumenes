@@ -1,6 +1,4 @@
-import type { NativeTool } from "../../../infrastructure/chat-stream";
 import { getLogger } from "../../../infrastructure/logger";
-import { toolchainListing } from "./context-system";
 
 const log = getLogger("dialogue");
 /** A reply sharing this many characters, as they are, with a line of the system part copies it. */
@@ -10,21 +8,13 @@ const COPY_CHARS = 15;
  * Whether a text copies the system part: it holds `COPY_CHARS` characters of one of its lines as they are. A reply
  * that did was copied again from the recent conversation until nothing else was said (the tool-call reliability
  * design, section 5.5); ordinary replies share no such run with the rules (none of 292 measured replies did).
- * The toolchain titles the system lists (`titles`) are what a reply may say as they are: their listing is left out.
  */
-export function systemCopyCheck(
-	system: string,
-	titles: readonly string[] = [],
-): (text: string) => boolean {
-	const listing = toolchainListing(titles);
+export function systemCopyCheck(system: string): (text: string) => boolean {
 	const windows = new Set(
 		system
 			.split("\n")
 			.filter((line) => !line.startsWith("## "))
 			.map((line) => line.replace(/^- /, ""))
-			.flatMap((line) =>
-				listing && line.includes(listing) ? line.split(listing) : [line],
-			)
 			.flatMap((line) =>
 				Array.from(
 					{ length: Math.max(0, line.length - COPY_CHARS + 1) },
@@ -45,17 +35,15 @@ const ATTACHED_RUN = /[!-~]+$/;
 
 /**
  * Check control syntax only. Never interpret or execute an operation from text: control syntax written in the answer
- * (a call written as text, a provider delimiter) is never published or kept, and the answer ends before it. An answer
- * that copies the system part (`system`) is not an answer at all: the output fails with `system_text_copied`, so it
- * is neither spoken further nor kept in the conversation's input.
+ * (a provider delimiter) is never published or kept, and the answer ends before it. An answer that copies the system
+ * part (`system`) is not an answer at all: the output fails with `system_text_copied`, so it is neither spoken
+ * further nor kept in the conversation's input.
  */
 export function conversationOutput(
 	publish: (text: string) => void,
-	tools: NativeTool[],
 	system?: string,
-	toolchainTitles: readonly string[] = [],
 ) {
-	const copies = system ? systemCopyCheck(system, toolchainTitles) : null;
+	const copies = system ? systemCopyCheck(system) : null;
 	/** Where the copy check has looked up to (each window is checked once). */
 	let checked = 0;
 	const checkCopy = (text: string) => {
@@ -69,24 +57,6 @@ export function conversationOutput(
 			throw new Error("system_text_copied");
 		}
 	};
-	const names = [...new Set(tools.map((t) => t.function.name))];
-	const escaped = names.map((name) =>
-		name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-	);
-	// A call written as text: `name({` or `name {"key` / `name {key`. A tool name in ordinary speech is not one. A
-	// call offering no tool (the routed talk turn) has no names to look for.
-	const callSyntax = escaped.length
-		? new RegExp(`(?:${escaped.join("|")})\\s*(?:\\(\\s*\\{|\\{\\s*["\\w])`)
-		: null;
-	const callStart = escaped.length
-		? new RegExp(`(?:${escaped.join("|")})\\s*(?:\\(\\s*)?\\{?\\s*$`)
-		: null;
-	// An offered tool written as an XML tag: `<delegate>`, `<work\n` (run `a3c89c6e`). The full-width brackets are
-	// the same tag: the log draws past text with them, and the model copies them back (run `6c08b000`).
-	const tagSyntax = escaped.length
-		? new RegExp(`[<＜]/?(?:${escaped.join("|")})[\\s>＞]`)
-		: null;
-	const tags = names.flatMap((name) => [`<${name}`, `＜${name}`]);
 	// These are provider control delimiters, not ordinary answer text (`<tool_call>` / `<function=`: run `f4764696`).
 	const delimiters = [
 		"<|",
@@ -95,7 +65,7 @@ export function conversationOutput(
 		"<function",
 		"<parameter",
 	].flatMap((token) => [token, `＜${token.slice(1).replace(">", "＞")}`]);
-	const prefixes = [...names, ...tags, ...delimiters].flatMap((word) =>
+	const prefixes = delimiters.flatMap((word) =>
 		Array.from({ length: word.length }, (_, i) => word.slice(0, i + 1)),
 	);
 	let pending = "",
@@ -109,22 +79,17 @@ export function conversationOutput(
 	};
 	/** Where the first control syntax of `text` starts; -1 when it has none. */
 	function controlStart(text: string) {
-		const starts = [
-			...delimiters.map((token) => text.indexOf(token)),
-			callSyntax ? text.search(callSyntax) : -1,
-			tagSyntax ? text.search(tagSyntax) : -1,
-		].filter((at) => at >= 0);
+		const starts = delimiters
+			.map((token) => text.indexOf(token))
+			.filter((at) => at >= 0);
 		return starts.length ? Math.min(...starts) : -1;
 	}
 	function tail(text: string) {
-		// A run of ASCII without spaces may be the start of a call written as text (`create_music{question:<|`):
+		// A run of ASCII without spaces may be the start of a delimiter written as text (`create_music{question:<|`):
 		// it is held until a space or other text ends it, so control syntax found later takes it along.
 		let held = text.match(ATTACHED_RUN)?.[0].length ?? 0;
 		for (const prefix of prefixes)
 			if (text.endsWith(prefix)) held = Math.max(held, prefix.length);
-		// Hold a complete function name, and its opening bracket, until what follows shows whether it is a call.
-		const opened = callStart ? text.match(callStart) : null;
-		if (opened) held = Math.max(held, opened[0].length);
 		return held;
 	}
 	/** Control syntax, the ASCII run it is attached to, and everything after it is dropped: the text before is the answer. */

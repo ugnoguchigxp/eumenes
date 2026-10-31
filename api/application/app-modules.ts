@@ -23,11 +23,6 @@ import { registerImage, type ImageService } from "../domains/image";
 import { registerGooglePhotoImport } from "./media/google-photo-import";
 import { registerMusic, type MusicService } from "../domains/music";
 import {
-	registerCodingSupervision,
-	type CodingSupervision,
-} from "../domains/coding-supervision";
-import { registerTaskReports, type TaskReports } from "../domains/task-reports";
-import {
 	registerCapabilities,
 	type Capabilities,
 } from "../domains/capabilities";
@@ -57,10 +52,6 @@ import {
 	registerWebResearch,
 	type WebResearchService,
 } from "../domains/web-research";
-import {
-	registerContinuity,
-	type ContinuityService,
-} from "../domains/continuity";
 import { registerScheduler, type SchedulerService } from "../domains/scheduler";
 import { registerTimers, type TimersService } from "../domains/timers";
 import { registerResourceRoutes } from "./resources";
@@ -81,23 +72,17 @@ import {
 	type ConnectionModelsService,
 	type InferenceService,
 } from "../domains/inference";
-import {
-	registerTtsDictionary,
-	type TtsDictionaryService,
-} from "../domains/tts-dictionary";
 import type { Changes } from "./events";
 import { registerTasks, type TasksService } from "../domains/tasks";
-import { registerCoding, type CodingService } from "../domains/coding";
 import {
 	registerToolchainHistory,
 	type ToolchainHistory,
 } from "../domains/toolchain-history";
 import {
-	registerWorldClaims,
 	registerWorldDocuments,
+	type WorldClaimsContext,
 	type WorldDocuments,
 } from "../domains/world";
-import type { WorldClaims, WorldClaimsContext } from "../domains/world";
 import {
 	registerServiceTests,
 	type ServiceTests,
@@ -106,6 +91,7 @@ import {
 	registerMonitoring,
 	type MonitoringService,
 } from "../domains/monitoring";
+import type { Resources } from "./resources/wiring";
 
 /** One independently mountable group of routes. Mounting order is registration order. */
 export type AppModule = { mount(app: Hono): void };
@@ -129,11 +115,9 @@ export type AppServices = {
 	settings?: SettingsService;
 	inference?: InferenceService;
 	connectionModels?: ConnectionModelsService;
-	ttsDictionary?: TtsDictionaryService;
 	memory?: MemoryService;
 	steward?: StewardService;
 	webResearch?: WebResearchService;
-	continuity?: ContinuityService;
 	changes?: Changes;
 	serviceTests?: ServiceTests;
 	/** The Spatial background's monitoring snapshot (absent: the route does not exist). */
@@ -149,13 +133,10 @@ export type AppServices = {
 	compute?: ComputeService;
 	browser?: BrowserService;
 	tasks?: TasksService;
-	coding?: CodingService;
-	codingSupervision?: CodingSupervision;
-	taskReports?: TaskReports;
 	toolchainHistory?: ToolchainHistory;
 	timers?: TimersService;
 	/** Resource URIs (absent: the routes do not exist). */
-	resources?: import("./resources/wiring").Resources;
+	resources?: Resources;
 	/** PTY sessions of the terminal screen (absent: the routes do not exist). */
 	shell?: ShellService;
 	terminals?: TerminalsService;
@@ -163,10 +144,9 @@ export type AppServices = {
 	kanban?: KanbanService;
 	/** UI actions and artifact registrations of bound toolchains. */
 	toolchainActions?: ActionRequests;
-	/** World claim list and corrections (P5-02). Absent with World OFF: the routes do not exist. */
-	worldClaims?: {
-		claims: WorldClaims;
-		documents?: WorldDocuments;
+	/** World document import. Absent with World OFF: the route does not exist. */
+	worldDocuments?: {
+		documents: WorldDocuments;
 		context: () => WorldClaimsContext;
 	};
 };
@@ -272,26 +252,13 @@ export function appModules(services: AppServices): AppModule[] {
 			mount: (app) => registerMonitoring(app, s.monitoring!),
 		},
 		s.tasks && { mount: (app) => registerTasks(app, s.tasks!) },
-		s.coding && { mount: (app) => registerCoding(app, s.coding!) },
-		s.codingSupervision && {
-			mount: (app) => registerCodingSupervision(app, s.codingSupervision!),
-		},
-		s.taskReports && {
-			mount: (app) => registerTaskReports(app, s.taskReports!),
-		},
 		s.toolchainHistory && {
 			mount: (app) => registerToolchainHistory(app, s.toolchainHistory!),
-		},
-		s.ttsDictionary && {
-			mount: (app) => registerTtsDictionary(app, s.ttsDictionary!),
 		},
 		s.memory && { mount: (app) => registerMemory(app, s.memory!) },
 		s.steward && { mount: (app) => registerSteward(app, s.steward!) },
 		s.webResearch && {
 			mount: (app) => registerWebResearch(app, s.webResearch!),
-		},
-		s.continuity && {
-			mount: (app) => registerContinuity(app, s.continuity!),
 		},
 		{ mount: (app) => registerConversation(app, s.conversation) },
 		{ mount: (app) => registerDialogue(app, s.dialogue) },
@@ -312,15 +279,12 @@ export function appModules(services: AppServices): AppModule[] {
 		s.toolchainActions && {
 			mount: (app) => registerToolchainActions(app, s.toolchainActions!),
 		},
-		s.worldClaims && {
-			mount: (app) => {
-				registerWorldClaims(app, s.worldClaims!.claims, s.worldClaims!.context);
-				if (s.worldClaims!.documents)
-					registerWorldDocuments(app, s.worldClaims!.documents!, () => {
-						const ctx = s.worldClaims!.context();
-						return { principal: ctx.principal, scopeKey: ctx.scopeKeys[0]! };
-					});
-			},
+		s.worldDocuments && {
+			mount: (app) =>
+				registerWorldDocuments(app, s.worldDocuments!.documents, () => {
+					const ctx = s.worldDocuments!.context();
+					return { principal: ctx.principal, scopeKey: ctx.scopeKeys[0]! };
+				}),
 		},
 	];
 	return modules.filter((module): module is AppModule => module !== undefined);

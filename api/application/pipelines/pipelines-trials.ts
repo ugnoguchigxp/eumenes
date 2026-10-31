@@ -10,7 +10,6 @@ import {
 import type { Capabilities } from "../../domains/capabilities";
 import {
 	trialFirstRound,
-	type ConversationAgentSystem,
 	type ToolchainRoutingPort,
 } from "../../domains/dialogue";
 import type { InferencePort } from "../../domains/inference";
@@ -45,7 +44,6 @@ export function createPipelineTrials(deps: {
 	inference: InferencePort;
 	service: PipelinesService;
 	/** The conversation agent's part of the system message (the trial asks the same agent). */
-	agentSystem: () => ConversationAgentSystem;
 	embedPassages?: (
 		texts: string[],
 	) => Promise<{ vectors: number[][]; space: VectorSpace } | undefined>;
@@ -163,7 +161,7 @@ export function createPipelineTrials(deps: {
 			const ranked = await rank(workRef, utterance, signal);
 			if (!ranked.ok) return ranked;
 			const capture = deps.inference.captureUserControlInTransaction;
-			if (!capture || !deps.inference.executeStream)
+			if (!capture)
 				return { ok: false as const, code: "inference_unavailable" };
 			const offered = ranked.rows.slice(0, OFFERED);
 			const requestId = await store.write((db) =>
@@ -171,6 +169,8 @@ export function createPipelineTrials(deps: {
 					subject: `pipeline-trial:${workRef}`,
 					deadline: Date.now() + 120_000,
 					maxOutputTokens: 1024,
+					// The choice is held to the routed turn's schema, as the conversation's is.
+					structuredOutput: true,
 				}),
 			);
 			const cards = store.read((db) =>
@@ -192,7 +192,6 @@ export function createPipelineTrials(deps: {
 				requestId,
 				text: utterance,
 				cards,
-				agentSystem: deps.agentSystem(),
 				signal,
 			});
 			return {

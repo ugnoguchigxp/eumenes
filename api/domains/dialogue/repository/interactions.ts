@@ -139,8 +139,6 @@ function map(row: Record<string, unknown>): InteractionRow {
 	};
 }
 
-export const OPEN_STATUSES = ["waiting_input", "ready", "invoking"] as const;
-
 export function interactionById(db: Database, id: string) {
 	const row = db
 		.query("SELECT * FROM command_interactions WHERE id=?")

@@ -94,11 +94,6 @@ function fixture() {
 	return { p, connections, inputs };
 }
 
-const tool = {
-	type: "function" as const,
-	function: { name: "noop", description: "", parameters: { type: "object" } },
-};
-
 test("background work on the conversation's prompt runs on its connection and yields to a conversation call", async () => {
 	const { p, inputs } = fixture();
 	const signal = AbortSignal.timeout(5000);
@@ -109,8 +104,6 @@ test("background work on the conversation's prompt runs on its connection and yi
 			{
 				sessionRole: "auxiliary",
 				onConversation: true,
-				tools: [tool],
-				toolChoice: "none",
 				jsonOutput: true,
 			},
 		);
@@ -127,7 +120,7 @@ test("background work on the conversation's prompt runs on its connection and yi
 		expect(((settled as PromiseRejectedResult).reason as Error).message).toBe(
 			"larm_preempted",
 		);
-		// Both went to the conversation's own connection, the background one with its tools not to be called.
+		// Both went to the conversation's own connection.
 		expect(inputs.map((i) => i.connection)).toEqual([
 			"main-client",
 			"main-client",
@@ -138,11 +131,9 @@ test("background work on the conversation's prompt runs on its connection and yi
 			{
 				sessionRole: "auxiliary",
 				onConversation: true,
-				tools: [tool],
-				toolChoice: "none",
 			},
 		);
-		expect(quick).toBe("quick background:none");
+		expect(quick).toBe("quick background:-");
 	} finally {
 		await p.close();
 	}
@@ -211,8 +202,6 @@ test("a read-ahead on the conversation's prompt ends normally at its output boun
 	const call = {
 		sessionRole: "auxiliary" as const,
 		onConversation: true as const,
-		tools: [tool],
-		toolChoice: "none" as const,
 		jsonOutput: true as const,
 		maxOutputTokens: 1,
 	};

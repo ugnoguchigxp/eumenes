@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
-import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
+import { parseJsonBody } from "../../../infrastructure/http";
 import type { MemoryService } from "..";
-import { conversationQuerySchema, settingsSchema } from "../contracts";
+import { settingsSchema } from "../contracts";
 import { memorySeedInputSchema } from "../contracts/seeds";
 export function registerMemory(app: Hono, service: MemoryService) {
 	app.post("/api/memory/seeds/preview", async (c) => {
@@ -29,19 +29,4 @@ export function registerMemory(app: Hono, service: MemoryService) {
 	app.get("/api/memory/items", (c) =>
 		c.json({ items: service.list(c.req.query("all") === "1") }),
 	);
-	// There is no default conversation: the caller names the one it shows.
-	const options = { code: "invalid_memory_input" };
-	app.get("/api/memory/short-term", (c) => {
-		const query = parseQuery(c, conversationQuerySchema, options);
-		if (!query.ok) return query.response;
-		return c.json({ items: service.shortTerm(query.data.conversationId) });
-	});
-	app.get("/api/memory/tendencies", (c) =>
-		c.json({ items: service.tendencies() }),
-	);
-	app.get("/api/memory/context", async (c) => {
-		const query = parseQuery(c, conversationQuerySchema, options);
-		if (!query.ok) return query.response;
-		return c.json(await service.context(query.data.conversationId));
-	});
 }

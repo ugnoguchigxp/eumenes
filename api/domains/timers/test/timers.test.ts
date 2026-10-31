@@ -13,12 +13,12 @@ import {
 	createTimers,
 	registerTimers,
 	migrations as timerMigrations,
-	startTimerSchema,
 	type TimersService,
 } from "..";
 import type { QueueService } from "../../queue";
 import type { SchedulerService } from "../../scheduler";
 import { waitFor } from "../../../infrastructure/wait-for";
+import { startTimerSchema } from "../contracts";
 
 const T0 = Date.parse("2026-10-09T00:00:00.000Z");
 

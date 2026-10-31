@@ -1,0 +1,10 @@
+# Source: api/application/agency/system-context.ts
+text = '''
+emotion は発話の気持ちを示す一覧の絵文字一つ（迷ったら平静）とします。発話本文へは含めません。話さないときは null にします。
+[[emotions]]'''
+
+[variables.emotions]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

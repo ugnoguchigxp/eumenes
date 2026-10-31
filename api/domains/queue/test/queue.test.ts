@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,6 +7,15 @@ import { z } from "zod";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createQueue, migration, type HandlerDefinition } from "..";
 import { waitFor as until } from "../../../infrastructure/wait-for";
+
+const listAttempts = (db: Database, jobId: string) =>
+	(
+		db
+			.query(
+				"SELECT outcome, ended_at_ms FROM queue_attempts WHERE job_id=? ORDER BY attempt",
+			)
+			.all(jobId) as { outcome: string | null; ended_at_ms: number | null }[]
+	).map((r) => ({ outcome: r.outcome, endedAtMs: r.ended_at_ms }));
 
 const dirs: string[] = [];
 const stores: SqliteStore[] = [];
@@ -204,7 +214,9 @@ test("success settles business and job together; failure of business rolls both 
 	c.gates.get("b")?.resolve("answer");
 	await until(() => h.queue.get(b.job.id)?.state === "completed");
 	expect(item(h.store, "b")).toEqual({ state: "done", result: "answer" });
-	expect(h.queue.listAttempts(b.job.id)[0]?.outcome).toBe("completed");
+	expect(h.store.read((db) => listAttempts(db, b.job.id))[0]?.outcome).toBe(
+		"completed",
+	);
 });
 
 test("resource slot and concurrency key serialize claims; interactive goes first", async () => {
@@ -267,10 +279,9 @@ test("retry only for allowed transient failures, with finite attempts and backof
 	await until(() => c.gates.has("a"));
 	c.gates.get("a")?.reject(new Error("transient"));
 	await until(() => h.queue.get(a.job.id)?.state === "failed");
-	expect(h.queue.listAttempts(a.job.id).map((x) => x.outcome)).toEqual([
-		"retry",
-		"failed",
-	]);
+	expect(
+		h.store.read((db) => listAttempts(db, a.job.id)).map((x) => x.outcome),
+	).toEqual(["retry", "failed"]);
 	const b = await enqueue(h, "b");
 	await h.queue.tick();
 	await until(() => c.gates.has("b"));

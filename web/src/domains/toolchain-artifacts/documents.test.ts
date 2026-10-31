@@ -8,7 +8,8 @@ import {
 	type RegisteredField,
 } from "./documents";
 import { createDraftStore, draftStoreFor, type DraftEntry } from "./drafts";
-import { findActionBinding } from "./ToolchainArtifactHost";
+
+import { findActionBinding } from "./screen-dispatch";
 
 const field = (extra: Partial<RegisteredField> = {}): RegisteredField => ({
 	fieldId: "a.b",

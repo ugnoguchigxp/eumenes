@@ -60,7 +60,13 @@ test("withdrawn collected evidence cannot be adopted after it was read", async (
 		search,
 		read,
 		async (packet) => {
-			await h.world.documents.withdraw(SCOPE, seed.id);
+			await h.store.write((db) =>
+				db
+					.query(
+						`UPDATE world_host_document SET withdrawn=1, content='', title='', collection='', manifest_digest='' WHERE principal=?1 AND scope_key=?2 AND id=?3`,
+					)
+					.run(SCOPE.principal, SCOPE.scopeKey, seed.id),
+			);
 			return report(packet);
 		},
 	]);

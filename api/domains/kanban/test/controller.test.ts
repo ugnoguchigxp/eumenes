@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { Hono } from "hono";
-import { errorStatus, registerKanban } from "..";
+import { registerKanban } from "..";
 import { openKanban } from "./kanban.fixture";
+import { errorStatus } from "../contracts";
 
 /** The notice API over a real store; thrown codes map to the domain's statuses as the app does. */
 function api() {

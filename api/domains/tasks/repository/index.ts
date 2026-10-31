@@ -298,26 +298,6 @@ export function clearPrivateHistory(db: Database, id: string) {
 export function detachConversation(db: Database, id: string) {
 	db.query("UPDATE work_tasks SET conversation_id=NULL WHERE id=?").run(id);
 }
-export interface TaskRuntimeRefs {
-	scheduleId?: string;
-	dispatchJobId?: string;
-	observeJobId?: string;
-	stopJobId?: string;
-}
-export function runtime(db: Database, id: string): TaskRuntimeRefs {
-	const row = db
-		.query("SELECT data_json FROM work_task_runtime WHERE task_id=?")
-		.get(id) as { data_json: string } | null;
-	return row ? JSON.parse(row.data_json) : {};
-}
-export function setRuntime(db: Database, id: string, refs: TaskRuntimeRefs) {
-	const previous = runtime(db, id);
-	const next = { ...previous, ...refs };
-	if (JSON.stringify(previous) === JSON.stringify(next)) return;
-	db.query(
-		"INSERT INTO work_task_runtime(task_id,data_json) VALUES(?,?) ON CONFLICT(task_id) DO UPDATE SET data_json=excluded.data_json",
-	).run(id, JSON.stringify(next));
-}
 export function expiredMetadata(db: Database, before: number): WorkTask[] {
 	return (
 		db

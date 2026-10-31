@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { answerError } from "../../../application/app";
 import { createWorldDocuments, registerWorldDocuments } from "..";
 import { sha256Hex } from "../../../infrastructure/digest";
-import { SCOPE, withHarness } from "./fixture";
+import { SCOPE, withHarness, type Harness } from "./fixture";
 
 const content = JSON.stringify({
 	text: "西工房の資料。規程の閾値は観測値ではない。",
@@ -18,6 +18,15 @@ const document = {
 	content,
 	digest: `sha256:${sha256Hex(content)}`,
 };
+
+const withdraw = (h: Harness, id: string) =>
+	h.store.write((db) =>
+		db
+			.query(
+				`UPDATE world_host_document SET withdrawn=1, content='', title='', collection='', manifest_digest='' WHERE principal=?1 AND scope_key=?2 AND id=?3`,
+			)
+			.run(SCOPE.principal, SCOPE.scopeKey, id),
+	);
 
 test("collected documents: immutable import, scope isolation, content integrity and withdrawal tombstone", async () => {
 	await withHarness(async (h) => {
@@ -53,7 +62,7 @@ test("collected documents: immutable import, scope isolation, content integrity 
 				docs.isCurrentInTransaction(db, SCOPE, "doc-1", "seed-v1"),
 			),
 		).toBe(true);
-		await docs.withdraw(SCOPE, "doc-1");
+		await withdraw(h, "doc-1");
 		expect(
 			h.store.readSnapshot((db) =>
 				docs.isCurrentInTransaction(db, SCOPE, "doc-1", "seed-v1"),
@@ -103,10 +112,7 @@ test("owner API imports only host scope, paged Unicode reads reconstruct all tex
 			offset = result.nextOffset;
 		}
 		expect(reconstructed).toBe(long);
-		expect(
-			(await app.request("/api/world/documents/doc-1", { method: "DELETE" }))
-				.status,
-		).toBe(200);
+		await withdraw(h, "doc-1");
 		expect((await post(document)).status).toBe(409);
 	});
 });
@@ -124,7 +130,9 @@ test("search metadata fits the research operation budget and advances without dr
 		let offset = 0;
 		const ids = new Set<string>();
 		for (;;) {
-			const result = docs.lookup(SCOPE, { query: "西工房", offset });
+			const result = h.store.readSnapshot((db) =>
+				docs.lookupInTransaction(db, SCOPE, { query: "西工房", offset }),
+			);
 			if (result.kind !== "search") throw new Error("expected_search");
 			expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(2600);
 			for (const item of result.documents) ids.add(item.id);
@@ -150,50 +158,47 @@ test("owner browsing pages all 1000 documents, searches beyond the first page, i
 				digest: `sha256:${sha256Hex(text)}`,
 			});
 		}
+		const page = (scope: typeof SCOPE, raw: unknown = {}) =>
+			h.store.readSnapshot((db) => docs.pageInTransaction(db, scope, raw));
 		const ids = new Set<string>();
 		for (let pageIndex = 0; pageIndex < 20; pageIndex++) {
-			const result = docs.page(SCOPE, { pageIndex, pageSize: 50, sort: "id" });
+			const result = page(SCOPE, { pageIndex, pageSize: 50, sort: "id" });
 			expect(result.total).toBe(1000);
 			expect(result.pageIndex).toBe(pageIndex);
 			expect(result.items).toHaveLength(50);
 			for (const row of result.items) ids.add(row.id);
 		}
 		expect(ids.size).toBe(1000);
-		const found = docs.page(SCOPE, { q: "needle-last" });
+		const found = page(SCOPE, { q: "needle-last" });
 		expect(found.total).toBe(1);
 		expect(found.items[0]?.id).toBe("doc-0999");
 		expect([...found.items[0]!.excerpt]).toHaveLength(2048);
 		expect(found.items[0]!.contentLength).toBe(3011);
-		expect(docs.page({ ...SCOPE, principal: "other" }).total).toBe(0);
-		expect(docs.page({ ...SCOPE, scopeKey: "other" }).total).toBe(0);
-		expect(docs.page(SCOPE, { sort: "title", desc: true }).items[0]?.id).toBe(
+		expect(page({ ...SCOPE, principal: "other" }).total).toBe(0);
+		expect(page({ ...SCOPE, scopeKey: "other" }).total).toBe(0);
+		expect(page(SCOPE, { sort: "title", desc: true }).items[0]?.id).toBe(
 			"doc-0999",
 		);
-		const app = new Hono();
-		app.onError(answerError);
-		registerWorldDocuments(app, docs, () => SCOPE);
-		const response = await app.request(
-			"/api/world/documents/page?pageIndex=99&pageSize=10&sort=id",
-		);
-		expect(response.status).toBe(200);
-		expect(await response.json()).toMatchObject({
+		expect(
+			page(SCOPE, { pageIndex: 99, pageSize: 10, sort: "id" }),
+		).toMatchObject({
 			total: 1000,
 			pageIndex: 99,
 			items: Array.from({ length: 10 }, (_, i) => ({ id: `doc-099${i}` })),
 		});
-		for (const query of [
-			"pageSize=1000",
-			"pageIndex=-1",
-			"sort=content",
-			"principal=other",
-			"desc=invalid",
+		for (const raw of [
+			{ pageSize: 1000 },
+			{ pageIndex: -1 },
+			{ sort: "content" },
+			{ principal: "other" },
+			{ desc: "invalid" },
 		])
-			expect(
-				(await app.request(`/api/world/documents/page?${query}`)).status,
-			).toBe(400);
-		await docs.withdraw(SCOPE, "doc-0999");
-		expect(docs.page(SCOPE, { q: "needle-last", pageIndex: 99 })).toMatchObject(
-			{ total: 0, pageIndex: 0, items: [] },
-		);
+			expect(() => page(SCOPE, raw)).toThrow();
+		await withdraw(h, "doc-0999");
+		expect(page(SCOPE, { q: "needle-last", pageIndex: 99 })).toMatchObject({
+			total: 0,
+			pageIndex: 0,
+			items: [],
+		});
 	});
 });

@@ -17,8 +17,9 @@ export type CallSessionRole = {
 	readAhead?: true;
 	/** `main` only: how much the model thinks before it answers, per target (see `CallSession`). */
 	reasoning?: NonNullable<CallSession["reasoning"]>;
-	/** `main` only: the answer is one JSON value of this strict schema (no native tools field). */
+	/** `main` or auxiliary control: one JSON value of this strict schema (no native tools field). */
 	outputSchema?: NonNullable<CallSession["outputSchema"]>;
+	cloudOutputSchema?: NonNullable<CallSession["cloudOutputSchema"]>;
 	/** `main` only: answer on the cloud without trying LARM first. */
 	target?: "cloud";
 	/** `main` only: a failure of this call leaves the request pending for another call. */
@@ -87,10 +88,11 @@ export function resolveSession(
 	if (
 		(given?.onConversation && sessionRole !== "auxiliary") ||
 		(given?.yields && sessionRole !== "auxiliary") ||
-		(given?.prefixTools && !given.onConversation) ||
 		(given?.readAhead && !given.onConversation) ||
 		(given?.reasoning !== undefined && sessionRole !== "main") ||
-		(given?.outputSchema !== undefined && sessionRole !== "main") ||
+		(given?.outputSchema !== undefined &&
+			sessionRole !== "main" &&
+			!(sessionRole === "auxiliary" && row.mode === "control")) ||
 		(given?.target !== undefined && sessionRole !== "main") ||
 		(given?.retainRequest !== undefined && sessionRole !== "main") ||
 		(sessionRole === "main" && row.mode !== "answer") ||
@@ -99,9 +101,13 @@ export function resolveSession(
 	)
 		throw new Error("invalid_session_role");
 	const schema = given?.outputSchema;
+	const cloudSchema = given?.cloudOutputSchema;
 	if (
-		schema !== undefined &&
-		(!schema || typeof schema !== "object" || Array.isArray(schema))
+		[schema, cloudSchema].some(
+			(s) =>
+				s !== undefined && (!s || typeof s !== "object" || Array.isArray(s)),
+		) ||
+		(cloudSchema !== undefined && schema === undefined)
 	)
 		throw new Error("invalid_output_contract");
 	if (given?.target !== undefined && given.target !== "cloud")
@@ -129,6 +135,7 @@ export function resolveSession(
 				}
 			: {}),
 		...(schema ? { outputSchema: schema } : {}),
+		...(cloudSchema ? { cloudOutputSchema: cloudSchema } : {}),
 		...(given?.target ? { target: given.target } : {}),
 		...(given?.retainRequest ? { retainRequest: true as const } : {}),
 		...(context

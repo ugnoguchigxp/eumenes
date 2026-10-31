@@ -16,7 +16,6 @@ test("defaults are the values the server used before the config was centralised"
 		attitudeDatasetPath: "data/attitude-dataset/dataset.sqlite3",
 		memoryJournalPath: "data/memory-forget-journal.jsonl",
 		worldJournalPath: undefined,
-		codingRunnerConfig: undefined,
 		researchCodexExecutable: "codex",
 		worldPollMs: undefined,
 		worldCursorSecret: undefined,
@@ -24,7 +23,6 @@ test("defaults are the values the server used before the config was centralised"
 		toolchainEnabled: true,
 		historyToolsEnabled: true,
 		webResearchToolsEnabled: true,
-		delegatedTasksEnabled: false,
 		env: undefined,
 	});
 });
@@ -51,7 +49,6 @@ test("explicit values, the log file switch, and empty strings as unset", () => {
 		EUMENES_ATTITUDE_DATASET: "/a",
 		EUMENES_MEMORY_JOURNAL: "/m",
 		EUMENES_WORLD_JOURNAL: "/w",
-		EUMENES_CODING_RUNNER_CONFIG: "/c.json",
 		EUMENES_WORLD_CURSOR_SECRET: "s",
 	});
 	expect(config).toMatchObject({
@@ -65,7 +62,6 @@ test("explicit values, the log file switch, and empty strings as unset", () => {
 		attitudeDatasetPath: "/a",
 		memoryJournalPath: "/m",
 		worldJournalPath: "/w",
-		codingRunnerConfig: "/c.json",
 		worldCursorSecret: "s",
 	});
 	// `VAR= cmd` clears a value.
@@ -95,25 +91,14 @@ test("flags: 1/true/on and 0/false/off; anything else fails with the variable na
 		expect(
 			loadConfig({ EUMENES_TOOLCHAIN_ENABLED: value }).toolchainEnabled,
 		).toBe(true);
-		expect(
-			loadConfig({ EUMENES_DELEGATED_TASKS_ENABLED: value })
-				.delegatedTasksEnabled,
-		).toBe(true);
 	}
 	for (const value of ["0", "false", "OFF"]) {
 		expect(
 			loadConfig({ EUMENES_TOOLCHAIN_ENABLED: value }).toolchainEnabled,
 		).toBe(false);
-		expect(
-			loadConfig({ EUMENES_DELEGATED_TASKS_ENABLED: value })
-				.delegatedTasksEnabled,
-		).toBe(false);
 	}
 	expect(() => loadConfig({ EUMENES_TOOLCHAIN_ENABLED: "maybe" })).toThrow(
 		"config_invalid:EUMENES_TOOLCHAIN_ENABLED",
-	);
-	expect(() => loadConfig({ EUMENES_DELEGATED_TASKS_ENABLED: "yes" })).toThrow(
-		"config_invalid:EUMENES_DELEGATED_TASKS_ENABLED",
 	);
 });
 

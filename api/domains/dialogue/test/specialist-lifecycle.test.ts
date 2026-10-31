@@ -18,13 +18,9 @@ const invoke = (title: string) => ({
 	tool: "draft.apply",
 	arguments: { title },
 });
-const main = (h: Harness, ...texts: string[]) =>
-	h.state.steps.push(...texts.map((text) => ({ text })));
-/** The `## State` line of the conversation model's latest call about the specialist's work. */
+/** The `## State` line of the conversation model's latest choice call about the specialist's work. */
 const workLine = (h: Harness) =>
-	h
-		.stateOf(h.state.calls.length - 1)
-		.find((line) => line.startsWith("- 担当との作業"));
+	h.stateOf(h.lastChoice()).find((line) => line.startsWith("- 担当との作業"));
 async function startDirty(h: Harness) {
 	h.handOver({ request: "アンケートを作って" });
 	h.state.specialist.push(invoke("アンケート"), reply("作りました"));
@@ -65,12 +61,13 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 	await startDirty(h);
 	const modelCalls = h.state.calls.length;
 	h.state.offsetMs += DAY + 60_000;
-	main(h, "通常の返答");
+	h.talk("通常の返答");
 	const run = await h.ask("まだ作業中？");
 	expect(run.specialistSessionId).toBeNull();
 	expect(run.status).toBe("completed");
 	expect(h.answerText(run.id)).toBe("通常の返答");
-	expect(h.state.calls.length).toBe(modelCalls + 1);
+	// The ordinary way: the request turn's choice, then the talk turn.
+	expect(h.state.calls.length).toBe(modelCalls + 2);
 	expect(h.userOf(h.state.calls.length - 1)).toBe("まだ作業中？");
 	expect(await h.session()).toBeNull();
 	expect(h.work()[0]!.ended).toBe(true);
@@ -81,7 +78,7 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 	expect(ended).toEqual([{ state: "ended", end_reason: "expired" }]);
 	// The conversation agent hears of it once, with that very utterance.
 	expect(workLine(h)).toMatch(/終了（expired）$/);
-	main(h, "はい");
+	h.talk("はい");
 	await h.ask("次の話");
 	expect(workLine(h)).toBeUndefined();
 });
@@ -118,7 +115,7 @@ test("the sweep ends expired sessions; a refusing domain leaves them closing and
 	// The domain keeps its work: nothing was half ended.
 	expect(h.work()[0]!.ended).toBe(false);
 	// A closing session does not address utterances.
-	main(h, "通常です");
+	h.talk("通常です");
 	const run = await h.ask("こんにちは");
 	expect(run.specialistSessionId).toBeNull();
 	// Entering it any other way is refused as well.
@@ -339,15 +336,15 @@ test("the work is never free between two queued turns; a return command withdraw
 	const third = await h.say("三つ目");
 	const chain = (await h.session())!;
 	const modelCalls = h.state.calls.length;
-	main(h, "二つ目と三つ目への返答");
+	h.talk("二つ目と三つ目への返答");
 	const returned = await command(h, "return", chain);
 	expect(returned.session).toMatchObject({ state: "suspended", busy: false });
 	expect(h.dialogue.get(first.id)!.status).toBe("cancelled");
 	release();
 	await h.finished(second.id);
 	await h.finished(third.id);
-	// Both utterances are the conversation agent's unhandled ones: one generation takes them, in order.
-	expect(h.state.calls.length).toBe(modelCalls + 1);
+	// Both utterances are the conversation agent's unhandled ones: one generation (a choice and a talk) takes them, in order.
+	expect(h.state.calls.length).toBe(modelCalls + 2);
 	const newest = h.userOf(h.state.calls.length - 1).split("\n");
 	expect(newest).toHaveLength(2);
 	expect(newest[0]).toContain("二つ目");
@@ -373,7 +370,7 @@ test("when the specialist leaves, utterances queued behind it go to the conversa
 	});
 	const first = await h.say("戻って");
 	await h.until(() => h.dialogue.get(first.id)?.status === "running");
-	main(h, "通常の返答");
+	h.talk("通常の返答");
 	const second = await h.say("天気は？");
 	release();
 	await h.finished(first.id);
@@ -397,7 +394,7 @@ test("an expired session with a turn in flight is withdrawn when the next uttera
 	const slow = await h.say("遅い依頼");
 	await h.until(() => h.dialogue.get(slow.id)?.status === "running");
 	h.state.offsetMs += DAY + 60_000;
-	main(h, "通常です");
+	h.talk("通常です");
 	const next = await h.ask("こんにちは");
 	expect(next.specialistSessionId).toBeNull();
 	await h.finished(slow.id);
@@ -442,7 +439,7 @@ test("after the specialist leaves, the conversation's own exchanges are not bloc
 		text: "戻ります",
 	});
 	const left = await h.ask("戻って");
-	main(h, "晴れです");
+	h.talk("晴れです");
 	const run = await h.ask("天気は？");
 	expect(run.status).toBe("completed");
 	const blocked = new Set(h.blocked());

@@ -45,11 +45,3 @@ export function timerToneWav(pcm = timerTonePcm()): Uint8Array {
 	for (let i = 0; i < pcm.length; i++) view.setInt16(44 + i * 2, pcm[i]!, true);
 	return bytes;
 }
-
-export const TIMER_TONE = {
-	sampleRate: SAMPLE_RATE,
-	seconds: SECONDS,
-	frequency: FREQUENCY,
-	amplitude: AMPLITUDE,
-	fadeSeconds: FADE_SECONDS,
-};

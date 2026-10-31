@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { SYSTEM_SECTIONS, systemText } from "../service/context-system";
+import { TALK_SECTIONS, systemText } from "../service/context-system";
 
 /**
  * The system part (the conversation input specification, section 4): the agent's parts and the host's rules under
- * eight headings, compiled from their TOML sources. These checks read the expected sentences from those sources, so
+ * five headings, compiled from their TOML sources. These checks read the expected sentences from those sources, so
  * the text cannot drift from them; names are carried literally, without escaping.
  */
 const DIR = join(import.meta.dir, "..", "contexts");
@@ -23,37 +23,31 @@ const agent = {
 	persona: "AGENT-PERSONA",
 	spokenReplyStyle: "AGENT-SPOKEN",
 	emotionRules: "AGENT-EMOTION",
-	toolRules: "AGENT-TOOLS",
 };
 const PERSONAS = ["butler", "maid", "strategist", "sage"] as const;
 const anonymous = { agentName: "", userName: "" };
 
-test("the eight sections stand in order, each part in its own, and no input heading is among them", () => {
-	const text = systemText({ ...anonymous, persona: "butler" }, agent, ["音楽"]);
-	const at = SYSTEM_SECTIONS.map((name) => text.indexOf(`## ${name}\n`));
+test("the five sections stand in order, each part in its own, and no input heading is among them", () => {
+	const text = systemText({ ...anonymous, persona: "butler" }, agent);
+	const at = TALK_SECTIONS.map((name) => text.indexOf(`## ${name}\n`));
 	expect(at.every((i) => i >= 0)).toBe(true);
 	expect([...at].sort((a, b) => a - b)).toEqual(at);
-	// The rules on handing work over follow the role: placed lower, creation requests went without a call.
-	expect(SYSTEM_SECTIONS.slice(0, 3)).toEqual(["Role", "Toolchains", "Tools"]);
+	expect(Array.from(text.matchAll(/^## (.+)$/gm), (m) => m[1])).toEqual([
+		...TALK_SECTIONS,
+	]);
 	const sectionOf = (part: string) =>
-		SYSTEM_SECTIONS.filter((_, i) => at[i]! < text.indexOf(part)).at(-1);
+		TALK_SECTIONS.filter((_, i) => at[i]! < text.indexOf(part)).at(-1);
 	expect(sectionOf("AGENT-BASE")).toBe("Role");
 	expect(sectionOf("AGENT-PERSONA")).toBe("Role");
 	expect(sectionOf("AGENT-SPOKEN")).toBe("Speaking");
 	expect(sectionOf("AGENT-EMOTION")).toBe("Emotion");
-	expect(sectionOf("AGENT-TOOLS")).toBe("Tools");
-	expect(text).toContain("依頼できる担当: 音楽。");
 	for (const heading of ["Memory", "State", "User", "Host notice", "Task"])
 		expect(text).not.toContain(`## ${heading}\n`);
 });
 
 test("a section without a part is left out (the feeling rule while the setting is off)", () => {
-	const text = systemText(
-		{ ...anonymous, persona: "butler" },
-		{ base: "B", toolRules: "T" },
-	);
+	const text = systemText({ ...anonymous, persona: "butler" }, { base: "B" });
 	expect(text).not.toContain("## Emotion");
-	expect(text).toContain("依頼できる担当: なし。");
 });
 
 test("every persona's role and style sentences are in the text, as the sources write them, without examples", () => {
@@ -86,15 +80,7 @@ test("the names are stated as given, omitted when empty, and never substituted",
 });
 
 test("no host rule carries an example, and the same input gives the same bytes", () => {
-	for (const file of [
-		"input",
-		"facts",
-		"tools",
-		"toolchains",
-		"results",
-		"speaking",
-		"role",
-	])
+	for (const file of ["input", "talk-facts", "talk-speaking", "role"])
 		expect(sourceText(`system/${file}`)).not.toMatch(/例[:：]/);
 	const input = {
 		persona: "sage" as const,

@@ -2,25 +2,22 @@
  * Conversation harness measurement (the conversation harness design, section 5.1). Chains of requests run on the
  * conversation's input, built by the product's own functions from the saved settings, in the forms given; each step
  * is judged and timed. Usage:
- *   bun scripts/context-eval/harness.ts [--harness local|cloud] [--client larm|codex] [--model <id>]
- *       [--reasoning off|low|medium|high] [--chains <key,...>] [--forms <form,...>] [--reps <n>]
- *       [--turn single|routed] [--probe] [--dry-run]
- *   bun scripts/context-eval/harness.ts --harness local --lane accept [--judge ruri|expect] [--chains <key,...>]
- *       [--reps <n>] [--dry-run]
- * Without `--client` the saved LARM connection answers (in this process; no server is started). `--client codex`
- * runs the Codex SDK path with `--model`; the model id is only ever this argument. The harness decides the call's
+ *   bun scripts/context-eval/harness.ts [--reasoning off|low|medium|high] [--chains <key,...>] [--forms <form,...>]
+ *       [--reps <n>] [--turn routed] [--probe] [--dry-run]
+ *   bun scripts/context-eval/harness.ts --lane accept [--judge ruri|expect] [--chains <key,...>] [--reps <n>]
+ *       [--dry-run]
+ * The saved LARM connection answers (in this process; no server is started). The harness decides the call's
  * reasoning and output limit; `--reasoning` overrides the reasoning for an experiment. `--probe` tries the first
  * request six times in the empty form.
  *
- * The turn is the harness's own (`single`: the reply loop with the native tools, the cloud harness; `routed`: the
- * local harness's turn, `harness-routed.ts`; saved LARM connection only). In a routed run the host routes each step
- * by the step's expectation as a stand-in for a correct judge: a step that expects a hand-over (`expect`) is a
- * request turn (a search with the user's words, then one silent choice held to the candidates' schema), any other
- * step (`free`, `notBroken`, `repeatOf`, plain talk) is a talk turn (one call, no tools). The judge is assumed
- * right; its own accuracy is measured from the production records, not here. `--dry-run` composes and prints the
- * first step of each chain and form (for a routed harness also the choice input of the chain's first step) without
- * calling any model. Runs interleave rep, chain, form. Reports go to
- * verification-reports/context-eval/harness/<timestamp>/ (new directories, never overwritten). It is outside verify.
+ * The turn is the product's routed turn (`harness-routed.ts`; `--turn routed` names it, and is the only turn). The
+ * host routes each step by the step's expectation as a stand-in for a correct judge: a step that expects a hand-over
+ * (`expect`) is a request turn (a search with the user's words, then one silent choice held to the candidates'
+ * schema), any other step (`free`, `notBroken`, `repeatOf`, plain talk) is a talk turn (one call, no tools). The judge
+ * is assumed right; its own accuracy is measured from the production records, not here. `--dry-run` composes and
+ * prints the first step of each chain and form and the choice input of the chain's first step without calling any
+ * model. Runs interleave rep, chain, form. Reports go to verification-reports/context-eval/harness/<timestamp>/ (new
+ * directories, never overwritten). It is outside verify.
  *
  * `--lane accept` (the review intake plan, section 6) runs each chain whole through the product's routed turn
  * instead, with the real judge (`--judge ruri`, the saved intent connection; `--judge expect` puts the step's
@@ -35,8 +32,6 @@ import {
 } from "../../api/domains/dialogue/eval/context/freeze";
 import { systemCopyCheck } from "../../api/domains/dialogue/service/conversation-output";
 import {
-	cloudHarness,
-	harnessFor,
 	localHarness,
 	type ConversationHarness,
 } from "../../api/domains/dialogue/service/harness";
@@ -81,24 +76,18 @@ import {
 	timingOf,
 	tokensOf,
 	type ReportMeta,
-	type TurnMode,
 	type StepRecord,
 } from "./harness-judge";
 import type { AcceptMeta, AcceptRecord } from "./harness-accept";
 import { readSaved, type Saved } from "./harness-source";
 import { runRoutedTurn, type RequestInput } from "./harness-routed";
-import { runTurn } from "./harness-turn";
 
 export type Options = {
 	harness: ConversationHarness;
-	client: "larm" | "codex";
-	model: string | null;
 	reasoning: Reasoning;
 	/** Whether `--reasoning` was given (the override of the harness's value). */
 	reasoningOverridden: boolean;
-	/** How a model round is made: the reply loop with the native tools, or the routed turn. */
-	turn: TurnMode;
-	/** The chooser measurement on the harness's own turn, or the acceptance lane on the product's. */
+	/** The chooser measurement on the routed turn's stand-ins, or the acceptance lane on the product's. */
 	lane: "choice" | "accept";
 	/** The acceptance lane's judge: the saved Ruri connection, or the step's expectation. */
 	judge: "ruri" | "expect";
@@ -121,9 +110,6 @@ export function parseOptions(argv: readonly string[]): Options {
 	};
 	const flag = (name: string) => argv.includes(`--${name}`);
 	const known = new Set([
-		"harness",
-		"client",
-		"model",
 		"reasoning",
 		"chains",
 		"forms",
@@ -137,35 +123,13 @@ export function parseOptions(argv: readonly string[]): Options {
 	for (const arg of argv)
 		if (arg.startsWith("--") && !known.has(arg.slice(2)))
 			throw new Error(`unknown option ${arg}`);
-	const client = value("client") ?? "larm";
-	if (client !== "larm" && client !== "codex")
-		throw new Error("--client is larm or codex");
-	const harnessName = value("harness");
-	if (harnessName && harnessName !== "local" && harnessName !== "cloud")
-		throw new Error("--harness is local or cloud");
-	const harness = harnessName
-		? harnessName === "cloud"
-			? cloudHarness
-			: localHarness
-		: harnessFor(client === "codex" ? "codex-sdk" : "larm");
-	const model = value("model") ?? null;
+	const harness = localHarness;
 	const dryRun = flag("dry-run");
-	if (client === "codex" && !model && !dryRun)
-		throw new Error("--client codex needs --model <id>");
 	const reasoning = value("reasoning");
 	if (reasoning && !REASONINGS.includes(reasoning as Reasoning))
 		throw new Error("--reasoning is off, low, medium or high");
-	if (client === "codex" && reasoning === "off")
-		throw new Error("--reasoning off is not available on the Codex path");
-	const turn = value("turn") ?? harness.turn;
-	if (turn !== "single" && turn !== "routed")
-		throw new Error("--turn is single or routed");
-	if (turn !== harness.turn)
-		throw new Error(
-			`--turn ${turn} does not fit the ${harness.name} harness (its turn is ${harness.turn})`,
-		);
-	if (turn === "routed" && client !== "larm")
-		throw new Error("--turn routed needs the saved LARM connection");
+	if ((value("turn") ?? "routed") !== "routed")
+		throw new Error("--turn is routed");
 	const lane = value("lane") ?? "choice";
 	if (lane !== "choice" && lane !== "accept")
 		throw new Error("--lane is choice or accept");
@@ -173,12 +137,8 @@ export function parseOptions(argv: readonly string[]): Options {
 	if (judge !== "ruri" && judge !== "expect")
 		throw new Error("--judge is ruri or expect");
 	if (lane === "accept") {
-		// The product's own turn decides its calls: only the local harness on the saved LARM connection runs it.
-		if (harness.name !== "local" || client !== "larm")
-			throw new Error(
-				"--lane accept runs the local harness on the saved LARM connection",
-			);
-		for (const fixed of ["model", "reasoning", "forms", "probe", "turn"])
+		// The product's own turn decides its calls.
+		for (const fixed of ["reasoning", "forms", "probe", "turn"])
 			if (argv.includes(`--${fixed}`))
 				throw new Error(`--${fixed} does not apply to --lane accept`);
 	} else if (argv.includes("--judge"))
@@ -211,11 +171,8 @@ export function parseOptions(argv: readonly string[]): Options {
 		throw new Error("--reps is a positive integer");
 	return {
 		harness,
-		client,
-		model,
 		reasoning: (reasoning as Reasoning | undefined) ?? harness.call.reasoning,
 		reasoningOverridden: !!reasoning,
-		turn,
 		lane,
 		judge,
 		chains,
@@ -237,11 +194,11 @@ export function planOf(
 	).flat();
 }
 
-/** The talk before a chain's first step; in a routed run a planted question back carries its `ask` step. */
-export const startLog = (chain: Chain, turn: TurnMode = "single"): Entry[] => [
+/** The talk before a chain's first step; a planted question back carries its `ask` step. */
+export const startLog = (chain: Chain): Entry[] => [
 	{ role: "agent", text: "こんにちは。" },
 	...(chain.planted ?? []).map(({ role, text, asked }): Entry => {
-		if (turn !== "routed" || !asked) return { role, text };
+		if (!asked) return { role, text };
 		return {
 			role,
 			text,
@@ -262,7 +219,6 @@ type Run = {
 	system: string;
 	harness: ConversationHarness;
 	settings: CallSettings;
-	turn: TurnMode;
 	/** The persona's tone for the choice call's `say`. */
 	style: string;
 	onStep: (record: StepRecord) => void;
@@ -275,8 +231,8 @@ async function runChain(
 	form: Form,
 	rep: number,
 ): Promise<StepRecord[]> {
-	const copies = systemCopyCheck(run.system, run.saved.source.titles);
-	const log = startLog(chain, run.turn);
+	const copies = systemCopyCheck(run.system);
+	const log = startLog(chain);
 	const works: Work[] = [];
 	let handed = 0;
 	let made = 0;
@@ -288,18 +244,15 @@ async function runChain(
 			harness: run.harness,
 			system: run.system,
 			log,
-			works,
-			presented,
 			say: step.say,
 		});
-		const request: RequestInput | null =
-			run.turn === "routed" && step.expect
-				? {
-						routed: routedInputOf({ log, works, presented }),
-						utterance: step.say,
-						style: run.style,
-					}
-				: null;
+		const request: RequestInput | null = step.expect
+			? {
+					routed: routedInputOf({ log, works, presented }),
+					utterance: step.say,
+					style: run.style,
+				}
+			: null;
 		presented = null;
 		await run.client.take();
 		const env = {
@@ -308,16 +261,13 @@ async function runChain(
 			...(run.harness.gates.systemCopy ? { copies } : {}),
 		};
 		const startedAt = performance.now();
-		const turn =
-			run.turn === "routed"
-				? await runRoutedTurn(
-						env,
-						messages,
-						run.saved.cards,
-						handed + 1,
-						request,
-					)
-				: await runTurn(env, messages, run.saved.cards, handed + 1);
+		const turn = await runRoutedTurn(
+			env,
+			messages,
+			run.saved.cards,
+			handed + 1,
+			request,
+		);
 		const turnMs = performance.now() - startedAt;
 		const timing = timingOf(turn.calls, startedAt, turnMs, turn.hostSpoke);
 		const lastAgent = lastOf(log, (e) => e.role === "agent")?.text ?? "";
@@ -333,7 +283,6 @@ async function runChain(
 			...verdict,
 			...turn.delegated,
 			said: turn.said.slice(0, 120),
-			turnMode: run.turn,
 			copyRun: copyRunOf(turn.said, lastAgent),
 			callTokens: tokensOf(turn.calls),
 			stop: turn.stop,
@@ -374,45 +323,37 @@ async function runChain(
 
 /** The first step of each chain and form, composed and printed; no model is called. */
 export function dryRunText(opts: Options, saved: Saved): string {
-	const system = buildSystem(saved.source, opts.harness);
-	const routed = opts.turn === "routed";
+	const system = buildSystem(saved.source);
 	const lines = [
-		`harness=${opts.harness.name} client=${opts.client} reasoning=${opts.reasoning}${opts.reasoningOverridden ? " (override)" : ""} outputLimit=${opts.harness.call.outputLimit}`,
+		`reasoning=${opts.reasoning}${opts.reasoningOverridden ? " (override)" : ""} outputLimit=${opts.harness.call.outputLimit}`,
 		`system: ${system.length} chars, ~${estimateMessageTokens([{ content: system }])} tokens, ${system.split("\n").filter((l) => l.startsWith("## ")).length} sections`,
-		routed
-			? `turn: routed (a request turn is one silent choice held to a schema, a talk turn one call with no tools; stand-ins: ${ROUTED_STAND_INS.join(" / ")})`
-			: "turn: single (one call with the native tools)",
+		`turn: routed (a request turn is one silent choice held to a schema, a talk turn one call with no tools; stand-ins: ${ROUTED_STAND_INS.join(" / ")})`,
 		"",
-		`=== system${routed ? " of the talk turn" : ""} (shared by every message list below) ===`,
+		"=== system of the talk turn (shared by every message list below) ===",
 		system,
 	];
 	for (const chain of opts.chains) {
-		const log = startLog(chain, opts.turn);
+		const log = startLog(chain);
 		for (const form of opts.forms) {
 			const messages = composeInput({
 				form,
 				harness: opts.harness,
 				system,
 				log,
-				works: [],
-				presented: null,
 				say: chain.steps[0]!.say,
 			});
 			lines.push(
 				"",
-				`=== ${chain.key} / ${form}: ${messages.length} messages, ~${estimateMessageTokens(messages)} tokens${routed ? " (the talk turn)" : ""} ===`,
+				`=== ${chain.key} / ${form}: ${messages.length} messages, ~${estimateMessageTokens(messages)} tokens (the talk turn) ===`,
 			);
 			for (const [i, m] of messages.entries()) {
-				const calls = m.tool_calls
-					?.map((c) => `${c.function.name}(${c.function.arguments})`)
-					.join(" ");
 				lines.push(
-					`--- [${i}] ${m.role}${m.tool_call_id ? ` (${m.tool_call_id})` : ""}, ${m.content.length} chars${calls ? `, calls: ${calls}` : ""}`,
+					`--- [${i}] ${m.role}, ${m.content.length} chars`,
 					...(m.role === "system" ? ["(system as above)"] : [m.content]),
 				);
 			}
 		}
-		if (routed) lines.push(...choiceDryRun(chain, saved));
+		lines.push(...choiceDryRun(chain, saved));
 	}
 	return lines.join("\n");
 }
@@ -421,7 +362,7 @@ export function dryRunText(opts: Options, saved: Saved): string {
 function choiceDryRun(chain: Chain, saved: Saved): string[] {
 	const say = chain.steps[0]!.say;
 	const routed = routedInputOf({
-		log: startLog(chain, "routed"),
+		log: startLog(chain),
 		works: [],
 		presented: null,
 	});
@@ -488,11 +429,7 @@ async function main() {
 		console.log(dryRunText(opts, saved));
 		return;
 	}
-	const clients = await import("./harness-client");
-	const client =
-		opts.client === "codex"
-			? await clients.createCodexClient(opts.model!)
-			: await clients.createLarmClient();
+	const client = await (await import("./harness-client")).createLarmClient();
 	const settings: CallSettings = {
 		reasoning: opts.reasoning,
 		outputLimit: opts.harness.call.outputLimit,
@@ -503,10 +440,9 @@ async function main() {
 	const run: Run = {
 		client,
 		saved,
-		system: buildSystem(saved.source, opts.harness),
+		system: buildSystem(saved.source),
 		harness: opts.harness,
 		settings,
-		turn: opts.turn,
 		style: personaStyle(saved.source.persona),
 		onStep: (record) => {
 			records.push(record);
@@ -525,22 +461,15 @@ async function main() {
 	}
 	const meta: ReportMeta = {
 		startedAt: now.toISOString(),
-		client: opts.client,
-		harness: opts.harness.name,
 		reasoning: opts.reasoning + (opts.reasoningOverridden ? "（指定）" : ""),
 		outputLimit: settings.outputLimit,
 		reps: opts.reps,
 		probe: opts.probe,
-		turn: opts.turn,
 		chains: opts.chains.map((c) => c.name),
 		forms: opts.forms,
-		settings:
-			opts.client === "larm"
-				? (await import("./live")).liveSettingsSnapshot()
-				: null,
+		settings: (await import("./live")).liveSettingsSnapshot(),
 	};
-	const report = reportMarkdown(meta, records);
-	const markdown = opts.turn === "routed" ? withStandIns(report) : report;
+	const markdown = withStandIns(reportMarkdown(meta, records));
 	writeReportFile(
 		dir,
 		"results.json",

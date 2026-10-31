@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { ContinuityKind } from "../../continuity/contracts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../conversation/contracts";
-import { continuityItemSchema } from "../../continuity/contracts";
 import type { VectorSpaceShape } from "../../../infrastructure/vector";
 /** The owner principal; defined once in conversation (the lower domain). */
 export const PRINCIPAL = CONVERSATION_DEFAULT_PRINCIPAL;
@@ -11,10 +10,8 @@ import { stateKinds } from "./state-kinds";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 export { stateKinds } from "./state-kinds";
 export {
-	memorySeedInputSchema,
 	memorySeedResultSchema,
 	parseMemorySeedJsonl,
-	seedStateText,
 	type MemorySeed,
 } from "./seeds";
 export const settingsSchema = z.object({ enabled: z.boolean() });
@@ -120,31 +117,12 @@ const memoryItemSchema: z.ZodType<MemoryItemDto> = z.object({
 });
 export const memoryItemsSchema = z.object({ items: z.array(memoryItemSchema) });
 
-/** Query of the short-term and context APIs: the conversation is always named (there is no default). */
-export const conversationQuerySchema = z.object({
-	conversationId: z.string().min(1).max(120),
-});
-export const shortTermSchema = z.object({
-	items: z.array(continuityItemSchema),
-});
 export type MemoryTendencyDto = {
 	id: string;
 	text: string;
 	revision: number;
 	updatedAt: string;
 };
-export const memoryTendenciesSchema: z.ZodType<{
-	items: MemoryTendencyDto[];
-}> = z.object({
-	items: z.array(
-		z.object({
-			id: z.string(),
-			text: z.string(),
-			revision: z.number(),
-			updatedAt: z.string(),
-		}),
-	),
-});
 /** The long-term part of the ContextWindow as the screen shows it: the published profile and what waits beside it. */
 export type MemoryContextDto =
 	| { disabled: true }
@@ -156,14 +134,6 @@ export type MemoryContextDto =
 			/** Current items the published profile does not show yet. */
 			newMemories: number;
 	  };
-export const memoryContextSchema: z.ZodType<MemoryContextDto> = z.union([
-	z.object({ disabled: z.literal(true) }),
-	z.object({
-		version: z.number(),
-		profile: z.object({ text: z.string(), tokens: z.number() }),
-		newMemories: z.number(),
-	}),
-]);
 
 // ---- the block ledger ----
 

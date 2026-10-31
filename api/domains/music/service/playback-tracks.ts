@@ -1,5 +1,3 @@
-import { musicPlaybackPlan, musicPlaybackPlanV2 } from "../../capabilities";
-import type { Prepared } from "../../capabilities";
 import { MusicLibraryError, type LarmPlayground } from "../../larm";
 import { trackId as trackIdSchema } from "../../larm/contracts";
 import { parseResourceUri } from "../../resources";
@@ -9,16 +7,6 @@ import {
 	MUSIC_PLAYLIST_RESOURCE_KIND,
 	MUSIC_TRACK_RESOURCE_KIND,
 } from "./resource-adapter";
-
-/** The plan schema of the tool this task was prepared with: V2 carries the tracks a request was given. */
-export const playbackSchemaOf = (prepared: Prepared) =>
-	prepared.dependencies.some(
-		(d) =>
-			d.kind === "tool" &&
-			(d.schemaKey as string | undefined) === "musicPlaybackPlanV2",
-	)
-		? musicPlaybackPlanV2
-		: musicPlaybackPlan;
 
 /** The resource URIs handed to this request (`kind: "resource"` references), in the stored form. */
 function handedUris(request: unknown) {

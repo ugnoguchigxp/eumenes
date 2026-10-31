@@ -20,8 +20,6 @@ import {
 } from "../toolchain-artifacts/specialist-bridge";
 
 const PIPELINES_ADAPTER_REF = "adapter:pipelines@1";
-/** The studio's artifact id, as a launcher or a navigation names it. */
-export const PIPELINE_STUDIO_ARTIFACT_ID = "pipeline.studio";
 
 /** What the mounted studio shows, read through the latest render. */
 type StudioScreen = {

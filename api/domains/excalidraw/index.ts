@@ -4,4 +4,4 @@ export { createDrawingResourceAdapter } from "./service/resource-adapter";
 export { migrations } from "./repository";
 export { registerDrawingOperations } from "./service/operations";
 
-export type { DrawingConnection } from "./service/connection";
+export type { /** @public */ DrawingConnection } from "./service/connection";

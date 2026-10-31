@@ -8,7 +8,6 @@ import {
 	saveConfirmationRefs,
 } from "../repository/resources";
 import { referencesOfUris, resolveDelegateRefs } from "./delegate-refs";
-import type { ToolOutcome } from "./generation-loop";
 import {
 	TOOL_NAMES,
 	requestRequired,
@@ -28,6 +27,7 @@ import {
 	adoptHere,
 	type ExecutorContext,
 	type Request,
+	type ToolOutcome,
 } from "./executor-context";
 
 /* Delegations: the announced handover, the confirmation before a change and its approval (sections 6.5, 6.7). */

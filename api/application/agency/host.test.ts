@@ -112,7 +112,10 @@ describe("opportunities", () => {
 		expect(prompt).toContain("猫を飼っている");
 		expect(prompt).not.toContain("夜は電話しない");
 		expect(prompt).not.toContain("辛い物が嫌い");
-		expect(prompt).toContain("memory:m1");
+		expect(JSON.parse(prompt).topics).toContainEqual({
+			id: "m1",
+			text: "コーヒーが好き",
+		});
 	});
 
 	test("two events of one commit are both observed, in order, and open one cycle", async () => {
@@ -206,7 +209,7 @@ describe("delivery", () => {
 		const h = harness({
 			settings: { emotion: true },
 			select: (request) => {
-				expect(request.system).toContain("【発話の気持ち】");
+				expect(request.system).toContain("emotion は発話の気持ち");
 				return { ...choice("speak", { refs: ["u1"] }), emotion: "🙂" };
 			},
 		});
@@ -536,7 +539,7 @@ describe("review fixes", () => {
 		}
 	});
 
-	test("close waits for an idle cycle in flight and nothing is written after it", async () => {
+	test("close cancels an idle cycle without waiting for an uncooperative provider and rejects its late result", async () => {
 		let release: () => void = () => {};
 		const gate = new Promise<void>((resolve) => (release = resolve));
 		let selects = 0;
@@ -555,10 +558,10 @@ describe("review fixes", () => {
 		let closed = false;
 		const closing = h.host.close().then(() => (closed = true));
 		await settle();
-		expect(closed).toBe(false);
-		release();
 		await closing;
 		expect(closed).toBe(true);
+		release();
+		await settle();
 		expect(h.texts()).toEqual(["u1", "a1"]);
 	});
 

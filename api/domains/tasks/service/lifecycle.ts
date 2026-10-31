@@ -38,7 +38,6 @@ export function createTaskLifecycle(core: TaskCore) {
 		t.executionDeadlineAt ??= iso(now() + t.grant.maxRuntimeMs);
 		t.state = "queued";
 		t.stopIntent = null;
-		if (t.kind === "coding") t.phase ??= "preparing";
 		record(tx, t, "start_requested");
 		syncHook(kind.startInTransaction(tx, t));
 		return t;

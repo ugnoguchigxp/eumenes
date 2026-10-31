@@ -27,6 +27,9 @@ const lastOf = (m: Materialized): string => m.input.messages.at(-1)!.content;
 /** The lines of one `## ` section of the last message. */
 const sect = (m: Materialized, heading: string) =>
 	sectionLines(lastOf(m), heading);
+/** The `## State` lines the choice calls read: the work by its numbers (only a generation of utterances has them). */
+const choiceState = (m: Materialized) =>
+	sectionLines(m.input.routed?.state ?? "", "State");
 /** The `## Memory` lines (its own message, or the head of the last one). */
 const memoryOf = (m: Materialized) =>
 	m.input.messages.flatMap((message) =>
@@ -196,7 +199,9 @@ test("the recent conversation is what reached the user: a partial delivery as he
 
 test("TODOs and confirmations come from the work ledger as lines of `## State`", async () => {
 	const m = await prepared(fullCase);
-	const state = sect(m, "State");
+	// The talk turn reads the time alone of `## State`; the choice calls read the work.
+	expect(sect(m, "State")).toHaveLength(1);
+	const state = choiceState(m);
 	// Finished work is archived as it finishes: the state names it as notified.
 	expect(state).toContain("- t1 宿の候補を調べる 通知済み");
 	expect(state).toContain(
@@ -233,7 +238,9 @@ test("a generation without an utterance answers a host notice, with the TODO in 
 	expect(m.input.final).toEqual({ kind: "fixed" });
 	expect(sect(m, "Host notice")).toEqual(["- kind: todo_changed"]);
 	expect(sect(m, "User")).toEqual([]);
-	expect(sect(m, "State")).toContain("- t1 調べる 通知済み");
+	// A notice generation only talks: the work is in its host notice, and no choice calls read the state.
+	expect(sect(m, "State")).toHaveLength(1);
+	expect(m.input.routed).toBeUndefined();
 });
 
 test("the input is deterministic, and outside text keeps its characters but can not open a heading", async () => {
@@ -335,47 +342,4 @@ test("a generation after a long silence keeps nothing said before it, and says w
 	} finally {
 		await wiring.close();
 	}
-});
-
-test("a kept search and hand-over pass the invariants only as answered pairs", async () => {
-	const m = await prepared(fullCase);
-	const [system, ...rest] = m.input.messages;
-	const last = rest.at(-1)!;
-	const call = (id: string) => ({
-		role: "assistant" as const,
-		content: "",
-		tool_calls: [
-			{
-				id,
-				type: "function" as const,
-				function: { name: "find_toolchain", arguments: "{}" },
-			},
-		],
-	});
-	const result = (id: string) => ({
-		role: "tool" as const,
-		content: "{}",
-		tool_call_id: id,
-	});
-	const kept = [
-		system!,
-		{ role: "user" as const, content: "## Memory\n- なし" },
-		call("u2-1"),
-		result("u2-1"),
-		{ role: "assistant" as const, content: "作りますね。" },
-		last,
-	];
-	expect(messageIssues({ ...m.input, messages: kept })).toEqual([]);
-	expect(
-		messageIssues({
-			...m.input,
-			messages: [kept[0]!, kept[1]!, call("u2-1"), kept[4]!, last],
-		}),
-	).toContain("unanswered_tool_call:2");
-	expect(
-		messageIssues({
-			...m.input,
-			messages: [kept[0]!, kept[1]!, result("u9-1"), kept[4]!, last],
-		}),
-	).toContain("tool_result_without_call:2");
 });

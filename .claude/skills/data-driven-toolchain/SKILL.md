@@ -1,6 +1,6 @@
 ---
 name: data-driven-toolchain
-description: Add, revise, or migrate an Eumenes toolchain in the data-driven form (capability bundle + versioned binding/artifact + registered DomainAdapter and Web adapter). Use when asked to add a new toolchain/専門担当/ツールチェーン, add an operation or screen variant to an existing one, change a toolchain's profile/SKILL/tools, or migrate a legacy toolchain (Web検索・会話履歴・音楽・画像・Excalidraw・物体認識・dots) off the fixed runtime map.
+description: Add, revise, or migrate an Eumenes toolchain in the data-driven form (capability bundle + versioned binding/artifact + registered DomainAdapter and Web adapter). Use when asked to add a new toolchain/専門担当/ツールチェーン, add an operation or screen variant to an existing one, change a toolchain's profile/SKILL/tools, or migrate a legacy toolchain (Web検索・会話履歴・音楽・画像・Excalidraw・物体認識) off the fixed runtime map.
 ---
 
 # データドリブン形式のツールチェーン追加・移行

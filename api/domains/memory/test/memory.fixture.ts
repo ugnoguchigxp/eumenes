@@ -26,13 +26,15 @@ import {
 	stewardLedgersMigration,
 	forgetClosureMigration,
 	seedImportMigration,
-	specialistBlockReasonMigration,
-	executionReferencesMigration,
-	retireExchangeLedgerMigration,
 	contextWindowMigration,
 	createMemoryService,
 	migration,
 } from "..";
+import {
+	specialistBlockReasonMigration,
+	executionReferencesMigration,
+	retireExchangeLedgerMigration,
+} from "../repository";
 import type {
 	CurationItem,
 	CurationResult,

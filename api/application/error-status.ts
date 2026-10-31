@@ -18,7 +18,6 @@ import { errorStatus as image } from "../domains/image/contracts";
 import { errorStatus as googleAccounts } from "../domains/google-accounts/contracts";
 import { errorStatus as worldDocuments } from "../domains/world/contracts/documents";
 import type { HttpErrorStatus } from "../infrastructure/http";
-import { errorStatus as coding } from "../domains/coding/contracts";
 import { errorStatus as larm } from "../domains/larm/contracts";
 import { errorStatus as scheduler } from "../domains/scheduler/contracts";
 import { errorStatus as taskReports } from "../domains/task-reports/contracts";
@@ -91,7 +90,6 @@ const statusByCode = mergeErrorStatus(
 	image,
 	googleAccounts,
 	worldDocuments,
-	coding,
 	larm,
 	scheduler,
 	taskReports,

@@ -112,7 +112,6 @@ export type Viewing = z.infer<typeof viewingSchema>;
 export const resourceViewingSchema = z
 	.object({ resource: resourceUriSchema })
 	.strict();
-export type ResourceViewing = z.infer<typeof resourceViewingSchema>;
 
 /** What a submit may carry as the screen's context: a specialist's saved item, or a resource. */
 export const runViewingSchema = z.union([viewingSchema, resourceViewingSchema]);

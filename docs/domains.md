@@ -25,7 +25,6 @@
 | `music` | 3 | `api/domains/music/index.ts` | `web/src/domains/music/index.ts` | `web/src/components/domains/music/` | `capabilities`、`inference`、`larm`、`queue`、`resources`、`tool-runtime` | `resources` | なし |
 | `dots` | 1 | `api/domains/dots/index.ts` | `web/src/domains/dots/` | なし | `queue` | なし | なし |
 | `task-reports` | 1 | `api/domains/task-reports/index.ts` | なし | なし | `tasks` | なし | なし |
-| `coding-supervision` | 3 | `api/domains/coding-supervision/index.ts` | なし | なし | `coding`、`inference`、`queue`、`task-reports`、`tasks` | なし | なし |
 | `coding` | 0 | `api/domains/coding/index.ts` | なし | なし | なし | なし | なし |
 | `artifact` | 3 | なし | `web/src/domains/artifact/index.ts` | `web/src/components/domains/artifact/` | なし | `conversation` | なし |
 | `tasks` | 0 | `api/domains/tasks/index.ts` | なし | なし | なし | なし | なし |
@@ -54,7 +53,7 @@
 | `audio` | 0 | なし | `web/src/domains/audio/index.ts` | なし | なし | なし | なし |
 | `queue` | 0 | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
 | `scheduler` | 1 | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
-| `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | なし | なし |
+| `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | `resources` | なし |
 | `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`continuity`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`resources`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `goals` |
 | `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference` | `audio`、`avatar`、`dialogue`、`settings` | なし |
 <!-- domains:end -->
@@ -63,10 +62,9 @@
 
 | Domain | Backend 入口 | Web 入口 | 所有する試験 |
 | --- | --- | --- | --- |
-| coding-supervision | `api/domains/coding-supervision/index.ts` | client/API（`docs/coding-supervision.md`） | `api/domains/coding-supervision/test/`、application結合試験 |
 | task-reports | `api/domains/task-reports/index.ts` | client/API | `api/domains/task-reports/test/` |
-| coding | `api/domains/coding/index.ts` | client/API（`docs/coding-runner.md`） | `api/domains/coding/test/`、`packages/coding-runner/test/`、application結合試験 |
-| tasks | `api/domains/tasks/index.ts` | 共通client/API・CLI（`docs/delegated-tasks.md`） | `api/domains/tasks/test/`、結合試験 `api/application/work/delegated-tasks.test.ts` |
+| coding | `api/domains/coding/index.ts` | Codex SDK runnerの公開口（`docs/coding-runner.md`） | `packages/coding-runner/test/`、application結合試験 |
+| tasks | `api/domains/tasks/index.ts` | 共通client/API・CLI（`docs/delegated-tasks.md`） | `api/domains/tasks/test/`、結合試験 `api/application/work/tasks-http.test.ts` |
 | attitude-dataset | `api/domains/attitude-dataset/index.ts` | CLI/API（`docs/ruri-collection.md`） | `api/domains/attitude-dataset/test/` |
 | delivery | `api/domains/delivery/index.ts` | なし | `api/domains/delivery/test/` |
 | avatar | なし | `web/src/domains/avatar/index.ts` | `web/src/domains/avatar/test/` |

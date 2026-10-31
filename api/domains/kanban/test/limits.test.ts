@@ -1,11 +1,8 @@
 import { expect, test } from "bun:test";
-import { KANBAN_PROMPT_MAX, WORK_ONLY_INSTRUCTION } from "..";
-import {
-	FOLLOWUP_QUOTED_NOTE_MAX,
-	followupBody,
-	taskBody,
-} from "../service/text";
+import { WORK_ONLY_INSTRUCTION } from "..";
+import { followupBody, taskBody } from "../service/text";
 import { openKanban } from "./kanban.fixture";
+import { KANBAN_PROMPT_MAX } from "../contracts";
 
 let req = 0;
 const rid = () => `limit-req-${++req}`;
@@ -61,6 +58,27 @@ test("a follow-up whose note fits is accepted whatever the earlier prompt and re
 	expect(body.endsWith(WORK_ONLY_INSTRUCTION)).toBe(true);
 	expect(body).toContain(`追加の依頼: ${JSON.stringify("続き")}`);
 });
+
+/** The longest JSON-quoted note `followupBody` accepts, found by probing the operation itself. */
+function quotedNoteMax() {
+	const accepts = (quoted: number) => {
+		try {
+			followupBody({ ...card, note: "あ".repeat(quoted - 2) });
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	let low = 2;
+	let high = 8000;
+	while (low < high) {
+		const mid = Math.ceil((low + high) / 2);
+		if (accepts(mid)) low = mid;
+		else high = mid - 1;
+	}
+	return low;
+}
+const FOLLOWUP_QUOTED_NOTE_MAX = quotedNoteMax();
 
 test("the note's quoted length decides: the largest allowed note passes, one more is refused", () => {
 	const withQuoted = (quoted: number) =>

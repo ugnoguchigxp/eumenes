@@ -117,33 +117,8 @@ const candidateAction = z.discriminatedUnion("action", [
 		.strict(),
 ]);
 
-// Published skill v1 asks for this field. Keep its output contract readable,
-// without storing or comparing a second copy of the user's request.
-// Reachable condition: a task binds its package revision when it starts, and
-// toolchain publication also supports rollback (capabilities `publishToolchain`),
-// so rolling `web.search` back to a stored revision 2/3 (package@2/@3 with
-// skill@1) starts v1 tasks again. A restart cancels every running task
-// (`recover()`), so no task outlives the process that started it.
-// Remove `archivedAction`/`guidedActionFor` when revisions that require
-// `skill:web.guided@1` can no longer be published as active (retired from the
-// catalogue), and call `guidedAction` directly.
-const legacyMission = z
-	.object({
-		facts: z.array(z.string().min(1).max(200)).min(1).max(8),
-		conditions: z.array(z.string().min(1).max(160)).max(4),
-	})
-	.strict();
-const archivedAction = z.discriminatedUnion("action", [
-	invoke.extend({ mission: legacyMission.optional() }),
-	wait.extend({ mission: legacyMission.optional() }),
-	finish.extend({ mission: legacyMission.optional() }),
-]);
 export const guidedActionFor = (p: Prepared) =>
-	p.package.schemaKey === "guidedCandidates"
-		? candidateAction
-		: p.package.requiredSkillRevisionIds?.includes("skill:web.guided@1")
-			? archivedAction
-			: guidedAction;
+	p.package.schemaKey === "guidedCandidates" ? candidateAction : guidedAction;
 export type GuidedAction = z.infer<typeof guidedAction>;
 export type GuidedReport = z.infer<typeof guidedReport> & {
 	resultKind?: "candidates" | "facts" | "mixed";

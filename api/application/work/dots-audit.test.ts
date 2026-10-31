@@ -1,5 +1,4 @@
 import { afterEach, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 import type { Prepared } from "../../domains/capabilities";
 import { dotsFixture } from "./dots-fixture";
 
@@ -8,25 +7,14 @@ afterEach(async () => {
 	for (const close of clean.splice(0)) await close();
 });
 
-test("audit Skill upgrades preserve archived revisions and freeze the new dependency in commands", async () => {
+test("the audit Skill is frozen in commands and survives reseeding", async () => {
 	const f = await dotsFixture();
 	clean.push(f.close);
 	const readRevision = (id: string) =>
 		f.store.readSnapshot((db) =>
 			f.capabilities.getDefinitionInTransaction(db, id),
 		);
-	const archived = readRevision("skill:dots.orchestrate@1");
-	expect(archived?.body).toBe(
-		readFileSync(
-			new URL(
-				"../../domains/capabilities/builtin/dots/SKILL.v1.md",
-				import.meta.url,
-			),
-			"utf8",
-		),
-	);
 	const current = readRevision("skill:dots.orchestrate@2");
-	expect(current?.hash).not.toBe(archived?.hash);
 	expect(f.project.capabilityRevisionId).toBe("package:dots.orchestrate@2");
 	const receipt = await f.tasks.create(f.input());
 	const command = f.command(receipt.taskId);
@@ -38,7 +26,6 @@ test("audit Skill upgrades preserve archived revisions and freeze the new depend
 		body: current!.body,
 	});
 	await f.capabilities.seed();
-	expect(readRevision("skill:dots.orchestrate@1")).toEqual(archived);
 	expect(readRevision("skill:dots.orchestrate@2")).toEqual(current);
 	expect(
 		f.dots.getCommand("dots", command.commandId).snapshot.capability,

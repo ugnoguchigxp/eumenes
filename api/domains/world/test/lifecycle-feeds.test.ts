@@ -1,10 +1,5 @@
 import { expect, test } from "bun:test";
-import type {
-	ListChangesRequest,
-	SourceAdapter,
-	SourceChange,
-	SourceChangeKind,
-} from "..";
+
 import {
 	SCOPE,
 	addMessage,
@@ -25,6 +20,12 @@ import {
 	worldExternals,
 	type Life,
 } from "./lifecycle-fixture";
+import type {
+	ListChangesRequest,
+	SourceAdapter,
+	SourceChange,
+	SourceChangeKind,
+} from "../contracts";
 
 async function seed(life: Life) {
 	expect((await life.lifecycle.recoverWorld()).status).toBe("open");

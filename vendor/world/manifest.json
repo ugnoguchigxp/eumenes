@@ -1,6 +1,9 @@
 {
 	"package": "eumenes-world-model",
 	"version": "0.0.1",
-	"artifact": "eumenes-world-model-0.0.1.tgz",
-	"sha256": "c553b67aa2497d597e7fce42ec62ea3a47b42dca8750d2d92ba9df1a65ff5fe9"
+	"artifact": "eumenes-world-model-0.0.1-be38c74a8016.tgz",
+	"sha256": "be38c74a80166f32c53b4bbe3bada3c9280a42980bc0be132ed4c4cf804e8769",
+	"sourceDigest": "f5963ee9152fae95dd18ef566a967718f4798ef0230d7c47221a0f0537ba801e",
+	"sourceGitCommit": "06e948047b34361e6ac469f33747601869522af4",
+	"srcDirtyFiles": 3
 }

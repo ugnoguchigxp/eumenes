@@ -54,6 +54,7 @@ export function createIndependentControls(
 				subject: string;
 				deadline: number;
 				maxOutputTokens: number;
+				structuredOutput?: boolean;
 			},
 		) {
 			if (
@@ -79,6 +80,10 @@ export function createIndependentControls(
 			db.query(
 				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents='[]' WHERE id=? AND status='pending'",
 			).run(input.maxOutputTokens, requestId);
+			if (input.structuredOutput)
+				db.query(
+					"UPDATE inference_requests SET structured_output=1 WHERE id=?",
+				).run(requestId);
 			return requestId;
 		},
 	};

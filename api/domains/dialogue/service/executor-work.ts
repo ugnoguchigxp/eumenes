@@ -2,7 +2,6 @@ import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
 import type { WorkRow } from "../repository/work";
 import type { DialogueDeps } from "./context";
-import type { ToolOutcome } from "./generation-loop";
 import { type ParsedCall, type WorkArgs } from "./generation-tools";
 import { hideUris, type DocumentRefs } from "./work-items";
 import { CHECK_MAX_TOKENS } from "./input-text";
@@ -17,6 +16,7 @@ import {
 	acceptHere,
 	adoptHere,
 	type ExecutorContext,
+	type ToolOutcome,
 } from "./executor-context";
 
 /** A work call with its TODO found: the row's id, the revision the model saw, and the open question. */

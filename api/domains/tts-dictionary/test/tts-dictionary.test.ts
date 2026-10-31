@@ -2,9 +2,10 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Hono } from "hono";
 import { openStore } from "../../../infrastructure/sqlite";
-import { createTtsDictionary, migration, registerTtsDictionary } from "..";
+import { createTtsDictionary } from "..";
+import { deleteSchema, saveSchema } from "../contracts";
+import { migration } from "../repository";
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {
 	for (const c of cleanup.splice(0)) await c();
@@ -16,7 +17,15 @@ function setup() {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
-	return createTtsDictionary(store);
+	const service = createTtsDictionary(store);
+	return {
+		...service,
+		list: () => store.read((db) => service.listInTransaction(db)),
+		save: (input: Parameters<typeof service.saveInTransaction>[1]) =>
+			store.write((db) => service.saveInTransaction(db, input)),
+		delete: (input: Parameters<typeof service.deleteInTransaction>[1]) =>
+			store.write((db) => service.deleteInTransaction(db, input)),
+	};
 }
 test("saves, applies longest match first, and rebuilds after change", async () => {
 	const d = setup();
@@ -58,29 +67,23 @@ test("stale expectations and duplicate headwords conflict; delete is guarded", a
 		(await d.delete({ written: "A", expected: { spoken: "x" } })).length,
 	).toBe(0);
 });
-test("HTTP validation rejects malformed entries", async () => {
-	const app = new Hono();
-	registerTtsDictionary(app, setup());
-	const post = (path: string, body: unknown) =>
-		app.request(path, { method: "POST", body: JSON.stringify(body) });
+test("validation rejects malformed entries", async () => {
+	const d = setup();
 	expect(
-		(
-			await post("/api/tts-dictionary/save", {
-				original: null,
-				entry: { written: " x", spoken: "y" },
-				expected: { spoken: null },
-			})
-		).status,
-	).toBe(400);
-	const ok = await post("/api/tts-dictionary/save", {
-		original: null,
-		entry: { written: "x", spoken: "y" },
-		expected: { spoken: null },
-	});
-	expect(ok.status).toBe(200);
-	expect(await (await app.request("/api/tts-dictionary")).json()).toEqual({
-		entries: [{ written: "x", spoken: "y" }],
-	});
+		saveSchema.safeParse({
+			original: null,
+			entry: { written: " x", spoken: "y" },
+			expected: { spoken: null },
+		}).success,
+	).toBe(false);
+	await d.save(
+		saveSchema.parse({
+			original: null,
+			entry: { written: "x", spoken: "y" },
+			expected: { spoken: null },
+		}),
+	);
+	expect(d.list()).toEqual([{ written: "x", spoken: "y" }]);
 });
 const add = (d: ReturnType<typeof setup>, written: string, spoken: string) =>
 	d.save({
@@ -128,23 +131,21 @@ test("rename moves the row atomically and refuses stale or conflicting renames",
 	});
 	expect(entries.map((e) => e.written)).toEqual(["B", "C"]);
 });
-test("HTTP rejects boundary headwords, normalizes to NFC, and deletes", async () => {
-	const app = new Hono();
-	registerTtsDictionary(app, setup());
-	const post = (path: string, body: unknown) =>
-		app.request(path, { method: "POST", body: JSON.stringify(body) });
+test("validation rejects boundary headwords, normalizes to NFC, and deletes", async () => {
+	const d = setup();
 	const save = (written: string, spoken: string) =>
-		post("/api/tts-dictionary/save", {
+		saveSchema.safeParse({
 			original: null,
 			entry: { written, spoken },
 			expected: { spoken: null },
 		});
-	expect((await save("Node.js", "ノード")).status).toBe(400);
-	expect((await save("\ud800", "x")).status).toBe(400);
-	expect((await save("が".normalize("NFD"), "が")).status).toBe(200);
-	const removed = await post("/api/tts-dictionary/delete", {
-		written: "が",
-		expected: { spoken: "が" },
-	});
-	expect(await removed.json()).toEqual({ entries: [] });
+	expect(save("Node.js", "ノード").success).toBe(false);
+	expect(save("\ud800", "x").success).toBe(false);
+	const parsed = save("が".normalize("NFD"), "が");
+	expect(parsed.success).toBe(true);
+	await d.save(parsed.data!);
+	const removed = await d.delete(
+		deleteSchema.parse({ written: "が", expected: { spoken: "が" } }),
+	);
+	expect(removed).toEqual([]);
 });

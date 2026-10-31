@@ -1,13 +1,10 @@
 import { expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	KANBAN_PROMPT_MAX,
-	WORK_ONLY_INSTRUCTION,
-	type KanbanDispatch,
-	type KanbanRunFinish,
-} from "..";
+import { WORK_ONLY_INSTRUCTION, type KanbanDispatch } from "..";
 import { openKanban } from "./kanban.fixture";
+import { KANBAN_PROMPT_MAX } from "../contracts";
+import type { KanbanRunFinish } from "../contracts";
 
 let req = 0;
 const rid = () => `run-req-${++req}`;

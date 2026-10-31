@@ -226,26 +226,6 @@ test("intervalLifecycle stop and idle can be used apart, and a rejecting job is 
 	expect(idle).toBe(true);
 });
 
-test("a non-exclusive interval fires every tick and does not track them", async () => {
-	const timers = manualTimers();
-	let runs = 0;
-	const job = intervalLifecycle(
-		"beat",
-		10,
-		() => {
-			runs++;
-			return new Promise(() => {});
-		},
-		{ exclusive: false, setTimer: timers.set, clearTimer: timers.clear },
-	);
-	job.start?.();
-	timers.pending[0]!.callback();
-	timers.pending[0]!.callback();
-	await flush();
-	expect(runs).toBe(2);
-	await job.idle();
-});
-
 function terminatorHarness(shutdown: () => Promise<boolean>) {
 	const timers = manualTimers();
 	const exits: number[] = [];

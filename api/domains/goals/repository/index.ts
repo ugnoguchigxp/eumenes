@@ -237,23 +237,6 @@ export function scopeEpoch(
 	);
 }
 
-export function goalHistory(
-	db: Database,
-	goalId: string,
-): { revision: number; status: GoalStatus; source: GoalSource }[] {
-	return (
-		db
-			.query(
-				"SELECT revision, status, source_json FROM goals_history WHERE goal_id=? ORDER BY revision",
-			)
-			.all(goalId) as Record<string, unknown>[]
-	).map((row) => ({
-		revision: row.revision as number,
-		status: row.status as GoalStatus,
-		source: JSON.parse(row.source_json as string) as GoalSource,
-	}));
-}
-
 /** Writes the provenance of one goal revision. Entity links only accumulate. */
 export function recordGoalLinks(
 	db: Database,

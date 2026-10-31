@@ -14,9 +14,9 @@
         "@playwright/mcp": "0.0.83",
         "@tanstack/react-query": "5.101.0",
         "bmp-ts": "1.0.9",
-        "eumenes-agency": "file:vendor/agency/eumenes-agency-0.0.1-bf34e9de9e6f.tgz",
+        "eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.1-94ad302a4ca7.tgz",
         "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz",
-        "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1.tgz",
+        "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz",
         "google-auth-library": "11.1.0",
         "hono": "4.12.34",
         "jsonrepair": "3.15.0",
@@ -1383,11 +1383,11 @@
 
     "etag": ["etag@1.8.1", "", {}, "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg=="],
 
-    "eumenes-agency": ["eumenes-agency@vendor/agency/eumenes-agency-0.0.1-bf34e9de9e6f.tgz", { "dependencies": { "zod": "4.4.3" } }, "sha512-RWwRUdfeMBGzIIUfJcaQD0Ejh0Z5pXovmoY+Zkr5YscP7tRLE5AEPs3Nkfu1LJ/BAbNqnTqXjmXpPxEm3FmCRA=="],
+    "eumenes-agency": ["eumenes-agency@vendor/agency/eumenes-agency-0.1.1-94ad302a4ca7.tgz", { "dependencies": { "zod": "4.4.3" } }, "sha512-gH6rntltzbBuBHSyE3P1YPPmNvD94Y7kqxqyoHfVGKuVa0sjigj/mSRJQ/IVWD+KkNlA7lhIQg8UUg25i2Z2PQ=="],
 
     "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz", {}, "sha512-+MIM2niIoJ+7GaycVEnuyl6zS5ZYH0Y3MAYyU/kEf9gfYZOMdNz99Jjal/ELF/ArdPoBTqhJue98M0J7FYlZAg=="],
 
-    "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1.tgz", {}, "sha512-NRG/JMrI+xu2MlnwRgKB0A8x4y6snR+8v0ElDJbKhtqf/cKrzTEzhC+JB36uXAseITvoYKEu2Ti1YRl8F24qQg=="],
+    "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz", {}, "sha512-+OuL1icda7iAwQG7wOcQ8k5dEiqSOwdWJv2XDkWqL9i3LzVFhr147MBFeu4G1uRuHHuLoJGt87M8zJ6A9WzTiA=="],
 
     "eventemitter3": ["eventemitter3@5.0.4", "", {}, "sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw=="],
 

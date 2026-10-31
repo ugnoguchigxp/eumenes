@@ -1,3 +1,0 @@
-# Source: api/domains/capabilities/builtin/web-research.ts
-text = '''
-公開資料を調べます。プレビューに必要項目がなければ保存本文を検索・範囲読取りします。資料が違えば別候補・不足項目の再検索に進みます。現在の依頼に必要な根拠と不足を返します。'''

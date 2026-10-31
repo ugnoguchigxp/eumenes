@@ -8,7 +8,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, test, vi } from "vitest";
 import { MusicArtifact } from "./MusicArtifact";
-import { musicArtifactDefinition } from "../../../domains/music/artifact-definition";
+import { musicArtifactDefinition } from "../../../domains/music/artifact-definition.fixture";
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();

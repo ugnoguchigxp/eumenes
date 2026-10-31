@@ -63,38 +63,66 @@ async function openFromHub(page: Page, label: string) {
 type Request = import("@playwright/test").APIRequestContext;
 const CONFLICT = /状態が変わりました/;
 
-async function dictionary(request: Request) {
+const DICTIONARY = "artifact:settings.dictionary@2";
+const artifactUrl = () =>
+	`http://127.0.0.1:${apiPort}/api/toolchain-artifacts/${encodeURIComponent(DICTIONARY)}`;
+
+/** The dictionary list, read from the same source the screen reads. */
+async function dictionarySource(request: Request) {
 	const response = await request.get(
-		`http://127.0.0.1:${apiPort}/api/tts-dictionary`,
-		{ headers: auth },
+		`${artifactUrl()}/sources/dictionary-entries`,
+		{
+			headers: auth,
+		},
 	);
 	expect(response.ok()).toBe(true);
-	return (
-		(await response.json()) as {
-			entries: Array<{ written: string; spoken: string }>;
-		}
-	).entries;
+	return (await response.json()) as {
+		revision: number;
+		data: { items: Array<{ written: string; spoken: string }> };
+	};
 }
 
-/** Another writer changes an entry through the public dictionary API. */
+async function dictionary(request: Request) {
+	return (await dictionarySource(request)).data.items.map(
+		({ written, spoken }) => ({ written, spoken }),
+	);
+}
+
+/** Another writer changes an entry through the same action path the screen uses. */
 async function otherSaves(
 	request: Request,
 	written: string,
 	was: string,
 	spoken: string,
 ) {
+	const artifact = await request.get(artifactUrl(), { headers: auth });
+	expect(artifact.ok()).toBe(true);
+	const { scopeRef } = (await artifact.json()) as { scopeRef: string };
+	const { revision } = await dictionarySource(request);
+	const now = Date.now();
 	const response = await request.post(
-		`http://127.0.0.1:${apiPort}/api/tts-dictionary/save`,
+		`http://127.0.0.1:${apiPort}/api/toolchain-actions`,
 		{
 			headers: auth,
 			data: {
-				original: written,
-				entry: { written, spoken },
-				expected: { spoken: was },
+				version: 1,
+				eventId: crypto.randomUUID(),
+				eventCreatedAt: new Date(now).toISOString(),
+				eventExpiresAt: new Date(now + 3600_000).toISOString(),
+				artifactId: "other-writer",
+				artifactRevisionId: DICTIONARY,
+				source: "dictionary-entries",
+				sourceRevision: revision,
+				actionId: "edit",
+				scopeRef,
+				input: { written, expectedSpoken: was, spoken },
 			},
 		},
 	);
 	expect(response.ok()).toBe(true);
+	expect(((await response.json()) as { status: string }).status).toBe(
+		"accepted",
+	);
 }
 
 /** The next action request the page sends, with the ledger's answer. */

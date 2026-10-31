@@ -102,20 +102,6 @@ const messages: Record<string, string> = {
 		"音声検出を準備できませんでした。ページを再読み込みしてから音声を再開してください。",
 };
 
-const turnStatuses: Record<string, string> = {
-	input_ready: "発話を確認中",
-	merged: "続きの発話へ結合済み",
-	recognizing: "聞き取り中",
-	responding: "回答を生成中",
-	synthesizing: "音声を合成中",
-	ready: "再生待ち",
-	played: "再生済み",
-	completed: "完了",
-	failed: "失敗",
-	cancelled: "中止",
-	interrupted: "中断",
-};
-
 const connectionStates: Record<string, string> = {
 	connecting: "接続中",
 	ready: "接続済み",
@@ -164,9 +150,6 @@ export function describeError(e: unknown): string {
 	if (known) return known;
 	return unknownError(text);
 }
-
-export const describeTurnStatus = (status: string) =>
-	turnStatuses[status] ?? "状態を確認中";
 
 export const describeConnectionState = (state: string) =>
 	connectionStates[state] ?? "状態を確認中";

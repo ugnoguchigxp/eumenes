@@ -3,14 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	createTasks,
-	migration,
-	type TaskFence,
-	type TaskKindDefinition,
-} from "..";
+import { createTasks, migrations, type TaskKindDefinition } from "..";
 import { createTaskSchema, workTaskSchema } from "../contracts";
 import { capacity } from "../repository";
+import type { TaskFence } from "../types";
 
 const stores: SqliteStore[] = [],
 	dirs: string[] = [];
@@ -27,12 +23,12 @@ function setup(
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-tasks-"));
 	dirs.push(dir);
 	const file = join(dir, "db");
-	const store = openStore(file, [migration]);
+	const store = openStore(file, migrations);
 	stores.push(store);
 	const clock = { t: T0 },
 		hooks = { starts: 0, stops: 0, answers: 0, fail: false };
 	const kind: TaskKindDefinition = {
-		kind: "coding",
+		kind: "orchestration",
 		version: 1,
 		available: () => ready,
 		startInTransaction() {
@@ -56,15 +52,16 @@ function setup(
 const input = (startMode: "start" | "register_only" = "start") =>
 	createTaskSchema.parse({
 		requestId: crypto.randomUUID(),
-		kind: "coding",
+		kind: "orchestration",
 		version: 1,
 		title: "fixture task",
 		request: "implement the requested change",
 		completionConditions: ["checks pass"],
 		startMode,
 		grant: {
-			workspaceId: "fixture-workspace",
-			operations: ["read", "edit", "check", "review"],
+			connectionRef: "fixture-connection",
+			projectRef: "fixture-project",
+			operations: ["read", "edit", "check"],
 			expiresAt: new Date(T0 + 3_600_000).toISOString(),
 		},
 	});
@@ -328,7 +325,7 @@ test("reopening preserves tasks independently of conversation lifetime, and reco
 	const registered = await h.tasks.create(input("register_only"));
 	const running = await h.tasks.create(input(), context);
 	await h.store.close();
-	const store = openStore(h.file, [migration]);
+	const store = openStore(h.file, migrations);
 	stores.push(store);
 	const recovered = createTasks(store, { now: () => T0 });
 	await recovered.recover();
@@ -435,7 +432,7 @@ test("asynchronous domain hooks cannot escape the single writer transaction", as
 	const h = setup(true, {
 		kinds: [
 			{
-				kind: "coding",
+				kind: "orchestration",
 				version: 1,
 				available: () => true,
 				startInTransaction: async () => {},
@@ -571,7 +568,7 @@ test("invalid runtime question types cannot create an unreadable waiting state",
 	expect(h.tasks.get(r.taskId).question).toBeNull();
 });
 
-test("storage admission bounds new grant history while revocation and cancellation remain available", async () => {
+test("storage admission bounds new grant history while cancellation remains available", async () => {
 	const baseline = setup(),
 		data = input("register_only");
 	await baseline.tasks.create(data);
@@ -586,11 +583,6 @@ test("storage admission bounds new grant history while revocation and cancellati
 		}),
 	).rejects.toThrow("task_capacity");
 	expect(h.tasks.get(t.id).task).toEqual(t);
-	await h.tasks.amend(t.id, {
-		...cmd(t.revision),
-		grant: { ...t.grant, operations: ["read"] },
-	});
-	expect(h.tasks.get(t.id).task.grant.operations).toEqual(["read"]);
 	await h.tasks.stop(t.id, {
 		...cmd(h.tasks.get(t.id).task.revision),
 		intent: "cancel",
@@ -661,7 +653,7 @@ test("Promise-like transaction callbacks are rejected as well as native Promises
 	const h = setup(true, {
 		kinds: [
 			{
-				kind: "coding",
+				kind: "orchestration",
 				version: 1,
 				available: () => true,
 				startInTransaction: () => ({
@@ -682,7 +674,7 @@ test("available actions reflect a missing answer capability and an exhausted run
 	const h = setup(true, {
 		kinds: [
 			{
-				kind: "coding",
+				kind: "orchestration",
 				version: 1,
 				available: () => true,
 				startInTransaction: () => {},

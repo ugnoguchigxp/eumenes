@@ -157,28 +157,6 @@ export function goalRevisionOf(
 	return revisionOf(db, goal);
 }
 
-/**
- * Host-only variant without an access check (for example maintenance or tests).
- * Deliberately not re-exported from the domain index: World must never get a
- * way to probe goals of other principals.
- */
-export function goalRevisionOfUnscoped(
-	db: Database,
-	goalId: string,
-): GoalRevision | null {
-	const goal = getGoal(db, goalId);
-	return goal ? revisionOf(db, goal) : null;
-}
-
-/** Current goal epoch of one scope (0 when the scope never had an adopted goal). */
-export function goalEpochOf(
-	db: Database,
-	principal: string,
-	scopeKey: string,
-): number {
-	return scopeEpoch(db, principal, scopeKey);
-}
-
 const operationDigest = (
 	status: string,
 	value: {

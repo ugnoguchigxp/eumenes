@@ -33,14 +33,6 @@ const FOLLOWUP_HEAD = (title: string) =>
 const FOLLOWUP_TAIL = `\n\n${WORK_ONLY_INSTRUCTION}`;
 const SUMMARY_LEAD = "\n\n前の会話を再開できない場合のための要約です。";
 /** Card titles are at most 40 characters (the typed input). */
-const TITLE_MAX = 40;
-
-/**
- * The longest JSON-quoted follow-up note that is always accepted: the rest of the request is the
- * title, the fixed words and the work instruction (the fallback summary is dropped to make room).
- */
-export const FOLLOWUP_QUOTED_NOTE_MAX =
-	MAX_BODY - FOLLOWUP_HEAD("x".repeat(TITLE_MAX)).length - FOLLOWUP_TAIL.length;
 
 /**
  * The fallback summary of the earlier request and report, quoted as JSON strings so they never

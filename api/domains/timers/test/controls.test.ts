@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { openTimers, startBody } from "./timers.test";
-import { migration, migrations } from "..";
+import { migrations } from "..";
 import { digest } from "../service/canonical";
-import { createTimers, TIMER_POLICY, timerReceiptSchema } from "..";
+import { createTimers, timerReceiptSchema } from "..";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createQueue, migration as queueMigration } from "../../queue";
 import {
@@ -13,6 +13,8 @@ import {
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
+import { migration } from "../repository/migrations";
+import { TIMER_POLICY } from "../service/policy";
 
 const T0 = Date.parse("2026-10-09T00:00:00Z");
 const input = (revision: number, now: number) => ({

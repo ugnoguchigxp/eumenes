@@ -3,8 +3,6 @@ import { expect } from "bun:test";
 import {
 	createConversationSourceAdapter,
 	createWorldCuration,
-	type CurationModelView,
-	type CurationOptions,
 	type CurationPrepareResult,
 	type CurationSettleResult,
 	type IntakePorts,
@@ -21,6 +19,10 @@ import {
 	entityOp,
 } from "./fixture";
 import { openLife, type Life } from "./lifecycle-fixture";
+import type {
+	CurationModelView,
+	CurationOptions,
+} from "../service/curation-types";
 
 /** What the host says about messages: shared by the feed (intake) and by curation. */
 export function testPorts() {

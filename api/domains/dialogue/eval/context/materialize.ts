@@ -9,6 +9,7 @@ import {
 	DEFAULT_START,
 	type EvalCard,
 	type Generated,
+	type Persona,
 	type Session,
 	SEED_SOURCE_MESSAGE,
 	type SeedWiring,
@@ -22,6 +23,8 @@ export type Materialized = {
 	runId: string;
 	input: GenerateInput;
 	cut: Generated["cut"];
+	/** The persona the case sets (the choice call writes in its style). */
+	persona: Persona;
 	/** Releases the temp store. */
 	close(): Promise<void>;
 };
@@ -215,6 +218,7 @@ export async function materialize(
 			runId: generated.runId,
 			input: generated.input,
 			cut: generated.cut,
+			persona: { ...session.ports.persona },
 			close: () => wiring.close(),
 		};
 	} catch (error) {

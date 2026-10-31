@@ -1,13 +1,7 @@
 export { migrations } from "./repository";
 export type { GoalsService } from "./service";
-export {
-	createGoalsService,
-	goalEpochOf,
-	goalRevisionOf,
-	goalSnapshot,
-} from "./service";
+export { createGoalsService, goalRevisionOf } from "./service";
 export type {
-	Goal,
 	GoalAccess,
 	GoalOp,
 	GoalOpResult,

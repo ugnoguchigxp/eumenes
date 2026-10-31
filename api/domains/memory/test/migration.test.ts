@@ -12,12 +12,14 @@ import {
 	createMemoryService,
 	migrations as hostMemoryMigrations,
 	seedImportMigration,
+	stewardLedgersMigration,
+} from "..";
+import {
 	executionReferencesMigration,
 	specialistBlockReasonMigration,
-	stewardLedgersMigration,
 	retireExchangeLedgerMigration,
 	dropWindowPrefetchMigration,
-} from "..";
+} from "../repository";
 import {
 	createContinuityService,
 	migrations as continuityMigrations,

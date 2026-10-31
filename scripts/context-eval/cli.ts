@@ -7,7 +7,7 @@
  *   bun scripts/context-eval/cli.ts score    --experiment <dir> --run <run dir> [--adjudication <file>]
  *   bun scripts/context-eval/cli.ts analyze  --experiment <dir> --scores <scores dir> [--baseline-scores <scores dir>] [--split dev|holdout]
  * Every case is prepared by the production code (the ContextWindow's prepare) and the model is called through the
- * production generation loop. `--baseline-scores` takes the scores of the same experiment measured before the change.
+ * product's routed turn. `--baseline-scores` takes the scores of the same experiment measured before the change.
  * Reports go to verification-reports/context-eval/<experiment>/<timestamp>/ (new directories, never overwritten).
  * `--live` uses the saved LARM connection in this process; it never starts a server. Without it the fixture lane runs.
  */

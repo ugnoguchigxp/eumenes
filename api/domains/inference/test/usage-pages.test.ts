@@ -2,14 +2,11 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Hono } from "hono";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { migrations } from "../repository";
 import { migrations as settingsMigrations } from "../../settings";
 import { createUsageReader } from "../service/usage";
 import { usagePageQuerySchema } from "../contracts";
-import { registerInference } from "../controller";
-import type { InferenceService } from "../service";
 
 let store: SqliteStore, dir: string;
 afterEach(async () => {
@@ -77,26 +74,22 @@ test("usage API sorts and searches the entire retained dataset before pagination
 	expect(last.items).toHaveLength(5);
 	for (const sort of ["purpose", "source", "status", "started"] as const)
 		expect(reader.usagePage(query({ sort })).items).toHaveLength(10);
-	const app = new Hono();
-	registerInference(app, reader as unknown as InferenceService);
 	for (const raw of [
-		"sort=model;drop",
-		"pageSize=500",
-		"pageIndex=-1",
-		"desc=evil",
-		"q=" + "x".repeat(201),
-		"unknown=1",
+		{ sort: "model;drop" },
+		{ pageSize: 500 },
+		{ pageIndex: -1 },
+		{ desc: "evil" },
+		{ q: "x".repeat(201) },
+		{ unknown: 1 },
 	])
-		expect((await app.request("/api/inference/usage/page?" + raw)).status).toBe(
-			400,
-		);
+		expect(usagePageQuerySchema.safeParse(raw).success).toBe(false);
 	expect(
-		(
-			await app.request(
-				"/api/inference/usage/page?sort=model&desc=false&pageIndex=1",
-			)
-		).status,
-	).toBe(200);
+		usagePageQuerySchema.safeParse({
+			sort: "model",
+			desc: false,
+			pageIndex: 1,
+		}).success,
+	).toBe(true);
 	await store.write((db) => {
 		db.query(
 			"INSERT INTO inference_attempts(id,request_id,source,model,status,started) VALUES('pending','001','larm',NULL,'pending',999)",

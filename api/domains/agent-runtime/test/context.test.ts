@@ -154,7 +154,7 @@ test("replay-only tools do not advertise new operation capacity and retain execu
 			{
 				executionRef: "host-only-ref",
 				replayOnly: true,
-				tool: { id: "web.lookup", schemaKey: "lookup" },
+				tool: { id: "web.lookup", schemaKey: "lookupV2" },
 			},
 		],
 		[],
@@ -184,7 +184,12 @@ test("all lookup routes advertise the canonical executable input contract", () =
 		const context = workerContext(
 			task,
 			{ ...prepared, package: { ...prepared.package, id } } as Prepared,
-			[{ executionRef: "x", tool: { id: "web.lookup", schemaKey: "lookup" } }],
+			[
+				{
+					executionRef: "x",
+					tool: { id: "web.lookup", schemaKey: "lookupV2" },
+				},
+			],
 			[],
 			[],
 			new EvidenceCatalog(),
@@ -193,7 +198,7 @@ test("all lookup routes advertise the canonical executable input contract", () =
 		const tools = JSON.parse(
 			context.messages[0]!.content.split("\nTOOLS=")[1]!.split("\n")[0]!,
 		);
-		expect(tools[0].inputSchema).toEqual(zSchema("lookup"));
+		expect(tools[0].inputSchema).toEqual(zSchema("lookupV2"));
 		for (const args of [
 			{ query: "今日の予報" },
 			{
@@ -568,7 +573,7 @@ test("a replayed observation moved after new material never pushes the packet pa
 });
 
 test("every route carries the shared rules, and the step contract is also returned as values", async () => {
-	const { commonRules } = await import("../service/context");
+	const { commonRules } = await import("../service/worker-control");
 	for (const id of ["web.quick", "web.search", "web.recipe", undefined]) {
 		const p = {
 			...prepared,

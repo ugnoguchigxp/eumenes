@@ -1,5 +1,5 @@
 import type { ConversationEvent } from "../../../continuity";
-import type { LabelTable, LoadedEvent } from "../context";
+import type { LoadedEvent } from "../context";
 import type { StepEnv } from "../types";
 
 /**
@@ -42,11 +42,4 @@ export function pendingEvents(env: StepEnv): ConversationEvent[] {
  */
 export function eventLabel(event: LoadedEvent, index: number): string {
 	return event.seq === null ? `x${index + 1}` : `e${event.seq}`;
-}
-
-/** The messages a label table stands on. */
-export function allMessageIds(table: LabelTable): string[] {
-	return Object.values(table)
-		.map((entry) => entry.messageId)
-		.filter((id): id is string => id !== null);
 }

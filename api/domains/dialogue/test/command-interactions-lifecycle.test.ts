@@ -1,12 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
 import { INTERACTION_POLICY } from "..";
 import { insertInteraction } from "../repository/interactions";
-import { settle } from "../../../infrastructure/wait-for";
 import {
 	BINDING,
 	PACKAGE,
 	REVISION,
 	answerFor,
+	choice,
 	setup,
 	until,
 	type Harness,
@@ -211,67 +211,6 @@ test("at most three questions are asked; the fourth stops the operation", async 
 		questionCount: 3,
 	});
 });
-test("cancelling closes the question, refuses a late answer and stops a resumed run still in flight", async () => {
-	h = await setup();
-	await h.asked();
-	const interaction = h.interaction()!;
-	const cancelled = await h.interactions.cancel(interaction.id, {
-		eventId: crypto.randomUUID(),
-		expectedRevision: 0,
-	});
-	expect(cancelled).toMatchObject({ status: "cancelled", question: null });
-	await expect(
-		h.interactions.answer(interaction.id, {
-			eventId: crypto.randomUUID(),
-			questionId: interaction.question!.questionId,
-			expectedRevision: 0,
-			input: { durationSeconds: 60 },
-		}),
-	).rejects.toThrow("interaction_closed");
-	// Epoch and generation advanced.
-	const row = h.rows(
-		"SELECT authority_epoch, execution_generation FROM command_interactions",
-	)[0];
-	expect(row.authority_epoch).toBeGreaterThan(0);
-	expect(row.execution_generation).toBeGreaterThan(0);
-	// Cancelling again is idempotent.
-	expect(
-		(
-			await h.interactions.cancel(interaction.id, {
-				eventId: crypto.randomUUID(),
-				expectedRevision: 5,
-			})
-		).status,
-	).toBe("cancelled");
-});
-test("a model result that arrives after the interaction was cancelled is not adopted", async () => {
-	h = await setup();
-	await h.asked();
-	const interaction = h.interaction()!;
-	let release!: () => void;
-	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.commands.push({
-		action: "invoke",
-		tool: "fake.start",
-		arguments: { seconds: 60 },
-	});
-	const { runId } = await h.interactions.answer(interaction.id, {
-		eventId: crypto.randomUUID(),
-		questionId: interaction.question!.questionId,
-		expectedRevision: 0,
-		input: { durationSeconds: 60 },
-	});
-	await until(() => h!.commandPrompts.length === 2);
-	await h.interactions.cancel(interaction.id, {
-		eventId: crypto.randomUUID(),
-		expectedRevision: 1,
-	});
-	release();
-	await until(() => h!.status(runId) === "cancelled");
-	await settle();
-	expect(h.started).toHaveLength(0);
-	expect(h.interaction()!.status).toBe("cancelled");
-});
 test("interactions are bounded: open and total capacity refuse a new one, and ending keeps the body for 30 days", async () => {
 	h = await setup();
 	const base = await h.asked();
@@ -314,6 +253,8 @@ test("interactions are bounded: open and total capacity refuse a new one, and en
 			});
 	});
 	h.state.commands.push({ action: "clarify", question: "もう一件" });
+	// The first TODO still waits for its answer: the pending turn is asked first, then the request turn delegates.
+	h.state.steps.push(choice({ choice: "none" }));
 	h.delegate("偽の操作を開始して");
 	const run = await h.say("偽の操作を開始して", "failed");
 	expect(h.dialogue.get(run.id)?.error).toBe("interaction_capacity");
@@ -321,16 +262,13 @@ test("interactions are bounded: open and total capacity refuse a new one, and en
 test("ended interactions lose their bodies after 30 days and their rows after 30 more", async () => {
 	h = await setup();
 	await h.asked();
-	const interaction = h.interaction()!;
-	await h.interactions.cancel(interaction.id, {
-		eventId: crypto.randomUUID(),
-		expectedRevision: 0,
-	});
+	h.state.offset = INTERACTION_POLICY.answerTtlMs + 60_000;
 	expect(await h.interactions.maintenance()).toMatchObject({
+		expired: 1,
 		bodiesDeleted: 0,
 		removed: 0,
 	});
-	h.state.offset = INTERACTION_POLICY.bodyRetentionMs + 60_000;
+	h.state.offset += INTERACTION_POLICY.bodyRetentionMs + 60_000;
 	expect(await h.interactions.maintenance()).toMatchObject({
 		bodiesDeleted: 1,
 	});

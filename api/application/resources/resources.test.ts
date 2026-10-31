@@ -18,12 +18,10 @@ import {
 } from "../../domains/resources";
 import { harness, request } from "../../domains/shell/test/shell.fixture";
 import { openStore } from "../../infrastructure/sqlite";
-import {
-	createEventResourceAdapter,
-	createResourceAccess,
-	createShellResourceAdapter,
-	registerResourceRoutes,
-} from ".";
+import { registerResourceRoutes } from ".";
+import { createEventResourceAdapter } from "./adapters/event";
+import { createResourceAccess } from "./access";
+import { createShellResourceAdapter } from "./adapters/shell";
 
 const signal = new AbortController().signal;
 const kinds: ResourceKind[] = [

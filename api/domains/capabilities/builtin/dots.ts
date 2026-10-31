@@ -5,6 +5,10 @@ export const coordinatorSkill = readFileSync(
 	new URL("./dots/SKILL.md", import.meta.url),
 	"utf8",
 );
+export const dotsMcpSkill = readFileSync(
+	new URL("./dots/MESSAGING.v2.md", import.meta.url),
+	"utf8",
+);
 const common = {
 	revision: 1,
 	aliases: [],
@@ -24,11 +28,12 @@ export const dotsBuiltins: Definition[] = [
 	},
 	{
 		...common,
+		revision: 2,
 		kind: "skill",
 		id: "dots.orchestrate",
 		title: "dots連携手順",
 		summary: "受領・Session紐付け・質問・結果・停止の報告",
-		body: readFileSync(new URL("./dots/SKILL.v1.md", import.meta.url), "utf8"),
+		body: coordinatorSkill,
 	},
 	{
 		...common,
@@ -41,6 +46,7 @@ export const dotsBuiltins: Definition[] = [
 	},
 	{
 		...common,
+		revision: 2,
 		kind: "package",
 		id: "dots.orchestrate",
 		title: "Codexの作業を委任",
@@ -48,38 +54,21 @@ export const dotsBuiltins: Definition[] = [
 		backend: "dots",
 		schemaKey: "dotsDelegation",
 		profileRevisionId: "profile:dots.orchestrate@1",
-		requiredSkillRevisionIds: ["skill:dots.orchestrate@1"],
+		requiredSkillRevisionIds: ["skill:dots.orchestrate@2"],
 		toolRevisionIds: ["tool:dots.coordinate@1"],
 		dependencies: [
 			"profile:dots.orchestrate@1",
-			"skill:dots.orchestrate@1",
+			"skill:dots.orchestrate@2",
 			"tool:dots.coordinate@1",
 		],
 	},
+	{
+		...common,
+		revision: 2,
+		kind: "skill",
+		id: "dots.messaging",
+		title: "dotsメッセージの返却手順",
+		summary: "メッセージへの返答と連携後の要約をMCPへ返す",
+		body: dotsMcpSkill,
+	},
 ];
-
-const previousSkill = dotsBuiltins.find((d) => d.kind === "skill")!;
-dotsBuiltins.push({ ...previousSkill, revision: 2, body: coordinatorSkill });
-const previousPackage = dotsBuiltins.find((d) => d.kind === "package")!;
-dotsBuiltins.push({
-	...previousPackage,
-	revision: 2,
-	requiredSkillRevisionIds: ["skill:dots.orchestrate@2"],
-	dependencies: previousPackage.dependencies.map((id) =>
-		id === "skill:dots.orchestrate@1" ? "skill:dots.orchestrate@2" : id,
-	),
-});
-
-export const dotsMcpSkill = readFileSync(
-	new URL("./dots/MESSAGING.v2.md", import.meta.url),
-	"utf8",
-);
-// A separate Skill identity preserves active task packages pinned to orchestration v2.
-dotsBuiltins.push({
-	...previousSkill,
-	id: "dots.messaging",
-	title: "dotsメッセージの返却手順",
-	summary: "メッセージへの返答と連携後の要約をMCPへ返す",
-	revision: 2,
-	body: dotsMcpSkill,
-});

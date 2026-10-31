@@ -37,16 +37,6 @@ export interface JobRecord {
 	revision: number;
 }
 
-export interface AttemptRecord {
-	jobId: string;
-	attempt: number;
-	owner: string;
-	startedAtMs: number;
-	endedAtMs: number | null;
-	outcome: string | null;
-	errorCode: string | null;
-}
-
 export interface JobClaim<P = unknown> {
 	jobId: string;
 	scope: string;

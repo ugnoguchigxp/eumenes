@@ -7,10 +7,8 @@ export type {
 	KanbanService,
 } from "./service";
 export {
-	errorStatus,
-	KANBAN_PROMPT_MAX,
 	kanbanReceiptSchema,
-	WORK_ONLY_INSTRUCTION,
+	/** @public */ WORK_ONLY_INSTRUCTION,
 } from "./contracts";
 export type {
 	KanbanBoardView,
@@ -20,7 +18,6 @@ export type {
 	KanbanGitGrant,
 	KanbanOperationContext,
 	KanbanReceipt,
-	KanbanRunFinish,
 	KanbanRunView,
 } from "./contracts";
 export type { KanbanExecutor } from "./contracts/shared";

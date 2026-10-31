@@ -6,6 +6,7 @@ import { registerDialogue } from "../controller";
 import {
 	STUDIO,
 	STUDIO_ARTIFACT,
+	approve,
 	setup,
 	type Harness,
 } from "./specialist.fixture";
@@ -364,7 +365,7 @@ test("the addressee the screen showed must still listen: otherwise nothing is st
 		});
 	const stored = () => h.rows("SELECT COUNT(*) AS n FROM dialogue_runs")[0]!.n;
 	// Main is listening: a send that saw a specialist is refused, one that saw the main agent goes through.
-	h.state.steps.push({ text: "はい" });
+	h.talk("はい");
 	expect((await send({ sessionId: "x", epoch: 1 })).status).toBe(409);
 	expect(stored()).toBe(0);
 	expect(h.rows("SELECT COUNT(*) AS n FROM messages")[0]!.n).toBe(0);
@@ -399,26 +400,33 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 		artifactRevisionId: STUDIO_ARTIFACT,
 		targetRef: "item-old",
 	};
-	h.state.steps.push({ text: "見ています" });
+	h.talk("見ています");
 	await h.ask("これは？", { viewing });
 	expect(h.stateOf(0)).toContain(
 		"- 制作担当「古い項目」（画面に表示中、target item-old）",
 	);
+	// Changing a saved item is confirmed first; the approval opens that item.
 	h.handOver({ request: "これを直して", target: "item-old" });
-	h.state.specialist.push(reply("開きました"));
 	await h.ask("これを直して", { viewing });
 	// The search offers it as a target of the studio.
-	const found = h.state.calls[2]!.messages.filter((m) => m.role === "tool")
-		.at(-1)!
+	const found = h.state.calls[2]!.messages.at(-1)!
 		.content.split("\n")
 		.find((line) => line.startsWith(`- ${STUDIO.id}: `))!;
 	expect(found).toContain("item-old「");
+	expect(h.work()).toHaveLength(0);
+	h.state.steps.push(approve());
+	h.state.specialist.push(reply("開きました"));
+	await h.ask("お願い", { viewing });
 	expect(h.work()[0]!.savedRef).toBe("item-old");
 	// Without the screen showing it, the same ref is not issued: nothing starts.
 	const other = await harness();
 	other.handOver({ request: "直して", target: "item-old" });
-	other.state.steps.push({ text: "開けません" });
+	// The refused choice is made once more; this one chooses nothing and the talk turn answers.
+	other.talk("開けません");
 	await other.ask("直して");
+	expect(other.state.calls[1]!.messages.at(-1)!.content).toContain(
+		"target_not_found",
+	);
 	expect(other.work()).toHaveLength(0);
 	expect(await other.session()).toBeNull();
 });

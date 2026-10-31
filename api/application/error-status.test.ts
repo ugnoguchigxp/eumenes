@@ -3,13 +3,6 @@ import { mergeErrorStatus, statusForError } from "./error-status";
 
 /** The status table as it was before each domain declared its own (ARC-10); it must never drift. */
 const legacy: Record<string, number> = {
-	coding_execution_not_found: 404,
-	coding_invalid_cursor: 400,
-	coding_workspace_unavailable: 503,
-	coding_workspace_busy: 409,
-	coding_branch_conflict: 409,
-	coding_authority_stale: 409,
-	coding_operation_conflict: 409,
 	task_not_found: 404,
 	task_history_expired: 410,
 	task_execution_unavailable: 503,

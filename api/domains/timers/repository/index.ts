@@ -8,7 +8,7 @@ import {
 	type SqlTimer,
 	type TimerRow,
 } from "./rows";
-export { migration, migrations } from "./migrations";
+export { migrations } from "./migrations";
 export type { NotificationRow, OperationRow, TimerRow } from "./rows";
 export { countLive, markPaused, markResumed } from "./controls";
 export {

@@ -26,7 +26,7 @@ import { getLogger } from "../infrastructure/logger";
 import { openStore } from "../infrastructure/sqlite";
 import type { Config } from "../infrastructure/config";
 import { createChanges } from "./events";
-import { legacyOrder, migrations } from "./migrations";
+import { migrations } from "./migrations";
 import { createWebReview } from "./toolchain/web-content-review";
 
 const log = getLogger("server");
@@ -37,7 +37,7 @@ export async function buildCore(
 	dependencies: { googleProvider?: GoogleProvider },
 ) {
 	const { dbPath } = config;
-	const store = openStore(dbPath, migrations, { legacyOrder });
+	const store = openStore(dbPath, migrations);
 	const changes = createChanges();
 	const unsubscribeCommits = store.onCommit(() => changes.publish());
 	const conversation = createConversationService(store, {

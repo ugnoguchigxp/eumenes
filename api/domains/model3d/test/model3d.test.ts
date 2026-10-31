@@ -87,9 +87,6 @@ function fakeLarm() {
 				mime: "model/gltf-binary",
 			};
 		},
-		async source() {
-			return { bytes: new Uint8Array([1]), mime: "image/png" };
-		},
 	};
 	return { larm, calls, state };
 }

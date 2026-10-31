@@ -133,24 +133,12 @@ export function createApp(options: AppOptions) {
 		await next();
 	});
 	// Cost guards for endpoints that fan out to providers; never for long-lived streams.
-	// Only the slow endpoints share the budget: cancel and retry-artifact must stay
-	// reachable while runs are in flight.
-	app.on(
-		"POST",
-		[
-			"/api/service-tests/catalog/refresh",
-			"/api/service-tests/diagnose",
-			"/api/service-tests/runs",
-			"/api/service-tests/uploads",
-		],
-		limitConcurrency(2),
-	);
+	app.on("POST", "/api/service-tests/uploads", limitConcurrency(2));
 	app.on(
 		"POST",
 		["/api/voice/replay/audio", "/api/voice/sample"],
 		limitConcurrency(2),
 	);
-	app.on("POST", "/api/inference/probes", limitConcurrency(1));
 	for (const module of options.modules) module.mount(app);
 	app.onError(answerError);
 	return app;

@@ -127,8 +127,6 @@ function sectionDescription(fields: readonly RegisteredField[]) {
 		)
 	)
 		return "LARM、AIの利用先、クラウド接続とモデルを設定します。変更は適用後に反映されます。";
-	if (fields.some((f) => f.path.startsWith("$.codingSupervision")))
-		return "外部作業の実行前の確認を設定します。変更は適用後に反映されます。";
 	return "声と音声入力を設定します。";
 }
 

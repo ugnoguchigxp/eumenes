@@ -6,10 +6,8 @@ import type {
 	ArtifactEvent,
 	MusicResource,
 } from "@eumenes/artifact-ui/contracts";
-import {
-	musicArtifactDefinition,
-	musicStudioSource,
-} from "./artifact-definition";
+import { musicStudioSource } from "./artifact-definition";
+import { musicArtifactDefinition } from "./artifact-definition.fixture";
 import { useMusicRuntime } from "./use-music-runtime";
 afterEach(() => {
 	cleanup();

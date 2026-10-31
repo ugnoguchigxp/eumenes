@@ -52,44 +52,14 @@ test("the setting is read and saved over HTTP, and a relative path is refused", 
 	});
 });
 
-test("connection, tabs, tasks and captures are readable and never cached", async () => {
+test("the open tabs are readable", async () => {
 	const env = setup({ runTaskStep: parkedRunner });
 	const a = app(env);
 	const tabRef = await connect(env);
-	const conn = await a.request("/api/browser/connection");
-	expect(conn.headers.get("Cache-Control")).toBe("no-store");
-	expect(await conn.json()).toMatchObject({
-		state: "connected",
-		availability: { available: true },
-	});
 	const tabs = (await (await a.request("/api/browser/tabs")).json()) as {
 		tabs: { tabRef: string }[];
 	};
 	expect(tabs.tabs.map((t) => t.tabRef)).toEqual([tabRef]);
-	const task = await env.service.startTask({
-		owner: OWNER,
-		conversationId: "main",
-		origin: "screen",
-		requestId: crypto.randomUUID(),
-		request: "open it",
-		tabRef,
-	});
-	const status = await a.request(`/api/browser/tasks/${task.taskId}`);
-	expect(await status.json()).toMatchObject({
-		taskId: task.taskId,
-		operations: [],
-	});
-	expect((await a.request("/api/browser/tasks/not-an-id")).status).toBe(400);
-	expect(
-		(await a.request(`/api/browser/tasks/${crypto.randomUUID()}`)).status,
-	).toBe(404);
-	expect(
-		(await app(env, "other").request(`/api/browser/tasks/${task.taskId}`))
-			.status,
-	).toBe(404);
-	expect(await (await a.request("/api/browser/captures")).json()).toEqual({
-		captures: [],
-	});
 });
 
 test("capture content is served only to its owner, as an inline lossy WebP", async () => {
@@ -126,10 +96,6 @@ test("capture content is served only to its owner, as an inline lossy WebP", asy
 	expect((await a.request("/api/browser/captures/..%2Fx/content")).status).toBe(
 		400,
 	);
-	const list = (await (await a.request("/api/browser/captures")).json()) as {
-		captures: unknown[];
-	};
-	expect(list.captures).toHaveLength(1);
 });
 
 test("a conversation keeps its own recent tasks even after more than twenty tasks in other chats", async () => {

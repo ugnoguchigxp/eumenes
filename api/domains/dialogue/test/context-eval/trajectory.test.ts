@@ -42,23 +42,18 @@ test("the default trajectory is twelve generations that keep the message invaria
 	);
 });
 
-test("between cuts the input only grows at its end: each call begins with the previous one but its last message", async () => {
+test("the system part stays the same and the recent conversation is a window of the user's last two utterances", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
 	const system = calls[0]!.input.messages[0]!.content;
-	for (const call of calls)
+	for (const call of calls) {
 		expect(call.input.messages[0]!.content).toBe(system);
-	for (let i = 1; i < calls.length; i++) {
-		if (calls[i]!.cut) continue;
-		const previous = calls[i - 1]!.input.messages.slice(0, -1);
-		const current = calls[i]!.input.messages;
-		// Every message but the newest stays as it was; the newest may only grow (the agent spoke on after it).
-		expect(current.slice(0, previous.length - 1)).toEqual(
-			previous.slice(0, -1),
+		// Between the system part and the last message: `## Memory` (a user message of its own) and the window.
+		const window = call.input.messages
+			.slice(1, -1)
+			.filter((m) => !m.content.startsWith("## Memory\n"));
+		expect(window.filter((m) => m.role === "user").length).toBeLessThanOrEqual(
+			call.input.harness.history.users!,
 		);
-		const was = previous.at(-1)!;
-		const now = current[previous.length - 1]!;
-		expect(now.role).toBe(was.role);
-		expect(now.content.startsWith(was.content)).toBe(true);
 	}
 });
 
@@ -81,11 +76,15 @@ test("a memory saved after the profile was drawn waits until a cut draws `## Mem
 
 test("the delegation's TODO is a line of the state, and a notice is the host notice of its generation", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
+	// The work is read by the choice calls of a generation of utterances (`routed.state`); a notice only talks.
 	const todos = (call: TrajectoryCall) =>
-		sectionOf(call, "State").filter((line) => /^- t\d+ /.test(line));
+		sectionLines(call.input.routed?.state ?? "", "State").filter((line) =>
+			/^- t\d+ /.test(line),
+		);
 	expect(todos(calls[4]!)).toEqual([]);
 	expect(calls[5]!.input.final).toEqual({ kind: "fixed" });
-	expect(todos(calls[5]!)).toEqual([
+	expect(calls[5]!.input.routed).toBeUndefined();
+	expect(todos(calls[6]!)).toEqual([
 		"- t1 旅行先のイメージ画像を作る 通知済み",
 	]);
 	expect(calls[7]!.input.final).toEqual({ kind: "fixed" });
@@ -93,9 +92,6 @@ test("the delegation's TODO is a line of the state, and a notice is the host not
 		"- kind: timer",
 		"- text: 三分のタイマーが鳴りました",
 	]);
-	// The tool exchanges of the delegation stayed in their turn.
-	for (const call of calls)
-		expect(call.input.messages.some((m) => m.role === "tool")).toBe(false);
 });
 
 test("long exchanges pass the hard limit and the host cuts the recent conversation to the newest few", async () => {

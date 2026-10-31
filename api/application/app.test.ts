@@ -142,12 +142,7 @@ test("status polling is passive and explicit reconnect requires auth and origin"
 
 test("auth and origin apply to the new endpoints", async () => {
 	const h = setup();
-	for (const path of [
-		"/api/events",
-		"/api/jobs",
-		"/api/queue/status",
-		"/api/schedules",
-	]) {
+	for (const path of ["/api/events", "/api/jobs", "/api/schedules"]) {
 		expect((await h.app.request(path)).status).toBe(401);
 		expect(
 			(
@@ -265,15 +260,6 @@ test("register → fire → history → pause/resume → cancel through the API"
 		lane: "background",
 		subjectRef: occ?.subjectRef,
 	});
-	const attempts = (await (
-		await h.call(`/api/jobs/${occ?.jobId}/attempts`)
-	).json()) as Array<{ outcome: string }>;
-	expect(attempts.map((a) => a.outcome)).toEqual(["completed"]);
-	const status = (await (await h.call("/api/queue/status")).json()) as {
-		lanes: Record<string, { queued: number }>;
-		openJobs: number;
-	};
-	expect(status.openJobs).toBe(0);
 	const list = (await (await h.call("/api/jobs?limit=1")).json()) as {
 		items: unknown[];
 		nextCursor: string | null;
@@ -455,7 +441,7 @@ test("oversized JSON bodies are rejected with 413 and normal requests pass", asy
 	});
 	expect(big.status).toBe(413);
 	expect(await big.json()).toEqual({ error: "payload_too_large" });
-	expect((await h.call("/api/queue/status")).status).toBe(200);
+	expect((await h.call("/api/status")).status).toBe(200);
 });
 
 test("responses carry anti-framing security headers", async () => {
@@ -546,7 +532,7 @@ test("modules mount in order behind the shared auth and origin checks", async ()
 	expect(foreign.status).toBe(403);
 });
 
-test("service-test concurrency limits cover the slow endpoints but not cancel or retry", async () => {
+test("service-test uploads share a budget of two; other service-test routes stay reachable", async () => {
 	let release: () => void = () => {};
 	const gate = new Promise<void>((resolve) => {
 		release = resolve;
@@ -557,20 +543,11 @@ test("service-test concurrency limits cover the slow endpoints but not cancel or
 		modules: [
 			{
 				mount(a) {
-					for (const path of [
-						"/api/service-tests/runs",
-						"/api/service-tests/diagnose",
-						"/api/service-tests/uploads",
-						"/api/service-tests/catalog/refresh",
-					])
-						a.post(path, async (c) => {
-							await gate;
-							return c.json({ ok: true });
-						});
-					a.post("/api/service-tests/runs/:id/cancel", (c) =>
-						c.json({ ok: 1 }),
-					);
-					a.post("/api/service-tests/runs/:id/retry-artifact", (c) =>
+					a.post("/api/service-tests/uploads", async (c) => {
+						await gate;
+						return c.json({ ok: true });
+					});
+					a.get("/api/service-tests/runs/:id/artifact", (c) =>
 						c.json({ ok: 1 }),
 					);
 				},
@@ -580,17 +557,18 @@ test("service-test concurrency limits cover the slow endpoints but not cancel or
 	const post = (path: string) =>
 		app.request(path, { method: "POST", headers: auth });
 	const held = [
-		post("/api/service-tests/runs"),
-		post("/api/service-tests/diagnose"),
+		post("/api/service-tests/uploads"),
+		post("/api/service-tests/uploads"),
 	];
 	await settle();
-	// The budget of 2 is shared by all slow endpoints.
 	expect((await post("/api/service-tests/uploads")).status).toBe(429);
-	expect((await post("/api/service-tests/catalog/refresh")).status).toBe(429);
-	expect((await post("/api/service-tests/runs/r1/cancel")).status).toBe(200);
-	expect((await post("/api/service-tests/runs/r1/retry-artifact")).status).toBe(
-		200,
-	);
+	expect(
+		(
+			await app.request("/api/service-tests/runs/r1/artifact", {
+				headers: auth,
+			})
+		).status,
+	).toBe(200);
 	release();
 	for (const response of await Promise.all(held))
 		expect(response.status).toBe(200);

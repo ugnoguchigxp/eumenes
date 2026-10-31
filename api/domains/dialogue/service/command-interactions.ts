@@ -33,9 +33,6 @@ export function createCommandInteractions(
 	return {
 		...createInteractionRuns(deps, core),
 		...createInteractionAnswers(deps, core, accept),
-		get(interactionId: string): InteractionView | null {
-			return store.read((db) => viewInTransaction(db, interactionId));
-		},
 		viewInTransaction,
 
 		list(filter: {

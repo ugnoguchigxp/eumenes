@@ -28,7 +28,6 @@ type Control = (
 ) => Promise<Response>;
 
 const GLB_LIMIT = 64 * 1024 * 1024;
-const IMAGE_LIMIT = 32 * 1024 * 1024;
 const enc = encodeURIComponent;
 
 /** A refusal LARM explained: the status, its own code and when to come back (429). */
@@ -83,20 +82,17 @@ export function createMeshLibrary(
 		if (!ok.includes(r.status)) throw await refusal(r);
 		return r;
 	}
-	async function media(path: string, signal: AbortSignal, image: boolean) {
+	async function media(path: string, signal: AbortSignal) {
 		const r = await call(path, signal);
 		const mime = r.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
-		const allowed = image
-			? ["image/png", "image/webp", "image/jpeg"]
-			: ["model/gltf-binary", "application/octet-stream"];
-		if (!allowed.includes(mime)) {
+		if (!["model/gltf-binary", "application/octet-stream"].includes(mime)) {
 			await r.body?.cancel();
 			throw new Error("invalid_mesh_content_type");
 		}
-		const content = await bytes(r, image ? IMAGE_LIMIT : GLB_LIMIT);
-		if (!image && new TextDecoder().decode(content.slice(0, 4)) !== "glTF")
+		const content = await bytes(r, GLB_LIMIT);
+		if (new TextDecoder().decode(content.slice(0, 4)) !== "glTF")
 			throw new Error("invalid_mesh_content");
-		return { bytes: content, mime: image ? mime : "model/gltf-binary" };
+		return { bytes: content, mime: "model/gltf-binary" };
 	}
 	return {
 		/** The 3D service and the image service of the current catalog; absent ones are `null`. */
@@ -220,9 +216,6 @@ export function createMeshLibrary(
 			).then((r) => r.body?.cancel());
 		},
 		content: (id: string, signal: AbortSignal) =>
-			media(`/v1/3d/assets/${enc(meshId.parse(id))}/content`, signal, false),
-		source: (id: string, signal: AbortSignal) =>
-			media(`/v1/3d/assets/${enc(meshId.parse(id))}/source`, signal, true),
+			media(`/v1/3d/assets/${enc(meshId.parse(id))}/content`, signal),
 	};
 }
-export type MeshLibrary = ReturnType<typeof createMeshLibrary>;

@@ -41,7 +41,7 @@ Eumenesは、**ユーザーを継続的に理解し、任された仕事を進�
 | 作業ボード | タスクボードでカードを登録し、Claude CodeまたはCodexへ順番に依頼する。会話からの直接依頼は「Claude Code」画面の作業依頼表を使う。commitとpushはボード上の人の操作に限る。固定試験とブラウザfixtureはあり、実 `claude` のフック確認は記録済み。自然言語受入とCodex側の最終受入は未完了。 |
 | 画面の自由制作 | 登録済みの部品（見出し・本文・カード・フォームのほか、画像・紙芝居・状態と式・数式・電卓・図解）の範囲で、会話または「UI自由制作」から協働型の担当とOpenUI画面を作り、同じ作品を手直しできる。任意のHTML・外部API実行は対象外。固定試験・ブラウザE2E済み。実モデル（live）は未実施。 |
 | 再起動時の扱い | キュー上の未着手ジョブ、タイマー満了、会話予約は再起動後に再開する。実行中だった会話生成・音声ターン・担当の仕事は中断（`backend_restarted`／`backend_stopped`）として記録し、自動では再開しない。LARMの接続は終了時に解放せず、次の起動で同じ接続に戻る（別プロセスのliveで入力キャッシュの再利用を確認。backend再起動後の実会話では未確認）。再起動をまたぐ仕事の継続は到達点であり、現状は未実装。 |
-| 作業委任 | Codex・dotsへの依頼、許可範囲、質問・進捗・報告、停止確認を保存する。dotsとは追加の受付サーバーを置かずに、メッセージの送受信（「dots メッセージ」）と作業委任（「dotsの仕事」）を行う。メッセージは実dotsとの3往復を試験用の認証で確認済み（2026-10-25）。直接CLIを実行するcoding runnerの本番隔離は未完成。詳しくは下記の制限を参照。 |
+| 作業委任 | Codex・dotsへの依頼、許可範囲、質問・進捗・報告、停止確認を保存する。dotsとは追加の受付サーバーを置かずに、メッセージの送受信（「dots メッセージ」）と作業委任（「dotsの仕事」）を行う。メッセージは実dotsとの3往復を試験用の認証で確認済み（2026-10-25）。Codexの実行はCodex SDK runner、Claude Codeの実行はタスクボードとClaude Code画面が担う。詳しくは下記の制限を参照。 |
 | OpenUIアーティファクト | 会話と並べるタブに、設定・TODOリスト・タイマー・画像・音楽・図などの登録済みviewを表示・合成する。JSONには表示定義を持ち、状態・認証・操作の検査はホスト側が担当する。 |
 | 俯瞰 | 記録・実行状態の照会、TODOリスト、Spatial背景の監視銀河（Eumenes 10体・LARM 4体）がある。Spatialは既存APIの実測とLARMの読み取り専用監視APIへ接続済み（fixture）で、外部連携は未計測、LARM監視APIの本番公開と実画面確認は残る。状況と仕事を統合する俯瞰モニターの完成ではない。[現在の表示基盤](docs/backgrounds.md)を参照。 |
 | ハーネスの自己改善 | 採用必須の構想。既存の試験・評価・実行記録を、改善候補の期限付き試験運用、本採用・棄却、切り戻しへつなぐ全体機構は、実装・受入済みとしていない。 |
@@ -125,7 +125,7 @@ EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EXPECT_TEXT=こん�
 
 - 実マイク・ヘッドホンによる3往復と再生中割込み、機器ごとの権限・echo、学習済み発話検出の実録音の受入は未完了です。録音中の逐次ASRは未実装です。[音声受入記録](docs/acceptance.md)を参照してください。
 - 主会話と補助は、どちらも保存済みのProfileで独立したSessionを持ちます。待機・履歴分離の実接続記録が過去にありますが、この更新では実接続を再検証していません。[LARMの説明と検証記録](docs/larm.md)を参照してください。
-- 直接CLIを実行する委任は`EUMENES_DELEGATED_TASKS_ENABLED`が既定で無効です。有効化だけでは本番隔離を満たさず、coding runnerは`isolation_not_verified`で実行不可です。dots連携は製品側の処理と一部の実接続記録がありますが、委任の新規Sessionから成果返却までの受入は未完了です。[runnerの残工程](docs/coding-runner.md)、[dotsの受入状況](docs/dots.md)を参照してください。
+- dots連携は製品側の処理と一部の実接続記録がありますが、委任の新規Sessionから成果返却までの受入は未完了です。[dotsの受入状況](docs/dots.md)を参照してください。Codexの実行は[Codex SDK runner](docs/coding-runner.md)です。
 - 個別のサービスや画面の成功を、専属アシスタント全体の完成認定には使いません。[Excalidraw](docs/excalidraw.md)、[物体認識](docs/object-recognition.md)、[設定](docs/settings.md)の受入範囲は各文書と検証記録を参照してください。計画書には未実装・部分実装の内容を含みます。
 
 ## 構成とドキュメント
@@ -135,7 +135,7 @@ EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EXPECT_TEXT=こん�
 | `api/application/` | `server.ts`でサービスを組み立て、API・実行キュー・ライフサイクルを接続する |
 | `api/domains/` | 会話、推論、調査、記憶、委任、制作などの業務処理・保存・公開操作・試験 |
 | `web/src/`、`client/`、`cli/` | Reactの画面、共通API client、CLI入口`cli/index.ts` |
-| `packages/` | DesignSystem、OpenUI用artifact-ui、coding runner、dots MCP |
+| `packages/` | DesignSystem、OpenUI用artifact-ui、Codex SDK runner、dots MCP |
 | `vendor/` | 取り込んだ会話エージェント（`eumenes-agency`）、記憶（`eumenes-memory`）、World（`eumenes-world-model`） |
 | `scripts/`、`tests/browser/` | 起動・検証・ログ・実接続確認のスクリプト、ブラウザfixture |
 | `docs/`、`spec/` | 利用・運用・実装の説明、計画・設計・検証記録 |
@@ -144,5 +144,5 @@ EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EXPECT_TEXT=こん�
 
 - 調査・拡張：[ツールチェーン](docs/toolchain.md)、[Web取得](docs/web-research.md)、[登録と拡張](docs/toolchain-extension.md)、[拡張の検証](docs/toolchain-extension-verification.md)、[リソースURI](docs/resources.md)
 - 制作・観測：[画像](docs/images.md)、[チャットの画像入力](docs/chat-images.md)、[音楽を含むLARMサービス](docs/larm.md)、[3Dモデル](docs/model3d.md)、[計算](docs/compute.md)、[Excalidraw](docs/excalidraw.md)、[物体認識](docs/object-recognition.md)、[OCR](docs/ocr.md)、[文章ナレッジベース](docs/docling.md)、[OpenUI](docs/openui-artifact.md)
-- 作業：[タスクボード](docs/kanban.md)、[Claude Code画面](docs/terminals.md)、[CLI画面](docs/shell.md)、[ブラウザ](docs/browser.md)、[dots](docs/dots.md)、[委任タスクの基盤](docs/delegated-tasks.md)、[CLI runner](docs/coding-runner.md)、[コーディング監督](docs/coding-supervision.md)
+- 作業：[タスクボード](docs/kanban.md)、[Claude Code画面](docs/terminals.md)、[CLI画面](docs/shell.md)、[ブラウザ](docs/browser.md)、[dots](docs/dots.md)、[委任タスクの基盤](docs/delegated-tasks.md)、[Codex SDK runner](docs/coding-runner.md)
 - 運用・設計：[設定](docs/settings.md)、[記憶](docs/memory.md)、[Google連携](docs/google-accounts.md)、[SSE通知](docs/realtime.md)、[spec索引](spec/README.md)

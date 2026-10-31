@@ -14,8 +14,6 @@ import { orderMigrations } from "../infrastructure/sqlite";
 import { migrations as agentRuntimeMigrations } from "../domains/agent-runtime";
 import { migrations as capabilitiesMigrations } from "../domains/capabilities";
 import { migrations as codexTasksMigrations } from "../domains/codex-tasks";
-import { migrations as codingMigrations } from "../domains/coding";
-import { migrations as supervisionMigrations } from "../domains/coding-supervision";
 import { migrations as continuityMigrations } from "../domains/continuity";
 import { migrations as conversationMigrations } from "../domains/conversation";
 import { migrations as dialogueMigrations } from "../domains/dialogue";
@@ -28,6 +26,8 @@ import { migrations as terminalsMigrations } from "../domains/terminals";
 import { migrations as kanbanMigrations } from "../domains/kanban";
 import { migrations as queueMigrations } from "../domains/queue";
 import {
+	retiredCodingMigrations,
+	retiredCodingSupervisionMigrations,
 	retiredResearchRoutesMigrations,
 	retiredScreenMigrations,
 } from "./retired-migrations";
@@ -190,9 +190,9 @@ const catalog: readonly Migration[] = [
 	...worldMigrations,
 	...timersMigrations,
 	...retiredScreenMigrations,
-	...codingMigrations,
+	...retiredCodingMigrations,
 	...taskReportsMigrations,
-	...supervisionMigrations,
+	...retiredCodingSupervisionMigrations,
 	...googleAccountsMigrations,
 ];
 
@@ -220,5 +220,3 @@ function resolve(all: readonly Migration[]): Migration[] {
 
 /** Everything, ordered topologically (for the frozen part: exactly the legacy order). */
 export const migrations: readonly Migration[] = resolve(catalog);
-/** The original host block: the first 18 legacy migrations. */
-export const hostMigrations: readonly Migration[] = migrations.slice(0, 18);

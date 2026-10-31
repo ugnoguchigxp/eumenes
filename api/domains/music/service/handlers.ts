@@ -8,7 +8,7 @@ import type { HandlerDefinition } from "../../queue";
 import { findServiceTarget, type TestOutput } from "../../larm";
 import type { MusicRecord } from "../contracts";
 import { row, record, patch } from "../repository";
-import { musicContext, musicSchema, PLAN_MS } from "./context";
+import { musicContext, PLAN_MS } from "./context";
 import type { createMusic } from "./index";
 type GenerationPlan = Omit<z.infer<typeof musicPlanV3>, "task"> & {
 	task?: "music" | "sound-effect";
@@ -66,7 +66,7 @@ export function registerMusicHandlers(
 				subject: `music:${r.id}:plan`,
 				policySubject: r.run_id,
 				deadline: Math.min(r.deadline - 15000, Date.now() + PLAN_MS),
-				maxOutputTokens: prepared.package.revision >= 2 ? 4096 : 2048,
+				maxOutputTokens: 4096,
 			};
 			const requestId = execution
 				? inference.captureUserControlInTransaction!(db, {
@@ -86,14 +86,12 @@ export function registerMusicHandlers(
 			};
 		},
 		async execute(input, { signal }) {
+			const providers = await deps.gateway().musicProviders(signal);
 			const messages = [...input.context.messages];
-			if (input.prepared.package.revision >= 3) {
-				const providers = await deps.gateway().musicProviders(signal);
-				messages.push({
-					role: "user",
-					content: JSON.stringify({ musicProviders: providers }),
-				});
-			}
+			messages.push({
+				role: "user",
+				content: JSON.stringify({ musicProviders: providers }),
+			});
 			const receipt = await inference.executeControl!(
 				input.requestId,
 				messages,
@@ -107,8 +105,7 @@ export function registerMusicHandlers(
 			} catch {
 				throw new Error("music_plan_invalid_json");
 			}
-			const schema = musicSchema(input.prepared);
-			const parsed = schema.safeParse(value);
+			const parsed = musicPlanV3.safeParse(value);
 			if (!parsed.success) throw new Error("music_plan_invalid_contract");
 			return {
 				receipt,
@@ -176,7 +173,7 @@ export function registerMusicHandlers(
 					id: r.id,
 					plan: {
 						instrumental: true,
-						...musicSchema(prepared).parse(JSON.parse(r.plan_json)),
+						...musicPlanV3.parse(JSON.parse(r.plan_json)),
 					},
 					prepared,
 				},

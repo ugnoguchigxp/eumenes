@@ -1,10 +1,5 @@
-import {
-	focusWhenDrawn,
-	FOCUS_MARK_MS,
-} from "../../components/domains/resource-focus";
+import { focusWhenDrawn } from "../../components/domains/resource-focus";
 import { imageContentUrl } from "../../media/use-image-library";
-
-export { FOCUS_MARK_MS };
 
 /**
  * The card (or the preview frame) showing this saved image on the open image screen. Parts

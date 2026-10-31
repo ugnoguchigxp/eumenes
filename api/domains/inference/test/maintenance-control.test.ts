@@ -16,10 +16,10 @@ import {
 	parentsMigration,
 	diagnosticsMigration,
 	controlMigration,
-	backgroundControlMigration,
 	migrations as inferenceMigrations,
 } from "..";
 import { waitFor } from "../../../infrastructure/wait-for";
+import { backgroundControlMigration } from "../repository";
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { CONTRACT_VERSIONS } from "eumenes-memory";
 import { reconcileForgetJournal } from "eumenes-memory/sqlite";
-import { createWorldService, readWorldJournal, type LifecyclePoint } from "..";
+import { createWorldService } from "..";
 import {
 	ACCESS,
 	NOW,
@@ -28,6 +28,8 @@ import {
 	worldExternals,
 	type Life,
 } from "./lifecycle-fixture";
+import { readWorldJournal } from "../service/world-journal";
+import type { LifecyclePoint } from "../service/lifecycle-types";
 
 async function seed(life: Life) {
 	expect((await life.lifecycle.recoverWorld()).status).toBe("open");

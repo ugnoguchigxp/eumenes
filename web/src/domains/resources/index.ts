@@ -1,5 +1,5 @@
 export { ResourceChips } from "./ResourceChips";
-export { ResourcesScreen } from "./ResourcesScreen";
+export { ArtifactIcon, KindIcon } from "./kind-icon";
 export type { ResourceLauncher } from "./present";
 export { useConversationResources } from "./use-conversation-resources";
 export { useResourceNotice, useResourceOpener } from "./use-resource-opener";

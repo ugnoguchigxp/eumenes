@@ -78,7 +78,6 @@ export function defaults(env: Record<string, string | undefined>): Settings {
 			background: "light-fairy",
 			subtitles: defaultSubtitles,
 		},
-		codingSupervision: { approveInstructions: true },
 		world: { enabled: false },
 	});
 }

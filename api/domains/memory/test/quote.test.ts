@@ -1,10 +1,11 @@
 import { expect, test } from "bun:test";
-import {
-	foldedLength,
-	locateQuote,
-	locateQuoteSpan,
-	normalizeKey,
-} from "../service/quote";
+import { foldedLength, locateQuoteSpan, normalizeKey } from "../service/quote";
+
+/** The exact substring of `text` the quote stands for, or null. */
+function locateQuote(text: string, quote: string): string | null {
+	const span = locateQuoteSpan(text, quote);
+	return span ? text.slice(span.start, span.end) : null;
+}
 
 test("an exact quote is returned as it is", () => {
 	expect(locateQuote("私はコーヒーが好きです", "コーヒーが好き")).toBe(

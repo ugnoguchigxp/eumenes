@@ -1,7 +1,2 @@
 export { useArtifactWorkspace } from "./hooks";
-export {
-	type ArtifactTab,
-	emptyArtifactWorkspace,
-	maxArtifactTabs,
-	reduceArtifactWorkspace,
-} from "./store";
+export { type ArtifactTab } from "./store";

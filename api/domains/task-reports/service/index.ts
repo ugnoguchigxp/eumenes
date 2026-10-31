@@ -91,24 +91,6 @@ export function createTaskReports(input: {
 		suppressInTransaction: repo.suppress,
 		supersedeQuestionsInTransaction: repo.supersedeQuestions,
 		purgeInTransaction: repo.purge,
-		list(taskId: string, after = 0, limit = 50) {
-			if (
-				!Number.isSafeInteger(after) ||
-				after < 0 ||
-				!Number.isSafeInteger(limit) ||
-				limit < 1 ||
-				limit > 100
-			)
-				throw new Error("invalid_task_report_query");
-			return input.store.readSnapshot((db) => {
-				task(db, taskId);
-				const items = repo.list(db, taskId, after, limit + 1);
-				return {
-					items: items.slice(0, limit),
-					nextCursor: items.length > limit ? items[limit - 1]!.sequence : null,
-				};
-			});
-		},
 	};
 }
 export type TaskReports = ReturnType<typeof createTaskReports>;

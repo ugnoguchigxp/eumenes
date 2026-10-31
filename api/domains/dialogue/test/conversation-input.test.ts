@@ -15,7 +15,6 @@ import {
 	type ConversationPrefix,
 } from "../service/conversation-input";
 import { dataText, fitLines, jstNowLine } from "../service/input-text";
-import { cloudHarness, localHarness } from "../service/harness";
 import { resultText, toolResultText } from "../service/result-text";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
 
@@ -25,8 +24,6 @@ import { estimateTextTokens } from "../../../infrastructure/context-budget";
  * checks them.
  */
 let seq = 0;
-/** Every part of the history drawn: what each one adds is what these tests check. */
-const drawn = cloudHarness.history;
 const said = (
 	speaker: "user" | "agent",
 	text: string,
@@ -57,94 +54,18 @@ test("the recent conversation starts with the agent, leaves out what waits for a
 		"できました",
 		"はい",
 	]);
-	expect(recentMessages(recent, drawn)).toEqual([
+	expect(recentMessages(recent)).toEqual([
 		{ role: "assistant", content: "作りますね\nできました" },
 		{ role: "user", content: "はい" },
 	]);
 	expect(recentUtterances([said("user", "だけ")], new Set())).toEqual([]);
 });
 
-test("an utterance's kept tool calls come before its words, the first joining the agent's words just before", () => {
-	seq = 0;
-	const find = {
-		name: "find_toolchain",
-		arguments: '{"query":"曲"}',
-		result: "{}",
-	};
-	const messages = recentMessages(
-		[
-			said("agent", "できました"),
-			{ ...said("agent", "作りますね"), toolCalls: [find] },
-			said("agent", "もう少しです"),
-			said("user", "はい"),
-		],
-		drawn,
-	);
-	expect(messages).toEqual([
-		{
-			role: "assistant",
-			content: "できました",
-			tool_calls: [
-				{
-					id: "u2-1",
-					type: "function",
-					function: { name: "find_toolchain", arguments: '{"query":"曲"}' },
-				},
-			],
-		},
-		{ role: "tool", tool_call_id: "u2-1", content: "{}" },
-		{ role: "assistant", content: "作りますね\nもう少しです" },
-		{ role: "user", content: "はい" },
-	]);
-});
-
-test("a report follows its notice as the host's line: joined to the user's words before it, left out at the start", () => {
-	seq = 0;
-	const report = (text: string, notice: string) => ({
-		...said("agent", text),
-		notice,
-	});
-	expect(
-		recentMessages(
-			[
-				report(
-					"できあがりました。",
-					"[ホストの知らせ] t1「曲」が終わりました（成功）。",
-				),
-				said("user", "ありがとう"),
-				report(
-					"絵もできました。",
-					"[ホストの知らせ] t2「絵」が終わりました（成功）。",
-				),
-				said("agent", "表示しますか？"),
-				report(
-					"効果音もできました。",
-					"[ホストの知らせ] t3「音」が終わりました（成功）。",
-				),
-			],
-			drawn,
-		),
-	).toEqual([
-		{ role: "assistant", content: "できあがりました。" },
-		{
-			role: "user",
-			content: "ありがとう\n[ホストの知らせ] t2「絵」が終わりました（成功）。",
-		},
-		{ role: "assistant", content: "絵もできました。\n表示しますか？" },
-		{
-			role: "user",
-			content: "[ホストの知らせ] t3「音」が終わりました（成功）。",
-		},
-		{ role: "assistant", content: "効果音もできました。" },
-	]);
-});
-
 test("an utterance is cut at its bound, and its data can not open a heading", () => {
 	seq = 0;
-	const [message] = recentMessages(
-		[said("user", `# 見出し\n${"あ".repeat(5000)}`)],
-		drawn,
-	);
+	const [message] = recentMessages([
+		said("user", `# 見出し\n${"あ".repeat(5000)}`),
+	]);
 	expect(message!.content.startsWith("\\# 見出し")).toBe(true);
 	expect(message!.content.endsWith("…")).toBe(true);
 	expect(estimateTextTokens(message!.content)).toBeLessThanOrEqual(
@@ -206,7 +127,6 @@ test("the last message joins a trailing user message and carries `## Memory` whe
 		({
 			messages,
 			carry,
-			tools: [],
 			cut: null,
 			recent: [],
 			lastAt: null,
@@ -503,7 +423,6 @@ test("after a gap nothing said before stays, even when the memory or the system 
 			window: null,
 			nowMs,
 			pending: new Set(),
-			history: localHarness.history,
 		});
 		expect(placed.reason).toBe("resumed");
 		expect(written).toEqual([99]);

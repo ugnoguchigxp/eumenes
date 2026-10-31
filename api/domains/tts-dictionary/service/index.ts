@@ -32,7 +32,6 @@ export function createTtsDictionary(store: SqliteStore) {
 		return list(db);
 	}
 	return {
-		list: () => store.read(list),
 		/** Replaces registered written forms with their readings for one speech request. */
 		apply(text: string) {
 			compiled ??= compile(store.read(list));
@@ -45,10 +44,6 @@ export function createTtsDictionary(store: SqliteStore) {
 		},
 		/** The list inside the caller's transaction (UI adapters read and write in one). */
 		listInTransaction: (db: Database): Entry[] => list(db),
-		save: (input: SaveInput): Promise<Entry[]> =>
-			store.write((db) => saveInTransaction(db, input)),
-		delete: (input: DeleteInput): Promise<Entry[]> =>
-			store.write((db) => deleteInTransaction(db, input)),
 		saveInTransaction,
 		deleteInTransaction,
 	};

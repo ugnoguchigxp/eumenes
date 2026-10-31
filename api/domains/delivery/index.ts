@@ -1,17 +1,13 @@
 export {
 	acceptedAvatarMotion,
-	acceptedEmotion,
-	deliveryState,
 	chooseSpeechDelivery,
 	hostDelivery,
 	speechParameters,
-	speechQuestions,
 } from "./service";
 export {
 	speechDeliverySchema,
 	emotionSchema,
-	deliveryEmotionSchema,
-	type Emotion,
+	/** @public */ type Emotion,
 	type DeliveryEmotion,
 	type DeliveryContext,
 	type SpeechPreparation,

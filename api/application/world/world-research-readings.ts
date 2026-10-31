@@ -10,15 +10,6 @@ import { sha256Hex } from "../../infrastructure/digest";
 
 /** The operation list the sub-agent sees is bounded (4 KiB): the summary stays well inside it. */
 const SUMMARY_BYTES = 2400;
-const VALUE_CHARS = 120;
-const CONDITION_CHARS = 100;
-/** Collapse whitespace and cut to `max` characters; `cut` says whether text was lost. */
-const clipped = (text: string, max: number) => {
-	const chars = [...text.replace(/\s+/g, " ").trim()];
-	return chars.length <= max
-		? { text: chars.join(""), cut: false }
-		: { text: chars.slice(0, max - 1).join("") + "…", cut: true };
-};
 const bytesOf = (value: unknown) =>
 	new TextEncoder().encode(JSON.stringify(value)).length;
 
@@ -142,29 +133,21 @@ function claimEntityIds(claim: WorldQueryBasis): string[] {
 	];
 }
 
-function valueOf(
-	value: unknown,
-	nameOf: NameOf,
-): { text: string; cut: boolean } {
+function valueOf(value: unknown, nameOf: NameOf): string {
 	const v = value as
 		| { kind?: string; value?: unknown; unit?: string; entityId?: string }
 		| undefined;
-	if (!v || typeof v !== "object") return clipped(String(value), VALUE_CHARS);
-	if (v.kind === "entity")
-		return { text: nameOf(v.entityId ?? "") ?? "", cut: false };
-	if (v.kind === "number")
-		return clipped(`${String(v.value)} ${v.unit ?? ""}`.trim(), VALUE_CHARS);
-	return clipped(
-		typeof v.value === "string" ? v.value : JSON.stringify(v.value),
-		VALUE_CHARS,
-	);
+	if (!v || typeof v !== "object") return String(value);
+	if (v.kind === "entity") return nameOf(v.entityId ?? "") ?? "";
+	if (v.kind === "number") return `${String(v.value)} ${v.unit ?? ""}`.trim();
+	return typeof v.value === "string" ? v.value : JSON.stringify(v.value);
 }
 
 /**
  * One claim as a `world_claim` Source, or undefined when a name it needs cannot be resolved (the
- * reading would otherwise show an unnamed target). `truncated` / `acquisitionTruncated` say the text
- * of this claim (value, condition, predicate) was clipped or `incomplete` (the whole read was partial):
- * the report's coverage then becomes partial.
+ * reading would otherwise show an unnamed target). Values, conditions and predicates are kept whole;
+ * the caller fits whole Sources to its existing byte budget. An `incomplete` read still marks the
+ * Source as truncated, so absence from a bounded read never means absence from World.
  */
 export function sourceOf(
 	claim: WorldQueryBasis,
@@ -179,27 +162,25 @@ export function sourceOf(
 	const value = valueOf(claim.value, nameOf);
 	const content = claim.relation
 		? `関係: ${relationText(claim.relation.kind)}（相手: ${nameOf(claim.relation.objectId)!}）`
-		: `値: ${value.text}`;
+		: `値: ${value}`;
 	const refutations = claim.refutations.length
 		? `${claim.refutations.length}件`
 		: "なし";
-	const condition = clipped(
-		conditionText(claim.condition as ConditionSpec),
-		CONDITION_CHARS,
-	);
-	const predicate = clipped(claim.predicate, 60);
-	const cut = (!claim.relation && value.cut) || condition.cut || predicate.cut;
+	const condition = conditionText(claim.condition as ConditionSpec);
 	const freshness = String(claim.freshness);
 	const body = [
 		...(claim.conditionEvaluation
 			? [
-					`条件計算: ${JSON.stringify(claim.conditionEvaluation)} / 判定時刻(UTC): ${new Date(claim.evaluatedAt!).toISOString()} / 観測値: 未提供 / 有効期間: ${JSON.stringify(claim.validTime ?? null)}`,
+					`条件計算: ${JSON.stringify(claim.conditionEvaluation)} / 判定時刻(UTC): ${new Date(claim.evaluatedAt!).toISOString()} / 観測値: 未提供`,
 				]
 			: []),
-		`対象: ${subject} / 項目: ${predicate.text} / ${content}`,
-		`由来: ${ORIGIN_TEXT[claim.origin] ?? claim.origin}。状態: ${STATUS_TEXT[claim.status] ?? claim.status}。鮮度: ${FRESHNESS_TEXT[freshness] ?? "不明"}。条件: ${condition.text}。反証: ${refutations}。`,
+		...(claim.validTime
+			? [`有効期間: ${JSON.stringify(claim.validTime)}`]
+			: []),
+		`対象: ${subject} / 項目: ${claim.predicate} / ${content}`,
+		`由来: ${ORIGIN_TEXT[claim.origin] ?? claim.origin}。状態: ${STATUS_TEXT[claim.status] ?? claim.status}。鮮度: ${FRESHNESS_TEXT[freshness] ?? "不明"}。条件: ${condition}。反証: ${refutations}。`,
 	].join("\n");
-	const truncated = cut || incomplete;
+	const truncated = incomplete;
 	return {
 		kind: "world_claim",
 		sourceId: crypto.randomUUID(),

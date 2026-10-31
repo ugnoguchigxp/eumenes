@@ -26,7 +26,6 @@ export const model3dCreate = z.strictObject({
 	tags: model3dTags,
 	source: model3dSource,
 });
-export type Model3dCreate = z.infer<typeof model3dCreate>;
 
 export const generationStates = [
 	"submitting",
@@ -37,11 +36,6 @@ export const generationStates = [
 	"cancelled",
 ] as const;
 export type GenerationState = (typeof generationStates)[number];
-export const activeStates: readonly GenerationState[] = [
-	"submitting",
-	"queued",
-	"running",
-];
 
 export const model3dGeneration = z.object({
 	id: z.uuid(),
@@ -193,10 +187,6 @@ export interface Model3dLarm {
 	): Promise<Model3dAsset>;
 	remove(id: string, signal: AbortSignal): Promise<void>;
 	content(
-		id: string,
-		signal: AbortSignal,
-	): Promise<{ bytes: Uint8Array; mime: string }>;
-	source(
 		id: string,
 		signal: AbortSignal,
 	): Promise<{ bytes: Uint8Array; mime: string }>;

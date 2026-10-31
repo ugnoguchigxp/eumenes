@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
-import { FOCUS_MARK_MS } from "./focus";
+import { FOCUS_MARK_MS } from "../../components/domains/resource-focus";
 import { imageScreenWebAdapter } from "./toolchain-adapter";
 
 afterEach(() => {

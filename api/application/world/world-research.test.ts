@@ -536,12 +536,13 @@ test("a reading whose target has no resolvable name is not written", () => {
 	).toBeUndefined();
 });
 
-test("a reading whose value was clipped says so, and its digest is stable", () => {
+test("a long reading retains its full value and its digest is stable", () => {
 	const long = claim({ value: { kind: "string", value: "あ".repeat(500) } });
 	const a = sourceOf(long, "scope", "2026-10-09T00:00:00Z", nameOf)!;
 	const b = sourceOf(long, "scope", "2026-10-09T00:00:00Z", nameOf)!;
-	expect(a.truncated).toBe(true);
-	expect(a.acquisitionTruncated).toBe(true);
+	expect(a.body).toContain("あ".repeat(500));
+	expect(a.truncated).toBe(false);
+	expect(a.acquisitionTruncated).toBeUndefined();
 	expect(a.viewDigest).toBe(b.viewDigest);
 });
 

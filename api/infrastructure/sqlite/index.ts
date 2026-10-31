@@ -103,42 +103,6 @@ export function orderMigrations(input: readonly MigrationInput[]): Migration[] {
 	return ordered;
 }
 
-/**
- * Moves rows of the old positional `schema_migrations` table into `schema_migrations_v2`.
- * Row N meant "the Nth migration of the frozen legacy order". The old table is left in place.
- */
-function importLegacyMigrations(
-	db: Database,
-	byId: Map<string, Migration>,
-	legacyOrder: readonly string[],
-) {
-	const columns = db.query("PRAGMA table_info(schema_migrations)").all() as {
-		name: string;
-	}[];
-	if (columns.length === 0) return;
-	const hasChecksum = columns.some((column) => column.name === "checksum");
-	const rows = db
-		.query(
-			hasChecksum
-				? "SELECT id, checksum FROM schema_migrations ORDER BY id"
-				: "SELECT id, NULL AS checksum FROM schema_migrations ORDER BY id",
-		)
-		.all() as { id: number; checksum: string | null }[];
-	const now = new Date().toISOString();
-	db.transaction(() => {
-		const insert = db.query(
-			"INSERT INTO schema_migrations_v2 (id, checksum, applied_at) VALUES (?, ?, ?)",
-		);
-		for (const row of rows) {
-			const id = legacyOrder[row.id - 1];
-			const known = id === undefined ? undefined : byId.get(id);
-			if (id === undefined || !known)
-				throw new MigrationUnknownAppliedError(id ?? `legacy/${row.id}`);
-			// Rows from before checksums existed trust the current definition once.
-			insert.run(id, row.checksum ?? sha256(known.sql), now);
-		}
-	})();
-}
 export class WriterBusyError extends Error {
 	constructor() {
 		super("database_writer_queue_full");
@@ -194,11 +158,6 @@ export function openStore(
 	migrations: readonly MigrationInput[],
 	options: {
 		incrementalVacuum?: boolean;
-		/**
-		 * Frozen ids of the old positional scheme (row N of `schema_migrations` is
-		 * `legacyOrder[N-1]`). Defaults to the given list's order.
-		 */
-		legacyOrder?: readonly string[];
 	} = {},
 ): SqliteStore {
 	if (filename === ":memory:")
@@ -232,17 +191,6 @@ export function openStore(
 		migrationWriter.exec(
 			"CREATE TABLE IF NOT EXISTS schema_migrations_v2 (id TEXT PRIMARY KEY, checksum TEXT NOT NULL, applied_at TEXT NOT NULL)",
 		);
-		const appliedCount = (
-			migrationWriter
-				.query("SELECT COUNT(*) AS n FROM schema_migrations_v2")
-				.get() as { n: number }
-		).n;
-		if (appliedCount === 0)
-			importLegacyMigrations(
-				migrationWriter,
-				byId,
-				options.legacyOrder ?? ordered.map((m) => m.id),
-			);
 		const applied = new Map(
 			(
 				migrationWriter

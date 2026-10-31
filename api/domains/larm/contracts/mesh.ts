@@ -25,7 +25,6 @@ export const meshCatalog = z.object({
 	contractVersion: z.literal("agent-connection.v3"),
 	services: z.array(z.unknown()).max(512),
 });
-export type MeshCatalogService = z.infer<typeof service>;
 export const meshCatalogService = service;
 
 export const meshSource = z.discriminatedUnion("type", [
@@ -86,7 +85,6 @@ export const meshJob = z.object({
 	reason: text(100).nullish(),
 	warnings: meshWarnings.optional(),
 });
-export type MeshJob = z.infer<typeof meshJob>;
 
 /** A saved 3D asset; LARM owns it, Eumenes keeps only these fields. */
 export const meshAsset = z
@@ -121,7 +119,6 @@ export const meshAsset = z
 			hasSource: !!(a.sourceUrl ?? a.urls?.source),
 		};
 	});
-export type MeshAsset = z.output<typeof meshAsset>;
 export const meshAssetPage = z.object({
 	assets: z.array(z.unknown()).max(100),
 	total: z.number().int().nonnegative(),

@@ -8,10 +8,7 @@ import {
 	connectionModelsSchema,
 	larmDetailsSchema,
 	larmProfilesSchema,
-	probeSchema,
-	startedProbeSchema,
 	usageSchema,
-	type UsagePageQuery,
 } from "../api/domains/inference/contracts";
 import {
 	diagnosticsSchema,
@@ -23,12 +20,6 @@ import {
 import { z } from "zod";
 import { callJson, json, withQuery, type Transport } from "./transport";
 
-const usagePageSchema = z.object({
-	items: z.array(usageSchema),
-	total: z.number(),
-	pageIndex: z.number(),
-	pageSize: z.number(),
-});
 export type { Usage } from "../api/domains/inference/contracts";
 
 export function settingsClient(t: Transport) {
@@ -80,32 +71,10 @@ export function settingsClient(t: Transport) {
 			callJson(t, diagnosticsSchema, "/api/settings/diagnostics"),
 		inferenceUsage: async () =>
 			callJson(t, usageSchema.array(), "/api/inference/usage"),
-		inferenceUsagePage: async (query: UsagePageQuery, signal?: AbortSignal) =>
-			callJson(
-				t,
-				usagePageSchema,
-				withQuery("/api/inference/usage/page", query),
-				{ signal },
-			),
 		larmDetails: async () =>
 			callJson(t, larmDetailsSchema, "/api/inference/larm"),
 		larmProfiles: async () =>
 			callJson(t, larmProfilesSchema, "/api/inference/larm/profiles"),
-		inferenceProbes: async () =>
-			callJson(t, probeSchema.array(), "/api/inference/probes"),
-		startProbe: async (target: string) =>
-			callJson(
-				t,
-				startedProbeSchema,
-				"/api/inference/probes",
-				json({ target }),
-			),
-		cancelProbe: async (id: string) => {
-			await t.call(
-				`/api/inference/probes/${encodeURIComponent(id)}/cancel`,
-				json({}),
-			);
-		},
 	};
 }
 export { usagePageQuerySchema } from "../api/domains/inference/contracts";

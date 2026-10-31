@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { contracts, newClient, stubFetch } from "./harness";
 
 const t0 = "2026-10-10T00:00:00.000Z";
@@ -13,7 +13,6 @@ const route = {
 };
 const settings = {
 	revision: 1,
-	codingSupervision: { approveInstructions: true },
 	agency: { emotion: true, idleSec: 20, interests: [], maxUnanswered: 1 },
 	world: { enabled: false, curationResourceId: null },
 	intent: { mode: "shadow", timeoutMs: 1500, searchScore: 0.6 },
@@ -65,14 +64,6 @@ const usage = {
 	accepted: 1,
 	inputTokens: 10,
 	outputTokens: 5,
-};
-const probe = {
-	id: "p1",
-	target: "llm",
-	status: "running",
-	error: null,
-	revision: 1,
-	created: 1,
 };
 contracts("settings client", [
 	{
@@ -132,31 +123,6 @@ contracts("settings client", [
 			],
 		},
 	},
-	{
-		name: "inferenceProbes",
-		call: (c) => c.inferenceProbes(),
-		method: "GET",
-		path: "/api/inference/probes",
-		response: [probe],
-	},
-	{
-		name: "startProbe",
-		call: (c) => c.startProbe("llm"),
-		method: "POST",
-		path: "/api/inference/probes",
-		body: { target: "llm" },
-		response: { id: "p1" },
-	},
-	{
-		name: "cancelProbe",
-		call: (c) => c.cancelProbe("p/1"),
-		method: "POST",
-		path: "/api/inference/probes/p%2F1/cancel",
-		body: {},
-		response: {},
-		result: undefined,
-		parsed: false,
-	},
 ]);
 
 it.each(["test-profile", "test-profile-large"])(
@@ -168,103 +134,7 @@ it.each(["test-profile", "test-profile-large"])(
 	},
 );
 
-const target = {
-	id: "t1",
-	name: "n",
-	model: "m",
-	capability: "chat",
-	protocol: "p",
-	kind: "llm",
-	source: "larm",
-	onDemand: false,
-	primary: true,
-	testable: true,
-};
-const catalog = {
-	targets: [target],
-	errors: [],
-	discoveredAt: null,
-	revision: 1,
-	stale: false,
-};
-const serviceRun = {
-	id: "sr1",
-	targetId: "t1",
-	model: "m",
-	kind: "llm",
-	status: "running",
-	phase: "running",
-	created: 1,
-	revision: 1,
-};
 contracts("service-tests client", [
-	{
-		name: "serviceCatalog",
-		call: (c) => c.serviceCatalog(),
-		method: "GET",
-		path: "/api/service-tests/catalog",
-		response: catalog,
-	},
-	{
-		name: "refreshServiceCatalog",
-		call: (c) => c.refreshServiceCatalog(),
-		method: "POST",
-		path: "/api/service-tests/catalog/refresh",
-		body: {},
-		response: catalog,
-	},
-	{
-		name: "serviceRuns",
-		call: (c) => c.serviceRuns(),
-		method: "GET",
-		path: "/api/service-tests/runs",
-		response: [serviceRun],
-	},
-	{
-		name: "startServiceTest",
-		call: (c) =>
-			c.startServiceTest({
-				targetId: "t1",
-				revision: 1,
-				requestKey: uuid,
-				input: { text: "hi" },
-			}),
-		method: "POST",
-		path: "/api/service-tests/runs",
-		body: {
-			targetId: "t1",
-			revision: 1,
-			requestKey: uuid,
-			input: { text: "hi" },
-		},
-		response: serviceRun,
-	},
-	{
-		name: "diagnoseServices",
-		call: (c) => c.diagnoseServices(),
-		method: "POST",
-		path: "/api/service-tests/diagnose",
-		body: {},
-		response: { ...serviceRun, kind: "diagnostics" },
-	},
-	{
-		name: "cancelServiceTest",
-		call: (c) => c.cancelServiceTest("sr/1"),
-		method: "POST",
-		path: "/api/service-tests/runs/sr%2F1/cancel",
-		body: {},
-		response: {},
-		result: undefined,
-		parsed: false,
-	},
-	{
-		name: "retryServiceArtifact",
-		call: (c) => c.retryServiceArtifact("sr1"),
-		method: "POST",
-		path: "/api/service-tests/runs/sr1/retry-artifact",
-		body: {},
-		response: serviceRun,
-	},
 	{
 		name: "uploadTestAudio",
 		call: (c) => c.uploadTestAudio(new Blob(["RIFF"])),
@@ -274,41 +144,19 @@ contracts("service-tests client", [
 	},
 ]);
 
-describe("service-tests artifact", () => {
-	it("returns the artifact bytes as a Blob", async () => {
-		const seen = stubFetch(
-			() =>
-				new Response("png-bytes", { headers: { "Content-Type": "image/png" } }),
-		);
-		const blob = await newClient().serviceArtifact("sr/1");
-		expect(await blob.text()).toBe("png-bytes");
-		expect(seen[0]?.path).toBe("/api/service-tests/runs/sr%2F1/artifact");
-	});
-	it("surfaces a 4xx {error} as ApiError", async () => {
-		stubFetch(() =>
-			Response.json({ error: "preview_expired" }, { status: 410 }),
-		);
-		await expect(newClient().serviceArtifact("sr1")).rejects.toMatchObject({
-			status: 410,
-			message: "preview_expired",
-		});
-	});
-});
-
 const grant = {
-	workspaceId: "w1",
+	connectionRef: "c1",
+	projectRef: "p1",
+	sessionRefs: [],
+	maxSessions: 1,
 	operations: ["read"],
-	branch: null,
-	remote: null,
-	network: "none",
 	expiresAt: "2026-10-11T00:00:00.000Z",
 	maxRuntimeMs: 3600000,
-	maxDecisions: 10,
 	progressIntervalMs: 300000,
 };
 const workTask = {
 	id: "task1",
-	kind: "coding",
+	kind: "orchestration",
 	version: 1,
 	title: "t",
 	request: "do it",
@@ -349,7 +197,7 @@ contracts("tasks client", [
 		call: (c) =>
 			c.createTask({
 				requestId: uuid,
-				kind: "coding",
+				kind: "orchestration",
 				version: 1,
 				title: "t",
 				request: "do it",
@@ -370,9 +218,6 @@ contracts("tasks client", [
 			task: workTask,
 			question: null,
 			availableActions: ["start", "forget"],
-			execution: null,
-			supervisor: null,
-			latestReport: null,
 		},
 	},
 	{
@@ -455,36 +300,5 @@ contracts("tasks client", [
 		path: "/api/tasks/task1/answers",
 		body: command({ questionId: "q1", answer: "yes" }),
 		response: receipt,
-	},
-]);
-
-const report = {
-	kind: "progress",
-	summary: "working",
-	facts: [],
-	limitations: [],
-	evidenceRefs: [],
-	snapshotHash: null,
-	questionId: null,
-	id: "rep1",
-	taskId: "task1",
-	sequence: 1,
-	executionGeneration: 1,
-	authorityEpoch: 1,
-	taskRevision: 2,
-	originConversationId: null,
-	phase: "implementing",
-	observedAt: 1,
-	createdAt: 1,
-	dedupeKey: "k",
-	priority: "normal",
-};
-contracts("coding-supervision client (reports)", [
-	{
-		name: "taskReports",
-		call: (c) => c.taskReports("task1", 2, 10),
-		method: "GET",
-		path: "/api/tasks/task1/reports?after=2&limit=10",
-		response: { items: [report], nextCursor: null },
 	},
 ]);

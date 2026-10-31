@@ -127,30 +127,6 @@ const memoryItem = {
 	validity: null,
 	capturedBy: "manual",
 };
-const continuityNote = {
-	id: "n1",
-	conversationId: "main",
-	kind: "activity",
-	text: "Rust移行の調査",
-	status: "active",
-	revision: 2,
-	createdAt: "2026-10-13T00:00:00.000Z",
-	updatedAt: "2026-10-13T01:00:00.000Z",
-	origin: "agent",
-	sourceMessageIds: ["m1"],
-	expiresAt: "2026-10-27T01:00:00.000Z",
-};
-const tendency = {
-	id: "t1",
-	text: "朝型",
-	revision: 1,
-	updatedAt: "2026-10-13T01:00:00.000Z",
-};
-const memoryContext = {
-	version: 3,
-	profile: { text: "以下は…", tokens: 9 },
-	newMemories: 1,
-};
 const decision = {
 	id: 7,
 	conversationId: "main",
@@ -190,29 +166,6 @@ contracts("memory client", [
 		result: [memoryItem],
 	},
 	{
-		name: "memoryShortTerm",
-		call: (c) => c.memoryShortTerm("main/1"),
-		method: "GET",
-		path: "/api/memory/short-term?conversationId=main%2F1",
-		response: { items: [continuityNote] },
-		result: [continuityNote],
-	},
-	{
-		name: "memoryTendencies",
-		call: (c) => c.memoryTendencies(),
-		method: "GET",
-		path: "/api/memory/tendencies",
-		response: { items: [tendency] },
-		result: [tendency],
-	},
-	{
-		name: "memoryContext",
-		call: (c) => c.memoryContext("main"),
-		method: "GET",
-		path: "/api/memory/context?conversationId=main",
-		response: memoryContext,
-	},
-	{
 		name: "stewardDecisions",
 		call: (c) => c.stewardDecisions("main/1", 20),
 		method: "GET",
@@ -244,102 +197,6 @@ contracts("memory client", [
 		method: "GET",
 		path: "/api/steward/error-report?conversationId=main%2F1",
 		response: { text: "# Eumenes エラーレポート（メモリー整理）" },
-	},
-	{
-		name: "memoryContext (off)",
-		call: (c) => c.memoryContext("main"),
-		method: "GET",
-		path: "/api/memory/context?conversationId=main",
-		response: { disabled: true },
-		parsed: false,
-	},
-]);
-
-const entry = { written: "NASA", spoken: "ナサ" };
-const dictionaryAnswer = { entries: [entry] };
-contracts("tts-dictionary client", [
-	{
-		name: "ttsDictionary",
-		call: (c) => c.ttsDictionary(),
-		method: "GET",
-		path: "/api/tts-dictionary",
-		response: dictionaryAnswer,
-		result: [entry],
-	},
-	{
-		name: "saveTtsDictionaryEntry",
-		call: (c) =>
-			c.saveTtsDictionaryEntry({
-				original: null,
-				entry,
-				expected: { spoken: null },
-			}),
-		method: "POST",
-		path: "/api/tts-dictionary/save",
-		body: { original: null, entry, expected: { spoken: null } },
-		response: dictionaryAnswer,
-		result: [entry],
-	},
-	{
-		name: "deleteTtsDictionaryEntry",
-		call: (c) =>
-			c.deleteTtsDictionaryEntry({
-				written: "NASA",
-				expected: { spoken: "ナサ" },
-			}),
-		method: "POST",
-		path: "/api/tts-dictionary/delete",
-		body: { written: "NASA", expected: { spoken: "ナサ" } },
-		response: { entries: [] },
-		result: [],
-	},
-]);
-
-const execution = {
-	id: "e1",
-	taskId: "t1",
-	generation: 1,
-	authorityEpoch: 1,
-	state: "running",
-	cursor: 0,
-	turnFinished: false,
-	childrenStopped: false,
-	evidenceComplete: false,
-	observation: {
-		turnOutcome: "unconfirmed",
-		terminalEventSeq: null,
-		processStarted: true,
-		captureState: "complete",
-		captureIssues: [],
-	},
-	reason: null,
-	exitCode: null,
-	createdAt: t0,
-	updatedAt: t0,
-};
-contracts("coding client", [
-	{
-		name: "codingWorkspaces",
-		call: (c) => c.codingWorkspaces(),
-		method: "GET",
-		path: "/api/coding/workspaces",
-		response: {
-			items: [{ id: "w1", branch: "main", available: true, reason: null }],
-		},
-	},
-	{
-		name: "codingExecution",
-		call: (c) => c.codingExecution("e/1"),
-		method: "GET",
-		path: "/api/coding/executions/e%2F1",
-		response: execution,
-	},
-	{
-		name: "codingExecutionEvents",
-		call: (c) => c.codingExecutionEvents("e1", 4, 10),
-		method: "GET",
-		path: "/api/coding/executions/e1/events?after=4&limit=10",
-		response: { execution, events: [] },
 	},
 ]);
 

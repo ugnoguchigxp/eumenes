@@ -79,7 +79,7 @@ export function createTaskCore(options: TasksOptions) {
 		requestId: string,
 		input: unknown,
 		operation: () => WorkTask,
-		admit: boolean | (() => boolean) = true,
+		admit = true,
 	) {
 		const digest = sha256Hex(canonical(input));
 		const existing = repo.command(tx, "local", requestId);
@@ -89,7 +89,7 @@ export function createTaskCore(options: TasksOptions) {
 		}
 		const result = receipt(operation());
 		repo.recordCommand(tx, "local", requestId, digest, result);
-		if (typeof admit === "function" ? admit() : admit) requireStorage(tx);
+		if (admit) requireStorage(tx);
 		return result;
 	}
 	function requireStorage(tx: Database) {

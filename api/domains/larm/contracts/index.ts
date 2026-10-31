@@ -81,10 +81,9 @@ export type LarmCallOptions = {
 	asrAcceptedLanguages?: string[];
 	tools?: NativeTool[];
 	/**
-	 * `required`: the provider must call one of `tools`; `none`: it must not (the tools only keep the prompt's prefix
-	 * the same as the conversation's). Default: it may answer in text.
+	 * `required`: the provider must call one of `tools`. Default: it may answer in text.
 	 */
-	toolChoice?: "required" | "none";
+	toolChoice?: "required";
 	onToolCalls?: (calls: NativeToolCall[]) => void;
 	maxOutputTokens?: number;
 	/** Internal control calls only: JSON-object generation at temperature zero. */
@@ -216,9 +215,4 @@ export {
 	musicTags,
 	type TrackQuery,
 } from "./music-library";
-export {
-	musicProviders,
-	musicGenerationInput,
-	type MusicProviders,
-} from "./music-generation";
-export { imageImportReceipt, type ImageImportReceipt } from "./image-import";
+export { musicProviders, musicGenerationInput } from "./music-generation";

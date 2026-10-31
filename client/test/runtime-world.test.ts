@@ -148,92 +148,6 @@ contracts("timers client", [
 	},
 ]);
 
-const row = {
-	id: "cl1",
-	revision: 1,
-	target: { subjectId: "s1" },
-	claim: {
-		predicate: "likes",
-		content: { kind: "value", value: { kind: "string", value: "tea" } },
-	},
-	adoption: "adopted",
-	origin: "user_report",
-	evidenceKinds: ["user_statement"],
-	freshness: "fresh",
-	tone: "adopted",
-};
-const scope = { scopeKey: "profile:owner" };
-const forget = {
-	forgetId: "f1",
-	display: "pending",
-	state: "requested",
-	blocked: null,
-	abandoned: { parts: 0, roots: 0 },
-	origin: "user",
-	rootCount: 1,
-	createdAt: 1,
-	updatedAt: 1,
-};
-contracts("world client", [
-	{
-		name: "worldStatus",
-		call: (c) => c.worldStatus(),
-		method: "GET",
-		path: "/api/world/status",
-		response: {
-			mode: "on",
-			enabled: true,
-			usable: true,
-			gateOpen: true,
-			scopes: [scope],
-		},
-	},
-	{
-		name: "worldClaims",
-		call: (c) => c.worldClaims("profile:owner"),
-		method: "GET",
-		path: "/api/world/claims?scopeKey=profile%3Aowner",
-		response: {
-			scopeKey: "profile:owner",
-			scopes: [scope],
-			asOf: 1,
-			complete: true,
-			stopped: 0,
-			items: [row],
-		},
-	},
-	{
-		name: "worldClaim",
-		call: (c) => c.worldClaim("cl/1"),
-		method: "GET",
-		path: "/api/world/claims/cl%2F1",
-		response: {
-			claim: row,
-			scopeKey: "profile:owner",
-			asOf: 1,
-			recordedAt: 1,
-			condition: {
-				kind: "unspecified",
-				text: "",
-				evaluation: "unknown",
-				reasons: [],
-			},
-			supports: [],
-			refutations: { evidence: [], claims: [] },
-			sources: [],
-			history: [],
-			historyTruncated: false,
-		},
-	},
-	{
-		name: "worldForgets",
-		call: (c) => c.worldForgets(),
-		method: "GET",
-		path: "/api/world/forgets",
-		response: { scopeKey: "profile:owner", forgets: [forget] },
-	},
-]);
-
 const source = {
 	sourceId: "s1",
 	url: "https://example.com/a",
@@ -303,44 +217,6 @@ contracts("agent-runtime client", [
 		path: "/api/agent-tasks/at1/cancel",
 		body: {},
 		response: { ...agentTask, status: "cancelled" },
-	},
-]);
-
-contracts("coding-supervision client (supervisor)", [
-	{
-		name: "taskSupervisor",
-		call: (c) => c.taskSupervisor("task1"),
-		method: "GET",
-		path: "/api/tasks/task1/supervisor",
-		response: {
-			diagnosticDue: false,
-			taskId: "task1",
-			generation: 1,
-			authorityEpoch: 1,
-			lastObservedAt: null,
-			lastProgressAt: null,
-			nextCheckAt: 1,
-			monitorHealth: "healthy",
-			failures: 0,
-			fingerprint: null,
-			handledFingerprint: null,
-			decisionId: null,
-			stepId: null,
-			decisionsUsed: 0,
-			repairLoops: 0,
-			lastReportAt: null,
-			lastReportFingerprint: null,
-			holdReason: null,
-			pendingApproval: null,
-		},
-	},
-	{
-		name: "taskSupervisor (no supervisor)",
-		call: (c) => c.taskSupervisor("task1"),
-		method: "GET",
-		path: "/api/tasks/task1/supervisor",
-		response: null,
-		parsed: false,
 	},
 ]);
 

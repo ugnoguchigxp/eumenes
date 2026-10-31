@@ -20,9 +20,6 @@ export type Turn = {
 	choiceFailure?: string;
 };
 
-/** How a model round is made: the reply loop with the native tools, or a routed turn (a choice, or a talk call). */
-export type TurnMode = "single" | "routed";
-
 const norm = (text: string) => text.replace(/\s+/g, "");
 
 /** The longest run of characters two texts share. */
@@ -112,7 +109,7 @@ const mean = (xs: readonly number[]) =>
 	xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
 
 /**
- * The timing of a turn's calls. The user first hears words at the first text of a single or talk call; a choice is
+ * The timing of a turn's calls. The user first hears words at the first text of a talk call; a choice is
  * never spoken, so words the host says after the last call (`hostSpoke`: a hand-over's announcement, a question
  * back, a fixed phrase) are heard when that call ends.
  */
@@ -126,7 +123,7 @@ export function timingOf(
 	const last = metrics.at(-1);
 	const heard = [
 		...calls.flatMap(({ kind, metrics: m }) =>
-			(kind === "single" || kind === "talk") && m.firstContentMs !== null
+			kind === "talk" && m.firstContentMs !== null
 				? [m.startedAt + m.firstContentMs - turnStartedAt]
 				: [],
 		),
@@ -212,7 +209,6 @@ export type StepRecord = Timing & {
 	toolchain?: string;
 	request?: string;
 	said: string;
-	turnMode: TurnMode;
 	/** The longest run the reply shares with the agent's previous reply. */
 	copyRun: number | null;
 	/** Why the turn ended. */
@@ -293,8 +289,6 @@ export function cellOf(records: readonly StepRecord[]): Cell {
 
 export type ReportMeta = {
 	startedAt: string;
-	client: string;
-	harness: string;
 	reasoning: string;
 	/** The output limit the harness sets (before the profile's own reserve caps it). */
 	outputLimit: number;
@@ -302,9 +296,8 @@ export type ReportMeta = {
 	probe: boolean;
 	chains: readonly string[];
 	forms: readonly string[];
-	turn: TurnMode;
-	/** Digest of the saved LARM settings (null for another client). */
-	settings: string | null;
+	/** Digest of the saved LARM settings. */
+	settings: string;
 };
 
 const seconds = (ms: number | null) =>
@@ -337,14 +330,11 @@ export function reportMarkdown(
 		"",
 		"| 項目 | 値 |",
 		"| --- | --- |",
-		`| 経路 | ${meta.client} |`,
-		`| ハーネス | ${meta.harness} |`,
 		`| reasoning | ${meta.reasoning} |`,
 		`| 出力の上限（ハーネス / 実際に求めた値） | ${meta.outputLimit} / ${distinct(records.map((r) => r.requestedLimit))} |`,
-		`| ターン | ${meta.turn} |`,
 		`| 回数 | ${meta.reps}${meta.probe ? "（probe）" : ""} |`,
 		`| サーバーが返したモデル名 | ${distinct(records.map((r) => r.model))} |`,
-		`| 設定の digest | ${meta.settings ?? "-"} |`,
+		`| 設定の digest | ${meta.settings} |`,
 		"",
 		"## 合否（連続依頼 × 形）",
 		"",
@@ -381,34 +371,28 @@ export function reportMarkdown(
 			const c = where(null, form);
 			return `| 合計 | ${form} | ${seconds(c.heardMs)} | ${seconds(c.turnMs)} | ${decimal(c.calls)} | ${whole(c.reasoningChars)} | ${whole(c.tokensPerSecond)} | ${share(c.cachedShare)} | ${share(c.cachedShareAll)} | ${c.truncated} | ${share(c.retryShare)} | ${share(c.copyShare)} |`;
 		}),
-		...(records.some((r) => r.turnMode === "routed")
-			? [
-					"",
-					"## 選ぶ呼出しと話す呼出しの時間（routed、平均 ms）",
-					"",
-					head([
-						"形",
-						"選ぶ 初token",
-						"選ぶ 初text",
-						"選ぶ 計",
-						"話す 初token",
-						"話す 初text",
-						"話す 計",
-					]),
-					...meta.forms.map((form) => {
-						const rows = records.filter(
-							(r) => r.form === form && r.turnMode === "routed",
-						);
-						const avg = (pick: (r: StepRecord) => number | null) =>
-							whole(mean(rows.flatMap((r) => pick(r) ?? [])));
-						return `| ${form} | ${avg((r) => r.choiceFirstTokenMs)} | ${avg((r) => r.choiceFirstTextMs)} | ${avg((r) => r.choiceMs)} | ${avg((r) => r.talkFirstTokenMs)} | ${avg((r) => r.talkFirstTextMs)} | ${avg((r) => r.talkMs)} |`;
-					}),
-					"",
-					"## 終わり方（回数）",
-					"",
-					...stopCounts(records),
-				]
-			: []),
+		"",
+		"## 選ぶ呼出しと話す呼出しの時間（routed、平均 ms）",
+		"",
+		head([
+			"形",
+			"選ぶ 初token",
+			"選ぶ 初text",
+			"選ぶ 計",
+			"話す 初token",
+			"話す 初text",
+			"話す 計",
+		]),
+		...meta.forms.map((form) => {
+			const rows = records.filter((r) => r.form === form);
+			const avg = (pick: (r: StepRecord) => number | null) =>
+				whole(mean(rows.flatMap((r) => pick(r) ?? [])));
+			return `| ${form} | ${avg((r) => r.choiceFirstTokenMs)} | ${avg((r) => r.choiceFirstTextMs)} | ${avg((r) => r.choiceMs)} | ${avg((r) => r.talkFirstTokenMs)} | ${avg((r) => r.talkFirstTextMs)} | ${avg((r) => r.talkMs)} |`;
+		}),
+		"",
+		"## 終わり方（回数）",
+		"",
+		...stopCounts(records),
 		"",
 		...cacheSection(records),
 		"## 落ちた手",

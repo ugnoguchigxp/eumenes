@@ -1,6 +1,5 @@
 import {
 	type CreateTask,
-	type TaskGrantInput,
 	type TaskReceipt,
 	taskReceiptSchema,
 	taskDetailSchema,
@@ -57,7 +56,7 @@ export function tasksClient(transport: Transport) {
 			input: {
 				requestId: string;
 				expectedRevision: number;
-				grant: TaskGrantInput | OrchestrationGrant;
+				grant: OrchestrationGrant;
 			},
 		) => post(`${path(id)}/amend`, input),
 		answerTask: (

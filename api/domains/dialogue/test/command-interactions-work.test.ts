@@ -1,15 +1,18 @@
 import { afterEach, expect, test } from "bun:test";
+import { systemContext } from "../../../infrastructure/system-context";
 import {
 	ADAPTER,
+	choice,
+	resumedJobs,
 	setup,
 	until,
 	type Harness,
 } from "./command-interactions.fixture";
-import { toolFields } from "./tool-text.fixture";
 
 /**
- * A command toolchain's question is answered by the conversation's `work` tool (operation `answer`) or by the
- * UI through the interaction routes (the ContextWindow specification, sections 6.1 and 9).
+ * A command toolchain's question is answered by the routed turn's pending choice (`answer`, which the host carries
+ * out as the `work` operation) or by the UI through the interaction routes (the ContextWindow specification,
+ * sections 6.1 and 9).
  */
 let h: Harness | undefined;
 afterEach(async () => {
@@ -17,19 +20,11 @@ afterEach(async () => {
 	h = undefined;
 });
 
-/** The result of the newest tool call the model was given back: what the last `work` call answered. */
-function lastToolResult(): Record<string, unknown> {
-	const call = [...h!.calls]
-		.reverse()
-		.find((c) => c.messages.at(-1)?.role === "tool")!;
-	return toolFields(call.messages.at(-1)!.content);
-}
-
-/** The work call that answers a TODO by its number (`t<ref>`); the host takes the open question and its revision itself. */
-const answerCall = (todo: { ref: number }, args: Record<string, unknown>) => ({
-	name: "work",
-	args: { todo: `t${todo.ref}`, operation: "answer", ...args },
-});
+/** The pending turn's choice that answers a TODO's question by its number (`t<ref>`); the host takes the open question. */
+const answerChoice = (todo: { ref: number }, fields: Record<string, unknown>) =>
+	choice({ choice: "answer", todo: `t${todo.ref}`, ...fields });
+/** What the host says when the work could not take the choice. */
+const FAILED = systemContext("dialogue.contexts.local.failed", {});
 
 const saved = (operationId: string) => ({
 	state: "saved",
@@ -38,7 +33,7 @@ const saved = (operationId: string) => ({
 	digest: `digest-${operationId}`,
 });
 
-test("the work tool's answer is accepted once and the same run resumes the interaction", async () => {
+test("the pending choice's answer is accepted once and the same run resumes the interaction", async () => {
 	h = await setup();
 	const first = await h.asked();
 	const interaction = h.interaction()!;
@@ -53,14 +48,14 @@ test("the work tool's answer is accepted once and the same run resumes the inter
 		arguments: { seconds: 180 },
 	});
 	h.state.outcome = saved("op-nl");
-	h.state.steps.push({
-		calls: [answerCall(todo!, { text: "3分でお願い" })],
-	});
+	h.state.steps.push(answerChoice(todo!, { text: "3分でお願い" }));
 	const second = await h.say("3分でお願い");
 	expect(second.id).not.toBe(first.id);
-	// The accepted answer handed the work back to the command sub-agent: the generation ended with no more calls,
-	// and the result is the conversation agent's to report on its own opportunity.
+	// The accepted answer handed the work back to the command sub-agent: the turn ended with the one choice, and
+	// the result is the conversation agent's to report on its own opportunity.
 	expect(h.state.steps).toEqual([]);
+	expect(h.calls).toHaveLength(2);
+	expect(h.calls.at(-1)!.session?.outputSchema).toBeDefined();
 	await until(() => h!.interaction()?.status === "completed");
 	expect(h.interaction()).toMatchObject({
 		status: "completed",
@@ -99,61 +94,21 @@ test("the work tool's answer is accepted once and the same run resumes the inter
 	).rejects.toThrow("interaction_closed");
 });
 
-test("an answer that names a question is refused as an unknown argument and changes nothing: the host takes the open question", async () => {
-	h = await setup();
-	await h.asked();
-	const interaction = h.interaction()!;
-	const [todo] = h.todos();
-	const jobs = () =>
-		h!.rows("SELECT id FROM queue_jobs WHERE kind='dialogue.toolchain-command'")
-			.length;
-	const before = jobs();
-	h.state.steps.push({
-		calls: [
-			{
-				name: "work",
-				args: {
-					todo: `t${todo!.ref}`,
-					operation: "answer",
-					questionId: crypto.randomUUID(),
-					text: "3分",
-				},
-			},
-		],
-	});
-	h.speak("どの質問か分かりません。");
-	await h.say("3分");
-	// The work tool's arguments are strict: a question number is not one of them, so the call is refused as a whole.
-	expect(lastToolResult()).toMatchObject({ refused: true });
-	expect(h.interaction()).toMatchObject({
-		status: "waiting_input",
-		revision: 0,
-	});
-	expect(h.todos()).toMatchObject([{ status: "waiting" }]);
-	expect(jobs()).toBe(before);
-	expect(
-		h.rows("SELECT id FROM command_interaction_events WHERE kind='answer'"),
-	).toHaveLength(0);
-	expect(interaction.question).not.toBeNull();
-});
-
-test("an answer without text is refused with question_not_open", async () => {
+test("an answer without text is refused and changes nothing", async () => {
 	h = await setup();
 	await h.asked();
 	const [todo] = h.todos();
-	h.state.steps.push({
-		calls: [answerCall(todo!, {})],
-	});
-	h.speak("答えがありません。");
-	await h.say("お願い");
-	expect(lastToolResult()).toMatchObject({
-		ok: false,
-		code: "question_not_open",
-	});
+	const jobs = resumedJobs(h).length;
+	h.state.steps.push(answerChoice(todo!, { text: "" }));
+	const run = await h.say("お願い");
+	expect(h.dialogue.answerText(run.id)).toBe(FAILED);
 	expect(h.interaction()!.status).toBe("waiting_input");
+	expect(h.todos()).toMatchObject([{ status: "waiting" }]);
+	expect(resumedJobs(h)).toHaveLength(jobs);
+	expect(h.started).toHaveLength(0);
 });
 
-test("a second answer to the same question is refused: the TODO no longer waits", async () => {
+test("a second answer to the same question is refused: the TODO no longer waits and is not offered", async () => {
 	h = await setup();
 	await h.asked();
 	const [todo] = h.todos();
@@ -163,34 +118,39 @@ test("a second answer to the same question is refused: the TODO no longer waits"
 		arguments: { seconds: 60 },
 	});
 	h.state.outcome = saved("op-once");
-	h.state.steps.push({
-		calls: [answerCall(todo!, { text: "1分" })],
-	});
+	h.state.steps.push(answerChoice(todo!, { text: "1分" }));
 	await h.say("1分");
 	await until(() => h!.interaction()?.status === "completed");
 	expect(h.todos()).toEqual([]);
 	const [done] = h.archived();
 	expect(done!.status).toBe("done");
-	h.state.steps.push({
-		calls: [answerCall(done!, { text: "2分" })],
-	});
-	h.speak("もう答えています。");
+	// Finished work is archived as it finishes: no question is pending, so the request turn runs and offers no
+	// choice on it. A choice that names it anyway is refused by the work operation and answers nothing.
+	h.state.steps.push(
+		choice({
+			choice: `t${done!.ref}`,
+			operation: "amend",
+			text: "2分",
+			say: "直します。",
+		}),
+	);
 	const starts = h.started.length;
-	await h.say("2分");
-	// Finished work is archived as it finishes: it is not answered again.
-	expect(lastToolResult()).toMatchObject({
-		ok: false,
-		code: "todo_not_found",
-	});
+	const jobs = resumedJobs(h).length;
+	const again = await h.say("2分");
+	const schema = JSON.stringify(h.calls.at(-1)!.session?.outputSchema);
+	// The finished TODO may only be checked: no answer and no correction of it is offered.
+	expect(schema).not.toContain('"answer"');
+	expect(schema).not.toContain('"amend"');
+	expect(h.dialogue.answerText(again.id)).toBe(FAILED);
 	expect(h.started).toHaveLength(starts);
+	expect(resumedJobs(h)).toHaveLength(jobs);
 });
 
 test("a stale TODO revision is refused before the answer is looked at", async () => {
 	h = await setup();
 	await h.asked();
 	const [todo] = h.todos();
-	h.state.steps.push({ calls: [answerCall(todo!, { text: "3分" })] });
-	h.speak("状態が変わっています。");
+	h.state.steps.push(answerChoice(todo!, { text: "3分" }));
 	// The model call is held after its state was shown (revision as it stands now); the TODO's revision moves on
 	// meanwhile, and the answer is then looked at against the revision the model saw.
 	let release!: () => void;
@@ -204,13 +164,10 @@ test("a stale TODO revision is refused before the answer is looked at", async ()
 	);
 	h.state.modelGate = null;
 	release();
-	await said;
-	expect(lastToolResult()).toMatchObject({
-		ok: false,
-		code: "revision_stale",
-		todo: `t${todo!.ref}`,
-	});
+	const run = await said;
+	expect(h.dialogue.answerText(run.id)).toBe(FAILED);
 	expect(h.interaction()!.status).toBe("waiting_input");
+	expect(h.started).toHaveLength(0);
 });
 
 test("an answer to a question whose chain has since been replaced is refused and leaves the question open", async () => {
@@ -220,15 +177,9 @@ test("an answer to a question whose chain has since been replaced is refused and
 	const [todo] = h.todos();
 	// The catalog now offers a newer revision: the question's exact revision can no longer be rebuilt.
 	h.state.activeRevision = "toolchain:fake.manage@2";
-	h.state.steps.push({
-		calls: [answerCall(todo!, { text: "3分" })],
-	});
-	h.speak("その担当はもう使えません。");
-	await h.say("3分");
-	expect(lastToolResult()).toMatchObject({
-		ok: false,
-		code: "toolchain_unavailable",
-	});
+	h.state.steps.push(answerChoice(todo!, { text: "3分" }));
+	const run = await h.say("3分");
+	expect(h.dialogue.answerText(run.id)).toBe(FAILED);
 	expect(h.started).toHaveLength(0);
 	expect(h.interaction()!.status).toBe("waiting_input");
 	// The UI's answer ends it with the reason.

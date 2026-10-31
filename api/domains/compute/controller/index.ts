@@ -25,10 +25,6 @@ export function registerCompute(
 			onError: (c) => c.json({ error: "payload_too_large" }, 413),
 		}),
 	);
-	app.get("/api/compute/environment", async (c) => {
-		await service.refresh();
-		return c.json(service.environment(), 200, { "Cache-Control": "no-store" });
-	});
 	app.get("/api/compute/jobs", (c) =>
 		c.json({ jobs: service.list(owner) }, 200, { "Cache-Control": "no-store" }),
 	);

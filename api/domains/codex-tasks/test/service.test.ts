@@ -3,8 +3,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
-import { createCodexTasks, migrations, type CodexEnqueue } from "..";
+import { createCodexTasks, migrations } from "..";
 import type { SdkReceipt, SdkActivity } from "../../coding";
+import type { CodexEnqueue } from "../contracts";
 
 const stores: SqliteStore[] = [];
 const dirs: string[] = [];

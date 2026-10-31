@@ -29,15 +29,6 @@ export function provenanceOf(db: Database, itemId: string): Provenance {
 		.get(itemId) as { mode: Provenance } | null;
 	return row?.mode ?? "manual";
 }
-/** `quote_matched` of an item: null when none was recorded. */
-export function quoteMatchedOf(db: Database, itemId: string): boolean | null {
-	const row = db
-		.query(
-			"SELECT quote_matched AS q FROM memory_item_provenance WHERE item_id = ?",
-		)
-		.get(itemId) as { q: number | null } | null;
-	return row?.q == null ? null : row.q === 1;
-}
 /** Forgotten items leave no provenance and no merge lineage (as the merged item or as a source). */
 export function deleteProvenance(db: Database, itemIds: readonly string[]) {
 	const remove = db.query(

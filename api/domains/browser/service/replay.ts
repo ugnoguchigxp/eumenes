@@ -314,4 +314,3 @@ export function createReplays(
 
 	return { startInTransaction, cancelInTransaction, abortRunning };
 }
-export type Replays = ReturnType<typeof createReplays>;

@@ -3,7 +3,6 @@ import type { Utterance } from "../../api/domains/conversation";
 import type { ChatMessage } from "../../api/domains/dialogue/service/context";
 import { systemText } from "../../api/domains/dialogue/service/context-system";
 import { recentMessages } from "../../api/domains/dialogue/service/conversation-input";
-import { localHarness } from "../../api/domains/dialogue/service/harness";
 import {
 	estimateMessageTokens,
 	estimateTextTokens,
@@ -95,7 +94,7 @@ export function cacheInput(
 		];
 		// The conversation ends with the agent's utterance: the user's words are the last message's.
 		if (said.at(-1)!.speaker === "user") said.pop();
-		const recent = recentMessages(said, localHarness.history);
+		const recent = recentMessages(said);
 		const messages: ChatMessage[] = [
 			{ role: "system", content: system },
 			...recent,

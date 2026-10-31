@@ -297,7 +297,7 @@ test("a preference said past the earlier words reaches the request through `## M
 	expect(missed!.pass).toBe(false);
 }, 60_000);
 
-test("--lane accept runs the chains and the scenes it adds, on the saved LARM connection, with its judge", () => {
+test("--lane accept runs the chains and the scenes it adds, with its judge", () => {
 	const o = parseOptions(["--lane", "accept"]);
 	expect(o).toMatchObject({ lane: "accept", judge: "ruri" });
 	expect(o.chains.map((c) => c.key)).toEqual(
@@ -318,8 +318,8 @@ test("--lane accept runs the chains and the scenes it adds, on the saved LARM co
 		"unknown chain",
 	);
 	expect(() =>
-		parseOptions(["--lane", "accept", "--client", "codex", "--model", "m"]),
-	).toThrow("--lane accept runs");
+		parseOptions(["--lane", "accept", "--reasoning", "low"]),
+	).toThrow("does not apply");
 	expect(() => parseOptions(["--lane", "accept", "--forms", "empty"])).toThrow(
 		"does not apply",
 	);

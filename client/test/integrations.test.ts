@@ -1,5 +1,4 @@
-import { describe, expect, it } from "vitest";
-import { contracts, newClient, stubFetch } from "./harness";
+import { contracts } from "./harness";
 
 const t0 = "2026-10-10T00:00:00.000Z";
 const uuid = "11111111-1111-4111-8111-111111111111";
@@ -266,24 +265,3 @@ contracts("ocr and object-recognition client answers", [
 		response: recognitionHandoff,
 	},
 ]);
-
-describe("inference usage page", () => {
-	it("parses each usage row and rejects a malformed page", async () => {
-		stubFetch(() =>
-			Response.json({ items: [], total: 0, pageIndex: 0, pageSize: 10 }),
-		);
-		await expect(
-			newClient().inferenceUsagePage({
-				pageIndex: 0,
-				pageSize: 10,
-				q: "",
-				desc: true,
-				sort: "createdAt",
-			} as never),
-		).resolves.toEqual({ items: [], total: 0, pageIndex: 0, pageSize: 10 });
-		stubFetch(() => Response.json({ items: [{ id: 1 }], total: 1 }));
-		await expect(
-			newClient().inferenceUsagePage({} as never),
-		).rejects.toMatchObject({ name: "ZodError" });
-	});
-});

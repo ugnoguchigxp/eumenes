@@ -31,7 +31,6 @@ const config = loadConfig({
 	EUMENES_ATTITUDE_DATASET: join(dir, "attitude-dataset/dataset.sqlite3"),
 	EUMENES_MEMORY_JOURNAL: join(dir, "memory-forget-journal.jsonl"),
 	EUMENES_WORLD_POLL_MS: "3600000",
-	EUMENES_DELEGATED_TASKS_ENABLED: "1",
 	EUMENES_WEB_RESEARCH_TOOLS_ENABLED: "0",
 });
 configureLogging({ file: config.logFile, level: config.logLevel });

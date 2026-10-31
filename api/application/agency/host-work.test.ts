@@ -35,7 +35,9 @@ describe("TODOs offered to the agency", () => {
 			h.requests.find((r) => r.purpose === "select")?.prompt,
 		);
 		expect(asked).toContain("c1");
-		expect(prompt).toContain("[todo:open1]");
+		expect(JSON.parse(prompt).todos).toContainEqual(
+			expect.objectContaining({ id: "open1", status: "todo" }),
+		);
 		expect(prompt).toContain("仕事 ask1");
 		expect(prompt).toContain("どの曲調ですか");
 		expect(prompt).not.toContain("done1");
@@ -138,7 +140,7 @@ describe("work that changed", () => {
 		const prompt = String(
 			h.requests.filter((r) => r.purpose === "select").at(-1)?.prompt,
 		);
-		expect(prompt).toContain("trigger=result_received");
+		expect(JSON.parse(prompt).opportunity.trigger).toBe("result_received");
 		// The update reads new observations, and there are none: only the decision is asked.
 		expect(h.calls.update).toBe(1);
 		// The same question told again opens nothing more.
@@ -207,7 +209,7 @@ describe("work that changed", () => {
 	test("the question the opportunity asks is delivered as a runless message citing it", async () => {
 		const h = harness({
 			select: (request) =>
-				String(request.prompt).includes("trigger=result_received")
+				JSON.parse(request.prompt).opportunity.trigger === "result_received"
 					? choice("speak", {
 							utterance: "どの曲調にしますか。",
 							refs: ["todo:t1"],

@@ -87,14 +87,6 @@ bun run logs -- --since 2026-10-08T10:00:00+09:00 --component inference --json
 
 応答に契約に合う`bootEpoch`・`configRevision`がある場合だけ保持し、現在値で過去の情報を埋めません。既知のcredentialと同じ値は相関情報からも除外します。主会話と補助接続の対応は`larm.connection_ready`・計数イベント・`larm.connection_released`のconnectionIdで追います。状態確認の失敗にも同じIDとclaimの期限を残します。失敗した会話のエラーレポートにも接続ID・上流要求ID・固定コードを表示します。これらのログは接続先の応答を診断するもので、新しいヘッダーや接続の再確保・自動再送は追加しません。
 
-## 旧しおりテーブルによる起動失敗の復旧
-
-旧しおり機能を使っていたDBでは、残っている `continuity_events` が新しい短期記憶の同名テーブルと衝突し、`continuity/0004-events` の適用で起動に失敗する場合があります。新規DBでは発生しません。
-
-APIが停止している状態で `bun api/application/repair-legacy-continuity.ts` を実行すると、通常のDB所有ロック・適用済みmigrationのチェックサム検証・整合性検査・バックアップを経て、旧形式の表だけを `continuity_legacy_bookmark_events` へ改名します。行と索引は保持し、適用済みSQLと履歴は変更しません。新形式・表なしでは何もせず、未知の形式や退避先の衝突は拒否します。バックアップ先は実行結果の `backupPath` です。
-
-この保守処理はサーバーを起動せず、未適用migrationも実行しません。次回の通常起動で適用されます。自動復旧の分岐は起動処理へ追加していません。
-
 ## DBの手動バックアップ
 
 APIが停止している状態で `bun run db:backup` を実行すると、通常のDB所有ロック・適用済みmigrationのチェックサム検証・`PRAGMA integrity_check` を経て、`VACUUM INTO` で `eumenes.sqlite3.manual-<時刻>.bak`（権限 `0600`）をDBの隣に作ります。保存先は実行結果の `backupPath` です。APIの起動中は所有ロックで拒否され、`db_backup_failed` で終了します。
@@ -219,7 +211,7 @@ LARMが`timings`を返す場合、`larm.llm_timing`に`providerPromptMs`（入�
 
 `streamFailure`は`output_limit`・`content_filter`・`missing_end`・`empty_output`・`invalid_tool_calls`・`aborted`・`invalid_response`・`read_error`を区別します。外向きのエラーは`chat_stream_incomplete`で、途中の本文・引数を採用しない判定は維持します。ただし、正常に終わって本文もツール呼出しも無い`empty_output`だけは外向きを`chat_output_empty`に分けます（会話の呼出しでは、その呼出しだけが終わり、推論の依頼は残ります。返事なしとして完了して`dialogue.no_answer`を記録します。ただし local ハーネスで利用者の発言に何も返さなかった回は、下の`dialogue.turn_failed`になります。ほかの呼出しでは失敗です）。思考（reasoning）の文字数は`reasoningChars`に数だけを記録します。例えば`output_limit`は出力上限到達を観測したもので、LARMの中継切断を示しません。usageやtimingsが届かない場合は不明として省略し、0にはしません。これらの診断には本文・引数・Providerの自由文は含めません。
 
-local ハーネス（LARM）の会話の回は、ホストが振り分けます（[計画](../spec/local-harness-rebuild-plan-2026-10-30.md)）。`dialogue.turn_routed`は回ごとに1件で、`kind`が回の種類（`talk`＝会話の回、`request`＝依頼の回、`pending`＝保留の回）、`count`がその回のモデル呼出しの数です。`dialogue.choice_made`は選ぶ呼出しごとに1件で、`kind`が回の種類、`decision`が選んだものの種類（`none`・`ask`・`memory.recall`・`memory.request`・`todo`・`toolchain_<実行の種類>`・`approve`・`decline`・`answer`・`unreadable`・`cut`）、`attempt`が何回目の選択か（依頼の回は2回まで）です。`cut`は選ぶ呼出しが出力の上限で切れ、決めきれなかったことを示します。依頼の回は選び直さずに会話の回へ渡します。選び直すのは、ホストが選んだものを断ったときだけです。利用者の言葉・選んだ担当への依頼文・`say`は記録しません。`dialogue.turn_failed`は、回の中の呼出しがまだ何も話さないうちに失敗した（利用者の発言に会話の呼出しが何も返さなかったときを含む）回ごとに1件で、`kind`が回の種類、`reason`が失敗の符号です。このときホストは決まった一言を回の答えにします。モデルの答えのない回（ホストの言葉だけ、または何も話さない回）は、推論の依頼をホストの答えとして受け入れます。受け入れられなかった（設定の変更・期限切れ）ときは`dialogue.answer_request_not_accepted`（`reason`）を記録し、回は完了します。回が採用されずに終わった後でも、音声で再生できた文はエージェントの発言として会話の記録とチャット欄に残ります。
+会話の回は、会話のモデルが LARM でもクラウドでも、ホストが振り分けます（[計画](../spec/local-harness-rebuild-plan-2026-10-30.md)、[一本化](../spec/single-harness-plan-2026-10-31.md)）。`dialogue.turn_routed`は回ごとに1件で、`kind`が回の種類（`talk`＝会話の回、`request`＝依頼の回、`pending`＝保留の回）、`count`がその回のモデル呼出しの数です。`dialogue.choice_made`は選ぶ呼出しごとに1件で、`kind`が回の種類、`decision`が選んだものの種類（`none`・`ask`・`memory.recall`・`memory.request`・`todo`・`toolchain_<実行の種類>`・`approve`・`decline`・`answer`・`unreadable`・`cut`）、`attempt`が何回目の選択か（依頼の回は2回まで）です。`cut`は選ぶ呼出しが出力の上限で切れ、決めきれなかったことを示します。選ぶ呼出しが呼出しそのものの失敗（提供元・通信・LARM の推論の失敗。クラウドの `cloud_http_<状態>`・`cloud_agent_<理由>` を含む）で終わると、`dialogue.choice_failed`（`reason`＝その code）を warn で残し、会話の回が答えます。クラウドの会話モデルには、選ぶ呼出しの schema を厳密な structured output の形（1つの object、全部の欄が必須で、使わない欄は null）で送ります。依頼の回は選び直さずに会話の回へ渡します。選び直すのは、ホストが選んだものを断ったときだけです。利用者の言葉・選んだ担当への依頼文・`say`は記録しません。`dialogue.turn_failed`は、回の中の呼出しがまだ何も話さないうちに失敗した（利用者の発言に会話の呼出しが何も返さなかったときを含む）回ごとに1件で、`kind`が回の種類、`reason`が失敗の符号です。このときホストは決まった一言を回の答えにします。モデルの答えのない回（ホストの言葉だけ、または何も話さない回）は、推論の依頼をホストの答えとして受け入れます。受け入れられなかった（設定の変更・期限切れ）ときは`dialogue.answer_request_not_accepted`（`reason`）を記録し、回は完了します。回が採用されずに終わった後でも、音声で再生できた文はエージェントの発言として会話の記録とチャット欄に残ります。
 
 補助接続の内部処理では物理的にmainへ置き換わっても、`sessionRole`へ呼出し元の`auxiliary`または`subagent`を保持します。`profile`だけで会話段を分類せず、`phase`・runId・attemptId等と対応させてください。接続を比較するrunnerは、同一接続の対照でも論理的な呼出し元を記録します。
 

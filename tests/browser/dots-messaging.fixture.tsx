@@ -4,9 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ArtifactRenderer } from "../../packages/artifact-ui/src";
 import { dotsMessagingWebAdapter } from "../../web/src/domains/dots/toolchain-adapter";
 import type { AdapterHostContext } from "../../web/src/domains/toolchain-artifacts/registry";
-import type { MessagingView } from "../../api/domains/dots/contracts/messaging";
+import type { z } from "zod";
+import type { messagingViewSchema } from "../../api/domains/dots/contracts/messaging";
 import bundle from "../../api/domains/capabilities/bundles/dots-messaging.bundle.json";
 import "@eumenes/design-system/styles";
+type MessagingView = z.infer<typeof messagingViewSchema>;
 const artifact = bundle.artifacts[0]! as AdapterHostContext["artifact"];
 const listeners = new Set<() => void>();
 const setting = {
