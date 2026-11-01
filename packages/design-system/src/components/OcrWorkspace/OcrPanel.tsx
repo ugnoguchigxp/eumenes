@@ -3,7 +3,7 @@ import {
 	capacityTimeoutMessage,
 	capacityWaitingMessage,
 	isCapacityWaiting,
-} from "../VisualAnalysis/capacity";
+} from "../../utils/capacity";
 import { useEffect, useRef, useState } from "react";
 import { Camera, FileUp, ScanText, Video } from "lucide-react";
 import { Button } from "../Button";

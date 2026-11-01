@@ -11,7 +11,7 @@ import {
 	capacityTimeoutMessage,
 	capacityWaitingMessage,
 	isCapacityWaiting,
-} from "./capacity";
+} from "../../utils/capacity";
 const tasks: Record<VisualAnalysisTask, string> = {
 	describe: "画像を説明",
 	referring: "条件に合う物を探す",

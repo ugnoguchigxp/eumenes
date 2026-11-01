@@ -3,7 +3,7 @@ import {
 	capacityTimeoutMessage,
 	capacityWaitingMessage,
 	isCapacityWaiting,
-} from "../VisualAnalysis/capacity";
+} from "../../utils/capacity";
 import { stateLabel } from "./RecognitionHistory";
 import type { RecognitionItem } from "./types";
 import type { CaptureOrigin, useCameraCapture } from "./useCameraCapture";
