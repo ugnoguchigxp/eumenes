@@ -74,6 +74,16 @@ const runControl = (env: Env, ...[id, m, s, c, session]: ControlArgs) =>
 import { createIndependentControls } from "./independent-control";
 import { createIntentJudge } from "./intent-judge";
 import { createSpeechLane } from "./speech-lane";
+
+function taskSessionRelease(store: SqliteStore, ports: Map<string, LarmPort>) {
+	return async (taskId: string) => {
+		await Promise.all([
+			releaseTaskSessions(store, taskId),
+			...[...ports.values()].map((p) => p.releaseTaskSession?.(taskId)),
+		]);
+	};
+}
+
 export function createInference(
 	store: SqliteStore,
 	settings: SettingsService,
@@ -384,7 +394,7 @@ export function createInference(
 			for (const requestId of revokeAgentAttempts(db, input))
 				revokedRequests.add(requestId);
 		},
-		releaseTaskSession: (taskId: string) => releaseTaskSessions(store, taskId),
+		releaseTaskSession: taskSessionRelease(store, ports),
 		flushCancelledRequests(requestIds: string[]) {
 			for (const requestId of requestIds)
 				if (store.read((db) => get(db, requestId))?.status === "cancelled")

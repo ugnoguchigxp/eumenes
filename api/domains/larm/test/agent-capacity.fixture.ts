@@ -43,6 +43,8 @@ export function capacityFixture() {
 			| ((id: string, signal: AbortSignal) => Promise<void>)
 			| undefined,
 		claimable: true,
+		probeReady: false,
+		healthCalls: 0,
 		polls: 0,
 		timeoutCreate: false,
 		wrongCapacity: undefined as number | undefined,
@@ -161,6 +163,18 @@ export function capacityFixture() {
 						},
 					],
 				});
+			}
+			if (operation === "providers" && path.endsWith("/health")) {
+				controls.healthCalls++;
+				if (controls.probeReady) controls.claimable = true;
+				return Response.json(
+					{
+						name: "llm",
+						ready: controls.claimable,
+						acceptingRequests: controls.claimable,
+					},
+					{ status: controls.claimable ? 200 : 503 },
+				);
 			}
 			controls.polls++;
 			return Response.json(state(binding));

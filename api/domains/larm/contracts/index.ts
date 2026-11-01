@@ -126,6 +126,8 @@ import type { IntentInput, IntentJudgment } from "./user-intent";
 export { ttsVoicesSchema, type TtsVoices } from "./voices";
 export * from "./user-intent";
 export interface LarmPort {
+	/** An explicitly ended task releases only its sub-agent connections, after active borrowers finish. */
+	releaseTaskSession?(taskId: string): Promise<void>;
 	decisionModel?(): string | null;
 	/**
 	 * The context window (tokens) of the LLM provider of the lease held now; null when no lease is held (the

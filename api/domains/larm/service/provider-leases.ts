@@ -50,6 +50,7 @@ async function releaseConnection(current: Lease, control: Control) {
 }
 
 type Options = {
+	llmConnection?: false;
 	connectionRole?: "main" | "sub";
 	base: URL | undefined;
 	token: string | undefined;
@@ -68,7 +69,10 @@ type Options = {
 /** LARM identifies different Provider scopes as different Connections, even for the same client. */
 export function createProviderLeases(options: Options) {
 	if (options.decisionOnly) return decisionLeases(options);
-	const main = createLeaseManager(options);
+	const main = createLeaseManager({
+		...options,
+		keepAlive: options.llmConnection === false ? false : options.keepAlive,
+	});
 	let voice: ReturnType<typeof createScope> | undefined;
 	let retained = false;
 	let closed = false;
@@ -106,7 +110,11 @@ export function createProviderLeases(options: Options) {
 			if (closed) return;
 			retained = active;
 			// An existing audio scope is enough to keep a visible chat warm.
-			if (!active || main.current() || !voice) main.retain(active);
+			if (
+				options.llmConnection !== false &&
+				(!active || main.current() || !voice)
+			)
+				main.retain(active);
 			voice?.retain(active);
 		},
 		status,
@@ -124,6 +132,8 @@ export function createProviderLeases(options: Options) {
 			signal: AbortSignal,
 			use: (p: Provider, id: string) => Promise<T>,
 		) {
+			if (name === "llm" && options.llmConnection === false)
+				throw new Error("larm_agent_identity_required");
 			return (name === "llm" ? main : speech()).withProvider(name, signal, use);
 		},
 		current(name?: ProviderName) {
@@ -179,6 +189,7 @@ function createScope({
 	control,
 	lifetime,
 	decisionOnly = false,
+	llmConnection,
 }: Options) {
 	let lease: Lease | undefined;
 	let creating: Promise<Lease> | undefined;
@@ -265,6 +276,7 @@ function createScope({
 					audience,
 					idleTimeoutMs,
 					fullProfile: !decisionOnly,
+					excludeLlm: llmConnection === false,
 					...(decisionOnly ? { providers: ["system-one"] } : {}),
 					lifetime: lifetime.signal,
 				},

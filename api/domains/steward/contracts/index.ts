@@ -119,6 +119,11 @@ export type ConversationSession =
 	| {
 			sessionRole: "auxiliary";
 			onConversation: true;
+			agentSession: {
+				conversationId: string;
+				agentId: string;
+				branchId?: string;
+			};
 	  }
 	/** A call on a connection of its own: the host's own background work, it yields to calls made for the user. */
 	| { sessionRole: "auxiliary"; yields: true };

@@ -81,6 +81,7 @@ test("the latest conversation's prefix is read by a one-token background call on
 			sessionRole: "auxiliary",
 			onConversation: true,
 			readAhead: true,
+			agentSession: { conversationId: "main", agentId: "main" },
 		});
 		// A background subject: it never counts as the user's foreground work.
 		expect(call!.subject).toStartWith("background:prewarm:");
@@ -89,6 +90,7 @@ test("the latest conversation's prefix is read by a one-token background call on
 		for (const listener of h.shown) listener();
 		await Bun.sleep(0);
 		expect(h.calls).toHaveLength(2);
+		expect(h.calls[1]!.session).toEqual(h.calls[0]!.session);
 	} finally {
 		h.prewarm.close();
 	}

@@ -374,6 +374,7 @@ describe("agency LLM port on the conversation's prompt", () => {
 		expect(executed[0]!.session).toEqual({
 			sessionRole: "auxiliary",
 			onConversation: true,
+			agentSession: { conversationId: "conv-1", agentId: "conv-1" },
 			outputSchema: z.toJSONSchema(schema),
 		});
 	});

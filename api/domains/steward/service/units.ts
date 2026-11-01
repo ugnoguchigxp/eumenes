@@ -82,6 +82,10 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 				? {
 						sessionRole: "auxiliary",
 						onConversation: true,
+						agentSession: {
+							conversationId: input.conversationId,
+							agentId: input.conversationId,
+						},
 					}
 				: { sessionRole: "auxiliary", yields: true },
 		);

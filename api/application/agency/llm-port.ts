@@ -147,11 +147,12 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 					]),
 					undefined, // Use the native schema channel; ControlContract would append instructions to the system.
 					// Either way the agency yields: a call made for the user aborts it (`larm_preempted`).
-					prefix
+					prefix && conversationId
 						? {
 								sessionRole: "auxiliary",
 								outputSchema,
 								onConversation: true,
+								agentSession: { conversationId, agentId: conversationId },
 							}
 						: { sessionRole: "auxiliary", yields: true, outputSchema },
 				);

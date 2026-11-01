@@ -1,0 +1,76 @@
+{
+  "at": "2026-11-01T00:43:33.877Z",
+  "lane": "isolated_live_library",
+  "creations": [
+    {
+      "id": "aconn_epoch-6a71e801-778f-4c8e-b469-eaf5668e85c2_8ac7f9a5-678e-418b-a02b-8d10e5a51f63",
+      "requestedTokens": 200000,
+      "providers": [
+        "llm"
+      ],
+      "state": "pending"
+    },
+    {
+      "id": "aconn_epoch-6a71e801-778f-4c8e-b469-eaf5668e85c2_4781f67f-b1bc-4a29-a662-f4c8d0d3c3ec",
+      "requestedTokens": null,
+      "providers": [
+        "asr",
+        "embedding",
+        "system-one",
+        "tts",
+        "tts-english"
+      ],
+      "state": "probing"
+    }
+  ],
+  "statuses": [
+    {
+      "state": "connecting",
+      "claims": 0
+    }
+  ],
+  "runtimeDeployment": false,
+  "probeCreatedConnections": 0,
+  "mainJSON": {
+    "ok": false,
+    "ms": 10001,
+    "error": "TimeoutError"
+  },
+  "voicePreparation": {
+    "ok": true,
+    "ms": 159
+  },
+  "asr": {
+    "ok": true,
+    "ms": 123,
+    "hasOutput": true
+  },
+  "tts": {
+    "ok": true,
+    "ms": 301,
+    "bytes": 61996
+  },
+  "claims": [
+    {
+      "id": "aconn_epoch-6a71e801-778f-4c8e-b469-eaf5668e85c2_4781f67f-b1bc-4a29-a662-f4c8d0d3c3ec",
+      "capacity": null
+    },
+    {
+      "id": "aconn_epoch-6a71e801-778f-4c8e-b469-eaf5668e85c2_4781f67f-b1bc-4a29-a662-f4c8d0d3c3ec",
+      "capacity": null
+    }
+  ],
+  "allOwnedConnectionsReleased": true,
+  "releaseChecks": [
+    {
+      "id": "aconn_epoch-6a71e801-778f-4c8e-b469-eaf5668e85c2_8ac7f9a5-678e-418b-a02b-8d10e5a51f63",
+      "http": 200,
+      "state": "released"
+    },
+    {
+      "id": "aconn_epoch-6a71e801-778f-4c8e-b469-eaf5668e85c2_4781f67f-b1bc-4a29-a662-f4c8d0d3c3ec",
+      "http": 200,
+      "state": "released"
+    }
+  ]
+}

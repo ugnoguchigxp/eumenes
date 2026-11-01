@@ -367,6 +367,7 @@ test("a step reading the conversation runs on the conversation's prompt with its
 	expect(call!.session).toEqual({
 		sessionRole: "auxiliary",
 		onConversation: true,
+		agentSession: { conversationId: "c1", agentId: "c1" },
 	});
 	// The answer is adopted as from the step's own prompt.
 	expect(h.memory.list().map((item) => item.text)).toEqual([

@@ -45,9 +45,10 @@ export function createConversationPrewarm(deps: {
 		try {
 			const prepared = store.read((db) => {
 				const conversationId = deps.latestConversationIdInTransaction(db);
-				return conversationId
+				const prompt = conversationId
 					? deps.task(db, conversationId, PREWARM_TASK)
 					: null;
+				return prompt && conversationId ? { ...prompt, conversationId } : null;
 			});
 			if (!prepared) return;
 			const requestId = await store.write((db) =>
@@ -66,6 +67,10 @@ export function createConversationPrewarm(deps: {
 				{
 					sessionRole: "auxiliary",
 					onConversation: true,
+					agentSession: {
+						conversationId: prepared.conversationId,
+						agentId: prepared.conversationId,
+					},
 					readAhead: true,
 				},
 			);

@@ -11,6 +11,7 @@ export async function createVoiceLease(
 		audience: string;
 		idleTimeoutMs: number;
 		fullProfile: boolean;
+		excludeLlm?: boolean;
 		/** The Providers a partial connection selects. */
 		providers?: string[];
 		lifetime: AbortSignal;
@@ -34,7 +35,15 @@ export async function createVoiceLease(
 		client,
 		audience,
 		fullProfile,
-		...(providers ? { providers } : {}),
+		...(deps.excludeLlm
+			? {
+					providers: catalogProviders
+						.filter((p) => p.name !== "llm")
+						.map((p) => string(p.name)),
+				}
+			: providers
+				? { providers }
+				: {}),
 		catalogRevision,
 	};
 	const startedAt = performance.now();

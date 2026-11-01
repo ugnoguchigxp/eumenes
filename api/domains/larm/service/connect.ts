@@ -1,5 +1,6 @@
 import { getLogger } from "../../../infrastructure/logger";
 import { assertAgentCapacity, claimExpiry } from "./agent-capacity";
+import { refreshClaimability } from "./claimability";
 import {
 	assertClaimContextWindow,
 	requestedContextTokens,
@@ -49,6 +50,7 @@ export async function fetchCatalog(
 	profile: string,
 	required: ProviderName[],
 ) {
+	if (!profile) throw new Error("larm_profile_missing");
 	const catalog = record(
 		await readJson(
 			await control(
@@ -109,7 +111,11 @@ export async function createConnection(
 				ttlSeconds: 900,
 				allowFallback: false,
 				deploymentPolicy: "existing-only",
-				...(input.fullProfile ? {} : { providers: input.providers ?? ["llm"] }),
+				...(input.providers
+					? { providers: input.providers }
+					: input.fullProfile
+						? {}
+						: { providers: ["llm"] }),
 				expectedCatalogRevision: input.catalogRevision,
 			}),
 		},
@@ -211,7 +217,18 @@ export async function awaitReady(
 		});
 	};
 	while (!check()) {
-		await pause(100);
+		const stale =
+			input.connectionRole && created.status === "ready"
+				? providersOf(created).filter(
+						(p) =>
+							required.includes(String(p.name)) &&
+							p.readiness === "ready" &&
+							p.claimable !== true,
+					)
+				: [];
+		await pause(
+			stale.length ? await refreshClaimability(control, id, stale) : 100,
+		);
 		created = record(
 			await readJson(
 				await control(`/v1/agent-connections/${id}`, { method: "GET" }, [200]),

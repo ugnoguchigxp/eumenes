@@ -15,6 +15,7 @@ import { createInfer } from "./infer";
 import { createConversationYield } from "./conversation-yield";
 import { createHelperConnections } from "./helper-connections";
 import { createProviderLeases as createLeaseManager } from "./provider-leases";
+import { fetchCatalog } from "./connect";
 import { requestIntent } from "./user-intent";
 import { leasePort } from "./lease-port";
 import { type Fetcher, type Provider } from "./profiles";
@@ -49,6 +50,8 @@ type LarmConfig = {
 	client?: string;
 	/** Capacity of an explicitly managed agent connection; speech selection is unchanged. */
 	connectionRole?: "main" | "sub";
+	/** Managed shared port: LLM allocation belongs to a logical agent, not this speech/discovery port. */
+	llmConnection?: false;
 	promptCacheKey?: string;
 	voice?: string;
 	fetch?: Fetcher;
@@ -153,6 +156,7 @@ export function createLarm(config: LarmConfig): LarmPort {
 		lifetime,
 		decisionOnly: config.decisionOnly,
 		connectionRole: config.connectionRole,
+		llmConnection: config.llmConnection,
 	});
 	const { connect, withProvider, status } = leases;
 	async function inferAnswer(
@@ -322,6 +326,10 @@ export function createLarm(config: LarmConfig): LarmPort {
 			);
 		},
 		async connect() {
+			if (config.llmConnection === false) {
+				await fetchCatalog(control, profile, ["llm"]);
+				return;
+			}
 			await connect(
 				[config.decisionOnly ? "system-one" : "llm"],
 				undefined,
@@ -375,6 +383,15 @@ export function createLarm(config: LarmConfig): LarmPort {
 			};
 		},
 		async probe(signal) {
+			if (config.llmConnection === false) {
+				await fetchCatalog(
+					(path, init, accepted) =>
+						control(path, { ...init, signal }, accepted),
+					profile,
+					["llm"],
+				);
+				return;
+			}
 			await connect(["llm"], signal);
 		},
 		status,

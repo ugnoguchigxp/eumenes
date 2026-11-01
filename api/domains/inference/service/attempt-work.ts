@@ -120,10 +120,14 @@ export function callOptionsFor(
 		...sessionCallOptions(r.session),
 		...(r.row.purpose === "llm"
 			? {
-					agentSession: r.session?.agentSession ?? {
-						conversationId: null,
-						agentId: r.session?.taskId ?? r.row.id,
-					},
+					agentSession:
+						r.session?.agentSession ??
+						(r.session?.onConversation || r.session?.sessionRole === "main"
+							? undefined
+							: {
+									conversationId: null,
+									agentId: r.session?.taskId ?? r.row.id,
+								}),
 				}
 			: {}),
 		// The level of the side that answers: a fallback attempt on the cloud takes the cloud's. Only the conversation's
