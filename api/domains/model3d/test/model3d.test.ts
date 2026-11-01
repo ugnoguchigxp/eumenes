@@ -602,6 +602,33 @@ test("a capacity refusal waits 30 s, sends the same key once and then follows th
 	expect(state(service, g.id).errorCode).toBeNull();
 });
 
+test("a lost response followed by a capacity refusal on the second send is a wait, then succeeds with the same key", async () => {
+	const { service, store, calls, state: larm } = setup();
+	larm.submits.push(
+		() => {
+			throw new TypeError("fetch failed");
+		},
+		() => {
+			throw new LarmCapacityBusy(null);
+		},
+	);
+	larm.jobs.push({ status: "completed", assetId: "asset-new" });
+	larm.assets.set("asset-new", asset("asset-new"));
+	const g = await create(service);
+	await until(() => waiting(service, g.id), { timeout: 3000 });
+	expect(state(service, g.id).state).toBe("submitting");
+	expect(calls.filter((c) => c.op === "submit")).toHaveLength(2);
+
+	dueNow(store);
+	await until(() => state(service, g.id).state === "completed", {
+		timeout: 3000,
+	});
+	const submits = calls.filter((c) => c.op === "submit");
+	expect(submits).toHaveLength(3);
+	expect(submits[2]!.args).toEqual(submits[0]!.args);
+	expect(state(service, g.id).errorCode).toBeNull();
+});
+
 test("Retry-After 90 s moves the next send to 90 s", async () => {
 	const { service, store, state: larm } = setup();
 	larm.submits.push(() => {

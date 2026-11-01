@@ -20,15 +20,13 @@ import {
 	LARM_CAPACITY_RETRY_MS,
 	LARM_CAPACITY_TIMEOUT,
 	LARM_CAPACITY_WAITING,
-	planCapacityWait,
+	settleCapacityWait,
 	type CapacityWait,
 } from "../../larm";
-import { getLogger } from "../../../infrastructure/logger";
 import { references } from "../repository";
 import type { ExcalidrawService } from "./index";
 import { START_WAIT_MS } from "./connection";
 import type { ChildExecution } from "../../tool-runtime";
-const log = getLogger("excalidraw");
 type RecordValue = {
 	id: string;
 	runId: string;
@@ -126,41 +124,31 @@ function waitForCapacity(
 	r: Row,
 	retryAfterMs: number,
 ) {
-	const record = view(r),
-		now = (deps.clock ?? Date.now)(),
-		delegated = !!JSON.parse(r.request_json).execution;
-	const plan = planCapacityWait({
-		now,
-		previous: record.capacityWait,
+	const delegated = !!JSON.parse(r.request_json).execution;
+	const { onWaiting } = deps;
+	settleCapacityWait({
+		domain: "excalidraw",
+		subjectId: r.id,
+		now: (deps.clock ?? Date.now)(),
+		previous: view(r).capacityWait,
 		retryAfterMs,
 		budgetMs: START_WAIT_MS,
+		// A delegated task's deadline is fixed by its caller; a conversation run is kept open instead.
 		limitAt: delegated ? r.deadline : null,
-	});
-	const until =
-		plan && !delegated ? deps.onWaiting?.(db, r.run_id, plan.deadline) : null;
-	const extended = plan && (delegated ? r.deadline : until);
-	if (!plan || extended == null || extended < plan.deadline) {
-		log.warn("excalidraw.capacity_wait_expired", {
-			jobId: r.job_id ?? undefined,
-			subjectId: r.id,
-			reason: LARM_CAPACITY_TIMEOUT,
-			waitedMs: now - (record.capacityWait?.startedAt ?? now),
-		});
-		failOperation(deps, db, r, LARM_CAPACITY_TIMEOUT);
-		return "applied" as const;
-	}
-	patch(db, r, { state: LARM_CAPACITY_WAITING, capacityWait: plan });
-	db.query("UPDATE excalidraw_operations SET deadline=? WHERE id=?").run(
-		extended,
-		r.id,
-	);
-	const jobId = enqueueStage(deps, db, read(db, r.id)!, "open", plan);
-	log.info("excalidraw.capacity_wait_scheduled", {
-		jobId,
-		subjectId: r.id,
-		waitCount: plan.count,
-		waitedMs: now - plan.startedAt,
-		nextInMs: plan.at - now,
+		extend:
+			delegated || !onWaiting
+				? undefined
+				: (deadline) => onWaiting(db, r.run_id, deadline),
+		expire: () => failOperation(deps, db, r, LARM_CAPACITY_TIMEOUT),
+		schedule: (plan) => {
+			patch(db, r, { state: LARM_CAPACITY_WAITING, capacityWait: plan });
+			if (!delegated)
+				db.query("UPDATE excalidraw_operations SET deadline=? WHERE id=?").run(
+					plan.deadline,
+					r.id,
+				);
+			return enqueueStage(deps, db, read(db, r.id)!, "open", plan);
+		},
 	});
 	return "applied" as const;
 }
@@ -343,8 +331,7 @@ export function registerDrawingOperations(deps: Deps) {
 				),
 			);
 			const s = await service.session({
-				// A try after a refusal is a new start; the first one's session stays failed.
-				requestId: view(r).capacityWait ? crypto.randomUUID() : r.id,
+				requestId: r.id,
 				conversationId: r.conversation_id,
 				title: plan.title,
 				referenceId: plan.referenceId!,
@@ -359,13 +346,15 @@ export function registerDrawingOperations(deps: Deps) {
 					await service.release(s.id);
 					signal.throwIfAborted();
 				}
-				const started = await service.wait(s.id);
+				// A try after a refusal starts the same session again; it holds no lease in between.
+				const started = await (s.state === "failed"
+					? service.reconnect(s.id).then(() => service.wait(s.id))
+					: service.wait(s.id));
 				// LARM had no free memory: the lease request was refused before it was accepted.
 				if (
 					started?.state === "failed" &&
 					started.errorCode === LARM_CAPACITY_BUSY
 				) {
-					await service.release(s.id);
 					return {
 						capacityWait: started.retryAfterMs ?? LARM_CAPACITY_RETRY_MS,
 					};

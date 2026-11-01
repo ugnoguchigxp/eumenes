@@ -63,7 +63,7 @@ export function createModel3d(deps: {
 		const r = generationRow(db, id)!;
 		const step = r.step + 1;
 		patchGeneration(db, id, { step });
-		queue.enqueueInTransaction(db, {
+		return queue.enqueueInTransaction(db, {
 			scope: "model3d",
 			kind: `model3d.${stage}`,
 			dedupeKey: `${id}:${step}`,
@@ -75,7 +75,7 @@ export function createModel3d(deps: {
 			availableAtMs: Date.now() + delay,
 			// The queue never runs a stage twice; the stages schedule their own next step.
 			maxAttempts: 1,
-		});
+		}).job.id;
 	}
 	function announce(
 		db: Database,

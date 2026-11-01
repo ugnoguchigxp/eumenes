@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
-import { getLogger } from "../../../infrastructure/logger";
 import type { HandlerDefinition } from "../../queue";
 import {
 	isCapacityBusy,
@@ -11,7 +10,6 @@ import type { createOcr } from "./index";
 import { row, patch, record, connectionMatches } from "../repository";
 import { ocrGateway } from "./gateway";
 import type { Connection } from "../contracts";
-const log = getLogger("ocr");
 /** The processing time one analyze try gets once LARM has room again. */
 /** How long one analysis may take after the gateway accepts it. */
 export const ANALYZE_BUDGET_MS = 600_000;

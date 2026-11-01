@@ -1,7 +1,7 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
 import {
 	isCapacityBusy,
-	LARM_CAPACITY_RETRY_MS,
+	capacityRetryMs,
 	type LarmCapacityBusy,
 	type LocalServiceLease,
 	type LocalServicesPort,
@@ -143,7 +143,7 @@ export function drawingConnection(
 			if (isCapacityBusy(e))
 				selected.refused = {
 					error: e,
-					until: clock() + (e.retryAfterMs ?? LARM_CAPACITY_RETRY_MS),
+					until: clock() + capacityRetryMs(e.retryAfterMs),
 				};
 			// A reset may already have installed a new use under this session ID.
 			await releaseUse(selected);

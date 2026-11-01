@@ -1,4 +1,4 @@
-import { capacityBusy } from "../../hooks/capacity-wait";
+import { LARM_CAPACITY_BUSY } from "../../hooks/capacity-wait";
 import type { EumenesClient } from "../../../../client";
 import type {
 	DrawingSession,
@@ -8,7 +8,7 @@ import type {
 /** A session start LARM refused for lack of free memory: it holds no lease and may be started again. */
 class DrawingCapacityBusy extends Error {
 	constructor(readonly retryAfterMs: number | null) {
-		super(capacityBusy);
+		super(LARM_CAPACITY_BUSY);
 	}
 }
 
@@ -23,7 +23,7 @@ export async function waitForDrawing(
 		s = await client.drawingSession(s.id, signal);
 	}
 	// LARM had no free memory: the owner waits and starts again; this is not a failed connection.
-	if (s.state === "failed" && s.errorCode === capacityBusy)
+	if (s.state === "failed" && s.errorCode === LARM_CAPACITY_BUSY)
 		throw new DrawingCapacityBusy(s.retryAfterMs ?? null);
 	// A status read may observe idle before the document read. That read ensures its lease.
 	if (s.state !== "ready" && s.state !== "idle")

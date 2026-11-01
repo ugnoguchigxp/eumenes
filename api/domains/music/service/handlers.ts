@@ -15,7 +15,7 @@ import {
 } from "../../larm";
 import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
 import type { MusicRecord } from "../contracts";
-import { row, record, patch } from "../repository";
+import { row, record, patch, type Row } from "../repository";
 import { musicContext, PLAN_MS } from "./context";
 import type { createMusic } from "./index";
 type GenerationPlan = Omit<z.infer<typeof musicPlanV3>, "task"> & {
@@ -28,6 +28,56 @@ const safeError = (error: unknown) =>
 	error instanceof Error && /^[a-z_0-9]{1,80}$/.test(error.message)
 		? error.message
 		: "music_generation_failed";
+/** LARM had no free memory: schedules the same generate stage later, or fails once the wait cannot go on. */
+function waitForCapacity(
+	db: Database,
+	r: Row,
+	retryAfterMs: number | null,
+	ports: {
+		onWaiting?: (db: Database, runId: string, untilMs: number) => number | null;
+		enqueue: (
+			db: Database,
+			id: string,
+			runId: string,
+			deadline: number,
+			stage: "generate",
+			wait: { at: number; count: number },
+		) => string;
+		fail: (db: Database, id: string, code: string) => void;
+	},
+) {
+	const execution = JSON.parse(r.request_json).execution;
+	const { onWaiting } = ports;
+	// A child execution's deadline is fixed by its caller; a run's deadline is extended or the wait ends.
+	settleCapacityWait({
+		domain: "music",
+		subjectId: r.id,
+		now: Date.now(),
+		previous: record(r).capacityWait,
+		retryAfterMs,
+		budgetMs: MEDIA_GENERATION_TIMEOUT_MS,
+		limitAt: execution ? r.deadline : null,
+		extend:
+			execution || !onWaiting
+				? undefined
+				: (deadline) => onWaiting(db, r.run_id, deadline),
+		expire: () => ports.fail(db, r.id, LARM_CAPACITY_TIMEOUT),
+		schedule(plan) {
+			db.query("UPDATE music_generations SET deadline=? WHERE id=?").run(
+				plan.deadline,
+				r.id,
+			);
+			patch(db, r.id, {
+				phase: LARM_CAPACITY_WAITING,
+				capacityWait: { startedAt: plan.startedAt, count: plan.count },
+			});
+			return ports.enqueue(db, r.id, r.run_id, plan.deadline, "generate", {
+				at: plan.at,
+				count: plan.count,
+			});
+		},
+	});
+}
 export function registerMusicHandlers(
 	deps: Parameters<typeof createMusic>[0] & {
 		enqueue: (
@@ -260,37 +310,10 @@ export function registerMusicHandlers(
 					fail(db, r.id, "capability_revoked");
 					return "applied";
 				}
-				const retryAfterMs = outcome.result.capacityWait;
-				const execution = JSON.parse(r.request_json).execution;
-				const { onWaiting } = deps;
-				// A child execution's deadline is fixed by its caller; a run's deadline is extended or the wait ends.
-				settleCapacityWait({
-					domain: "music",
-					subjectId: r.id,
-					now: Date.now(),
-					previous: record(r).capacityWait,
-					retryAfterMs,
-					budgetMs: MEDIA_GENERATION_TIMEOUT_MS,
-					limitAt: execution ? r.deadline : null,
-					extend:
-						execution || !onWaiting
-							? undefined
-							: (deadline) => onWaiting(db, r.run_id, deadline),
-					expire: () => fail(db, r.id, LARM_CAPACITY_TIMEOUT),
-					schedule(plan) {
-						db.query("UPDATE music_generations SET deadline=? WHERE id=?").run(
-							plan.deadline,
-							r.id,
-						);
-						patch(db, r.id, {
-							phase: LARM_CAPACITY_WAITING,
-							capacityWait: { startedAt: plan.startedAt, count: plan.count },
-						});
-						return enqueue(db, r.id, r.run_id, plan.deadline, "generate", {
-							at: plan.at,
-							count: plan.count,
-						});
-					},
+				waitForCapacity(db, r, outcome.result.capacityWait, {
+					onWaiting: deps.onWaiting,
+					enqueue,
+					fail,
 				});
 				return "applied";
 			}

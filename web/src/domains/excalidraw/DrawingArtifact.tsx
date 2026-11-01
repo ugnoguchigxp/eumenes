@@ -3,17 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { ArtifactRenderer, type ArtifactRuntime } from "@eumenes/artifact-ui";
 import type { EumenesClient } from "../../../../client";
 import type { DrawingSession } from "../../../../api/domains/excalidraw/contracts";
-import { isDrawingFrameOf, isDrawingFrameState } from "@eumenes/design-system";
+import {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+	isDrawingFrameOf,
+	isDrawingFrameState,
+} from "@eumenes/design-system";
 import { useDrawingPreviews } from "./useDrawingPreviews";
 import { draftDrawingHash, drawingLocation } from "./location";
 import { queryRoots } from "../../queryKeys";
 import { useLiveDrawingScreen } from "./resource-screen";
-import {
-	capacityBusy,
-	capacityTimeoutMessage,
-	capacityWaitingMessage,
-	useCapacityWait,
-} from "../../hooks/capacity-wait";
+import { LARM_CAPACITY_BUSY, useCapacityWait } from "../../hooks/capacity-wait";
 const emptyReferences: Awaited<ReturnType<EumenesClient["drawingReferences"]>> =
 	[];
 export function DrawingArtifact({
@@ -76,7 +76,7 @@ export function DrawingArtifact({
 			if (value.state === "ready" || value.state === "idle") wait.reset();
 			else if (
 				value.state === "failed" &&
-				value.errorCode === capacityBusy &&
+				value.errorCode === LARM_CAPACITY_BUSY &&
 				value.referenceId &&
 				refusal.current !== value.id
 			) {

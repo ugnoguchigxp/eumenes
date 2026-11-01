@@ -1,17 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+} from "@eumenes/design-system";
 import { queryRoots } from "../../queryKeys";
 import type {
 	AdapterHostContext,
 	AdapterState,
 	WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
-import {
-	capacityBusyOf,
-	capacityTimeoutMessage,
-	capacityWaitingMessage,
-	useCapacityWait,
-} from "../../hooks/capacity-wait";
+import { capacityBusyOf, useCapacityWait } from "../../hooks/capacity-wait";
 import { doclingMessages, openDocling } from "./open";
 
 const configurationError =

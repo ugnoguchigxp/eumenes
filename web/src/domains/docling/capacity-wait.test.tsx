@@ -8,8 +8,8 @@ import type { AdapterHostContext } from "../toolchain-artifacts/registry";
 import {
 	capacityTimeoutMessage,
 	capacityWaitingMessage,
-	createCapacityWait,
-} from "../../hooks/capacity-wait";
+} from "@eumenes/design-system";
+import { createCapacityWait } from "../../hooks/capacity-wait";
 import { doclingWebAdapter } from "./toolchain-adapter";
 
 const origin = "http://localhost:28765";

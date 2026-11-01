@@ -1,22 +1,21 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "../../../client/transport";
+import {
+	capacityRetryMs,
+	LARM_CAPACITY_BUSY,
+	LARM_CAPACITY_WAIT_LIMIT_MS,
+} from "../../../api/domains/larm/contracts";
 
-/** LARM had no free memory for an on-demand start; the backend answers 503 `{ error, retryAfterMs }`. */
-export const capacityBusy = "larm_capacity_busy";
-export const capacityWaitingMessage =
-	"LARMの空きを待っています。ほかの処理が終わりしだい始めます。";
-export const capacityTimeoutMessage =
-	"LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。";
-const retryMs = 30_000;
-const retryLimitMs = 300_000;
-const waitLimitMs = 30 * 60_000;
+/** The error code of a request LARM refused for lack of free memory (web domains read it from here). */
+export { LARM_CAPACITY_BUSY };
 
 /**
  * The wait the backend asks for after a capacity refusal (its 503 body, or an error a domain raised with
  * the same code and wait), or `null` for any other error.
  */
 export function capacityBusyOf(error: unknown) {
-	if (!(error instanceof Error) || error.message !== capacityBusy) return null;
+	if (!(error instanceof Error) || error.message !== LARM_CAPACITY_BUSY)
+		return null;
 	if (error instanceof ApiError && error.status !== 503) return null;
 	const ms =
 		error instanceof ApiError
@@ -55,11 +54,8 @@ export function createCapacityWait(options: {
 		refuse(retryAfterMs: number | null, send: () => void) {
 			const now = clock();
 			firstAt ??= now;
-			const delay = Math.min(
-				Math.max(retryMs, retryAfterMs ?? 0),
-				retryLimitMs,
-			);
-			if (now + delay - firstAt > waitLimitMs) {
+			const delay = capacityRetryMs(retryAfterMs);
+			if (now + delay - firstAt > LARM_CAPACITY_WAIT_LIMIT_MS) {
 				reset();
 				return "expired" as const;
 			}

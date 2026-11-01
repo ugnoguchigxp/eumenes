@@ -6,7 +6,7 @@ import { ApiError } from "../../../../client/transport";
 import {
 	capacityTimeoutMessage,
 	capacityWaitingMessage,
-} from "../../hooks/capacity-wait";
+} from "@eumenes/design-system";
 import { DrawingArtifact } from "./DrawingArtifact";
 import { drawingDefinition } from "./drawing-definition";
 import { drawingScreen } from "./resource-screen";
@@ -159,6 +159,36 @@ test("a refused reconnect waits the same way, with the manual reconnect and acti
 	await advance(30_000);
 	expect(client.reconnectDrawing).toHaveBeenCalledTimes(2);
 	expect(h.result.current.error).toBe("");
+});
+
+test("a gesture LARM refuses starts the one timer, sends the same activity once after the wait, and other gestures send nothing meanwhile", async () => {
+	const client = editorClient(0);
+	client.drawingActivity
+		.mockRejectedValueOnce(
+			new ApiError(503, "larm_capacity_busy", undefined, undefined, {
+				error: "larm_capacity_busy",
+				retryAfterMs: 45_000,
+			}),
+		)
+		.mockImplementation(async () => {});
+	const h = editor(client);
+	await advance(300);
+	await act(async () => {
+		await h.result.current.activity();
+	});
+	expect(client.drawingActivity).toHaveBeenCalledTimes(1);
+	expect(h.result.current.status).toBe(capacityWaitingMessage);
+	await advance(11_000);
+	await act(async () => {
+		await h.result.current.activity();
+	});
+	await advance(33_000);
+	expect(client.drawingActivity).toHaveBeenCalledTimes(1);
+	await advance(1_000);
+	expect(client.drawingActivity).toHaveBeenCalledTimes(2);
+	expect(h.result.current.status).not.toBe(capacityWaitingMessage);
+	await advance(10 * 60_000);
+	expect(client.drawingActivity).toHaveBeenCalledTimes(2);
 });
 
 test("a refused save keeps the draft, sends the same key once after the wait, and the editor saves nothing else meanwhile", async () => {

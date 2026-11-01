@@ -277,3 +277,39 @@ P1以降は、P0でLARMの契約が確定してから着手する。
 | design-system の対象部品（MusicWorkspace・ExternalAppLauncher・VisualAnalysis・Model3dWorkspace） | 個別実行で成功 |
 
 画像・音楽の T7（待機中の同じ会話の次の発言）と T8（待機中の再起動）は専用試験がない（待機は通常の queued ジョブで、会話の順番の鍵を持たない）。ブラウザE2E・live・実機器の受入（3D生成中に画像を依頼し、空き待ちを経て完成）は未実施で、サーバーの再起動は利用者が行う。
+
+## 9. LARM再デプロイ後の実接続確認と再レビュー（2026-11-01）
+
+### 9.1 実接続（live）
+
+利用者からLARM側の実装完了・再デプロイの連絡を受け、動作中のbackend（今回のコードを含む）とCLIで確認した。会話ID `capacity-wait-live-20261101`。
+
+| 時刻（JST） | 起きたこと | 結果 |
+| --- | --- | --- |
+| 08:17:31 | 3D生成を依頼（`32caf1a6`）。stage `image`（元画像の生成）へ | — |
+| 08:18:25 | 画像生成（`9911acb9`）のPOSTに LARM が 503・`resource_exhausted`（`larm.capacity_refused`、route `/v1/images/generations`、`Retry-After` なし） | 期待どおり。phase `waiting_capacity`、`image.capacity_wait_scheduled`（waitCount 1、nextInMs 30000） |
+| 08:18:25〜55 | backend が再起動（pid 99549→8672。こちらの操作ではない） | 待機中のジョブは queued のまま残り、予定時刻に再開（T8 を live で確認） |
+| 08:18:56 | 30秒後の送り直しに LARM が 409 `media_variant_busy`（3D は stage `waiting_gpu`） | 統一の拒否ではないため失敗（設計どおり）。LARM側の統一が、3Dの段階によっては未適用 |
+| 08:21:18 | 3D生成が完成 | — |
+
+LARMは同じ「重い処理の実行中」でも、3Dの段階により 503 `resource_exhausted` と 409 `media_variant_busy` を返し分けている。統一規格どおりなら後者も 503 `resource_exhausted`（resource `memory`）であるべきで、LARM側の修正を利用者に依頼する。Eumenes側で 409 を待ちに加えるのは D5 の変更になるため行っていない。空き待ちから完成までの通しは、LARM側の修正後に再確認する。
+
+### 9.2 再レビュー（二重化の観点）
+
+同じ拒否に対して同じ依頼が2回届く経路はなし。別セッションの会話用接続（agent-capacity・generation-lanes など）は `resend.ts` を使わず、503 の独自処理もなく、重ならない。
+
+| 指摘 | 対応 |
+| --- | --- |
+| Excalidraw: 一度拒否された利用単位が再接続まで送らない（保存が空いても通らない） | 拒否を時間窓（`capacityRetryMs`）に変え、窓の後は実際に送る。窓の過ぎた利用単位を `tick` で消す。activity の失敗も同じ1本の時計で待つ。試験追加 |
+| 決着処理が7か所に重複し、延長の判定が少しずつ違う | `api/domains/larm/service/capacity-wait.ts` の `settleCapacityWait` に一本化（判定・ログ・打ち切り）。記録の書込み・入れ直しは各domain。延長の窓口がない場合は延ばさずに待つ、に統一 |
+| Excalidraw の会話からの起動が試行ごとに新しいsessionを作る（30分で約60行） | 同じsessionを `reconnect` で起動し直す。1操作1session |
+| `Retry-After` の解釈が3Dで別実装 | `resend.ts` の `retryAfter` を共用 |
+| Web の定数（30秒・5分・30分・コード）の再定義 | `web/src/hooks/capacity-wait.ts` が larm contracts から読む。web の domain はこの hook 経由で読む |
+| 待機・打ち切りの文言が6か所に直書き | design-system の `utils/capacity.ts` を唯一の出所にし、web と各部品が使う。api の 3D の stage 表示だけは境界のため複製のまま |
+| 3D: 応答喪失の後の空きなしを失敗にしていた | 3Dは全試行で同じキーを使うので待機へ（`sendAgainIfLost(send, true)`）。到達しない busy 処理を削除。待機ログに新しいジョブIDを出す |
+
+別セッションの範囲（報告のみ）: `agent-connections.ts` の接続 Map が増え続ける、会話用接続の拒否コードがログに残らない（`larm.control_rejected` は status のみ）、`establish.ts` の接続作成の再送が `sendAgainIfLost` と別実装。
+
+### 9.3 検証（fixture）
+
+`bun run verify -- --domain larm --domain image --domain music --domain model3d --domain ocr --domain object-recognition --domain excalidraw --domain docling` 成功（96.1秒、bun 786件・web 191件・design-system 4ファイル）。design-system の対象部品 104件、larm の共通部品の試験（`capacity-wait.test.ts`・`resend.test.ts`）成功。改善後のコードを live で確認するには backend の再起動が要る。

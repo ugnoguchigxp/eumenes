@@ -1,3 +1,4 @@
+import { capacityTimeoutMessage } from "@eumenes/design-system";
 import { useCallback, useEffect, useRef } from "react";
 import type { EumenesClient } from "../../../../client";
 import type {
@@ -6,7 +7,6 @@ import type {
 } from "../../../../api/domains/excalidraw/contracts";
 import {
 	capacityBusyOf,
-	capacityTimeoutMessage,
 	type createCapacityWait,
 } from "../../hooks/capacity-wait";
 import { waitForDrawing } from "./editor-session";

@@ -1,10 +1,9 @@
 import { useCallback } from "react";
 import {
-	capacityBusyOf,
 	capacityTimeoutMessage,
 	capacityWaitingMessage,
-	useCapacityWait,
-} from "../../hooks/capacity-wait";
+} from "@eumenes/design-system";
+import { capacityBusyOf, useCapacityWait } from "../../hooks/capacity-wait";
 
 /** The editor's part of the LARM capacity wait: its one timer and the messages it shows. */
 export function useDrawingCapacityWait(

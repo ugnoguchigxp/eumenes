@@ -1,12 +1,11 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { getLogger } from "../../../infrastructure/logger";
 import {
 	isCapacityBusy,
 	LARM_CAPACITY_TIMEOUT,
 	LARM_CAPACITY_WAITING,
-	planCapacityWait,
+	settleCapacityWait,
 	sendAgainIfLost,
 	type CapacityWait,
 } from "../../larm";
@@ -28,8 +27,6 @@ import {
 	type GenerationRow,
 } from "../repository";
 
-const log = getLogger("model3d");
-
 export type Stage = "submit" | "poll" | "cancel";
 /** What a re-enqueued submit carries: the capacity wait so far, and whether its one recovery was used. */
 export type SubmitExtra = {
@@ -46,7 +43,7 @@ export type Deps = {
 		stage: Stage,
 		delay?: number,
 		extra?: SubmitExtra,
-	) => void;
+	) => string;
 	notify: (
 		db: Database,
 		r: GenerationRow,
@@ -84,17 +81,13 @@ const CALL_MS = 60_000;
 const bounded = (signal: AbortSignal) =>
 	AbortSignal.any([signal, AbortSignal.timeout(CALL_MS)]);
 /**
- * Any refusal becomes a model3d code and is not sent again. A capacity refusal passes through only
- * where `passBusy` is set (the submit decides to wait); elsewhere it is the busy code.
+ * Any refusal becomes a model3d code and is not sent again. A capacity refusal (only the submit can
+ * raise one) passes through: the submit decides to wait.
  */
-async function guarded<T>(work: () => Promise<T>, passBusy = false) {
+async function guarded<T>(work: () => Promise<T>) {
 	try {
 		return await work();
 	} catch (e) {
-		if (isCapacityBusy(e)) {
-			if (passBusy) throw e;
-			throw new Error("model3d_busy");
-		}
 		if (e instanceof Error && e.message === "invalid_mesh_service")
 			throw new Error("model3d_service_invalid");
 		const code = refusalCode(e);
@@ -118,8 +111,7 @@ async function patient<T>(
 			throw new Error(refusalCode(e)!);
 		return {
 			ok: false as const,
-			waitMs:
-				((isLarmRefusal(e) || isCapacityBusy(e)) && e.retryAfterMs) || waitMs,
+			waitMs: (isLarmRefusal(e) && e.retryAfterMs) || waitMs,
 		};
 	}
 }
@@ -153,7 +145,7 @@ function registerSubmit(deps: Deps) {
 		const larm = larmOf(deps);
 		let { body, path } = input;
 		if (!body || !path) {
-			const found = await guarded(() => larm.discover(bounded(signal)), true);
+			const found = await guarded(() => larm.discover(bounded(signal)));
 			if (!found.mesh) throw new Error("model3d_service_unavailable");
 			if (input.source.type === "prompt" && !found.image)
 				throw new Error("model3d_image_service_unavailable");
@@ -189,12 +181,12 @@ function registerSubmit(deps: Deps) {
 			if (!fixed) throw new Error("model3d_state_changed");
 			({ body, path } = fixed);
 		}
-		return await guarded(
-			() =>
-				sendAgainIfLost(() =>
-					larm.submit(path!, body!, input.key, bounded(signal)),
-				),
-			true,
+		// The key is kept for every later try, so a capacity refusal after a lost response is a wait too.
+		return await guarded(() =>
+			sendAgainIfLost(
+				() => larm.submit(path!, body!, input.key, bounded(signal)),
+				true,
+			),
 		);
 	}
 	/** `capacityWait` is LARM's "no free memory" refusal; it carries Retry-After. */
@@ -276,45 +268,41 @@ function registerSubmit(deps: Deps) {
 				const now = Date.now();
 				// A deadline a task fixed is never extended; the wait must end inside it.
 				const fixed = r.origin === "task";
-				const plan = planCapacityWait({
+				settleCapacityWait({
+					domain: "model3d",
+					subjectId: r.id,
 					now,
 					previous: capacity,
 					retryAfterMs: outcome.result.capacityWait,
 					budgetMs: fixed ? 0 : deps.followMs,
 					limitAt: fixed ? r.deadline : null,
-				});
-				const waitedMs = now - (capacity?.startedAt ?? now);
-				if (!plan) {
-					log.warn("model3d.capacity_wait_expired", {
-						subjectId: r.id,
-						reason: LARM_CAPACITY_TIMEOUT,
-						waitedMs,
-					});
-					deps.notify(
-						db,
+					expire: () =>
+						deps.notify(
+							db,
+							patchGeneration(db, r.id, {
+								state: "failed",
+								stage: null,
+								error_code: LARM_CAPACITY_TIMEOUT,
+							}),
+							"failed",
+						),
+					schedule(plan) {
+						// The follow window starts when LARM accepts, so it moves with the wait.
 						patchGeneration(db, r.id, {
-							state: "failed",
-							stage: null,
-							error_code: LARM_CAPACITY_TIMEOUT,
-						}),
-						"failed",
-					);
-					return "applied";
-				}
-				// The follow window starts when LARM accepts, so it moves with the wait.
-				patchGeneration(db, r.id, {
-					stage: LARM_CAPACITY_WAITING,
-					...(fixed ? {} : { deadline: plan.deadline }),
-				});
-				// Refused before acceptance: the next send is a new try, not a recovery.
-				deps.enqueue(db, r.id, "submit", Math.max(0, plan.at - now), {
-					capacity: { startedAt: plan.startedAt, count: plan.count },
-				});
-				log.info("model3d.capacity_wait_scheduled", {
-					subjectId: r.id,
-					waitCount: plan.count,
-					waitedMs,
-					nextInMs: plan.at - now,
+							stage: LARM_CAPACITY_WAITING,
+							...(fixed ? {} : { deadline: plan.deadline }),
+						});
+						// Refused before acceptance: the next send is a new try, not a recovery.
+						return deps.enqueue(
+							db,
+							r.id,
+							"submit",
+							Math.max(0, plan.at - now),
+							{
+								capacity: { startedAt: plan.startedAt, count: plan.count },
+							},
+						);
+					},
 				});
 				return "applied";
 			}

@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+} from "@eumenes/design-system";
 import type { EumenesClient } from "../../../../client";
 import type { ImageWorkspaceResource } from "@eumenes/artifact-ui/contracts";
 import { queryRoots } from "../../queryKeys";
@@ -132,7 +136,7 @@ export function useImageCreation(
 			description:
 				statusItem?.state === "generating" &&
 				statusItem.phase === "waiting_capacity"
-					? "LARMの空きを待っています。ほかの処理が終わりしだい始めます。"
+					? capacityWaitingMessage
 					: statusItem?.state === "planning"
 						? "テーマから構図を考えています。"
 						: running(currentRun?.status) && !submitted
@@ -140,7 +144,7 @@ export function useImageCreation(
 							: statusItem?.errorCode === "generation_unknown"
 								? "通信が途切れ、生成結果を確認できませんでした。過去の画像の一覧を更新してください。"
 								: statusItem?.errorCode === "larm_capacity_timeout"
-									? "LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。"
+									? capacityTimeoutMessage
 									: statusItem?.errorCode === "larm_http_507"
 										? "画像の保存容量が不足しています。"
 										: statusItem?.errorCode === "image_model_unavailable"

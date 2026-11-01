@@ -39,6 +39,7 @@ export type {
 } from "./contracts/playground";
 export { findServiceTarget } from "./service/playground-select";
 export {
+	capacityRetryMs,
 	LARM_CAPACITY_BUSY,
 	LARM_CAPACITY_RETRY_MS,
 	LARM_CAPACITY_TIMEOUT,

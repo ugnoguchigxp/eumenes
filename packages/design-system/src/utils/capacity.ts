@@ -4,8 +4,7 @@ export const capacityWaitingMessage =
 /** Shown when the 30-minute wait limit passed (error code `larm_capacity_timeout`). */
 export const capacityTimeoutMessage =
 	"LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。";
-export type CapacityWait = { startedAt: number; count: number };
 export const isCapacityWaiting = (item: {
 	state: string;
-	capacityWait?: CapacityWait;
+	capacityWait?: { startedAt: number; count: number };
 }) => item.state === "queued" && !!item.capacityWait;

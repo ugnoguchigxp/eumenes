@@ -1,5 +1,9 @@
 import { ImageOff, Loader2 } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
+import {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+} from "../../utils/capacity";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
 import {
@@ -181,12 +185,12 @@ export function MusicWorkspace({
 										<p role={artworkStatus === "failed" ? "alert" : undefined}>
 											{artworkStatus === "generating"
 												? current?.artworkWaiting
-													? "LARMの空きを待っています。ほかの処理が終わりしだい始めます。"
+													? capacityWaitingMessage
 													: "楽曲イメージを生成しています。"
 												: artworkStatus === "failed"
 													? current?.artworkErrorCode ===
 														"larm_capacity_timeout"
-														? "LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。"
+														? capacityTimeoutMessage
 														: "楽曲イメージを作成できませんでした。"
 													: image
 														? "楽曲イメージを読み込めませんでした。"

@@ -62,3 +62,44 @@ LARMへ不正な容量を送信した実測: -1はHTTP400 `invalid_request`、20
 サーバー操作の事前許可を現在の会話で依頼済み。稼働への反映・配備後確認は未実施。
 
 並行作業の後続liveが503で停止した観測は、08:10〜08:12の本チャットの成功を上書きせず、別の資源受付結果として扱う。省略128kを広告200kと比較して拒否する元の不具合とは別。
+
+## 再起動後の反映確認（08:24〜08:28 JST）
+
+利用者が08:24:39に再起動済みと回答。こちらからサーバー操作はしていない。
+backend PID 11846、bootId `e1cca88d-91ab-4f52-9eff-db7507e72190`、08:24:41に8787でlisten。
+同bootの運用ログでLLMのclaim成功、maxTokens=131072、connection_readyを確認した。
+元の`larm_claim_context_mismatch`は同bootに再発していない。
+容量修正2ファイルは実接続受入時と同じSHA-256で、実装commitは`10ba1eaeeb386486f3a8ec6020f2ba84f67723e2`。
+再起動は未コミットの接続管理最終差分も含む。起動時に全source digestを残す機構がないため、
+全体の厳密なロード版は断定しない。検証したsource revisionは上記に記録している。
+
+既存CLIの検証用会話`larm-capacity-acceptance-20261101-0825`は2往復完了。
+run IDは`59dd4230-bc98-4690-924c-e8d135cec6c2`と`ee42cd26-a985-435d-bf3b-bd58143971f0`。
+保存済みの会話経路がcloud_onlyのため、この応答はLARM生成の受入には数えていない。
+設定の経路は変更していない。
+
+既存のサービス試用APIでLARMを選ぶためcatalogを更新したが、LARM側Profileの
+発見処理が失敗しLARMのLLM候補を取得できなかった。続いて再起動後の保存済み設定を使う
+既存backend portからJSON/SSEを確認したが、時間切れで停止し、finallyのcloseで終了した。
+この再起動後の生成確認は成功扱いしない。結果は`postrestart-direct-report.json`。
+
+LARM本体への読み取りではhealth・ready・選択ProfileのcatalogはいずれもHTTP200。
+Eumenesでは別の`larm_failed`、補助LLMのpending/waitingが記録されている。
+これは上限200000と実容量131072の不一致による即時releaseとは異なる。
+別機能や503処理の変更によって通そうとせず、現状を残す。
+
+残る受入は、LARMのProvider準備・生成が通る状態での再起動後のLARM JSON/SSE再確認。
+容量契約の修正・稼働版への反映・修正前後の実接続受入は確認できたが、
+「再起動後もすべてのLARM生成が成功する」とは宣言しない。
+
+### 最後の読み取り確認
+
+現在の音声系Connectionはprobingで、ASR/TTSはready、LLM/embedding/system-oneはwaiting。
+補助LLMの待機Connectionは、Eumenes側の60秒の試行終了後にreleased
+（`allocation_released`）であった。このrelease自体をLARM障害の根本原因とは断定しない。
+Providerが準備完了しない理由は未確定で、容量照合を再び緩めたり、上限容量を全接続に
+要求したり、別Providerへ切り替えたりはしていない。
+
+3ラウンドの配備後確認（会話入口、サービス試用、保存設定の直接port）を俯瞰し、
+会話はcloud経路、試用は候補発見失敗、直接portはtimeoutであることを区別した。
+同じ条件で生成や接続を再送せず、今回の容量契約の修正とは別の準備待ちを残して停止する。

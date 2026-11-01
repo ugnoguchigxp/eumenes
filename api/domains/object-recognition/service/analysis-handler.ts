@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { imageForInput } from "../../../infrastructure/media-image";
-import { getLogger } from "../../../infrastructure/logger";
 import type { HandlerDefinition, QueueService } from "../../queue";
 import {
 	isCapacityBusy,
@@ -17,7 +16,6 @@ import {
 	updateAnalysis,
 } from "../repository/analyses";
 import { active, valid } from "./analysis-source";
-const log = getLogger("object-recognition");
 /** The processing time one try gets once LARM has room again. */
 /** How long one detail analysis may take after LARM accepts it. */
 export const ANALYSIS_BUDGET_MS = 360_000;

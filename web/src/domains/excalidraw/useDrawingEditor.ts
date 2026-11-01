@@ -135,7 +135,8 @@ export function useDrawingEditor(
 			selected.current = value;
 		},
 		editing: () => dirty.current || saving.current,
-		waiting: wait.waiting,
+		wait,
+		refused,
 		setStatus,
 	});
 	async function create(input: { title: string; scene: Scene }, key: string) {

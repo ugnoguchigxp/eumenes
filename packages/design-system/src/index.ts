@@ -94,6 +94,11 @@ export { DEFAULT_THEME, THEME_COLORS, THEME_CONSTANTS } from "./styles/themes";
 // Utils
 // ============================================
 export { cn } from "./utils/cn";
+export {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+	isCapacityWaiting,
+} from "./utils/capacity";
 
 export * from "./components/MusicPlayer";
 export * from "./components/Model3dWorkspace";

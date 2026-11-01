@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	capacityTimeoutMessage,
+	capacityWaitingMessage,
+} from "@eumenes/design-system";
 import type { EumenesClient } from "../../../../client";
 import type { MusicResource } from "@eumenes/artifact-ui/contracts";
 import { queryRoots } from "../../queryKeys";
@@ -122,7 +126,7 @@ export function useMusicCreation(
 			description:
 				statusItem?.state === "generating" &&
 				statusItem.phase === "waiting_capacity"
-					? "LARMの空きを待っています。ほかの処理が終わりしだい始めます。"
+					? capacityWaitingMessage
 					: status === "failed" &&
 						  [
 								"larm_http_400",
@@ -132,7 +136,7 @@ export function useMusicCreation(
 						  ].includes(statusItem?.errorCode ?? "")
 						? "用途・長さ・歌詞・生成オプションの指定を確認してください。上限を超えた長さや矛盾する条件は送れません。"
 						: statusItem?.errorCode === "larm_capacity_timeout"
-							? "LARMの空きを待ちましたが、待てる時間内に空かなかったため中止しました。"
+							? capacityTimeoutMessage
 							: statusItem?.state === "planning"
 								? "テーマから曲調を考えています。"
 								: running(run.data?.status) && !submitted

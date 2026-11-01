@@ -290,6 +290,17 @@ test("T3: a refusal that never ends stops at 30 minutes with larm_capacity_timeo
 	expect(h.leaseRequests).toHaveLength(61);
 	for (let i = 1; i < h.leaseRequests.length; i++)
 		expect(h.leaseRequests[i]! - h.leaseRequests[i - 1]!).toBe(30_000);
+	// Every try restarted the one session the operation opened (the other row is the setup's).
+	expect(
+		h.store.read(
+			(db) =>
+				(
+					db.query("SELECT COUNT(*) AS n FROM excalidraw_sessions").get() as {
+						n: number;
+					}
+				).n,
+		),
+	).toBe(2);
 	const count = h.leaseRequests.length;
 	h.clock.t += 600_000;
 	await h.run();
