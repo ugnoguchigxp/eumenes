@@ -6,7 +6,6 @@ import {
 } from "./speech";
 import type { Database } from "bun:sqlite";
 import {
-	createAgencyRuntime,
 	createIdlePlanner,
 	createIdleScheduler,
 	emotionName,
@@ -36,7 +35,8 @@ import { getLogger } from "../../infrastructure/logger";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { AgencyCallIdentity } from "./llm-port";
 import { selectMemoryTopics } from "./topics";
-import { agencyBackgroundSystem, agencyReplyParts } from "./system-context";
+import { agencyReplyParts } from "./system-context";
+import { createHostRuntime } from "./runtime";
 import type { AgencyWork } from "./work";
 
 export type AgencySettings = Settings["agency"];
@@ -260,25 +260,11 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	}
 
 	function newRuntime(c: Conv): AgencyRuntime {
-		const interests = cfg.interests.map((text, index) => ({
-			id: `i${index + 1}`,
-			text,
-		}));
-		return createAgencyRuntime({
-			condition: "B1",
-			selectWhenEmpty: true,
-			hostTopics: true,
-			hostTodos: true,
-			...(cfg.emotion ? { utteranceEmotion: true } : {}),
-			systemContext: {
-				update: (input) =>
-					agencyBackgroundSystem("update", input, persona, cfg.emotion),
-				select: (input) =>
-					agencyBackgroundSystem("select", input, persona, cfg.emotion),
-			},
-			...(interests.length > 0 ? { standingInterests: interests } : {}),
+		return createHostRuntime({
+			agency: cfg,
+			persona,
 			todos: () => todosNow(c),
-			tools: [],
+			topics: topicsNow,
 			llm: wrapLlm(c, c.scope),
 		});
 	}
@@ -720,6 +706,14 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		);
 		const fresh = [...now].some((key) => !c.reportable.has(key));
 		c.reportable = now;
+		if (fresh)
+			observe(c, {
+				id: `work:${crypto.randomUUID()}`,
+				kind: "source.changed",
+				actor: "host",
+				occurredAt: nowMs(),
+				text: JSON.stringify({ todos: todosNow(c) }),
+			});
 		return fresh;
 	}
 

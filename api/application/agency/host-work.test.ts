@@ -141,8 +141,11 @@ describe("work that changed", () => {
 			h.requests.filter((r) => r.purpose === "select").at(-1)?.prompt,
 		);
 		expect(JSON.parse(prompt).opportunity.trigger).toBe("result_received");
-		// The update reads new observations, and there are none: only the decision is asked.
-		expect(h.calls.update).toBe(1);
+		// F must interpret the changed question before it can propose a speaking candidate.
+		expect(h.calls.update).toBe(2);
+		expect(h.host.inspect("c1")?.snapshot.observations).toContainEqual(
+			expect.objectContaining({ kind: "source.changed", actor: "host" }),
+		);
 		// The same question told again opens nothing more.
 		h.advanceClock(60_000);
 		await changed(h);

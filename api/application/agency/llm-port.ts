@@ -11,9 +11,10 @@ import type { InferencePort, Messages } from "../../domains/inference";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { LlmJsonError, parseLlmJson } from "../../infrastructure/llm-json";
 import type { SqliteStore } from "../../infrastructure/sqlite";
+import { shareNullableSchemas } from "./schema";
 
 /** The background control limits of the inference domain (`background-control.ts`). */
-export const BACKGROUND_OUTPUT_LIMIT = 1500;
+export const BACKGROUND_OUTPUT_LIMIT = 2400;
 /**
  * A structured call on the conversation route takes the structured cap (300 s): LARM thinks at length before the
  * answer, and the call yields to the user's calls meanwhile. The cloud fallback reserves its own time out of it.
@@ -98,7 +99,7 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 				BACKGROUND_OUTPUT_LIMIT,
 				Math.max(1, Math.floor(request.maxOutputTokens)),
 			);
-			const outputSchema = z.toJSONSchema(request.schema);
+			const outputSchema = shareNullableSchemas(z.toJSONSchema(request.schema));
 			if (!DECISION_ID.test(identity.decisionId))
 				throw new LlmCallError("invalid_background_control", false);
 

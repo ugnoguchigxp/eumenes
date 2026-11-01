@@ -2,7 +2,12 @@ import { afterEach } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { LlmPort, LlmRequest } from "eumenes-agency";
+import type {
+	LlmPort,
+	LlmRequest,
+	UpdateModelData,
+	WireOp,
+} from "eumenes-agency";
 import {
 	createConversationService,
 	migrations,
@@ -32,10 +37,79 @@ export const updated = (over: Record<string, unknown> = {}) => ({
 	focusRefs: [],
 	ops: [],
 	reconciliations: [],
-	reportedTodos: [],
+	interestOps: [],
 	...over,
 });
-export const update: Reply = () => updated();
+/** A scripted F model for host lifecycle tests. This is fixture data, never a product fallback. */
+export const wireOp = (
+	op: WireOp["op"],
+	over: Partial<WireOp> = {},
+): WireOp => ({
+	op,
+	id: null,
+	localId: null,
+	expectedRevision: null,
+	state: null,
+	text: null,
+	reason: null,
+	completionCondition: null,
+	resumeCondition: null,
+	withdrawCondition: null,
+	applyWhen: null,
+	hours: null,
+	intentRef: null,
+	desireRef: null,
+	supersedes: null,
+	kind: null,
+	confidence: null,
+	toolName: null,
+	toolInput: null,
+	evidenceRefs: [],
+	beliefRefs: [],
+	...over,
+});
+export function pendingUpdate(data: UpdateModelData) {
+	if (
+		data.state.candidates.some((c) =>
+			["available", "deferred"].includes(c.state),
+		)
+	)
+		return updated();
+	const evidenceRefs = data.observations.slice(-1).map((o) => o.id);
+	const intent = data.state.intents.find((i) =>
+		["adopted", "proposed"].includes(i.state),
+	);
+	return updated({
+		ops: [
+			...(intent
+				? []
+				: [
+						wireOp("intent.add", {
+							localId: "g",
+							state: "adopted",
+							text: "Continue the topic",
+							reason: "Unresolved question",
+							completionCondition: "User confirms resolution",
+							resumeCondition: "Quiet opportunity",
+							withdrawCondition: "User declines",
+							hours: 1,
+							evidenceRefs,
+						}),
+					]),
+			wireOp("candidate.add", {
+				localId: "c",
+				intentRef: intent?.id ?? "g",
+				kind: "question",
+				text: "Would you like to continue?",
+				applyWhen: "Quiet opportunity",
+				hours: 1,
+				evidenceRefs,
+			}),
+		],
+	});
+}
+export const update: Reply = (request) =>
+	pendingUpdate(JSON.parse(request.prompt));
 export const choice = (
 	action: "speak" | "wait",
 	over: { utterance?: string; refs?: string[] } = {},
@@ -150,8 +224,24 @@ export function harness(
 					requests.push(request as LlmRequest<unknown>);
 					const reply =
 						request.purpose === "update" ? (options.update ?? update) : select;
+					const raw = await reply(request as LlmRequest<unknown>);
+					// Bind the scripted speech to the actual F candidate supplied by this call.
+					const data = JSON.parse(request.prompt);
+					const candidate = data.candidates?.[0];
+					const spoken = raw as ReturnType<typeof choice>;
 					const value = request.schema.parse(
-						await reply(request as LlmRequest<unknown>),
+						request.purpose === "select" &&
+							spoken.action === "speak" &&
+							!spoken.candidateRef &&
+							candidate
+							? {
+									...spoken,
+									candidateRef: {
+										id: candidate.id,
+										revision: candidate.revision,
+									},
+								}
+							: raw,
 					);
 					return {
 						value,

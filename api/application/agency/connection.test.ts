@@ -11,7 +11,9 @@ import { openDialogueStore } from "../../domains/dialogue/test/store.fixture";
 import { waitFor, settle } from "../../infrastructure/wait-for";
 import { systemContext } from "../../infrastructure/system-context";
 import { assembleAgency } from "./assembly";
-import { choice, updated } from "./host.fixture";
+import { shareNullableSchemas } from "./schema";
+import { z } from "zod";
+import { choice, pendingUpdate } from "./host.fixture";
 
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -92,7 +94,9 @@ for (const target of ["larm", "cloud"] as const) {
 				messages.at(-1)!.content.split("## Task\n").at(-1)!,
 			);
 			return JSON.stringify(
-				data.opportunity ? { ...choice("wait"), emotion: null } : updated(),
+				data.opportunity
+					? { ...choice("wait"), emotion: null }
+					: pendingUpdate(data),
 			);
 		};
 		const larm: LarmPort = {
@@ -189,12 +193,14 @@ for (const target of ["larm", "cloud"] as const) {
 			const outputContract =
 				purpose === "update"
 					? agencyOutputContract("update", {
-							condition: "B1",
+							condition: "F",
+							interestFormation: true,
 							hostTodos: true,
 							utteranceEmotion: true,
 						})
 					: agencyOutputContract("select", {
-							condition: "B1",
+							condition: "F",
+							interestFormation: true,
 							hostTodos: true,
 							utteranceEmotion: true,
 						});
@@ -228,6 +234,9 @@ for (const target of ["larm", "cloud"] as const) {
 					.join("\n"),
 			).not.toContain(system);
 			expect(call.schema).toMatchObject({ type: "object" });
+			expect(call.schema).toEqual(
+				shareNullableSchemas(z.toJSONSchema(outputContract.schema)),
+			);
 			if (target === "cloud") expect(call.session).toBeUndefined(); // no persisted conversation session is resumed
 			else expect(call.role).toBe("auxiliary");
 		}

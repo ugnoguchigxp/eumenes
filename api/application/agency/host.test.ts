@@ -581,7 +581,9 @@ describe("review fixes", () => {
 			level: 0,
 		});
 		await h.advance(20_000);
-		expect(h.calls.select).toBe(5);
+		// F has no candidate after forgetting: the new planner fires, but no model is asked.
+		expect(h.host.inspect("c1")?.idle.level).toBe(1);
+		expect(h.calls.select).toBe(4);
 	});
 
 	test("the delivery fence reads the committed setting, not the cached one", async () => {

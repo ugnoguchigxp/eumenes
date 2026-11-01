@@ -99,7 +99,8 @@ export function captureBackgroundControl(
 		input.deadline >
 			Date.now() +
 				(input.structuredOutput ? STRUCTURED_BACKGROUND_MS : BACKGROUND_MS) ||
-		input.maxOutputTokens > 1500
+		// Structured F updates encode both the goal and candidate; unstructured callers keep their existing ceiling.
+		input.maxOutputTokens > (input.structuredOutput ? 2400 : 1500)
 	)
 		throw new Error("invalid_background_control");
 	const binding = JSON.stringify([

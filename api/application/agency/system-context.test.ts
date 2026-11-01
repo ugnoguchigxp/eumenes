@@ -40,12 +40,14 @@ test("both runtime purposes send the complete Eumenes system; observations stay 
 					outputContract:
 						request.purpose === "update"
 							? agencyOutputContract("update", {
-									condition: "B1",
+									condition: "F",
+									interestFormation: true,
 									hostTodos: true,
 									utteranceEmotion: true,
 								})
 							: agencyOutputContract("select", {
-									condition: "B1",
+									condition: "F",
+									interestFormation: true,
 									hostTodos: true,
 									utteranceEmotion: true,
 								}),

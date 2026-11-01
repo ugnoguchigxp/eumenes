@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import agencyPkg from "eumenes-agency/package.json";
+import { HOST_RULES_VERSION, INSTRUCTION_VERSION } from "eumenes-agency";
 import pkg from "eumenes-memory/package.json";
 import worldPkg from "eumenes-world-model/package.json";
 import worldDistribution from "eumenes-world-model/distribution-manifest.json";
@@ -87,6 +88,8 @@ test("the vendored agency package matches its manifest, package.json, the lockfi
 	];
 	expect(dependency).toBe(`file:vendor/agency/${agencyManifest.artifact}`);
 	expect(agencyPkg.version).toBe(agencyManifest.version);
+	expect(HOST_RULES_VERSION).toBe(agencyManifest.HOST_RULES_VERSION);
+	expect(INSTRUCTION_VERSION).toBe(agencyManifest.INSTRUCTION_VERSION);
 	const lock = read("bun.lock").toString();
 	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
 	expect(lock).toContain(

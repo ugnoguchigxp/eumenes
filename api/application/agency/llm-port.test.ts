@@ -134,7 +134,8 @@ describe("agency LLM port", () => {
 		for (const [asked, sent] of [
 			[99_999, BACKGROUND_OUTPUT_LIMIT],
 			[1500, 1500],
-			[1501, 1500],
+			[2400, 2400],
+			[2401, 2400],
 			[0.4, 1],
 			[-5, 1],
 		] as const) {

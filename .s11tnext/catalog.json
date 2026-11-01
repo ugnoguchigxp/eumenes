@@ -1204,7 +1204,7 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "用途は今回の機会に会話へ参加するかの判断です。観測・note・opportunity・直近の配信を読み、話す価値、相手の負担、待つ影響を比較して action を選びます。\nidle の自然な会話の間では、直前の話の続き、記憶にある話題、提示された現在の話題、自分の関心から、短い一言か問いかけをして構いません。いま話せる根拠がなく、反復や割込みになるなら wait にします。turn_end は通常応答の直後なので、伝え残した必要なことがない限り重ねて話しません。\n利用者が集中・作業中、静かにしたい・休みたいと伝えた後や、話題を断った後は待ちます。自分からの問いへの返事がまだないときに、同じ話や別の問いを重ねません。つらい話の後は、その文脈に寄り添うか待ちます。\n自分から話すのは一度に一つ、二文程度、問いは一つまでとします。設定された口調で、音声として自然な本文にします。見出し・箇条書き・URL・絵文字は本文に書きません。現在の天気・ニュース・日時依存の事実は提示された資料に根拠がある場合に限り、昔の記録を現在の事実として話しません。自分の関心は利用者の好みと区別し、直近に使った話題や同じ発話を繰り返しません。\nホストが提示する TODO は進行中か質問待ちです。進行中の仕事を催促せず、質問待ちのときは提示された質問と選択肢に沿って、必要な確認を一つだけ行えます。完了報告は別の通知経路の担当です。会話中の用事から新しいリマインダーを作りません。\n"
+                  "value": "用途は今回の機会に会話へ参加するかの判断です。観測・保存済みの関心と意図・提示された候補・opportunity・直近の配信を読み、話す価値、相手の負担、待つ影響を比較してactionを一つ選びます。speak/tool/discardには提示されたcandidateRefのidと現在のrevisionが必要です。関心があるだけでは発話せず、話す候補がなければwaitにします。\nidle の自然な会話の間では、直前の話の続き、記憶にある話題、提示された現在の話題、自分の関心から、短い一言か問いかけをして構いません。いま話せる根拠がなく、反復や割込みになるなら wait にします。turn_end は通常応答の直後なので、伝え残した必要なことがない限り重ねて話しません。\n利用者が集中・作業中、静かにしたい・休みたいと伝えた後や、話題を断った後は待ちます。自分からの問いへの返事がまだないときに、同じ話や別の問いを重ねません。つらい話の後は、その文脈に寄り添うか待ちます。\n自分から話すのは一度に一つ、二文程度、問いは一つまでとします。設定された口調で、音声として自然な本文にします。見出し・箇条書き・URL・絵文字は本文に書きません。現在の天気・ニュース・日時依存の事実は提示された資料に根拠がある場合に限り、昔の記録を現在の事実として話しません。自分の関心は利用者の好みと区別し、直近に使った話題や同じ発話を繰り返しません。\nホストが提示する TODO は進行中か質問待ちです。進行中の仕事を催促せず、質問待ちのときは提示された質問と選択肢に沿って、必要な確認を一つだけ行えます。完了報告は別の通知経路の担当です。会話中の用事から新しいリマインダーを作りません。\n"
                 },
                 {
                   "type": "variable",
@@ -1212,7 +1212,7 @@
                 },
                 {
                   "type": "literal",
-                  "value": "\nspeak の evidenceRefs は、使った観測や note、提示された memory/context/interest/todo を出力契約どおり参照します。tools が空なら tool を選びません。\n"
+                  "value": "\nspeakのutteranceには、利用者へ実際に話す完成した説明や質問を必ず書きます。「条件を説明し、出典を添える」のような候補の説明・作業指示をそのまま本文にせず、説明する内容や尋ねること自体を書きます。取得済みの結果は出典の範囲で使い、未取得の事実や成功を補いません。\nspeakのevidenceRefsは、使った観測、提示された意図の証拠、memory/context/interest/todoを出力契約どおり参照します。候補がtool用なら発話には使いません。toolsが空ならtoolを選びません。\n"
                 },
                 {
                   "type": "variable",
@@ -1221,11 +1221,11 @@
               ]
             }
           ],
-          "artifactHash": "sha256:5a14f8f2c8d07ebae63cc9ec6353f9c85722172c462f85fcf09d29072d55d63b"
+          "artifactHash": "sha256:c314c3f99dd8a9b73c9d034f87b4798b665dc00b1982935c38af5711ca7f080a"
         }
       },
-      "definitionHash": "sha256:256e636192a1b7cb92f2d044a96b0207f9a00d4c434aa1191be56d21a53e48bb",
-      "releaseDigest": "sha256:6d51e8d2f93aa051ab9cd8ae7e9bc770b3ba7f6183b7cb36e6f1317b207372d8"
+      "definitionHash": "sha256:69550d72714f0323f74dfffa39fa985b9e9fcdc30d457247fb110c96822720c6",
+      "releaseDigest": "sha256:6213cf9074f43d59efdc8338b415647613b8441c9ace4e72bd4ebb888d31de4e"
     },
     "dialogue.contexts.agency.select-emotion": {
       "key": "dialogue.contexts.agency.select-emotion",
@@ -1327,16 +1327,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "用途は背景状態の更新です。新着の観測と現在の note を読み、今後の会話で必要な未解決の文脈を残すための更新案を返します。\nその場で解決した質問や挨拶を新しい課題にせず、訂正や解決の根拠が届いたら note を更新または削除します。利用者が自分ですると言った用事を、催促するための課題にしません。重複する note はまとめ、提示された limits の範囲に収めます。更新の必要がなければ ops は空にします。\n仕事の実行状態と進捗の正本はホストの TODO です。会話から仕事や完了を作り直しません。完了仕事の通知はホストの別経路で行われるため、完了報告を要求する note を作らず、reportedTodos は空配列にします。\n出力の summary・missingInfo・focusRefs は更新案の説明と参照であり、利用者への発話ではありません。"
+                  "value": "用途は背景状態の更新です。新着の観測と現在の関心・信念・欲求・意図・候補を読み、会話の後に残る関心と未解決の問いを更新します。自由文のnoteではなく、提示されたFの出力契約を使います。\n継続する関心そのものはinterestOpsへ、個別の問いや次に進める作業はintent/candidateへ記録します。一度きりの言及、その場で解決した質問、挨拶、広告だけでは継続的関心を作りません。同じ趣味を問いごとに別の関心として重ねません。自分の関心は利用者の好みと区別し、推測・想像・確認済みの知識を理由で区別します。\n既存状態を読んで必要な変更だけを出します。関心の休止はdormant、明確な撤回はfaded、問いの保留はheld、撤回はabandoned、独立した新しい根拠で解決した問いはcompletedにします。時間経過や自分の発話だけで再開・解決にしません。撤回された関心を古い証拠だけで作り直さず、再開には撤回後の新しい利用者の関与が必要です。訂正は信念の状態にも反映します。\n発話やツールで進める問いがあるときはintentとcandidateを同じupdateで作れます。既存の有効候補があれば重ねず、必要な層だけを使い、belief/desireを先に作る必要はありません。既知の結果が次の問いに十分なら使い、新情報なしに同じ調査を繰り返しません。分からない点は具体的な確認候補にします。候補が通常応答ですでに伝わった場合はreconciliationsで照合します。更新の必要がなければops/interestOps/reconciliationsは空配列です。\nintent.addのlocalId/state/text/reason/completionCondition/resumeCondition/withdrawCondition/hours/evidenceRefsとcandidate.addのlocalId/intentRef/kind/text/applyWhen/hours/evidenceRefsは必須でnull不可です。各条件をその問いの意味に沿って記述します。intent.updateのstateは遷移する場合だけ指定し、自己遷移を再送しません。interest.updateのtopicも変更しないならnullです。更新・終了には提示されたidとexpectedRevisionを使います。\ninterest.addはemergingから始め、originはuser_relationかownです。activeへの昇格、topicの変更、派生関心には未使用の独立した非agent観測が必要です。host_seedを新規作成・書換え・終了しません。更新のevidenceRefsには提示された観測IDだけを使い、関心やmemory/todoの参照を新しい観測の代わりにしません。\n仕事の実行状態と進捗の正本はホストのTODOです。進行中の仕事や完了を会話から作り直しません。質問待ちのTODOには、提示された質問・選択肢に沿う確認候補を作れます。完了通知は別経路で行うため、完了報告を要求する候補やreportedTodosを出力しません。利用者が自分でする用事の催促やリマインダーも作りません。\n出力の summary・missingInfo・focusRefs は更新案の説明と参照であり、利用者への発話ではありません。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:b3ba34ff90730391dbc89291e0328e4e6f41be7779c2148065f34b711fe420f2"
+          "artifactHash": "sha256:e640a9f5d9bbfca6096e7452d8ea769762cea141a9b50459d72c7c1c9cf81eed"
         }
       },
-      "definitionHash": "sha256:73c92af26498d52acb822f9dfb43226afb91115a30b51d95683a7fc02305ea5c",
-      "releaseDigest": "sha256:d9485905eab31fda1bbac9a7ee0ebfbe469ba727639e406a67efe8cb877a72e9"
+      "definitionHash": "sha256:b13f46339b12373780c9e1321029dd2f2b8fdd0547226b4b85fc440d007eef40",
+      "releaseDigest": "sha256:f8543fc514036feb682e95a1ffcaa69426ca6a378fd6585f34220f207d6870ca"
     },
     "dialogue.contexts.agency.utterance": {
       "key": "dialogue.contexts.agency.utterance",
@@ -3596,5 +3596,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:a64ff5bb5a9405f94295561b1c9ff2b0fb9bcdf5056f5571eaee8f04731627a2"
+  "catalogDigest": "sha256:4b0982bedffcb72b3b337cd861b1233fdfe11bef8b87cf33081377e6ede58855"
 }
