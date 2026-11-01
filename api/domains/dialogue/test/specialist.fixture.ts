@@ -554,6 +554,7 @@ export async function setup(options: Options = {}) {
 		continuity,
 		memory,
 		dialogue,
+		larm,
 		state,
 		async close() {
 			await dialogue.close();

@@ -5,6 +5,18 @@ import type { Settings, Purpose } from "../../settings/contracts";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
 export type { ChatImage } from "../../larm";
 export type { IntentInput, IntentJudgment } from "../../larm";
+export type {
+	RouteAnswer,
+	RouteCriterion,
+	RouteFieldsAnswer,
+	RouteFieldsInput,
+	RouteInput,
+} from "../../larm";
+export {
+	ROUTE_LIMITS,
+	routeCriterionName,
+	routeQuestionName,
+} from "../../larm";
 export type Messages = ChatMessage[];
 /** How much a model thinks before it answers (`off`: not at all). */
 export type ReasoningLevel = "off" | "low" | "medium" | "high";
@@ -65,6 +77,10 @@ import type {
 	ChatMessage,
 	IntentInput,
 	IntentJudgment,
+	RouteAnswer,
+	RouteFieldsAnswer,
+	RouteFieldsInput,
+	RouteInput,
 } from "../../larm";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 export interface Receipt {
@@ -271,6 +287,16 @@ export interface InferencePort {
 		input: IntentInput,
 		signal: AbortSignal,
 	): Promise<IntentJudgment>;
+	/**
+	 * The router of the saved router profile, on its own LARM connection (spec toolchain-router-redesign §3.2): it
+	 * throws when the router is off or unconfigured or failed, and the caller keeps the turn going without it.
+	 */
+	route?(input: RouteInput, signal: AbortSignal): Promise<RouteAnswer>;
+	/** The chosen candidate's fields on the same connection (§3.4); `larm_route_extract_unsupported` when it cannot. */
+	routeFields?(
+		input: RouteFieldsInput,
+		signal: AbortSignal,
+	): Promise<RouteFieldsAnswer>;
 	transcribe(wav: Uint8Array, signal: AbortSignal): Promise<string>;
 	speak(
 		text: string,

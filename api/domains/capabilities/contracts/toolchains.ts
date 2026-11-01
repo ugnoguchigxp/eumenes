@@ -140,3 +140,22 @@ export type VectorSpace = {
 	artifactDigest: string;
 	dimension: number;
 };
+
+/** The longest description a router criterion carries (the LARM request prompt §2.2). */
+export const ROUTER_PASSAGE_CHARS = 300;
+/**
+ * A toolchain's (or a read tool's) description as the router reads it (spec toolchain-router-redesign 2026-11-01
+ * §3.2): its name and summary, and the first two use cases. The kind (dedicated, pipeline, general) is not written:
+ * the router's calibration takes it.
+ */
+export function routerPassage(d: {
+	title: string;
+	summary: string;
+	useWhen?: readonly string[];
+}): string {
+	const uses = (d.useWhen ?? []).slice(0, 2);
+	const text = `${d.title}: ${d.summary}${uses.length ? `（${uses.join("／")}）` : ""}`;
+	return text.length > ROUTER_PASSAGE_CHARS
+		? text.slice(0, ROUTER_PASSAGE_CHARS)
+		: text;
+}

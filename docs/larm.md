@@ -185,6 +185,29 @@ API は `GET /api/settings/intent` と `PUT /api/settings/intent`（変える項
 
 判定ごとの記録は表 `dialogue_intent_judgments`（本文と秘密は持たない）。ログは `dialogue.intent_judged`（`kind` がモード、`decision` が Ruri のラベル、`route` が選んだルーティング、`reason` が判定を使えなかった理由）。判定の失敗・時間切れでは、今のルーティングで続ける。`ruri` の強制はその手の1回目の呼出しだけを `tool_choice: "required"` にするので、LARM がこれを受け付けることを live で確かめてから使う。
 
+## Router（担当の振り分け）
+
+担当の振り分けの判断を、LARM の `system-one` の口（意図判定と同じ `systemone`）で呼ぶ（[設計](../spec/toolchain-router-redesign-2026-11-01.md) §3.2・§3.4、LARM への[依頼](../spec/larm-router-request-prompt-2026-11-01.md) §2）。接続は意図判定・表情判定・会話とは別で、保存済みの router profile の `providers: ["system-one"]` だけの接続を作り、その claim の `endpoint`・credential・model で呼ぶ（model の名前はコードにも設定にも持たない）。接続の client は再起動しても変わらず、`mode` が `off` の間・profile が空の間は接続を作らない。profile・LARM の接続先・`mode` が変わると接続を作り直し、終了時に解放する。
+
+| 口 | 内容 |
+| --- | --- |
+| `route` | 1回目。`questions.route`（choice）に、呼出しごとの criteria（名前と説明、渡した順）を送り、選ばれた1件・全 criteria の確率（合計1）・任意の `scores`・`head_revision`／`calibration_revision` を読む。`text` は先頭2000字、`previous_agent`・`previous_user` は末尾1000字（空は送らない）。criteria は1〜128件、名前は英字で始まる ASCII（最大96字）、説明は最大300字 |
+| `routeFields` | 2回目。選ばれた担当の欄を、choice（質問名ごと）と `fields`（extract、1段の object）で埋める。値は発言にないとき `null` |
+
+要求が上限を破る場合は送らず（`larm_invalid_route_request`）、応答が形に合わない場合（criteria の外の選択・欠けた確率・範囲外の値）は `larm_invalid_route_response`、`truncated: true` または `criteria_dropped` がある場合は `larm_route_truncated` で失敗し、部分の答えは使わない。`extract` を扱えないモデルの 400 `unsupported_question_type` は `larm_route_extract_unsupported`（呼び手が欄を別の経路で埋める）。router の接続でない口（`decisionOnly` でない）は `larm_route_port_required`。呼び手は各呼出しの時間を自分で区切り、失敗・時間切れでは今の経路で続ける。
+
+設定は SQLite の設定文書の `router`（意図判定・表情判定の設定とは別）。`mode` は `off`（初期値）・`shadow`・`on`、`profile` は保存するまで空、`timeoutMs`（1呼出しの待ち、初期 2000）、決定表の閾値 `accept`（τ採用 0.6）・`low`（τ低 0.3）・`margin`（δ 0.15）・`approve`（τ承認 0.85）・`multi`（τ多 0.5）、訂正の記憶の `feedbackNear`（0.95）・`feedbackWeight`（0 で訂正の補正なし、初期 2）。
+
+```sh
+bun run cli -- router status
+bun run cli -- router set profile <Router の Agent Profile>
+bun run cli -- router set mode shadow
+bun run cli -- router set accept 0.6
+bun run cli -- router clear-profile
+```
+
+API は `GET /api/settings/router` と `PATCH /api/settings/router`（変える項目だけを送る。`profile` に `null` で削除）。
+
 ## チャットの画像入力
 
 画像入力（JPG・PNG・BMP）は、Providerの`llm.vision`と`chatInput`を確認して使います。保存、履歴再送、正式token計数と保持説明は[チャット画像入力](chat-images.md)を参照してください。

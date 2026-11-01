@@ -17,6 +17,7 @@ import { createHelperConnections } from "./helper-connections";
 import { createProviderLeases as createLeaseManager } from "./provider-leases";
 import { fetchCatalog } from "./connect";
 import { requestIntent } from "./user-intent";
+import { routePort } from "./route";
 import { leasePort } from "./lease-port";
 import { type Fetcher, type Provider } from "./profiles";
 import { localEndpoint, readJson, record, untilAborted } from "./guards";
@@ -318,6 +319,12 @@ export function createLarm(config: LarmConfig): LarmPort {
 				),
 			);
 		},
+		...routePort(
+			config.decisionOnly,
+			lifetime.signal,
+			withProvider,
+			judgeInfer,
+		),
 		async voices(signal, language) {
 			return withProvider(
 				language === "en" ? "tts-english" : "tts",

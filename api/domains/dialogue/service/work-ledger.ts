@@ -52,6 +52,12 @@ const oneLine = (text: string, max: number) => {
 	return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
 
+/** What a confirmation is issued with: its row but for what the ledger gives; `words` only when the request carries more than they said. */
+type ConfirmationInput = Omit<
+	ConfirmationRow,
+	"id" | "ref" | "issuedAt" | "expiresAt" | "usedAt" | "supersededAt" | "words"
+> & { words?: string | null };
+
 export function todoOf(row: WorkRow): TodoItem {
 	return {
 		id: row.id,
@@ -350,6 +356,8 @@ export function createWorkLedger(
 				runId: string;
 				card: Pick<ToolchainCard, "id" | "revisionId" | "execution">;
 				request: string;
+				/** The user's own words behind the request: the TODO's title when given. */
+				title?: string;
 				dedupeKey: string;
 				sourceRef?: string;
 				/** The user's messages the request comes from (forgetting one clears the TODO). */
@@ -366,7 +374,7 @@ export function createWorkLedger(
 				toolchainRevisionId: input.card.revisionId,
 				execution: input.card.execution ?? "agent",
 				request: input.request,
-				title: oneLine(input.request, TITLE_CHARS),
+				title: oneLine(input.title ?? input.request, TITLE_CHARS),
 				sourceRef: input.sourceRef ?? null,
 				dedupeKey: input.dedupeKey,
 				createdAt: clock(),
@@ -510,15 +518,13 @@ export function createWorkLedger(
 		},
 		issueConfirmationInTransaction(
 			db: Database,
-			input: Omit<
-				ConfirmationRow,
-				"id" | "ref" | "issuedAt" | "expiresAt" | "usedAt" | "supersededAt"
-			>,
+			input: ConfirmationInput,
 			messageIds: readonly string[],
 		): ConfirmationRow {
 			const issuedAt = clock();
 			const row = {
 				...input,
+				words: input.words ?? null,
 				id: id(),
 				issuedAt,
 				expiresAt: new Date(
@@ -545,7 +551,8 @@ export function createWorkLedger(
 				id: row.id,
 				ref: row.ref,
 				toolchain: row.toolchainId,
-				request: row.request,
+				// What the user said, not the request the agent reads (which may carry the utterance before it).
+				request: row.words ?? row.request,
 				impact: row.impact,
 				target: row.targetLabel,
 			}));

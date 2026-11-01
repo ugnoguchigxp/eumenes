@@ -1,0 +1,20 @@
+# Source: api/domains/dialogue/service/routed-route.ts
+text = '''直前の依頼「[[request]]」を、「[[from]]」ではなく「[[to]]」でやり直す。'''
+
+[variables.request]
+type = "string"
+trust = "untrusted"
+placement = "delimited-context"
+encoding = "delimited-text"
+
+[variables.from]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.to]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

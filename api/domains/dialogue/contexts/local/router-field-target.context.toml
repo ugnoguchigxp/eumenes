@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/routed-route.ts
+text = '''どの作品に頼むか。新しく作る依頼なら new を、保存済みの作品を直す・続けると言っているときだけ、その作品を選んでください。'''

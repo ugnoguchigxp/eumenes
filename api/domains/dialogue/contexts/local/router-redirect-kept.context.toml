@@ -1,0 +1,3 @@
+# Source: api/domains/dialogue/service/routed-router.ts
+# Spoken to the user, never read as input by a model call of this turn.
+text = '''元の依頼は、確認が取れるまでそのまま続けます。'''

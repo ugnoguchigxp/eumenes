@@ -11,6 +11,11 @@ import type {
 	SelectionCandidate,
 	SelectionDecision,
 	SelectionOutcome,
+	NearFeedback,
+	RouterFeedbackSource,
+	RouterFeedbackState,
+	RouterTrace,
+	RouterTraceRecord,
 } from "../../toolchain-history";
 
 export type QueryVector = { space: VectorSpace; vector: number[] };
@@ -41,6 +46,8 @@ export interface ToolchainRoutingPort {
 			available: ReadonlySet<string>;
 			/** Discovery must not expand the catalog when embedding retrieval fails. */
 			strict?: boolean;
+			/** The router's wider slots (spec toolchain-router-redesign §3.1) instead of the choice call's. */
+			slots?: "router";
 		},
 	): ToolchainRoute;
 	/** Rebuild a callable card from its exact active revision without retrieval. */
@@ -95,6 +102,58 @@ export interface ToolchainRoutingPort {
 		db: Database,
 		toolchainRevisionId: string,
 	): import("./specialist").SpecialistSet;
+	/** The router's trace of one request turn (spec toolchain-router-redesign §5.3); a later write of the run replaces it. */
+	recordRouterTraceInTransaction?(
+		db: Database,
+		input: {
+			runId: string;
+			conversationId: string;
+			messageId: string;
+			/** Every message the text was made from (the turn's own, an asked request's): a forget of any removes it. */
+			messageIds: readonly string[];
+			text: string;
+			query: QueryVector | null;
+			trace: RouterTrace;
+		},
+	): void;
+	/** The work (TODO) the routed turn handed over, for a correction of it in the next turn. */
+	linkRouterWorkInTransaction?(
+		db: Database,
+		runId: string,
+		workId: string,
+	): void;
+	/** The conversation's newest trace, made at `since` or later, whatever it decided (a question back decided nothing). */
+	latestRouterTraceInTransaction?(
+		db: Database,
+		input: { conversationId: string; since: number },
+	): RouterTraceRecord | null;
+	/** A user's correction (§5.2): for an utterance like `text`, `rightId` and not `wrongId`. */
+	recordRouterFeedbackInTransaction?(
+		db: Database,
+		input: {
+			conversationId: string;
+			messageId: string;
+			/** The messages of the traced utterance (its record's `messageIds`). */
+			messageIds: readonly string[];
+			runId: string;
+			source: RouterFeedbackSource;
+			text: string;
+			query: QueryVector;
+			wrongId: string | null;
+			rightId: string;
+		},
+	): string;
+	/** A correction's state (a conflict found while routing takes it out of use and onto the review list). */
+	setRouterFeedbackStateInTransaction?(
+		db: Database,
+		id: string,
+		state: RouterFeedbackState,
+	): boolean;
+	/** The active corrections at least `threshold` similar to the vector, nearest first. */
+	nearRouterFeedbackInTransaction?(
+		db: Database,
+		input: QueryVector & { threshold: number; limit?: number },
+	): NearFeedback[];
 	recordSelectionInTransaction(
 		db: Database,
 		input: {

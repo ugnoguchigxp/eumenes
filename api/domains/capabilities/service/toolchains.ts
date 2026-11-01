@@ -47,6 +47,23 @@ export const CANDIDATE_SLOTS = {
 	general: 2,
 	near: 0.05,
 } as const;
+/**
+ * The router's slots (spec toolchain-router-redesign 2026-11-01 §3.1, §11): wider than the choice call's, and cut by
+ * no distance from the closest, so a pipeline or a general toolchain reaches the router beside the dedicated ones.
+ * The sizes are where the evaluation set's right answer stays in the router's offer (§3.2).
+ */
+export const ROUTER_SLOTS = {
+	dedicated: 10,
+	pipeline: 4,
+	general: 4,
+	near: Number.POSITIVE_INFINITY,
+} as const;
+type Slots = {
+	dedicated: number;
+	pipeline: number;
+	general: number;
+	near: number;
+};
 type CandidateKind = "dedicated" | "pipeline" | "general";
 
 /**
@@ -94,6 +111,7 @@ function slotted<T>(
 	ranked: readonly T[],
 	similarityOf: (entry: T) => number,
 	kind: (entry: T) => CandidateKind,
+	slots: Slots = CANDIDATE_SLOTS,
 ): T[] {
 	const best = ranked[0] ? similarityOf(ranked[0]) : 0;
 	const taken: Record<CandidateKind, number> = {
@@ -103,10 +121,10 @@ function slotted<T>(
 	};
 	const out: T[] = [];
 	for (const entry of ranked) {
-		const far = best - similarityOf(entry) > CANDIDATE_SLOTS.near;
-		if (far && taken.dedicated >= CANDIDATE_SLOTS.dedicated) break;
+		const far = best - similarityOf(entry) > slots.near;
+		if (far && taken.dedicated >= slots.dedicated) break;
 		const k = kind(entry);
-		if (taken[k] >= CANDIDATE_SLOTS[k] || (k !== "dedicated" && far)) continue;
+		if (taken[k] >= slots[k] || (k !== "dedicated" && far)) continue;
 		taken[k]++;
 		out.push(entry);
 	}
@@ -270,8 +288,8 @@ export function createToolchains(
 			fromHistory?: string[];
 			limit?: number;
 			strict?: boolean;
-			/** Fill the slots of each kind (`CANDIDATE_SLOTS`) instead of the first `limit`. */
-			slots?: true;
+			/** Fill the slots of each kind (`CANDIDATE_SLOTS`, or the router's `ROUTER_SLOTS`) instead of the first `limit`. */
+			slots?: true | "router";
 		},
 	): ToolchainCard[] {
 		const active = [...activeInTransaction(db), ...readToolEntries].filter(
@@ -297,6 +315,7 @@ export function createToolchains(
 						ranked,
 						(d) => similarity.get(d.revisionId)!,
 						(d) => kindOf(db, d),
+						input.slots === "router" ? ROUTER_SLOTS : CANDIDATE_SLOTS,
 					)
 				: ranked.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
 			: input.strict

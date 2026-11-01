@@ -1,0 +1,9 @@
+# Source: api/domains/dialogue/service/routed-router.ts
+# Spoken to the user, never read as input by a model call of this turn.
+text = '''元の依頼は取りやめましたが、「[[title]]」への依頼はできませんでした。'''
+
+[variables.title]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

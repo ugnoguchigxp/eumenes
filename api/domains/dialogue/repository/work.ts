@@ -57,6 +57,10 @@ ALTER TABLE dialogue_confirmations ADD COLUMN resolve_unsaved TEXT;`;
 export const confirmationTargetLabelMigration = `
 ALTER TABLE dialogue_confirmations ADD COLUMN target_label TEXT;`;
 
+/** The user's own words a confirmed request was made from (the quote of its statement and the TODO's title). */
+export const confirmationWordsMigration = `
+ALTER TABLE dialogue_confirmations ADD COLUMN words TEXT;`;
+
 /**
  * A TODO is archived as it finishes and the user is told by a notice on screen, unread until `notice_read_at` (the
  * TODO completion notice design, 2026-10-29). TODOs archived before are read; finished ones that still waited for
@@ -93,7 +97,7 @@ export function forgetWork(
 		).run(at, at, row.id);
 	// The row stays without its words, so its number (`c<ref>`) is never given to another confirmation.
 	db.query(
-		`UPDATE dialogue_confirmations SET request = '', inputs_json = NULL, target = NULL, target_label = NULL, resolve_unsaved = NULL, superseded_at = COALESCE(superseded_at, ?) WHERE ${fromMessages("dialogue_confirmations", messageIds.length)}`,
+		`UPDATE dialogue_confirmations SET request = '', words = NULL, inputs_json = NULL, target = NULL, target_label = NULL, resolve_unsaved = NULL, superseded_at = COALESCE(superseded_at, ?) WHERE ${fromMessages("dialogue_confirmations", messageIds.length)}`,
 	).run(at, ...messageIds);
 	return rows;
 }
@@ -507,6 +511,8 @@ export type ConfirmationRow = {
 	/** The target's name as the confirmation showed it. */
 	targetLabel: string | null;
 	resolveUnsaved: "discard" | null;
+	/** The user's own words behind `request` (the router's hand-overs add the earlier utterance to the request); null when the request is the words. */
+	words: string | null;
 	impact: string;
 	statementDeliveryKey: string;
 	issuedAt: string;
@@ -529,6 +535,7 @@ function mapConfirmation(row: Record<string, unknown>): ConfirmationRow {
 		target: (row.target as string | null) ?? null,
 		targetLabel: (row.target_label as string | null) ?? null,
 		resolveUnsaved: (row.resolve_unsaved as "discard" | null) ?? null,
+		words: (row.words as string | null) ?? null,
 		impact: row.impact as string,
 		statementDeliveryKey: row.statement_delivery_key as string,
 		issuedAt: row.issued_at as string,
@@ -555,7 +562,7 @@ export function insertConfirmation(
 		row.target,
 	);
 	db.query(
-		"INSERT INTO dialogue_confirmations (id, ref, conversation_id, toolchain_id, toolchain_revision_id, request, inputs_json, target, target_label, resolve_unsaved, impact, statement_delivery_key, issued_at, expires_at, message_ids_json) VALUES (?,(SELECT COALESCE(MAX(ref), 0) + 1 FROM dialogue_confirmations WHERE conversation_id = ?),?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		"INSERT INTO dialogue_confirmations (id, ref, conversation_id, toolchain_id, toolchain_revision_id, request, inputs_json, target, target_label, resolve_unsaved, words, impact, statement_delivery_key, issued_at, expires_at, message_ids_json) VALUES (?,(SELECT COALESCE(MAX(ref), 0) + 1 FROM dialogue_confirmations WHERE conversation_id = ?),?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 	).run(
 		row.id,
 		row.conversationId,
@@ -567,6 +574,7 @@ export function insertConfirmation(
 		row.target,
 		row.targetLabel,
 		row.resolveUnsaved,
+		row.words,
 		row.impact,
 		row.statementDeliveryKey,
 		row.issuedAt,

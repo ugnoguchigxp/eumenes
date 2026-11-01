@@ -20,7 +20,11 @@ import type {
 } from "../contracts";
 import type { ImagePort } from "../contracts/image";
 import type { MusicPort } from "../contracts/music";
-import type { ToolchainRoutingPort } from "../contracts/toolchains";
+import type {
+	QueryVector,
+	ToolchainRoutingPort,
+} from "../contracts/toolchains";
+import type { NearFeedback, RouterTraceRecord } from "../../toolchain-history";
 import type { ChatMessage } from "../service/context";
 import type { ResourceAccess } from "../service/resource-ledger";
 import { testConversationAgent } from "./conversation-agent.fixture";
@@ -202,6 +206,20 @@ export async function setup(options: SetupOptions = {}) {
 		/** The context policies set on the run's requests, as `requestId:policy`. */
 		policies: [] as string[],
 		settled: [] as Array<{ runId: string; outcome: string }>,
+		/** The vector the search embeds a query to (absent: the embedding is unavailable). */
+		vector: undefined as QueryVector | undefined,
+		/** The `slots` each search of the catalog was asked with (absent: the choice call's own). */
+		searchSlots: [] as Array<"router" | undefined>,
+		/** The router's traces as the store was asked to keep them, and the work each was linked to. */
+		traces: [] as RouterTraceRecord[],
+		traceModes: [] as string[],
+		/** The corrections the user made (the store's active rows); the nearest are read by their similarity. */
+		corrections: [] as NearFeedback[],
+		feedback: [] as Array<Record<string, unknown>>,
+		/** The states the store was asked to put corrections in (a conflict found while routing). */
+		feedbackStates: [] as Array<{ id: string; state: string }>,
+		/** The router's read of the previous trace fails. */
+		failRouterRead: false,
 		/** The settings each run captured, by purpose, as the run took them. */
 		captures: [] as Array<{
 			subject: string;
@@ -294,12 +312,81 @@ export async function setup(options: SetupOptions = {}) {
 	const runtimeOf = (revisionId: string): ToolchainRuntimeMeta =>
 		({ execution: cardOf(revisionId)?.execution }) as ToolchainRuntimeMeta;
 	const toolchains = {
-		embedQuery: async () => undefined,
-		routeInTransaction: () => ({
-			cards,
-			past: [],
-			retrieval: "fts",
-		}),
+		embedQuery: async () => state.vector,
+		routeInTransaction: (
+			_db: unknown,
+			input: { slots?: "router" | undefined },
+		) => {
+			state.searchSlots.push(input.slots);
+			return { cards, past: [], retrieval: "fts" };
+		},
+		recordRouterTraceInTransaction: (
+			_db: unknown,
+			input: Parameters<
+				NonNullable<ToolchainRoutingPort["recordRouterTraceInTransaction"]>
+			>[1],
+		) => {
+			state.traceModes.push(input.trace.mode);
+			state.traces = state.traces.filter((t) => t.runId !== input.runId);
+			state.traces.push({
+				runId: input.runId,
+				conversationId: input.conversationId,
+				messageId: input.messageId,
+				messageIds: [...input.messageIds],
+				text: input.text,
+				query: input.query,
+				decided: input.trace.decided,
+				workId: null,
+				set: input.trace.set,
+				createdAt: Date.now() + state.offsetMs,
+				row: input.trace.row,
+				mode: input.trace.mode,
+				// What the fake keeps of the trace beyond the record: the failure.
+				...({ error: input.trace.error } as object),
+			});
+		},
+		linkRouterWorkInTransaction: (
+			_db: unknown,
+			runId: string,
+			workId: string,
+		) => {
+			const trace = state.traces.find((t) => t.runId === runId);
+			if (trace) trace.workId = workId;
+		},
+		latestRouterTraceInTransaction: (
+			_db: unknown,
+			input: { conversationId: string; since: number },
+		) => {
+			if (state.failRouterRead) throw new Error("fixture_router_read_failed");
+			return (
+				[...state.traces]
+					.reverse()
+					.find(
+						(t) =>
+							t.conversationId === input.conversationId &&
+							t.createdAt >= input.since,
+					) ?? null
+			);
+		},
+		setRouterFeedbackStateInTransaction: (
+			_db: unknown,
+			id: string,
+			state_: string,
+		) => {
+			state.feedbackStates.push({ id, state: state_ });
+			return true;
+		},
+		recordRouterFeedbackInTransaction: (
+			_db: unknown,
+			input: Record<string, unknown>,
+		) => {
+			state.feedback.push(input);
+			return "feedback";
+		},
+		nearRouterFeedbackInTransaction: (
+			_db: unknown,
+			input: { threshold: number },
+		) => state.corrections.filter((row) => row.similarity >= input.threshold),
 		cardInTransaction: (_db: unknown, revisionId: string) =>
 			options.unbuildable?.includes(revisionId)
 				? undefined

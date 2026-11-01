@@ -1,0 +1,15 @@
+# Source: api/domains/dialogue/service/routed-router.ts
+# Spoken to the user, never read as input by a model call of this turn.
+text = '''「[[title]]」を「[[to]]」でやり直しますか？'''
+
+[variables.title]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.to]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

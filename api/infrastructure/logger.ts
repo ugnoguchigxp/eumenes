@@ -77,6 +77,9 @@ export interface LogFields {
 	nextInMs?: number;
 	bytes?: number;
 	count?: number;
+	/** A router's mode (`shadow`, `on`) and the decision table's row it decided by. */
+	mode?: string;
+	row?: number;
 	attempt?: number;
 	generation?: number;
 	port?: number;
@@ -255,6 +258,8 @@ const keys = new Set<keyof LogFields>([
 	"nextInMs",
 	"bytes",
 	"count",
+	"mode",
+	"row",
 	"attempt",
 	"generation",
 	"port",

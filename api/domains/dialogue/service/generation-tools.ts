@@ -43,7 +43,14 @@ export const memoryArgs = z.discriminatedUnion("operation", [
 export type MemoryArgs = z.infer<typeof memoryArgs>;
 
 export const searchArgs = z
-	.object({ query: z.string().trim().min(1).max(2000) })
+	.object({
+		query: z.string().trim().min(1).max(2000),
+		/**
+		 * The router's wider slots (spec toolchain-router-redesign §3.1); the host's own call only. A search that has one
+		 * of the turn's search before it is a second look at the same query: it changes nothing the turn keeps.
+		 */
+		slots: z.literal("router").optional(),
+	})
 	.strict();
 
 const announcement = z.string().trim().min(1).max(80);
@@ -66,6 +73,11 @@ export const delegateArgs = z.discriminatedUnion("mode", [
 				.max(8)
 				.optional(),
 			resolveUnsaved: z.literal("discard").optional(),
+			/**
+			 * The user's own words behind `request` (the router's hand-overs add the utterance before them to it): the
+			 * TODO's title, and what a confirmation quotes. The host's call only.
+			 */
+			words: z.string().trim().min(1).max(8000).optional(),
 		})
 		.strict(),
 	z

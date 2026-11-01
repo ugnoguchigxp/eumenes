@@ -169,6 +169,7 @@ export async function handOver(
 						runId: run.id,
 						card: chosen.card,
 						request: chosen.request,
+						...(chosen.words ? { title: chosen.words } : {}),
 						dedupeKey: actionKey(target),
 						messageIds: origin,
 						...(dispatched.sourceRef
@@ -282,6 +283,7 @@ export function confirm(
 				target: chosen.target ?? null,
 				targetLabel: target.label,
 				resolveUnsaved: chosen.resolveUnsaved ?? null,
+				words: chosen.words ?? null,
 				impact,
 				statementDeliveryKey: `run:${run.id}`,
 			},
@@ -399,6 +401,7 @@ export async function delegate(
 		...(inputs ? { inputs } : {}),
 		...(args.target ? { target: args.target } : {}),
 		...(args.resolveUnsaved ? { resolveUnsaved: args.resolveUnsaved } : {}),
+		...(args.words ? { words: args.words } : {}),
 	};
 	// A call without `impact` (a local model often leaves it out) is not refused: a request on a saved target is
 	// taken as changing it, anything else as no change of its own (the review fixes design, D7).
@@ -503,6 +506,7 @@ export function approval(
 			...(row.inputs ? { inputs: row.inputs } : {}),
 			...(row.target ? { target: row.target } : {}),
 			...(row.resolveUnsaved ? { resolveUnsaved: row.resolveUnsaved } : {}),
+			...(row.words ? { words: row.words } : {}),
 			confirmationId: row.id,
 			refUris: confirmationResourceUris(db, row.id),
 		},

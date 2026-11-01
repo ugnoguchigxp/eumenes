@@ -1,0 +1,9 @@
+# Source: api/domains/dialogue/service/routed-router.ts
+# Spoken to the user, never read as input by a model call of this turn.
+text = '''未保存の作業を捨てて「[[title]]」に切り替えてよいか、はい、またはいいえで答えてください。'''
+
+[variables.title]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

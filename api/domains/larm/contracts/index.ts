@@ -123,8 +123,15 @@ export type LarmStatus = {
 };
 import type { TtsVoices } from "./voices";
 import type { IntentInput, IntentJudgment } from "./user-intent";
+import type {
+	RouteAnswer,
+	RouteFieldsAnswer,
+	RouteFieldsInput,
+	RouteInput,
+} from "./route";
 export { ttsVoicesSchema, type TtsVoices } from "./voices";
 export * from "./user-intent";
+export * from "./route";
 export interface LarmPort {
 	/** An explicitly ended task releases only its sub-agent connections, after active borrowers finish. */
 	releaseTaskSession?(taskId: string): Promise<void>;
@@ -148,6 +155,13 @@ export interface LarmPort {
 		input: IntentInput,
 		signal: AbortSignal,
 	): Promise<IntentJudgment>;
+	/** The router's choice over a turn's criteria (a router port, `decisionOnly`, only; spec toolchain-router-redesign §3.2). */
+	route?(input: RouteInput, signal: AbortSignal): Promise<RouteAnswer>;
+	/** The chosen candidate's fields by choice and extraction (a router port only; §3.4). */
+	routeFields?(
+		input: RouteFieldsInput,
+		signal: AbortSignal,
+	): Promise<RouteFieldsAnswer>;
 	voices?(signal: AbortSignal, language?: SpeechLanguage): Promise<TtsVoices>;
 	status(): LarmStatus;
 	onChange?(listener: () => void): () => void;

@@ -31,6 +31,8 @@ export type InferenceOptions = {
 	larmFactory?: (s: Settings) => LarmPort;
 	/** The user-intent judge's port of these settings and its LARM client, in place of a LARM port of the saved intent profile. */
 	intentLarmFactory?: (s: Settings, client: string | undefined) => LarmPort;
+	/** The router's port of these settings and its LARM client, in place of a LARM port of the saved router profile. */
+	routerLarmFactory?: (s: Settings, client: string | undefined) => LarmPort;
 	/**
 	 * The host process: the saved LARM connection is held while it runs, under a client stable across restarts, and
 	 * kept at shutdown, so LARM's input cache (which lives on the connection) outlasts idle time and restarts.

@@ -7,6 +7,8 @@ import { offlineBundleHost } from "../../../application/toolchain/toolchain-adap
 import {
 	createCapabilities,
 	migrations,
+	ROUTER_PASSAGE_CHARS,
+	routerPassage,
 	toolchainPassages,
 	type VectorSpace,
 } from "..";
@@ -202,4 +204,93 @@ test("the search fills each kind's slots: the three closest dedicated toolchains
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+test("the router's slots are wider and cut by no distance: ten dedicated toolchains and the general ones however far", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-router-slots-"));
+	const store = openStore(join(dir, "db"), migrations);
+	const caps = createCapabilities(
+		store,
+		new Set(["web", "history", "music", "image", "excalidraw", "dots"]),
+		{
+			bundleHost: () => ({
+				adapters: new Map(),
+				availability: new Set(),
+				inputAdapters: new Set(),
+				projections: new Set(),
+				domainSchemas: new Set(),
+			}),
+		},
+	);
+	try {
+		await caps.seed();
+		const active = store.read((db) => caps.toolchainsInTransaction(db));
+		const general = active.filter((d) => d.general);
+		const dedicated = active.filter((d) => !d.general);
+		expect(general.length).toBeGreaterThan(0);
+		const rank = (id: string) => dedicated.findIndex((d) => d.id === id);
+		// Every general toolchain is far (0.5) below the dedicated ones (0.99 and down).
+		await store.write((db) =>
+			caps.saveToolchainVectorsInTransaction(
+				db,
+				space,
+				active.flatMap((d) => {
+					const s = rank(d.id) >= 0 ? 0.99 - rank(d.id) * 0.01 : 0.5;
+					return toolchainPassages(d).map((text, item) => ({
+						revisionId: d.revisionId,
+						text,
+						item,
+						vector: [s, Math.sqrt(1 - s * s)],
+					}));
+				}),
+			),
+		);
+		const search = (slots: true | "router") =>
+			store.read((db) =>
+				caps.toolchainCandidatesInTransaction(db, {
+					text: "",
+					vector: { space, values: [1, 0] },
+					available: () => true,
+					strict: true,
+					slots,
+				}),
+			);
+		// The choice call's slots drop the far general toolchains.
+		expect(search(true).some((c) => c.general)).toBe(false);
+		const offered = search("router");
+		const offeredDedicated = offered.filter((c) => !c.general);
+		expect(offeredDedicated.map((c) => c.id)).toEqual(
+			dedicated.slice(0, Math.min(10, dedicated.length)).map((d) => d.id),
+		);
+		expect(
+			offered
+				.filter((c) => c.general)
+				.map((c) => c.id)
+				.sort(),
+		).toEqual(
+			general
+				.slice(0, 4)
+				.map((d) => d.id)
+				.sort(),
+		);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a router passage is the name, the summary and the first two use cases, at most the criterion's length", () => {
+	expect(
+		routerPassage({
+			title: "天気予報",
+			summary: "地名と日の天気を答える",
+			useWhen: ["天気を聞かれた", "気温を聞かれた", "傘が要るか聞かれた"],
+		}),
+	).toBe("天気予報: 地名と日の天気を答える（天気を聞かれた／気温を聞かれた）");
+	expect(routerPassage({ title: "計算", summary: "式を計算する" })).toBe(
+		"計算: 式を計算する",
+	);
+	expect(
+		routerPassage({ title: "長い", summary: "あ".repeat(400) }).length,
+	).toBe(ROUTER_PASSAGE_CHARS);
 });

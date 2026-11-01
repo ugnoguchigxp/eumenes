@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/routed-route.ts
+text = '''「[[toolchain]]」の確認です。頼んでよいか、はい、またはいいえで答えてください。'''
+
+[variables.toolchain]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

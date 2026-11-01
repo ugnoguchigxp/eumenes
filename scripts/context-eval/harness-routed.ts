@@ -21,7 +21,7 @@ import {
 	parseChoice,
 	type ChoiceCandidate,
 } from "../../api/domains/dialogue/service/routed-choice";
-import { askedRequest } from "../../api/domains/dialogue/service/routed-steps";
+import { askedRequest } from "../../api/domains/dialogue/service/routed-actions";
 import {
 	ASK_STEP,
 	carriedToolCalls,

@@ -56,6 +56,38 @@ export type SelectionRow = {
 	settled_at: number | null;
 	expires_at: number;
 };
+export type RouterTraceRow = {
+	run_id: string;
+	conversation_id: string;
+	message_id: string;
+	message_ids_json: string;
+	query_text: string;
+	query_space: string | null;
+	query_space_json: string | null;
+	query_vector: Uint8Array | null;
+	decided_id: string | null;
+	work_id: string | null;
+	set_json: string;
+	trace_json: string;
+	created_at: number;
+	expires_at: number;
+};
+export type RouterFeedbackRow = {
+	id: string;
+	conversation_id: string;
+	message_id: string;
+	message_ids_json: string;
+	run_id: string;
+	source: "redirect" | "ask_answer" | "ui_pick" | "review";
+	query_text: string;
+	query_space: string;
+	query_vector: Uint8Array;
+	wrong_id: string | null;
+	right_id: string;
+	state: "active" | "retracted" | "stale" | "conflict";
+	created_at: number;
+	updated_at: number;
+};
 export type RecipeRow = {
 	id: string;
 	toolchain_id: string;
@@ -98,5 +130,27 @@ UPDATE toolchain_recipes SET toolchain_id='web.research.codex' WHERE toolchain_i
 		after: ["toolchain-history/0003-selection-analysis"],
 		sql: `ALTER TABLE toolchain_selections DROP COLUMN analysis_json;
 ALTER TABLE toolchain_selections DROP COLUMN repaired;`,
+	},
+	{
+		// The router's per-turn traces and the user's corrections of it (spec toolchain-router-redesign §5.3).
+		id: "toolchain-history/0005-router",
+		after: ["toolchain-history/0004-drop-analysis"],
+		sql: `CREATE TABLE router_traces(
+ run_id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL,message_id TEXT NOT NULL,message_ids_json TEXT NOT NULL,
+ query_text TEXT NOT NULL,query_space TEXT,query_space_json TEXT,query_vector BLOB,
+ decided_id TEXT,work_id TEXT,set_json TEXT NOT NULL,trace_json TEXT NOT NULL,
+ created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL);
+CREATE INDEX router_traces_conversation ON router_traces(conversation_id,created_at);
+CREATE INDEX router_traces_message ON router_traces(message_id);
+CREATE INDEX router_traces_expiry ON router_traces(expires_at);
+CREATE TABLE router_feedback(
+ id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL,message_id TEXT NOT NULL,message_ids_json TEXT NOT NULL,run_id TEXT NOT NULL,
+ source TEXT NOT NULL CHECK(source IN ('redirect','ask_answer','ui_pick','review')),
+ query_text TEXT NOT NULL,query_space TEXT NOT NULL,query_vector BLOB NOT NULL,
+ wrong_id TEXT,right_id TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('active','retracted','stale','conflict')),
+ created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+CREATE INDEX router_feedback_space ON router_feedback(query_space,state);
+CREATE INDEX router_feedback_message ON router_feedback(message_id);`,
 	},
 ];

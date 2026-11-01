@@ -19,7 +19,9 @@ import { INPUT_HEADINGS } from "./input-text";
 import { openIntentGate } from "./intent-gate";
 import { refusalText, toolResultText } from "./result-text";
 import { parseChoice, strictChoiceSchema } from "./routed-choice";
-import { pendingTurn, requestTurn, type Step } from "./routed-steps";
+import type { Step } from "./routed-actions";
+import { activeRouter, routerTurn } from "./routed-router";
+import { pendingTurn, requestTurn } from "./routed-steps";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 
 const log = getLogger("dialogue");
@@ -87,7 +89,20 @@ export async function runRoutedTurn(
 		let step: Step = "talk";
 		// A choice needs the schema call on the run's request; without it the turn only talks.
 		if (input.final.kind === "utterances" && routed && turn.canChoose) {
-			if (routed.asked) {
+			if (turn.router?.settings.mode === "on") {
+				// The router decides the request turn and the pending turn together (spec toolchain-router-redesign §3.1).
+				const pending =
+					routed.pending.confirmations.length > 0 ||
+					routed.pending.questions.length > 0 ||
+					routed.switching !== null;
+				if (pending || routed.asked || gate.route !== "answer") {
+					kind = pending ? "pending" : "request";
+					step = await routerTurn(turn, turn.router, {
+						// The judge found no request of work: only the open confirmations and questions are looked at.
+						search: !!routed.asked || gate.route !== "answer",
+					});
+				}
+			} else if (routed.asked) {
 				// The user answers the question the agent asked back: the request turn takes both.
 				kind = "request";
 				step = await requestTurn(turn);
@@ -200,12 +215,59 @@ function createTurn(
 		);
 	};
 
+	/** One host operation through the generation's executor; `record` keeps it as an executed call of the turn. */
+	async function operate(
+		name: string,
+		args: Record<string, unknown>,
+		record: boolean,
+	): Promise<{ outcome: ToolOutcome } | { refused: ValidationFailure }> {
+		const raw = {
+			id: `routed-${++seq}`,
+			name,
+			arguments: JSON.stringify(args),
+		};
+		try {
+			const parsed = parseCall(raw);
+			const outcome = await options.execute(parsed, {
+				signal,
+				...(receipt ? { receipt } : {}),
+				exchange,
+			});
+			if (record) {
+				executed.push({ call: parsed, outcome });
+				if (carriesExchange(name))
+					exchange.push({
+						name,
+						arguments: raw.arguments,
+						result: outcome.result,
+					});
+			}
+			return { outcome };
+		} catch (error) {
+			if (!(error instanceof ValidationFailure)) throw error;
+			for (const issue of error.issues)
+				log.warn("dialogue.operation_rejected", {
+					...issue,
+					issueCount: error.issues.length,
+				});
+			if (record && carriesExchange(name))
+				exchange.push({
+					name,
+					arguments: raw.arguments,
+					result: { refused: true },
+				});
+			return { refused: error };
+		}
+	}
+
 	return {
 		deps,
 		input,
 		signal,
 		routed: input.routed,
 		canChoose: !!(input.requestId && deps.larm.executeStream),
+		/** The saved router, when it is on or in shadow and the port can ask it (spec toolchain-router-redesign §8). */
+		router: activeRouter(deps),
 		utterance: input.utterances.join("\n"),
 		executed,
 		exchange,
@@ -267,46 +329,12 @@ function createTurn(
 		},
 
 		/** One host operation through the generation's executor: its outcome, or the refusal of its arguments. */
-		async act(
-			name: string,
-			args: Record<string, unknown>,
-		): Promise<{ outcome: ToolOutcome } | { refused: ValidationFailure }> {
-			const raw = {
-				id: `routed-${++seq}`,
-				name,
-				arguments: JSON.stringify(args),
-			};
-			try {
-				const parsed = parseCall(raw);
-				const outcome = await options.execute(parsed, {
-					signal,
-					...(receipt ? { receipt } : {}),
-					exchange,
-				});
-				executed.push({ call: parsed, outcome });
-				if (carriesExchange(name))
-					exchange.push({
-						name,
-						arguments: raw.arguments,
-						result: outcome.result,
-					});
-				return { outcome };
-			} catch (error) {
-				if (!(error instanceof ValidationFailure)) throw error;
-				for (const issue of error.issues)
-					log.warn("dialogue.operation_rejected", {
-						...issue,
-						issueCount: error.issues.length,
-					});
-				if (carriesExchange(name))
-					exchange.push({
-						name,
-						arguments: raw.arguments,
-						result: { refused: true },
-					});
-				return { refused: error };
-			}
-		},
+		act: (name: string, args: Record<string, unknown>) =>
+			operate(name, args, true),
+
+		/** An operation the turn keeps no trace of (it is not an executed call nor a step of its exchange). */
+		probe: (name: string, args: Record<string, unknown>) =>
+			operate(name, args, false),
 
 		/** Why the host refused an operation, as the retry reads it. */
 		reasonOf(error: ValidationFailure) {

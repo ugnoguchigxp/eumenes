@@ -108,6 +108,25 @@ export function registerSettings(app: Hono, settings: SettingsService) {
 			"Cache-Control": "no-store",
 		});
 	});
+	app.get("/api/settings/router", (c) =>
+		c.json(settings.get().router, 200, { "Cache-Control": "no-store" }),
+	);
+	app.patch("/api/settings/router", async (c) => {
+		const raw = await readBounded(c.req.raw.body, {
+			limit: 4096,
+			tooLarge: "invalid_body_size",
+			missing: "invalid_body",
+		});
+		let input: unknown;
+		try {
+			input = JSON.parse(new TextDecoder().decode(raw));
+		} catch {
+			throw new Error("invalid_router_settings");
+		}
+		return c.json(await settings.configureRouter(input), 200, {
+			"Cache-Control": "no-store",
+		});
+	});
 	app.get("/api/settings/diagnostics", (c) => c.json(settings.diagnostics()));
 	app.post("/api/settings/apply", async (c) => {
 		const bytes = await readBounded(c.req.raw.body, {

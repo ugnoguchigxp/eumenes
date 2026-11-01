@@ -6,7 +6,11 @@ import {
 	queryInt,
 } from "../../../infrastructure/http";
 import type { ToolchainHistory } from "../service";
-import { recipeStateBody } from "../contracts";
+import {
+	recipeStateBody,
+	routerFeedbackStateBody,
+	routerFeedbackStates,
+} from "../contracts";
 
 const pattern = /^[A-Za-z0-9._:-]{1,160}$/;
 const id = (v: string | undefined) =>
@@ -17,6 +21,11 @@ const listQuery = z.object({
 	toolchain: z.string().regex(pattern).optional(),
 	since: queryInt.optional(),
 	cursor: queryInt.optional(),
+	limit: queryInt.optional(),
+});
+
+const feedbackQuery = z.object({
+	state: z.enum(routerFeedbackStates).optional(),
 	limit: queryInt.optional(),
 });
 
@@ -65,5 +74,26 @@ export function registerToolchainHistory(app: Hono, history: ToolchainHistory) {
 		if (!key) return c.json({ error: "invalid_request" }, 400);
 		await history.deleteRecipe(key);
 		return c.json({ ok: true });
+	});
+	app.get("/api/toolchain-history/router-feedback", (c) => {
+		const q = parseQuery(c, feedbackQuery, { code: "invalid_request" });
+		if (!q.ok) return q.response;
+		return c.json({
+			items: history.listRouterFeedback({
+				state: q.data.state,
+				limit: q.data.limit,
+			}),
+		});
+	});
+	app.post("/api/toolchain-history/router-feedback/:id/state", async (c) => {
+		const body = await parseJsonBody(c, routerFeedbackStateBody, {
+			code: "invalid_request",
+		});
+		if (!body.ok) return body.response;
+		const key = id(c.req.param("id"));
+		if (!key) return c.json({ error: "invalid_request" }, 400);
+		return (await history.setRouterFeedbackState(key, body.data.state))
+			? c.json({ ok: true })
+			: c.json({ error: "router_feedback_not_found" }, 404);
 	});
 }

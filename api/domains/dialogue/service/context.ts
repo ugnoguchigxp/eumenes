@@ -108,6 +108,8 @@ export type RoutedInput = {
 	 * 別の作業への切替の確認待ち): only its branch may carry `resolveUnsaved`.
 	 */
 	switching: string | null;
+	/** The item the waiting hand-over changes (`switching`'s target): the discard hands over to the same one. */
+	switchTarget?: string | null;
 };
 
 export interface GenerateInput {

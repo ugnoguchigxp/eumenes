@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/routed-route.ts
+text = '''仕事の質問「[[question]]」に答える。'''
+
+[variables.question]
+type = "string"
+trust = "untrusted"
+placement = "delimited-context"
+encoding = "delimited-text"

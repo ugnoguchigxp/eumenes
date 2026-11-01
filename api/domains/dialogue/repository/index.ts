@@ -2,6 +2,7 @@ import { intentAnswerRouteMigration, intentJudgmentsMigration } from "./intent";
 import type { Database } from "bun:sqlite";
 import {
 	confirmationTargetLabelMigration,
+	confirmationWordsMigration,
 	confirmationTargetMigration,
 	workMigration,
 	workNoticesMigration,
@@ -436,6 +437,11 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0031-confirmation-target-label",
 		after: ["dialogue/0030-confirmation-target"],
 		sql: confirmationTargetLabelMigration,
+	},
+	{
+		id: "dialogue/0032-confirmation-words",
+		after: ["dialogue/0031-confirmation-target-label"],
+		sql: confirmationWordsMigration,
 	},
 ];
 

@@ -11,6 +11,7 @@ import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contract
 import { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
 import { configureTaskExecution } from "./toolchain/task-execution-port";
+import { toolchainForgetPurge } from "./toolchain/toolchain-forget";
 import { createSearchCheck } from "./toolchain/toolchain-search-check";
 import { taskMediaPorts } from "./toolchain/task-media-execution";
 import { taskLegacyPorts } from "./toolchain/task-legacy-execution";
@@ -296,9 +297,7 @@ export async function buildServices(
 	agency.attachWork(createAgencyWork({ dialogue }));
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
-	memory.registerForgetPurge(
-		toolchain.agents.executions.purgeSourcesInTransaction,
-	);
+	memory.registerForgetPurge(toolchainForgetPurge(toolchain));
 	const audioDeps = { ...core, conversation, continuity, dialogue, memory };
 	const { voice, liveVoice, prewarm } = liveBridge.attach(audioDeps);
 	const monitoring = createMonitoring({

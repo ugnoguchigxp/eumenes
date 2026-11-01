@@ -45,6 +45,8 @@ const oneOf = (values: readonly string[]): Schema => ({
 	enum: [...values],
 });
 const ANY_OBJECT: Schema = { type: "object" };
+/** The memory request as a candidate of the router's fill. */
+export const MEMORY_REQUEST = "memory.request";
 /**
  * The target a choice names for a request that makes something new: a candidate with saved items has its target
  * always filled, so a new piece is chosen as such and never left to an item the model happened to fill in.
@@ -73,17 +75,20 @@ function candidateBranch(
 	candidate: ChoiceCandidate,
 	resources: readonly string[],
 	switching: string | null,
+	/** The branch has `say`: false when the host says its own words (the router's fill). */
+	withSay = true,
 ): Schema {
 	const choice = only(candidate.id);
+	const say: Record<string, Schema> = withSay ? { say: SAY } : {};
 	// An instant answer and a read tool both take their inputs alone.
 	if (candidate.execution === "instant" || candidate.execution === "read")
 		return branch({ choice, inputs: candidate.inputs ?? ANY_OBJECT });
 	if (candidate.execution === "pipeline")
-		return branch({ choice, say: SAY, inputs: candidate.inputs ?? ANY_OBJECT });
+		return branch({ choice, ...say, inputs: candidate.inputs ?? ANY_OBJECT });
 	return branch(
 		{
 			choice,
-			say: SAY,
+			...say,
 			request: text(REQUEST_CHARS),
 			...(candidate.targets?.length
 				? {
@@ -102,6 +107,20 @@ function candidateBranch(
 				: {}),
 		},
 		["refs", "resolveUnsaved"],
+	);
+}
+
+/** The memory request's branch: its kind, what it is about, and a detail when there is one. */
+function memoryBranch(withSay = true): Schema {
+	return branch(
+		{
+			choice: only("memory.request"),
+			kind: oneOf(MEMORY_KINDS),
+			what: text(500),
+			detail: text(1000),
+			...(withSay ? { say: SAY } : {}),
+		},
+		["detail"],
 	);
 }
 
@@ -188,6 +207,25 @@ export function pendingSchema(pending: RoutedInput["pending"]): Schema {
 	};
 }
 
+/**
+ * The router's fill of one candidate's fields (spec toolchain-router-redesign §3.4): none, a question back, and the
+ * one branch the router decided on (without `say`: the host says its own words).
+ */
+export function fillSchema(
+	candidate: ChoiceCandidate | typeof MEMORY_REQUEST,
+	{ resources, switching }: Pick<RoutedInput, "resources" | "switching">,
+): Schema {
+	return {
+		anyOf: [
+			branch({ choice: only("none") }),
+			branch({ choice: only("ask"), say: SAY }),
+			candidate === MEMORY_REQUEST
+				? memoryBranch(false)
+				: candidateBranch(candidate, resources, switching, false),
+		],
+	};
+}
+
 /** The agent's last words, as the choice calls read them. */
 function previousLine(routed: RoutedInput): string[] {
 	return routed.previousReply ? [`直前の返事: ${routed.previousReply}`] : [];
@@ -240,6 +278,41 @@ export function choiceMessages(input: {
 		{
 			role: "system",
 			content: systemContext("dialogue.contexts.local.choice", {
+				style: input.style,
+			}),
+		},
+		{ role: "user", content: lines.join("\n") },
+	];
+}
+
+/** The router's fill input: the records, the one candidate the router decided on, and the words. */
+export function fillMessages(input: {
+	style: string;
+	routed: RoutedInput;
+	candidate: ChoiceCandidate | typeof MEMORY_REQUEST;
+	utterance: string;
+}): ChatMessage[] {
+	const { routed } = input;
+	const lines = [
+		...(routed.memory ? [routed.memory] : []),
+		...(routed.earlier.length
+			? [INPUT_HEADINGS.earlier, ...routed.earlier.map((said) => `- ${said}`)]
+			: []),
+		routed.state,
+		...previousLine(routed),
+		...(routed.asked
+			? [`聞き返した依頼: ${lineText(routed.asked.request)}`]
+			: []),
+		INPUT_HEADINGS.candidates,
+		input.candidate === MEMORY_REQUEST
+			? `- memory.request: ${systemContext("dialogue.contexts.local.memory-request", {})}`
+			: toolResultText("find_toolchain", { candidates: [input.candidate] }),
+		`${INPUT_HEADINGS.user}\n${dataText(input.utterance)}`,
+	];
+	return [
+		{
+			role: "system",
+			content: systemContext("dialogue.contexts.local.router-fill", {
 				style: input.style,
 			}),
 		},

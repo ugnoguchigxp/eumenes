@@ -10,7 +10,9 @@ test("selections saved with an analysis and a repair flag keep everything else w
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-history-drop-analysis-"));
 	const path = join(dir, "db");
 	const before = migrations.filter(
-		(migration) => migration.id !== "toolchain-history/0004-drop-analysis",
+		(migration) =>
+			migration.id !== "toolchain-history/0004-drop-analysis" &&
+			migration.id !== "toolchain-history/0005-router",
 	);
 	let store = openStore(path, [...capabilityMigrations, ...before]);
 	try {

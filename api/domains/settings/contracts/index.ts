@@ -245,6 +245,68 @@ export const intentPatchSchema = z
 	})
 	.partial()
 	.strict();
+
+/**
+ * The router (spec toolchain-router-redesign 2026-11-01 §3.3, §8): `off` (the default) keeps the choice call,
+ * `shadow` also asks the router in a request turn and records what it would decide, `on` lets the router decide the
+ * request turn with no choice call. The thresholds are the decision table's; they are compared with LARM's calibrated
+ * probabilities, and a measurement changes them, not the code.
+ */
+export const routerModes = ["off", "shadow", "on"] as const;
+/** τ低 ≤ τ採用 ≤ τ承認 (spec toolchain-router-redesign §3.3). */
+export function routerThresholdsOrdered(t: {
+	low: number;
+	accept: number;
+	approve: number;
+}) {
+	return t.low <= t.accept && t.accept <= t.approve;
+}
+const routerProfile = z.string().trim().min(1).max(200);
+const routerTimeoutMs = z.number().int().min(100).max(10000);
+const routerUnit = z.number().min(0).max(1);
+const routerFeedbackWeight = z.number().min(0).max(5);
+export const routerSettingsSchema = z
+	.object({
+		mode: z.enum(routerModes).default("off"),
+		/** The LARM Agent Profile of the router; absent until saved, and then the router is not asked. */
+		profile: routerProfile.optional(),
+		/** How long a turn waits for the router (each call) before it goes on without it. */
+		timeoutMs: routerTimeoutMs.default(2000),
+		/** τ採用: the top candidate is taken at least this probable, with `margin` over the second. */
+		accept: routerUnit.default(0.6),
+		/** τ低: below this, the top candidate is not taken (the host asks, or the turn talks). */
+		low: routerUnit.default(0.3),
+		/** δ: the least lead of the top candidate over the second for row 2. */
+		margin: routerUnit.default(0.15),
+		/** τ承認: a confirmation is approved only this probable. */
+		approve: routerUnit.default(0.85),
+		/** τ多: two toolchains scoring at least this (independently) make a request of several jobs. */
+		multi: routerUnit.default(0.5),
+		/** θ: a correction applies to an utterance at least this similar (inner product in the search's space). */
+		feedbackNear: routerUnit.default(0.95),
+		/** β: the most a correction moves a candidate's log-probability. 0 turns the corrections off. */
+		feedbackWeight: routerFeedbackWeight.default(2),
+	})
+	.strict()
+	// The decision table's lines keep their order: an approval is never easier than taking a candidate (§3.5).
+	.refine(routerThresholdsOrdered, "low ≤ accept ≤ approve");
+export type RouterSettings = z.infer<typeof routerSettingsSchema>;
+/** A change of the router's settings: the fields given replace the saved ones; a null profile removes it. */
+export const routerPatchSchema = z
+	.object({
+		mode: z.enum(routerModes),
+		profile: routerProfile.nullable(),
+		timeoutMs: routerTimeoutMs,
+		accept: routerUnit,
+		low: routerUnit,
+		margin: routerUnit,
+		approve: routerUnit,
+		multi: routerUnit,
+		feedbackNear: routerUnit,
+		feedbackWeight: routerFeedbackWeight,
+	})
+	.partial()
+	.strict();
 export const settingsSchema = z
 	.object({
 		revision: z.number().int().nonnegative(),
@@ -336,6 +398,17 @@ export const settingsSchema = z
 			mode: "ruri",
 			timeoutMs: 1500,
 			searchScore: 0.6,
+		}),
+		router: routerSettingsSchema.default({
+			mode: "off",
+			timeoutMs: 2000,
+			accept: 0.6,
+			low: 0.3,
+			margin: 0.15,
+			approve: 0.85,
+			multi: 0.5,
+			feedbackNear: 0.95,
+			feedbackWeight: 2,
 		}),
 		world: z
 			.object({

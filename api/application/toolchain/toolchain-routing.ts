@@ -193,8 +193,10 @@ export function createToolchainRouting(
 				available: (id) => input.available.has(id),
 				fromHistory,
 				strict: input.strict,
-				// The conversation's and a task's search fill each kind's slots.
-				...(input.strict ? { slots: true as const } : {}),
+				// The conversation's and a task's search fill each kind's slots (the router's are wider).
+				...(input.strict
+					? { slots: input.slots === "router" ? ("router" as const) : true }
+					: {}),
 			});
 			const offered = cards.flatMap((card) => enrich(db, card));
 			const fts = cards.some((c) => c.score.ftsRank !== null);
@@ -285,6 +287,15 @@ export function createToolchainRouting(
 		bound,
 		instantInTransaction: instant.run,
 		recordSelectionInTransaction: history.recordSelectionInTransaction,
+		// The router's traces and the user's corrections (spec toolchain-router-redesign 2026-11-01 §5.3).
+		recordRouterTraceInTransaction: history.recordRouterTraceInTransaction,
+		linkRouterWorkInTransaction: history.linkRouterWorkInTransaction,
+		latestRouterTraceInTransaction: history.latestRouterTraceInTransaction,
+		recordRouterFeedbackInTransaction:
+			history.recordRouterFeedbackInTransaction,
+		nearRouterFeedbackInTransaction: history.nearRouterFeedbackInTransaction,
+		setRouterFeedbackStateInTransaction:
+			history.setRouterFeedbackStateInTransaction,
 		linkTaskInTransaction: history.linkTaskInTransaction,
 		settleSelectionInTransaction: history.settleSelectionInTransaction,
 		requestOfRunInTransaction: history.requestOfRunInTransaction,

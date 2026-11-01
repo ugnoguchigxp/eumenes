@@ -1,6 +1,6 @@
 # 担当の振り分け（Toolchain Router）の作り直し 調査と設計（2026-11-01）
 
-状態: 案（調査・設計のみ）。製品コード・設定・サーバー・モデルは変えていない。数値は、製品 DB の読み取り専用の集計（集計値だけ。発言の本文は読んでいない）と `data/logs/api*.jsonl` の集計、既存の設計書・検証記録から取った。モデルの性能は公開値と理論推定で、Eumenes の担当の振り分けで測った値ではない。
+状態: 方針は合意（2026-11-01 利用者回答、§11）・未実装。モデルは LARM で動かし、Eumenes（この PC・このリポジトリ）では動かさない。LARM への依頼は [依頼プロンプト](larm-router-request-prompt-2026-11-01.md)。製品コード・設定・サーバー・モデルは変えていない。数値は、製品 DB の読み取り専用の集計（集計値だけ。発言の本文は読んでいない）と `data/logs/api*.jsonl` の集計、既存の設計書・検証記録から取った。モデルの性能は公開値と理論推定で、Eumenes の担当の振り分けで測った値ではない。
 
 利用者の依頼（2026-11-01）: 担当の選択・起動を、速く・正しく・単純にする作りを、今の実装を精査して独立に考える。追記（同日）:「Rerankerを導入するなら、Ruriによる『ツール利用か会話か』の二値判定も、削除候補にすべき」「Rerankerまたは専用Routerに、通常会話・各Toolchain・判断保留を統合し、1回の推論で振り分ける設計を第一候補として評価する」。
 
@@ -10,16 +10,16 @@
 
 | # | 問い | 答え |
 | --- | --- | --- |
-| 1 | Embedding 検索を残すか | 担当探しの段（`find_toolchain`）は残し、中身を「全候補の採点」に替える。今の規模（担当26＋読む道具5＋ホストの操作）では Embedding の上位k件による絞込みは外す。Embedding の索引は消さない（訂正の記憶の近傍探し、100件規模での絞込み、検索の確認に使う） |
+| 1 | Embedding 検索を残すか | 残す（§11 で決定）。担当は増える前提なので、検索（種類ごとの枠）で候補を集め、Router は集めた候補と、いつも入る候補（会話・記憶・仕事・確認・使っている担当）から決める。Router の入力の数が担当の総数に比例しなくなる。混合の依頼で複数の担当・パイプラインを拾うのは、担当ごとに独立に点を付ける検索の役（Router の choice は1つを選ぶ形で、混合の依頼では点が割れる）。Embedding の索引は訂正の記憶の近傍探しにも使う |
 | 2 | CrossEncoder か判断モデルか | どちらも「候補の説明文を条件にして、閉じた候補集合に確率を付ける」形で使い、LARM の `system-one` の choice（Eumenes が Ruri の意図判定で既に使う形）に載せる。会話を含めた統合の判断を学習なしで試せるのは、候補の説明を並べて1回の forward で選ぶ判断専用モデル（d1-2B。生成しない）だけなので、PoC はこれを先に測る。CrossEncoder は担当どうしの採点に強く学習の手順も揃っているが、会話の候補は学習しないと採点できない。決めるのは同じ評価データでの測定（§4、§7） |
 | 3 | 追加学習なしで足りるか | 担当どうしの区別（作る／流す）は、どちらの方式でも今の Embedding より良くなる見込み。会話か依頼か（雑談の誤起動）は、汎用の Reranker では学習なしでは足りない（「質問と文書の関連度」で学習されており、話題が近いだけの雑談を断る学習をしていない）。d1-2B は振り分け・意図分類を用途に挙げるが、公開値は提供元の自社測定だけで、日本語の振り分けの精度は分からない。指示語・訂正は、どの方式も評価データで確かめるまで足りるとは言えない |
 | 4 | 誤選択を即時に直す方式 | 利用者の明示的な訂正だけを「訂正の記憶」に残し、次の採点で近い発言にだけ上限付きの補正をかける。重みは逐次更新しない。重みの学習はまとめて行い、固定の評価で通ったときだけ版を切り替える（§5） |
-| 5 | LLM の最終選択をなくせるか | 通常の経路からはなくす。残すのは、どの候補の点数も低い回の「上位3件からの選ぶ呼出し」だけ。即答・パイプライン・記憶の欄を埋める呼出しは残るが、選ぶのではなく、選ばれた1担当の欄だけを書く |
-| 6 | 選択から非同期実行までの最も単純な形 | 発言 → ホストが宛先を決められる回はそのまま → Router 1回（会話・担当・仕事・確認を同時に採点） → 決定表 → 会話の回か、今の引き渡し（予告・TODO・Queue） |
-| 7 | 消せる・まとめられるもの | 選ぶ呼出しの多候補 schema と選び直しのループ（低い点数の回だけに縮める）、LLM に書かせる `say`・`request`、候補の枠（専用3・パイプライン2・汎用2・差0.05）、過去の選択の 0.8 の線と `fromHistory` の印、迷ったら1位の設計、選ぶ呼出しの system の優先順位の決まり。Ruri の意図判定は、統合 Router が測定で劣らないと確かめた後に消す（§3.6、§8） |
-| 8 | モデル1つの追加は見合うか | 見合う。LARM の選ぶ呼出しは中央値 45.3 秒・26回中9回が出力の上限で切断（実測）。Router の採点は、小型の CrossEncoder で 0.2〜1 秒、d1-2B で 0.2〜6 秒（どちらも推定。CPU と前置きの再利用の有無で変わる）。重みは 40 MB〜1.9 GB。本当の費用はモデルではなく、人手で正解を付けた評価データ（400〜600件）と、その保守 |
+| 5 | LLM の最終選択をなくせるか | なくす（§11 で決定。トークンの消費を減らす）。点数の低い回も LLM に選ばせず、ホストの聞き返しか会話の回にする（§3.3）。頼み方の欄も LLM に書かせず、列挙の欄は Router の choice、自由な文の欄（地名・会社名・記憶の中身など）は LARM の抽出で埋める。LARM の抽出ができるまでの間だけ、自由な文の欄がある担当（即答・パイプライン・読む道具・記憶の依頼）で、その1担当の欄を埋める呼出しを残す |
+| 6 | 選択から非同期実行までの最も単純な形 | 発言 → ホストが宛先を決められる回はそのまま → 検索（候補を集める）→ Router 1回（会話・担当・仕事・確認を同時に採点）→ 決定表 → 会話の回か、今の引き渡し（予告・TODO・Queue） |
+| 7 | 消せる・まとめられるもの | 検索と候補の種類の枠は消さない（§11 で決定。パイプライン・汎用の担当が増える）。枠の大きさは Router の入力に合わせて広げる。消すのは、LLM の選ぶ呼出し（多候補 schema・選び直しのループ・`say`・`request` を書かせる部分）、過去の選択の 0.8 の線と `fromHistory` の印（訂正の記憶に替える）、迷ったら1位の設計（決定表に入る）、選ぶ呼出しの system の決まり。Ruri の意図判定は、統合 Router が測定で劣らないと確かめた後に消す（§3.6、§8） |
+| 8 | モデル1つの追加は見合うか | 見合う。モデルは LARM で動かす（§11 で決定）。LARM の選ぶ呼出しは中央値 45.3 秒・26回中9回が出力の上限で切断（実測）。Router の採点は、小型の CrossEncoder で 0.2〜1 秒、d1-2B で 0.2〜6 秒（どちらも推定。CPU と前置きの再利用の有無で変わる）。重みは 40 MB〜1.9 GB。本当の費用はモデルではなく、人手で正解を付けた評価データ（400〜600件）と、その保守 |
 
-第一推奨は「統合 Router」（§3）: 会話・担当・仕事・確認を1回の判断で振り分け、LLM の選ぶ呼出しは点数の低い回の fallback だけにする。モデルは PoC で決める。最初に測るのは d1-2B（学習なしで統合の判断を試せる）、次に CrossEncoder（hotchpotch xsmall-v2、ruri-v3-reranker-310m）。Ruri の二値判定は、統合 Router の会話の判定が Ruri を使う今の振り分けに劣らないと測定で確かめられた段階（R4）で削除する。Reranker を入れるだけでは会話の判定は良くならないので、CrossEncoder を使う場合は会話を含めた正解データでの学習と校正を同じ段階に含める。
+第一推奨は「統合 Router」（§3）: 検索で集めた候補と、いつも入る候補（会話・仕事・確認）を、1回の判断で振り分け、LLM の選ぶ呼出しをなくす。モデルは PoC で決める。最初に測るのは d1-2B（学習なしで統合の判断を試せる）、次に CrossEncoder（hotchpotch xsmall-v2、ruri-v3-reranker-310m）。Ruri の二値判定は、統合 Router の会話の判定が Ruri を使う今の振り分けに劣らないと測定で確かめられた段階（R4）で削除する。Reranker を入れるだけでは会話の判定は良くならないので、CrossEncoder を使う場合は会話を含めた正解データでの学習と校正を同じ段階に含める。
 
 ## 1 今の実装の診断
 
@@ -115,7 +115,7 @@ Ruri の意図判定の記録（`dialogue_intent_judgments`、10-29〜11-01）: 
 | E | Hybrid | Embedding・FTS、Reranker、小型判断モデル、履歴の補正、LLM の fallback を組み合わせる |
 | F1 | 常駐の会話 LLM の1トークン採点 | 選ぶ呼出しを、生成させずに候補記号の確率（logprob）だけで読む |
 | F2 | encoder の近傍と学習ヘッド | Ruri 等の embedding だけで、説明文との類似度・正解例の近傍・小さな学習ヘッドを組み合わせる。CrossEncoder を使わない |
-| U | 統合 Router（推奨） | 全候補を1回で採点する判断（D または C）を核に、会話・仕事・確認・記憶の操作も同じ候補として採点し、訂正の記憶で補正し、決定表で決める。点数が低い回だけ上位3件で選ぶ呼出し |
+| U | 統合 Router（推奨） | 全候補を1回で採点する判断（D または C）を核に、会話・仕事・確認・記憶の操作も同じ候補として採点し、訂正の記憶で補正し、決定表で決める。候補は検索で集める。LLM に選ばせない |
 
 ### 2.2 評価
 
@@ -145,11 +145,11 @@ Ruri の意図判定の記録（`dialogue_intent_judgments`、10-29〜11-01）: 
 
 ### 2.4 方式ごとの判断
 
-- A: 担当どうしの区別は一番良いが、LARM の会話モデルでは考える分で 45 秒・35% 切断。モデルを替えるたびに直す必要があり、「場当たり的な修正を増やさない」目的に合わない。クラウドの会話モデル（5 秒）なら実用だが、local を主とする以上、主経路にしない。fallback として残す。
-- B と C: CrossEncoder は発言と担当の説明を同時に読むので、「作って」と「流して」の違いを点数に出せる（bi-encoder の内積ではこれが弱い。§1.3 の差 0.008）。今の規模では、小型の CrossEncoder なら全件を採点しても 1 秒未満の見込み（§4.4）なので、上位K件で切る理由がない。B の上位K件は、候補が百件を超えたときの絞込みとして同じ口に足せばよい。
+- A: 担当どうしの区別は一番良いが、LARM の会話モデルでは考える分で 45 秒・35% 切断。モデルを替えるたびに直す必要があり、「場当たり的な修正を増やさない」目的に合わない。クラウドの会話モデル（5 秒）なら実用だが、local を主とする以上、主経路にしない。トークンの消費も多いので、fallback にも残さない（§11）。
+- B と C: CrossEncoder は発言と担当の説明を同時に読むので、「作って」と「流して」の違いを点数に出せる（bi-encoder の内積ではこれが弱い。§1.3 の差 0.008）。今の規模なら、小型の CrossEncoder で全件を採点しても 1 秒未満の見込み（§4.4）。ただし担当は増える前提で（§11）、検索は担当ごとに独立に点を付けて、混合の依頼の複数の担当・パイプラインを種類ごとの枠で拾える。そこで B の形（検索で集め、Router で決める）を採り、枠を Router の入力に合わせて広げる。
 - D: d1-2B は文を生成しない判断専用モデルで、候補（criteria: 名前と説明）を並べた入力に1回の forward で確率を返す（§4.1）。LARM の Ruri（今の意図判定）・Laya と同じ判断モデルの扱いで、会話の LLM を2つ置くことにはならない。CrossEncoder が候補を1件ずつ独立に採点するのに対し、全候補を同じ入力の中で比べるので、「どれにも当たらない＝会話」を候補の1つとして選ばせやすい。Eumenes 側は、今の意図判定と同じ `system-one` の choice に候補ごとの criteria を入れるだけで済む。弱みは、公開から5日で公開値が提供元の自社測定だけ、CPU の速さが非公開、選択肢の数の上限が不明、学習の手順が非公開、ライセンス（LFM Open License v1.0、年商1千万ドル以上の法人の商用利用を除く）。
 - Laya（laya-multilingual）は、学習なしではほぼチャンス水準（MASSIVE intent 0.342〜0.366）で、20択未満を推奨している。今の候補数（33〜44）には学習なしでは使えない。
-- E: 部品が最も多く、「単純にする」目的に反する。U は E のうち必要な部品（全候補を1回で採点する判断、訂正の記憶、上位3件の fallback）だけを残したもの。
+- E: 部品が最も多く、「単純にする」目的に反する。U は E のうち必要な部品（候補を集める検索、集めた候補を1回で採点する判断、訂正の記憶）だけを残したもの。
 - F1: 追加のモデルなしで会話か依頼かも読める点は魅力。ただし LARM に「生成させずに候補の確率を返す口」が要り、考えるモデルでは考える分を飛ばす口も要る。会話モデルを替えるたびに校正し直しになる。会話モデルの入れ替えが多い Eumenes では、校正と訂正の蓄積がモデルの入れ替えで失われない独立の Router の方が保守しやすい。
 - F2: 最も軽い。訂正の記憶の近傍探しにはこの仕組みを使う（U の一部）。ただし担当の主な採点を bi-encoder に任せると、今の検索と同じ「動詞の違いが点に出ない」問題が残る。
 
@@ -164,10 +164,13 @@ Ruri の意図判定の記録（`dialogue_intent_judgments`、10-29〜11-01）: 
   │    ・専門担当のセッション中 → 担当へ
   │    ・画面のフォームからの依頼（pinned）→ 指定の担当へ
   │
+  ├─ 担当探し（今の find_toolchain の検索。種類ごとの枠を Router 向けに広げる）
+  │    専用の上位10・パイプラインの上位4・汎用の上位4（1位との差で切らない）
+  │
   └─ Router（1回）
        入力: 今の発言＋直前の返事＋前の発言（指示語のため）
-       候補: conversation.respond ＋ 有効な担当すべて ＋ 読む道具
-             ＋ memory.request ＋ 仕事（t<n>.check / amend / cancel / redirect）
+       候補: 検索で集めた担当・読む道具 ＋ conversation.respond ＋ memory.request
+             ＋ 使っている担当（retained）＋ 仕事（t<n>.check / amend / cancel / redirect）
              ＋ 確認・質問（c<n>.approve / decline、t<n>.answer）
        採点: LARM の Router（system-one の choice。候補の説明を criteria にして送り、
              候補ごとの確率を受け取る。中のモデルは判断モデルか CrossEncoder）
@@ -178,23 +181,25 @@ Ruri の意図判定の記録（`dialogue_intent_judgments`、10-29〜11-01）: 
             ├─ 会話 → 会話の回（今の talk、道具なし）
             ├─ 担当 → 欄の要る担当だけ「欄を埋める呼出し」→ 今の引き渡し（影響・確認・予告・TODO・Queue）
             ├─ 仕事・確認・記憶 → 今のホストの操作
-            ├─ 迷い（上位が並ぶ）→ 1位に頼む（影響なしの担当だけ）／聞き返し（ホストの決まった文）
-            └─ どれも低い → 上位3件＋会話＋聞き返しで、今の選ぶ呼出し（fallback）
+            ├─ 迷い（上位が並ぶ）→ 1位に頼む（影響なしの担当だけ）
+            └─ どれも低い → ホストの聞き返し（上位2件の名前）か会話の回。LLM に選ばせない
 ```
 
 ### 3.2 候補（Router が採点するもの）
 
-| 種類 | id（criteria の名前） | 出る条件 | 採点に使う文（criteria の説明、各96 token 以内） |
+| 種類 | id（criteria の名前） | 出る条件 | 採点に使う文（criteria の説明、各300字以内。今の平均118字、最大263字） |
 | --- | --- | --- | --- |
 | 会話 | `conversation.respond` | いつも | 「仕事を始めず、話し相手として返事をする（雑談、感想、気持ち、相づち、エージェントへの質問）」。文は登録データ（bundle と同じ形の host 定義）に置き、コードに書かない |
-| 担当 | 担当の id | 有効で adapter が使える | `名前: 説明` と `useWhen` の先頭2行。種類（専用・パイプライン・汎用）は文に入れず、校正の偏りで扱う |
-| 読む道具 | `read_memory` ほか | 今と同じ | 今の検索の文 |
+| 担当 | 担当の id | 検索の枠に入った担当（専用10・パイプライン4・汎用4）と、使っている担当（retained） | `名前: 説明（useWhen の先頭2行）`。種類（専用・パイプライン・汎用）は文に入れず、校正の偏りで扱う |
+| 読む道具 | `read_memory` ほか | 検索の枠に入ったもの（今と同じく専用の枠を取り合う） | 今の検索の文 |
 | 記憶 | `memory.request` | いつも | 今の `memory.request` の説明 |
 | 仕事 | `t<n>.check`・`t<n>.amend`・`t<n>.cancel` | `## State` に仕事がある（amend・cancel は進行中だけ） | 「〈仕事の題〉の様子・結果を確かめる」「〈題〉の内容を直す」「〈題〉を取りやめる」 |
 | 訂正 | `t<n>.redirect:<担当 id>` | 直前の回（同じ会話、5分以内）に引き渡した仕事が1件あり、その回の予測集合にほかの担当があるとき、その担当ごと（最大2件） | 「直前の依頼「〈元の発言、60字〉」を、〈元の担当〉ではなく〈別の担当〉でやり直す」 |
 | 確認・質問 | `c<n>.approve`・`c<n>.decline`・`t<n>.answer` | 確認待ち・質問待ちがある | 「〈確認の文〉に、はいと答える」「…に、いいえと答える」「〈質問〉に答える」 |
 
-今の候補数: 会話1＋担当26＋読む道具5＋記憶1＋仕事 0〜6＋訂正 0〜2＋確認 0〜3 ＝ 33〜44件。
+候補数: 検索の枠 最大18＋会話1＋記憶1＋使っている担当 0〜2＋仕事 0〜6＋訂正 0〜2＋確認 0〜3 ＝ 20〜33件。担当が百件に増えても変わらない。今の有効な担当・読む道具・ホストの操作の文は [criteria の一覧](assets/router-criteria-2026-11-01.json)（33件＋動的な候補の例7件）。
+
+枠の大きさ（専用10・パイプライン4・汎用4）は目安で、評価データで「正解が Router の候補に入る割合（検索の Recall@枠）≥ 99%」になる最小の値に決める。今の記録では、正解（モデルの選択）が上位4件に入らなかった回は171回中2回。
 
 Router への要求の実物の形（今の意図判定と同じ `larm.system-one.v1` の choice。説明文は例で、実際は担当の登録データから作る）:
 
@@ -236,26 +241,44 @@ Router への要求の実物の形（今の意図判定と同じ `larm.system-on
 | 5 | 1位が `c<n>.approve` | p1 ≥ τ承認（τ採用より高い）のときだけ承認。足りなければもう一度確認の文 | 今の決まった文 |
 | 6 | 1位が `t<n>.cancel`・`t<n>.redirect` | p1 ≥ τ採用 のときだけ実行。足りなければ「〈題〉を取りやめますか？」と確認 | `say` の代わりの決まった文 |
 | 7 | 1位が会話で、2位の担当が τ低 以上 | 会話の回（作業を約束しない）。記録に「迷い」を残す | 会話の回の返事 |
-| 8 | p1 < τ低（どれも低い） | 上位3件＋会話＋聞き返しで、今の選ぶ呼出し（fallback）。切れたら会話の回 | 選ぶ呼出しの結果のとおり |
-| 9 | Router の失敗（時間切れ・接続） | 今の経路（Ruri → 検索 → 選ぶ呼出し）。R4 以降は検索の1位を使わず fallback の選ぶ呼出し | — |
+| 8 | p1 < τ低（どれも低い） | 上位2件に会話があれば会話の回。なければホストの聞き返し。答えで決まった担当は訂正の記憶の正解になる（§5.2） | 「「〈1位〉」と「〈2位〉」のどちらに頼みますか？」 |
+| 9 | 2件以上の担当が、独立の点数（Router の `scores`。なければ検索の類似度）で τ多 以上、全体をこなすパイプラインが候補にない（混合の依頼） | 1位に頼み、残りの作業はまだ頼んでいないと伝える（今の選ぶ呼出しの決まり3と同じ） | 「「〈担当〉」に頼みます。ほかの作業はまだ頼んでいません。」 |
+| 10 | Router の失敗（時間切れ・接続） | 会話の回（作業を約束しない）。R2 の受入までは、設定で今の経路（Ruri → 検索 → 選ぶ呼出し）に戻せる | 会話の回の返事 |
 
-τ・δ は評価データの calibration で決め、設定（SQLite）に保存する。初期の目安は τ採用 0.6、τ低 0.3、δ 0.15、τ承認 0.85（目安で、測る前の値）。
+LLM に選ばせる行はない。τ・δ は評価データの calibration で決め、設定（SQLite）に保存する。初期の目安は τ採用 0.6、τ低 0.3、δ 0.15、τ承認 0.85、τ多 0.5（目安で、測る前の値）。
 
 ### 3.4 頼み方の欄を書く場所
 
 選ぶことと書くことを分ける。Router は書かない。
 
+欄は Router の2回目の呼出し（選んだ担当に欄があるときだけ）で埋める。列挙の欄は `system-one` の choice、自由な文の欄は LARM の抽出（`extract`。依頼プロンプトで依頼）。
+
 | 実行の種類 | 今（選ぶ呼出しが書く） | 新 |
 | --- | --- | --- |
 | research・command・task・音楽・画像・描画 | `say`・`request`・`refs` | `request` は利用者の言葉（聞き返しの答えは元の依頼とつなぐ。前の発言を `## Earlier` として担当へ渡す）。原文は今の `originalRequest`。`say` はホストの文（§3.3）。提示中の資源は一覧を担当へ渡し、担当が使うものを選ぶ |
-| session（作品を持つ担当） | `say`・`request`・`target` | 保存済みの作品がない担当は `target` なし。作品がある担当は「欄を埋める呼出し」で `target`（`new` か作品）だけを書く |
-| instant（天気・株価） | `inputs` | 欄を埋める呼出し（その担当の欄の schema 1つだけ。候補を比べない） |
-| pipeline | `say`・`inputs` | 欄を埋める呼出し |
-| read | `inputs` | 欄を埋める呼出し |
-| `memory.request` | `kind`・`what`・`detail` | 欄を埋める呼出し |
+| session（作品を持つ担当） | `say`・`request`・`target` | 保存済みの作品がない担当は `target` なし。作品がある担当は、2回目の呼出しの choice（`new` か作品の `a<n>`、説明は作品の名前）で `target` を決める |
+| instant（天気・株価） | `inputs` | 列挙の欄（天気の `day`）は choice、自由な文の欄（`place`・`prefecture`・`query`）は抽出 |
+| pipeline | `say`・`inputs` | 同上（欄の schema のとおり） |
+| read | `inputs` | 同上 |
+| `memory.request` | `kind`・`what`・`detail` | `kind` は choice、`what`・`detail` は抽出 |
 | `t<n>.amend`・`t<n>.answer` | `text` | 利用者の言葉をそのまま |
 
-欄を埋める呼出しは今の `choiceSchema` を「候補1件・`none`・`ask` だけ」にした形で、新しい仕組みを作らない。比べる相手がないので考える分は短くなる見込みだが、測っていない（§7 で測る）。
+LARM の抽出ができるまでの間だけ、自由な文の欄がある担当で、今の `choiceSchema` を「候補1件・`none`・`ask` だけ」にした「欄を埋める呼出し」（会話の LLM）を使う。抽出ができたら消す。
+
+2回目の呼出しの実物の形（天気。値は例）:
+
+```json
+{
+  "model": "<claim の model>",
+  "state": { "previous_agent": "", "previous_user": "", "text": "明日の鎌倉の天気を教えて" },
+  "questions": {
+    "day": { "type": "choice", "instructions": "いつの天気か", "criteria": { "today": "今日", "tomorrow": "明日", "day_after": "明後日" } },
+    "fields": { "type": "extract", "instructions": "天気を調べる場所", "schema": {
+      "type": "object", "required": ["place", "prefecture"],
+      "properties": { "place": { "type": "string", "description": "言われた地名" }, "prefecture": { "type": "string", "description": "その地名の都道府県" } } } }
+  }
+}
+```
 
 ### 3.5 担当の選択と実行の許可を分ける
 
@@ -283,22 +306,22 @@ Ruri を消しても、LARM の `system-one` は表情・声色の判定（deliv
 | 条件 | 起きること | 対処 |
 | --- | --- | --- |
 | 評価データが集まらない（人手の正解が 300件未満） | 会話の候補を学習できず、R4 に進めない | R3 で止める（Ruri を残す）。それでも段2の 45 秒は解消する |
-| 担当が百件を超え、全件の採点の P95 が 1 秒を超える | 体感の遅れ | 同じ口に Embedding の絞込み（上位30件＋会話・仕事・使った担当）を足す（B） |
+| 検索の枠に正解が入らない（担当が増え、文の似た担当が枠を取り合う） | Router が正解を採点できない | 検索の Recall@枠 を到達性の確認（§3.8）で毎回測り、下がったら枠を広げる。Router の入力の数（今 20〜33件）は §4.4 の時間の範囲で広げられる |
 | 担当の説明文が似ている（作曲と再生のように文が近い） | Reranker も区別できない | 登録時の到達性の確認（§3.8）で登録を止め、文を直す |
 | 訂正の記憶が古い担当に固定される | 新しい担当が選ばれない | 担当の追加時の再評価（§5.6） |
 | パイプラインが公開され、単独の担当と競う | 「依頼の全体をこなすなら先に」の規則を Reranker は知らない | パイプラインを公開する前に、複数工程の依頼を評価データに入れて学習する |
-| LARM の Router が落ちる | 依頼が振り分けられない | #9 の今の経路 |
+| LARM の Router が落ちる | 依頼が振り分けられない | 決定表 #10（会話の回）。R2 の受入までは設定で今の経路に戻せる |
 
 ### 3.8 到達できない担当を作らない
 
 | 仕組み | 中身 |
 | --- | --- |
-| 全件の採点 | 有効な担当はすべて採点される。検索の枠で切られて候補に出ないことがない |
-| 登録時の到達性の確認 | `toolchain:bundle check` と検索の確認 API に Router の確認を足す。担当ごとに、登録の `examples` と評価データの正例がその担当を1位か予測集合に入れる割合（Recall@1・Recall@集合）を出す。新しい担当の登録で、ほかの担当の Recall@1 が評価データで 2 ポイント以上下がれば登録を断る |
+| 広い枠 | 検索の枠を種類ごとに広げ（専用10・パイプライン4・汎用4）、1位との差では切らない。パイプライン・汎用の担当は、専用の担当に押し出されずに Router に届く |
+| 登録時の到達性の確認 | `toolchain:bundle check` と検索の確認 API に Router の確認を足す。担当ごとに、登録の `examples` と評価データの正例が、検索の枠に入る割合（Recall@枠）と、Router の1位か予測集合に入る割合（Recall@1・Recall@集合）を分けて出す。新しい担当の登録で、ほかの担当の Recall@1 が評価データで 2 ポイント以上下がれば登録を断る |
 | 汎用の担当への集中 | 種類ごとの偏り（校正の `b汎用`）で汎用を下げる。担当ごとの選ばれた割合を、評価データの正解の割合と比べて記録する |
 | 新しい担当（正解例 0件） | 説明文と `examples` だけで採点する（学習は id ではなく文で行う）。leave-one-out（§7.4）で、学習に入っていない担当の Recall@1 を測る |
 | 繰り返す誤選択 | 同じ（誤った担当、正しい担当）の組が2回を超えたら、確認の一覧に出す（担当の文の直し・再学習の材料） |
-| fallback へ送る条件 | 決定表 #8（どれも低い）だけ。上位の並び（#3）は fallback に送らない |
+| 決めきれないとき | 決定表 #8（どれも低い）でホストが上位2件を聞き返す。LLM には送らない。上位の並び（#3）は1位に頼む |
 
 ## 4 モデル選定
 
@@ -384,7 +407,7 @@ Ruri を消しても、LARM の `system-one` は表情・声色の判定（deliv
 | --- | --- | --- | --- |
 | `t<n>.redirect:<担当>` が実行された | 直前の回の引き渡し・同じ会話・5分以内 | 誤選択 | 訂正の記憶（誤り・正解）＋学習の正例・負例 |
 | `t<n>.cancel` の後、次の回で別の担当に渡った | 同じ会話・取消から2分以内・元の依頼文を引き継いだ | 誤選択の見込み | 学習の候補（人の確認の後に正例）。訂正の記憶には入れない |
-| 聞き返し（決定表 #4・#6・fallback の `ask`）への答えで担当が決まった | 聞き返しの記録 | 曖昧さの解消 | 訂正の記憶（正解だけ）＋学習の正例 |
+| 聞き返し（決定表 #4・#6・#8）への答えで担当が決まった | 聞き返しの記録 | 曖昧さの解消 | 訂正の記憶（正解だけ）＋学習の正例 |
 | 画面の「担当を変える」（予測集合の2・3位から選ぶ） | 利用者の操作 | 誤選択 | 訂正の記憶＋学習 |
 | 人のレビュー（`router-review`） | レビューの記録 | 正解 | 学習（評価データ） |
 | `outcome: failed` | — | 担当の実行の失敗。選択の誤りではない | 使わない。担当の失敗率として別に数える |
@@ -507,16 +530,16 @@ type RouteCandidate =
 /** The LARM router's answer (a system-one choice): a probability for every criterion sent, by its name. */
 type RouteAnswer = {
 	choice: string;
-	probabilities: Record<string, number>;
+	probabilities: Record<string, number>; // sums to 1 over the criteria sent
+	scores?: Record<string, number>;       // independent 0..1 per criterion, when the model gives them (mixed requests)
 	revision: string; // routing.head_revision
 	model: string;
 };
 
 type RouteDecision =
-	| { row: 1 | 7; to: "conversation" }
-	| { row: 2 | 3 | 4 | 5 | 6; to: RouteCandidate; announce: "fixed" | "confirm" }
-	| { row: 8; to: "choice"; shortlist: RouteCandidate[] }
-	| { row: 9; to: "legacy" };
+	| { row: 1 | 7 | 10; to: "conversation" }
+	| { row: 2 | 3 | 4 | 5 | 6 | 9; to: RouteCandidate; announce: "fixed" | "confirm" | "partial" }
+	| { row: 8; to: "ask"; options: [RouteCandidate, RouteCandidate] };
 
 /** What the selection record keeps of the router (no utterance text). */
 type RouterTrace = {
@@ -533,7 +556,8 @@ type RouterTrace = {
 ```ts
 async function routeTurn(turn: Turn): Promise<Step> {
 	if (turn.session || turn.pinned) return "direct"; // the host knows where it goes
-	const candidates = routeCandidates(turn);          // §3.2
+	const found = await findToolchains(turn);          // today's search, Router-sized slots (§3.1)
+	const candidates = routeCandidates(turn, found);   // §3.2: found + always-included
 	const state = routerState(turn);                   // §3.2 literal form
 	const [answer, near] = await Promise.all([
 		turn.deps.inference.route(
@@ -543,15 +567,14 @@ async function routeTurn(turn: Turn): Promise<Step> {
 		),
 		turn.deps.feedback.near(state.text, turn.signal), // embedding k-NN, θ cut
 	]).catch(() => [undefined, []]);
-	if (!answer) return legacyRequestTurn(turn);        // row 9
+	if (!answer) return "talk";                         // row 10
 	const p = calibrate(answer.probabilities, candidates, correction(near, candidates)); // §5.4
-	const decision = decide(p, candidates, turn.settings.router);                       // §3.3
+	const decision = decide(p, answer.scores ?? found.similarities, candidates, turn.settings.router); // §3.3
 	recordTrace(turn, decision, p, answer.revision);
 	switch (decision.to) {
 		case "conversation": return "talk";
-		case "choice": return requestTurn(turn, decision.shortlist); // today's choice call, 3 candidates
-		case "legacy": return legacyRequestTurn(turn);
-		default: return carryOutRouted(turn, decision);  // fill call if the candidate needs inputs
+		case "ask": return askBetween(turn, decision.options); // host's fixed question, no LLM
+		default: return carryOutRouted(turn, decision);  // second router call for the inputs, if any
 	}
 }
 ```
@@ -561,11 +584,11 @@ async function routeTurn(turn: Turn): Promise<Step> {
 | ファイル | 変更 | 段階 |
 | --- | --- | --- |
 | `dialogue/service/routed-turn.ts` | `runRoutedTurn` の振り分けを `routeTurn` に替える。Ruri の判定は R4 で消す | R2・R4 |
-| `dialogue/service/routed-steps.ts` | `requestTurn` は fallback（上位3件）と欄を埋める呼出しの入口にする。`pendingTurn` は Router の候補（確認・質問）に吸収 | R2・R3 |
-| `dialogue/service/routed-choice.ts` | `choiceSchema` に候補の絞込み（1件・3件）。多候補の枝は fallback だけで使う | R2 |
-| `dialogue/contexts/local/choice.context.toml` | 優先順位の決まり（パイプラインを先に、汎用は最後に、1位を選ぶ）を消す。校正の偏りと学習へ移す | R4 |
-| `dialogue/service/executor-search.ts` | `find` は Router の候補作りと記録に置き換える（担当探しの段として残る） | R2 |
-| `capabilities/service/toolchains.ts` | `slotted`・`CANDIDATE_SLOTS` を消す。担当の Router の文（`routerPassage`）を足す。Embedding の索引は残す | R4 |
+| `dialogue/service/routed-steps.ts` | `requestTurn` の選ぶ呼出しを消し、Router の決定の実行（`carryOutRouted`）とホストの聞き返しにする。`pendingTurn` は Router の候補（確認・質問）に吸収 | R2・R3 |
+| `dialogue/service/routed-choice.ts` | 多候補の選ぶ呼出し（`choiceMessages`・`choiceSchema` の多候補の枝・`parseChoice`・選び直し）を消す。LARM の抽出ができるまで、1候補の欄を埋める呼出しだけ残し、抽出ができたら消す | R2・R5 |
+| `dialogue/contexts/local/choice.context.toml` | 消す（選ぶ呼出しがなくなる）。優先順位の決まり（パイプラインを先に、汎用は最後に）は、校正の偏りと学習データへ移す | R2 |
+| `dialogue/service/executor-search.ts` | `find` は残す（担当探しの段）。結果を Router の候補作りへ渡す | R2 |
+| `capabilities/service/toolchains.ts` | `slotted`・種類ごとの枠は残す。Router 向けの枠の大きさ（専用10・パイプライン4・汎用4、差で切らない）を足す。担当の Router の文（`routerPassage`）を足す | R2 |
 | `toolchain-history/service/selections.ts` | `similarSelectionsInTransaction`（0.8 の線）と `fromHistory` を、訂正の記憶の近傍に替える。`router_json` の欄 | R3 |
 | `dialogue/service/intent-gate.ts`、`settings` の `intent`、`dialogue_intent_judgments` の書込み | 消す（R4 の条件を満たしたとき）。表の行を消すかは利用者が決める | R4 |
 | `inference`・`larm` | `route` の口（`system-one` の choice、呼出しごとの criteria）。Router の profile を設定（SQLite）に保存 | R1 |
@@ -573,7 +596,7 @@ async function routeTurn(turn: Turn): Promise<Step> {
 
 ## 7 実用性を確かめる PoC
 
-製品の経路に入れず、評価専用の script（[判断モデルのベンチマーク](decision-model-benchmark-design.md) と同じ作り）で測る。LARM での測定は利用者の合図の後。
+製品の経路に入れずに測る。モデルの実行・速度・学習は LARM 側（[依頼プロンプト](larm-router-request-prompt-2026-11-01.md)）、評価データの作成と、LARM が返した予測の記録からの精度の集計は Eumenes 側（[判断モデルのベンチマーク](decision-model-benchmark-design.md) と同じく、モデルを呼ばずに再集計できる形）。測定は利用者の合図の後。
 
 ### 7.1 評価データ
 
@@ -608,7 +631,8 @@ split は会話（`group`）の単位で train・calibration・test に分け、
 | 担当ごとの Recall | 担当ごとの Top-1。最小値を必ず出す |
 | False Dispatch Rate | 正解が会話の発言のうち、担当・操作に渡した割合 |
 | 見逃し率 | 正解が担当・操作の発言のうち、会話の回にした割合 |
-| 不要な fallback 率 | fallback（#8）に送った回のうち、Router の1位が正解だった割合 |
+| 不要な聞き返しの率 | 聞き返し（#8）にした回のうち、Router の1位が正解だった割合 |
+| 検索の Recall@枠 | 正解が検索の枠（Router の候補）に入る割合。担当の種類ごとにも出す |
 | 選択の時間 | Router の往復と採点の P50・P95（warmup 10回の後）。段2を含む回の合計も |
 | 訂正からの回復率 | 訂正を1件入れた後、同じ・言い換えの発言（評価データの対の片方）が正しく振り分けられる割合 |
 | 訂正の副作用 | 訂正を入れる前後で、test の無関係な発言の決定が変わった割合 |
@@ -632,8 +656,8 @@ split は会話（`group`）の単位で train・calibration・test に分け、
 | # | すること | 合否の基準 |
 | --- | --- | --- |
 | 1 | 評価データ 400件以上を作り、利用者が正解を確認する | 区分ごとの件数を満たす |
-| 2 | 基準0・基準1・学習なしの C（xsmall-v2・ruri-v3-reranker-310m）・D（d1-2B）の精度を、評価専用の process で測る（製品の LARM を呼ばない） | C か D の Top-1 が基準1 より 10 ポイント以上高ければ次へ。D は雑談の誤起動率・見逃し率も R と比べる |
-| 3 | AI MAX+ 395 の CPU（評価専用の process）で、残った方式の速度と資源を測る。会話 LLM を動かしたまま測る。D は前置きの再利用の有無を分ける | 全件の採点の P95 ≤ 1.5 s、会話の token/s の低下 ≤ 5% |
+| 2 | 基準0・基準1・学習なしの C（xsmall-v2・ruri-v3-reranker-310m）・D（d1-2B）の精度を、LARM の評価用の process で測る（製品の Router の profile を使わない） | C か D の Top-1 が基準1 より 10 ポイント以上高ければ次へ。D は雑談の誤起動率・見逃し率も R と比べる |
+| 3 | AI MAX+ 395 の CPU（LARM の評価用の process）で、残った方式の速度と資源を測る。会話 LLM を動かしたまま測る。D は前置きの再利用の有無を分ける | 候補 40件の採点の P95 ≤ 1.5 s、会話の token/s の低下 ≤ 5% |
 | 4 | C なら train で学習し、どちらも calibration で T・b・τ・δ を決め、test で測る | 誤起動率・見逃し率が R 以下、Top-1 が A 以上（A は測れた場合） |
 | 5 | 訂正の回復率・副作用・leave-one-out を測る | 回復率 ≥ 90%、副作用 ≤ 1%、cold start の Recall@1 ≥ 70% |
 
@@ -643,10 +667,10 @@ split は会話（`group`）の単位で train・calibration・test に分け、
 | --- | --- | --- | --- |
 | R0 | 評価データの書き出しと正解付け。`docs/toolchain.md` の食い違いを直す。PoC（§7.4 の1〜3） | §7.4 の2・3 | C が基準1 より良くならない → この設計を止め、A の最適化に戻る |
 | R1 | LARM に Router の profile（`system-one`、呼出しごとの criteria。中は §7 で選んだモデル）を足し、Eumenes の `route` の口を作る。今の経路のまま shadow で採点し、`router_json` に記録する | shadow の失敗率 < 1%、P95 ≤ 1 s、回の時間が増えない | 回の時間が増える・失敗が多い → shadow を切る（設定） |
-| R2 | 依頼の回で Router が決める（決定表 #2〜#9）。Ruri はそのまま。頼み方の欄を担当側へ（§3.4）。fallback は上位3件の選ぶ呼出し | 評価データで Top-1 が A 以上、依頼の回の時間の中央値 ≤ 3 s（欄を埋める呼出しのない担当）、fallback 率 ≤ 15% | 実会話で誤選択の訂正が週あたり R1 の shadow の予測より多い → 依頼の回を今の選ぶ呼出しへ戻す（設定） |
+| R2 | 依頼の回で Router が決める（決定表 #2〜#10）。検索は Router 向けの枠で残す。Ruri はそのまま。頼み方の欄を担当側へ（§3.4）。LLM の選ぶ呼出しを消す（自由な文の欄を埋める1候補の呼出しは抽出ができるまで残す） | 評価データで Top-1 が A 以上、依頼の回の時間の中央値 ≤ 3 s（欄のない担当）、聞き返し（#8）の率 ≤ 10% | 実会話で誤選択の訂正が週あたり R1 の shadow の予測より多い → 依頼の回を今の選ぶ呼出しへ戻す（設定） |
 | R3 | 訂正の記憶、`t<n>.redirect`、画面の「担当を変える」、確認・質問を Router の候補へ。Ruri の `chat` を特徴に | 訂正の回復率 ≥ 90%、副作用 ≤ 1% | 副作用が出る → 補正を切る（β=0）。記憶の行は残す |
-| R4 | 会話の候補を学習した版で、Ruri なしの判定を測る。劣らなければ意図判定の口・設定・枠・`similarSelections`・選ぶ呼出しの system の優先順位を消す | §3.6 の「劣らない」 | 劣る → Ruri を特徴として残す（R3 の形で止める） |
-| R5 | 再学習の流れ（§5.7）を回す。担当の登録に到達性の確認 | 版ごとの評価が採用の条件を満たす | 版を戻す |
+| R4 | 会話の候補を学習した版で、Ruri なしの判定を測る。劣らなければ意図判定の口・設定・`similarSelections` を消す | §3.6 の「劣らない」 | 劣る → Ruri を特徴として残す（R3 の形で止める） |
+| R5 | 再学習の流れ（§5.7）を回す。担当の登録に到達性の確認。LARM の抽出ができたら、欄を埋める呼出しを消す（ルーティングでの会話の LLM の呼出しが 0 になる） | 版ごとの評価が採用の条件を満たす。抽出は評価データの欄の一致率が欄を埋める呼出し以上 | 版を戻す |
 
 各段で、設定で戻せる切替（`router.mode`: `off`・`shadow`・`request`・`unified`）を SQLite に置き、R4 の後に `off`・`shadow` の分岐を消す。
 
@@ -679,3 +703,73 @@ split は会話（`group`）の単位で train・calibration・test に分け、
 | onnxruntime-node と Bun | https://github.com/microsoft/onnxruntime/blob/main/js/node/README.md 、https://github.com/oven-sh/bun/issues/30286 、https://github.com/oven-sh/bun/pull/30291 |
 | ONNX Runtime の ROCm・MIGraphX・Vitis AI | https://onnxruntime.ai/docs/execution-providers/ROCm-ExecutionProvider.html 、https://rocm.docs.amd.com/en/latest/about/release-notes.html 、https://github.com/blakeblackshear/frigate/discussions/24245 、https://ryzenai.docs.amd.com/en/latest/linux.html |
 | CrossEncoder の CPU の値 | https://qdrant.tech/blog/oxidizing-cross-encoders/ 、https://sbert.net/docs/cross_encoder/usage/efficiency.html |
+
+## 11 決めたこと（2026-11-01 利用者回答）
+
+利用者回答:「1.検索もう要らなくなりそうですか？ 2.よく分からないけど試してみていい。3.追加学習していい。4.その方針でいい。5.はい。トークン消費が多いのでなくしたいです。6.はい。その方針でいい。7.消しません。むしろ増える想定です。検索は残すべきかな、複雑な複数のタスクの混合は検索しか拾えなそう。8.このPCやレポジトリでは採用しません。LARMで実行して使います。」
+
+| # | こと | 決め |
+| --- | --- | --- |
+| 1・7 | 検索 | 残す。検索と候補の種類の枠（専用・パイプライン・汎用）は消さず、担当・パイプライン・汎用の担当が増える前提にする。枠を Router の入力に合わせて広げ（専用10・パイプライン4・汎用4、1位との差で切らない）、大きさは評価データの Recall@枠 で決める。混合の依頼の複数の担当は、担当ごとに独立の点数を持つ検索（と Router の `scores`）で拾う |
+| 2 | 判断モデルと CrossEncoder | 両方を試す。d1-2B を先に、次に CrossEncoder（§4.2） |
+| 3 | 追加学習 | してよい（§5.7） |
+| 4 | 即時の訂正 | 訂正の記憶（明示の訂正だけ、近傍に上限付きの補正）と、重みのまとめての学習（§5） |
+| 5 | LLM の選択 | なくす。点数の低い回の fallback も LLM に選ばせない（決定表 #8 はホストの聞き返し）。欄は LARM の choice と抽出で埋め、抽出ができるまでの間だけ1候補の欄埋めを残す |
+| 6 | 全体の形 | 発言 → 検索 → Router 1回 → 決定表 → 会話の回か今の引き渡し |
+| 8 | モデルの実行場所 | LARM で動かす。Eumenes は `system-one` の口で呼ぶだけで、モデル・ONNX Runtime・学習の仕組みを持たない |
+
+## 12 実施記録（2026-11-01〜02）
+
+利用者の指示（2026-11-01）「私は寝ますが、やれる所までやってください」。サーバーの起動・停止・再起動、LARM での計測、コミットはしていない。
+
+### 12.1 したこと
+
+| 段 | 中身 | 状態 |
+| --- | --- | --- |
+| R0 | 評価データの元の書き出し（製品 DB を読み取り専用で読み、408回・58会話。`data/router-eval/2026-11-01-snapshot/`、Git 管理外。正解欄は空、当時の予測は別ファイル、付け方は同じ場所の README）。`docs/toolchain.md` の候補の提示（RRF の記述）を実装に合わせた | 済み。正解付けは利用者 |
+| R1 | LARM の Router の口（`route`・`routeFields`、`system-one`、呼出しごとの criteria、応答の厳密な検査）、inference の Router の接続（保存した `router.profile` の自分の接続）、設定 `router`（API・CLI）、記録 `router_traces`、`shadow` | 実装済み・fixture 検証済み。LARM の Router の profile は LARM 側で作業中 |
+| R2 | `on`: 検索（Router 用の枠）→ Router 1回 → 決定表 → 今の引き渡し。LLM の選ぶ呼出しを使わない。欄は Router の2回目（choice・抽出）、抽出できないときだけ1候補の欄埋め | 実装済み・fixture 検証済み。既定は `off` |
+| R3 | 訂正の記憶（`router_feedback`、近傍の補正、衝突の扱い、レビュー API）、やり直し（`t<n>.redirect`）、聞き返しへの答え、確認・質問・切替待ちを Router の候補に | 実装済み（画面の「担当を変える」と、Ruri の `chat` を特徴にする部分は未実装） |
+| PoC の道具 | `scripts/router-bench/score.ts`（LARM が返した予測を、製品と同じ判定で採点） | 実装済み |
+
+### 12.2 設計から変えたこと・決めたこと
+
+| 項目 | 決め | 理由 |
+| --- | --- | --- |
+| 決定表 #1 の τ会話 | `accept` を使う（専用の設定項目を足さない） | 線を増やさない |
+| 決定表 #8 | 上位2件がどちらも担当・読む道具のときだけ聞き返す。仕事・確認が上位なら会話の回 | 仕事・確認の2択の聞き返しは意味が通らない |
+| 決定表 #9 | LARM が `scores` を返したときだけ。検索の類似度で代用しない | 今の embedding の類似度は 0.7〜0.9 に詰まっていて、どの線でもほぼ全部が「混合」になる |
+| 記憶・訂正・取りやめ・答え | `accept` 以上かつ差 `margin` 以上でないときは会話の回（約束しない）。確認は `low` 以上で読む | 状態を変える操作は確かなときだけ |
+| 聞き直し（#5・#6 で線に届かない） | 尋ねた候補を記録し、次の回（5分以内）でその候補は `low` で採る。やり直しの聞き直しは「〜でやり直しますか？」 | 利用者に明示して尋ねた後の答え |
+| やり直しの順 | 欄・確認を先に済ませ、確認が要る担当なら元の仕事を続けたまま確認を出す。要らなければ取りやめてから引き渡し、引き渡しに失敗したらそれを伝える | 元の仕事だけが消える状態を作らない |
+| 依頼文 | 利用者の言葉の後ろに、前の発言を添える（TOML の区切り付き）。TODO の題と確認の文は利用者の言葉だけ（確認待ちに `words` 列、migration `dialogue/0032-confirmation-words`） | 題と確認の文に添えた文脈や区切りを入れない。`off` の題は変えない |
+| 提示中の資源 | 欄埋めのない引き渡しで、`## State` の資源を新しい順に8件まで `refs` で渡す | 指示語の依頼に資源が届く |
+| 切替待ち | 候補 `switch.discard`（`approve` 以上で `resolveUnsaved: discard` の引き渡し） | 選ぶ呼出しがしていたことを Router の候補にした |
+| 訂正の衝突 | 衝突した行を `conflict` にして使わず、補正なしで決める（#8 へは送らない） | 一覧で利用者が直す。回は止めない |
+| 候補の限界 | 説明は300字を超えたら外し、仕事の候補は新しい6件、全体128件を超えたら動的な候補から落とす。外した数はログ | 1件の超過で Router 全体が失敗しない |
+| 抽出の拒否 | 同じ model には10分間 `routeFields` を呼ばず欄埋めへ | 拒否のたびに1往復しない |
+| 記録と忘却 | 記録・訂正は、文を作ったすべての発言の id を持ち、どれを忘れても消える（`message_ids_json`） | まとめた発言・聞き返した依頼の本文も消す |
+| 校正 | 種類ごとの偏り `b_kind` と温度 `T` は持たず、LARM の版ごとの校正に任せる。Eumenes は訂正の補正だけ（§5.4 の `b_kind`・`T` は LARM 側） | 線を Eumenes と LARM の二重に持たない |
+| LARM のエラーの形 | `unsupported_question_type` は LARM の既存の形（`error.code`）だけを読む。依頼プロンプトに明記 | 共通のエラー読取り（`providerError`）を変えると、ほかの LARM 呼出しに効く |
+| shadow の待ち | 選ぶ呼出しが先に終わった回は、Router の応答を `timeoutMs`（既定2秒）まで待つ | 受け入れる。LARM の選ぶ呼出しはこれより長い |
+
+### 12.3 検証（fixture。live・実機は未実施）
+
+| 検証 | 結果 |
+| --- | --- |
+| `bun run verify -- --domain dialogue --domain inference --domain larm --domain settings --domain toolchain-history --domain capabilities` | pass（Bun 1,675件、Web 32件）。選択の外の `docs/domains.md` の不一致1件は以前から |
+| `bun test ./api/application` | 995件成功、5件失敗。失敗は以前からの5件（`toolchain.test.ts` の3件、`fixed-names.test.ts` の2件は画像のモデル選択のコミット f1a77e19 の bundle と `docs/images.md`・`docs/larm.md` の既存の行） |
+| `bun test scripts/router-bench scripts/context-eval api/domains/voice-dialogue` | 164件成功 |
+| 型検査・整形・未使用の export | エラー0件。未使用の export の報告は以前からのものだけ |
+| migration | 製品 DB の複製（読み取り専用で複製）に `toolchain-history/0005-router` と `dialogue/0032-confirmation-words` が当たり、起動できることを確かめた。複製は削除 |
+| 独立したレビュー | 高0・中7・低12。中はすべて直した。低は12件中11件を直し、shadow の待ちは受け入れた（§12.2） |
+
+### 12.4 残り
+
+| こと | 状態 |
+| --- | --- |
+| LARM の Router の profile（`system-one`、呼出しごとの criteria、`scores`・`extract`） | LARM 側で作業中。できたら `bun run cli -- router set profile <profile>` → `router set mode shadow` |
+| 評価データの正解付け | 利用者（`data/router-eval/2026-11-01-snapshot/README.md`） |
+| PoC の計測（§7.4） | 利用者の合図の後 |
+| 画面の「担当を変える」（訂正の `ui_pick`）、Ruri の `chat` を特徴にする（R3）、Ruri の意図判定と選ぶ呼出しの削除（R4）、再学習の流れ（R5） | 未実装 |
+| 反映 | 利用者の再起動で新しいコードと migration 2件が当たる。既定は `router.mode: off` で、動きは今と同じ |

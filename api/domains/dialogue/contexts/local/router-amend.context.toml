@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/routed-route.ts
+text = '''「[[title]]」の仕事の内容を直す。'''
+
+[variables.title]
+type = "string"
+trust = "untrusted"
+placement = "delimited-context"
+encoding = "delimited-text"

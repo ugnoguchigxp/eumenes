@@ -1,0 +1,8 @@
+# Source: api/domains/dialogue/service/routed-route.ts
+text = '''利用者の発言から、「[[title]]」に必要な値を取り出してください。発言に無い値は null にします。'''
+
+[variables.title]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

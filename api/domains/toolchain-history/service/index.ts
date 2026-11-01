@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { recipeProposal } from "../contracts";
 import { createRecipes, recipe } from "./recipes";
+import { createRouter } from "./router";
 import { createSelections, selection } from "./selections";
 import { createHistoryPages } from "./record-pages";
 
@@ -15,6 +16,7 @@ export function createToolchainHistory(
 	now: () => number = Date.now,
 ) {
 	const selections = createSelections(store, now);
+	const router = createRouter(store, now);
 	const recipes = createRecipes(store, now, selections.queryOfRunInTransaction);
 	/**
 	 * The upkeep of procedures when a sub-agent's report is accepted. A read of an offered URL
@@ -78,6 +80,7 @@ export function createToolchainHistory(
 	return {
 		...selections,
 		...recipes,
+		...router,
 		...createHistoryPages(store, selection, recipe),
 		settleRecipesInTransaction,
 	};

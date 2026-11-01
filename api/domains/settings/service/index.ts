@@ -30,11 +30,14 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	defaultSubtitles,
 	intentPatchSchema,
+	routerPatchSchema,
+	routerThresholdsOrdered,
 	purposeSchema,
 	settingsSchema,
 	type ApplySettings,
 	type Connection,
 	type IntentSettings,
+	type RouterSettings,
 	type Settings,
 } from "../contracts";
 import { persistStoredMigration, read, save } from "../repository";
@@ -295,6 +298,32 @@ export async function createSettings(
 				});
 				save(db, next);
 				return next.intent;
+			});
+			notifyChanged();
+			return saved;
+		},
+		/**
+		 * Changes the router's settings alone (spec toolchain-router-redesign §3.3): the given fields replace the saved
+		 * ones and the document's revision moves on; a null profile removes the saved one.
+		 */
+		async configureRouter(raw: unknown): Promise<RouterSettings> {
+			const patch = routerPatchSchema.safeParse(raw);
+			if (!patch.success) throw new Error("invalid_router_settings");
+			const saved = await store.write((db) => {
+				const current = read(db);
+				const { profile, ...rest } = patch.data;
+				const router = { ...current.router, ...rest };
+				if (profile === null) delete router.profile;
+				else if (profile !== undefined) router.profile = profile;
+				if (!routerThresholdsOrdered(router))
+					throw new Error("invalid_router_settings");
+				const next = settingsSchema.parse({
+					...current,
+					revision: current.revision + 1,
+					router,
+				});
+				save(db, next);
+				return next.router;
 			});
 			notifyChanged();
 			return saved;

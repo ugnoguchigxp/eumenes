@@ -14,6 +14,8 @@ import {
 	diagnosticsSchema,
 	intentPatchSchema,
 	intentSettingsSchema,
+	routerPatchSchema,
+	routerSettingsSchema,
 	settingsSchema,
 	type ApplySettings,
 } from "../api/domains/settings/contracts";
@@ -50,6 +52,16 @@ export function settingsClient(t: Transport) {
 				intentSettingsSchema,
 				"/api/settings/intent",
 				json(intentPatchSchema.parse(input), "PUT"),
+			),
+		/** The router's settings (spec toolchain-router-redesign §3.3). */
+		routerSettings: async () =>
+			callJson(t, routerSettingsSchema, "/api/settings/router"),
+		configureRouter: async (input: z.infer<typeof routerPatchSchema>) =>
+			callJson(
+				t,
+				routerSettingsSchema,
+				"/api/settings/router",
+				json(routerPatchSchema.parse(input), "PATCH"),
 			),
 		applySettings: async (input: ApplySettings) =>
 			callJson(t, settingsSchema, "/api/settings/apply", json(input)),

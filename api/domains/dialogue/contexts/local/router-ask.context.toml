@@ -1,0 +1,14 @@
+# Source: api/domains/dialogue/service/routed-route.ts
+text = '''「[[first]]」と「[[second]]」のどちらに頼みますか？'''
+
+[variables.first]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.second]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

@@ -22,6 +22,8 @@ export type ToolOutcome = {
 	confirmation?: true;
 	/** The work was handed over (the run now waits for it): the generation ends here, without speech of its own. */
 	end?: true;
+	/** A search's cards as it found them, and the vector of its query (what the router scores and corrects by). */
+	search?: { cards: ToolchainCard[]; query?: QueryVector };
 };
 
 /** Executes one call of a fixed tool; throws a `ValidationFailure` for a call the host refuses outright. */
@@ -68,6 +70,8 @@ export type Handover = {
 export type Request = {
 	card: ToolchainCard;
 	request: string;
+	/** The user's own words behind the request, when it carries more than they said. */
+	words?: string;
 	inputs?: Record<string, unknown>;
 	target?: string;
 	resolveUnsaved?: "discard";
@@ -122,7 +126,7 @@ export function createExecutorContext(
 		input.retained.map((entry) => [entry.card.id, entry.card]),
 	);
 	const state: {
-		search: { route: ToolchainRoute; query?: QueryVector } | null;
+		search: { route: ToolchainRoute; query?: QueryVector; text: string } | null;
 		handover: Handover | null;
 		/** The instant toolchain that answered in this generation, with the inputs it was given. */
 		instant: { card: ToolchainCard; inputs: Record<string, unknown> } | null;

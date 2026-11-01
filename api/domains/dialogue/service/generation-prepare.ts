@@ -291,6 +291,8 @@ function routedInputInTransaction(
 		resources: namedResources(input.state),
 		switching:
 			liveSession(tx, input.conversationId)?.pendingSwitch?.toolchainId ?? null,
+		switchTarget:
+			liveSession(tx, input.conversationId)?.pendingSwitch?.targetRef ?? null,
 	};
 }
 

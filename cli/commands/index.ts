@@ -9,6 +9,7 @@ import { run as intent } from "./intent";
 import { run as memory } from "./memory";
 import { run as recentClear } from "./recent";
 import { run as toolchainHistory } from "./toolchain-history";
+import { run as router } from "./router";
 import { run as runCommand } from "./run";
 import { run as send } from "./send";
 import { run as status } from "./status";
@@ -30,6 +31,7 @@ export const commands: Readonly<Record<string, CommandRun>> = {
 	intent,
 	memory,
 	"recent-clear": recentClear,
+	router,
 	run: runCommand,
 	send,
 	status,
