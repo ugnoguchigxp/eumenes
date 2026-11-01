@@ -93,15 +93,60 @@ test("an adopted handover announcement without a final message is spoken once, b
 	expect(history.player.play).not.toHaveBeenCalled();
 });
 
-test("an announcement does not replace a final answer whose message has not arrived", async () => {
+test("a light message sent before the task runs is spoken while the run is still going, and only its new part is spoken when it grows", async () => {
+	const { hook, player } = fixture();
+	const running = {
+		...answer("task").run,
+		status: "running",
+		revision: 1,
+		answerMessageId: null,
+		announcement: "画像を作成します。",
+	} as Run;
+	hook.rerender({ runs: [running], messages: [], enabled: true });
+	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
+	expect(player.play).toHaveBeenCalledWith(
+		"announcement:task:1",
+		"画像を作成します。",
+		"task",
+		{ automatic: true },
+	);
+	hook.rerender({
+		runs: [
+			{ ...running, announcement: "画像を作成します。\n生成しています。" },
+		],
+		messages: [],
+		enabled: true,
+	});
+	await waitFor(() => expect(player.play).toHaveBeenCalledTimes(2));
+	expect(player.play.mock.calls[1]?.[1]).toBe("生成しています。");
+	// The run ends with this announcement as its answer: it is not read a second time.
+	const done = {
+		...running,
+		announcement: "画像を作成します。\n生成しています。",
+		status: "completed",
+		answerMessageId: "answer:task",
+	} as Run;
+	hook.rerender({
+		runs: [done],
+		messages: [
+			{ id: "answer:task", text: "画像を作成します。\n生成しています。" },
+		],
+		enabled: true,
+	});
+	await act(async () => {});
+	expect(player.play).toHaveBeenCalledTimes(2);
+});
+
+test("an announcement is read when it appears and does not replace the final answer that follows", async () => {
 	const { hook, player } = fixture();
 	const adopted = answer("final");
 	const run = { ...adopted.run, announcement: "確認を始めます。" };
 	hook.rerender({ runs: [run], messages: [], enabled: true });
-	expect(player.play).not.toHaveBeenCalled();
-	hook.rerender({ runs: [run], messages: [adopted.message], enabled: true });
 	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
-	expect(player.play.mock.calls[0]?.[1]).toBe(adopted.message.text);
+	expect(player.play.mock.calls[0]?.[1]).toBe("確認を始めます。");
+	hook.rerender({ runs: [run], messages: [adopted.message], enabled: true });
+	await waitFor(() => expect(player.play).toHaveBeenCalledTimes(2));
+	expect(player.play.mock.calls[1]?.[1]).toBe(adopted.message.text);
 });
 
 test("all adopted answer sources use TTS once; existing history and native playback are not repeated", async () => {

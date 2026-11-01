@@ -44,7 +44,12 @@ export function createSpeechClaims({
 		const runKey = /^run:([^:]+):/.exec(sourceKey);
 		if (runKey) {
 			const run = dialogue.get(runKey[1]!);
-			if (!run || run.status !== "completed") return "speech_not_speaker";
+			// A light message (announcement) is read while its run is still going; an answer is read only once adopted.
+			const announcement = sourceKey.startsWith(
+				`run:${runKey[1]}:announcement:`,
+			);
+			if (!run || (!announcement && run.status !== "completed"))
+				return "speech_not_speaker";
 			// A voice turn speaks its own answer in chunks on the screen that holds the microphone.
 			if (
 				run.utteranceId &&

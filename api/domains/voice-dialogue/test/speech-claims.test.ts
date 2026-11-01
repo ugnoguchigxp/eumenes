@@ -123,6 +123,15 @@ test("an automatic speech is claimed once, by the playback screen, and only for 
 			409,
 			{ error: "speech_not_speaker" },
 		]);
+		// A light message is spoken while its run is still going, so it can be claimed then.
+		expect(await claim(PLAYING, "run:running:announcement:1")).toEqual([
+			200,
+			{ claimed: true },
+		]);
+		expect(await claim(PLAYING, "run:running:announcement:1")).toEqual([
+			409,
+			{ error: "speech_already_claimed" },
+		]);
 		expect((await claim(PLAYING, "anything else"))[0]).toBe(400);
 	} finally {
 		await store.close();

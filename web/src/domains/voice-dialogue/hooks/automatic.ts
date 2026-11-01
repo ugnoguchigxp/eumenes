@@ -16,7 +16,8 @@ type Pending = {
 };
 
 /**
- * New adopted answers and new agency utterances share the existing player; live voice turns own
+ * New adopted answers, the light messages sent before a task runs, and new agency utterances share
+ * the existing player; live voice turns own
  * their chunks. Eumenes speaks as one (spec tts-single-lane §4.1–4.3): only the playback screen
  * reads, only the conversation agent or the specialist the conversation is switched to is read, and
  * each one is claimed on the backend first so no other screen reads it too.
@@ -53,6 +54,8 @@ export function useAutomaticSpeech({
 	const { playbackScreen: playback, claim } = screen;
 	const speakerSession = speaker?.state === "active" ? speaker.id : null;
 	const seen = useRef<Set<string> | null>(null);
+	/** The light message (announcement) text already read or passed over, per run. It only grows. */
+	const seenAnnouncements = useRef<Map<string, string> | null>(null);
 	const seenUtterances = useRef<Set<string> | null>(null);
 	const pending = useRef<Pending[]>([]);
 	const epoch = useRef(0);
@@ -75,12 +78,54 @@ export function useAutomaticSpeech({
 			seen.current = new Set(
 				runs.filter((run) => run.status === "completed").map((run) => run.id),
 			);
+			seenAnnouncements.current = new Map(
+				runs.flatMap((run) =>
+					run.announcement ? [[run.id, run.announcement] as const] : [],
+				),
+			);
 			seenUtterances.current = new Set(
 				messages.filter(isAgencyUtterance).map((message) => message.id),
 			);
 			return;
 		}
 		for (const run of runs) {
+			// A light message is read as soon as it appears, while its task is still going; only the part
+			// that is new since the last read is spoken. One that ended in failure is not read after the fact.
+			const announcement = run.announcement;
+			if (announcement) {
+				const read = seenAnnouncements.current!.get(run.id) ?? "";
+				if (announcement !== read) {
+					seenAnnouncements.current!.set(run.id, announcement);
+					const ended =
+						run.status === "failed" ||
+						run.status === "cancelled" ||
+						run.status === "interrupted";
+					if (
+						!ended &&
+						audible &&
+						!ownsSpeech(run.utteranceId) &&
+						!(
+							run.specialistSessionId &&
+							run.specialistSessionId !== speakerSession
+						)
+					) {
+						const fresh = announcement.startsWith(read)
+							? announcement.slice(read.length).replace(/^\n+/, "")
+							: announcement;
+						if (fresh.trim())
+							pending.current.push({
+								id: read
+									? `announcement:${run.id}:${run.revision}:${read.length}`
+									: `announcement:${run.id}:${run.revision}`,
+								text: fresh,
+								runId: run.id,
+								sourceKey: read
+									? `run:${run.id}:announcement:${run.revision}:${read.length}`
+									: `run:${run.id}:announcement:${run.revision}`,
+							});
+					}
+				}
+			}
 			if (run.status !== "completed" || seen.current.has(run.id)) continue;
 			if (
 				!audible ||
@@ -90,24 +135,20 @@ export function useAutomaticSpeech({
 				seen.current.add(run.id);
 				continue;
 			}
-			const message = run.answerMessageId
-				? messages.find((message) => message.id === run.answerMessageId)
-				: run.announcement
-					? {
-							id: `announcement:${run.id}:${run.revision}`,
-							text: run.announcement,
-						}
-					: undefined;
+			if (!run.answerMessageId) continue; // Its light message, if any, is read above.
+			const message = messages.find(
+				(message) => message.id === run.answerMessageId,
+			);
 			if (!message) continue; // The two queries can settle in either order.
 			seen.current.add(run.id);
 			if (!message.text.trim()) continue;
+			// A run that ends with its light message as its answer has already read it.
+			if (announcement && message.text.trim() === announcement.trim()) continue;
 			pending.current.push({
 				id: message.id,
 				text: message.text,
 				runId: run.id,
-				sourceKey: run.answerMessageId
-					? `run:${run.id}:answer`
-					: `run:${run.id}:announcement:${run.revision}`,
+				sourceKey: `run:${run.id}:answer`,
 			});
 		}
 		for (const message of messages) {
