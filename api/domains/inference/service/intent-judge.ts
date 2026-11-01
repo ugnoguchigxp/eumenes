@@ -5,16 +5,22 @@ import {
 	type LarmPort,
 } from "../../larm";
 import type { Settings } from "../../settings";
+import { stableLarmClient } from "./configured-larm";
 import type { InferenceOptions } from "./execute-types";
 
 /**
  * The user-intent judge's own LARM port (the intent gate design, section 3): a connection of the saved intent
  * profile that carries the decision provider alone, held while the judge is in use, and released when the profile,
  * the LARM origin or the mode (`legacy`) changes and when inference closes. It never serves the speaking-attitude
- * judge, and the conversation's port never serves it.
+ * judge, and the conversation's port never serves it. Its client is stable across restarts, so a host that stopped
+ * without releasing gets the same connection back instead of holding a second one.
  */
 export function createIntentJudge(deps: {
-	settings: { get(): Settings; onChange(fn: () => void): () => void };
+	settings: {
+		get(): Settings;
+		onChange(fn: () => void): () => void;
+		derivedKey(purpose: string): Uint8Array | undefined;
+	};
 	options: InferenceOptions;
 }) {
 	let held: { key: string; port: LarmPort } | undefined;
@@ -34,13 +40,22 @@ export function createIntentJudge(deps: {
 	function port(s: Settings, key: string) {
 		if (held?.key !== key) {
 			drop();
+			const client = stableLarmClient(
+				deps.settings.derivedKey("larm.intent-client"),
+				{
+					baseUrl: s.larm.baseUrl,
+					profile: s.intent.profile,
+					audience: s.larm.audience,
+				},
+			);
 			held = {
 				key,
 				port:
-					deps.options.intentLarmFactory?.(s) ??
+					deps.options.intentLarmFactory?.(s, client) ??
 					createLarm({
 						decisionOnly: true,
 						keepAlive: true,
+						client,
 						baseUrl: s.larm.baseUrl ?? undefined,
 						token: deps.options.token,
 						providerHosts: deps.options.providerHosts,

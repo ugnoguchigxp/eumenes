@@ -170,19 +170,27 @@ type TerminatorOptions = {
 
 /**
  * The signal handler. First call: start the shutdown with a hard process-level
- * deadline (exit 1), then exit 0 on success and 1 on any failure. A repeated
- * call while shutting down means the operator insists: exit 130 at once.
+ * deadline (exit 1), then exit 0 on success and 1 on any failure. The same cause
+ * again while shutting down means the operator insists: exit 130 at once. Another
+ * cause joins the shutdown in progress: one Ctrl+C reaches `bun run dev` and the API
+ * in one process group, and the runner's SIGTERM that follows is not a second request.
  */
-export function createTerminator(options: TerminatorOptions): () => void {
+export function createTerminator(
+	options: TerminatorOptions,
+): (cause: string) => void {
 	const setTimer = options.setTimer ?? setTimeout;
-	let started = false;
-	return () => {
-		if (started) {
+	const causes = new Set<string>();
+	return (cause) => {
+		if (causes.size) {
+			if (!causes.has(cause)) {
+				causes.add(cause);
+				return;
+			}
 			options.log.warn("server.shutdown_forced", { reason: "second_signal" });
 			options.exit(130);
 			return;
 		}
-		started = true;
+		causes.add(cause);
 		const deadline = setTimer(() => {
 			options.log.error("server.shutdown_timeout", {
 				reason: "shutdown_timeout",

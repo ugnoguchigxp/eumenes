@@ -26,8 +26,11 @@ async function main() {
 	const config = loadProcessConfig();
 	configureLogging({ file: config.logFile, level: config.logLevel });
 	// Resolved lazily: the guard is armed before the terminator exists.
-	let terminate: () => void = () => process.exit(1);
-	const guard = createProcessGuard({ log, terminate: () => terminate() });
+	let terminate: (cause: string) => void = () => process.exit(1);
+	const guard = createProcessGuard({
+		log,
+		terminate: () => terminate("process_guard"),
+	});
 	process.on("unhandledRejection", guard.onRejection);
 	process.on("uncaughtException", guard.onException);
 	let runner: ReturnType<typeof createLifecycleRunner> | undefined;
@@ -52,7 +55,7 @@ async function main() {
 		deadlineMs: PROCESS_SHUTDOWN_DEADLINE_MS,
 	});
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const)
-		process.on(signal, () => terminate());
+		process.on(signal, () => terminate(signal));
 	log.info("server.starting");
 	try {
 		if (config.host !== "127.0.0.1" && config.host !== "localhost")

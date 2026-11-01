@@ -1,19 +1,32 @@
 import { expect, test } from "bun:test";
+import { createHmac } from "node:crypto";
 import type { LarmPort } from "../../larm";
 import { defaults } from "../../settings";
 import type { Settings } from "../../settings/contracts";
+import { stableLarmClient } from "../service/configured-larm";
 import { createIntentJudge } from "../service/intent-judge";
+
+const installationKey = new Uint8Array(32).fill(7);
+/** Per-purpose keys of one installation, as the settings domain derives them. */
+const derive = (key: Uint8Array | null) => (purpose: string) =>
+	key
+		? new Uint8Array(createHmac("sha256", key).update(purpose).digest())
+		: undefined;
 
 /**
  * The user-intent judge's port (the intent gate design, section 3): made from the saved intent profile, made again
  * when the profile or the LARM origin changes, closed in `legacy` and at the end; never the conversation's port.
  */
-function harness(intent: Partial<Settings["intent"]>) {
+function harness(
+	intent: Partial<Settings["intent"]>,
+	key: Uint8Array | null = installationKey,
+) {
 	let saved = defaults({});
 	saved.larm.baseUrl = "http://127.0.0.1:9810";
 	saved.intent = { ...saved.intent, ...intent };
 	const listeners = new Set<() => void>();
 	const made: Array<{ profile: string | undefined; closed: boolean }> = [];
+	const clients: Array<string | undefined> = [];
 	const judge = createIntentJudge({
 		settings: {
 			get: () => saved,
@@ -21,11 +34,13 @@ function harness(intent: Partial<Settings["intent"]>) {
 				listeners.add(fn);
 				return () => listeners.delete(fn);
 			},
+			derivedKey: derive(key),
 		},
 		options: {
-			intentLarmFactory: (s) => {
+			intentLarmFactory: (s, client) => {
 				const record = { profile: s.intent.profile, closed: false };
 				made.push(record);
+				clients.push(client);
 				return {
 					judgeIntent: async (input) => ({
 						choice: input.text === "天気" ? "request" : "chat",
@@ -55,7 +70,7 @@ function harness(intent: Partial<Settings["intent"]>) {
 		next(saved);
 		for (const fn of listeners) fn();
 	};
-	return { judge, made, change };
+	return { judge, made, clients, change };
 }
 const signal = () => new AbortController().signal;
 const input = { previousAgent: null, text: "天気" };
@@ -117,4 +132,28 @@ test("a changed profile releases the old port and the next judgement makes the n
 	});
 	expect(h.made.at(-1)!.closed).toBe(false);
 	await h.judge.close();
+});
+
+test("the judge's client is the same after a restart, its own rather than the conversation's, and follows the profile", async () => {
+	const first = harness({ profile: "judge-a" });
+	const restarted = harness({ profile: "judge-a" });
+	expect(first.clients[0]).toMatch(/^eumenes-[0-9a-f]{32}$/);
+	// A host that stopped without releasing asks LARM again under the same client.
+	expect(restarted.clients).toEqual(first.clients);
+	const conversation = defaults({}).larm;
+	conversation.baseUrl = "http://127.0.0.1:9810";
+	conversation.profile = "judge-a";
+	expect(first.clients[0]).not.toBe(
+		stableLarmClient(derive(installationKey)("larm.client"), conversation),
+	);
+	first.change((s) => {
+		s.intent.profile = "judge-b";
+	});
+	await first.judge.judge(input, signal());
+	expect(first.clients).toHaveLength(2);
+	expect(first.clients[1]).not.toBe(first.clients[0]);
+	// Without the installation key the port keeps its own per-process client.
+	const keyless = harness({ profile: "judge-a" }, null);
+	expect(keyless.clients).toEqual([undefined]);
+	await Promise.all([first, restarted, keyless].map((h) => h.judge.close()));
 });

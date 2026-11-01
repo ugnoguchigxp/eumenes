@@ -244,17 +244,17 @@ function terminatorHarness(shutdown: () => Promise<boolean>) {
 
 test("terminator: a successful shutdown exits 0 and a failed one exits 1", async () => {
 	const ok = terminatorHarness(async () => true);
-	ok.terminate();
+	ok.terminate("SIGINT");
 	await flush();
 	expect(ok.exits).toEqual([0]);
 	const failed = terminatorHarness(async () => false);
-	failed.terminate();
+	failed.terminate("SIGINT");
 	await flush();
 	expect(failed.exits).toEqual([1]);
 	const thrown = terminatorHarness(async () => {
 		throw new Error("x");
 	});
-	thrown.terminate();
+	thrown.terminate("SIGINT");
 	await flush();
 	expect(thrown.exits).toEqual([1]);
 	expect(thrown.logs).toEqual(["server.shutdown_failed:shutdown_failed"]);
@@ -266,18 +266,43 @@ test("terminator: a second signal while shutting down exits 130 at once", async 
 		calls++;
 		return new Promise(() => {});
 	});
-	hung.terminate();
+	hung.terminate("SIGINT");
 	await flush();
 	expect(hung.exits).toEqual([]);
-	hung.terminate();
+	hung.terminate("SIGINT");
 	expect(hung.exits).toEqual([130]);
 	expect(hung.logs).toEqual(["server.shutdown_forced:second_signal"]);
 	expect(calls).toBe(1);
 });
 
+test("terminator: Ctrl+C's SIGINT and the dev runner's SIGTERM are one request; Ctrl+C again forces", async () => {
+	let finish!: (ok: boolean) => void;
+	let calls = 0;
+	const graceful = terminatorHarness(() => {
+		calls++;
+		return new Promise((resolve) => (finish = resolve));
+	});
+	graceful.terminate("SIGINT");
+	graceful.terminate("SIGTERM");
+	await flush();
+	expect(graceful.exits).toEqual([]);
+	expect(graceful.logs).toEqual([]);
+	finish(true);
+	await flush();
+	expect(graceful.exits).toEqual([0]);
+	expect(calls).toBe(1);
+
+	const insisted = terminatorHarness(() => new Promise(() => {}));
+	insisted.terminate("SIGINT");
+	insisted.terminate("SIGTERM");
+	insisted.terminate("SIGINT");
+	expect(insisted.exits).toEqual([130]);
+	expect(insisted.logs).toEqual(["server.shutdown_forced:second_signal"]);
+});
+
 test("terminator: the 30 s process deadline exits 1 when shutdown never finishes", async () => {
 	const hung = terminatorHarness(() => new Promise(() => {}));
-	hung.terminate();
+	hung.terminate("SIGINT");
 	expect(hung.timers.pending).toHaveLength(1);
 	expect(hung.timers.pending[0]!.ms).toBe(30_000);
 	hung.timers.fire();
