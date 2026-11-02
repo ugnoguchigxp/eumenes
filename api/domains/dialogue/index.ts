@@ -20,3 +20,7 @@ export type { SpecialistPort, SpecialistSet } from "./contracts";
 export type { ToolchainRoutingPort } from "./contracts/toolchains";
 
 export { conversationPersona } from "./service/context-system";
+
+export { autonomousResearchSource } from "./repository/agency";
+export { createAgencyStatePort } from "./service/agency-state";
+export type { AgencyStatePort, AgencyRecord } from "./service/agency-state";

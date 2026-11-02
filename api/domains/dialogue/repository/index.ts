@@ -1,3 +1,4 @@
+import { agencyMigration } from "./agency";
 import { intentAnswerRouteMigration, intentJudgmentsMigration } from "./intent";
 import type { Database } from "bun:sqlite";
 import {
@@ -442,6 +443,11 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0032-confirmation-words",
 		after: ["dialogue/0031-confirmation-target-label"],
 		sql: confirmationWordsMigration,
+	},
+	{
+		id: "dialogue/0033-agency-autonomy",
+		after: ["dialogue/0032-confirmation-words"],
+		sql: agencyMigration,
 	},
 ];
 

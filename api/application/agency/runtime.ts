@@ -4,6 +4,8 @@ import {
 	type LlmPort,
 	type HostTodo,
 	type HostTopic,
+	type AgencyRestore,
+	type ToolCapability,
 } from "eumenes-agency";
 import type { Settings } from "../../domains/settings";
 import { agencyBackgroundSystem } from "./system-context";
@@ -15,10 +17,17 @@ export function createHostRuntime(input: {
 	llm: LlmPort;
 	topics(): readonly HostTopic[];
 	todos(): readonly HostTodo[];
+	restore?: AgencyRestore;
+	tools?: readonly ToolCapability[];
 }) {
 	const { agency, persona } = input;
 	return createAgencyRuntime({
 		condition: "F",
+		planOnOpportunity: true,
+		repairUpdates: true,
+		constrainToolNames: true,
+		findings: true,
+		...(input.restore ? { restore: input.restore } : {}),
 		interestFormation: true,
 		hostTopics: true,
 		hostTodos: true,
@@ -40,7 +49,7 @@ export function createHostRuntime(input: {
 			updateMaxOutputTokens: 2400,
 			selectMaxOutputTokens: 1000,
 		},
-		tools: [],
+		tools: input.tools ?? [],
 		llm: input.llm,
 	});
 }

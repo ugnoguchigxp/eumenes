@@ -8,7 +8,18 @@ export type ChildCaller =
 			kind: "research";
 			owner: Owner;
 			invocationId: string;
-			source: import("./task-execution").ExecutionSource;
+			source:
+				| import("./task-execution").ExecutionSource
+				| {
+						origin: "autonomous";
+						conversationId: string;
+						runId: string;
+						request: string;
+						digest: string;
+						intentId: string;
+						candidateId: string;
+						ticketId: string;
+				  };
 	  }
 	| { kind: "execution"; child: import("./task-execution").ChildExecution };
 export interface ChildOperationPort {

@@ -26,19 +26,23 @@ describe("start and settings", () => {
 		).toEqual(["u2", "a2"]);
 	});
 
-	test("a change of the agency settings applies at once: every conversation starts over", async () => {
+	test("agency settings immediately replace pending inference while retaining grounded state", async () => {
 		const h = harness();
 		await exchange(h, 1);
 		await waitFor(() => h.calls.select === 1);
 		expect(h.host.inspect("c1")).not.toBeNull();
+		const before = h.host.inspect("c1")!;
 		h.setAgency({ idleSec: 30 });
-		expect(h.host.inspect("c1")).toBeNull();
-		// What was said before the change is not read again; what follows is.
+		expect(h.host.inspect("c1")?.snapshot.observations).toEqual(
+			before.snapshot.observations,
+		);
+		expect(h.host.inspect("c1")?.generation).toBeGreaterThan(before.generation);
+		// Grounded observations survive; new input is appended without replay.
 		await exchange(h, 2);
 		await waitFor(() => h.calls.select === 2);
 		expect(
 			h.host.inspect("c1")?.snapshot.observations.map((o) => o.id),
-		).toEqual(["u2", "a2"]);
+		).toEqual(["u1", "a1", "u2", "a2"]);
 	});
 
 	test("settings that are not the agency's change nothing", async () => {
@@ -348,8 +352,8 @@ describe("delivery", () => {
 		const h = harness({ select: () => choice("speak", { refs: ["u1"] }) });
 		h.inference.busy = true;
 		await exchange(h, 1);
-		await waitFor(() => h.calls.update === 1);
 		await settle();
+		expect(h.calls.update).toBe(0);
 		expect(h.calls.select).toBe(0);
 		expect(h.texts()).toEqual(["u1", "a1"]);
 	});
@@ -376,6 +380,76 @@ describe("delivery", () => {
 });
 
 describe("idle", () => {
+	test("a review with no work leaves the original idle deadline in place", async () => {
+		const h = harness({ persistent: true, settings: { idleSec: 80 } });
+		await exchange(h, 1);
+		await waitFor(() => h.calls.select === 1);
+		await waitFor(() => h.host.inspect("c1")?.idle.blockedBy === null);
+		await h.advance(80_000);
+		await waitFor(() => h.calls.select === 2, { timeout: 1000 });
+	});
+
+	test("an exhausted call window defers idle without consuming a speech opportunity", async () => {
+		const h = harness();
+		for (let i = 1; i <= 6; i++) {
+			await exchange(h, i);
+			await waitFor(() => h.calls.select === i);
+			await waitFor(() => h.host.inspect("c1")?.idle.blockedBy === null);
+		}
+		await h.advance(20_000);
+		expect(h.calls).toMatchObject({ update: 6, select: 6 });
+		expect(h.host.inspect("c1")?.idle.level).toBe(0);
+		h.advanceClock(600_000);
+		await h.advance(0);
+		await waitFor(() => h.calls.select === 7);
+	});
+
+	test("periodic review leaves a running idle update intact", async () => {
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const h = harness({
+			persistent: true,
+			settings: { idleSec: 40 },
+			update: async (request) => {
+				if (JSON.parse(request.prompt).opportunity?.trigger === "idle")
+					await gate;
+				return update(request);
+			},
+		});
+		let stage = "exchange";
+		try {
+			await exchange(h, 1);
+			stage = "turn selection";
+			await waitFor(() => h.calls.select === 1, { timeout: 1000 });
+			stage = "idle ready";
+			await waitFor(() => h.host.inspect("c1")?.idle.blockedBy === null, {
+				timeout: 1000,
+			});
+			await h.advance(40_000);
+			stage = "idle update";
+			await waitFor(() => h.calls.update === 2, { timeout: 1000 });
+			const generation = h.host.inspect("c1")!.generation;
+			await h.advance(20_000);
+			expect(h.host.inspect("c1")!.generation).toBe(generation);
+			expect(h.calls.select).toBe(1);
+			release();
+			stage = "idle selection";
+			await waitFor(() => h.calls.select === 2, { timeout: 1000 });
+			expect(h.calls.update).toBe(2);
+		} catch (error) {
+			console.error({
+				stage,
+				calls: h.calls,
+				idle: h.host.inspect("c1")?.idle,
+			});
+			throw error;
+		} finally {
+			release();
+		}
+	});
+
 	test("silence is retried at 20s, 40s, 80s and then given up", async () => {
 		const h = harness();
 		await exchange(h, 1);

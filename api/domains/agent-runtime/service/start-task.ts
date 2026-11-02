@@ -51,6 +51,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 			} as {
 				execution?: ChildExecution;
 				kind?: "web" | "history" | "world" | "action";
+				autonomous?: boolean;
 				question: string;
 				originalRequest?: string;
 				urls?: string[];
@@ -58,6 +59,11 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				/** The package of the toolchain the conversation chose. */
 				packageRevisionId?: string;
 			};
+			if (
+				request.autonomous &&
+				!ctx.deps.autonomousResearch?.(db, input.rootRunId)
+			)
+				throw new Error("autonomous_origin_invalid");
 			if (
 				request.packageRevisionId !== undefined &&
 				!/^package:[a-z][a-z0-9._-]{0,100}@[1-9][0-9]*$/.test(
@@ -143,6 +149,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 								}
 							: {}),
 						execution: request.execution,
+						...(request.autonomous ? { autonomous: true } : {}),
 					},
 					workerDeadline(
 						root.deadline,

@@ -10,6 +10,11 @@ export function createQueries(ctx: RuntimeContext, answer: Answer) {
 	const { prepared } = ctx.state;
 	const { reportInTransaction } = answer;
 	return {
+		getInTransaction: (db: Database, id: string) => {
+			const row = get(db, id);
+			return row ? dto(row) : null;
+		},
+		reportInTransaction,
 		authorizeReadOwnerInTransaction(
 			db: Database,
 			input: Owner,
@@ -33,6 +38,11 @@ export function createQueries(ctx: RuntimeContext, answer: Answer) {
 					!["waiting_child", "ready_for_answer"].includes(root.state)) ||
 				(stage === "read" && (!active(task) || task.deadline <= now())) ||
 				["cancelled", "failed", "interrupted"].includes(task.state)
+			)
+				throw new Error("source_ref_invalid");
+			if (
+				JSON.parse(task.input_json ?? "{}").autonomous === true &&
+				!ctx.deps.autonomousResearch?.(db, task.root_run_id)
 			)
 				throw new Error("source_ref_invalid");
 			const binding = prepared.get(task.id);

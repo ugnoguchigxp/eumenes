@@ -7,7 +7,10 @@ import type {
 } from "../../domains/conversation";
 import type { ToolAdapter, Source } from "../../domains/tool-runtime";
 import type { WebResearchService } from "../../domains/web-research";
-import { readActionOriginInTransaction } from "../../domains/dialogue";
+import {
+	autonomousResearchSource,
+	readActionOriginInTransaction,
+} from "../../domains/dialogue";
 import type { MemoryService } from "../../domains/memory";
 /** Memory's ledger of the messages that must not reach a model again (forgotten ones, scheduled prompts). */
 export type BlockedMessages = Pick<
@@ -63,7 +66,13 @@ export function createReadPorts(
 		stage: "read" | "adopt",
 	): HistoryOwner {
 		const root = runtime().authorizeReadOwnerInTransaction(db, owner, stage);
-		const origin = readActionOriginInTransaction(db, owner.rootRunId);
+		const autonomous = autonomousResearchSource(
+			db,
+			owner.rootRunId,
+			Date.now(),
+		);
+		const origin =
+			autonomous ?? readActionOriginInTransaction(db, owner.rootRunId);
 		if (!origin || !conversation) throw new Error("history_scope_unavailable");
 		return {
 			key:
@@ -71,7 +80,7 @@ export function createReadPorts(
 				JSON.stringify([owner.rootRunId, owner.taskId, owner.cancelEpoch]),
 			conversationId: origin.conversationId,
 			deadline: root.deadline,
-			excludeMessageId: origin.messageId,
+			...("messageId" in origin ? { excludeMessageId: origin.messageId } : {}),
 		};
 	}
 	const historyRoots = new Map<string, Set<string>>();

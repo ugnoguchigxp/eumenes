@@ -29,6 +29,7 @@ export function createAgentRuntime({
 	timers = { setTimeout, clearTimeout },
 	onSearchReport,
 	resources,
+	autonomousResearch,
 }: {
 	store: SqliteStore;
 	capabilities: Capabilities;
@@ -46,6 +47,10 @@ export function createAgentRuntime({
 	onSearchReport?: SearchReportHook;
 	/** Reads a resource by URI for the sub-agent tool `resource.read` (the registry's `read`). */
 	resources?: ResourceReadPort;
+	autonomousResearch?: (
+		db: import("bun:sqlite").Database,
+		rootId: string,
+	) => boolean;
 }) {
 	const ctx = {
 		state: createRuntimeState(),
@@ -61,6 +66,7 @@ export function createAgentRuntime({
 			log: getLogger("agent-runtime"),
 			onSearchReport,
 			resources,
+			autonomousResearch,
 		},
 	};
 	const ops = createTaskOps(ctx);

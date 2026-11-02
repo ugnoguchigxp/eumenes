@@ -94,7 +94,7 @@ for (const target of ["larm", "cloud"] as const) {
 				messages.at(-1)!.content.split("## Task\n").at(-1)!,
 			);
 			return JSON.stringify(
-				data.opportunity
+				data.candidates
 					? { ...choice("wait"), emotion: null }
 					: pendingUpdate(data),
 			);
@@ -189,16 +189,18 @@ for (const target of ["larm", "cloud"] as const) {
 			const data = JSON.parse(
 				call.messages.at(-1)!.content.split("## Task\n").at(-1)!,
 			);
-			const purpose = data.opportunity ? "select" : "update";
+			const purpose = data.candidates ? "select" : "update";
 			const outputContract =
 				purpose === "update"
 					? agencyOutputContract("update", {
+							toolNames: [],
 							condition: "F",
 							interestFormation: true,
 							hostTodos: true,
 							utteranceEmotion: true,
 						})
 					: agencyOutputContract("select", {
+							toolNames: [],
 							condition: "F",
 							interestFormation: true,
 							hostTodos: true,

@@ -1,3 +1,4 @@
+import { createAgencyStatePort } from "../../domains/dialogue";
 import type { DialogueService } from "../../domains/dialogue";
 import { createAgencyHost, type AgencyHostDeps } from "./host";
 import { createAgencyLlmPort } from "./llm-port";
@@ -8,24 +9,27 @@ import { createAgencyLlmPort } from "./llm-port";
  * own utterances there.
  */
 export function assembleAgency(
-	deps: Pick<
+	deps: {
+		research?: Omit<Parameters<typeof createAgencyStatePort>[0], "now">;
+	} & Pick<
 		AgencyHostDeps,
 		| "store"
 		| "conversation"
 		| "settings"
 		| "memory"
 		| "routeSpeechInTransaction"
+		| "state"
 	> & {
-		inference: AgencyHostDeps["inference"] &
-			Parameters<typeof createAgencyLlmPort>[0]["inference"] & {
-				usage(): Array<{
-					id: string;
-					model: string | null;
-					inputTokens: number | null;
-					outputTokens: number | null;
-				}>;
-			};
-	},
+			inference: AgencyHostDeps["inference"] &
+				Parameters<typeof createAgencyLlmPort>[0]["inference"] & {
+					usage(): Array<{
+						id: string;
+						model: string | null;
+						inputTokens: number | null;
+						outputTokens: number | null;
+					}>;
+				};
+		},
 	dialogue: () => Pick<
 		DialogueService,
 		| "conversationHasActiveRunInTransaction"
@@ -34,8 +38,14 @@ export function assembleAgency(
 	>,
 ) {
 	const { store, inference } = deps;
+	const state =
+		deps.state ??
+		(deps.research
+			? createAgencyStatePort({ ...deps.research, now: Date.now })
+			: undefined);
 	return createAgencyHost({
 		...deps,
+		...(state ? { state } : {}),
 		conversationBusy: (db, conversationId) =>
 			dialogue().conversationHasActiveRunInTransaction(db, conversationId),
 		recordSpokeInTransaction: (db, input) =>

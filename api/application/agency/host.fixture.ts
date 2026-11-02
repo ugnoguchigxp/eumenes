@@ -18,6 +18,8 @@ import { settle } from "../../infrastructure/wait-for";
 import { openStore } from "../../infrastructure/sqlite";
 import { createAgencyHost, type AgencySettings } from "./host";
 import { createAgencyWork } from "./work";
+import { createAgencyStatePort } from "../../domains/dialogue";
+import { openDialogueStore } from "../../domains/dialogue/test/store.fixture";
 
 export const T0 = Date.parse("2026-10-22T09:00:00Z");
 export const baseSettings: AgencySettings = {
@@ -163,13 +165,19 @@ export function harness(
 		memory?: MemoryItemDto[];
 		busy?: () => boolean;
 		start?: boolean;
+		persistent?: boolean;
 		llm?: (
 			next: Parameters<Parameters<typeof createAgencyHost>[0]["createLlm"]>[0],
 		) => LlmPort;
 	} = {},
 ) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-agency-host-"));
-	const store = openStore(join(dir, "test.sqlite3"), migrations);
+	const persisted = options.persistent
+		? openDialogueStore("agency-host-")
+		: null;
+	const dir =
+		persisted?.dir ?? mkdtempSync(join(tmpdir(), "eumenes-agency-host-"));
+	const store =
+		persisted?.store ?? openStore(join(dir, "test.sqlite3"), migrations);
 	const conversation = createConversationService(store, {
 		requireOutbox: true,
 	});
@@ -193,6 +201,9 @@ export function harness(
 	const memoryReads = { count: 0 };
 	const spoke: Array<Record<string, unknown>> = [];
 	const host = createAgencyHost({
+		...(options.persistent
+			? { state: createAgencyStatePort({ now: () => now }) }
+			: {}),
 		store,
 		conversation,
 		inference: { foregroundBusy: () => inference.busy },

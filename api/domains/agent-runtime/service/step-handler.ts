@@ -1,3 +1,7 @@
+import {
+	authorizeAutonomousTask,
+	captureResearchControl,
+} from "./research-control";
 import { executionCallSession } from "../../tool-runtime";
 import { z } from "zod";
 import {} from "../../../infrastructure/validation-log";
@@ -101,6 +105,8 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 			const t = get(db, claim.payload.taskId);
 			if (!t || t.state !== "queued" || t.job_id !== claim.jobId)
 				return { status: "stale", reason: "task_not_queued" };
+			if (!authorizeAutonomousTask(ctx, db, t, fail))
+				return { status: "stale", reason: "autonomous_origin_invalid" };
 			const execution = JSON.parse(t.input_json ?? "{}").execution as
 				| ChildExecution
 				| undefined;
@@ -191,14 +197,13 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 					deadline: claim.deadlineAtMs ?? t.deadline,
 					maxOutputTokens: 4096,
 				};
-				const requestId = execution
-					? inference.captureUserControlInTransaction!(db, {
-							subject: `execution-research:${t.id}-${t.current_step}`,
-							route: "subagent",
-							deadline: Math.min(capture.deadline, now() + 45_000),
-							maxOutputTokens: capture.maxOutputTokens,
-						})
-					: inference.captureControlInTransaction(db, capture);
+				const requestId = captureResearchControl(
+					ctx,
+					db,
+					t,
+					capture,
+					execution,
+				);
 				const current = update(db, t, "running", t.phase);
 				db.query(
 					"UPDATE agent_tasks SET model_calls=model_calls+1 WHERE id=?",
@@ -266,6 +271,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 				);
 				return "applied";
 			}
+			if (!authorizeAutonomousTask(ctx, db, t, fail)) return "stale";
 			if (!input || t.state !== "running" || t.revision !== input.revision)
 				return "stale";
 			const step = db

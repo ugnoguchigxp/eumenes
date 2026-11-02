@@ -221,10 +221,15 @@ export async function buildServices(
 				toolchain.worldAvailable,
 			)
 		: undefined;
-	// The conversation agent: its replies, and its spontaneous speech (runtimes per conversation, fed by the
-	// conversation outbox). The dialogue service is built below (it takes this host's ports).
 	const liveBridge = createLiveBridge();
-	const agencyDeps = { store, conversation, inference, settings, memory };
+	const agencyDeps = {
+		store,
+		conversation,
+		inference,
+		settings,
+		memory,
+		research: { agents: toolchain.agents, toolchains },
+	};
 	const agency = assembleAgency(
 		{ ...agencyDeps, ...liveBridge.agency },
 		() => dialogue,
@@ -268,8 +273,7 @@ export async function buildServices(
 				}
 			: {}),
 	});
-	// A forgotten State item must not stay a topic suggestion.
-	memory.registerForgetPurge(() => agency.invalidateTopics());
+	memory.registerForgetPurge(agency.forgetInTransaction);
 	links.attachDialogue(dialogue);
 	if (enabled && toolchains)
 		configureTaskExecution({
@@ -293,7 +297,6 @@ export async function buildServices(
 			legacy: taskLegacyPorts(dialogue),
 			resources: resources.access.registry,
 		});
-	// The agency sees the conversation's open TODOs; the conversation reports their results itself.
 	agency.attachWork(createAgencyWork({ dialogue }));
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);

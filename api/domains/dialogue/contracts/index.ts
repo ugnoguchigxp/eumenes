@@ -184,6 +184,11 @@ export type WorldRecords = {
  * opportunity when work changes.
  */
 export interface AgencyLayerPort {
+	/** Settled reference data, never system instructions. */
+	stateForContextInTransaction?(
+		db: Database,
+		conversationId: string,
+	): readonly string[];
 	/** A TODO of the conversation finished or asks the user something: the agent's opportunity to say so. */
 	workChangedInTransaction(db: Database, conversationId: string): void;
 }

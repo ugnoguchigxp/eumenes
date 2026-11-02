@@ -1,7 +1,11 @@
+import type { Database } from "bun:sqlite";
 import { createDoclingAdapter } from "../docling/docling-adapter";
 import { createDotsMessagingAdapter } from "../work/dots-messaging-adapter";
 import { createDotsDelegationAdapter } from "../work/dots-delegation-adapter";
-import { readActionOriginInTransaction } from "../../domains/dialogue";
+import {
+	autonomousResearchSource,
+	readActionOriginInTransaction,
+} from "../../domains/dialogue";
 import { createChildOperations } from "./child-operations";
 import { extendKanbanAdapter } from "../work/kanban-shared-adapter";
 import { createCodexTasksAdapter } from "../work/codex-tasks-adapter";
@@ -166,6 +170,12 @@ function researchSourceResolver(
 		db: import("bun:sqlite").Database,
 		owner: import("../../domains/capabilities").Owner,
 	) => {
+		const autonomous = autonomousResearchSource(
+			db,
+			owner.rootRunId,
+			Date.now(),
+		);
+		if (autonomous) return { ...autonomous, digest: hash(autonomous.request) };
 		const origin =
 			agents().executionOriginInTransaction(db, owner)?.source ??
 			readActionOriginInTransaction(db, owner.rootRunId);
@@ -189,6 +199,17 @@ function researchSourceResolver(
 		};
 	};
 }
+
+const autonomousResearchAllowed = (db: Database, root: string) =>
+	autonomousResearchSource(db, root, Date.now()) !== null;
+
+const createResearchRuntime = (
+	deps: Parameters<typeof createAgentRuntime>[0],
+) =>
+	createAgentRuntime({
+		...deps,
+		autonomousResearch: autonomousResearchAllowed,
+	});
 
 export async function createToolchain(
 	store: SqliteStore,
@@ -432,7 +453,7 @@ export async function createToolchain(
 		Date.now,
 		actions,
 	);
-	const agents = createAgentRuntime({
+	const agents = createResearchRuntime({
 		store,
 		capabilities,
 		tools,
@@ -502,7 +523,10 @@ function researchToolAdapter(deps: {
 	researchSource: (
 		db: import("bun:sqlite").Database,
 		owner: import("../../domains/capabilities").Owner,
-	) => import("../../domains/tool-runtime").ExecutionSource;
+	) => Extract<
+		import("../../domains/tool-runtime").ChildCaller,
+		{ kind: "research" }
+	>["source"];
 	tools: () => ReturnType<typeof createToolRuntime>;
 }): ToolAdapter {
 	const {

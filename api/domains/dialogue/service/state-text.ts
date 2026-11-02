@@ -126,6 +126,7 @@ export function stateLinesInTransaction(
 			: "";
 	lines.push(`今: ${jstNowLine(input.nowMs)}${gap}`);
 
+	lines.push(...agencyStateLines(deps, tx, input.conversationId));
 	const ledger = deps.work;
 	const open = ledger?.todosInTransaction(tx, input.conversationId) ?? [];
 	const work = [
@@ -254,4 +255,19 @@ export function namedTodos(lines: readonly string[]): number[] {
 /** `## State` as the input shows it. */
 export function stateText(lines: readonly string[]): string {
 	return `${INPUT_HEADINGS.state}\n${lines.join("\n")}`;
+}
+
+/** The settled agency state, bounded and escaped as reference data. */
+export function agencyStateLines(
+	deps: DialogueDeps,
+	db: Database,
+	id: string,
+): string[] {
+	const lines = deps.agency?.stateForContextInTransaction?.(db, id) ?? [];
+	return lines.length
+		? [
+				"あなた自身の関心・問い（資料）:",
+				...lines.slice(0, 8).map((line) => `- ${lineText(line)}`),
+			]
+		: [];
 }

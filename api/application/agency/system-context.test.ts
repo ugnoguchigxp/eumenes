@@ -40,12 +40,14 @@ test("both runtime purposes send the complete Eumenes system; observations stay 
 					outputContract:
 						request.purpose === "update"
 							? agencyOutputContract("update", {
+									toolNames: [],
 									condition: "F",
 									interestFormation: true,
 									hostTodos: true,
 									utteranceEmotion: true,
 								})
 							: agencyOutputContract("select", {
+									toolNames: [],
 									condition: "F",
 									interestFormation: true,
 									hostTodos: true,
@@ -127,6 +129,12 @@ test("the real dialogue composes Eumenes-owned reply parts and keeps user text o
 		conversationAgent: host.host.conversationAgent,
 		settings,
 		cards: [],
+		agency: {
+			workChangedInTransaction() {},
+			stateForContextInTransaction: () => [
+				"AGENCY_STATE_SENTINEL: work result",
+			],
+		},
 	});
 	try {
 		h.state.steps.push(...reply("🙂おはようございます。"));
@@ -140,6 +148,12 @@ test("the real dialogue composes Eumenes-owned reply parts and keeps user text o
 		expect(system).toContain("HostInterest");
 		expect(system).toContain("Emotion");
 		expect(system).not.toContain("USER_SENTINEL");
+		expect(system).not.toContain("AGENCY_STATE_SENTINEL");
+		expect(
+			call.messages
+				.filter((m) => m.role !== "system")
+				.some((m) => m.content.includes("AGENCY_STATE_SENTINEL")),
+		).toBe(true);
 		expect(system).not.toContain("あなたは利用者と自然に会話する相手です。");
 		expect(call.messages.at(-1)?.content).toContain("USER_SENTINEL");
 	} finally {

@@ -1,49 +1,44 @@
-import {
-	persistSpeech,
-	speechReceipt,
-	deliveryEmotionOf,
-	type SpeechRouter,
-} from "./speech";
+import { createResultCollector } from "./returns";
+import { logCalls, logDecision } from "./diagnostics";
+import { createAgencyDelivery } from "./delivery";
+import { hostPlanner, recoverTickets } from "./recovery";
+import { createCheckpoint } from "./checkpoint";
+import type {
+	AgencyHostDeps,
+	AgencySettings,
+	HostPersona,
+	Conv,
+	Cycle,
+} from "./host-types";
+export type { AgencyHostDeps, AgencySettings } from "./host-types";
+import { projectionLines, researchTools, waitingForWork } from "./research";
+import type { AgencyRecord } from "../../domains/dialogue";
+import type { AgencySnapshot, IdleCheckpoint } from "eumenes-agency";
+import { deliveryEmotionOf } from "./speech";
 import type { Database } from "bun:sqlite";
 import {
-	createIdlePlanner,
 	createIdleScheduler,
 	emotionName,
 	runRespond,
-	type ActionTicket,
 	type AgencyRuntime,
-	type CallOutcome,
 	type CycleOutcome,
-	type Decision,
 	type IdlePlanner,
 	type LlmPort,
 	type LlmRequest,
 	type Opportunity,
 } from "eumenes-agency";
-import type {
-	ConversationService,
-	OutboxEvent,
-} from "../../domains/conversation";
+import type { OutboxEvent } from "../../domains/conversation";
 import type {
 	AgencyLayerPort,
 	ConversationAgentPort,
 } from "../../domains/dialogue/contracts";
-import type { MemoryService } from "../../domains/memory";
-import type { Settings } from "../../domains/settings";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { getLogger } from "../../infrastructure/logger";
-import type { SqliteStore } from "../../infrastructure/sqlite";
-import type { AgencyCallIdentity } from "./llm-port";
 import { selectMemoryTopics } from "./topics";
 import { agencyReplyParts } from "./system-context";
 import { createHostRuntime } from "./runtime";
 import type { AgencyWork } from "./work";
 
-export type AgencySettings = Settings["agency"];
-type HostPersona = Pick<
-	Settings["general"],
-	"agentName" | "userName" | "persona"
->;
 const samePersona = (a: HostPersona, b: HostPersona) =>
 	a.agentName === b.agentName &&
 	a.userName === b.userName &&
@@ -57,73 +52,6 @@ const MAX_CONVERSATIONS = 20;
 const TOPICS_TTL_MS = 30_000;
 /** Outbox events read per pass. */
 const FEED_PAGE = 200;
-const LOG_REASON_CHARS = 120;
-export type AgencyHostDeps = {
-	routeSpeechInTransaction?: SpeechRouter;
-	store: Pick<SqliteStore, "read" | "write" | "onCommit">;
-	conversation: Pick<
-		ConversationService,
-		| "changesInTransaction"
-		| "outboxHeadInTransaction"
-		| "sourceInTransaction"
-		| "latestOrdinalInTransaction"
-		| "appendInTransaction"
-	>;
-	/** `foregroundBusy()` serves the user right now (conversation answers, ASR, TTS); background calls never count. */
-	inference: { foregroundBusy(): boolean };
-	settings: {
-		get(): { agency: AgencySettings; general: HostPersona };
-		/** The committed settings as the transaction sees them (the delivery fence reads this, not the cache). */
-		inTransaction(db: Database): {
-			agency: AgencySettings;
-			general: HostPersona;
-		};
-		onChange(listener: () => void): () => void;
-	};
-	/** The user's State items are the topic material (hostTopics mode). */
-	memory: Pick<MemoryService, "status" | "list">;
-	/**
-	 * Builds the background LLM port of one conversation. `next` names each call (unique decision id, the
-	 * conversation's current execution generation); the host wraps the port to log.
-	 */
-	createLlm(
-		next: (request: LlmRequest<unknown>) => AgencyCallIdentity,
-	): LlmPort;
-	/** True when the conversation has a queued or running run (inside a transaction, read-only). */
-	conversationBusy(db: Database, conversationId: string): boolean;
-	/** Records the agency's utterance as an event of the conversation, in the transaction that stores it. */
-	recordSpokeInTransaction(
-		db: Database,
-		input: {
-			conversationId: string;
-			messageId: string;
-			text: string;
-			at: string;
-			/** The TODOs it cited (a question it asks for the work). */
-			todoRefs?: readonly string[];
-		},
-	): void;
-	nowMs?(): number;
-	setTimer?(fn: () => void, ms: number): unknown;
-	clearTimer?(handle: unknown): void;
-};
-
-type Conv = {
-	id: string;
-	/** Unique per runtime instance: ticket ids restart per runtime, message ids must not repeat. */
-	scope: string;
-	runtime: AgencyRuntime;
-	planner: IdlePlanner;
-	scheduler: ReturnType<typeof createIdleScheduler>;
-	generation: number;
-	background: AbortController | null;
-	opportunities: number;
-	calls: number;
-	/** Last time the conversation had an event or a cycle (for forgetting idle conversations). */
-	touched: number;
-	/** The questions of TODOs the agent was last given an opportunity for. */
-	reportable: Set<string>;
-};
 
 const sanitize = (id: string) =>
 	id.replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 60);
@@ -170,6 +98,38 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	const stoppers: Array<() => void> = [];
 	/** The open TODOs of the conversation (the dialogue ledger); attached once the dialogue service exists. */
 	let work: AgencyWork | null = null;
+	const restored = new Map<string, AgencyRecord>();
+	const digest = () => JSON.stringify({ agency: cfg, persona });
+	const checkpoint = createCheckpoint({
+		deps,
+		inflight,
+		convs,
+		nowMs,
+		digest,
+		feed: () => ({ cursor, activeId }),
+	});
+	const save = checkpoint.save;
+	const collectReturns = createResultCollector({
+		deps,
+		convs,
+		convOf,
+		dropConv,
+		launch,
+		nowMs,
+		digest,
+		inflight,
+	});
+	const trackSave = checkpoint.trackSave;
+
+	function armReview(c: Conv) {
+		if (!deps.state || !on() || c.reviewTimer !== undefined) return;
+		c.reviewTimer = setTimer(() => {
+			delete c.reviewTimer;
+			if (!on() || convs.get(c.id) !== c) return;
+			if (c.background) return armReview(c);
+			void runCycle(c, "review_due").finally(() => armReview(c));
+		}, 60_000);
+	}
 
 	const on = () => started && !closed;
 
@@ -259,25 +219,20 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		return `${boot}-${++scopeCounter}`;
 	}
 
-	function newRuntime(c: Conv): AgencyRuntime {
+	function newRuntime(c: Conv, restore?: AgencySnapshot): AgencyRuntime {
 		return createHostRuntime({
 			agency: cfg,
 			persona,
+			...(restore ? { restore } : {}),
+			tools: researchTools(store, deps.state),
 			todos: () => todosNow(c),
 			topics: topicsNow,
-			llm: wrapLlm(c, c.scope),
+			llm: wrapLlm(c, newScope()),
 		});
 	}
 
-	function newPlanner(id: string): IdlePlanner {
-		const planner = createIdlePlanner(
-			{ idleSec: cfg.idleSec, maxUnanswered: cfg.maxUnanswered },
-			nowMs(),
-		);
-		// Only the conversation the user spoke in last gets idle cycles.
-		planner.setPaused(id !== activeId, nowMs());
-		return planner;
-	}
+	const newPlanner = (id: string, restore?: IdleCheckpoint) =>
+		hostPlanner(id, cfg, activeId, nowMs(), restore);
 
 	function newScheduler(c: Conv) {
 		const planner = c.planner;
@@ -286,23 +241,40 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			now: nowMs,
 			setTimer,
 			clearTimer,
-			run: () => runCycle(c, "idle", false),
-			onCycle: (outcome) =>
+			run: () => runCycle(c, "idle"),
+			onCycle: (outcome) => {
+				trackSave(c);
 				log.info("agency.idle_cycle", {
 					subjectId: c.id,
 					outcome,
 					...idleFields(planner),
-				}),
+				});
+			},
 		});
 	}
 
 	function convOf(id: string): Conv {
 		const known = convs.get(id);
 		if (known) return known;
+		const previous =
+			restored.get(id) ??
+			(deps.state
+				? store.read((db) =>
+						deps
+							.state!.recordsInTransaction(db)
+							.find((r) => r.conversationId === id),
+					)
+				: undefined);
+		restored.delete(id);
 		const c = {
+			epoch:
+				previous?.epoch ??
+				(deps.state
+					? store.read((db) => deps.state!.epochInTransaction(db, id))
+					: 0),
 			id,
-			scope: newScope(),
-			planner: newPlanner(id),
+			scope: previous?.scope ?? newScope(),
+			planner: newPlanner(id, previous?.idle as IdleCheckpoint | undefined),
 			generation: 1,
 			background: null,
 			opportunities: 0,
@@ -310,9 +282,12 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			touched: nowMs(),
 			reportable: new Set<string>(),
 		} as unknown as Conv;
-		c.runtime = newRuntime(c);
+		c.runtime = newRuntime(c, previous?.snapshot as AgencySnapshot | undefined);
+		if (previous && previous.settingsDigest !== digest())
+			c.runtime.invalidate("settings.changed", nowMs());
 		c.scheduler = newScheduler(c);
 		convs.set(id, c);
+		armReview(c);
 		return c;
 	}
 
@@ -357,6 +332,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 
 	/** Ends a conversation's runtime for good: in-flight work is stale and no timer is left. */
 	function dropConv(c: Conv, reason: string) {
+		if (c.reviewTimer !== undefined) clearTimer(c.reviewTimer);
 		c.generation++;
 		abortBackground(c);
 		c.runtime.invalidate(reason, nowMs());
@@ -367,6 +343,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 
 	/** Starts a conversation over in place: new runtime, planner and scheduler. */
 	function resetConv(c: Conv, reason: string) {
+		if (deps.state)
+			c.epoch = store.read((db) => deps.state!.epochInTransaction(db, c.id));
 		c.generation++;
 		abortBackground(c);
 		c.runtime.invalidate(reason, nowMs());
@@ -414,174 +392,29 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		inference.foregroundBusy() ||
 		store.read((db) => deps.conversationBusy(db, c.id));
 
-	function logCalls(c: Conv, calls: readonly CallOutcome[]) {
-		for (const call of calls)
-			if (call.code !== "applied" && call.code !== "no_change")
-				log.info("agency.background_call", {
-					subjectId: c.id,
-					purpose: call.purpose,
-					outcome: call.code,
-					validationCode: call.rejectCodes.join(","),
-				});
-	}
+	const { deliver } = createAgencyDelivery({
+		deps,
+		nowMs,
+		save,
+		isCurrent: (cy, db) => {
+			const { c } = cy;
+			const committed = deps.settings.inTransaction(db);
+			return (
+				on() &&
+				sameSettings(committed.agency, cfg) &&
+				samePersona(committed.general, persona) &&
+				c.generation === cy.mine &&
+				c.runtime === cy.runtime &&
+				convs.get(c.id) === c &&
+				conversation.latestOrdinalInTransaction(db, c.id) === cy.ordinal &&
+				!deps.conversationBusy(db, c.id) &&
+				!inference.foregroundBusy()
+			);
+		},
+	});
 
-	function logDecision(
-		c: Conv,
-		trigger: Opportunity["trigger"],
-		decision: Decision,
-		superseded: boolean,
-	) {
-		log.info("agency.decision", {
-			subjectId: c.id,
-			selectionId: decision.opportunityId,
-			kind: trigger,
-			decision: decision.action,
-			source: decision.source,
-			outcome: superseded ? "superseded" : "current",
-			validationCode: decision.rejectCodes.join(","),
-			// The model's own short rationale, cut; never a message body.
-			reason: decision.reason.slice(0, LOG_REASON_CHARS),
-		});
-	}
-
-	/** What one cycle works on: the runtime and planner it started with stay its own even if replaced. */
-	type Cycle = {
-		c: Conv;
-		runtime: AgencyRuntime;
-		planner: IdlePlanner;
-		trigger: Opportunity["trigger"];
-		controller: AbortController;
-		mine: number;
-		ordinal: number;
-	};
-
-	/** Returns true when the utterance was appended. */
-	async function deliver(
-		cy: Cycle,
-		ticket: ActionTicket,
-		evidenceRefs: readonly string[],
-	): Promise<boolean> {
-		const { c, trigger } = cy;
-		if (ticket.action !== "speak") {
-			log.info("agency.delivered", {
-				subjectId: c.id,
-				attemptId: ticket.id,
-				kind: trigger,
-				outcome: "tool_not_supported",
-			});
-			receipt(cy, ticket, "failed", "no tool runtime");
-			return false;
-		}
-		const text = ticket.utterance ?? "";
-		const messageId = `agency:${c.scope}:${ticket.id}`;
-		const at = nowMs();
-		let outcome: "appended" | "stale" | "routed";
-		try {
-			outcome = await store.write((db) => {
-				// Re-checked inside the writer transaction: the setting as committed (not the cached copy),
-				// and nothing may have been said since the opportunity.
-				const committed = deps.settings.inTransaction(db);
-				if (
-					text === "" ||
-					!on() ||
-					!sameSettings(committed.agency, cfg) ||
-					!samePersona(committed.general, persona) ||
-					c.generation !== cy.mine ||
-					c.runtime !== cy.runtime ||
-					convs.get(c.id) !== c ||
-					conversation.latestOrdinalInTransaction(db, c.id) !== cy.ordinal ||
-					deps.conversationBusy(db, c.id) ||
-					// The user is speaking or being answered (ASR, TTS) though no message is written yet.
-					inference.foregroundBusy()
-				)
-					return "stale";
-				return persistSpeech(deps, db, {
-					conversationId: c.id,
-					messageId,
-					text,
-					at,
-					ticket,
-					evidenceRefs,
-				});
-			});
-		} catch (error) {
-			log.warn("agency.delivered", {
-				subjectId: c.id,
-				attemptId: ticket.id,
-				kind: trigger,
-				outcome: "write_failed",
-				reason: toErrorCode(error, "write_failed"),
-			});
-			receipt(cy, ticket, "failed", "");
-			return false;
-		}
-		if (outcome === "stale") {
-			log.info("agency.delivered", {
-				subjectId: c.id,
-				attemptId: ticket.id,
-				kind: trigger,
-				outcome: "interrupted",
-			});
-			receipt(cy, ticket, "interrupted", "");
-			return false;
-		}
-		cy.planner.proactiveSpoke(nowMs());
-		log.info("agency.delivered", {
-			subjectId: c.id,
-			attemptId: ticket.id,
-			kind: trigger,
-			outcome,
-			outputCharacters: text.length,
-			...(ticket.emotion ? { emotion: ticket.emotion } : {}),
-		});
-		receipt(cy, ticket, "succeeded", speechReceipt(outcome, text));
-		return true;
-	}
-
-	/** One terminal receipt per ticket (S3), recorded on the runtime that issued it and only while it is current. */
-	function receipt(
-		cy: Cycle,
-		ticket: ActionTicket,
-		status: "succeeded" | "failed" | "interrupted",
-		resultText: string,
-	) {
-		const { c } = cy;
-		// A replaced runtime already interrupted its tickets; its late receipt belongs to nobody.
-		if (c.runtime !== cy.runtime) {
-			log.info("agency.receipt", {
-				subjectId: c.id,
-				attemptId: ticket.id,
-				status,
-				outcome: "dropped",
-			});
-			return;
-		}
-		try {
-			cy.runtime.recordResult({
-				ticketId: ticket.id,
-				status,
-				at: nowMs(),
-				resultText,
-			});
-			log.info("agency.receipt", {
-				subjectId: c.id,
-				attemptId: ticket.id,
-				status,
-			});
-		} catch (error) {
-			log.warn("agency.receipt", {
-				subjectId: c.id,
-				attemptId: ticket.id,
-				status,
-				reason: toErrorCode(error, "receipt_failed"),
-			});
-		}
-	}
-
-	async function cycleBody(cy: Cycle, update: boolean): Promise<CycleOutcome> {
+	async function cycleBody(cy: Cycle): Promise<CycleOutcome> {
 		const { c, runtime, trigger, controller } = cy;
-		if (update)
-			logCalls(c, await runtime.runBackground(nowMs(), controller.signal));
 		if (controller.signal.aborted) return "aborted";
 		const opportunity: Opportunity = {
 			id: `o${++c.opportunities}`,
@@ -590,14 +423,28 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			presence: "quiet",
 			foregroundBusy: hostBusy(c),
 			playerBusy: false,
+			speechAllowed:
+				c.id === activeId && c.planner.blockedBy() !== "unanswered",
 			topics: topicsNow(),
 			todos: todosNow(c),
 		};
-		const { decision, calls } = await runtime.decide(
-			opportunity,
-			controller.signal,
-		);
+		const result =
+			trigger === "review_due"
+				? await runtime.wake!(
+						nowMs(),
+						{
+							presence: "quiet",
+							foregroundBusy: hostBusy(c),
+							speechAllowed:
+								c.id === activeId && c.planner.blockedBy() !== "unanswered",
+						},
+						controller.signal,
+					)
+				: await runtime.decide(opportunity, controller.signal);
+		const { calls } = result;
+		const decision = result.decision;
 		logCalls(c, calls);
+		if (!decision) return "silent";
 		const superseded =
 			!on() ||
 			convs.get(c.id) !== c ||
@@ -608,21 +455,25 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			calls.some((call) => call.code === "aborted");
 		logDecision(c, trigger, decision, superseded);
 		if (superseded) return "aborted";
-		// A busy moment is not a silent one: it must not spend the idle backoff.
-		if (decision.source === "host_blocked") return "aborted";
+		// Host limits defer an opportunity; they do not spend the speech backoff.
+		if (["host_blocked", "host_budget"].includes(decision.source))
+			return "aborted";
 		if (!decision.ticket) return "silent";
-		return (await deliver(cy, decision.ticket, decision.evidenceRefs))
-			? "spoke"
-			: "silent";
+		if (!(await save(c))) return "aborted";
+		const delivered = await deliver(cy, decision.ticket, decision.evidenceRefs);
+		if (decision.ticket.action === "tool") return "aborted";
+		return delivered ? "spoke" : "silent";
 	}
 
 	async function cycle(
 		c: Conv,
 		trigger: Opportunity["trigger"],
-		update: boolean,
 	): Promise<CycleOutcome> {
 		if (!on() || convs.get(c.id) !== c) return "halted";
-		if (trigger === "idle" && hostBusy(c)) {
+		if (
+			trigger === "idle" &&
+			(c.background || hostBusy(c) || waitingForWork(c.runtime))
+		) {
 			// Wait one more interval at the same level.
 			c.planner.enter();
 			c.planner.leave(nowMs());
@@ -643,10 +494,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 				conversation.latestOrdinalInTransaction(db, c.id),
 			),
 		};
-		cy.planner.enter();
+		if (trigger !== "review_due") cy.planner.enter();
 		let outcome: CycleOutcome = "silent";
 		try {
-			outcome = await cycleBody(cy, update);
+			outcome = await cycleBody(cy);
 		} catch (error) {
 			if (controller.signal.aborted) outcome = "aborted";
 			else
@@ -657,7 +508,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 				});
 		} finally {
 			if (c.background === controller) c.background = null;
-			cy.planner.leave(nowMs());
+			if (trigger !== "review_due") cy.planner.leave(nowMs());
+			if (convs.get(c.id) === c) await save(c);
 		}
 		if (on() && convs.get(c.id) === c && c.planner === cy.planner)
 			c.scheduler.rearm();
@@ -668,17 +520,16 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	function runCycle(
 		c: Conv,
 		trigger: Opportunity["trigger"],
-		update: boolean,
 	): Promise<CycleOutcome> {
-		const task = cycle(c, trigger, update);
+		const task = cycle(c, trigger);
 		inflight.add(task);
 		const done = () => inflight.delete(task);
 		task.then(done, done);
 		return task;
 	}
 
-	function launch(c: Conv, trigger: Opportunity["trigger"], update: boolean) {
-		runCycle(c, trigger, update).catch((error) =>
+	function launch(c: Conv, trigger: Opportunity["trigger"]) {
+		runCycle(c, trigger).catch((error) =>
 			log.warn("agency.cycle_failed", {
 				subjectId: c.id,
 				reason: toErrorCode(error, "cycle_failed"),
@@ -749,6 +600,20 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			// The core cannot forget one observation: the conversation's agency starts over without it
 			// (new runtime and planner; nothing of the old idle backoff survives).
 			resetConv(c, "retracted");
+			if (deps.state) {
+				const task = store
+					.write((tx) => deps.state!.revokeInTransaction(tx, c.id))
+					.then(() => {
+						if (convs.get(c.id) === c) {
+							c.epoch = store.read((tx) =>
+								deps.state!.epochInTransaction(tx, c.id),
+							);
+							trackSave(c);
+						}
+					});
+				inflight.add(task);
+				task.finally(() => inflight.delete(task));
+			}
 			pending.delete(c.id);
 			return;
 		}
@@ -792,6 +657,16 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	/** Reads and handles every new outbox event in order, then opens the turn-end opportunities. */
 	function pump() {
 		if (!on()) return;
+		if (deps.state) {
+			for (const c of convs.values())
+				if (
+					store.read((db) => deps.state!.epochInTransaction(db, c.id)) !==
+					c.epoch
+				)
+					dropConv(c, "source_forgotten");
+			collectReturns();
+		}
+		const before = cursor;
 		const pending = new Map<string, Pending>();
 		for (;;) {
 			const page = store.read((db) => {
@@ -816,17 +691,18 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			if (state.turnEnd && c && conversationId === activeId) {
 				workChanged.delete(conversationId);
 				newWork(c);
-				launch(c, "turn_end", true);
+				launch(c, "turn_end");
 			}
 		}
 		// A question is asked where the user is talking; elsewhere it waits for the next turn there.
 		for (const conversationId of workChanged) {
 			if (conversationId !== activeId) continue;
 			const c = convOf(conversationId);
-			if (newWork(c)) launch(c, "result_received", true);
+			if (newWork(c)) launch(c, "result_received");
 		}
 		workChanged.clear();
 		prune();
+		if (cursor !== before) for (const c of convs.values()) trackSave(c);
 	}
 
 	function safePump() {
@@ -849,13 +725,31 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		cfg = next;
 		persona = nextPersona;
 		// Applied immediately: whatever was in flight belongs to the old setting.
-		resetAll("settings.changed");
+		for (const c of convs.values()) {
+			c.generation++;
+			abortBackground(c);
+			c.runtime.invalidate("settings.changed", nowMs());
+			const snapshot = c.runtime.snapshot();
+			c.scope = newScope();
+			c.runtime = newRuntime(c, {
+				...snapshot,
+				continuity: { ...snapshot.continuity!, issued: [] },
+			});
+			c.planner = newPlanner(c.id);
+			c.scheduler.dispose();
+			c.scheduler = newScheduler(c);
+			c.scheduler.rearm();
+			trackSave(c);
+		}
 		log.info("agency.settings_applied", {});
 	}
 
 	// ---- public ---------------------------------------------------------------
 
 	const dialoguePort: AgencyLayerPort = {
+		stateForContextInTransaction(db, id) {
+			return projectionLines(deps, convs, db, id);
+		},
 		workChangedInTransaction(_db, conversationId) {
 			workChanged.add(conversationId);
 		},
@@ -885,12 +779,31 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			if (started || closed) return;
 			started = true;
 			cfg = deps.settings.get().agency;
-			cursor = feedEnd();
+			const feed = deps.state
+				? store.read((db) => deps.state!.feedInTransaction(db))
+				: null;
+			cursor = feed?.cursor ?? feedEnd();
+			activeId = feed?.activeId ?? null;
+			if (deps.state)
+				for (const record of store.read((db) =>
+					deps.state!.recordsInTransaction(db),
+				))
+					restored.set(record.conversationId, record);
+			for (const id of restored.keys()) {
+				const c = convOf(id);
+				const task = recoverTickets(deps, c, nowMs())
+					.then(() => save(c))
+					.then(() => c.scheduler.rearm());
+				inflight.add(task);
+				task.finally(() => inflight.delete(task));
+			}
+			safePump();
 			stoppers.push(deps.settings.onChange(applySettings));
 			stoppers.push(store.onCommit(safePump));
 		},
 		async close() {
 			if (closed) return;
+			await Promise.all([...convs.values()].map((c) => save(c)));
 			closed = true;
 			for (const stop of stoppers.splice(0)) stop();
 			resetAll("closed");
@@ -901,6 +814,13 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		/** The open TODOs of the dialogue ledger (attached once the dialogue service exists). */
 		attachWork(value: AgencyWork) {
 			work = value;
+		},
+		forgetInTransaction(
+			db: Database,
+			purge: { messageIds: readonly string[]; itemIds: readonly string[] },
+		) {
+			topicsCache = null;
+			deps.state?.forgetInTransaction(db, purge);
 		},
 		/** Memory forgot something: the cached topics may name it. */
 		invalidateTopics() {

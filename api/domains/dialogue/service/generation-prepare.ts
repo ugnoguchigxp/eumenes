@@ -45,6 +45,7 @@ import {
 	namedResources,
 	namedTodos,
 	stateLinesInTransaction,
+	agencyStateLines,
 	stateText,
 } from "./state-text";
 import { ASK_STEP } from "./tool-exchange";
@@ -487,7 +488,10 @@ export function createPrepare(
 			refs,
 		});
 		// A routed turn talks on the time alone; its choice calls read the work and what is presented.
-		const state = stateText(stateLines.slice(0, 1));
+		const state = stateText([
+			...stateLines.slice(0, 1),
+			...agencyStateLines(deps, tx, conversationId),
+		]);
 		const messages = withLastMessage(
 			prefix,
 			[

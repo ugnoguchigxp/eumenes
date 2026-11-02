@@ -49,6 +49,10 @@ type RuntimeDeps = {
 	onSearchReport?: SearchReportHook;
 	/** Reads a resource by URI for the sub-agent tool `resource.read`; without it the tool is not offered. */
 	resources?: ResourceReadPort;
+	autonomousResearch?: (
+		db: import("bun:sqlite").Database,
+		rootId: string,
+	) => boolean;
 };
 export type SearchReportHook = (
 	db: import("bun:sqlite").Database,
