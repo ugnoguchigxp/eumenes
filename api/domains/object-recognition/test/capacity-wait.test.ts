@@ -1,3 +1,4 @@
+import { createAnalysisFactory } from "../../../application/media/analysis";
 import { afterEach, expect, setSystemTime, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -57,7 +58,7 @@ async function fixture(
 			baseUrl: "http://127.0.0.1:9",
 			credential: "test",
 		}),
-		visual: () =>
+		analyses: createAnalysisFactory(store, queue, () =>
 			createVisualPerception({
 				baseUrl: "http://127.0.0.1:9810",
 				token: "control-secret",
@@ -65,6 +66,7 @@ async function fixture(
 				fetch: f.fetcher,
 				pollMs: 1,
 			}),
+		),
 		fetcher: (async (input: RequestInfo | URL, init?: RequestInit) => {
 			const path = new URL(String(input)).pathname;
 			if (init?.method === "POST" && refuse) {

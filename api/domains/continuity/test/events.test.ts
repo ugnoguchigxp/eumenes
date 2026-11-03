@@ -19,7 +19,7 @@ function setup() {
 		itemSourceMigration,
 		eventsMigration,
 	]);
-	const events = createContinuityService(store).events;
+	const events = createContinuityService().events;
 	return { store, events, done: () => rmSync(dir, { recursive: true }) };
 }
 

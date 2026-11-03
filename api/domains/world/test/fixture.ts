@@ -1,3 +1,4 @@
+import { createWorldFixture } from "./usage.fixture";
 import type { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,10 +19,8 @@ import {
 } from "../../conversation";
 import {
 	createConversationSourceAdapter,
-	createWorldService,
 	sourceKeyOf,
 	type WorldApplyRequest,
-	type WorldService,
 } from "..";
 import type { WorldServiceOptions } from "../service/world-service";
 
@@ -52,7 +51,7 @@ export const memoryPolicyRevision = (db: Database): string =>
 export type Harness = {
 	store: SqliteStore;
 	conversation: ConversationService;
-	world: WorldService;
+	world: ReturnType<typeof createWorldFixture>;
 	path: string;
 	cleanup(): Promise<void>;
 };
@@ -80,7 +79,7 @@ export async function openHarness(
 		const conversation = createConversationService(store, {
 			requireOutbox: true,
 		});
-		const world = createWorldService({
+		const world = createWorldFixture({
 			store,
 			policyRevision: memoryPolicyRevision,
 			...over,

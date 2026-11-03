@@ -1,4 +1,4 @@
-import { buildVisualPerception } from "./media/visual-perception";
+import { buildAnalysisFactory } from "./media/visual-perception";
 import { registerCaptureLibrary } from "./media/capture-library";
 import type { Database } from "bun:sqlite";
 import type { Capabilities } from "../domains/capabilities";
@@ -98,7 +98,7 @@ export function buildMedia(
 		() => mediaGateway().imageImports.identity,
 	);
 	objectRecognition = createObjectRecognition({
-		visual: buildVisualPerception(config, settings),
+		analyses: buildAnalysisFactory(config, settings, store, queue),
 		store,
 		queue,
 		connection: () => settings.objectRecognitionCredentials(),

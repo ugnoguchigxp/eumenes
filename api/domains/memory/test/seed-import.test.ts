@@ -309,7 +309,7 @@ for (const backupBeforeImport of [true, false])
 		const store = openStore(join(h.dir, "db.sqlite3"), memoryTestMigrations);
 		extra.push(() => store.close());
 		const conversation = createConversationService(store);
-		const continuity = createContinuityService(store, () => h.time.now);
+		const continuity = createContinuityService(() => h.time.now);
 		const memory = createMemoryService(store, conversation, continuity, {
 			journalPath: join(h.dir, "journal.jsonl"),
 			clock: () => h.time.now,

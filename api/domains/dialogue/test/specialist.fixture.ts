@@ -114,7 +114,7 @@ export type SpecialistCall = Array<{ role: string; content: string }>;
 export async function setup(options: Options = {}) {
 	const { dir, store } = openDialogueStore("eumenes-specialist-");
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store);
+	const continuity = createContinuityService();
 	const memory: MemoryService | undefined =
 		options.memory === false
 			? undefined

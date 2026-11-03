@@ -305,8 +305,6 @@ export function createCurationCtx(options: CurationOptions) {
 		adapters,
 		accessOf,
 		unusable,
-		manifestPrefix,
-		releaseManifests,
 		releaseEvents,
 		settleOp,
 		rejectEvent,

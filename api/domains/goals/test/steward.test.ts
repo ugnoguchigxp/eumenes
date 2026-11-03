@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { createGoalsService, migrations } from "..";
+import { migrations } from "..";
+import { createGoalsFixture as createGoalsService } from "../test/fixture";
 import type { GoalAccess, GoalOp } from "..";
 
 const alice: GoalAccess = { principal: "alice", scopeKeys: ["work"] };

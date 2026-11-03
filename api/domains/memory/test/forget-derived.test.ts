@@ -194,7 +194,7 @@ test("an older database restored over the forget gets derived replayed before me
 	const store = openStore(join(h.dir, "db.sqlite3"), memoryTestMigrations);
 	extra.push(() => store.close());
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store, () => h.time.now);
+	const continuity = createContinuityService(() => h.time.now);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: journalPath(h),
 		clock: () => h.time.now,

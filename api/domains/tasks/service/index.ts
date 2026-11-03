@@ -45,11 +45,9 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 	const { maintenanceInTransaction, recoverInTransaction } = maintenance;
 	return {
 		createInTransaction,
-		requestStartInTransaction,
 		requestStopInTransaction,
 		forgetInTransaction,
 		settleStopInTransaction,
-		amendGrantInTransaction,
 		applyTransitionInTransaction,
 		askInTransaction,
 		answerInTransaction,

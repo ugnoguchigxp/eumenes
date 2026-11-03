@@ -90,7 +90,7 @@ export async function scenario(options: {
 		conversationAgent: testConversationAgent,
 		store,
 		conversation: createConversationService(store),
-		continuity: createContinuityService(store),
+		continuity: createContinuityService(),
 		larm,
 		queue,
 		agents: { list: () => tasks } as never,

@@ -14,12 +14,12 @@ import {
 } from "../../conversation";
 import {
 	type ContinuityKind,
-	createContinuityService,
 	migration as continuityMigration,
 	shortTermMigration,
 	itemSourceMigration,
 	eventsMigration,
 } from "../../continuity";
+import { createContinuityFixture as createContinuityService } from "../../../application/world/state-services.fixture";
 import {
 	agentHardeningMigration,
 	turnVectorsMigration,

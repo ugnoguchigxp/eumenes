@@ -1,29 +1,33 @@
 import { z } from "zod";
-import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { imageForInput } from "../../../infrastructure/media-image";
-import type { HandlerDefinition, QueueService } from "../../queue";
+import type { SqliteStore } from "../../infrastructure/sqlite";
+import { imageForInput } from "../../infrastructure/media-image";
+import type { HandlerDefinition, QueueService } from "../../domains/queue";
 import {
 	isCapacityBusy,
 	LARM_CAPACITY_TIMEOUT,
 	settleCapacityWait,
 	type AnalysisRecord,
 	type PerceptionPort,
-} from "../../larm";
-import { row } from "../repository";
-import {
-	analysisRow,
-	analysisRecord,
-	updateAnalysis,
-} from "../repository/analyses";
-import { active, valid } from "./analysis-source";
-/** The processing time one try gets once LARM has room again. */
+} from "../../domains/larm";
+import type { MediaAnalysisStorage } from "../../infrastructure/media-analysis";
+import type { AnalysisCreate } from "../../domains/larm";
+export const active = (v: AnalysisRecord) =>
+	["queued", "starting", "running", "cancelling"].includes(v.state);
 /** How long one detail analysis may take after LARM accepts it. */
 export const ANALYSIS_BUDGET_MS = 360_000;
 export function analysisHandler(
 	store: SqliteStore,
 	queue: QueueService,
 	visual: () => PerceptionPort,
+	storage: MediaAnalysisStorage<AnalysisRecord, AnalysisCreate>,
 ) {
+	const {
+		row: analysisRow,
+		record: analysisRecord,
+		update: updateAnalysis,
+		valid,
+		scope,
+	} = storage;
 	type Prepared = {
 		bytes: Uint8Array;
 		timestamp: number | null;
@@ -40,7 +44,7 @@ export function analysisHandler(
 		| { ok: false; code: string }
 		| { capacityWait: number | null };
 	const handler: HandlerDefinition<{ id: string }, Prepared, Output> = {
-		kind: "object-recognition.analysis",
+		kind: `${scope}.analysis`,
 		payloadVersions: [1],
 		schema: z.object({ id: z.uuid() }),
 		recovery: "interrupt",
@@ -60,12 +64,12 @@ export function analysisHandler(
 				});
 				return { status: "stale", reason: "analysis_source_changed" };
 			}
-			const src = row(db, r.source_id)!;
+			const bytes = storage.sourceBytes(db, r.source_id);
 			updateAnalysis(db, r, { state: "starting" });
 			return {
 				status: "ready",
 				input: {
-					bytes: src.bytes,
+					bytes,
 					timestamp: v.timestamp,
 					id: r.id,
 					options: v.options,
@@ -97,9 +101,7 @@ export function analysisHandler(
 							const r = analysisRow(db, input.id);
 							if (!r) return;
 							if (phase === "connection") {
-								db.query(
-									"UPDATE object_recognition_analyses SET connection_id=? WHERE id=?",
-								).run(id!, r.id);
+								storage.setConnection(db, r.id, id!);
 								updateAnalysis(db, r, { releaseConfirmed: null });
 							} else if (phase === "lifecycle") {
 								if (observation)
@@ -160,7 +162,7 @@ export function analysisHandler(
 			if (outcome.type !== "success") return "stale";
 			if ("capacityWait" in outcome.result) {
 				const waiting = settleCapacityWait({
-					domain: "object-recognition",
+					domain: scope,
 					subjectId: r.id,
 					now: Date.now(),
 					previous: v.capacityWait,
@@ -174,8 +176,8 @@ export function analysisHandler(
 						}),
 					schedule(wait) {
 						const next = queue.enqueueInTransaction(db, {
-							scope: "object-recognition",
-							kind: "object-recognition.analysis",
+							scope,
+							kind: `${scope}.analysis`,
 							dedupeKey: `${r.id}:analysis:w${wait.count}`,
 							payload: { id: r.id },
 							subjectRef: r.id,
@@ -186,9 +188,7 @@ export function analysisHandler(
 							deadlineAtMs: wait.deadline,
 							maxAttempts: 1,
 						});
-						db.query(
-							"UPDATE object_recognition_analyses SET job_id=? WHERE id=?",
-						).run(next.job.id, r.id);
+						storage.setJob(db, r.id, next.job.id);
 						updateAnalysis(db, r, {
 							state: "queued",
 							capacityWait: { startedAt: wait.startedAt, count: wait.count },

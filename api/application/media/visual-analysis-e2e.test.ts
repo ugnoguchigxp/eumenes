@@ -90,8 +90,10 @@ test("OCR and recognition detail analysis share one queue resource and the real 
 			},
 		];
 		const ids: string[] = [];
+		// Both owners may use the same request ID; storage and queue scopes must stay isolated.
+		const sharedId = crypto.randomUUID();
 		for (const { domain, source } of targets) {
-			const id = crypto.randomUUID();
+			const id = sharedId;
 			ids.push(id);
 			const path = `/api/${domain}/${source.id}/analyses`;
 			expect(
@@ -135,6 +137,7 @@ test("OCR and recognition detail analysis share one queue resource and the real 
 				`/api/${t.domain}/${t.source.id}/analyses/${ids[i]}?conversationId=main`,
 			);
 			const v = await response.json();
+			expect(v.sourceId).toBe(t.source.id);
 			expect(v.releaseConfirmed).toBe(true);
 			expect(v.result.response).toContain("<script>");
 			expect(JSON.stringify(v)).not.toContain("credential");

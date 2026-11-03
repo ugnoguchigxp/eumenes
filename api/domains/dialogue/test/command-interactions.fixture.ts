@@ -94,7 +94,7 @@ export async function setup(
 	};
 	const { dir, store } = openDialogueStore("eumenes-interactions-");
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store);
+	const continuity = createContinuityService();
 	const state = {
 		activeRevision: REVISION,
 		/** Added to the dialogue's clock (ms). */

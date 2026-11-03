@@ -1,4 +1,4 @@
-import { buildVisualPerception } from "./media/visual-perception";
+import { buildAnalysisFactory } from "./media/visual-perception";
 import { createLiveBridge } from "./media/live-bridge";
 import { createLateResources } from "./resources/late";
 import { buildResources } from "./resources/wiring";
@@ -94,7 +94,7 @@ export async function buildServices(
 		settings,
 		core.activity.embedding,
 	);
-	const continuity = createContinuityService(store);
+	const continuity = createContinuityService();
 	const dotsMessages = createDotsMessages({
 		store,
 		conversation,
@@ -130,7 +130,7 @@ export async function buildServices(
 	const uiCompositions = createUiCompositions();
 	let ocrCapabilities: Capabilities | null = null;
 	const ocr = createOcr({
-		visual: buildVisualPerception(config, settings),
+		analyses: buildAnalysisFactory(config, settings, store, queue),
 		store,
 		queue,
 		connection: () => settings.ocrCredentials(),

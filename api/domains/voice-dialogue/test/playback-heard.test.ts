@@ -6,9 +6,7 @@ import { say, setup, until, wav } from "./settings-voice.fixture";
 /** The `delivered` events the host logged for the main conversation, as the fields it wrote. */
 function deliveredFields(h: Awaited<ReturnType<typeof setup>>) {
 	return h.store
-		.read((db) =>
-			createContinuityService(h.store).events.logInTransaction(db, "main"),
-		)
+		.read((db) => createContinuityService().events.logInTransaction(db, "main"))
 		.filter((event) => event.type === "delivered")
 		.map((event) => JSON.parse(event.text ?? "{}") as Record<string, unknown>);
 }

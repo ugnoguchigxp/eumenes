@@ -6,7 +6,7 @@
  */
 import type { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
-import { createGoalsService } from "../../goals";
+import { createGoalsFixture as createGoalsService } from "../../../application/world/state-services.fixture";
 import {
 	createWorldHostGate,
 	createWorldQuery,

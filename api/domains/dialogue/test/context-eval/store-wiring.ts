@@ -40,7 +40,7 @@ export async function openSeedWiring(): Promise<SeedWiring> {
 	let counter = 0;
 	const id = () =>
 		`11111111-0000-4000-8000-${String(++counter).padStart(12, "0")}`;
-	const continuity = createContinuityService(store, () => now, id);
+	const continuity = createContinuityService(() => now, id);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: join(dir, "journal.jsonl"),
 		clock: () => now,

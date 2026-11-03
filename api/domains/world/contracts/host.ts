@@ -5,7 +5,6 @@ import type {
 	WorldOperation,
 	WorldOperationResult,
 	WorldSnapshotResult,
-	WorldUsageResult,
 } from "eumenes-world-model/sqlite";
 
 /** Feeds whose cursors the host stores. A cursor is valid only for the restore epoch that issued it. */
@@ -93,13 +92,6 @@ export type WorldHistoryRequest = {
 
 export type WorldHistoryReadResult =
 	| WorldHistoryResult
-	| {
-			status: "blocked";
-			reasonCode: "WORLD_DISABLED" | "WORLD_RECOVERY_REQUIRED";
-	  };
-
-export type WorldUsageCheck =
-	| WorldUsageResult
 	| {
 			status: "blocked";
 			reasonCode: "WORLD_DISABLED" | "WORLD_RECOVERY_REQUIRED";

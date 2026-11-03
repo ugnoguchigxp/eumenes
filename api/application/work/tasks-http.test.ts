@@ -55,7 +55,7 @@ function setup() {
 	const dialogue = createDialogueService({
 			conversationAgent: testConversationAgent,
 			store,
-			continuity: createContinuityService(store),
+			continuity: createContinuityService(),
 			queue,
 			conversation,
 			larm,

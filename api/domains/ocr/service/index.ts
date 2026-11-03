@@ -1,5 +1,6 @@
-import { createOcrAnalyses } from "./analyses";
-import type { PerceptionPort } from "../../larm";
+import { analysisStorage } from "./analyses";
+import type { AnalysisRecord, AnalysisCreate } from "../../larm";
+import type { MediaAnalysisFactory } from "../../../infrastructure/media-analysis";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { QueueService } from "../../queue";
@@ -29,15 +30,13 @@ export function createOcr(deps: {
 	queue: QueueService;
 	connection: () => Connection | null;
 	fetcher?: typeof fetch;
-	visual?: () => PerceptionPort;
+	analyses?: MediaAnalysisFactory<AnalysisRecord, AnalysisCreate>;
 	inference?: InferencePort;
 	capabilities?: () => Capabilities | null;
 	qrDecoder?: typeof import("./qr-input").decodeQr;
 }) {
 	const { store, queue } = deps;
-	const analyses = deps.visual
-		? createOcrAnalyses({ store, queue, visual: deps.visual })
-		: null;
+	const analyses = deps.analyses?.(analysisStorage()) ?? null;
 	const qr = createOcrQr(store, queue, deps.qrDecoder);
 	const corrections =
 		deps.inference && deps.capabilities

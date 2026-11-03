@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
-import { type ContinuityKind, createContinuityService } from "../../continuity";
+import type { ContinuityKind } from "../../continuity";
+import { createContinuityFixture as createContinuityService } from "../../../application/world/state-services.fixture";
 import { createMemoryService } from "..";
 import { memoryTestMigrations, saveItem } from "./memory.fixture";
 import {

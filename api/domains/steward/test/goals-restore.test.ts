@@ -1,3 +1,4 @@
+import { createContinuityService } from "../../continuity";
 import { Database } from "bun:sqlite";
 import { copyFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -7,8 +8,8 @@ import {
 	CONVERSATION_DEFAULT_SCOPE,
 	createConversationService,
 } from "../../conversation";
-import { createContinuityService } from "../../continuity";
-import { createGoalsService } from "../../goals";
+
+import { createGoalsFixture as createGoalsService } from "../../../application/world/state-services.fixture";
 import { createMemoryService } from "../../memory";
 import { createQueue } from "../../queue";
 import { createStewardService } from "../service";
@@ -84,9 +85,7 @@ test("a database restored from before a goal forget loses the goal again at star
 			rows(store, "SELECT desired_state AS text FROM goals_ledger"),
 		).toHaveLength(2);
 		const conversation = createConversationService(store);
-		const continuity = createContinuityService(store, () =>
-			new Date().toISOString(),
-		);
+		const continuity = createContinuityService(() => new Date().toISOString());
 		const memory = createMemoryService(store, conversation, continuity, {
 			journalPath: join(dir, "journal.jsonl"),
 			clock: () => new Date().toISOString(),

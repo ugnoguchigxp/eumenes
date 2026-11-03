@@ -52,7 +52,7 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 		createMemoryService(
 			store,
 			createConversationService(store),
-			createContinuityService(store),
+			createContinuityService(),
 			{ journalPath },
 		);
 	try {

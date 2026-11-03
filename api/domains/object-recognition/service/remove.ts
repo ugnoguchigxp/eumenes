@@ -1,11 +1,11 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { QueueService } from "../../queue";
-import type { createRecognitionAnalyses } from "./analyses";
+import type { ObjectRecognitionService } from "./index";
 import { owned, record } from "../repository";
 export async function removeRecognition(
 	store: SqliteStore,
 	queue: QueueService,
-	analyses: ReturnType<typeof createRecognitionAnalyses> | null,
+	analyses: ObjectRecognitionService["analyses"],
 	owner: string,
 	id: string,
 ) {

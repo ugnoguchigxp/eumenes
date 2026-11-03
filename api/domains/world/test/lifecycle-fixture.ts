@@ -1,3 +1,4 @@
+import { createWorldFixture } from "./usage.fixture";
 import { Database } from "bun:sqlite";
 import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,11 +17,9 @@ import {
 	createConversationSourceAdapter,
 	createWorldHostGate,
 	createWorldLifecycle,
-	createWorldService,
 	type LifecycleOptions,
 	type WorldHostGate,
 	type WorldLifecycle,
-	type WorldService,
 } from "..";
 import {
 	ACCESS,
@@ -76,7 +75,7 @@ function build(
 		allowedPurposes: [PURPOSE],
 		cursorSecret: TEST_CURSOR_SECRET,
 	});
-	const world: WorldService = createWorldService({
+	const world = createWorldFixture({
 		store,
 		policyRevision: memoryPolicyRevision,
 		sources: [sourceAdapter],

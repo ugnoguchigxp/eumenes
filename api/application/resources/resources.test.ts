@@ -63,7 +63,7 @@ function eventHarness() {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
-	const events = createContinuityService(store).events;
+	const events = createContinuityService().events;
 	const access = createResourceAccess({
 		store,
 		kinds: () => kinds,

@@ -62,7 +62,7 @@ async function assemble(
 	const memory = createMemoryService(
 		store,
 		conversation,
-		createContinuityService(store),
+		createContinuityService(),
 		{ journalPath: memoryJournalPath },
 	);
 	const world: WorldAssembly = createWorldAssembly({
@@ -108,7 +108,7 @@ async function startServerWorld(dir: string, enabled: boolean) {
 	const memory = createMemoryService(
 		store,
 		conversation,
-		createContinuityService(store),
+		createContinuityService(),
 		{ journalPath: memoryJournalPath },
 	);
 	const settings = await createSettings(store, { dbPath, env: {} });

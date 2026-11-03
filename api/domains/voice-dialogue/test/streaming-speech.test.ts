@@ -284,7 +284,7 @@ test("clauses played before generation ends are recorded as heard once the answe
 	source.finish();
 	await until(() => h.voice.get(id)?.status === "played");
 	const delivered = h.store.read((db) =>
-		createContinuityService(h.store)
+		createContinuityService()
 			.events.logInTransaction(db, "main")
 			.filter((event) => event.type === "delivered")
 			.map((event) => JSON.parse(event.text ?? "{}")),
@@ -374,7 +374,7 @@ test("a generation that fails after a clause was played keeps the played words i
 			.map((m) => ({ text: m.text, runId: m.runId })),
 	).toEqual([{ text: "先に届いた句。", runId }]);
 	const said = h.store.read((db) =>
-		createContinuityService(h.store)
+		createContinuityService()
 			.events.logInTransaction(db, "main")
 			.filter((event) => event.type === "said" && event.by === "agent")
 			.map((event) => JSON.parse(event.text ?? "{}").text),

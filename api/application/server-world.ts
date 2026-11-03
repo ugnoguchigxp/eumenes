@@ -77,7 +77,7 @@ export function assembleCuration(
 	deps: Parameters<typeof createStewardAssembly>[0] &
 		Omit<Parameters<typeof assembleServerWorld>[1], "steward">,
 ) {
-	const goals = createGoalsAssembly(deps.store);
+	const goals = createGoalsAssembly();
 	// World wakes the steward after its intake, and the steward curates World: the kick is bound late.
 	let kick: StewardService["kickInTransaction"] | undefined;
 	const world = assembleServerWorld(config, {

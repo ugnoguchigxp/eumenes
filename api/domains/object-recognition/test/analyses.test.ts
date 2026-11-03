@@ -1,3 +1,4 @@
+import { createAnalysisFactory } from "../../../application/media/analysis";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -44,7 +45,10 @@ async function fixture(
 			baseUrl: "http://127.0.0.1:9",
 			credential: "test",
 		}),
-		visual: () => ({ ...p, version: () => version }),
+		analyses: createAnalysisFactory(store, queue, () => ({
+			...p,
+			version: () => version,
+		})),
 		fetcher: (async () =>
 			Response.json({
 				kind: "image",

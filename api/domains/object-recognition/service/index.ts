@@ -4,8 +4,9 @@ import {
 	captureSaveOperations,
 	type CaptureSaveDependencies,
 } from "./capture-save";
-import { createRecognitionAnalyses } from "./analyses";
-import type { PerceptionPort } from "../../larm";
+import { analysisStorage } from "./analyses";
+import type { AnalysisRecord, AnalysisCreate } from "../../larm";
+import type { MediaAnalysisFactory } from "../../../infrastructure/media-analysis";
 import { recognitionCommand } from "../../capabilities/contracts";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -35,13 +36,11 @@ export function createObjectRecognition(
 		queue: QueueService;
 		connection: () => Connection | null;
 		fetcher?: typeof fetch;
-		visual?: () => PerceptionPort;
+		analyses?: MediaAnalysisFactory<AnalysisRecord, AnalysisCreate>;
 	} & CaptureSaveDependencies,
 ) {
 	const { store, queue } = deps;
-	const analyses = deps.visual
-		? createRecognitionAnalyses({ store, queue, visual: deps.visual })
-		: null;
+	const analyses = deps.analyses?.(analysisStorage()) ?? null;
 	function cancelInTransaction(db: Database, owner: string, id: string) {
 		const r = owned(db, id, owner);
 		const v = record(r);

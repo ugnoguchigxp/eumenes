@@ -4,12 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	createContinuityService,
-	itemSourceMigration,
-	migration,
-	shortTermMigration,
-} from "..";
+import { itemSourceMigration, migration, shortTermMigration } from "..";
+import { createContinuityFixture as createContinuityService } from "../test/fixture";
 import type { ContinuityKind } from "../contracts";
 
 type Service = ReturnType<typeof createContinuityService>;

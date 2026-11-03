@@ -185,7 +185,7 @@ export async function setup(options: SetupOptions = {}) {
 		options.extraMigrations,
 	);
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store);
+	const continuity = createContinuityService();
 	const cards = options.cards ?? DEFAULT_CARDS;
 	const state = {
 		offsetMs: 0,

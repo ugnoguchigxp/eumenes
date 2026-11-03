@@ -12,11 +12,13 @@ import {
 	migrations as conversationMigrations,
 	type ConversationService,
 } from "../../conversation";
-import { createGoalsService, migrations as goalsMigrations } from "../../goals";
+import { migrations as goalsMigrations } from "../../goals";
+import { createGoalsFixture as createGoalsService } from "../../../application/world/state-services.fixture";
 import {
 	createContinuityService,
 	migrations as continuityMigrations,
 } from "../../continuity";
+
 import {
 	createMemoryService,
 	migrations as memoryMigrations,
@@ -235,7 +237,7 @@ export async function setupSteward(
 	let counter = 0;
 	const conversation =
 		options.host?.conversation ?? createConversationService(store);
-	const continuity = createContinuityService(store, clock);
+	const continuity = createContinuityService(clock);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: join(dir, "journal.jsonl"),
 		clock,

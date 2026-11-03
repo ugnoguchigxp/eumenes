@@ -253,8 +253,3 @@ export function assertionSourceRefs(
 ): SourceRef[] {
 	return uniqueByIdentity(assertions.flatMap(assertionInputs));
 }
-
-/** Source versions a usage receipt names. Untrusted shape: World validates the receipt itself. */
-export function receiptSourceRefs(receipt: unknown): SourceRef[] {
-	return uniqueByIdentity(refs(list(rec(receipt)?.["sourceVersions"])));
-}

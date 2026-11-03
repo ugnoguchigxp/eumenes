@@ -88,7 +88,7 @@ export async function worldHarness(options: WorldFixtureOptions = {}) {
 	const memory = createMemoryService(
 		store,
 		conversation,
-		createContinuityService(store),
+		createContinuityService(),
 		{ journalPath: memoryJournalPath },
 	);
 	let stalled = options.stallForget === true;
@@ -262,7 +262,7 @@ export async function worldHarness(options: WorldFixtureOptions = {}) {
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		store,
-		continuity: createContinuityService(store),
+		continuity: createContinuityService(),
 		conversation,
 		larm: inference,
 		queue,

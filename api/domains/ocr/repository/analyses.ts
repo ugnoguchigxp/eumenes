@@ -1,16 +1,7 @@
+import type { MediaAnalysisRow } from "../../../infrastructure/media-analysis";
 import type { Database } from "bun:sqlite";
 import type { AnalysisRecord } from "../../larm";
-export type AnalysisRow = {
-	id: string;
-	source_id: string;
-	owner: string;
-	conversation_id: string;
-	frame_key: number;
-	record_json: string;
-	input_json: string;
-	job_id: string | null;
-	connection_id: string | null;
-};
+export type AnalysisRow = MediaAnalysisRow;
 export const analysisRow = (db: Database, id: string) =>
 	db
 		.query("SELECT * FROM ocr_analyses WHERE id=?")

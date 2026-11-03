@@ -1,10 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import type { AnalysisRecord } from "../../larm";
 import { record, row, type Row } from "../repository";
 import { analysisRecord, type AnalysisRow } from "../repository/analyses";
-export const active = (v: AnalysisRecord) =>
-	["queued", "starting", "running", "cancelling"].includes(v.state);
 export const digest = (r: Row) =>
 	createHash("sha256").update(r.bytes).update(r.record_json).digest("hex");
 export function frame(r: Row, index?: number) {

@@ -205,8 +205,6 @@ export type WorldAssembly = {
 	 * is reported; forgets keep being retried by the pump.
 	 */
 	recover(memory?: { feedResyncRequired?: boolean }): Promise<RecoverReport>;
-	/** First full pass over both change feeds; marks the host flag when drained. */
-	initialSync(): Promise<InitialSyncReport>;
 	/** Explicit switch. ON runs `initialSync` first and is refused if it cannot finish. */
 	setEnabled(enabled: boolean): Promise<void>;
 	status(): {
@@ -445,7 +443,6 @@ export function createWorldAssembly(
 			scopeKeys: [scope.scopeKey],
 		}),
 		recover,
-		initialSync,
 		async setEnabled(enabled) {
 			if (enabled) await initialSync();
 			await service.setEnabled(enabled);

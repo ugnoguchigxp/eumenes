@@ -10,7 +10,7 @@ async function setup() {
 	let at = Date.now();
 	const f = await dotsFixture(() => at);
 	clean.push(f.close);
-	const continuity = createContinuityService(f.store),
+	const continuity = createContinuityService(),
 		messages = createDotsMessages({
 			store: f.store,
 			conversation: f.conversation,

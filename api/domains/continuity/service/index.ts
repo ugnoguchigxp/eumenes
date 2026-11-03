@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { createEventStore } from "./events";
 import {
 	CONTINUITY_TTL_MS,
@@ -27,7 +26,6 @@ export interface AgentContinuityInput {
 }
 
 export function createContinuityService(
-	store: SqliteStore,
 	clock: () => string = () => new Date().toISOString(),
 	id: () => string = () => crypto.randomUUID(),
 ) {
@@ -154,19 +152,8 @@ export function createContinuityService(
 		): { noteIds: string[]; deleted: number } {
 			return deleteBySource(db, messageIds);
 		},
-		list(conversationId: string, includeClosed = false): ContinuityItem[] {
-			return store.read((db) => listItems(db, conversationId, !includeClosed));
-		},
-		/** The conversation's revision alone: cheaper than a snapshot when only a change counter is needed. */
-		revisionInTransaction(db: Database, conversationId: string): number {
-			return conversationRevision(db, conversationId);
-		},
 		/** Same-transaction read so an adoption check sees what the writer will commit. Expired items are left out. */
 		snapshotInTransaction,
-		/** A snapshot outside a writer transaction (read-only API). */
-		snapshot(conversationId: string): ContinuitySnapshot {
-			return store.read((db) => snapshotInTransaction(db, conversationId));
-		},
 		/** The event flow, episode, work results and window version (the active short-term memory). */
 		events: createEventStore(),
 	};

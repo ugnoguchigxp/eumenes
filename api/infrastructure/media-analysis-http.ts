@@ -1,0 +1,122 @@
+type MaskedAnalysis = {
+	state: string;
+	result: { masks: { data: string }[] } | null;
+};
+import { z } from "zod";
+import type { Hono } from "hono";
+import { parseJsonBody, parseQuery } from "./http";
+import type { MediaAnalyses } from "./media-analysis";
+const summary = <R extends MaskedAnalysis>(v: R) => ({
+	...v,
+	result: v.result
+		? { ...v.result, masks: v.result.masks.map((m) => ({ ...m, data: "" })) }
+		: null,
+});
+export function registerMediaAnalyses<I, R extends MaskedAnalysis>(
+	app: Hono,
+	root: `${string}/:id/analyses`,
+	service: MediaAnalyses<R, I>,
+	owner: string,
+	analysisCreate: z.ZodType<I>,
+) {
+	const scope = z.object({
+		conversationId: z.string().min(1).max(120),
+		frameIndex: z.coerce.number().int().min(0).max(59).optional(),
+	});
+	app.post(root, async (c) => {
+		const v = await parseJsonBody(c, analysisCreate, {
+			code: "invalid_analysis_input",
+		});
+		if (!v.ok) return v.response;
+		return c.json(
+			summary(await service.create(owner, c.req.param("id"), v.data)),
+			202,
+		);
+	});
+	app.get(root, (c) => {
+		const q = parseQuery(c, scope, { code: "invalid_analysis_input" });
+		if (!q.ok) return q.response;
+		return c.json(
+			service
+				.list(
+					owner,
+					c.req.param("id"),
+					q.data.conversationId,
+					q.data.frameIndex,
+				)
+				.map(summary),
+		);
+	});
+	app.get(`${root}/:analysisId`, (c) => {
+		const q = parseQuery(c, scope, { code: "invalid_analysis_input" });
+		if (!q.ok) return q.response;
+		return c.json(
+			summary(
+				service.get(
+					owner,
+					c.req.param("id"),
+					c.req.param("analysisId"),
+					q.data.conversationId,
+				),
+			),
+		);
+	});
+	app.post(`${root}/:analysisId/cancel`, async (c) => {
+		const q = await parseJsonBody(c, scope, { code: "invalid_analysis_input" });
+		if (!q.ok) return q.response;
+		return c.json(
+			summary(
+				await service.cancel(
+					owner,
+					c.req.param("id"),
+					c.req.param("analysisId"),
+					q.data.conversationId,
+				),
+			),
+		);
+	});
+	app.get(`${root}/:analysisId/image`, async (c) => {
+		const q = parseQuery(c, scope, { code: "invalid_analysis_input" });
+		if (!q.ok) return q.response;
+		const image = await service.image(
+			owner,
+			c.req.param("id"),
+			c.req.param("analysisId"),
+			q.data.conversationId,
+			AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(30000)]),
+		);
+		return new Response(new Uint8Array(image.bytes), {
+			headers: {
+				"Content-Type": image.mime,
+				"Cache-Control": "no-store",
+				"X-Content-Type-Options": "nosniff",
+			},
+		});
+	});
+	app.get(`${root}/:analysisId/masks/:index`, (c) => {
+		const q = parseQuery(c, scope, { code: "invalid_analysis_input" });
+		const index = z.coerce
+			.number()
+			.int()
+			.min(0)
+			.max(7)
+			.safeParse(c.req.param("index"));
+		if (!q.ok) return q.response;
+		if (!index.success) return c.json({ error: "invalid_analysis_input" }, 400);
+		const r = service.get(
+			owner,
+			c.req.param("id"),
+			c.req.param("analysisId"),
+			q.data.conversationId,
+		);
+		const mask = r.state === "completed" && r.result?.masks[index.data];
+		if (!mask) return c.json({ error: "analysis_not_found" }, 404);
+		return new Response(Buffer.from(mask.data, "base64"), {
+			headers: {
+				"Content-Type": "image/png",
+				"Cache-Control": "no-store",
+				"X-Content-Type-Options": "nosniff",
+			},
+		});
+	});
+}

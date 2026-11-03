@@ -15,7 +15,7 @@ async function setup() {
 	const messages = createDotsMessages({
 		store: f.store,
 		conversation: f.conversation,
-		continuity: createContinuityService(f.store),
+		continuity: createContinuityService(),
 		commands: f.dots.commands,
 		events: f.events,
 	});

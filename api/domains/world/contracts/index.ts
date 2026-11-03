@@ -126,7 +126,6 @@ export type {
 	WorldReadResult,
 	WorldSchemaStatus,
 	WorldStatus,
-	WorldUsageCheck,
 } from "./host";
 export type { WorldQueryContext, WorldQueryResult } from "./query";
 export * from "./view";

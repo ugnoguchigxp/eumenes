@@ -182,7 +182,7 @@ test("a database with only the original three migrations (plus later ones) upgra
 			conversationAgent: testConversationAgent,
 			store: upgraded,
 			conversation: createConversationService(upgraded),
-			continuity: createContinuityService(upgraded),
+			continuity: createContinuityService(),
 			larm: {
 				status: () => ({ state: "ready", capabilities: [] }),
 				connect: async () => {},

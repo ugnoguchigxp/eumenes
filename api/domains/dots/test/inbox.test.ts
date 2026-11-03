@@ -278,18 +278,6 @@ test("schedule binding is owned by its first task and connection and can be exte
 	expect(inbox.scheduleInTransaction(db, "none")).toBeNull();
 });
 
-test("dialogue receipts are stored per run and read back", () => {
-	const { db, inbox } = setup();
-	expect(inbox.dialogueReceiptInTransaction(db, "run-1")).toBeNull();
-	inbox.saveDialogueReceiptInTransaction(db, "run-1", "main", "task-1", {
-		ok: true,
-	});
-	expect(inbox.dialogueReceiptInTransaction(db, "run-1")).toEqual({ ok: true });
-	expect(() =>
-		inbox.saveDialogueReceiptInTransaction(db, "run-1", "main", "task-1", {}),
-	).toThrow();
-});
-
 test("projects are listed in ref order", () => {
 	const { db, inbox } = setup();
 	for (const ref of ["b", "a"])

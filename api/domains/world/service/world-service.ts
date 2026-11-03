@@ -7,7 +7,6 @@ import {
 	applyWorldOperation,
 	readAssertionHistory,
 	readWorldSnapshot,
-	validateWorldUsage,
 	type HostChecks,
 	type WorldOperation,
 	type WorldOperationResult,
@@ -27,7 +26,6 @@ import type {
 	WorldReadResult,
 	WorldSchemaStatus,
 	WorldStatus,
-	WorldUsageCheck,
 } from "../contracts";
 import {
 	readFeedCursor,
@@ -46,7 +44,6 @@ import {
 	assertionSourceRefs,
 	isMemoryStateItem,
 	operationInputs,
-	receiptSourceRefs,
 	resolveSources,
 } from "./inputs";
 import {
@@ -337,39 +334,6 @@ export function createWorldService(options: WorldServiceOptions) {
 		});
 	}
 
-	function validateUsageInTransaction(
-		db: Database,
-		receipt: unknown,
-		request: Pick<WorldReadRequest, "access" | "scope">,
-	): WorldUsageCheck {
-		requireTransaction(db);
-		if (options.gate && !options.gate.isOpen())
-			return { status: "blocked", reasonCode: "WORLD_RECOVERY_REQUIRED" };
-		if (!readHostState(db).enabled)
-			return { status: "blocked", reasonCode: "WORLD_DISABLED" };
-		const access = accessOf(db, request);
-		const resolved = resolveSources(
-			db,
-			adapters,
-			access,
-			request.scope,
-			receiptSourceRefs(receipt),
-			"lenient",
-			isStateItem,
-		);
-		return validateWorldUsage(db, receipt, {
-			contractVersion: 1,
-			access,
-			scope: request.scope,
-			hostChecks: hostChecks(
-				db,
-				request.scope,
-				access,
-				resolved.ok ? resolved.states : [],
-			),
-		});
-	}
-
 	return {
 		/** ON/OFF state and whether the installed schema matches the pinned migrations. */
 		statusInTransaction,
@@ -417,11 +381,6 @@ export function createWorldService(options: WorldServiceOptions) {
 				throw error;
 			}
 		},
-		validateUsage: (
-			receipt: unknown,
-			request: Pick<WorldReadRequest, "access" | "scope">,
-		): Promise<WorldUsageCheck> =>
-			store.write((db) => validateUsageInTransaction(db, receipt, request)),
 
 		entityGeneration: (): number => entityGeneration,
 

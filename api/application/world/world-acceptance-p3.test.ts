@@ -1,3 +1,4 @@
+import { createContinuityService } from "../../domains/continuity";
 import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { withVoiceAuthority } from "../../domains/voice-dialogue/test/voice-fixture";
 /**
@@ -27,14 +28,14 @@ import {
 	planForget,
 } from "eumenes-memory/sqlite";
 import { planAssertionTransition } from "eumenes-world-model";
-import { createContinuityService } from "../../domains/continuity";
+
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
 	CONVERSATION_DEFAULT_SCOPE,
 	createConversationService,
 } from "../../domains/conversation";
 import { createDialogueService } from "../../domains/dialogue";
-import { createGoalsService } from "../../domains/goals";
+import { createGoalsFixture as createGoalsService } from "../../domains/goals/test/fixture";
 import type { InferencePort, Receipt } from "../../domains/inference";
 import { createMemoryService } from "../../domains/memory";
 import { createQueue } from "../../domains/queue";
@@ -101,7 +102,7 @@ async function boot(options: BootOptions) {
 	const conversation = createConversationService(store, {
 		requireOutbox: true,
 	});
-	const continuity = createContinuityService(store);
+	const continuity = createContinuityService();
 	const memoryJournalPath = join(options.dir, "memory-forget-journal.jsonl");
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: memoryJournalPath,
@@ -170,7 +171,7 @@ async function boot(options: BootOptions) {
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		store,
-		continuity: createContinuityService(store),
+		continuity: createContinuityService(),
 		conversation,
 		larm,
 		queue,

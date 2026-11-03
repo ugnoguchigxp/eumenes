@@ -1,6 +1,5 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	MAX_ADOPTED_GOALS,
 	MAX_PROPOSED_GOALS,
@@ -254,7 +253,6 @@ function forgetGoals(db: Database, input: ForgetGoalsInput): ForgetGoalsResult {
 }
 
 export function createGoalsService(
-	store: SqliteStore,
 	clock: () => string = () => new Date().toISOString(),
 	id: () => string = () => crypto.randomUUID(),
 ) {
@@ -507,37 +505,6 @@ export function createGoalsService(
 		revisionOfInTransaction: goalRevisionOf,
 	};
 
-	return {
-		...inTransaction,
-		adopt: (access: GoalAccess, input: AdoptGoal) =>
-			store.write((db) => inTransaction.adoptInTransaction(db, access, input)),
-		propose: (access: GoalAccess, input: ProposeGoal) =>
-			store.write((db) =>
-				inTransaction.proposeInTransaction(db, access, input),
-			),
-		adoptProposal: (access: GoalAccess, goalId: string, input: AdoptProposal) =>
-			store.write((db) =>
-				inTransaction.adoptProposalInTransaction(db, access, goalId, input),
-			),
-		update: (access: GoalAccess, goalId: string, input: UpdateGoal) =>
-			store.write((db) =>
-				inTransaction.updateInTransaction(db, access, goalId, input),
-			),
-		withdraw: (access: GoalAccess, goalId: string, input: GoalTransition) =>
-			store.write((db) =>
-				inTransaction.withdrawInTransaction(db, access, goalId, input),
-			),
-		complete: (access: GoalAccess, goalId: string, input: GoalTransition) =>
-			store.write((db) =>
-				inTransaction.completeInTransaction(db, access, goalId, input),
-			),
-		/** Single committed snapshot on the readonly reader. */
-		snapshot: (access: GoalAccess): GoalSnapshot =>
-			store.readSnapshot((db) => goalSnapshot(db, access)),
-		proposals: (access: GoalAccess): Goal[] =>
-			store.readSnapshot((db) =>
-				inTransaction.proposalsInTransaction(db, access),
-			),
-	};
+	return inTransaction;
 }
 export type GoalsService = ReturnType<typeof createGoalsService>;

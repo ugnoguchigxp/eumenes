@@ -22,7 +22,7 @@ test("forget removes every version of a fact beyond the 1000-row listing cap, an
 		const memory = createMemoryService(
 			store,
 			conversation,
-			createContinuityService(store),
+			createContinuityService(),
 			{ journalPath: join(dir, "journal.jsonl") },
 		);
 		expect((await memory.recover()).healthy).toBe(true);
@@ -106,7 +106,7 @@ test("forget refuses an unknown or foreign item before anything is journaled", a
 		const memory = createMemoryService(
 			store,
 			createConversationService(store),
-			createContinuityService(store),
+			createContinuityService(),
 			{ journalPath },
 		);
 		expect((await memory.recover()).healthy).toBe(true);
@@ -128,7 +128,7 @@ test("a forget that fails after it was journaled reports memory_forget_incomplet
 		const memory = createMemoryService(
 			store,
 			conversation,
-			createContinuityService(store),
+			createContinuityService(),
 			{ journalPath: join(dir, "journal.jsonl") },
 		);
 		expect((await memory.recover()).healthy).toBe(true);

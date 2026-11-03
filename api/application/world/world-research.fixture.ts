@@ -1,3 +1,4 @@
+import { createContinuityService } from "../../domains/continuity";
 import {
 	callsOf,
 	candidatesOf,
@@ -14,7 +15,7 @@ import { join } from "node:path";
 import { CONTRACT_VERSIONS } from "eumenes-memory";
 import { applyForget, planForget } from "eumenes-memory/sqlite";
 import { planAssertionTransition } from "eumenes-world-model";
-import { createContinuityService } from "../../domains/continuity";
+
 import {
 	CONVERSATION_DEFAULT_PRINCIPAL,
 	CONVERSATION_DEFAULT_SCOPE,
@@ -22,7 +23,7 @@ import {
 } from "../../domains/conversation";
 import { createDialogueService } from "../../domains/dialogue";
 import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
-import { createGoalsService } from "../../domains/goals";
+import { createGoalsFixture as createGoalsService } from "../../domains/goals/test/fixture";
 import type { Messages } from "../../domains/inference/contracts";
 import { createInference } from "../../domains/inference";
 import type { LarmPort } from "../../domains/larm";
@@ -263,7 +264,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 	const memory = createMemoryService(
 		store,
 		conversation,
-		createContinuityService(store),
+		createContinuityService(),
 		{ journalPath: memoryJournalPath },
 	);
 	const world = createWorldAssembly({
@@ -435,7 +436,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		store,
-		continuity: createContinuityService(store),
+		continuity: createContinuityService(),
 		conversation,
 		larm: inference,
 		queue,

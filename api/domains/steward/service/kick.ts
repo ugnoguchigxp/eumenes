@@ -341,6 +341,6 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		for (const id of ids) kickOne(db, id);
 	}
 	wake.onWake(() => deps.store.write((db) => kickInTransaction(db)));
-	return { kickInTransaction, kickOne, createUnit };
+	return { kickInTransaction, kickOne };
 }
 export type Kick = ReturnType<typeof createKick>;

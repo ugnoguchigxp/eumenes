@@ -1,8 +1,9 @@
+import { stopUsing, releaseConnection } from "./release-connection";
+import { getLogger } from "../../../infrastructure/logger";
 import {
 	isNetworkError,
 	toErrorCode,
 } from "../../../infrastructure/error-code";
-import { getLogger } from "../../../infrastructure/logger";
 import type { Capability, LarmStatus } from "../contracts";
 import type { Lease } from "./profiles";
 import { type Control, type ProviderHosts } from "./connect";
@@ -17,7 +18,6 @@ import {
 } from "./profile-retention";
 import { createWithProvider } from "./with-provider";
 import { callerAborted, untilAborted, wait } from "./guards";
-
 const log = getLogger("larm");
 
 function preparationSignal(lifetime: AbortSignal, caller?: AbortSignal) {
@@ -26,39 +26,6 @@ function preparationSignal(lifetime: AbortSignal, caller?: AbortSignal) {
 		AbortSignal.timeout(60_000),
 		...(caller ? [caller] : []),
 	]);
-}
-
-function stopUsing(current: Lease) {
-	current.closing = true;
-	clearTimeout(current.renewTimer);
-	clearTimeout(current.idleTimer);
-}
-
-/** One terminal DELETE, even when recovery and the final borrower both clean up. */
-async function releaseConnection(current: Lease, control: Control) {
-	if (current.release) return current.release;
-	current.release = control(
-		`/v1/agent-connections/${encodeURIComponent(current.id)}`,
-		{ method: "DELETE" },
-		[204, 200, 404, 410],
-	)
-		.then((response) => {
-			// The status confirms deletion; body cleanup must not hold up reconnection.
-			void response.body?.cancel().catch(() => {});
-			try {
-				log.info("larm.connection_released", {
-					connectionId: current.id,
-					status: response.status,
-				});
-			} catch {
-				/* Observation does not invalidate a confirmed release. */
-			}
-		})
-		.catch((error: unknown) => {
-			current.release = undefined;
-			throw error;
-		});
-	return current.release;
 }
 
 type LeaseManagerOptions = {

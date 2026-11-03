@@ -1,10 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import type { AnalysisRecord } from "../../larm";
 import { record, row, type Row } from "../repository";
 import { analysisRecord, type AnalysisRow } from "../repository/analyses";
-export const active = (v: AnalysisRecord) =>
-	["queued", "starting", "running", "cancelling"].includes(v.state);
 /** The capture's LARM save state changes beside the source, so it is left out of the source's digest. */
 function sourceJson(json: string) {
 	const { captureSave, ...source } = JSON.parse(json) as Record<

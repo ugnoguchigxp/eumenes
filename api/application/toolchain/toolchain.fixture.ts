@@ -1,6 +1,8 @@
+import { createContinuityService } from "../../domains/continuity";
+import { createAnalysisFactory } from "../media/analysis";
 import { reportShellRuns } from "../shell/shell-reports";
 import { createDotsHarness } from "../work/dots-harness.fixture";
-import { createContinuityService } from "../../domains/continuity";
+
 import { createMemoryService } from "../../domains/memory";
 import { createPipelinesService } from "../pipelines/pipelines-service";
 import { dormantBundleFile } from "../../domains/capabilities";
@@ -624,7 +626,9 @@ export async function harness(options: HarnessOptions = {}) {
 				queue,
 				connection: () => settings.ocrCredentials(),
 				fetcher: options.ocrFetcher,
-				visual: options.visual,
+				analyses: options.visual
+					? createAnalysisFactory(store, queue, options.visual)
+					: undefined,
 				inference,
 				capabilities: () => activeCapabilities,
 			})
@@ -735,7 +739,9 @@ export async function harness(options: HarnessOptions = {}) {
 				queue,
 				connection: () => settings.objectRecognitionCredentials(),
 				fetcher: options.recognitionFetcher,
-				visual: options.visual,
+				analyses: options.visual
+					? createAnalysisFactory(store, queue, options.visual)
+					: undefined,
 			})
 		: undefined;
 	const routing = createToolchainRouting(
@@ -764,7 +770,7 @@ export async function harness(options: HarnessOptions = {}) {
 		toolchain.registry,
 		toolchain.schemas,
 	);
-	const continuity = createContinuityService(store);
+	const continuity = createContinuityService();
 	const memory = options.memory
 		? createMemoryService(store, conversation, continuity, {
 				journalPath: join(dir, "journal.jsonl"),

@@ -139,7 +139,7 @@ test("a failed input persistence prevents any provider request", async () => {
 		conversation,
 		larm,
 		queue: createQueue(store),
-		continuity: createContinuityService(store),
+		continuity: createContinuityService(),
 	});
 	await expect(
 		dialogue.submit({

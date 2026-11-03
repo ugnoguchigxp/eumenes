@@ -100,10 +100,7 @@ async function upgrade(path: string) {
 	const store: SqliteStore = openStore(path, memoryTestMigrations);
 	cleanups.push(() => store.close().catch(() => {}));
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(
-		store,
-		() => "2026-10-24T00:00:00.000Z",
-	);
+	const continuity = createContinuityService(() => "2026-10-24T00:00:00.000Z");
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: join(path, "..", "journal.jsonl"),
 	});

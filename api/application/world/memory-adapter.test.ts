@@ -46,7 +46,7 @@ async function setup() {
 	dir = mkdtempSync(join(tmpdir(), "memory-adapter-"));
 	store = openStore(join(dir, "db"), migrations);
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store);
+	const continuity = createContinuityService();
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: join(dir, "memory-forget-journal.jsonl"),
 	});

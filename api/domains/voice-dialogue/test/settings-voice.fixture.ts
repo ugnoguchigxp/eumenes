@@ -161,7 +161,7 @@ export async function setup(
 	});
 	const conversation = createConversationService(store);
 	const queue = createQueue(store, { pollMs: 5 });
-	const continuity = createContinuityService(store);
+	const continuity = createContinuityService();
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		store,

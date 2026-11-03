@@ -63,7 +63,7 @@ function setup() {
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		store,
-		continuity: createContinuityService(store),
+		continuity: createContinuityService(),
 		conversation,
 		larm,
 		queue,
@@ -318,7 +318,7 @@ test("full queue is reported as 503 for submissions", async () => {
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		store,
-		continuity: createContinuityService(store),
+		continuity: createContinuityService(),
 		conversation: createConversationService(store),
 		larm: {
 			status: () => ({ state: "ready", capabilities: [] }),

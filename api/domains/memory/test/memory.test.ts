@@ -18,7 +18,7 @@ test("save, stop and forget work without dialogue; memory is shared across conve
 		const memory = createMemoryService(
 			store,
 			conversation,
-			createContinuityService(store),
+			createContinuityService(),
 			{ journalPath: join(dir, "journal.jsonl") },
 		);
 		expect((await memory.recover()).healthy).toBe(true);
@@ -113,7 +113,7 @@ test("policyRevisionInTransaction is the revision memory's access() uses and mov
 		const memory = createMemoryService(
 			store,
 			createConversationService(store),
-			createContinuityService(store),
+			createContinuityService(),
 			{ journalPath: join(dir, "journal.jsonl") },
 		);
 		const raw = (db: Database) =>

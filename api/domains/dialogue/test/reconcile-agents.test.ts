@@ -78,7 +78,7 @@ async function setup(root: RootMode, failed: { ids: string[] } = { ids: [] }) {
 		conversation,
 		larm,
 		queue,
-		continuity: createContinuityService(store),
+		continuity: createContinuityService(),
 		agents,
 	});
 	const run = await dialogue.submit({

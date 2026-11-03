@@ -6,6 +6,7 @@ import { planForget } from "eumenes-memory/sqlite";
 import { configureLogging } from "../../../infrastructure/logger";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
+import { createContinuityFixture } from "../../../application/world/state-services.fixture";
 import { createContinuityService } from "../../continuity";
 import { createMemoryService } from "..";
 import type { ForgetPurge } from "../contracts";
@@ -364,7 +365,7 @@ const beforeRecovery = (s: Scenario) => {
 	const memory2 = createMemoryService(
 		s.h.store,
 		s.h.conversation,
-		createContinuityService(s.h.store, () => s.h.time.now),
+		createContinuityService(() => s.h.time.now),
 		{ journalPath: journalPath(s.h), clock: () => s.h.time.now },
 	);
 	return memory2;
@@ -498,7 +499,7 @@ test("an older database restored over the forget is brought to the same state by
 		),
 	).toBe(0);
 	const conversation = createConversationService(store);
-	const continuity = createContinuityService(store, () => h.time.now);
+	const continuity = createContinuityFixture(store, () => h.time.now);
 	const memory = createMemoryService(store, conversation, continuity, {
 		journalPath: journalPath(h),
 		clock: () => h.time.now,
@@ -512,7 +513,7 @@ test("an older database restored over the forget is brought to the same state by
 	// The same checks, on the restored database.
 	const restored = {
 		...s,
-		h: { ...h, store, memory, continuity, conversation } as MemoryHarness,
+		h: { ...h, store, memory, continuity, conversation },
 	};
 	expectForgotten(restored);
 });
