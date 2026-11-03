@@ -373,8 +373,7 @@ function readJsonl<T>(path: string): T[] {
 /** Items with their defaults: no acceptable ids, no review. */
 function itemOf(raw: Record<string, unknown>): Item {
 	const gold = raw.gold as
-		| { primary?: unknown; acceptable?: unknown }
-		| undefined;
+		{ primary?: unknown; acceptable?: unknown } | undefined;
 	if (typeof raw.id !== "string" || typeof gold?.primary !== "string")
 		throw new Error(`item_invalid: ${String(raw.id)}`);
 	return {

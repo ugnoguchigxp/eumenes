@@ -60,9 +60,11 @@ for (const outcome of [
 		try {
 			await store.write((db) =>
 				db
-					.query(`INSERT INTO music_generations
+					.query(
+						`INSERT INTO music_generations
 				(id,run_id,conversation_id,record_json,request_json,bindings_json,deadline)
-				VALUES('track','run','main',?,'{}','{}',0)`)
+				VALUES('track','run','main',?,'{}','{}',0)`,
+					)
 					.run(
 						JSON.stringify({
 							id: "track",

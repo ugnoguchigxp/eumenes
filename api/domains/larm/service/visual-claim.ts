@@ -36,13 +36,10 @@ export async function claimVisualProvider(
 			if (busy) throw busy;
 			const error =
 				typeof body.error === "string" ? body.error : object(body.error).code;
-			if (
-				!(
-					(response.status === 503 &&
-						error === "provider_semantic_not_ready") ||
-					(response.status === 409 && error === "connection_not_ready")
-				)
-			)
+			if (!(
+				(response.status === 503 && error === "provider_semantic_not_ready") ||
+				(response.status === 409 && error === "connection_not_ready")
+			))
 				throw new Error(`larm_http_${response.status}`);
 			return null;
 		},

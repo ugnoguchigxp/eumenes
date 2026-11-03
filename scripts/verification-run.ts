@@ -16,11 +16,7 @@ import { join } from "node:path";
 import { verificationRevision } from "./verification-inputs";
 
 export type StepStatus =
-	| "not_run"
-	| "running"
-	| "pass"
-	| "fail"
-	| "interrupted";
+	"not_run" | "running" | "pass" | "fail" | "interrupted";
 /** Findings outside the selection: they do not fail the step but are shown and recorded. */
 export type StepOutcome = { warnings: string[] };
 export type VerificationStep = {
@@ -100,7 +96,7 @@ export function distRevision(root: string) {
 	return hash.digest("hex");
 }
 
-/** CSI sequences, built without a control character in the source (oxlint no-control-regex). */
+/** CSI sequences, built without a control character in the source (lint rule no-control-regex). */
 const ANSI = new RegExp(
 	`${String.fromCharCode(0x1b)}\\[[0-?]*[ -/]*[@-~]`,
 	"g",

@@ -390,8 +390,6 @@ export function createWorldService(options: WorldServiceOptions) {
 		/** The host's explicit statement that the first full feed pass is done. */
 		markInitialSyncComplete: (): Promise<void> =>
 			store.write((db) => writeInitialSyncComplete(db, true)),
-		markInitialSyncCompleteInWriter: (db: Database): void =>
-			writeInitialSyncComplete(db, true),
 
 		/** The AccessContext a request gets (with the policy revision Memory also sees). */
 		accessInTransaction: accessOf,
@@ -419,8 +417,6 @@ export function createWorldService(options: WorldServiceOptions) {
 				throw error;
 			}
 		},
-		/** Run on the writer connection (pre-adoption check with the answer). */
-		validateUsageInWriter: validateUsageInTransaction,
 		validateUsage: (
 			receipt: unknown,
 			request: Pick<WorldReadRequest, "access" | "scope">,

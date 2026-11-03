@@ -1,7 +1,8 @@
+import { createRouterExport } from "./toolchain/router-export";
 import type { Services } from "./server-services";
 import { registerDots } from "./work/dots-http";
 
-export function appServices(s: Services) {
+export function appServices(s: Services, secrets: readonly string[] = []) {
 	return {
 		capabilities: s.toolchain.capabilities,
 		pipelines: s.pipelines,
@@ -42,6 +43,7 @@ export function appServices(s: Services) {
 				registerDots(app, s.dots, s.dotsEvents, undefined, s.dotsMessages),
 		},
 		toolchainHistory: s.toolchain.history,
+		routerExport: createRouterExport(s.store, secrets),
 		timers: s.timers,
 		resources: s.resources,
 		shell: s.toolchain.shell,

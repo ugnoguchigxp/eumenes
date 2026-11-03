@@ -116,8 +116,7 @@ export function entityIdsOf(
 		ids.add(claim.subjectId);
 		if (claim.relation) ids.add(claim.relation.objectId);
 		const value = claim.value as
-			| { kind?: string; entityId?: string }
-			| undefined;
+			{ kind?: string; entityId?: string } | undefined;
 		if (value?.kind === "entity" && value.entityId) ids.add(value.entityId);
 	}
 	return [...ids].slice(0, maxListEntities);

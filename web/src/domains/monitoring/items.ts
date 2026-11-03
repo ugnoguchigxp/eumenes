@@ -2,7 +2,6 @@ import type { MonitoringSnapshot } from "../../../../api/domains/monitoring/cont
 import { initialSpatialItems, type SpatialItem } from "../background";
 import { monitoringDetails } from "./details";
 import { displayStale, STALE_AFTER_MS } from "./freshness";
-export { STALE_AFTER_MS } from "./freshness";
 
 /**
  * Snapshot items placed on the Spatial layout by shape. Before the first read nothing is

@@ -108,8 +108,7 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 			if (!authorizeAutonomousTask(ctx, db, t, fail))
 				return { status: "stale", reason: "autonomous_origin_invalid" };
 			const execution = JSON.parse(t.input_json ?? "{}").execution as
-				| ChildExecution
-				| undefined;
+				ChildExecution | undefined;
 			if (
 				execution &&
 				(!activeExecutionChild(db, execution) ||

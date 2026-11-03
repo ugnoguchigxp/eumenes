@@ -14,14 +14,11 @@ export {
 	createWorldClaims,
 	conditionText,
 	createWorldQuery,
-
 	/** @public */ sourceKeyOf,
 	worldHasContent,
 } from "./service";
 export type {
-
 	/** @public */ CurationElement,
-
 	/** @public */ CurationPrepareResult,
 	/** @public */ CurationSettleResult,
 	IntakePorts,
@@ -41,7 +38,6 @@ export { migrations } from "./repository/migrations";
 export type {
 	WorldQueryContext,
 	WorldQueryResult,
-
 	/** @public */ WorldApplyRequest,
 	WorldStatus,
 } from "./contracts";

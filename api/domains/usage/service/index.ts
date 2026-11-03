@@ -271,4 +271,3 @@ export function createUsage(
 		},
 	};
 }
-export type UsageService = ReturnType<typeof createUsage>;

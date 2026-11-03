@@ -8,9 +8,7 @@ export type BrowserUnavailableReason =
 
 /** Braveとの接続状態。利用者が接続するまでは disconnected。 */
 export type BrowserConnectionState =
-	| "disconnected"
-	| "connecting"
-	| "connected";
+	"disconnected" | "connecting" | "connected";
 
 /** 接続が終わった理由。未知のコードは汎用文言で表示する。 */
 export type BrowserConnectionEndReason =
@@ -28,8 +26,7 @@ export type BrowserConnection = {
 };
 
 export type BrowserAvailability =
-	| { available: true }
-	| { available: false; reason: BrowserUnavailableReason };
+	{ available: true } | { available: false; reason: BrowserUnavailableReason };
 
 /** blocked: 安全のためホストが操作を止めたタブ（切り替え・操作・撮影ができない）。 */
 export type BrowserTabStatus = "open" | "busy" | "lost" | "closed" | "blocked";
@@ -98,8 +95,7 @@ export type BrowserTaskItem = {
 	continuedFrom?: string | null;
 	errorLabel?: string;
 	script?:
-		| (BrowserScriptRevision & { history: BrowserScriptRevision[] })
-		| null;
+		(BrowserScriptRevision & { history: BrowserScriptRevision[] }) | null;
 	taskId: string;
 	/** 最後のScriptが使う履歴が今あるときだけ付く。 */
 	history?: { historyId: string; title: string };
@@ -203,10 +199,7 @@ export type BrowserHistoryDetail = BrowserHistorySummary & {
 };
 
 export type BrowserReplayState =
-	| "running"
-	| "completed"
-	| "failed"
-	| "cancelled";
+	"running" | "completed" | "failed" | "cancelled";
 
 /** 履歴のコードを新しいタブで実行した1回。時刻はepoch ms。 */
 export type BrowserReplayItem = {

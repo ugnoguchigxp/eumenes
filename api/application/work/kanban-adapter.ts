@@ -51,8 +51,7 @@ export const kanbanDomainSchemas = {
 
 type Fields = Record<string, unknown>;
 type Converted =
-	| { ok: true; value: Fields }
-	| { ok: false; errors: FieldError[] };
+	{ ok: true; value: Fields } | { ok: false; errors: FieldError[] };
 
 /**
  * The string values of the board events (spec §2.2) to typed fields. Each reader records a

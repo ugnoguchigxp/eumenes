@@ -349,7 +349,11 @@ export const domains = {
 		backend: "api/domains/conversation",
 		web: "web/src/domains/conversation",
 		components: "web/src/components/domains/conversation",
-		depends: { api: ["delivery"], web: ["avatar", "delivery"], test: [] },
+		depends: {
+			api: ["delivery"],
+			web: ["avatar", "audio", "delivery"],
+			test: [],
+		},
 	},
 	resources: {
 		tier: 0,

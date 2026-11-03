@@ -492,8 +492,6 @@ export function createMemoryService(
 			includeInactive = false,
 		): readonly StateItem[] =>
 			stateItems(db, includeInactive, "memory.steward"),
-		/** A State item as the screen shows it. */
-		itemDtoInTransaction: toDto,
 		executionReferencesInTransaction: executionRefs.issueInTransaction,
 		executionReferenceInTransaction: executionRefs.readInTransaction,
 		/**

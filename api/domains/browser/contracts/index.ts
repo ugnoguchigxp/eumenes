@@ -275,8 +275,7 @@ export class BrowserApprovalRequired extends Error {
 }
 
 export type BrowserAvailability =
-	| { available: true }
-	| { available: false; reason: string };
+	{ available: true } | { available: false; reason: string };
 
 export type ConnectionView = {
 	connectionId: string | null;

@@ -87,12 +87,7 @@ export type OutgoingMessage = {
 	createdAt: number;
 	terminalAt: number | null;
 	state:
-		| "pending"
-		| "claimed"
-		| "answered"
-		| "failed"
-		| "cancelled"
-		| "expired";
+		"pending" | "claimed" | "answered" | "failed" | "cancelled" | "expired";
 	revision: number;
 	replyId: string | null;
 	bodyBytes: number;

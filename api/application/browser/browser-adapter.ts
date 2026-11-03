@@ -406,8 +406,7 @@ export function createBrowserAdapter(
 				const prior =
 					request.origin.kind === "task"
 						? (request.origin.execution.resume?.previous as
-								| { result?: { domain?: { taskId?: string } } }
-								| undefined)
+								{ result?: { domain?: { taskId?: string } } } | undefined)
 						: undefined;
 				const granted = prior?.result?.domain?.taskId === taskId;
 				const task = granted
@@ -505,8 +504,7 @@ export function createBrowserAdapter(
 						throw new Error("execution_budget_exceeded");
 					if (execution && input.continueFrom) {
 						const previous = execution.resume?.previous as
-							| { result?: { domain?: { taskId?: string } } }
-							| undefined;
+							{ result?: { domain?: { taskId?: string } } } | undefined;
 						if (previous?.result?.domain?.taskId !== input.continueFrom)
 							throw new Error("origin_invalid");
 					}

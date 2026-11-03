@@ -7,8 +7,7 @@ export type NavigationCode =
 	| "navigation_unresolved_blocked";
 
 export type NavigationVerdict =
-	| { ok: true; url: string }
-	| { ok: false; code: NavigationCode };
+	{ ok: true; url: string } | { ok: false; code: NavigationCode };
 
 const MAX_URL_CHARS = 2048;
 

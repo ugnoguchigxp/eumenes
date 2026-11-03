@@ -18,7 +18,7 @@ function Demo() {
 	const [playback, setPlayback] = useState<MusicPlaybackState | null>(null);
 	useEffect(() => {
 		const url = URL.createObjectURL(demoAudio());
-		// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
+		// eslint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 		setSrc(url);
 		return () => URL.revokeObjectURL(url);
 	}, []);

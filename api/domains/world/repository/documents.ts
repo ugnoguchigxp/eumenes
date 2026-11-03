@@ -35,10 +35,12 @@ export function searchDocuments(
 	offset: number,
 ) {
 	return db
-		.query(`SELECT id, revision, title, collection FROM world_host_document
+		.query(
+			`SELECT id, revision, title, collection FROM world_host_document
 	 WHERE principal=?1 AND scope_key=?2 AND withdrawn=0
 	 AND (instr(lower(title), lower(?3))>0 OR instr(lower(content), lower(?3))>0)
-	 ORDER BY id LIMIT 11 OFFSET ?4`)
+	 ORDER BY id LIMIT 11 OFFSET ?4`,
+		)
 		.all(scope.principal, scope.scopeKey, query, offset) as Pick<
 		Row,
 		"id" | "revision" | "title" | "collection"
@@ -70,10 +72,12 @@ export function pageDocuments(
 		revision: "revision",
 	}[query.sort];
 	const items = db
-		.query(`SELECT id,revision,title,collection,digest,manifest_digest AS manifestDigest,
+		.query(
+			`SELECT id,revision,title,collection,digest,manifest_digest AS manifestDigest,
 	 substr(content,1,2048) AS excerpt,length(content) AS contentLength
 	 FROM world_host_document WHERE ${where}
-	 ORDER BY ${sort} COLLATE NOCASE ${query.desc ? "DESC" : "ASC"}, id ASC LIMIT ?4 OFFSET ?5`)
+	 ORDER BY ${sort} COLLATE NOCASE ${query.desc ? "DESC" : "ASC"}, id ASC LIMIT ?4 OFFSET ?5`,
+		)
 		.all(
 			scope.principal,
 			scope.scopeKey,
@@ -94,9 +98,11 @@ export function insertDocument(
 	doc: WorldDocumentInput,
 ) {
 	if (!db.inTransaction) throw new Error("transaction_required");
-	db.query(`INSERT INTO world_host_document
+	db.query(
+		`INSERT INTO world_host_document
 	 (principal, scope_key, id, revision, title, collection, manifest_digest, content, digest)
-	 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`).run(
+	 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
+	).run(
 		scope.principal,
 		scope.scopeKey,
 		doc.id,

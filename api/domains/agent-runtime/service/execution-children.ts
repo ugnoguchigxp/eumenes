@@ -92,8 +92,7 @@ export function executionChildren(
 			const task = get(db, owner.taskId);
 			const child = task
 				? (JSON.parse(task.input_json ?? "{}").execution as
-						| ChildExecution
-						| undefined)
+						ChildExecution | undefined)
 				: undefined;
 			if (!task || !child) return undefined;
 			if (
@@ -136,8 +135,7 @@ export function executionChildren(
 			const task = get(db, owner.taskId);
 			const child = task
 				? (JSON.parse(task.input_json ?? "{}").execution as
-						| ChildExecution
-						| undefined)
+						ChildExecution | undefined)
 				: undefined;
 			if (!child) return null;
 			if (!activeExecutionChild(db, child))

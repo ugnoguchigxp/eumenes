@@ -117,10 +117,7 @@ test("formal connection: cold start, MacBook drawing/save/reopen, physical idle 
 	const restartedPid = await workerPid();
 	expect(restartedPid).toBeGreaterThan(0);
 	expect(restartedPid).not.toBe(startedPid);
-	await editor
-		.getByRole("radio", { name: /矩形/ })
-		.locator("..")
-		.click();
+	await editor.getByRole("radio", { name: /矩形/ }).locator("..").click();
 	await editor.mouse.move(box.x + 600, box.y + 420);
 	await editor.mouse.down();
 	await editor.mouse.move(box.x + 760, box.y + 550);

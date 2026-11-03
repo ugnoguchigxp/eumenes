@@ -286,8 +286,7 @@ export function runDocTool(
 		};
 	}
 	const input = parsed.data as
-		| z.infer<typeof docEdit>
-		| z.infer<typeof docWrite>;
+		z.infer<typeof docEdit> | z.infer<typeof docWrite>;
 	if (input.baseRevision !== current.revision)
 		return {
 			ok: false,

@@ -20,3 +20,7 @@ packages/design-system/dist/
 
 # Supplied with desktop releases, never committed as source.
 /api/domains/google-accounts/distribution-client.json
+
+# Locally installed Live2D model data; retain its installation directory.
+/web/public/live2d/hiyori/**
+!/web/public/live2d/hiyori/.gitkeep

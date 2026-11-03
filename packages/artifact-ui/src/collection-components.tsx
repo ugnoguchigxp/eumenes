@@ -228,7 +228,7 @@ function MediaCell({ path, mime }: { path: string; mime: string }) {
 		return kind === "image" ? (
 			<img src={url} alt="" style={{ maxWidth: "12rem" }} />
 		) : (
-			// oxlint-disable-next-line jsx-a11y/media-has-caption -- a stored recording has no captions
+			// eslint-disable-next-line jsx-a11y/media-has-caption -- a stored recording has no captions
 			<audio controls src={url} />
 		);
 	return (

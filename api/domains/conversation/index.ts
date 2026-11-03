@@ -1,3 +1,4 @@
+export { routingExportUtterance } from "./service/routing-export";
 export { registerConversation } from "./controller";
 export {
 	/** @public */ migration,

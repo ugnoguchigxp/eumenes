@@ -23,8 +23,7 @@ const WORD_REF = /^w\d+$/;
 const NEW_REF = /^new:(\d+)$/;
 
 type SubjectQuery =
-	| { kind: "id"; id: string }
-	| { kind: "alias"; text: string };
+	{ kind: "id"; id: string } | { kind: "alias"; text: string };
 
 export type Planned = {
 	/** Position in the output's `claims`. */

@@ -12,12 +12,7 @@ export function createTaskQueries(store: SqliteStore, core: TaskCore) {
 			return store.readSnapshot((tx) => {
 				const t = requireTask(tx, taskId);
 				const actions: (
-					| "start"
-					| "amend"
-					| "answer"
-					| "pause"
-					| "cancel"
-					| "forget"
+					"start" | "amend" | "answer" | "pause" | "cancel" | "forget"
 				)[] = [];
 				const valid =
 					Date.parse(t.grant.expiresAt) > now() &&

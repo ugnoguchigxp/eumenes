@@ -77,8 +77,7 @@ export type TurnRecall = {
 	pins: { messageId: string; digest: string }[];
 };
 export type SettleResult =
-	| { ok: true }
-	| { ok: false; reason: "memory_stale" | "memory_unavailable" };
+	{ ok: true } | { ok: false; reason: "memory_stale" | "memory_unavailable" };
 
 export const memoryStatusSchema: z.ZodType<MemoryStatus> = z.object({
 	enabled: z.boolean(),

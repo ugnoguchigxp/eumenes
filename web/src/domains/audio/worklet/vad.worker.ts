@@ -9,8 +9,7 @@ import {
 } from "../controller/speech-model";
 
 export type VadRequest =
-	| { type: "classify"; id: number; window: Float32Array }
-	| { type: "reset" };
+	{ type: "classify"; id: number; window: Float32Array } | { type: "reset" };
 export type VadResponse =
 	| { type: "ready" }
 	| { type: "failed"; reason: string }

@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions --
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-noninteractive-element-interactions --
    The keypad group takes focus and key presses so numbers can be typed; its buttons stay the interactive parts. */
 import { Calculator as CalculatorIcon } from "lucide-react";
 import { type KeyboardEvent, useCallback, useState } from "react";

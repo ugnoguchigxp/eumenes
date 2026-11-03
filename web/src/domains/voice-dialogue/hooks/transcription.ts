@@ -32,7 +32,7 @@ export function useTranscription(
 	const [saved, setSaved] = useState<Snapshot | null>(null);
 	useEffect(() => {
 		// Preserve the pending text across the query switch while a new upload starts.
-		// oxlint-disable-next-line react/set-state-in-effect
+		// eslint-disable-next-line react/set-state-in-effect
 		setSaved((previous) => (recognitionId ? observe(previous, turn) : null));
 	}, [turn, recognitionId]);
 	if (!recognitionId) return null;

@@ -4,6 +4,8 @@ export type AvatarCue = {
 	key: string;
 	motion: AvatarMotion;
 	speaking?: boolean;
+	/** Presentation strength, independent of classifier confidence. */
+	intensity?: number;
 };
 /** Reaction variants of the `touched` motion, by what was touched. */
 const reactions = {

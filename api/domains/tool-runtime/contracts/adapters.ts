@@ -187,8 +187,7 @@ export interface SessionWorkAdapter {
 
 /** The outcome of an instant operation: the answer sentence, or a safe code for why there is none. */
 export type InstantResult =
-	| { ok: true; answer: string }
-	| { ok: false; code: string };
+	{ ok: true; answer: string } | { ok: false; code: string };
 
 /**
  * What an adapter offers an instant binding (spec weather-instant-toolchain-design 2026-10-18):
@@ -428,10 +427,7 @@ export const toolchainActionEventV1 = z
 export type ToolchainActionEventV1 = z.infer<typeof toolchainActionEventV1>;
 
 export type ActionRequestStatus =
-	| "accepted"
-	| "rejected"
-	| "pending"
-	| "indeterminate";
+	"accepted" | "rejected" | "pending" | "indeterminate";
 /** The stored acceptance of one UI action and its settled result. */
 export type ActionRequestView = {
 	eventId: string;

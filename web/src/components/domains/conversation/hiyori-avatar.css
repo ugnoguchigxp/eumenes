@@ -1,0 +1,38 @@
+.hiyori-avatar-background {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	overflow: hidden;
+	pointer-events: none;
+	background: radial-gradient(ellipse at 72% 45%, #293347, #0b1018 75%);
+}
+.hiyori-avatar-background canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+.hiyori-avatar-credit {
+	position: absolute;
+	right: 12px;
+	bottom: 8px;
+	font-size: 10px;
+	color: #b9c3d5;
+}
+
+.hiyori-avatar-unavailable {
+	display: none;
+}
+.hiyori-avatar-background:is(
+		[data-avatar-state="load-failed"],
+		[data-avatar-state="render-failed"],
+		[data-avatar-state="context-lost"]
+	)
+	.hiyori-avatar-unavailable {
+	display: block;
+	position: absolute;
+	top: 16px;
+	left: 16px;
+	right: 16px;
+	color: #c4cede;
+	font-size: 12px;
+}

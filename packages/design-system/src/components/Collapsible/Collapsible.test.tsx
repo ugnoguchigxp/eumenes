@@ -15,8 +15,7 @@ vi.mock("@radix-ui/react-collapsible", () => ({
 		...props
 	}: {
 		children?:
-			| React.ReactNode
-			| ((props: { open: boolean }) => React.ReactNode);
+			React.ReactNode | ((props: { open: boolean }) => React.ReactNode);
 		open?: boolean;
 		onOpenChange?: (open: boolean) => void;
 		[key: string]: unknown;

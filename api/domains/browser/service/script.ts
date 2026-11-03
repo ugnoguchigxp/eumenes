@@ -89,8 +89,10 @@ export function publishScript(
 			old.evidenceRef === step.evidenceRef;
 		if (step.state === "completed" && !unchangedComplete) {
 			const evidence = db
-				.query(`SELECT o.ref FROM browser_observations o JOIN browser_tabs t ON t.tab_ref=o.tab_ref
-			 WHERE o.ref=? AND o.task_id=? AND t.observation_ref=o.ref AND t.generation=o.generation AND t.status='open'`)
+				.query(
+					`SELECT o.ref FROM browser_observations o JOIN browser_tabs t ON t.tab_ref=o.tab_ref
+			 WHERE o.ref=? AND o.task_id=? AND t.observation_ref=o.ref AND t.generation=o.generation AND t.status='open'`,
+				)
 				.get(step.evidenceRef ?? "", taskId);
 			if (!evidence) throw new Error("script_evidence_invalid");
 		}

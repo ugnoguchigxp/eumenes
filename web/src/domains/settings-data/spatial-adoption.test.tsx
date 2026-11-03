@@ -31,3 +31,28 @@ test("the actual Spatial registration exposes 350 to 500 and saves through share
 	await screen.findAllByText("変更を適用しました");
 	expect(backend.saved().general.spatialScatter).toBe(500);
 });
+
+test("Hiyori is a third background and persists through the existing draft and save flow", async () => {
+	const bundle = JSON.parse(
+		readFileSync(
+			"api/domains/capabilities/bundles/settings.spatial.bundle.json",
+			"utf8",
+		),
+	);
+	const backend = createSettingsBackend({
+		artifacts: { display: bundle.artifacts.at(-1) },
+	});
+	render(
+		<Screens backend={backend} start="display" cache={newCache(backend)} />,
+	);
+	expect(await screen.findByRole("button", { name: "光の妖精" })).toBeTruthy();
+	expect(screen.getByRole("button", { name: "Spatial" })).toBeTruthy();
+	fireEvent.click(
+		await screen.findByRole("button", { name: "桃瀬ひより（Live2D）" }),
+	);
+	fireEvent.click(
+		screen.getByRole("button", { name: "設定の変更をすべて保存" }),
+	);
+	await screen.findAllByText("変更を適用しました");
+	expect(backend.saved().general.background).toBe("live2d-hiyori");
+});

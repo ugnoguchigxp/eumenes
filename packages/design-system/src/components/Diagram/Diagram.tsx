@@ -28,12 +28,7 @@ import {
 export type { DiagramAspect } from "./geometry";
 
 export type DiagramColor =
-	| "accent"
-	| "ink"
-	| "muted"
-	| "positive"
-	| "negative"
-	| "warning";
+	"accent" | "ink" | "muted" | "positive" | "negative" | "warning";
 
 export type DiagramLabelSize = "sm" | "md" | "lg";
 export type DiagramLabelAlign = "start" | "middle" | "end";
@@ -533,7 +528,7 @@ const Diagram = React.forwardRef<HTMLElement, DiagramProps>(
 						if (content === null) return null;
 						return (
 							<g
-								// biome-ignore lint/suspicious/noArrayIndexKey: 図解の要素は順序が識別子で、並べ替えない。
+								// 図解の要素は順序が識別子で、並べ替えない。
 								key={index}
 								data-diagram-element={el.type}
 								data-highlighted={paint.highlighted ? "true" : undefined}

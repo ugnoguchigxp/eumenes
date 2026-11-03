@@ -64,9 +64,7 @@ export function createOcrAdapter(service: OcrService): DomainAdapter {
 		}),
 		invokeInTransaction(db, request) {
 			const operation = request.operationName.slice(4) as
-				| "open"
-				| "read"
-				| "cancel";
+				"open" | "read" | "cancel";
 			if (!describeOcrAdapter().operations.has(request.operationName))
 				throw new Error("unsupported_operation");
 			const input = request.input as { id?: string };

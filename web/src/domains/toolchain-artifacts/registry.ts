@@ -62,8 +62,7 @@ type AdapterPhase =
 type SendTiming = { sent: number; sentAt: number };
 
 export type AnswerInput =
-	| { ok: true; value: Record<string, unknown> }
-	| { ok: false; message: string };
+	{ ok: true; value: Record<string, unknown> } | { ok: false; message: string };
 
 /**
  * What a domain contributes to the common host. The host owns registration lookup, variants,

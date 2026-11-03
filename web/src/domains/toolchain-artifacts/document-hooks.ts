@@ -110,7 +110,7 @@ export function useDraftViews(
 	});
 	const stores = useMemo(
 		() => documents.map((doc) => draftStoreFor(identity, doc)),
-		// oxlint-disable-next-line react/exhaustive-deps
+		// eslint-disable-next-line react/exhaustive-deps
 		[identity, key],
 	);
 	return useSyncExternalStore(

@@ -157,11 +157,7 @@ export type TesterAction = {
 };
 
 export type FailureClass =
-	| "product"
-	| "tester"
-	| "environment"
-	| "criteria"
-	| "undetermined";
+	"product" | "tester" | "environment" | "criteria" | "undetermined";
 type Verdict = "success" | "failure" | "inconclusive";
 
 export type Termination = {

@@ -18,8 +18,7 @@ const draftSchema = z.strictObject({
 	conversationId,
 });
 export type DrawingLocation =
-	| z.infer<typeof referenceSchema>
-	| z.infer<typeof draftSchema>;
+	z.infer<typeof referenceSchema> | z.infer<typeof draftSchema>;
 /** The link carries reference context; the backend still enforces its conversation. */
 export function drawingLocation(hash: string): DrawingLocation | null {
 	const match = /^#drawing\/(new\/)?([^/?]+)(?:\?(.*))?$/.exec(hash);

@@ -173,8 +173,7 @@ export type WorldAssemblyOptions = {
 };
 
 type InitialSyncReport =
-	| { complete: true }
-	| { complete: false; reason: string };
+	{ complete: true } | { complete: false; reason: string };
 
 type PumpReport =
 	| { status: "skipped"; reason: string }

@@ -7,9 +7,7 @@ import type { Database } from "bun:sqlite";
  */
 
 export type BlockReason =
-	| "scheduled_prompt"
-	| "forgotten"
-	| "specialist_dialogue";
+	"scheduled_prompt" | "forgotten" | "specialist_dialogue";
 
 // ---- blocked messages ----
 

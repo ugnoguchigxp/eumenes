@@ -71,12 +71,7 @@ export interface TestOutput {
 	artifact?: TestArtifact;
 }
 type HealthState =
-	| "healthy"
-	| "busy"
-	| "unhealthy"
-	| "on-demand"
-	| "unknown"
-	| "unsupported";
+	"healthy" | "busy" | "unhealthy" | "on-demand" | "unknown" | "unsupported";
 export interface TestHealth {
 	state: HealthState;
 	reason: string;

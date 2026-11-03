@@ -40,9 +40,7 @@ const INITIAL_FORGET_EPOCH = "forget-0";
 export class WorldHostStateError extends Error {
 	constructor(
 		readonly code:
-			| "state_missing"
-			| "transaction_required"
-			| "initial_sync_required",
+			"state_missing" | "transaction_required" | "initial_sync_required",
 	) {
 		super(`world_host_${code}`);
 	}
@@ -163,9 +161,7 @@ export function readFeedCursor(
 			"SELECT restore_epoch, cursor FROM world_host_feed_cursor WHERE feed = ? AND principal = ? AND scope_key = ?",
 		)
 		.get(feed, principal, scopeKey) as
-		| { restore_epoch: string; cursor: string }
-		| null
-		| undefined;
+		{ restore_epoch: string; cursor: string } | null | undefined;
 	if (!row) return { cursor: null, stale: false, restoreEpoch };
 	if (row.restore_epoch !== restoreEpoch)
 		return { cursor: null, stale: true, restoreEpoch };
@@ -190,9 +186,7 @@ export function writeFeedCursor(
 			"SELECT restore_epoch, cursor FROM world_host_feed_cursor WHERE feed = ? AND principal = ? AND scope_key = ?",
 		)
 		.get(feed, principal, scopeKey) as
-		| { restore_epoch: string; cursor: string }
-		| null
-		| undefined;
+		{ restore_epoch: string; cursor: string } | null | undefined;
 	if (current?.restore_epoch === restoreEpoch && current.cursor === cursor)
 		return;
 	db.query(

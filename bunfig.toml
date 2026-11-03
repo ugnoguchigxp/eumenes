@@ -3,3 +3,38 @@ peer = false
 minimumReleaseAge = 604800
 # The user explicitly selected these newly published, pinned releases.
 minimumReleaseAgeExcludes = ["llm-fetch", "vite"]
+
+# `bun fmt` (scripts `format` / `format:check`). There is no separate linter; `bun check` type-checks.
+[fmt]
+useTabs = true
+tabWidth = 2
+printWidth = 80
+singleQuote = false
+jsxSingleQuote = false
+quoteProps = "as-needed"
+trailingComma = "all"
+semi = true
+arrowParens = "always"
+bracketSameLine = false
+bracketSpacing = true
+sortPackageJson = false
+ignorePatterns = [
+	"**/*.md",
+	"vendor/live2d/framework.js",
+	"web/public/live2d/**",
+	"node_modules/**",
+	"dist/**",
+	"dist-web/**",
+	"coverage/**",
+	"data/**",
+	"verification-reports/**",
+	"spec/verification/**",
+	"spec/design/**",
+	"spec/reference/**",
+	"scripts/context-eval/experiments/**/manifest.json",
+	"test-results/**",
+	"playwright-report/**",
+	".serena/**",
+	".claude/**",
+	".s11tnext/**",
+]

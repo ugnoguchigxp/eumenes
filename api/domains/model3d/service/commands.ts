@@ -15,13 +15,7 @@ import {
 } from "../repository";
 
 export type Model3dOperation =
-	| "open"
-	| "generate"
-	| "find"
-	| "show"
-	| "update"
-	| "delete"
-	| "cancel";
+	"open" | "generate" | "find" | "show" | "update" | "delete" | "cancel";
 export type Model3dCommandInput = {
 	prompt?: string;
 	title?: string;
@@ -313,16 +307,6 @@ export function createModel3dCommands(deps: {
 					assetRef: o.asset_id,
 				})),
 			};
-		},
-		knownAssetInTransaction: (db: Database, owner: string, id: string) =>
-			knownAsset(db, owner, id) !== null,
-		generationOwnedInTransaction(db: Database, owner: string, id: string) {
-			try {
-				ownedGeneration(db, id, owner);
-				return true;
-			} catch {
-				return false;
-			}
 		},
 	};
 }

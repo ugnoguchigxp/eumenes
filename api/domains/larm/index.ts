@@ -54,14 +54,12 @@ export {
 	LARM_CAPACITY_RETRY_MS,
 	LARM_CAPACITY_TIMEOUT,
 	LARM_CAPACITY_WAITING,
-	planCapacityWait,
 	type CapacityWait,
 } from "./contracts/capacity";
 export {
 	checkRefusal,
 	isCapacityBusy,
 	LarmCapacityBusy,
-	retryAfter,
 	sendAgainIfLost,
 } from "./service/resend";
 export { settleCapacityWait } from "./service/capacity-wait";

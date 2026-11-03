@@ -122,11 +122,7 @@ export function dropRunResults(
 
 export type WorkStatus = "todo" | "waiting" | "done";
 export type WorkOutcome =
-	| "succeeded"
-	| "partial"
-	| "failed"
-	| "cancelled"
-	| "interrupted";
+	"succeeded" | "partial" | "failed" | "cancelled" | "interrupted";
 export type WorkRow = {
 	id: string;
 	/** The conversation's number of the TODO (`t<ref>`). */
@@ -480,8 +476,10 @@ export function workNotices(
 /** Archives completion notices without changing the work, result, or read state. */
 export function archiveWorkNotices(db: Database, at: string) {
 	return db
-		.query(`UPDATE dialogue_work SET notice_archived_at=?
-		WHERE ${NOTICE} AND notice_archived_at IS NULL`)
+		.query(
+			`UPDATE dialogue_work SET notice_archived_at=?
+		WHERE ${NOTICE} AND notice_archived_at IS NULL`,
+		)
 		.run(at).changes;
 }
 

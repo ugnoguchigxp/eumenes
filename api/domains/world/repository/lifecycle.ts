@@ -80,11 +80,7 @@ export const TOMBSTONE_REASONS = [
 ] as const;
 export type TombstoneReasonCode = (typeof TOMBSTONE_REASONS)[number];
 export type ForgetOrigin =
-	| "request"
-	| "memory_feed"
-	| "source_feed"
-	| "restored"
-	| "steward";
+	"request" | "memory_feed" | "source_feed" | "restored" | "steward";
 export const ROOT_KINDS = [
 	"source",
 	"state",
@@ -375,10 +371,7 @@ export function setBlockedReason(
 // --- confirmations ------------------------------------------------------------
 
 export type ConfirmationState =
-	| "pending"
-	| "confirmed"
-	| "unverified"
-	| "failed";
+	"pending" | "confirmed" | "unverified" | "failed";
 export type ConfirmationRow = {
 	memoryForgetId: string;
 	externalId: string;

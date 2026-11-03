@@ -44,7 +44,7 @@ export function Slides({ title, slides, className }: SlidesProps) {
 
 	if (!current) return null;
 	return (
-		// oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 部品内にフォーカスがあるときの左右キー送り
+		// eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- 部品内にフォーカスがあるときの左右キー送り
 		<section
 			className={cn("ds-slides", className)}
 			aria-roledescription="紙芝居"

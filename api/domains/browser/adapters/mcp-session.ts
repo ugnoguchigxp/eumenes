@@ -6,11 +6,7 @@ import { spawn, type ChildProcess } from "node:child_process";
  */
 
 export type McpFailureReason =
-	| "timeout"
-	| "aborted"
-	| "exited"
-	| "rpc_error"
-	| "output_limit";
+	"timeout" | "aborted" | "exited" | "rpc_error" | "output_limit";
 
 export class McpTransportError extends Error {
 	constructor(

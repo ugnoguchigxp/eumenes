@@ -10,7 +10,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import type { EumenesClient } from "../../../../client";
 import type { MonitoringSnapshot } from "../../../../api/domains/monitoring/contracts";
 import { useMonitoringItems } from ".";
-import { STALE_AFTER_MS } from "./items";
+import { STALE_AFTER_MS } from "./freshness";
 import {
 	emptyLarm,
 	larmViewSchema,

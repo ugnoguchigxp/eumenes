@@ -69,19 +69,6 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 			if ("status" in accepted) return accepted;
 			return itemOf(db, getIntake(db, accepted.forgetId)!);
 		},
-		/** One forget of a Scope as this connection sees it, or null (unknown, or another Scope). */
-		forgetItemInTransaction: (
-			db: Database,
-			scope: ScopeRef,
-			forgetId: string,
-		): ForgetListItem | null => {
-			const row = getIntake(db, forgetId);
-			return row &&
-				row.principal === scope.principal &&
-				row.scopeKey === scope.scopeKey
-				? itemOf(db, row)
-				: null;
-		},
 		/** Resume every forget that is not complete (also done by recoverWorld). */
 		resumeForgets: forget.resumeForgets,
 		forgetStatus: (forgetId: string): ForgetReport | null =>

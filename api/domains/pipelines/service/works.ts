@@ -34,8 +34,7 @@ const fail = (code: string, detail?: string): never => {
 };
 
 export type Caller =
-	| { kind: "ui" }
-	| { kind: "specialist"; runId: string; workRef: string };
+	{ kind: "ui" } | { kind: "specialist"; runId: string; workRef: string };
 export type RejectedDraft = {
 	title: string;
 	text: string;

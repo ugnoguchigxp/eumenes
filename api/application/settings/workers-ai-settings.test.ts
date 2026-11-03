@@ -145,10 +145,10 @@ test("the spatial settings bundle keeps its latest screen and shares the new sav
 				.filter((a) => a.artifactId === "settings.display"),
 		);
 		expect(display.map((a) => a.artifactRevisionId)).toEqual([
-			"artifact:settings.display@10",
+			"artifact:settings.display@11",
 		]);
 		const doc = h.store.read((db) =>
-			h.caps.documentInTransaction(db, "artifact:settings.display@10"),
+			h.caps.documentInTransaction(db, "artifact:settings.display@11"),
 		);
 		expect(JSON.stringify(doc?.document)).toContain("settings.apply-v4");
 	} finally {

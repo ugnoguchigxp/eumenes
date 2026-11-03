@@ -60,7 +60,6 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 		/** The newest tasks of every kind, for a screen that reads inside a transaction. */
 		listInTransaction: (tx: Database, limit = 100) =>
 			repo.list(tx, { limit }).map((row) => row.task),
-		assertFenceInTransaction: core.fence,
 		create: (input: CreateTask, context?: TrustedTaskContext) =>
 			writeCommand(
 				(tx) => createInTransaction(tx, input, context),
@@ -92,13 +91,6 @@ export function createTasks(store: SqliteStore, options: TasksOptions = {}) {
 		liveInTransaction: repo.live,
 		kindPageInTransaction: repo.kindPage,
 		hasConnectionHistoryInTransaction: repo.hasConnectionHistory,
-		conversationInTransaction(
-			db: Database,
-			conversationId: string,
-			limit = 50,
-		) {
-			return repo.conversation(db, conversationId, limit);
-		},
 		maintenance: () => store.write(maintenanceInTransaction),
 		async recover() {
 			return store.write(recoverInTransaction);

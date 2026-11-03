@@ -82,7 +82,7 @@ export const Formula = ({
 					<div
 						className="min-w-0 overflow-x-auto overflow-y-hidden text-lg [&_.katex-display]:m-0"
 						// KaTeX output for trust:false input; text is escaped by KaTeX.
-						// biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized by KaTeX (trust: false)
+						// sanitized by KaTeX (trust: false)
 						dangerouslySetInnerHTML={{ __html: html }}
 					/>
 				)}

@@ -283,7 +283,7 @@ const MarkdownContent = memo(function MarkdownContent({
 	const html = useMemo(() => renderSafeMarkdown(text), [text]);
 	return (
 		// Links are handled by delegation: the HTML is a string, so it has no handlers of its own.
-		// oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+		// eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
 		<div
 			className="markdown-content"
 			onClick={(event) => {
@@ -308,7 +308,7 @@ function EmotionIcon({ delivery }: { delivery?: SpeechDelivery }) {
 			data-emotion={emotion}
 			data-emotion-source={delivery?.source}
 			// Emoji is text and has no image URL.
-			// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+			// eslint-disable-next-line jsx-a11y/prefer-tag-over-role
 			role="img"
 			aria-label={label}
 			title={label}

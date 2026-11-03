@@ -94,13 +94,15 @@ const recomputedBytes = (h: Harness) =>
 	(
 		h.store.read((db) =>
 			db
-				.query(`SELECT
+				.query(
+					`SELECT
  (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_tasks) +
  (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_questions) +
  (SELECT coalesce(sum(length(CAST(data_json AS BLOB))+length(CAST(origin_json AS BLOB))),0) FROM work_task_grants) +
  (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_events) +
  (SELECT coalesce(sum(length(CAST(receipt_json AS BLOB))+length(input_digest)),0) FROM work_task_commands) +
- (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_runtime) AS bytes`)
+ (SELECT coalesce(sum(length(CAST(data_json AS BLOB))),0) FROM work_task_runtime) AS bytes`,
+				)
 				.get(),
 		) as { bytes: number }
 	).bytes;

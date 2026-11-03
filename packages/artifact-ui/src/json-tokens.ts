@@ -1,10 +1,5 @@
 type JsonTokenType =
-	| "key"
-	| "string"
-	| "number"
-	| "literal"
-	| "punct"
-	| "space";
+	"key" | "string" | "number" | "literal" | "punct" | "space";
 export type JsonToken = { type: JsonTokenType; text: string };
 
 const NUMBER = /^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/;

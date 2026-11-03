@@ -1,3 +1,7 @@
+export {
+	routingExportRuns,
+	routingExportFixedCards,
+} from "./service/routing-export";
 export { registerDialogue, registerCommandInteractions } from "./controller";
 export { /** @public */ migration } from "./repository";
 export type { DialogueService } from "./service";

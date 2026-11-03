@@ -10,8 +10,7 @@ vi.mock("@radix-ui/react-dialog", () => ({
 		onOpenChange,
 	}: {
 		children?:
-			| React.ReactNode
-			| ((props: { open: boolean }) => React.ReactNode);
+			React.ReactNode | ((props: { open: boolean }) => React.ReactNode);
 		open?: boolean;
 		onOpenChange?: (open: boolean) => void;
 	}) => (

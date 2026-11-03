@@ -23,11 +23,7 @@ export type KanbanLabel = "done" | "blocker";
 export type RunKind = "task" | "followup" | "commit_push" | "commit" | "push";
 /** Kanban's view of a run; `handed` until the terminals request is final. */
 type LegacyRunState =
-	| "waiting_turn"
-	| "handed"
-	| "completed"
-	| "blocked"
-	| "cancelled";
+	"waiting_turn" | "handed" | "completed" | "blocked" | "cancelled";
 export type RunState = import("./shared").CommonRunState;
 export type BlockerReason =
 	| "interrupted"

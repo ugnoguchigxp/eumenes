@@ -243,7 +243,7 @@ export function OcrMedia(props: OcrWorkspaceProps) {
 					{item.mime.startsWith("image/") ? (
 						<img src={props.mediaUrl} alt={`${item.name}の原本`} />
 					) : (
-						// oxlint-disable-next-line jsx-a11y/media-has-caption -- user-supplied source has no caption track
+						// eslint-disable-next-line jsx-a11y/media-has-caption -- user-supplied source has no caption track
 						<video
 							src={props.mediaUrl}
 							controls

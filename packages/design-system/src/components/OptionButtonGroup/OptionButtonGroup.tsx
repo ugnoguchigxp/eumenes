@@ -33,8 +33,7 @@ export interface MultiOptionButtonGroupProps<
 }
 
 export type OptionButtonGroupProps<T extends string> =
-	| SingleOptionButtonGroupProps<T>
-	| MultiOptionButtonGroupProps<T>;
+	SingleOptionButtonGroupProps<T> | MultiOptionButtonGroupProps<T>;
 
 export function OptionButtonGroup<T extends string>(
 	props: OptionButtonGroupProps<T>,

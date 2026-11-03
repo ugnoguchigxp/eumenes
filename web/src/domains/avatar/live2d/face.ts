@@ -1,0 +1,76 @@
+import type { AvatarMotion } from "../../../../../api/domains/delivery/contracts";
+
+type Expression = {
+	smile: number;
+	eyes: number;
+	brow: number;
+	cheek: number;
+	form: number;
+};
+const neutral: Expression = { smile: 0, eyes: 1, brow: 0, cheek: 0, form: 0 };
+// Model presentation only: the existing delivery classifier has already chosen the motion.
+const expressions: Partial<Record<AvatarMotion, Partial<Expression>>> = {
+	agreeing: { smile: 0.35, eyes: 0.9, form: 0.5 },
+	joyful: { smile: 0.9, eyes: 0.72, brow: 0.2, cheek: 0.25, form: 0.9 },
+	listening: { eyes: 0.88, brow: -0.15, form: 0.2 },
+	curious: { eyes: 1, brow: 0.35, form: 0.15 },
+	surprised: { eyes: 1.15, brow: 0.8, form: -0.3 },
+	downcast: { eyes: 0.8, brow: -0.4, form: -0.5 },
+	shy: { eyes: 0.85, cheek: 0.6, form: 0.3 },
+	sleepy: { eyes: 0.5, brow: -0.1 },
+	greeting: { smile: 0.6, form: 0.7 },
+};
+
+/** Display-clock blinking: no timers, natural intervals and brief close/open phases. */
+export function createBlink(random = Math.random) {
+	let start = 3 + random() * 4;
+	let duration = 0.16 + random() * 0.12;
+	let previous = 0;
+	return (time: number) => {
+		if (time < previous) start = time + 3 + random() * 4;
+		previous = time;
+		if (time > start + duration) {
+			start = time + 3 + random() * 4;
+			duration = 0.16 + random() * 0.12;
+		}
+		const phase = (time - start) / duration;
+		return phase <= 0 || phase >= 1 ? 0 : Math.sin(Math.PI * phase) ** 2;
+	};
+}
+
+export function createFace(random = Math.random) {
+	const blink = createBlink(random);
+	const current = { ...neutral };
+	return (
+		time: number,
+		dt: number,
+		motion: AvatarMotion,
+		mouth: number,
+		intensity = 1,
+	) => {
+		const preset = { ...neutral, ...expressions[motion] };
+		const strength = Number.isFinite(intensity)
+			? Math.max(0, Math.min(1, intensity))
+			: 1;
+		const weight = 1 - Math.exp(-Math.max(0, dt) / 0.18);
+		for (const key of Object.keys(current) as Array<keyof Expression>) {
+			const target = neutral[key] + (preset[key] - neutral[key]) * strength;
+			current[key] += (target - current[key]) * weight;
+		}
+		const open = current.eyes * (1 - blink(time));
+		return {
+			ParamEyeLOpen: open,
+			ParamEyeROpen: open,
+			ParamEyeLSmile: current.smile,
+			ParamEyeRSmile: current.smile,
+			ParamBrowLY: current.brow,
+			ParamBrowRY: current.brow,
+			ParamCheek: current.cheek,
+			ParamMouthForm: current.form,
+			// The amplitude owns this parameter, even for surprise and after a stop.
+			ParamMouthOpenY: Number.isFinite(mouth)
+				? Math.max(0, Math.min(0.7, mouth))
+				: 0,
+		};
+	};
+}

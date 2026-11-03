@@ -1,3 +1,4 @@
+import { routerExportClient } from "./router-export";
 import { visualAnalysisClient } from "./visual-analysis";
 import { doclingClient } from "./docling";
 import { shellClient } from "./shell";
@@ -64,6 +65,7 @@ export function createClient(baseUrl: string, token?: string) {
 		...agentRuntimeClient(transport),
 		...tasksClient(transport),
 		...toolchainHistoryClient(transport),
+		...routerExportClient(transport),
 		...timersClient(transport),
 		...terminalsClient(transport),
 		...shellClient(transport),

@@ -33,8 +33,7 @@ const log = getLogger("dialogue");
 export type Filled = { fields: Record<string, unknown> } | { step: Step };
 
 type Target =
-	| Extract<RouteCandidate, { kind: "toolchain" | "read" }>
-	| "memory";
+	Extract<RouteCandidate, { kind: "toolchain" | "read" }> | "memory";
 
 type Plan = {
 	input: Pick<RouteFieldsInput, "choices" | "extract">;
@@ -127,8 +126,7 @@ function toolchainPlan(
 	// The word that lets the suspended unsaved work go is read by the conversation model alone.
 	if (turn.routed!.switching === choice.id) return "fill";
 	const schema = choice.inputs as
-		| { properties?: Record<string, Property>; required?: string[] }
-		| undefined;
+		{ properties?: Record<string, Property>; required?: string[] } | undefined;
 	const required = new Set(schema?.required ?? []);
 	const choices: RouteFieldsInput["choices"] = {};
 	const free: Record<

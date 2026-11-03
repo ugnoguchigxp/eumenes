@@ -61,7 +61,7 @@ const Modal = React.memo(
 			// Modal閉じた時に位置をリセット
 			React.useEffect(() => {
 				if (!show) {
-					// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
+					// eslint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 					setPosition({ x: 0, y: 0 });
 					setIsDragging(false);
 				}

@@ -28,7 +28,7 @@ export const imageRecord = z.object({
 });
 export type ImageRecord = z.infer<typeof imageRecord>;
 
-export { imagePlan, imagePlanV2 } from "../../capabilities/contracts";
+export { imagePlanV2 } from "../../capabilities/contracts";
 export { imageImportView, type ImageImportView } from "./imports";
 
 /** HTTP status of the image codes, which the conversation's attachments and the imports share. */

@@ -55,10 +55,12 @@ export function liveUsageInTransaction(
 	end: number,
 ) {
 	return db
-		.query(`SELECT id,model,connection_id AS connectionId,connection_name AS connectionName,
+		.query(
+			`SELECT id,model,connection_id AS connectionId,connection_name AS connectionName,
 started_at AS startedAt,ended_at AS endedAt,status,test,
 observed_seconds AS seconds,usage_confirmed AS confirmed,error
-FROM live_voice_sessions WHERE julianday(started_at)>=julianday(?) AND julianday(started_at)<julianday(?) ORDER BY started_at DESC,id`)
+FROM live_voice_sessions WHERE julianday(started_at)>=julianday(?) AND julianday(started_at)<julianday(?) ORDER BY started_at DESC,id`,
+		)
 		.all(new Date(start).toISOString(), new Date(end).toISOString()) as Array<{
 		id: string;
 		model: string | null;

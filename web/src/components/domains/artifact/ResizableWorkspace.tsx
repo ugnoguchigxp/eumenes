@@ -69,7 +69,7 @@ export function ResizableWorkspace({
 				<div
 					className="workspace-resize-handle"
 					// A focusable splitter is an interactive separator, not a thematic break.
-					// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+					// eslint-disable-next-line jsx-a11y/prefer-tag-over-role
 					role="separator"
 					tabIndex={0}
 					aria-label="会話とアーティファクトのサイズを調整"

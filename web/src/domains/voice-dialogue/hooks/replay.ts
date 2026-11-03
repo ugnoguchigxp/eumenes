@@ -122,8 +122,7 @@ export function useReplay(
 				let failure: unknown;
 				for (let i = 0; i < sentences.length; i++) {
 					let speech:
-						| Awaited<ReturnType<typeof client.replaySpeech>>
-						| undefined;
+						Awaited<ReturnType<typeof client.replaySpeech>> | undefined;
 					try {
 						speech = await next;
 					} catch (e) {
@@ -155,6 +154,7 @@ export function useReplay(
 						signal.addEventListener("abort", finish, { once: true });
 						target
 							.play(speech.wav, finish, {
+								assistantSpeech: true,
 								timing: { runId: runId ?? undefined, chunkIndex: i },
 								volume,
 								shouldPlay: valid,

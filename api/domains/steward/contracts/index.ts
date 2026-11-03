@@ -45,11 +45,7 @@ export type RequestKind = (typeof requestKinds)[number];
 export type InboxState = "pending" | "done" | "none";
 /** How a conversation run ended (the dialogue tells the steward, which only takes it as a reason to look again). */
 export type RunEnd =
-	| "completed"
-	| "failed"
-	| "interrupted"
-	| "cancelled"
-	| "stale";
+	"completed" | "failed" | "interrupted" | "cancelled" | "stale";
 /** What the application knows of a run: `active` is still running; an unknown run is `stale`. */
 export type RunLookup = "active" | RunEnd;
 

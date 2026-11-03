@@ -6,12 +6,7 @@ import type { ComputePort, RemoteJob, Result, SubmitInput } from "../contracts";
 import { row, patch, type JobRow } from "../repository";
 
 export type Step =
-	| "submit"
-	| "reconcile"
-	| "poll"
-	| "cancel"
-	| "fetch"
-	| "delete";
+	"submit" | "reconcile" | "poll" | "cancel" | "fetch" | "delete";
 export type HandlerDeps = {
 	store: SqliteStore;
 	queue: QueueService;

@@ -21,8 +21,7 @@ const URI_PATTERN =
 const SCAN_DEPTH = 6;
 
 export type ResourceReadOutcome =
-	| { ok: true; text: string }
-	| { ok: false; code: string };
+	{ ok: true; text: string } | { ok: false; code: string };
 
 /** What the host provides to read a resource by URI (the registry's `read`); the runtime never opens a store. */
 export interface ResourceReadPort {

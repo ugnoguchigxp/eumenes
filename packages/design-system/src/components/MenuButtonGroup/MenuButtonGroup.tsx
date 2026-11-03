@@ -157,7 +157,7 @@ export const MenuButtonGroup: React.FC<IMenuButtonGroupProps> = ({
 	// Reset measurement when items change
 	React.useEffect(() => {
 		if (_testColumnCount !== undefined) return;
-		// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
+		// eslint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 		setIsMeasured(false);
 		setButtonWidths([]);
 		setColumnCount(0);

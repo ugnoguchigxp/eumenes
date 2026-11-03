@@ -10,8 +10,7 @@ export function registerDocling(app: Hono, docling: DoclingService) {
 		app.post(`/api/docling/${path}`, async (c) => {
 			// Bun passes its Server to Hono as env. app.request() fixtures have no network timeout.
 			const server = c.env as
-				| { timeout?: (request: Request, seconds: number) => void }
-				| undefined;
+				{ timeout?: (request: Request, seconds: number) => void } | undefined;
 			server?.timeout?.(c.req.raw, 200);
 			try {
 				const value =

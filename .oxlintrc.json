@@ -9,6 +9,8 @@
 	},
 	"ignorePatterns": [
 		"node_modules/**",
+		"vendor/live2d/framework.js",
+		"web/public/live2d/**",
 		"dist/**",
 		"dist-web/**",
 		"coverage/**",

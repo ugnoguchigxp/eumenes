@@ -156,6 +156,7 @@ select:focus-visible {
 .chat-panel[data-chat-hidden]
 	> :not(
 		.light-avatar-background,
+		.hiyori-avatar-background,
 		.light-avatar-touches,
 		.spatial-container,
 		.subtitle,

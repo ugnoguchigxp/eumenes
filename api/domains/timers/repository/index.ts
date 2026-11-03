@@ -43,9 +43,11 @@ export function recentNotifiedTimers(
 ): TimerRow[] {
 	return (
 		db
-			.query(`SELECT t.* FROM timers t JOIN timer_notifications n ON n.timer_id=t.id
+			.query(
+				`SELECT t.* FROM timers t JOIN timer_notifications n ON n.timer_id=t.id
 		WHERE t.scope=? AND t.state='elapsed' AND t.body_expired=0 AND n.status<>'dismissed'
-		ORDER BY n.due_at_ms DESC, n.id DESC LIMIT ?`)
+		ORDER BY n.due_at_ms DESC, n.id DESC LIMIT ?`,
+			)
 			.all(scope, limit) as SqlTimer[]
 	).map(mapTimer);
 }

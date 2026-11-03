@@ -169,14 +169,12 @@ export function compileMotion(data: MotionData): Motion {
 		}
 		const blinks = variant.blinks ?? [];
 		for (const [at, length] of blinks)
-			if (
-				!(
-					at >= 0 &&
-					length > 0 &&
-					length <= 1.2 &&
-					at + length <= data.duration
-				)
-			)
+			if (!(
+				at >= 0 &&
+				length > 0 &&
+				length <= 1.2 &&
+				at + length <= data.duration
+			))
 				fail(`${variant.id} の瞬きが不正です`);
 		return { id: variant.id, label: variant.label, tracks, blinks };
 	});

@@ -421,7 +421,7 @@ export function MusicCreationForm({
 							className="music-creation-genres"
 							role="region"
 							aria-label="ジャンル一覧"
-							// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
+							// eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
 							tabIndex={0}
 						>
 							{groups.map((group) => (

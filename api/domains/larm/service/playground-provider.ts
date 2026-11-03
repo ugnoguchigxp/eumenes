@@ -90,8 +90,7 @@ export function createProviderAccess({
 		return { infer, fields };
 	}
 	let embeddingTarget:
-		| { target: LarmTestTarget; space: EmbeddingSpace; at: number }
-		| undefined;
+		{ target: LarmTestTarget; space: EmbeddingSpace; at: number } | undefined;
 	/** The embedding provider of the configured profile, with its declared vector space. */
 	async function findEmbedding(signal: AbortSignal) {
 		if (embeddingTarget && Date.now() - embeddingTarget.at < 600_000)

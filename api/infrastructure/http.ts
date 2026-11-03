@@ -14,8 +14,7 @@ export type ParseQueryOptions = {
 };
 
 export type ParsedInput<T> =
-	| { ok: true; data: T }
-	| { ok: false; response: Response };
+	{ ok: true; data: T } | { ok: false; response: Response };
 
 /**
  * Reads the request body as JSON and validates it. A body that is not JSON, or that the schema

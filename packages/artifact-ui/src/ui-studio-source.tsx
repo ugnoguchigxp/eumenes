@@ -221,7 +221,7 @@ export function StudioSource({
 					<div className="aui-ui-source-gutter" aria-hidden="true">
 						{lines.map((_, index) => (
 							<span
-								// biome-ignore lint/suspicious/noArrayIndexKey: the gutter is positional
+								// the gutter is positional
 								key={index}
 								data-change={diff?.changed[index] ? "changed" : undefined}
 								data-removed={removedBefore.has(index) ? "true" : undefined}
@@ -234,14 +234,14 @@ export function StudioSource({
 						<code>
 							{lines.map((tokens, index) => (
 								<span
-									// biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
+									// lines are positional
 									key={index}
 									className="aui-ui-source-line"
 									data-change={diff?.changed[index] ? "changed" : undefined}
 								>
 									{tokens.map((token, at) => (
 										<span
-											// biome-ignore lint/suspicious/noArrayIndexKey: tokens are positional
+											// tokens are positional
 											key={at}
 											className={`aui-json-${token.type}`}
 										>

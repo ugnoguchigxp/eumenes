@@ -211,11 +211,7 @@ export type PerceptionPort = {
 		signal: AbortSignal,
 		progress: (
 			phase:
-				| "running"
-				| "connection"
-				| "released"
-				| "release_failed"
-				| "lifecycle",
+				"running" | "connection" | "released" | "release_failed" | "lifecycle",
 			value?: string,
 			observation?: StopObservation,
 		) => Promise<void>,

@@ -166,8 +166,7 @@ export async function createHostToolchain(
 	const links = createToolchainHostLinks(s);
 	// Claude Code sessions start in the server's working directory (the repository).
 	let loadedCapabilities:
-		| import("../../domains/capabilities").Capabilities
-		| undefined;
+		import("../../domains/capabilities").Capabilities | undefined;
 	const sdkHost = createKanbanSdkHost({
 		store: s.store,
 		settings: s.settings,

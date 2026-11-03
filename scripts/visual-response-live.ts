@@ -56,8 +56,7 @@ for (const scenario of ["describe", "failure", "cancel"] as const) {
 	}[] = [];
 	const observations: StopObservation[] = [];
 	let credential:
-		| { endpoint: string; token: string; body?: string }
-		| undefined;
+		{ endpoint: string; token: string; body?: string } | undefined;
 	let connectionId: string | undefined;
 	let inferenceStarted = false;
 	const port = createVisualPerception({

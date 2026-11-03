@@ -187,9 +187,11 @@ export function list(
 ) {
 	return (
 		db
-			.query(`SELECT seq,data_json FROM work_tasks WHERE
+			.query(
+				`SELECT seq,data_json FROM work_tasks WHERE
  (? IS NULL OR state=?) AND (? IS NULL OR conversation_id=?) AND (? IS NULL OR seq<?)
- ORDER BY seq DESC LIMIT ?`)
+ ORDER BY seq DESC LIMIT ?`,
+			)
 			.all(
 				query.state ?? null,
 				query.state ?? null,
@@ -255,13 +257,10 @@ export function openQuestion(
 	return row ? JSON.parse(row.data_json) : null;
 }
 export function putQuestion(db: Database, q: TaskQuestion) {
-	db.query(`INSERT INTO work_task_questions(id,task_id,state,data_json) VALUES(?,?,?,?)
- ON CONFLICT(id) DO UPDATE SET state=excluded.state,data_json=excluded.data_json`).run(
-		q.id,
-		q.taskId,
-		q.state,
-		JSON.stringify(q),
-	);
+	db.query(
+		`INSERT INTO work_task_questions(id,task_id,state,data_json) VALUES(?,?,?,?)
+ ON CONFLICT(id) DO UPDATE SET state=excluded.state,data_json=excluded.data_json`,
+	).run(q.id, q.taskId, q.state, JSON.stringify(q));
 }
 export function live(db: Database): WorkTask[] {
 	return (
@@ -274,8 +273,10 @@ export function live(db: Database): WorkTask[] {
 }
 export function capacity(db: Database) {
 	return db
-		.query(`SELECT count(*) AS total, coalesce(sum(finished_ms IS NULL),0) AS live,
- (SELECT bytes FROM work_task_storage WHERE id=1) AS bytes FROM work_tasks`)
+		.query(
+			`SELECT count(*) AS total, coalesce(sum(finished_ms IS NULL),0) AS live,
+ (SELECT bytes FROM work_task_storage WHERE id=1) AS bytes FROM work_tasks`,
+		)
 		.get() as { total: number; live: number; bytes: number };
 }
 export function expiredBodies(
@@ -315,10 +316,12 @@ export function purgeCandidates(
 ): WorkTask[] {
 	return (
 		db
-			.query(`SELECT data_json FROM work_tasks
+			.query(
+				`SELECT data_json FROM work_tasks
  WHERE finished_ms<=? AND json_extract(data_json,'$.metadataExpired')=1
  AND id NOT IN (SELECT value FROM json_each(?))
- ORDER BY finished_ms, id LIMIT ?`)
+ ORDER BY finished_ms, id LIMIT ?`,
+			)
 			.all(before, JSON.stringify(exclude), limit) as TaskRow[]
 	).map((r) => task(r)!);
 }
@@ -350,16 +353,6 @@ export const migrations: readonly Migration[] = [
 		sql: retentionMigration,
 	},
 ];
-
-export function conversation(db: Database, id: string, limit: number) {
-	return (
-		db
-			.query(
-				"SELECT seq,data_json FROM work_tasks WHERE conversation_id=? ORDER BY seq DESC LIMIT ?",
-			)
-			.all(id, Math.min(50, Math.max(1, limit))) as TaskRow[]
-	).map((r) => task(r)!);
-}
 
 /** Terminal state does not discard a retained orchestration request's owner binding. */
 export function hasConnectionHistory(

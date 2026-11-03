@@ -48,7 +48,7 @@ export const MenuDropdown: React.FC<IMenuDropdownProps> = ({
 
 	useEffect(() => {
 		if (!isOpen) {
-			// oxlint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
+			// eslint-disable-next-line react/set-state-in-effect -- local state follows a prop or open state, reset when it changes
 			setActiveSubmenuIndex(null);
 		}
 	}, [isOpen]);

@@ -266,9 +266,7 @@ export const uiCompositionsWebAdapter: WebArtifactAdapter = {
 					case "ui-discard": {
 						if (!bridge) return rejected("この操作は利用できません。");
 						const kind = binding.eventAction.slice(3) as
-							| "return"
-							| "resume"
-							| "discard";
+							"return" | "resume" | "discard";
 						const result = await bridge.command(kind);
 						if (result.ok) {
 							// A resumed draft and a discarded one are shown from the start.

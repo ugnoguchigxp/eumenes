@@ -15,6 +15,7 @@ import type { useBackground } from "../domains/settings";
 const labels: Record<BackgroundKind, string> = {
 	"light-fairy": "光の妖精",
 	spatial: "Spatial",
+	"live2d-hiyori": "桃瀬ひより（Live2D）",
 };
 
 export function BackgroundSelect({

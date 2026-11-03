@@ -15,8 +15,7 @@ import {
 export const scope = "default";
 /** Who asks: the screen (the user's own action) or a specialist turn holding the work. */
 export type Caller =
-	| { kind: "ui" }
-	| { kind: "specialist"; runId: string; workRef: string };
+	{ kind: "ui" } | { kind: "specialist"; runId: string; workRef: string };
 export type Outcome = { receipt: StoredReceipt; replay: boolean };
 /** A whole draft that failed its check: what it was and where it broke (positions and rule names only). */
 export type RejectedDraft = {

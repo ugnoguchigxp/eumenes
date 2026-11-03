@@ -156,8 +156,7 @@ export type LoadedEvent = {
 	digests: Record<string, string>;
 };
 export type LoadResult =
-	| { status: "ok"; event: LoadedEvent }
-	| { status: "gone" | "blocked" };
+	{ status: "ok"; event: LoadedEvent } | { status: "gone" | "blocked" };
 
 const roleOf = (by: EventBy) => (by === "user" ? "user" : "assistant");
 

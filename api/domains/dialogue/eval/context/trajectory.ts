@@ -31,11 +31,7 @@ type Step = {
 			| {
 					status: "done";
 					outcome:
-						| "succeeded"
-						| "partial"
-						| "failed"
-						| "cancelled"
-						| "interrupted";
+						"succeeded" | "partial" | "failed" | "cancelled" | "interrupted";
 					result: unknown;
 			  };
 	}>;

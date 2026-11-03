@@ -300,8 +300,7 @@ export type GapTaskRequest = {
 	origin: unknown;
 };
 export type GapTaskDecision =
-	| { status: "created"; taskRef: string }
-	| { status: "denied"; reason: string };
+	{ status: "created"; taskRef: string } | { status: "denied"; reason: string };
 export interface GapTaskPort {
 	linkInTransaction(db: Database, request: GapTaskRequest): GapTaskDecision;
 }

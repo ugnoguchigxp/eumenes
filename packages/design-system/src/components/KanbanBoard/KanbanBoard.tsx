@@ -161,7 +161,7 @@ export function KanbanBoard(props: KanbanBoardProps) {
 				className="kanban-columns"
 				role="group"
 				aria-label="タスクのステータス別一覧"
-				// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need to focus and scroll the columns
+				// eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- keyboard users need to focus and scroll the columns
 				tabIndex={0}
 			>
 				{COLUMNS.map((column) => (

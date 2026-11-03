@@ -30,11 +30,7 @@ test.beforeAll(() => {
 });
 test.afterAll(() => rmSync(directory, { recursive: true, force: true }));
 const modes: readonly (
-	| "cpu"
-	| "transformers"
-	| "failure"
-	| "cancel"
-	| "live"
+	"cpu" | "transformers" | "failure" | "cancel" | "live"
 )[] = process.env.EUMENES_VISUAL_RESULT
 	? ["live"]
 	: ["cpu", "transformers", "failure", "cancel"];

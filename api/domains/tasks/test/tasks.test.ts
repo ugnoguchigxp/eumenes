@@ -657,7 +657,7 @@ test("Promise-like transaction callbacks are rejected as well as native Promises
 				version: 1,
 				available: () => true,
 				startInTransaction: () => ({
-					// oxlint-disable-next-line unicorn/no-thenable -- Intentionally invalid transaction callback fixture.
+					// eslint-disable-next-line unicorn/no-thenable -- Intentionally invalid transaction callback fixture.
 					then: (resolve: () => void) => resolve(),
 				}),
 				stopInTransaction: () => {},

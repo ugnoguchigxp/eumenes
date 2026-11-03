@@ -87,6 +87,7 @@ export function queueChunks(
 						.catch(fail);
 				};
 				await deps.controller()?.play(bytes, ended, {
+					assistantSpeech: true,
 					waitForPrevious: true,
 					timing: identity,
 					volume,

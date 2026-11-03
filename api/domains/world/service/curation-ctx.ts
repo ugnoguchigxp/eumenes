@@ -44,8 +44,7 @@ export type Live = {
 	text: string;
 };
 export type Classified =
-	| { kind: "live"; live: Live }
-	| { kind: "final"; reason: string };
+	{ kind: "live"; live: Live } | { kind: "final"; reason: string };
 
 /** Configuration and the pieces every part of curation shares. */
 export function createCurationCtx(options: CurationOptions) {

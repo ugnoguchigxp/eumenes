@@ -969,8 +969,7 @@ function offeredKinds(
 ) {
 	const kinded = JSON.stringify(tools).includes('"kind"');
 	const conditions = step.arguments.conditions as
-		| Array<Record<string, unknown>>
-		| undefined;
+		Array<Record<string, unknown>> | undefined;
 	if (!Array.isArray(conditions)) return step;
 	return {
 		...step,

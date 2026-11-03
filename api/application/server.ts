@@ -86,7 +86,7 @@ async function main() {
 		const app = createApp({
 			token,
 			origin: config.origin,
-			modules: appModules(appServices(services)),
+			modules: appModules(appServices(services, [token])),
 		});
 		await gate.step(() => {
 			try {

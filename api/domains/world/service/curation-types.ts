@@ -198,11 +198,7 @@ export type CurationElement = {
 	reasonCodes: string[];
 	/** What an applied claim became. */
 	outcome?:
-		| "adopted"
-		| "adopted_hypothesis"
-		| "corrected"
-		| "retracted"
-		| "registered";
+		"adopted" | "adopted_hypothesis" | "corrected" | "retracted" | "registered";
 	claimId?: string;
 	entityId?: string;
 	messageId?: string;

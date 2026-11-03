@@ -43,12 +43,7 @@ export type OcrCorrection = {
 	frameIndex: number | null;
 	sourceRevision: number;
 	state:
-		| "queued"
-		| "running"
-		| "cancelling"
-		| "cancelled"
-		| "completed"
-		| "failed";
+		"queued" | "running" | "cancelling" | "cancelled" | "completed" | "failed";
 	errorCode: string | null;
 	createdAt: number;
 	result: {
@@ -97,12 +92,7 @@ export type OcrQr = {
 	frameIndex: number | null;
 	sourceRevision: number;
 	state:
-		| "queued"
-		| "running"
-		| "cancelling"
-		| "cancelled"
-		| "completed"
-		| "failed";
+		"queued" | "running" | "cancelling" | "cancelled" | "completed" | "failed";
 	errorCode: string | null;
 	updatedAt: number;
 	items:

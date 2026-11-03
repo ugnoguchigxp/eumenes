@@ -171,12 +171,10 @@ export function createWorldSteps(ctx: LifecycleCtx) {
 						reasonCode: row.reasonCode,
 						roots: [],
 					});
-					if (
-						!(
-							verify.status === "rejected" &&
-							verify.reasonCode === "FORGET_ALREADY_COMPLETE"
-						)
-					)
+					if (!(
+						verify.status === "rejected" &&
+						verify.reasonCode === "FORGET_ALREADY_COMPLETE"
+					))
 						throw new StepBlocked("WORLD_NOT_VERIFIED");
 					part += 1;
 					chunks = 0;

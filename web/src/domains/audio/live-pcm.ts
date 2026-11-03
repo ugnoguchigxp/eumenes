@@ -1,3 +1,4 @@
+import { analyseAssistantSpeech } from "./assistant-speech";
 import recorderUrl from "./worklet/recorder.worklet.ts?worker&url";
 
 export function pcm16(samples: Float32Array): Uint8Array {
@@ -59,14 +60,25 @@ export async function createLivePcm(options: {
 	const gain = context.createGain();
 	gain.gain.value = options.volume;
 	gain.connect(context.destination);
+	const releaseSpeech = analyseAssistantSpeech(
+		context,
+		gain,
+		() => playing.size > 0,
+	);
 	const close = () => {
 		if (closed) return;
 		closed = true;
+		releaseSpeech();
 		for (const track of stream?.getTracks() ?? []) track.stop();
 		node?.disconnect();
 		source?.disconnect();
-		for (const p of playing) p.stop();
+		for (const p of playing) {
+			p.onended = null;
+			p.stop();
+			p.disconnect();
+		}
 		playing.clear();
+		gain.disconnect();
 		void context.close();
 		options.onPlaying(false);
 	};
@@ -139,6 +151,7 @@ export async function createLivePcm(options: {
 			options.onPlaying(true);
 			next.onended = () => {
 				playing.delete(next);
+				next.disconnect();
 				if (!playing.size) options.onPlaying(false);
 			};
 		},

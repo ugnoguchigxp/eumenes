@@ -40,8 +40,7 @@ export function capacityFixture() {
 	const claims: string[] = [];
 	const controls = {
 		hold: undefined as
-			| ((id: string, signal: AbortSignal) => Promise<void>)
-			| undefined,
+			((id: string, signal: AbortSignal) => Promise<void>) | undefined,
 		claimable: true,
 		probeReady: false,
 		healthCalls: 0,

@@ -70,7 +70,7 @@ type CandidateKind = "dedicated" | "pipeline" | "general";
  * The conversation's read tools as the search sees them (spec conversation-read-tools-design 2026-10-31 §2.6): in no
  * catalog and with no package, their passages indexed and ranked with the toolchains' (in the dedicated slots).
  */
-const readToolEntries: FixedDefinition[] = READ_TOOLS.map((tool) => ({
+export const readToolEntries: FixedDefinition[] = READ_TOOLS.map((tool) => ({
 	kind: "toolchain",
 	id: tool.name,
 	revision: tool.revision,
@@ -95,7 +95,7 @@ const readToolSchemas = new Map(
 );
 
 /** A pipeline by its stored binding, a general toolchain by its definition, any other dedicated. */
-function kindOf(db: Database, d: FixedDefinition): CandidateKind {
+export function kindOf(db: Database, d: FixedDefinition): CandidateKind {
 	if (d.general) return "general";
 	return d.bindingRevisionId &&
 		storedBindingInTransaction(db, d.bindingRevisionId)?.document.execution ===

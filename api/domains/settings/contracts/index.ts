@@ -211,7 +211,7 @@ const asrLanguageCodes = asrLanguages.map(([code]) => code) as [
 	...AsrLanguage[],
 ];
 const personas = ["butler", "maid", "strategist", "sage"] as const;
-const backgroundSchema = z.enum(["light-fairy", "spatial"]);
+const backgroundSchema = z.enum(["light-fairy", "spatial", "live2d-hiyori"]);
 export type BackgroundKind = z.infer<typeof backgroundSchema>;
 export const backgroundKinds = backgroundSchema.options;
 /**

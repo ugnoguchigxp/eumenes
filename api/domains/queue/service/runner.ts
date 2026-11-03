@@ -101,11 +101,7 @@ export function createRunner(
 		db: Tx,
 		job: JobRecord,
 		state:
-			| "failed"
-			| "expired"
-			| "interrupted"
-			| "outcome_unknown"
-			| "cancelled",
+			"failed" | "expired" | "interrupted" | "outcome_unknown" | "cancelled",
 		errorCode: string | null,
 		now: number,
 	) {

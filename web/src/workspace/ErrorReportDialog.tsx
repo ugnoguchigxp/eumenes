@@ -4,9 +4,7 @@ import { Button, Modal } from "../design-system";
 import "./ErrorReportDialog.css";
 
 type Report =
-	| { state: "loading" }
-	| { state: "ready"; text: string }
-	| { state: "error" };
+	{ state: "loading" } | { state: "ready"; text: string } | { state: "error" };
 
 /** The heading of a failed answer, in its bubble and above its report. */
 export const RUN_FAILURE_HEADING = "回答を取得できませんでした";

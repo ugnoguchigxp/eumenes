@@ -22,8 +22,7 @@ import {
 } from "./composition-compute";
 
 export type CompositionValidation =
-	| { ok: true }
-	| { ok: false; path: string; rule: string };
+	{ ok: true } | { ok: false; path: string; rule: string };
 
 class Rejection extends Error {
 	constructor(

@@ -81,9 +81,7 @@ export type WorldReadResult =
 	| {
 			status: "blocked";
 			reasonCode:
-				| "WORLD_DISABLED"
-				| "STORE_CLOSING"
-				| "WORLD_RECOVERY_REQUIRED";
+				"WORLD_DISABLED" | "STORE_CLOSING" | "WORLD_RECOVERY_REQUIRED";
 	  };
 
 export type WorldHistoryRequest = {

@@ -208,11 +208,11 @@ export function KanbanCard({
 			data-dragging={dragging || undefined}
 			data-card-id={card.id}
 		>
-			{/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children */}
+			{/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children */}
 			<article
 				ref={article}
 				className="kanban-card"
-				// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
+				// eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
 				tabIndex={0}
 				aria-labelledby={titleId}
 				aria-keyshortcuts={movable ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
@@ -388,7 +388,7 @@ function KanbanDetails({ card }: { card: KanbanBoardCard }) {
 			<section aria-label="最後の報告">
 				<h5>最後の報告</h5>
 				{card.lastReport ? (
-					// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
+					// eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable or keyboard-reachable region needs to take focus
 					<div className="kanban-report" tabIndex={0}>
 						{card.lastReport}
 					</div>

@@ -78,7 +78,7 @@ export const DataTable = ({
 					<tbody>
 						{rows.map((row, rowIndex) => (
 							<tr
-								// biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity
+								// rows have no identity
 								key={rowIndex}
 								className="border-b border-border/60 last:border-b-0"
 							>

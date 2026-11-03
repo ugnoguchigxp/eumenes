@@ -43,10 +43,7 @@ export type WorldJournalDraft = Omit<
 >;
 
 export type WorldJournalFailure =
-	| "unreadable"
-	| "malformed"
-	| "chain_broken"
-	| "truncated";
+	"unreadable" | "malformed" | "chain_broken" | "truncated";
 /** The journal cannot be trusted. Callers keep World closed (fail closed). */
 export class WorldJournalCorruptError extends Error {
 	constructor(readonly code: WorldJournalFailure) {

@@ -31,7 +31,6 @@ export {
 } from "./curation";
 export type {
 	/** @public */ CurationElement,
-
 	/** @public */ CurationPrepareResult,
 	/** @public */ CurationSettleResult,
 	PendingCurationEvent,

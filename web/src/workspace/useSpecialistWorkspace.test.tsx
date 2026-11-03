@@ -83,7 +83,7 @@ function setup(initial: SpecialistSession | null) {
 			const ws = useSpecialistWorkspace({
 				client,
 				artifacts,
-				// biome-ignore lint/suspicious/noExplicitAny: the launcher stub has only what is used
+				// the launcher stub has only what is used
 				toolchain: toolchain as any,
 				runSignature: signature,
 			});

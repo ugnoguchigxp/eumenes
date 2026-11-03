@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "bun:test";
 import { workersSettingsFixture } from "./workers-ai-settings.fixture";
 
-test("Spatial display v10 upgrades v9 immutably and reimports idempotently", async () => {
+test("Display v11 upgrades v9 immutably and reimports idempotently", async () => {
 	const h = await workersSettingsFixture();
 	try {
 		const bundle = JSON.parse(
@@ -40,11 +40,16 @@ test("Spatial display v10 upgrades v9 immutably and reimports idempotently", asy
 		const active = h.store
 			.read((db) => h.caps.artifactsInTransaction(db))
 			.find((a) => a.artifactId === "settings.display");
-		expect(active?.artifactRevisionId).toBe("artifact:settings.display@10");
-		const latest = bundle.artifacts.at(-1),
-			scatter = latest.fields.find(
-				(f: { fieldId: string }) => f.fieldId === "spatial.scatter",
-			);
+		expect(active?.artifactRevisionId).toBe("artifact:settings.display@11");
+		const latest = bundle.artifacts.at(-1);
+		expect(
+			latest.fields
+				.find((f: { fieldId: string }) => f.fieldId === "appearance.background")
+				.options.map((o: { value: string }) => o.value),
+		).toEqual(["light-fairy", "spatial", "live2d-hiyori"]);
+		const scatter = latest.fields.find(
+			(f: { fieldId: string }) => f.fieldId === "spatial.scatter",
+		);
 		expect(scatter.max).toBe(500);
 		expect(scatter.defaultValue).toBe("350");
 		expect(

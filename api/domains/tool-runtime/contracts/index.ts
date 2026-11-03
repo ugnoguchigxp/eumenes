@@ -29,10 +29,7 @@ export type ToolResult = {
 };
 export type Source = {
 	kind?:
-		| "web_source"
-		| "conversation_source"
-		| "world_claim"
-		| "world_document";
+		"web_source" | "conversation_source" | "world_claim" | "world_document";
 	sourceRef?: string;
 	sourceRevision?: string;
 	viewId?: string;

@@ -63,7 +63,7 @@ export function KanbanColumn({
 				<span className="kanban-count">{items.length}</span>
 			</h3>
 			<p className="kanban-column-description">{description}</p>
-			{/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children */}
+			{/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children */}
 			<ul
 				ref={list}
 				className="kanban-list"

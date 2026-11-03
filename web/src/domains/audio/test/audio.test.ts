@@ -43,6 +43,7 @@ test("pausing the microphone retains current output, resumes capture, and reject
 				connect() {},
 				start() {},
 				stop: outputStop,
+				disconnect() {},
 			};
 		}
 	}
@@ -119,6 +120,7 @@ test("playback volume includes mute and releases gain on completion and cancella
 				connect: vi.fn(),
 				start: vi.fn(),
 				stop: vi.fn(),
+				disconnect: vi.fn(),
 			};
 			sources.push(source);
 			return source;
@@ -250,6 +252,7 @@ test("stopping playback while WAV decoding prevents a late start", async () => {
 				connect: () => {},
 				start: () => started++,
 				stop: () => {},
+				disconnect: () => {},
 			};
 		}
 	}
@@ -307,6 +310,7 @@ test("without interruption the next response waits, while superseded waiting aud
 					started++;
 				},
 				stop: () => {},
+				disconnect: () => {},
 				connect: () => {},
 				buffer: null as unknown,
 			};
@@ -487,6 +491,7 @@ test.each(["half-duplex", "timer-tone"])(
 					connect() {},
 					start() {},
 					stop() {},
+					disconnect() {},
 				};
 				sources.push(source);
 				return source;

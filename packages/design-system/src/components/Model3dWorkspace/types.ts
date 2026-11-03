@@ -2,12 +2,7 @@ import type { ReactNode } from "react";
 import type { ImagePickerProps } from "../ImagePicker";
 
 export type Model3dGenerationState =
-	| "submitting"
-	| "queued"
-	| "running"
-	| "completed"
-	| "failed"
-	| "cancelled";
+	"submitting" | "queued" | "running" | "completed" | "failed" | "cancelled";
 
 export type Model3dGenerationItem = {
 	id: string;

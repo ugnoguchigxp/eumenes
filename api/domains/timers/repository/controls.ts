@@ -17,9 +17,11 @@ export function markPaused(
 ): boolean {
 	return (
 		db
-			.query(`UPDATE timers SET state='paused', paused_at_ms=?, paused_remaining_ms=due_at_ms-?,
+			.query(
+				`UPDATE timers SET state='paused', paused_at_ms=?, paused_remaining_ms=due_at_ms-?,
     revision=revision+1, cancel_epoch=cancel_epoch+1, schedule_id=NULL, expiry_job_id=NULL, updated_at_ms=?
-    WHERE id=? AND state='active' AND revision=? AND due_at_ms>? AND body_expired=0`)
+    WHERE id=? AND state='active' AND revision=? AND due_at_ms>? AND body_expired=0`,
+			)
 			.run(at, at, at, id, revision, at).changes === 1
 	);
 }
@@ -32,10 +34,12 @@ export function markResumed(
 ): boolean {
 	return (
 		db
-			.query(`UPDATE timers SET state='active', due_at_ms=?, paused_total_ms=?-started_at_ms-duration_seconds*1000,
+			.query(
+				`UPDATE timers SET state='active', due_at_ms=?, paused_total_ms=?-started_at_ms-duration_seconds*1000,
     paused_at_ms=NULL, paused_remaining_ms=NULL, cancelled_at_ms=NULL, terminal_at_ms=NULL,
     revision=revision+1, cancel_epoch=cancel_epoch+1, schedule_id=NULL, expiry_job_id=NULL, error_code=NULL, updated_at_ms=?
-    WHERE id=? AND state IN ('paused','cancelled') AND revision=? AND body_expired=0`)
+    WHERE id=? AND state IN ('paused','cancelled') AND revision=? AND body_expired=0`,
+			)
 			.run(dueAt, dueAt, at, id, revision).changes === 1
 	);
 }

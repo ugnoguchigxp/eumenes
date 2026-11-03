@@ -96,10 +96,10 @@ async function mount(
 				<Probe />
 				{requests.map((request, index) =>
 					request.view === "diagram" ? (
-						// biome-ignore lint/suspicious/noArrayIndexKey: fixed test list
+						// fixed test list
 						<DiagramView key={index} request={request} />
 					) : (
-						// biome-ignore lint/suspicious/noArrayIndexKey: fixed test list
+						// fixed test list
 						<StepperView key={index} request={request} />
 					),
 				)}

@@ -28,12 +28,7 @@ export function useResourceNotice() {
 }
 
 type OpenResourceResult =
-	| "done"
-	| "blocked"
-	| "unavailable"
-	| "not_found"
-	| "not_allowed"
-	| "failed";
+	"done" | "blocked" | "unavailable" | "not_found" | "not_allowed" | "failed";
 
 /**
  * `openResource(uri, action?)`: resolves the URI, opens the screen of the resource and points at it;

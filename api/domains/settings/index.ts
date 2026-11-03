@@ -1,3 +1,4 @@
+export { routingExportSecrets } from "./service/export-secrets";
 export {
 	createSettings,
 	/** @public */ defaults,

@@ -49,8 +49,7 @@ export type ResourceActionWords = z.infer<typeof resourceActionWords>;
 
 /** What a definition's `resourceKindData` holds, by the definition's kind. */
 export type ResourceDefinitionData =
-	| ResourceKindRegistration
-	| ResourceActionWords;
+	ResourceKindRegistration | ResourceActionWords;
 
 /** The id of the one `resource-actions` item. */
 export const resourceActionsItemId = "resource.actions";

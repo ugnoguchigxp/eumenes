@@ -62,23 +62,20 @@ export function localEndpoint(
 	allowLocal: readonly string[] = [],
 ): URL {
 	const url = new URL(value);
-	if (
-		!(
-			["http:", "https:"].includes(url.protocol) &&
-			!url.username &&
-			!url.password &&
-			!url.search &&
-			!url.hash &&
-			(url.hostname === "localhost" ||
-				(url.hostname.endsWith(".local") &&
-					allowLocal.includes(url.hostname)) ||
-				(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(url.hostname) &&
-					url.hostname.split(".").every((part) => Number(part) <= 255) &&
-					/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
-						url.hostname,
-					)))
-		)
-	)
+	if (!(
+		["http:", "https:"].includes(url.protocol) &&
+		!url.username &&
+		!url.password &&
+		!url.search &&
+		!url.hash &&
+		(url.hostname === "localhost" ||
+			(url.hostname.endsWith(".local") && allowLocal.includes(url.hostname)) ||
+			(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(url.hostname) &&
+				url.hostname.split(".").every((part) => Number(part) <= 255) &&
+				/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
+					url.hostname,
+				)))
+	))
 		throw new Error("larm_nonlocal_endpoint");
 	return url;
 }

@@ -104,7 +104,7 @@ export function DetectionPreview({
 							{item.mime.startsWith("image/") ? (
 								<img src={url} alt={item?.name ?? "解析した画像"} />
 							) : (
-								// oxlint-disable-next-line jsx-a11y/media-has-caption -- user-supplied recording or camera preview has no caption track
+								// eslint-disable-next-line jsx-a11y/media-has-caption -- user-supplied recording or camera preview has no caption track
 								<video
 									ref={video}
 									src={url}

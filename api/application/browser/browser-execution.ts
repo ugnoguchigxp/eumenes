@@ -138,8 +138,7 @@ export function browserExecutionDeadline(
 	execution: import("../../domains/tool-runtime").ChildExecution,
 ) {
 	const previous = execution.resume?.previous as
-		| { result?: { domain?: { deadline?: number } } }
-		| undefined;
+		{ result?: { domain?: { deadline?: number } } } | undefined;
 	return Math.min(
 		execution.deadline,
 		previous?.result?.domain?.deadline ?? execution.deadline,

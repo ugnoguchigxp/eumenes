@@ -677,11 +677,7 @@ export const compositionDirections = [
 export type CompositionPoint = { x: number | string; y: number };
 export type CompositionSeries = readonly CompositionPoint[];
 export type CompositionValue =
-	| number
-	| string
-	| boolean
-	| null
-	| CompositionSeries;
+	number | string | boolean | null | CompositionSeries;
 export type CompositionModel = {
 	/** The current value of a state or computed value; null when unknown. */
 	value(name: string): CompositionValue;

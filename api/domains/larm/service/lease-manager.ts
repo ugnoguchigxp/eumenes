@@ -200,12 +200,10 @@ export function createLeaseManager({
 				(signal ?? lifetime.signal).throwIfAborted();
 				// The attempt belongs to another caller; its own cancellation or
 				// deadline (AbortError / TimeoutError) must not fail this caller.
-				if (
-					!(
-						error instanceof DOMException &&
-						(error.name === "AbortError" || error.name === "TimeoutError")
-					)
-				)
+				if (!(
+					error instanceof DOMException &&
+					(error.name === "AbortError" || error.name === "TimeoutError")
+				))
 					throw error;
 			}
 			return connect(required, signal, force, requestProfile);

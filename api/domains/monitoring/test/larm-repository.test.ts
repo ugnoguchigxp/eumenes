@@ -22,11 +22,10 @@ test("local history enforces the upstream count and byte bounds and records prun
 	const h = collectorHarness(),
 		e = eventsPage().events[1]!;
 	await h.store.write((db) => {
-		db.query(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<100001)
-INSERT INTO monitoring_larm_events SELECT 'source','event:'||i,?,1,json_set(?,'$.id','event:'||i,'$.sequence',cast(i AS TEXT)) FROM n`).run(
-			NOW - 1,
-			JSON.stringify(e),
-		);
+		db.query(
+			`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<100001)
+INSERT INTO monitoring_larm_events SELECT 'source','event:'||i,?,1,json_set(?,'$.id','event:'||i,'$.sequence',cast(i AS TEXT)) FROM n`,
+		).run(NOW - 1, JSON.stringify(e));
 	});
 	await h.repository.save("source", emptyLarm(NOW), [], () => {});
 	expect(

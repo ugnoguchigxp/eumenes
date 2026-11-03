@@ -61,8 +61,7 @@ export function workerContext(
 	const { controlFor, contractsFor, dependencies, ownSet, search, guided } =
 		createWorkerControl(prepared, tools, requirements);
 	const execution = JSON.parse(task.input_json ?? "{}").execution as
-		| import("../../tool-runtime").ChildExecution
-		| undefined;
+		import("../../tool-runtime").ChildExecution | undefined;
 	const fixed = {
 		...(execution?.source.amendments
 			? { requestUpdates: execution.source.amendments }

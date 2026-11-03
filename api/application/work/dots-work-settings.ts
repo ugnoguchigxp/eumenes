@@ -40,8 +40,7 @@ const descriptions: Record<keyof WorkSettings, DocumentPathInfo> = {
 };
 const keyOf = (path: string) =>
 	Object.keys(descriptions).find((k) => path === `$.settings.${k}`) as
-		| keyof WorkSettings
-		| undefined;
+		keyof WorkSettings | undefined;
 export const dotsSettingsDocument: DocumentDescription = {
 	describePath: (path) => {
 		const k = keyOf(path);

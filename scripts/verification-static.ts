@@ -70,7 +70,10 @@ export function typecheckFindings(output: string): Finding[] {
 	return reconcile(findings, output, /^Found ([\d,]+) errors? /m, "typecheck");
 }
 
-/** `oxlint --format unix`: `path:line:col: message [Severity/rule]`. */
+/**
+ * `oxlint --format unix`: `path:line:col: message [Severity/rule]`. `bun lint --format unix` (when a
+ * stable bun ships it) prints the same shape.
+ */
 export function lintFindings(output: string): Finding[] {
 	const findings = output.split("\n").flatMap((line) => {
 		const match = /^(\S.*?):\d+:\d+: /.exec(line);
@@ -79,7 +82,10 @@ export function lintFindings(output: string): Finding[] {
 	return reconcile(findings, output, /^([\d,]+) problems?$/m, "lint");
 }
 
-/** `oxfmt --check`: one `path (Nms)` line per unformatted file, `,-[path:l:c]` for a parse error. */
+/**
+ * `bun fmt --check`: one `path (Nms)` line per unformatted file; a parse error is an `error:` line
+ * followed by `    at path:line:col`.
+ */
 export function formatFindings(output: string): Finding[] {
 	const unformatted: Finding[] = [];
 	const unparsed: Finding[] = [];
@@ -87,7 +93,7 @@ export function formatFindings(output: string): Finding[] {
 		const file = /^(\S.*) \(\d+(?:\.\d+)?m?s\)$/.exec(line);
 		if (file)
 			unformatted.push({ text: `not formatted: ${file[1]}`, path: file[1] });
-		const parse = /,-\[(.+?):\d+:\d+\]/.exec(line);
+		const parse = /^\s+at (.+?):\d+:\d+$/.exec(line);
 		if (parse)
 			unparsed.push({ text: `cannot parse: ${parse[1]}`, path: parse[1] });
 	}

@@ -239,7 +239,8 @@ for (const target of ["larm", "cloud"] as const) {
 			expect(call.schema).toEqual(
 				shareNullableSchemas(z.toJSONSchema(outputContract.schema)),
 			);
-			if (target === "cloud") expect(call.session).toBeUndefined(); // no persisted conversation session is resumed
+			if (target === "cloud")
+				expect(call.session).toBeUndefined(); // no persisted conversation session is resumed
 			else expect(call.role).toBe("auxiliary");
 		}
 		expect(captured[2]!.messages[0]!.content).toContain(

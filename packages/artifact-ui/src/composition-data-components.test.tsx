@@ -68,7 +68,7 @@ async function mount(
 		root.render(
 			<CompositionModelProvider model={model}>
 				{views.map((child, index) => (
-					// biome-ignore lint/suspicious/noArrayIndexKey: a fixed list of views
+					// a fixed list of views
 					<Fragment key={index}>{child}</Fragment>
 				))}
 			</CompositionModelProvider>,

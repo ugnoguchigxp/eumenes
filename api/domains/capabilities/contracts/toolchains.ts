@@ -28,8 +28,7 @@ export const toolchainRequest = z
  * "none" is an explicit choice, not a default.
  */
 export type ToolchainArtifact =
-	| { kind: "none" }
-	| { kind: "component"; component: string };
+	{ kind: "none" } | { kind: "component"; component: string };
 
 /** A redirect to the toolchain to use instead, shown to the conversation model by function name. */
 export type ToolchainRedirect = { when: string; toolchainId: string };

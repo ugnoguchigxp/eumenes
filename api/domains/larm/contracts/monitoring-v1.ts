@@ -478,7 +478,7 @@ export function monitoringJsonSchema(
 				if: {
 					properties: { status: { enum: ["ok", "stale"] } },
 					required: ["status"],
-				} /* oxlint-disable-next-line unicorn/no-thenable -- Required JSON Schema keyword. */,
+				} /* eslint-disable-next-line unicorn/no-thenable -- Required JSON Schema keyword. */,
 				then: measured,
 				else: {
 					not: { required: ["value"] },

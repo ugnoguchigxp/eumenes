@@ -1,3 +1,7 @@
+import {
+	registerRouterExport,
+	type createRouterExport,
+} from "./toolchain/router-export";
 import { registerDocling, type DoclingService } from "../domains/docling";
 import { registerPipelines } from "./pipelines/pipelines-controller";
 import { registerSearchCheck } from "./toolchain/toolchain-search-check";
@@ -142,6 +146,7 @@ export type AppServices = {
 	browser?: BrowserService;
 	tasks?: TasksService;
 	toolchainHistory?: ToolchainHistory;
+	routerExport?: ReturnType<typeof createRouterExport>;
 	timers?: TimersService;
 	/** Resource URIs (absent: the routes do not exist). */
 	resources?: Resources;
@@ -270,6 +275,9 @@ export function appModules(services: AppServices): AppModule[] {
 			mount: (app) => registerMonitoring(app, s.monitoring!),
 		},
 		s.tasks && { mount: (app) => registerTasks(app, s.tasks!) },
+		s.routerExport && {
+			mount: (app) => registerRouterExport(app, s.routerExport!),
+		},
 		s.toolchainHistory && {
 			mount: (app) => registerToolchainHistory(app, s.toolchainHistory!),
 		},

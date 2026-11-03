@@ -336,12 +336,7 @@ export type Resource =
 			kind: "timer-workspace";
 			revision: number;
 			state:
-				| "setup"
-				| "active"
-				| "paused"
-				| "confirming"
-				| "elapsed"
-				| "cancelled";
+				"setup" | "active" | "paused" | "confirming" | "elapsed" | "cancelled";
 			durationSeconds?: number;
 			remainingSeconds?: number;
 			title?: string;

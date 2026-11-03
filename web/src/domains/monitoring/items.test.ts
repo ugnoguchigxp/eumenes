@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import type { MonitoringSnapshot } from "../../../../api/domains/monitoring/contracts";
-import { monitoringItems, STALE_AFTER_MS } from "./items";
+import { monitoringItems } from "./items";
+import { STALE_AFTER_MS } from "./freshness";
 
 const snapshot: MonitoringSnapshot = {
 	observedAt: 1000,

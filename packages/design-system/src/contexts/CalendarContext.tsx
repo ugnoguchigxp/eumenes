@@ -1,18 +1,10 @@
 import React, { createContext, useContext, useMemo } from "react";
 
 export type SecondaryCalendar =
-	| "none"
-	| "japanese"
-	| "buddhist"
-	| "islamic"
-	| "chinese";
+	"none" | "japanese" | "buddhist" | "islamic" | "chinese";
 
 export type CalendarSystem =
-	| "gregorian"
-	| "japanese"
-	| "buddhist"
-	| "islamic"
-	| "chinese";
+	"gregorian" | "japanese" | "buddhist" | "islamic" | "chinese";
 
 interface CalendarContextType {
 	secondaryCalendar: SecondaryCalendar;

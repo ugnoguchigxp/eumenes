@@ -1,3 +1,4 @@
+import { run as routerExport } from "./router-export";
 import { run as requirements } from "./requirements";
 import type { CommandRun } from "./types";
 import { run as cancel } from "./cancel";
@@ -32,6 +33,7 @@ export const commands: Readonly<Record<string, CommandRun>> = {
 	memory,
 	"recent-clear": recentClear,
 	router,
+	"router-export": routerExport,
 	run: runCommand,
 	send,
 	status,

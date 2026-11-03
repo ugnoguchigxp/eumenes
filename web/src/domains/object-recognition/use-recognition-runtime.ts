@@ -411,8 +411,7 @@ async function handleLibrary(
 async function changeCredentialSource(
 	client: EumenesClient,
 	connection:
-		| Awaited<ReturnType<EumenesClient["recognitionConnection"]>>
-		| undefined,
+		Awaited<ReturnType<EumenesClient["recognitionConnection"]>> | undefined,
 	source: unknown,
 	refetch: () => Promise<unknown>,
 ): Promise<Receipt> {

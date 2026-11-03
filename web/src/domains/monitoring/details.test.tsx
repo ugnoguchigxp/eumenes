@@ -8,7 +8,8 @@ import {
 	larmViewSchema,
 } from "../../../../api/domains/monitoring/contracts/larm";
 import { monitoringDetails } from "./details";
-import { monitoringItems, STALE_AFTER_MS } from "./items";
+import { monitoringItems } from "./items";
+import { STALE_AFTER_MS } from "./freshness";
 
 const now = Date.now();
 const state = (count = 3): MonitoringItem["state"] => ({

@@ -52,8 +52,7 @@ export interface JobClaim<P = unknown> {
 }
 
 type PrepareResult<I> =
-	| { status: "ready"; input: I }
-	| { status: "stale"; reason: string };
+	{ status: "ready"; input: I } | { status: "stale"; reason: string };
 
 export type SettleOutcome<O> =
 	| { type: "success"; result: O; resultRef?: string }
@@ -63,9 +62,7 @@ export type SettleOutcome<O> =
 	| { type: "interrupted"; errorCode: string };
 
 export type SettleResult =
-	| "applied"
-	| "stale"
-	| { status: "failed"; errorCode: string };
+	"applied" | "stale" | { status: "failed"; errorCode: string };
 
 /**
  * Typed handler. The three transactional callbacks are synchronous: they run

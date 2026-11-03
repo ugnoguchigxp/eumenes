@@ -68,7 +68,7 @@ export function useVoiceDialogue(
 		if (!value) return;
 		if (value.status === "failed")
 			// Keep the failure visible when restoring a previous accepted turn.
-			// oxlint-disable-next-line react/set-state-in-effect
+			// eslint-disable-next-line react/set-state-in-effect
 			setError(
 				value.error ? describeError(value.error) : "音声処理に失敗しました",
 			);
@@ -475,7 +475,7 @@ export function useVoiceDialogue(
 		// Muting takes effect now: drop what is playing and release the turn.
 		if (settings?.autoSpeak !== false) return;
 		controller.current?.stopPlayback();
-		// oxlint-disable-next-line react/set-state-in-effect
+		// eslint-disable-next-line react/set-state-in-effect
 		cancelPlayback();
 		const id = machine.get().current;
 		if (!id) return;

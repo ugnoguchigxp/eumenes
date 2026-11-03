@@ -298,8 +298,7 @@ export function readState(db: Database, conversationId: string): StateRow {
 			 FROM steward_state WHERE conversation_id = ?`,
 		)
 		.get(conversationId) as
-		| (Omit<StateRow, "conversationId" | "quiet"> & { quiet: string })
-		| null;
+		(Omit<StateRow, "conversationId" | "quiet"> & { quiet: string }) | null;
 	return row
 		? {
 				conversationId,
@@ -500,12 +499,7 @@ export function insertDecision(db: Database, input: DecisionInput): number {
 	return Number(result.lastInsertRowid);
 }
 export type DecisionRefType =
-	| "item"
-	| "message"
-	| "request"
-	| "claim"
-	| "entity"
-	| "goal";
+	"item" | "message" | "request" | "claim" | "entity" | "goal";
 export function insertDecisionRefs(
 	db: Database,
 	decisionId: number,

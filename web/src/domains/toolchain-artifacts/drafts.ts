@@ -5,12 +5,7 @@
  * operation. Confidential values live in this memory only (§2.4): the view never carries them.
  */
 export type JsonValue =
-	| string
-	| number
-	| boolean
-	| null
-	| JsonValue[]
-	| { [key: string]: JsonValue };
+	string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export type FieldChange = { value: JsonValue } | { unset: true };
 

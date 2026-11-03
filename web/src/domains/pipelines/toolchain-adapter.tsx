@@ -356,8 +356,7 @@ export const pipelinesWebAdapter: WebArtifactAdapter = {
 					case "pipeline-resume": {
 						if (!bridge) return rejected("この操作は利用できません。");
 						const kind = binding.eventAction.slice("pipeline-".length) as
-							| "return"
-							| "resume";
+							"return" | "resume";
 						const result = await bridge.command(kind);
 						if (result.ok) {
 							// A resumed draft is shown from the start.

@@ -1,0 +1,31 @@
+{
+	"sdk": "5-r.5",
+	"samplesCommit": "ed1e0b714826d92469b9e51cacc3346f4e393f03",
+	"sha256": {
+		"web/public/live2d/material-license.html": "e7daa8a2a20b491fa9e530455a83faf8f4fe5876d7b85cf9d9ad1bcdddcbaf8f",
+		"web/public/live2d/live2dcubismcore.min.js": "8741f739779b5d5210872bd3d7d99f0f1e56e6c87409e7d26d6bb4b80aa1ef47",
+		"web/public/live2d/open-license.html": "a8274bf5f461335738791e9f392eb3f3684eaa22cbb4dfe1f3f887c3586a8d82",
+		"web/public/live2d/proprietary-license.html": "e7b4ffc6c636de2cfdd6d2eed6a4e43fa7034e7f15a0c3a15f1603dbb3b4c2b6",
+		"web/public/live2d/hiyori/Hiyori.pose3.json": "ff1cc242790f196c87a7379dc1340b608723db60af1b2825e00da8f351ffc1bf",
+		"web/public/live2d/hiyori/Hiyori.model3.json": "973cb3392f7b01f5f73e9d3fedc495a81a0f3ee8014e5df72ef943311c56ee12",
+		"web/public/live2d/hiyori/Hiyori.moc3": "0323f5f377b9afef54318be09e9b4eea2a8cb266190ff9d2f843f95ecb77716c",
+		"web/public/live2d/hiyori/Hiyori.cdi3.json": "0fc3fc76b7a68136056c8832c930c8af9f93899f359eded7349b481ea2342d03",
+		"web/public/live2d/hiyori/Hiyori.physics3.json": "c7a6d641893519c0bbc615545887f03f6c5b8031b4096873740b618370452fc1",
+		"web/public/live2d/hiyori/Hiyori.2048/texture_00.png": "560aea0d910dc04950d669640b2ef17c0d817969e9909f477f166bb5cbd8ffbe",
+		"web/public/live2d/hiyori/Hiyori.2048/texture_01.png": "87fe9ab7db81ab3025e0407229e449233581e00fa92c8e911923bc6c7d98ce84",
+		"web/public/live2d/shaders/vertshadersrc.vert": "291ed3f35f71f1e71e6df33fb055f009a8a9b36ee664f74f24f6cefef0c4029b",
+		"web/public/live2d/shaders/vertshadersrcblend.vert": "2589837bd7a6a550a1c3af41b4fa776011e6e71f2531320fa39afcb83b209bf4",
+		"web/public/live2d/shaders/fragshadersrccopy.frag": "15c67a4ec3adda4c849aff2a8319a3f6aceef8a84d5e5e1f3fb7fd9cd681193c",
+		"web/public/live2d/shaders/fragshadersrcpremultipliedalpha.frag": "c93abe215357cc782a25fc4ef20f5fe1f34e2cc193ee23d763b56b81fae5fce1",
+		"web/public/live2d/shaders/fragshadersrcpremultipliedalphablend.frag": "2155076275199a2946959838391dfb856e9d1db91b6ca3abd19ed70d4ff27e15",
+		"web/public/live2d/shaders/vertshadersrcsetupmask.vert": "649aad2f6c0af55a7a4adcf33dbf78937ef9d77ed6ba917fd716176adce25afe",
+		"web/public/live2d/shaders/fragshadersrcmaskpremultipliedalpha.frag": "f84ff615393d26ea6ab7c28747803db6472524c92567c0ad01e8225fbab36a3b",
+		"web/public/live2d/shaders/fragshadersrcsetupmask.frag": "3cccc0b68a56cfbf4bd4841b0a759431dd159812c38dc280981ba633fa0afe7a",
+		"web/public/live2d/shaders/fragshadersrcalphablend.frag": "855b247f02042a808a41e282ee4d7de7cc4533abeb5032b4ab8fe84f7dec107f",
+		"web/public/live2d/shaders/vertshadersrccopy.vert": "b7bc4ba7517f405af4812ac47d99bc2b633c99f463c1224029556b00e8dff3cf",
+		"web/public/live2d/shaders/vertshadersrcmasked.vert": "6704a9df2e6d3ee5176c72fca4ba59358ba4827a07054b1e0a72a3c574e281fd",
+		"web/public/live2d/shaders/fragshadersrcmaskinvertedpremultipliedalpha.frag": "1005cff8113de587cf1c0e295288d04d85f0f4ebc223684c8340e017fd8fc788",
+		"web/public/live2d/shaders/fragshadersrccolorblend.frag": "01d4bf6a14b4a738976e9a538767a21da0defa8816f3845a7df08a7713327538",
+		"vendor/live2d/framework.js": "77553715dce389c29db8840b94e5ca3024372ef403742e045f3d856f28e8781c"
+	}
+}

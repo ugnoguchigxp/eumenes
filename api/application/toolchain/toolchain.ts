@@ -219,8 +219,7 @@ export async function createToolchain(
 	options: ToolchainOptions = {},
 ) {
 	let taskRuntime:
-		| import("../../domains/agent-runtime").AgentRuntime
-		| undefined;
+		import("../../domains/agent-runtime").AgentRuntime | undefined;
 	const shared =
 		options.kanbanSdk &&
 		extendKanbanAdapter(
@@ -237,8 +236,7 @@ export async function createToolchain(
 	const stock = options.stock && createStockAdapter(options.stock);
 	// The pipelines service is built on the routing, after this registry: the adapter reads it once attached.
 	let pipelines:
-		| import("../pipelines/pipelines-service").PipelinesService
-		| undefined;
+		import("../pipelines/pipelines-service").PipelinesService | undefined;
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
 	const registry = createAdapterRegistry([
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),

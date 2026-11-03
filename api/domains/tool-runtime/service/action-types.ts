@@ -45,14 +45,7 @@ export const ACTION_POLICY = {
 } as const;
 
 export type ActionRequestErrorStatus =
-	| 400
-	| 403
-	| 404
-	| 409
-	| 410
-	| 413
-	| 422
-	| 503;
+	400 | 403 | 404 | 409 | 410 | 413 | 422 | 503;
 /** A refusal that saved nothing (or only a conflict audit row). `status` is its HTTP status. */
 export class ActionRequestError extends Error {
 	constructor(

@@ -156,7 +156,7 @@ function Player({
 				{!compact && track.subtitle && <p>{track.subtitle}</p>}
 			</div>
 			{/* Audio-only generated music; no video caption track. */}
-			{/* oxlint-disable-next-line jsx-a11y/media-has-caption */}
+			{/* eslint-disable-next-line jsx-a11y/media-has-caption */}
 			<audio
 				ref={audioRef}
 				src={track.src}

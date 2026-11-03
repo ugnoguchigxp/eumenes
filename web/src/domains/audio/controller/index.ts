@@ -1,3 +1,4 @@
+import { connectPlaybackOutput } from "./playback-output";
 import { createOutputWatch } from "./output-watch";
 import { traceAudioOutput } from "./playback-trace";
 import { createResampler } from "./resample";
@@ -207,12 +208,12 @@ export function createAudioController(
 	} = {},
 ) {
 	let context: AudioContext | undefined;
+	let releaseOutput: (() => void) | undefined;
 	let stream: MediaStream | undefined;
 	let worklet: AudioWorkletNode | undefined;
 	let drainRecorder: (() => void) | undefined;
 	let source: MediaStreamAudioSourceNode | undefined;
 	let playback: AudioBufferSourceNode | undefined;
-	let playbackGain: GainNode | undefined;
 	let keepAliveSource: AudioBufferSourceNode | undefined;
 	let playbackEpoch = 0;
 	let playbackDone: Promise<void> = Promise.resolve();
@@ -603,6 +604,8 @@ export function createAudioController(
 			bytes: Uint8Array,
 			onEnded: () => void,
 			playOptions: {
+				/** Only assistant speech drives the avatar; notices and tones leave this off. */
+				assistantSpeech?: boolean;
 				waitForPrevious?: boolean;
 				shouldPlay?: () => boolean;
 				volume?: number;
@@ -630,14 +633,12 @@ export function createAudioController(
 			const next = context.createBufferSource();
 			next.buffer = buffer;
 			const volume = playOptions.volume ?? 1;
-			if (!Number.isFinite(volume) || volume < 0 || volume > 1)
-				throw new Error("audio_volume_invalid");
-			if (volume !== 1) {
-				playbackGain = context.createGain();
-				playbackGain.gain.value = volume;
-				next.connect(playbackGain);
-				playbackGain.connect(context.destination);
-			} else next.connect(context.destination);
+			releaseOutput = connectPlaybackOutput(
+				context,
+				next,
+				volume,
+				playOptions.assistantSpeech ?? false,
+			);
 			playback = next;
 			playbackSuppressInput = playOptions.suppressInput ?? false;
 			interruptedPlayback = playOptions.onInterrupted;
@@ -647,12 +648,12 @@ export function createAudioController(
 			next.onended = () => {
 				if (playback === next) {
 					interruptedPlayback = undefined;
+					releaseOutput?.();
+					releaseOutput = undefined;
 					listenAfter = performance.now() + OUTPUT_TAIL_MS;
 					if (playbackSuppressInput) forcedInputGateUntil = listenAfter;
 					playbackSuppressInput = false;
 					playback = undefined;
-					playbackGain?.disconnect();
-					playbackGain = undefined;
 					finishPlayback();
 					emit("listening");
 					onEnded();
@@ -664,6 +665,8 @@ export function createAudioController(
 			emit("playing");
 		},
 		stopPlayback() {
+			releaseOutput?.();
+			releaseOutput = undefined;
 			playbackEpoch++;
 			finishPlayback();
 			if (playbackSuppressInput)
@@ -673,8 +676,6 @@ export function createAudioController(
 			const interrupted = interruptedPlayback;
 			interruptedPlayback = undefined;
 			playback = undefined;
-			playbackGain?.disconnect();
-			playbackGain = undefined;
 			if (old) {
 				old.onended = null;
 				old.stop();

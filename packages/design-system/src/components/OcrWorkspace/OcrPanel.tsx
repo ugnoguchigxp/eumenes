@@ -45,11 +45,11 @@ export function OcrPanel(props: OcrWorkspaceProps) {
 	const { preview, ...camera } = useCameraCapture(upload);
 	useEffect(() => {
 		props.onRecordingChange?.(camera.recording);
-		// oxlint-disable-next-line react-hooks/exhaustive-deps -- runs only when the listed value changes
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- runs only when the listed value changes
 	}, [camera.recording]);
 	useEffect(() => {
 		camera.close();
-		// oxlint-disable-next-line react-hooks/exhaustive-deps -- runs only when the listed value changes
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- runs only when the listed value changes
 	}, [props.selectedId]);
 	const item = props.items.find((i) => i.id === props.selectedId);
 	const active =

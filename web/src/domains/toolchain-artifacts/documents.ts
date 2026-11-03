@@ -81,8 +81,7 @@ export function toWire(value: JsonValue | undefined): string {
 }
 
 export type ParsedEdit =
-	| { ok: true; change: FieldChange }
-	| { ok: false; message: string };
+	{ ok: true; change: FieldChange } | { ok: false; message: string };
 
 const refuse = (message: string): ParsedEdit => ({ ok: false, message });
 

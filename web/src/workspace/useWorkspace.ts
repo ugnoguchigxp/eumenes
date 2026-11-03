@@ -165,7 +165,7 @@ export function useWorkspace({
 		)
 			return;
 		// This is the external ASR result; manual edits take ownership for this utterance.
-		// oxlint-disable-next-line react/set-state-in-effect
+		// eslint-disable-next-line react/set-state-in-effect
 		setInput({ text: recognitionText, dictated: true });
 	}, [recognitionId, recognitionText]);
 	const previousSettings = useRef(settings.data);

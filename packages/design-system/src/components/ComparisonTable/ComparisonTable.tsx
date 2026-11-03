@@ -32,7 +32,7 @@ export function ComparisonTable({
 				className="ds-comparison-table-scroll"
 				role="region"
 				aria-label={title ?? "比較表"}
-				// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- 横スクロールをキーボードから操作できるようにフォーカスを受ける
+				// eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- 横スクロールをキーボードから操作できるようにフォーカスを受ける
 				tabIndex={0}
 			>
 				<table>

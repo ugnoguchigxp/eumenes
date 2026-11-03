@@ -730,8 +730,7 @@ export function claudeUsage(usage: {
 /** The context window the CLI reported for the model of this call (positive integers only). */
 function modelContextWindow(result: SDKResultMessage, model: string) {
 	const usage = result.modelUsage as
-		| Record<string, { contextWindow?: unknown } | undefined>
-		| undefined;
+		Record<string, { contextWindow?: unknown } | undefined> | undefined;
 	const value = usage?.[model]?.contextWindow;
 	return typeof value === "number" && Number.isSafeInteger(value) && value > 0
 		? value

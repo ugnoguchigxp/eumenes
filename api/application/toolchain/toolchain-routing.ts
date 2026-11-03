@@ -311,8 +311,7 @@ function agentOf(
 	agent: AgentV1 | undefined,
 	/** Read only for a binding that names a work document. */
 	workspaces: () =>
-		| ReadonlyMap<string, { path: string; mediaType: string }>
-		| undefined,
+		ReadonlyMap<string, { path: string; mediaType: string }> | undefined,
 ): SpecialistSet["agent"] {
 	const ref = agent?.workspace?.documentRef;
 	const declared = ref ? workspaces()?.get(ref) : undefined;

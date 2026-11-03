@@ -1,3 +1,4 @@
+import { routerExportSinceSchema } from "../api/domains/toolchain-history/contracts";
 import { resolve } from "node:path";
 import { createClient } from "../client";
 import { cliFailure } from "./failure";
@@ -30,11 +31,36 @@ let toolchainId: string | undefined;
 let listCursor: string | undefined;
 let listLimit: number | undefined;
 const historyOptions: NonNullable<CliArgs["historyOptions"]> = {};
+let exportOut: string | undefined;
+let exportSince: string | undefined;
+let withEmbeddings = false;
 let historyBefore: number | undefined;
 let historyAfter: number | undefined;
 const positional: string[] = [];
 for (let i = 0; i < args.length; i++) {
 	const value = args[i];
+	if (value === "--with-embeddings") {
+		withEmbeddings = true;
+		continue;
+	}
+	if (value === "--out" || value === "--since") {
+		const option = args[++i];
+		if (
+			!option ||
+			option.startsWith("--") ||
+			(value === "--since" &&
+				!routerExportSinceSchema.safeParse(option).success)
+		) {
+			console.error(
+				"router-export requires --out <dir> and --since ISO date/time with timezone",
+			);
+			process.exit(2);
+		}
+		if (value === "--out") exportOut = option;
+		else exportSince = new Date(option).toISOString();
+		continue;
+	}
+
 	if (
 		[
 			"--json",
@@ -133,6 +159,16 @@ for (let i = 0; i < args.length; i++) {
 	positional.push(value);
 }
 const command = positional.shift();
+if (
+	command !== "router-export" &&
+	(exportOut || exportSince || withEmbeddings)
+) {
+	console.error(
+		"--out, --since and --with-embeddings are router-export options",
+	);
+	process.exit(2);
+}
+
 if (command !== "web" && (fresh || stable || readPages)) {
 	console.error("--fresh, --stable and --read-pages are web options");
 	process.exit(2);
@@ -153,7 +189,11 @@ try {
 	);
 } catch (error) {
 	console.error(
-		error instanceof Error ? error.message : "API auth is not configured",
+		command === "router-export"
+			? "router_export_auth_unavailable"
+			: error instanceof Error
+				? error.message
+				: "API auth is not configured",
 	);
 	console.error("Start the backend once to create the API token.");
 	process.exit(2);
@@ -175,6 +215,9 @@ async function main(): Promise<number> {
 	if (!run) throw new Error(USAGE);
 	const cliArgs: CliArgs = {
 		command: command!,
+		exportOut,
+		exportSince,
+		withEmbeddings,
 		positional,
 		json,
 		wait,
@@ -201,14 +244,23 @@ async function main(): Promise<number> {
 try {
 	process.exitCode = await main();
 } catch (error) {
-	const failure = cliFailure(
-		error,
-		command === "web" &&
-			error instanceof Error &&
-			["TimeoutError", "AbortError"].includes(error.name)
-			? 4
-			: 2,
-	);
-	for (const line of failure.lines) console.error(line);
-	process.exitCode = failure.exitCode;
+	if (command === "router-export") {
+		console.error(
+			error instanceof Error && /^router_export_[a-z_]+$/.test(error.message)
+				? error.message
+				: "router_export_failed (check arguments, output directory and API availability)",
+		);
+		process.exitCode = 2;
+	} else {
+		const failure = cliFailure(
+			error,
+			command === "web" &&
+				error instanceof Error &&
+				["TimeoutError", "AbortError"].includes(error.name)
+				? 4
+				: 2,
+		);
+		for (const line of failure.lines) console.error(line);
+		process.exitCode = failure.exitCode;
+	}
 }

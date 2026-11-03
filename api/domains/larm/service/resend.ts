@@ -129,12 +129,10 @@ export async function sendAgainIfLost<T>(
 	try {
 		return await send();
 	} catch (error) {
-		if (
-			!(
-				error instanceof TypeError ||
-				(error instanceof DOMException && error.name === "TimeoutError")
-			)
-		)
+		if (!(
+			error instanceof TypeError ||
+			(error instanceof DOMException && error.name === "TimeoutError")
+		))
 			throw error;
 		return await send().catch((again: unknown) => {
 			throw isCapacityBusy(again) && !keyKept ? error : again;

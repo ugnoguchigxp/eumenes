@@ -5,6 +5,12 @@ import type { AvatarCue } from "../domains/avatar";
 import { LightAvatarBackground } from "./domains/conversation/LightAvatarBackground";
 import { ErrorBoundary } from "./ErrorBoundary";
 
+const HiyoriAvatarBackground = lazy(() =>
+	import("./domains/conversation/HiyoriAvatarBackground").then((module) => ({
+		default: module.HiyoriAvatarBackground,
+	})),
+);
+
 const SpatialBackground = lazy(() =>
 	import("../domains/background").then((module) => ({
 		default: module.SpatialBackground,
@@ -31,6 +37,14 @@ export function ConversationBackground({
 }) {
 	if (kind === "light-fairy")
 		return <LightAvatarBackground {...avatar} interactive={interactive} />;
+	if (kind === "live2d-hiyori")
+		return (
+			<ErrorBoundary label="avatar">
+				<Suspense fallback={null}>
+					<HiyoriAvatarBackground {...avatar} />
+				</Suspense>
+			</ErrorBoundary>
+		);
 	return (
 		<ErrorBoundary label="background">
 			<Suspense fallback={null}>

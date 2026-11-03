@@ -212,8 +212,7 @@ export function readToolParameters(
 		readToolInputs[name],
 	) as Record<string, unknown>;
 	const properties = schema.properties as
-		| Record<string, Record<string, unknown>>
-		| undefined;
+		Record<string, Record<string, unknown>> | undefined;
 	if (!properties) return schema;
 	return {
 		...schema,
