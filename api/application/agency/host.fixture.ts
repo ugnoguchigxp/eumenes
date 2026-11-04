@@ -78,6 +78,7 @@ export function pendingUpdate(data: UpdateModelData) {
 	)
 		return updated();
 	const evidenceRefs = data.observations.slice(-1).map((o) => o.id);
+	if (evidenceRefs.length === 0) return updated();
 	const intent = data.state.intents.find((i) =>
 		["adopted", "proposed"].includes(i.state),
 	);

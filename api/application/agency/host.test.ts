@@ -710,7 +710,7 @@ describe("review fixes", () => {
 			level: 0,
 		});
 		await h.advance(20_000);
-		// F has no candidate after forgetting: the new planner fires, but no model is asked.
+		// After forgetting, the update finds no evidence and selection is skipped.
 		expect(h.host.inspect("c1")?.idle.level).toBe(1);
 		expect(h.calls.select).toBe(4);
 	});
