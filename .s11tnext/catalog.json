@@ -1251,7 +1251,7 @@
                 },
                 {
                   "type": "literal",
-                  "value": "\nspeakのutteranceには、利用者へ実際に話す完成した説明や質問を必ず書きます。「条件を説明し、出典を添える」のような候補の説明・作業指示をそのまま本文にせず、説明する内容や尋ねること自体を書きます。取得済みの結果は出典の範囲で使い、未取得の事実や成功を補いません。\nevidenceRefsにはcitableEvidenceRefsの中から、実際に判断を支えるIDをそのまま使います。候補がtool用なら発話には使いません。toolsが空ならtoolを選びません。\n"
+                  "value": "\nspeakのutteranceには、利用者へ実際に話す完成した説明や質問を必ず書きます。「条件を説明し、出典を添える」のような候補の説明・作業指示をそのまま本文にせず、説明する内容や尋ねること自体を書きます。取得済みの結果は出典の範囲で使い、未取得の事実や成功を補いません。\nevidenceRefsにはcitableEvidenceRefsの中から、実際に判断を支えるIDをそのまま使います。候補がtool用なら発話には使いません。調査の選択は、ホストに渡すaction=\"tool\"のJSON提案です。実行可能な能力一覧は今回の入力JSONのtoolsです。候補のtoolNameをこの一覧のnameと照合します。一致する承認不要の能力があれば、実行の価値を判断できます。ここでモデルが直接ツールを呼び出す必要はありません。toolsが空ならtoolを選びません。\n"
                 },
                 {
                   "type": "variable",
@@ -1260,11 +1260,11 @@
               ]
             }
           ],
-          "artifactHash": "sha256:317dcca7355f55a6006829fbe104975d764d0dfb0b5f7eeb2979615311f3cb47"
+          "artifactHash": "sha256:f9055b4025a989d94acb33c83f95dc895f62890a67e7a785ee29c4d90f3b3e37"
         }
       },
-      "definitionHash": "sha256:b6ef751c398800fa84ed92fc93ffbc32f5107884c275b7152e80790a463931de",
-      "releaseDigest": "sha256:6b9e92ed9fcf68cbec3aa0a4b65024a7d2d72af3a12f16e9b088c3fb14e92c08"
+      "definitionHash": "sha256:423e0d194f42d40eefb3d3fda264c259b1acc53f7dd4ec58a1c8641402510d83",
+      "releaseDigest": "sha256:95a2f346cdc23f9ca0672935ac657ac9dcd915faea81135251944ebf61155e72"
     },
     "dialogue.contexts.agency.select-emotion": {
       "key": "dialogue.contexts.agency.select-emotion",
@@ -5440,5 +5440,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:6b2245446ae231f859164dd9f7cd3bb8da72b36abb0173de99b574394731583b"
+  "catalogDigest": "sha256:fb15c15a45b0c8953e7376fbcde579b50838f961d18e228e29f81d1a3a09e972"
 }
