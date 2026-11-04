@@ -3,6 +3,7 @@ import {
 	currentAgencyWork,
 	revokeAgencyWork,
 	agencyRecords,
+	claimAgencyDispatch,
 	agencyEpoch,
 	saveAgency,
 	agencyFeed,
@@ -42,6 +43,7 @@ export function createAgencyStatePort(deps: {
 		});
 	return {
 		recordsInTransaction: agencyRecords,
+		claimDispatchInTransaction: claimAgencyDispatch,
 		epochInTransaction: agencyEpoch,
 		feedInTransaction: agencyFeed,
 		saveInTransaction: saveAgency,
@@ -59,6 +61,7 @@ export function createAgencyStatePort(deps: {
 				question: string;
 				revisionId: string;
 				deadline: number;
+				outboundIntervalMs: number;
 				sourceRefs: readonly string[];
 			},
 		) {
@@ -80,6 +83,16 @@ export function createAgencyStatePort(deps: {
 				db,
 				input.revisionId,
 			);
+			if (
+				!claimAgencyDispatch(
+					db,
+					input.conversationId,
+					input.epoch,
+					deps.now(),
+					input.outboundIntervalMs,
+				)
+			)
+				throw new Error("agency_dispatch_interval");
 			insertAgencyWork(db, {
 				root_id: input.rootId,
 				conversation_id: input.conversationId,

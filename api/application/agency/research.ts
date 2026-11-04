@@ -4,6 +4,7 @@ import type { AgencyHostDeps, Conv } from "./host-types";
 import { z } from "zod";
 import {
 	delegationRequest,
+	defaultLimits,
 	type AgencyRuntime,
 	type ActionTicket,
 	type ToolCapability,
@@ -48,6 +49,7 @@ export function researchInput(
 	const attempt = snap.state.attempts.find((a) => a.id === ticket.id);
 	const intent = snap.state.intents.find((i) => i.id === d.intentId)!;
 	return {
+		outboundIntervalMs: defaultLimits.outboundIntervalMs,
 		rootId: `agency:${scope}:${ticket.id}`,
 		conversationId,
 		epoch,

@@ -2,6 +2,8 @@ import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import {
 	agencyMigration,
+	dispatchClockMigration,
+	claimAgencyDispatch,
 	saveAgency,
 	agencyRecords,
 	agencyEpoch,
@@ -13,6 +15,7 @@ import { createAgencyStatePort } from "../service/agency-state";
 function fixture() {
 	const db = new Database(":memory:");
 	db.exec(agencyMigration);
+	db.exec(dispatchClockMigration);
 	const record = {
 		conversationId: "c",
 		epoch: 0,
@@ -161,6 +164,25 @@ test("evidence invalidated before adoption is rejected and the pending answer en
 		expect(failed).toBe(1);
 		expect(completed).toBe(0);
 		expect(p.resultsInTransaction(db)).toEqual([]);
+	} finally {
+		db.close();
+	}
+});
+
+test("actual dispatch time is atomic with the effect and survives subsequent checkpoints", () => {
+	const { db, record } = fixture();
+	try {
+		expect(() =>
+			db.transaction(() => {
+				expect(claimAgencyDispatch(db, "c", 0, 10, 60000)).toBe(true);
+				throw new Error("write_failed");
+			})(),
+		).toThrow("write_failed");
+		expect(claimAgencyDispatch(db, "c", 0, 12, 60000)).toBe(true);
+		saveAgency(db, record, 100);
+		expect(claimAgencyDispatch(db, "c", 0, 60011, 60000)).toBe(false);
+		expect(claimAgencyDispatch(db, "c", 1, 60012, 60000)).toBe(false);
+		expect(claimAgencyDispatch(db, "c", 0, 60012, 60000)).toBe(true);
 	} finally {
 		db.close();
 	}

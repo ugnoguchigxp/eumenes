@@ -81,6 +81,8 @@ export type Conv = {
 	scheduler: ReturnType<typeof createIdleScheduler>;
 	generation: number;
 	background: AbortController | null;
+	/** Used by ephemeral hosts without a durable state port. */
+	lastDispatchAt?: number;
 	opportunities: number;
 	calls: number;
 	/** Last time the conversation had an event or a cycle (for forgetting idle conversations). */

@@ -221,6 +221,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 
 	function newRuntime(c: Conv, restore?: AgencySnapshot): AgencyRuntime {
 		return createHostRuntime({
+			now: nowMs,
 			agency: cfg,
 			persona,
 			...(restore ? { restore } : {}),

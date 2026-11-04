@@ -13,6 +13,7 @@ import { agencyBackgroundSystem } from "./system-context";
 /** Composition of the adopted F model on Eumenes-owned instructions and host data. */
 export function createHostRuntime(input: {
 	agency: Settings["agency"];
+	now: () => number;
 	persona: Pick<Settings["general"], "agentName" | "userName" | "persona">;
 	llm: LlmPort;
 	topics(): readonly HostTopic[];
@@ -23,6 +24,7 @@ export function createHostRuntime(input: {
 	const { agency, persona } = input;
 	return createAgencyRuntime({
 		condition: "F",
+		now: input.now,
 		planOnOpportunity: true,
 		repairUpdates: true,
 		constrainToolNames: true,

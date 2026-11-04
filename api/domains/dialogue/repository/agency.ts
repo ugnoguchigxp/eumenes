@@ -14,6 +14,29 @@ CREATE TABLE dialogue_agency_work (
  source_refs_json TEXT NOT NULL, task_id TEXT, returned INTEGER NOT NULL DEFAULT 0,
  revoked INTEGER NOT NULL DEFAULT 0, UNIQUE(conversation_id,epoch,ticket_id)
 );`;
+// A separate column keeps delayed snapshot saves from replacing a committed dispatch time.
+export const dispatchClockMigration = `
+ALTER TABLE dialogue_agency_state ADD COLUMN last_dispatch_at INTEGER;
+UPDATE dialogue_agency_state SET last_dispatch_at=CAST(unixepoch('subsec')*1000 AS INTEGER)
+ WHERE json_extract(snapshot_json,'$.state.lastOutboundAt') IS NOT NULL;`;
+
+export function claimAgencyDispatch(
+	db: Database,
+	conversationId: string,
+	epoch: number,
+	now: number,
+	interval: number,
+) {
+	return (
+		db
+			.query(
+				`UPDATE dialogue_agency_state SET last_dispatch_at=?
+		WHERE conversation_id=? AND epoch=? AND snapshot_json IS NOT NULL
+		AND (last_dispatch_at IS NULL OR last_dispatch_at<=?)`,
+			)
+			.run(now, conversationId, epoch, now - interval).changes === 1
+	);
+}
 export type AgencyRecord = {
 	conversationId: string;
 	epoch: number;

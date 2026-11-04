@@ -1,3 +1,4 @@
+import { defaultLimits } from "eumenes-agency";
 import type { Database } from "bun:sqlite";
 import type { ActionTicket, ActionReceipt } from "eumenes-agency";
 import { getLogger } from "../../infrastructure/logger";
@@ -62,7 +63,7 @@ export function createAgencyDelivery(config: {
 		}
 		const text = ticket.utterance ?? "";
 		const messageId = `agency:${c.scope}:${ticket.id}`;
-		const at = nowMs();
+		let at = 0;
 		let outcome: "appended" | "stale" | "routed";
 		try {
 			outcome = await store.write((db) => {
@@ -70,6 +71,18 @@ export function createAgencyDelivery(config: {
 				// and nothing may have been said since the opportunity.
 				if (text === "" || !config.isCurrent(cy, db, ticket.action))
 					return "stale";
+				at = nowMs();
+				const interval = defaultLimits.outboundIntervalMs;
+				const allowed = deps.state
+					? deps.state.claimDispatchInTransaction(
+							db,
+							c.id,
+							c.epoch,
+							at,
+							interval,
+						)
+					: c.lastDispatchAt === undefined || at - c.lastDispatchAt >= interval;
+				if (!allowed) return "stale";
 				return persistSpeech(deps, db, {
 					conversationId: c.id,
 					messageId,
@@ -100,6 +113,7 @@ export function createAgencyDelivery(config: {
 			receipt(cy, ticket, { status: "interrupted", resultText: "" });
 			return false;
 		}
+		c.lastDispatchAt = at;
 		cy.planner.proactiveSpoke(nowMs());
 		log.info("agency.delivered", {
 			subjectId: c.id,
