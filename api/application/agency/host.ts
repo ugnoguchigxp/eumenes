@@ -447,7 +447,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		const { calls } = result;
 		const decision = result.decision;
 		logCalls(c, calls);
-		if (!decision) return "silent";
+		if (!decision) return "aborted";
 		const superseded =
 			!on() ||
 			convs.get(c.id) !== c ||
@@ -459,13 +459,23 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		logDecision(c, trigger, decision, superseded);
 		if (superseded) return "aborted";
 		// Host limits defer an opportunity; they do not spend the speech backoff.
-		if (["host_blocked", "host_budget"].includes(decision.source))
+		if (
+			[
+				"host_blocked",
+				"host_budget",
+				"host_stale",
+				"host_delegation",
+				"host_disabled",
+			].includes(decision.source) ||
+			(decision.rejectCodes.length === 1 &&
+				decision.rejectCodes[0] === "outbound_interval")
+		)
 			return "aborted";
+		if (decision.source === "rejected" || decision.source === "error")
+			return "failed";
 		if (!decision.ticket) return "silent";
 		if (!(await save(c))) return "aborted";
-		const delivered = await deliver(cy, decision.ticket, decision.evidenceRefs);
-		if (decision.ticket.action === "tool") return "aborted";
-		return delivered ? "spoke" : "silent";
+		return deliver(cy, decision.ticket, decision.evidenceRefs);
 	}
 
 	async function cycle(
@@ -498,7 +508,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			),
 		};
 		if (trigger !== "review_due") cy.planner.enter();
-		let outcome: CycleOutcome = "silent";
+		let outcome: CycleOutcome = "failed";
 		try {
 			outcome = await cycleBody(cy);
 		} catch (error) {

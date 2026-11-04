@@ -1,6 +1,6 @@
 import { defaultLimits } from "eumenes-agency";
 import type { Database } from "bun:sqlite";
-import type { ActionTicket, ActionReceipt } from "eumenes-agency";
+import type { ActionTicket, ActionReceipt, CycleOutcome } from "eumenes-agency";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { persistSpeech, speechReceipt } from "./speech";
@@ -15,16 +15,16 @@ export function createAgencyDelivery(config: {
 	const { deps, nowMs, save } = config;
 	const { store } = deps;
 	const log = getLogger("agency");
-	/** Returns true when the utterance was appended. */
+	/** Pass technical failures and deferrals back to the idle scheduler. */
 	async function deliver(
 		cy: Cycle,
 		ticket: ActionTicket,
 		evidenceRefs: readonly string[],
-	): Promise<boolean> {
+	): Promise<CycleOutcome> {
 		const { c, trigger } = cy;
 		if (ticket.action === "tool" && deps.state) {
 			try {
-				if (!(await save(c))) return false;
+				if (!(await save(c))) return "aborted";
 				const input = researchInput(
 					ticket,
 					cy.runtime,
@@ -43,13 +43,19 @@ export function createAgencyDelivery(config: {
 					attemptId: ticket.id,
 				});
 			} catch (error) {
+				const code = toErrorCode(error, "research_failed");
 				receipt(cy, ticket, {
 					status: "failed",
-					resultText: toErrorCode(error, "research_failed"),
+					resultText: code,
 				});
+				await save(c);
+				return code === "agency_dispatch_interval" ||
+					code === "agency_origin_stale"
+					? "aborted"
+					: "failed";
 			}
 			await save(c);
-			return false;
+			return "aborted";
 		}
 		if (ticket.action !== "speak") {
 			log.info("agency.delivered", {
@@ -59,12 +65,12 @@ export function createAgencyDelivery(config: {
 				outcome: "tool_not_supported",
 			});
 			receipt(cy, ticket, { status: "failed", resultText: "no tool runtime" });
-			return false;
+			return "failed";
 		}
 		const text = ticket.utterance ?? "";
 		const messageId = `agency:${c.scope}:${ticket.id}`;
 		let at = 0;
-		let outcome: "appended" | "stale" | "routed";
+		let outcome: "appended" | "stale" | "interval" | "routed";
 		try {
 			outcome = await store.write((db) => {
 				// Re-checked inside the writer transaction: the setting as committed (not the cached copy),
@@ -82,7 +88,7 @@ export function createAgencyDelivery(config: {
 							interval,
 						)
 					: c.lastDispatchAt === undefined || at - c.lastDispatchAt >= interval;
-				if (!allowed) return "stale";
+				if (!allowed) return "interval";
 				return persistSpeech(deps, db, {
 					conversationId: c.id,
 					messageId,
@@ -101,17 +107,20 @@ export function createAgencyDelivery(config: {
 				reason: toErrorCode(error, "write_failed"),
 			});
 			receipt(cy, ticket, { status: "failed", resultText: "" });
-			return false;
+			return "failed";
 		}
-		if (outcome === "stale") {
+		if (outcome === "stale" || outcome === "interval") {
 			log.info("agency.delivered", {
 				subjectId: c.id,
 				attemptId: ticket.id,
 				kind: trigger,
-				outcome: "interrupted",
+				outcome,
 			});
-			receipt(cy, ticket, { status: "interrupted", resultText: "" });
-			return false;
+			receipt(cy, ticket, {
+				status: "interrupted",
+				resultText: outcome === "interval" ? "agency_dispatch_interval" : "",
+			});
+			return "aborted";
 		}
 		c.lastDispatchAt = at;
 		cy.planner.proactiveSpoke(nowMs());
@@ -124,7 +133,7 @@ export function createAgencyDelivery(config: {
 			...(ticket.emotion ? { emotion: ticket.emotion } : {}),
 		});
 		receipt(cy, ticket, speechReceipt(outcome, text));
-		return true;
+		return "spoke";
 	}
 
 	/** One terminal receipt per ticket (S3), recorded on the runtime that issued it and only while it is current. */
