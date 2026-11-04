@@ -27,7 +27,7 @@ export function researchTools(
 				{
 					name: "delegate",
 					requiresApproval: false,
-					description: `関心に基づく読み取り調査を委譲します。toolInputはJSON文字列 {"revisionId":"提示された版","question":"調べたい問いと受入条件"}。候補: ${JSON.stringify(catalog)}`,
+					description: `関心に基づく読み取り調査を委譲します。toolInputはrevisionIdとquestionを持つJSON文字列です。revisionIdには次の一覧から選んだ項目のidをそのまま写し、questionには調べたい問いと受入条件を書きます。一覧: ${JSON.stringify(catalog)}`,
 				},
 			]
 		: [];
