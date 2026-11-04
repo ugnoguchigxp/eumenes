@@ -166,6 +166,9 @@ export function harness(
 		busy?: () => boolean;
 		start?: boolean;
 		persistent?: boolean;
+		routeSpeechInTransaction?: Parameters<
+			typeof createAgencyHost
+		>[0]["routeSpeechInTransaction"];
 		llm?: (
 			next: Parameters<Parameters<typeof createAgencyHost>[0]["createLlm"]>[0],
 		) => LlmPort;
@@ -201,6 +204,9 @@ export function harness(
 	const memoryReads = { count: 0 };
 	const spoke: Array<Record<string, unknown>> = [];
 	const host = createAgencyHost({
+		...(options.routeSpeechInTransaction
+			? { routeSpeechInTransaction: options.routeSpeechInTransaction }
+			: {}),
 		...(options.persistent
 			? { state: createAgencyStatePort({ now: () => now }) }
 			: {}),

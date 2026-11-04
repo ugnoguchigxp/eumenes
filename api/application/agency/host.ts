@@ -392,15 +392,19 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		inference.foregroundBusy() ||
 		store.read((db) => deps.conversationBusy(db, c.id));
 
+	const speechAllowed = (c: Conv) =>
+		c.id === activeId && c.planner.checkpoint().unanswered < cfg.maxUnanswered;
+
 	const { deliver } = createAgencyDelivery({
 		deps,
 		nowMs,
 		save,
-		isCurrent: (cy, db) => {
+		isCurrent: (cy, db, action) => {
 			const { c } = cy;
 			const committed = deps.settings.inTransaction(db);
 			return (
 				on() &&
+				(action !== "speak" || speechAllowed(c)) &&
 				sameSettings(committed.agency, cfg) &&
 				samePersona(committed.general, persona) &&
 				c.generation === cy.mine &&
@@ -423,8 +427,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			presence: "quiet",
 			foregroundBusy: hostBusy(c),
 			playerBusy: false,
-			speechAllowed:
-				c.id === activeId && c.planner.blockedBy() !== "unanswered",
+			speechAllowed: speechAllowed(c),
 			topics: topicsNow(),
 			todos: todosNow(c),
 		};
@@ -435,8 +438,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 						{
 							presence: "quiet",
 							foregroundBusy: hostBusy(c),
-							speechAllowed:
-								c.id === activeId && c.planner.blockedBy() !== "unanswered",
+							speechAllowed: speechAllowed(c),
 						},
 						controller.signal,
 					)

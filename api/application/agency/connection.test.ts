@@ -200,6 +200,7 @@ for (const target of ["larm", "cloud"] as const) {
 							utteranceEmotion: true,
 						})
 					: agencyOutputContract("select", {
+							findings: true,
 							toolNames: [],
 							condition: "F",
 							interestFormation: true,

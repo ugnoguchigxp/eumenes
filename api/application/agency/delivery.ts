@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { ActionTicket } from "eumenes-agency";
+import type { ActionTicket, ActionReceipt } from "eumenes-agency";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { persistSpeech, speechReceipt } from "./speech";
@@ -9,7 +9,7 @@ export function createAgencyDelivery(config: {
 	deps: AgencyHostDeps;
 	nowMs: () => number;
 	save(c: Conv): Promise<boolean>;
-	isCurrent(cy: Cycle, db: Database): boolean;
+	isCurrent(cy: Cycle, db: Database, action: ActionTicket["action"]): boolean;
 }) {
 	const { deps, nowMs, save } = config;
 	const { store } = deps;
@@ -33,7 +33,8 @@ export function createAgencyDelivery(config: {
 					nowMs(),
 				);
 				await store.write((db) => {
-					if (!config.isCurrent(cy, db)) throw new Error("agency_origin_stale");
+					if (!config.isCurrent(cy, db, ticket.action))
+						throw new Error("agency_origin_stale");
 					deps.state!.startInTransaction(db, input);
 				});
 				log.info("agency.research_started", {
@@ -41,7 +42,10 @@ export function createAgencyDelivery(config: {
 					attemptId: ticket.id,
 				});
 			} catch (error) {
-				receipt(cy, ticket, "failed", toErrorCode(error, "research_failed"));
+				receipt(cy, ticket, {
+					status: "failed",
+					resultText: toErrorCode(error, "research_failed"),
+				});
 			}
 			await save(c);
 			return false;
@@ -53,7 +57,7 @@ export function createAgencyDelivery(config: {
 				kind: trigger,
 				outcome: "tool_not_supported",
 			});
-			receipt(cy, ticket, "failed", "no tool runtime");
+			receipt(cy, ticket, { status: "failed", resultText: "no tool runtime" });
 			return false;
 		}
 		const text = ticket.utterance ?? "";
@@ -64,7 +68,8 @@ export function createAgencyDelivery(config: {
 			outcome = await store.write((db) => {
 				// Re-checked inside the writer transaction: the setting as committed (not the cached copy),
 				// and nothing may have been said since the opportunity.
-				if (text === "" || !config.isCurrent(cy, db)) return "stale";
+				if (text === "" || !config.isCurrent(cy, db, ticket.action))
+					return "stale";
 				return persistSpeech(deps, db, {
 					conversationId: c.id,
 					messageId,
@@ -82,7 +87,7 @@ export function createAgencyDelivery(config: {
 				outcome: "write_failed",
 				reason: toErrorCode(error, "write_failed"),
 			});
-			receipt(cy, ticket, "failed", "");
+			receipt(cy, ticket, { status: "failed", resultText: "" });
 			return false;
 		}
 		if (outcome === "stale") {
@@ -92,7 +97,7 @@ export function createAgencyDelivery(config: {
 				kind: trigger,
 				outcome: "interrupted",
 			});
-			receipt(cy, ticket, "interrupted", "");
+			receipt(cy, ticket, { status: "interrupted", resultText: "" });
 			return false;
 		}
 		cy.planner.proactiveSpoke(nowMs());
@@ -104,7 +109,7 @@ export function createAgencyDelivery(config: {
 			outputCharacters: text.length,
 			...(ticket.emotion ? { emotion: ticket.emotion } : {}),
 		});
-		receipt(cy, ticket, "succeeded", speechReceipt(outcome, text));
+		receipt(cy, ticket, speechReceipt(outcome, text));
 		return true;
 	}
 
@@ -112,10 +117,10 @@ export function createAgencyDelivery(config: {
 	function receipt(
 		cy: Cycle,
 		ticket: ActionTicket,
-		status: "succeeded" | "failed" | "interrupted",
-		resultText: string,
+		result: Omit<ActionReceipt, "ticketId" | "at">,
 	) {
 		const { c } = cy;
+		const { status } = result;
 		// A replaced runtime already interrupted its tickets; its late receipt belongs to nobody.
 		if (c.runtime !== cy.runtime) {
 			log.info("agency.receipt", {
@@ -129,9 +134,8 @@ export function createAgencyDelivery(config: {
 		try {
 			cy.runtime.recordResult({
 				ticketId: ticket.id,
-				status,
 				at: nowMs(),
-				resultText,
+				...result,
 			});
 			log.info("agency.receipt", {
 				subjectId: c.id,

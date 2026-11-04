@@ -184,6 +184,32 @@ describe("opportunities", () => {
 });
 
 describe("delivery", () => {
+	test("accepted Live speech keeps the offered text separate from playback evidence", async () => {
+		const h = harness({
+			routeSpeechInTransaction: () => true,
+			select: () =>
+				choice("speak", { refs: ["u1"], utterance: "offered utterance" }),
+		});
+		await exchange(h, 1);
+		await waitFor(
+			() =>
+				h.host
+					.inspect("c1")
+					?.snapshot.observations.some(
+						(o) => o.kind === "delivery.observed",
+					) === true,
+		);
+		const record = h.host
+			.inspect("c1")!
+			.snapshot.observations.find((o) => o.kind === "delivery.observed")!;
+		expect(record.speechHandoff).toEqual({
+			proposedText: "offered utterance",
+			findingWorkRefs: [],
+		});
+		expect(record.text).toContain("未確認");
+		expect(h.texts()).toEqual(["u1", "a1"]);
+	});
+
 	test("a spoken ticket becomes one runless assistant message with one terminal receipt", async () => {
 		const h = harness({ select: () => choice("speak", { refs: ["u1"] }) });
 		await exchange(h, 1);
@@ -482,6 +508,35 @@ describe("idle", () => {
 		expect(h.host.inspect("c1")?.idle.blockedBy).toBe("unanswered");
 		await h.say("u2", "user", "うん");
 		expect(h.host.inspect("c1")?.idle.blockedBy).toBeNull();
+	});
+
+	test("pending speech is interrupted if the user switches conversations before delivery", async () => {
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const h = harness({
+			select: async () => {
+				await gate;
+				return choice("speak", { refs: ["u1"] });
+			},
+		});
+		await exchange(h, 1);
+		await waitFor(() => h.calls.select === 1);
+		await h.say("u-new", "user", "another conversation", null, "c2");
+		await waitFor(() => h.host.inspect("c2") !== null);
+		release();
+		await waitFor(() =>
+			(h.host.inspect("c1")?.snapshot.state.attempts ?? []).some(
+				(a) => a.status === "succeeded" || a.status === "interrupted",
+			),
+		);
+		expect(h.host.inspect("c1")?.snapshot.state.attempts[0]?.status).toBe(
+			"interrupted",
+		);
+		expect(h.texts("c1")).toEqual(["u1", "a1"]);
+		expect(h.texts("c2")).toEqual(["u-new"]);
+		expect(h.spoke).toHaveLength(0);
 	});
 
 	test("only the conversation the user spoke in last gets idle cycles", async () => {

@@ -122,6 +122,24 @@ describe("work that changed", () => {
 		};
 	};
 
+	test("a waiting work question cannot bypass the unanswered speech limit", async () => {
+		const h = harness({ select: () => choice("speak", { refs: ["u1"] }) });
+		const ask = asking(h);
+		await exchange(h, 1);
+		await waitFor(() => h.host.inspect("c1")?.idle.blockedBy === "unanswered");
+		h.advanceClock(61_000);
+		ask();
+		await changed(h);
+		await waitFor(() => h.calls.select === 2);
+		await settle();
+		expect(JSON.parse(h.requests.at(-1)!.prompt).opportunity).toMatchObject({
+			trigger: "result_received",
+			speechAllowed: false,
+		});
+		expect(h.spoke).toHaveLength(1);
+		expect(h.host.inspect("c1")?.idle.unanswered).toBe(1);
+	});
+
 	test("a question opens a result_received opportunity after the commit, in the conversation the user is in", async () => {
 		const h = harness();
 		const ask = asking(h);

@@ -47,6 +47,7 @@ test("both runtime purposes send the complete Eumenes system; observations stay 
 									utteranceEmotion: true,
 								})
 							: agencyOutputContract("select", {
+									findings: true,
 									toolNames: [],
 									condition: "F",
 									interestFormation: true,
