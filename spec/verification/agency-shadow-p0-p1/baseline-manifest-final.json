@@ -1,0 +1,329 @@
+{
+	"schema": "agency-p0-manifest.v2",
+	"runId": "record-2ef1674f-5fed-456b-83ba-1677ca0206e1",
+	"createdAt": "2026-11-05T09:11:26.443Z",
+	"command": [
+		"bun",
+		"eval/initiative/p0.ts",
+		"record",
+		"--out",
+		"../eumenes/verification-reports/agency-shadow/p0-20261105-final/baseline-record",
+		"--preregistration",
+		"../eumenes/spec/verification/agency-shadow-p0-p1/preregistration-r2.md"
+	],
+	"lane": "fixture",
+	"mode": "record",
+	"variant": "baseline-dist",
+	"replayOf": null,
+	"tamper": null,
+	"identity": {
+		"host": {
+			"sha": "056afd43115c0ae7df91449ad62baa0000d73c60",
+			"dirty": true,
+			"changed": [
+				"?? spec/agency-autonomy-improvement-design-2026-11-05.md",
+				"?? spec/agency-shadow-p0-p1-implementation-request-2026-11-05.md",
+				"?? spec/verification/agency-shadow-p0-p1/baseline-manifest-r1.json",
+				"?? spec/verification/agency-shadow-p0-p1/baseline-manifest-r2.json",
+				"?? spec/verification/agency-shadow-p0-p1/p0-acceptance.json",
+				"?? spec/verification/agency-shadow-p0-p1/p0-report.md",
+				"?? spec/verification/agency-shadow-p0-p1/preregistration-r2.md",
+				"?? spec/verification/agency-shadow-p0-p1/preregistration.md",
+				"M spec/README.md"
+			],
+			"diffDigest": "1b93fc0d9683471fc7a74fa2dcbff2d117317745faf3b8940d43ea28c4457a8a"
+		},
+		"agency": {
+			"sha": "79c0418d3a27ec2f3ae878e74a48c251d4fe6add",
+			"dirty": true,
+			"changed": [
+				"?? eval/initiative/baseline.ts",
+				"?? eval/initiative/cassette.ts",
+				"?? eval/initiative/p0-cases.ts",
+				"?? eval/initiative/p0.test.ts",
+				"?? eval/initiative/p0.ts",
+				"?? eval/initiative/record.ts",
+				"?? spec/improvement-implementation-plan-2026-11-05.md",
+				"?? standalone/api-keys.ts",
+				"?? standalone/test/api-keys.test.ts",
+				"M README.md",
+				"M eval/action-steps/run.ts",
+				"M eval/f-fusion/run.ts",
+				"M eval/initiative/research.ts",
+				"M eval/initiative/trials.ts",
+				"M eval/live-b1-f/run.ts",
+				"M standalone/claude.ts",
+				"M standalone/cli.ts"
+			],
+			"diffDigest": "ca4de98c6d3ace664aa87e00cd650121c569ecbd552784e5dcd296d4f3990664"
+		},
+		"distribution": {
+			"kind": "distribution",
+			"specifier": "eumenes-agency",
+			"resolvedFrom": "/Users/y.noguchi/Code/eumenes/api/application/agency/runtime.ts",
+			"entry": "/Users/y.noguchi/Code/eumenes/node_modules/.bun/eumenes-agency@vendor+agency+eumenes-agency-0.1.3-e7b4096d5bd5.tgz+3a38e73420b28681/node_modules/eumenes-agency/dist/index.js",
+			"entryRealpath": "/Users/y.noguchi/Code/eumenes/node_modules/.bun/eumenes-agency@vendor+agency+eumenes-agency-0.1.3-e7b4096d5bd5.tgz+3a38e73420b28681/node_modules/eumenes-agency/dist/index.js",
+			"packageDir": "/Users/y.noguchi/Code/eumenes/node_modules/.bun/eumenes-agency@vendor+agency+eumenes-agency-0.1.3-e7b4096d5bd5.tgz+3a38e73420b28681/node_modules/eumenes-agency",
+			"version": "0.1.3",
+			"bunTag": "sha512-OjjnNCCyhoEekEQi0qXME4WVE+1dEI+ENTUI8ZVfTnEB5RO0gAvCwpW+YcadLzLPqnritehOMQWab9XvBoFJvg==",
+			"distDigest": "9bc1db3eeebf7014d1422bf3fe6c12f1017b3ac336c22763b009bc6201a55bb0",
+			"distFiles": 92,
+			"artifact": "eumenes-agency-0.1.3-e7b4096d5bd5.tgz",
+			"artifactSha256": "b4fc0e1e9ac15aaaee8f9c78b416e0dbd54a9f76f568d7d9f125769718cd3f7d",
+			"vendorManifest": {
+				"package": "eumenes-agency",
+				"version": "0.1.3",
+				"artifact": "eumenes-agency-0.1.3-e7b4096d5bd5.tgz",
+				"sha256": "b4fc0e1e9ac15aaaee8f9c78b416e0dbd54a9f76f568d7d9f125769718cd3f7d",
+				"size": 114144,
+				"INSTRUCTION_VERSION": "p0e-instructions-17",
+				"HOST_RULES_VERSION": "host-rules-14",
+				"gitSha": "e7b4096d5bd56b8a32dd8bd93a65a519f8393b3f",
+				"dirty": false,
+				"builtAt": "2026-11-04T11:18:08.362Z"
+			},
+			"vendorManifestDigest": "28274c4eb676d61d256ba193e51fefb1c5e47ca6f8fe2d630179b0ae1c02f9c0",
+			"hostDependency": "file:vendor/agency/eumenes-agency-0.1.3-e7b4096d5bd5.tgz",
+			"lockfileReference": true,
+			"instructionVersion": "p0e-instructions-17",
+			"hostRulesVersion": "host-rules-14",
+			"artifactContents": {
+				"artifactFiles": 92,
+				"installedFiles": 92,
+				"missing": [],
+				"extra": [],
+				"changed": [],
+				"equal": true
+			},
+			"checks": {
+				"installedDistMatchesArtifact": true,
+				"entryInsideDist": true,
+				"artifactChecksumMatchesManifest": true,
+				"hostDependsOnArtifact": true,
+				"lockfileReferencesArtifact": true,
+				"installedVersionMatches": true,
+				"instructionVersionMatches": true,
+				"hostRulesVersionMatches": true,
+				"hostImportIsLoadedModule": true
+			}
+		},
+		"environment": {
+			"bun": "1.4.4",
+			"bunRevision": "38afee6c84fcf48c0edb2466aa4b27d287a59c30",
+			"platform": "darwin",
+			"osRelease": "25.6.0",
+			"arch": "arm64"
+		}
+	},
+	"fixed": {
+		"composition": {
+			"files": {
+				"api/application/agency/runtime.ts": "d14b7edc02b4a36b791bcacfd895125d2df7f0b895308ad8f3e2a3bb4789292c",
+				"api/application/agency/llm-port.ts": "ba03256cbd29880a120a0ac19330d0dc0e094e23e5fad020752ee5c4fb3d4bcb",
+				"api/application/agency/system-context.ts": "3cfbc08532f1e52437f2dd8a421fef27dbe63351ceece36f8f0246fad8aa0450",
+				"api/application/agency/schema.ts": "d1179317bca28e16731c36fa80c224d90a2980126902d33985e0c90a2f0adc78",
+				"api/application/agency/research.ts": "d54bcd09273113e3bd0ad79016ca028b7f6d4d85bd92c3edd481d42fa07d0d15",
+				"api/infrastructure/json-schema.ts": "bef00de2015351cb21b0917bb28ab9dba951ccd7905a633bf23db1375d0d717a",
+				"api/infrastructure/llm-json.ts": "faa22ca6f10b5930bcca268fa2a0dce24ddc67fe6b8e4ec57cbcf70a60681f9e",
+				"api/infrastructure/system-context.ts": "d58f37b95337a328b9ad1c7842c1a4098b0a4fc1f8aaddd8c08e18e908cb7030",
+				"api/domains/dialogue/service/conversation-input.ts": "41baff1c89223896eedb172777d2394de2631165364ffd2b60b90df4c149893c",
+				"api/domains/dialogue/service/input-text.ts": "19c64bb76bff532f845b1f4a685b8b51fbfc1cbab2a1101c50343089a7aa6891"
+			},
+			"filesDigest": "02dd9b87979a00155361110716cbd76fbc0625e39422864b55e897a41c95927e",
+			"systemContextAssets": {
+				"files": 10,
+				"digest": "c44f512fb5afc04ea8dd5db517c87b478ccd142c6a3951f56f8a01b5202751eb"
+			}
+		},
+		"settings": {
+			"digest": "747c088886f861708c2845e34dddffdf3be665d3ef7b5c8e9f4c780c737e57ec",
+			"value": {
+				"agency": {
+					"emotion": false,
+					"interests": [
+						"小型望遠鏡の光学設計。携帯型の新しい方式には調べたい点が残っている。"
+					]
+				},
+				"persona": {
+					"agentName": "ユリ",
+					"userName": "",
+					"persona": "butler"
+				}
+			}
+		},
+		"capabilityCatalog": {
+			"digest": "3e49a645dd4d10da4e3627fb54c796d1776cd722c5a8909a980e911bd33f94d0",
+			"value": [
+				{
+					"name": "delegate",
+					"requiresApproval": false,
+					"description": "関心に基づく読み取り調査を委譲します。toolInputはrevisionIdとquestionを持つJSON文字列です。revisionIdには次の一覧から選んだ項目のidをそのまま写し、questionには調べたい問いと受入条件を書きます。一覧: [{\"id\":\"catalog1\",\"title\":\"公開資料調査\",\"description\":\"公開資料の読み取り調査\"}]"
+				}
+			],
+			"approvalTool": {
+				"name": "publish_note",
+				"requiresApproval": true,
+				"description": "合成: 公開メモを投稿する（利用者の明示承認が必要）"
+			}
+		},
+		"budget": {
+			"defaultBudget": {
+				"maxCallsPerWindow": 12,
+				"windowMs": 600000,
+				"minIntervalMs": 30000,
+				"batchSize": 4,
+				"updateMaxOutputTokens": 1200,
+				"selectMaxOutputTokens": 800
+			},
+			"hostOverride": {
+				"updateMaxOutputTokens": 2400,
+				"selectMaxOutputTokens": 1000
+			},
+			"source": "api/application/agency/runtime.ts"
+		},
+		"limits": {
+			"digest": "4e02468292befcb7c603d0cd02a95a8ba7a5fe88f844be1e15b57dca0bada91b",
+			"value": {
+				"openIntents": 16,
+				"openCandidates": 32,
+				"beliefsAndDesires": 64,
+				"notes": 16,
+				"reviewAfterMaxHours": 168,
+				"expireAfterMaxHours": 168,
+				"outboundIntervalMs": 60000,
+				"capacityPressureRatio": 0.8
+			}
+		},
+		"wakeConfig": {
+			"value": "not exported: file digest only",
+			"file": "domains/agency/wake.js",
+			"digest": "89e6b88afacf7c657f5bad8d9dce2219b4acedf2c47863b121c611e702eb215c"
+		},
+		"activityLimits": {
+			"value": "not exported: file digest only",
+			"file": "application/activity-budget.js",
+			"digest": "2f24df9092e78c4f05790d7dc3e81ef3d3e6964500cc976c77409225e29311ad"
+		},
+		"cases": {
+			"digest": "d033561798dccaff4c0ba012b61f4439062a4f79b395ac271020320cfe0c6638",
+			"ids": [
+				"dev-previous-task",
+				"dev-past-unrelated",
+				"dev-interest",
+				"dev-resume",
+				"dev-closed",
+				"dev-unanchored",
+				"dev-proof",
+				"dev-proof-declined",
+				"dev-audio-open",
+				"dev-audio-closed",
+				"M01-unknown-ref",
+				"M02-stale-revision",
+				"M03-approval-required",
+				"M04-budget-exhausted",
+				"M05-return-and-review",
+				"M06-fault-repeat",
+				"M07-cancel-uncooperative",
+				"M08-restart",
+				"M09-duplicate-observation",
+				"M10-save-failure",
+				"M11-malformed-output",
+				"M12-transient-retry",
+				"M13-authority-claim",
+				"M14-invalid-delegation-input",
+				"M15-conversation-prefix"
+			],
+			"splits": [
+				"dev",
+				"mechanism"
+			]
+		},
+		"labels": "9ce50cf2a0f085c400a0621e2d4f6214510cd775678bd5234cd85b9179a88644",
+		"responses": {
+			"digest": "215673c84a558c590189880f80c81c4af4b917c1d41bb2586457cda5c4695bad",
+			"kind": "fixed synthetic scripts"
+		},
+		"clock": {
+			"kind": "virtual",
+			"steps": "358e66e8102f1cd542090c7b3a1a2ed8666f7a6184b6a38adff5a36ee32c2bc0"
+		},
+		"seed": {
+			"value": null,
+			"note": "no randomness in inputs; transport ids carry a per-process boot id"
+		},
+		"reps": 1,
+		"order": "rep-major, cases in listed order, steps in order",
+		"conversationPrefix": {
+			"default": "none: task() returns null for cases without conversationPrefix",
+			"synthetic": {
+				"cases": [
+					"M15-conversation-prefix"
+				],
+				"data": "f227df1b03c9d9f172c4c256121bc0960fee983aadcbef2c094fc0538f713c00",
+				"dataBuilder": "synthetic ConversationPrefix and ## State (product backgroundPrefixInTransaction / stateLinesInTransaction not used: they read the conversation store)",
+				"assembly": "product taskMessages + backgroundMessage (api/domains/dialogue/service/conversation-input.ts)",
+				"finalPath": "product createAgencyLlmPort (drops prefix system messages, onConversation session, agentSession)"
+			}
+		},
+		"model": {
+			"requested": null,
+			"note": "no model; fixture inference serves scripted responses"
+		},
+		"transportIdentities": [
+			"decisionId",
+			"requestId",
+			"attemptId",
+			"conversationId",
+			"agentId"
+		],
+		"stop": {
+			"maxAttempts": 200,
+			"attemptCap": "served attempts over the run; checked at the inference boundary before each physical attempt and before each case",
+			"providerCalls": 0,
+			"outwardEffects": 0,
+			"versionChange": true
+		},
+		"retries": "no re-draw; core transient retries are recorded as separate attempts",
+		"preregistration": {
+			"path": "/Users/y.noguchi/Code/eumenes/spec/verification/agency-shadow-p0-p1/preregistration-r2.md",
+			"digest": "e7fc55f43ccf7d87999cd6731f0e758590dee133e8fdedcd8baef41952858b4c"
+		}
+	},
+	"plan": {
+		"trials": [
+			"dev-previous-task/r1/s1",
+			"dev-past-unrelated/r1/s1",
+			"dev-interest/r1/s1",
+			"dev-resume/r1/s1",
+			"dev-closed/r1/s1",
+			"dev-unanchored/r1/s1",
+			"dev-proof/r1/s1",
+			"dev-proof-declined/r1/s1",
+			"dev-audio-open/r1/s1",
+			"dev-audio-closed/r1/s1",
+			"M01-unknown-ref/r1/s1",
+			"M02-stale-revision/r1/s1",
+			"M03-approval-required/r1/s1",
+			"M04-budget-exhausted/r1/s1",
+			"M05-return-and-review/r1/s1",
+			"M05-return-and-review/r1/s2",
+			"M06-fault-repeat/r1/s1",
+			"M06-fault-repeat/r1/s2",
+			"M07-cancel-uncooperative/r1/s1",
+			"M08-restart/r1/s1",
+			"M08-restart/r1/s2",
+			"M09-duplicate-observation/r1/s1",
+			"M10-save-failure/r1/s1",
+			"M11-malformed-output/r1/s1",
+			"M12-transient-retry/r1/s1",
+			"M13-authority-claim/r1/s1",
+			"M14-invalid-delegation-input/r1/s1",
+			"M15-conversation-prefix/r1/s1"
+		]
+	},
+	"semantics": {
+		"fixtureResponses": "scripted: not a model judgement; not semantically scorable",
+		"holdout": "not_run: Q01–Q08 unseen set (16) needs an evaluator designated by the user",
+		"live": "not_permitted in P0"
+	}
+}

@@ -1,0 +1,187 @@
+{
+	"schema": "agency-p0-acceptance.v3",
+	"date": "2026-11-05",
+	"scope": "P0 fixture lane only. P1, product reflection, live model, billing, semantic evaluation, src/api or dependency changes and server operations were not performed.",
+	"current": "final (canonical placement of the reviewed r2 files)",
+	"baseline": {
+		"host": "056afd43115c0ae7df91449ad62baa0000d73c60",
+		"distribution": "eumenes-agency 0.1.3 e7b4096d5bd56b8a32dd8bd93a65a519f8393b3f",
+		"artifactSha256": "b4fc0e1e9ac15aaaee8f9c78b416e0dbd54a9f76f568d7d9f125769718cd3f7d",
+		"artifactContents": "package/dist 92 files vs installed dist 92 files: missing 0, extra 0, changed 0",
+		"distDigest": "9bc1db3eeebf7014d1422bf3fe6c12f1017b3ac336c22763b009bc6201a55bb0",
+		"adjacentAgency": "79c0418d3a27ec2f3ae878e74a48c251d4fe6add (comparison lane, not the baseline)",
+		"recordRun": "record-5cfd5e23-163c-4fb2-90fb-7b6cec39ad86",
+		"manifest": "baseline-manifest-r2.json",
+		"preregistration": "preregistration-r2.md",
+		"codeFreeze": "../../../verification-reports/agency-shadow/p0-20261105-r2/logs/code-freeze-r2.sha256"
+	},
+	"reports": "../../../verification-reports/agency-shadow/p0-20261105-r2/",
+	"acceptance": {
+		"P0-A01": {
+			"status": "pass",
+			"evidence": [
+				"baseline-manifest-r2.json",
+				"p0-20261105-r2/baseline-replay/replay-compare.json#pair",
+				"p0-20261105-r2/adjacent-src-replay/replay-compare.json#pair",
+				"eumenes_agency/eval/initiative/p0.test.ts: P0-A01"
+			],
+			"notes": "Required identity present (missing=[]). Declared differences allowed; fixed-item, undeclared and missing-required pairs become hold."
+		},
+		"P0-A02": {
+			"status": "pass",
+			"scope": "fixture lane; conversation prefix data synthetic",
+			"evidence": [
+				"p0-20261105-r2/baseline-replay/replay-compare.json (28 trials, 0 mismatches, 0 record diffs, 140 one-to-one bindings over 5 identity kinds)",
+				"M15-conversation-prefix record→replay equal; final messages, native schema and agentSession built by the product createAgencyLlmPort on product taskMessages/backgroundMessage",
+				"p0-20261105-r2/tamper-{system,options,prefix,prefix-content,session,drop-entry,extra-entry,identity,corrupt-response,response}/replay-compare.json",
+				"p0.test.ts: P0-A02 (R1) session/identity regression, P0-A02 (R5) prefix assembly"
+			],
+			"notes": "All ten deliberate differences detected on the targeted trial only; corrupt-response refused at the boundary, checksummed response change caught by record comparison. Prefix data from the product conversation store is not covered (hold)."
+		},
+		"P0-A03": {
+			"status": "pass",
+			"evidence": [
+				"p0-20261105-r2/faults/ (6/6 recorded)",
+				"p0-20261105-r2/faults/record-loss-check.json",
+				"p0-20261105-r2/cap-{0,1,45}/",
+				"p0.test.ts: R3 boundary tests"
+			],
+			"notes": "runner_error 2 (one after calls, attempts and usage kept), model_error 2, incomplete 2 after an injected stop; every trial after an attempt-cap stop recorded incomplete, none counted as passed."
+		},
+		"P0-A04": {
+			"status": "pass",
+			"evidence": [
+				"p0-20261105-r2/baseline-record/aggregate.json#buckets",
+				"p0.test.ts: P0-A04 (mock records)"
+			],
+			"notes": "Suppression only as mock records: observe is not implemented in P0."
+		},
+		"P0-A05": {
+			"status": "pass",
+			"evidence": [
+				"p0-20261105-r2/*/aggregate.json#outwardEffects (17 runs, 0)",
+				"p0-20261105-r2/*/run-log.json#guards"
+			],
+			"notes": "Admission only on :memory: SQLite with an inert worker. Speech and notification ports are absent from the composition, so their 0 is structural."
+		},
+		"P0-A06": {
+			"status": "pass",
+			"evidence": [
+				"baseline-manifest-r2.json#identity.distribution.checks,artifactContents",
+				"p0.test.ts: P0-A06 (R4) fake-host negative controls",
+				"p0-20261105-r2/logs/preservation.log"
+			],
+			"notes": "Installed dist equals the artifact file for file; changed, missing and added dist files are detected while checksum, version and constants still match. Adjacent src: same version constants, 4 src files differ."
+		},
+		"P0-A07": {
+			"status": "pass",
+			"scope": "fixture lane",
+			"evidence": [
+				"p0-20261105-r2/baseline-record/aggregate.json#calls,usage",
+				"p0-20261105-r2/cap-{0,1,45}/aggregate.json#calls"
+			],
+			"notes": "46 served attempts counted apart from refused-before-serve (0 in baseline, 1 each in cap-1 and cap-45); served never exceeded the cap. Usage unknown for all 46 (not 0); 45 zero-filled by the product port counted. Provider calls 0. Live usage unknown."
+		},
+		"P0-A08": {
+			"status": "pass",
+			"evidence": [
+				"p0-20261105-r2/logs/aggregate-regeneration.log (17/17 equal)",
+				"p0-20261105-r2/*/protection.json (0 hits)",
+				"p0.test.ts: P0-A08 planted positive control"
+			],
+			"notes": "No product DB, settings or .env read."
+		}
+	},
+	"initialRun": {
+		"id": "r1",
+		"reports": "../../../verification-reports/agency-shadow/p0-20261105/",
+		"manifest": "baseline-manifest-r1.json",
+		"preregistration": "preregistration.md",
+		"recordedVerdict": "A01–A08 pass (as judged at the time)",
+		"status": "superseded: not a final result",
+		"defects": {
+			"R1": "agentSession reduced to present/absent: agentId and unknown fields not compared (A02)",
+			"R2": "stored response returned without checking responseDigest (A02)",
+			"R3": "attempt cap checked between cases with '>': cap could be exceeded; served usage lost on a step exception (A03, A07)",
+			"R4": "installed dist not shown to equal the artifact contents (A06)",
+			"R5": "no positive replay baseline with a conversation prefix (A02)"
+		}
+	},
+	"notRun": {
+		"semanticDev": "not run: dev10 used scripted responses (mechanism only)",
+		"holdout16": "not created: needs an independent evaluator designated by the user",
+		"live": "not permitted in P0; usage/cost unknown",
+		"conversationStorePrefix": "product backgroundPrefixInTransaction / stateLinesInTransaction need the conversation store; not exercised",
+		"performance": "P1 procedure, not run"
+	},
+	"proposal": {
+		"adopt": [
+			"P0 measurement basis for the fixture lane (r2; proposal to the user, not auto-applied)"
+		],
+		"reject": [
+			"r1 verdict as a final result"
+		],
+		"hold": [
+			"semantic quality",
+			"live usage and cost",
+			"prefix data from the product conversation store",
+			"performance batch composition (needs holdout)",
+			"P1"
+		]
+	},
+	"finalCanonical": {
+		"date": "2026-11-05",
+		"note": "Same reviewed files placed in the canonical repositories; no code rewritten. Candidate r2 results are not presented as canonical runs.",
+		"placement": {
+			"agencyFiles": "8/8 copied to /Users/y.noguchi/Code/eumenes_agency/eval/initiative; after == control/reviewed-p0-files.json (logs/copy-agency-files.log); canonical before: 6 absent, research.ts/trials.ts == HEAD",
+			"eumenesArtifacts": "267 files copied to new locations only, all hashes equal (logs/copy-eumenes-artifacts.log)",
+			"docs": "design docs and spec/README.md edited in place (not overwritten by candidate copies); P1 contract unchanged",
+			"concurrentChanges": "user-side changes outside eval/initiative appeared in canonical Agency after placement (README.md, eval/{action-steps,f-fusion,live-b1-f}/run.ts, standalone/*); not touched (logs/agency-status-after.log)"
+		},
+		"reports": "../../../verification-reports/agency-shadow/p0-20261105-final/",
+		"manifest": "baseline-manifest-final.json",
+		"runs": {
+			"baselineRecord": {
+				"runId": "record-2ef1674f-5fed-456b-83ba-1677ca0206e1",
+				"planned": 28,
+				"passed": 28,
+				"servedAttempts": 46,
+				"refusedBeforeServe": 0,
+				"providerCalls": 0,
+				"outwardEffects": 0,
+				"usageTotal": null
+			},
+			"baselineReplay": {
+				"runId": "replay-5d82c928-c75e-4cae-b189-abef6bb60241",
+				"mismatches": 0,
+				"recordDiffs": 0,
+				"bindings": 140,
+				"pair": "comparable"
+			},
+			"aggregateRegeneration": "2/2 equal",
+			"distribution": "resolvedFrom canonical api/application/agency/runtime.ts; artifact package/dist 92 vs installed 92, 0 differences; 9/9 checks true",
+			"vsCandidateR2": "record comparison 0 differences on 28 trials; fixed digests equal; replayDeclaration pair = hold only for location/dirty-state items (not used as the same pair)",
+			"productData": "data/ never read; runner existsSync reported true, ls returned EPERM; .env not read"
+		},
+		"verification": {
+			"agencyVerifyStandard": "not completed: exit 1 because bun child processes auto-load the canonical .env whose read is denied by the sandbox (logs/agency-env-file-evidence.log)",
+			"agencyVerifySteps": "with --no-env-file: format, lint, typecheck, boundaries pass; test 830 pass, 1 fail (test/core/pack.test.ts: its child bun --eval auto-loads .env -> EPERM; unchanged from HEAD, unrelated to P0), 23 skip, 1 todo (855 tests, 64 files incl. concurrent user tests)",
+			"agencyP0Tests": "bun --no-env-file test eval/initiative/: 34 pass, 0 fail",
+			"hostAgencyFixtures": "bun test api/application/agency: 11 files, 88 pass, 0 fail"
+		},
+		"status": "P0 basis confirmed after canonical placement for the fixture lane, with the stated environment limitation of the standard Agency verify command",
+		"parentReview": [
+			"../../../verification-reports/agency-shadow/p0-20261105-final/logs/parent-review/parent-review-r2.json",
+			"../../../verification-reports/agency-shadow/p0-20261105-final/logs/parent-review/parent-artifact-audit-r2.json",
+			"../../../verification-reports/agency-shadow/p0-20261105-final/logs/parent-review/parent-host-full-baseline.log"
+		],
+		"docsAfterFinal": "report, acceptance JSON and manifest copies were written after the final runs and checks; they are not verification inputs. The preregistrations are fixed inputs (digests in manifests)."
+	},
+	"candidateR2": {
+		"verification": {
+			"agencyVerify": "827 pass, 0 fail, 23 skip, 1 todo (851 tests, 63 files)",
+			"hostAgencyFixtures": "bun test api/application/agency: 11 files, 88 pass, 0 fail",
+			"hostFullVerify": "not run: no host source change"
+		}
+	}
+}
