@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { createTerminals, type SpawnPty } from "../../domains/terminals";
 import { WORK_ONLY_INSTRUCTION } from "../../domains/kanban";
 import { harness } from "../toolchain/toolchain.fixture";
+import { askedOf } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
 type Store = Parameters<
@@ -83,8 +84,11 @@ type CommandData = {
 	};
 	previousQuestions?: Array<{ question: string; answer: unknown }>;
 };
-const dataOf = (messages: Messages) =>
-	JSON.parse(messages.at(-1)!.content) as CommandData;
+/** The sub-agent's input, its request read as the user's words (the context after them is not the request). */
+const dataOf = (messages: Messages) => {
+	const data = JSON.parse(messages.at(-1)!.content) as CommandData;
+	return { ...data, request: askedOf(data.request) };
+};
 const invoke = (tool: string, args: unknown) =>
 	JSON.stringify({ action: "invoke", tool, arguments: args });
 

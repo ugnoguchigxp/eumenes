@@ -47,6 +47,7 @@ import { migrations as webResearchMigrations } from "../domains/web-research";
 import { migrations as worldMigrations } from "../domains/world";
 import { migrations as memoryPackageSql } from "eumenes-memory/sqlite";
 import { migrations as worldPackageSql } from "eumenes-world-model/sqlite";
+import { migrations as routerPackageSql } from "eumenes_router/sqlite";
 
 /**
  * The positional order the databases deployed before 2026-10-10 were built in. Row N of the old
@@ -146,6 +147,20 @@ function packageMigrations(
 	});
 }
 
+/**
+ * The router package's tables (spec router-package-integration 2026-11-04 §1 #2), after the router's traces and
+ * corrections: its `router_feedback` is the same table, which it keeps.
+ */
+const routerPackageMigrations: Migration[] = routerPackageSql.map((sql, i) => ({
+	id: `router-package/${String(i + 1).padStart(4, "0")}`,
+	sql,
+	after: [
+		i
+			? `router-package/${String(i).padStart(4, "0")}`
+			: "toolchain-history/0005-router",
+	],
+}));
+
 import { migrations as liveVoiceMigrations } from "../domains/live-voice";
 /** Every migration of the product, in no meaningful order. */
 const catalog: readonly Migration[] = [
@@ -188,6 +203,7 @@ const catalog: readonly Migration[] = [
 	...dotsMigrations,
 	...retiredResearchRoutesMigrations,
 	...toolchainHistoryMigrations,
+	...routerPackageMigrations,
 	...packageMigrations("world-package", worldPackageSql),
 	...worldMigrations,
 	...timersMigrations,

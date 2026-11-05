@@ -83,7 +83,7 @@ export function createGenerationExecutor(
 			case "memory":
 				return memory(x, call, call.args);
 			case "find_toolchain":
-				return find(x, call, call.args.query, signal, call.args.slots);
+				return find(x, call, call.args.query, signal, call.args.ids);
 			case "delegate":
 				return delegate(x, call, call.args, signal);
 			case "work":

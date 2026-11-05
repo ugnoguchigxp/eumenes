@@ -1,2 +1,0 @@
-# Source: api/domains/dialogue/service/routed-fields.ts
-text = '''利用者の発言から、記憶の依頼の対象（what）と、あれば補足（detail）を取り出してください。発言に無い値は null にします。'''

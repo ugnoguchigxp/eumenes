@@ -219,6 +219,7 @@ export async function buildServices(
 				toolchain.registry,
 				toolchain.schemas,
 				toolchain.worldAvailable,
+				toolchain.embedRouter,
 			)
 		: undefined;
 	const liveBridge = createLiveBridge();

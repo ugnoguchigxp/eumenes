@@ -1,4 +1,6 @@
 import type { Database } from "bun:sqlite";
+import type { BestV2Model } from "eumenes_router";
+import type { RouterCard } from "eumenes_router/sqlite";
 import type {
 	FixedDefinition,
 	ToolchainCard,
@@ -46,8 +48,11 @@ export interface ToolchainRoutingPort {
 			available: ReadonlySet<string>;
 			/** Discovery must not expand the catalog when embedding retrieval fails. */
 			strict?: boolean;
-			/** The router's wider slots (spec toolchain-router-redesign §3.1) instead of the choice call's. */
-			slots?: "router";
+			/**
+			 * The router's offer (spec router-package-integration 2026-11-04 §1 #11): exactly these toolchains and read
+			 * tools, without a search.
+			 */
+			ids?: readonly string[];
 		},
 	): ToolchainRoute;
 	/** Rebuild a callable card from its exact active revision without retrieval. */
@@ -154,6 +159,32 @@ export interface ToolchainRoutingPort {
 		db: Database,
 		input: QueryVector & { threshold: number; limit?: number },
 	): NearFeedback[];
+	/**
+	 * The router package (spec router-package-integration 2026-11-04 §1): its embedding of what it routes (passages,
+	 * as its cards and memory were made; a failure is thrown), its synced cards with their vectors in a space, its
+	 * lexical index, and best-v2 with the memory of a space (null until the memory is imported).
+	 */
+	embedRouter?(
+		texts: readonly string[],
+		signal: AbortSignal,
+	): Promise<{ space: VectorSpace; vectors: number[][] }>;
+	routerCardsInTransaction?(
+		db: Database,
+		input: { space: VectorSpace; available: (id: string) => boolean },
+	): RouterCard[];
+	routerLexicalInTransaction?(
+		db: Database,
+		text: string,
+	): ReadonlyMap<string, number>;
+	routerModelInTransaction?(
+		db: Database,
+		space: VectorSpace,
+	): BestV2Model | null;
+	/** The titles of these toolchains and read tools (those that are active), by id. */
+	titlesInTransaction?(
+		db: Database,
+		ids: readonly string[],
+	): ReadonlyMap<string, string>;
 	recordSelectionInTransaction(
 		db: Database,
 		input: {

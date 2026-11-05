@@ -4,6 +4,7 @@ import { createTerminals, type SpawnPty } from "../../domains/terminals";
 import { harness } from "../toolchain/toolchain.fixture";
 import {
 	approve,
+	askedOf,
 	isNoticeRound,
 } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -59,13 +60,13 @@ function fakeClaude() {
 	};
 }
 
-/** Approves the open confirmation when the utterance starts with はい. */
+/** Approves the open confirmation (the router's `c<n>.approve` candidate) when the utterance starts with はい. */
 function confirmWhenAsked(
 	messages: ReadonlyArray<{ content: string }>,
 	question: string,
 ) {
 	if (!question.startsWith("はい")) return undefined;
-	const ref = /- (c\d+) 確認待ち/.exec(
+	const ref = /- (c\d+)\.approve:/.exec(
 		messages.map((m) => m.content).join("\n"),
 	)?.[1];
 	return ref ? { calls: [approve(ref)] } : undefined;
@@ -86,14 +87,13 @@ test("a conversation request reaches Claude Code once saved, and its finished ta
 			const data = JSON.parse(messages.at(-1)!.content) as {
 				request: string;
 			};
+			const asked = askedOf(data.request);
 			return JSON.stringify({
 				action: "invoke",
 				tool: "claude-code.request",
 				arguments: {
-					prompt: data.request,
-					task: data.request.includes("README")
-						? "README の手順修正"
-						: "テスト修正",
+					prompt: asked,
+					task: asked.includes("README") ? "README の手順修正" : "テスト修正",
 				},
 			});
 		},
@@ -351,7 +351,7 @@ test("a conversation request whose run cannot be tracked is stopped and reported
 			return JSON.stringify({
 				action: "invoke",
 				tool: "claude-code.request",
-				arguments: { prompt: data.request, task: "追えない作業" },
+				arguments: { prompt: askedOf(data.request), task: "追えない作業" },
 			});
 		},
 		parent: (messages) => {

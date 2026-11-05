@@ -12,8 +12,6 @@ import {
 } from "../api/domains/inference/contracts";
 import {
 	diagnosticsSchema,
-	intentPatchSchema,
-	intentSettingsSchema,
 	routerPatchSchema,
 	routerSettingsSchema,
 	settingsSchema,
@@ -43,17 +41,6 @@ export function settingsClient(t: Transport) {
 				{ signal },
 			),
 		settings: async () => callJson(t, settingsSchema, "/api/settings"),
-		/** The user-intent judge's settings, apart from the speaking-attitude judge's. */
-		intentSettings: async () =>
-			callJson(t, intentSettingsSchema, "/api/settings/intent"),
-		configureIntent: async (input: z.infer<typeof intentPatchSchema>) =>
-			callJson(
-				t,
-				intentSettingsSchema,
-				"/api/settings/intent",
-				json(intentPatchSchema.parse(input), "PUT"),
-			),
-		/** The router's settings (spec toolchain-router-redesign §3.3). */
 		routerSettings: async () =>
 			callJson(t, routerSettingsSchema, "/api/settings/router"),
 		configureRouter: async (input: z.infer<typeof routerPatchSchema>) =>
@@ -62,6 +49,14 @@ export function settingsClient(t: Transport) {
 				routerSettingsSchema,
 				"/api/settings/router",
 				json(routerPatchSchema.parse(input), "PATCH"),
+			),
+		/** Imports best-v2's memory for the router package (spec router-package-integration 2026-11-04 §1 #6). */
+		importRouterMemory: async (memory: unknown) =>
+			callJson(
+				t,
+				z.object({ count: z.number().int(), source: z.string() }),
+				"/api/router/memory",
+				json(memory),
 			),
 		applySettings: async (input: ApplySettings) =>
 			callJson(t, settingsSchema, "/api/settings/apply", json(input)),

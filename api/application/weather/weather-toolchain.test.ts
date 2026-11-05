@@ -37,7 +37,7 @@ async function weatherHarness(
 	return { h, service, candidates };
 }
 
-test("a cold weather request is answered after the host's search and one choice: fixed sentence, no TODO, no notice", async () => {
+test("a cold weather request is answered after the router's decision and one fill call: fixed sentence, no TODO, no notice", async () => {
 	const { h, service, candidates } = await weatherHarness();
 	try {
 		const run = await h.dialogue.submit({
@@ -49,9 +49,9 @@ test("a cold weather request is answered after the host's search and one choice:
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe(tomorrowKamakura);
-		// The host searched and the one choice named the weather with its inputs: the host said the answer, and nothing
-		// reached a worker, the web, or another model call.
-		expect(candidates.filter(Boolean)).toHaveLength(1);
+		// The router decided the weather (the fixture's context judgment reads the script) and the one fill call gave its
+		// inputs: the host said the answer, and nothing reached a worker, the web, or another model call.
+		expect(candidates.filter(Boolean)).toHaveLength(2);
 		expect(h.calls).toBe(1);
 		expect(h.workerContexts).toHaveLength(0);
 		expect(h.routeContexts).toHaveLength(0);
@@ -141,25 +141,13 @@ test("without the list of areas the weather toolchain is not among the candidate
 	}
 });
 
-test("instant inputs outside the schema are refused, the choice is made once more with the reason, and nothing is fetched", async () => {
+test("instant inputs outside the schema are refused: the host says it could not hand it over, and nothing is fetched", async () => {
 	const service = weatherFetch();
-	const refusals: string[] = [];
 	const g = await harness({
 		weather: { fetch: service.fetch },
-		// The talk turn's answer once the choice gave up.
-		parentAnswer: "天気を取得できませんでした。",
-		firstRound: (_tools, _question, messages) => {
-			// The refusal comes back as the retry's reason; the model gives up and chooses none (the talk turn answers).
-			const retry = messages
-				.at(-1)!
-				.content.split("\n")
-				.find((line) => line.startsWith("前の選び方では頼めませんでした"));
-			if (retry) {
-				refusals.push(retry);
-				return {};
-			}
-			return askWeather({ place: "鎌倉", day: "tomorrow" })(messages);
-		},
+		// The fill call leaves out the prefecture the schema requires.
+		firstRound: (_tools, _question, messages) =>
+			askWeather({ place: "鎌倉", day: "tomorrow" })(messages),
 	});
 	try {
 		await g.toolchain.weather!.maintain();
@@ -170,10 +158,10 @@ test("instant inputs outside the schema are refused, the choice is made once mor
 		});
 		const done = await g.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("completed");
-		expect(refusals).toHaveLength(1);
-		expect(refusals[0]).toContain("refused: true");
-		expect(refusals[0]).toContain("inputs");
-		expect(g.dialogue.answerText(run.id)).toBe("天気を取得できませんでした。");
+		// The router's choice is not made again (spec router-package-integration 2026-11-04): the host says it failed.
+		expect(g.dialogue.answerText(run.id)).toBe(
+			"うまく頼めませんでした。もう一度言ってもらえますか。",
+		);
 		expect(
 			service.urls.filter((u) => u.includes("/api/forecast/")),
 		).toHaveLength(0);

@@ -80,7 +80,6 @@ export type HarnessOptions = {
 	workerReportOutput?: string;
 	voiceText?: string;
 	parentAnswer?: string;
-	announcement?: string;
 	speechFailure?: boolean;
 	badQuote?: boolean;
 	badQuoteOnce?: boolean;

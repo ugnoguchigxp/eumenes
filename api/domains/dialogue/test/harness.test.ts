@@ -177,7 +177,7 @@ test("a run takes the saved cloud model's route and runs the same routed turn: t
 	await h.say("もう一度");
 	expect(h.state.captures).toHaveLength(2);
 	expect(h.state.calls.map((c) => c.session?.outputLimit)).toEqual([
-		4096, 4096, 4096, 4096,
+		4096, 4096,
 	]);
 	const talk = h.state.calls.at(-1)!.messages[0]!.content;
 	expect(talk).not.toContain("## Toolchains");
@@ -196,7 +196,7 @@ test("a run takes the saved cloud model's route and runs the same routed turn: t
 		fallbackId: RESOURCE,
 	});
 	expect(h.state.calls.map((c) => c.session)).toEqual(
-		Array.from({ length: 4 }, () =>
+		Array.from({ length: 2 }, () =>
 			expect.objectContaining({ outputLimit: 4096, reasoning: BOTH }),
 		),
 	);

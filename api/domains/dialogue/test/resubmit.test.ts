@@ -38,8 +38,8 @@ test("an edit while the answer is generated stops the run, corrects the utteranc
 	h = await setup();
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	// The stopped run's one call (its choice) is answered when made; the answer waits for the gate.
-	h.state.steps.push(choice({ choice: "none" }));
+	// The stopped run's one call (its talk) is answered when made; the answer waits for the gate.
+	h.state.steps.push({ text: "犬です。" });
 	const first = await submit("犬の絵を描いて");
 	await waitFor(() => h!.state.calls.length === 1);
 	const result = await resubmit(first.inputMessageId, "猫の絵を描いて");
@@ -187,8 +187,8 @@ test("finding a toolchain commits nothing: the utterance is still edited, and it
 	h = await setup();
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	// The host searched with the user's words before the choice call, which is held.
-	h.state.steps.push(choice({ choice: "none" }));
+	// The host offered what the router ranked before the talk call, which is held.
+	h.state.steps.push({ text: "犬です。" });
 	const run = await submit("犬の絵");
 	await waitFor(() => h!.state.calls.length === 1);
 	expect(h.log().some((e) => h!.fields(e).action === "find_toolchain")).toBe(

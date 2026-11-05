@@ -166,47 +166,28 @@ TTSの合成は backend 全体で同時に1件。音声対話の句・読み上�
 
 再確認は `bun scripts/mixed-speech-live.ts --run`。隔離backendに保存済みLARM設定を保存し、固定の日英混在回答を区間化して、区間ごとに日本語・英語TTSのどちらで合成されたか（attemptのmodel）とWAV取得を `verification-reports/mixed-speech-live/`（ローカルの検証記録。リポジトリには含めない）に記録する。合成音声の取得はスピーカー再生の実機器受入に数えない。旧Ruri分類の接続記録は [検証記録](../spec/verification/ruri-sentence-language-2026-10-12/README.md) に残す。
 
-## ユーザー意図判定
-
-利用者の発言が確定した後、LLM へ渡す前に、LARM の Ruri ユーザー意図判定を呼ぶ（[設計](../spec/intent-gate-design-2026-10-29.md)）。表情・声色判定（エージェント自身の回答チャンクを判定）とは、口（`judgeIntent` と `judge`）・入力・結果・設定・接続を分ける。意図判定の口は、保存済みの intent profile で `providers: ["system-one"]` だけの接続を作り、その claim の `endpoint`・credential・model で判定する。renew・再 claim・release は既存の provider の扱いと同じ。表情判定の credential を使い回さない。
-
-設定は SQLite の設定文書の `intent`（表情判定の設定とは別）。`mode` は `legacy`・`shadow`（初期値）・`ruri`、`profile` は保存するまで空（空の間は判定も記録もしない。保存すると最初の発言を待たずに接続を作る）、`timeoutMs`（`ruri` で待つ上限）、`searchScore`（`ruri` で Tool 探索を強制する `request` のスコアの閾値）。
-
-```sh
-bun run cli -- intent status
-bun run cli -- intent set profile <意図判定の Agent Profile>
-bun run cli -- intent set mode shadow
-bun run cli -- intent set mode ruri
-bun run cli -- intent set searchScore 0.6
-bun run cli -- intent clear-profile
-```
-
-API は `GET /api/settings/intent` と `PUT /api/settings/intent`（変える項目だけを送る）。
-
-判定ごとの記録は表 `dialogue_intent_judgments`（本文と秘密は持たない）。ログは `dialogue.intent_judged`（`kind` がモード、`decision` が Ruri のラベル、`route` が選んだルーティング、`reason` が判定を使えなかった理由）。判定の失敗・時間切れでは、今のルーティングで続ける。`ruri` の強制はその手の1回目の呼出しだけを `tool_choice: "required"` にするので、LARM がこれを受け付けることを live で確かめてから使う。
-
 ## Router（担当の振り分け）
 
-担当の振り分けの判断を、LARM の `system-one` の口（意図判定と同じ `systemone`）で呼ぶ（[設計](../spec/toolchain-router-redesign-2026-11-01.md) §3.2・§3.4、LARM への[依頼](../spec/larm-router-request-prompt-2026-11-01.md) §2）。接続は意図判定・表情判定・会話とは別で、保存済みの router profile の `providers: ["system-one"]` だけの接続を作り、その claim の `endpoint`・credential・model で呼ぶ（model の名前はコードにも設定にも持たない）。接続の client は再起動しても変わらず、`mode` が `off` の間・profile が空の間は接続を作らない。profile・LARM の接続先・`mode` が変わると接続を作り直し、終了時に解放する。
+担当の振り分けは `eumenes_router` パッケージが決める（[組み込みの設計](../spec/router-package-integration-2026-11-04.md)）。LARM はその reranker で、保存済みの router profile の catalog から capability `decision.context`（protocol `larm.system-one.v1`、endpoint `/v1/systemone`）の provider を探し、その provider だけの接続を作って、claim の `endpoint`・credential・model で呼ぶ（provider 名・model・network はコードにも設定にも持たない。catalog と claim の値を使う）。接続は表情判定・会話とは別で、client は再起動しても変わらず、profile が空の間は接続を作らない（Router もなく、発言の回は会話の回になる）。profile・LARM の接続先が変わると接続を作り直し、終了時に解放する。
 
 | 口 | 内容 |
 | --- | --- |
-| `route` | 1回目。`questions.route`（choice）に、呼出しごとの criteria（名前と説明、渡した順）を送り、選ばれた1件・全 criteria の確率（合計1）・任意の `scores`・`head_revision`／`calibration_revision` を読む。`text` は先頭2000字、`previous_agent`・`previous_user` は末尾1000字（空は送らない）。criteria は1〜128件、名前は英字で始まる ASCII（最大96字）、説明は最大300字 |
-| `routeFields` | 2回目。選ばれた担当の欄を、choice（質問名ごと）と `fields`（extract、1段の object）で埋める。値は発言にないとき `null` |
+| `route` | `questions.route`（choice）に、パッケージが offer した criteria（名前と説明、渡した順）を送り、選ばれた1件・全 criteria の確率（合計1）・`scores`（criteria ごとの独立の点数。パッケージは必須とする）・`head_revision`／`calibration_revision` を読む。`state` は最新の発言の `text` だけ（文脈判定の契約は履歴を受けない）で、先頭400字。criteria は1〜128件、名前は英字で始まる ASCII（最大96字）、説明は最大4096字。上限はパッケージの `ROUTE_LIMITS` |
 
-要求が上限を破る場合は送らず（`larm_invalid_route_request`）、応答が形に合わない場合（criteria の外の選択・欠けた確率・範囲外の値）は `larm_invalid_route_response`、`truncated: true` または `criteria_dropped` がある場合は `larm_route_truncated` で失敗し、部分の答えは使わない。`extract` を扱えないモデルの 400 `unsupported_question_type` は `larm_route_extract_unsupported`（呼び手が欄を別の経路で埋める）。router の接続でない口（`decisionOnly` でない）は `larm_route_port_required`。呼び手は各呼出しの時間を自分で区切り、失敗・時間切れでは今の経路で続ける。
+要求が上限を破る場合は送らず（`larm_invalid_route_request`）、応答が形に合わない場合（criteria の外の選択・欠けた確率・範囲外の値）は `larm_invalid_route_response`、`truncated: true` または `criteria_dropped` がある場合は `larm_route_truncated` で失敗し、部分の答えは使わない。router の接続でない口（`decisionOnly` でない）は `larm_route_port_required`。呼び手は各呼出しの時間を `timeoutMs` で区切り、失敗・時間切れでは会話の回にする。欄の抽出（旧 `routeFields`）はない。欄の要る担当は会話のモデルの1候補の欄埋めで埋める。
 
-設定は SQLite の設定文書の `router`（意図判定・表情判定の設定とは別）。`mode` は `off`（初期値）・`shadow`・`on`、`profile` は保存するまで空、`timeoutMs`（1呼出しの待ち、初期 2000）、決定表の閾値 `accept`（τ採用 0.6）・`low`（τ低 0.3）・`margin`（δ 0.15）・`approve`（τ承認 0.85）・`multi`（τ多 0.5）、訂正の記憶の `feedbackNear`（0.95）・`feedbackWeight`（0 で訂正の補正なし、初期 2）。
+設定は SQLite の設定文書の `router`（表情判定の設定とは別）。`profile` は保存するまで空（保存すると発言の回をすべてパッケージが決める。意図判定はない）、`entry`（`route`・`routeStructured`、初期 `route`）、`structureResourceId`（構造の判断のクラウド LLM 資源、初期 null。利用者の発言と直前のエージェントの返答をパッケージの指示文とともに送る）、`structureTimeoutMs`（初期 8000）、`timeoutMs`（LARM の1呼出しの待ち、初期 2000）、決定表の閾値 `accept`（τ採用 0.6）・`low`（τ低 0.3）・`margin`（δ 0.15）・`approve`（τ承認 0.85）・`multi`（τ多 0.5）、訂正の記憶の `feedbackNear`（0.95）・`feedbackWeight`（0 で訂正の補正なし、初期 2）。best-v2 の記憶は設定ではなくパッケージの表に入れる（発言から作ったので Git にない）。取込みは今の LARM の埋め込みの空間に結び付けるので、同じ埋め込みモデル（catalog の `embeddingSpace`）で作った記憶だけを入れる。
 
 ```sh
+bun run cli -- router import-memory <best-v2 の記憶の JSON>
 bun run cli -- router status
-bun run cli -- router set profile <Router の Agent Profile>
-bun run cli -- router set mode shadow
-bun run cli -- router set accept 0.6
+bun run cli -- router set profile <decision.context を持つ Agent Profile>
+bun run cli -- router set entry routeStructured
+bun run cli -- router set structureResource <資源 ID|none>
 bun run cli -- router clear-profile
 ```
 
-API は `GET /api/settings/router` と `PATCH /api/settings/router`（変える項目だけを送る。`profile` に `null` で削除）。
+API は `GET /api/settings/router` と `PATCH /api/settings/router`（変える項目だけを送る。`profile` に `null` で削除）、記憶の取込みは `POST /api/router/memory`（今の埋め込みの空間に入れる）。
 
 ## チャットの画像入力
 

@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import {
+	READ_TOOLS,
 	toolchainRuntimeOf,
 	type AgentV1,
 	type BindingV1,
@@ -35,6 +36,8 @@ export function createToolchainRouting(
 	schemas: SchemaProvider,
 	/** World is usable now; without it the World investigation is never offered. */
 	worldAvailable?: (db: Database) => boolean,
+	/** The router package's embedding of what it routes (spec router-package-integration 2026-11-04 §1 #5). */
+	embedRouter?: ToolchainRoutingPort["embedRouter"],
 ): ToolchainRoutingPort {
 	function runtimeInTransaction(
 		db: Database,
@@ -170,6 +173,20 @@ export function createToolchainRouting(
 			return card ? enrich(db, card)[0] : undefined;
 		},
 		routeInTransaction(db, input) {
+			// The router's offer (the eumenes_router package searched already): those cards, no search of ours.
+			if (input.ids)
+				return {
+					cards: capabilities
+						.toolchainCandidatesInTransaction(db, {
+							text: "",
+							available: (id) => input.available.has(id),
+							ids: input.ids,
+						})
+						.flatMap((card) => enrich(db, card)),
+					past: [],
+					// The package's retrieval is lexical and by embedding.
+					retrieval: "hybrid",
+				};
 			const active = capabilities
 				.toolchainsInTransaction(db)
 				.filter((d) => input.available.has(d.id));
@@ -193,10 +210,8 @@ export function createToolchainRouting(
 				available: (id) => input.available.has(id),
 				fromHistory,
 				strict: input.strict,
-				// The conversation's and a task's search fill each kind's slots (the router's are wider).
-				...(input.strict
-					? { slots: input.slots === "router" ? ("router" as const) : true }
-					: {}),
+				// A task's search fills each kind's slots.
+				...(input.strict ? { slots: true as const } : {}),
 			});
 			const offered = cards.flatMap((card) => enrich(db, card));
 			const fts = cards.some((c) => c.score.ftsRank !== null);
@@ -296,6 +311,22 @@ export function createToolchainRouting(
 		nearRouterFeedbackInTransaction: history.nearRouterFeedbackInTransaction,
 		setRouterFeedbackStateInTransaction:
 			history.setRouterFeedbackStateInTransaction,
+		// The router package's tables and its embedding (spec router-package-integration 2026-11-04 §1).
+		...(embedRouter ? { embedRouter } : {}),
+		routerCardsInTransaction: history.routerCardsInTransaction,
+		routerLexicalInTransaction: history.routerLexicalInTransaction,
+		routerModelInTransaction: history.routerModelInTransaction,
+		titlesInTransaction(db, ids) {
+			const wanted = new Set(ids);
+			return new Map(
+				[
+					...capabilities
+						.toolchainsInTransaction(db)
+						.map((d) => [d.id, d.title] as const),
+					...READ_TOOLS.map((tool) => [tool.name, tool.title] as const),
+				].filter(([id]) => wanted.has(id)),
+			);
+		},
 		linkTaskInTransaction: history.linkTaskInTransaction,
 		settleSelectionInTransaction: history.settleSelectionInTransaction,
 		requestOfRunInTransaction: history.requestOfRunInTransaction,

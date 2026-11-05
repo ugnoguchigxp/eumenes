@@ -24,17 +24,15 @@ export async function find(
 	call: ParsedCall,
 	query: string,
 	signal: AbortSignal,
-	slots?: "router",
+	/** The router's offer (spec router-package-integration 2026-11-04 §1 #11): given, not searched. */
+	ids: readonly string[],
 ): Promise<ToolOutcome> {
 	const { deps, offered, current, acted } = x;
 	const { store, toolchains } = deps;
 	if (!toolchains) return { result: { candidates: [] } };
-	// A second look at the query this turn already searched (the router's slots) keeps that search and its vector.
-	const earlier =
-		slots && x.state.search?.text === query ? x.state.search : null;
-	const vector = earlier
-		? earlier.query
-		: await toolchains.embedQuery(query, signal);
+	// The router's offer is not searched, but its record keeps the query's vector as a search's does (the procedures
+	// and the past choices are found by it).
+	const vector = await toolchains.embedQuery(query, signal);
 	signal.throwIfAborted();
 	return store.write((tx) => {
 		const run = current(tx);
@@ -51,23 +49,21 @@ export async function find(
 				...availableReadTools(deps, tx),
 			]),
 			strict: true,
-			...(slots ? { slots } : {}),
+			ids,
 		});
-		if (!earlier) {
-			x.state.search = {
-				route,
-				text: query,
-				...(vector ? { query: vector } : {}),
-			};
-			for (const card of route.cards) offered.set(card.id, card);
-			acted(tx, `find_toolchain:${call.call.id}`, {
-				action: "find_toolchain",
-				candidates: route.cards.map((card) => ({
-					id: card.id,
-					title: card.title,
-				})),
-			});
-		}
+		x.state.search = {
+			route,
+			text: query,
+			...(vector ? { query: vector } : {}),
+		};
+		for (const card of route.cards) offered.set(card.id, card);
+		acted(tx, `find_toolchain:${call.call.id}`, {
+			action: "find_toolchain",
+			candidates: route.cards.map((card) => ({
+				id: card.id,
+				title: card.title,
+			})),
+		});
 		log.info("dialogue.candidates_selected", {
 			candidateCount: route.cards.length,
 			retrieval: route.retrieval,
@@ -83,7 +79,6 @@ export async function find(
 						),
 					),
 				),
-				...(vector ? {} : { discovery: "embedding_unavailable" }),
 			},
 			search: { cards: route.cards, ...(vector ? { query: vector } : {}) },
 		};

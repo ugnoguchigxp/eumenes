@@ -48,10 +48,9 @@ test("a run handles the utterances pending at its claim; a later input waits for
 	await waitFor(() => h!.dialogue.get(a.id)?.status === "completed");
 	await waitFor(() => h!.dialogue.get(b.id)?.status === "completed");
 	expect(h.dialogue.answerText(b.id)).toBe("ansB");
-	// A made two calls (its choice, its talk); B's own talk call sees A's exchange as history, then B.
-	expect(userOf(h.state.calls[2]!)).toBe("B");
-	expect(userOf(h.state.calls[3]!)).toBe("B");
-	expect(h.state.calls[3]!.messages[2]!.content).toContain("ansA");
+	// A made one call (its talk); B's own talk call sees A's exchange as history, then B.
+	expect(userOf(h.state.calls[1]!)).toBe("B");
+	expect(h.state.calls[1]!.messages[2]!.content).toContain("ansA");
 });
 
 test("utterances pending together are one generation; a run with nothing left to handle ends as handled", async () => {
@@ -70,15 +69,14 @@ test("utterances pending together are one generation; a run with nothing left to
 	h.start();
 	await waitFor(() => h!.dialogue.get(a.id)?.status === "completed");
 	await waitFor(() => h!.dialogue.get(b.id)?.status === "cancelled");
-	// One generation (its choice and its talk) carried both utterances, one line each in its `## User`, in the order
-	// they were said.
-	expect(h.state.calls).toHaveLength(2);
+	// One generation (its talk) carried both utterances, one line each in its `## User`, in the order they were said.
+	expect(h.state.calls).toHaveLength(1);
 	for (const call of h.state.calls) expect(userOf(call)).toBe("A\nB");
 	expect(h.dialogue.get(b.id)).toMatchObject({
 		status: "cancelled",
 		error: "utterance_handled",
 	});
-	expect(h.state.calls).toHaveLength(2);
+	expect(h.state.calls).toHaveLength(1);
 });
 
 test("full queue rejects the submit and stores neither message nor run", async () => {
@@ -138,7 +136,8 @@ test("restart: queued runs continue, a running run is interrupted, a late result
 	expect(await queue2.recover()).toBe(1);
 	expect(dialogue2.get(a.id)?.status).toBe("interrupted");
 	expect(dialogue2.get(b.id)?.status).toBe("queued");
-	h.state.steps.push(...reply("ansB"));
+	// The restarted service is given no toolchains, so no router: its turn talks.
+	h.state.steps.push({ text: "ansB" });
 	queue2.start();
 	await waitFor(() => h!.state.calls.length === 2);
 	// The old owner's answer arrives late: it is not adopted.
@@ -227,7 +226,7 @@ test("a scheduled prompt creates exactly one background run per occurrence; an i
 	await waitFor(() => h!.dialogue.get(live.id)?.status === "completed");
 	await h.queue.tick();
 	await waitFor(() => h!.dialogue.get(runs[0]!.id)?.status === "completed");
-	expect(h.state.calls).toHaveLength(4);
+	expect(h.state.calls).toHaveLength(2);
 	expect(scheduler.listOccurrences(schedule.id).items[0]?.jobState).toBe(
 		"completed",
 	);
@@ -321,14 +320,14 @@ test("only an adopted, confident motion labels an answer; a judgment of a cancel
 		avatarMotion: "joyful",
 	});
 	// A run cancelled before its answer is adopted takes no judgment.
-	h.state.steps.push(choice({ choice: "none" }));
+	h.state.steps.push({ text: "取り消されます。" });
 	h.state.gate = new Promise<void>(() => {});
 	const cancelled = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
 		text: "取消",
 	});
-	await waitFor(() => h!.state.calls.length === 3);
+	await waitFor(() => h!.state.calls.length === 2);
 	await h.dialogue.cancel(cancelled.id);
 	expect(
 		await h.store.write((db) =>

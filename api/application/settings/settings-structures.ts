@@ -71,6 +71,9 @@ function releaseFallbacks(doc: Settings, resourceIds: ReadonlySet<string>) {
 	const curation = doc.world.curationResourceId;
 	if (curation && resourceIds.has(curation))
 		doc.world.curationResourceId = null;
+	const structure = doc.router.structureResourceId;
+	if (structure && resourceIds.has(structure))
+		doc.router.structureResourceId = null;
 }
 
 export type StructuralResult = {

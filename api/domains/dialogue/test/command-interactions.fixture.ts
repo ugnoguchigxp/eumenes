@@ -12,6 +12,14 @@ import type {
 	ToolchainRoutingPort,
 } from "../contracts/toolchains";
 import { COMMAND_KIND, type ChatMessage } from "../service/context";
+import type { RouteInput } from "../../inference/contracts";
+import {
+	FIXTURE_ROUTER,
+	ROUTER_MODEL,
+	ROUTER_SPACE,
+	routeBySteps,
+	routerCards,
+} from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
 
@@ -108,6 +116,8 @@ export async function setup(
 		modelGate: null as Promise<void> | null,
 		/** The conversation model's scripted calls. */
 		steps: [] as Step[],
+		/** What the router's context judgment was asked, turn by turn. */
+		routerAsked: [] as RouteInput[],
 		/** The command sub-agent's replies, consumed in order. */
 		commands: [] as Command[],
 		/** Host-issued choices per question schema ref. */
@@ -132,6 +142,12 @@ export async function setup(
 	const clock = () => new Date(Date.now() + state.offset).toISOString();
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		// The router decides every utterance turn: its context judgment reads the scripted steps.
+		route: routeBySteps(state.steps, state.routerAsked),
+		snapshotInTransaction: () => ({
+			general: { agentName: "", userName: "", persona: "butler" },
+			router: FIXTURE_ROUTER,
+		}),
 		requestFor: (_db: unknown, runId: string) => `req:${runId}`,
 		llmContextWindowInTransaction: () => undefined,
 		setContextPolicyInTransaction: () => {},
@@ -304,6 +320,16 @@ export async function setup(
 	const current = () => ({ ...card, revisionId: state.activeRevision });
 	const toolchains = {
 		embedQuery: async () => undefined,
+		// The router package's ports (spec router-package-integration 2026-11-04), as generation.fixture fakes them.
+		embedRouter: async (texts: readonly string[]) => ({
+			space: ROUTER_SPACE,
+			vectors: texts.map(() => [1, 0]),
+		}),
+		routerCardsInTransaction: () => routerCards([current()]),
+		routerLexicalInTransaction: () => new Map(),
+		routerModelInTransaction: () => ROUTER_MODEL,
+		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
+			new Map(ids.includes(card.id) ? [[card.id, card.title]] : []),
 		routeInTransaction: (
 			_db: unknown,
 			input: { available: ReadonlySet<string> },

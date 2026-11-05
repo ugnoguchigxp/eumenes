@@ -20,9 +20,9 @@ test("an utterance is answered with plain text: the said events, a full delivery
 	h.state.steps.push(...reply("こんにちは。"));
 	const run = await h.say("やあ");
 	expect(h.dialogue.answerText(run.id)).toBe("こんにちは。");
-	// The choice (nothing fits), then the talk turn.
-	expect(h.state.calls).toHaveLength(2);
-	const call = h.state.calls[1]!;
+	// The router finds nothing to hand over: the talk turn is the only call.
+	expect(h.state.calls).toHaveLength(1);
+	const call = h.state.calls[0]!;
 	// The system part, then the last message: the state of this call and the utterance itself.
 	expect(call.messages.map((m) => m.role)).toEqual(["system", "user"]);
 	expect(call.messages[1]!.content).toStartWith("## State\n今: ");
@@ -57,23 +57,6 @@ test("a model call that fails fails the run; its utterance joins the log unanswe
 	const last = h.state.calls.at(-1)!.messages;
 	expect(last.at(-1)!.content).toEndWith("## User\n今日は寒いね");
 	expect(last.at(-1)!.content).not.toContain("こんばんは\n");
-});
-
-test("a request that names a saved target is taken as changing it: confirmed first, nothing handed over", async () => {
-	h = await setup();
-	h.state.steps.push(
-		choice({
-			choice: IMAGE.id,
-			say: "描きますね。",
-			request: "猫の絵",
-			target: "s1",
-		}),
-	);
-	const run = await h.say("猫の絵を描いて");
-	expect(run.status).toBe("completed");
-	expect(h.dialogue.answerText(run.id)).toContain("よろしいですか？");
-	expect(h.dialogue.answerText(run.id)).toContain("今あるものを変えます");
-	expect(h.todos()).toEqual([]);
 });
 
 test("choices the host cannot carry out twice leave the host's words and a rejected selection; nothing is handed over", async () => {
@@ -113,9 +96,10 @@ test("a delegation is announced, opens a TODO and hands the run over; the finish
 		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
 	);
 	const waiting = await h.say("猫の絵を描いて", "queued");
-	expect(waiting.announcement).toBe("描きますね。");
+	expect(waiting.announcement).toBe("「画像」に頼みます。");
 	const [todo] = h.todos();
-	expect(todo).toMatchObject({ status: "todo", title: "猫の絵" });
+	// The work is titled by the user's words (the router hands those over, not a model's request).
+	expect(todo).toMatchObject({ status: "todo", title: "猫の絵を描いて" });
 	const types = h
 		.log()
 		.map((e) => [
@@ -200,8 +184,8 @@ test("an answer delivery uses the emotion of the reply, never judged again", asy
 			tone: hostDelivery(emotion).tone,
 		},
 	});
-	// The feeling came with the reply: no judgment call follows the turn's two calls (the choice and the talk).
-	expect(h.state.calls).toHaveLength(2);
+	// The feeling came with the reply: no judgment call follows the turn's talk call.
+	expect(h.state.calls).toHaveLength(1);
 });
 
 test("a change needs a confirmation first; the approval executes the saved request", async () => {
@@ -221,17 +205,13 @@ test("a change needs a confirmation first; the approval executes the saved reque
 	expect(h.todos()).toEqual([]);
 	h.state.steps.push(choice({ choice: "approve", confirmation: "c1" }));
 	const approved = await h.say("お願い", "queued");
-	// The approving turn's document shows the confirmation under the number the approval names.
-	expect(
-		h.state.calls
-			.at(-1)!
-			.messages.at(-1)!
-			.content.split("\n")
-			.some((line) => line.startsWith("- c1 確認待ち")),
-	).toBe(true);
+	// The router was offered the open confirmation under the number the approval names, and no model was called.
+	expect(h.state.routerAsked.at(-1)!.criteria.map((c) => c.name)).toEqual(
+		expect.arrayContaining(["c1.approve", "c1.decline"]),
+	);
 	expect(approved.announcement).toBeTruthy();
 	expect(h.todos()[0]).toMatchObject({
-		title: "壁紙を差し替える",
+		title: "壁紙を差し替えて",
 		status: "todo",
 	});
 	// A confirmation is used once.
@@ -256,7 +236,7 @@ test("a memory request goes to the steward with the user's message as its source
 		}),
 	);
 	const run = await h.say("辛い物が好きって覚えて");
-	expect(h.dialogue.answerText(run.id)).toBe("覚えておきます。");
+	expect(h.dialogue.answerText(run.id)).toBe("承知しました。");
 	expect(h.state.stewardRequests).toEqual([
 		expect.objectContaining({
 			kind: "remember",

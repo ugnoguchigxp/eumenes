@@ -101,12 +101,13 @@ test("the current music request reaches generation after unrelated Web and image
 		expect(run?.status).toBe("completed");
 		expect(h.music!.list("main")[0]?.state).toBe("completed");
 		const selection = h.toolchain.history.getSelection(id)!;
+		// The router (the eumenes_router package) found it: the earlier choices are not shown as history.
 		expect(selection).toMatchObject({
-			retrieval: "embedding",
+			retrieval: "hybrid",
 			toolchainId: "music.create",
+			historyRefs: [],
 		});
-		expect(selection.historyRefs.length).toBeGreaterThan(0);
-		// Only the search the generation made is embedded (its query is the request), never the earlier requests.
+		// Only the offer's query is embedded for the record (the request), never the earlier requests.
 		expect(embeddedQueries).toEqual([question]);
 		expect(
 			selection.candidates.find((c) => c.toolchainId === "music.create")!.rank,

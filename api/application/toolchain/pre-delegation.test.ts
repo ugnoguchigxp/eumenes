@@ -2,6 +2,9 @@ import { expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
+/** The host's notice of a hand-over the router decided (spec router-package-integration 2026-11-04). */
+const NOTICE = "「Web検索」に頼みます。";
+
 test("research announces before the worker, retains the notice over API reads, then finishes without a reply of its own", async () => {
 	const h = await harness();
 	let stop = () => {};
@@ -20,7 +23,7 @@ test("research announces before the worker, retains the notice over API reads, t
 		).toBe("completed");
 		expect(observations[0]).toBe(0);
 		const final = await (await h.request(`/api/runs/${run.id}`)).json();
-		expect(final.announcement).toBe("お調べします。");
+		expect(final.announcement).toBe(NOTICE);
 		// The agency reports the finished research; the run has no reply.
 		expect(h.dialogue.answerText(run.id)).toBeNull();
 		expect(h.reported()).toContain("晴れ");
@@ -32,57 +35,51 @@ test("research announces before the worker, retains the notice over API reads, t
 	}
 });
 
-for (const notice of ["お調べします。", "お調べします"])
-	test(`voice waits for notice playback: ${notice}`, async () => {
-		const h = await harness({
-			announcement: notice,
-			voiceText: "東京の天気を調べて",
+test("voice waits for the playback of the host's notice, which the router decided with no model call", async () => {
+	const h = await harness({ voiceText: "東京の天気を調べて" });
+	try {
+		const session = crypto.randomUUID(),
+			utterance = crypto.randomUUID();
+		const wav = new Uint8Array(48);
+		wav.set(new TextEncoder().encode("RIFF"));
+		wav.set(new TextEncoder().encode("WAVE"), 8);
+		h.voice.start(session, 1);
+		await h.voice.accept(session, 1, 1, utterance, wav);
+		await waitFor(() => h.voice.get(utterance)?.status === "input_ready", {
+			timeout: 1000,
+		}).catch(() => {
+			throw new Error(`input stage: ${JSON.stringify(h.voice.get(utterance))}`);
 		});
-		try {
-			const session = crypto.randomUUID(),
-				utterance = crypto.randomUUID();
-			const wav = new Uint8Array(48);
-			wav.set(new TextEncoder().encode("RIFF"));
-			wav.set(new TextEncoder().encode("WAVE"), 8);
-			h.voice.start(session, 1);
-			await h.voice.accept(session, 1, 1, utterance, wav);
-			await waitFor(() => h.voice.get(utterance)?.status === "input_ready", {
-				timeout: 1000,
-			}).catch(() => {
-				throw new Error(
-					`input stage: ${JSON.stringify(h.voice.get(utterance))}`,
-				);
-			});
-			await h.voice.commit(utterance, h.voice.get(utterance)!.revision);
-			await waitFor(() => !!h.voice.get(utterance)?.audioChunks?.length);
-			expect(h.workerContexts).toHaveLength(0);
-			expect(h.acquisitions).toBe(0);
-			expect(h.voice.get(utterance)?.audioChunks?.[0]?.text).toBe(notice);
-			await h.voice.played(
-				utterance,
-				h.voice.get(utterance)!.audioChunks![0]!.index,
+		await h.voice.commit(utterance, h.voice.get(utterance)!.revision);
+		await waitFor(() => !!h.voice.get(utterance)?.audioChunks?.length);
+		expect(h.workerContexts).toHaveLength(0);
+		expect(h.acquisitions).toBe(0);
+		expect(h.voice.get(utterance)?.audioChunks?.[0]?.text).toBe(NOTICE);
+		await h.voice.played(
+			utterance,
+			h.voice.get(utterance)!.audioChunks![0]!.index,
+		);
+		await waitFor(
+			() =>
+				["played", "completed", "failed"].includes(
+					h.voice.get(utterance)?.status ?? "",
+				),
+			{ timeout: 2000 },
+		).catch(() => {
+			throw new Error(
+				`speech stage: ${JSON.stringify({ turn: h.voice.get(utterance), spoken: h.spoken })}`,
 			);
-			await waitFor(
-				() =>
-					["played", "completed", "failed"].includes(
-						h.voice.get(utterance)?.status ?? "",
-					),
-				{ timeout: 2000 },
-			).catch(() => {
-				throw new Error(
-					`speech stage: ${JSON.stringify({ turn: h.voice.get(utterance), spoken: h.spoken })}`,
-				);
-			});
-			const turn = h.voice.get(utterance)!;
-			expect(turn.status).toBe("played");
-			// The notice is the only speech of the turn; the finished research is the agency's to report.
-			expect(h.spoken).toEqual([notice]);
-			expect(h.dialogue.answerText(turn.runId!)).toBeNull();
-			expect(h.reported()).toContain("晴れ");
-		} finally {
-			await h.close();
-		}
-	});
+		});
+		const turn = h.voice.get(utterance)!;
+		expect(turn.status).toBe("played");
+		// The notice is the only speech of the turn; the finished research is the agency's to report.
+		expect(h.spoken).toEqual([NOTICE]);
+		expect(h.dialogue.answerText(turn.runId!)).toBeNull();
+		expect(h.reported()).toContain("晴れ");
+	} finally {
+		await h.close();
+	}
+});
 
 test("cancelling during the spoken notice never starts the research worker", async () => {
 	const h = await harness({ voiceText: "鎌倉の天気を調べて" });

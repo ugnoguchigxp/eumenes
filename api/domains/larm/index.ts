@@ -5,22 +5,7 @@ export type {
 	LarmCallOptions,
 	LarmStatus,
 } from "./contracts";
-export {
-	intentLabels,
-	type IntentInput,
-	type IntentJudgment,
-	type IntentLabel,
-} from "./contracts/user-intent";
-export {
-	ROUTE_LIMITS,
-	routeCriterionName,
-	routeQuestionName,
-	type RouteAnswer,
-	type RouteCriterion,
-	type RouteFieldsAnswer,
-	type RouteFieldsInput,
-	type RouteInput,
-} from "./contracts/route";
+export type { RouteAnswer, RouteInput } from "./contracts/route";
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
 export { createAgentLarm } from "./service/agent-connections";

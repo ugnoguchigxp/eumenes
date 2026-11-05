@@ -59,7 +59,7 @@ export function delegateConversation(
 export function availableToolchainsInTransaction(
 	deps: DialogueDeps,
 	db: Database,
-	_run: Run,
+	_run?: Run,
 ): Set<string> {
 	return new Set(readyCatalog(deps, db).map((entry) => entry.id));
 }

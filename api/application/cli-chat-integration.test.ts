@@ -76,11 +76,10 @@ test("CLI and Web read the same persisted utterances and full answers through th
 	}
 }, 20000);
 
+const NOTICE = "「タイマー」に頼みます。";
+
 test("a CLI creation request executes an existing toolchain without rendering its artifact", async () => {
-	const h = await harness({
-		timers: true,
-		announcement: "タイマーを作ります。",
-	});
+	const h = await harness({ timers: true });
 	const lifetime = new AbortController();
 	const shown: string[] = [];
 	const errors: string[] = [];
@@ -101,10 +100,9 @@ test("a CLI creation request executes an existing toolchain without rendering it
 		expect((await client.conversation("main")).messages[0]?.text).toBe(
 			"3分タイマーを作って",
 		);
-		expect((await client.runs("main"))[0]?.announcement).toBe(
-			"タイマーを作ります。",
-		);
-		expect(shown).toEqual(["3分タイマーを作って", "タイマーを作ります。"]);
+		// The router's hand-over is announced by the host (spec router-package-integration 2026-11-04).
+		expect((await client.runs("main"))[0]?.announcement).toBe(NOTICE);
+		expect(shown).toEqual(["3分タイマーを作って", NOTICE]);
 		expect(errors).toEqual([]);
 	} finally {
 		lifetime.abort();

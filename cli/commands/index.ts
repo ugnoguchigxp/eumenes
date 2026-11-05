@@ -6,7 +6,6 @@ import { run as chat } from "./chat";
 import { run as capabilities } from "./capabilities";
 import { run as collection } from "./collection";
 import { run as history } from "./history";
-import { run as intent } from "./intent";
 import { run as memory } from "./memory";
 import { run as recentClear } from "./recent";
 import { run as toolchainHistory } from "./toolchain-history";
@@ -29,7 +28,6 @@ export const commands: Readonly<Record<string, CommandRun>> = {
 	history,
 	"history-search": history,
 	"history-read": history,
-	intent,
 	memory,
 	"recent-clear": recentClear,
 	router,

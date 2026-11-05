@@ -125,89 +125,6 @@ function memoryBranch(withSay = true): Schema {
 }
 
 /**
- * The request turn's schema: none, a question back, one branch per candidate (but those `excluded`; a read tool the
- * search offered is one), the memory request, and a correction or cancellation of each open TODO.
- */
-export function choiceSchema(
-	candidates: readonly ChoiceCandidate[],
-	{
-		todos,
-		resources,
-		switching,
-	}: Pick<RoutedInput, "todos" | "resources" | "switching">,
-	excluded: ReadonlySet<string> = new Set(),
-): Schema {
-	return {
-		anyOf: [
-			branch({ choice: only("none") }),
-			branch({ choice: only("ask"), say: SAY }),
-			...candidates
-				.filter((candidate) => !excluded.has(candidate.id))
-				.map((candidate) => candidateBranch(candidate, resources, switching)),
-			branch(
-				{
-					choice: only("memory.request"),
-					kind: oneOf(MEMORY_KINDS),
-					what: text(500),
-					detail: text(1000),
-					say: SAY,
-				},
-				["detail"],
-			),
-			...(todos.length
-				? [
-						branch({
-							choice: oneOf(todos.map((todo) => `t${todo.ref}`)),
-							operation: only("check"),
-						}),
-					]
-				: []),
-			...todos
-				.filter((todo) => todo.open)
-				.map((todo) =>
-					branch(
-						{
-							choice: only(`t${todo.ref}`),
-							operation: oneOf(["amend", "cancel"]),
-							text: text(8000),
-							say: SAY,
-						},
-						["text"],
-					),
-				),
-		],
-	};
-}
-
-/** The pending turn's schema: none, an answer to a confirmation, or an answer to a work's question. */
-export function pendingSchema(pending: RoutedInput["pending"]): Schema {
-	const confirmations = pending.confirmations.map((c) => `c${c.ref}`);
-	const questions = pending.questions.map((q) => `t${q.ref}`);
-	return {
-		anyOf: [
-			branch({ choice: only("none") }),
-			...(confirmations.length
-				? [
-						branch({
-							choice: oneOf(["approve", "decline"]),
-							confirmation: oneOf(confirmations),
-						}),
-					]
-				: []),
-			...(questions.length
-				? [
-						branch({
-							choice: only("answer"),
-							todo: oneOf(questions),
-							text: text(8000),
-						}),
-					]
-				: []),
-		],
-	};
-}
-
-/**
  * The router's fill of one candidate's fields (spec toolchain-router-redesign §3.4): none, a question back, and the
  * one branch the router decided on (without `say`: the host says its own words).
  */
@@ -229,60 +146,6 @@ export function fillSchema(
 /** The agent's last words, as the choice calls read them. */
 function previousLine(routed: RoutedInput): string[] {
 	return routed.previousReply ? [`直前の返事: ${routed.previousReply}`] : [];
-}
-
-/** The request turn's input: the role, then the records, the candidates and the host's operations, and the words. */
-export function choiceMessages(input: {
-	style: string;
-	routed: RoutedInput;
-	candidates: readonly ChoiceCandidate[];
-	utterance: string;
-	excluded?: ReadonlySet<string>;
-	/** Why the last choice could not be carried out, for the one retry. */
-	retry?: string;
-}): ChatMessage[] {
-	const { routed } = input;
-	const shown = input.candidates.filter(
-		(candidate) => !input.excluded?.has(candidate.id),
-	);
-	const lines = [
-		...(routed.memory ? [routed.memory] : []),
-		...(routed.earlier.length
-			? [INPUT_HEADINGS.earlier, ...routed.earlier.map((said) => `- ${said}`)]
-			: []),
-		routed.state,
-		...previousLine(routed),
-		...(routed.asked
-			? [`聞き返した依頼: ${lineText(routed.asked.request)}`]
-			: []),
-		INPUT_HEADINGS.candidates,
-		...(shown.length
-			? [toolResultText("find_toolchain", { candidates: shown })]
-			: []),
-		`- memory.request: ${systemContext("dialogue.contexts.local.memory-request", {})}`,
-		...routed.todos.map(
-			(todo) =>
-				`- t${todo.ref}: ${systemContext(todo.open ? "dialogue.contexts.local.todo" : "dialogue.contexts.local.todo-done", { title: lineText(todo.title) })}`,
-		),
-		...(input.retry
-			? [
-					INPUT_HEADINGS.retry,
-					systemContext("dialogue.contexts.local.retry", {
-						reason: lineText(input.retry),
-					}),
-				]
-			: []),
-		`${INPUT_HEADINGS.user}\n${dataText(input.utterance)}`,
-	];
-	return [
-		{
-			role: "system",
-			content: systemContext("dialogue.contexts.local.choice", {
-				style: input.style,
-			}),
-		},
-		{ role: "user", content: lines.join("\n") },
-	];
 }
 
 /** The router's fill input: the records, the one candidate the router decided on, and the words. */
@@ -320,30 +183,43 @@ export function fillMessages(input: {
 	];
 }
 
-/** The pending turn's input: the open confirmations and questions, the agent's last words, and the user's words. */
-export function pendingMessages(
-	routed: RoutedInput,
-	utterance: string,
-): ChatMessage[] {
-	const lines = [
-		INPUT_HEADINGS.pending,
-		...routed.pending.confirmations.map(
-			(c) =>
-				`- c${c.ref} 確認待ち: ${lineText(c.toolchain)}「${lineText(c.request)}」${c.target ? ` 対象「${lineText(c.target)}」` : ""}`,
-		),
-		...routed.pending.questions.map(
-			(q) =>
-				`- t${q.ref} 質問「${lineText(q.title)}」: ${lineText(q.question)}`,
-		),
-		...previousLine(routed),
-		`${INPUT_HEADINGS.user}\n${dataText(utterance)}`,
-	];
+/**
+ * The fill of an answer to a work's question that asks for a structured answer (its input schema is not a plain
+ * string): none, or the answer in that shape. The router decides that the words answer the question; the shape is
+ * the conversation model's to write, as it wrote it before the router.
+ */
+export function answerSchema(inputSchema: Record<string, unknown>): Schema {
+	return {
+		anyOf: [
+			branch({ choice: only("none") }),
+			branch({ choice: only("answer"), answer: inputSchema }),
+		],
+	};
+}
+
+/** The answer fill's input: the records, the question and the shape it asks for, and the words. */
+export function answerMessages(input: {
+	routed: RoutedInput;
+	question: string;
+	inputSchema: Record<string, unknown>;
+	utterance: string;
+}): ChatMessage[] {
+	const { routed } = input;
 	return [
 		{
 			role: "system",
-			content: systemContext("dialogue.contexts.local.pending", {}),
+			content: systemContext("dialogue.contexts.local.router-answer-fill", {}),
 		},
-		{ role: "user", content: lines.join("\n") },
+		{
+			role: "user",
+			content: [
+				routed.state,
+				...previousLine(routed),
+				`質問: ${lineText(input.question)}`,
+				`答えの形: ${JSON.stringify(input.inputSchema)}`,
+				`${INPUT_HEADINGS.user}\n${dataText(input.utterance)}`,
+			].join("\n"),
+		},
 	];
 }
 

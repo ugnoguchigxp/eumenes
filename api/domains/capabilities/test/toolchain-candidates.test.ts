@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { parseCard } from "eumenes_router";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -206,8 +207,8 @@ test("the search fills each kind's slots: the three closest dedicated toolchains
 	}
 });
 
-test("the router's slots are wider and cut by no distance: ten dedicated toolchains and the general ones however far", async () => {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-router-slots-"));
+test("the router's offer is exactly the ids given, in their order, read tools among them; the router's cards are valid", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-router-offer-"));
 	const store = openStore(join(dir, "db"), migrations);
 	const caps = createCapabilities(
 		store,
@@ -225,54 +226,30 @@ test("the router's slots are wider and cut by no distance: ten dedicated toolcha
 	try {
 		await caps.seed();
 		const active = store.read((db) => caps.toolchainsInTransaction(db));
-		const general = active.filter((d) => d.general);
-		const dedicated = active.filter((d) => !d.general);
-		expect(general.length).toBeGreaterThan(0);
-		const rank = (id: string) => dedicated.findIndex((d) => d.id === id);
-		// Every general toolchain is far (0.5) below the dedicated ones (0.99 and down).
-		await store.write((db) =>
-			caps.saveToolchainVectorsInTransaction(
-				db,
-				space,
-				active.flatMap((d) => {
-					const s = rank(d.id) >= 0 ? 0.99 - rank(d.id) * 0.01 : 0.5;
-					return toolchainPassages(d).map((text, item) => ({
-						revisionId: d.revisionId,
-						text,
-						item,
-						vector: [s, Math.sqrt(1 - s * s)],
-					}));
-				}),
-			),
+		const [first, second] = active.map((d) => d.id) as [string, string];
+		const offered = store.read((db) =>
+			caps.toolchainCandidatesInTransaction(db, {
+				text: "",
+				available: (id) => id !== second,
+				strict: true,
+				ids: [second, "read_memory", first, "missing", first],
+			}),
 		);
-		const search = (slots: true | "router") =>
-			store.read((db) =>
-				caps.toolchainCandidatesInTransaction(db, {
-					text: "",
-					vector: { space, values: [1, 0] },
-					available: () => true,
-					strict: true,
-					slots,
-				}),
-			);
-		// The choice call's slots drop the far general toolchains.
-		expect(search(true).some((c) => c.general)).toBe(false);
-		const offered = search("router");
-		const offeredDedicated = offered.filter((c) => !c.general);
-		expect(offeredDedicated.map((c) => c.id)).toEqual(
-			dedicated.slice(0, Math.min(10, dedicated.length)).map((d) => d.id),
-		);
+		expect(offered.map((c) => c.id)).toEqual(["read_memory", first]);
+		expect(offered[0]!.execution).toBe("read");
+		const cards = store.read((db) => caps.routerCardsInTransaction(db));
+		for (const card of cards) expect(parseCard(card)).toEqual(card);
+		expect(cards.map((c) => c.id)).toEqual([
+			...active.map((d) => d.id),
+			...cards.filter((c) => c.kind === "read").map((c) => c.id),
+		]);
+		expect(cards.find((c) => c.id === "read_memory")).toMatchObject({
+			kind: "read",
+			impact: "none",
+		});
 		expect(
-			offered
-				.filter((c) => c.general)
-				.map((c) => c.id)
-				.sort(),
-		).toEqual(
-			general
-				.slice(0, 4)
-				.map((d) => d.id)
-				.sort(),
-		);
+			cards.find((c) => c.id === active.find((d) => d.general)?.id)?.kind,
+		).toBe("general");
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

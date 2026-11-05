@@ -506,6 +506,34 @@ test("a host-fixed answer accepts its pending llm request without an accepted at
 		),
 	).toBe(false);
 });
+test("a pending answer request no call has tried stands as captured; a failed call or its deadline ends that", async () => {
+	const h = await setup({
+		local: async () => {
+			throw new Error("larm_inference_403");
+		},
+	});
+	// The router decides with no call of the run's request: the host's words stand on it as it was captured.
+	const untried = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "host-run", "llm", Date.now() + 10000),
+	);
+	expect(h.inference.liveRequest(untried)).toBe(true);
+	const failed = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"failed-run",
+			"llm",
+			Date.now() + 10000,
+		),
+	);
+	await expect(
+		h.inference.executeRequest(failed, messages, new AbortController().signal),
+	).rejects.toThrow("larm_inference_403");
+	expect(h.inference.liveRequest(failed)).toBe(false);
+	const late = await h.store.write((db) =>
+		h.inference.captureInTransaction(db, "late-run", "llm", Date.now() - 1),
+	);
+	expect(h.inference.liveRequest(late)).toBe(false);
+});
 test("a host-fixed answer follows earlier unadopted rounds, never an adopted answer, and is refused past its deadline", async () => {
 	const h = await setup({ local: async () => "local-answer" });
 	const open = await h.store.write((db) =>

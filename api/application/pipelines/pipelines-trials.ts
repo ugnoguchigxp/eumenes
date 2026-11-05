@@ -1,25 +1,20 @@
 import type { Database } from "bun:sqlite";
 import {
 	dot,
+	READ_TOOLS,
 	toolchainPassages,
 	type FixedDefinition,
 	type PipelineDefinition,
-	type ToolchainCard,
 	type VectorSpace,
 } from "../../domains/capabilities";
 import type { Capabilities } from "../../domains/capabilities";
-import {
-	trialFirstRound,
-	type ToolchainRoutingPort,
-} from "../../domains/dialogue";
+import { CONVERSATION_ID, rerankDocument } from "eumenes_router";
+import { routeTrial, type ToolchainRoutingPort } from "../../domains/dialogue";
 import type { InferencePort } from "../../domains/inference";
 import {
 	checkText,
 	documentInTransaction,
-	inputParameters,
-	parseInputs,
 	runFixture,
-	stepOutline,
 } from "../../domains/pipelines";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import {
@@ -28,9 +23,6 @@ import {
 	pipelineToolchainId,
 } from "./pipeline-bundle";
 import type { PipelinesService } from "./pipelines-service";
-
-/** As many candidates as a conversation's discovery offers its first round. */
-const OFFERED = 4;
 
 /**
  * The studio's trials of a work's current draft (spec task-pipeline-design 2026-10-22 §8.2): where it ranks for a
@@ -113,30 +105,6 @@ export function createPipelineTrials(deps: {
 			passages: passages.map((text, i) => ({ text, similarity: scores[i]! })),
 		};
 	}
-	/** The draft as a candidate card of the first round, the way the routing fills a published pipeline's. */
-	function draftCard(
-		d: PipelineDefinition,
-		rankOf: number,
-		similarity: number,
-	): ToolchainCard {
-		const { definition } = draftToolchain(d);
-		return {
-			execution: "pipeline",
-			revisionId: `toolchain:${pipelineToolchainId(d)}@draft`,
-			id: pipelineToolchainId(d),
-			functionName: pipelineFunctionName(d),
-			title: definition.title,
-			summary: definition.summary,
-			useWhen: definition.useWhen,
-			redirects: [],
-			pipeline: {
-				parameters: inputParameters(d),
-				outline: stepOutline(d),
-				parse: (args, request) => parseInputs(d, args, request),
-			},
-			score: { rank: rankOf, ftsRank: null, similarity, fromHistory: false },
-		};
-	}
 	return {
 		async probe(workRef: string, query: string, signal: AbortSignal) {
 			const ranked = await rank(workRef, query, signal);
@@ -156,51 +124,86 @@ export function createPipelineTrials(deps: {
 				passages: ranked.passages,
 			};
 		},
-		/** The first round over the candidates a conversation would offer for the utterance (the draft among them). */
+		/**
+		 * What the router decides for the utterance with the draft among the candidates (spec router-package-integration
+		 * 2026-11-04): the package's decision on the whole utterance, nothing run. `chosen` names the function decided
+		 * (`none` for the conversation, null when the router could not decide).
+		 */
 		async select(workRef: string, utterance: string, signal: AbortSignal) {
-			const ranked = await rank(workRef, utterance, signal);
-			if (!ranked.ok) return ranked;
-			const capture = deps.inference.captureUserControlInTransaction;
-			if (!capture)
-				return { ok: false as const, code: "inference_unavailable" };
-			const offered = ranked.rows.slice(0, OFFERED);
-			const requestId = await store.write((db) =>
-				capture(db, {
-					subject: `pipeline-trial:${workRef}`,
-					deadline: Date.now() + 120_000,
-					maxOutputTokens: 1024,
-					// The choice is held to the routed turn's schema, as the conversation's is.
-					structuredOutput: true,
-				}),
+			const draft = store.read((db) => draftOf(db, workRef));
+			if (!draft.ok) return draft;
+			const d = draft.definition;
+			const { definition } = draftToolchain(d);
+			const id = pipelineToolchainId(d);
+			const catalog = store.read((db) =>
+				capabilities.toolchainsInTransaction(db),
 			);
-			const cards = store.read((db) =>
-				offered.flatMap((r, i) =>
-					r.draft
-						? [draftCard(ranked.definition, i + 1, r.similarity!)]
-						: r.card
-							? (() => {
-									const card = routing.cardInTransaction(
-										db,
-										r.card!.revisionId,
-									);
-									return card ? [card] : [];
-								})()
-							: [],
+			const available = new Set([
+				...store.read((db) =>
+					routing
+						.catalogInTransaction(db)
+						.filter((e) => e.id !== id)
+						.map((e) => e.id),
 				),
+				...READ_TOOLS.map((tool) => tool.name),
+			]);
+			const decided = await routeTrial(
+				{ larm: deps.inference, toolchains: routing, store },
+				{
+					text: utterance,
+					extra: [
+						{
+							id,
+							kind: "toolchain",
+							passage: rerankDocument({
+								title: definition.title,
+								summary: definition.summary,
+								useWhen: definition.useWhen,
+								examples: definition.examples ?? [],
+							}),
+							card: {
+								id,
+								title: definition.title,
+								execution: "pipeline",
+								score: {
+									rank: 1,
+									ftsRank: null,
+									similarity: null,
+									fromHistory: false,
+								},
+							},
+							choice: { id, title: definition.title },
+						},
+					],
+					available: (toolchainId) => available.has(toolchainId),
+					signal,
+				},
 			);
-			const round = await trialFirstRound(deps.inference, {
-				requestId,
-				text: utterance,
-				cards,
-				signal,
-			});
+			if ("code" in decided)
+				return {
+					ok: true as const,
+					chosen: null,
+					matched: false,
+					next: null,
+					inputs: null,
+					code: decided.code,
+				};
+			const chosen =
+				decided.decided === null
+					? null
+					: decided.decided === id
+						? pipelineFunctionName(d)
+						: decided.decided === CONVERSATION_ID
+							? "none"
+							: (catalog.find((c) => c.id === decided.decided)?.functionName ??
+								decided.decided);
 			return {
 				ok: true as const,
-				chosen: round.chosen,
-				matched: round.chosen === pipelineFunctionName(ranked.definition),
-				next: round.next,
-				inputs: round.inputs,
-				code: round.code,
+				chosen,
+				matched: decided.decided === id,
+				next: null,
+				inputs: null,
+				code: null,
 			};
 		},
 		fixture(workRef: string, test: number) {

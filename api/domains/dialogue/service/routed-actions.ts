@@ -2,7 +2,12 @@ import { systemContext } from "../../../infrastructure/system-context";
 import { IMPACT_ORDER } from "./executor-context";
 import { TOOL_NAMES } from "./generation-tools";
 import { lineText } from "./input-text";
-import { NEW_TARGET, type ChoiceCandidate } from "./routed-choice";
+import {
+	NEW_TARGET,
+	answerMessages,
+	answerSchema,
+	type ChoiceCandidate,
+} from "./routed-choice";
 import type { Turn } from "./routed-turn";
 import { ARGUMENT_CHARS, ASK_STEP } from "./tool-exchange";
 
@@ -263,11 +268,37 @@ export async function answerQuestion(
 	todo: string,
 	text: string,
 ): Promise<Step> {
-	const worked = await turn.act(TOOL_NAMES.work, {
-		todo,
-		operation: "answer",
-		text,
-	});
+	const answer = (words: string) =>
+		turn.act(TOOL_NAMES.work, { todo, operation: "answer", text: words });
+	let worked = await answer(text);
+	// A question that asks for a structured answer refuses the words as they are and names its shape: the
+	// conversation model writes them in that shape once (the router decides only that they answer it).
+	const refused =
+		"outcome" in worked
+			? (worked.outcome.result as { code?: unknown; inputSchema?: unknown })
+			: null;
+	if (
+		refused?.code === "invalid_answer" &&
+		refused.inputSchema &&
+		typeof refused.inputSchema === "object" &&
+		turn.canChoose
+	) {
+		const inputSchema = refused.inputSchema as Record<string, unknown>;
+		const question =
+			turn.routed?.pending.questions.find((q) => `t${q.ref}` === todo)
+				?.question ?? "";
+		const filled = await turn.choose(
+			answerMessages({
+				routed: turn.routed!,
+				question,
+				inputSchema,
+				utterance: text,
+			}),
+			answerSchema(inputSchema),
+		);
+		if (filled && filled !== "cut" && filled.choice === "answer")
+			worked = await answer(JSON.stringify(filled.answer));
+	}
 	if (
 		!("outcome" in worked) ||
 		(worked.outcome.result as { ok?: unknown }).ok === false

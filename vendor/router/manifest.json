@@ -1,0 +1,61 @@
+{
+	"package": "eumenes_router",
+	"version": "0.0.1",
+	"artifact": "eumenes_router-0.0.1-5db35839bd54.tgz",
+	"sha256": "5db35839bd54bb2f7835d15d8604976ed1d8afd072a828ebcfb658544c5d4ccb",
+	"source": {
+		"commit": "070b00ce5393048a015c40c073cccd41a69d85c0",
+		"dirty": false
+	},
+	"contractVersions": {
+		"cards": 1,
+		"route": 2,
+		"feedback": 1,
+		"structure": 1
+	},
+	"dbSchemaVersion": 1,
+	"entries": {
+		"route": {
+			"flavor": "direct",
+			"ports": [
+				"embed",
+				"rerank",
+				"read.cards",
+				"read.lexical",
+				"read.nearFeedback",
+				"model",
+				"settings"
+			]
+		},
+		"routeStructured": {
+			"flavor": "structured",
+			"ports": [
+				"analyze",
+				"embed",
+				"rerank",
+				"read.cards",
+				"read.lexical",
+				"read.nearFeedback",
+				"model",
+				"settings"
+			],
+			"structurePrompt": "structure-v1"
+		}
+	},
+	"bestV2": {
+		"format": "best-v2.v2",
+		"version": "best-v2/2026-11-03",
+		"source": "4442fe7939835c60",
+		"deferBelow": 0.2989432082621926,
+		"extraTools": 10
+	},
+	"requires": {
+		"memory": {
+			"format": "best-v2-memory.v1",
+			"source": "4442fe7939835c60",
+			"dimension": 384,
+			"note": "the host imports it (importExamplesInTransaction); made from utterances, it is not in the tarball"
+		}
+	},
+	"verifiedWith": "eumenes_router: typecheck, lint, bun test 88 pass / 2 skip / 0 fail, the mainline parity tests ran (route and routeStructured against the bench records); ships built dist (JavaScript and declarations)"
+}

@@ -110,6 +110,8 @@ async function rig() {
 					confidence: 0.99,
 				});
 			if (system.includes("あなたはUI制作の専門担当です")) {
+				// The hand-over the main script asked for happened: its step is used up.
+				if (typeof script.main[0] === "object") script.main.shift();
 				specialistPrompts.push(messages.map((m) => ({ ...m })));
 				const step = script.specialist.shift();
 				if (step === undefined) throw new Error("script_specialist_missing");
@@ -142,7 +144,6 @@ async function rig() {
 						impact: "create",
 					},
 				)(loop);
-				if (step.calls?.[0]?.name === "delegate") script.main.shift();
 				return step;
 			});
 			if (routed) {
@@ -497,13 +498,12 @@ test("return with unsaved work suspends the session, the main agent answers, and
 	const next = await r.sayAndWait("こんにちは");
 	expect(r.mainRuns).toBe(mainBefore + 1);
 	expect(r.h.dialogue.answerText(next.id)).toBe("ご用件をどうぞ。");
-	// The choice the main agent made before it talked reads the work: the suspended work is a line of its `## State`
-	// (section 7.1); the talk turn reads the time alone.
-	const pending = text(choiceOf(r.mainPrompts));
-	expect(pending).toContain("## State");
-	expect(pending).toContain("UI自由制作「来場者アンケート」保留中（未保存");
-	// Only the record's facts, never the draft's definition.
-	expect(pending).not.toContain("ご感想をお聞かせください");
+	// The router decided before the talk (spec router-package-integration 2026-11-04): the suspended work's toolchain
+	// is among its candidates, and nothing of the draft's definition reaches it. The talk turn reads the time alone;
+	// the work's `## State` line is read by a fill call only.
+	const judged = text(choiceOf(r.mainPrompts));
+	expect(judged).toContain("- ui.compose: ");
+	expect(judged).not.toContain("ご感想をお聞かせください");
 	// Starting the same toolchain again resumes the suspended work; no second work or session.
 	r.script.main.push(toolCall("続きを直したいです"));
 	r.script.specialist.push(reply("続きから直しましょう。"));
@@ -721,10 +721,12 @@ test("a session idle past its expiry is ended by the sweep and its work is remov
 	);
 	expect(await r.session()).toBeNull();
 	expect((await r.source()).data.work).toBeNull();
-	// The main agent is told once why the session ended, then the conversation is plain.
+	// The conversation goes on plain: the router sends the words to the talk turn (the session's end is a `## State`
+	// line, which a fill call reads; spec router-package-integration 2026-11-04).
 	r.script.main.push("承知しました。");
-	await r.sayAndWait("こんにちは");
-	expect(text(choiceOf(r.mainPrompts))).toContain("expired");
+	const next = await r.sayAndWait("こんにちは");
+	expect(next.status).toBe("completed");
+	expect(r.h.dialogue.answerText(next.id)).toBe("承知しました。");
 });
 
 test("the specialist's prompt holds no conversation, World or memory material; what was said during the switch is not in the main agent's input", async () => {

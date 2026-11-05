@@ -37,6 +37,7 @@ import { migrations } from "../migrations";
 import { createToolchain } from "../toolchain/toolchain";
 import { createToolchainHostLinks } from "../toolchain/toolchain-host";
 import { createToolchainRouting } from "../toolchain/toolchain-routing";
+import { askModel, attachFixtureRouter } from "../toolchain/router.fixture";
 import { fixtureDiscovery } from "../toolchain/discovery.fixture";
 import {
 	createWorldAssembly,
@@ -433,6 +434,15 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		toolchain.schemas,
 		toolchain.worldAvailable,
 	);
+	// The router decides every utterance turn: its context judgment is this fixture's model, asked as a choice.
+	await attachFixtureRouter({
+		store,
+		inference,
+		routing,
+		settings,
+		capabilities: toolchain.capabilities,
+		ask: askModel(model),
+	});
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		store,

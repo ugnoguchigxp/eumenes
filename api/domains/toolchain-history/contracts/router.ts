@@ -18,7 +18,15 @@ export type RouterCandidateKind =
 
 /** What the router saw and decided in one request turn (no utterance text: that is the record's own column). */
 export type RouterTrace = {
+	/** `shadow` only in traces written before the router package (spec router-package-integration 2026-11-04). */
 	mode: "shadow" | "on";
+	/** The router package's entry that decided (absent in traces written before it). */
+	entry?: "route" | "routeStructured";
+	/** best-v2's top-two gap, and whether it was too small to be sure. */
+	gate?: number | null;
+	defer?: boolean | null;
+	/** The structure model's requests and the parts routed (`routeStructured`); null without a structure. */
+	structure?: { requests: number; parts: number } | null;
 	revision: string | null;
 	model: string | null;
 	candidates: Array<{

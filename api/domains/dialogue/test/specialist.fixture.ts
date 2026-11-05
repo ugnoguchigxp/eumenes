@@ -21,8 +21,14 @@ import type {
 import type { ImagePort } from "../contracts/image";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { ChatMessage } from "../service/context";
+import type { RouteInput } from "../../inference/contracts";
 import {
+	FIXTURE_ROUTER,
 	IMAGE,
+	ROUTER_MODEL,
+	ROUTER_SPACE,
+	routeBySteps,
+	routerCards,
 	sectionLines,
 	type Call,
 	type Step,
@@ -143,6 +149,8 @@ export async function setup(options: Options = {}) {
 		endWorkFails: false,
 		/** The toolchains a search finds, by id; null: every card. */
 		found: null as string[] | null,
+		/** What the router's context judgment was asked, turn by turn. */
+		routerAsked: [] as RouteInput[],
 		/** Saved items deleted since: no longer offered, and opening one is refused. */
 		gone: new Set<string>(),
 		/** A safe code the next operations are refused with. */
@@ -173,6 +181,12 @@ export async function setup(options: Options = {}) {
 		});
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		// The router decides every utterance turn: its context judgment reads the scripted steps.
+		route: routeBySteps(state.steps, state.routerAsked),
+		snapshotInTransaction: () => ({
+			general: { agentName: "", userName: "", persona: "butler" },
+			router: FIXTURE_ROUTER,
+		}),
 		captureInTransaction: () => {},
 		captureControlInTransaction: (
 			_db: unknown,
@@ -484,6 +498,18 @@ export async function setup(options: Options = {}) {
 			: ({ execution: "image", requires: "image" } as ToolchainRuntimeMeta);
 	const toolchains = {
 		embedQuery: async () => undefined,
+		// The router package's ports (spec router-package-integration 2026-11-04), as generation.fixture fakes them.
+		embedRouter: async (texts: readonly string[]) => ({
+			space: ROUTER_SPACE,
+			vectors: texts.map(() => [1, 0]),
+		}),
+		routerCardsInTransaction: () => routerCards(cards),
+		routerLexicalInTransaction: () => new Map(),
+		routerModelInTransaction: () => ROUTER_MODEL,
+		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
+			new Map(
+				cards.filter((c) => ids.includes(c.id)).map((c) => [c.id, c.title]),
+			),
 		routeInTransaction: () => ({
 			cards: state.found
 				? cards.filter((card) => state.found!.includes(card.id))

@@ -12,7 +12,7 @@ import {
 import { saveItem } from "./memory-seed";
 
 /**
- * The work the routed turn does through the host (a choice naming a TODO, a confirmation or the memory) (the ContextWindow specification, sections 6.1, 6.7, 9
+ * The work the routed turn does through the host (the router deciding a TODO, a confirmation or the memory) (the ContextWindow specification, sections 6.1, 6.7, 9
  * and 14): checking a TODO, the confirmation an approval needs to have been heard, the archive of finished work with
  * its notice, the agency's spontaneous utterance and the memory read.
  */
@@ -45,59 +45,6 @@ test("check reads a TODO's state and result into the talk turn's notice, and log
 	expect(checked).toContain(`t${todo.ref}「猫の絵」が終わりました（成功）。`);
 	expect(checked).toContain("- title: 猫");
 	expect(h.log().some((e) => h!.fields(e).action === "work.check")).toBe(true);
-});
-
-test("a check of an unknown TODO is refused with todo_not_found, is made again with that reason, and changes nothing", async () => {
-	h = await setup();
-	h.state.steps.push(
-		choice({ choice: "t99", operation: "check" }),
-		choice({ choice: "t99", operation: "check" }),
-	);
-	const run = await h.say("さっきの仕事を見て");
-	expect(run.status).toBe("completed");
-	expect(h.state.calls[1]!.messages.at(-1)!.content).toContain(
-		"## Retry\n前の選び方では頼めませんでした（todo_not_found",
-	);
-	expect(h.dialogue.answerText(run.id)).toBe(
-		"うまく頼めませんでした。もう一度言ってもらえますか。",
-	);
-	expect(
-		h.log().some((e) => h!.fields(e).action?.toString().startsWith("work.")),
-	).toBe(false);
-});
-
-test("a stale revision is refused and the host says it could not ask; nothing is executed", async () => {
-	h = await setup();
-	h.state.steps.push(
-		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
-	);
-	const waiting = await h.say("猫の絵を描いて", "queued");
-	h.state.steps.push(
-		choice({ choice: "t1", operation: "cancel", say: "取り消しました。" }),
-	);
-	// The state of the call is fixed when it is made (revision 1). The model call is held, the TODO's revision moves on
-	// meanwhile (the owner's report bumps it; the job itself cannot run behind the held generation), and the cancel
-	// is then looked at against the revision the model saw.
-	let release!: () => void;
-	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	const calls = h.state.calls.length;
-	const cancelling = h.say("やっぱり取り消して");
-	await waitFor(() => h!.state.calls.length > calls);
-	await h.store.write((db) =>
-		db
-			.query("UPDATE dialogue_work SET revision = revision + 1 WHERE id = ?")
-			.run(h!.todos()[0]!.id),
-	);
-	h.state.gate = null;
-	release();
-	const run = await cancelling;
-	// The cancel was not carried out, so the choice's `say` was not said: the host's words are.
-	expect(h.dialogue.answerText(run.id)).toBe(
-		"うまく頼めませんでした。もう一度言ってもらえますか。",
-	);
-	// Nothing is executed: the TODO is still open and the run it waits on still waits.
-	expect(h.todos()).toMatchObject([{ ref: 1, status: "todo" }]);
-	expect(h.dialogue.get(waiting.id)?.status).toBe("queued");
 });
 
 test("an approval is refused when the confirmation statement was not heard at all", async () => {
@@ -167,10 +114,9 @@ test("an irreversible confirmation heard only in part is not enough to approve",
 
 /** A done image TODO: the delegating run is over (no generation for the result), the TODO archived with its notice. */
 async function doneTodo(request: string, title = request) {
-	h!.state.steps.push(
-		choice({ choice: IMAGE.id, say: "描きますね。", request }),
-	);
-	const waiting = await h!.say(request + "を描いて", "queued");
+	// The router hands the user's words over: the TODO is titled and asked by them.
+	h!.state.steps.push(choice({ choice: IMAGE.id }));
+	const waiting = await h!.say(request, "queued");
 	await h!.finishImage(waiting.id, { state: "completed", title });
 	return h!.archived().find((todo) => todo.title === request)!;
 }
@@ -409,7 +355,7 @@ test("cancel of a waiting TODO from a later utterance ends the run it waits on, 
 		}),
 	);
 	const cancelling = await h.say("やっぱりやめて");
-	expect(h.dialogue.answerText(cancelling.id)).toBe("取り消しました。");
+	expect(h.dialogue.answerText(cancelling.id)).toBe("承知しました。");
 	expect(h.dialogue.get(waiting.id)?.status).toBe("cancelled");
 	// Cancelled work is not reported back: the TODO is archived at once.
 	expect(h.todos()).toEqual([]);
@@ -436,8 +382,10 @@ test("the TODO screen's page shows the whole request, the newest finished first,
 	const archived = page("archived");
 	expect(archived.total).toBe(2);
 	expect(archived.counts).toEqual({ todo: 0, archived: 2 });
-	// The ledger's title is cut for the model's state; the screen reads the request itself.
-	expect(archived.rows.map((row) => row.request)).toEqual([long, "猫の絵"]);
+	// The ledger's title is cut for the model's state; the screen reads the request itself (the user's words, then the
+	// utterance before them that the router hands over with them).
+	expect(archived.rows[0]!.request).toStartWith(`${long}\n直前の発言`);
+	expect(archived.rows[1]!.request).toBe("猫の絵");
 	expect(archived.rows[0]!.title.length).toBeLessThan(long.length);
 	expect(page("active").rows).toEqual([]);
 });
@@ -450,13 +398,13 @@ test("a finished TODO can still be checked: its result is read again, with room 
 		text: "猫の絵でした。",
 	});
 	await h.say("さっきの絵、もう一度教えて");
-	const [chose, talked] = h.state.calls.slice(-2);
-	expect(talked!.messages.at(-1)!.content).toContain(
+	const talked = h.state.calls.at(-1)!;
+	expect(talked.messages.at(-1)!.content).toContain(
 		`t${todo.ref}「猫の絵」が終わりました`,
 	);
-	// The state names it as notified, so the choice knows the number to read.
-	expect(chose!.messages.at(-1)!.content).toContain(
-		`- t${todo.ref} 猫の絵 通知済み`,
+	// The finished work is still offered to the router, for a check.
+	expect(h.state.routerAsked.at(-1)!.criteria.map((c) => c.name)).toContain(
+		`t${todo.ref}.check`,
 	);
 });
 

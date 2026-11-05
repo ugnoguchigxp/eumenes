@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { harness, workerPacket } from "./toolchain.fixture";
+import { askedOf } from "./conversation-script.fixture";
 
 for (const invalidateLatest of [false, true])
 	test(`the finished TODO keeps its answer and source through stock → weather${invalidateLatest ? " (superseded search)" : ""}`, async () => {
@@ -38,18 +39,21 @@ for (const invalidateLatest of [false, true])
 					return JSON.stringify({
 						action: "invoke",
 						tool: "web.lookup",
-						arguments: { query: data.task.question },
+						// The worker searches for the user's words, not the earlier utterance after them.
+						arguments: { query: askedOf(data.task.question) },
 					});
 				if (invalidateLatest && !replaced.has(data.originalRequest)) {
 					replaced.add(data.originalRequest);
 					return JSON.stringify({
 						action: "invoke",
 						tool: "web.lookup",
-						arguments: { query: "superseded: " + data.task.question },
+						arguments: {
+							query: "superseded: " + askedOf(data.task.question),
+						},
 					});
 				}
 				if (invalidateLatest && !invalidated.has(data.originalRequest)) {
-					await supersede("superseded: " + data.task.question);
+					await supersede("superseded: " + askedOf(data.task.question));
 					invalidated.add(data.originalRequest);
 				}
 				const page = data.observations.find((o: any) => o.basis === "page");

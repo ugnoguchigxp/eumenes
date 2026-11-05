@@ -35,7 +35,7 @@ async function stockHarness(
 	return { h, service, candidates };
 }
 
-test("a cold stock request is answered after the host's search and one choice: fixed sentence, no TODO, no notice", async () => {
+test("a cold stock request is answered after the router's decision and one fill call: fixed sentence, no TODO, no notice", async () => {
 	const { h, service, candidates } = await stockHarness();
 	try {
 		const run = await h.dialogue.submit({
@@ -47,9 +47,9 @@ test("a cold stock request is answered after the host's search and one choice: f
 			(await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 }))?.status,
 		).toBe("completed");
 		expect(h.dialogue.answerText(run.id)).toBe(softbankSentence);
-		// The host searched and the one choice named the quote with its query: the host said the answer, and nothing
-		// reached a worker, the web, or another model call.
-		expect(candidates.filter(Boolean)).toHaveLength(1);
+		// The router decided the quote (the fixture's context judgment reads the script) and the one fill call gave its
+		// query: the host said the answer, and nothing reached a worker, the web, or another model call.
+		expect(candidates.filter(Boolean)).toHaveLength(2);
 		expect(h.calls).toBe(1);
 		expect(h.workerContexts).toHaveLength(0);
 		expect(h.routeContexts).toHaveLength(0);
@@ -126,25 +126,13 @@ test("without the stock services configured the stock toolchain is not among the
 	}
 });
 
-test("a query that is not text is refused, the choice is made once more with the reason, and nothing is fetched", async () => {
+test("a query that is not text is refused: the host says it could not hand it over, and nothing is fetched", async () => {
 	const service = stockFetch();
-	const refusals: string[] = [];
 	const h = await harness({
 		stock: { fetch: service.fetch },
-		// The talk turn's answer once the choice gave up.
-		parentAnswer: "株価を取得できませんでした。",
-		firstRound: (_tools, _question, messages) => {
-			// The refusal comes back as the retry's reason; the model gives up and chooses none (the talk turn answers).
-			const retry = messages
-				.at(-1)!
-				.content.split("\n")
-				.find((line) => line.startsWith("前の選び方では頼めませんでした"));
-			if (retry) {
-				refusals.push(retry);
-				return {};
-			}
-			return askStock({ query: 123 })(messages);
-		},
+		// The fill call gives a number where the schema takes text.
+		firstRound: (_tools, _question, messages) =>
+			askStock({ query: 123 })(messages),
 	});
 	try {
 		await h.toolchain.stock!.maintain();
@@ -155,9 +143,10 @@ test("a query that is not text is refused, the choice is made once more with the
 		});
 		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 5000 });
 		expect(done?.status).toBe("completed");
-		expect(refusals).toHaveLength(1);
-		expect(refusals[0]).toContain("refused: true");
-		expect(h.dialogue.answerText(run.id)).toBe("株価を取得できませんでした。");
+		// The router's choice is not made again (spec router-package-integration 2026-11-04): the host says it failed.
+		expect(h.dialogue.answerText(run.id)).toBe(
+			"うまく頼めませんでした。もう一度言ってもらえますか。",
+		);
 		expect(service.charts()).toHaveLength(0);
 	} finally {
 		await h.close();

@@ -108,7 +108,7 @@ test("a run records one row per call; a thrown error is a transport error with i
 	);
 });
 
-test("the fixture model answers through the production loop, so tools, analysis and delegation are exercised", async () => {
+test("the fixture model answers through the production loop: with no router in the lane the turn talks, and the row is scored", async () => {
 	const delegating = makeCase("ctx-f13-dev-01", "天気を調べて", {
 		expect: {
 			checks: [{ kind: "delegated", toolchain: "web_research" }],
@@ -134,11 +134,9 @@ test("the fixture model answers through the production loop, so tools, analysis 
 		runner: createFixtureRunner([delegating], catalog),
 		onRow: (row) => rows.push(row),
 	});
+	// Hand-overs are the router's (the eumenes_router package, measured in its own bench): the lane runs the talk.
 	expect(rows[0]).toMatchObject({ status: "ok" });
-	expect(rows[0]!.answer!.toolCalls.map((c) => c.name)).toEqual([
-		"find_toolchain",
-		"delegate",
-	]);
+	expect(rows[0]!.answer!.toolCalls).toEqual([]);
 });
 
 test("the trajectory measurement is a valid report; ordinary calls share nearly all of the previous prompt, cut ones less", async () => {

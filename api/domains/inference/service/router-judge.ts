@@ -2,8 +2,6 @@ import {
 	createLarm,
 	type LarmPort,
 	type RouteAnswer,
-	type RouteFieldsAnswer,
-	type RouteFieldsInput,
 	type RouteInput,
 } from "../../larm";
 import type { Settings } from "../../settings";
@@ -11,10 +9,10 @@ import { stableLarmClient } from "./configured-larm";
 import type { InferenceOptions } from "./execute-types";
 
 /**
- * The router's own LARM port (spec toolchain-router-redesign 2026-11-01 §3.2): a connection of the saved router
- * profile that carries the decision provider alone, held while the router is not `off`, and released when the
- * profile, the LARM origin or the mode changes and when inference closes. It never serves the intent judge or the
- * speaking-attitude judge, and the conversation's port never serves it. The caller bounds each call; this holds no
+ * The router's own LARM port (spec router-package-integration 2026-11-04 §1 #4): a connection of the saved router
+ * profile that carries its context judgment (the decision provider of capability `decision.context`) alone, held while a
+ * profile is saved, and released when the profile or the LARM origin changes and when inference closes. It never
+ * serves the speaking-attitude judge, and the conversation's port never serves it. The caller bounds each call; this holds no
  * timeout. Its client is stable across restarts, so a host that stopped without releasing gets the same connection
  * back instead of holding a second one.
  */
@@ -30,7 +28,7 @@ export function createRouterJudge(deps: {
 	const closing = new Set<Promise<void>>();
 	let closed = false;
 	const keyOf = (s: Settings) =>
-		s.router.mode !== "off" && s.router.profile && s.larm.baseUrl
+		s.router.profile && s.larm.baseUrl
 			? JSON.stringify([s.larm.baseUrl, s.router.profile, s.larm.audience])
 			: null;
 	function drop() {
@@ -57,6 +55,8 @@ export function createRouterJudge(deps: {
 					deps.options.routerLarmFactory?.(s, client) ??
 					createLarm({
 						decisionOnly: true,
+						// The reranker the eumenes_router package was measured with: LARM's context judgment.
+						decisionCapability: "decision.context",
 						keepAlive: true,
 						client,
 						baseUrl: s.larm.baseUrl ?? undefined,
@@ -98,15 +98,6 @@ export function createRouterJudge(deps: {
 			const route = ready().route;
 			if (!route) throw new Error("router_unconfigured");
 			return route(input, signal);
-		},
-		/** The chosen candidate's fields on the same connection. */
-		async routeFields(
-			input: RouteFieldsInput,
-			signal: AbortSignal,
-		): Promise<RouteFieldsAnswer> {
-			const routeFields = ready().routeFields;
-			if (!routeFields) throw new Error("router_unconfigured");
-			return routeFields(input, signal);
 		},
 		async close() {
 			closed = true;

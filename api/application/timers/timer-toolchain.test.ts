@@ -107,8 +107,9 @@ test("C01-C03: a relative timer request is saved through the toolchain", async (
 			origin_message_id: run.inputMessageId,
 		});
 		expect(h.acquisitions).toBe(0);
-		// One choice (the host searched) and the timer sub-agent's operation (no completion check).
-		expect(h.calls).toBe(2);
+		// The router decides with no model call (the timer takes no inputs to fill): the timer sub-agent's operation only
+		// (no completion check).
+		expect(h.calls).toBe(1);
 	} finally {
 		await h.close();
 	}
@@ -564,9 +565,9 @@ test("real dialogue list and cancel select an authoritative timer snapshot", asy
 		expect(h.commandContexts[1]).toContain("revision");
 		expect(await ask("タイマーを止めて")).toContain("cancelled");
 		expect(h.timers!.get(timer.id)?.timer.state).toBe("cancelled");
-		// Every request searches again (the conversation input specification, section 4.5: no toolchain is carried over):
-		// the host searches, so each takes one choice and the sub-agent's operation (2).
-		expect(h.calls).toBe(6);
+		// Every request is routed again (the conversation input specification, section 4.5: no toolchain is carried over):
+		// the router decides with no model call, so each takes the sub-agent's operation only.
+		expect(h.calls).toBe(3);
 	} finally {
 		await h.close();
 	}

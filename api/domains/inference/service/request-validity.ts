@@ -78,8 +78,16 @@ export function createRequestValidity({
 				"SELECT source,connection_id FROM inference_attempts WHERE request_id=? AND status='succeeded' ORDER BY started DESC LIMIT 1",
 			)
 			.get(id) as { source: string; connection_id: string | null } | null;
-		if ((!running || running.controller.signal.aborted) && !completed)
-			return false;
+		if ((!running || running.controller.signal.aborted) && !completed) {
+			// A request no call has tried yet stands as it was captured: the host's own words before the run's first
+			// model call (the router decides by LARM's context judgment, not by a call of this request) are spoken under
+			// its settings and parents. One whose call failed or was stopped does not.
+			if (running) return false;
+			const tried = db
+				.query("SELECT 1 FROM inference_attempts WHERE request_id=? LIMIT 1")
+				.get(id);
+			return !tried && settings.valid(db, row.snapshot, row.purpose);
+		}
 		const connection =
 			running?.connection ??
 			(completed?.source === "cloud"

@@ -1,11 +1,8 @@
 /**
- * Runs one prepared generation through the product's routed turn (`runRoutedTurn`: the host routes the turn, then the
- * model talks or makes one choice held to a schema built from the turn's candidates). The model is whatever
- * `inference` is (the live LARM connection, or the scripted model of the fixture lane); the host side of the
- * operations (search, hand-over, confirmation, work, memory) is an offline stand-in that keeps the rules the choice
- * must meet (a toolchain that was offered, an announcement with a hand-over, a confirmation before a change of a saved
- * item) by refusing an operation that breaks them, as the product does, and changes nothing: no TODO is made, nothing
- * is executed. Without a judge connection the routing is `free`: every turn of utterances is a request turn.
+ * Runs one prepared generation through the product's routed turn (`runRoutedTurn`). The lane has no router (the
+ * eumenes_router package decides hand-overs in the product, and is measured in its own bench), so every turn is the
+ * talk turn: the model is whatever `inference` is (the live LARM connection, or the scripted model of the fixture
+ * lane), and the host side of the operations it may read is an offline stand-in that changes nothing.
  */
 import type { InferencePort } from "../../../inference";
 import type { DialogueDeps, GenerateInput } from "../../service/context";

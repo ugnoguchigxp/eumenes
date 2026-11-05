@@ -1,4 +1,22 @@
 import type { Database } from "bun:sqlite";
+import {
+	BEST_V2_PARAMS,
+	loadBestV2,
+	type BestV2Memory,
+	type BestV2Model,
+	type Card,
+	type VectorSpace as RouterSpace,
+} from "eumenes_router";
+import {
+	examplesInTransaction,
+	importExamplesInTransaction,
+	lexicalInTransaction,
+	saveVectorsInTransaction,
+	srCardsInTransaction,
+	syncCardsInTransaction,
+	type RouterCard,
+	type VectorRow,
+} from "eumenes_router/sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
@@ -76,11 +94,76 @@ function feedback(row: RouterFeedbackRow): RouterFeedback {
 	};
 }
 
+/** A vector space as the router package names it: the four fields its key is made of. */
+const routerSpace = (space: RouterQuery["space"]): RouterSpace => ({
+	modelId: space.modelId,
+	revision: space.revision,
+	artifactDigest: space.artifactDigest,
+	dimension: space.dimension,
+});
+
 /**
  * The router's per-turn traces and the user's corrections (spec toolchain-router-redesign §5.3). Both hold the
- * utterance the user said, so a forget of its message removes them; no operation here logs the text.
+ * utterance the user said, so a forget of its message removes them; no operation here logs the text. The router
+ * package's own tables (its cards and their passages, the lexical index, best-v2's memory; spec
+ * router-package-integration 2026-11-04 §1 #2) are read and written here through the package, on this connection.
  */
 export function createRouter(store: SqliteStore, now: () => number) {
+	/** best-v2 with the memory of a space, made once per import (its vectors are read from the database once). */
+	let model: { key: string; model: BestV2Model | null } | undefined;
+	function routerModelInTransaction(
+		db: Database,
+		space: RouterQuery["space"],
+	): BestV2Model | null {
+		const key = vectorSpaceKey(space);
+		if (model?.key !== key) {
+			const memory = examplesInTransaction(db, {
+				source: BEST_V2_PARAMS.source,
+				space: routerSpace(space),
+			});
+			model = {
+				key,
+				model: memory ? loadBestV2(BEST_V2_PARAMS, memory) : null,
+			};
+		}
+		return model.model;
+	}
+	/** Stores best-v2's memory in the space (it was made from utterances: the host brings it, Git does not). */
+	function importRouterMemoryInTransaction(
+		db: Database,
+		memory: BestV2Memory,
+		space: RouterQuery["space"],
+	): number {
+		if (memory.source !== BEST_V2_PARAMS.source)
+			throw new Error("router_memory_source_mismatch");
+		const count = importExamplesInTransaction(db, memory, routerSpace(space));
+		model = undefined;
+		log.info("toolchain.router_memory_imported", { count });
+		return count;
+	}
+	function syncRouterCardsInTransaction(
+		db: Database,
+		cards: readonly Card[],
+		space: RouterQuery["space"],
+	) {
+		return syncCardsInTransaction(db, cards, routerSpace(space)).pending;
+	}
+	function saveRouterVectorsInTransaction(
+		db: Database,
+		space: RouterQuery["space"],
+		rows: readonly VectorRow[],
+	) {
+		saveVectorsInTransaction(db, routerSpace(space), rows);
+	}
+	function routerCardsInTransaction(
+		db: Database,
+		input: { space: RouterQuery["space"]; available: (id: string) => boolean },
+	): RouterCard[] {
+		return srCardsInTransaction(db, {
+			space: routerSpace(input.space),
+			available: input.available,
+		});
+	}
 	function pruneTracesInTransaction(db: Database) {
 		db.query(
 			"DELETE FROM router_traces WHERE run_id IN (SELECT run_id FROM router_traces WHERE expires_at<=? LIMIT 200)",
@@ -271,6 +354,13 @@ export function createRouter(store: SqliteStore, now: () => number) {
 		return removed;
 	}
 	return {
+		routerModelInTransaction,
+		importRouterMemoryInTransaction,
+		syncRouterCardsInTransaction,
+		saveRouterVectorsInTransaction,
+		routerCardsInTransaction,
+		routerLexicalInTransaction: (db: Database, text: string) =>
+			lexicalInTransaction(db, text),
 		recordRouterTraceInTransaction,
 		linkRouterWorkInTransaction,
 		latestRouterTraceInTransaction,

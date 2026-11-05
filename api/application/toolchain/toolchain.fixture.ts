@@ -33,6 +33,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../infrastructure/sqlite";
+import { systemContext } from "../../infrastructure/system-context";
 import { migrations } from "../migrations";
 import { createConversationService } from "../../domains/conversation";
 import { createSettings } from "../../domains/settings";
@@ -60,7 +61,10 @@ import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
 import { appModules } from "../app-modules";
 import type { LarmPort } from "../../domains/larm";
+import { askModel, attachFixtureRouter } from "./router.fixture";
 import {
+	answerByScript,
+	askedOf,
 	callsOf,
 	candidatesOf,
 	choiceByScript,
@@ -76,6 +80,11 @@ import {
 	UNAVAILABLE_TEXT,
 } from "./conversation-script.fixture";
 /** The conversation agent's fixed tools, as a script reads what it may call. */
+/** The system of the router's fill of a structured answer (spec router-package-integration 2026-11-04). */
+const ANSWER_FILL = systemContext(
+	"dialogue.contexts.local.router-answer-fill",
+	{},
+);
 const CONVERSATION_TOOLS = ["memory", "find_toolchain", "delegate", "work"].map(
 	(name) => ({ function: { name } }),
 );
@@ -239,7 +248,7 @@ export async function harness(options: HarnessOptions = {}) {
 		const handOver = (toolchain: string): Step => ({
 			calls: [
 				delegate(toolchain, question, {
-					announcement: options.announcement ?? "お調べします。",
+					announcement: "お調べします。",
 					impact:
 						options.timers && /タイマー/.test(question) ? "create" : "none",
 				}),
@@ -294,6 +303,16 @@ export async function harness(options: HarnessOptions = {}) {
 				]);
 				return "";
 			}
+			// The router's fill of a structured answer to a work's question, from the same script.
+			if (callOptions?.jsonSchema && system === ANSWER_FILL)
+				return answerByScript(messages, (loop) =>
+					utteranceStep(
+						loop as never,
+						utteranceOf(messages),
+						CONVERSATION_TOOLS,
+						true,
+					),
+				);
 			// The local harness's routed turn: a silent choice held to a schema, from the same script.
 			const round = callOptions?.jsonSchema ? choiceRound(messages) : null;
 			if (round)
@@ -372,8 +391,10 @@ export async function harness(options: HarnessOptions = {}) {
 				};
 				const invoke = (tool: string, args: unknown) =>
 					JSON.stringify({ action: "invoke", tool, arguments: args });
-				if (/確認|残り/.test(data.request)) return invoke("timer.list", {});
-				if (/取消|止め/.test(data.request)) {
+				// The user's words are the request's first line; the earlier utterance after it is only context.
+				const asked = askedOf(data.request);
+				if (/確認|残り/.test(asked)) return invoke("timer.list", {});
+				if (/取消|止め/.test(asked)) {
 					const targets =
 						data.snapshot?.items?.filter((item) => item.state === "active") ??
 						[];
@@ -387,12 +408,12 @@ export async function harness(options: HarnessOptions = {}) {
 						expectedRevision: targets[0]!.revision,
 					});
 				}
-				const seconds = /^(\d+)秒/.exec(data.request);
+				const seconds = /^(\d+)秒/.exec(asked);
 				const durationSeconds = seconds
 					? Number(seconds[1])
-					: /1時間/.test(data.request)
+					: /1時間/.test(asked)
 						? 3600
-						: /3分30秒/.test(data.request)
+						: /3分30秒/.test(asked)
 							? 210
 							: 180;
 				return invoke("timer.start", {
@@ -744,32 +765,51 @@ export async function harness(options: HarnessOptions = {}) {
 					: undefined,
 			})
 		: undefined;
+	// The function a search for `query` finds first: the test's fixed embedding stands in for the model's.
+	const discovery = (query: string) =>
+		options.discoveryTarget?.(query) ??
+		(options.history
+			? "conversation_history"
+			: (options.routeTool ??
+				(options.uiCompositions
+					? "ui_create"
+					: options.weather && /天気/.test(query)
+						? "weather_forecast"
+						: options.stock && /株価/.test(query)
+							? "stock_quote"
+							: options.timers && /タイマー/.test(query)
+								? "timer"
+								: "web_search")));
 	const routing = createToolchainRouting(
 		toolchain.capabilities,
 		toolchain.history,
 		options.embed
 			? toolchain.embedQuery
-			: fixtureDiscovery(
-					store,
-					toolchain.capabilities,
-					(query) =>
-						options.discoveryTarget?.(query) ??
-						(options.history
-							? "conversation_history"
-							: (options.routeTool ??
-								(options.uiCompositions
-									? "ui_create"
-									: options.weather && /天気/.test(query)
-										? "weather_forecast"
-										: options.stock && /株価/.test(query)
-											? "stock_quote"
-											: options.timers && /タイマー/.test(query)
-												? "timer"
-												: "web_search"))),
-				),
+			: fixtureDiscovery(store, toolchain.capabilities, discovery),
 		toolchain.registry,
 		toolchain.schemas,
 	);
+	// The router decides every utterance turn: its context judgment is the conversation's script (the test's own model
+	// when it has one), asked as the old choice call asked it.
+	await attachFixtureRouter({
+		store,
+		inference,
+		routing,
+		settings,
+		capabilities: toolchain.capabilities,
+		...(options.embed ? {} : { discovery }),
+		ask: options.model
+			? askModel(options.model)
+			: (messages, round) =>
+					choiceByScript(messages as never, round, (loop) =>
+						utteranceStep(
+							loop as never,
+							utteranceOf(messages as never),
+							CONVERSATION_TOOLS,
+							true,
+						),
+					),
+	});
 	const continuity = createContinuityService();
 	const memory = options.memory
 		? createMemoryService(store, conversation, continuity, {

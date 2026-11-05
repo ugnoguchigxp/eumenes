@@ -1,8 +1,0 @@
-# Source: api/domains/dialogue/service/routed-route.ts
-text = '''[[field]]に当たるものを選んでください。'''
-
-[variables.field]
-type = "string"
-trust = "trusted"
-placement = "inline"
-encoding = "raw"

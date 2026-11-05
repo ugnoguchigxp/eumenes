@@ -30,15 +30,17 @@ test("status reads the settings, and clear-profile removes the profile", async (
 	expect(h.patches).toEqual([{ profile: null }]);
 });
 
-test("set sends the mode, the profile and the numbers as typed values", async () => {
+test("set sends the entry, the structure resource, the profile and the numbers as typed values", async () => {
 	const h = harness();
-	await h.call("set", "mode", "shadow");
+	await h.call("set", "entry", "routeStructured");
+	await h.call("set", "structureResource", "none");
 	await h.call("set", "profile", "router-p");
 	await h.call("set", "timeoutMs", "1500");
 	await h.call("set", "accept", "0.7");
 	await h.call("set", "feedbackWeight", "0");
 	expect(h.patches).toEqual([
-		{ mode: "shadow" },
+		{ entry: "routeStructured" },
+		{ structureResourceId: null },
 		{ profile: "router-p" },
 		{ timeoutMs: 1500 },
 		{ accept: 0.7 },
@@ -49,7 +51,8 @@ test("set sends the mode, the profile and the numbers as typed values", async ()
 test("an unknown mode, field or number, or a missing value, is a usage error and sends nothing", async () => {
 	const h = harness();
 	for (const args of [
-		["set", "mode", "legacy"],
+		["set", "mode", "on"],
+		["set", "entry", "direct"],
 		["set", "threshold", "0.5"],
 		["set", "accept", "high"],
 		["set", "accept", ""],

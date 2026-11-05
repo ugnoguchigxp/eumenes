@@ -215,44 +215,11 @@ const backgroundSchema = z.enum(["light-fairy", "spatial", "live2d-hiyori"]);
 export type BackgroundKind = z.infer<typeof backgroundSchema>;
 export const backgroundKinds = backgroundSchema.options;
 /**
- * The user-intent judge (the intent gate design, section 5), apart from the speaking-attitude judge's settings:
- * `legacy` keeps the existing routing, `shadow` also asks the judge and records it, `ruri` (the default) lets the
- * judge's result decide the routing.
+ * The router (spec router-package-integration 2026-11-04 §1, §3): the eumenes_router package decides every utterance
+ * turn once a profile is saved, by its `entry` (`route`: the whole utterance; `routeStructured`: the structure model
+ * first, then each request). The thresholds are the decision table's; a measurement changes them, not the code.
  */
-export const intentModes = ["legacy", "shadow", "ruri"] as const;
-const intentProfile = z.string().trim().min(1).max(200);
-const intentTimeoutMs = z.number().int().min(100).max(5000);
-const intentSearchScore = z.number().min(0).max(1);
-export const intentSettingsSchema = z
-	.object({
-		mode: z.enum(intentModes).default("ruri"),
-		/** The LARM Agent Profile of the judge; absent until saved, and then no judge is asked. */
-		profile: intentProfile.optional(),
-		/** How long `ruri` waits for the judge before the existing routing goes on alone. */
-		timeoutMs: intentTimeoutMs.default(1500),
-		/** `ruri` asks for the toolchain search first when `request` scores at least this (a threshold, not a chance). */
-		searchScore: intentSearchScore.default(0.6),
-	})
-	.strict();
-export type IntentSettings = z.infer<typeof intentSettingsSchema>;
-/** A change of the judge's settings: the fields given replace the saved ones; a null profile removes it. */
-export const intentPatchSchema = z
-	.object({
-		mode: z.enum(intentModes),
-		profile: intentProfile.nullable(),
-		timeoutMs: intentTimeoutMs,
-		searchScore: intentSearchScore,
-	})
-	.partial()
-	.strict();
-
-/**
- * The router (spec toolchain-router-redesign 2026-11-01 §3.3, §8): `off` (the default) keeps the choice call,
- * `shadow` also asks the router in a request turn and records what it would decide, `on` lets the router decide the
- * request turn with no choice call. The thresholds are the decision table's; they are compared with LARM's calibrated
- * probabilities, and a measurement changes them, not the code.
- */
-export const routerModes = ["off", "shadow", "on"] as const;
+export const routerEntries = ["route", "routeStructured"] as const;
 /** τ低 ≤ τ採用 ≤ τ承認 (spec toolchain-router-redesign §3.3). */
 export function routerThresholdsOrdered(t: {
 	low: number;
@@ -263,13 +230,22 @@ export function routerThresholdsOrdered(t: {
 }
 const routerProfile = z.string().trim().min(1).max(200);
 const routerTimeoutMs = z.number().int().min(100).max(10000);
+const routerStructureTimeoutMs = z.number().int().min(1000).max(30000);
 const routerUnit = z.number().min(0).max(1);
 const routerFeedbackWeight = z.number().min(0).max(5);
 export const routerSettingsSchema = z
 	.object({
-		mode: z.enum(routerModes).default("off"),
-		/** The LARM Agent Profile of the router; absent until saved, and then the router is not asked. */
+		/**
+		 * The LARM Agent Profile whose context judgment (`decision.context`) is the router's reranker; absent until
+		 * saved, and then the router is not asked.
+		 */
 		profile: routerProfile.optional(),
+		/** Which of the package's two entries decides (the tarball holds both). */
+		entry: z.enum(routerEntries).default("route"),
+		/** The cloud LLM resource the structure model runs on (`routeStructured`); null keeps the conversation route. */
+		structureResourceId: z.uuid().nullable().default(null),
+		/** How long a turn waits for the structure model before it routes the whole utterance. */
+		structureTimeoutMs: routerStructureTimeoutMs.default(8000),
 		/** How long a turn waits for the router (each call) before it goes on without it. */
 		timeoutMs: routerTimeoutMs.default(2000),
 		/** τ採用: the top candidate is taken at least this probable, with `margin` over the second. */
@@ -294,8 +270,10 @@ export type RouterSettings = z.infer<typeof routerSettingsSchema>;
 /** A change of the router's settings: the fields given replace the saved ones; a null profile removes it. */
 export const routerPatchSchema = z
 	.object({
-		mode: z.enum(routerModes),
 		profile: routerProfile.nullable(),
+		entry: z.enum(routerEntries),
+		structureResourceId: z.uuid().nullable(),
+		structureTimeoutMs: routerStructureTimeoutMs,
 		timeoutMs: routerTimeoutMs,
 		accept: routerUnit,
 		low: routerUnit,
@@ -394,13 +372,10 @@ export const settingsSchema = z
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})
 			.strict(),
-		intent: intentSettingsSchema.default({
-			mode: "ruri",
-			timeoutMs: 1500,
-			searchScore: 0.6,
-		}),
 		router: routerSettingsSchema.default({
-			mode: "off",
+			entry: "route",
+			structureResourceId: null,
+			structureTimeoutMs: 8000,
 			timeoutMs: 2000,
 			accept: 0.6,
 			low: 0.3,
@@ -549,6 +524,18 @@ export const settingsSchema = z
 					path: ["routes", "tts", "mode"],
 				});
 		}
+		const structureResource = s.router.structureResourceId;
+		if (
+			structureResource &&
+			!s.resources.some(
+				(r) => r.id === structureResource && r.purpose === "llm",
+			)
+		)
+			ctx.addIssue({
+				code: "custom",
+				message: "構造の判断に使うAIが会話モデルとして登録されていません",
+				path: ["router", "structureResourceId"],
+			});
 		const worldResource = s.world.curationResourceId;
 		if (
 			worldResource &&

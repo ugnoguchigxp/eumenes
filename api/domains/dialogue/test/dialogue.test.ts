@@ -6,13 +6,7 @@ import { createConversationService } from "../../conversation";
 import { createContinuityService } from "../../continuity";
 import { createQueue } from "../../queue";
 import { createDialogueService } from "..";
-import {
-	setup,
-	IMAGE,
-	choice,
-	reply,
-	type Harness,
-} from "./generation.fixture";
+import { setup, IMAGE, reply, type Harness } from "./generation.fixture";
 import { dialogueMigrationList, removeDialogueStore } from "./store.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
 
@@ -37,8 +31,8 @@ test("a request ID is idempotent, a different body under it conflicts, and the a
 		h.dialogue.submit({ ...input, text: "異なる本文" }),
 	).rejects.toThrow("request_conflict");
 	await waitFor(() => h!.dialogue.get(first.id)?.status === "completed");
-	// One turn: its choice and its talk.
-	expect(h.state.calls).toHaveLength(2);
+	// One turn: its talk (the router makes no model call).
+	expect(h.state.calls).toHaveLength(1);
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"こんにちは",
 		"お答えします。",
@@ -156,7 +150,7 @@ test("a cancelled inference cannot append its answer", async () => {
 	// The model call is held until after the cancel; its answer then arrives late.
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push(choice({ choice: "none" }));
+	h.state.steps.push({ text: "承知しました。" });
 	const run = await h.say("先ほどの依頼", "running");
 	expect((await h.dialogue.cancel(run.id))?.status).toBe("cancelled");
 	release();

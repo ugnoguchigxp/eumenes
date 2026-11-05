@@ -44,6 +44,7 @@ export function appServices(s: Services, secrets: readonly string[] = []) {
 		},
 		toolchainHistory: s.toolchain.history,
 		routerExport: createRouterExport(s.store, secrets),
+		routerMemory: s.toolchain.importRouterMemory,
 		timers: s.timers,
 		resources: s.resources,
 		shell: s.toolchain.shell,

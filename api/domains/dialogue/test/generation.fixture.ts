@@ -1,4 +1,13 @@
 import { join } from "node:path";
+import {
+	BEST_V2_FEATURES,
+	BEST_V2_FORMAT,
+	BEST_V2_MEMORY_FORMAT,
+	loadBestV2,
+	type BestV2Params,
+} from "eumenes_router";
+import type { RouterCard } from "eumenes_router/sqlite";
+import type { RouteAnswer, RouteInput } from "../../inference/contracts";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
@@ -138,6 +147,188 @@ export const INSTANT: ToolchainCard = {
 
 const DEFAULT_CARDS = [IMAGE, INSTANT];
 
+/** The router package's embedding space in the fixture: every text and passage is the same vector. */
+export const ROUTER_SPACE = {
+	modelId: "m",
+	revision: "1",
+	artifactDigest: "d",
+	dimension: 2,
+};
+const featureWeight = (
+	weights: Partial<Record<(typeof BEST_V2_FEATURES)[number], number>>,
+) => BEST_V2_FEATURES.map((f) => weights[f] ?? 0);
+/**
+ * A best-v2 whose probability is the context judgment's score alone, with the conversation at a fixed level:
+ * σ(10·score − 4) for a candidate scored, σ(0) = 0.5 for the conversation. A score of 0.95 is sure (≈1.0), 0.45 is
+ * the top but not sure (≈0.62, within the gate of the conversation), 0 is nothing (≈0.02).
+ */
+const ROUTER_PARAMS: BestV2Params = {
+	format: BEST_V2_FORMAT,
+	version: "fixture",
+	source: "fixture",
+	features: [...BEST_V2_FEATURES],
+	ranker: {
+		mean: featureWeight({}),
+		scale: BEST_V2_FEATURES.map(() => 1),
+		coef: featureWeight({ rr: 10, is_conv: 4 }),
+		intercept: -4,
+	},
+	gate: { deferBelow: 0.2 },
+	fuse: { weight: 2, conversation: 0.18, top: 8 },
+	extra: { tools: 4 },
+	knn: { neighbors: 1, dimension: 2 },
+};
+export const ROUTER_MODEL = loadBestV2(ROUTER_PARAMS, {
+	format: BEST_V2_MEMORY_FORMAT,
+	source: "fixture",
+	dimension: 2,
+	labels: ["conversation.respond"],
+	vectors: btoa(
+		String.fromCharCode(...new Uint8Array(new Float32Array([1, 0]).buffer)),
+	),
+});
+/** The router as the fixtures save it: a profile, the package's `route` entry and the product's lines. */
+export const FIXTURE_ROUTER = {
+	profile: "router-fixture-profile",
+	entry: "route" as const,
+	structureResourceId: null,
+	structureTimeoutMs: 8000,
+	timeoutMs: 2000,
+	accept: 0.6,
+	low: 0.3,
+	margin: 0.15,
+	approve: 0.85,
+	multi: 0.5,
+	feedbackNear: 0.95,
+	feedbackWeight: 2,
+};
+
+/**
+ * The criteria a scripted step names as the model's choice used to (`choice({...})`), and the step the fill call
+ * answers with when the choice carried fields. A step that is no choice names nothing.
+ */
+function pickedBy(step: Step | undefined): {
+	ids: string[];
+	next?: Step;
+} | null {
+	if (!step?.text || step.fail || step.calls) return null;
+	let v: Record<string, unknown>;
+	try {
+		v = JSON.parse(step.text) as Record<string, unknown>;
+	} catch {
+		return null;
+	}
+	if (!v || typeof v !== "object" || typeof v.choice !== "string") return null;
+	const { choice } = v;
+	if (choice === "ask")
+		return {
+			ids: [],
+			...(typeof v.say === "string" ? { next: { text: v.say } } : {}),
+		};
+	const ids = idsOfChoice(v as Record<string, unknown> & { choice: string });
+	const { say: _say, ...fields } = v;
+	return {
+		ids,
+		// The fields the choice carried are the fill's answer (a memory request, inputs, a saved target).
+		...(ids.length === 1 &&
+		ids[0] === choice &&
+		(choice === "memory.request" || "inputs" in v || "target" in v)
+			? { next: { text: JSON.stringify(fields) } }
+			: {}),
+	};
+}
+
+/**
+ * The router's criteria a choice the model used to make names (`choice({...})` of the old choice call): a toolchain,
+ * a read tool or a memory request by its id, a confirmation's yes or no, a question's answer, an operation on a work,
+ * the word that lets unsaved work go. `none` and `ask` name nothing.
+ */
+export function idsOfChoice(
+	v: Record<string, unknown> & { choice: string },
+): string[] {
+	const { choice } = v;
+	if (choice === "none" || choice === "ask") return [];
+	if (choice === "approve" || choice === "decline")
+		return [`${String(v.confirmation)}.${choice}`];
+	if (choice === "answer") return [`${String(v.todo)}.answer`];
+	if (/^t\d+$/.test(choice) && typeof v.operation === "string")
+		return [`${choice}.${v.operation}`];
+	// The user's word that the unsaved work may go is the host's own candidate now.
+	if (v.resolveUnsaved === "discard") return ["switch.discard"];
+	return [choice];
+}
+
+/**
+ * LARM's context judgment of the fixtures: the next scripted step, when it is a choice, makes its candidate a sure
+ * top (0.95, with `ROUTER_MODEL`); anything else scores nothing, so the conversation leads.
+ */
+export function routeBySteps(steps: Step[], routes?: RouteInput[]) {
+	return async (input: RouteInput): Promise<RouteAnswer> => {
+		routes?.push(input);
+		const picked = pickedBy(steps[0]);
+		if (picked) {
+			steps.shift();
+			if (picked.next) steps.unshift(picked.next);
+		}
+		const names = input.criteria.map((c) => c.name);
+		const scores = Object.fromEntries(
+			names.map((name) => [name, picked?.ids.includes(name) ? 0.95 : 0]),
+		);
+		return {
+			choice: names.find((name) => scores[name]) ?? names[0]!,
+			probabilities: Object.fromEntries(
+				names.map((name) => [name, 1 / names.length]),
+			),
+			scores,
+			model: "router-fixture-model",
+			headRevision: "head-1",
+			calibrationRevision: "cal-1",
+		};
+	};
+}
+
+/** The fixture's toolchains as the router package's synced cards, with the conversation's and a memory request's. */
+export function routerCards(cards: readonly ToolchainCard[]): RouterCard[] {
+	const card = (
+		id: string,
+		kind: RouterCard["kind"],
+		title: string,
+		summary: string,
+		useWhen: readonly string[] = [],
+		impact: RouterCard["impact"] = "none",
+	): RouterCard => ({
+		id,
+		revision: "1",
+		kind,
+		title,
+		summary,
+		useWhen: [...useWhen],
+		examples: [],
+		impact,
+		passages: [new Float32Array([1, 0])],
+	});
+	return [
+		card("conversation.respond", "general", "conversation.respond", "会話"),
+		card("memory.request", "general", "memory.request", "記憶の依頼"),
+		...cards.map((c) =>
+			card(
+				c.id,
+				c.execution === "read"
+					? "read"
+					: c.execution === "pipeline"
+						? "pipeline"
+						: c.general
+							? "general"
+							: "dedicated",
+				c.title,
+				c.summary,
+				c.useWhen,
+				c.minImpact ?? "none",
+			),
+		),
+	];
+}
+
 export type SetupOptions = {
 	externalOutput?: Parameters<
 		typeof createDialogueService
@@ -208,8 +399,15 @@ export async function setup(options: SetupOptions = {}) {
 		settled: [] as Array<{ runId: string; outcome: string }>,
 		/** The vector the search embeds a query to (absent: the embedding is unavailable). */
 		vector: undefined as QueryVector | undefined,
-		/** The `slots` each search of the catalog was asked with (absent: the choice call's own). */
-		searchSlots: [] as Array<"router" | undefined>,
+		/** The ids each offer of the catalog was asked for (absent: the choice call's own search). */
+		searchSlots: [] as Array<readonly string[] | undefined>,
+		/** What the router's context judgment was asked, turn by turn. */
+		routerAsked: [] as RouteInput[],
+		/** The texts the router package embedded; a failure of the embedding with this code. */
+		routerEmbeds: [] as string[],
+		routerEmbedFails: null as string | null,
+		/** best-v2's memory was imported (without it the router decides nothing). */
+		routerMemory: true,
 		/** The router's traces as the store was asked to keep them, and the work each was linked to. */
 		traces: [] as RouterTraceRecord[],
 		traceModes: [] as string[],
@@ -242,11 +440,16 @@ export async function setup(options: SetupOptions = {}) {
 	});
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
+		// The router decides every utterance turn: its context judgment reads the scripted steps.
+		route: routeBySteps(state.steps, state.routerAsked),
 		requestFor: (_db: unknown, runId: string) =>
 			options.settings && !captured.has(runId) ? null : `req:${runId}`,
 		...(options.settings
 			? {
-					snapshotInTransaction: () => structuredClone(options.settings),
+					snapshotInTransaction: () => ({
+						router: FIXTURE_ROUTER,
+						...structuredClone(options.settings as object),
+					}),
 					captureInTransaction: (
 						_db: unknown,
 						subject: string,
@@ -268,7 +471,13 @@ export async function setup(options: SetupOptions = {}) {
 					snapshotFor: (_db: unknown, subject: string) =>
 						captured.get(subject) ?? null,
 				}
-			: {}),
+			: {
+					// Without saved settings the fixture still has the router (and the persona's defaults).
+					snapshotInTransaction: () => ({
+						general: { agentName: "", userName: "", persona: "butler" },
+						router: FIXTURE_ROUTER,
+					}),
+				}),
 		llmContextWindowInTransaction: () => options.window,
 		setContextPolicyInTransaction: (
 			_db: unknown,
@@ -313,13 +522,28 @@ export async function setup(options: SetupOptions = {}) {
 		({ execution: cardOf(revisionId)?.execution }) as ToolchainRuntimeMeta;
 	const toolchains = {
 		embedQuery: async () => state.vector,
-		routeInTransaction: (
-			_db: unknown,
-			input: { slots?: "router" | undefined },
-		) => {
-			state.searchSlots.push(input.slots);
-			return { cards, past: [], retrieval: "fts" };
+		routeInTransaction: (_db: unknown, input: { ids?: readonly string[] }) => {
+			state.searchSlots.push(input.ids);
+			return {
+				cards: input.ids
+					? cards.filter((c) => input.ids!.includes(c.id))
+					: cards,
+				past: [],
+				retrieval: "fts",
+			};
 		},
+		embedRouter: async (texts: readonly string[]) => {
+			state.routerEmbeds.push(...texts);
+			if (state.routerEmbedFails) throw new Error(state.routerEmbedFails);
+			return { space: ROUTER_SPACE, vectors: texts.map(() => [1, 0]) };
+		},
+		routerCardsInTransaction: () => routerCards(cards),
+		routerLexicalInTransaction: () => new Map(),
+		routerModelInTransaction: () => (state.routerMemory ? ROUTER_MODEL : null),
+		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
+			new Map(
+				cards.filter((c) => ids.includes(c.id)).map((c) => [c.id, c.title]),
+			),
 		recordRouterTraceInTransaction: (
 			_db: unknown,
 			input: Parameters<

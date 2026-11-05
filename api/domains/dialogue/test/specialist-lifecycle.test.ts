@@ -19,8 +19,6 @@ const invoke = (title: string) => ({
 	arguments: { title },
 });
 /** The `## State` line of the conversation model's latest choice call about the specialist's work. */
-const workLine = (h: Harness) =>
-	h.stateOf(h.lastChoice()).find((line) => line.startsWith("- 担当との作業"));
 async function startDirty(h: Harness) {
 	h.handOver({ request: "アンケートを作って" });
 	h.state.specialist.push(invoke("アンケート"), reply("作りました"));
@@ -66,8 +64,8 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 	expect(run.specialistSessionId).toBeNull();
 	expect(run.status).toBe("completed");
 	expect(h.answerText(run.id)).toBe("通常の返答");
-	// The ordinary way: the request turn's choice, then the talk turn.
-	expect(h.state.calls.length).toBe(modelCalls + 2);
+	// The ordinary way: the router, then the talk turn (the only model call).
+	expect(h.state.calls.length).toBe(modelCalls + 1);
 	expect(h.userOf(h.state.calls.length - 1)).toBe("まだ作業中？");
 	expect(await h.session()).toBeNull();
 	expect(h.work()[0]!.ended).toBe(true);
@@ -76,11 +74,6 @@ test("an expired session is not extended by a new utterance: it ends and the utt
 		"SELECT state, end_reason FROM dialogue_specialist_sessions",
 	);
 	expect(ended).toEqual([{ state: "ended", end_reason: "expired" }]);
-	// The conversation agent hears of it once, with that very utterance.
-	expect(workLine(h)).toMatch(/終了（expired）$/);
-	h.talk("はい");
-	await h.ask("次の話");
-	expect(workLine(h)).toBeUndefined();
 });
 
 test("a turn that outlives the session's expiry is not adopted", async () => {
@@ -343,8 +336,8 @@ test("the work is never free between two queued turns; a return command withdraw
 	release();
 	await h.finished(second.id);
 	await h.finished(third.id);
-	// Both utterances are the conversation agent's unhandled ones: one generation (a choice and a talk) takes them, in order.
-	expect(h.state.calls.length).toBe(modelCalls + 2);
+	// Both utterances are the conversation agent's unhandled ones: one generation (its talk) takes them, in order.
+	expect(h.state.calls.length).toBe(modelCalls + 1);
 	const newest = h.userOf(h.state.calls.length - 1).split("\n");
 	expect(newest).toHaveLength(2);
 	expect(newest[0]).toContain("二つ目");

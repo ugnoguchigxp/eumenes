@@ -6,7 +6,6 @@ import {
 	PACKAGE,
 	REVISION,
 	answerFor,
-	choice,
 	setup,
 	until,
 	type Harness,
@@ -253,8 +252,7 @@ test("interactions are bounded: open and total capacity refuse a new one, and en
 			});
 	});
 	h.state.commands.push({ action: "clarify", question: "もう一件" });
-	// The first TODO still waits for its answer: the pending turn is asked first, then the request turn delegates.
-	h.state.steps.push(choice({ choice: "none" }));
+	// The first TODO still waits for its answer; the router decides the command again all the same.
 	h.delegate("偽の操作を開始して");
 	const run = await h.say("偽の操作を開始して", "failed");
 	expect(h.dialogue.get(run.id)?.error).toBe("interaction_capacity");

@@ -1,4 +1,9 @@
-import type { Lease, ProviderName } from "./profiles";
+import {
+	endpoints,
+	protocols,
+	type Lease,
+	type ProviderName,
+} from "./profiles";
 import { createConnection, fetchCatalog, type Control } from "./connect";
 import { string } from "./guards";
 
@@ -14,6 +19,8 @@ export async function createVoiceLease(
 		excludeLlm?: boolean;
 		/** The Providers a partial connection selects. */
 		providers?: string[];
+		/** A decision-only connection: the one provider of this capability, found in the catalog. */
+		decisionCapability?: string;
 		lifetime: AbortSignal;
 	},
 	required: ProviderName[],
@@ -30,20 +37,36 @@ export async function createVoiceLease(
 	} = deps;
 	const { catalogRevision, catalogProfile, catalogProviders } =
 		await fetchCatalog(scopedControl, profile, required);
+	const decision = deps.decisionCapability
+		? catalogProviders.find((p) => p.capability === deps.decisionCapability)
+		: undefined;
+	if (
+		deps.decisionCapability &&
+		(!decision ||
+			decision.protocol !== protocols["system-one"] ||
+			decision.endpoint !== endpoints["system-one"] ||
+			!decision.model)
+	)
+		throw new Error("larm_system_one_unavailable");
 	const request = {
 		profile,
 		client,
 		audience,
 		fullProfile,
-		...(deps.excludeLlm
+		...(deps.decisionCapability
 			? {
-					providers: catalogProviders
-						.filter((p) => p.name !== "llm")
-						.map((p) => string(p.name)),
+					providers: [string(decision!.name)],
+					decisionCapability: deps.decisionCapability,
 				}
-			: providers
-				? { providers }
-				: {}),
+			: deps.excludeLlm
+				? {
+						providers: catalogProviders
+							.filter((p) => p.name !== "llm")
+							.map((p) => string(p.name)),
+					}
+				: providers
+					? { providers }
+					: {}),
 		catalogRevision,
 	};
 	const startedAt = performance.now();

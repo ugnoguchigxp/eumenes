@@ -1,8 +1,0 @@
-# Source: api/domains/dialogue/service/routed-fields.ts
-text = '''[[label]]'''
-
-[variables.label]
-type = "string"
-trust = "untrusted"
-placement = "delimited-context"
-encoding = "delimited-text"

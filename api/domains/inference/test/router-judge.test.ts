@@ -12,8 +12,9 @@ const derive = (purpose: string) =>
 	);
 
 /**
- * The router's port (spec toolchain-router-redesign §3.2): made from the saved router profile while the router is not
- * `off`, made again when the profile or the LARM origin changes, closed at the end; never the intent judge's port.
+ * The router's port (spec router-package-integration 2026-11-04 §1 #4): made from the saved router profile while the
+ * router is on, made again when the profile or the LARM origin changes, closed at the end; never the intent judge's
+ * port.
  */
 function harness(router: Partial<Settings["router"]>) {
 	let saved = defaults({});
@@ -45,13 +46,6 @@ function harness(router: Partial<Settings["router"]>) {
 						headRevision: null,
 						calibrationRevision: null,
 					}),
-					routeFields: async () => ({
-						choices: {},
-						values: null,
-						confidence: null,
-						model: `model-of-${s.router.profile}`,
-						headRevision: null,
-					}),
 					connect: async () => {},
 					close: async () => {
 						record.closed = true;
@@ -75,52 +69,31 @@ const input = {
 	instructions: "選んでください",
 	criteria: [{ name: "weather", description: "天気" }],
 };
-const fields = {
-	text: "天気",
-	previousAgent: null,
-	previousUser: null,
-	choices: {},
-	extract: null,
-};
 
-test("a router that is on is connected ahead of the first call, once, held, and closed at the end", async () => {
-	const h = harness({ mode: "shadow", profile: "router-a" });
+test("a router with a saved profile is connected ahead of the first call, once, held, and closed at the end", async () => {
+	const h = harness({ profile: "router-a" });
 	expect(h.made).toEqual([{ profile: "router-a", closed: false }]);
 	expect(await h.judge.route(input, signal())).toMatchObject({
 		choice: "weather",
-		model: "model-of-router-a",
-	});
-	expect(await h.judge.routeFields(fields, signal())).toMatchObject({
 		model: "model-of-router-a",
 	});
 	expect(h.made).toHaveLength(1);
 	expect(h.clients[0]).toMatch(/^eumenes-[0-9a-f]{32}$/);
 	await h.judge.close();
 	expect(h.made[0]!.closed).toBe(true);
-	for (const call of [
-		h.judge.route(input, signal()),
-		h.judge.routeFields(fields, signal()),
-	])
-		await expect(call).rejects.toThrow("router_closed");
+	await expect(h.judge.route(input, signal())).rejects.toThrow("router_closed");
 });
 
-test("with the router off or without a profile no port is made and the caller falls back", async () => {
-	const off = harness({ mode: "off", profile: "router-a" });
-	const missing = harness({ mode: "on" });
-	await expect(off.judge.route(input, signal())).rejects.toThrow(
-		"router_unconfigured",
-	);
-	await expect(off.judge.routeFields(fields, signal())).rejects.toThrow(
-		"router_unconfigured",
-	);
+test("without a profile no port is made and the caller falls back", async () => {
+	const missing = harness({});
 	await expect(missing.judge.route(input, signal())).rejects.toThrow(
 		"router_profile_missing",
 	);
-	expect([...off.made, ...missing.made]).toEqual([]);
+	expect(missing.made).toEqual([]);
 });
 
-test("a changed profile releases the old port and the next call makes the new one; turning it off releases it too", async () => {
-	const h = harness({ mode: "on", profile: "router-a" });
+test("a changed profile releases the old port and the next call makes the new one; clearing it releases it too", async () => {
+	const h = harness({ profile: "router-a" });
 	await h.judge.route(input, signal());
 	h.change((s) => {
 		s.router.profile = "router-b";
@@ -130,25 +103,25 @@ test("a changed profile releases the old port and the next call makes the new on
 		model: "model-of-router-b",
 	});
 	expect(h.clients[1]).not.toBe(h.clients[0]);
-	// A change of a threshold or of other judges' settings keeps the port.
+	// A change of a threshold or of the entry keeps the port.
 	h.change((s) => {
 		s.router.accept = 0.7;
-		s.intent.mode = "shadow";
+		s.router.entry = "routeStructured";
 	});
 	expect(h.made.map((m) => m.closed)).toEqual([true, false]);
 	h.change((s) => {
-		s.router.mode = "off";
+		delete s.router.profile;
 	});
 	expect(h.made.map((m) => m.closed)).toEqual([true, true]);
 	await expect(h.judge.route(input, signal())).rejects.toThrow(
-		"router_unconfigured",
+		"router_profile_missing",
 	);
 	await h.judge.close();
 });
 
 test("a changed LARM origin makes a new port, and the client is the same after a restart", async () => {
-	const first = harness({ mode: "on", profile: "router-a" });
-	const restarted = harness({ mode: "on", profile: "router-a" });
+	const first = harness({ profile: "router-a" });
+	const restarted = harness({ profile: "router-a" });
 	expect(restarted.clients).toEqual(first.clients);
 	first.change((s) => {
 		s.larm.baseUrl = "http://127.0.0.1:9811";

@@ -16,7 +16,6 @@ import { createConversationYield } from "./conversation-yield";
 import { createHelperConnections } from "./helper-connections";
 import { createProviderLeases as createLeaseManager } from "./provider-leases";
 import { fetchCatalog } from "./connect";
-import { requestIntent } from "./user-intent";
 import { routePort } from "./route";
 import { leasePort } from "./lease-port";
 import { type Fetcher, type Provider } from "./profiles";
@@ -67,10 +66,15 @@ type LarmConfig = {
 	/** Records attitude judge outcomes for monitoring; the judge has no attempt record of its own. */
 	judgeActivity?: ActivityRecorder;
 	/**
-	 * A port of the user-intent judge: its connection selects the decision provider of the saved intent profile and
-	 * nothing else. It answers `judgeIntent` only; the conversation's port answers the attitude `judge` only.
+	 * The router's port: its connection selects the decision provider of `decisionCapability` of the saved router
+	 * profile and nothing else. It answers `route` only; the conversation's port answers the attitude `judge` only.
 	 */
 	decisionOnly?: boolean;
+	/**
+	 * With `decisionOnly`: the decision provider's capability (absent: `decision.system-one`). The router's port asks
+	 * for `decision.context` (spec router-package-integration 2026-11-04 §1 #4).
+	 */
+	decisionCapability?: string;
 };
 
 function assertSpeechSettings(config: LarmConfig) {
@@ -156,6 +160,9 @@ export function createLarm(config: LarmConfig): LarmPort {
 		control,
 		lifetime,
 		decisionOnly: config.decisionOnly,
+		...(config.decisionCapability
+			? { decisionCapability: config.decisionCapability }
+			: {}),
 		connectionRole: config.connectionRole,
 		llmConnection: config.llmConnection,
 	});
@@ -309,15 +316,6 @@ export function createLarm(config: LarmConfig): LarmPort {
 			if (judging) throw new Error("larm_decision_busy");
 			const call = () => judgeOnce(state, questions, signal);
 			return config.judgeActivity?.track(call, signal) ?? call();
-		},
-		async judgeIntent(input, signal) {
-			if (!config.decisionOnly) throw new Error("larm_intent_port_required");
-			const scoped = AbortSignal.any([signal, lifetime.signal]);
-			return withProvider("system-one", scoped, (p, connectionId) =>
-				requestIntent(p, input, scoped, (init) =>
-					judgeInfer(p, "systemone", init, scoped, connectionId),
-				),
-			);
 		},
 		...routePort(
 			config.decisionOnly,

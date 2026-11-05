@@ -29,8 +29,6 @@ export type InferenceOptions = {
 	providerHosts?: readonly string[];
 	fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 	larmFactory?: (s: Settings) => LarmPort;
-	/** The user-intent judge's port of these settings and its LARM client, in place of a LARM port of the saved intent profile. */
-	intentLarmFactory?: (s: Settings, client: string | undefined) => LarmPort;
 	/** The router's port of these settings and its LARM client, in place of a LARM port of the saved router profile. */
 	routerLarmFactory?: (s: Settings, client: string | undefined) => LarmPort;
 	/**

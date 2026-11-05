@@ -52,8 +52,8 @@ test("a display artifact's body is not held to the speech contract", async () =>
 	});
 	expect(run.status).toBe("completed");
 	expect(h.dialogue.answerText(run.id)).toBe(content);
-	// The turn's choice, then its talk.
-	expect(h.state.calls).toHaveLength(2);
+	// The turn's talk alone (the router makes no model call).
+	expect(h.state.calls).toHaveLength(1);
 });
 
 test("a long conversation answer is adopted as it is: the host neither repairs nor rejects it", async () => {
@@ -63,6 +63,6 @@ test("a long conversation answer is adopted as it is: the host neither repairs n
 	h.state.steps.push(...reply(verbose));
 	const run = await h.say("説明して");
 	expect(h.dialogue.answerText(run.id)).toBe(verbose);
-	// The turn's choice, then its talk.
-	expect(h.state.calls).toHaveLength(2);
+	// The turn's talk alone (the router makes no model call).
+	expect(h.state.calls).toHaveLength(1);
 });

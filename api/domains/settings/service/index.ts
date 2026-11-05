@@ -29,14 +29,12 @@ import { createFileExclusive } from "../../../infrastructure/atomic-file";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	defaultSubtitles,
-	intentPatchSchema,
 	routerPatchSchema,
 	routerThresholdsOrdered,
 	purposeSchema,
 	settingsSchema,
 	type ApplySettings,
 	type Connection,
-	type IntentSettings,
 	type RouterSettings,
 	type Settings,
 } from "../contracts";
@@ -279,32 +277,9 @@ export async function createSettings(
 		applyInTransaction,
 		notifyChanged,
 		/**
-		 * Changes the user-intent judge's settings alone (the intent gate design, section 7): the given fields replace
-		 * the saved ones and the document's revision moves on; the speaking-attitude judge's settings are not touched.
-		 */
-		async configureIntent(raw: unknown): Promise<IntentSettings> {
-			const patch = intentPatchSchema.safeParse(raw);
-			if (!patch.success) throw new Error("invalid_intent_settings");
-			const saved = await store.write((db) => {
-				const current = read(db);
-				const { profile, ...rest } = patch.data;
-				const intent = { ...current.intent, ...rest };
-				if (profile === null) delete intent.profile;
-				else if (profile !== undefined) intent.profile = profile;
-				const next = settingsSchema.parse({
-					...current,
-					revision: current.revision + 1,
-					intent,
-				});
-				save(db, next);
-				return next.intent;
-			});
-			notifyChanged();
-			return saved;
-		},
-		/**
-		 * Changes the router's settings alone (spec toolchain-router-redesign §3.3): the given fields replace the saved
-		 * ones and the document's revision moves on; a null profile removes the saved one.
+		 * Changes the router's settings alone (spec router-package-integration 2026-11-04 §3): the given fields replace
+		 * the saved ones and the document's revision moves on; a null profile removes the saved one. A structure model
+		 * that is not a saved LLM resource is refused like any other bad value.
 		 */
 		async configureRouter(raw: unknown): Promise<RouterSettings> {
 			const patch = routerPatchSchema.safeParse(raw);
@@ -317,13 +292,14 @@ export async function createSettings(
 				else if (profile !== undefined) router.profile = profile;
 				if (!routerThresholdsOrdered(router))
 					throw new Error("invalid_router_settings");
-				const next = settingsSchema.parse({
+				const parsed = settingsSchema.safeParse({
 					...current,
 					revision: current.revision + 1,
 					router,
 				});
-				save(db, next);
-				return next.router;
+				if (!parsed.success) throw new Error("invalid_router_settings");
+				save(db, parsed.data);
+				return parsed.data.router;
 			});
 			notifyChanged();
 			return saved;

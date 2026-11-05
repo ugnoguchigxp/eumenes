@@ -16,6 +16,7 @@
         "eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.3-e7b4096d5bd5.tgz",
         "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz",
+        "eumenes_router": "file:vendor/router/eumenes_router-0.0.1-5db35839bd54.tgz",
         "google-auth-library": "11.1.0",
         "hono": "4.12.34",
         "jsonrepair": "3.15.0",
@@ -1347,6 +1348,8 @@
     "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz", {}, "sha512-+MIM2niIoJ+7GaycVEnuyl6zS5ZYH0Y3MAYyU/kEf9gfYZOMdNz99Jjal/ELF/ArdPoBTqhJue98M0J7FYlZAg=="],
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz", {}, "sha512-+OuL1icda7iAwQG7wOcQ8k5dEiqSOwdWJv2XDkWqL9i3LzVFhr147MBFeu4G1uRuHHuLoJGt87M8zJ6A9WzTiA=="],
+
+    "eumenes_router": ["eumenes_router@vendor/router/eumenes_router-0.0.1-5db35839bd54.tgz", {}, "sha512-UilFzmy/JZMU0vFcG0dGNpNUdSsSbE0pN4DN5AOncTGNntr9/5u+1Euoqe5oXVsyjz0B61ONS1LQBPmu4gi6ag=="],
 
     "eventemitter3": ["eventemitter3@5.0.4", "", {}, "sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw=="],
 

@@ -7,6 +7,9 @@ import { HOST_RULES_VERSION, INSTRUCTION_VERSION } from "eumenes-agency";
 import pkg from "eumenes-memory/package.json";
 import worldPkg from "eumenes-world-model/package.json";
 import worldDistribution from "eumenes-world-model/distribution-manifest.json";
+import routerPkg from "eumenes_router/package.json";
+import { contractVersions, STRUCTURE_PROMPT } from "eumenes_router";
+import { migrations as routerSql } from "eumenes_router/sqlite";
 
 const root = join(import.meta.dir, "../..");
 const read = (path: string) => readFileSync(join(root, path));
@@ -94,6 +97,40 @@ test("the vendored agency package matches its manifest, package.json, the lockfi
 	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
 	expect(lock).toContain(
 		`${agencyManifest.package}@vendor/agency/${agencyManifest.artifact}`,
+	);
+	expect(lock).toContain(integrity);
+});
+
+const routerManifest = JSON.parse(
+	read("vendor/router/manifest.json").toString(),
+);
+
+test("the vendored router package matches its manifest, package.json, the lockfile and the installed copy", () => {
+	const artifact = read(`vendor/router/${routerManifest.artifact}`);
+	expect(routerManifest.package).toBe("eumenes_router");
+	expect(routerManifest.source.dirty).toBe(false);
+	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
+		routerManifest.sha256,
+	);
+	expect(
+		read(`vendor/router/${routerManifest.artifact}.sha256`)
+			.toString()
+			.split(/\s+/)[0],
+	).toBe(routerManifest.sha256);
+	const dependency = JSON.parse(read("package.json").toString()).dependencies[
+		routerManifest.package
+	];
+	expect(dependency).toBe(`file:vendor/router/${routerManifest.artifact}`);
+	expect(routerPkg.version).toBe(routerManifest.version);
+	expect(contractVersions).toEqual(routerManifest.contractVersions);
+	expect(routerSql.length).toBe(routerManifest.dbSchemaVersion);
+	expect(STRUCTURE_PROMPT.version).toBe(
+		routerManifest.entries.routeStructured.structurePrompt,
+	);
+	const lock = read("bun.lock").toString();
+	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
+	expect(lock).toContain(
+		`${routerManifest.package}@vendor/router/${routerManifest.artifact}`,
 	);
 	expect(lock).toContain(integrity);
 });

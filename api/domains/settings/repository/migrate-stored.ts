@@ -17,6 +17,8 @@ const isObject = (v: unknown): v is Json =>
  *   other than World curation runs on the one LLM configured for the conversation.
  * - The removed `codingSupervision` section (instruction approval for the retired CLI runner) is dropped.
  * - Speech has no fallback: a `larm-preferred` speech route becomes `larm-only`.
+ * - The router decides every utterance turn (spec router-package-integration 2026-11-04 §1 #12): its `mode` and the
+ *   user-intent judge's settings (`intent`), whose routing it replaced, are dropped.
  * It is idempotent: a migrated document passes through unchanged.
  */
 export function migrateStoredSettings(
@@ -44,6 +46,14 @@ export function migrateStoredSettings(
 		if (sentenceLanguageEnabled !== undefined)
 			larm.englishSpeechEnabled ??= sentenceLanguageEnabled;
 		raw = { ...raw, larm };
+	}
+	if (isObject(raw)) {
+		const { intent: _intent, ...rest } = raw;
+		raw = rest;
+		if (isObject(rest.router)) {
+			const { mode: _mode, ...router } = rest.router;
+			raw = { ...rest, router };
+		}
 	}
 	if (
 		isObject(raw) &&
@@ -113,6 +123,12 @@ export function migrateStoredSettings(
 	const world = raw.world;
 	if (isObject(world) && removedResources.has(String(world.curationResourceId)))
 		out.world = { ...world, curationResourceId: null };
+	const router = raw.router;
+	if (
+		isObject(router) &&
+		removedResources.has(String(router.structureResourceId))
+	)
+		out.router = { ...router, structureResourceId: null };
 	return { document: out, removedConnectionIds: [...removed] };
 }
 

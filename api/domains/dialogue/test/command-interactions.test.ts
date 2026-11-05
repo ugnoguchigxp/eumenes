@@ -62,9 +62,9 @@ test("a delegation ends the generation: the model is not called again after the 
 	h.state.commands.push({ action: "clarify", question: "どれ" });
 	h.delegate("偽の操作を開始して");
 	await h.say("偽の操作を開始して");
-	// Only the choice was made: the question the sub-agent asks is the agent's to say on its own opportunity.
-	expect(h.calls).toHaveLength(1);
-	expect(h.calls[0]!.session?.outputSchema).toBeDefined();
+	// The router handed it over with no model call: the question the sub-agent asks is the agent's to say on its own
+	// opportunity.
+	expect(h.calls).toHaveLength(0);
 	expect(h.state.steps).toEqual([]);
 });
 

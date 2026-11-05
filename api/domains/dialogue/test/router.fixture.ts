@@ -1,15 +1,7 @@
-import type {
-	RouteAnswer,
-	RouteFieldsAnswer,
-	RouteFieldsInput,
-	RouteInput,
-} from "../../inference/contracts";
+import type { RouteAnswer, RouteInput } from "../../inference/contracts";
 import type { ToolchainCard } from "../../capabilities";
 import { IMAGE, setup, type SetupOptions } from "./generation.fixture";
 import { settings, type Snapshot } from "./harness.fixture";
-
-/** The code LARM's router port throws when the deployed model cannot extract (larm contracts `routeErrors`). */
-export const EXTRACT_UNSUPPORTED = "larm_route_extract_unsupported";
 
 /** A second toolchain that changes what exists, so its hand-over is confirmed first. */
 export const EDIT: ToolchainCard = {
@@ -22,8 +14,10 @@ export const EDIT: ToolchainCard = {
 };
 
 export const ROUTER = {
-	mode: "on",
-	profile: "router-fixture-profile",
+	profile: "router-fixture-profile" as string | undefined,
+	entry: "route" as "route" | "routeStructured",
+	structureResourceId: null as string | null,
+	structureTimeoutMs: 8000,
 	timeoutMs: 2000,
 	accept: 0.6,
 	low: 0.3,
@@ -33,67 +27,57 @@ export const ROUTER = {
 	feedbackNear: 0.95,
 	feedbackWeight: 2,
 };
-/** The router model of the test: each test has its own, as a refusal to extract is remembered per model. */
-let model = "router-fixture-model";
-let models = 0;
 export type Script = (
 	input: RouteInput,
 	signal: AbortSignal,
 ) => Promise<RouteAnswer>;
 
-/** The router's answer: these probabilities (the rest of the mass is shared by the others), and scores if given. */
+/**
+ * LARM's context judgment: these scores for the criteria named (0 for the rest; the conversation is never sent), and
+ * probabilities in proportion. With the fixture's best-v2 a score of 0.95 is a sure top, 0.45 a top that is not sure,
+ * and the conversation leads when nothing scores (generation.fixture `ROUTER_MODEL`).
+ */
 export const weigh =
-	(
-		weights: Record<string, number>,
-		scores?: Record<string, number>,
-		as?: string,
-	): Script =>
+	(scores: Record<string, number>): Script =>
 	async (input) => {
 		const names = input.criteria.map((c) => c.name);
-		const rest = names.filter((name) => !(name in weights));
-		const left = Math.max(
-			0,
-			1 - names.reduce((sum, name) => sum + (weights[name] ?? 0), 0),
+		const given = Object.fromEntries(
+			names.map((name) => [name, scores[name] ?? 0]),
 		);
+		const total = Object.values(given).reduce((a, b) => a + b, 0);
 		const probabilities = Object.fromEntries(
 			names.map((name) => [
 				name,
-				name in weights ? weights[name]! : rest.length ? left / rest.length : 0,
+				total ? given[name]! / total : 1 / names.length,
 			]),
 		);
-		const best = names.reduce((a, b) =>
-			probabilities[b]! > probabilities[a]! ? b : a,
-		);
+		const best = names.reduce((a, b) => (given[b]! > given[a]! ? b : a));
 		return {
 			choice: best,
 			probabilities,
-			scores: scores ?? null,
-			model: as ?? model,
+			scores: given,
+			model: "router-fixture-model",
 			headRevision: "head-1",
 			calibrationRevision: "cal-1",
 		};
 	};
 
-export type Fields = (input: RouteFieldsInput) => Promise<RouteFieldsAnswer>;
-export const fieldsAnswer =
-	(
-		values: RouteFieldsAnswer["values"],
-		choices: RouteFieldsAnswer["choices"] = {},
-	): Fields =>
-	async () => ({
-		choices,
-		values,
-		confidence: null,
-		model: "router-fixture-model",
-		headRevision: "head-1",
-	});
+/** One call of the structure model, as the router made it. */
+export type StructureCall = {
+	control: Record<string, unknown>;
+	messages: Array<{ role: string; content: string }>;
+	options: unknown;
+	session: unknown;
+};
 
-/** A harness with the router saved as `router` says and scripted: its calls are `routes`, `fields`. */
+/**
+ * A harness with the router saved as `router` says, LARM's context judgment scripted (its calls are `routes`) and the
+ * structure model scripted (`structures`: an answer, or an Error it fails with; its calls are `structureCalls`).
+ */
 export async function startRouter(
 	router: Partial<typeof ROUTER> = {},
 	options: SetupOptions = {},
 ) {
-	model = `router-fixture-model-${++models}`;
 	const h = await setup({
 		settings: {
 			...settings({ mode: "larm-only" }),
@@ -102,9 +86,10 @@ export async function startRouter(
 		...options,
 	});
 	const routes: RouteInput[] = [];
-	const fieldCalls: RouteFieldsInput[] = [];
 	const scripts: Script[] = [];
-	const fieldScripts: Fields[] = [];
+	const structures: Array<string | Error> = [];
+	const structureCalls: StructureCall[] = [];
+	const controls = new Map<string, Record<string, unknown>>();
 	Object.assign(h.larm, {
 		route: async (input: RouteInput, signal: AbortSignal) => {
 			routes.push(input);
@@ -112,14 +97,34 @@ export async function startRouter(
 			if (!next) throw new Error("fixture_route_missing");
 			return next(input, signal);
 		},
-		routeFields: async (input: RouteFieldsInput) => {
-			fieldCalls.push(input);
-			const next = fieldScripts.shift();
-			if (!next) throw new Error("fixture_fields_missing");
-			return next(input);
+		captureBackgroundControlInTransaction: (
+			_db: unknown,
+			control: Record<string, unknown>,
+		) => {
+			const id = `structure-${controls.size + 1}`;
+			controls.set(id, control);
+			return id;
+		},
+		executeControl: async (
+			requestId: string,
+			messages: Array<{ role: string; content: string }>,
+			_signal: AbortSignal,
+			options: unknown,
+			session: unknown,
+		) => {
+			structureCalls.push({
+				control: controls.get(requestId)!,
+				messages,
+				options,
+				session,
+			});
+			const next = structures.shift();
+			if (next === undefined) throw new Error("fixture_structure_missing");
+			if (next instanceof Error) throw next;
+			return { requestId, attemptId: "structure", value: next };
 		},
 	});
-	return { h, routes, fieldCalls, scripts, fieldScripts };
+	return { h, routes, scripts, structures, structureCalls };
 }
 
 export const VECTOR = {
@@ -131,6 +136,7 @@ export const traceOf = (h: { state: { traces: unknown[] } }, index = 0) =>
 	h.state.traces[index] as {
 		runId: string;
 		text: string;
+		query: unknown;
 		decided: string | null;
 		workId: string | null;
 		set: string[];

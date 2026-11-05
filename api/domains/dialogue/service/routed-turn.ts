@@ -14,14 +14,13 @@ import type {
 	ToolExecutor,
 	ToolOutcome,
 } from "./executor-context";
-import { TOOL_NAMES, parseCall } from "./generation-tools";
+import { parseCall } from "./generation-tools";
 import { INPUT_HEADINGS } from "./input-text";
-import { openIntentGate } from "./intent-gate";
 import { refusalText, toolResultText } from "./result-text";
 import { parseChoice, strictChoiceSchema } from "./routed-choice";
 import type { Step } from "./routed-actions";
-import { activeRouter, routerTurn } from "./routed-router";
-import { pendingTurn, requestTurn } from "./routed-steps";
+import { activeRouter } from "./routed-package";
+import { routerTurn } from "./routed-router";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 
 const log = getLogger("dialogue");
@@ -70,10 +69,11 @@ const callFailed = (code: string) =>
 	);
 
 /**
- * One turn of the local harness (the local harness rebuild plan, section 4): the host routes it by what it holds
- * pending and the user-intent judge, then the model talks (one call, no tools) or makes one choice held to a schema
- * built from this turn's candidates (no words of its own but `say`). Every word for the user goes out through one
- * mouth, so what was said is the answer.
+ * One turn of the local harness (the local harness rebuild plan, section 4): the eumenes_router package decides every
+ * utterance turn, the conversation among the toolchains, the work and the open confirmations and questions (spec
+ * router-package-integration 2026-11-04 §1 #12), with no model call of its own; the model talks (one call, no tools)
+ * when the turn is the conversation's, when no router is saved, or when it could not decide. Every word for the user
+ * goes out through one mouth, so what was said is the answer.
  */
 export async function runRoutedTurn(
 	deps: DialogueDeps,
@@ -82,44 +82,22 @@ export async function runRoutedTurn(
 ): Promise<GenerationOutcome> {
 	const turn = createTurn(deps, input, options);
 	const { routed } = turn;
-	// The judge runs before the first model call, for the user's words only (the intent gate design, section 5).
-	const gate = await openIntentGate(deps, input, options.signal);
 	let kind: "talk" | "request" | "pending" = "talk";
 	try {
 		let step: Step = "talk";
-		// A choice needs the schema call on the run's request; without it the turn only talks.
-		if (input.final.kind === "utterances" && routed && turn.canChoose) {
-			if (turn.router?.settings.mode === "on") {
-				// The router decides the request turn and the pending turn together (spec toolchain-router-redesign §3.1).
-				const pending =
-					routed.pending.confirmations.length > 0 ||
-					routed.pending.questions.length > 0 ||
-					routed.switching !== null;
-				if (pending || routed.asked || gate.route !== "answer") {
-					kind = pending ? "pending" : "request";
-					step = await routerTurn(turn, turn.router, {
-						// The judge found no request of work: only the open confirmations and questions are looked at.
-						search: !!routed.asked || gate.route !== "answer",
-					});
-				}
-			} else if (routed.asked) {
-				// The user answers the question the agent asked back: the request turn takes both.
-				kind = "request";
-				step = await requestTurn(turn);
-			} else {
-				if (
-					routed.pending.confirmations.length ||
-					routed.pending.questions.length
-				) {
-					kind = "pending";
-					step = await pendingTurn(turn);
-				}
-				// `answer`: the judge found no request of work; `search` or no judgement: the request turn decides.
-				if (step === "talk" && gate.route !== "answer") {
-					kind = "request";
-					step = await requestTurn(turn);
-				}
-			}
+		// A hand-over may need the fill call on the run's request; without it the turn only talks.
+		if (
+			input.final.kind === "utterances" &&
+			routed &&
+			turn.canChoose &&
+			turn.router
+		) {
+			const pending =
+				routed.pending.confirmations.length > 0 ||
+				routed.pending.questions.length > 0 ||
+				routed.switching !== null;
+			kind = pending ? "pending" : "request";
+			step = await routerTurn(turn, turn.router);
 		}
 		if (step === "talk") await turn.talk();
 	} catch (error) {
@@ -128,15 +106,6 @@ export async function runRoutedTurn(
 			throw error;
 		log.warn("dialogue.turn_failed", { kind, reason: code });
 		turn.answer(SAID_FAILED);
-	} finally {
-		gate.observe({
-			searched: turn.executed.some(
-				({ call }) => call.name === TOOL_NAMES.search,
-			),
-			delegated: turn.executed.some(
-				({ call }) => call.name === TOOL_NAMES.delegate,
-			),
-		});
 	}
 	log.info("dialogue.turn_routed", { kind, count: turn.calls() });
 	options.signal.throwIfAborted();
@@ -215,11 +184,10 @@ function createTurn(
 		);
 	};
 
-	/** One host operation through the generation's executor; `record` keeps it as an executed call of the turn. */
+	/** One host operation through the generation's executor, kept as an executed call of the turn. */
 	async function operate(
 		name: string,
 		args: Record<string, unknown>,
-		record: boolean,
 	): Promise<{ outcome: ToolOutcome } | { refused: ValidationFailure }> {
 		const raw = {
 			id: `routed-${++seq}`,
@@ -233,15 +201,13 @@ function createTurn(
 				...(receipt ? { receipt } : {}),
 				exchange,
 			});
-			if (record) {
-				executed.push({ call: parsed, outcome });
-				if (carriesExchange(name))
-					exchange.push({
-						name,
-						arguments: raw.arguments,
-						result: outcome.result,
-					});
-			}
+			executed.push({ call: parsed, outcome });
+			if (carriesExchange(name))
+				exchange.push({
+					name,
+					arguments: raw.arguments,
+					result: outcome.result,
+				});
 			return { outcome };
 		} catch (error) {
 			if (!(error instanceof ValidationFailure)) throw error;
@@ -250,7 +216,7 @@ function createTurn(
 					...issue,
 					issueCount: error.issues.length,
 				});
-			if (record && carriesExchange(name))
+			if (carriesExchange(name))
 				exchange.push({
 					name,
 					arguments: raw.arguments,
@@ -266,7 +232,7 @@ function createTurn(
 		signal,
 		routed: input.routed,
 		canChoose: !!(input.requestId && deps.larm.executeStream),
-		/** The saved router, when it is on or in shadow and the port can ask it (spec toolchain-router-redesign §8). */
+		/** The saved router, when it is on and the ports it needs are there (spec router-package-integration 2026-11-04). */
 		router: activeRouter(deps),
 		utterance: input.utterances.join("\n"),
 		executed,
@@ -329,12 +295,7 @@ function createTurn(
 		},
 
 		/** One host operation through the generation's executor: its outcome, or the refusal of its arguments. */
-		act: (name: string, args: Record<string, unknown>) =>
-			operate(name, args, true),
-
-		/** An operation the turn keeps no trace of (it is not an executed call nor a step of its exchange). */
-		probe: (name: string, args: Record<string, unknown>) =>
-			operate(name, args, false),
+		act: (name: string, args: Record<string, unknown>) => operate(name, args),
 
 		/** Why the host refused an operation, as the retry reads it. */
 		reasonOf(error: ValidationFailure) {

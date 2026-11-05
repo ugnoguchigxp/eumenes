@@ -37,6 +37,11 @@ export type ProfileRequest = {
 	fullProfile: boolean;
 	/** The Providers a partial connection selects (absent: the LLM alone). */
 	providers?: string[];
+	/**
+	 * The capability of the decision provider a decision-only connection carries (absent: `decision.system-one`): the
+	 * router's is `decision.context` (spec router-package-integration 2026-11-04 §1 #4). Found in the catalog by it.
+	 */
+	decisionCapability?: string;
 	catalogRevision: string;
 };
 
@@ -249,6 +254,8 @@ export async function claimProviders(
 		fullProfile: boolean;
 		/** The decision provider is claimed on its own (a connection that carries it alone). */
 		decision?: boolean;
+		/** The decision provider's capability (absent: `decision.system-one`). */
+		decisionCapability?: string;
 		claimNames?: string[];
 		connectionRole?: "main" | "sub";
 		hosts: ProviderHosts;
@@ -312,7 +319,13 @@ export async function claimProviders(
 			throw new Error("chat_input_contract_unavailable");
 		providers.set(name, speechProvider(name, info, hosts));
 	}
-	const decision = decisionProvider(claimed, created, catalogProviders, hosts);
+	const decision = decisionProvider(
+		claimed,
+		created,
+		catalogProviders,
+		hosts,
+		input.decisionCapability,
+	);
 	if ((input.fullProfile || input.decision) && decision)
 		providers.set("system-one", decision);
 	const english = input.fullProfile
@@ -387,23 +400,29 @@ function claimedEndpoint(
 	return endpoint.href;
 }
 
-/** Optional decisions never make the speech providers unusable. */
+/**
+ * The decision provider of the capability (the speaking-attitude judge's `decision.system-one`, or the router's
+ * `decision.context`), found in the catalog by it and kept under the decision role with its catalog name. Optional
+ * decisions never make the speech providers unusable.
+ */
 function decisionProvider(
 	claimed: Rec,
 	created: Rec,
 	catalogProviders: Rec[],
 	hosts: ProviderHosts,
+	capability = "decision.system-one",
 ): Provider | undefined {
-	const declared = catalogProviders.find((p) => p.name === "system-one");
+	const declared = catalogProviders.find((p) => p.capability === capability);
 	if (
-		declared?.capability !== "decision.system-one" ||
+		!declared ||
 		declared.protocol !== protocols["system-one"] ||
 		declared.endpoint !== endpoints["system-one"]
 	)
 		return undefined;
+	const claimName = string(declared.name);
 	try {
-		const announced = providersOf(created).find((p) => p.name === "system-one");
-		const info = providersOf(claimed).find((p) => p.name === "system-one");
+		const announced = providersOf(created).find((p) => p.name === claimName);
+		const info = providersOf(claimed).find((p) => p.name === claimName);
 		if (
 			announced?.readiness === "ready" &&
 			info?.protocol === protocols["system-one"] &&
@@ -416,6 +435,7 @@ function decisionProvider(
 			if (baseUrl === info.baseUrl && fields.model === info.model)
 				return {
 					name: "system-one",
+					...(claimName !== "system-one" ? { claimName } : {}),
 					baseUrl,
 					endpoint: claimedEndpoint(info, baseUrl, "system-one", hosts),
 					model: string(info.model),

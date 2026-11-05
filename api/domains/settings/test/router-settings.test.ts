@@ -5,15 +5,17 @@ import { settingsSchema } from "../contracts";
 import { cleanup, setup } from "./settings.fixture";
 
 /**
- * The router's settings (spec toolchain-router-redesign 2026-11-01 §3.3, §8): `off` until changed, no profile until
- * saved, changed on their own without touching the intent judge's or the speaking-attitude judge's settings.
+ * The router's settings (spec router-package-integration 2026-11-04 §3): no profile until saved, the package's
+ * `route` entry, changed on their own without touching the speaking-attitude judge's settings.
  */
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
 
 const defaults = {
-	mode: "off" as const,
+	entry: "route" as const,
+	structureResourceId: null,
+	structureTimeoutMs: 8000,
 	timeoutMs: 2000,
 	accept: 0.6,
 	low: 0.3,
@@ -24,7 +26,7 @@ const defaults = {
 	feedbackWeight: 2,
 };
 
-test("the router starts off without a profile, and an older document reads the same", async () => {
+test("the router starts without a profile, and an older document reads the same", async () => {
 	const h = await setup();
 	expect(h.settings.get().router).toEqual(defaults);
 	const older = structuredClone(h.settings.get()) as Record<string, unknown>;
@@ -38,18 +40,24 @@ test("a change of the router's settings moves the revision, notifies once and le
 	let changed = 0;
 	h.settings.onChange(() => changed++);
 	expect(
-		await h.settings.configureRouter({ mode: "shadow", profile: "router-p" }),
-	).toEqual({ ...defaults, mode: "shadow", profile: "router-p" });
+		await h.settings.configureRouter({
+			profile: "router-p",
+			entry: "routeStructured",
+		}),
+	).toEqual({
+		...defaults,
+		profile: "router-p",
+		entry: "routeStructured",
+	});
 	const after = h.settings.get();
 	expect(after.revision).toBe(before.revision + 1);
 	expect(after.larm).toEqual(before.larm);
-	expect(after.intent).toEqual(before.intent);
 	expect(changed).toBe(1);
 	await h.settings.configureRouter({ accept: 0.7, feedbackWeight: 0 });
 	expect(h.settings.get().router).toEqual({
 		...defaults,
-		mode: "shadow",
 		profile: "router-p",
+		entry: "routeStructured",
 		accept: 0.7,
 		feedbackWeight: 0,
 	});
@@ -62,6 +70,13 @@ test("an unknown mode, a field out of range or an unknown field is refused and c
 	const before = h.settings.get();
 	for (const input of [
 		{ mode: "legacy" },
+		// The router has no mode: it decides every utterance turn (a saved one is dropped at startup).
+		{ mode: "on" },
+		{ entry: "direct" },
+		{ structureTimeoutMs: 500 },
+		{ structureResourceId: "not-a-uuid" },
+		// A structure model must be a saved LLM resource.
+		{ structureResourceId: "00000000-0000-4000-8000-000000000001" },
 		{ accept: 1.5 },
 		{ low: -0.1 },
 		{ timeoutMs: 10 },
@@ -92,15 +107,14 @@ test("the API reads and changes the router's settings", async () => {
 	expect(await read.json()).toEqual(defaults);
 	const patch = await app.request("/api/settings/router", {
 		method: "PATCH",
-		body: JSON.stringify({ mode: "on", timeoutMs: 800, profile: "router-p" }),
+		body: JSON.stringify({ timeoutMs: 800, profile: "router-p" }),
 	});
 	expect(patch.status).toBe(200);
 	expect(await patch.json()).toMatchObject({
-		mode: "on",
 		timeoutMs: 800,
 		profile: "router-p",
 	});
-	expect(h.settings.get().router.mode).toBe("on");
+	expect(h.settings.get().router.profile).toBe("router-p");
 	const invalid = await app.request("/api/settings/router", {
 		method: "PATCH",
 		body: "not json",

@@ -51,11 +51,10 @@ test("the pending choice's answer is accepted once and the same run resumes the 
 	h.state.steps.push(answerChoice(todo!, { text: "3分でお願い" }));
 	const second = await h.say("3分でお願い");
 	expect(second.id).not.toBe(first.id);
-	// The accepted answer handed the work back to the command sub-agent: the turn ended with the one choice, and
-	// the result is the conversation agent's to report on its own opportunity.
+	// The accepted answer handed the work back to the command sub-agent with no model call (the router decided the
+	// answer), and the result is the conversation agent's to report on its own opportunity.
 	expect(h.state.steps).toEqual([]);
-	expect(h.calls).toHaveLength(2);
-	expect(h.calls.at(-1)!.session?.outputSchema).toBeDefined();
+	expect(h.calls).toHaveLength(0);
 	await until(() => h!.interaction()?.status === "completed");
 	expect(h.interaction()).toMatchObject({
 		status: "completed",
@@ -94,20 +93,6 @@ test("the pending choice's answer is accepted once and the same run resumes the 
 	).rejects.toThrow("interaction_closed");
 });
 
-test("an answer without text is refused and changes nothing", async () => {
-	h = await setup();
-	await h.asked();
-	const [todo] = h.todos();
-	const jobs = resumedJobs(h).length;
-	h.state.steps.push(answerChoice(todo!, { text: "" }));
-	const run = await h.say("お願い");
-	expect(h.dialogue.answerText(run.id)).toBe(FAILED);
-	expect(h.interaction()!.status).toBe("waiting_input");
-	expect(h.todos()).toMatchObject([{ status: "waiting" }]);
-	expect(resumedJobs(h)).toHaveLength(jobs);
-	expect(h.started).toHaveLength(0);
-});
-
 test("a second answer to the same question is refused: the TODO no longer waits and is not offered", async () => {
 	h = await setup();
 	await h.asked();
@@ -124,50 +109,19 @@ test("a second answer to the same question is refused: the TODO no longer waits 
 	expect(h.todos()).toEqual([]);
 	const [done] = h.archived();
 	expect(done!.status).toBe("done");
-	// Finished work is archived as it finishes: no question is pending, so the request turn runs and offers no
-	// choice on it. A choice that names it anyway is refused by the work operation and answers nothing.
-	h.state.steps.push(
-		choice({
-			choice: `t${done!.ref}`,
-			operation: "amend",
-			text: "2分",
-			say: "直します。",
-		}),
-	);
+	// Finished work is archived as it finishes: no question is pending, so the router is offered no answer to it and
+	// no correction of it, only a check; nothing here picks one, so the turn talks.
+	h.state.steps.push({ text: "もう終わっています。" });
 	const starts = h.started.length;
 	const jobs = resumedJobs(h).length;
 	const again = await h.say("2分");
-	const schema = JSON.stringify(h.calls.at(-1)!.session?.outputSchema);
-	// The finished TODO may only be checked: no answer and no correction of it is offered.
-	expect(schema).not.toContain('"answer"');
-	expect(schema).not.toContain('"amend"');
-	expect(h.dialogue.answerText(again.id)).toBe(FAILED);
+	const offered = h.state.routerAsked.at(-1)!.criteria.map((c) => c.name);
+	expect(offered).toContain(`t${done!.ref}.check`);
+	expect(offered).not.toContain(`t${done!.ref}.answer`);
+	expect(offered).not.toContain(`t${done!.ref}.amend`);
+	expect(h.dialogue.answerText(again.id)).toBe("もう終わっています。");
 	expect(h.started).toHaveLength(starts);
 	expect(resumedJobs(h)).toHaveLength(jobs);
-});
-
-test("a stale TODO revision is refused before the answer is looked at", async () => {
-	h = await setup();
-	await h.asked();
-	const [todo] = h.todos();
-	h.state.steps.push(answerChoice(todo!, { text: "3分" }));
-	// The model call is held after its state was shown (revision as it stands now); the TODO's revision moves on
-	// meanwhile, and the answer is then looked at against the revision the model saw.
-	let release!: () => void;
-	h.state.modelGate = new Promise<void>((resolve) => (release = resolve));
-	const calls = h.calls.length;
-	const said = h.say("3分");
-	await until(() => h!.calls.length > calls);
-	h.write(
-		"UPDATE dialogue_work SET revision = revision + 1 WHERE id = ?",
-		todo!.id,
-	);
-	h.state.modelGate = null;
-	release();
-	const run = await said;
-	expect(h.dialogue.answerText(run.id)).toBe(FAILED);
-	expect(h.interaction()!.status).toBe("waiting_input");
-	expect(h.started).toHaveLength(0);
 });
 
 test("an answer to a question whose chain has since been replaced is refused and leaves the question open", async () => {

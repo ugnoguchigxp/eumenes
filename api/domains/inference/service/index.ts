@@ -572,7 +572,7 @@ export function createInference(
 			// Task sessions nobody released and a crashed host's temporary directories, now and then hourly.
 			await sweeper.start();
 		},
-		/** The user-intent judge (the intent gate design, section 3) and the router (spec toolchain-router-redesign §3.2), each on its own port. */
+		/** The router's reranker on its own port (spec router-package-integration 2026-11-04 §1 #4). */
 		...judges.ports,
 		async close() {
 			screen.close();

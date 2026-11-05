@@ -1,10 +1,10 @@
+import { head, type Ranked, type RouteTurn } from "eumenes_router";
 import { getLogger } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
-import type { InferencePort } from "../../inference";
-import type { RouteAnswer } from "../../inference/contracts";
 import type { RouterTraceRecord } from "../../toolchain-history";
 import type { QueryVector } from "../contracts/toolchains";
-import type { DialogueDeps } from "./context";
+import { availableToolchainsInTransaction } from "./delegate-conversation";
+import { availableReadTools } from "./executor-read";
 import { TOOL_NAMES } from "./generation-tools";
 import { lineText } from "./input-text";
 import {
@@ -25,59 +25,36 @@ import {
 } from "./routed-actions";
 import { fieldsOf } from "./routed-fields";
 import {
+	decidedPart,
+	hostDecision,
+	offer,
+	reasonOf,
+	routeByEntry,
+	type ActiveRouter,
+	type Routed,
+} from "./routed-package";
+import {
+	CONVERSATION_ID,
+	MEMORY_ID,
 	TRACE_WINDOW_MS,
-	correctProbabilities,
-	decide,
 	decidedKind,
-	routeCandidates,
+	dynamicCandidates,
 	routerTrace,
-	type Skipped,
 	type Announce,
-	type Ranked,
+	type DynamicCandidate,
 	type RouteCandidate,
 	type RouteDecision,
-	type RouterSettings,
 } from "./routed-route";
-import {
-	retainedChoice,
-	searchTurn,
-	switchingOf,
-	type Searched,
-} from "./routed-search";
+import { referencedKindInTransaction } from "./routing-export";
+import { retainedChoice, switchingOf } from "./routed-search";
 import type { Turn } from "./routed-turn";
 
 const log = getLogger("dialogue");
 /** The resources one hand-over may carry (the delegate call's bound). */
 const RESOURCE_REFS = 8;
-
-/** The saved router when it is on or in shadow, with the ports that ask it (spec toolchain-router-redesign §8). */
-export type ActiveRouter = {
-	settings: RouterSettings;
-	route: NonNullable<InferencePort["route"]>;
-	routeFields?: InferencePort["routeFields"];
-};
-
-/** The router the turn may ask: none until a profile is saved, none when it is off or the port cannot route. */
-export function activeRouter(deps: DialogueDeps): ActiveRouter | null {
-	const snapshot = deps.larm.snapshotInTransaction?.bind(deps.larm);
-	const route = deps.larm.route?.bind(deps.larm);
-	if (!snapshot || !route) return null;
-	const settings = deps.store.read((tx) => snapshot(tx)).router;
-	if (!settings || settings.mode === "off" || !settings.profile) return null;
-	const fields = deps.larm.routeFields?.bind(deps.larm);
-	return { settings, route, ...(fields ? { routeFields: fields } : {}) };
-}
-
-/** A failure as the log may name it: a code, never the words of a message. */
-export function reasonOf(error: unknown, timeout?: AbortSignal): string {
-	if (timeout?.aborted) return "timeout";
-	return error instanceof Error && /^[a-z0-9_]{1,80}$/.test(error.message)
-		? error.message
-		: "router_failed";
-}
-
 /** What one asking of the router left the turn with. */
 type Consulted = {
+	/** The candidates the host can carry out: those the package offered, the host's own, the conversation's two. */
 	candidates: RouteCandidate[];
 	/** The words the turn acts on. */
 	words: string;
@@ -85,8 +62,6 @@ type Consulted = {
 	decision: RouteDecision | null;
 	/** The previous routed turn of the conversation, within the correction window. */
 	latest: RouterTraceRecord | null;
-	/** The model of the router's answer: what its second call is asked of. */
-	model: string | null;
 	/** Writes the turn's trace again with these parts changed (a redirect carried out, a question asked once more). */
 	retrace(changes: Retrace): Promise<void>;
 };
@@ -134,102 +109,123 @@ function messagesOf(turn: Turn, asking: RouterTraceRecord | null): string[] {
 }
 
 /**
- * Asks the router about the turn: scores the candidates, corrects the scores by what the user corrected near these
- * words, decides by the table, and records the trace. A router that failed (or a read of its own that did) leaves no
- * decision.
+ * Asks the router about the turn (spec router-package-integration 2026-11-04 §1): the package routes it by the saved
+ * entry with the host's candidates beside its search, the host offers the toolchains it ranked (its own operation
+ * keeps the authority checks), marks the corrections that disagreed, and records the trace. A router that failed (or
+ * a read of its own that did) leaves no decision.
  */
 async function consult(
 	turn: Turn,
 	router: ActiveRouter,
-	mode: "shadow" | "on",
 	words: string,
-	searched: Searched | null,
 ): Promise<Consulted> {
+	const { deps, input } = turn;
 	const routed = turn.routed!;
 	const { settings } = router;
+	const port = deps.toolchains!;
 	const started = performance.now();
+	const embedded = new Map<string, QueryVector>();
 	let previous: ReturnType<typeof previousTrace> = null;
-	let candidates: RouteCandidate[] = [];
-	let answer: RouteAnswer | null = null;
-	let ranked: Ranked[] = [];
-	let decision: RouteDecision | null = null;
+	let dynamic: DynamicCandidate[] = [];
+	let result: Routed | null = null;
 	let error: string | null = null;
-	let timeout: AbortSignal | undefined;
 	try {
 		previous = previousTrace(turn);
-		const skipped: Skipped[] = [];
-		candidates = routeCandidates({
+		dynamic = dynamicCandidates({
 			routed,
-			searched,
 			redirect: previous?.todo
 				? { trace: previous.trace, todo: previous.todo }
 				: null,
 			switching: switchingOf(turn),
-			skipped,
+			titles: (ids) =>
+				port.titlesInTransaction
+					? deps.store.read((tx) => port.titlesInTransaction!(tx, ids))
+					: new Map(),
 		});
-		for (const reason of new Set(skipped.map((s) => s.reason)))
-			log.warn("dialogue.router_candidate_skipped", {
-				count: skipped.filter((s) => s.reason === reason).length,
-				reason,
-			});
+		// best-v2 needs the memory of the embedding's space: the utterance is embedded first, once.
+		const text = words.trim();
+		const first = head(text, 2000);
+		const r = await port.embedRouter!([first], turn.signal);
+		embedded.set(first, { space: r.space, vector: r.vectors[0]! });
+		const model = deps.store.read((tx) =>
+			port.routerModelInTransaction!(tx, r.space),
+		);
+		if (!model) throw new Error("router_memory_missing");
+		const { available, resource } = deps.store.read((tx) => ({
+			available: new Set<string>([
+				...availableToolchainsInTransaction(deps, tx),
+				...availableReadTools(deps, tx),
+			]),
+			resource: referencedKindInTransaction(tx, input.runId),
+		}));
+		// The candidate asked about in the turn before (rows 5 and 6) was put to the user: the answer needs `low` only.
+		const asked =
+			previous?.trace.mode === "on" &&
+			(previous.trace.row === 5 || previous.trace.row === 6)
+				? previous.trace.decided
+				: null;
+		const routeTurn: RouteTurn = {
+			state: {
+				text,
+				previousAgent: routed.previousReply,
+				previousUser: routed.earlier.at(-1) ?? null,
+			},
+			dynamic,
+			retained: input.retained.map((entry) => entry.card.id),
+			available: (id) =>
+				id === CONVERSATION_ID || id === MEMORY_ID || available.has(id),
+			instructions: systemContext(
+				"dialogue.contexts.local.router-instructions",
+				{},
+			),
+			resource,
+			asked,
+		};
+		result = await routeByEntry(turn, router, routeTurn, model, embedded);
 	} catch (cause) {
+		// A cancelled run is the run's, not the router's.
 		if (turn.signal.aborted) throw cause;
 		error = reasonOf(cause);
 	}
-	if (!error) {
-		timeout = AbortSignal.timeout(settings.timeoutMs);
+	const part = result ? decidedPart(result) : undefined;
+	let candidates: RouteCandidate[] = [];
+	let decision: RouteDecision | null = null;
+	if (result) {
 		try {
-			answer = await router.route(
-				{
-					// The router cuts the text to its bound itself (at a character, never inside one).
-					text: words.trim(),
-					previousAgent: routed.previousReply,
-					previousUser: routed.earlier.at(-1) ?? null,
-					instructions: systemContext(
-						"dialogue.contexts.local.router-instructions",
-						{},
-					),
-					criteria: candidates.map((c) => ({
-						name: c.id,
-						description: c.passage,
-					})),
-				},
-				AbortSignal.any([turn.signal, timeout]),
-			);
-		} catch (cause) {
-			// A cancelled run is the run's, not the router's.
-			if (turn.signal.aborted) throw cause;
-			error = reasonOf(cause, timeout);
-		}
-	}
-	const durationMs = Math.round(performance.now() - started);
-	const query = searched?.query;
-	if (answer) {
-		try {
-			const scored = rank(turn, router, candidates, answer, query);
-			ranked = scored.ranked;
-			if (scored.conflicts.length) await markConflicts(turn, scored.conflicts);
-			// A question asked in the turn before (rows 5 and 6) was put to the user: the answer needs `low` only.
-			const asked =
-				previous?.trace.mode === "on" &&
-				(previous.trace.row === 5 || previous.trace.row === 6)
-					? previous.trace.decided
-					: null;
-			decision = decide(ranked, settings, asked);
+			const offered = await offer(turn, words, result, dynamic);
+			candidates = offered.candidates;
+			decision = hostDecision(result.decision, offered.hostOf);
+			if (!decision) error = "router_candidate_unavailable";
+			const conflicts = [
+				...new Set(result.parts.flatMap((p) => p.result.explain.conflicts)),
+			];
+			if (conflicts.length) await markConflicts(turn, conflicts);
 		} catch (cause) {
 			if (turn.signal.aborted) throw cause;
 			error = reasonOf(cause);
-			ranked = [];
 			decision = null;
 		}
 	}
+	const durationMs = Math.round(performance.now() - started);
+	const query =
+		(part && embedded.get(head(part.text, 2000))) ??
+		embedded.get(head(words.trim(), 2000)) ??
+		null;
 	const traced = {
-		mode,
-		ranked,
+		ranked: decision && part ? part.result.corrected : ([] as Ranked[]),
 		decision,
-		answer: decision ? answer : null,
+		answer: decision && part ? part.result.answer : null,
 		durationMs,
 		error,
+		entry: settings.entry,
+		gate: part?.result.explain.gate ?? null,
+		defer: part?.result.explain.defer ?? null,
+		structure: result?.structure
+			? {
+					requests: result.structure.requests.length,
+					parts: result.parts.length,
+				}
+			: null,
 	};
 	const latest = previous?.trace ?? null;
 	const trace = (changes: Retrace = {}) =>
@@ -237,8 +233,7 @@ async function consult(
 			turn,
 			{
 				text: changes.text ?? words,
-				query:
-					changes.query === undefined ? query : (changes.query ?? undefined),
+				query: changes.query === undefined ? query : changes.query,
 				messageIds: changes.messageIds ?? messagesOf(turn, latest),
 			},
 			{
@@ -250,64 +245,15 @@ async function consult(
 	await trace();
 	if (decision)
 		log.info("dialogue.router_decided", {
-			mode,
+			mode: "on",
+			source: settings.entry,
 			row: decision.row,
 			kind: decidedKind(decision),
-			count: candidates.length,
+			count: part?.result.explain.offered.length ?? 0,
 			durationMs,
 		});
 	else log.warn("dialogue.router_failed", { reason: error ?? "router_failed" });
-	return {
-		candidates,
-		words,
-		decision,
-		latest,
-		model: answer?.model ?? null,
-		retrace: trace,
-	};
-}
-
-/** The candidates with the router's probabilities, corrected by the corrections near the query, best first. */
-function rank(
-	turn: Turn,
-	router: ActiveRouter,
-	candidates: readonly RouteCandidate[],
-	answer: RouteAnswer,
-	query: QueryVector | undefined,
-): { ranked: Ranked[]; conflicts: string[] } {
-	const { deps } = turn;
-	const { settings } = router;
-	const port = deps.toolchains;
-	const near =
-		query &&
-		settings.feedbackWeight > 0 &&
-		port?.nearRouterFeedbackInTransaction
-			? deps.store.read((tx) =>
-					port.nearRouterFeedbackInTransaction!(tx, {
-						...query,
-						threshold: settings.feedbackNear,
-					}),
-				)
-			: [];
-	const corrected = correctProbabilities(
-		candidates.map((c) => ({ id: c.id, p: answer.probabilities[c.id] ?? 0 })),
-		near,
-		{ threshold: settings.feedbackNear, weight: settings.feedbackWeight },
-	);
-	if (corrected.conflict)
-		log.warn("dialogue.router_feedback_conflict", { count: near.length });
-	return {
-		conflicts: corrected.conflict ? near.map((row) => row.id) : [],
-		ranked: candidates
-			.map((candidate, i): Ranked => ({
-				candidate,
-				raw: answer.probabilities[candidate.id] ?? 0,
-				correction: corrected.shift[i]!,
-				p: corrected.p[i]!,
-				score: answer.scores?.[candidate.id] ?? null,
-			}))
-			.sort((a, b) => b.p - a.p),
-	};
+	return { candidates, words, decision, latest, retrace: trace };
 }
 
 /** Corrections that name different right answers are taken out of use and left for the user's review. */
@@ -330,7 +276,7 @@ function recordTrace(
 	turn: Turn,
 	utterance: {
 		text: string;
-		query: QueryVector | undefined;
+		query: QueryVector | null;
 		messageIds: readonly string[];
 	},
 	made: Parameters<typeof routerTrace>[0],
@@ -346,7 +292,7 @@ function recordTrace(
 				messageId: input.inputMessageId,
 				messageIds: utterance.messageIds,
 				text: utterance.text,
-				query: utterance.query ?? null,
+				query: utterance.query,
 				trace: routerTrace(made),
 			}),
 		)
@@ -356,46 +302,21 @@ function recordTrace(
 }
 
 /**
- * The shadow router (spec §8, R1): looks at the turn beside the choice call, records what it would decide, and
- * changes nothing. Whatever goes wrong only reaches the log.
- */
-export async function shadowRoute(
-	turn: Turn,
-	router: ActiveRouter,
-	words: string,
-): Promise<void> {
-	try {
-		const searched = await searchTurn(turn, words, {
-			slots: "router",
-			record: false,
-		});
-		await consult(turn, router, "shadow", words, searched);
-	} catch (error) {
-		if (turn.signal.aborted) return;
-		log.warn("dialogue.router_failed", { reason: reasonOf(error) });
-	}
-}
-
-/**
- * The request turn and the pending turn, decided by the router (spec §3.1, §3.3): no choice call. `search: false`
- * when the judge found no request of work: only the open confirmations and questions are offered then.
+ * Every utterance turn when the router is on (spec router-package-integration 2026-11-04 §1 #12): the package decides
+ * with no choice call, among the toolchains, the conversation, the work and the open confirmations and questions.
  */
 export async function routerTurn(
 	turn: Turn,
 	router: ActiveRouter,
-	options: { search: boolean },
 ): Promise<Step> {
 	const routed = turn.routed!;
 	const words = routed.asked
 		? `${routed.asked.request}\n${turn.utterance}`
 		: turn.utterance;
-	const searched = options.search
-		? await searchTurn(turn, words, { slots: "router" })
-		: null;
-	const consulted = await consult(turn, router, "on", words, searched);
+	const consulted = await consult(turn, router, words);
 	// A router that failed leaves the turn to the talk turn (row 10); nothing is promised.
 	if (!consulted.decision) return "talk";
-	const step = await carryOut(turn, router, consulted, consulted.decision);
+	const step = await carryOut(turn, consulted, consulted.decision);
 	if (typeof step === "string") return step;
 	// The host could not carry it out: it says so, and the router's choice is not made again.
 	turn.speak(SAID.failed);
@@ -419,7 +340,6 @@ const announcement = (announce: Announce, title: string) =>
 /** What a decision does (spec §3.3). */
 async function carryOut(
 	turn: Turn,
-	router: ActiveRouter,
 	consulted: Consulted,
 	decision: RouteDecision,
 ): Promise<Step> {
@@ -437,13 +357,7 @@ async function carryOut(
 		case "again":
 			return askAgain(turn, consulted, decision.candidate);
 		case "run":
-			return run(
-				turn,
-				router,
-				consulted,
-				decision.candidate,
-				decision.announce,
-			);
+			return run(turn, consulted, decision.candidate, decision.announce);
 	}
 }
 
@@ -508,7 +422,6 @@ async function askAgain(
 /** One candidate the router decided to do. */
 async function run(
 	turn: Turn,
-	router: ActiveRouter,
 	consulted: Consulted,
 	c: RouteCandidate,
 	announce: Announce,
@@ -520,15 +433,9 @@ async function run(
 			return "talk";
 		case "toolchain":
 		case "read":
-			return toolchain(turn, router, consulted, c, announce);
+			return toolchain(turn, consulted, c, announce);
 		case "memory": {
-			const filled = await fieldsOf(
-				turn,
-				router,
-				consulted.words,
-				"memory",
-				consulted.model,
-			);
+			const filled = await fieldsOf(turn, consulted.words, "memory");
 			if ("step" in filled) return filled.step;
 			return requestMemory(
 				turn,
@@ -547,7 +454,7 @@ async function run(
 					? operateWork(turn, c.todo, "amend", turn.utterance, accepted())
 					: operateWork(turn, c.todo, "cancel", undefined, accepted());
 		case "redirect":
-			return redirect(turn, router, consulted, c);
+			return redirect(turn, consulted, c);
 		case "pending":
 			if (c.operation === "approve")
 				return approveConfirmation(turn, c.confirmation);
@@ -573,12 +480,11 @@ function requestWords(turn: Turn, words: string): string {
 type Prepared = { step: Step } | { confirms: boolean; go: () => Promise<Step> };
 
 /**
- * A toolchain or a read tool, up to the host operation: its fields (the router's second call, else the model's fill).
+ * A toolchain or a read tool, up to the host operation: its fields (the model's one-candidate fill when it has any).
  * Nothing is changed yet. `redirected` is the earlier turn this hand-over corrects: its words are already in `words`.
  */
 async function prepare(
 	turn: Turn,
-	router: ActiveRouter,
 	consulted: Consulted,
 	c: Extract<RouteCandidate, { kind: "toolchain" | "read" }>,
 	announce: Announce,
@@ -587,7 +493,7 @@ async function prepare(
 	const words = redirected
 		? `${redirected.trace.text}\n${turn.utterance}`
 		: consulted.words;
-	const filled = await fieldsOf(turn, router, words, c, consulted.model);
+	const filled = await fieldsOf(turn, words, c);
 	if ("step" in filled) return filled;
 	const { choice } = c;
 	if (choice.execution === "read")
@@ -633,12 +539,11 @@ async function prepare(
 /** A toolchain or a read tool: its fields, then the host operation it takes. */
 async function toolchain(
 	turn: Turn,
-	router: ActiveRouter,
 	consulted: Consulted,
 	c: Extract<RouteCandidate, { kind: "toolchain" | "read" }>,
 	announce: Announce,
 ): Promise<Step> {
-	const prepared = await prepare(turn, router, consulted, c, announce);
+	const prepared = await prepare(turn, consulted, c, announce);
 	return "step" in prepared ? prepared.step : prepared.go();
 }
 
@@ -726,7 +631,6 @@ async function afterHandOver(
  */
 async function redirect(
 	turn: Turn,
-	router: ActiveRouter,
 	consulted: Consulted,
 	c: Extract<RouteCandidate, { kind: "redirect" }>,
 ): Promise<Step> {
@@ -736,7 +640,7 @@ async function redirect(
 			other.kind === "toolchain" && other.id === c.toolchainId,
 	);
 	if (!trace?.decided || !target) return { retry: "redirect_unavailable" };
-	const prepared = await prepare(turn, router, consulted, target, "fixed", {
+	const prepared = await prepare(turn, consulted, target, "fixed", {
 		trace,
 		wrongId: /^t\d+\.redirect:/.test(trace.decided)
 			? (trace.set[0] ?? trace.decided)

@@ -8,7 +8,51 @@ import {
 	createPipelinesAdapter,
 	PIPELINES_ADAPTER_REF,
 } from "./pipelines-adapter";
+import {
+	BEST_V2_FEATURES,
+	BEST_V2_FORMAT,
+	BEST_V2_MEMORY_FORMAT,
+	loadBestV2,
+	type RouteInput,
+} from "eumenes_router";
 import { createPipelineTrials } from "./pipelines-trials";
+
+/** The router's embedding space and a best-v2 that reads the context judgment's score alone (σ(10·score − 4)). */
+const ROUTER_SPACE = {
+	modelId: "m",
+	revision: "1",
+	artifactDigest: "d",
+	dimension: 2,
+};
+const ROUTER_MODEL = loadBestV2(
+	{
+		format: BEST_V2_FORMAT,
+		version: "fixture",
+		source: "fixture",
+		features: [...BEST_V2_FEATURES],
+		ranker: {
+			mean: BEST_V2_FEATURES.map(() => 0),
+			scale: BEST_V2_FEATURES.map(() => 1),
+			coef: BEST_V2_FEATURES.map((f) =>
+				f === "rr" ? 10 : f === "is_conv" ? 4 : 0,
+			),
+			intercept: -4,
+		},
+		gate: { deferBelow: 0.2 },
+		fuse: { weight: 2, conversation: 0.18, top: 8 },
+		extra: { tools: 4 },
+		knn: { neighbors: 1, dimension: 2 },
+	},
+	{
+		format: BEST_V2_MEMORY_FORMAT,
+		source: "fixture",
+		dimension: 2,
+		labels: ["conversation.respond"],
+		vectors: btoa(
+			String.fromCharCode(...new Uint8Array(new Float32Array([1, 0]).buffer)),
+		),
+	},
+);
 
 const draft: PipelineDefinition = {
 	formatVersion: 1,
@@ -226,7 +270,7 @@ test("a screen edit that fails the format check is kept as the rejected draft; a
 	}
 });
 
-test("trials read the work's draft: the probe ranks it among the toolchains, the selection test runs the first round only", async () => {
+test("trials read the work's draft: the probe ranks it among the toolchains, the selection asks the router with the draft among its candidates", async () => {
 	const { h, work, invoke } = await setup();
 	try {
 		await invoke("pipelines.source.apply", {
@@ -262,7 +306,55 @@ test("trials read the work's draft: the probe ranks it among the toolchains, the
 			text: "二つのタイマー: 分のタイマーと、続けて秒のタイマーを掛ける",
 			similarity: 1,
 		});
-		const selection = await trials.select(
+		// The selection trial asks the router (the eumenes_router package) with the draft among its candidates; here
+		// LARM's context judgment and best-v2 are fakes that make a score of 0.95 a sure top.
+		const routed: string[][] = [];
+		const routerTrials = createPipelineTrials({
+			store: h.store,
+			capabilities: h.toolchain.capabilities,
+			routing: {
+				...h.routing,
+				embedRouter: async (texts: readonly string[]) => ({
+					space: ROUTER_SPACE,
+					vectors: texts.map(() => [1, 0]),
+				}),
+				routerCardsInTransaction: () => [],
+				routerLexicalInTransaction: () => new Map(),
+				routerModelInTransaction: () => ROUTER_MODEL,
+			},
+			inference: {
+				...h.inference,
+				snapshotInTransaction: (db: never) => ({
+					...h.inference.snapshotInTransaction!(db),
+					router: {
+						...h.inference.snapshotInTransaction!(db).router,
+						profile: "router-fixture-profile",
+					},
+				}),
+				route: async (input: RouteInput) => {
+					routed.push(input.criteria.map((c) => c.name));
+					const scores = Object.fromEntries(
+						input.criteria.map((c) => [
+							c.name,
+							c.name === "pipeline.timer-pair" ? 0.95 : 0,
+						]),
+					);
+					return {
+						choice: "pipeline.timer-pair",
+						probabilities: Object.fromEntries(
+							input.criteria.map((c) => [c.name, 1 / input.criteria.length]),
+						),
+						scores,
+						model: "router-fixture-model",
+						headRevision: null,
+						calibrationRevision: null,
+					};
+				},
+			} as typeof h.inference,
+			service: h.pipelines,
+			embedPassages: h.toolchain.embedPassages,
+		});
+		const selection = await routerTrials.select(
 			work.workRef,
 			"5分のタイマーを掛けて、続けてもう一つタイマーを",
 			new AbortController().signal,
@@ -271,10 +363,20 @@ test("trials read the work's draft: the probe ranks it among the toolchains, the
 			ok: true,
 			chosen: "pipeline_timer_pair",
 			matched: true,
-			next: "pipeline",
-			inputs: { minutes: 5 },
+			next: null,
+			inputs: null,
 			code: null,
 		});
+		expect(routed[0]).toContain("pipeline.timer-pair");
+		// Without a saved router the trial says so instead of choosing.
+		await h.settings.configureRouter({ profile: null });
+		expect(
+			await trials.select(
+				work.workRef,
+				"5分のタイマーを掛けて",
+				new AbortController().signal,
+			),
+		).toMatchObject({ ok: true, chosen: null, code: "router_unavailable" });
 		// Nothing was run.
 		expect(
 			h.store.read((db) => db.query("SELECT COUNT(*) AS n FROM timers").get()),

@@ -51,42 +51,37 @@ const FOUND = {
 
 test("a hand-over's search and delegation are kept with its announcement, the next local turn draws the words alone, and the background calls read the same prefix", async () => {
 	h = await setup();
-	h.state.steps.push(
-		choice({
-			choice: IMAGE.id,
-			say: "描きますね。",
-			request: "猫の絵",
-		}),
-	);
+	h.state.steps.push(choice({ choice: IMAGE.id }));
 	const waiting = await h.say("猫の絵を描いて", "queued");
 	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
 	h.state.steps.push(choice({ choice: "none" }), {
 		text: "どういたしまして。",
 	});
 	await h.say("ありがとう");
-	// The request opens the recent conversation with `## Memory`; the agent's words follow it, alone.
-	expect(recent()).toEqual([{ role: "assistant", content: "描きますね。" }]);
+	// The request opens the recent conversation with `## Memory`; the host's announcement follows it, alone.
+	const announced = "「画像」に頼みます。";
+	expect(recent()).toEqual([{ role: "assistant", content: announced }]);
 	expect(
-		kept("描きますね。").toolCalls.map(({ name, arguments: args, result }) => ({
+		kept(announced).toolCalls.map(({ name, arguments: args, result }) => ({
 			name,
 			args: JSON.parse(args),
 			result,
 		})),
 	).toEqual([
 		{
-			// The host searched with the user's words.
+			// The host offered what the router ranked, for the user's words.
 			name: "find_toolchain",
-			args: { query: "猫の絵を描いて" },
+			args: { query: "猫の絵を描いて", ids: [IMAGE.id, INSTANT.id] },
 			result: JSON.stringify(FOUND),
 		},
 		{
 			name: "delegate",
-			args: {
+			args: expect.objectContaining({
 				mode: "execute",
 				toolchain: IMAGE.id,
-				announcement: "描きますね。",
-				request: "猫の絵",
-			},
+				announcement: announced,
+				request: "猫の絵を描いて",
+			}),
 			result: '{"todo":"t1"}',
 		},
 	]);
@@ -203,10 +198,8 @@ test("a replayed call's arguments are always a JSON object, each text within its
 
 test("a report keeps the notice of the work it told; the next local turn draws the words alone", async () => {
 	h = await setup();
-	h.state.steps.push(
-		choice({ choice: IMAGE.id, say: "描きますね。", request: "猫の絵" }),
-	);
-	const waiting = await h.say("猫の絵を描いて", "queued");
+	h.state.steps.push(choice({ choice: IMAGE.id }));
+	const waiting = await h.say("猫の絵", "queued");
 	await h.finishImage(waiting.id, { state: "completed", title: "猫" });
 	const [todo] = h.archived();
 	await h.store.write((db) =>
@@ -226,6 +219,9 @@ test("a report keeps the notice of the work it told; the next local turn draws t
 		`[ホストの知らせ] t${todo!.ref}「猫の絵」が終わりました（成功）。`,
 	);
 	expect(recent()).toEqual([
-		{ role: "assistant", content: "描きますね。\n猫の絵ができあがりました。" },
+		{
+			role: "assistant",
+			content: "「画像」に頼みます。\n猫の絵ができあがりました。",
+		},
 	]);
 });

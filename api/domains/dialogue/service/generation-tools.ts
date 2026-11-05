@@ -46,10 +46,10 @@ export const searchArgs = z
 	.object({
 		query: z.string().trim().min(1).max(2000),
 		/**
-		 * The router's wider slots (spec toolchain-router-redesign §3.1); the host's own call only. A search that has one
-		 * of the turn's search before it is a second look at the same query: it changes nothing the turn keeps.
+		 * The router's offer (spec router-package-integration 2026-11-04 §1 #11): exactly these toolchains and read tools,
+		 * without a search; the host's own call only.
 		 */
-		slots: z.literal("router").optional(),
+		ids: z.array(id).min(1).max(128),
 	})
 	.strict();
 

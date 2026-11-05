@@ -17,7 +17,6 @@ import {
 import { systemContext } from "../../../infrastructure/system-context";
 import type { Run } from "../contracts";
 import { recentRuns } from "../repository";
-import { intentJudgmentsOfMessage } from "../repository/intent";
 import { sessionEventsOfRun } from "../repository/specialist";
 import type { DialogueDeps, GenerateInput } from "./context";
 import type { ExecutorContext, ToolOutcome } from "./executor-context";
@@ -59,11 +58,6 @@ const LIMITS = {
 	logMs: 3_000,
 } as const;
 
-const ROUTE_LABELS: Readonly<Record<string, string>> = {
-	search: "依頼",
-	answer: "会話",
-	free: "判定で決めず",
-};
 const TURN_LABELS: Readonly<Record<string, string>> = {
 	talk: "会話",
 	request: "依頼",
@@ -289,7 +283,6 @@ async function runsFound(
 				said:
 					deps.conversation.messageInTransaction(db, run.inputMessageId)
 						?.message.text ?? "",
-				judged: intentJudgmentsOfMessage(db, run.inputMessageId).at(-1),
 				usage: deps.toolchains?.usageOfRunInTransaction?.(db, run.id),
 			}));
 	});
@@ -299,15 +292,10 @@ async function runsFound(
 		rows.flatMap(({ run }) => [run.id, ...(run.jobId ? [run.jobId] : [])]),
 	);
 	return {
-		lines: rows.map(({ run, said, judged, usage }) => {
+		lines: rows.map(({ run, said, usage }) => {
 			const logs = logsByRun(entries, run);
 			return [
 				`- ${when(run.createdAt)} 発言「${clip(said, LIMITS.headChars)}」`,
-				...(judged
-					? [
-							`判定: ${judged.choice ?? "なし"}→${ROUTE_LABELS[judged.finalRoute] ?? judged.finalRoute}`,
-						]
-					: []),
 				...(logs.turn ? [`回: ${logs.turn}`] : []),
 				`担当: ${usage?.toolchainId ?? "なし"}`,
 				`結果: ${run.status}${codeText(usage?.code ?? run.error)}`,

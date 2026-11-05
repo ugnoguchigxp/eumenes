@@ -171,7 +171,7 @@ test("a published pipeline is a new revision of an ordinary toolchain; an unchan
 	}
 });
 
-test("the first round picks the pipeline with its inputs; the host runs each step as a child and the finished run is reported", async () => {
+test("the router picks the pipeline and the fill call gives its inputs; the host runs each step as a child and the finished run is reported", async () => {
 	const { h, pipelines } = await setup(() => 30);
 	try {
 		expect((await pipelines.publish(relay)).ok).toBe(true);
@@ -183,8 +183,9 @@ test("the first round picks the pipeline with its inputs; the host runs each ste
 		await waitFor(() => execution(h)?.state === "completed", {
 			timeout: 15000,
 		});
+		// The router's hand-over is announced by the host (spec router-package-integration 2026-11-04).
 		expect(h.dialogue.answerText(run.id)).toBe(
-			"二つのタイマーを順に掛けます。",
+			"「続けて掛けるタイマー」に頼みます。",
 		);
 		// Both timers stand on the user's own message; the second takes the value the extract step gave.
 		expect(timers(h)).toEqual([

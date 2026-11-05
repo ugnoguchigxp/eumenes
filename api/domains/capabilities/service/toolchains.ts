@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { cardDigest, type Card } from "eumenes_router";
 import { get } from "../repository";
 import { zSchema } from "./schema";
 import { createArtifacts } from "./artifacts";
@@ -47,17 +48,6 @@ export const CANDIDATE_SLOTS = {
 	general: 2,
 	near: 0.05,
 } as const;
-/**
- * The router's slots (spec toolchain-router-redesign 2026-11-01 §3.1, §11): wider than the choice call's, and cut by
- * no distance from the closest, so a pipeline or a general toolchain reaches the router beside the dedicated ones.
- * The sizes are where the evaluation set's right answer stays in the router's offer (§3.2).
- */
-export const ROUTER_SLOTS = {
-	dedicated: 10,
-	pipeline: 4,
-	general: 4,
-	near: Number.POSITIVE_INFINITY,
-} as const;
 type Slots = {
 	dedicated: number;
 	pipeline: number;
@@ -93,6 +83,54 @@ const readToolSchemas = new Map(
 		readToolParameters(tool.name),
 	]),
 );
+
+/** The candidates as cards, in their order: their rank, similarity and whether a past choice suggested them. */
+function cardsOf(
+	db: Database,
+	candidates: readonly FixedDefinition[],
+	active: readonly FixedDefinition[],
+	similarity: ReadonlyMap<string, number>,
+	historical: ReadonlySet<string>,
+): ToolchainCard[] {
+	const functionOf = new Map(active.map((d) => [d.id, d.functionName!]));
+	const producers = producersInTransaction(db);
+	return candidates.map((d, i) => ({
+		revisionId: d.revisionId,
+		id: d.id,
+		functionName: d.functionName!,
+		title: d.title,
+		summary: d.summary,
+		useWhen: d.useWhen,
+		...(d.minImpact ? { minImpact: d.minImpact } : {}),
+		...(d.general ? { general: true as const } : {}),
+		...(producers.has(d.id) ? { produces: producers.get(d.id)! } : {}),
+		...(readToolSchemas.has(d.revisionId)
+			? {
+					execution: "read" as const,
+					read: { parameters: readToolSchemas.get(d.revisionId)! },
+				}
+			: {}),
+		redirects: (d.redirects ?? []).flatMap((r) =>
+			functionOf.has(r.toolchainId)
+				? [
+						{
+							when: r.when,
+							toolchainId: r.toolchainId,
+							functionName: functionOf.get(r.toolchainId)!,
+						},
+					]
+				: [],
+		),
+		score: {
+			rank: i + 1,
+			ftsRank: null,
+			similarity: similarity.has(d.revisionId)
+				? Number(similarity.get(d.revisionId)!.toFixed(4))
+				: null,
+			fromHistory: historical.has(d.revisionId),
+		},
+	}));
+}
 
 /** A pipeline by its stored binding, a general toolchain by its definition, any other dedicated. */
 export function kindOf(db: Database, d: FixedDefinition): CandidateKind {
@@ -288,13 +326,28 @@ export function createToolchains(
 			fromHistory?: string[];
 			limit?: number;
 			strict?: boolean;
-			/** Fill the slots of each kind (`CANDIDATE_SLOTS`, or the router's `ROUTER_SLOTS`) instead of the first `limit`. */
-			slots?: true | "router";
+			/** Fill the slots of each kind (`CANDIDATE_SLOTS`) instead of the first `limit`. */
+			slots?: true;
+			/**
+			 * Exactly these toolchains and read tools, in this order, without a search: the ones the router (the
+			 * eumenes_router package) offered for the turn.
+			 */
+			ids?: readonly string[];
 		},
 	): ToolchainCard[] {
 		const active = [...activeInTransaction(db), ...readToolEntries].filter(
 			(d) => input.available(d.id),
 		);
+		if (input.ids) {
+			const byId = new Map(active.map((d) => [d.id, d]));
+			return cardsOf(
+				db,
+				[...new Set(input.ids)].flatMap((id) => byId.get(id) ?? []),
+				active,
+				new Map(),
+				new Set(),
+			);
+		}
 		const similarity = input.vector
 			? similaritiesOf(
 					indexRows(db, vectorSpaceKey(input.vector.space)),
@@ -315,51 +368,14 @@ export function createToolchains(
 						ranked,
 						(d) => similarity.get(d.revisionId)!,
 						(d) => kindOf(db, d),
-						input.slots === "router" ? ROUTER_SLOTS : CANDIDATE_SLOTS,
+						CANDIDATE_SLOTS,
 					)
 				: ranked.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
 			: input.strict
 				? []
 				: // Every available toolchain; the read tools are found by similarity only.
 					active.filter((d) => !readToolSchemas.has(d.revisionId));
-		const functionOf = new Map(active.map((d) => [d.id, d.functionName!]));
-		const producers = producersInTransaction(db);
-		return candidates.map((d, i) => ({
-			revisionId: d.revisionId,
-			id: d.id,
-			functionName: d.functionName!,
-			title: d.title,
-			summary: d.summary,
-			useWhen: d.useWhen,
-			...(d.minImpact ? { minImpact: d.minImpact } : {}),
-			...(d.general ? { general: true as const } : {}),
-			...(producers.has(d.id) ? { produces: producers.get(d.id)! } : {}),
-			...(readToolSchemas.has(d.revisionId)
-				? {
-						execution: "read" as const,
-						read: { parameters: readToolSchemas.get(d.revisionId)! },
-					}
-				: {}),
-			redirects: (d.redirects ?? []).flatMap((r) =>
-				functionOf.has(r.toolchainId)
-					? [
-							{
-								when: r.when,
-								toolchainId: r.toolchainId,
-								functionName: functionOf.get(r.toolchainId)!,
-							},
-						]
-					: [],
-			),
-			score: {
-				rank: i + 1,
-				ftsRank: null,
-				similarity: similarity.has(d.revisionId)
-					? Number(similarity.get(d.revisionId)!.toFixed(4))
-					: null,
-				fromHistory: historical.has(d.revisionId),
-			},
-		}));
+		return cardsOf(db, candidates, active, similarity, historical);
 	}
 	/** The exact active toolchain revision and its package, or an error code. */
 	function resolveInTransaction(db: Database, revisionId: string) {
@@ -452,6 +468,29 @@ export function createToolchains(
 		).run(revisionId, key);
 		indexSearch(db, d);
 	}
+	/**
+	 * The router package's cards (spec router-package-integration 2026-11-04 §1 #7): every enabled toolchain and the
+	 * read tools, by their purpose, use cases and examples (the passages they are searched by), kind and least impact.
+	 */
+	function routerCardsInTransaction(db: Database): Card[] {
+		const card = (d: FixedDefinition, read: boolean): Card => {
+			const body = {
+				id: d.id,
+				revision: String(d.revision),
+				kind: read ? ("read" as const) : kindOf(db, d),
+				title: d.title,
+				summary: d.summary,
+				useWhen: d.useWhen,
+				examples: d.examples ?? [],
+				impact: read ? ("none" as const) : (d.minImpact ?? "none"),
+			};
+			return { ...body, digest: cardDigest(body) };
+		};
+		return [
+			...activeInTransaction(db).map((d) => card(d, false)),
+			...readToolEntries.map((d) => card(d, true)),
+		];
+	}
 	/** Every active toolchain's examples, for routing evaluation. */
 	function examplesInTransaction(db: Database) {
 		return activeInTransaction(db).map((d) => ({
@@ -489,6 +528,7 @@ export function createToolchains(
 		}),
 		publishToolchainRevisionInTransaction: publishRevisionInTransaction,
 		toolchainExamplesInTransaction: examplesInTransaction,
+		routerCardsInTransaction,
 		producesInTransaction,
 		resourceKindsInTransaction,
 	};

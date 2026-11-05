@@ -400,16 +400,14 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 		artifactRevisionId: STUDIO_ARTIFACT,
 		targetRef: "item-old",
 	};
-	h.talk("見ています");
-	await h.ask("これは？", { viewing });
-	expect(h.stateOf(0)).toContain(
-		"- 制作担当「古い項目」（画面に表示中、target item-old）",
-	);
 	// Changing a saved item is confirmed first; the approval opens that item.
 	h.handOver({ request: "これを直して", target: "item-old" });
 	await h.ask("これを直して", { viewing });
-	// The search offers it as a target of the studio.
-	const found = h.state.calls[2]!.messages.at(-1)!
+	// The fill of the studio shows it on screen and offers it as a target.
+	expect(h.stateOf(0)).toContain(
+		"- 制作担当「古い項目」（画面に表示中、target item-old）",
+	);
+	const found = h.state.calls[0]!.messages.at(-1)!
 		.content.split("\n")
 		.find((line) => line.startsWith(`- ${STUDIO.id}: `))!;
 	expect(found).toContain("item-old「");
@@ -421,11 +419,10 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 	// Without the screen showing it, the same ref is not issued: nothing starts.
 	const other = await harness();
 	other.handOver({ request: "直して", target: "item-old" });
-	// The refused choice is made once more; this one chooses nothing and the talk turn answers.
-	other.talk("開けません");
-	await other.ask("直して");
-	expect(other.state.calls[1]!.messages.at(-1)!.content).toContain(
-		"target_not_found",
+	// The fill names an item that was not issued: the host refuses it and says it could not ask.
+	const refused = await other.ask("直して");
+	expect(other.answerText(refused.id)).toBe(
+		"うまく頼めませんでした。もう一度言ってもらえますか。",
 	);
 	expect(other.work()).toHaveLength(0);
 	expect(await other.session()).toBeNull();

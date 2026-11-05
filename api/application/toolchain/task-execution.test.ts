@@ -116,8 +116,10 @@ test("the conversation hands a request to the task toolchain and it executes two
 			status: "completed",
 			error: null,
 		});
-		// The run that handed the work over completes with the announcement as its answer (handed: false).
-		expect(h.dialogue.answerText(source.id)).toBe("順に進めます。");
+		// The run that handed the work over completes with the host's announcement as its answer (handed: false).
+		expect(h.dialogue.answerText(source.id)).toBe(
+			"「日常の複数操作」に頼みます。",
+		);
 		const list = () =>
 			h.store.read((db) =>
 				h.toolchain.agents.executions.listInTransaction(db, "main"),
@@ -340,7 +342,9 @@ test("an instant child keeps the registered arguments and follows its explicit r
 			{ timeout: 5000 },
 		);
 		expect(steps).toBe(3);
-		expect(h.dialogue.answerText(source.id)).toBe("明日の天気を確認します。");
+		expect(h.dialogue.answerText(source.id)).toBe(
+			"「日常の複数操作」に頼みます。",
+		);
 		const rows = h.store.read((db) =>
 			db
 				.query("SELECT input_json,result_json FROM agent_execution_steps")

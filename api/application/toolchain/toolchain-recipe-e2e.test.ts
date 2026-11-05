@@ -104,7 +104,7 @@ test("鎌倉の天気: the second request reads the saved page again without sea
 	}
 });
 
-test("the conversation sees one flat request function per offered toolchain", async () => {
+test("the router's offer is recorded with the toolchains it ranked", async () => {
 	const h = await harness({});
 	try {
 		const run = await h.dialogue.submit({
@@ -115,9 +115,8 @@ test("the conversation sees one flat request function per offered toolchain", as
 		await h.dialogue.waitForTerminal(run.id, { timeoutMs: 8000 });
 		const trace = h.toolchain.history.getSelection(run.id)!;
 		expect(trace.candidates.map((c) => c.functionName)).toContain("web_search");
-		// Discovery is bounded by explicit fixture embeddings, with no all-catalog fallback.
-		expect(trace.retrieval).toBe("embedding");
-		expect(trace.candidates.length).toBeLessThanOrEqual(4);
+		// The router (the eumenes_router package) found them, lexically and by embedding; the offer is what it ranked.
+		expect(trace.retrieval).toBe("hybrid");
 	} finally {
 		await h.close();
 	}

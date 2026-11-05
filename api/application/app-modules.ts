@@ -1,3 +1,4 @@
+import { registerRouterMemory } from "./toolchain/router-memory";
 import {
 	registerRouterExport,
 	type createRouterExport,
@@ -147,6 +148,8 @@ export type AppServices = {
 	tasks?: TasksService;
 	toolchainHistory?: ToolchainHistory;
 	routerExport?: ReturnType<typeof createRouterExport>;
+	/** best-v2's memory for the router package (spec router-package-integration 2026-11-04 §1 #6). */
+	routerMemory?: Parameters<typeof registerRouterMemory>[1];
 	timers?: TimersService;
 	/** Resource URIs (absent: the routes do not exist). */
 	resources?: Resources;
@@ -277,6 +280,9 @@ export function appModules(services: AppServices): AppModule[] {
 		s.tasks && { mount: (app) => registerTasks(app, s.tasks!) },
 		s.routerExport && {
 			mount: (app) => registerRouterExport(app, s.routerExport!),
+		},
+		s.routerMemory && {
+			mount: (app) => registerRouterMemory(app, s.routerMemory!),
 		},
 		s.toolchainHistory && {
 			mount: (app) => registerToolchainHistory(app, s.toolchainHistory!),

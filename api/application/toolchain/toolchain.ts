@@ -86,6 +86,7 @@ import { createReadPorts } from "./research-history-ports";
 import { createToolchainHistory } from "../../domains/toolchain-history";
 import { createRecipePorts } from "./toolchain-recipes";
 import { createVectorRefresh, type Embed } from "./toolchain-vectors";
+import { routerFixedCards } from "../../domains/dialogue";
 type ToolchainOptions = {
 	docling?: import("../../domains/docling").DoclingService;
 	dotsWork?: import("../work/dots-work").DotsWork;
@@ -467,6 +468,11 @@ export async function createToolchain(
 		capabilities,
 		history,
 		options.embed,
+		// The router package's cards: the toolchains and read tools, and the conversation's own two.
+		(db) => [
+			...capabilities.routerCardsInTransaction(db),
+			...routerFixedCards(),
+		],
 	);
 	return {
 		capabilities,
@@ -507,6 +513,10 @@ export async function createToolchain(
 		embedPassages: vectors.embedPassages,
 		/** Embed one request for retrieval; undefined when embedding is unavailable or slow. */
 		embedQuery: vectors.embedQuery,
+		/** The router package's embedding of what it routes (passages); throws when unavailable. */
+		embedRouter: vectors.embedRouter,
+		/** Stores best-v2's memory for the router package in the current embedding space. */
+		importRouterMemory: vectors.importRouterMemory,
 	};
 }
 

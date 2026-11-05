@@ -33,7 +33,8 @@ async function accept(h: Awaited<ReturnType<typeof harness>>) {
 		);
 		const notice = h.voice.get(id)!.audioChunks?.[0];
 		if (h.dialogue.get(h.voice.get(id)!.runId!)?.announcement) {
-			expect(notice?.text).toBe("お調べします。");
+			// The router's hand-over is announced by the host.
+			expect(notice?.text).toBe("「タイマー」に頼みます。");
 			await h.voice.played(id, notice!.index);
 		}
 	}
@@ -65,7 +66,7 @@ test("a committed timer result is reported by the agency, not by the turn: the n
 		);
 		expect(h.voice.get(id)?.status).toBe("played");
 		expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
-		expect(h.spoken).toEqual(["お調べします。"]);
+		expect(h.spoken).toEqual(["「タイマー」に頼みます。"]);
 		expect(h.reported()).toContain("180");
 		expect(
 			h.store.read((db) =>

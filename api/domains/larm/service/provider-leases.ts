@@ -31,8 +31,10 @@ type Options = {
 	hostsFor: () => ProviderHosts;
 	control: Control;
 	lifetime: AbortController;
-	/** The port serves the decision provider alone (the user-intent judge): its connection selects nothing else. */
+	/** The port serves the decision provider alone (the router): its connection selects nothing else. */
 	decisionOnly?: boolean;
+	/** That decision provider's capability (absent: `decision.system-one`). */
+	decisionCapability?: string;
 };
 
 /** LARM identifies different Provider scopes as different Connections, even for the same client. */
@@ -158,6 +160,7 @@ function createScope({
 	control,
 	lifetime,
 	decisionOnly = false,
+	decisionCapability = "decision.system-one",
 	llmConnection,
 }: Options) {
 	let lease: Lease | undefined;
@@ -246,10 +249,11 @@ function createScope({
 					idleTimeoutMs,
 					fullProfile: !decisionOnly,
 					excludeLlm: llmConnection === false,
-					...(decisionOnly ? { providers: ["system-one"] } : {}),
+					...(decisionOnly ? { decisionCapability } : {}),
 					lifetime: lifetime.signal,
 				},
-				decisionOnly ? ["system-one"] : ["asr", "tts"],
+				// The decision provider is checked by its capability (its catalog name is LARM's).
+				decisionOnly ? [] : ["asr", "tts"],
 				crypto.randomUUID(),
 			).then((current) => {
 				lease = current;

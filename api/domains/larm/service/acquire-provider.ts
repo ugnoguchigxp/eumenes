@@ -34,7 +34,10 @@ export async function acquireProvider(
 	const declared = catalog.find((p) =>
 		name === "tts-english"
 			? p.capability === "speech.tts.english"
-			: p.name === name,
+			: name === "system-one"
+				? p.capability ===
+					(current.request.decisionCapability ?? "decision.system-one")
+				: p.name === name,
 	);
 	if (!declared && name === "tts-english" && !withoutEnglish.has(current)) {
 		const response = record(
@@ -133,6 +136,9 @@ export async function acquireProvider(
 				catalogProviders: catalog,
 				fullProfile: current.request.fullProfile,
 				decision: name === "system-one",
+				...(current.request.decisionCapability
+					? { decisionCapability: current.request.decisionCapability }
+					: {}),
 				claimNames: [externalName],
 				hosts,
 			});

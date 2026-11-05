@@ -138,6 +138,12 @@ export const searchThenDelegate =
 			: { text: UNAVAILABLE_TEXT };
 	};
 
+/**
+ * The user's words of a hand-over's request, as a sub-agent reads them: its first line. The router's hand-over adds
+ * the utterance before them on the next lines as delimited context (spec toolchain-router-redesign 2026-11-01).
+ */
+export const askedOf = (request: string) => request.split("\n")[0]!;
+
 /** What the conversation says when no toolchain can do the request. */
 export const UNAVAILABLE_TEXT = "その依頼は、今の担当ではできません。";
 
@@ -307,6 +313,32 @@ export async function choiceByScript(
 		];
 	}
 	return NONE;
+}
+
+/**
+ * The answer fill of a question that asks for a structured answer, from a script written for the agent loop: the
+ * text of its work answer read as the answer; none when it gives no such answer.
+ */
+export async function answerByScript(
+	messages: ConversationMessage[],
+	step: (loop: ConversationMessage[]) => Promise<Step> | Step,
+): Promise<string> {
+	const chosen = JSON.parse(
+		await choiceByScript(messages, "pending", step),
+	) as {
+		choice?: string;
+		text?: unknown;
+	};
+	if (chosen.choice !== "answer" || typeof chosen.text !== "string")
+		return NONE;
+	try {
+		return JSON.stringify({
+			choice: "answer",
+			answer: JSON.parse(chosen.text),
+		});
+	} catch {
+		return NONE;
+	}
 }
 
 /**
