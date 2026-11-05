@@ -118,3 +118,34 @@ test("conversation selects the registered research task, uses the existing guard
 		await h.close();
 	}
 }, 20000);
+
+test("disabled research is not offered, while its retained owner still erases prior private work", async () => {
+	const h = await harness({ webResearch: false, pursuit: researchScript() });
+	try {
+		const adapter = h.toolchain.registry.get("adapter:pursuit@1")!;
+		const id = crypto.randomUUID();
+		expect(h.toolchain.pursuit).toBeDefined();
+		h.store.read((db) =>
+			expect(adapter.availableInTransaction(db)).toBe(false),
+		);
+		await h.store.write((db) => {
+			db.query(
+				"INSERT INTO pursuit_runs(id,conversation_id,state,epoch,revision,deadline,step,data_json,created_at,updated_at) VALUES (?,?,'queued',0,0,?,0,?,?,?)",
+			).run(
+				id,
+				"main",
+				Date.now() + 60000,
+				JSON.stringify({ coreIds: [], request: "private prior research" }),
+				Date.now(),
+				Date.now(),
+			);
+			adapter.task!.forgetInTransaction!(db, id);
+			expect(
+				db.query("SELECT data_json FROM pursuit_runs WHERE id=?").get(id),
+			).toEqual({ data_json: null });
+		});
+		expect((await h.request("/api/capabilities")).status).toBe(200);
+	} finally {
+		await h.close();
+	}
+});

@@ -610,6 +610,7 @@ export async function harness(options: HarnessOptions = {}) {
 			},
 		};
 	const toolchain = await createToolchain(store, queue, inference, web, {
+		webResearch: options.webResearch,
 		docling: options.docling,
 		compute,
 		browser,

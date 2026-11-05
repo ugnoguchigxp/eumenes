@@ -164,7 +164,7 @@ export async function fixture(
 			},
 			request,
 			references: [],
-			toolchainRevisionId: "toolchain:web.research@2",
+			toolchainRevisionId: "toolchain:web.research@3",
 			bindingRevisionId: "binding:pursuit.research@2",
 		}),
 	);

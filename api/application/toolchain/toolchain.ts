@@ -277,7 +277,7 @@ export async function createToolchain(
 		...collaboration.adapters,
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
-		createPursuitAdapter(() => pursuitRuntime),
+		createPursuitAdapter(() => pursuitRuntime, options.webResearch !== false),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk
 			? [
@@ -387,16 +387,14 @@ export async function createToolchain(
 		bundleHost: () => bundleHostOf(registry),
 	});
 	await capabilities.seed();
-	pursuitRuntime =
-		options.webResearch === false
-			? undefined
-			: createPursuit({
-					store,
-					queue,
-					inference,
-					capabilities,
-					web: createPursuitWebPort(web, queue),
-				});
+	// Keep the owner alive after disablement so retained work can still be cancelled or erased.
+	pursuitRuntime = createPursuit({
+		store,
+		queue,
+		inference,
+		capabilities,
+		web: createPursuitWebPort(web, queue),
+	});
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(
 		web,

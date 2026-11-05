@@ -15,6 +15,7 @@ export function describePursuitAdapter() {
 /** Registered lifecycle; the dialogue's common task path selects this owner. */
 export function createPursuitAdapter(
 	service: () => PursuitService | undefined,
+	enabled = true,
 ): DomainAdapter {
 	const required = () => {
 		const value = service();
@@ -24,7 +25,8 @@ export function createPursuitAdapter(
 	return {
 		ref: "adapter:pursuit@1",
 		describe: describePursuitAdapter,
-		availableInTransaction: () => service()?.availableInTransaction() ?? false,
+		availableInTransaction: () =>
+			enabled && (service()?.availableInTransaction() ?? false),
 		artifactAvailableInTransaction: () => false,
 		task: {
 			startInTransaction: (db, input) =>
