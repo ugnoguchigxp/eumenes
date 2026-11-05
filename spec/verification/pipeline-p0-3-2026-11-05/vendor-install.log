@@ -1,0 +1,8 @@
+bun install v1.4.4 (38afee6c8)
+Resolving dependencies
+Resolved, downloaded and extracted [1]
+Saved lockfile
+
++ eumenes-pipeline@vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz
+
+2 packages installed [58.00ms]

@@ -14,12 +14,11 @@ import { appModules } from "../api/application/app-modules";
 import { appServices } from "../api/application/server-app-services";
 import { createClient } from "../client";
 import { liveLarmSettings } from "../scripts/live-larm";
-import { livePipelines } from "./live-pipelines";
 const args = process.argv.slice(2);
 if (args[0] !== "--run") throw Error("explicit_--run_required");
 const suite = args[1] ?? "timers",
 	count = Number(args[2] ?? 3),
-	// Publish the hand-written task pipelines into the isolated database first (spec task-pipeline-design §9).
+	// Require the imported one-off planner for the pipeline acceptance variant.
 	pipelined = args.includes("--pipelines"),
 	// A similar request with other words is checked like the suite it varies.
 	base = suite.replace(/2$/, "");
@@ -164,14 +163,6 @@ try {
 	}
 	await life.recoverAll();
 	await s.inference.connect();
-	if (pipelined) {
-		for (const definition of livePipelines)
-			record({
-				stage: "pipeline_published",
-				id: definition.id,
-				result: await s.pipelines!.publish(definition),
-			});
-	}
 	await s.toolchain.refreshVectors();
 	life.startAll();
 	const token = resolveApiToken({ EUMENES_DB: config.dbPath });
@@ -584,7 +575,7 @@ try {
 														active.length === 2 &&
 														a?.durationSeconds === 5400 &&
 														b?.durationSeconds === 6000;
-		// With the pipelines published, the request must also have been run by one of them.
+		// The pipeline variant must have completed through the imported planner.
 		const byPipeline = works.some(
 			(w) => w.pipeline && w.status === "completed",
 		);

@@ -1,0 +1,2 @@
+$ s11tnext build --release-profile application
+Built /Users/y.noguchi/Code/eumenes/.s11tnext/catalog.json and /Users/y.noguchi/Code/eumenes/.s11tnext/catalog.generated.ts (sha256:dda02a04c60852c48315877c17057f3005dda93acd51107e278a66acfd3af421).

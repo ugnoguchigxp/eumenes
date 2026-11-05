@@ -42,13 +42,13 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 開始・回答・訂正・取消・期限・再起動・忘却は [日常の複数操作担当](task-execution.md) を参照。数値上限と適合性の意味判断をadapter独自の処理で変更しない。
 
-### 決まった手順を実行するpipeline型
+### 依頼ごとに計画するpipeline型
 
-`execution:"pipeline"` のbindingは、3つ以上の担当を決まった順に使う手順（タスクパイプライン）を、定義（`pipeline`、schemaは `api/domains/capabilities/contracts/pipelines.ts`）ごと持つ。adapterは `adapter:pipelines@1`、画面とtoolは持たず、packageはtoolを持たない。設計は[タスクパイプライン設計](../spec/task-pipeline-design-2026-10-22.md)。
+`pipeline-execution.bundle.json` の `pipeline.execute` は、`execution:"pipeline"`・`contractVersion:"p0-3"`・`adapter:pipelines@2` で登録する。定義と検査の正本は `vendor/pipeline/` の配布ライブラリ。元依頼を保持した `request / steps / output` をLLMが作り、1〜8手順を既存agent-runtimeで実行する。[取込み仕様](../spec/pipeline-p0-3-integration-2026-11-05.md)を参照する。
 
-- 手で bundle を書かない。定義を `POST /api/pipelines/publish`（`/check` で検査だけ、`/fixture` で試験の事例を担当なしで運転）か、パイプライン制作の画面（`pipeline-studio.bundle.json`、協働型 `pipeline.studio`）の「公開」で登録する。公開のたびに profile・skill・package・binding・toolchain の新revision（id `pipeline.<定義のid>`、関数名 `pipeline_<id>`）ができ、既存revisionは書き換えない。
-- 担当の検索の結果に入力のschemaとステップの一覧が付き、会話エージェントが依頼の`inputs`に入力と原文の引用（`<名前>_quote`）を書いて依頼する。実行は agent-runtime の親実行が1ステップずつ子として担当へ渡す。依頼の検索文が最初の作業だけのときも、依頼そのものの埋め込みで見つかるパイプラインを候補に足す。
-- ステップに書けるのは単発の担当（command・instant・research・画像・音楽など）だけ。session・task・pipeline は書けない。
+- 部品の公開ID・revision・引数契約を渡し、参照と最終配送を明示する。session・read・task・pipelineの再帰は部品に含めない。
+- `ready` の検査済み定義だけを実行する。`needs_input` は既存の質問、`unsupported` は未達の結果にする。構造修復は一回まで。
+- Routerの複数作業判定は、この入口へ元依頼全体を渡す。旧テンプレートの入力展開・値抽出・制作画面・公開APIは撤去済み。既存の保存revisionは書き換えず、旧実行経路は提供しない。
 
 ### 1.1 Seedと初期化
 

@@ -17,6 +17,10 @@ import {
 	describePipelinesAdapter,
 } from "../pipelines/pipelines-adapter";
 import {
+	collaborationRef,
+	describeCollaborationAdapter,
+} from "../collaboration/collaboration-adapter";
+import {
 	describeSharedKanbanAdapter,
 	SHARED_KANBAN_ADAPTER_REF,
 } from "../work/kanban-shared-adapter";
@@ -210,6 +214,10 @@ export function bundleHostOf(
 export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
+	...(["pipeline", "interact"] as const).map((kind) => ({
+		ref: collaborationRef(kind),
+		describe: () => describeCollaborationAdapter(kind),
+	})),
 	{ ref: USAGE_ADAPTER_REF, describe: describeUsageAdapter },
 	{ ref: DOCLING_ADAPTER_REF, describe: describeDoclingAdapter },
 	{ ref: DOTS_DELEGATION_ADAPTER_REF, describe: describeDotsDelegationAdapter },

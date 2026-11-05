@@ -1,5 +1,4 @@
 import {
-	head,
 	route,
 	routeStructured,
 	type RouteCandidate as PackageCandidate,
@@ -11,15 +10,12 @@ import {
 	type VectorSpace as PackageSpace,
 } from "eumenes_router";
 import { getLogger } from "../../../infrastructure/logger";
-import { systemContext } from "../../../infrastructure/system-context";
 import type { InferencePort } from "../../inference";
 import type { QueryVector } from "../contracts/toolchains";
 import type { DialogueDeps } from "./context";
 import { TOOL_NAMES } from "./generation-tools";
 import type { ChoiceCandidate } from "./routed-choice";
 import {
-	CONVERSATION_ID,
-	MEMORY_ID,
 	type DynamicCandidate,
 	type RouteCandidate,
 	type RouteDecision,
@@ -239,38 +235,25 @@ export type Routed = {
 	structure: StructuredResult["structure"];
 };
 
-/** The part the decision came from: the one decided, or the first step of a pipeline that is a tool. */
+/** The package's evidence part; a multi-job pipeline keeps the full original request. */
 export function decidedPart(routed: Routed) {
-	const { parts, decision } = routed;
-	if (decision.to === "pipeline") {
-		const step = firstStep(decision);
-		return parts.find((p) => p.text === step?.text) ?? parts[0];
-	}
-	return parts.find((p) => p.result.decision === decision) ?? parts[0];
+	return isPipelineDecision(routed.decision)
+		? undefined
+		: (routed.parts.find((p) => p.result.decision === routed.decision) ??
+				routed.parts[0]);
 }
 
-/**
- * The step of a pipeline the host does first: the first that is a toolchain or a read tool, in the structure's order;
- * else the first that is anything but the conversation (a memory request, the host's own work).
- */
-function firstStep(decision: Extract<PackageDecision, { to: "pipeline" }>) {
-	return (
-		decision.steps.find(
-			(s) => s.candidate.kind === "toolchain" || s.candidate.kind === "read",
-		) ?? decision.steps.find((s) => s.candidate.kind !== "conversation")
-	);
-}
-
-/**
- * The package's decision as the host carries it out. A pipeline's steps go to the pipeline stage, which is being
- * rebuilt apart (spec router-package-integration 2026-11-04 §1 #9): until then the first step that is a tool is done
- * and the user is told the rest was not asked for (row 9, as a request of several jobs). A candidate the host cannot
- * carry out (it left the offer) is no decision.
- */
+/** Honor the router's multi-job decision through the registered planner, without a first-job fallback. */
 export function hostDecision(
 	decision: PackageDecision,
 	hostOf: (c: PackageCandidate) => RouteCandidate | null,
+	pipelineCandidate?: RouteCandidate,
 ): RouteDecision | null {
+	// The pinned router exposes row 9 as `run/partial` in route(), and `pipeline` in routeStructured().
+	if (isPipelineDecision(decision))
+		return pipelineCandidate
+			? { row: 9, to: "run", candidate: pipelineCandidate, announce: "fixed" }
+			: null;
 	switch (decision.to) {
 		case "conversation":
 			return decision;
@@ -289,13 +272,10 @@ export function hostDecision(
 			const candidate = hostOf(decision.candidate);
 			return candidate ? { ...decision, candidate } : null;
 		}
-		case "pipeline": {
-			const step = firstStep(decision);
-			const candidate = step ? hostOf(step.candidate) : null;
-			return candidate
-				? { row: 9, to: "run", candidate, announce: "partial" }
-				: { row: 1, to: "conversation" };
-		}
+		case "pipeline":
+			return pipelineCandidate
+				? { row: 9, to: "run", candidate: pipelineCandidate, announce: "fixed" }
+				: null;
 	}
 }
 
@@ -313,8 +293,21 @@ export async function offer(
 	candidates: RouteCandidate[];
 	hostOf: (c: PackageCandidate) => RouteCandidate | null;
 }> {
+	const pipelineIds = isPipelineDecision(routed.decision)
+		? turn.deps.store.read((db) =>
+				turn.deps
+					.toolchains!.catalogInTransaction(db)
+					.filter(
+						(e) =>
+							e.runtime.execution === "pipeline" &&
+							e.runtime.binding?.available,
+					)
+					.map((e) => e.id),
+			)
+		: [];
 	const ids = [
 		...new Set([
+			...pipelineIds,
 			...routed.parts.flatMap((p) =>
 				p.result.corrected
 					.map((r) => r.candidate)
@@ -413,64 +406,9 @@ export async function routeByEntry(
 	};
 }
 
-/**
- * The router's decision on one utterance as a trial (the pipeline studio's selection trial, spec task-pipeline-design
- * 2026-10-22 §8.2): the whole utterance through the package (`route`), on an empty conversation, with the caller's
- * candidates beside its search (a draft that is not synced yet). Nothing is handed over and nothing is recorded. The
- * decided id: a toolchain or read tool, the conversation's, or null when the router asks or cannot decide.
- */
-export async function routeTrial(
-	deps: Pick<DialogueDeps, "larm" | "toolchains" | "store">,
-	input: {
-		text: string;
-		extra: readonly PackageCandidate[];
-		available: (id: string) => boolean;
-		signal: AbortSignal;
-	},
-): Promise<{ decided: string | null } | { code: string }> {
-	const router = activeRouter(deps);
-	if (!router) return { code: "router_unavailable" };
-	const env = {
-		store: deps.store,
-		port: deps.toolchains!,
-		signal: input.signal,
-	};
-	const embedded = new Map<string, QueryVector>();
-	try {
-		const text = head(input.text.trim(), 2000);
-		const r = await env.port.embedRouter!([text], input.signal);
-		embedded.set(text, { space: r.space, vector: r.vectors[0]! });
-		const model = deps.store.read((tx) =>
-			env.port.routerModelInTransaction!(tx, r.space),
-		);
-		if (!model) return { code: "router_memory_missing" };
-		const result = await route(portsOf(env, router, model, embedded), {
-			state: {
-				text: input.text.trim(),
-				previousAgent: null,
-				previousUser: null,
-			},
-			dynamic: input.extra,
-			available: (id) =>
-				id === CONVERSATION_ID || id === MEMORY_ID || input.available(id),
-			instructions: systemContext(
-				"dialogue.contexts.local.router-instructions",
-				{},
-			),
-		});
-		const { decision } = result;
-		switch (decision.to) {
-			case "conversation":
-				return { decided: CONVERSATION_ID };
-			case "ask":
-				return { decided: null };
-			case "pipeline":
-				return { decided: firstStep(decision)?.candidate.id ?? null };
-			default:
-				return { decided: decision.candidate.id };
-		}
-	} catch (cause) {
-		if (input.signal.aborted) throw cause;
-		return { code: reasonOf(cause) };
-	}
+/** Translate both published multi-job variants of the pinned router contract. */
+function isPipelineDecision(decision: PackageDecision) {
+	return (
+		decision.to === "pipeline" || (decision.to === "run" && decision.row === 9)
+	);
 }

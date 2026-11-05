@@ -155,15 +155,6 @@ export const viewRegistry = {
 		label: "UI制作",
 		schema: z.strictObject({ view: z.literal("ui-studio"), source, title }),
 	},
-	"pipeline-studio": {
-		name: "PipelineStudio",
-		label: "パイプライン制作",
-		schema: z.strictObject({
-			view: z.literal("pipeline-studio"),
-			source,
-			title,
-		}),
-	},
 	"ocr-media": {
 		name: "OcrMedia",
 		label: "OCRの元資料",

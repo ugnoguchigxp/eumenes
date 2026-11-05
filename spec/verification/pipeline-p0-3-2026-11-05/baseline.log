@@ -1,0 +1,106 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/pipelines/pipeline-studio-dialogue.test.ts:
+(pass) the conversation hands over to the studio; its specialist writes the definition, the screen shows and publishes it [545.11ms]
+(pass) the user edits the source on the screen; a text that fails is shown as the rejected draft [472.99ms]
+
+api/application/pipelines/pipelines.test.ts:
+(pass) a published pipeline is a new revision of an ordinary toolchain; an unchanged one is left as it is [454.81ms]
+(pass) the router picks the pipeline and the fill call gives its inputs; the host runs each step as a child and the finished run is reported [537.68ms]
+(pass) a value that does not fit gets one repair; then the run stops with what was done [493.26ms]
+(pass) a quote that is not the user's words goes back for the structural repair [460.27ms]
+(pass) a pipeline id that names another toolchain is refused; a revision published during a run does not stop it [555.69ms]
+(pass) published materials survive storage and arrive in the actual command input as separate full data [514.73ms]
+
+api/application/pipelines/pipeline-studio.test.ts:
+(pass) the specialist writes the draft by the work document; the screen shows its text, flow and full check by line [434.26ms]
+(pass) a screen edit that fails the format check is kept as the rejected draft; a good one is the next revision and publishes [437.43ms]
+(pass) trials read the work's draft: the probe ranks it among the toolchains, the selection asks the router with the draft among its candidates [436.08ms]
+(pass) artifact source edits preserve materials and refuse a stale modal revision [433.19ms]
+
+api/domains/pipelines/test/resource-adapter.test.ts:
+(pass) a drafted or published receipt becomes a pipeline ref; a rejected one and other owners do not [10.83ms]
+(pass) get: studio screen, the published toolchain as target; a draft never published has an empty target; missing is null [6.34ms]
+(pass) a closed work is gone from get, search and read [5.48ms]
+(pass) search matches title and definition text, newest first, with limit and period [5.34ms]
+(pass) read summarizes the definition within 600 tokens and refuses an unknown id [8.82ms]
+
+api/domains/pipelines/test/materials.test.ts:
+(pass) materials preserve body, raw prompts, typed values and owned media IDs independently [0.09ms]
+(pass) missing paths fail, null is data, UTF-8 capacity fails instead of truncating [0.04ms]
+(pass) references are contract checked, forward results rejected and raw self prompts allowed [0.39ms]
+(pass) fixture and flow report what is passed, not a fixed sample replacing the reference [0.12ms]
+
+api/domains/pipelines/test/pipelines.test.ts:
+(pass) pipeline check > a sound definition passes [0.09ms]
+(pass) pipeline check > each rule is reported by its place, never by the value [0.11ms]
+(pass) pipeline check > format errors come first, with their pointer [0.28ms]
+(pass) pipeline check > an unknown toolchain and a missing step result fail the check [0.07ms]
+(pass) inputs may not take the first round's names; an optional input without a default may not be read; inherited names are unknown [0.07ms]
+(pass) inputs > the first round's parameters are flat, with a quote for each input [0.03ms]
+(pass) inputs > a quote must be the user's words; an unmentioned input takes its default [0.04ms]
+(pass) templates and steps > references expand; a whole reference keeps its type [0.05ms]
+(pass) templates and steps > a step passes only when it completed with what it requires [0.02ms]
+(pass) templates and steps > a fixture case runs without toolchains and compares the expected values [0.07ms]
+
+api/domains/agent-runtime/test/pipeline-materials.test.ts:
+(pass) resolved materials exceeding the whole child input budget stop without launching the next child [12.92ms]
+
+verification-reports/collaboration-integration-2026-11-05/baseline-host/api/application/pipelines/pipeline-studio-dialogue.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '../../../../packages/dots-mcp/src' from '/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-05/baseline-host/api/domains/dots/service/events.ts'
+-------------------------------
+
+
+verification-reports/collaboration-integration-2026-11-05/baseline-host/api/application/pipelines/pipelines.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '../../../../packages/dots-mcp/src' from '/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-05/baseline-host/api/domains/dots/service/event-delivery.ts'
+-------------------------------
+
+
+verification-reports/collaboration-integration-2026-11-05/baseline-host/api/application/pipelines/pipeline-studio.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+-------------------------------
+
+
+verification-reports/collaboration-integration-2026-11-05/baseline-host/api/domains/pipelines/test/resource-adapter.test.ts:
+(pass) a drafted or published receipt becomes a pipeline ref; a rejected one and other owners do not [7.45ms]
+(pass) get: studio screen, the published toolchain as target; a draft never published has an empty target; missing is null [5.99ms]
+(pass) a closed work is gone from get, search and read [5.33ms]
+(pass) search matches title and definition text, newest first, with limit and period [6.19ms]
+(pass) read summarizes the definition within 600 tokens and refuses an unknown id [6.54ms]
+
+verification-reports/collaboration-integration-2026-11-05/baseline-host/api/domains/pipelines/test/materials.test.ts:
+(pass) materials preserve body, raw prompts, typed values and owned media IDs independently [0.06ms]
+(pass) missing paths fail, null is data, UTF-8 capacity fails instead of truncating [0.02ms]
+(pass) references are contract checked, forward results rejected and raw self prompts allowed [0.36ms]
+(pass) fixture and flow report what is passed, not a fixed sample replacing the reference [0.11ms]
+
+verification-reports/collaboration-integration-2026-11-05/baseline-host/api/domains/pipelines/test/pipelines.test.ts:
+(pass) pipeline check > a sound definition passes [0.05ms]
+(pass) pipeline check > each rule is reported by its place, never by the value [0.07ms]
+(pass) pipeline check > format errors come first, with their pointer [0.09ms]
+(pass) pipeline check > an unknown toolchain and a missing step result fail the check [0.04ms]
+(pass) inputs may not take the first round's names; an optional input without a default may not be read; inherited names are unknown [0.04ms]
+(pass) inputs > the first round's parameters are flat, with a quote for each input [0.01ms]
+(pass) inputs > a quote must be the user's words; an unmentioned input takes its default [0.03ms]
+(pass) templates and steps > references expand; a whole reference keeps its type [0.01ms]
+(pass) templates and steps > a step passes only when it completed with what it requires [0.01ms]
+(pass) templates and steps > a fixture case runs without toolchains and compares the expected values [0.04ms]
+
+verification-reports/collaboration-integration-2026-11-05/baseline-host/api/domains/agent-runtime/test/pipeline-materials.test.ts:
+(pass) resolved materials exceeding the whole child input budget stop without launching the next child [17.49ms]
+
+3 tests failed:
+
+ 52 pass
+ 3 fail
+ 3 errors
+ 207 expect() calls
+Ran 55 tests across 14 files. [6.53s]

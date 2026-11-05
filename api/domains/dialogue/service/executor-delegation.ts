@@ -374,20 +374,7 @@ export async function delegate(
 	// The request text is what the toolchain works from; an instant one needed only its inputs.
 	const request = args.request;
 	if (!request) throw requestRequired();
-	let inputs = args.inputs;
-	if (card.pipeline) {
-		const parsed = card.pipeline.parse(args.inputs ?? {}, x.utteranceText());
-		if (!parsed.ok)
-			throw toolRejection(
-				"invalid_tool_arguments",
-				parsed.issues.map((issue) => ({
-					tool: TOOL_NAMES.delegate,
-					path: `inputs.${issue.path}`,
-					reason: issue.code,
-				})),
-			);
-		inputs = parsed.value;
-	}
+	const inputs = args.inputs;
 	const { uris, references } = await resolveDelegateRefs(
 		deps,
 		x.input.conversationId,

@@ -24,7 +24,6 @@ import type { LarmPlayground } from "../../domains/larm";
 import { createModel3dResourceAdapter } from "../../domains/model3d";
 import { createMusicResourceAdapters } from "../../domains/music";
 import { createOcrResourceAdapter } from "../../domains/ocr";
-import { createPipelinesResourceAdapter } from "../../domains/pipelines";
 import {
 	combineKindAdapters,
 	type ResourceKind,
@@ -108,7 +107,6 @@ export function buildResources(deps: {
 			createComputeResourceAdapter({ store, owner }),
 			createBrowserResourceAdapter({ store, owner, includeInteract: true }),
 			createOcrResourceAdapter({ store }),
-			createPipelinesResourceAdapter({ store }),
 			codeTasks,
 			createEventResourceAdapter({
 				store,

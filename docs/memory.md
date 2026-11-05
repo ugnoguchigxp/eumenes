@@ -8,20 +8,25 @@
 
 | domain | 持つもの |
 | --- | --- |
-| `memory` | 往復の台帳、除外台帳（block ledger）と block journal、要約の保管、ContextWindow の保管と公開、State と傾向の保存、忘却とその派生データの削除 |
+| `memory` | 除外台帳（block ledger）と block journal、ContextWindow の保管と公開、パッケージ公開APIによるStateの保存・訂正・停止・忘却、傾向と派生データの削除 |
 | `steward` | 判断のすべて。step ジョブ、指示文、出力の検証と正規化、依頼の inbox、判断記録 |
-| `continuity` | 短期メモ（目的・決定・未解決・活動・メモ）の保存 |
+| `continuity` | 会話の出来事の列、短期メモ（目的・決定・未解決・活動・メモ）の保存 |
 | `dialogue` | 会話。run の終わりで往復の登録と steward への通知を呼び、`compileContext` で Window を prompt に並べる |
 
 - steward は memory、continuity、conversation を使う。dialogue は memory だけを見る。複数 domain への保存は、step の settle が1つの transaction の中で各 domain の公開操作を呼んで行う。
 - 通常の記憶の変更は会話で伝える（依頼キュー）。設定画面は閲覧と「メモリーの接続」の入り切りに限る。導入時の例外として、本人の許可を得た未確認Seed候補を追加する管理API・CLIがある（下記）。
+- 会話から明示的な記憶の依頼を渡すには、既存Routerのprofile設定と判断データの導入が必要である。設定は保存済みの接続とcatalogから選び、判断データは[Router導入手順](../spec/router-package-integration-2026-11-04.md#3-設定sqlite-が正本)の既存APIで取り込む。未設定や未導入で会話へ戻った場合、背景の記憶担当が保存したことと、明示依頼が受け付けられたことを区別して調べる。
 - profile 名・モデル名はコードに固定しない。steward の推論は会話と同じ route、同じ接続先で行われる。例外は World の記録（curate-world）で、設定 `world.curationResourceId` に登録済みのクラウドの会話モデルを選ぶと、その resource だけで推論する（未設定・resource がない・接続が無効・会話の route がクラウドを許可しないときは会話と同じ route）。
 
 ## パッケージの利用とSeedの導入
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
-配布物は `vendor/eumenes-memory/eumenes-memory-0.0.2-6643656f3383.tgz` に固定する。パッケージ版は0.0.2で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。SQLite契約は8のままで、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.2-3070b7dd6e4a.tgz` に固定する。元は独立リポジトリのmain、commit `5504945f838935fbff6401c962bdecb1d3b49956`。パッケージ版は0.0.2で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。`manifest.json`と配布内の`dist/release-manifest.json`で、元commit・ソースhash・配布内容のhashを照合する。旧tgzと依存参照は削除済み。SQLite契約は8で、既存SQL8本も同一であり、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
+
+会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
+
+旧会話台帳の一度限りの変換は、過去DBの更新・復元に必要な読取り互換として保持する。未移行の原文を捨てず、既存のcontinuity eventsを上書きせず、変換が完了した旧表を削除する。適用済みmigrationの変更や、旧台帳への新規の保存・読取り経路の追加は行わない。
 
 Seedは本人の確認済み発言として扱わない。構造化された候補の分類を受け取り、次のように扱う。
 

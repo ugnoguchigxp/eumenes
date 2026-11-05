@@ -1,0 +1,35 @@
+api/application/vendor.test.ts(48,65): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'string'.
+api/domains/browser/service/interact-execution.ts(135,29): error TS2345: Argument of type '{ taskId: string; tabRef: string; url: string; action: string; element: string; valueDigest: string | null; }' is not assignable to parameter of type '{ taskId: string; tabRef: string; url: string; action: ApprovalAction; element: string; valueDigest: string | null; }'.
+  Types of property 'action' are incompatible.
+    Type 'string' is not assignable to type 'ApprovalAction'.
+api/domains/browser/service/interact-step.ts(33,43): error TS2322: Type '(image: CapturedImage, range: "full" | "item" | "viewport") => Promise<{ captureId: `${string}-${string}-${string}-${string}-${string}`; fileName: string; width: number; height: number; bytes: number; mediaType: "image/webp"; range: "full" | ... 1 more ... | "viewport"; }>' is not assignable to type '(range: CaptureRange, image: CapturedImage) => Promise<SavedCapture>'.
+  Types of parameters 'image' and 'range' are incompatible.
+    Type 'string' is not assignable to type 'CapturedImage'.
+      Type 'string' is not assignable to type 'CapturedImage'.
+api/domains/browser/service/interact.ts(3,65): error TS2724: '"eumenes-interact/sqlite"' has no exported member named 'forgetRun'. Did you mean 'getRun'?
+api/domains/browser/service/interact.ts(60,8): error TS2339: Property 'register' does not exist on type '{ registerHandler<P, I, O>(definition: HandlerDefinition<P, I, O>): void; enqueueInTransaction: (tx: Database, input: EnqueueInput) => { ...; }; ... 15 more ...; close: (drainMs?: number) => Promise<...>; }'.
+api/domains/browser/service/interact.ts(62,24): error TS7006: Parameter 'db' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(62,27): error TS7006: Parameter 'claim' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(72,13): error TS7006: Parameter 'input' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(72,19): error TS7006: Parameter 'ctx' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(73,23): error TS7006: Parameter 'db' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(73,26): error TS7006: Parameter 'claim' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(73,32): error TS7006: Parameter 'input' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(73,38): error TS7006: Parameter 'outcome' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(85,23): error TS7006: Parameter 'db' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(85,26): error TS7006: Parameter 'job' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(85,30): error TS7006: Parameter 'reason' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(88,8): error TS2339: Property 'register' does not exist on type '{ registerHandler<P, I, O>(definition: HandlerDefinition<P, I, O>): void; enqueueInTransaction: (tx: Database, input: EnqueueInput) => { ...; }; ... 15 more ...; close: (drainMs?: number) => Promise<...>; }'.
+api/domains/browser/service/interact.ts(89,24): error TS7006: Parameter 'db' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(89,27): error TS7006: Parameter 'claim' implicitly has an 'any' type.
+api/domains/browser/service/interact.ts(90,17): error TS7006: Parameter 'id' implicitly has an 'any' type.
+api/domains/dialogue/service/routed-package.ts(461,23): error TS2304: Cannot find name 'firstStep'.
+Found 21 errors in 5 files, checked 2,825 files [539.03ms]
+
+   1  api/application/vendor.test.ts:48
+   1  api/domains/browser/service/interact-execution.ts:135
+   1  api/domains/browser/service/interact-step.ts:33
+  17  api/domains/browser/service/interact.ts:3
+   1  api/domains/dialogue/service/routed-package.ts:461

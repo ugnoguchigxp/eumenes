@@ -1,0 +1,28 @@
+api/application/pipelines/component-catalog.ts(14,48): error TS2339: Property 'title' does not exist on type '{ id: string; revisionId: string; runtime: ToolchainRuntimeMeta; }'.
+api/application/pipelines/component-catalog.ts(14,64): error TS2339: Property 'summary' does not exist on type '{ id: string; revisionId: string; runtime: ToolchainRuntimeMeta; }'.
+api/application/pipelines/component-catalog.ts(14,82): error TS2339: Property 'useWhen' does not exist on type '{ id: string; revisionId: string; runtime: ToolchainRuntimeMeta; }'.
+api/application/pipelines/component-catalog.ts(14,102): error TS2339: Property 'avoidWhen' does not exist on type '{ id: string; revisionId: string; runtime: ToolchainRuntimeMeta; }'.
+api/application/pipelines/pipelines-adapter.ts(7,2): error TS2739: Type '{ ref: string; describe: () => { owner: string; operations: Map<any, any>; queries: Set<string>; inputAdapters: Map<any, any>; projections: Set<string>; availability: string; pipeline: boolean; }; availableInTransaction: (db: Database) => boolean; snapshotInTransaction: () => null; invokeInTransaction(): never; read...' is missing the following properties from type 'DomainAdapter': sourceInTransaction, targetInput
+api/application/vendor.test.ts(48,65): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type 'string'.
+api/domains/browser/service/interact-execution.ts(135,29): error TS2345: Argument of type '{ taskId: string; tabRef: string; url: string; action: string; element: string; valueDigest: string | null; }' is not assignable to parameter of type '{ taskId: string; tabRef: string; url: string; action: ApprovalAction; element: string; valueDigest: string | null; }'.
+  Types of property 'action' are incompatible.
+    Type 'string' is not assignable to type 'ApprovalAction'.
+api/domains/browser/service/interact-step.ts(33,43): error TS2322: Type '(image: CapturedImage, range: "full" | "item" | "viewport") => Promise<{ captureId: `${string}-${string}-${string}-${string}-${string}`; fileName: string; width: number; height: number; bytes: number; mediaType: "image/webp"; range: "full" | ... 1 more ... | "viewport"; }>' is not assignable to type '(range: CaptureRange, image: CapturedImage) => Promise<SavedCapture>'.
+  Types of parameters 'image' and 'range' are incompatible.
+    Type 'string' is not assignable to type 'CapturedImage'.
+      Type 'string' is not assignable to type 'CapturedImage'.
+api/domains/dialogue/test/routed-turn.test.ts(91,3): error TS2353: Object literal may only specify known properties, and 'pipeline' does not exist in type 'ToolchainCard'.
+api/domains/dialogue/test/routed-turn.test.ts(98,12): error TS7006: Parameter 'args' implicitly has an 'any' type.
+scripts/task-execution-live.ts(17,31): error TS2307: Cannot find module './live-pipelines' or its corresponding type declarations.
+scripts/task-execution-live.ts(172,21): error TS2339: Property 'pipelines' does not exist on type '{ taskReports: { appendInTransaction(db: Database, taskId: string, key: string, body: { kind: "blocker" | "cancelled" | "completed" | "failed" | "monitoring_issue" | "no_next_work" | "paused" | "progress" | "reminder"; ... 6 more ...; git?: { ...; } | ... 1 more ... | undefined; }, observedAt?: number): { ...; }; .....'.
+Found 12 errors in 7 files, checked 2,824 files [609.30ms]
+
+  4  api/application/pipelines/component-catalog.ts:14
+  1  api/application/pipelines/pipelines-adapter.ts:7
+  1  api/application/vendor.test.ts:48
+  1  api/domains/browser/service/interact-execution.ts:135
+  1  api/domains/browser/service/interact-step.ts:33
+  2  api/domains/dialogue/test/routed-turn.test.ts:91
+  2  scripts/task-execution-live.ts:17

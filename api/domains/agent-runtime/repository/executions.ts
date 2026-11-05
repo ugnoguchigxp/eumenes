@@ -8,8 +8,11 @@ import type {
 	ExecutionStatus,
 	ExecutionView,
 } from "../../tool-runtime";
-import type { PipelineDefinition } from "../../capabilities";
-import type { StepValues } from "../../pipelines";
+import type {
+	PipelineDefinition,
+	ExecutionPlan,
+	ComponentRecord,
+} from "eumenes-pipeline";
 
 export const taskExecutionMigration = `
 CREATE TABLE agent_executions (
@@ -73,18 +76,19 @@ export type ParentState = {
 	amending?: boolean;
 	activeRequestId?: string;
 	planRequired?: boolean;
-	/**
-	 * A task pipeline's run (spec task-pipeline-design 2026-10-22 §13.4): the host takes the steps in order, so no
-	 * parent decision is asked. `values` holds each finished step's result; `children` its child's id.
-	 */
+	/** One request's imported, checked definition; never a reusable template. */
 	pipeline?: {
+		contractVersion: "p0-3";
 		toolchainRevisionId: string;
-		definition: Omit<PipelineDefinition, "tests">;
-		inputs: Record<string, unknown>;
-		values: Record<string, StepValues>;
+		catalog: ComponentRecord[];
+		initialRefs: string[];
+		definition: PipelineDefinition | null;
+		executionPlan: ExecutionPlan | null;
 		cursor: number;
 		children: Record<string, string>;
-		/** The structural repair an extract step's next attempt carries. */
+		results: Record<string, ChildResult>;
+		repaired: boolean;
+		draft?: string;
 		correction?: string;
 	};
 	plan?: {
@@ -220,6 +224,7 @@ export function eraseExecutionBodies(
 	state.retained = [];
 	state.plan = undefined;
 	state.planRequired = undefined;
+	state.pipeline = undefined;
 	row.request = "";
 	row.source_json = null;
 	row.result_json = JSON.stringify({

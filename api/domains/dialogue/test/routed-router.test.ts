@@ -139,14 +139,16 @@ test("a yes below the approval line asks the host's question again and leaves th
 	);
 });
 
-test("several jobs in one request: the first is handed over and the rest are said not to be asked yet (row 9)", async () => {
+test("route(): row 9 never dispatches only the first job when no planner is available", async () => {
 	const r = await start({}, { cards: [IMAGE, MUSIC], music: true });
 	r.scripts.push(weigh({ [IMAGE.id]: 0.95, [MUSIC.id]: 0.9 }));
-	const waiting = await h!.say("猫の絵を描いて、曲も作って", "queued");
-	expect(waiting.announcement).toBe(
-		"「画像」に頼みます。ほかの作業はまだ頼んでいません。",
+	h!.state.steps.push({ text: "パイプラインを利用できません。" });
+	const waiting = await h!.say("猫の絵を描いて、曲も作って");
+	expect(h!.dialogue.answerText(waiting.id)).toBe(
+		"パイプラインを利用できません。",
 	);
-	expect(trace().row).toBe(9);
+	expect(h!.todos()).toHaveLength(0);
+	expect(trace().decided).not.toBe(IMAGE.id);
 });
 
 test("a router that fails, is slow, has no memory or no embedding leaves the turn to the talk turn; the trace says why (row 10)", async () => {
@@ -489,7 +491,7 @@ test("routeStructured: one request with a reference routes the masked utterance;
 	expect(trace()).toMatchObject({ decided: IMAGE.id, row: 2 });
 });
 
-test("routeStructured: no request is the conversation, with nothing scored; requests of two tools hand the first over (the pipeline stage is not built yet)", async () => {
+test("routeStructured: no request is the conversation, with nothing scored; requests of two tools never dispatch a partial first job when the pipeline is unavailable", async () => {
 	const r = await start(
 		{ entry: "routeStructured" },
 		{ cards: [IMAGE, MUSIC], music: true },
@@ -504,15 +506,17 @@ test("routeStructured: no request is the conversation, with nothing scored; requ
 		'{"requests":[{"text":"曲を作って","target":"曲","inputs":[],"after":[]},{"text":"画像も作って","target":"画像","inputs":[],"after":[0]}]}',
 	);
 	r.scripts.push(weigh({ [MUSIC.id]: 0.95 }), weigh({ [IMAGE.id]: 0.95 }));
-	const waiting = await h!.say("曲を作って、画像も作って", "queued");
+	h!.state.steps.push({ text: "パイプラインを利用できません。" });
+	const waiting = await h!.say("曲を作って、画像も作って");
 	expect(r.routes.map((route) => route.text)).toEqual([
 		"曲を作って",
 		"画像も作って",
 	]);
-	expect(waiting.announcement).toBe(
-		"「作曲」に頼みます。ほかの作業はまだ頼んでいません。",
+	expect(h!.dialogue.answerText(waiting.id)).toBe(
+		"パイプラインを利用できません。",
 	);
-	expect(trace(1)).toMatchObject({ decided: MUSIC.id, row: 9 });
+	expect(h!.todos()).toHaveLength(0);
+	expect(trace(1).decided).not.toBe(MUSIC.id);
 });
 
 test("routeStructured: a structure model that fails gives no structure, and the whole utterance is routed as route() does", async () => {
@@ -526,7 +530,7 @@ test("routeStructured: a structure model that fails gives no structure, and the 
 	]);
 });
 
-test("routeStructured: requests whose first is not a tool hand over the first tool, in the structure's order", async () => {
+test("routeStructured: a mixed multi-job request never falls back to running only its first tool", async () => {
 	const r = await start({ entry: "routeStructured" });
 	r.structures.push(
 		'{"requests":[{"text":"辛い物が好きと覚えて","target":"辛い物が好き","inputs":[],"after":[]},{"text":"画像も作って","target":"画像","inputs":[],"after":[]}]}',
@@ -535,9 +539,11 @@ test("routeStructured: requests whose first is not a tool hand over the first to
 		weigh({ "memory.request": 0.95 }),
 		weigh({ [IMAGE.id]: 0.95 }),
 	);
-	const waiting = await h!.say("辛い物が好きと覚えて、画像も作って", "queued");
-	expect(waiting.announcement).toBe(
-		"「画像」に頼みます。ほかの作業はまだ頼んでいません。",
+	h!.state.steps.push({ text: "パイプラインを利用できません。" });
+	const waiting = await h!.say("辛い物が好きと覚えて、画像も作って");
+	expect(h!.dialogue.answerText(waiting.id)).toBe(
+		"パイプラインを利用できません。",
 	);
-	expect(trace()).toMatchObject({ decided: IMAGE.id, row: 9 });
+	expect(h!.todos()).toHaveLength(0);
+	expect(trace().decided).not.toBe(IMAGE.id);
 });

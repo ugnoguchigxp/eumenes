@@ -68,7 +68,6 @@ import { TodoWorkspaceView } from "./todo-components";
 import { ServiceTestWorkspaceView } from "./service-test-components";
 import { TextBlockView, InfoCardView } from "./ui-composition-components";
 import { UiStudioView } from "./ui-studio-components";
-import { PipelineStudioView } from "./pipeline-studio-components";
 import {
 	CompositionModelProvider,
 	useCompositionModel,
@@ -126,7 +125,6 @@ const renderers = {
 	"work-result": WorkResultView,
 	"google-accounts": GoogleAccountsView,
 	"ui-studio": UiStudioView,
-	"pipeline-studio": PipelineStudioView,
 	"text-block": TextBlockView,
 	"info-card": InfoCardView,
 	hero: HeroView,

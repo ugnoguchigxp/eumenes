@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { PipelineDefinition, ToolchainCard } from "../../capabilities";
+import type { ToolchainCard } from "../../capabilities";
 import { z } from "zod";
 
 /** Source identities are issued by the host, never reconstructed from model prose. */
@@ -72,6 +72,9 @@ export type ExecutionSource = {
 	runId: string;
 	request: string;
 	digest: string;
+	/** Host-issued authority of a collaborative session. Never inferred from model output. */
+	specialistSessionId?: string;
+	specialistEpoch?: number;
 	amendments?: Array<{ messageId: string; request: string; digest: string }>;
 	responses?: Array<{ messageId: string; request: string; digest: string }>;
 };
@@ -87,12 +90,6 @@ export type ChildExecution = {
 	arguments?: Record<string, unknown>;
 	refs: ExecutionReference[];
 	referenceData?: Array<{ ref: string; text: string }>;
-	/** Host-resolved data from a pipeline's frozen definition, separate from its request. */
-	materials?: Array<{
-		kind: "value" | "image" | "music";
-		label: string;
-		value: unknown;
-	}>;
 	source: ExecutionSource;
 	deadline: number;
 	modelCalls: number;
@@ -138,6 +135,7 @@ export interface ToolchainExecutionPort {
 		db: Database,
 		conversationId: string,
 		messageId: string,
+		forSource?: ExecutionSource,
 	): { messageId: string; request: string; digest: string } | null;
 	validReferenceInTransaction(
 		db: Database,
@@ -205,18 +203,15 @@ export interface ToolchainExecutionPort {
 		view: ExecutionView,
 		eventId: string,
 	): boolean;
-	/**
-	 * A task pipeline revision and its binding (spec task-pipeline-design 2026-10-22 §13.4); null when its pipeline is
-	 * no longer published or not runnable on this host now. A later revision of the same pipeline keeps it valid.
-	 */
+	/** Published pipeline planner, resolved through the same registry as other toolchains. */
 	pipelineInTransaction?(
 		db: Database,
 		toolchainRevisionId: string,
-	): {
-		bindingRevisionId: string;
-		definition: PipelineDefinition;
-		runMs: number;
-	} | null;
+	): { bindingRevisionId: string; instructions: string; runMs: number } | null;
+	pipelineCatalogInTransaction?(
+		db: Database,
+		source: ExecutionSource,
+	): import("eumenes-pipeline").ComponentRecord[];
 	/** The revision of the toolchain a pipeline step names that a child may run now; null when none may. */
 	stepToolchainInTransaction?(
 		db: Database,

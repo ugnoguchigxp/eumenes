@@ -8,7 +8,6 @@ export { /** @public */ migration } from "./repository";
 export type { DialogueService } from "./service";
 export { createDialogueService } from "./service";
 export { readActionOriginInTransaction } from "./service/action-origin";
-export { routeTrial } from "./service/routed-package";
 export { isAdoptedAnswerInTransaction } from "./service/adopted-answer";
 export type {
 	/** @public */ ConversationAgentPort,

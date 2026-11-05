@@ -1,0 +1,517 @@
+{
+  "baseCommit": "e917e920f7b252c6f70a07dda1a119b0a2516bfc",
+  "snapshot": "/tmp/eumenes-pipeline-host-verify-20261105",
+  "packageChange": "dependencies.eumenes-pipeline only; other package and lock changes preserved",
+  "sharedPathsChangedDuringWork": [
+    "api/domains/agent-runtime/service/execution-pipeline.ts",
+    "api/domains/capabilities/contracts/index.ts",
+    "api/domains/tool-runtime/contracts/task-execution.ts",
+    "packages/artifact-ui/src/contracts.ts",
+    "scripts/domains.ts",
+    "spec/README.md",
+    ".s11tnext/catalog.generated.ts",
+    ".s11tnext/catalog.json",
+    "package.json",
+    "bun.lock"
+  ],
+  "files": {
+    "api/application/app-modules.ts": {
+      "currentSha256": "362850abe6c3d70a30020e32242e50f91eb87a20cf8d63b3c065e1d5d7b1f24b",
+      "verifiedSnapshotSha256": "362850abe6c3d70a30020e32242e50f91eb87a20cf8d63b3c065e1d5d7b1f24b"
+    },
+    "api/application/pipelines/component-catalog.ts": {
+      "currentSha256": "297a90fb433dd83cc94ef090e621aa1e63c6f597b5fdb3f9bdb4e92401cc2bcf",
+      "verifiedSnapshotSha256": "297a90fb433dd83cc94ef090e621aa1e63c6f597b5fdb3f9bdb4e92401cc2bcf"
+    },
+    "api/application/pipelines/pipeline-bundle.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/application/pipelines/pipeline-execution.test.ts": {
+      "currentSha256": "a798d909f78b21968c1e51160acfc8789ee7bf40ede2e19b7cb3f1dba4f02870",
+      "verifiedSnapshotSha256": "a798d909f78b21968c1e51160acfc8789ee7bf40ede2e19b7cb3f1dba4f02870"
+    },
+    "api/application/pipelines/pipeline-studio-dialogue.test.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/application/pipelines/pipeline-studio.test.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/application/pipelines/pipelines-adapter.ts": {
+      "currentSha256": "a22d1ef1fcfd3b6806e5714a0abc944d8f809e5669bb77589058b7f7a2d2d869",
+      "verifiedSnapshotSha256": "a22d1ef1fcfd3b6806e5714a0abc944d8f809e5669bb77589058b7f7a2d2d869"
+    },
+    "api/application/pipelines/pipelines-controller.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/application/pipelines/pipelines-service.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/application/pipelines/pipelines-trials.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/application/pipelines/pipelines.test.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/application/pipelines/vendor.test.ts": {
+      "currentSha256": "a07c3e489ec537fd5345c90e2cb0a3ed9bb17859cad8486e9e22cebbfc26f68b",
+      "verifiedSnapshotSha256": "a07c3e489ec537fd5345c90e2cb0a3ed9bb17859cad8486e9e22cebbfc26f68b"
+    },
+    "api/application/resources/wiring.ts": {
+      "currentSha256": "a4502afeb5d2ab486963fefb1fae0d4250f9eb5e8f5c069ce4441146c34ee99d",
+      "verifiedSnapshotSha256": "a4502afeb5d2ab486963fefb1fae0d4250f9eb5e8f5c069ce4441146c34ee99d"
+    },
+    "api/application/server-app-services.ts": {
+      "currentSha256": "fddd39b3587e66440fb09bfe3557686458a9908073cf82667bc394bca986fb37",
+      "verifiedSnapshotSha256": "fddd39b3587e66440fb09bfe3557686458a9908073cf82667bc394bca986fb37"
+    },
+    "api/application/server-services.ts": {
+      "currentSha256": "0cd0dfc0b4d9d4289c0dd66466ae13fdada47c23ee73025b9e8355a2f4432e49",
+      "verifiedSnapshotSha256": "5d5a47d6b1517d68113b735b2eadb5cb4feccb35653949a532d9cb55595a5356"
+    },
+    "api/application/toolchain/task-execution-browser.test.ts": {
+      "currentSha256": "8091ec02634e56d4b662e11fc9e21c24fca9adaf639b8c23f1f9ceea1d68a165",
+      "verifiedSnapshotSha256": "8091ec02634e56d4b662e11fc9e21c24fca9adaf639b8c23f1f9ceea1d68a165"
+    },
+    "api/application/toolchain/task-execution-port.ts": {
+      "currentSha256": "94a92f108dd54e4db85dac7b763bea8bf3f8e33be20da10f0ad722d0cc3ed464",
+      "verifiedSnapshotSha256": "736c247fa049056a8e077024a06c27d4e37d219279f0d25cee16c09c1c080d95"
+    },
+    "api/application/toolchain/toolchain-harness-options.fixture.ts": {
+      "currentSha256": "ff219b7e04927973d732b3b18c00f50309c679e51405ecc037ca2076e3e7dcab",
+      "verifiedSnapshotSha256": "e2785ccb141879dda8744d3df57908ea1c3b047c00a7aaf2f624f155d3ab481e"
+    },
+    "api/application/toolchain/toolchain-history.test.ts": {
+      "currentSha256": "04d20fbf2995556a4d58839134638569b6dda8d729ef6900afc6d9955ed315c3",
+      "verifiedSnapshotSha256": "04d20fbf2995556a4d58839134638569b6dda8d729ef6900afc6d9955ed315c3"
+    },
+    "api/application/toolchain/toolchain-pipeline.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/application/toolchain/toolchain-routing.ts": {
+      "currentSha256": "71b04db3723875d3aa40dc27e5b3feb70e5ca7e634ab51030404606b0a10fec8",
+      "verifiedSnapshotSha256": "71b04db3723875d3aa40dc27e5b3feb70e5ca7e634ab51030404606b0a10fec8"
+    },
+    "api/application/toolchain/toolchain.fixture.ts": {
+      "currentSha256": "6757d127ae596cbb7a1a653e563f04636f8d8481c210776871e64c14169ebaa4",
+      "verifiedSnapshotSha256": "78ffa411a4b9a02512ec12863e1d36f612fabb0ba46c63af969b964ed0499cbc"
+    },
+    "api/application/toolchain/toolchain.test.ts": {
+      "currentSha256": "dcf27e31efad473b5b16f81d759c566eacbe9dd17a3436bdb2d185653ecf3fcb",
+      "verifiedSnapshotSha256": "dcf27e31efad473b5b16f81d759c566eacbe9dd17a3436bdb2d185653ecf3fcb"
+    },
+    "api/application/toolchain/toolchain.ts": {
+      "currentSha256": "284526d57e3712263d0f0bafffb9307fa0e9319dc14d9d339f806b6b6860bcb5",
+      "verifiedSnapshotSha256": "d110ec25efcac1bb10662323823a241e20287b904245dc708fff384f8402088a"
+    },
+    "api/domains/agent-runtime/contexts/pipeline-extract/instruction.context.toml": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/agent-runtime/repository/executions.ts": {
+      "currentSha256": "75b5d609aec3aeab1a4a92b934738666400a0566ffe9f69cd448d167eb2ac80a",
+      "verifiedSnapshotSha256": "75b5d609aec3aeab1a4a92b934738666400a0566ffe9f69cd448d167eb2ac80a"
+    },
+    "api/domains/agent-runtime/service/context.ts": {
+      "currentSha256": "61f736e35c6211531ccb40b03609e5ea362aaa7dc78298fe78cf6574070a6b61",
+      "verifiedSnapshotSha256": "61f736e35c6211531ccb40b03609e5ea362aaa7dc78298fe78cf6574070a6b61"
+    },
+    "api/domains/agent-runtime/service/execution-compose.ts": {
+      "currentSha256": "337e76db99ffaef8e83da7df33ce3963c06fee10b8c25b760b65ff0e98f857aa",
+      "verifiedSnapshotSha256": "337e76db99ffaef8e83da7df33ce3963c06fee10b8c25b760b65ff0e98f857aa"
+    },
+    "api/domains/agent-runtime/service/execution-context.ts": {
+      "currentSha256": "305d44a5e3d13aa9bf519974718277d9933c968ad02621dbce7d247a51a32a16",
+      "verifiedSnapshotSha256": "305d44a5e3d13aa9bf519974718277d9933c968ad02621dbce7d247a51a32a16"
+    },
+    "api/domains/agent-runtime/service/execution-extract.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/agent-runtime/service/execution-pipeline.ts": {
+      "currentSha256": "c06442598055cfcf549f017487bf217f8b4e39c1a30321eb709c412361af516c",
+      "verifiedSnapshotSha256": "346e10f735e23e4c17a1133e86d22ad2d7cce0ff7d62c789f5cbcf8661c01498"
+    },
+    "api/domains/agent-runtime/service/execution-store.ts": {
+      "currentSha256": "43a14b9d7cc3407cde8ab66fd8ac92837c1700cfe4e8e2cc9a38f4cd81760da2",
+      "verifiedSnapshotSha256": "43a14b9d7cc3407cde8ab66fd8ac92837c1700cfe4e8e2cc9a38f4cd81760da2"
+    },
+    "api/domains/agent-runtime/service/executions.ts": {
+      "currentSha256": "9a81150278b67bdb6f531cf375ec8ec0b8fe69643ca9e8be635c057adb1994cc",
+      "verifiedSnapshotSha256": "9a81150278b67bdb6f531cf375ec8ec0b8fe69643ca9e8be635c057adb1994cc"
+    },
+    "api/domains/agent-runtime/test/context.test.ts": {
+      "currentSha256": "606a30c7f3787c5a25a9139dfdb70ee25f8f2de357dfbdb03b86f2e6471a4e51",
+      "verifiedSnapshotSha256": "606a30c7f3787c5a25a9139dfdb70ee25f8f2de357dfbdb03b86f2e6471a4e51"
+    },
+    "api/domains/agent-runtime/test/pipeline-execution.test.ts": {
+      "currentSha256": "48391eda7643e594350bf822de19b79b2a605b7f53bf028bc94302a56e2b2d1f",
+      "verifiedSnapshotSha256": "48391eda7643e594350bf822de19b79b2a605b7f53bf028bc94302a56e2b2d1f"
+    },
+    "api/domains/agent-runtime/test/pipeline-materials.test.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/capabilities/builtin/resource-kinds.ts": {
+      "currentSha256": "af6f2f89ef51557fd76456287b500b79bd19c8b38795ccbd451705d0236559d4",
+      "verifiedSnapshotSha256": "af6f2f89ef51557fd76456287b500b79bd19c8b38795ccbd451705d0236559d4"
+    },
+    "api/domains/capabilities/bundles/pipeline-execution.bundle.json": {
+      "currentSha256": "972b9ae2c1b22292ab1ec075d857a021b0792b7538a27003f552f0d969d052ae",
+      "verifiedSnapshotSha256": "972b9ae2c1b22292ab1ec075d857a021b0792b7538a27003f552f0d969d052ae"
+    },
+    "api/domains/capabilities/bundles/pipeline-studio.bundle.json": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/capabilities/contracts/bindings.ts": {
+      "currentSha256": "537c807265334f30e1012bed3c47b8051d76c31f54581dfc3b3f2cc307f43359",
+      "verifiedSnapshotSha256": "537c807265334f30e1012bed3c47b8051d76c31f54581dfc3b3f2cc307f43359"
+    },
+    "api/domains/capabilities/contracts/index.ts": {
+      "currentSha256": "dcc894f9bb2803718d82abc0475c008ccb337d6ff430928de5feab37db756c97",
+      "verifiedSnapshotSha256": "fb84090bc49153b0accffe9b8a748c5c8871fe6b9f10e417ce98653c42642200"
+    },
+    "api/domains/capabilities/contracts/pipelines.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/capabilities/contracts/toolchains.ts": {
+      "currentSha256": "e8f9eaa1532f7cee276693062408c127dac1e168168a0d50f906314ae7d70150",
+      "verifiedSnapshotSha256": "e8f9eaa1532f7cee276693062408c127dac1e168168a0d50f906314ae7d70150"
+    },
+    "api/domains/capabilities/test/pipeline-bundle.test.ts": {
+      "currentSha256": "1aec67b0a44c66880281bb4d969da6c85f760f361cb0992b7ac00f5b2bf78221",
+      "verifiedSnapshotSha256": "1aec67b0a44c66880281bb4d969da6c85f760f361cb0992b7ac00f5b2bf78221"
+    },
+    "api/domains/capabilities/test/resource-kinds.test.ts": {
+      "currentSha256": "28dfc22a085c8201937617a5dced752370a6b15dcb3ea2a91836423ae676ff06",
+      "verifiedSnapshotSha256": "28dfc22a085c8201937617a5dced752370a6b15dcb3ea2a91836423ae676ff06"
+    },
+    "api/domains/dialogue/contexts/local/router-announce-partial.context.toml": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/dialogue/index.ts": {
+      "currentSha256": "1166224dda6af94fefa0c966b8ab2843bf31dbe18270df6d53126ab35d23c324",
+      "verifiedSnapshotSha256": "1166224dda6af94fefa0c966b8ab2843bf31dbe18270df6d53126ab35d23c324"
+    },
+    "api/domains/dialogue/service/execution-command.ts": {
+      "currentSha256": "263a1cd7a6e501c52bc6870fb638c66c8e6ee945bf516f033ae37bd5caf3b4e2",
+      "verifiedSnapshotSha256": "263a1cd7a6e501c52bc6870fb638c66c8e6ee945bf516f033ae37bd5caf3b4e2"
+    },
+    "api/domains/dialogue/service/executor-context.ts": {
+      "currentSha256": "bbf36f24637ebe16a0e0df1c0e671cbfffb2f8de995cfacae226a2d1c331cbc5",
+      "verifiedSnapshotSha256": "bbf36f24637ebe16a0e0df1c0e671cbfffb2f8de995cfacae226a2d1c331cbc5"
+    },
+    "api/domains/dialogue/service/executor-delegation.ts": {
+      "currentSha256": "1e60d0686a6be64bd571569ade7968884531caa725a650a9c9e80c6f2512421e",
+      "verifiedSnapshotSha256": "1e60d0686a6be64bd571569ade7968884531caa725a650a9c9e80c6f2512421e"
+    },
+    "api/domains/dialogue/service/routed-actions.ts": {
+      "currentSha256": "aff9c8b361909a58cb29098f9bac53effde14f7b4abe8f5f358d07231933ef74",
+      "verifiedSnapshotSha256": "aff9c8b361909a58cb29098f9bac53effde14f7b4abe8f5f358d07231933ef74"
+    },
+    "api/domains/dialogue/service/routed-choice.ts": {
+      "currentSha256": "0c42b04fcddd42456346f6a210e7094f0382c6d85d297cb54649d7bbc8a3d254",
+      "verifiedSnapshotSha256": "0c42b04fcddd42456346f6a210e7094f0382c6d85d297cb54649d7bbc8a3d254"
+    },
+    "api/domains/dialogue/service/routed-package.ts": {
+      "currentSha256": "b12168c80d486a440c61813388ed78b43186619c1c5d73c6f2a1d980dc93f598",
+      "verifiedSnapshotSha256": "b12168c80d486a440c61813388ed78b43186619c1c5d73c6f2a1d980dc93f598"
+    },
+    "api/domains/dialogue/service/routed-router.ts": {
+      "currentSha256": "c6d9dd804889d8762bef0763df22b7535baa9ec4f700c8cadcce448c9de66c6b",
+      "verifiedSnapshotSha256": "c6d9dd804889d8762bef0763df22b7535baa9ec4f700c8cadcce448c9de66c6b"
+    },
+    "api/domains/dialogue/service/work-dispatch.ts": {
+      "currentSha256": "cb60a62c7b8f128b9d2eeae7eb4b46a86b095df79c063f5afbe8477d075b2a5a",
+      "verifiedSnapshotSha256": "cb60a62c7b8f128b9d2eeae7eb4b46a86b095df79c063f5afbe8477d075b2a5a"
+    },
+    "api/domains/dialogue/test/routed-router.test.ts": {
+      "currentSha256": "f5adc81a02d675b762b8ad051b6af26f2669781809b7be3f9a30113f365ec1e4",
+      "verifiedSnapshotSha256": "f5adc81a02d675b762b8ad051b6af26f2669781809b7be3f9a30113f365ec1e4"
+    },
+    "api/domains/dialogue/test/routed-turn.test.ts": {
+      "currentSha256": "c503689abbfc982e46d9c4e1306966d1bb94c3e604705ffa24759f2e3f909c4e",
+      "verifiedSnapshotSha256": "c503689abbfc982e46d9c4e1306966d1bb94c3e604705ffa24759f2e3f909c4e"
+    },
+    "api/domains/pipelines/index.ts": {
+      "currentSha256": "63c68f7634c803bb22a36a3e96b01818d17df10a6b9b33adce70b9af508890d7",
+      "verifiedSnapshotSha256": "63c68f7634c803bb22a36a3e96b01818d17df10a6b9b33adce70b9af508890d7"
+    },
+    "api/domains/pipelines/repository/index.ts": {
+      "currentSha256": "52972a1f8184504085525fa0ce96dab869b26fd7268654dff4f52e8b055d49a1",
+      "verifiedSnapshotSha256": "52972a1f8184504085525fa0ce96dab869b26fd7268654dff4f52e8b055d49a1"
+    },
+    "api/domains/pipelines/repository/resources.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/service/check.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/service/definition.ts": {
+      "currentSha256": "cc9e2ca836dd470e3830f551b2948493d39bd6c053649340b86fc1bebae44af9",
+      "verifiedSnapshotSha256": "cc9e2ca836dd470e3830f551b2948493d39bd6c053649340b86fc1bebae44af9"
+    },
+    "api/domains/pipelines/service/document.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/service/inputs.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/service/materials.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/service/resource-adapter.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/service/template.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/service/values.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/service/works.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/test/materials.test.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/test/pipeline.fixture.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/test/pipelines.test.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/pipelines/test/resource-adapter.test.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "api/domains/tool-runtime/contracts/task-execution.ts": {
+      "currentSha256": "895448719cd2c77a062cffbbe20f724c1d5711f37bc21ba2fc063fde48d32240",
+      "verifiedSnapshotSha256": "adbd7afdb8eaf2f4bd94c6281e88b6fb6deecee76fc70f5103a66685d1f63d8e"
+    },
+    "client/index.ts": {
+      "currentSha256": "261ca8205f3a93bcbd8c325b18ccfbb6b38de81aea8d89b82e2a86104540a384",
+      "verifiedSnapshotSha256": "261ca8205f3a93bcbd8c325b18ccfbb6b38de81aea8d89b82e2a86104540a384"
+    },
+    "client/pipelines.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "docs/domains.md": {
+      "currentSha256": "0ea861faf9fa14154a929ed7441a6e9bfc28da13ebb0a2ec7bad3af2b2648623",
+      "verifiedSnapshotSha256": "0ea861faf9fa14154a929ed7441a6e9bfc28da13ebb0a2ec7bad3af2b2648623"
+    },
+    "docs/toolchain-extension.md": {
+      "currentSha256": "6b3abed0bdc2f92b796a163468f13658ba97930c1dbd109724f7d9cca3ea4e15",
+      "verifiedSnapshotSha256": "6b3abed0bdc2f92b796a163468f13658ba97930c1dbd109724f7d9cca3ea4e15"
+    },
+    "packages/artifact-ui/src/contracts-views.ts": {
+      "currentSha256": "d32a89cfcd721dae954ee4069994cbbbb4e6e69fdc0e783278641df95508b67d",
+      "verifiedSnapshotSha256": "d32a89cfcd721dae954ee4069994cbbbb4e6e69fdc0e783278641df95508b67d"
+    },
+    "packages/artifact-ui/src/contracts.ts": {
+      "currentSha256": "033cc468b8dfca1283de5d263d18d8dfa0d8895c008c6600ce35f75d60a6dc0b",
+      "verifiedSnapshotSha256": "21e9ee999bb8e432e7f8419cfc406911d2e7e6c56300c4deeb9d7efec6bef4b1"
+    },
+    "packages/artifact-ui/src/library.tsx": {
+      "currentSha256": "4a1ef32c0750d94f469931d0568ce4bfee7f3513ffe4b34ac811944569278663",
+      "verifiedSnapshotSha256": "4a1ef32c0750d94f469931d0568ce4bfee7f3513ffe4b34ac811944569278663"
+    },
+    "packages/artifact-ui/src/pipeline-studio-components.test.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/artifact-ui/src/pipeline-studio-components.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/artifact-ui/src/pipeline-studio-contracts.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/artifact-ui/src/resource-exports.ts": {
+      "currentSha256": "0dd6f3a7826d520c24138f4ac2744d3e983092f1290edc929f560407aff9d6f6",
+      "verifiedSnapshotSha256": "0dd6f3a7826d520c24138f4ac2744d3e983092f1290edc929f560407aff9d6f6"
+    },
+    "packages/design-system/src/components/PipelineFlow/PipelineFlow.css": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineFlow/PipelineFlow.stories.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineFlow/PipelineFlow.test.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineFlow/PipelineFlow.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineFlow/index.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineFlow/types.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/HandoffMediaPicker.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/HandoffValuePicker.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineChecks.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineHandoff.css": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineHandoff.test.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineHandoff.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineSource.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineStudio.css": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineStudio.stories.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineStudio.test.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineStudio.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/PipelineTrials.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/handoff-types.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/index.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/components/PipelineStudio/types.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "packages/design-system/src/index.ts": {
+      "currentSha256": "641022fcac946379ba5b90415f36d0ef12b2ae0ec5b6318fca2c98e08e9e33c6",
+      "verifiedSnapshotSha256": "641022fcac946379ba5b90415f36d0ef12b2ae0ec5b6318fca2c98e08e9e33c6"
+    },
+    "scripts/domains.ts": {
+      "currentSha256": "6f83df6cdaf5e613e72e12f4ae99f1f71ad2b14a3c04e8af9f83fcc7c12e695f",
+      "verifiedSnapshotSha256": "19bdea85b1073dec6ff19c75c3bf2caa9e1df77acd865290aad3ee45110564a8"
+    },
+    "scripts/live-pipelines.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "scripts/task-execution-live.ts": {
+      "currentSha256": "c371056b5eb30f60453b4de92746340561a9c41b85aef74af7baba3192e03ecb",
+      "verifiedSnapshotSha256": "c371056b5eb30f60453b4de92746340561a9c41b85aef74af7baba3192e03ecb"
+    },
+    "spec/pipeline-p0-3-integration-2026-11-05.md": {
+      "currentSha256": "3b9ff7177fa570c695e1282e740234f2b0fc3b2ee32affcc5f4bcd68fd47491f",
+      "verifiedSnapshotSha256": "04c08163bba0a63166cce857209fa3c0ddfd1206a7a8d9ac0a136578b56d32fa"
+    },
+    "spec/task-pipeline-design-2026-10-22.md": {
+      "currentSha256": "4f9ca7fb9161a4342f038bd4a83f1b10def9722426d7078150e0c4f29859ed66",
+      "verifiedSnapshotSha256": "4f9ca7fb9161a4342f038bd4a83f1b10def9722426d7078150e0c4f29859ed66"
+    },
+    "tests/browser/pipeline-handoff.fixture.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "tests/browser/pipeline-handoff.spec.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz": {
+      "currentSha256": "9ba750c488610ad39d280931e861e6d8fb6a6e44f118ce5900cb80ce8fcc62c9",
+      "verifiedSnapshotSha256": "9ba750c488610ad39d280931e861e6d8fb6a6e44f118ce5900cb80ce8fcc62c9"
+    },
+    "vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz.sha256": {
+      "currentSha256": "866156a505fe18f72abfbfc3e4b4fe7f20c0d07235851f251d1a62e1bf9ce6e8",
+      "verifiedSnapshotSha256": "866156a505fe18f72abfbfc3e4b4fe7f20c0d07235851f251d1a62e1bf9ce6e8"
+    },
+    "vendor/pipeline/manifest.json": {
+      "currentSha256": "0a53afacf22bf6454113e599ee5f6778ca3d6ee34a5a041f141f5b638551cfbf",
+      "verifiedSnapshotSha256": "0a53afacf22bf6454113e599ee5f6778ca3d6ee34a5a041f141f5b638551cfbf"
+    },
+    "web/src/domains/pipelines/toolchain-adapter.test.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "web/src/domains/pipelines/toolchain-adapter.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "web/src/domains/pipelines/use-pipeline-library.test.tsx": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "web/src/domains/pipelines/use-pipeline-library.ts": {
+      "currentSha256": null,
+      "verifiedSnapshotSha256": null
+    },
+    "web/src/workspace/toolchain-adapters.ts": {
+      "currentSha256": "94d81741a239ad14581e553183490bfd16551f6d106e5a72ed16dbf37d414886",
+      "verifiedSnapshotSha256": "94d81741a239ad14581e553183490bfd16551f6d106e5a72ed16dbf37d414886"
+    }
+  },
+  "verificationSummary": {
+    "isolatedSelectedVerify": "pass: 964 Bun tests, 32 Web tests, static checks and DesignSystem build",
+    "artifactUi": "pass: 335 tests",
+    "currentPipelinePaths": "pass: 16 tests",
+    "currentWholeTypecheck": "pass after concurrent browser return type was updated; combined-typecheck-signoff-after-browser-update.log",
+    "contextCheck": "pass",
+    "live": "not run",
+    "serverOperations": "not performed",
+    "commitPush": "not performed in host repository"
+  }
+}

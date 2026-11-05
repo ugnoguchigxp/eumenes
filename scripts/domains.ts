@@ -5,6 +5,13 @@
  * allow-list in `depends`; raising a dependency means raising `tier` here.
  */
 export const domains = {
+	collaboration: {
+		tier: 3,
+		backend: "api/domains/collaboration",
+		web: "web/src/domains/collaboration",
+		components: null,
+		depends: { api: [], web: [], test: [] },
+	},
 	usage: {
 		tier: 4,
 		backend: "api/domains/usage",
@@ -218,11 +225,11 @@ export const domains = {
 	pipelines: {
 		tier: 1,
 		backend: "api/domains/pipelines",
-		web: "web/src/domains/pipelines",
-		components: "packages/design-system/src/components/PipelineStudio",
+		web: null,
+		components: null,
 		depends: {
-			api: ["capabilities", "resources"],
-			web: ["resources"],
+			api: [],
+			web: [],
 			test: [],
 		},
 	},

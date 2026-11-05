@@ -1,0 +1,27 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/capabilities/test/resource-kinds.test.ts:
+(pass) the 12 builtin kinds load with their actions, default and owner [173.77ms]
+(pass) action labels fall back to the global action words and a kind can override them [93.06ms]
+(pass) produces lists the kinds a toolchain creates and the candidate card carries it [85.69ms]
+(pass) an invalid registration is rejected and stores nothing [10.07ms]
+(pass) a bundle can register a kind and refuses an invalid one [8.33ms]
+(pass) revisions are versioned: seeding again changes nothing, a changed revision conflicts, a new one supersedes [195.45ms]
+
+api/domains/dialogue/test/routed-turn.test.ts:
+(pass) an instant toolchain the router decided answers from the inputs of the one fill call: the host says its answer [88.34ms]
+(pass) a talk cut before a word gets the host's words [80.58ms]
+(pass) a talk that tells the user who spoke nothing gets the host's words; each call of the turn ends only itself [81.91ms]
+(pass) a pipeline uses the request branch and has no legacy template input contract [72.48ms]
+(pass) no candidate fits: the talk turn answers with only the read tools, on a system that names no toolchain and the time alone of the state [85.31ms]
+(pass) a no on the pending turn closes the confirmation: the next turn has nothing pending [85.75ms]
+(pass) the talk turn's recent conversation is the last two of the user's utterances and the reply before them [82.95ms]
+(pass) finished work State still lists may be checked, never corrected: the check's record is what the talk turn tells [1077.03ms]
+(pass) the fill reads the user's earlier words of the talk window: its fields carry the condition they point to [73.29ms]
+(pass) the fill reads `## Memory` as the talk turn shows it [84.99ms]
+(pass) a fill the provider failed (a cloud error) leaves the turn to the talk turn; the cloud got the fill's strict form [72.78ms]
+
+ 17 pass
+ 0 fail
+ 240 expect() calls
+Ran 17 tests across 2 files. [2.99s]

@@ -47,6 +47,8 @@ import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
 import { createErrorReport } from "./error-report";
 import { executionSourceInTransaction } from "./execution-source";
+import { createSpecialistHost } from "./specialist-host";
+import { forgetObservations } from "../repository/specialist-observations";
 import { executionCommands } from "./execution-command";
 import {
 	clearRecentInTransaction,
@@ -122,6 +124,7 @@ function registerChangeHooks(
  */
 function registerForgetHook(deps: DialogueDeps) {
 	deps.memory?.registerForgetPurge?.((db, purge) => {
+		forgetObservations(db, purge.messageIds);
 		const changed = new Set(
 			deps.conversation.input.retractUtterancesInTransaction(
 				db,
@@ -280,6 +283,7 @@ export function createDialogueService({
 		logFile: logFile ?? (() => undefined),
 	});
 	const service = {
+		...createSpecialistHost(deps),
 		acceptExistingInTransaction: intake.acceptExistingInTransaction,
 		executionCommands: executionCommands(deps),
 		/** True while the conversation has a queued or running run (the agency host waits for a quiet moment). */

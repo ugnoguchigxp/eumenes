@@ -100,9 +100,6 @@ export function candidateOf(
 		...(produces.length ? { produces } : {}),
 		...(card.instant ? { inputs: card.instant.parameters } : {}),
 		...(card.read ? { inputs: card.read.parameters } : {}),
-		...(card.pipeline
-			? { inputs: card.pipeline.parameters, steps: card.pipeline.outline }
-			: {}),
 		...(targets ? { targets } : {}),
 	};
 }

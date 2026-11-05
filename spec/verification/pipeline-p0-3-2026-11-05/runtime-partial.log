@@ -1,0 +1,14 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/agent-runtime/test/pipeline-execution.test.ts:
+(pass) one-off definition uses pinned entries, declared references, literal arguments and selected final links [27.87ms]
+(pass) one step is valid and a model-modified request is never dispatched, even after its single repair [13.37ms]
+(pass) needs_input waits without side effects; the answer keeps the original request and re-enters authoring [1024.42ms]
+(pass) unsupported is explicit partial work with no child dispatch [26.44ms]
+(pass) revoked component revision stops the pipeline before dispatch [17.95ms]
+(pass) cancelled late model output cannot launch any child [38.55ms]
+
+ 6 pass
+ 0 fail
+ 26 expect() calls
+Ran 6 tests across 1 file. [1357.00ms]

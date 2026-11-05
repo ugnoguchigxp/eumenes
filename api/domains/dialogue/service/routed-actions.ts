@@ -180,7 +180,7 @@ export async function handWith(
 	const request = {
 		toolchain: candidate.id,
 		announcement,
-		// A pipeline's branch has no request text: the user's words are what its inputs quote.
+		// Keep the complete words for request-based delegation.
 		request: typeof fields.request === "string" ? fields.request : words,
 		// `new` makes something new: the request names no saved item.
 		...(typeof fields.target === "string" && fields.target !== NEW_TARGET
@@ -194,9 +194,6 @@ export async function handWith(
 		...(fields.resolveUnsaved === "discard" &&
 		candidate.id === turn.routed?.switching
 			? { resolveUnsaved: "discard" as const }
-			: {}),
-		...(candidate.execution === "pipeline" && fields.inputs
-			? { inputs: fields.inputs }
 			: {}),
 		// The user's own words, when the request carries more than they said: the TODO's title and the statement's quote.
 		...(typeof fields.words === "string" ? { words: fields.words } : {}),

@@ -7,6 +7,7 @@
 <!-- domains:start -->
 | Domain | Tier | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| `collaboration` | 3 | `api/domains/collaboration/index.ts` | `web/src/domains/collaboration/` | なし | なし | なし | なし |
 | `usage` | 4 | `api/domains/usage/index.ts` | `web/src/domains/usage/` | `packages/design-system/src/components/UsageDashboard/index.tsx` | なし | なし | なし |
 | `docling` | 1 | `api/domains/docling/index.ts` | `web/src/domains/docling/` | `packages/design-system/src/components/ExternalAppLauncher/index.ts` | `larm` | なし | なし |
 | `google-accounts` | 0 | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
@@ -30,7 +31,7 @@
 | `artifact` | 3 | なし | `web/src/domains/artifact/index.ts` | `web/src/components/domains/artifact/` | なし | `conversation` | なし |
 | `tasks` | 0 | `api/domains/tasks/index.ts` | なし | なし | なし | なし | なし |
 | `capabilities` | 0 | `api/domains/capabilities/index.ts` | なし | なし | なし | なし | なし |
-| `pipelines` | 1 | `api/domains/pipelines/index.ts` | `web/src/domains/pipelines/` | `packages/design-system/src/components/PipelineStudio/index.ts` | `capabilities`、`resources` | `resources` | なし |
+| `pipelines` | 1 | `api/domains/pipelines/index.ts` | なし | なし | なし | なし | なし |
 | `tool-runtime` | 1 | `api/domains/tool-runtime/index.ts` | なし | なし | `capabilities`、`queue` | なし | なし |
 | `agent-runtime` | 3 | `api/domains/agent-runtime/index.ts` | `web/src/domains/agent-runtime/index.ts` | なし | `capabilities`、`inference`、`pipelines`、`queue`、`resources`、`tool-runtime` | なし | なし |
 | `toolchain-history` | 1 | `api/domains/toolchain-history/index.ts` | なし | なし | `capabilities` | なし | なし |

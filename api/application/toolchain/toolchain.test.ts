@@ -599,7 +599,7 @@ test("CLI reads catalogue, task and summary through the authenticated API", asyn
 			expect(await proc.exited).toBe(0);
 			const value = JSON.parse(text);
 			if (args[0] === "capabilities") {
-				// The packages of the web search toolchains (web.search, web.recipe, web.quick) and the pipeline studio.
+				// The packages of the web search toolchains (web.search, web.recipe, web.quick) and the pipeline executor.
 				expect(value.items).toHaveLength(4);
 				expect(
 					value.items.some((v: { id: string }) => v.id === "web.search"),

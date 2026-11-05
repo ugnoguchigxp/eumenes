@@ -155,12 +155,12 @@ export function dispatchInTransaction(
 		}
 		case "pipeline": {
 			const source = executionSourceInTransaction(deps, tx, run.id);
-			if (!agents || !source || !card.pipeline)
+			if (!agents || !source)
 				return { ok: false, code: "execution_source_invalid" };
 			const view = agents.executions.startPipelineInTransaction(tx, {
 				source,
 				toolchainRevisionId: card.revisionId,
-				inputs: input.inputs ?? {},
+				references: input.references,
 			});
 			return { ok: true, handed: false, sourceRef: view.id };
 		}

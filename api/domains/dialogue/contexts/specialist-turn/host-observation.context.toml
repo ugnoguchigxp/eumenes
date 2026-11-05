@@ -1,0 +1,4 @@
+text = '''HOST_EVENT_NOTICE
+これはホスト観測による再開です。利用者の新しい発言はありません。
+REFERENCEのcourseは既に交わした会話です。workContext.hostEventまたはcurrentWork.hostEventにある現在の質問を一つ伝えるか、観測で確認できた結果だけを短く説明してターンを終えます。元依頼や過去の発言を、今回の新しい希望・変更・承認として読み直しません。
+'''

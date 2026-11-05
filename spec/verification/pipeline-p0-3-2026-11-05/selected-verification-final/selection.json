@@ -1,0 +1,52 @@
+{
+  "selected": [
+    "pipelines",
+    "capabilities",
+    "tool-runtime",
+    "agent-runtime",
+    "dialogue"
+  ],
+  "dependencySet": [
+    "pipelines",
+    "capabilities",
+    "queue",
+    "tool-runtime",
+    "delivery",
+    "attitude-dataset",
+    "larm",
+    "settings",
+    "inference",
+    "resources",
+    "agent-runtime",
+    "continuity",
+    "conversation",
+    "memory",
+    "scheduler",
+    "toolchain-history",
+    "dialogue",
+    "avatar",
+    "audio"
+  ],
+  "testDependencySet": [
+    "pipelines",
+    "capabilities",
+    "queue",
+    "tool-runtime",
+    "delivery",
+    "attitude-dataset",
+    "larm",
+    "settings",
+    "inference",
+    "resources",
+    "agent-runtime",
+    "continuity",
+    "avatar",
+    "audio",
+    "conversation",
+    "memory",
+    "scheduler",
+    "toolchain-history",
+    "goals",
+    "dialogue"
+  ]
+}

@@ -124,13 +124,18 @@ export function executionCommands(
 		answerMessageId: string,
 	) {
 		const input = executionControl.parse(raw);
-		const controlSource = ctx
-			.port()
-			.controlSourceInTransaction(db, conversationId, answerMessageId);
-		if (!controlSource) throw new Error("execution_source_invalid");
 		const row = executionRow(db, input.workRef);
 		if (!row || row.conversation_id !== conversationId)
 			throw new Error("execution_not_found");
+		const controlSource = ctx
+			.port()
+			.controlSourceInTransaction(
+				db,
+				conversationId,
+				answerMessageId,
+				executionSource(row),
+			);
+		if (!controlSource) throw new Error("execution_source_invalid");
 		if (row.request_revision !== input.expectedRevision)
 			throw new Error("revision_conflict");
 		const state = executionState(row);

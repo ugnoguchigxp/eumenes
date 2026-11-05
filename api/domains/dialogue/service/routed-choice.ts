@@ -83,8 +83,6 @@ function candidateBranch(
 	// An instant answer and a read tool both take their inputs alone.
 	if (candidate.execution === "instant" || candidate.execution === "read")
 		return branch({ choice, inputs: candidate.inputs ?? ANY_OBJECT });
-	if (candidate.execution === "pipeline")
-		return branch({ choice, ...say, inputs: candidate.inputs ?? ANY_OBJECT });
 	return branch(
 		{
 			choice,

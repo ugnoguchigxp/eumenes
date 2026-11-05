@@ -352,6 +352,9 @@ test("a browser approval resumes in a new physical task, keeps the old deadline,
 	const h = await harness({
 		everyday: true,
 		routeTool: "browser_operate",
+		// This fixture exercises task approval, independently of additions to the recalled catalog.
+		discoveryTarget: (query) =>
+			query === "browser operations" ? "browser_operate" : "execute_task",
 		browser: (store, queue, capabilities) => {
 			let service: ReturnType<typeof createBrowser>;
 			service = createBrowser({

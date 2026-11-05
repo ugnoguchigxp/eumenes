@@ -26,6 +26,7 @@ import {
 	turnRefusal,
 } from "./specialist-core";
 import { releaseSpecialistTurn } from "./specialist-turn-end";
+import { specialistObservation } from "./specialist-notices";
 import type { TurnInput, TurnOutput } from "./specialist-turn";
 
 function failTurn(
@@ -168,6 +169,23 @@ export function settleSpecialistTurn(
 		deps.clock(),
 	);
 	if (refusal || !session) return failTurn(deps, tx, run, refusal ?? "x");
+	try {
+		if (
+			!deps.specialist?.workStateInTransaction(
+				tx,
+				session.adapterRef,
+				session.workRef,
+			)
+		)
+			return failTurn(deps, tx, run, "specialist_work_revoked");
+		if (run.sourceKind === "notice") {
+			specialistObservation(deps, tx, run.id, session);
+			if (outcome.result.action.kind !== "reply")
+				return failTurn(deps, tx, run, "specialist_event_action_forbidden");
+		}
+	} catch {
+		return failTurn(deps, tx, run, "specialist_work_revoked");
+	}
 	for (const receipt of outcome.result.receipts)
 		if (!deps.larm.acceptInTransaction?.(tx, receipt))
 			return failTurn(deps, tx, run, "permission_revoked");

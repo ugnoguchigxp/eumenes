@@ -41,7 +41,7 @@ export type ToolchainRuntimeMeta = {
 	 * music-create / music-playback: the music domain's own planner runs the package.
 	 * session: the conversation hands over to the package's specialist for several direct turns.
 	 * instant: the first round's function call carries the arguments and the adapter's sentence is the answer.
-	 * pipeline: the first round's function call carries the inputs and the host runs the fixed steps.
+	 * pipeline: the request is planned through the imported short contract and existing parent runtime.
 	 * read: one of the conversation's read tools (no toolchain): the host reads, and the talk turn tells it.
 	 */
 	execution:
@@ -105,23 +105,6 @@ export type ToolchainCard = {
 		parse(
 			args: unknown,
 		): { ok: true; value: Record<string, unknown> } | { ok: false };
-	};
-	/**
-	 * A task pipeline only (binding execution "pipeline"), filled by the host while it finds the candidates: the
-	 * inputs its first-round function takes besides the analysis and the notice, each with its quote.
-	 */
-	pipeline?: {
-		/** JSON Schema (flat object) of the inputs and their `<name>_quote`. */
-		parameters: Record<string, unknown>;
-		/** The steps as one line ("調べる→タイマー→曲"). */
-		outline: string;
-		/** Check the model's inputs against the definition and the user's request (the quotes). */
-		parse(
-			args: Record<string, unknown>,
-			request: string,
-		):
-			| { ok: true; value: Record<string, unknown> }
-			| { ok: false; issues: Array<{ path: string; code: string }> };
 	};
 	/** Ranks and scores that placed it among the candidates; recorded in the selection trace. */
 	score: {

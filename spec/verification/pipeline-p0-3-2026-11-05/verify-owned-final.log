@@ -1,0 +1,1741 @@
+$ bun scripts/verify.ts --domain pipelines --domain capabilities --domain tool-runtime --domain agent-runtime --domain dialogue
+[verify] selected=pipelines,capabilities,tool-runtime,agent-runtime,dialogue dependencyClosure=pipelines,capabilities,queue,tool-runtime,delivery,attitude-dataset,larm,settings,inference,resources,agent-runtime,continuity,conversation,memory,scheduler,toolchain-history,dialogue,avatar,audio
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] boundaries: 5 finding(s) outside the selection (not failing; all in report.json)
+  api/domains/kanban/contracts/index.ts: forbidden dependency kanban -> capabilities
+  api/domains/kanban/contracts/index.ts: forbidden dependency kanban -> capabilities
+  api/domains/kanban/service/resource-adapter.ts: forbidden dependency kanban -> resources
+  api/domains/kanban/test/resource-adapter.test.ts: forbidden dependency kanban -> resources
+  web/src/domains/kanban/toolchain-adapter.tsx: forbidden dependency kanban -> resources
+[verify] system-context
+[verify] size-budget
+[verify] sql-boundaries
+[verify] domain-docs
+[verify] format
+[verify] lint
+[verify] design-system typecheck: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system typecheck
+$ bun check
+✓ No type errors in 524 files [163.24ms]
+[verify] design-system build: /Users/y.noguchi/.bun/bin/bun run --cwd packages/design-system build
+$ bun check -p tsconfig.build.json && vite build
+✓ No type errors in 307 files [99.50ms]
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 344 modules transformed.
+rendering chunks...
+
+[unplugin:dts] Start generate declaration files...
+[unplugin:dts] Start bundling declaration files...
+Analysis will use the bundled TypeScript version 5.9.3
+[unplugin:dts] Declaration files built in 4773ms.
+
+computing gzip size...
+dist/design-system.css                                                      224.29 kB │ gzip: 38.00 kB
+dist/components/Collapsible/Collapsible.mjs                                   0.26 kB │ gzip:  0.16 kB
+dist/utils/cn.mjs                                                             0.26 kB │ gzip:  0.20 kB
+dist/components/ImageViewer/ImageFrame.mjs                                    0.29 kB │ gzip:  0.22 kB
+dist/components/Model3dWorkspace/types.mjs                                    0.35 kB │ gzip:  0.30 kB
+dist/components/OcrWorkspace/types.mjs                                        0.35 kB │ gzip:  0.28 kB
+dist/utils/capacity.mjs                                                       0.40 kB │ gzip:  0.30 kB
+dist/components/ActionButton/SaveButton.mjs                                   0.41 kB │ gzip:  0.28 kB
+dist/components/ActionButton/EditButton.mjs                                   0.41 kB │ gzip:  0.28 kB
+dist/components/ScrollArea/ScrollArea.mjs                                     0.42 kB │ gzip:  0.28 kB
+dist/components/ActionButton/DeleteButton.mjs                                 0.42 kB │ gzip:  0.28 kB
+dist/components/ActionButton/CancelButton.mjs                                 0.42 kB │ gzip:  0.29 kB
+dist/components/Subtitle/Subtitle2.mjs                                        0.45 kB │ gzip:  0.29 kB
+dist/utils/menuKeyboard.mjs                                                   0.46 kB │ gzip:  0.31 kB
+dist/components/ActionButton/CreateButton.mjs                                 0.47 kB │ gzip:  0.31 kB
+dist/components/OcrWorkspace/region.mjs                                       0.50 kB │ gzip:  0.31 kB
+dist/components/VisualAnalysis/StopObservationStatus.mjs                      0.51 kB │ gzip:  0.40 kB
+dist/styles/themes.mjs                                                        0.51 kB │ gzip:  0.26 kB
+dist/components/Label/Label.mjs                                               0.54 kB │ gzip:  0.35 kB
+dist/components/Separator/Separator.mjs                                       0.57 kB │ gzip:  0.36 kB
+dist/hooks/useMobile.mjs                                                      0.62 kB │ gzip:  0.33 kB
+dist/components/Textarea/Textarea.mjs                                         0.67 kB │ gzip:  0.40 kB
+dist/components/DigitalClock/DigitalClock2.mjs                                0.71 kB │ gzip:  0.41 kB
+dist/components/DigitalClock/format.mjs                                       0.72 kB │ gzip:  0.43 kB
+dist/components/Tooltip/Tooltip.mjs                                           0.72 kB │ gzip:  0.43 kB
+dist/components/Skeleton/Skeleton.mjs                                         0.74 kB │ gzip:  0.41 kB
+dist/components/CopyClipButton/CopyClipButton.mjs                             0.75 kB │ gzip:  0.48 kB
+dist/components/Input/Input.mjs                                               0.75 kB │ gzip:  0.44 kB
+dist/contexts/CalendarContext.mjs                                             0.76 kB │ gzip:  0.39 kB
+dist/components/MusicPlayer/playbackRequest.mjs                               0.77 kB │ gzip:  0.47 kB
+dist/components/ConfirmModal/ConfirmModal.mjs                                 0.84 kB │ gzip:  0.47 kB
+dist/components/Subtitle/SubtitlePreview.mjs                                  0.89 kB │ gzip:  0.51 kB
+dist/components/TerminalWorkspace/TerminalWorkspace2.mjs                      0.97 kB │ gzip:  0.51 kB
+dist/components/Popover/Popover.mjs                                           1.01 kB │ gzip:  0.51 kB
+dist/components/Spinner/Spinner.mjs                                           1.01 kB │ gzip:  0.57 kB
+dist/components/ObjectRecognitionWorkspace/CaptureSaveNotice.mjs              1.03 kB │ gzip:  0.55 kB
+dist/components/ActionButton/ActionButton.mjs                                 1.03 kB │ gzip:  0.54 kB
+dist/components/SelectableTextInput/SelectableTextInput.mjs                   1.04 kB │ gzip:  0.47 kB
+dist/components/MediaCard/MediaCard2.mjs                                      1.06 kB │ gzip:  0.47 kB
+dist/components/DrawingWorkspace/frame-protocol.mjs                           1.06 kB │ gzip:  0.51 kB
+dist/components/RangeSlider/RangeSlider2.mjs                                  1.09 kB │ gzip:  0.56 kB
+dist/components/SimpleSearchInput/SimpleSearchInput.mjs                       1.12 kB │ gzip:  0.61 kB
+dist/components/MiniTable/MiniTable.mjs                                       1.12 kB │ gzip:  0.54 kB
+dist/components/Timeline/Timeline2.mjs                                        1.12 kB │ gzip:  0.48 kB
+dist/components/Faq/Faq2.mjs                                                  1.12 kB │ gzip:  0.52 kB
+dist/components/Switch/Switch.mjs                                             1.15 kB │ gzip:  0.56 kB
+dist/components/Avatar/Avatar.mjs                                             1.16 kB │ gzip:  0.65 kB
+dist/components/RadioButtonGroup/RadioButtonGroup2.mjs                        1.17 kB │ gzip:  0.53 kB
+dist/components/ViewSwitcher/ViewSwitcher.mjs                                 1.18 kB │ gzip:  0.58 kB
+dist/components/StatTile/StatTile2.mjs                                        1.20 kB │ gzip:  0.56 kB
+dist/components/KanbanBoard/positions.mjs                                     1.25 kB │ gzip:  0.68 kB
+dist/components/NotificationCard/NotificationCard2.mjs                        1.27 kB │ gzip:  0.46 kB
+dist/components/FullscreenDialog/FullscreenDialog2.mjs                        1.28 kB │ gzip:  0.56 kB
+dist/components/ExternalAppLauncher/ExternalAppLauncher2.mjs                  1.29 kB │ gzip:  0.69 kB
+dist/components/ContentImage/ContentImage2.mjs                                1.30 kB │ gzip:  0.66 kB
+dist/components/TimerWorkspace/TimerDurationFields.mjs                        1.31 kB │ gzip:  0.66 kB
+dist/components/Testimonial/Testimonial2.mjs                                  1.33 kB │ gzip:  0.57 kB
+dist/components/ErrorState/ErrorState.mjs                                     1.33 kB │ gzip:  0.70 kB
+dist/components/MusicWorkspace/MusicCreationPanel.mjs                         1.35 kB │ gzip:  0.64 kB
+dist/components/AdaptiveText/AdaptiveText.mjs                                 1.39 kB │ gzip:  0.76 kB
+dist/components/Pagination/Pagination.mjs                                     1.39 kB │ gzip:  0.69 kB
+dist/components/UsageDashboard/controls.mjs                                   1.41 kB │ gzip:  0.70 kB
+dist/components/TextInput/TextInput.mjs                                       1.41 kB │ gzip:  0.59 kB
+dist/components/TimerWorkspace/ClockDial.mjs                                  1.43 kB │ gzip:  0.61 kB
+dist/components/CtaBanner/CtaBanner2.mjs                                      1.45 kB │ gzip:  0.59 kB
+dist/components/MusicPlayer/useAudioAnalysis.mjs                              1.47 kB │ gzip:  0.65 kB
+dist/components/ImageWorkspace/image-creation-options.mjs                     1.49 kB │ gzip:  0.88 kB
+dist/components/ObjectRecognitionWorkspace/CameraCapture.mjs                  1.51 kB │ gzip:  0.69 kB
+dist/components/Chart/chart-data.mjs                                          1.58 kB │ gzip:  0.84 kB
+dist/components/ChoiceGroup/ChoiceGroup2.mjs                                  1.59 kB │ gzip:  0.76 kB
+dist/components/Select/selectVariants.mjs                                     1.60 kB │ gzip:  0.74 kB
+dist/components/ContentHeader/ContentHeader.mjs                               1.64 kB │ gzip:  0.70 kB
+dist/components/MusicWorkspace/MusicCurrentTrack.mjs                          1.65 kB │ gzip:  0.79 kB
+dist/components/PricingCard/PricingCard2.mjs                                  1.67 kB │ gzip:  0.66 kB
+dist/components/RecordsWorkspace/RecordList.mjs                               1.67 kB │ gzip:  0.71 kB
+dist/components/FeatureCard/FeatureCard2.mjs                                  1.68 kB │ gzip:  0.92 kB
+dist/components/ScaleInput/ScaleInput.mjs                                     1.69 kB │ gzip:  0.82 kB
+dist/components/MusicPlayer/usePlayback.mjs                                   1.73 kB │ gzip:  0.78 kB
+dist/components/OptionButtonGroup/OptionButtonGroup.mjs                       1.73 kB │ gzip:  0.72 kB
+dist/components/NumberFormat/NumberFormat.mjs                                 1.78 kB │ gzip:  0.64 kB
+dist/components/TimerWorkspace/TimerWorkspace2.mjs                            1.78 kB │ gzip:  0.71 kB
+dist/components/GenerationStatus/GenerationStatus2.mjs                        1.85 kB │ gzip:  0.85 kB
+dist/components/Card/Card.mjs                                                 1.87 kB │ gzip:  0.64 kB
+dist/components/Hero/Hero2.mjs                                                1.91 kB │ gzip:  0.71 kB
+dist/components/Diagram/geometry.mjs                                          1.95 kB │ gzip:  1.01 kB
+dist/components/Formula/Formula.mjs                                           1.99 kB │ gzip:  1.00 kB
+dist/components/Tabs/Tabs.mjs                                                 2.02 kB │ gzip:  0.88 kB
+dist/components/DateDisplay/DateDisplay.mjs                                   2.02 kB │ gzip:  0.61 kB
+dist/components/Checkbox/Checkbox.mjs                                         2.05 kB │ gzip:  0.87 kB
+dist/components/Badge/Badge.mjs                                               2.07 kB │ gzip:  0.77 kB
+dist/components/MusicWorkspace/MusicVisualizer2.mjs                           2.11 kB │ gzip:  1.10 kB
+dist/components/ComparisonTable/ComparisonTable2.mjs                          2.17 kB │ gzip:  0.74 kB
+dist/components/DataTable/DataTable.mjs                                       2.20 kB │ gzip:  0.93 kB
+dist/components/KanbanBoard/KanbanColumn.mjs                                  2.21 kB │ gzip:  0.97 kB
+dist/components/KanbanBoard/ExecutorLogo.mjs                                  2.23 kB │ gzip:  1.22 kB
+dist/components/ChatDock/ChatDock.mjs                                         2.24 kB │ gzip:  0.96 kB
+dist/components/DropdownMenu/menuLayout.mjs                                   2.32 kB │ gzip:  1.05 kB
+dist/components/ImageViewer/ImageViewer.mjs                                   2.34 kB │ gzip:  1.10 kB
+dist/components/KanbanBoard/MoveMenu.mjs                                      2.35 kB │ gzip:  1.08 kB
+dist/components/MusicPlayer/PlaybackControls.mjs                              2.40 kB │ gzip:  0.81 kB
+dist/components/EditableSelect/EditableSelect.mjs                             2.40 kB │ gzip:  1.11 kB
+dist/components/OcrWorkspace/OcrQr.mjs                                        2.44 kB │ gzip:  0.96 kB
+dist/components/ProgressBar/ProgressBar.mjs                                   2.47 kB │ gzip:  1.18 kB
+dist/components/AsyncDataWrapper/AsyncDataWrapper.mjs                         2.53 kB │ gzip:  0.97 kB
+dist/components/TimerWorkspace/StopwatchPane.mjs                              2.54 kB │ gzip:  1.00 kB
+dist/components/Form/Form.mjs                                                 2.61 kB │ gzip:  1.02 kB
+dist/components/Slides/Slides2.mjs                                            2.64 kB │ gzip:  1.08 kB
+dist/components/Calculator/calculator-expression.mjs                          2.68 kB │ gzip:  0.99 kB
+dist/components/RecordsWorkspace/SavedProcedures.mjs                          2.76 kB │ gzip:  1.18 kB
+dist/components/BrowserWorkspace/BrowserTabList.mjs                           2.85 kB │ gzip:  1.02 kB
+dist/components/DrawingWorkspace/useDrawingFrame.mjs                          2.86 kB │ gzip:  1.32 kB
+dist/components/KanbanBoard/ExecutorQueues.mjs                                2.86 kB │ gzip:  1.22 kB
+dist/components/Model3dWorkspace/Model3dGenerationList.mjs                    2.86 kB │ gzip:  1.12 kB
+dist/components/ImageWorkspace/ImagePreview.mjs                               2.91 kB │ gzip:  1.13 kB
+dist/components/ProductCard/ProductCard2.mjs                                  2.93 kB │ gzip:  1.09 kB
+dist/components/ImageWorkspace/ImageWorkspace2.mjs                            2.94 kB │ gzip:  1.11 kB
+dist/components/Drawer/Drawer.mjs                                             2.95 kB │ gzip:  1.21 kB
+dist/components/DateFormat/DateFormat.mjs                                     3.04 kB │ gzip:  1.29 kB
+dist/components/ActivityTimeline/ActivityTimeline2.mjs                        3.06 kB │ gzip:  1.42 kB
+dist/components/Playlist/Playlist2.mjs                                        3.10 kB │ gzip:  1.22 kB
+dist/components/NotificationToast/NotificationToast.mjs                       3.18 kB │ gzip:  1.22 kB
+dist/components/WorkListMenu/WorkListMenu.mjs                                 3.21 kB │ gzip:  1.44 kB
+dist/components/UsageDashboard/UsageTables.mjs                                3.41 kB │ gzip:  1.50 kB
+dist/components/SearchableSelect/SearchableSelect.mjs                         3.42 kB │ gzip:  1.45 kB
+dist/components/BrowserWorkspace/BrowserConnectionPanel.mjs                   3.46 kB │ gzip:  1.42 kB
+dist/components/TerminalWorkspace/TerminalPane.mjs                            3.47 kB │ gzip:  1.50 kB
+dist/components/MusicWorkspace/MusicTrackDetails.mjs                          3.53 kB │ gzip:  1.21 kB
+dist/components/Canvas2D/Canvas2D2.mjs                                        3.58 kB │ gzip:  1.54 kB
+dist/components/RecordsWorkspace/RecordsWorkspace2.mjs                        3.58 kB │ gzip:  1.35 kB
+dist/components/Select/Select.mjs                                             3.63 kB │ gzip:  1.29 kB
+dist/components/BrowserWorkspace/BrowserSettings.mjs                          3.64 kB │ gzip:  1.47 kB
+dist/components/ImagePicker/ImageGrid.mjs                                     3.72 kB │ gzip:  1.44 kB
+dist/components/ObjectRecognitionWorkspace/RecognitionHistory.mjs             3.76 kB │ gzip:  1.57 kB
+dist/components/Button/Button.mjs                                             3.86 kB │ gzip:  1.45 kB
+dist/components/StepGuide/StepGuide.mjs                                       3.86 kB │ gzip:  1.55 kB
+dist/components/BrowserWorkspace/BrowserHistoryReplay.mjs                     3.88 kB │ gzip:  1.36 kB
+dist/components/ObjectRecognitionWorkspace/useCameraCapture.mjs               3.91 kB │ gzip:  1.73 kB
+dist/components/KanbanBoard/CommitPushDialog.mjs                              3.93 kB │ gzip:  1.55 kB
+dist/components/Model3dWorkspace/Model3dDetail.mjs                            3.97 kB │ gzip:  1.49 kB
+dist/components/KanbanBoard/KanbanBoard2.mjs                                  4.05 kB │ gzip:  1.74 kB
+dist/components/MusicLibraryControls/MusicLibraryControls2.mjs                4.08 kB │ gzip:  1.44 kB
+dist/components/MenuButtonGroup/MenuButtonGroup.mjs                           4.17 kB │ gzip:  1.69 kB
+dist/components/MusicWorkspace/music-creation-options.mjs                     4.33 kB │ gzip:  1.85 kB
+dist/components/MusicPlayer/MusicPlayer2.mjs                                  4.46 kB │ gzip:  1.71 kB
+dist/components/TimerWorkspace/TimerPane.mjs                                  4.46 kB │ gzip:  1.76 kB
+dist/components/WorkResultPanel/WorkResultPanel.mjs                           4.52 kB │ gzip:  1.49 kB
+dist/components/Calculator/Calculator.mjs                                     4.55 kB │ gzip:  1.93 kB
+dist/components/UsageDashboard/RatePanel.mjs                                  4.64 kB │ gzip:  1.86 kB
+dist/components/ImageWorkspace/ImageGallery.mjs                               4.71 kB │ gzip:  1.77 kB
+dist/components/BrowserWorkspace/labels.mjs                                   4.71 kB │ gzip:  2.06 kB
+dist/components/TodoWorkspace/TodoWorkspace2.mjs                              4.73 kB │ gzip:  1.66 kB
+dist/components/Model3dWorkspace/Model3dGenerationForm.mjs                    4.86 kB │ gzip:  1.81 kB
+dist/components/Model3dWorkspace/Model3dWorkspace2.mjs                        4.87 kB │ gzip:  1.77 kB
+dist/components/BrowserWorkspace/BrowserCaptureList.mjs                       4.89 kB │ gzip:  1.65 kB
+dist/components/KanbanBoard/CardForms.mjs                                     4.93 kB │ gzip:  1.81 kB
+dist/components/BrowserWorkspace/BrowserHistoryList.mjs                       4.93 kB │ gzip:  1.64 kB
+dist/components/DropdownMenu/DropdownMenu.mjs                                 5.13 kB │ gzip:  2.02 kB
+dist/components/Chart/Chart.mjs                                               5.21 kB │ gzip:  1.89 kB
+dist/components/BrowserWorkspace/BrowserHistoryDetail.mjs                     5.27 kB │ gzip:  1.71 kB
+dist/components/Model3dWorkspace/Model3dLibrary.mjs                           5.33 kB │ gzip:  1.84 kB
+dist/components/TreeMenu/TreeMenu.mjs                                         5.39 kB │ gzip:  1.89 kB
+dist/components/Modal/Modal.mjs                                               5.42 kB │ gzip:  2.03 kB
+dist/components/BrowserWorkspace/BrowserScriptPanel.mjs                       5.58 kB │ gzip:  2.00 kB
+dist/components/LightSpiritLab/LightSpiritLab2.mjs                            5.82 kB │ gzip:  1.96 kB
+dist/components/OcrWorkspace/OcrCorrection.mjs                                5.95 kB │ gzip:  1.97 kB
+dist/components/NavigationStepper/NavigationStepper.mjs                       6.01 kB │ gzip:  1.84 kB
+dist/components/ObjectRecognitionWorkspace/CaptureControls.mjs                6.05 kB │ gzip:  2.01 kB
+dist/components/InfiniteListMenu/InfiniteListMenu.mjs                         6.22 kB │ gzip:  2.14 kB
+dist/components/ObjectRecognitionWorkspace/DetectionPreview.mjs               6.33 kB │ gzip:  2.44 kB
+dist/components/BrowserWorkspace/BrowserWorkspace2.mjs                        6.63 kB │ gzip:  2.18 kB
+dist/components/OcrWorkspace/OcrResult.mjs                                    6.65 kB │ gzip:  2.07 kB
+dist/components/ServerDataTable/ServerDataTable2.mjs                          6.74 kB │ gzip:  2.33 kB
+dist/components/OcrWorkspace/OcrPanel.mjs                                     7.03 kB │ gzip:  2.65 kB
+dist/components/Diagram/Diagram.mjs                                           7.07 kB │ gzip:  2.63 kB
+dist/components/OcrWorkspace/OcrMedia.mjs                                     7.25 kB │ gzip:  2.57 kB
+dist/components/KeypadModal/KeypadModal.mjs                                   7.60 kB │ gzip:  2.47 kB
+dist/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace2.mjs    8.06 kB │ gzip:  3.26 kB
+dist/components/GoogleAccounts/index.mjs                                      8.28 kB │ gzip:  2.57 kB
+dist/components/ComputeWorkspace/index.mjs                                    8.29 kB │ gzip:  2.42 kB
+dist/components/OcrWorkspace/OcrPreview.mjs                                   8.70 kB │ gzip:  3.26 kB
+dist/components/MusicWorkspace/MusicWorkspace2.mjs                            8.97 kB │ gzip:  2.95 kB
+dist/components/DrawingWorkspace/index.mjs                                    9.42 kB │ gzip:  2.66 kB
+dist/components/UsageDashboard/index.mjs                                      9.64 kB │ gzip:  2.99 kB
+dist/components/ImagePicker/ImagePicker2.mjs                                 10.04 kB │ gzip:  3.28 kB
+dist/components/KanbanBoard/KanbanCard.mjs                                   10.42 kB │ gzip:  3.44 kB
+dist/components/ImageWorkspace/ImageCreationForm2.mjs                        10.83 kB │ gzip:  3.07 kB
+dist/components/VisualAnalysis/VisualAnalysis.mjs                            11.18 kB │ gzip:  3.87 kB
+dist/components/SettingsPanels/index.mjs                                     12.21 kB │ gzip:  3.46 kB
+dist/components/MusicWorkspace/MusicCreationForm2.mjs                        12.67 kB │ gzip:  3.73 kB
+dist/index.mjs                                                               15.19 kB │ gzip:  3.76 kB
+
+transforming...
+✓ 344 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/design-system.css                                                     224.29 kB │ gzip: 38.00 kB
+dist/components/ImageViewer/ImageFrame.js                                    0.16 kB │ gzip:  0.14 kB
+dist/utils/cn.js                                                             0.18 kB │ gzip:  0.16 kB
+dist/components/Collapsible/Collapsible.js                                   0.25 kB │ gzip:  0.17 kB
+dist/components/OcrWorkspace/types.js                                        0.25 kB │ gzip:  0.21 kB
+dist/components/ActionButton/SaveButton.js                                   0.27 kB │ gzip:  0.20 kB
+dist/components/ActionButton/EditButton.js                                   0.27 kB │ gzip:  0.21 kB
+dist/components/Model3dWorkspace/types.js                                    0.27 kB │ gzip:  0.25 kB
+dist/components/ActionButton/DeleteButton.js                                 0.28 kB │ gzip:  0.21 kB
+dist/components/ActionButton/CancelButton.js                                 0.28 kB │ gzip:  0.21 kB
+dist/components/Subtitle/Subtitle2.js                                        0.30 kB │ gzip:  0.22 kB
+dist/components/ActionButton/CreateButton.js                                 0.31 kB │ gzip:  0.24 kB
+dist/utils/capacity.js                                                       0.34 kB │ gzip:  0.25 kB
+dist/components/OcrWorkspace/region.js                                       0.34 kB │ gzip:  0.23 kB
+dist/components/ScrollArea/ScrollArea.js                                     0.35 kB │ gzip:  0.25 kB
+dist/utils/menuKeyboard.js                                                   0.36 kB │ gzip:  0.27 kB
+dist/components/VisualAnalysis/StopObservationStatus.js                      0.37 kB │ gzip:  0.32 kB
+dist/styles/themes.js                                                        0.39 kB │ gzip:  0.21 kB
+dist/components/Label/Label.js                                               0.50 kB │ gzip:  0.31 kB
+dist/components/Separator/Separator.js                                       0.50 kB │ gzip:  0.31 kB
+dist/components/DigitalClock/DigitalClock2.js                                0.50 kB │ gzip:  0.32 kB
+dist/_virtual/_rolldown/runtime.js                                           0.51 kB │ gzip:  0.33 kB
+dist/components/MusicPlayer/playbackRequest.js                               0.51 kB │ gzip:  0.35 kB
+dist/components/DigitalClock/format.js                                       0.53 kB │ gzip:  0.34 kB
+dist/components/CopyClipButton/CopyClipButton.js                             0.54 kB │ gzip:  0.38 kB
+dist/hooks/useMobile.js                                                      0.55 kB │ gzip:  0.31 kB
+dist/components/ConfirmModal/ConfirmModal.js                                 0.57 kB │ gzip:  0.36 kB
+dist/components/Textarea/Textarea.js                                         0.61 kB │ gzip:  0.36 kB
+dist/components/Skeleton/Skeleton.js                                         0.61 kB │ gzip:  0.36 kB
+dist/components/Subtitle/SubtitlePreview.js                                  0.63 kB │ gzip:  0.40 kB
+dist/contexts/CalendarContext.js                                             0.66 kB │ gzip:  0.34 kB
+dist/components/Tooltip/Tooltip.js                                           0.67 kB │ gzip:  0.40 kB
+dist/components/TerminalWorkspace/TerminalWorkspace2.js                      0.70 kB │ gzip:  0.41 kB
+dist/components/Input/Input.js                                               0.70 kB │ gzip:  0.40 kB
+dist/components/MediaCard/MediaCard2.js                                      0.72 kB │ gzip:  0.34 kB
+dist/components/RangeSlider/RangeSlider2.js                                  0.76 kB │ gzip:  0.43 kB
+dist/components/Timeline/Timeline2.js                                        0.76 kB │ gzip:  0.36 kB
+dist/components/ObjectRecognitionWorkspace/CaptureSaveNotice.js              0.77 kB │ gzip:  0.44 kB
+dist/components/Faq/Faq2.js                                                  0.79 kB │ gzip:  0.41 kB
+dist/components/RadioButtonGroup/RadioButtonGroup2.js                        0.81 kB │ gzip:  0.40 kB
+dist/components/ActionButton/ActionButton.js                                 0.81 kB │ gzip:  0.47 kB
+dist/components/StatTile/StatTile2.js                                        0.81 kB │ gzip:  0.42 kB
+dist/components/SelectableTextInput/SelectableTextInput.js                   0.82 kB │ gzip:  0.38 kB
+dist/components/NotificationCard/NotificationCard2.js                        0.82 kB │ gzip:  0.33 kB
+dist/components/DrawingWorkspace/frame-protocol.js                           0.84 kB │ gzip:  0.41 kB
+dist/components/Spinner/Spinner.js                                           0.85 kB │ gzip:  0.50 kB
+dist/components/MiniTable/MiniTable.js                                       0.87 kB │ gzip:  0.44 kB
+dist/components/TimerWorkspace/TimerDurationFields.js                        0.88 kB │ gzip:  0.51 kB
+dist/components/ExternalAppLauncher/ExternalAppLauncher2.js                  0.90 kB │ gzip:  0.57 kB
+dist/components/ContentImage/ContentImage2.js                                0.93 kB │ gzip:  0.53 kB
+dist/components/ViewSwitcher/ViewSwitcher.js                                 0.94 kB │ gzip:  0.50 kB
+dist/components/Popover/Popover.js                                           0.94 kB │ gzip:  0.46 kB
+dist/components/FullscreenDialog/FullscreenDialog2.js                        0.94 kB │ gzip:  0.47 kB
+dist/components/TimerWorkspace/ClockDial.js                                  0.95 kB │ gzip:  0.47 kB
+dist/components/Avatar/Avatar.js                                             0.96 kB │ gzip:  0.57 kB
+dist/components/Testimonial/Testimonial2.js                                  0.96 kB │ gzip:  0.45 kB
+dist/components/ErrorState/ErrorState.js                                     0.96 kB │ gzip:  0.58 kB
+dist/components/MusicWorkspace/MusicCreationPanel.js                         0.99 kB │ gzip:  0.53 kB
+dist/components/SimpleSearchInput/SimpleSearchInput.js                       0.99 kB │ gzip:  0.56 kB
+dist/components/AdaptiveText/AdaptiveText.js                                 1.01 kB │ gzip:  0.60 kB
+dist/components/KanbanBoard/positions.js                                     1.01 kB │ gzip:  0.56 kB
+dist/components/CtaBanner/CtaBanner2.js                                      1.03 kB │ gzip:  0.46 kB
+dist/components/UsageDashboard/controls.js                                   1.04 kB │ gzip:  0.55 kB
+dist/components/ObjectRecognitionWorkspace/CameraCapture.js                  1.04 kB │ gzip:  0.55 kB
+dist/components/Pagination/Pagination.js                                     1.05 kB │ gzip:  0.59 kB
+dist/components/TextInput/TextInput.js                                       1.05 kB │ gzip:  0.49 kB
+dist/components/MusicPlayer/useAudioAnalysis.js                              1.09 kB │ gzip:  0.51 kB
+dist/components/Switch/Switch.js                                             1.09 kB │ gzip:  0.53 kB
+dist/components/FeatureCard/FeatureCard2.js                                  1.11 kB │ gzip:  0.63 kB
+dist/components/ChoiceGroup/ChoiceGroup2.js                                  1.14 kB │ gzip:  0.60 kB
+dist/components/PricingCard/PricingCard2.js                                  1.17 kB │ gzip:  0.53 kB
+dist/components/RecordsWorkspace/RecordList.js                               1.17 kB │ gzip:  0.55 kB
+dist/components/MusicWorkspace/MusicCurrentTrack.js                          1.19 kB │ gzip:  0.64 kB
+dist/components/ContentHeader/ContentHeader.js                               1.19 kB │ gzip:  0.56 kB
+dist/components/ImageWorkspace/image-creation-options.js                     1.21 kB │ gzip:  0.74 kB
+dist/components/OptionButtonGroup/OptionButtonGroup.js                       1.26 kB │ gzip:  0.55 kB
+dist/components/TimerWorkspace/TimerWorkspace2.js                            1.26 kB │ gzip:  0.58 kB
+dist/components/GenerationStatus/GenerationStatus2.js                        1.28 kB │ gzip:  0.68 kB
+dist/components/MusicPlayer/usePlayback.js                                   1.30 kB │ gzip:  0.63 kB
+dist/components/Chart/chart-data.js                                          1.31 kB │ gzip:  0.71 kB
+dist/components/NumberFormat/NumberFormat.js                                 1.33 kB │ gzip:  0.51 kB
+dist/components/Hero/Hero2.js                                                1.34 kB │ gzip:  0.56 kB
+dist/components/Select/selectVariants.js                                     1.36 kB │ gzip:  0.67 kB
+dist/components/ScaleInput/ScaleInput.js                                     1.38 kB │ gzip:  0.70 kB
+dist/components/Diagram/geometry.js                                          1.49 kB │ gzip:  0.84 kB
+dist/components/KanbanBoard/KanbanColumn.js                                  1.53 kB │ gzip:  0.78 kB
+dist/components/ComparisonTable/ComparisonTable2.js                          1.56 kB │ gzip:  0.60 kB
+dist/components/DateDisplay/DateDisplay.js                                   1.56 kB │ gzip:  0.53 kB
+dist/components/Formula/Formula.js                                           1.58 kB │ gzip:  0.88 kB
+dist/components/MusicWorkspace/MusicVisualizer2.js                           1.60 kB │ gzip:  0.92 kB
+dist/components/DataTable/DataTable.js                                       1.61 kB │ gzip:  0.76 kB
+dist/components/Tabs/Tabs.js                                                 1.62 kB │ gzip:  0.75 kB
+dist/components/KanbanBoard/MoveMenu.js                                      1.64 kB │ gzip:  0.88 kB
+dist/components/Card/Card.js                                                 1.66 kB │ gzip:  0.58 kB
+dist/components/Checkbox/Checkbox.js                                         1.71 kB │ gzip:  0.74 kB
+dist/components/MusicPlayer/PlaybackControls.js                              1.75 kB │ gzip:  0.65 kB
+dist/components/OcrWorkspace/OcrQr.js                                        1.75 kB │ gzip:  0.79 kB
+dist/components/TimerWorkspace/StopwatchPane.js                              1.80 kB │ gzip:  0.82 kB
+dist/components/DropdownMenu/menuLayout.js                                   1.82 kB │ gzip:  0.90 kB
+dist/components/Slides/Slides2.js                                            1.84 kB │ gzip:  0.88 kB
+dist/components/ChatDock/ChatDock.js                                         1.92 kB │ gzip:  0.85 kB
+dist/components/ImageViewer/ImageViewer.js                                   1.92 kB │ gzip:  0.97 kB
+dist/components/EditableSelect/EditableSelect.js                             1.94 kB │ gzip:  0.98 kB
+dist/components/Badge/Badge.js                                               1.94 kB │ gzip:  0.72 kB
+dist/components/Calculator/calculator-expression.js                          1.95 kB │ gzip:  0.81 kB
+dist/components/ProgressBar/ProgressBar.js                                   1.95 kB │ gzip:  1.03 kB
+dist/components/BrowserWorkspace/BrowserTabList.js                           1.98 kB │ gzip:  0.83 kB
+dist/components/RecordsWorkspace/SavedProcedures.js                          1.99 kB │ gzip:  0.97 kB
+dist/components/AsyncDataWrapper/AsyncDataWrapper.js                         2.01 kB │ gzip:  0.82 kB
+dist/components/Model3dWorkspace/Model3dGenerationList.js                    2.01 kB │ gzip:  0.92 kB
+dist/components/ImageWorkspace/ImagePreview.js                               2.03 kB │ gzip:  0.90 kB
+dist/components/KanbanBoard/ExecutorLogo.js                                  2.03 kB │ gzip:  1.12 kB
+dist/components/ProductCard/ProductCard2.js                                  2.04 kB │ gzip:  0.85 kB
+dist/components/KanbanBoard/ExecutorQueues.js                                2.08 kB │ gzip:  1.00 kB
+dist/components/Form/Form.js                                                 2.17 kB │ gzip:  0.90 kB
+dist/components/ImageWorkspace/ImageWorkspace2.js                            2.18 kB │ gzip:  0.94 kB
+dist/components/Playlist/Playlist2.js                                        2.21 kB │ gzip:  1.02 kB
+dist/components/ActivityTimeline/ActivityTimeline2.js                        2.21 kB │ gzip:  1.20 kB
+dist/components/DateFormat/DateFormat.js                                     2.32 kB │ gzip:  1.07 kB
+dist/components/WorkListMenu/WorkListMenu.js                                 2.35 kB │ gzip:  1.20 kB
+dist/components/DrawingWorkspace/useDrawingFrame.js                          2.36 kB │ gzip:  1.13 kB
+dist/components/RecordsWorkspace/RecordsWorkspace2.js                        2.40 kB │ gzip:  1.07 kB
+dist/components/NotificationToast/NotificationToast.js                       2.45 kB │ gzip:  1.02 kB
+dist/components/BrowserWorkspace/BrowserConnectionPanel.js                   2.51 kB │ gzip:  1.16 kB
+dist/components/Drawer/Drawer.js                                             2.54 kB │ gzip:  1.09 kB
+dist/components/UsageDashboard/UsageTables.js                                2.56 kB │ gzip:  1.28 kB
+dist/components/MusicWorkspace/MusicTrackDetails.js                          2.61 kB │ gzip:  1.03 kB
+dist/components/SearchableSelect/SearchableSelect.js                         2.63 kB │ gzip:  1.25 kB
+dist/components/ImagePicker/ImageGrid.js                                     2.67 kB │ gzip:  1.17 kB
+dist/components/MusicLibraryControls/MusicLibraryControls2.js                2.68 kB │ gzip:  1.18 kB
+dist/components/TerminalWorkspace/TerminalPane.js                            2.70 kB │ gzip:  1.26 kB
+dist/components/BrowserWorkspace/BrowserSettings.js                          2.72 kB │ gzip:  1.27 kB
+dist/components/ObjectRecognitionWorkspace/RecognitionHistory.js             2.72 kB │ gzip:  1.29 kB
+dist/components/Model3dWorkspace/Model3dDetail.js                            2.77 kB │ gzip:  1.22 kB
+dist/components/Canvas2D/Canvas2D2.js                                        2.82 kB │ gzip:  1.31 kB
+dist/components/BrowserWorkspace/BrowserHistoryReplay.js                     2.88 kB │ gzip:  1.08 kB
+dist/components/StepGuide/StepGuide.js                                       2.88 kB │ gzip:  1.33 kB
+dist/components/KanbanBoard/CommitPushDialog.js                              2.92 kB │ gzip:  1.32 kB
+dist/components/KanbanBoard/KanbanBoard2.js                                  3.00 kB │ gzip:  1.48 kB
+dist/components/TimerWorkspace/TimerPane.js                                  3.07 kB │ gzip:  1.44 kB
+dist/components/Select/Select.js                                             3.15 kB │ gzip:  1.14 kB
+dist/components/WorkResultPanel/WorkResultPanel.js                           3.16 kB │ gzip:  1.22 kB
+dist/components/ObjectRecognitionWorkspace/useCameraCapture.js               3.18 kB │ gzip:  1.51 kB
+dist/components/UsageDashboard/RatePanel.js                                  3.26 kB │ gzip:  1.57 kB
+dist/components/MenuButtonGroup/MenuButtonGroup.js                           3.31 kB │ gzip:  1.44 kB
+dist/components/Calculator/Calculator.js                                     3.33 kB │ gzip:  1.65 kB
+dist/components/Button/Button.js                                             3.35 kB │ gzip:  1.31 kB
+dist/components/ImageWorkspace/ImageGallery.js                               3.36 kB │ gzip:  1.49 kB
+dist/components/TodoWorkspace/TodoWorkspace2.js                              3.38 kB │ gzip:  1.36 kB
+dist/components/MusicPlayer/MusicPlayer2.js                                  3.40 kB │ gzip:  1.44 kB
+dist/components/BrowserWorkspace/BrowserHistoryList.js                       3.42 kB │ gzip:  1.35 kB
+dist/components/BrowserWorkspace/BrowserCaptureList.js                       3.43 kB │ gzip:  1.34 kB
+dist/components/Model3dWorkspace/Model3dGenerationForm.js                    3.51 kB │ gzip:  1.50 kB
+dist/components/Chart/Chart.js                                               3.52 kB │ gzip:  1.47 kB
+dist/components/MusicWorkspace/music-creation-options.js                     3.53 kB │ gzip:  1.66 kB
+dist/components/Model3dWorkspace/Model3dLibrary.js                           3.57 kB │ gzip:  1.49 kB
+dist/components/KanbanBoard/CardForms.js                                     3.58 kB │ gzip:  1.49 kB
+dist/components/Model3dWorkspace/Model3dWorkspace2.js                        3.62 kB │ gzip:  1.49 kB
+dist/components/BrowserWorkspace/BrowserHistoryDetail.js                     3.82 kB │ gzip:  1.41 kB
+dist/components/LightSpiritLab/LightSpiritLab2.js                            4.03 kB │ gzip:  1.64 kB
+dist/components/DropdownMenu/DropdownMenu.js                                 4.08 kB │ gzip:  1.74 kB
+dist/components/BrowserWorkspace/BrowserScriptPanel.js                       4.13 kB │ gzip:  1.73 kB
+dist/components/TreeMenu/TreeMenu.js                                         4.25 kB │ gzip:  1.62 kB
+dist/components/BrowserWorkspace/labels.js                                   4.32 kB │ gzip:  1.93 kB
+dist/components/ObjectRecognitionWorkspace/DetectionPreview.js               4.43 kB │ gzip:  2.05 kB
+dist/components/NavigationStepper/NavigationStepper.js                       4.46 kB │ gzip:  1.55 kB
+dist/components/OcrWorkspace/OcrCorrection.js                                4.47 kB │ gzip:  1.68 kB
+dist/components/Modal/Modal.js                                               4.49 kB │ gzip:  1.80 kB
+dist/components/BrowserWorkspace/BrowserWorkspace2.js                        4.66 kB │ gzip:  1.83 kB
+dist/components/InfiniteListMenu/InfiniteListMenu.js                         4.68 kB │ gzip:  1.85 kB
+dist/components/OcrWorkspace/OcrResult.js                                    4.74 kB │ gzip:  1.71 kB
+dist/components/ServerDataTable/ServerDataTable2.js                          4.75 kB │ gzip:  1.98 kB
+dist/components/ObjectRecognitionWorkspace/CaptureControls.js                4.76 kB │ gzip:  1.77 kB
+dist/components/OcrWorkspace/OcrMedia.js                                     5.13 kB │ gzip:  2.11 kB
+dist/components/Diagram/Diagram.js                                           5.41 kB │ gzip:  2.24 kB
+dist/components/OcrWorkspace/OcrPanel.js                                     5.43 kB │ gzip:  2.36 kB
+dist/components/ComputeWorkspace/index.js                                    5.55 kB │ gzip:  2.00 kB
+dist/components/GoogleAccounts/index.js                                      5.98 kB │ gzip:  2.18 kB
+dist/components/ObjectRecognitionWorkspace/ObjectRecognitionWorkspace2.js    6.14 kB │ gzip:  2.86 kB
+dist/components/KeypadModal/KeypadModal.js                                   6.24 kB │ gzip:  2.13 kB
+dist/components/MusicWorkspace/MusicWorkspace2.js                            6.31 kB │ gzip:  2.51 kB
+dist/components/UsageDashboard/index.js                                      6.38 kB │ gzip:  2.47 kB
+dist/components/OcrWorkspace/OcrPreview.js                                   6.59 kB │ gzip:  2.79 kB
+dist/components/DrawingWorkspace/index.js                                    6.67 kB │ gzip:  2.24 kB
+dist/components/ImagePicker/ImagePicker2.js                                  6.89 kB │ gzip:  2.73 kB
+dist/components/KanbanBoard/KanbanCard.js                                    7.63 kB │ gzip:  2.95 kB
+dist/components/ImageWorkspace/ImageCreationForm2.js                         7.69 kB │ gzip:  2.57 kB
+dist/components/VisualAnalysis/VisualAnalysis.js                             8.14 kB │ gzip:  3.42 kB
+dist/components/SettingsPanels/index.js                                      8.94 kB │ gzip:  2.86 kB
+dist/components/MusicWorkspace/MusicCreationForm2.js                         9.21 kB │ gzip:  3.12 kB
+dist/index.js                                                               14.20 kB │ gzip:  3.26 kB
+
+✓ built in 5.53s
+[33m[PLUGIN_TIMINGS] [0mJavaScript callbacks ran for 5.4s of this 5.5s build (98%).
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin unplugin-dts buildStart (64%, 3.5s, 2 calls)
+  - plugin unplugin-dts writeBundle (25%, 1.4s, 2 calls)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:
+  - plugin @tailwindcss/vite:generate:build transform (688 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+
+[verify] typecheck
+[verify] bun tests: /Users/y.noguchi/.bun/bin/bun test ./api/application/agency/autonomy.test.ts ./api/application/app.test.ts ./api/application/browser/browser-adapter.test.ts ./api/application/browser/browser-replay.test.ts ./api/application/browser/browser-toolchain.test.ts ./api/application/media/image-screen-adapter.test.ts ./api/application/media/live-voice.test.ts ./api/application/media/music-routing.test.ts ./api/application/media/music-screen-adapter.test.ts ./api/application/media/object-recognition-screen-adapter.test.ts ./api/application/media/ui-compositions-actions.test.ts ./api/application/media/ui-compositions-adapter.test.ts ./api/application/media/visual-analysis-registration.test.ts ./api/application/settings/service-tests-adapter.test.ts ./api/application/settings/settings-adapter.test.ts ./api/application/settings/settings-live-upgrade.test.ts ./api/application/settings/tts-dictionary-adapter.test.ts ./api/application/toolchain/capability-seed.test.ts ./api/application/toolchain/capability-upgrade.test.ts ./api/application/toolchain/conversation-output.test.ts ./api/application/toolchain/read-tools-search.test.ts ./api/application/toolchain/router-export.test.ts ./api/application/toolchain/specialist-port.test.ts ./api/application/toolchain/task-execution-browser.test.ts ./api/application/toolchain/toolchain-history.test.ts ./api/application/toolchain/toolchain-routing.test.ts ./api/application/toolchain/toolchain-search-check.test.ts ./api/application/usage/usage.test.ts ./api/application/work/dots-audit.test.ts ./api/application/work/dots-delegation-registration.test.ts ./api/application/work/dots-messaging-registration.test.ts ./api/application/work/tasks-http.test.ts ./api/application/work/terminals-adapter.test.ts ./api/application/world/memory-adapter.test.ts ./api/application/world/world-acceptance-p3.test.ts ./api/application/world/world-adapter.test.ts ./api/application/world/world-bundle-upgrade.test.ts ./api/domains/agent-runtime/test/action-route.test.ts ./api/domains/agent-runtime/test/candidate-reading.test.ts ./api/domains/agent-runtime/test/context.test.ts ./api/domains/agent-runtime/test/control-output.test.ts ./api/domains/agent-runtime/test/deadline.test.ts ./api/domains/agent-runtime/test/guided-candidates.test.ts ./api/domains/agent-runtime/test/guided-contract.test.ts ./api/domains/agent-runtime/test/guided-limits.test.ts ./api/domains/agent-runtime/test/guided-web.test.ts ./api/domains/agent-runtime/test/pipeline-execution.test.ts ./api/domains/agent-runtime/test/read-evidence.test.ts ./api/domains/agent-runtime/test/reconcile-failure.test.ts ./api/domains/agent-runtime/test/rejection-logging.test.ts ./api/domains/agent-runtime/test/repair-diagnostics.test.ts ./api/domains/agent-runtime/test/report.test.ts ./api/domains/agent-runtime/test/reports-drop-migration.test.ts ./api/domains/agent-runtime/test/request-urls.test.ts ./api/domains/agent-runtime/test/requirement-adoption.test.ts ./api/domains/agent-runtime/test/requirement-verification.test.ts ./api/domains/agent-runtime/test/requirements.test.ts ./api/domains/agent-runtime/test/research-contract.test.ts ./api/domains/agent-runtime/test/research-engine.test.ts ./api/domains/agent-runtime/test/resource-access.test.ts ./api/domains/agent-runtime/test/resource-adapter.test.ts ./api/domains/agent-runtime/test/service-search-budget.test.ts ./api/domains/agent-runtime/test/structured-web.test.ts ./api/domains/agent-runtime/test/subagent-route.test.ts ./api/domains/agent-runtime/test/task-execution-plan.test.ts ./api/domains/agent-runtime/test/task-execution.test.ts ./api/domains/agent-runtime/test/world-evidence-dedupe.test.ts ./api/domains/capabilities/test/bundles.test.ts ./api/domains/capabilities/test/capabilities.test.ts ./api/domains/capabilities/test/command-agent-binding.test.ts ./api/domains/capabilities/test/docling-bundle.test.ts ./api/domains/capabilities/test/dots-messaging-revision.test.ts ./api/domains/capabilities/test/image.test.ts ./api/domains/capabilities/test/instant-binding.test.ts ./api/domains/capabilities/test/json-schema-subset.test.ts ./api/domains/capabilities/test/music-versions.test.ts ./api/domains/capabilities/test/pipeline-bundle.test.ts ./api/domains/capabilities/test/requirement-controller.test.ts ./api/domains/capabilities/test/requirement-schema.test.ts ./api/domains/capabilities/test/requirements.test.ts ./api/domains/capabilities/test/resource-kinds.test.ts ./api/domains/capabilities/test/session-binding.test.ts ./api/domains/capabilities/test/settings-google.test.ts ./api/domains/capabilities/test/standalone-artifacts-forms.test.ts ./api/domains/capabilities/test/standalone-artifacts.test.ts ./api/domains/capabilities/test/steward-request-retire.test.ts ./api/domains/capabilities/test/task-binding.test.ts ./api/domains/capabilities/test/timer-compatibility.test.ts ./api/domains/capabilities/test/toolchain-candidates.test.ts ./api/domains/capabilities/test/web-guided.test.ts ./api/domains/dialogue/test/active-run.test.ts ./api/domains/dialogue/test/agency-state.test.ts ./api/domains/dialogue/test/answer-streams.test.ts ./api/domains/dialogue/test/attachment-notes.test.ts ./api/domains/dialogue/test/brief-reply.test.ts ./api/domains/dialogue/test/command-interactions-http.test.ts ./api/domains/dialogue/test/command-interactions-lifecycle.test.ts ./api/domains/dialogue/test/command-interactions-questions.test.ts ./api/domains/dialogue/test/command-interactions-work.test.ts ./api/domains/dialogue/test/command-interactions.test.ts ./api/domains/dialogue/test/context-eval/analysis.test.ts ./api/domains/dialogue/test/context-eval/case-schema.test.ts ./api/domains/dialogue/test/context-eval/checks-judge.test.ts ./api/domains/dialogue/test/context-eval/freeze.test.ts ./api/domains/dialogue/test/context-eval/generation-runner.test.ts ./api/domains/dialogue/test/context-eval/integrity.test.ts ./api/domains/dialogue/test/context-eval/materialize.test.ts ./api/domains/dialogue/test/context-eval/pipeline.test.ts ./api/domains/dialogue/test/context-eval/run.test.ts ./api/domains/dialogue/test/context-eval/scoring.test.ts ./api/domains/dialogue/test/context-eval/trajectory.test.ts ./api/domains/dialogue/test/context-keeper.test.ts ./api/domains/dialogue/test/context-system.test.ts ./api/domains/dialogue/test/controller.test.ts ./api/domains/dialogue/test/conversation-input.test.ts ./api/domains/dialogue/test/conversation-output.test.ts ./api/domains/dialogue/test/copy-gate.test.ts ./api/domains/dialogue/test/dialogue.test.ts ./api/domains/dialogue/test/error-report.test.ts ./api/domains/dialogue/test/execution-notices.test.ts ./api/domains/dialogue/test/generation-prepare.test.ts ./api/domains/dialogue/test/generation-tools.test.ts ./api/domains/dialogue/test/generation-work.test.ts ./api/domains/dialogue/test/generation.test.ts ./api/domains/dialogue/test/harness-voice.test.ts ./api/domains/dialogue/test/harness.test.ts ./api/domains/dialogue/test/media-deadline.test.ts ./api/domains/dialogue/test/memory-integration.test.ts ./api/domains/dialogue/test/pinned-operation.test.ts ./api/domains/dialogue/test/progress.test.ts ./api/domains/dialogue/test/queue.test.ts ./api/domains/dialogue/test/read-tools.test.ts ./api/domains/dialogue/test/reconcile-agents.test.ts ./api/domains/dialogue/test/resources.test.ts ./api/domains/dialogue/test/resubmit.test.ts ./api/domains/dialogue/test/routed-choice.test.ts ./api/domains/dialogue/test/routed-cut.test.ts ./api/domains/dialogue/test/routed-route.test.ts ./api/domains/dialogue/test/routed-router-switch.test.ts ./api/domains/dialogue/test/routed-router-turns.test.ts ./api/domains/dialogue/test/routed-router.test.ts ./api/domains/dialogue/test/routed-turn.test.ts ./api/domains/dialogue/test/run-end.test.ts ./api/domains/dialogue/test/specialist-document.test.ts ./api/domains/dialogue/test/specialist-flush.test.ts ./api/domains/dialogue/test/specialist-lifecycle.test.ts ./api/domains/dialogue/test/specialist-memory.test.ts ./api/domains/dialogue/test/specialist-turn.test.ts ./api/domains/dialogue/test/specialist.test.ts ./api/domains/dialogue/test/state-text.test.ts ./api/domains/dialogue/test/todo-screen.test.ts ./api/domains/dialogue/test/tool-exchange.test.ts ./api/domains/tool-runtime/test/action-controller.test.ts ./api/domains/tool-runtime/test/action-invoke.test.ts ./api/domains/tool-runtime/test/action-requests.test.ts ./api/domains/tool-runtime/test/invoke.test.ts ./api/domains/tool-runtime/test/read-retry.test.ts ./api/domains/tool-runtime/test/vault-fairness.test.ts
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/autonomy.test.ts:
+(pass) autonomous intent dispatches real research, receives a result, survives restart and is revoked on forget [543.16ms]
+
+api/application/app.test.ts:
+(pass) status polling is passive and explicit reconnect requires auth and origin [373.27ms]
+(pass) auth and origin apply to the new endpoints [361.28ms]
+(pass) register → fire → history → pause/resume → cancel through the API [382.79ms]
+(pass) full queue is reported as 503 for submissions [364.12ms]
+(pass) authenticated SSE notifies a background commit and the existing API supplies the snapshot [367.51ms]
+(pass) replay endpoints split text and synthesize one clause, with auth and limits [367.82ms]
+(pass) sample endpoint validates unsaved voice settings and returns audio [367.97ms]
+(pass) oversized JSON bodies are rejected with 413 and normal requests pass [370.68ms]
+(pass) responses carry anti-framing security headers [371.56ms]
+(pass) requests with both Content-Length and Transfer-Encoding are rejected [378.33ms]
+(pass) error codes map to HTTP statuses through the table [0.12ms]
+(pass) Web research is authenticated, validates malformed JSON, and does not claim an unavailable cache was cleared [379.14ms]
+(pass) modules mount in order behind the shared auth and origin checks [0.38ms]
+(pass) service-test uploads share a budget of two; other service-test routes stay reachable [1.46ms]
+(pass) CORS preflight allows every method the API serves [0.38ms]
+(pass) stream-bounded upload routes skip the 1MiB JSON cap by exact path only [0.43ms]
+(pass) malformed percent-encoding in a path parameter does not return 500 [0.50ms]
+(pass) API responses carry a deny-all Content-Security-Policy [383.06ms]
+
+api/application/browser/browser-adapter.test.ts:
+(pass) the adapter registers the operations of the capture toolchain and the screen [0.19ms]
+(pass) the screen stays reachable while the browser is not connected [12.20ms]
+(pass) connect refuses without a saved path, then starts once and is idempotent [58.31ms]
+(pass) the snapshot shows tabs the conversation may name, without queries or fragments [13.40ms]
+(pass) a conversation may capture only a tab its snapshot showed; the screen may name any open tab [14.39ms]
+(pass) a capture started from the conversation runs, is announced, and its receipt reads back [18.55ms]
+(pass) a capture of an unknown tab is refused even from the screen [10.49ms]
+(pass) cancelling a capture ends it and aborts the stage in flight after the commit [76.27ms]
+(pass) screen tab operations queue the browser call and refuse tabs that are not listed [31.54ms]
+(pass) a tab cannot be opened while the browser is not connected [10.87ms]
+(pass) disconnect stops the connection; opening the workspace changes nothing [16.97ms]
+(pass) a replay of the same request repeats its receipt and queues no second effect [16.82ms]
+(pass) an effect that waited past its age expires unrun instead of running late [91.66ms]
+(pass) the workspace source reads the domain's data and nothing else [11.08ms]
+(pass) a task keeps the user's own words as its request and the command step's paraphrase beside it [14.76ms]
+(pass) a task that stopped for the user's approval is shown with what it waits for, and its approval reaches the task that continues it [29.04ms]
+(pass) without a saved user message the paraphrase is the request; the screen's own words are used as given [14.78ms]
+(pass) a task needs a connection, a tab its snapshot showed, and room [29.29ms]
+(pass) status reads a task the snapshot showed, cancel ends it and aborts the running step after the commit [28.89ms]
+(pass) each binding of the bundle names only operations, schemas and queries this adapter registers [0.51ms]
+(pass) the screen's history events pass the action path as sent: action schema, input adapter, operation schema [0.87ms]
+(pass) the tool schemas the model sees are flat objects [0.23ms]
+(pass) the scripted task entry accepts a new disconnected request only with saved connection authorization [20.83ms]
+(pass) deleting a history is the screen's: it needs the revision the screen showed, and the conversation cannot do it [11.31ms]
+(pass) the delete event's string revision becomes a number; anything else reports every field [0.17ms]
+
+api/application/browser/browser-replay.test.ts:
+(pass) replaying is the screen's: it starts one replay, reads back by its id and the screen can stop it [30.22ms]
+(pass) the replay event's strings become the number and the values map; anything else reports its field [0.14ms]
+(pass) the page operator's tools never reach the code runner: replays are the screen's alone [0.09ms]
+
+api/application/browser/browser-toolchain.test.ts:
+(pass) the shipped adapter description is the one the bundle was checked against [0.15ms]
+(pass) the capture toolchain is a command toolchain whose adapter is available before any connection [472.45ms]
+(pass) capture and operate share one browser screen, so the launcher shows it once [474.15ms]
+(pass) the command specialist gets the capture tools with flat schemas and the tabs it may name [494.31ms]
+(pass) a validated invocation reaches the adapter and starts a capture of that tab [525.61ms]
+(pass) the operate toolchain is a command toolchain that starts a single-shot task with the binding's policy [630.88ms]
+(pass) the acceptance package, with the operator package it runs, still fits the context budget [472.44ms]
+(pass) every tool the operator package offers has a flat schema the host also checks [451.73ms]
+(pass) upgrading the old browser bundle preserves its definitions and is idempotent [542.12ms]
+
+api/application/media/image-screen-adapter.test.ts:
+(pass) image screen bundle seeds one registered screen and reads the image domain source [513.98ms]
+
+api/application/media/live-voice.test.ts:
+(pass) Live retains the normal conversation identity and maid role and style independently of its voice [75.39ms]
+(pass) Live retains the normal conversation identity and butler role and style independently of its voice [72.33ms]
+(pass) Live retains the normal conversation identity and strategist role and style independently of its voice [72.51ms]
+(pass) Live retains the normal conversation identity and sage role and style independently of its voice [72.67ms]
+(pass) Live transcript delegates through the actual routed harness and returns only its actual spoken transcript to chat [503.37ms]
+(pass) a typed request during Live uses the same tools and external output without adopting a second assistant message [87.15ms]
+(pass) a delegated work's completion returns its result and source to Live once, while keeping the normal notice [1120.55ms]
+(pass) pre-delegation announcement waits for the screen receipt and never calls legacy TTS [96.31ms]
+(pass) a typed supplement is sent to Live and its repeated delegation reuses the same backend run [533.34ms]
+(pass) a confirmation requires its exact screen receipt before the existing LLM approval gate can dispatch work [116.11ms]
+(pass) forgetting a seeded text message interrupts Live and does not let it republish that message [81.99ms]
+
+api/application/media/music-routing.test.ts:
+(pass) the current music request reaches generation after unrelated Web and image history [472.41ms]
+
+api/application/media/music-screen-adapter.test.ts:
+(pass) music screen bundle seeds one registered screen and reads the music domain source [527.91ms]
+
+api/application/media/object-recognition-screen-adapter.test.ts:
+(pass) recognition screen seeds once and exposes its owner-scoped source [531.74ms]
+(pass) the published recognition screen binds every action the screen sends [4.75ms]
+
+api/application/media/ui-compositions-actions.test.ts:
+(pass) seeding an upgraded database leaves only the studio as a launcher [430.07ms]
+(pass) the screen's string values reach undo, redo and save as the operations' integers, with or without a viewed target [443.91ms]
+(pass) the screen deletes the viewed saved work once no work is built on it [451.54ms]
+
+api/application/media/ui-compositions-adapter.test.ts:
+(pass) the work document: canonical text, a check that fixes and says where, commits only by the holding turn [20.03ms]
+(pass) the screen applies its own source edit as a drafted receipt [11.74ms]
+(pass) operations accept only their origins and typed input [10.14ms]
+(pass) the sources show the work, the saved form and the definition, and choices offer saved items only [11.56ms]
+(pass) the session adapter ends a work by mode and starts from a saved item [11.16ms]
+(pass) the bundle connects only operations, queries and schemas this adapter registers [0.49ms]
+(pass) choices are cut at the limit while hasTarget knows every saved item [25.55ms]
+(pass) screen actions on the work of a session that is no longer live are refused [11.11ms]
+
+api/application/media/visual-analysis-registration.test.ts:
+(pass) existing OCR and recognition artifacts upgrade without replacing published revisions or adding a toolchain identity [387.03ms]
+
+api/application/settings/service-tests-adapter.test.ts:
+(pass) the service-tests bundle passes a dry-run import against this host, and needs the adapter [381.53ms]
+(pass) the catalog source labels targets, the status shows an outdated list until it is refreshed [385.73ms]
+(pass) a row starts a test once, the run is listed with its result, and a resend starts no second run [389.44ms]
+(pass) the free-form start passes only the entered values to the service [383.10ms]
+(pass) start is refused for an unsupported target, a stale view and while another test runs [392.69ms]
+(pass) diagnosis records a run and its Health rows, and does not generate anything [385.69ms]
+(pass) a fetch that failed after generation can be retried from the run's row without generating again [384.80ms]
+(pass) a write whose transaction does not commit starts nothing [376.65ms]
+(pass) operations are for screens only and validate their input [389.23ms]
+(pass) the screen re-reads only while something runs: the bundle names the field and the rows carry it [397.76ms]
+(pass) a cancel still aborts the run when a progress save rewrote its phase before the abort ran [396.53ms]
+(pass) the free-form start carries no revision of its own: only the catalog's stale check guards it [397.17ms]
+(pass) a run with a preview carries its path and type for the media column [400.49ms]
+
+api/application/settings/settings-adapter.test.ts:
+(pass) every field of the settings bundle names an existing, writable settings path and a declared condition [0.23ms]
+(pass) describePath accepts leaves and stable-id array elements and rejects objects, managed values and unknown names [0.17ms]
+(pass) a draft's changes become one saved revision with typed values, and the receipt carries no values [373.21ms]
+(pass) an array element is chosen by its stable id and no other element changes [367.31ms]
+(pass) targets are required for element fields, refused for plain fields and must exist [368.63ms]
+(pass) unset follows the field's registered meaning and is refused elsewhere [378.80ms]
+(pass) rejections are safe codes and save nothing [376.53ms]
+(pass) conversations cannot change settings [378.39ms]
+(pass) a stale draft is reported as revision_conflict, even when its target has since gone [390.68ms]
+(pass) the same request id is a replay and saves once [380.47ms]
+(pass) keys go through to the settings domain and never into the result or an error [375.31ms]
+(pass) sources give the saved document, the TTS models as targets and the ASR languages [372.20ms]
+(pass) fields registered by published artifacts are found through capabilities [488.99ms]
+(pass) the registered settings bundle applies a draft through the action ledger and rejects a stale one [444.12ms]
+(pass) describePath reports kind, bounds, enum values and optional/nullable from the settings schema [0.19ms]
+(pass) a target must be one the field's query lists: another purpose's model is refused [377.70ms]
+(pass) every structure and action of the bundle is registered with a matching schema [0.17ms]
+(pass) a connection is added with its first model, its key and the route it fills [372.01ms]
+(pass) a new connection takes exactly one credential source, except CLI-login agent kinds [372.73ms]
+(pass) deleting a connection removes its models, frees the routes that used them and drops its key [373.81ms]
+(pass) connection targets name the auth method and never claim a Claude login [371.80ms]
+(pass) deleting a model or connection also frees the dedicated World model that used it [371.39ms]
+(pass) models are added and deleted, and a change may name an added model as its target [378.51ms]
+(pass) changing a model's purpose resets the purpose's values and frees its route [372.25ms]
+(pass) turning cloud sending off leaves a cloud-only purpose LARM only [368.62ms]
+(pass) a changed LARM origin needs its confirmation as a structure [376.79ms]
+(pass) connection fields use the connection query's targets, and the API key never travels in changes [369.16ms]
+(pass) sources list connections without credentials, models per purpose and the routes [383.92ms]
+(pass) the AI and external-work artifacts apply through the action ledger with structure and keys [436.13ms]
+(pass) a key alone is an apply, and a key inside a structure's input is refused [370.19ms]
+(pass) the AI screen's collections name registered actions with rows built by fixed paths [0.22ms]
+(pass) the connection form registers a connection alone or with its first model in one apply [376.53ms]
+(pass) the probe row is offered for enabled targets and a clean draft, and the key field can be unset [0.15ms]
+
+api/application/settings/settings-live-upgrade.test.ts:
+(pass) Live settings upgrade publishes the new selects and persistent save layout without changing the existing revision [379.46ms]
+
+api/application/settings/tts-dictionary-adapter.test.ts:
+(pass) describe offers the entries query and the three writes, and the bundle imports with no issue [360.02ms]
+(pass) save adds and never replaces; update changes the reading behind the expected reading [371.13ms]
+(pass) invalid entries and inputs are rejected with safe codes and save nothing [370.76ms]
+(pass) delete is guarded by the reading the row showed [370.34ms]
+(pass) conversation origin and unknown operations are unavailable [472.94ms]
+(pass) the source pages, sorts and searches, and its revision follows the entries [370.93ms]
+(pass) the registered bundle saves and deletes through the action ledger [444.34ms]
+
+api/application/toolchain/capability-seed.test.ts:
+(pass) fresh initialization installs every repository seed and bundle without runtime or personal data [734.48ms]
+(pass) reopening and seeding preserves disabled toolchains and explicitly published revisions [654.68ms]
+(pass) normal server assembly seeds toolchains and launchers without a separate import [826.44ms]
+
+api/application/toolchain/capability-upgrade.test.ts:
+(pass) seed upgrades the deployed board and terminal schemas without replacing archived definitions [895.62ms]
+
+api/application/toolchain/conversation-output.test.ts:
+(pass) voice does not display, persist or speak text-only control output: a reply of nothing else gets the host's words [459.70ms]
+
+api/application/toolchain/read-tools-search.test.ts:
+(pass) the read tools are indexed with the toolchains but are no toolchain of the catalog [6.62ms]
+(pass) a read tool's card carries execution read and the JSON Schema of its arguments [2.17ms]
+(pass) a read tool that is not available now is not offered [1.63ms]
+(pass) 「直近の会話ログをチェックしてくれる？」 puts read_history first in the search [1.80ms]
+(pass) 「前に私が何て言ったか確認して」 puts read_history first in the search [1.50ms]
+(pass) 「メモリーに何が残ってるかチェックして」 puts read_memory first in the search [1.55ms]
+(pass) 「私について記憶していることを教えて」 puts read_memory first in the search [1.39ms]
+(pass) 「さっきの依頼はどうして失敗したの？」 puts read_runs first in the search [1.62ms]
+(pass) 「実行ログを見せて」 puts read_runs first in the search [1.44ms]
+(pass) 「サブエージェントは何をしたの？」 puts read_agents first in the search [1.38ms]
+(pass) 「さっきの調べものでどのページを見た？」 puts read_agents first in the search [1.37ms]
+(pass) 「World だと Eumenes について何が記録されてる？」 puts read_world first in the search [1.30ms]
+(pass) 「半年前の会話で決めたことを履歴から調べて」 puts history.research first in the search [1.32ms]
+(pass) 「これまでの会話全体から旅行の話の経緯を洗い出して」 puts history.research first in the search [1.35ms]
+
+api/application/toolchain/router-export.test.ts:
+(pass) fixture snapshot preserves cards, context, both routing paths, corrections and matching passage vectors without writes [2065.83ms]
+(pass) authenticated API, typed client and JSONL/gzip writer work together; Git destinations and overwrites are refused [496.92ms]
+(pass) security filtering removes environment values, credentials and signed/authenticated URLs while retaining names [0.20ms]
+(pass) CLI parser and command dispatch write a fixture without printing prose, and reject invalid dates [868.65ms]
+(pass) a retracted input is not resurrected from trace text; an orphaned run uses only an exact retained message link [471.34ms]
+
+api/application/toolchain/specialist-port.test.ts:
+(pass) the choices are the adapter's most recent items, at most 50 [0.69ms]
+(pass) an item on screen that is older than the recent ones is offered first and the oldest makes room [0.06ms]
+(pass) an item the adapter does not confirm, or one already offered, changes nothing [0.03ms]
+(pass) an invalid argument reports where, what kind and the expected type, never the input values [0.92ms]
+(pass) the detail holds at most 8 issues of at most 200 characters [0.93ms]
+
+api/application/toolchain/task-execution-browser.test.ts:
+(pass) one public request searches, passes the exact result URL to a browser child, opens a new tab and confirms playback from the next observation [876.13ms]
+(pass) a browser approval resumes in a new physical task, keeps the old deadline, and commits the approved operation exactly once [697.32ms]
+
+api/application/toolchain/toolchain-history.test.ts:
+(pass) every builtin and bundled toolchain registers as a complete set with flat tool schemas [520.60ms]
+(pass) a toolchain is offered only where its whole package is registered [417.47ms]
+(pass) an incomplete set or a reused function name is refused at registration [416.75ms]
+(pass) without vectors every available toolchain is offered; with vectors the top ones by similarity [435.66ms]
+(pass) a selection is traced from offer to outcome and later offered as reference data [432.00ms]
+(pass) a saved procedure is found by its signature and suspended after three failed reads [419.12ms]
+(pass) a proposed procedure is kept only when the answer cites the page it read [422.63ms]
+
+api/application/toolchain/toolchain-routing.test.ts:
+(pass) a session toolchain's runtime says session and its set carries the binding's contract [432.02ms]
+(pass) the command set refuses a session toolchain and the session set refuses command and unavailable ones [884.49ms]
+(pass) a command binding's agent turn reaches the command set; a binding without one carries none [446.26ms]
+(pass) rehydrating an exact revision preserves its redirect conditions without expanding the offered context [440.21ms]
+
+api/application/toolchain/toolchain-search-check.test.ts:
+(pass) a past choice is ranked again from its stored vector; one the slots would not offer is listed by its toolchain only [438.52ms]
+
+api/application/usage/usage.test.ts:
+(pass) settings navigation and authenticated usage are available without a model call [441.48ms]
+(pass) registered artifact reads owner records across pages and stores reviewed rates through its public operation [438.71ms]
+
+api/application/work/dots-audit.test.ts:
+(pass) the audit Skill is frozen in commands and survives reseeding [386.34ms]
+(pass) an unregistered callback never receives task notifications [370.80ms]
+
+api/application/work/dots-delegation-registration.test.ts:
+(pass) stored first document revisions survive upgrade and do not block the current bundle [521.34ms]
+(pass) fresh seed registers one launcher and immutable revisions; reseed keeps disabled publication [523.84ms]
+(pass) an old seeded revision retains its hash while publication migrates to the new binding [518.89ms]
+
+api/application/work/dots-messaging-registration.test.ts:
+(pass) startup seed registers the messaging launcher and its local actions with the production adapter descriptions [169.00ms]
+
+api/application/work/tasks-http.test.ts:
+(pass) task HTTP bodies are rejected while streaming past the bound, before the peer finishes sending [363.23ms]
+(pass) HTTP rejects spoofed origins and arbitrary state, authenticates tasks, and validates query limits [365.69ms]
+(pass) API client and CLI register, read and cancel through authenticated HTTP; unavailable execution stays explicit [1079.66ms]
+
+api/application/work/terminals-adapter.test.ts:
+(pass) Claude Code screen is registered as a launcher and reads the live session list [456.24ms]
+(pass) a Claude Code request is saved once per request id and read back from the table [380.79ms]
+
+api/application/world/memory-adapter.test.ts:
+(pass) describe offers the memory queries and the one write (the connection switch), for the UI only [406.69ms]
+(pass) the shipped memory bundle registers against this adapter plus the existing ones with no issue [388.13ms]
+(pass) status shows the connection and the switch needs a healthy memory to turn on [382.07ms]
+(pass) items page, search and sort; memory content cannot be changed by hand [383.16ms]
+(pass) tendencies, short-term notes and the context are read [384.56ms]
+(pass) the steward timeline shows decisions with their proposal, result and window change, and the event log [504.54ms]
+(pass) the memory bundle runs through the action ledger: only the connection switch is offered [652.35ms]
+
+api/application/world/world-acceptance-p3.test.ts:
+(pass) the conversation input carries no World material: no target hint, no claim text, no ids [659.60ms]
+(pass) A34 (host side) the host consumes only the vendored World tgz: package.json points at it [1.73ms]
+(pass) A34-A41 World OFF (protect) + Memory OFF + model stopped: a forget is still processed and completes [413.76ms]
+(pass) A38 Memory unavailable: World content is deleted at once, the forget stays pending (never complete) and finishes when Memory is back [728.90ms]
+
+api/application/world/world-adapter.test.ts:
+(pass) describe offers the World queries and no operation; the shipped bundle registers with no issue and has no action [393.06ms]
+(pass) World OFF has no ports: the adapter is unavailable and shows nothing [375.43ms]
+(pass) status, claims and forgets are plain rows with the words the screen shows [391.14ms]
+(pass) the World bundle runs through the action ledger as a view: sources read, no change is accepted [381.40ms]
+(pass) World table revision upgrades the catalog without changing the prior view and imports idempotently [378.60ms]
+(pass) an unavailable or partial list says why in the status row instead of passing for empty [378.33ms]
+(pass) the forgets list marks the forgets still moving, and the bundle re-reads it only while one is [483.20ms]
+(pass) paged claims fetch grounds for the selected page beyond row 50; compact status avoids reading lists [385.42ms]
+
+api/application/world/world-bundle-upgrade.test.ts:
+(pass) World document tool has the same public and owner contract [0.22ms]
+(pass) World bundle upgrades an existing catalog without modifying old definitions and reseeds idempotently [521.74ms]
+
+api/domains/agent-runtime/test/action-route.test.ts:
+(pass) an action runs the binding's adapter operation and its projection reaches the answer [17.72ms]
+(pass) a refused operation ends the task with the safe code and the answer reports a failure only [17.89ms]
+(pass) a command that is malformed, for another package, or without a frozen capability is refused before the adapter [18.64ms]
+(pass) a result that is not a bounded object is not handed to the answer [63.19ms]
+(pass) a frozen request id and decision time reach the adapter; without them the runtime mints its own [17.95ms]
+
+api/domains/agent-runtime/test/candidate-reading.test.ts:
+(pass) a candidate read resolves its observed URL and then supports body evidence [54.80ms]
+
+api/domains/agent-runtime/test/context.test.ts:
+(pass) quick Web work is bounded independently of question wording while Codex research keeps exploration [0.65ms]
+(pass) retired evidence cannot be reported and its reference is never reassigned [0.11ms]
+(pass) a stateless follow-up retains earlier exact evidence including its final qualification [0.22ms]
+(pass) exact-quote evidence from one search and three reads keeps read tools available [0.76ms]
+(pass) replay-only tools do not advertise new operation capacity and retain executed arguments [0.44ms]
+(pass) all lookup routes advertise the canonical executable input contract [0.56ms]
+(pass) fixed report schema publishes the same outcome/claim constraints as host validation [0.54ms]
+(pass) three distant ranges of one document keep immutable task evidence and use one document alias [0.13ms]
+(pass) evidence capacity stops additions without evicting previous references [0.80ms]
+(pass) fixed contract retains the whole request, removes needs and suggestions, and scopes operation references [0.29ms]
+(pass) one worker deadline policy reserves 30 seconds for the parent [0.02ms]
+(pass) bounded observations never register an excerpt absent from the actual model packet [0.72ms]
+(pass) R16/R17 check-only evidence remains in the union and verification receives the complete excerpt [0.14ms]
+(pass) fetched bodies are sent only in a separate UNTRUSTED_MATERIALS message [0.20ms]
+(pass) retired references stay retired when an old source is presented again [0.02ms]
+(pass) capacity exhaustion closes tools in the actual worker packet [1.13ms]
+(pass) long titles count toward capacity: later bodies stop registering instead of overflowing the step [1.06ms]
+(pass) a replayed observation moved after new material never pushes the packet past capacity [1.08ms]
+(pass) every route carries the shared rules, and the step contract is also returned as values [1.18ms]
+(pass) search invocation examples name an offered executable tool and disappear for replay-only tools [0.27ms]
+(pass) a view returned by several operations is presented once and never overflows the step [3.09ms]
+(pass) a large frozen request and question still leave a full catalog presentable [1.75ms]
+(pass) an empty page keeps its cursor metadata visible [0.18ms]
+(pass) delegated reference data reserves room before evidence admission and remains intact on later research steps [0.86ms]
+
+api/domains/agent-runtime/test/control-output.test.ts:
+(pass) control diagnostics distinguish non-text, empty, fenced, oversized and malformed output without retaining the response [2.62ms]
+(pass) one whole JSON fence decodes without accepting surrounding prose, multiple blocks or malformed JSON [0.11ms]
+(pass) only one complete leading think block is removed [0.05ms]
+(pass) control syntax is corrected once without inventing a report [0.22ms]
+(pass) common repair refusals take precedence over an unrelated native syntax error [0.12ms]
+
+api/domains/agent-runtime/test/deadline.test.ts:
+(pass) an operation granted with 70 seconds remains valid after the model spends 25 seconds; only the next step stops exploration [21.26ms]
+(pass) a failed model-selected read retains the deadline and reserves finish plus verification [18.75ms]
+
+api/domains/agent-runtime/test/guided-candidates.test.ts:
+(pass) the service route's candidate-only example satisfies its own contract without body evidence [0.26ms]
+(pass) only displayed live candidates may be returned or resolved into reads [0.11ms]
+(pass) candidate references never stand in for body facts [0.32ms]
+
+api/domains/agent-runtime/test/guided-contract.test.ts:
+(pass) current actions omit the duplicate request [0.17ms]
+(pass) readAhead accepts an array of URL strings and rejects the former object form [0.14ms]
+
+api/domains/agent-runtime/test/guided-limits.test.ts:
+(pass) the final model call is reserved once on the guided quick budget [0.05ms]
+(pass) batch read budgets and URL scopes are enforced atomically before adoption [89.95ms]
+(pass) retry cooldown is owned by Queue without a web-specific timer or another model call [44.41ms]
+
+api/domains/agent-runtime/test/guided-web.test.ts:
+(pass) staggered batch arrivals use shared receipts and reserve the final answer without wait calls [49.53ms]
+(pass) failed reads remain observations and a batch resumes once after its final receipt [45.16ms]
+(pass) batch cancellation rejects late successful results and cancels every pending call [45.29ms]
+(pass) unpresented evidence still requires repair and cannot become an accepted report [46.19ms]
+
+api/domains/agent-runtime/test/pipeline-execution.test.ts:
+(pass) one-off definition uses pinned entries, declared references, selected final links [16.86ms]
+(pass) a model-modified request is never dispatched, even after its single repair [13.16ms]
+(pass) needs_input waits without side effects; the answer keeps the original request and re-enters authoring [1018.39ms]
+(pass) unsupported is explicit partial work with no child dispatch [16.99ms]
+(pass) revoked component revision stops the pipeline before dispatch [12.46ms]
+(pass) cancelled late model output cannot launch any child [33.66ms]
+(pass) from request includes supplied result references without implicitly adding later results [13.24ms]
+(pass) child failure stops subsequent work and cannot become successful output [12.99ms]
+(pass) oversized child input stops without retrying planning or dispatching [13.71ms]
+(pass) forgetting a source erases frozen requests, plans, catalog and supplied material [10.36ms]
+(pass) a persisted legacy pipeline cannot resume as the new contract [12.72ms]
+(pass) typed literal arguments cross the host unchanged and expected result reaches the child [13.39ms]
+(pass) a child's question resumes that child, then advances the frozen plan without another planning call [1018.27ms]
+(pass) all eight declared steps fit the existing child lifecycle [25.56ms]
+
+api/domains/agent-runtime/test/read-evidence.test.ts:
+(pass) R7: equal e0 identifiers in different views never redirect an old quotation; unpresented and forged views fail [0.47ms]
+(pass) zero evidence has bounded not_found/clarification/failed outcomes; answered/partial still require evidence [0.14ms]
+
+api/domains/agent-runtime/test/reconcile-failure.test.ts:
+(pass) a single settle failure does not abort the pass and is retried [24.59ms]
+(pass) a poisoned invocation fails its owner after five consecutive failures [22.61ms]
+(pass) transient writer errors never count toward giving up [21.39ms]
+(pass) close survives an in-flight reconcile failure and still interrupts the coordinator [19.14ms]
+(pass) item failures are logged with a machine-readable reason [18.47ms]
+(pass) commits right after a pass are throttled until the injected timer fires [16.95ms]
+
+api/domains/agent-runtime/test/rejection-logging.test.ts:
+(pass) rolled-back and stale rejections are not logged as committed failures [18.42ms]
+
+api/domains/agent-runtime/test/repair-diagnostics.test.ts:
+(pass) a draft that breaks the contract names the failing check and condition [19.33ms]
+(pass) a request item that breaks the contract is located by position [18.09ms]
+(pass) an unsupported value schema stores its reason as the repair issue [17.71ms]
+(pass) a bad document reference stores the field and reason as the repair issue [0.08ms]
+(pass) semantic verification failure records which items failed and keeps the task failed [18.48ms]
+(pass) a verification output with the wrong items is repaired with the failing positions as data [19.27ms]
+(pass) the repair notice follows the actual rejection code [1.46ms]
+(pass) tools that are withheld come with the reason as a state value [1.46ms]
+(pass) the prompt time is local ISO 8601 with its offset [0.20ms]
+(pass) operations stop early enough to leave finish, verification and one repair [0.03ms]
+(pass) a finish that leaves no room for verification is not saved [37.09ms]
+
+api/domains/agent-runtime/test/report.test.ts:
+(pass) parent receives summary and citation metadata; neither raw text, quotes nor titles cross boundary [0.07ms]
+(pass) unseen source and fabricated quote are refused; snippet and incomplete acquisition are partial [0.11ms]
+(pass) model-selected excerpt references become exact canonical quotes without copying or normalizing source text [0.08ms]
+(pass) references cannot cite missing sources, unseen text, another source's excerpt, or override canonical quotes [0.20ms]
+(pass) excerpt boundaries preserve Unicode and bound every quote to the public report contract [0.07ms]
+(pass) a world claim is cited by its excerpt and projected as a reference without text, title or URL [0.07ms]
+
+api/domains/agent-runtime/test/reports-drop-migration.test.ts:
+(pass) dropping the held-report table sends a held notice as an ordinary one [19.98ms]
+
+api/domains/agent-runtime/test/request-urls.test.ts:
+(pass) explicit URL identity survives extraction and the shared invocation scope: https://example.org/日本語 [43.29ms]
+(pass) explicit URL identity survives extraction and the shared invocation scope: https://例え.jp/資料?q=天気 [41.99ms]
+(pass) explicit URL identity survives extraction and the shared invocation scope: https://example.org/%E6%97%A5%E6%9C%AC%E8%AA%9E [43.06ms]
+(pass) Japanese commas and periods end a URL even without a space [0.05ms]
+(pass) a different path on the same host remains outside the request scope [41.71ms]
+
+api/domains/agent-runtime/test/requirement-adoption.test.ts:
+(pass) R19 profile revision invalidates pending verification authority [20.20ms]
+(pass) R19 profile revision invalidates accepted verification authority [21.01ms]
+(pass) R19/R23 accepted report cannot outlive deletion of its frozen contract and draft [20.41ms]
+
+api/domains/agent-runtime/test/requirement-verification.test.ts:
+(pass) unsupported extracted schema uses the shared single repair and cannot freeze or execute [20.39ms]
+(pass) semantic rejection requestCovered never adopts a pending draft or retries [20.49ms]
+(pass) semantic rejection summarySupported never adopts a pending draft or retries [19.00ms]
+(pass) semantic rejection limitationsConsistent never adopts a pending draft or retries [18.60ms]
+(pass) a structurally invalid first action rolls back frozen requirements with zero tool execution [21.51ms]
+(pass) a pending draft is accepted only after one complete verification [19.11ms]
+(pass) R13 a valid deadline value backed by an opening-time excerpt is rejected by semantic verification [22.06ms]
+
+api/domains/agent-runtime/test/requirements.test.ts:
+(pass) external rule validity compares instants rather than their UTC string spelling [0.13ms]
+(pass) R10/R12/R14 request quote, profile merge and unknown/null constraints are fixed once [18.05ms]
+(pass) R08/R11 invalid quote and 13 conditions fail without truncating or saving any contract [18.55ms]
+
+api/domains/agent-runtime/test/research-contract.test.ts:
+(pass) every research route carries minimal examples that pass its own schema [0.67ms]
+(pass) the first research step examples carry the frozen-contract inputs [0.26ms]
+(pass) report schema states the conditions the host already enforces [0.14ms]
+(pass) every field of the requirement verification schema is described [0.11ms]
+
+api/domains/agent-runtime/test/research-engine.test.ts:
+(pass) worker syntax correction completes without consuming its one model repair [19.10ms]
+(pass) worker contract failure after syntax correction retries once and then stops [19.22ms]
+(pass) search-only reports still reject invented evidence and return the failure to the parent [18.89ms]
+(pass) search failures return without creating requirement contracts or drafts [20.57ms]
+(pass) a worker cannot give up before invoking an available tool: one repair, then failure [18.90ms]
+
+api/domains/agent-runtime/test/resource-access.test.ts:
+(pass) the RESOURCES section lists the resources handed to the sub-agent, one line each, beside the references [1.48ms]
+(pass) no RESOURCES section appears when no resource was handed over [0.25ms]
+(pass) what the sub-agent has read is shown in the next step [0.30ms]
+(pass) a URI argument must be one of the allowed URIs [0.16ms]
+(pass) finish links are canonical, de-duplicated and limited to allowed URIs [0.04ms]
+(pass) URIs are collected from nested strings [0.05ms]
+(pass) the allowed set is the handed URIs and those in the tool results, never open-web text [0.30ms]
+(pass) finish links are accepted when a tool result of the same execution carried them [21.66ms]
+(pass) an invented link is a contract violation repaired once, then fails as unknown_resource [20.61ms]
+(pass) resource_read reads a URI a tool returned, shows it at the next step and refuses any other [23.09ms]
+
+api/domains/agent-runtime/test/resource-adapter.test.ts:
+(pass) a finished research result maps to the report that holds it; failures, other shapes and reportless results map to nothing [12.51ms]
+(pass) ids outside the agent prefix are rejected: get is null, read throws item_not_found [10.25ms]
+(pass) the view names the TODO screen, offers read first and previews the request [9.31ms]
+(pass) search is a text AND over summary, claims and request, in the time range, newest first [11.91ms]
+(pass) read is a summary within 600 tokens with source titles, marked as material [10.95ms]
+
+api/domains/agent-runtime/test/service-search-budget.test.ts:
+(pass) service budgets preserve fallback and final answer without changing existing budgets [0.05ms]
+(pass) the history investigation is given its own research time; other research keeps the default [0.01ms]
+(pass) revoking the frozen package revokes a research child's caller authority [45.97ms]
+(pass) native refusal continues through external lookup and host-issued candidate result [48.16ms]
+
+api/domains/agent-runtime/test/structured-web.test.ts:
+(pass) structural Web views preserve table rows and heading/header references under the same material bound [0.30ms]
+(pass) World and archived Web views retain the old excerpt algorithm by default [0.01ms]
+(pass) short multiline pages retain their final answer and leave room for another source [0.15ms]
+
+api/domains/agent-runtime/test/subagent-route.test.ts:
+(pass) a research step runs as a sub-agent of its task [17.65ms]
+(pass) a task's agent sessions are released when the task ends, however it ends [17.39ms]
+
+api/domains/agent-runtime/test/task-execution-plan.test.ts:
+(pass) identical planned items execute independently, while same-item replay returns its receipt and changed input conflicts [1023.27ms]
+(pass) a revised pending plan preserves executed receipts, invalidates removed step refs, and keeps the remaining budgets [1035.75ms]
+(pass) unknown, removed and dependency-blocked steps are rejected before dispatch; completed plans offer no new effects [15.08ms]
+(pass) plan structural conflicts never alter the accepted plan or reset counters [12.83ms]
+(pass) an amended request requires a new plan while preserving past receipts as facts rather than automatically satisfying the new request [2042.60ms]
+(pass) candidate selection keeps its frozen offer until a child result; a later revision can remove unnecessary pending work [17.48ms]
+(pass) a revision depends on executed items by stepRef, never on pending items, and the host owns the plan version [12.83ms]
+(pass) the plan projection keeps pending dependencies copyable and does not call an in-flight item executed [20.33ms]
+(pass) a failed prerequisite keeps its dependents closed and offers no search until a revision reopens the work [10.22ms]
+(pass) a plan blocked by a failure reopens revision after an unrelated completion, and shows the failed dependency apart [8.22ms]
+(pass) the existing one-time repair explains plan schema fields without accepting model-authored progress [1018.71ms]
+
+api/domains/agent-runtime/test/task-execution.test.ts:
+(pass) native reference fields enumerate only issued refs and offer no reader without refs [11.97ms]
+(pass) search → child result → different search → child → completion uses fresh functions and real source IDs [1024.17ms]
+(pass) after an operation, completion must cite its issued result rather than omit evidence; the existing repair can correct it without another operation [1018.80ms]
+(pass) a start replay is idempotent and cancel during a child prevents subsequent discovery or dispatch [1021.16ms]
+(pass) a disabled parent binding rejects a queued decision and an existing child's authority immediately, before background reconciliation [1029.28ms]
+(pass) restart interrupts a waiting question and clears its pending delivery [1024.49ms]
+(pass) a question answer resumes the same candidate offer without another search and rejects stale or invalid answers [2029.94ms]
+(pass) a range read records what was read while preserving the background preview outside that range [1025.62ms]
+(pass) a child question resumes with a fresh dispatch identity but keeps its logical child, absolute deadline and remaining budget [2027.54ms]
+(pass) an amend waits for the old child to stop; an uncertain stop finishes partially without a new write [1026.56ms]
+(pass) source invalidation and a waiting deadline terminate without another inference [2035.92ms]
+(pass) the last parent inference is reserved and exposes only final result functions within the shared 48-call budget [15.98ms]
+(pass) restart interrupts every unfinished state without replaying queued side effects [41.82ms]
+(pass) per-conversation capacity rejects the fifth parent before saving another execution or dispatch [10.01ms]
+(pass) the single contract repair reports a safe structural reason and never retries an operation [1013.05ms]
+
+api/domains/agent-runtime/test/world-evidence-dedupe.test.ts:
+(pass) re-reading the same claim revision reuses the registered excerpt and source [0.34ms]
+(pass) a different revision, scope or text is registered separately [0.10ms]
+(pass) repeated queries over the same claims never fill the catalog [3.78ms]
+(pass) the report cites the registered source and verifies it, whichever query read it last [0.28ms]
+(pass) a registered reading that is gone is invalidated and a re-read registers anew [0.13ms]
+
+api/domains/capabilities/test/bundles.test.ts:
+(pass) the shipped bundle's pin is the stored digest and its toolchain is data-driven [70.19ms]
+(pass) a bundle the host cannot run is skipped whole, and without a host nothing is added [78.31ms]
+(pass) old revisions keep their JSON and hash, and publication moves back and forth [70.63ms]
+(pass) rolling the pointer back to the unbound revision removes the chain from the offer until a bound revision is published [43.39ms]
+(pass) the dry run lists every problem and writes nothing [25.37ms]
+(pass) each kind of reference problem is refused [110.58ms]
+(pass) a failing toolchain rolls back its documents and keeps the published revision [20.52ms]
+(pass) documents are immutable: the same id with other content is a conflict, the same content a no-op [28.68ms]
+(pass) binding fields belong to toolchains only and need a matching binding [12.85ms]
+(pass) a bound tool is prepared with its own schema and only from an active package [42.25ms]
+(pass) a timer start without a duration is defined as the 3 minute default, not as a question [40.02ms]
+(pass) stored schemas are served as validators; unknown and domain references are not [14.64ms]
+(pass) a bound toolchain is shown by its artifact registration: artifact is optional there, and unbound ones still need one [40.29ms]
+(pass) question schemas must be readable validators and the choice field one of their fields [57.47ms]
+(pass) an install already at revision 5 is upgraded to the latest, and revision 5 stays a valid rollback target [51.42ms]
+(pass) toolchain publication over HTTP is compare-and-set and can roll back [43.28ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [4665.51ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [22.86ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [11.89ms]
+(pass) seed still rejects a changed newest builtin revision [6.08ms]
+(pass) history and timer catalogue selection can be enabled independently [22.53ms]
+
+api/domains/capabilities/test/command-agent-binding.test.ts:
+(pass) a command binding takes agent.turn as the policy of its single-shot task, and stays valid without it [3.96ms]
+(pass) the bundle check accepts the existing command binding with or without agent.turn [78.89ms]
+(pass) the bundle check refuses retries that name a tool the binding does not have [79.06ms]
+
+api/domains/capabilities/test/docling-bundle.test.ts:
+(pass) Docling menu revision seeds once and preserves earlier revisions (existing=%s) [12.78ms]
+(pass) Docling menu revision seeds once and preserves earlier revisions (existing=%s) [11.89ms]
+
+api/domains/capabilities/test/dots-messaging-revision.test.ts:
+(pass) messaging v2 seeds without re-registering or replacing an installation's archived v1 [18.68ms]
+
+api/domains/capabilities/test/image.test.ts:
+(pass) image seed is additive, repeatable and published with one flat request schema [23.94ms]
+(pass) image model-selection bundle upgrades legacy definitions without rewriting their revisions [69.28ms]
+
+api/domains/capabilities/test/instant-binding.test.ts:
+(pass) the shipped weather bundle is seeded: an instant toolchain with a binding and no artifact [39.55ms]
+(pass) an instant binding has no field filled from the host's values: its arguments are the model's [39.04ms]
+(pass) an adapter that does not answer instant bindings is refused [39.00ms]
+(pass) an instant toolchain that also names an artifact is refused [39.17ms]
+(pass) an instant binding takes exactly one tool [37.29ms]
+(pass) the shipped stock bundle is an instant toolchain [36.91ms]
+
+api/domains/capabilities/test/json-schema-subset.test.ts:
+(pass) the finite subset becomes a strict validator with the stated bounds [0.68ms]
+(pass) anything outside the subset is refused with its path, never dropped [0.23ms]
+
+api/domains/capabilities/test/music-versions.test.ts:
+(pass) V3 describes music/vocals/SFX without changing historical schemas [0.33ms]
+
+api/domains/capabilities/test/pipeline-bundle.test.ts:
+(pass) seed installs p0-3 idempotently, preserves an old binding body, and refuses its execution contract [62.91ms]
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) profile validity compares instants with mixed fractional-second precision [0.37ms]
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [13.68ms]
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [8.29ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) enum values must also satisfy bounds and formats at every nested node [0.89ms]
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.08ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [0.43ms]
+(pass) optional string bounds preserve explicit constraints and the overall value capacity [0.11ms]
+(pass) a rejected value schema reports where and why, never its keys or values [0.03ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+
+api/domains/capabilities/test/resource-kinds.test.ts:
+(pass) the 12 builtin kinds load with their actions, default and owner [76.60ms]
+(pass) action labels fall back to the global action words and a kind can override them [74.65ms]
+(pass) produces lists the kinds a toolchain creates and the candidate card carries it [77.81ms]
+(pass) an invalid registration is rejected and stores nothing [11.28ms]
+(pass) a bundle can register a kind and refuses an invalid one [9.44ms]
+(pass) revisions are versioned: seeding again changes nothing, a changed revision conflicts, a new one supersedes [165.86ms]
+
+api/domains/capabilities/test/session-binding.test.ts:
+(pass) a session binding passes the check and registers as a toolchain with the session execution [50.07ms]
+(pass) a session binding's references are all checked [77.49ms]
+(pass) a session binding with command-only fields or an unknown execution is refused [42.63ms]
+(pass) the registry refuses a session binding whose tool schema differs from the package tool's [38.96ms]
+(pass) a session binding may carry its own time limits: each 10 s to 60 min, inference <= turn <= run [4.90ms]
+
+api/domains/capabilities/test/settings-google.test.ts:
+(pass) Google settings bundle exposes no AI definitions or bindings [0.01ms]
+
+api/domains/capabilities/test/standalone-artifacts-forms.test.ts:
+(pass) structure actions must be registered by the document's adapter with its input schema [8.63ms]
+(pass) collection sources, paging and row actions are checked against this artifact's bindings [8.41ms]
+(pass) row input keys must be top-level properties of the action's input, on write and structure actions only [8.15ms]
+(pass) the create form must match the action input and keep secrets declared [8.57ms]
+(pass) form options come from fixed values or a registered query of the source's adapter [8.18ms]
+(pass) a row edit form adds fields to the row-built input without overlapping it [8.37ms]
+(pass) form defaults fit their control, and refresh-while keeps to an existing source [9.26ms]
+(pass) structure actions can be row actions and create actions, and ids may be generated [7.68ms]
+(pass) a clean-draft requirement names a registered document that the artifact uses [9.37ms]
+
+api/domains/capabilities/test/standalone-artifacts.test.ts:
+(pass) launcher artifacts are published without a toolchain, with the final entry shape [9.18ms]
+(pass) a newer revision switches the published pointer, an old one is a rollback, and re-import keeps the choice [9.82ms]
+(pass) fields are checked against the adapter that owns the document [9.16ms]
+(pass) a field id is unique across the whole published catalog, but a revision may keep its own [9.06ms]
+(pass) draft documents, navigation targets and apply operations must be registered [8.28ms]
+(pass) a refused bundle publishes nothing [7.85ms]
+(pass) a navigate-by-value map is checked for every target, and a default value stays display-only [8.70ms]
+(pass) a field must agree with what the document schema says about its path [9.51ms]
+(pass) confidential values travel only in declared input properties of every write that applies the document [6.81ms]
+(pass) source params schemas must resolve [7.51ms]
+(pass) revisions of one artifact id inside a bundle may carry the same fields [7.24ms]
+(pass) artifact publication over HTTP is compare-and-set [9.23ms]
+
+api/domains/capabilities/test/steward-request-retire.test.ts:
+(pass) the steward.request items lose their active entry, search and embedding; their revisions stay as history [18.48ms]
+
+api/domains/capabilities/test/task-binding.test.ts:
+(pass) task binding is bounded, has no artifact and rejects unknown execution kinds [0.40ms]
+(pass) the dormant task bundle is never seeded, registers explicitly without a dummy artifact, and survives reseeding [150.73ms]
+(pass) a host with the earlier task result schema upgrades by new revisions and preserves its old binding [12.74ms]
+
+api/domains/capabilities/test/timer-compatibility.test.ts:
+(pass) timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state [0.52ms]
+(pass) the bound-command inputs accept exactly the shapes the UI and the questions send [0.34ms]
+
+api/domains/capabilities/test/toolchain-candidates.test.ts:
+(pass) the current request embedding selects music.create despite past choices and unrelated text matches [80.00ms]
+(pass) the current request embedding selects image.create despite past choices and unrelated text matches [76.68ms]
+(pass) the current request embedding selects excalidraw.edit despite past choices and unrelated text matches [84.08ms]
+(pass) strict discovery has no all-catalog fallback and returns the top four [77.32ms]
+(pass) the search fills each kind's slots: the three closest dedicated toolchains, and general ones near the closest candidate [48.37ms]
+(pass) the router's offer is exactly the ids given, in their order, read tools among them; the router's cards are valid [44.00ms]
+(pass) a router passage is the name, the summary and the first two use cases, at most the criterion's length [0.05ms]
+
+api/domains/capabilities/test/web-guided.test.ts:
+(pass) the Web bundle seeds the current revisions and reseeding changes nothing [68.19ms]
+
+api/domains/dialogue/test/active-run.test.ts:
+(pass) a conversation has an active run from acceptance until the run ends, and only that conversation [73.67ms]
+
+api/domains/dialogue/test/agency-state.test.ts:
+(pass) forget fences late checkpoints and removes their saved bodies [0.35ms]
+(pass) only an actual current autonomous work authorizes research and expiry revokes it [0.23ms]
+(pass) a worker failure at ready_for_answer returns failure instead of waiting for a nonexistent report [0.22ms]
+(pass) evidence invalidated before adoption is rejected and the pending answer ends [0.20ms]
+(pass) actual dispatch time is atomic with the effect and survives subsequent checkpoints [0.18ms]
+
+api/domains/dialogue/test/answer-streams.test.ts:
+(pass) a late subscriber receives only the current generation and superseded producers cannot publish [0.09ms]
+(pass) abort clears buffered text immediately and late subscribers cannot replay it [0.05ms]
+(pass) adoption releases the buffer without revoking audio already synthesized [0.03ms]
+(pass) disposing an old subscription twice cannot remove a later subscriber [0.06ms]
+(pass) a subscriber whose initial replay throws is removed instead of leaking without a disposal handle [0.03ms]
+
+api/domains/dialogue/test/attachment-notes.test.ts:
+(pass) images without host annotations leave the text unchanged [0.03ms]
+(pass) annotations follow the text in image order as reference data, including an empty meta [0.03ms]
+
+api/domains/dialogue/test/brief-reply.test.ts:
+(pass) specialist reply length is bounded without limiting production arguments [0.37ms]
+(pass) brief speech is at most two sentences, keeping decimal values and links intact [0.05ms]
+(pass) a display artifact's body is not held to the speech contract [68.13ms]
+(pass) a long conversation answer is adopted as it is: the host neither repairs nor rejects it [65.75ms]
+
+api/domains/dialogue/test/command-interactions-http.test.ts:
+(pass) the HTTP routes answer and list interactions with the documented statuses [74.65ms]
+(pass) the HTTP answer to an expired question is 410 [71.47ms]
+
+api/domains/dialogue/test/command-interactions-lifecycle.test.ts:
+(pass) an answer whose request id already belongs to another run is a conflict, not a link [72.11ms]
+(pass) a failed operation ends the interaction without a receipt [73.03ms]
+(pass) answers are refused for a stale question or revision, an invalid value, or a changed version [69.42ms]
+(pass) an answer past the question's time is expired, not resumed [69.67ms]
+(pass) maintenance expires open questions and ends interactions whose run is gone [69.19ms]
+(pass) an answer and its new run commit together: a refused job leaves the question open [71.03ms]
+(pass) at most three questions are asked; the fourth stops the operation [79.27ms]
+(pass) interactions are bounded: open and total capacity refuse a new one, and ending keeps the body for 30 days [77.58ms]
+(pass) ended interactions lose their bodies after 30 days and their rows after 30 more [74.23ms]
+(pass) an interaction whose run ended without finishing it is closed [175.43ms]
+
+api/domains/dialogue/test/command-interactions-questions.test.ts:
+(pass) a clarifying question is saved with the delegation's TODO and reaches the conversation, then is answered once by the UI [72.63ms]
+(pass) the resumed command run gets the question and the answer as data and completes the interaction with the receipt [74.79ms]
+(pass) a target question carries the host's choices and accepts only one of them [71.47ms]
+(pass) a binding without questions allows only free text, and the model is offered no other schema [66.49ms]
+(pass) free text is always allowed: a binding without questions asks builtin:answerText [67.65ms]
+(pass) a binding with questions offers exactly those schemas to the model [67.78ms]
+(pass) the choice field is the binding's: a schema with another field is validated the same way [70.86ms]
+(pass) a schema without a choice field carries no choices even if the host has some [67.53ms]
+(pass) a target question without host choices is asked as free text [70.25ms]
+
+api/domains/dialogue/test/command-interactions-work.test.ts:
+(pass) the pending choice's answer is accepted once and the same run resumes the interaction [74.76ms]
+(pass) a second answer to the same question is refused: the TODO no longer waits and is not offered [80.33ms]
+(pass) an answer to a question whose chain has since been replaced is refused and leaves the question open [71.25ms]
+(pass) an answer the UI gave completes the operation into the TODO that asked the question [71.02ms]
+(pass) a question asked again after a UI answer replaces the TODO's question [76.14ms]
+
+api/domains/dialogue/test/command-interactions.test.ts:
+(pass) the offer comes from the catalog: bound chains by adapter availability, the rest by host capability [133.13ms]
+(pass) a delegation to a command toolchain opens a command TODO and hands the run to the command job [69.59ms]
+(pass) a delegation ends the generation: the model is not called again after the work was handed over [68.06ms]
+(pass) a command chain without a binding or with an unknown backend is refused before any execution [199.16ms]
+(pass) a bound chain runs through the generic action route with the binding's adapter and operation [67.63ms]
+(pass) arguments that the binding's schema rejects never reach the agent runtime [66.91ms]
+(pass) an operation without an interaction carries no frozen stamp [65.71ms]
+(pass) the command sub-agent runs as a sub-agent of its run, as one call [65.95ms]
+
+api/domains/dialogue/test/context-eval/analysis.test.ts:
+(pass) adoption: all seven criteria met adopts [0.84ms]
+(pass) adoption criterion 1: a transport error or an unresolved axis makes the decision incomplete [0.45ms]
+(pass) adoption criterion 2: one regression in a safety family rejects, even with a large net gain [0.54ms]
+(pass) adoption criterion 3: a net of zero adopts; a net below the configured minimum rejects [0.65ms]
+(pass) adoption criterion 4: a family with a net loss rejects even when the total gain is positive [0.17ms]
+(pass) adoption criterion 5: more F9 contract violations than baseline rejects [0.29ms]
+(pass) adoption criterion 6: prefix stability must be higher than baseline; unmeasured is incomplete, never adopted [0.41ms]
+(pass) adoption criterion 7: a median response time above the baseline's rejects [0.43ms]
+(pass) fixture and dev analyses are never binding; a safety regression rejects even when criterion 1 is also unmet [0.28ms]
+(pass) a run without a baseline is summarized per family, with its safety failures and no comparison [0.08ms]
+(pass) the report names the lane and says when a result cannot decide [0.40ms]
+
+api/domains/dialogue/test/context-eval/case-schema.test.ts:
+(pass) a valid case parses; unknown fields and bad ids are rejected [0.28ms]
+(pass) id, family and split must agree; axes are unique; families that need an axis carry it [0.27ms]
+(pass) a generation without an utterance needs a trigger, and an utterance has none [0.13ms]
+(pass) references must name a seeded key, keys are unique, delivery fields agree with how much was heard [0.53ms]
+(pass) episode parts, TODOs, tendencies and forbidden identifiers are checked against the seed [0.47ms]
+(pass) the loader reports invalid json, schema errors, file-name mismatch and duplicate ids together [0.21ms]
+(pass) skeleton normalization keeps grammar and collapses content runs [0.16ms]
+(pass) dev/holdout leakage: the same skeleton or heavy n-gram overlap is refused; a different sentence passes [0.14ms]
+(pass) the example experiment's cases validate and cover every family in both splits [76.42ms]
+
+api/domains/dialogue/test/context-eval/checks-judge.test.ts:
+(pass) tool checks look at the fixed tool names [1.49ms]
+(pass) delegation checks read the delegate call's mode and toolchain [0.09ms]
+(pass) speaks and silent read the text [0.02ms]
+(pass) the brief spoken reply contract is the delivery domain's isBriefSpokenReply [0.05ms]
+(pass) forbidden identifiers are exact substrings of the answer text [0.03ms]
+(pass) the request is blind: facts, input, answer and axes only, with the auxiliary exact JSON options [0.21ms]
+(pass) a generation without an utterance gives the judge its trigger; the events are the seed's, without keys [0.17ms]
+(pass) the judge sees the functions the answer called, with their arguments escaped, so "call or announce" is decidable [0.10ms]
+(pass) a valid reply (object or JSON text) gives a 0/1 per axis with its reason, in rubric order [0.36ms]
+(pass) the judge fails closed: call failure, bad JSON, schema violation and axis mismatch all need adjudication [0.38ms]
+(pass) without rubric axes the judge is not called [0.05ms]
+(pass) the judge prompt lives in a system-context toml, not in TypeScript [3.36ms]
+
+api/domains/dialogue/test/context-eval/freeze.test.ts:
+(pass) the manifest holds a sha256 per file and a holdout digest [0.11ms]
+(pass) freezing twice with the same content is a no-op; changed holdout content is refused [2.93ms]
+(pass) any frozen file (judge prompt, harness source) changing is refused, as are added and removed files [2.79ms]
+(pass) verifyFrozen fails closed when nothing was frozen [0.41ms]
+(pass) a report directory is new every time and a report file is never overwritten [3.55ms]
+
+api/domains/dialogue/test/context-eval/generation-runner.test.ts:
+(pass) a generation without an utterance only talks, and may stay silent [37.85ms]
+(pass) an answer that copies the system part is not heard: the host says its fixed words instead [36.20ms]
+(pass) the offline search ranks the catalog by shared character pairs, best first, at most four [0.23ms]
+
+api/domains/dialogue/test/context-eval/integrity.test.ts:
+(pass) the freeze covers every harness source and the judge prompt, and nothing of the deleted arms [490.74ms]
+(pass) run.json records the settings snapshot and score.json the judge rules digest [308.66ms]
+(pass) the catalog text of the judge rules is byte-identical to the frozen toml source (live lane check) [0.40ms]
+(pass) score refuses raw rows that do not belong to the run: duplicates, unknown case, trial out of range, lane [293.77ms]
+(pass) score refuses a holdout run whose freeze changed; a dev run records a manifest mismatch [1152.12ms]
+(pass) analyze refuses scores whose raw rows changed, malformed score rows, an invalid prefix measurement, and a baseline of another lane [338.26ms]
+(pass) rerun condition: a line that is empty, missing or still says 要合意 is not filled in [0.07ms]
+(pass) transport re-run: refused until preregistered; then a NEW run dir holds the original rows with only the failed calls replaced, with provenance [1337.82ms]
+
+api/domains/dialogue/test/context-eval/materialize.test.ts:
+(pass) a case becomes the production messages: the system part, the recent conversation, then State and the user's words [41.42ms]
+(pass) `## Memory` is the published leanings: a waiting memory, the notes, goals and World are not in the input [40.05ms]
+(pass) the recent conversation is what reached the user: a partial delivery as heard, nothing being spoken, no notice or tool line [39.20ms]
+(pass) TODOs and confirmations come from the work ledger as lines of `## State` [38.12ms]
+(pass) a generation without an utterance answers a host notice, with the TODO in `## State` [35.46ms]
+(pass) the input is deterministic, and outside text keeps its characters but can not open a heading [107.84ms]
+(pass) a window the plan cannot use stops the case, and the store is closed [38.01ms]
+(pass) a seed that fails to write closes the store before the error propagates [34.08ms]
+(pass) the generation time is just after the newest thing the seed records [0.05ms]
+(pass) a generation after a long silence keeps nothing said before it, and says why and how long [36.98ms]
+
+api/domains/dialogue/test/context-eval/pipeline.test.ts:
+(pass) prepare freezes once; changing a holdout case afterwards is refused by prepare and by run [1458.41ms]
+(pass) prepare refuses a case whose messages break an invariant or cannot be prepared, before anything is frozen [328.05ms]
+(pass) holdout cases are not run before the freeze [12.37ms]
+(pass) fixture lane: run, score and analyze produce reports labelled fixture, each in a new directory [873.59ms]
+
+api/domains/dialogue/test/context-eval/run.test.ts:
+(pass) every case is prepared once by the production code and its trials share the messages [140.36ms]
+(pass) planJobs closes every store it opens, including when a case cannot be prepared [107.52ms]
+(pass) a run records one row per call; a thrown error is a transport error with its class only, a contract failure is its own status [69.61ms]
+(pass) the fixture model answers through the production loop: with no router in the lane the turn talks, and the row is scored [35.11ms]
+(pass) the trajectory measurement is a valid report; ordinary calls share nearly all of the previous prompt, cut ones less [112.12ms]
+(pass) prefix stability counts the shared bytes of consecutive calls [0.06ms]
+(pass) the example experiment's cases all prepare within the message invariants [4271.34ms]
+
+api/domains/dialogue/test/context-eval/scoring.test.ts:
+(pass) a trial passes only when every check and every axis passes [0.50ms]
+(pass) transport errors are counted apart; a contract failure is a failed trial; a repair is a violation [0.07ms]
+(pass) an unusable judge reply leaves the trial needing adjudication, and adjudication.json settles exactly that axis [0.21ms]
+(pass) a case passes on the majority of trials and is incomplete when a trial is unresolved, failed to run or missing [0.09ms]
+(pass) a failed deterministic check is a definite fail even when the judge is unresolved [0.13ms]
+(pass) duplicate or out-of-range trial rows never add votes and make the case incomplete [0.04ms]
+(pass) the scores.jsonl schema refuses malformed rows and knows the new check kinds [0.19ms]
+
+api/domains/dialogue/test/context-eval/trajectory.test.ts:
+(pass) the default trajectory is twelve generations that keep the message invariants [101.16ms]
+(pass) the system part stays the same and the recent conversation is a window of the user's last two utterances [50.26ms]
+(pass) the recent conversation is cut where the host's rules say: a long silence resumes the conversation [50.45ms]
+(pass) a memory saved after the profile was drawn waits until a cut draws `## Memory` again [52.00ms]
+(pass) the delegation's TODO is a line of the state, and a notice is the host notice of its generation [50.58ms]
+(pass) long exchanges pass the hard limit and the host cuts the recent conversation to the newest few [60.88ms]
+
+api/domains/dialogue/test/context-keeper.test.ts:
+(pass) the keeper reads the shared prefix with its own sections under a strict schema, and what it writes of the state is held [87.68ms]
+(pass) with no cut point to offer, the keeper is not called while its state is held [169.84ms]
+(pass) the keeper's provider schema keeps each op's shape and types, and leaves the bounds to the host [0.36ms]
+(pass) the keeper offers the World names it reads inside one read transaction [83.99ms]
+(pass) a held state op that breaks a rule is only counted: the cut it chose is taken [85.81ms]
+(pass) a cut at a point it was not offered refuses the whole output [83.49ms]
+(pass) the keeper's cut moves the recent conversation, and the new prefix is read ahead [85.46ms]
+(pass) a user utterance stops the keeper of that conversation: the answer comes first [284.62ms]
+
+api/domains/dialogue/test/context-system.test.ts:
+(pass) the five sections stand in order, each part in its own, and no input heading is among them [0.36ms]
+(pass) a section without a part is left out (the feeling rule while the setting is off) [0.13ms]
+(pass) every persona's role and style sentences are in the text, as the sources write them, without examples [4.25ms]
+(pass) the names are stated as given, omitted when empty, and never substituted [0.35ms]
+(pass) no host rule carries an example, and the same input gives the same bytes [3.12ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) the dialogue controller validates requests and delegates one run per request ID [78.43ms]
+(pass) the public runs API rejects utteranceId, unknown keys and a pinned toolchain outside a form submit; it accepts the shape web and CLI send [62.92ms]
+(pass) the resubmit route answers the new run, 400 for an empty text, 404 for an unknown message and 409 when refused [66.80ms]
+
+api/domains/dialogue/test/conversation-input.test.ts:
+(pass) the recent conversation starts with the agent, leaves out what waits for an answer, and joins a side's run [0.12ms]
+(pass) an utterance is cut at its bound, and its data can not open a heading [0.39ms]
+(pass) a fixed-rule cut keeps the newest few from an agent's utterance [0.02ms]
+(pass) `## Memory` holds the leanings only, with source and date, within its bound [3.00ms]
+(pass) the last message joins a trailing user message and carries `## Memory` when nothing comes before it [0.04ms]
+(pass) a research result is what was and was not confirmed, with links to its own sources, within its bound [0.40ms]
+(pass) a result names its resources by number, hides identifiers, and says failure plainly [0.08ms]
+(pass) tool results are text: the search lists its candidates with how to call them, never JSON [0.05ms]
+(pass) lines past a bound name how many were left out and of what [0.08ms]
+(pass) the keeper's operations apply by the numbers shown; a rule broken anywhere refuses the whole output [0.09ms]
+(pass) after a gap nothing said before stays, even when the memory or the system part changed meanwhile [0.13ms]
+
+api/domains/dialogue/test/conversation-output.test.ts:
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 1 [0.08ms]
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 3 [0.03ms]
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 63
+(pass) control text is never published, including split delimiters: 元気の出る曲、再生しますね。
+
+＜p / 1 [0.05ms]
+(pass) control text is never published, including split delimiters: 元気の出る曲、再生しますね。
+
+＜p / 3 [0.02ms]
+(pass) control text is never published, including split delimiters: 元気の出る曲、再生しますね。
+
+＜p / 58
+(pass) control text is never published, including split delimiters: ＜tool_call＞
+＜funct / 1 [0.02ms]
+(pass) control text is never published, including split delimiters: ＜tool_call＞
+＜funct / 3
+(pass) control text is never published, including split delimiters: ＜tool_call＞
+＜funct / 52
+(pass) an ASCII run attached to control syntax goes with it, even when it streamed first [0.10ms]
+(pass) a name written like a call, with no provider delimiter, is ordinary text, and is published [0.05ms]
+(pass) angle brackets in ordinary prose are published [0.05ms]
+(pass) ordinary prose, JSON and code retain their text and stream before completion [0.08ms]
+(pass) an unfinished delimiter is held until its ordinary continuation is known [0.02ms]
+(pass) a natural prefix does not let later control syntax into the published text [0.04ms]
+(pass) control text in a nonstream response is never published; the text before it is the answer [0.03ms]
+(pass) held whitespace and discarded output still obey the total capacity limit [0.09ms]
+(pass) an answer that copies a line of the system part fails as it streams, and an ordinary answer passes [0.06ms]
+
+api/domains/dialogue/test/copy-gate.test.ts:
+(pass) a reply copying the rules is not kept and the host answers in its words: the next turn does not see it [70.83ms]
+(pass) a copying utterance kept before the gate (or the agency's) is not drawn into the recent conversation [68.31ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) a request ID is idempotent, a different body under it conflicts, and the answer is adopted atomically [69.97ms]
+(pass) a pinned toolchain is stored on the run and is part of the request's identity [62.83ms]
+(pass) a failed input persistence prevents any provider request [0.28ms]
+(pass) a cancelled inference cannot append its answer [66.23ms]
+
+api/domains/dialogue/test/error-report.test.ts:
+(pass) token counting refusal includes the connection and upstream correlation without raw provider text [68.55ms]
+(pass) records written in UTC before the JST format and JST records mix in one correct timeline [70.03ms]
+(pass) a worker's control failure is reported in the fixed form with the first failure and its reference [67.07ms]
+(pass) repeated rejections of an operation fold into one row; a contract violation names the run's reason [70.02ms]
+(pass) a research failure answered by the fixed reply is reported with the tool failure of the Web run [66.69ms]
+(pass) a cancellation and the failure it causes are reported with the cancellation first [68.62ms]
+(pass) an inference failure shows where it happened (without the checkout's path) [65.49ms]
+(pass) a repaired violation of the first round is a row of the table, not the failure the worker ended with [66.66ms]
+(pass) a warning the run went on from is not the failure; the record with the run's failure code is [66.14ms]
+(pass) records from the rotated generations and the other IDs of the run are read [67.16ms]
+(pass) a missing log still gives the overview from the run's own state [63.59ms]
+(pass) an interrupted run, which ended without an answer, is reported like a failure [63.13ms]
+(pass) only fixed fields and identifier-like values are printed; text, settings and unknown fields never are [65.37ms]
+(pass) a long run stays within the limit: the oldest normal rows go first and the omission is stated [68.26ms]
+(pass) the route returns the report, 404 for an unknown run and 409 for a run that did not fail [255.64ms]
+
+api/domains/dialogue/test/execution-notices.test.ts:
+(pass) revoking a queued notice run cancels it and its job, and the steward is told it was cancelled [64.83ms]
+(pass) revoking a notice that already completed changes nothing [65.68ms]
+(pass) revoking an unknown source is a no-op [61.71ms]
+
+api/domains/dialogue/test/generation-prepare.test.ts:
+(pass) the recent conversation is native messages from the agent's first utterance; the last message is State, then the user's words [71.69ms]
+(pass) the talk system part is its sections in order, and the same in every talk call [68.95ms]
+(pass) a read stays in its own turn: the next input has the reply only, and what was read was text [70.02ms]
+(pass) a notice is the host notice of the last message, its fields as items; no user section [66.28ms]
+(pass) a plain notice text is the host notice as it is [65.73ms]
+(pass) the user's words can not forge a heading or a role [65.51ms]
+(pass) after half an hour nothing said before stays in the recent conversation, and the gap is said in the 今 line [76.36ms]
+(pass) clearing the recent conversation leaves the earlier words out of the next input, and what follows is kept [71.21ms]
+(pass) the recent conversation is not cleared while a run of the conversation is waiting or running [66.91ms]
+(pass) a window too small for the planned sections fails the run with window_too_small, with no model call [65.66ms]
+
+api/domains/dialogue/test/generation-tools.test.ts:
+(pass) the argument schemas leave each mode's required fields to the host's check [0.37ms]
+(pass) a delegate call without impact or the request is taken (the host fills or checks it); approve may carry it [0.04ms]
+
+api/domains/dialogue/test/generation-work.test.ts:
+(pass) check reads a TODO's state and result into the talk turn's notice, and logs only the check [1086.08ms]
+(pass) an approval is refused when the confirmation statement was not heard at all [90.29ms]
+(pass) an irreversible confirmation heard only in part is not enough to approve [69.76ms]
+(pass) a partial playback records what was heard of the reply [71.01ms]
+(pass) finished work is archived as it finishes, with an unread notice the screen reads and marks read [1074.73ms]
+(pass) clearing notification history keeps TODO results, archives every page, and leaves future completion notices visible [3107.42ms]
+(pass) the TODO screen's archive stops the run an open TODO waits on and archives it as cancelled, with no notice [87.07ms]
+(pass) an agency utterance is recorded as a spontaneous said event, and the next input carries it as the agent's [66.35ms]
+(pass) a memory read returns the long-term items that match, tells them to the talk call and logs the read [69.64ms]
+(pass) a memory not yet published is read with its text and not marked as shown [70.39ms]
+(pass) cancel of a waiting TODO from a later utterance ends the run it waits on, and the TODO is done as cancelled [70.12ms]
+(pass) the TODO screen's page shows the whole request, the newest finished first, in the archive [2086.36ms]
+(pass) a finished TODO can still be checked: its result is read again, with room for what the notice left out [1107.56ms]
+(pass) a spoken reply takes its place when adopted and keeps only what was heard; one not heard at all leaves the input [99.31ms]
+(pass) an image waiting for LARM memory extends its open run, never shortens it, and not after it ends [1068.86ms]
+
+api/domains/dialogue/test/generation.test.ts:
+(pass) an utterance is answered with plain text: the said events, a full delivery and the answer trace [74.17ms]
+(pass) a model call that fails fails the run; its utterance joins the log unanswered and the next generation answers only its own [75.50ms]
+(pass) choices the host cannot carry out twice leave the host's words and a rejected selection; nothing is handed over [74.95ms]
+(pass) an instant toolchain's answer is the host's answer, and makes no TODO [72.31ms]
+(pass) a delegation is announced, opens a TODO and hands the run over; the finished work ends the run without a generation and is archived with its notice [1072.62ms]
+(pass) a finished TODO with no agency port ends its run without a generation too [1082.25ms]
+(pass) an answer delivery uses the emotion of the reply, never judged again [95.33ms]
+(pass) a change needs a confirmation first; the approval executes the saved request [69.96ms]
+(pass) a memory request goes to the steward with the user's message as its source [66.87ms]
+(pass) a spoken answer cut short records what was heard, without the announcement [66.88ms]
+
+api/domains/dialogue/test/harness-voice.test.ts:
+(pass) the route of a voice run is found from its bound llm request by the run id [64.05ms]
+
+api/domains/dialogue/test/harness.test.ts:
+(pass) the harness: the routed turn's talk on the last two utterances, thinking at low within 4,096 tokens [0.03ms]
+(pass) the llm route is LARM only unless the saved route picks a usable cloud model [0.06ms]
+(pass) a usable saved cloud model is the llm route; speech routes are left as saved [0.03ms]
+(pass) the copy filter leaves out an agent's utterance that copies the system part, and only when the flag is on [0.11ms]
+(pass) an answer that copies the system part fails only while the harness's gate is on [0.18ms]
+(pass) a run is the routed turn: its calls carry the harness's limit and reasoning [65.64ms]
+(pass) a run takes the saved cloud model's route and runs the same routed turn: the same limit and the same talk system [139.16ms]
+(pass) a saved cloud model that can not be used falls back to LARM [67.39ms]
+(pass) a run accepted keeps the saved route as it is: a LARM-preferred one stays so [67.58ms]
+(pass) a run captured at prepare pins speech to LARM and routes the llm as the saved route picks [68.58ms]
+(pass) a resubmitted utterance is captured with the saved route as it is [68.26ms]
+
+api/domains/dialogue/test/media-deadline.test.ts:
+(pass) image: default deadline survives on-demand startup without overriding caller limits [0.21ms]
+(pass) image: explicit deadline survives on-demand startup without overriding caller limits [0.07ms]
+(pass) image: longer deadline survives on-demand startup without overriding caller limits [0.06ms]
+(pass) music-create: default deadline survives on-demand startup without overriding caller limits [0.06ms]
+(pass) music-create: explicit deadline survives on-demand startup without overriding caller limits [0.05ms]
+(pass) music-create: longer deadline survives on-demand startup without overriding caller limits [0.05ms]
+
+api/domains/dialogue/test/memory-integration.test.ts:
+(pass) a remembered fact is in the profile of the next prompt [70.53ms]
+(pass) memory switched off injects nothing: the profile is empty [70.81ms]
+(pass) a forgotten fact leaves the next prompt, and the messages it came from stay in the conversation [73.83ms]
+(pass) a forget of a fact shown while the answer is generated makes that answer stale: nothing is adopted [80.29ms]
+(pass) an addition or a republish during generation does not expire the answer [73.74ms]
+(pass) a fact whose period has not started yet, or has ended, is not current understanding [82.44ms]
+(pass) a remembered text with newlines stays on its own line, so it cannot forge a heading or a line [75.86ms]
+(pass) the context policy of a memory-enabled run is exact: the server neither trims nor reorders the prompt [71.30ms]
+(pass) a long multibyte conversation id keeps its runs and its messages apart from others [68.62ms]
+
+api/domains/dialogue/test/pinned-operation.test.ts:
+(pass) a run pinned to image.create hands its submit body to the toolchain: a TODO, no model call, no answer text [66.09ms]
+(pass) a run pinned to music.create hands over the same way when the music port is offered [67.02ms]
+(pass) a run pinned to a command toolchain (the CLI's --toolchain) hands its body to the command sub-agent [69.12ms]
+(pass) a toolchain that is not offered on this host (no music port) fails the pinned run with toolchain_unavailable and no fallback [65.84ms]
+(pass) a toolchain with no active revision (not in the catalog) fails the pinned run with toolchain_unavailable and no fallback [66.77ms]
+(pass) a toolchain whose card cannot be rebuilt fails the pinned run with toolchain_unavailable and no fallback [64.11ms]
+(pass) a research toolchain fails the pinned run with toolchain_unavailable and no fallback [64.50ms]
+(pass) a music playback toolchain fails the pinned run with toolchain_unavailable and no fallback [65.29ms]
+
+api/domains/dialogue/test/progress.test.ts:
+(pass) publishing an unwatched run still delivers its current status to a later subscriber [63.02ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run handles the utterances pending at its claim; a later input waits for its own run [70.30ms]
+(pass) utterances pending together are one generation; a run with nothing left to handle ends as handled [67.53ms]
+(pass) full queue rejects the submit and stores neither message nor run [64.70ms]
+(pass) restart: queued runs continue, a running run is interrupted, a late result from the old owner is rejected [73.39ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [63.67ms]
+(pass) a scheduled prompt creates exactly one background run per occurrence; an interactive input is claimed first [76.36ms]
+(pass) waitForTerminal honours its own timeout and an abort, and never cancels the run [104.85ms]
+(pass) a rejected answer adoption fails both the run and its queue job, and adds no message [70.08ms]
+(pass) only an adopted, confident motion labels an answer; a judgment of a cancelled run is rejected [75.35ms]
+(pass) the emotion context holds the earlier turns and the complete answer, never a later input [70.99ms]
+
+api/domains/dialogue/test/read-tools.test.ts:
+(pass) the talk turn reads memory with its tool, and a second call with no tool tells what was read [72.56ms]
+(pass) the conversation log is read from before the current words, the recent runs with how each was handled [74.58ms]
+(pass) a tool the talk turn was not offered is refused and never run; its next call answers [85.59ms]
+(pass) a read tool the search offered is chosen with its inputs: the talk turn tells what was read, with no tool [84.82ms]
+(pass) the sub-agents' work and World's records are told as records; nothing found says so [103.39ms]
+(pass) a forgotten message is read by none of the read tools: not in the log, nor as a run, nor as work [110.65ms]
+(pass) a read that cannot be made says so and the run goes on; a failed answer after a read gets the host's words [76.15ms]
+
+api/domains/dialogue/test/reconcile-agents.test.ts:
+(pass) a throwing event is logged, never rejected, and close() still completes [67.28ms]
+(pass) transient store errors back off but never fail the run [92.53ms]
+(pass) a poison event fails the run after five failures [96.64ms]
+(pass) a failing run synchronisation write does not reject [119.25ms]
+
+api/domains/dialogue/test/resources.test.ts:
+(pass) a resource keeps its number; the most recently used comes first; a forgotten one is hidden and returns under its number [63.29ms]
+(pass) a message links resources in order, once each [68.36ms]
+(pass) an image result becomes the TODO's link, which the state names by its number [90.32ms]
+(pass) delegate refs: a number in the ledger becomes a reference with the owner's text; an unknown or forgotten one is refused [79.95ms]
+(pass) a finished image TODO links its image, its notice and a message citing it show it, and the next prompt shows its number [1085.46ms]
+(pass) the resource on screen is shown in the state by its number and joins the ledger as viewed [71.54ms]
+(pass) the candidates tell what a toolchain makes, in the kinds' display names [72.19ms]
+(pass) forgetting the messages a TODO came from empties its links and hides the resources it made [1078.48ms]
+(pass) the resources a confirmation was issued with are kept with it [61.22ms]
+
+api/domains/dialogue/test/resubmit.test.ts:
+(pass) an edit while the answer is generated stops the run, corrects the utterance and answers it again [70.48ms]
+(pass) the same text sends the utterance again without a correction [69.10ms]
+(pass) an utterance stopped by the user can be edited and answered [66.27ms]
+(pass) an answered utterance is not edited, and nothing changes [72.01ms]
+(pass) an utterance whose delegation was committed is refused and its run keeps waiting [73.58ms]
+(pass) an utterance followed by another is not the latest [66.22ms]
+(pass) a screen's submit, an empty text and another conversation's message are refused [63.96ms]
+(pass) a repeated requestId is one edit and one run [66.62ms]
+(pass) finding a toolchain commits nothing: the utterance is still edited, and its exchange moves to the new run [70.15ms]
+(pass) a repeated requestId with another text is a conflict [65.77ms]
+
+api/domains/dialogue/test/routed-choice.test.ts:
+(pass) the resources State names are its references, not the words of their labels [0.05ms]
+(pass) a hand-over's refs are the named resources; with none named the branch has no refs [0.06ms]
+(pass) the work State lists is read by its lines' heads: a title that holds a number is not work [0.04ms]
+(pass) a toolchain with saved items always names its target: new first, then the items; the system says when each [0.14ms]
+(pass) a cloud provider gets the fill in strict form: one object, every field required and nullable, no ranges; the host reads it back [0.15ms]
+
+api/domains/dialogue/test/routed-cut.test.ts:
+(pass) a fill cut at the output limit passes to talk and keeps its log, with none of the words [67.42ms]
+
+api/domains/dialogue/test/routed-route.test.ts:
+(pass) the host's candidates: the work, the open confirmations and questions, in the order the records give [0.16ms]
+(pass) a work doubted offers a redirect to each other toolchain of the earlier prediction set, at most two [0.27ms]
+(pass) a redirect is offered only from a decision the host can still name: the toolchain the work went to is active [0.11ms]
+(pass) a description that carries the user's words stays within the router's bound, whatever they are [0.16ms]
+(pass) a delimiter inside the user's words cannot close the context it sits in [0.05ms]
+(pass) a hand-over waiting for the word on unsaved work offers one candidate, last, that lets it go [0.03ms]
+(pass) only the newest six work are offered [0.07ms]
+(pass) the trace keeps the package's ranking, the prediction set, the row, the entry and best-v2's gate [0.06ms]
+
+api/domains/dialogue/test/routed-router-switch.test.ts:
+(pass) the word that lets unsaved work go hands the waiting request over again, to the same item; below the approval line the host asks and does nothing [87.37ms]
+
+api/domains/dialogue/test/routed-router-turns.test.ts:
+(pass) a confirmation quotes the user's words only, not the utterance before them nor any marker; so do the criteria of its answers [74.70ms]
+(pass) a doubted work is not cancelled before the new hand-over is certain: a fill that asks back leaves it running [69.99ms]
+(pass) a doubted work stays running when the new toolchain needs the user's yes: the confirmation says so [72.64ms]
+(pass) a hand-over that fails after the old work was cancelled says both, with no model call to try again [72.88ms]
+(pass) a cancellation asked about once more is done on a plain yes: the user was asked, so the lower line holds [74.71ms]
+(pass) without the question before it, the same probability is asked about again [75.41ms]
+(pass) a redirect asked about is worded as doing it again, and its yes redirects the same work to the same toolchain [80.67ms]
+(pass) a redirect that was carried out is what its trace decided, so the next redirect names the toolchain the work went to [75.50ms]
+(pass) a read of the router's own that fails is a router failure: the turn talks [70.66ms]
+(pass) the router reads the head of a long utterance: 2000 characters embedded and searched, 400 for the reranker [67.50ms]
+
+api/domains/dialogue/test/routed-router.test.ts:
+(pass) the package decides with no model call: a sure toolchain is offered by the host, handed the words and announced in the host's words (row 2) [69.56ms]
+(pass) the conversation leads when no tool scores: the turn talks, with one call and no choice [68.99ms]
+(pass) a toolchain best-v2 is not sure of is asked to try, in the host's words (row 3) [65.29ms]
+(pass) an unsure toolchain that changes what exists is confirmed first (row 4), and a yes above the approval line approves it (row 5) [68.45ms]
+(pass) a yes below the approval line asks the host's question again and leaves the confirmation open; a sure no closes it [74.33ms]
+(pass) route(): row 9 never dispatches only the first job when no planner is available [70.21ms]
+(pass) a router that fails, is slow, has no memory or no embedding leaves the turn to the talk turn; the trace says why (row 10) [401.39ms]
+(pass) a toolchain with inputs is filled by the one-candidate call, the only model call, held to that candidate [81.23ms]
+(pass) a fill that finds nothing to ask for leaves the turn to the talk turn; one that asks back keeps the request it asked about [95.48ms]
+(pass) a hand-over the host refuses, or an instant toolchain that cannot answer, is said in the host's failure words, with no call to try again [82.98ms]
+(pass) a memory request is filled by the one-candidate call and taken by the host's operation [72.97ms]
+(pass) a work is checked, corrected or cancelled by the package's decision: the host's operation, the host's words [83.96ms]
+(pass) a doubted hand-over is redone elsewhere: the work is cancelled, the same words go to the other toolchain, and the correction is kept [78.95ms]
+(pass) the turns before go to the reranker's port, and the user's utterance before the words goes to the toolchain with them [72.90ms]
+(pass) a correction near the utterance moves the decision, never to a sure one; disagreeing ones apply none and are put out of use; weight 0 turns them off [181.08ms]
+(pass) with no profile saved there is no router: the turn talks, and nothing is offered or embedded [68.17ms]
+(pass) with the router on the user-intent judge is not asked: the package sees the tools and the open confirmations together [82.03ms]
+(pass) the resources State presents go with a hand-over the router decided, for the agent to pick from [1082.30ms]
+(pass) routeStructured: one request with a reference routes the masked utterance; the structure model is the saved resource, at low effort [78.11ms]
+(pass) routeStructured: no request is the conversation, with nothing scored; requests of two tools never dispatch a partial first job when the pipeline is unavailable [85.82ms]
+(pass) routeStructured: a structure model that fails gives no structure, and the whole utterance is routed as route() does [74.15ms]
+(pass) routeStructured: a mixed multi-job request never falls back to running only its first tool [70.71ms]
+
+api/domains/dialogue/test/routed-turn.test.ts:
+(pass) an instant toolchain the router decided answers from the inputs of the one fill call: the host says its answer [73.67ms]
+(pass) a talk cut before a word gets the host's words [79.59ms]
+(pass) a talk that tells the user who spoke nothing gets the host's words; each call of the turn ends only itself [75.59ms]
+(pass) a pipeline uses the request branch and has no legacy template input contract [72.92ms]
+(pass) no candidate fits: the talk turn answers with only the read tools, on a system that names no toolchain and the time alone of the state [78.33ms]
+(pass) a no on the pending turn closes the confirmation: the next turn has nothing pending [75.76ms]
+(pass) the talk turn's recent conversation is the last two of the user's utterances and the reply before them [81.98ms]
+(pass) finished work State still lists may be checked, never corrected: the check's record is what the talk turn tells [1075.85ms]
+(pass) the fill reads the user's earlier words of the talk window: its fields carry the condition they point to [74.43ms]
+(pass) the fill reads `## Memory` as the talk turn shows it [84.65ms]
+(pass) a fill the provider failed (a cloud error) leaves the turn to the talk turn; the cloud got the fill's strict form [77.73ms]
+
+api/domains/dialogue/test/run-end.test.ts:
+(pass) a completed run tells the steward once, with its conversation and the completed state [86.43ms]
+(pass) a failed run tells the steward its failure [69.16ms]
+(pass) a cancelled run tells the steward it was cancelled, and its waiting TODO ends with it [79.08ms]
+(pass) stopping the reply of a run that handed its work over keeps the run and its TODO [80.90ms]
+(pass) stopping the reply of a run that handed nothing over cancels it [71.18ms]
+(pass) a run that already completed is not ended or told twice by a later cancel [78.19ms]
+(pass) a run left without a job when the backend restarts is interrupted and the steward is told [78.58ms]
+
+api/domains/dialogue/test/specialist-document.test.ts:
+(pass) the work document is read as its canonical text, and the host offers its document tools [83.44ms]
+(pass) a partial edit with its reply makes a revision in one call and is kept in the session's course [80.46ms]
+(pass) an edit whose text is missing or not unique applies nothing and says which edit, for one retry [84.13ms]
+(pass) an edit that changes nothing ends the turn with the host's question [85.15ms]
+(pass) an edit on an old revision is refused with the current one [91.52ms]
+(pass) a whole write that fails its check is kept as the rejected draft and ends the turn at once; the next turn reads it [92.23ms]
+(pass) a write the domain had to trim says so after the reply [82.93ms]
+(pass) a document larger than the inline budget is an outline, and doc.view reads its lines [78.38ms]
+(pass) a domain refusal of the commit is data for the next call, and a later screen change is flagged [83.41ms]
+(pass) a later change that adds nothing after one that changed the work is reported as the change [79.28ms]
+(pass) an edit not found says why and gives the document's own lines to copy on the retry [85.58ms]
+
+api/domains/dialogue/test/specialist-flush.test.ts:
+(pass) a deferred flush does not cancel a run the database still has running [66.05ms]
+
+api/domains/dialogue/test/specialist-lifecycle.test.ts:
+(pass) expiry is the session's only one: polling never extends it, an accepted utterance does [85.99ms]
+(pass) an expired session is not extended by a new utterance: it ends and the utterance goes the ordinary way [85.31ms]
+(pass) a turn that outlives the session's expiry is not adopted [93.68ms]
+(pass) the sweep ends expired sessions; a refusing domain leaves them closing and the next sweep retries the same end [79.40ms]
+(pass) a suspended work that was saved meanwhile is ended by the sweep, an unsaved one is kept [85.71ms]
+(pass) recovery ends every session that was not ended as restarted [88.20ms]
+(pass) a pinned form submit is the main conversation's: an active session does not take it [82.25ms]
+(pass) commands: revision guard, idempotent by requestId, return suspends or ends, resume advances the epoch [78.69ms]
+(pass) closing a clean work ends it; returning a clean one ends it too [83.68ms]
+(pass) return cancels the turn in flight; the work is free and a late result is not adopted [132.53ms]
+(pass) an utterance while a turn holds the work is queued behind it, in order, and takes the work when its turn starts [84.42ms]
+(pass) the work is never free between two queued turns; a return command withdraws the turn in flight and hands the queued utterances to the conversation agent in order [100.89ms]
+(pass) when the specialist leaves, utterances queued behind it go to the conversation agent instead of being lost [84.34ms]
+(pass) an expired session with a turn in flight is withdrawn when the next utterance ends it [133.83ms]
+(pass) the live check holds only for an active or suspended session that has not expired [81.59ms]
+(pass) after the specialist leaves, the conversation's own exchanges are not blocked from memory and are learned from [93.00ms]
+
+api/domains/dialogue/test/specialist-memory.test.ts:
+(pass) 2026-10-18: a draft whose reply broke the contract, an utterance cut off by the next one, and the follow-up all reach the specialist [98.40ms]
+(pass) a failed turn stays in the course with its refused operations and its code [88.12ms]
+(pass) an operation that changes nothing ends the turn with the host's question, without another call [80.53ms]
+
+api/domains/dialogue/test/specialist-turn.test.ts:
+(pass) a malformed output is repaired once with the rejected output as data; a second one fails the run [86.69ms]
+(pass) a rejected output is logged with where it broke the contract, never with what it said [86.92ms]
+(pass) a repair call says where the output broke the contract: schema path and kind, or the reply's measured length, never an internal code name [95.60ms]
+(pass) a turn is bounded by its model calls; the last one must carry its reply, and work changed before the limit is reported by the host [80.53ms]
+(pass) refusals beyond the tool's retries end the turn with the host's words [92.08ms]
+(pass) a refused or invalid operation is data for the next call, never a crash [90.23ms]
+(pass) the specialist is not given memory, World, the main prompt or the conversation's persona [78.87ms]
+(pass) a toolchain's own time limits: the run lasts its run time from the hand-over, each call gets its turn and inference time, and an utterance addressed to it gets the run time too [90.52ms]
+(pass) the specialist turn never calls the conversation model, and a failed turn does not either [112.48ms]
+(pass) HTTP: the session, its commands and their errors [92.30ms]
+(pass) HTTP: an utterance while a turn holds the work is accepted and queued [96.96ms]
+(pass) the addressee the screen showed must still listen: otherwise nothing is stored (409 addressee_changed) [108.14ms]
+(pass) a saved item older than the recent choices is offered, accepted and shown when it is on screen [169.96ms]
+(pass) a refusal's short repair hint reaches the specialist, truncated [88.35ms]
+
+api/domains/dialogue/test/specialist.test.ts:
+(pass) a session starts from the conversation's delegate, then talks directly: no conversation model call for the utterances after it [88.88ms]
+(pass) a hand-over to a session toolchain ends the generation: the model is called for the one choice only (the host searches itself) [79.97ms]
+(pass) an utterance handed to the specialist is logged as said by the user, to the specialist, and is not pending for the conversation agent [91.53ms]
+(pass) the specialist's reply is logged as said by the specialist, with the toolchain's id (6.8) [90.88ms]
+(pass) specialist dialogue is blocked from memory, and the specialist's turns tell the steward nothing [94.57ms]
+(pass) returning: unsaved work is suspended and the conversation agent takes over with a short record of it [85.63ms]
+(pass) returning a clean work ends the session once and tells the conversation agent once [86.98ms]
+(pass) a request outside the specialist's scope is forwarded to the conversation agent once, as its own utterance [91.33ms]
+(pass) a discard ends the session, drops the work and returns the conversation [89.14ms]
+(pass) a hand-over to another toolchain while unsaved work stands waits for the user's decision, and the conversation agent asks [106.59ms]
+(pass) the same target resumes the suspended work instead of starting another [87.08ms]
+(pass) a target the host did not issue is refused before anything starts [80.30ms]
+(pass) a saved item starts the session from it; the fill offers exactly the issued items, and the screen's viewing is shown when issued [96.13ms]
+(pass) an item on screen the host did not issue is not shown [88.76ms]
+(pass) a change of a saved item is confirmed naming the item, and the approval opens that same item [102.39ms]
+(pass) a request to make something new is handed to the specialist at once, on a new work [88.54ms]
+(pass) a confirmation keeps its target: the same request on two items stays two confirmations, and the approved one opens its item [98.81ms]
+(pass) an item that is gone is refused when confirmed, and a confirmation whose item went since is closed before anything is announced [87.81ms]
+(pass) forgetting the words a confirmation came from clears its target with its request [84.62ms]
+
+api/domains/dialogue/test/state-text.test.ts:
+(pass) finished work is shown from the start of the recent conversation, within its usual window [0.19ms]
+(pass) the context keeper's fields show only while it runs [0.09ms]
+
+api/domains/dialogue/test/todo-screen.test.ts:
+(pass) the archive read returns only the latest 20 by archive time and leaves them out of the active page [78.07ms]
+
+api/domains/dialogue/test/tool-exchange.test.ts:
+(pass) a hand-over's search and delegation are kept with its announcement, the next local turn draws the words alone, and the background calls read the same prefix [1085.43ms]
+(pass) a confirmation's number and a refused call are kept; the read is not [84.14ms]
+(pass) a result keeps only the candidates' names and the host's numbers, never an instant answer's text [0.12ms]
+(pass) a replayed call's arguments are always a JSON object, each text within its bound [0.09ms]
+(pass) a report keeps the notice of the work it told; the next local turn draws the words alone [1083.55ms]
+
+api/domains/tool-runtime/test/action-controller.test.ts:
+(pass) POST maps outcomes to status codes and GET reads back by eventId [9.85ms]
+(pass) unsettled list, launcher list, artifact and source endpoints [8.91ms]
+(pass) source params are URL-encoded JSON of at most 4 KiB validated by the source's schema [6.17ms]
+(pass) artifact availability can remain readable independently of execution, with the default still fail closed [6.56ms]
+
+api/domains/tool-runtime/test/action-invoke.test.ts:
+(pass) agent action invocation stores the adapter and operation of its binding and reads through them [20.79ms]
+
+api/domains/tool-runtime/test/action-requests.test.ts:
+(pass) artifact reads keep availability and source queries inside a read snapshot [9.37ms]
+(pass) execution and acceptance commit together and the adapter receives eventId and host issuedAt [8.07ms]
+(pass) same eventId and digest returns the stored result even after the send window expired [7.97ms]
+(pass) same eventId with a different digest is a 409 recorded in conflicts without overwriting [8.05ms]
+(pass) time window applies to new requests only [6.33ms]
+(pass) forged source, action, artifact, scope and target are refused before anything is saved [6.72ms]
+(pass) a source revision mismatch is a recorded definitive rejection with no execution [8.99ms]
+(pass) invalid UI input returns field errors and saves nothing [8.91ms]
+(pass) domain rejection rolls back its writes but records the rejection; unknown failures abort everything [8.12ms]
+(pass) capacity: ordinary actions stop at 4096 rows and cancel operations use the reserved 64 [55.78ms]
+(pass) bodies are deleted 30 days after settlement and tombstones 30 days later [9.88ms]
+(pass) registered artifacts, definitions and sources are read through the host, not the client [6.74ms]
+(pass) the accepted and rejected log lines are written only after the transaction committed [6.06ms]
+(pass) a standalone launcher artifact is listed and readable only while every source adapter is available [6.74ms]
+(pass) navigate and draft actions never reach the backend [6.40ms]
+(pass) a draft-apply write is validated by its schema; confidential keys are redacted and never persisted [9.19ms]
+(pass) confidential replay: same secret returns the stored result, a different secret is a 409 [7.17ms]
+(pass) an action that declares confidential fields but carries none needs no host key [7.95ms]
+(pass) a confidential action without a host key is refused before anything is stored [7.82ms]
+(pass) source params are accepted only for sources with a params schema and are validated [7.35ms]
+(pass) conflict audit never stores a plain hash of confidential input [9.46ms]
+(pass) a shared artifact routes writes to its registered source independently of the conversation binding [9.75ms]
+
+api/domains/tool-runtime/test/invoke.test.ts:
+(pass) gateway refuses foreign refs and unselected URLs; idempotent invocation and rolled-back result is not exposed [19.78ms]
+(pass) superseded invocations leave observations but stay in the budget and the invocation list [15.20ms]
+
+api/domains/tool-runtime/test/read-retry.test.ts:
+(pass) failure-only partial reads retry on a new step without bypassing budget; usable partial bodies replay [19.01ms]
+
+api/domains/tool-runtime/test/vault-fairness.test.ts:
+(pass) one task filling its result-vault quota cannot make another task's settle fail [19.21ms]
+
+ 964 pass
+ 0 fail
+ 7228 expect() calls
+Ran 964 tests across 158 files. [150.13s]
+[verify] web tests: /Users/y.noguchi/.bun/bin/bun x --no-install vitest run web/src/domains/agent-runtime/ResearchTaskCard.test.tsx web/src/domains/agent-runtime/toolchain-adapter.test.tsx web/src/domains/dialogue/test/hooks.test.tsx web/src/domains/dialogue/test/progress.test.tsx web/src/domains/dialogue/test/specialist.test.tsx web/src/domains/dialogue/test/todo-notices.test.tsx
+
+ RUN  v4.1.8 /private/tmp/eumenes-pipeline-host-verify-20261105
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  6 passed (6)
+      Tests  32 passed (32)
+   Start at  23:38:02
+   Duration  4.50s (transform 2.15s, setup 204ms, import 6.11s, tests 1.22s, environment 5.58s)
+
+[verify] pass: 169002 ms; /private/tmp/eumenes-pipeline-host-verify-20261105/verification-reports/runs/2026-11-05T14-35-19-310Z-cb25d0b2-61c0-4071-b573-3d73b8c21e21/report.json

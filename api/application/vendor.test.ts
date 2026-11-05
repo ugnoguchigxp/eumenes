@@ -35,6 +35,22 @@ test("the vendored memory package matches its manifest, package.json, the lockfi
 	expect(lock).toContain(integrity);
 });
 
+test("the memory distribution identifies its source and verifies the installed published files", () => {
+	const packageUrl = import.meta.resolve("eumenes-memory/package.json");
+	const release = JSON.parse(
+		readFileSync(new URL("./dist/release-manifest.json", packageUrl), "utf8"),
+	);
+	expect(release.baseCommit).toBe(manifest.sourceGitCommit);
+	expect(release.sourceHash).toBe(manifest.sourceHash);
+	expect(release.packageVersion).toBe(pkg.version);
+	for (const [path, expected] of Object.entries(release.files)) {
+		if (typeof expected !== "string")
+			throw new Error("Invalid release checksum");
+		const bytes = readFileSync(new URL(path, packageUrl));
+		expect(createHash("sha256").update(bytes).digest("hex")).toBe(expected);
+	}
+});
+
 const worldManifest = JSON.parse(read("vendor/world/manifest.json").toString());
 
 test("the vendored world-model package matches its manifest, package.json, the lockfile and the installed copy", () => {

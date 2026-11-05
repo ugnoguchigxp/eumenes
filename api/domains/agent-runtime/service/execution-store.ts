@@ -18,6 +18,7 @@ import {
 import {
 	CHILD_STEP,
 	PARENT_STEP,
+	PIPELINE_COMPOSE,
 	type ExecutionContext,
 } from "./execution-context";
 import { plannedInvocation } from "./execution-invocation";
@@ -40,6 +41,8 @@ export function createExecutionStore(ctx: ExecutionContext) {
 		child = false,
 		kind = child ? CHILD_STEP : PARENT_STEP,
 	) {
+		if (!child && state.pipeline && !state.pipeline.executionPlan)
+			kind = PIPELINE_COMPOSE;
 		state.ordinal++;
 		const { job } = queue.enqueueInTransaction(db, {
 			scope: "agent",
@@ -66,10 +69,13 @@ export function createExecutionStore(ctx: ExecutionContext) {
 	) {
 		if (!isExecutionActive(row)) return;
 		// What the children made stays the parent's result, whatever its sub-agent wrote.
-		const links = [...new Set(state.notes.flatMap((n) => n.links ?? []))].slice(
-			0,
-			8,
-		);
+		const links = [
+			...new Set(
+				state.pipeline
+					? (result.links ?? [])
+					: state.notes.flatMap((n) => n.links ?? []),
+			),
+		].slice(0, 8);
 		const body = JSON.stringify({
 			...result,
 			status,
@@ -307,8 +313,11 @@ function followsControl(
 	state: ParentState,
 ) {
 	return state.pipeline
-		? ctx.port().pipelineInTransaction?.(db, state.pipeline.toolchainRevisionId)
-				?.bindingRevisionId === state.bindingRevisionId
+		? state.pipeline.contractVersion === "p0-3" &&
+				ctx
+					.port()
+					.pipelineInTransaction?.(db, state.pipeline.toolchainRevisionId)
+					?.bindingRevisionId === state.bindingRevisionId
 		: ctx.port().controlInTransaction(db)?.revisionId ===
 				state.bindingRevisionId;
 }
@@ -336,7 +345,7 @@ function childLauncher(
 		state: ParentState,
 		input: Pick<
 			import("../../tool-runtime").ChildExecution,
-			"chainRevisionId" | "request" | "arguments" | "refs" | "materials"
+			"chainRevisionId" | "request" | "arguments" | "refs"
 		>,
 		id: string,
 		started?: () => void,

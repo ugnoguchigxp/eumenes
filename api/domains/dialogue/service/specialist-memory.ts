@@ -1,5 +1,8 @@
 import type { Database } from "bun:sqlite";
-import { systemContext } from "../../../infrastructure/system-context";
+import {
+	buildCollaborationMessages,
+	type CourseEntry,
+} from "eumenes-collaboration";
 import { promptTime } from "../../inference";
 import type { RejectedDraft, Run } from "../contracts";
 import {
@@ -18,28 +21,7 @@ const SUPERSEDED_MS = 5000;
 /** An older turn keeps this much of its utterance in the course. */
 const COURSE_CHARS = 80;
 
-const REFERENCE = systemContext(
-	"dialogue.contexts.specialist-turn.reference",
-	{},
-);
-
 type Outcome = "completed" | "failed" | "cancelled" | "interrupted";
-
-/** One earlier turn as the specialist reads it: what was asked, what ran, how it ended. */
-type CourseEntry = {
-	utterance: string;
-	handedOver?: string;
-	steps?: Array<{
-		tool: string;
-		ok: boolean;
-		error?: string;
-		revision?: number;
-		size?: Record<string, number>;
-	}>;
-	outcome: Outcome;
-	error?: string;
-	reply?: string;
-};
 
 const clip = (text: string, chars: number) =>
 	text.length > chars ? `${text.slice(0, chars)}…` : text;
@@ -107,7 +89,9 @@ export function sessionCourse(
 					]
 				: [],
 		);
-		const utterance = text(entry.inputMessageId);
+		// A host observation refers to an existing input; it is not another utterance by the user.
+		const utterance =
+			entry.sourceKind === "notice" ? "" : text(entry.inputMessageId);
 		const reply = text(entry.answerMessageId);
 		const size = Buffer.byteLength(utterance) + Buffer.byteLength(reply);
 		const full =
@@ -172,76 +156,8 @@ export function specialistTurnMessages(input: {
 		inlineBytes: number;
 	};
 }): ChatMessage[] {
-	const { course, interrupted, handedOver } = input.course;
-	const document = input.document;
-	const rejected = document?.rejected;
-	const reference = {
-		...(handedOver && handedOver !== input.utterance
-			? { handedOverRequest: handedOver }
-			: {}),
-		...(interrupted ? { joinsInterrupted: true } : {}),
-		course,
-		...(document
-			? {
-					document: {
-						path: document.path,
-						revision: document.revision,
-						title: document.title,
-						...(document.outlined ? { outlined: true } : {}),
-						// The screen moved it since the last operation here (undo, redo, the user's own edit).
-						...(document.revision !== lastRevision(course)
-							? { changedOnScreen: true }
-							: {}),
-					},
-				}
-			: { currentWork: input.work.current }),
-		// Beside the document: what the work's domain hands the specialist (the choices its document may name).
-		...(document && input.work.context !== undefined
-			? { workContext: input.work.context }
-			: {}),
-		// A whole draft that failed its check: what was wrong, and the draft itself when it is small.
-		...(rejected
-			? {
-					rejectedDraft: {
-						title: rejected.title,
-						issues: rejected.issues,
-						...(rejected.fixes.length ? { fixes: rejected.fixes } : {}),
-						...(Buffer.byteLength(rejected.text) <= document.inlineBytes
-							? { text: rejected.text }
-							: {}),
-						createdAt: rejected.createdAt,
-					},
-				}
-			: {}),
-		savedRef: input.work.savedRef,
-		viewing: input.viewing,
-		label: input.work.label,
-		dirty: input.work.dirty,
-		callsLeft: input.callsLeft,
-		...promptTime(input.nowMs),
-	};
-	const block = document
-		? `\nCURRENT_DOCUMENT path=${document.path} revision=${document.revision}${document.outlined ? " outline" : ""}\n<<<\n${document.body}\n>>>`
-		: "";
-	return [
-		input.system,
-		{
-			role: "user",
-			content: `${REFERENCE}\nREFERENCE=${JSON.stringify(reference)}${block}`,
-		},
-		{
-			role: "user",
-			content: interrupted
-				? `${interrupted}\n${input.utterance}`
-				: input.utterance,
-		},
-	];
-}
-
-/** The work's revision after the last operation of the course that reported one (0 before any). */
-function lastRevision(course: CourseEntry[]): number {
-	for (const entry of [...course].reverse())
-		for (const step of [...(entry.steps ?? [])].reverse())
-			if (step.revision !== undefined) return step.revision;
-	return 0;
+	return buildCollaborationMessages({
+		...input,
+		time: promptTime(input.nowMs),
+	});
 }

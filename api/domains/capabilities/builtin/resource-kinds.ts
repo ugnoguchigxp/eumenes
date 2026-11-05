@@ -115,15 +115,6 @@ const rows: Row[] = [
 		summary: "OCRで読み取った文書",
 	},
 	{
-		kind: "pipeline",
-		label: "手順",
-		owner: "pipelines",
-		actions: ["open", "read"],
-		defaultAction: "open",
-		producedBy: ["pipeline.studio"],
-		summary: "登録した手順",
-	},
-	{
 		kind: "code.task",
 		label: "コード作業",
 		owner: "codex-tasks",

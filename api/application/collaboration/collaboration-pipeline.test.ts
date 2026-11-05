@@ -1,0 +1,184 @@
+import { expect, test } from "bun:test";
+import { waitFor } from "../../infrastructure/wait-for";
+import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
+import { harness } from "../toolchain/toolchain.fixture";
+
+test("a collaborative draft is edited, confirmed and executed exactly once without recomposing, then reported to the same session", async () => {
+	const request = "二つのタイマーの手順を一緒に作って。最初は20秒、次は30秒";
+	const definition = {
+		request,
+		steps: [
+			{
+				id: "first",
+				bundle: "timers.manage",
+				task: "20秒のタイマー",
+				from: ["request"],
+				result: "保存済みタイマー",
+			},
+			{
+				id: "second",
+				bundle: "timers.manage",
+				task: "30秒のタイマー",
+				from: ["first"],
+				result: "保存済みタイマー",
+			},
+		],
+		output: { from: ["second"], deliver: "作成したタイマーを報告" },
+	};
+	let stage = 0,
+		compose = 0;
+	const observations: string[] = [];
+	const traces: string[] = [];
+	const h = await harness({
+		memory: true,
+		pipelines: true,
+		timers: true,
+		discoveryTarget: () => "collaborate_pipeline",
+		firstRound: (_tools, _question, messages) =>
+			searchThenDelegate((c) => c.id === "collaboration.pipeline", request, {
+				announcement: "一緒に手順を作ります。",
+				impact: "create",
+			})(messages),
+		compose: () => {
+			compose++;
+			throw new Error("confirmed_draft_must_not_be_recomposed");
+		},
+		specialist: (messages) => {
+			const prompt = messages.map((m) => m.content).join("\n");
+			traces.push(prompt);
+			const revision = Number(
+				/CURRENT_DOCUMENT path=pipeline\.json revision=(\d+)/.exec(prompt)?.[1],
+			);
+			if (stage === 0) {
+				stage++;
+				return {
+					action: "invoke",
+					tool: "doc.write",
+					arguments: {
+						baseRevision: revision,
+						title: "タイマーの手順",
+						content: definition,
+					},
+					text: "手順を作りました。",
+				};
+			}
+			if (stage === 1) {
+				stage++;
+				return {
+					action: "invoke",
+					tool: "doc.edit",
+					arguments: {
+						baseRevision: revision,
+						edits: [
+							{
+								old: '"task": "30秒のタイマー"',
+								new: '"task": "45秒のタイマー"',
+							},
+						],
+					},
+					text: "二つ目を45秒に変えました。",
+				};
+			}
+			if (stage === 2) {
+				stage++;
+				return {
+					action: "invoke",
+					tool: "collaboration.pipeline.start",
+					arguments: { expectedRevision: revision },
+					text: "確認した手順で進めます。",
+				};
+			}
+			observations.push(prompt);
+			const schema = JSON.parse(
+				messages[0]!.content.split("\nOUTPUT_SCHEMA=")[1]!,
+			);
+			expect(schema.properties.action.enum).toEqual(["reply"]);
+			return { action: "reply", text: "二つのタイマーを作成しました。" };
+		},
+		command: (messages) => {
+			const packet = JSON.parse(messages.at(-1)!.content);
+			expect(packet.originalRequest).toBe(request);
+			return JSON.stringify({
+				action: "invoke",
+				tool: "timer.start",
+				arguments: {
+					durationSeconds: packet.request.includes("45秒") ? 45 : 20,
+					label: packet.request.includes("45秒") ? "second" : "first",
+				},
+			});
+		},
+	});
+	const say = async (text: string) => {
+		const response = await h.request("/api/runs", {
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text,
+		});
+		expect(response.status).toBe(202);
+		const run = await response.json();
+		const done = await h.dialogue.waitForTerminal(run.id, { timeoutMs: 6000 });
+		expect(
+			done?.status,
+			JSON.stringify(done) + traces.at(-1)?.slice(-6500),
+		).toBe("completed");
+		return run.id;
+	};
+	const session = async () =>
+		(await (await h.request("/api/conversations/main/specialist")).json())
+			.session;
+	const source = async (conversationId = "main") =>
+		h.request(
+			"/api/toolchain-artifacts/artifact:collaboration.pipeline@1/sources/collaboration?params=" +
+				encodeURIComponent(JSON.stringify({ conversationId })),
+		);
+	try {
+		expect(
+			h.store
+				.read((db) => h.routing.catalogInTransaction(db))
+				.find((c) => c.id === "collaboration.pipeline")?.runtime.binding
+				?.available,
+		).toBe(true);
+		const initial = await say(request);
+		expect(h.dialogue.answerText(initial)).toBe("手順を作りました。");
+		const owner = await session();
+		expect(owner).toBeTruthy();
+		expect(h.toolchain.agents.executions.list("main")).toHaveLength(0);
+		await say("二つ目だけ45秒に直して");
+		const draft = await (await source()).json();
+		expect(draft.data.work.summary).toContain("45秒のタイマー");
+		expect(draft.data.work.summary).toContain("20秒のタイマー");
+		expect(draft.data.work.request).toBe(request);
+		expect(h.toolchain.agents.executions.list("main")).toHaveLength(0);
+		await say("この内容で実行してください");
+		await waitFor(
+			() =>
+				["completed", "partial", "failed", "cancelled"].includes(
+					h.toolchain.agents.executions.list("main")[0]?.status ?? "",
+				),
+			{ timeout: 6000 },
+		);
+		expect(
+			h.toolchain.agents.executions.list("main")[0]?.status,
+			JSON.stringify(h.toolchain.agents.executions.list("main")[0]),
+		).toBe("completed");
+		await waitFor(() => observations.length === 1, { timeout: 6000 });
+		expect((await session()).id).toBe(owner.id);
+		expect(compose).toBe(0);
+		expect(h.toolchain.agents.executions.list("main")).toHaveLength(1);
+		const timers = await (await h.request("/api/timers")).json();
+		expect(
+			timers.items
+				.map((t: any) => t.durationSeconds)
+				.sort((a: number, b: number) => a - b),
+		).toEqual([20, 45]);
+		expect(
+			h.store
+				.read((db) => h.conversation.messagesInTransaction(db, "main"))
+				.filter((m) => m.role === "user"),
+		).toHaveLength(3);
+		expect((await (await source()).json()).data.work.summary).toBeTruthy();
+		expect((await source("another-conversation")).status).toBe(404);
+	} finally {
+		await h.close();
+	}
+});

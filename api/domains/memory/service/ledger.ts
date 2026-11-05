@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ContinuityService } from "../../continuity";
 import type { BlockReason } from "../contracts";
+import { isSourceRevoked } from "../repository/source-revocations";
 import {
 	blockedAmong,
 	blockedInConversation,
@@ -39,6 +40,9 @@ export function createLedger(deps: {
 	};
 
 	return {
+		/** A specialist may use its own excluded input; forgotten or journal-blocked sources remain invalid. */
+		isSourceRevokedInTransaction: (db: Database, messageId: string): boolean =>
+			isSourceRevoked(db, messageId) || journalBlocked.has(messageId),
 		/** The blocked ones among these messages. */
 		blockedMessageIdsInTransaction: (
 			db: Database,

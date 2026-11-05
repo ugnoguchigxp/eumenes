@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { pipelineDefinitionV1 } from "./pipelines";
 
 /**
  * Versioned bindings and artifact registrations (spec: timer-data-driven-ui-acceptance-design
@@ -211,10 +210,10 @@ export const taskBindingV1 = z.strictObject({
 	}),
 });
 /**
- * A task pipeline (spec task-pipeline-design 2026-10-22 §13.1): the procedure itself is the binding's, so the
- * pipeline's revision is the binding's. No tools and no screen; `timeLimits.runMs` bounds the whole run.
+ * One-off planning with the imported p0-3 contract. The checked definition belongs to an execution,
+ * not the reusable binding. No tools or screen; `timeLimits.runMs` bounds the whole run.
  */
-export const pipelineBindingV1 = z.strictObject({
+export const pipelineBindingV2 = z.strictObject({
 	kind: z.literal("binding"),
 	id: slug,
 	revision: revisionNumber,
@@ -223,14 +222,14 @@ export const pipelineBindingV1 = z.strictObject({
 	availabilityRef: hostRef("availability"),
 	tools: z.array(bindingTool).max(0),
 	timeLimits: timeLimitsV1,
-	pipeline: pipelineDefinitionV1,
+	contractVersion: z.literal("p0-3"),
 });
 export const bindingV1 = z.discriminatedUnion("execution", [
 	commandBindingV1,
 	sessionBindingV1,
 	instantBindingV1,
 	taskBindingV1,
-	pipelineBindingV1,
+	pipelineBindingV2,
 ]);
 export type BindingV1 = z.infer<typeof bindingV1>;
 /** Where one OpenUI source's data comes from: a registered adapter query. */

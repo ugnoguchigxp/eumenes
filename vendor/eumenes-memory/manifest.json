@@ -1,8 +1,8 @@
 {
 	"package": "eumenes-memory",
 	"version": "0.0.2",
-	"artifact": "eumenes-memory-0.0.2-6643656f3383.tgz",
-	"sha256": "6643656f338300a10061f2fcab3999c1f05c54ccb4bacc998bcdb76387bd3984",
+	"artifact": "eumenes-memory-0.0.2-3070b7dd6e4a.tgz",
+	"sha256": "3070b7dd6e4a4db945300407851b6678d65af35fb8badfe5df93c33d037e6706",
 	"contractVersions": {
 		"records": 1,
 		"state": 1,
@@ -10,5 +10,7 @@
 		"external": 1
 	},
 	"dbSchemaVersion": 8,
-	"verifiedWith": "eumenes_memory verify:all: 548 tests; ships built dist (JavaScript and declarations); Eumenes packaged integration verified separately"
+	"verifiedWith": "eumenes_memory: 807 local tests passed; Eumenes host integration recorded in spec/memory-integration-2026-11-05.md",
+	"sourceGitCommit": "5504945f838935fbff6401c962bdecb1d3b49956",
+	"sourceHash": "410170e57d78030890b67b5041cc94a6a727e4965fcb251face9a2c32e35d6f4"
 }

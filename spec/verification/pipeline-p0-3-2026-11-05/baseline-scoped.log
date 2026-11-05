@@ -1,0 +1,52 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/pipelines/test/resource-adapter.test.ts:
+(pass) a drafted or published receipt becomes a pipeline ref; a rejected one and other owners do not [13.47ms]
+(pass) get: studio screen, the published toolchain as target; a draft never published has an empty target; missing is null [8.02ms]
+(pass) a closed work is gone from get, search and read [8.51ms]
+(pass) search matches title and definition text, newest first, with limit and period [7.88ms]
+(pass) read summarizes the definition within 600 tokens and refuses an unknown id [7.96ms]
+
+api/domains/pipelines/test/materials.test.ts:
+(pass) materials preserve body, raw prompts, typed values and owned media IDs independently [0.19ms]
+(pass) missing paths fail, null is data, UTF-8 capacity fails instead of truncating [0.05ms]
+(pass) references are contract checked, forward results rejected and raw self prompts allowed [0.86ms]
+(pass) fixture and flow report what is passed, not a fixed sample replacing the reference [0.30ms]
+
+api/domains/pipelines/test/pipelines.test.ts:
+(pass) pipeline check > a sound definition passes [0.09ms]
+(pass) pipeline check > each rule is reported by its place, never by the value [0.12ms]
+(pass) pipeline check > format errors come first, with their pointer [0.28ms]
+(pass) pipeline check > an unknown toolchain and a missing step result fail the check [0.11ms]
+(pass) inputs may not take the first round's names; an optional input without a default may not be read; inherited names are unknown [0.08ms]
+(pass) inputs > the first round's parameters are flat, with a quote for each input [0.04ms]
+(pass) inputs > a quote must be the user's words; an unmentioned input takes its default [0.20ms]
+(pass) templates and steps > references expand; a whole reference keeps its type [0.04ms]
+(pass) templates and steps > a step passes only when it completed with what it requires [0.03ms]
+(pass) templates and steps > a fixture case runs without toolchains and compares the expected values [0.06ms]
+
+api/application/pipelines/pipelines.test.ts:
+(pass) a published pipeline is a new revision of an ordinary toolchain; an unchanged one is left as it is [521.51ms]
+(pass) the router picks the pipeline and the fill call gives its inputs; the host runs each step as a child and the finished run is reported [558.83ms]
+(pass) a value that does not fit gets one repair; then the run stops with what was done [522.05ms]
+(pass) a quote that is not the user's words goes back for the structural repair [458.24ms]
+(pass) a pipeline id that names another toolchain is refused; a revision published during a run does not stop it [532.59ms]
+(pass) published materials survive storage and arrive in the actual command input as separate full data [521.83ms]
+
+api/application/pipelines/pipeline-studio.test.ts:
+(pass) the specialist writes the draft by the work document; the screen shows its text, flow and full check by line [450.56ms]
+(pass) a screen edit that fails the format check is kept as the rejected draft; a good one is the next revision and publishes [490.04ms]
+(pass) trials read the work's draft: the probe ranks it among the toolchains, the selection asks the router with the draft among its candidates [468.95ms]
+(pass) artifact source edits preserve materials and refuse a stale modal revision [448.36ms]
+
+api/application/pipelines/pipeline-studio-dialogue.test.ts:
+(pass) the conversation hands over to the studio; its specialist writes the definition, the screen shows and publishes it [474.67ms]
+(pass) the user edits the source on the screen; a text that fails is shown as the rejected draft [473.61ms]
+
+api/domains/agent-runtime/test/pipeline-materials.test.ts:
+(pass) resolved materials exceeding the whole child input budget stop without launching the next child [15.51ms]
+
+ 32 pass
+ 0 fail
+ 146 expect() calls
+Ran 32 tests across 7 files. [6.42s]

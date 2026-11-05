@@ -1,0 +1,46 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/pipelines/pipeline-execution.test.ts:
+(pass) conversation selects the imported planner and two actual timer commands complete under one pipeline TODO [591.22ms]
+
+api/domains/agent-runtime/test/pipeline-execution.test.ts:
+(pass) one-off definition uses pinned entries, declared references, selected final links [16.26ms]
+(pass) a model-modified request is never dispatched, even after its single repair [12.13ms]
+(pass) needs_input waits without side effects; the answer keeps the original request and re-enters authoring [1028.23ms]
+(pass) unsupported is explicit partial work with no child dispatch [19.18ms]
+(pass) revoked component revision stops the pipeline before dispatch [18.17ms]
+(pass) cancelled late model output cannot launch any child [37.76ms]
+(pass) from request includes supplied result references without implicitly adding later results [15.15ms]
+(pass) child failure stops subsequent work and cannot become successful output [13.95ms]
+(pass) oversized child input stops without retrying planning or dispatching [15.35ms]
+(pass) forgetting a source erases frozen requests, plans, catalog and supplied material [10.49ms]
+(pass) a persisted legacy pipeline cannot resume as the new contract [13.36ms]
+
+api/domains/dialogue/test/routed-router.test.ts:
+(pass) the package decides with no model call: a sure toolchain is offered by the host, handed the words and announced in the host's words (row 2) [80.21ms]
+(pass) the conversation leads when no tool scores: the turn talks, with one call and no choice [67.13ms]
+(pass) a toolchain best-v2 is not sure of is asked to try, in the host's words (row 3) [66.30ms]
+(pass) an unsure toolchain that changes what exists is confirmed first (row 4), and a yes above the approval line approves it (row 5) [68.08ms]
+(pass) a yes below the approval line asks the host's question again and leaves the confirmation open; a sure no closes it [73.10ms]
+(pass) route(): row 9 never dispatches only the first job when no planner is available [67.55ms]
+(pass) a router that fails, is slow, has no memory or no embedding leaves the turn to the talk turn; the trace says why (row 10) [367.11ms]
+(pass) a toolchain with inputs is filled by the one-candidate call, the only model call, held to that candidate [70.61ms]
+(pass) a fill that finds nothing to ask for leaves the turn to the talk turn; one that asks back keeps the request it asked about [72.80ms]
+(pass) a hand-over the host refuses, or an instant toolchain that cannot answer, is said in the host's failure words, with no call to try again [72.00ms]
+(pass) a memory request is filled by the one-candidate call and taken by the host's operation [66.80ms]
+(pass) a work is checked, corrected or cancelled by the package's decision: the host's operation, the host's words [81.72ms]
+(pass) a doubted hand-over is redone elsewhere: the work is cancelled, the same words go to the other toolchain, and the correction is kept [72.29ms]
+(pass) the turns before go to the reranker's port, and the user's utterance before the words goes to the toolchain with them [71.41ms]
+(pass) a correction near the utterance moves the decision, never to a sure one; disagreeing ones apply none and are put out of use; weight 0 turns them off [147.55ms]
+(pass) with no profile saved there is no router: the turn talks, and nothing is offered or embedded [70.59ms]
+(pass) with the router on the user-intent judge is not asked: the package sees the tools and the open confirmations together [72.70ms]
+(pass) the resources State presents go with a hand-over the router decided, for the agent to pick from [1094.14ms]
+(pass) routeStructured: one request with a reference routes the masked utterance; the structure model is the saved resource, at low effort [82.57ms]
+(pass) routeStructured: no request is the conversation, with nothing scored; requests of two tools never dispatch a partial first job when the pipeline is unavailable [68.51ms]
+(pass) routeStructured: a structure model that fails gives no structure, and the whole utterance is routed as route() does [67.03ms]
+(pass) routeStructured: a mixed multi-job request never falls back to running only its first tool [69.17ms]
+
+ 34 pass
+ 0 fail
+ 173 expect() calls
+Ran 34 tests across 3 files. [5.17s]

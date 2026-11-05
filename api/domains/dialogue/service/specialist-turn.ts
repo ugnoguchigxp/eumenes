@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { systemContext } from "../../../infrastructure/system-context";
 import type { Database } from "bun:sqlite";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
@@ -35,6 +36,7 @@ import {
 	type SpecialistAction,
 } from "./specialist-prompt";
 import { viewedSpecialistTarget } from "./specialist-context";
+import { specialistObservation } from "./specialist-notices";
 import { sessionCourse, specialistTurnMessages } from "./specialist-memory";
 import {
 	agentPolicy,
@@ -49,6 +51,10 @@ import { settleSpecialistTurn } from "./specialist-settle";
 const log = getLogger("dialogue");
 
 const MAX_OUTPUT_TOKENS = 24_576;
+const HOST_EVENT_NOTICE = systemContext(
+	"dialogue.contexts.specialist-turn.host-observation",
+	{},
+);
 /** The longest repair hint of a refused operation that reaches the specialist. */
 const DETAIL_CHARS = 1000;
 /** A refusal that a retry does not fix: the request named nothing to change (spec §7.5). */
@@ -70,6 +76,7 @@ export type TurnOutput = {
 	action: Exclude<SpecialistAction, { kind: "invoke" }>;
 };
 export type TurnInput = {
+	observation?: true;
 	runId: string;
 	revision: number;
 	sessionId: string;
@@ -128,6 +135,24 @@ function turnDocument(
 		rejected: document.rejected,
 		inlineBytes: policy.inlineBytes,
 	};
+}
+
+/** A host event is reference data, carried separately from the real user input. */
+function observedWork(
+	work: NonNullable<
+		ReturnType<
+			NonNullable<DialogueDeps["specialist"]>["workStateInTransaction"]
+		>
+	>,
+	hostEvent: unknown,
+) {
+	return hostEvent !== null
+		? {
+				...work,
+				current: { work: work.current, hostEvent },
+				context: { work: work.context, hostEvent },
+			}
+		: work;
 }
 
 /** The specialist turn: the user's utterance goes to the toolchain's specialist, never to the main model. */
@@ -203,13 +228,16 @@ export function createSpecialistTurnHandler(
 				return { status: "stale", reason: "run_changed" };
 			const policy = agentPolicy(set);
 			const document = turnDocument(port, set, session.workRef, policy, tx);
+			const hostEvent = specialistObservation(deps, tx, run.id, session);
 			const control = specialistControl(
 				set,
 				documentTools(set, document?.outlined ?? false),
+				hostEvent !== null,
 			);
 			return {
 				status: "ready",
 				input: {
+					...(hostEvent !== null ? { observation: true as const } : {}),
 					runId: run.id,
 					revision: (byId(tx, run.id) as Run).revision,
 					sessionId: session.id,
@@ -221,15 +249,10 @@ export function createSpecialistTurnHandler(
 					control,
 					messages: specialistTurnMessages({
 						system: agentSystemMessage(control),
-						utterance: input.message.text,
+						utterance:
+							hostEvent !== null ? HOST_EVENT_NOTICE : input.message.text,
 						course: sessionCourse(deps, tx, session, run, policy),
-						work: {
-							label: work.label,
-							dirty: work.dirty,
-							current: work.current,
-							...(work.context !== undefined ? { context: work.context } : {}),
-							savedRef: work.savedRef,
-						},
+						work: observedWork(work, hostEvent),
 						viewing: viewedSpecialistTarget(deps, tx, run),
 						nowMs: Date.parse(clock()),
 						callsLeft: policy.maxModelCalls,
@@ -363,8 +386,10 @@ export function createSpecialistTurnHandler(
 			} catch {
 				action = null;
 			}
-			if (!action) {
-				const violations = specialistViolations(value);
+			if (!action || (input.observation && action.kind !== "reply")) {
+				const violations = action
+					? [{ path: "action", code: "host_event_reply_only" }]
+					: specialistViolations(value);
 				log.warn("dialogue.specialist_output_rejected", {
 					reason: "invalid_contract",
 					repairAttempt: repaired ? 1 : 0,

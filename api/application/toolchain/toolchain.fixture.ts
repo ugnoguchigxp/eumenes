@@ -1,10 +1,10 @@
+import { collaborationInstructions } from "eumenes-collaboration";
 import { createContinuityService } from "../../domains/continuity";
 import { createAnalysisFactory } from "../media/analysis";
 import { reportShellRuns } from "../shell/shell-reports";
 import { createDotsHarness } from "../work/dots-harness.fixture";
 
 import { createMemoryService } from "../../domains/memory";
-import { createPipelinesService } from "../pipelines/pipelines-service";
 import { dormantBundleFile } from "../../domains/capabilities";
 import { bundleHostOf } from "./toolchain-adapters";
 import { computeAnnouncements } from "../compute/compute-composition";
@@ -279,6 +279,13 @@ export async function harness(options: HarnessOptions = {}) {
 					confidence: 0.99,
 				});
 			const system = messages[0]!.content;
+			if (
+				options.specialist &&
+				system.includes(collaborationInstructions.rules)
+			) {
+				const value = await options.specialist(messages, _signal, callOptions);
+				return typeof value === "string" ? value : JSON.stringify(value);
+			}
 			// The default fixture declines operations on the prose-only route review.
 			const question = messages
 				.filter((m) => m.role === "user")
@@ -356,17 +363,10 @@ export async function harness(options: HarnessOptions = {}) {
 				]);
 				return "";
 			}
-			if (
-				callOptions?.tools?.some((t) => t.function.name === "extract_value")
-			) {
-				callOptions.onToolCalls!([
-					{
-						id: crypto.randomUUID(),
-						name: "extract_value",
-						arguments: JSON.stringify({ value: options.extract?.(messages) }),
-					},
-				]);
-				return "";
+			if (options.compose && !callOptions?.tools?.length) {
+				const packet = JSON.parse(question);
+				if (Array.isArray(packet.cards) && "providedMaterials" in packet)
+					return JSON.stringify(options.compose(messages));
 			}
 			if (system.includes("あなたはこのツールチェーンの操作担当です")) {
 				commandContexts.push(JSON.stringify(messages));
@@ -770,6 +770,9 @@ export async function harness(options: HarnessOptions = {}) {
 			: { issues: [] };
 		if (registered.issues.length) throw new Error("dormant_bundle_rejected");
 		configureTaskExecution({
+			collaboration: toolchain.collaboration,
+			interact: browser?.interact,
+			memory,
 			queue,
 			childOperations: toolchain.childOperations,
 			store,
@@ -788,14 +791,6 @@ export async function harness(options: HarnessOptions = {}) {
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	if (terminals) reportFinishedTasks(terminals, dialogue);
 	if (shell) reportShellRuns(shell, dialogue);
-	const pipelines = createPipelinesService({
-		store,
-		capabilities: toolchain.capabilities,
-		registry: toolchain.registry,
-		routing,
-		schemas: toolchain.schemas,
-	});
-	toolchain.attachPipelines(pipelines);
 	const app = createApp({
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
@@ -824,7 +819,6 @@ export async function harness(options: HarnessOptions = {}) {
 			toolchainHistory: toolchain.history,
 			toolchainActions: toolchain.actionRequests,
 			...toolchain,
-			pipelines,
 		}),
 	});
 	toolchain.agents.start();
@@ -860,7 +854,6 @@ export async function harness(options: HarnessOptions = {}) {
 		conversation,
 		toolchain,
 		routing,
-		pipelines,
 		timers,
 		scheduler,
 		queue,

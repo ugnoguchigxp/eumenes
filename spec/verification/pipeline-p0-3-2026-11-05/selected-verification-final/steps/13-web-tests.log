@@ -1,0 +1,11 @@
+
+ RUN  v4.1.8 /private/tmp/eumenes-pipeline-host-verify-20261105
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  6 passed (6)
+      Tests  32 passed (32)
+   Start at  23:38:02
+   Duration  4.50s (transform 2.15s, setup 204ms, import 6.11s, tests 1.22s, environment 5.58s)
+

@@ -1,0 +1,16 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/toolchain/task-execution-browser.test.ts:
+(pass) one public request searches, passes the exact result URL to a browser child, opens a new tab and confirms playback from the next observation [980.56ms]
+(pass) a browser approval resumes in a new physical task, keeps the old deadline, and commits the approved operation exactly once [717.01ms]
+
+api/application/pipelines/pipeline-execution.test.ts:
+(pass) conversation selects the imported planner and two actual timer commands complete under one pipeline TODO [502.63ms]
+
+api/application/pipelines/vendor.test.ts:
+(pass) pipeline archive, manifest, lock and installed runtime agree [1.02ms]
+
+ 4 pass
+ 0 fail
+ 50 expect() calls
+Ran 4 tests across 3 files. [2.61s]

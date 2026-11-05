@@ -1,0 +1,2 @@
+$ s11tnext build --release-profile application
+Built /Users/y.noguchi/Code/eumenes/verification-reports/pipeline-owned-snapshot-20261105/.s11tnext/catalog.json and /Users/y.noguchi/Code/eumenes/verification-reports/pipeline-owned-snapshot-20261105/.s11tnext/catalog.generated.ts (sha256:dbedda4d37444b3d9e5b9515d49611be1267b53407c57b09738386dead8c72de).

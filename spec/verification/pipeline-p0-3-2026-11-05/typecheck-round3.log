@@ -1,0 +1,23 @@
+api/domains/collaboration/service/work.ts(55,3): error TS2322: Type 'Authority | null' is not assignable to type 'Authority'.
+  Type 'null' is not assignable to type 'Authority'.
+api/domains/collaboration/service/work.ts(71,34): error TS18047: 'answer' is possibly 'null'.
+api/domains/collaboration/service/work.ts(75,83): error TS2322: Type 'Source | null' is not assignable to type 'Source'.
+  Type 'null' is not assignable to type 'Source'.
+api/domains/collaboration/service/work.ts(75,116): error TS2339: Property 'value' does not exist on type 'Check'.
+  Property 'value' does not exist on type '{ ok: false; issues: Issue[]; }'.
+api/domains/collaboration/service/work.ts(85,79): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+api/domains/collaboration/service/work.ts(88,7): error TS18047: 'user' is possibly 'null'.
+api/domains/collaboration/service/work.ts(89,54): error TS2345: Argument of type 'Source | null' is not assignable to parameter of type 'Source'.
+  Type 'null' is not assignable to type 'Source'.
+api/domains/collaboration/service/work.ts(137,13): error TS2339: Property 'request' does not exist on type 'Source | null'.
+api/domains/collaboration/service/work.ts(157,161): error TS2339: Property 'value' does not exist on type 'Check'.
+  Property 'value' does not exist on type '{ ok: false; issues: Issue[]; }'.
+api/domains/dialogue/service/execution-command.ts(60,15): error TS2339: Property 'materials' does not exist on type 'ChildExecution'.
+api/domains/dialogue/service/execution-command.ts(60,54): error TS2339: Property 'materials' does not exist on type 'ChildExecution'.
+api/domains/dialogue/service/specialist-memory.ts(93,27): error TS2339: Property 'sourceKind' does not exist on type '{ id: string; status: string; error: string | null; inputMessageId: string; answerMessageId: string | null; updatedAt: string; }'.
+Found 12 errors in 3 files, checked 2,836 files [501.30ms]
+
+  9  api/domains/collaboration/service/work.ts:55
+  2  api/domains/dialogue/service/execution-command.ts:60
+  1  api/domains/dialogue/service/specialist-memory.ts:93

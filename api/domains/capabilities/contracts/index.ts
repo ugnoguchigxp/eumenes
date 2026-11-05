@@ -5,6 +5,8 @@ export { recognitionCommand };
 import { drawingRequest, drawingPlan } from "./excalidraw";
 export { drawingRequest, drawingPlan };
 import { z } from "zod";
+import { collaborationInputs } from "./collaboration";
+export { collaborationInputs } from "./collaboration";
 import { guidedResearchInput } from "./guided-research";
 import {
 	uiCompositionDelete,
@@ -16,11 +18,6 @@ import {
 	uiWorkStep,
 } from "./ui-compositions";
 import { claudeCodeRequest } from "./claude-code";
-import {
-	pipelineSourceApply,
-	pipelineTargetRef,
-	pipelineWorkStep,
-} from "./pipelines";
 import {
 	kanbanSharedAdd,
 	kanbanExecutorRef,
@@ -224,6 +221,7 @@ export {
 	dotsWorkStopV1,
 } from "./dots-work";
 export const validators = {
+	...collaborationInputs,
 	browserInteractStart,
 	browserInteractTarget,
 	browserInteractAnswer,
@@ -272,9 +270,6 @@ export const validators = {
 	uiWorkSave,
 	uiCompositionDelete,
 	uiTargetRef,
-	pipelineSourceApply,
-	pipelineWorkStep,
-	pipelineTargetRef,
 	uiResponseFields,
 	uiSubmitRequest,
 	recognitionManageV2,
@@ -458,5 +453,4 @@ export * from "./bindings";
 export * from "./requirements";
 export * from "./runtime-meta";
 export * from "./toolchains";
-export * from "./pipelines";
 export * from "./resource-kinds";

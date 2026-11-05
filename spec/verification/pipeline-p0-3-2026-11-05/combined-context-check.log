@@ -1,0 +1,2 @@
+$ s11tnext build --check --release-profile application
+Generated outputs are current (sha256:34e004db878f209e25d2a381959b9c94d83168746451ab260c599dfcd6b24d3c).

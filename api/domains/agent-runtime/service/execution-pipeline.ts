@@ -1,13 +1,12 @@
 import type { Database } from "bun:sqlite";
+import type { AuthoringOutcome } from "eumenes-pipeline";
 import { hash } from "../../capabilities";
-import {
-	expand,
-	expandValue,
-	resolvePipelineMaterials,
-	startInputs,
-	stepFault,
-} from "../../pipelines";
-import type { ChildResult, ExecutionSource } from "../../tool-runtime";
+import { checkPipelineDefinition, CONTRACT_VERSION } from "../../pipelines";
+import type {
+	ChildResult,
+	ExecutionSource,
+	ExecutionReference,
+} from "../../tool-runtime";
 import {
 	executionRow,
 	executionSource,
@@ -15,37 +14,17 @@ import {
 	type ExecutionRow,
 	type ParentState,
 } from "../repository/executions";
-import { PIPELINE_EXTRACT, type ExecutionContext } from "./execution-context";
+import type { ExecutionContext } from "./execution-context";
 import type { ExecutionOps } from "./execution-store";
 
-type Pipeline = NonNullable<ParentState["pipeline"]>;
-
-/**
- * A task pipeline's run on the parent execution (spec task-pipeline-design 2026-10-22 §13.4). The host takes the
- * steps in order: a toolchain step is a child of the run, an extract step one inference of its own. A step that
- * does not pass stops the run with what was done so far. Meaning is never judged here.
- */
+/** Adapt the imported plan to the existing parent/child lifecycle, without another execution loop. */
 export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
-	const { now } = ctx;
-	const titles = (p: Pipeline, from: number, to = p.definition.steps.length) =>
-		p.definition.steps
-			.slice(from, to)
-			.filter((s) => s.kind === "toolchain")
-			.map((s) => s.title);
-	const summaries = (p: Pipeline) =>
-		p.definition.steps
-			.slice(0, p.cursor)
-			.flatMap((s) => {
-				const v = p.values[s.id];
-				return s.kind === "toolchain" && v?.summary
-					? [`${s.title}: ${v.summary}`]
-					: [];
-			})
-			.join("\n")
-			.slice(0, 2000);
-	const refs = (state: ParentState) =>
-		[...new Set(state.notes.flatMap((n) => n.refs))].slice(0, 8);
-
+	function selected(state: ParentState) {
+		const p = state.pipeline!;
+		return (p.executionPlan?.output.from ?? []).flatMap((id) =>
+			p.results[id] ? [p.results[id]!] : [],
+		);
+	}
 	function stop(
 		db: Database,
 		row: ExecutionRow,
@@ -54,150 +33,175 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 	) {
 		const p = state.pipeline!;
 		ops.finish(db, row, state, "partial", {
-			summary: summaries(p) || code,
-			fulfilled: titles(p, 0, p.cursor),
-			missing: titles(p, p.cursor),
-			refs: refs(state),
+			summary: code,
+			fulfilled:
+				p.definition?.steps
+					.slice(0, p.cursor)
+					.map((s) => s.task.slice(0, 200)) ?? [],
+			missing: p.definition?.steps
+				.slice(p.cursor)
+				.map((s) => s.task.slice(0, 200)) ?? [code],
+			refs: [],
 			code,
 		});
 	}
-	function complete(db: Database, row: ExecutionRow, state: ParentState) {
-		const p = state.pipeline!;
-		let summary = summaries(p);
-		if (p.definition.answer)
-			try {
-				summary = expand(p.definition.answer, {
-					inputs: p.inputs,
-					steps: p.values,
-				});
-			} catch {
-				// The answer's template names a value no step gave: the steps' own results stand for it.
-			}
-		ops.finish(db, row, state, "completed", {
-			summary: summary.slice(0, 2000) || p.definition.title,
-			fulfilled: titles(p, 0),
-			missing: [],
-			refs: refs(state),
-		});
-	}
-	/** The step at the cursor: a child for a toolchain step, the extract job for an extract step, or the end. */
 	function next(db: Database, row: ExecutionRow, state: ParentState) {
-		const p = state.pipeline!;
-		const step = p.definition.steps[p.cursor];
-		if (!step) return complete(db, row, state);
-		if (step.kind === "extract")
-			return ops.enqueue(db, row, state, false, PIPELINE_EXTRACT);
-		const chain = ctx
-			.port()
-			.stepToolchainInTransaction?.(db, step.toolchain, executionSource(row));
-		if (!chain) return stop(db, row, state, "pipeline_toolchain_unavailable");
-		const scope = { inputs: p.inputs, steps: p.values };
-		let request: string;
-		let args: Record<string, unknown> | undefined;
-		let materials: import("../../tool-runtime").ChildExecution["materials"];
-		try {
-			materials = resolvePipelineMaterials(
-				p.definition,
-				step.materials,
-				scope,
-				executionSource(row).request,
+		const p = state.pipeline!,
+			plan = p.executionPlan;
+		if (!plan) return ops.enqueue(db, row, state);
+		const step = plan.steps[p.cursor];
+		if (!step) {
+			const outputs = selected(state);
+			const ids = new Set(
+				plan.output.from.map((id) => p.children[id]).filter(Boolean),
 			);
-			request = expand(step.request, scope).slice(0, 8000);
-			args = step.arguments
-				? Object.fromEntries(
-						Object.entries(step.arguments).map(([k, v]) => [
-							k,
-							expandValue(v, scope),
-						]),
-					)
-				: undefined;
-		} catch (error) {
-			const code =
-				error instanceof Error &&
-				["pipeline_material_missing", "pipeline_material_capacity"].includes(
-					error.message,
-				)
-					? error.message
-					: "pipeline_reference_missing";
-			return stop(db, row, state, code);
+			return ops.finish(db, row, state, "completed", {
+				summary: [
+					...outputs.map((r) => r.summary),
+					`配送: ${plan.output.deliver}`,
+				]
+					.join("\n")
+					.slice(0, 2000),
+				fulfilled: plan.steps.map((s) => s.task.slice(0, 200)),
+				missing: [],
+				refs: state.notes.filter((n) => ids.has(n.id)).flatMap((n) => n.refs),
+				links: [...new Set(outputs.flatMap((r) => r.links ?? []))],
+			});
 		}
-		const used = new Set(
-			(step.uses ?? []).map((id) => `result:${p.children[id]}`),
-		);
+		const current = ctx
+			.port()
+			.stepToolchainInTransaction?.(db, step.entry, executionSource(row));
+		if (current !== step.revisionId)
+			return stop(db, row, state, "pipeline_component_changed");
+		const refs: ExecutionReference[] = [];
+		for (const from of step.from) {
+			if (from === "request") {
+				refs.push(...state.refs.filter((r) => p.initialRefs.includes(r.ref)));
+				continue;
+			}
+			const child = p.children[from],
+				result = p.results[from];
+			if (!child || result?.state !== "completed")
+				return stop(db, row, state, "pipeline_reference_missing");
+			const note = state.notes.find((n) => n.id === child);
+			if (!note) return stop(db, row, state, "pipeline_reference_missing");
+			refs.push(...state.refs.filter((r) => note.refs.includes(r.ref)));
+		}
 		const id = crypto.randomUUID();
-		p.children[step.id] = id;
+		p.children[step.stepId] = id;
 		try {
 			ops.launch(
 				db,
 				row,
 				state,
 				{
-					chainRevisionId: chain,
-					request,
-					...(args ? { arguments: args } : {}),
-					...(materials?.length ? { materials } : {}),
-					refs: state.refs.filter((r) => used.has(r.ref)),
+					chainRevisionId: step.revisionId,
+					request: `${step.task}\n期待する結果: ${step.expectedResult}`,
+					...(step.arguments !== undefined
+						? { arguments: step.arguments }
+						: {}),
+					refs: [...new Map(refs.map((r) => [r.ref, r])).values()],
 				},
 				id,
 			);
 		} catch (error) {
 			if (
-				error instanceof Error &&
-				error.message === "execution_input_capacity"
+				!(error instanceof Error) ||
+				error.message !== "execution_input_capacity"
 			)
-				return stop(db, row, state, "execution_input_capacity");
-			throw error;
+				throw error;
+			delete p.children[step.stepId];
+			stop(db, row, state, error.message);
 		}
 	}
-	/** A settled child: the step passes with its result, or the run stops. */
 	function advance(
 		db: Database,
 		row: ExecutionRow,
 		state: ParentState,
 		result: ChildResult,
 	) {
-		const p = state.pipeline!;
-		const step = p.definition.steps[p.cursor];
-		if (step?.kind !== "toolchain")
-			return stop(db, row, state, "pipeline_step_mismatch");
-		const fault = stepFault(step, result);
-		if (fault) return stop(db, row, state, fault);
-		p.values[step.id] = { summary: result.summary, output: result.output };
-		p.cursor++;
-		next(db, row, state);
-	}
-	/** An extract step's checked value. */
-	function extracted(
-		db: Database,
-		row: ExecutionRow,
-		state: ParentState,
-		value: unknown,
-	) {
-		const p = state.pipeline!;
-		const step = p.definition.steps[p.cursor]!;
-		p.values[step.id] = { value };
-		p.correction = undefined;
+		const p = state.pipeline!,
+			step = p.executionPlan?.steps[p.cursor];
+		if (!step) return stop(db, row, state, "pipeline_step_mismatch");
+		if (result.state !== "completed")
+			return stop(
+				db,
+				row,
+				state,
+				result.code ?? `pipeline_child_${result.state}`,
+			);
+		p.results[step.stepId] = result;
 		p.cursor++;
 		next(db, row, state);
 	}
 	ops.setAdvance(advance);
-
+	function composed(
+		db: Database,
+		row: ExecutionRow,
+		state: ParentState,
+		outcome: AuthoringOutcome,
+	) {
+		const p = state.pipeline!;
+		if (outcome.status === "needs_input")
+			return ops.question(db, row, state, outcome.questions.join("\n"));
+		if (outcome.status === "unsupported")
+			return ops.finish(db, row, state, "partial", {
+				summary: outcome.reasons.join("\n").slice(0, 2000),
+				fulfilled: [],
+				missing: outcome.reasons,
+				refs: [],
+				code: "pipeline_unsupported",
+			});
+		const checked = checkPipelineDefinition(
+			outcome.definition,
+			p.catalog,
+			executionSource(row).request,
+		);
+		if (!checked.ok) throw new Error("pipeline_definition_invalid");
+		p.definition = checked.definition;
+		p.executionPlan = checked.plan;
+		p.correction = undefined;
+		next(db, row, state);
+	}
 	function startPipelineInTransaction(
 		db: Database,
 		input: {
 			source: ExecutionSource;
 			toolchainRevisionId: string;
-			inputs: Record<string, unknown>;
+			references?: ExecutionReference[];
+			/** A collaborative draft already reviewed by the user. Revalidated against the current catalog. */
+			definition?: unknown;
+			requestId?: string;
 		},
 	) {
-		const published = ctx
+		const control = ctx
 			.port()
 			.pipelineInTransaction?.(db, input.toolchainRevisionId);
-		if (!published) throw new Error("pipeline_unavailable");
-		if (!ctx.port().validSourceInTransaction(db, input.source))
+		if (!control) throw new Error("pipeline_unavailable");
+		if (
+			!ctx.port().validSourceInTransaction(db, input.source) ||
+			input.source.request.length > 8000 ||
+			!input.source.request.length
+		)
 			throw new Error("execution_source_invalid");
-		const key = `pipeline:${input.source.messageId}:${input.source.digest}`;
-		const digest = hash(input);
+		const refs = input.references ?? [];
+		if (
+			refs.length > 32 ||
+			refs.some(
+				(r) => !ctx.port().validReferenceInTransaction(db, input.source, r),
+			)
+		)
+			throw new Error("execution_reference_invalid");
+		if (
+			input.definition !== undefined &&
+			(!input.requestId || !input.source.specialistSessionId)
+		)
+			throw new Error("pipeline_authored_source_required");
+		const key =
+				input.definition !== undefined
+					? `pipeline-authored:${input.source.specialistSessionId}:${input.requestId}`
+					: `pipeline:${input.source.messageId}:${input.source.digest}`,
+			digest = hash(input);
 		const prior = db
 			.query("SELECT * FROM agent_executions WHERE start_key=?")
 			.get(key) as ExecutionRow | null;
@@ -210,21 +214,22 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 			.query(
 				"SELECT conversation_id FROM agent_executions WHERE state IN ('queued','deciding','waiting_child','waiting_user')",
 			)
-			.all() as Array<{ conversation_id: string }>;
+			.all() as { conversation_id: string }[];
 		if (
 			active.length >= 32 ||
 			active.filter((r) => r.conversation_id === input.source.conversationId)
 				.length >= 4
 		)
 			throw new Error("execution_capacity");
-		const { tests: _, ...definition } = published.definition;
-		const steps = definition.steps.filter((s) => s.kind === "toolchain").length;
-		const extracts = definition.steps.length - steps;
+		const catalog = ctx.port().pipelineCatalogInTransaction?.(db, input.source);
+		if (!catalog) throw new Error("pipeline_unavailable");
+		if (new TextEncoder().encode(JSON.stringify(catalog)).length > 128000)
+			throw new Error("pipeline_catalog_capacity");
 		const id = crypto.randomUUID();
 		const state: ParentState = {
 			version: 1,
-			bindingRevisionId: published.bindingRevisionId,
-			instructions: "",
+			bindingRevisionId: control.bindingRevisionId,
+			instructions: control.instructions,
 			calls: 0,
 			consumed: 0,
 			searches: 0,
@@ -234,26 +239,34 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 			selecting: false,
 			offered: [],
 			retained: [],
-			refs: [],
+			refs: [...refs],
 			notes: [],
 			pending: null,
 			question: null,
-			// Each extract may take its one repair; each child may take the most a child is allotted.
-			limits: {
-				parentCalls: extracts * 2 + 1,
-				childCalls: steps,
-				searches: 0,
-				modelCalls: steps * 12 + extracts * 2 + 1,
-			},
+			limits: { parentCalls: 5, childCalls: 8, searches: 0, modelCalls: 101 },
 			pipeline: {
+				contractVersion: CONTRACT_VERSION,
 				toolchainRevisionId: input.toolchainRevisionId,
-				definition,
-				inputs: startInputs(published.definition, input.inputs),
-				values: {},
+				catalog,
+				initialRefs: refs.map((r) => r.ref),
+				definition: null,
+				executionPlan: null,
 				cursor: 0,
 				children: {},
+				results: {},
+				repaired: false,
 			},
 		};
+		if (input.definition !== undefined) {
+			const checked = checkPipelineDefinition(
+				input.definition,
+				catalog,
+				input.source.request,
+			);
+			if (!checked.ok) throw new Error("pipeline_definition_invalid");
+			state.pipeline!.definition = checked.definition;
+			state.pipeline!.executionPlan = checked.plan;
+		}
 		db.query(
 			"INSERT INTO agent_executions(id,start_key,input_digest,conversation_id,source_json,request,state,state_json,deadline,created_at,updated_at) VALUES(?,?,?,?,?,?,'queued',?,?,?,?)",
 		).run(
@@ -262,15 +275,22 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 			digest,
 			input.source.conversationId,
 			JSON.stringify(input.source),
-			definition.title,
+			input.source.request,
 			JSON.stringify(state),
-			now() + published.runMs,
-			now(),
-			now(),
+			ctx.now() + control.runMs,
+			ctx.now(),
+			ctx.now(),
 		);
-		next(db, executionRow(db, id)!, state);
+		for (const ref of refs)
+			db.query("INSERT INTO agent_execution_refs VALUES(?,?,?)").run(
+				id,
+				ref.ref,
+				JSON.stringify(ref),
+			);
+		if (state.pipeline!.executionPlan) next(db, executionRow(db, id)!, state);
+		else ops.enqueue(db, executionRow(db, id)!, state);
 		return executionView(executionRow(db, id)!);
 	}
-	return { startPipelineInTransaction, extracted, stop };
+	return { startPipelineInTransaction, composed, stop };
 }
 export type ExecutionPipeline = ReturnType<typeof executionPipeline>;

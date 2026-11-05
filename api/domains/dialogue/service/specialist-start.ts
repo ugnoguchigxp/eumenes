@@ -43,7 +43,7 @@ export type SessionStart = {
 };
 
 /** Queue the specialist's turn; a toolchain with its own run time gets it from here. */
-function enqueueTurn(
+export function enqueueTurn(
 	deps: DialogueDeps,
 	tx: Database,
 	handed: Run,
@@ -51,6 +51,7 @@ function enqueueTurn(
 	sessionId: string,
 	epoch: number,
 	request: string,
+	recordHandover = true,
 ) {
 	const run = extendRunForToolchain(deps, tx, handed, set);
 	const { job } = deps.queue.enqueueInTransaction(tx, {
@@ -67,12 +68,13 @@ function enqueueTurn(
 	});
 	linkAnswer(tx, run.id, job.id);
 	// The hand-over's request stays in the session record even when this turn fails.
-	insertSessionEvent(
-		tx,
-		sessionId,
-		{ kind: "handover", runId: run.id, request: request.slice(0, 8000) },
-		deps.clock(),
-	);
+	if (recordHandover)
+		insertSessionEvent(
+			tx,
+			sessionId,
+			{ kind: "handover", runId: run.id, request: request.slice(0, 8000) },
+			deps.clock(),
+		);
 }
 
 /** The main agent asks the user whether to drop the unsaved work: the switch has not happened. */
@@ -107,13 +109,13 @@ function addressTurn(
 	run: Run,
 	session: SessionRecord,
 ) {
+	setRunSession(tx, run.id, session.id);
 	deps.specialist!.beginTurnInTransaction(
 		tx,
 		session.adapterRef,
 		session.workRef,
 		run.id,
 	);
-	setRunSession(tx, run.id, session.id);
 	blockSpecialistMessages(deps, tx, run.conversationId, [run.inputMessageId]);
 	patchSession(tx, session.id, { activeRunId: run.id }, deps.clock());
 }

@@ -1,0 +1,12 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/capabilities/test/pipeline-bundle.test.ts:
+(pass) seed installs p0-3 idempotently, preserves an old binding body, and refuses its execution contract [153.91ms]
+
+api/application/pipelines/vendor.test.ts:
+(pass) pipeline archive, manifest, lock and installed runtime agree [2.91ms]
+
+ 2 pass
+ 0 fail
+ 14 expect() calls
+Ran 2 tests across 2 files. [240.00ms]

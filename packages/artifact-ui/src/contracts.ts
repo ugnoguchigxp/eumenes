@@ -31,7 +31,6 @@ import type { Model3dWorkspaceResource } from "./model3d-components";
 import type { BrowserWorkspaceResource } from "./browser-components";
 import type { MusicResource, GenerationResource } from "./media-contracts";
 import type { UiStudioResource } from "./ui-studio-contracts";
-import type { PipelineStudioResource } from "./pipeline-studio-contracts";
 import type {
 	SettingsSectionResource,
 	SettingsNavigationResource,
@@ -362,7 +361,6 @@ export type Resource =
 	| CollectionResource
 	| FormResource
 	| UiStudioResource
-	| PipelineStudioResource
 	| MemoryResource
 	| SettingsResource
 	| { kind: "components"; revision: number; example?: string };

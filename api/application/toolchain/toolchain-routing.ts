@@ -19,7 +19,6 @@ import type {
 import type { AdapterRegistry } from "../../domains/tool-runtime";
 import type { SchemaProvider } from "./toolchain-adapters";
 import { createInstantRouting } from "./toolchain-instant";
-import { createPipelineRouting } from "./toolchain-pipeline";
 
 /**
  * Dialogue's view of the toolchain registry and selection history. Retrieval uses
@@ -83,10 +82,9 @@ export function createToolchainRouting(
 			return !!runtime && (!runtime.binding || runtime.binding.available);
 		},
 	});
-	const pipelines = createPipelineRouting({ capabilities, registry });
-	/** The card with what its execution adds: an instant toolchain's arguments, a pipeline's inputs. */
+	/** The card with the instant execution's typed arguments. */
 	const enrich = (db: Database, card: Parameters<typeof instant.card>[1]) =>
-		instant.card(db, card).flatMap((c) => pipelines.card(db, c));
+		instant.card(db, card);
 	const bound: BoundCommandPort = {
 		snapshotInTransaction: (db, bindingRevisionId, context) =>
 			adapterOf(db, bindingRevisionId).snapshotInTransaction(db, context),

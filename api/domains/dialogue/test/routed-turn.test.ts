@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import type { ToolchainCard } from "../../capabilities";
 import { IMAGE, INSTANT, setup, type Harness } from "./generation.fixture";
 import { saveItem } from "./memory-seed";
+import { fillSchema } from "../service/routed-choice";
 
 /**
  * The local harness's routed turn (spec router-package-integration 2026-11-04): the router (the eumenes_router package;
@@ -80,7 +81,7 @@ test("a talk that tells the user who spoke nothing gets the host's words; each c
 	]);
 });
 
-test("a pipeline is handed the user's words as its request: its branch has inputs and no request of its own", async () => {
+test("a pipeline uses the request branch and has no legacy template input contract", async () => {
 	const pipeline: ToolchainCard = {
 		...IMAGE,
 		revisionId: "toolchain:fake.pipeline@1",
@@ -88,32 +89,28 @@ test("a pipeline is handed the user's words as its request: its branch has input
 		functionName: "fake_pipeline",
 		title: "手順",
 		execution: "pipeline",
-		pipeline: {
-			parameters: {
-				type: "object",
-				properties: { topic: { type: "string" } },
-				required: ["topic"],
-			},
-			outline: "調べる→曲",
-			parse: (args) => ({ ok: true, value: args }),
-		},
 	};
 	h = await setup({ cards: [pipeline, INSTANT] });
-	h.state.steps.push(choice({ choice: pipeline.id, inputs: { topic: "雨" } }));
+	h.state.steps.push(
+		choice({
+			choice: pipeline.id,
+			request: "雨の曲の手順を進めて",
+			say: "手順を進めます。",
+		}),
+	);
 	const run = await h.say("雨の曲の手順を進めて");
-	// The fill's branch of a pipeline has its inputs and no request of its own.
-	const branch = (
-		h.state.calls[0]!.session!.outputSchema as {
-			anyOf: Array<{ properties: Record<string, { enum?: string[] }> }>;
-		}
-	).anyOf.find((b) => b.properties.choice?.enum?.[0] === pipeline.id)!;
-	expect(Object.keys(branch.properties)).toContain("inputs");
-	expect(Object.keys(branch.properties)).not.toContain("request");
-	// The hand-over went past the argument check (this fixture runs no pipelines): the host says it could not.
+	expect(h.state.calls).toHaveLength(0);
+	const schema = fillSchema(pipeline, { resources: [], switching: null }) as {
+		anyOf: Array<{ properties: Record<string, { enum?: string[] }> }>;
+	};
+	const branch = schema.anyOf.find(
+		(b) => b.properties.choice?.enum?.[0] === pipeline.id,
+	)!;
+	expect(Object.keys(branch.properties)).toContain("request");
+	expect(Object.keys(branch.properties)).not.toContain("inputs");
 	expect(h.dialogue.answerText(run.id)).toBe(
 		"うまく頼めませんでした。もう一度言ってもらえますか。",
 	);
-	expect(h.state.calls).toHaveLength(1);
 });
 
 test("no candidate fits: the talk turn answers with only the read tools, on a system that names no toolchain and the time alone of the state", async () => {

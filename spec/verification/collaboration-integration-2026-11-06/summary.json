@@ -1,0 +1,324 @@
+{
+	"date": "2026-11-06",
+	"status": "implemented_and_fixture_verified; running-server acceptance pending",
+	"baseCommit": "e917e920f7b252c6f70a07dda1a119b0a2516bfc",
+	"snapshotDigest": "3fee9717d2abc4bba5e1e8e399dfafed57c31d5c75d84d866e7432ff821b9a54",
+	"snapshotManifest": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-05/candidate-v2-r8-manifest.json",
+	"package": {
+		"package": "eumenes-collaboration",
+		"version": "0.2.0",
+		"archive": "eumenes-collaboration-0.2.0-b407ecd8372b.tgz",
+		"archiveSha256": "52a7041f47cfafa148db132144d82a0f436c19bb9de4aedca6761b1e846fabbd",
+		"sourceRepository": "eumenes_collaboration",
+		"sourceCommit": "b407ecd8372b2718f05c23a2340e0483833a0296",
+		"sourceTreeDigest": "59e7a1d0cbd7aa3230ee62d6002e86b131bcdd3e183c75429e739e9dc89da308",
+		"coreContractVersion": 1,
+		"supportedStateSchemaVersions": [
+			1
+		],
+		"integration": "Existing session runtime consumes the public action contract, shared instructions and message builder. State proposals, planning helpers, example stores and external ports are not installed as a second host runtime."
+	},
+	"checks": [
+		{
+			"scope": "r4 broad backend regression including browser, before command-source fix",
+			"passed": 1228,
+			"failed": 1,
+			"assertions": 9302,
+			"files": 182,
+			"failure": "browser driver readText added by parallel interact work; exact driver-key test expects old list"
+		},
+		{
+			"scope": "r5 dialogue/capabilities/collaboration/ui-compositions and existing UI specialist integration",
+			"passed": 649,
+			"failed": 0,
+			"assertions": 5109,
+			"files": 98
+		},
+		{
+			"scope": "r7 final collaboration, privacy/forget, notice, legacy command/browser/media execution integration",
+			"passed": 27,
+			"failed": 0,
+			"assertions": 252,
+			"files": 12
+		},
+		{
+			"scope": "web integration",
+			"passed": 34,
+			"failed": 0,
+			"files": 3
+		},
+		{
+			"scope": "r7 complete typecheck",
+			"passed": true,
+			"files": 2881
+		},
+		{
+			"scope": "r7 own static checks",
+			"result": {
+				"files": 41,
+				"results": [
+					{
+						"name": "format",
+						"exitCode": 0
+					},
+					{
+						"name": "lint",
+						"exitCode": 0
+					},
+					{
+						"name": "size",
+						"exitCode": 0
+					},
+					{
+						"name": "context",
+						"exitCode": 0
+					},
+					{
+						"name": "bundle",
+						"exitCode": 0
+					}
+				]
+			}
+		},
+		{
+			"scope": "r6 full web build, before forget-only r7 change",
+			"passed": true
+		},
+		{
+			"scope": "required domain verify",
+			"passed": false,
+			"reason": "shared-worktree format failures outside this task; broad browser size/API expectation also pending",
+			"logs": [
+				"candidate-v2-r2-verify.log",
+				"candidate-v2-r3-verify.log",
+				"candidate-v2-r5-verify.log"
+			]
+		},
+		{
+			"scope": "production ArtifactRenderer and DesignSystem in desktop/mobile Chromium; no HTTP server",
+			"passed": true,
+			"result": {
+				"serverStarted": false,
+				"realExternalOperation": false,
+				"source": "Authenticated in-process API replay of recorded live actions; production ArtifactRenderer and DesignSystem; saved live UI definition",
+				"results": [
+					{
+						"label": "desktop",
+						"status": "started",
+						"errors": []
+					},
+					{
+						"label": "desktop",
+						"width": 1440,
+						"height": 1100,
+						"errors": [],
+						"overflow": false,
+						"departmentOptional": true,
+						"fieldEditable": true
+					},
+					{
+						"label": "mobile",
+						"status": "started",
+						"errors": []
+					},
+					{
+						"label": "mobile",
+						"width": 390,
+						"height": 844,
+						"errors": [],
+						"overflow": false,
+						"departmentOptional": true,
+						"fieldEditable": true
+					}
+				]
+			}
+		},
+		{
+			"scope": "r8 host observation labeling and specialist regression",
+			"passed": 36,
+			"failed": 0,
+			"assertions": 216,
+			"files": 8
+		},
+		{
+			"scope": "r8 final complete typecheck",
+			"passed": true,
+			"files": 2881
+		},
+		{
+			"scope": "r8 final own static checks",
+			"result": {
+				"files": 41,
+				"results": [
+					{
+						"name": "format",
+						"exitCode": 0
+					},
+					{
+						"name": "lint",
+						"exitCode": 0
+					},
+					{
+						"name": "size",
+						"exitCode": 0
+					},
+					{
+						"name": "context",
+						"exitCode": 0
+					},
+					{
+						"name": "bundle",
+						"exitCode": 0
+					}
+				]
+			}
+		},
+		{
+			"scope": "r9 required verify --domain collaboration",
+			"passed": true,
+			"steps": 12,
+			"outsideBoundaryWarnings": 5,
+			"notes": "Kanban dependencies outside this integration remain warnings; no whole-project success claimed"
+		},
+		{
+			"scope": "r9 previously failing browser driver suite after parallel fix",
+			"passed": 27,
+			"failed": 0,
+			"assertions": 160,
+			"files": 1
+		},
+		{
+			"scope": "current main global formatting/size checks after parallel updates",
+			"passed": true,
+			"formatFiles": 3905,
+			"sizeFiles": 2117
+		},
+		{
+			"scope": "full affected-domain verify after shared fixes",
+			"status": "not_run",
+			"reason": "Selected application tests include actual Bun.serve HTTP servers; explicit server permission is pending"
+		}
+	],
+	"live": {
+		"ledger": "/Users/y.noguchi/Code/eumenes_collaboration/reports/quality-2026-11-05/api-budget.sqlite",
+		"capUsd": 10,
+		"accountedUsd": 6.765742,
+		"integrationIncrementUsd": 0.497419,
+		"unknownReservationsRetained": true,
+		"parentSelection": "scripted, not live verified",
+		"operationTranslation": "scripted; actual timer domain",
+		"transport": "experimental scalar JSON wrapper for both providers; unchanged host validates action",
+		"results": [
+			{
+				"provider": "openai",
+				"scope": "UI create/edit/save/return",
+				"result": "passed",
+				"evidence": "live-current.json"
+			},
+			{
+				"provider": "openai",
+				"scope": "new pipeline create/edit/confirm/execute/report",
+				"result": "passed",
+				"evidence": "live-current-r4.json"
+			},
+			{
+				"provider": "anthropic",
+				"scope": "UI create/edit/save/return",
+				"result": "operations passed; return reply incorrectly described saved state",
+				"evidence": "live-current-r3.json"
+			},
+			{
+				"provider": "anthropic",
+				"scope": "new pipeline",
+				"result": "not accepted: repeated three-sentence reply violates unchanged host contract",
+				"evidence": "live-current-r3.json"
+			},
+			{
+				"provider": "openai",
+				"scope": "r8 real-model result report after replay of recorded real generation/edit/confirmation",
+				"result": "passed; actual persisted host observation; same session and child; 3 actual user inputs only; one new API call",
+				"answer": "二つのタイマーは開始済みで、結果は一つ目が20秒、二つ目が45秒です。",
+				"evidence": "live-resume-r8.json"
+			},
+			{
+				"provider": "openai",
+				"scope": "previous result-report trial",
+				"result": "protocol succeeded, but model misread original user text as a new request; fixed by explicit HOST_EVENT_NOTICE and no repeated current utterance",
+				"evidence": "live-resume.json"
+			}
+		]
+	},
+	"limits": [
+		"No running Eumenes server started/stopped/restarted",
+		"No product DB/settings/keys copied or changed",
+		"No CI used",
+		"No messages sent to other Codex chats",
+		"Interact conversation pilot remains disabled; synthetic lifecycle tested; real external browsing not tested",
+		"Changes not committed/pushed in host: shared uncommitted prerequisite work belongs to parallel tasks"
+	],
+	"ownCodeHashes": {
+		"api/application/toolchain/collaboration-package.test.ts": "5031305f167026433e1f062cac6ec27ee9d9a5e0b618ee4d9e83ca6c42083d70",
+		"api/application/toolchain/task-execution-port.ts": "5cc01cfc7358622ce324be036b3ca4586a5c38fa121b132c325da2c5e6360167",
+		"api/application/toolchain/task-execution-sources.ts": "ebc6fad22cca5f60033386bc8cae6a3ea6b21d75589063489f62778c875e9441",
+		"api/application/toolchain/toolchain-harness-options.fixture.ts": "d6bd7daa2e44d1ce0e679f10618437025d54c2b8a155f6c830b976eaae2ac9d1",
+		"api/application/toolchain/toolchain.fixture.ts": "18b0a8e64591230577d847018e0acf6525e04b435c0b9ad3147c781b023e45d3",
+		"api/domains/capabilities/contracts/collaboration.ts": "a752649a955c962c0ef08507a0e1374bf70d37984153b2b1c118f16a23731780",
+		"api/domains/dialogue/repository/specialist-observations.ts": "e7b12ba6fd912af69cef75e6552bfb867dd0b321c32354dd38d6bca359602f96",
+		"api/domains/dialogue/service/specialist-source.ts": "5682f8c979f744e4663df5101eb0aa4fd85dfdcffc0e4623cd120cc6792ddb47",
+		"api/domains/dialogue/service/specialist-notices.ts": "dd81bd75f081bd2b7d5057245d18edfb14dc71e3bd37d98a3fce4444450addf5",
+		"api/domains/dialogue/service/specialist-host.ts": "decf45f15118115487331dd0fa0b6f2fa370b9f2632c6e9bd88a673ac2e19526",
+		"api/domains/dialogue/service/specialist-prompt.ts": "48e88cbd9aa34656b4c9cd7a1ec65246dc5aef9359e30ea6913f37f2b3042150",
+		"api/domains/dialogue/service/specialist-memory.ts": "fd2cd627774b4f5e8e9666ed104da691e55a939d0eba93c27e730308599d7f54",
+		"api/domains/dialogue/service/specialist-turn.ts": "aaa4a66b42e514b68526adba709246de8a71549998c0c535291a40f72d76e879",
+		"api/domains/dialogue/service/specialist-settle.ts": "57b9a564cb705a36065a713b0274a37abb3b24081588750a490326cabfc7edd3",
+		"api/domains/dialogue/service/specialist-start.ts": "3329918e69338adaf6e318150feddf67e12c0a8e43c23749b7f5caa45a491cdd",
+		"api/domains/dialogue/service/execution-command.ts": "802b50a59039bf541a32fa8e1a05b9835a6c3eb997e5a24e61fb10c75ad2d8ba",
+		"api/domains/dialogue/test/collaboration-control.test.ts": "5bbf48074084f9ad71712a51b25cdfa240a9a59e65e59acd401d5eca0b28dca8",
+		"api/domains/dialogue/test/specialist-notices.test.ts": "52161c89121557bb0af4617c16b00066f564833f1a8fc0b33443a7f45cedf768",
+		"api/domains/memory/repository/source-revocations.ts": "6cd0607b5daea6038e88814a8babdbc2864597aa0017a9bc54b0c504260efafa",
+		"api/domains/memory/service/ledger.ts": "178b83df54c2f1d8570995dc025aee63e7fc64e67d37636b28b91b9d34288586",
+		"api/domains/memory/test/collaboration-source.test.ts": "b7504e3b198565efafc7690ece6f55c4927ad4b56d12bf6a23c2eb0f695dc98b",
+		"api/domains/agent-runtime/service/execution-pipeline.ts": "59c4cdd87495777074893a7545e7be60675b4837fe939a42d78e46b5523a1c8c",
+		"api/domains/agent-runtime/service/execution-commands.ts": "d4acebd2fd860ddd3c64475d82254a1f21ebd2c5a2b03fe95cb3c23df40ed4a0",
+		"api/domains/tool-runtime/contracts/task-execution.ts": "895448719cd2c77a062cffbbe20f724c1d5711f37bc21ba2fc063fde48d32240",
+		"web/src/workspace/collaboration-artifact.test.tsx": "f1cbc54340cb514c746acfb30c8bc0e2d81e4d3a897ee3cb8e250df72f479fcb",
+		"api/application/collaboration/collaboration-wiring.ts": "8985cb216cdd15c301ee5bcd8fd84d748e98dc83e63416b795015cedc1f9cbb7",
+		"api/application/collaboration/collaboration-adapter.ts": "374e8eac5135382769e56f71b714239e648e6b51fa7317b5ba8fddccf2a6c1b2",
+		"api/application/collaboration/collaboration-repair.test.ts": "0a2032ae116de41d4a5f27d84c1a8dd5b5a22a9fb9d736618135298248df9506",
+		"api/application/collaboration/collaboration-backends.ts": "0123d32099212cdb862e720e454d9dd5117c16b05986ca6ac0767100bea81d0f",
+		"api/application/collaboration/collaboration-interact.test.ts": "3fb9357bca9f6c0324b42eec4ef3166f3b821f263cba2bfab659079a1278a426",
+		"api/application/collaboration/collaboration-host.ts": "9ba7803c39e9c11f676ea4eb24759386e07d87cfb0f618f69224d20f113fbb1e",
+		"api/application/collaboration/collaboration-followup.ts": "70f6f9628cddc9e6ba82b8ac6e63eb724daf205e66496cc27240353dac64a534",
+		"api/application/collaboration/collaboration-pipeline.test.ts": "b6c0e3f07fb9b41c7f86303679e8b031849600d2d35aa05b1d09dd4b391084c6",
+		"api/domains/collaboration/repository/index.ts": "64c1d125f7a35762abe432ec080097d834c19fe9ee6719443efa30c499da9589",
+		"api/domains/collaboration/test/work.test.ts": "f3bc2c89284df5f246021ae1d4c9c9e7e0c8d1ed7ef23cdab4066402c1733a80",
+		"api/domains/collaboration/contracts/index.ts": "e8168c4acaaab777698965cbc56cfdf29144b779c99a230c6724ee46134e80e4",
+		"api/domains/collaboration/index.ts": "a4793c81e106cfd4a6036ac8d6790c0456bee6c735dfbcdd4722cea609d45fb2",
+		"api/domains/collaboration/service/work-context.ts": "3e96cb29b7d766ba7dc94fa08a27830ed5ceea5b7f6df471f9adf685129703d5",
+		"api/domains/collaboration/service/work-children.ts": "a84c8d384e1d05711a338b04c8c22880e1588acbfefeefe25137e1c285fce6de",
+		"api/domains/collaboration/service/work.ts": "75e934ba70096712afd759e89b5a61470c2effcab748d54e3c700b98e9c10f3a",
+		"web/src/domains/collaboration/toolchain-adapter.tsx": "b61fc85f71cefa354134496e31f2f9c5f79406868a252fe9e52da32a7ed3ab9c",
+		"api/domains/dialogue/contexts/specialist-turn/rules.context.toml": "0279f99483743ff0901989ae60391965561047cc75d087edffa7fde3555915ae",
+		"api/domains/dialogue/contexts/specialist-turn/host-observation.context.toml": "4516b943e7ef579516997276cdc68adee19ad1c6006dcc803cc847b1637d9516"
+	},
+	"currentOwnFilesMatchSnapshot": true,
+	"currentOwnFilesDifferentFromSnapshot": [],
+	"contextToolCalls": {
+		"initial_instructions": 1,
+		"context_compile": 1,
+		"compile_eval": 1
+	},
+	"latestWholeCodeSnapshot": {
+		"digest": "b2ecd79f75684336711373d7fbceabfe2908d8ac0d04594b8ff5a37e690fc92d",
+		"manifest": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-05/candidate-v2-r9-manifest.json",
+		"purpose": "Concurrent global format/size and browser test updates resolved; own source identical to r8"
+	},
+	"permissionPending": {
+		"scope": "Remaining shared-main checks and server operations before running-server acceptance",
+		"requiredBy": [
+			"User-provided task-scope rule",
+			"/Users/y.noguchi/Code/eumenes/AGENTS.md:5"
+		],
+		"approved": false
+	}
+}

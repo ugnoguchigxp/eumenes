@@ -13,12 +13,23 @@ import {
 } from "./toolchain-command";
 import type { BoundInvocation } from "./command-apply";
 import { executionSourceInTransaction } from "./execution-source";
+import { specialistExecutionSource } from "./specialist-source";
 
 /** The existing command translator, with a real source turn and a separate child-call identity. */
 export function executionCommands(deps: DialogueDeps) {
+	const sourceOf = (db: Database, child: ChildExecution) =>
+		child.source.specialistSessionId !== undefined
+			? specialistExecutionSource(
+					deps,
+					db,
+					child.source.runId,
+					child.source.specialistSessionId,
+					child.source.specialistEpoch,
+				)
+			: executionSourceInTransaction(deps, db, child.source.runId);
 	function prepareInTransaction(db: Database, child: ChildExecution) {
 		const run = byId(db, child.source.runId);
-		const source = executionSourceInTransaction(deps, db, child.source.runId);
+		const source = sourceOf(db, child);
 		if (
 			!run ||
 			source?.digest !== child.source.digest ||
@@ -57,7 +68,6 @@ export function executionCommands(deps: DialogueDeps) {
 				userAnswers: child.source.responses,
 				snapshot,
 				references: child.referenceData ?? child.refs,
-				...(child.materials?.length ? { materials: child.materials } : {}),
 				...(child.resume
 					? {
 							previousQuestion: child.resume.previous,
@@ -187,7 +197,7 @@ export function executionCommands(deps: DialogueDeps) {
 			command: unknown,
 		) {
 			const run = byId(db, child.source.runId);
-			if (!run || !executionSourceInTransaction(deps, db, run.id))
+			if (!run || !sourceOf(db, child))
 				throw new Error("execution_source_invalid");
 			const callId = child.dispatchId ?? child.id;
 			if (input.backend === "object-recognition" && deps.objectRecognition) {

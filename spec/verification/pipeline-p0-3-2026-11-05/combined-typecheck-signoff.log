@@ -1,0 +1,2 @@
+api/application/toolchain/toolchain.fixture.ts(766,23): error TS2339: Property 'interact' does not exist on type 'Pick<{ service: { listHistories: (owner: string) => HistorySummary[]; historyDetail: (owner: string, id: string) => HistoryDetail; deleteHistoryInTransaction: (db: Database, owner: string, input: { ...; }) => { ...; }; ... 48 more ...; sourceInTransaction: (db: Database, owner: string) => { ...; }; }; interact: { .....'.
+Found 1 error in 1 file, checked 2,850 files [542.01ms]

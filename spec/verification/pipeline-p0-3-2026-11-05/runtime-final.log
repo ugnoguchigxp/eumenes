@@ -1,0 +1,22 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/agent-runtime/test/pipeline-execution.test.ts:
+(pass) one-off definition uses pinned entries, declared references, selected final links [25.81ms]
+(pass) a model-modified request is never dispatched, even after its single repair [12.34ms]
+(pass) needs_input waits without side effects; the answer keeps the original request and re-enters authoring [1022.42ms]
+(pass) unsupported is explicit partial work with no child dispatch [23.52ms]
+(pass) revoked component revision stops the pipeline before dispatch [19.21ms]
+(pass) cancelled late model output cannot launch any child [40.00ms]
+(pass) from request includes supplied result references without implicitly adding later results [20.01ms]
+(pass) child failure stops subsequent work and cannot become successful output [17.02ms]
+(pass) oversized child input stops without retrying planning or dispatching [16.47ms]
+(pass) forgetting a source erases frozen requests, plans, catalog and supplied material [12.69ms]
+(pass) a persisted legacy pipeline cannot resume as the new contract [14.93ms]
+(pass) typed literal arguments cross the host unchanged and expected result reaches the child [15.75ms]
+(pass) a child's question resumes that child, then advances the frozen plan without another planning call [1023.39ms]
+(pass) all eight declared steps fit the existing child lifecycle [32.44ms]
+
+ 14 pass
+ 0 fail
+ 58 expect() calls
+Ran 14 tests across 1 file. [2.51s]

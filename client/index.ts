@@ -3,7 +3,6 @@ import { visualAnalysisClient } from "./visual-analysis";
 import { doclingClient } from "./docling";
 import { shellClient } from "./shell";
 import { computeClient } from "./compute";
-import { pipelinesClient } from "./pipelines";
 import { googleAccountsClient } from "./google-accounts";
 import { ocrClient } from "./ocr";
 import { objectRecognitionClient } from "./object-recognition";
@@ -40,7 +39,6 @@ export function createClient(baseUrl: string, token?: string) {
 	return {
 		...doclingClient(transport),
 		...computeClient(transport),
-		...pipelinesClient(transport),
 		...musicClient(transport),
 		...imageClient(transport),
 		...objectRecognitionClient(transport),

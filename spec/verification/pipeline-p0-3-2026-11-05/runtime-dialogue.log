@@ -1,0 +1,95 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/agent-runtime/test/pipeline-execution.test.ts:
+(pass) one-off definition uses pinned entries, declared references, selected final links [29.38ms]
+(pass) a model-modified request is never dispatched, even after its single repair [13.06ms]
+(pass) needs_input waits without side effects; the answer keeps the original request and re-enters authoring [1017.04ms]
+(pass) unsupported is explicit partial work with no child dispatch [15.84ms]
+(pass) revoked component revision stops the pipeline before dispatch [14.97ms]
+(pass) cancelled late model output cannot launch any child [36.79ms]
+(pass) from request includes supplied result references without implicitly adding later results [16.32ms]
+(pass) child failure stops subsequent work and cannot become successful output [15.49ms]
+(pass) oversized child input stops without retrying planning or dispatching [13.97ms]
+(fail) source invalidation erases frozen requests, plans, catalog and supplied material [5011.03ms]
+  ^ this test timed out after 5000ms.
+
+# Unhandled error between tests
+-------------------------------
+255 | 			});
+256 | 		return task;
+257 | 	}
+258 | 	return {
+259 | 		read: (operation) => {
+260 | 			if (closing) throw new Error("database_closing");
+                                ^
+error: database_closing
+      at read (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:260:27)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/test/pipeline-execution.test.ts:272:22)
+      at waitFor (/Users/y.noguchi/Code/eumenes/api/infrastructure/wait-for.ts:11:17)
+      at async <anonymous> (/Users/y.noguchi/Code/eumenes/api/domains/agent-runtime/test/pipeline-execution.test.ts:272:8)
+-------------------------------
+
+(fail) a persisted legacy pipeline cannot resume as the new contract [5004.99ms]
+  ^ this test timed out after 5000ms.
+
+api/domains/agent-runtime/test/context.test.ts:
+(pass) quick Web work is bounded independently of question wording while Codex research keeps exploration [2.41ms]
+(pass) retired evidence cannot be reported and its reference is never reassigned [0.28ms]
+(pass) a stateless follow-up retains earlier exact evidence including its final qualification [0.44ms]
+(pass) exact-quote evidence from one search and three reads keeps read tools available [1.09ms]
+(pass) replay-only tools do not advertise new operation capacity and retain executed arguments [0.66ms]
+(pass) all lookup routes advertise the canonical executable input contract [1.25ms]
+(pass) fixed report schema publishes the same outcome/claim constraints as host validation [0.88ms]
+(pass) three distant ranges of one document keep immutable task evidence and use one document alias [0.46ms]
+(pass) evidence capacity stops additions without evicting previous references [0.99ms]
+(pass) fixed contract retains the whole request, removes needs and suggestions, and scopes operation references [0.44ms]
+(pass) one worker deadline policy reserves 30 seconds for the parent [0.03ms]
+(pass) bounded observations never register an excerpt absent from the actual model packet [0.90ms]
+(pass) R16/R17 check-only evidence remains in the union and verification receives the complete excerpt [0.70ms]
+(pass) fetched bodies are sent only in a separate UNTRUSTED_MATERIALS message [0.38ms]
+(pass) retired references stay retired when an old source is presented again [0.04ms]
+(pass) capacity exhaustion closes tools in the actual worker packet [1.37ms]
+(pass) long titles count toward capacity: later bodies stop registering instead of overflowing the step [1.38ms]
+(pass) a replayed observation moved after new material never pushes the packet past capacity [1.02ms]
+(pass) every route carries the shared rules, and the step contract is also returned as values [1.32ms]
+(pass) search invocation examples name an offered executable tool and disappear for replay-only tools [0.26ms]
+(pass) a view returned by several operations is presented once and never overflows the step [3.60ms]
+(pass) a large frozen request and question still leave a full catalog presentable [1.87ms]
+(pass) an empty page keeps its cursor metadata visible [0.20ms]
+(pass) delegated reference data reserves room before evidence admission and remains intact on later research steps [0.92ms]
+
+api/domains/dialogue/test/routed-router.test.ts:
+(pass) the package decides with no model call: a sure toolchain is offered by the host, handed the words and announced in the host's words (row 2) [78.19ms]
+(pass) the conversation leads when no tool scores: the turn talks, with one call and no choice [73.25ms]
+(pass) a toolchain best-v2 is not sure of is asked to try, in the host's words (row 3) [66.64ms]
+(pass) an unsure toolchain that changes what exists is confirmed first (row 4), and a yes above the approval line approves it (row 5) [70.40ms]
+(pass) a yes below the approval line asks the host's question again and leaves the confirmation open; a sure no closes it [72.98ms]
+(pass) several jobs in one request: the first is handed over and the rest are said not to be asked yet (row 9) [66.55ms]
+(pass) a router that fails, is slow, has no memory or no embedding leaves the turn to the talk turn; the trace says why (row 10) [374.23ms]
+(pass) a toolchain with inputs is filled by the one-candidate call, the only model call, held to that candidate [68.22ms]
+(pass) a fill that finds nothing to ask for leaves the turn to the talk turn; one that asks back keeps the request it asked about [74.36ms]
+(pass) a hand-over the host refuses, or an instant toolchain that cannot answer, is said in the host's failure words, with no call to try again [68.96ms]
+(pass) a memory request is filled by the one-candidate call and taken by the host's operation [65.29ms]
+(pass) a work is checked, corrected or cancelled by the package's decision: the host's operation, the host's words [76.64ms]
+(pass) a doubted hand-over is redone elsewhere: the work is cancelled, the same words go to the other toolchain, and the correction is kept [71.27ms]
+(pass) the turns before go to the reranker's port, and the user's utterance before the words goes to the toolchain with them [69.02ms]
+(pass) a correction near the utterance moves the decision, never to a sure one; disagreeing ones apply none and are put out of use; weight 0 turns them off [143.47ms]
+(pass) with no profile saved there is no router: the turn talks, and nothing is offered or embedded [68.03ms]
+(pass) with the router on the user-intent judge is not asked: the package sees the tools and the open confirmations together [69.63ms]
+(pass) the resources State presents go with a hand-over the router decided, for the agent to pick from [1075.50ms]
+(pass) routeStructured: one request with a reference routes the masked utterance; the structure model is the saved resource, at low effort [74.56ms]
+(pass) routeStructured: no request is the conversation, with nothing scored; requests of two tools never dispatch a partial first job when the pipeline is unavailable [69.02ms]
+(pass) routeStructured: a structure model that fails gives no structure, and the whole utterance is routed as route() does [67.70ms]
+(pass) routeStructured: a mixed multi-job request never falls back to running only its first tool [64.67ms]
+
+2 tests failed:
+(fail) source invalidation erases frozen requests, plans, catalog and supplied material [5011.03ms]
+  ^ this test timed out after 5000ms.
+(fail) a persisted legacy pipeline cannot resume as the new contract [5004.99ms]
+  ^ this test timed out after 5000ms.
+
+ 55 pass
+ 2 fail
+ 1 error
+ 526 expect() calls
+Ran 57 tests across 3 files. [14.40s]

@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { SpecialistEndReason, SpecialistState } from "../contracts";
+import type { Run, SpecialistEndReason, SpecialistState } from "../contracts";
 
 /**
  * Specialist sessions (spec toolchain-specialist-dialogue §4.3): one non-ended session per conversation,
@@ -425,6 +425,7 @@ export function sessionRunsBefore(
 ): Array<{
 	id: string;
 	status: string;
+	sourceKind: Run["sourceKind"];
 	error: string | null;
 	inputMessageId: string;
 	answerMessageId: string | null;
@@ -433,13 +434,14 @@ export function sessionRunsBefore(
 	return (
 		db
 			.query(
-				`SELECT id, status, error, input_message_id, answer_message_id, updated_at FROM dialogue_runs
+				`SELECT id, status, source_kind, error, input_message_id, answer_message_id, updated_at FROM dialogue_runs
 				 WHERE specialist_session_id = ? AND seq < (SELECT seq FROM dialogue_runs WHERE id = ?)
 				 ORDER BY seq DESC LIMIT ?`,
 			)
 			.all(sessionId, runId, limit) as Array<{
 			id: string;
 			status: string;
+			source_kind: Run["sourceKind"];
 			error: string | null;
 			input_message_id: string;
 			answer_message_id: string | null;
@@ -449,6 +451,7 @@ export function sessionRunsBefore(
 		.map((row) => ({
 			id: row.id,
 			status: row.status,
+			sourceKind: row.source_kind,
 			error: row.error,
 			inputMessageId: row.input_message_id,
 			answerMessageId: row.answer_message_id,

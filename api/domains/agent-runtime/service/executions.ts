@@ -14,7 +14,7 @@ import { executionChild } from "./execution-child";
 import { executionCommands } from "./execution-commands";
 import type { ExecutionContext } from "./execution-context";
 import { executionStep } from "./execution-step";
-import { executionExtract } from "./execution-extract";
+import { executionCompose } from "./execution-compose";
 import { executionPipeline } from "./execution-pipeline";
 import { createExecutionStore } from "./execution-store";
 export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
@@ -37,7 +37,7 @@ export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 	queue.registerHandler(executionStep(ctx, ops));
 	queue.registerHandler(executionChild(ctx, ops));
 	const pipeline = executionPipeline(ctx, ops);
-	queue.registerHandler(executionExtract(ctx, ops, pipeline));
+	queue.registerHandler(executionCompose(ctx, ops, pipeline));
 	const table = (db: Database) =>
 		!!db
 			.query(

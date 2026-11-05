@@ -194,7 +194,13 @@ async function consult(
 		try {
 			const offered = await offer(turn, words, result, dynamic);
 			candidates = offered.candidates;
-			decision = hostDecision(result.decision, offered.hostOf);
+			decision = hostDecision(
+				result.decision,
+				offered.hostOf,
+				offered.candidates.find(
+					(c) => c.kind === "toolchain" && c.card.execution === "pipeline",
+				),
+			);
 			if (!decision) error = "router_candidate_unavailable";
 			const conflicts = [
 				...new Set(result.parts.flatMap((p) => p.result.explain.conflicts)),
@@ -332,7 +338,7 @@ const titleOf = (c: RouteCandidate) =>
 const ANNOUNCE = {
 	fixed: "dialogue.contexts.local.router-announce",
 	try: "dialogue.contexts.local.router-announce-try",
-	partial: "dialogue.contexts.local.router-announce-partial",
+	partial: "dialogue.contexts.local.router-announce",
 } as const;
 const announcement = (announce: Announce, title: string) =>
 	announce === "none" ? "" : systemContext(ANNOUNCE[announce], { title });
@@ -493,7 +499,10 @@ async function prepare(
 	const words = redirected
 		? `${redirected.trace.text}\n${turn.utterance}`
 		: consulted.words;
-	const filled = await fieldsOf(turn, words, c);
+	const filled =
+		c.card.execution === "pipeline"
+			? { fields: { request: words } }
+			: await fieldsOf(turn, words, c);
 	if ("step" in filled) return filled;
 	const { choice } = c;
 	if (choice.execution === "read")

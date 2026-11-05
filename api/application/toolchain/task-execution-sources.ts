@@ -18,7 +18,15 @@ export function taskExecutionSources(
 	const checkingReferences = new Set<string>();
 	const port: ReturnType<typeof taskExecutionSources> = {
 		validSourceInTransaction(db, source) {
-			const current = dialogue.executionSourceInTransaction(db, source.runId);
+			const current =
+				source.specialistSessionId !== undefined
+					? dialogue.specialistExecutionSourceInTransaction(
+							db,
+							source.runId,
+							source.specialistSessionId,
+							source.specialistEpoch,
+						)
+					: dialogue.executionSourceInTransaction(db, source.runId);
 			const { amendments, responses, ...original } = source;
 			return (
 				!!current &&
@@ -28,16 +36,25 @@ export function taskExecutionSources(
 						db,
 						source.conversationId,
 						update.messageId,
+						source,
 					);
 					return !control || hash(control) !== hash(update);
 				})
 			);
 		},
-		controlSourceInTransaction(db, conversationId, messageId) {
+		controlSourceInTransaction(db, conversationId, messageId, forSource) {
 			const message = conversation.messageInTransaction(db, messageId)?.message;
 			if (!message?.runId || message.conversationId !== conversationId)
 				return null;
-			const source = dialogue.executionSourceInTransaction(db, message.runId);
+			const source =
+				forSource?.specialistSessionId !== undefined
+					? dialogue.specialistExecutionSourceInTransaction(
+							db,
+							message.runId,
+							forSource.specialistSessionId,
+							forSource.specialistEpoch,
+						)
+					: dialogue.executionSourceInTransaction(db, message.runId);
 			return source
 				? {
 						messageId: source.messageId,

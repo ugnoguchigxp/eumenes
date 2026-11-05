@@ -1,0 +1,19 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/toolchain/task-execution-browser.test.ts:
+ 7 | 	options: { timeout?: number; interval?: number } = {},
+ 8 | ): Promise<void> {
+ 9 | 	const { timeout = 5000, interval = 2 } = options;
+10 | 	const end = performance.now() + timeout;
+11 | 	while (!(await condition())) {
+12 | 		if (performance.now() > end) throw new Error("wait_for_timeout");
+                                              ^
+error: wait_for_timeout
+      at waitFor (/private/tmp/eumenes-pipeline-host-verify-20261105/api/infrastructure/wait-for.ts:12:42)
+      at async <anonymous> (/private/tmp/eumenes-pipeline-host-verify-20261105/api/application/toolchain/task-execution-browser.test.ts:462:9)
+(fail) a browser approval resumes in a new physical task, keeps the old deadline, and commits the approved operation exactly once [5537.36ms]
+
+ 0 pass
+ 1 filtered out
+ 1 fail
+Ran 1 test across 1 file. [5.94s]

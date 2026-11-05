@@ -1,0 +1,23 @@
+$ bun scripts/verify.ts --domain pipelines --domain capabilities --domain tool-runtime --domain agent-runtime --domain dialogue
+[verify] selected=pipelines,capabilities,tool-runtime,agent-runtime,dialogue dependencyClosure=pipelines,capabilities,queue,tool-runtime,delivery,attitude-dataset,larm,settings,inference,resources,agent-runtime,continuity,conversation,memory,scheduler,toolchain-history,dialogue,avatar,audio
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] boundaries: 5 finding(s) outside the selection (not failing; all in report.json)
+  api/domains/kanban/contracts/index.ts: forbidden dependency kanban -> capabilities
+  api/domains/kanban/contracts/index.ts: forbidden dependency kanban -> capabilities
+  api/domains/kanban/service/resource-adapter.ts: forbidden dependency kanban -> resources
+  api/domains/kanban/test/resource-adapter.test.ts: forbidden dependency kanban -> resources
+  web/src/domains/kanban/toolchain-adapter.tsx: forbidden dependency kanban -> resources
+[verify] system-context
+[verify] size-budget
+[verify] sql-boundaries
+[verify] domain-docs
+[verify] format
+[verify] lint
+[verify] fail: 4911 ms; /private/tmp/eumenes-pipeline-host-verify-20261105/verification-reports/runs/2026-11-05T14-22-32-371Z-2bff4f33-46db-4e57-9059-1b4268d3412a/report.json
+Error: api/domains/dialogue/service/routed-package.ts:2:2: Identifier 'head' is imported but never used. [Error/eslint(no-unused-vars)]
+api/domains/dialogue/service/routed-package.ts:14:10: Identifier 'systemContext' is imported but never used. [Error/eslint(no-unused-vars)]
+api/domains/dialogue/service/routed-package.ts:21:2: Identifier 'CONVERSATION_ID' is imported but never used. [Error/eslint(no-unused-vars)]
+api/domains/dialogue/service/routed-package.ts:22:2: Identifier 'MEMORY_ID' is imported but never used. [Error/eslint(no-unused-vars)]
+error: script "verify" exited with code 1

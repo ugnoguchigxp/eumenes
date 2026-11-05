@@ -147,7 +147,9 @@ test("without vectors every available toolchain is offered; with vectors the top
 			"music.library",
 			// This test's explicit availability callback enables every registered entry except timers.
 			"browser.interact",
-			"pipeline.studio",
+			"collaboration.interact",
+			"collaboration.pipeline",
+			"pipeline.execute",
 			// The dots delegation bundle (backend `dots`, offered by this setup).
 			"dots.delegate",
 			// The conversation history investigation bundle (backend `history`).

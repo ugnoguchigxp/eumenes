@@ -107,9 +107,6 @@ export function workerContext(
 					),
 				}
 			: {}),
-		...(execution?.materials?.length
-			? { pipelineMaterials: execution.materials }
-			: {}),
 		...(execution?.referenceData?.length
 			? { delegatedReferences: execution.referenceData }
 			: {}),

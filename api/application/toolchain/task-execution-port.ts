@@ -1,3 +1,7 @@
+import { pipelineComponents } from "../pipelines/component-catalog";
+import type { CollaborationInteract } from "../collaboration/collaboration-backends";
+import { configureCollaboration } from "../collaboration/collaboration-wiring";
+import type { CollaborationHost } from "../collaboration/collaboration-host";
 import { executionNoticeResult } from "../../domains/tool-runtime";
 import type { AgentRuntime } from "../../domains/agent-runtime";
 import { type Capabilities } from "../../domains/capabilities";
@@ -23,6 +27,8 @@ import { taskExecutionStops } from "./task-execution-stops";
 import { reference, result, total } from "./task-execution-values";
 
 export type TaskExecutionHost = {
+	collaboration?: CollaborationHost;
+	interact?: CollaborationInteract;
 	queue: import("../../domains/queue").QueueService;
 	store: SqliteStore;
 	capabilities: Capabilities;
@@ -92,7 +98,6 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		registry,
 		dialogue,
 		conversation,
-		memory,
 		inference,
 	} = host;
 	const stopExternal = taskExecutionStops(host.queue, registry, agents);
@@ -250,6 +255,9 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		revokeDeliveryInTransaction: dialogue.revokeExecutionNoticeInTransaction,
 		deliveryStateInTransaction: dialogue.noticeDeliveryInTransaction,
 		deliverInTransaction(db, view, eventId) {
+			// The durable collaboration watcher delivers to the owning specialist session.
+			if (host.collaboration?.works.ownsChild(db, view.id, view.conversationId))
+				return true;
 			if (
 				!dialogue.executionSourceInTransaction(
 					db,
@@ -261,7 +269,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			return false;
 		},
 		// A run follows the revision it started from (its definition is frozen in the run): a later revision of the
-		// same pipeline does not stop it; withdrawing the pipeline or its adapter does.
+		// same pipeline does not stop it; withdrawing the planner or its adapter does.
 		pipelineInTransaction(db, toolchainRevisionId) {
 			const id = /^toolchain:(.+)@[1-9][0-9]*$/.exec(toolchainRevisionId)?.[1];
 			if (
@@ -281,10 +289,18 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 				return null;
 			return {
 				bindingRevisionId: bound!.binding.revisionId,
-				definition: binding.pipeline,
+				instructions: (() => {
+					const set = capabilities.toolchainSetInTransaction(
+						db,
+						toolchainRevisionId,
+					);
+					return [set.profile, ...set.skills].join("\n\n");
+				})(),
 				runMs: binding.timeLimits.runMs,
 			};
 		},
+		pipelineCatalogInTransaction: (db, source) =>
+			pipelineComponents(host, context, db, source),
 		stepToolchainInTransaction: (db, toolchainId, source) =>
 			available(db, source.runId).find((e) => e.id === toolchainId)
 				?.revisionId ?? null,
@@ -316,6 +332,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		},
 	};
 	agents.executions.configure(port);
+	configureCollaboration(host, port);
 	host.browser?.setTaskExecutionSource((db, frozen) => {
 		const child = (frozen as { execution?: ChildExecution } | null)?.execution;
 		if (!child || !agents.executions.authorizeChildInTransaction(db, child))
@@ -336,12 +353,12 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			(!answer ||
 				answer.role !== "user" ||
 				answer.conversationId !== child.source.conversationId ||
-				memory
-					?.blockedMessageIdsOfConversationInTransaction(
-						db,
-						child.source.conversationId,
-					)
-					.includes(answer.id))
+				!port.controlSourceInTransaction(
+					db,
+					child.source.conversationId,
+					answer.id,
+					child.source,
+				))
 		)
 			return null;
 		return [

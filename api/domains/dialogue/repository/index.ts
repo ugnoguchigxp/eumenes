@@ -1,4 +1,5 @@
 import { agencyMigration, dispatchClockMigration } from "./agency";
+import { specialistObservationsMigration } from "./specialist-observations";
 import { intentAnswerRouteMigration, intentJudgmentsMigration } from "./intent";
 import type { Database } from "bun:sqlite";
 import {
@@ -454,6 +455,7 @@ export const migrations: readonly Migration[] = [
 		after: ["dialogue/0033-agency-autonomy"],
 		sql: dispatchClockMigration,
 	},
+	specialistObservationsMigration,
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

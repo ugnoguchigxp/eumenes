@@ -1,0 +1,10 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/toolchain/task-execution-browser.test.ts:
+(pass) one public request searches, passes the exact result URL to a browser child, opens a new tab and confirms playback from the next observation [1037.84ms]
+(pass) a browser approval resumes in a new physical task, keeps the old deadline, and commits the approved operation exactly once [848.88ms]
+
+ 2 pass
+ 0 fail
+ 29 expect() calls
+Ran 2 tests across 1 file. [2.33s]

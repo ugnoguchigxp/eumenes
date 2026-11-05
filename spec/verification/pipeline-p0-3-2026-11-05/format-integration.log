@@ -1,0 +1,15 @@
+api/application/pipelines/component-catalog.ts
+api/application/pipelines/pipelines-adapter.ts
+api/domains/pipelines/index.ts
+api/domains/pipelines/service/definition.ts
+api/domains/agent-runtime/service/execution-context.ts
+api/domains/agent-runtime/service/execution-pipeline.ts
+api/domains/agent-runtime/service/execution-compose.ts
+api/domains/agent-runtime/service/execution-store.ts
+api/domains/agent-runtime/repository/executions.ts
+api/domains/tool-runtime/contracts/task-execution.ts
+api/application/toolchain/task-execution-port.ts
+api/domains/dialogue/service/routed-package.ts
+api/domains/dialogue/service/routed-router.ts
+api/domains/dialogue/test/routed-turn.test.ts
+Formatted 14 files, 26 unchanged [12.57ms]

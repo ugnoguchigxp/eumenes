@@ -4,7 +4,6 @@ import {
 	type createRouterExport,
 } from "./toolchain/router-export";
 import { registerDocling, type DoclingService } from "../domains/docling";
-import { registerPipelines } from "./pipelines/pipelines-controller";
 import { registerSearchCheck } from "./toolchain/toolchain-search-check";
 import {
 	registerGoogleAccounts,
@@ -113,8 +112,6 @@ export type AppServices = {
 	};
 	dotsModule?: AppModule;
 	capabilities?: Capabilities;
-	pipelines?: import("./pipelines/pipelines-service").PipelinesService;
-	pipelineTrials?: import("./pipelines/pipelines-trials").PipelineTrials;
 	searchCheck?: import("./toolchain/toolchain-search-check").SearchCheck;
 	agents?: AgentRuntime;
 	attitudeDataset?: AttitudeDataset;
@@ -250,9 +247,6 @@ export function appModules(services: AppServices): AppModule[] {
 		s.music && { mount: (app) => registerMusic(app, s.music!) },
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),
-		},
-		s.pipelines && {
-			mount: (app) => registerPipelines(app, s.pipelines!, s.pipelineTrials),
 		},
 		s.searchCheck && {
 			mount: (app) => registerSearchCheck(app, s.searchCheck!),

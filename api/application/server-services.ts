@@ -43,8 +43,6 @@ import { createTimerAnnouncements } from "./timers/timer-announcements";
 import { createSpecialistPort } from "./toolchain/specialist-port";
 import { buildBrowser } from "./browser/browser-composition";
 import { createToolchainRouting } from "./toolchain/toolchain-routing";
-import { createPipelinesService } from "./pipelines/pipelines-service";
-import { createPipelineTrials } from "./pipelines/pipelines-trials";
 import { createHostToolchain } from "./toolchain/toolchain-host";
 import { assembleAgency } from "./agency/assembly";
 import { createAgencyWork } from "./agency/work";
@@ -278,6 +276,8 @@ export async function buildServices(
 	links.attachDialogue(dialogue);
 	if (enabled && toolchains)
 		configureTaskExecution({
+			collaboration: toolchain.collaboration,
+			interact: browser.interact,
 			queue,
 			childOperations: toolchain.childOperations,
 			store,
@@ -324,17 +324,6 @@ export async function buildServices(
 		dataDir: dirname(resolve(dbPath)),
 	});
 	scheduler.registerTarget(dialogue.promptTarget);
-	const pipelines = toolchains
-		? createPipelinesService({
-				store,
-				capabilities: toolchain.capabilities,
-				registry: toolchain.registry,
-				routing: toolchains,
-				schemas: toolchain.schemas,
-				refreshVectors: toolchain.refreshVectors,
-			})
-		: undefined;
-	if (pipelines) toolchain.attachPipelines(pipelines);
 	const searchCheck = toolchains
 		? createSearchCheck({
 				store,
@@ -343,17 +332,6 @@ export async function buildServices(
 				routing: toolchains,
 			})
 		: undefined;
-	const pipelineTrials =
-		pipelines && toolchains
-			? createPipelineTrials({
-					store,
-					capabilities: toolchain.capabilities,
-					routing: toolchains,
-					inference,
-					service: pipelines,
-					embedPassages: toolchain.embedPassages,
-				})
-			: undefined;
 	return {
 		liveVoice,
 		store,
@@ -391,8 +369,6 @@ export async function buildServices(
 		settings,
 		world,
 		toolchain,
-		pipelines,
-		pipelineTrials,
 		searchCheck,
 		resources,
 		dialogue,

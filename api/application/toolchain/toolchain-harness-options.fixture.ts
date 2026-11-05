@@ -12,8 +12,8 @@ export type HarnessOptions = {
 	everyday?: boolean;
 	/** Task pipelines run on the parent execution, without the suspended task bundle. */
 	pipelines?: boolean;
-	/** A pipeline's extract step: the value the model gives for the step's text. */
-	extract?: (
+	/** A pipeline composer response, scripted independently from the child operations. */
+	compose?: (
 		messages: import("../../domains/inference/contracts").Messages,
 	) => unknown;
 	computePort?: ComputePort;
@@ -30,6 +30,12 @@ export type HarnessOptions = {
 		messages: import("../../domains/inference/contracts").Messages,
 	) => { name: string; arguments: Record<string, unknown> };
 	model?: LarmPort;
+	/** Script only the collaborative specialist, retaining the real parent/command fixture. */
+	specialist?: (
+		messages: import("../../domains/inference/contracts").Messages,
+		signal: AbortSignal | undefined,
+		options: Parameters<LarmPort["answer"]>[2],
+	) => unknown | Promise<unknown>;
 	embed?: import("./toolchain-vectors").Embed;
 	musicGateway?: () => LarmPlayground;
 	imageGateway?: () => LarmPlayground;
@@ -43,7 +49,10 @@ export type HarnessOptions = {
 	) => Pick<
 		import("../browser/browser-composition").BrowserAssembly,
 		"service" | "effects" | "requests"
-	>;
+	> &
+		Partial<
+			Pick<import("../browser/browser-composition").BrowserAssembly, "interact">
+		>;
 	review?: (
 		input: import("llm-fetch").GuardReviewInput,
 	) => Promise<import("llm-fetch").GuardReviewDecision>;
