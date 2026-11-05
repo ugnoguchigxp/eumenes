@@ -1,0 +1,114 @@
+{
+  "at": "2026-11-05T16:29:07.639611+00:00",
+  "scope": "Eumenes browser.interact pilot integration; normal conversation availability remains false",
+  "source": {
+    "baseCommit": "e917e920f7b252c6f70a07dda1a119b0a2516bfc",
+    "deltaSha256": "2af16825564ed94a414a4d17948b8de4db93c5a618538dc78e60552349f91d95",
+    "manifest": "sources.json",
+    "sourceFiles": 62,
+    "upstreamCommit": "d459f1bf94ca871676a993d524e613879cf93411",
+    "archiveSha256": "c120d878ffe217bd302d1fb60a255e6744e9a98865c8483b9bdf54bc3f3e266f"
+  },
+  "checks": [
+    {
+      "kind": "broad local verify",
+      "domains": [
+        "browser",
+        "capabilities",
+        "tool-runtime",
+        "agent-runtime",
+        "dialogue",
+        "artifact"
+      ],
+      "result": "pass",
+      "bun": 1584,
+      "web": 158,
+      "designSystem": 58,
+      "report": "verify-broad.json",
+      "stage": "Before the final capture-resource, image-placeholder and confidential-input binding changes; these changes were checked by the final verify."
+    },
+    {
+      "kind": "final local verify",
+      "domains": [
+        "browser",
+        "capabilities",
+        "tool-runtime",
+        "artifact"
+      ],
+      "result": "pass",
+      "bun": 937,
+      "web": 126,
+      "designSystem": 58,
+      "report": "verify-final.json"
+    },
+    {
+      "kind": "new backend acceptance",
+      "result": "pass",
+      "tests": 31,
+      "failed": 0,
+      "assertions": 135,
+      "log": "backend.log"
+    },
+    {
+      "kind": "new Web acceptance",
+      "result": "pass",
+      "tests": 5,
+      "log": "web.log"
+    },
+    {
+      "kind": "new browser UI acceptance",
+      "result": "pass",
+      "tests": 2,
+      "widths": [
+        320,
+        700
+      ],
+      "log": "browser.log"
+    },
+    {
+      "kind": "explicit legacy runner/composition/migrations",
+      "result": "pass",
+      "tests": 50,
+      "log": "legacy.log"
+    }
+  ],
+  "countsOverlap": true,
+  "inference": "Deterministic fixture responses through the existing control/receipt ports. HTTP server, pinned MCP CLI, isolated Chrome and WebP encoding are real.",
+  "coverage": [
+    "owner/conversation/idempotent admission",
+    "question/revision/generation/TTL and parent binding",
+    "one-time operation approval and explicit capture consent",
+    "cancel during inference/review/cleanup and revoked source",
+    "indeterminate dispatch and restart without replay",
+    "capture target change and forbidden redirects during read/capture",
+    "7-day capture/30-day metadata retention and orphan/forget cleanup",
+    "exact capture resource selection",
+    "request/URL/free-text answer redaction in the common action ledger",
+    "canonical Skill, pinned 134-file release and old-DB upgrade"
+  ],
+  "apiBudget": {
+    "newPaidCalls": 0,
+    "newPaidCostUsd": 0,
+    "sharedLedger": "eumenes_interact/lab/data/api-spend.sqlite",
+    "attempts": 579,
+    "accountedUpperUsd": 8.024065,
+    "unknownCalls": 11,
+    "capUsd": 10,
+    "maxAttempts": 600,
+    "unknownReservationsPreserved": true
+  },
+  "limits": [
+    "Pilot only; old browser route remains in service.",
+    "No production database/server migration or restart.",
+    "Existing top-level URL/DNS rules retained; no all-subresource pinned-DNS proxy added.",
+    "Completion review uses the saved model configuration; no fixed provider/model names.",
+    "No new live Claude/Luna acceptance or new rubric score claimed for this integration.",
+    "CI not run, as requested."
+  ],
+  "semanticReview": "No request-phrase routing, scenario-specific product branches or fixed semantic responses added. New branches decode registered schemas, enforce authority/lifecycle, resolve observed locator data or render state.",
+  "contextWorkflow": {
+    "contextCompile": 1,
+    "compileEval": 1,
+    "scope": "this Eumenes integration"
+  }
+}

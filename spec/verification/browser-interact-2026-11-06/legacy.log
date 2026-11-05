@@ -1,0 +1,62 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/migrations.test.ts:
+(pass) GOLDEN: the legacy order and every deployed SQL string are byte-for-byte unchanged [0.19ms]
+(pass) a database that holds a migration this code does not know refuses to start [384.24ms]
+(pass) a migration with `after` is applied after its dependencies, wherever it sits in the list [20.42ms]
+(pass) migration ordering is stable and rejects cycles, unknown dependencies and duplicate ids [0.10ms]
+(pass) the memory package's migrations keep their order and every one is applied; the first four stay contiguous [0.14ms]
+(pass) host migrations are frozen: the count and the retired slot never move
+(pass) every migration is named once, and none outside the frozen order exists yet without `after` [0.15ms]
+(pass) a fresh database gets every migration and passes the memory schema check [377.08ms]
+(pass) an applied migration that is rewritten later stops startup with its id only [17.43ms]
+(pass) an existing 0.3.3 host database upgrades without rewriting migration checksums or losing data [388.80ms]
+(pass) World source/goal migrations are appended last and upgrade an already-deployed database [380.76ms]
+(pass) with the full production migrations, retracting a message referenced by a dialogue run tombstones it [370.31ms]
+(pass) World's package migrations stay contiguous, and timers is appended after them [0.09ms]
+(pass) a fresh database gets the World schema; World is OFF and its schema is current [381.96ms]
+(pass) an already-deployed database (data present, no World yet) upgrades and keeps its data [397.34ms]
+(pass) a drifted World schema disables World; an edited World migration stops startup [393.58ms]
+(pass) research/history metadata migrations append after the frozen legacy order and upgrade without copying message bodies [420.35ms]
+
+api/application/browser/browser-composition.test.ts:
+(pass) MCP output and captures live in two managed folders next to the database [0.08ms]
+(pass) a connection builds the driver with the path saved at that moment [24.41ms]
+(pass) closing the assembly stops the child and records nothing [40.27ms]
+(pass) a completion is added to its conversation once, under a stable id [15.53ms]
+(pass) tasks can be started only where the model calls are assembled [53.89ms]
+(pass) the adapter reads only a saved user message of the conversation [13.91ms]
+
+api/application/browser/browser-task-runner.test.ts:
+(pass) the collection view keeps action refs and long or malformed labels without duplicating complete links [0.27ms]
+(pass) observe, type with a grant, click, re-observe, finish: one inference per job and the page only as data [536.10ms]
+(pass) the first call has the D7 context: system layer, enclosed reference with the observation, the original request last [490.64ms]
+(pass) a clarify ends the task as needs_input with the question [495.84ms]
+(pass) the last of the 12 calls is reserved: callsLeft is shown every call, and an invoke there fails the task [506.76ms]
+(pass) a finish on the last call still completes the task [499.64ms]
+(pass) a rejected output is repaired once and the repair counts against the budget [978.19ms]
+(pass) a refused tool goes back as data and is retried once; the second refusal ends the task [977.08ms]
+(pass) unknown tools, invalid arguments and blocked addresses are refusals, not crashes [476.42ms]
+(pass) submitting a typed value needs a declared effect [472.78ms]
+(pass) a value is typed on a quote from the request, however it was reformatted [478.62ms]
+(pass) a missing source quotation receives the existing repair hint before any input is sent [469.76ms]
+(pass) readable link URLs keep the exact observed target and never double-decode escapes [0.11ms]
+(pass) an operation that may have reached the page stops the task as indeterminate and no further call is made [474.74ms]
+(pass) an operation the browser refused before sending is a refusal the model may answer [469.28ms]
+(pass) cancelling aborts the model call in flight and the task stays cancelled and quiet [501.82ms]
+(pass) a task past its deadline expires, aborts the call in flight and makes no further call [502.62ms]
+(pass) losing the connection ends the task and aborts the call in flight [481.97ms]
+(pass) an element capture inside the task is saved before the task finishes [637.81ms]
+(pass) a capture over the size limit is a refusal with its reason [624.62ms]
+(pass) tabs can be listed and a new tab becomes the target [479.46ms]
+(pass) a newer observation turns the older ones into a one-line stub, and nothing else changes [473.21ms]
+(pass) a tab the request named that is gone stops the task; it never moves to another tab [475.64ms]
+(pass) a page the host blocks goes back to the model as a refusal it can answer [475.57ms]
+(pass) too large a context stops the task before a call is made [471.12ms]
+(pass) a revoked model call ends the task and its request is dropped [475.48ms]
+(pass) a conversation request reaches the loop through the adapter with the user's own words [472.99ms]
+
+ 50 pass
+ 0 fail
+ 864 expect() calls
+Ran 50 tests across 3 files. [17.50s]

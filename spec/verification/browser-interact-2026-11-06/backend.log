@@ -1,0 +1,49 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/browser/test/interact.test.ts:
+(pass) queue executes public parts, verifies completion, persists only metadata [28.39ms]
+(pass) idempotent admission is owner/conversation scoped and rejects changed payload [13.49ms]
+(pass) confirmation is bound to question/revision/generation and consumes exactly once [18.50ms]
+(pass) denial never sends the pending effect [14.57ms]
+(pass) answers cannot reset the overall model-call budget [21.96ms]
+(pass) parent-linked answers/forget must use the parent's lifecycle [17.43ms]
+(pass) capture requires explicit approval; resource ownership, WebP and forget propagate [17.95ms]
+(pass) unverified or missing completion evidence never becomes completed [14.34ms]
+(pass) review failure yields partial [14.15ms]
+(pass) an unknown dispatch is recorded once, never replayed [13.54ms]
+(pass) cancel during an ignored inference abort releases queue and cannot accept late completion [31.36ms]
+(pass) cancel during completion review prevents a completed result [30.79ms]
+(pass) expiry and revoked source end the saved run without adopting output [16.86ms]
+(pass) restart sweeps transient-context runs to failure and never resumes operations [34.91ms]
+(pass) a changed capture target asks again before any bytes are saved [21.68ms]
+(pass) a revoked source cancels late output [18.56ms]
+(pass) cancellation during cleanup cannot publish completed [16.75ms]
+(pass) capture TTL, metadata TTL and orphan cleanup remove their owned records/files [19.94ms]
+(pass) a read redirected to a forbidden destination is withheld from inference [15.97ms]
+(pass) a capture that navigates during acquisition is never published [20.28ms]
+
+api/domains/browser/test/interact-knowledge.test.ts:
+(pass) public site seeds preserve origin/provenance/revision and never claim live verification [16.24ms]
+
+api/domains/capabilities/test/browser-interact-bundle.test.ts:
+(pass) pilot bundle registers immutably, with shared components and no unsupported host contracts [22.16ms]
+
+api/application/browser/interact-inference.test.ts:
+(pass) shared control receives the canonical Skill, typed schema and unchanged reference data [11.88ms]
+(pass) a late control receipt is cancelled rather than accepted under revoked authority [12.27ms]
+(pass) the wire translation neither interprets free text nor invents approval [0.20ms]
+(pass) pilot stays unavailable to ordinary conversation discovery [12.52ms]
+(pass) the existing child contract resumes the same run and preserves partial status [19.45ms]
+(pass) capture resource navigation resolves the exact image and enforces conversation scope [19.33ms]
+
+api/application/browser/interact-integration.test.ts:
+(pass) canonical Skill and pinned 134-file distribution match the registered operator [12.17ms]
+(pass) isolated HTTP pilot uses the common action ledger, real browser, explicit capture approval and authenticated WebP deletion [2889.86ms]
+
+api/application/browser/interact-migrations.test.ts:
+(pass) package migrations follow the existing browser tail and upgrade an old database without rewriting applied SQL [411.07ms]
+
+ 31 pass
+ 0 fail
+ 135 expect() calls
+Ran 31 tests across 6 files. [4.29s]

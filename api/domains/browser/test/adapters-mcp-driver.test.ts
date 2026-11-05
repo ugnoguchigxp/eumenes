@@ -635,6 +635,7 @@ test("only allowlisted tools are ever sent, and the driver exposes no generic ca
 			"measure",
 			"newTab",
 			"onStateChange",
+			"readText",
 			"runReplay",
 			"screenshot",
 			"selectTab",

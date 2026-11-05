@@ -108,6 +108,7 @@ export type ChildResult = {
 		| "running"
 		| "waiting_input"
 		| "completed"
+		| "partial"
 		| "failed"
 		| "cancelled"
 		| "expired"

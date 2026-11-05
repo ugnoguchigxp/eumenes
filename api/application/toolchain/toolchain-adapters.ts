@@ -50,6 +50,11 @@ import {
 	browserDomainSchemas,
 	describeBrowserAdapter,
 } from "../browser/browser-adapter";
+import {
+	INTERACT_ADAPTER_REF,
+	describeInteractAdapter,
+	interactDomainSchemas,
+} from "../browser/interact-adapter";
 import type { Database } from "bun:sqlite";
 import type { ZodType } from "zod";
 import {
@@ -156,6 +161,7 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...model3dDomainSchemas,
 	...computeDomainSchemas,
 	...browserDomainSchemas,
+	...interactDomainSchemas,
 	...terminalsDomainSchemas,
 	...shellDomainSchemas,
 	...kanbanDomainSchemas,
@@ -216,6 +222,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: MODEL3D_ADAPTER_REF, describe: describeModel3dAdapter },
 	{ ref: COMPUTE_ADAPTER_REF, describe: describeComputeAdapter },
 	{ ref: BROWSER_ADAPTER_REF, describe: describeBrowserAdapter },
+	{ ref: INTERACT_ADAPTER_REF, describe: describeInteractAdapter },
 	{ ref: SETTINGS_ADAPTER_REF, describe: describeSettingsAdapter },
 	{ ref: RECORDS_ADAPTER_REF, describe: describeRecordsAdapter },
 	{ ref: INFERENCE_ADAPTER_REF, describe: describeInferenceAdapter },

@@ -248,6 +248,8 @@ export const imageUrlSchema = z.string().refine(isSafeImageUrl, {
 });
 export type ImageResource = {
 	kind: "generated-image";
+	/** Neutral host wording when no image is present (for saved media as well as generation). */
+	emptyMessage?: string;
 	revision: number;
 	status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
 	url?: string;
@@ -287,6 +289,10 @@ export type QuestionResource = {
 export type FormResource = {
 	kind: "form";
 	revision: number;
+	/** Changing records/questions clears the previous record's draft and confirmation. */
+	identity?: string;
+	/** A host-owned form that is unavailable in the current saved lifecycle state. */
+	disabled?: boolean;
 	submitLabel?: string;
 	fields: Field[];
 	defaults: Record<string, string | boolean>;

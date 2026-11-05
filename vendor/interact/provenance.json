@@ -1,0 +1,14 @@
+{
+	"package": "eumenes-interact",
+	"version": "0.1.1",
+	"archive": "eumenes-interact-0.1.1-c120d878ffe2.tgz",
+	"archiveSha256": "c120d878ffe217bd302d1fb60a255e6744e9a98865c8483b9bdf54bc3f3e266f",
+	"sourceRepository": "eumenes_interact",
+	"sourceCommit": "d459f1bf94ca871676a993d524e613879cf93411",
+	"sourceTreeSha256": "49617e3a017980305d164781cb02bde831ffdb9effb6c023a5fe6c0038547806",
+	"skillSha256": "701516361de7e572183b88fafb93a245bcf72ea3ebe9836de60d255890572fed",
+	"contractVersion": 2,
+	"coreFormatVersion": 1,
+	"limits": "Build inputs are not all included in upstream source digest; exact archive and all packaged files are pinned for this pilot. See upstream F12.",
+	"distributionManifestSha256": "3bbf581e753e3e1ed20efc260ef15d9f598932f93d15ec304326099ed8a7e201"
+}

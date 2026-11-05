@@ -2,6 +2,19 @@ export { createBrowser, type BrowserService } from "./service";
 export { registerBrowser } from "./controller";
 export { createBrowserResourceAdapter } from "./service/resource-adapter";
 export { migrations } from "./repository";
+export { interactMigrations } from "./repository/interact";
+export {
+	createBrowserInteract,
+	type BrowserInteractService,
+	type BrowserInteractView,
+} from "./service/interact";
+export type { InteractDriver, InteractInference } from "./contracts/interact";
+export {
+	interactStart,
+	interactTarget,
+	interactAnswer,
+} from "./contracts/interact";
+export { createInteractDriver } from "./adapters/interact-driver";
 export { BrowserApprovalRequired } from "./contracts";
 export type {
 	ApprovalRequest,

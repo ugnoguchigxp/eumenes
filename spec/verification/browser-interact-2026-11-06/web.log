@@ -1,0 +1,10 @@
+
+ RUN  v4.1.8 /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-interact-candidate-qe_bqsn7
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  01:25:56
+   Duration  2.27s (transform 543ms, setup 20ms, import 1.69s, tests 146ms, environment 341ms)

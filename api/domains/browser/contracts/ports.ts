@@ -114,6 +114,12 @@ export interface BrowserDriver {
 	closeTab(index: number): Promise<DriverTab[]>;
 	/** Snapshot of the current tab. */
 	snapshot(signal: AbortSignal): Promise<DriverSnapshot>;
+	/** Fixed read-only extraction used by the registered-parts engine. */
+	readText?(
+		ref: string | null,
+		maxChars: number,
+		signal: AbortSignal,
+	): Promise<import("eumenes-interact").ExtractedContent>;
 	act(action: DriverAction, signal: AbortSignal): Promise<DriverActionResult>;
 	/**
 	 * Runs the code of a replay on the current tab (MCP's `browser_run_code_unsafe`). The host has checked the code;

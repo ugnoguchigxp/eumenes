@@ -1,3 +1,5 @@
+import { prepareMcpIsolation } from "./mcp-isolation";
+import { interactTextFunction, parseInteractText } from "./interact-text";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -100,6 +102,8 @@ const REF = /^(?:f\d+)?e\d+$/;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 export type McpBrowserDriverOptions = {
+	/** Dedicated in-memory browser; never attaches to the user's extension session. */
+	isolated?: boolean;
 	extensionToken?: string;
 	/** Saved Brave executable. Empty or missing: `connect` ends as `not_configured`. */
 	executablePath: string | undefined;
@@ -185,7 +189,9 @@ export function createMcpBrowserDriver(
 			command: launch.command,
 			args: [
 				...launch.args,
-				"--extension",
+				...(options.isolated
+					? ["--config", join(options.outputDir, "isolation.json")]
+					: ["--extension"]),
 				"--output-dir",
 				options.outputDir,
 				"--no-webmcp",
@@ -201,6 +207,8 @@ export function createMcpBrowserDriver(
 	): Promise<DriverConnectionState> => {
 		await mkdir(options.outputDir, { recursive: true, mode: 0o700 });
 		await clearOutput();
+		if (options.isolated)
+			await prepareMcpIsolation(options.outputDir, options.executablePath);
 		setState({ state: "connecting", startedAt: now().toISOString() });
 		let child: McpSession;
 		try {
@@ -495,7 +503,7 @@ function createReaders(
 	callTool: CallTool,
 ): Pick<
 	BrowserDriver,
-	"inspectTarget" | "inspectFocused" | "measure" | "screenshot"
+	"inspectTarget" | "inspectFocused" | "measure" | "screenshot" | "readText"
 > {
 	/** Inspection only reads attributes, so whatever goes wrong never reached the page's state. */
 	const inspectCall = async (args: Record<string, unknown>) => {
@@ -506,6 +514,19 @@ function createReaders(
 		}
 	};
 	return {
+		async readText(ref, maxChars, signal) {
+			if (!Number.isSafeInteger(maxChars) || maxChars < 100 || maxChars > 50000)
+				throw new BrowserDriverError("extraction_limit_invalid", false);
+			const body = interactTextFunction(maxChars);
+			const parsed = await callTool(
+				"browser_evaluate",
+				ref
+					? { function: body, target: refOf(ref), element: "read content" }
+					: { function: `() => (${body})(null)` },
+				signal,
+			);
+			return parseInteractText(parsed.result, maxChars);
+		},
 		async inspectTarget(ref) {
 			return inspected(
 				await inspectCall({

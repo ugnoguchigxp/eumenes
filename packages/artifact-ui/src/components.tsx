@@ -181,15 +181,17 @@ export function ImageFrame({ request }: { request: ArtifactRequest }) {
 	const ready =
 		image.status === "succeeded" && image.url && brokenUrl !== image.url;
 	const status =
-		brokenUrl === image.url && image.url
-			? "画像を読み込めませんでした"
-			: {
-					queued: "生成を待っています",
-					running: "画像を生成中です",
-					succeeded: "画像が完成しました",
-					failed: "画像生成に失敗しました",
-					cancelled: "画像生成を取り消しました",
-				}[image.status];
+		!image.url && image.emptyMessage
+			? image.emptyMessage
+			: brokenUrl === image.url && image.url
+				? "画像を読み込めませんでした"
+				: {
+						queued: "生成を待っています",
+						running: "画像を生成中です",
+						succeeded: "画像が完成しました",
+						failed: "画像生成に失敗しました",
+						cancelled: "画像生成を取り消しました",
+					}[image.status];
 	return (
 		<Card>
 			<CardHeader>
@@ -377,7 +379,7 @@ function FieldInput({
 							disabled={disabled}
 							required={field.type === "radio" && field.required && index === 0}
 						/>
-						{option}
+						{field.optionLabels?.[option] ?? option}
 					</label>
 				))}
 			</fieldset>
@@ -437,19 +439,30 @@ function FieldInput({
 export function SmallForm({ request }: { request: ArtifactRequest }) {
 	const action = useAction(request);
 	const data = action.resource as FormResource;
+	const disabled = action.pending || data.disabled === true;
 	const [values, setValues] = useState(data.defaults);
 	const [dirty, setDirty] = useState(false);
 	const defaults = useRef(data.defaults);
+	const identity = useRef(data.identity);
+	const [sent, setSent] = useState(false);
+	const [validationMessage, setValidationMessage] = useState("");
 	useEffect(() => {
+		if (identity.current !== data.identity) {
+			identity.current = data.identity;
+			defaults.current = data.defaults;
+			setValues(data.defaults);
+			setDirty(false);
+			setSent(false);
+			setValidationMessage("");
+			return;
+		}
 		// Refresh clean forms after a save, including hidden revision controls.
 		// An edited form retains its original precondition so external edits still conflict.
 		if (!dirty && defaults.current !== data.defaults) {
 			defaults.current = data.defaults;
 			setValues(data.defaults);
 		}
-	}, [data.defaults, dirty]);
-	const [sent, setSent] = useState(false);
-	const [validationMessage, setValidationMessage] = useState("");
+	}, [data.defaults, data.identity, dirty]);
 	const prefix = useId();
 	return (
 		<Card>
@@ -475,7 +488,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 							return;
 						}
 						setValidationMessage("");
-						if (!action.pending)
+						if (!disabled)
 							void action.send("submit", values).then((accepted) => {
 								setSent(accepted);
 								if (accepted) setDirty(false);
@@ -495,7 +508,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 										? "[]"
 										: "")
 							}
-							disabled={action.pending}
+							disabled={disabled}
 							onChange={(value) => {
 								setDirty(true);
 								setSent(false);
@@ -505,7 +518,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 						/>
 					))}
 					<div className="aui-row">
-						<Button type="submit" disabled={action.pending}>
+						<Button type="submit" disabled={disabled}>
 							{action.pending
 								? "送信中"
 								: (data.submitLabel ?? "フォームを送信")}
@@ -514,7 +527,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 							<Button
 								type="button"
 								variant="secondary"
-								disabled={action.pending}
+								disabled={disabled}
 								onClick={() => {
 									setDirty(false);
 									setValues(data.defaults);

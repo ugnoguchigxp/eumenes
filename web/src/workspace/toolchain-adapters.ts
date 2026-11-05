@@ -17,6 +17,7 @@ import { musicScreenWebAdapter } from "../domains/music/toolchain-adapter";
 import { imageScreenWebAdapter } from "../domains/image/toolchain-adapter";
 import { model3dWebAdapter } from "../domains/model3d/toolchain-adapter";
 import { browserWebAdapter } from "../domains/browser/toolchain-adapter";
+import { browserInteractWebAdapter } from "../domains/browser/interact/toolchain-adapter";
 import { uiCompositionsWebAdapter } from "../domains/ui-compositions/toolchain-adapter";
 import { pipelinesWebAdapter } from "../domains/pipelines/toolchain-adapter";
 import { objectRecognitionScreenWebAdapter } from "../domains/object-recognition/toolchain-adapter";
@@ -38,6 +39,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	model3dWebAdapter,
 	computeWebAdapter,
 	browserWebAdapter,
+	browserInteractWebAdapter,
 	uiCompositionsWebAdapter,
 	pipelinesWebAdapter,
 	objectRecognitionScreenWebAdapter,

@@ -16,6 +16,11 @@ import {
 	readyCapturesWithTab,
 	type CaptureWithTab,
 } from "../repository";
+import {
+	readyInteractCaptures,
+	type InteractCaptureResource,
+} from "../repository/interact";
+type CaptureResource = CaptureWithTab | InteractCaptureResource;
 
 /** The browser screen; the target is the capture (the screen lists captures, plan section 9). */
 const BROWSER_RESOURCE_ADAPTER_REF = "adapter:browser@1";
@@ -41,7 +46,7 @@ const hostOf = (url: string | null) => {
 	}
 };
 
-const atOf = (c: CaptureWithTab) =>
+const atOf = (c: CaptureResource) =>
 	new Date(c.captured_at ?? c.created_at).toISOString();
 
 /**
@@ -51,9 +56,29 @@ const atOf = (c: CaptureWithTab) =>
 export function createBrowserResourceAdapter(deps: {
 	store: SqliteStore;
 	owner: string;
+	/** Enabled by the application after installing the package's migrations. */
+	includeInteract?: boolean;
 }): ResourceAdapter {
 	const { store, owner } = deps;
-	const labelOf = (c: CaptureWithTab) =>
+	const get = (db: Database, id: string): CaptureResource | null =>
+		readyCaptureWithTab(db, owner, id) ??
+		(deps.includeInteract
+			? readyInteractCaptures(db, owner, 1, Date.now(), id)[0]
+			: undefined) ??
+		null;
+	const list = (db: Database): CaptureResource[] =>
+		[
+			...readyCapturesWithTab(db, owner, SEARCH_WINDOW),
+			...(deps.includeInteract
+				? readyInteractCaptures(db, owner, SEARCH_WINDOW, Date.now())
+				: []),
+		]
+			.sort(
+				(a, b) =>
+					(b.captured_at ?? b.created_at) - (a.captured_at ?? a.created_at),
+			)
+			.slice(0, SEARCH_WINDOW);
+	const labelOf = (c: CaptureResource) =>
 		[
 			...(c.tab_title?.trim()
 				? `${c.tab_title.trim()}の撮影`
@@ -61,7 +86,7 @@ export function createBrowserResourceAdapter(deps: {
 		]
 			.slice(0, RESOURCE_LABEL_MAX)
 			.join("");
-	const refOf = (c: CaptureWithTab): ResourceRef => ({
+	const refOf = (c: CaptureResource): ResourceRef => ({
 		uri: formatResourceUri(KIND, c.id),
 		kind: KIND,
 		label: labelOf(c),
@@ -74,15 +99,18 @@ export function createBrowserResourceAdapter(deps: {
 			if (!result || typeof result !== "object") return [];
 			const id = (result as { captureId?: unknown }).captureId;
 			if (typeof id !== "string" || !id) return [];
-			const capture = readyCaptureWithTab(db, owner, id);
+			const capture = get(db, id);
 			return capture ? [refOf(capture)] : [];
 		},
 		getInTransaction(db: Database, id: string) {
-			const capture = readyCaptureWithTab(db, owner, id);
+			const capture = get(db, id);
 			return capture
 				? {
 						...refOf(capture),
-						adapterRef: BROWSER_RESOURCE_ADAPTER_REF,
+						adapterRef:
+							"run_id" in capture
+								? "adapter:browser.interact@1"
+								: BROWSER_RESOURCE_ADAPTER_REF,
 						targetRef: capture.id,
 						actions: ["open", "read"],
 						preview: `/api/browser/captures/${encodeURIComponent(capture.id)}/content`,
@@ -94,7 +122,7 @@ export function createBrowserResourceAdapter(deps: {
 			const since = query.since ? Date.parse(query.since) : null;
 			const until = query.until ? Date.parse(query.until) : null;
 			return store
-				.read((db) => readyCapturesWithTab(db, owner, SEARCH_WINDOW))
+				.read(list)
 				.filter((c) => {
 					const at = c.captured_at ?? c.created_at;
 					if (since !== null && at < since) return false;
@@ -111,7 +139,7 @@ export function createBrowserResourceAdapter(deps: {
 		},
 		/** When, of which page (title and host only), how (range, size), and the capture's state; a long title is cut with a marker. */
 		async read(id: string) {
-			const c = store.read((db) => readyCaptureWithTab(db, owner, id));
+			const c = store.read((db) => get(db, id));
 			if (!c) throw new Error("item_not_found");
 			const lines = [
 				`撮影（${rangeLabel[c.range]}）`,

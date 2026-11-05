@@ -16,6 +16,7 @@ import { createSavedPathDriver } from "./browser-driver";
 import type { BrowserRequests } from "./browser-adapter";
 import { registerBrowserEffects } from "./browser-effects";
 import { createTaskRunner, type TaskRunnerPorts } from "./browser-task-runner";
+import { buildBrowserInteract } from "./interact-composition";
 
 /** MCP output and captures live under the data directory next to the database, in two managed folders. */
 export function browserDirectories(dbPath: string) {
@@ -76,6 +77,10 @@ export function buildBrowser(
 		capabilities?: TaskRunnerPorts["capabilities"];
 		/** Replaces the MCP driver (tests only). */
 		createDriver?: (executablePath: string | undefined) => BrowserDriver;
+		createInteractDriver?: (
+			runId: string,
+			executablePath: string | undefined,
+		) => import("../../domains/browser").InteractDriver;
 	},
 ) {
 	const { store, queue } = deps.core;
@@ -122,14 +127,53 @@ export function buildBrowser(
 		await service!.disconnect();
 	});
 	const effects = registerBrowserEffects({ queue, service });
+	const interact = deps.inference
+		? buildBrowserInteract({
+				store,
+				queue,
+				inference: deps.inference,
+				legacy: service,
+				conversation: deps.conversation,
+				outputDir,
+				captureDir,
+				origin: config.origin,
+				createDriver: deps.createInteractDriver,
+			})
+		: undefined;
+	if (interact) {
+		const purge = service.purgeTaskExecutionInTransaction;
+		service.purgeTaskExecutionInTransaction = (db, id) => {
+			const result = purge(db, id);
+			interact.purgeExecutionInTransaction(db, id);
+			return result;
+		};
+		const content = service.captureContent;
+		service.captureContent = async (owner, id) => {
+			const ref = store.read((db) =>
+				interact.captureRunInTransaction(db, owner, id),
+			);
+			return ref
+				? interact.captureContent(owner, ref.conversation_id, ref.run_id, id)
+				: content(owner, id);
+		};
+		const sweep = service.sweep;
+		service.sweep = async () => {
+			const result = await sweep();
+			await interact.sweep();
+			return result;
+		};
+	}
 	return {
 		service,
+		interact,
 		effects,
 		requests: browserRequests(deps.conversation),
 		/** Stops the MCP child when the process goes away; the user's browser is left as it is. */
 		close: () => {
 			unsubscribe?.();
-			return driver.close();
+			return Promise.all([driver.close(), interact?.close()]).then(
+				() => undefined,
+			);
 		},
 	};
 }

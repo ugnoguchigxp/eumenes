@@ -3,6 +3,8 @@ import { migrations as ocrMigrations } from "../domains/ocr";
 import { migrations as computeMigrations } from "../domains/compute";
 import { migrations as model3dMigrations } from "../domains/model3d";
 import { migrations as browserMigrations } from "../domains/browser";
+import { interactMigrations as browserInteractMigrations } from "../domains/browser";
+import { migrations as interactPackageSql } from "eumenes-interact/sqlite";
 import { migrations as excalidrawMigrations } from "../domains/excalidraw";
 import { migrations as objectRecognitionMigrations } from "../domains/object-recognition";
 import { migrations as imageMigrations } from "../domains/image";
@@ -137,13 +139,14 @@ const retiredContinuityMigration: Migration = {
 function packageMigrations(
 	owner: string,
 	sqls: readonly string[],
+	firstAfter: readonly string[] = [],
 ): Migration[] {
 	const ids = sqls.map((_, i) => `${owner}/${String(i + 1).padStart(4, "0")}`);
 	return sqls.map((sql, i) => {
 		const id = ids[i] as string;
 		return legacyOrder.includes(id)
 			? { id, sql }
-			: { id, sql, after: [ids[i - 1] as string] };
+			: { id, sql, after: i === 0 ? [...firstAfter] : [ids[i - 1] as string] };
 	});
 }
 
@@ -194,6 +197,10 @@ const catalog: readonly Migration[] = [
 	...model3dMigrations,
 	...computeMigrations,
 	...browserMigrations,
+	...packageMigrations("interact-package", interactPackageSql, [
+		browserMigrations.at(-1)!.id,
+	]),
+	...browserInteractMigrations,
 	...webResearchMigrations,
 	...capabilitiesMigrations,
 	...toolRuntimeMigrations,

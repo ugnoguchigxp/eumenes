@@ -126,6 +126,11 @@ import {
 	browserTaskStart,
 	browserTaskTarget,
 } from "./browser";
+import {
+	browserInteractStart,
+	browserInteractTarget,
+	browserInteractAnswer,
+} from "./browser-interact";
 export { stockQuote } from "./stock";
 export * from "./read-tools";
 export { musicPlaybackPlanV2, resourceRead };
@@ -219,6 +224,9 @@ export {
 	dotsWorkStopV1,
 } from "./dots-work";
 export const validators = {
+	browserInteractStart,
+	browserInteractTarget,
+	browserInteractAnswer,
 	dotsWorkStartV1,
 	dotsWorkListV1,
 	dotsWorkInspectV1,

@@ -13,7 +13,11 @@ const DNS_TIMEOUT_MS = 3_000;
 const DNS_CACHE_MAX = 500;
 
 /** Addresses of a host name, or null when it does not resolve in time. Short-lived cache: a tab list asks for every tab. */
-async function addressesOf(ctx: Ctx, hostname: string) {
+type DestinationContext = Pick<
+	Ctx,
+	"now" | "webOrigins" | "resolveHost" | "dnsCache"
+>;
+async function addressesOf(ctx: DestinationContext, hostname: string) {
 	const hit = ctx.dnsCache.get(hostname);
 	if (hit && hit.at > ctx.now() - DNS_TTL_MS) return hit.addresses;
 	let addresses: string[] | null = null;
@@ -46,7 +50,7 @@ async function addressesOf(ctx: Ctx, hostname: string) {
  * resolve it differently than this process does.
  */
 export async function urlVerdict(
-	ctx: Ctx,
+	ctx: DestinationContext,
 	raw: string,
 ): Promise<NavigationVerdict> {
 	const verdict = checkNavigationTarget(raw, ctx.webOrigins);

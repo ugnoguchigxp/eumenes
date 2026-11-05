@@ -15,6 +15,7 @@ import { createOcrAdapter } from "../media/ocr-adapter";
 import { createComputeAdapter } from "../compute/compute-adapter";
 import { createModel3dAdapter } from "../media/model3d-adapter";
 import { createBrowserAdapter } from "../browser/browser-adapter";
+import { createInteractAdapter } from "../browser/interact-adapter";
 import {
 	createTaskAdapter,
 	type TodoLedgerPort,
@@ -109,7 +110,8 @@ type ToolchainOptions = {
 	compute?: import("../../domains/compute").ComputeService;
 	model3d?: import("../../domains/model3d").Model3dService;
 	/** Brave tabs and local captures (absent: not offered). */
-	browser?: Pick<BrowserAssembly, "service" | "effects" | "requests">;
+	browser?: Pick<BrowserAssembly, "service" | "effects" | "requests"> &
+		Partial<Pick<BrowserAssembly, "interact">>;
 	/** PTY sessions for the terminal screen (absent: not offered). */
 	shell?: import("../../domains/shell").ShellService;
 	terminals?: import("../../domains/terminals").TerminalsService;
@@ -325,6 +327,14 @@ export async function createToolchain(
 						options.browser.effects,
 						options.browser.requests,
 					),
+					...(options.browser.interact
+						? [
+								createInteractAdapter(
+									options.browser.interact,
+									options.browser.requests,
+								),
+							]
+						: []),
 				]
 			: []),
 		...(options.objectRecognition

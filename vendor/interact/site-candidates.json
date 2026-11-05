@@ -1,0 +1,274 @@
+{
+	"sourceCommit": "d459f1bf94ca871676a993d524e613879cf93411",
+	"lastConfirmedAt": null,
+	"sites": [
+		{
+			"origins": ["https://biggo.jp"],
+			"pageProfiles": [
+				{
+					"name": "any",
+					"urlHint": "/",
+					"description": "結果ページの種類はまだ分かっていないので、サイト全体を一つの種類として扱う"
+				}
+			],
+			"objects": [
+				{
+					"profile": "any",
+					"logicalName": "search.query",
+					"description": "商品を検索する欄（Enterで検索）",
+					"candidates": [
+						{
+							"kind": "role",
+							"fields": {
+								"role": "textbox",
+								"name": "検索…"
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				},
+				{
+					"profile": "any",
+					"logicalName": "search.first_result",
+					"description": "検索結果の最初の商品ページへのリンク（/r/ の広告リンクは除く）",
+					"candidates": [
+						{
+							"kind": "structure",
+							"fields": {
+								"role": "link",
+								"named": "true",
+								"urlIncludes": "/gp/",
+								"urlExcludes": "#price|/compare",
+								"nth": 0
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				}
+			],
+			"sourceRef": "eumenes_interact:lab/knowledge/biggo.json",
+			"sourceSha256": "c5624c30e98aebe44f9cb11f64c81dd9eca397f05f48a8945273f703b5313094"
+		},
+		{
+			"origins": ["https://www.gizmodo.jp"],
+			"pageProfiles": [
+				{
+					"name": "any",
+					"urlHint": "/",
+					"description": "どのページでも共通（検索欄がある）"
+				},
+				{
+					"name": "search_results",
+					"urlHint": "/search/",
+					"description": "検索結果のページ（Google CSEの結果がページ内に出る）"
+				}
+			],
+			"objects": [
+				{
+					"profile": "any",
+					"logicalName": "search.query",
+					"description": "サイト内を検索する欄（Enterで検索）",
+					"candidates": [
+						{
+							"kind": "role",
+							"fields": {
+								"role": "textbox",
+								"name": "キーワードを入力"
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				},
+				{
+					"profile": "search_results",
+					"logicalName": "search.first_result",
+					"description": "検索結果の最初の記事へのリンク（google.comへのリンクは除く）",
+					"candidates": [
+						{
+							"kind": "structure",
+							"fields": {
+								"role": "link",
+								"named": "true",
+								"urlIncludes": "https://www.gizmodo.jp/article/",
+								"nth": 0
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				}
+			],
+			"sourceRef": "eumenes_interact:lab/knowledge/gizmodo.json",
+			"sourceSha256": "c31ac035d5a417baff6ed88e84e5d65fa094483c966b6a795981ebc1462cd75b"
+		},
+		{
+			"origins": ["https://slashdot.org"],
+			"pageProfiles": [
+				{
+					"name": "any",
+					"urlHint": "/",
+					"description": "どのページでも共通（検索欄がある）"
+				},
+				{
+					"name": "search_results",
+					"urlHint": "/index2.pl",
+					"description": "検索結果のページ"
+				}
+			],
+			"objects": [
+				{
+					"profile": "any",
+					"logicalName": "search.query",
+					"description": "サイト内を検索する欄（Enterで検索）",
+					"candidates": [
+						{
+							"kind": "role",
+							"fields": {
+								"role": "textbox",
+								"name": "Search"
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				},
+				{
+					"profile": "search_results",
+					"logicalName": "search.first_result",
+					"description": "検索結果の最初のストーリーの見出しリンク。押すとページ内のJavaScriptが要約本文をその場に展開する。サイドバーの「Most Discussed」等のリンク（?sbsrc=）とコメントへのリンク、元記事の外部リンクは除く",
+					"candidates": [
+						{
+							"kind": "structure",
+							"fields": {
+								"role": "link",
+								"named": "true",
+								"withinRole": "article",
+								"urlIncludes": "/story/",
+								"urlExcludes": "#comments|sbsrc=",
+								"nth": 0
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				},
+				{
+					"profile": "search_results",
+					"logicalName": "search.first_story",
+					"description": "検索結果の最初のストーリー。要約本文は見出しを押して展開するまで隠れている",
+					"candidates": [
+						{
+							"kind": "structure",
+							"fields": {
+								"role": "article",
+								"nth": 0
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				}
+			],
+			"sourceRef": "eumenes_interact:lab/knowledge/slashdot.json",
+			"sourceSha256": "db9a87922e8fa42fb580431213345cc848e76e6a7d330efa24499a41f8d81401"
+		},
+		{
+			"origins": ["https://ja.wikipedia.org"],
+			"pageProfiles": [
+				{
+					"name": "any",
+					"urlHint": "/",
+					"description": "どのページでも共通（検索欄がある）"
+				},
+				{
+					"name": "search_results",
+					"urlHint": "/w/index.php",
+					"description": "検索結果のページ。題名が完全一致しない検索はここに来る"
+				},
+				{
+					"name": "article",
+					"urlHint": "/wiki/",
+					"description": "記事のページ"
+				}
+			],
+			"objects": [
+				{
+					"profile": "any",
+					"logicalName": "search.query",
+					"description": "全ページにある、Wikipedia内を検索する欄（Enterで検索）",
+					"candidates": [
+						{
+							"kind": "role",
+							"fields": {
+								"role": "searchbox",
+								"name": "Wikipedia内を検索"
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				},
+				{
+					"profile": "search_results",
+					"logicalName": "search.first_result",
+					"description": "検索結果の最初の記事へのリンク（ヘルプ・特別ページ・赤リンクを除く）",
+					"candidates": [
+						{
+							"kind": "structure",
+							"fields": {
+								"role": "link",
+								"withinRole": "main",
+								"named": "true",
+								"urlIncludes": "/wiki/",
+								"urlExcludes": "/wiki/Help:|/wiki/Special:|/wiki/特別:",
+								"nth": 0
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				},
+				{
+					"profile": "article",
+					"logicalName": "article.body",
+					"description": "記事の本文を含む領域",
+					"candidates": [
+						{
+							"kind": "role",
+							"fields": {
+								"role": "main"
+							},
+							"source": {
+								"adapter": "playwright-mcp",
+								"via": "snapshot"
+							}
+						}
+					]
+				}
+			],
+			"sourceRef": "eumenes_interact:lab/knowledge/wikipedia.json",
+			"sourceSha256": "5713f5899f7401f818917db669e4783f96e9350051ee4229bbd1201a1d69cc6e"
+		}
+	]
+}

@@ -106,7 +106,7 @@ export function buildResources(deps: {
 			createUiCompositionResourceAdapter({ store }),
 			reports,
 			createComputeResourceAdapter({ store, owner }),
-			createBrowserResourceAdapter({ store, owner }),
+			createBrowserResourceAdapter({ store, owner, includeInteract: true }),
 			createOcrResourceAdapter({ store }),
 			createPipelinesResourceAdapter({ store }),
 			codeTasks,
