@@ -1,12 +1,11 @@
 import type { Database } from "bun:sqlite";
 import { READ_TOOLS, type Capabilities } from "../../domains/capabilities";
 import {
+	INPUT_HEADINGS,
 	routerFixedCards,
 	type ToolchainRoutingPort,
 } from "../../domains/dialogue";
-import { candidateOf } from "../../domains/dialogue/service/executor-context";
-import { INPUT_HEADINGS } from "../../domains/dialogue/service/input-text";
-import { toolResultText } from "../../domains/dialogue/service/result-text";
+import { candidateLines } from "../../domains/dialogue/test/router-presentation.fixture";
 import {
 	ROUTER_MODEL,
 	ROUTER_SPACE,
@@ -59,11 +58,7 @@ export async function attachFixtureRouter(input: {
 		const toolIds = new Set(tools.map((card) => card.id));
 		const lines = [
 			// One result per tool, as the fill call reads its candidate: a long list is not cut to the search's budget.
-			...tools.map((card) =>
-				toolResultText("find_toolchain", {
-					candidates: [candidateOf(card, null)],
-				}),
-			),
+			...candidateLines(tools),
 			...route.criteria
 				.filter((c) => !toolIds.has(c.name))
 				.map((c) => `- ${c.name}: ${c.description}`),

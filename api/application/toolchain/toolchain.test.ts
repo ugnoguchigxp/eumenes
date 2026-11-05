@@ -1,6 +1,46 @@
 import { test, expect } from "bun:test";
 import { harness, forbidden, workerPacket } from "./toolchain.fixture";
 import { settle, waitFor } from "../../infrastructure/wait-for";
+
+/** Failed research keeps its result in the archive and publishes one unread completion notice. */
+async function expectFailureNotice(
+	h: Awaited<ReturnType<typeof harness>>,
+	runId: string,
+	code: string,
+) {
+	const page = h.store.read((db) =>
+		h.dialogue.todoPageInTransaction(db, "main", {
+			state: "archived",
+			pageIndex: 0,
+			pageSize: 10,
+		}),
+	);
+	expect(h.todos()).toEqual([]);
+	expect(page.total).toBe(1);
+	expect(page.rows).toHaveLength(1);
+	const todo = page.rows[0]!;
+	expect(todo).toMatchObject({
+		runId,
+		status: "done",
+		outcome: "failed",
+		result: { code },
+		noticeReadAt: null,
+	});
+	expect(todo.archivedAt).not.toBeNull();
+	const response = await h.request("/api/todo-notices");
+	expect(response.status).toBe(200);
+	const { notices, unread } = await response.json();
+	expect(unread).toBe(1);
+	expect(notices).toHaveLength(1);
+	expect(notices[0]).toMatchObject({
+		id: todo.id,
+		conversationId: "main",
+		outcome: "failed",
+		summary: JSON.stringify({ code }),
+		read: false,
+	});
+}
+
 test("a plain weather request carries useful details and actual sources into the finished TODO's result", async () => {
 	const h = await harness({ excerptEvidence: true });
 	try {
@@ -256,7 +296,10 @@ test("rolled-back cancellation cannot cancel another conversation's pending infe
 		await h.close();
 	}
 });
-for (const options of [{ badJson: true }, { badQuote: true }])
+for (const [options, code] of [
+	[{ badJson: true }, "invalid_control_json"],
+	[{ badQuote: true }, "invalid_evidence"],
+] as const)
 	test(`bounded rejected worker output: ${JSON.stringify(options)}`, async () => {
 		const h = await harness(options);
 		try {
@@ -272,14 +315,13 @@ for (const options of [{ badJson: true }, { badQuote: true }])
 				.list(run.id)
 				.find((t) => t.kind === "worker")!;
 			expect(child.status).toBe("failed");
+			expect(child.errorCode).toBe(code);
 			expect(
 				h.toolchain.agents.report(h.dialogue.get(run.id)!.agentTaskId!),
 			).toBe(null);
 			expect(child.modelCalls).toBeLessThanOrEqual(5);
-			// The failed research is the TODO's result; the agency reports it, so the run says nothing more.
-			expect(h.todos().map((todo) => [todo.status, todo.outcome])).toEqual([
-				["done", "failed"],
-			]);
+			// Completion archives the failed result and tells the user through the screen's notice.
+			await expectFailureNotice(h, run.id, code);
 			expect(h.dialogue.answerText(run.id)).toBeNull();
 			expect(
 				h.store.read((db) =>
@@ -477,10 +519,7 @@ test("worker deadline cancels acquisition and fails the research, which the TODO
 			.find((t) => t.kind === "worker")!;
 		expect(child.status).toBe("failed");
 		expect(child.errorCode).toBe("deadline_exceeded");
-		// The failed research is the TODO's result; the agency reports it.
-		expect(h.todos().map((todo) => [todo.status, todo.outcome])).toEqual([
-			["done", "failed"],
-		]);
+		await expectFailureNotice(h, run.id, "deadline_exceeded");
 		expect(h.dialogue.answerText(run.id)).toBeNull();
 	} finally {
 		release();

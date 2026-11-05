@@ -74,26 +74,6 @@ export function createToolchainRouting(
 			throw new Error("adapter_unavailable");
 		return adapter;
 	}
-	/** The binding's tools with the package tool's id and summary and the flat JSON schema. */
-	function boundTools(
-		db: Database,
-		set: ReturnType<Capabilities["toolchainSetInTransaction"]>,
-		tools: BindingV1["tools"],
-	) {
-		return tools.map((t) => {
-			const tool = set.tools.find((x) => x.revisionId === t.toolRevisionId);
-			const schema = schemas.resolveInTransaction(db, t.inputSchemaRef);
-			if (!tool || !schema) throw new Error("required_context_missing");
-			return {
-				id: tool.id,
-				toolRevisionId: t.toolRevisionId,
-				operationName: t.operationId,
-				inputSchemaRef: t.inputSchemaRef,
-				summary: tool.summary,
-				schema: z.toJSONSchema(schema) as Record<string, unknown>,
-			};
-		});
-	}
 	const instant = createInstantRouting({
 		capabilities,
 		registry,
@@ -258,7 +238,7 @@ export function createToolchainRouting(
 					artifactRevisionId: doc.artifactRevisionId,
 					packageRevisionId: set.package.revisionId,
 					questions: doc.questions ?? [],
-					tools: boundTools(db, set, doc.tools),
+					tools: boundTools(db, set, doc.tools, schemas),
 					...(doc.agent ? { agentTurn: doc.agent.turn } : {}),
 				};
 			}
@@ -293,7 +273,7 @@ export function createToolchainRouting(
 				packageRevisionId: set.package.revisionId,
 				profile: set.profile,
 				skills: set.skills,
-				tools: boundTools(db, set, doc.tools),
+				tools: boundTools(db, set, doc.tools, schemas),
 				targetSchemaRef: doc.session.targetSchemaRef ?? null,
 				timeLimits: doc.timeLimits ?? null,
 				agent: agentOf(doc.agent, () => adapter.describe().workspaces),
@@ -332,6 +312,28 @@ export function createToolchainRouting(
 		requestOfRunInTransaction: history.requestOfRunInTransaction,
 		usageOfRunInTransaction: history.usageOfRunInTransaction,
 	};
+}
+
+/** The binding's tools with the package tool's id and summary and the flat JSON schema. */
+function boundTools(
+	db: Database,
+	set: ReturnType<Capabilities["toolchainSetInTransaction"]>,
+	tools: BindingV1["tools"],
+	schemas: SchemaProvider,
+) {
+	return tools.map((t) => {
+		const tool = set.tools.find((x) => x.revisionId === t.toolRevisionId);
+		const schema = schemas.resolveInTransaction(db, t.inputSchemaRef);
+		if (!tool || !schema) throw new Error("required_context_missing");
+		return {
+			id: tool.id,
+			toolRevisionId: t.toolRevisionId,
+			operationName: t.operationId,
+			inputSchemaRef: t.inputSchemaRef,
+			summary: tool.summary,
+			schema: z.toJSONSchema(schema) as Record<string, unknown>,
+		};
+	});
 }
 
 /**

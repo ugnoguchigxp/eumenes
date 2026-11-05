@@ -212,6 +212,34 @@ const createResearchRuntime = (
 		autonomousResearch: autonomousResearchAllowed,
 	});
 
+/** Backends enabled by the host's available service ports. */
+function enabledBackends(options: ToolchainOptions) {
+	return new Set([
+		...(options.docling ? ["docling"] : []),
+		"task-execution",
+		...(options.webResearch !== false ? ["web"] : []),
+		...(options.timers ? ["timer"] : []),
+		...(options.dots ? ["dots"] : []),
+		...(options.music ? ["music"] : []),
+		...(options.image ? ["image"] : []),
+		...(options.uiCompositions ? ["ui-compositions"] : []),
+		...(options.objectRecognition ? ["object-recognition"] : []),
+		...(options.shell ? ["shell"] : []),
+		...(options.terminals ? ["claude-code"] : []),
+		...(options.kanban && options.terminals ? ["kanban"] : []),
+		...(options.kanbanSdk ? ["codex-tasks"] : []),
+		...(options.weather ? ["weather"] : []),
+		...(options.stock ? ["stock"] : []),
+		...(options.worldResearch ? ["world-query"] : []),
+		...(options.ocr ? ["ocr"] : []),
+		...(options.model3d ? ["model3d"] : []),
+		...(options.compute ? ["compute"] : []),
+		...(options.browser ? ["browser"] : []),
+		...(options.excalidraw ? ["excalidraw"] : []),
+		...(options.conversation && options.history !== false ? ["history"] : []),
+	]);
+}
+
 export async function createToolchain(
 	store: SqliteStore,
 	queue: QueueService,
@@ -343,34 +371,9 @@ export async function createToolchain(
 			? [createServiceTestsAdapter(options.serviceTests)]
 			: []),
 	]);
-	const capabilities = createCapabilities(
-		store,
-		new Set([
-			...(options.docling ? ["docling"] : []),
-			"task-execution",
-			...(options.webResearch !== false ? ["web"] : []),
-			...(options.timers ? ["timer"] : []),
-			...(options.dots ? ["dots"] : []),
-			...(options.music ? ["music"] : []),
-			...(options.image ? ["image"] : []),
-			...(options.uiCompositions ? ["ui-compositions"] : []),
-			...(options.objectRecognition ? ["object-recognition"] : []),
-			...(options.shell ? ["shell"] : []),
-			...(options.terminals ? ["claude-code"] : []),
-			...(options.kanban && options.terminals ? ["kanban"] : []),
-			...(options.kanbanSdk ? ["codex-tasks"] : []),
-			...(options.weather ? ["weather"] : []),
-			...(options.stock ? ["stock"] : []),
-			...(options.worldResearch ? ["world-query"] : []),
-			...(options.ocr ? ["ocr"] : []),
-			...(options.model3d ? ["model3d"] : []),
-			...(options.compute ? ["compute"] : []),
-			...(options.browser ? ["browser"] : []),
-			...(options.excalidraw ? ["excalidraw"] : []),
-			...(options.conversation && options.history !== false ? ["history"] : []),
-		]),
-		{ bundleHost: () => bundleHostOf(registry) },
-	);
+	const capabilities = createCapabilities(store, enabledBackends(options), {
+		bundleHost: () => bundleHostOf(registry),
+	});
 	await capabilities.seed();
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(
