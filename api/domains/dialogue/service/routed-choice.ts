@@ -127,16 +127,22 @@ function memoryBranch(withSay = true): Schema {
  * one branch the router decided on (without `say`: the host says its own words).
  */
 export function fillSchema(
-	candidate: ChoiceCandidate | typeof MEMORY_REQUEST,
+	candidate: ChoiceCandidate | ChoiceCandidate[] | typeof MEMORY_REQUEST,
 	{ resources, switching }: Pick<RoutedInput, "resources" | "switching">,
 ): Schema {
 	return {
 		anyOf: [
 			branch({ choice: only("none") }),
 			branch({ choice: only("ask"), say: SAY }),
-			candidate === MEMORY_REQUEST
-				? memoryBranch(false)
-				: candidateBranch(candidate, resources, switching, false),
+			...(Array.isArray(candidate)
+				? candidate.map((item) =>
+						candidateBranch(item, resources, switching, false),
+					)
+				: [
+						candidate === MEMORY_REQUEST
+							? memoryBranch(false)
+							: candidateBranch(candidate, resources, switching, false),
+					]),
 		],
 	};
 }
@@ -150,7 +156,8 @@ function previousLine(routed: RoutedInput): string[] {
 export function fillMessages(input: {
 	style: string;
 	routed: RoutedInput;
-	candidate: ChoiceCandidate | typeof MEMORY_REQUEST;
+	candidate: ChoiceCandidate | ChoiceCandidate[] | typeof MEMORY_REQUEST;
+	components?: readonly ChoiceCandidate[];
 	utterance: string;
 }): ChatMessage[] {
 	const { routed } = input;
@@ -167,15 +174,30 @@ export function fillMessages(input: {
 		INPUT_HEADINGS.candidates,
 		input.candidate === MEMORY_REQUEST
 			? `- memory.request: ${systemContext("dialogue.contexts.local.memory-request", {})}`
-			: toolResultText("find_toolchain", { candidates: [input.candidate] }),
+			: toolResultText("find_toolchain", {
+					candidates: Array.isArray(input.candidate)
+						? input.candidate
+						: [input.candidate],
+				}),
+		...(input.components?.length
+			? [
+					"## Related candidates",
+					toolResultText("find_toolchain", { candidates: input.components }),
+				]
+			: []),
 		`${INPUT_HEADINGS.user}\n${dataText(input.utterance)}`,
 	];
 	return [
 		{
 			role: "system",
-			content: systemContext("dialogue.contexts.local.router-fill", {
-				style: input.style,
-			}),
+			content: systemContext(
+				Array.isArray(input.candidate)
+					? "dialogue.contexts.local.router-work"
+					: "dialogue.contexts.local.router-fill",
+				{
+					style: input.style,
+				},
+			),
 		},
 		{ role: "user", content: lines.join("\n") },
 	];

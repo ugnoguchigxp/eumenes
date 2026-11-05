@@ -132,6 +132,14 @@ test("a collaborative draft is edited, confirmed and executed exactly once witho
 				encodeURIComponent(JSON.stringify({ conversationId })),
 		);
 	try {
+		const saved = h.settings.get();
+		saved.routes.llm.mode = "larm-preferred";
+		await h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: saved.revision,
+			settings: saved,
+			keys: [],
+		});
 		expect(
 			h.store
 				.read((db) => h.routing.catalogInTransaction(db))
@@ -161,9 +169,24 @@ test("a collaborative draft is edited, confirmed and executed exactly once witho
 			h.toolchain.agents.executions.list("main")[0]?.status,
 			JSON.stringify(h.toolchain.agents.executions.list("main")[0]),
 		).toBe("completed");
-		await waitFor(() => observations.length === 1, { timeout: 6000 });
+		await waitFor(
+			async () =>
+				(await session())?.activeRunId === null && observations.length === 1,
+			{ timeout: 6000 },
+		);
 		expect((await session()).id).toBe(owner.id);
 		expect(compose).toBe(0);
+		const commandSnapshots = h.store.read((db) =>
+			db
+				.query<{ snapshot: string }, []>(
+					"SELECT snapshot FROM inference_requests WHERE subject LIKE 'execution-command:%' ORDER BY subject",
+				)
+				.all(),
+		);
+		expect(commandSnapshots).toHaveLength(2);
+		expect(
+			commandSnapshots.map((row) => JSON.parse(row.snapshot).routes.llm.mode),
+		).toEqual(["larm-preferred", "larm-preferred"]);
 		expect(h.toolchain.agents.executions.list("main")).toHaveLength(1);
 		const timers = await (await h.request("/api/timers")).json();
 		expect(
@@ -176,7 +199,9 @@ test("a collaborative draft is edited, confirmed and executed exactly once witho
 				.read((db) => h.conversation.messagesInTransaction(db, "main"))
 				.filter((m) => m.role === "user"),
 		).toHaveLength(3);
-		expect((await (await source()).json()).data.work.summary).toBeTruthy();
+		expect((await (await source()).json()).data.work.summary).toBe(
+			"二つのタイマーを作成しました。",
+		);
 		expect((await source("another-conversation")).status).toBe(404);
 	} finally {
 		await h.close();

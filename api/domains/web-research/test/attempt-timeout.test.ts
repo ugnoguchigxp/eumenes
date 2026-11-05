@@ -7,7 +7,11 @@ import { createQueue, migration as queueMigration } from "../../queue";
 import { createWebResearch, type AcquisitionPort } from "..";
 import type { ResearchResult } from "../contracts";
 import { waitFor } from "../../../infrastructure/wait-for";
-import { attemptTimeoutMigration, migration } from "../repository";
+import {
+	acquisitionTimeoutMigration,
+	attemptTimeoutMigration,
+	migration,
+} from "../repository";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -34,13 +38,18 @@ const response = (): ResearchResult => ({
 		},
 	],
 });
-function setup(execute: AcquisitionPort["execute"], capacity = 2) {
+function setup(
+	execute: AcquisitionPort["execute"],
+	capacity = 2,
+	acquisitionTimeoutMs = 30000,
+) {
 	const dir = mkdtempSync(join(tmpdir(), "web-attempt-"));
 	const clock = { t: 1000000 };
 	const store = openStore(join(dir, "main.db"), [
 		queueMigration,
 		migration,
 		attemptTimeoutMigration,
+		acquisitionTimeoutMigration,
 	]);
 	const queue = createQueue(store, {
 		now: () => clock.t,
@@ -51,6 +60,7 @@ function setup(execute: AcquisitionPort["execute"], capacity = 2) {
 		store,
 		queue,
 		acquisition: { execute, async close() {} },
+		acquisitionTimeoutMs,
 		now: () => clock.t,
 		timers: {
 			set: (fn, ms) => timers.push({ fn, ms, cleared: false }) - 1,
@@ -80,6 +90,70 @@ async function until(cond: () => boolean, tick: () => Promise<void>) {
 		return cond();
 	});
 }
+
+test("a host-owned longer acquisition survives the short route's expiry and keeps its persisted bound", async () => {
+	const calls: Array<{ signal: AbortSignal; finish: () => void }> = [];
+	// Scale the shared timer down; Queue ownership/deadlines and persistence remain real.
+	const s = setup(
+		(_input, signal) =>
+			new Promise((resolve) =>
+				calls.push({
+					signal,
+					finish: () => resolve({ result: response(), freshUntilMs: null }),
+				}),
+			),
+		2,
+		10,
+	);
+	const fast = await submit(s);
+	const request = read();
+	const slow = await s.store.write((db) =>
+		s.service.submitInTransaction(db, request, {
+			deadlineAtMs: s.clock.t + 10000,
+			lane: "background",
+			acquisitionTimeoutMs: 1000,
+		}),
+	);
+	expect(
+		s.store.read((db) =>
+			db
+				.query(
+					"SELECT acquisition_timeout_ms FROM web_research_runs WHERE id=?",
+				)
+				.get(slow.runId),
+		),
+	).toEqual({ acquisition_timeout_ms: 1000 });
+	await expect(
+		s.store.write((db) =>
+			s.service.submitInTransaction(db, request, {
+				deadlineAtMs: s.clock.t + 10000,
+				lane: "background",
+				acquisitionTimeoutMs: 2000,
+			}),
+		),
+	).rejects.toThrow("request_conflict");
+	await until(() => calls.length === 2, s.queue.tick);
+	await until(
+		() => s.service.get(fast.runId)?.status === "failed",
+		s.queue.tick,
+	);
+	expect(calls[1]!.signal.aborted).toBe(false);
+	calls[1]!.finish();
+	await until(
+		() => s.service.get(slow.runId)?.status === "completed",
+		s.queue.tick,
+	);
+	for (const acquisitionTimeoutMs of [0, 120001, NaN])
+		await expect(
+			s.store.write((db) =>
+				s.service.submitInTransaction(db, read(), {
+					deadlineAtMs: s.clock.t + 10000,
+					lane: "background",
+					acquisitionTimeoutMs,
+				}),
+			),
+		).rejects.toThrow("invalid_web_acquisition_timeout");
+});
 function submit(
 	s: ReturnType<typeof setup>,
 	attemptTimeoutMs?: number,

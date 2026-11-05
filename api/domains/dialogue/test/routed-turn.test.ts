@@ -130,8 +130,10 @@ test("no candidate fits: the talk turn answers with only the read tools, on a sy
 		"delegate",
 	])
 		expect(system).not.toContain(word);
+	expect(system).toContain("渡された読む道具で、記録");
+	expect(system).toContain("受付は反映完了ではありません。");
 	expect(system).toContain(
-		"この返事でできるのは、読む道具が渡されているときに",
+		"その他の作業を始めること、Webで調べること、外部を操作することはできず",
 	);
 	// Nor does it write what a toolchain makes: a page or a text it is asked for goes to a toolchain.
 	expect(system).toContain(

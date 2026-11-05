@@ -125,9 +125,9 @@ export function buildWebResearch(
 		store,
 		queue,
 		cache: webCache,
-		review: createWebReview(store, inference),
+		review: createWebReview(store, inference, 120000),
 		acquisition: createWebAcquisition({
-			review: createWebReview(store, inference),
+			review: createWebReview(store, inference, 120000),
 		}),
 		acquisitionTimeoutMs: 30000,
 	});

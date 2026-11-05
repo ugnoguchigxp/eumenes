@@ -451,6 +451,17 @@ export const domains = {
 		components: "web/src/components/domains/timers",
 		depends: { api: ["queue", "scheduler"], web: ["resources"], test: [] },
 	},
+	pursuit: {
+		tier: 3,
+		backend: "api/domains/pursuit",
+		web: null,
+		components: null,
+		depends: {
+			api: ["capabilities", "inference", "queue", "tool-runtime"],
+			web: [],
+			test: [],
+		},
+	},
 	dialogue: {
 		tier: 5,
 		backend: "api/domains/dialogue",

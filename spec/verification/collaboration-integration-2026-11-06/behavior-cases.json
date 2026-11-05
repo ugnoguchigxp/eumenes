@@ -1,0 +1,84 @@
+{
+	"date": "2026-11-06",
+	"modelObserved": "gpt-6-luna",
+	"transport": "actual native codex app-server; saved keyless ChatGPT login",
+	"additionalPaidApiCalls": 0,
+	"selectionCases": [
+		{
+			"name": "actual mixed-score draft failure",
+			"input": "二つのタイマーを開始する手順を、担当と共同編集したいです。見出しは「30分・60分のタイマー」にしてください。最初に30分を開始し、開始を確認したら終了を待たずにすぐ二つ目の60分を開始します。まず下書きだけを作り、まだ実行しないでください。",
+			"expectedToolchain": "collaboration.pipeline",
+			"observedToolchain": "collaboration.pipeline",
+			"passed": true
+		},
+		{
+			"name": "genuine multiple output execution",
+			"input": "猫の画像を1枚と、落ち着いた10秒のピアノ曲を作り、両方を届けてください。今実行してください。",
+			"expectedToolchain": "pipeline.execute",
+			"observedToolchain": "pipeline.execute",
+			"passed": true
+		},
+		{
+			"name": "single interactive UI with multiple parts",
+			"input": "見出しと本文とフォームのある画面を一緒に作りたいです。最初の下書きを見せて、修正してから保存したいです。",
+			"expectedToolchain": "ui.compose",
+			"observedToolchain": "ui.compose",
+			"passed": true
+		},
+		{
+			"name": "same complete timer request with related handler information",
+			"input": "30分のタイマーを開始し、開始できたら続けて60分のタイマーも開始してください。どちらも終了を待つ必要はありません。今、この二つを実行してください。",
+			"expectedToolchain": "pipeline.execute",
+			"observedToolchain": "pipeline.execute",
+			"passed": true
+		}
+	],
+	"nativeMainWorkflow": {
+		"conversationId": "collab-main-pipeline-20261106-0750",
+		"sessionId": "5acc4a19-0450-47f4-9d33-116e5bee9962",
+		"childId": "f4f294ab-659e-49ec-b220-f839bb31260b",
+		"userInputs": 4,
+		"stages": [
+			"draft 30/60",
+			"partial edit second timer to45; explicitly named title retained",
+			"next real user input: second40 and current-condition title",
+			"separate confirmation",
+			"native child execution",
+			"persisted terminal observation and same specialist reply"
+		],
+		"assertions": {
+			"passed": true,
+			"exactConfirmedDefinition": true,
+			"parentComposerCalls": 0,
+			"childOperations": 2,
+			"sameSpecialist": true,
+			"userInputs": 4,
+			"noSyntheticUserTurn": true,
+			"timerSeconds": [
+				1800,
+				2400
+			],
+			"cancelledTimers": [
+				{
+					"id": "7ad239bb-9fb4-48c5-ba92-c5da2e8c380a",
+					"action": "cancelled"
+				},
+				{
+					"id": "80ca0d88-123c-4b6c-8d70-873112e81d86",
+					"action": "cancelled"
+				}
+			],
+			"resultReply": "30分と40分のタイマーは、どちらも開始済みです。"
+		},
+		"note": "r7 title expectation was not passed. r8 continues the actual session with an explicit additional user edit; no replay, no synthesized user turn."
+	},
+	"runtimeRegressions": [
+		"whole-work owner can be selected instead of an automatic multi-job pipeline",
+		"related components inform the model without becoming partial first-job destinations",
+		"unavailable or malformed choices cannot dispatch",
+		"original whole execution request is preserved",
+		"schema refusals expose key names and expected types without argument values",
+		"command children inherit the saved subagent route",
+		"UI report is an adopted terminal explanation scoped to exact session and child; forget removes it"
+	]
+}

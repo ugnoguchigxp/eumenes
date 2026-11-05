@@ -276,6 +276,7 @@ export async function buildServices(
 	links.attachDialogue(dialogue);
 	if (enabled && toolchains)
 		configureTaskExecution({
+			pursuit: toolchain.pursuit,
 			collaboration: toolchain.collaboration,
 			interact: browser.interact,
 			queue,

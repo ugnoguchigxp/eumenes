@@ -31,6 +31,7 @@ export type MemoryDescription = {
 	coverage: {
 		stateTotal: number;
 		stateShown: number;
+		stateVersionsTotal?: number;
 		tendenciesTotal: number;
 		tendenciesShown: number;
 	};
@@ -56,7 +57,10 @@ export function activeStateItems(env: StepEnv): StateItem[] {
  * The long-term list (State, then tendencies) and the live notes, each with a short ref. The list is cut where
  * it would outgrow the profile section of the window plan (estimated tokens), newest first.
  */
-export function describeMemory(env: StepEnv): MemoryDescription {
+export function describeMemory(
+	env: StepEnv,
+	{ includeInactive = false }: { includeInactive?: boolean } = {},
+): MemoryDescription {
 	const { db, deps, conversationId } = env;
 	const refs: MemoryDescription["refs"] = {};
 	const longTerm: MemoryDescription["longTerm"] = [];
@@ -77,14 +81,54 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 		return true;
 	};
 	let m = 0;
-	const stateItems = activeStateItems(env);
+	const stateItems = includeInactive
+		? [...deps.memory.stateItemsInTransaction(db, true)]
+				.filter((item) => item.subject === "self")
+				.sort((a, b) => b.updatedSeq - a.updatedSeq)
+		: activeStateItems(env);
+	const groups = new Map<string, StateItem[]>();
 	for (const item of stateItems) {
+		// The memory port has already restricted these items to its authenticated principal.
+		const identity = includeInactive
+			? JSON.stringify([
+					item.scopeKey,
+					item.subject,
+					item.kind,
+					item.semanticKey,
+				])
+			: item.itemId;
+		const versions = groups.get(identity) ?? [];
+		versions.push(item);
+		groups.set(identity, versions);
+	}
+	for (const versions of groups.values()) {
+		const item =
+			versions.find((version) => version.status === "active") ?? versions[0]!;
 		const ref = `lm${m + 1}`;
 		const entry: Record<string, unknown> = {
 			ref,
 			kind: item.kind,
 			key: item.semanticKey,
 			origin: item.origin,
+			...(includeInactive ? { status: item.status } : {}),
+			...(includeInactive && versions.length > 1
+				? {
+						versions: versions.map((version) => ({
+							text: version.value.text,
+							status: version.status,
+							origin: version.origin,
+							polarity: version.value.polarity,
+							validFrom:
+								version.validFromMs === null
+									? null
+									: localDay(version.validFromMs),
+							validUntil:
+								version.validUntilMs === null
+									? null
+									: localDay(version.validUntilMs - 1),
+						})),
+					}
+				: {}),
 			text: item.value.text,
 			...(item.value.polarity === "negated" ? { polarity: "negated" } : {}),
 			...(item.validFromMs === null
@@ -130,8 +174,9 @@ export function describeMemory(env: StepEnv): MemoryDescription {
 		shortTerm,
 		recent,
 		coverage: {
-			stateTotal: stateItems.length,
+			stateTotal: groups.size,
 			stateShown: m,
+			...(includeInactive ? { stateVersionsTotal: stateItems.length } : {}),
 			tendenciesTotal: tendencies.length,
 			tendenciesShown: t,
 		},

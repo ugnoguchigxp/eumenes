@@ -49,6 +49,73 @@ async function learnAddress(h: StewardHarness) {
 	return first;
 }
 
+test("a forget request can identify and erase an inactive memory", async () => {
+	const h = await setup();
+	await learnAddress(h);
+	h.inference.script("curate-memory", (data) => {
+		const ref = (data.longTerm as Array<{ ref: string }>)[0]!.ref;
+		return { ...empty, stop: [{ ref, why: "user_asked" }] };
+	});
+	await h.run({ user: "住所の記憶は使うのをやめてください", end: "completed" });
+	await h.drain();
+	expect(h.memory.list()).toEqual([]);
+	expect(h.memory.list(true)[0]!.status).toBe("inactive");
+	h.inference.script("curate-memory", (data) => {
+		const item = (
+			data.longTerm as Array<{ ref: string; status: string; text: string }>
+		).find((item) => item.text.includes("千代田区"));
+		expect(item?.status).toBe("inactive");
+		return { ...empty, resolve: [resolve({ refs: [item!.ref] })] };
+	});
+	await h.run({
+		user: "停止した住所の記憶も忘れてください",
+		end: "completed",
+		requests: [{ kind: "forget", what: "住所の記憶" }],
+	});
+	await h.drain();
+	expect(
+		h.memory.list(true).filter((item) => item.semanticKey === "address"),
+	).toEqual([]);
+	expect(h.inbox().at(-1)?.state).toBe("done");
+});
+
+test("a fact with more than five versions uses one forget reference and erases every version", async () => {
+	const h = await setup();
+	await learnAddress(h);
+	for (let version = 1; version <= 5; version++) {
+		const text = `住所は東京都千代田区の${version}番地`;
+		h.inference.script("curate-memory", (data) => ({
+			...empty,
+			update: [
+				{
+					ref: (data.longTerm as Array<{ ref: string }>)[0]!.ref,
+					text,
+					evidence: "e1",
+					quote: null,
+					negated: false,
+				},
+			],
+		}));
+		await h.run({ user: text, end: "completed" });
+		await h.drain();
+	}
+	expect(h.memory.list(true)).toHaveLength(6);
+	h.inference.script("curate-memory", (data) => {
+		const items = data.longTerm as Array<{ ref: string; versions: unknown[] }>;
+		expect(items).toHaveLength(1);
+		expect(items[0]!.versions).toHaveLength(6);
+		return { ...empty, resolve: [resolve({ refs: [items[0]!.ref] })] };
+	});
+	await h.run({
+		user: "住所の記憶を過去の版も忘れてください",
+		end: "completed",
+		requests: [{ kind: "forget", what: "住所の全版" }],
+	});
+	await h.drain();
+	expect(h.memory.list(true)).toEqual([]);
+	expect(h.inbox().at(-1)?.state).toBe("done");
+});
+
 test("a forget request erases the memory and blocks the exchanges, and nothing else of the steward keeps the words", async () => {
 	const h = await setup();
 	const first = await learnAddress(h);

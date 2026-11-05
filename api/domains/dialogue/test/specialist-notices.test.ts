@@ -6,6 +6,46 @@ afterEach(async () => {
 	for (const h of opened.splice(0)) await h.close();
 });
 
+test("the screen reuses only an adopted terminal explanation of the same session and child, and forget removes it", async () => {
+	const h = await setup();
+	opened.push(h);
+	h.handOver({ request: "一緒に作品を作る" });
+	h.state.specialist.push({ action: "reply", text: "始めます。" });
+	const original = await h.ask("一緒に作品を作る");
+	const session = h.session()!;
+	h.state.specialist.push({ action: "reply", text: "作品を作成しました。" });
+	expect(
+		await h.dialogue.notifySpecialist({
+			sessionId: session.id,
+			epoch: session.epoch,
+			sourceRunId: original.id,
+			eventId: "completed-child",
+			event: {
+				id: "child-1",
+				status: "completed",
+				revision: 1,
+				summary: '{"internal":"result"}',
+			},
+		}),
+	).toBe(true);
+	await h.until(
+		() =>
+			h.state.specialistPrompts.length === 2 &&
+			h.session()?.activeRunId === null,
+	);
+	const report = (owner: string, child: string) =>
+		h.store.read((db) =>
+			h.dialogue.specialistResultTextInTransaction(db, owner, child),
+		);
+	expect(report(session.id, "child-1")).toBe("作品を作成しました。");
+	expect(report(session.id, "another-child")).toBeNull();
+	expect(report("another-session", "child-1")).toBeNull();
+	await h.store.write((db) =>
+		h.dialogue.forgetSpecialistObservationsInTransaction(db, session.id),
+	);
+	expect(report(session.id, "child-1")).toBeNull();
+});
+
 test("a persisted observation resumes the same specialist without adding a user message or granting a tool", async () => {
 	const h = await setup();
 	opened.push(h);

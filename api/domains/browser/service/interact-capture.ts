@@ -84,7 +84,7 @@ export function createInteractCapture(
 				await deps.store.write((db) => {
 					check(db);
 					db.query(
-						"INSERT INTO browser_interact_captures VALUES(?,?,?,?,?,?,?,?,?)",
+						"INSERT INTO browser_interact_captures (id,run_id,file_ref,width,height,bytes,range,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)",
 					).run(
 						captureId,
 						ctx.runId,

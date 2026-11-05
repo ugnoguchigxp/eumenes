@@ -93,6 +93,8 @@ export function createTaskAdapter(
 		ref: TASK_ADAPTER_REF,
 		describe: describeTaskAdapter,
 		task: {
+			cancelInTransaction: (db, conversationId, id) =>
+				runtime()?.executions.cancelByUserInTransaction(db, conversationId, id),
 			startInTransaction: (db, input) => {
 				const agent = runtime();
 				if (!agent) throw new Error("execution_unavailable");

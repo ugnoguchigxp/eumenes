@@ -19,9 +19,15 @@ CREATE TABLE browser_interact_runs (
 CREATE TABLE browser_interact_captures (
  id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES browser_interact_runs(run_id) ON DELETE CASCADE,
  file_ref TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, bytes INTEGER NOT NULL,
- range TEXT NOT NULL CHECK(range IN ('viewport','full-page','element')), created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
+ expires_at INTEGER NOT NULL
 );
 `,
+	},
+	{
+		id: "browser/0008-interact-capture-metadata",
+		after: ["browser/0007-interact"],
+		sql: `ALTER TABLE browser_interact_captures ADD COLUMN range TEXT CHECK(range IN ('viewport','full-page','element'));
+ALTER TABLE browser_interact_captures ADD COLUMN created_at INTEGER;`,
 	},
 ];
 export const interactMeta = (db: Database, id: string) =>
@@ -62,7 +68,7 @@ export function readyInteractCaptures(
 ) {
 	return db
 		.query(
-			`SELECT ${captureColumns} FROM browser_interact_captures c JOIN browser_interact_runs m ON m.run_id=c.run_id WHERE m.owner=? AND c.expires_at>? AND m.expires_at>? ${id ? "AND c.id=?" : ""} ORDER BY c.created_at DESC LIMIT ?`,
+			`SELECT ${captureColumns} FROM browser_interact_captures c JOIN browser_interact_runs m ON m.run_id=c.run_id WHERE m.owner=? AND c.expires_at>? AND m.expires_at>? AND c.range IS NOT NULL AND c.created_at IS NOT NULL ${id ? "AND c.id=?" : ""} ORDER BY c.created_at DESC LIMIT ?`,
 		)
 		.all(
 			...(id ? [owner, now, now, id, limit] : [owner, now, now, limit]),

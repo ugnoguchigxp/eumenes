@@ -257,6 +257,10 @@ async function agentRequest(
 		attemptId,
 	);
 	const observations: Promise<void>[] = [];
+	log.info("inference.agent_tools_offered", {
+		count: options?.tools?.length ?? 0,
+		kind: options?.toolOutputFormat ?? "native",
+	});
 	const result = await env.agents
 		.run({
 			kind: connection.kind as CloudAgentKind,

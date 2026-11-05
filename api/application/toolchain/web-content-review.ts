@@ -9,10 +9,13 @@ import {
 export function createWebReview(
 	store: SqliteStore,
 	inference: InferenceService,
+	timeoutMs = 30_000,
 ) {
+	if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000)
+		throw new Error("invalid_web_review_timeout");
 	return createWebContentReview(async (messages, signal) => {
 		const taskId = `web-guard-${crypto.randomUUID()}`;
-		const deadline = Date.now() + 30_000;
+		const deadline = Date.now() + timeoutMs;
 		signal.throwIfAborted();
 		const requestId = await store.write((db) => {
 			signal.throwIfAborted();

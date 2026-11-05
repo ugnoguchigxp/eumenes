@@ -1,13 +1,22 @@
 import type { Database } from "bun:sqlite";
 import type { DialogueDeps } from "./context";
 import { specialistExecutionSource } from "./specialist-source";
-import { notifySpecialist, specialistAuthority } from "./specialist-notices";
+import {
+	notifySpecialist,
+	specialistAuthority,
+	specialistResultText,
+} from "./specialist-notices";
 import { forgetSessionObservations } from "../repository/specialist-observations";
 
 /** Public host integration for session-scoped sources and child observations. */
 export function createSpecialistHost(deps: DialogueDeps) {
 	return {
 		forgetSpecialistObservationsInTransaction: forgetSessionObservations,
+		specialistResultTextInTransaction: (
+			db: Database,
+			sessionId: string,
+			childId: string,
+		) => specialistResultText(deps, db, sessionId, childId),
 		specialistExecutionSourceInTransaction: (
 			db: Database,
 			runId: string,

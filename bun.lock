@@ -18,6 +18,7 @@
         "eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.1-c120d878ffe2.tgz",
         "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.2-3070b7dd6e4a.tgz",
         "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz",
+        "eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz",
         "eumenes_router": "file:vendor/router/eumenes_router-0.0.1-5db35839bd54.tgz",
         "google-auth-library": "11.1.0",
@@ -1356,6 +1357,8 @@
 
     "eumenes-pipeline": ["eumenes-pipeline@vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz", { "dependencies": { "zod": "4.6.7" } }, "sha512-qXv0ICKg9jSqlp8xay2iF0bI4aQ3eHD3pcdZT2ymNo8repRnwDiJnOs6Cp4cAh1YvKFmtclqxftWXY0oOZjitQ=="],
 
+    "eumenes-pursuit": ["eumenes-pursuit@vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz", { "dependencies": { "zod": "4.6.6" } }, "sha512-clOrPYsA7pYR+ntf6gJlDBhcaRpKVaG4HX/3WoAnk3MdgGmXDIpE8D+tozsvH6s39JVIjdCb7yNej57wE+fA0Q=="],
+
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz", {}, "sha512-+OuL1icda7iAwQG7wOcQ8k5dEiqSOwdWJv2XDkWqL9i3LzVFhr147MBFeu4G1uRuHHuLoJGt87M8zJ6A9WzTiA=="],
 
     "eumenes_router": ["eumenes_router@vendor/router/eumenes_router-0.0.1-5db35839bd54.tgz", {}, "sha512-UilFzmy/JZMU0vFcG0dGNpNUdSsSbE0pN4DN5AOncTGNntr9/5u+1Euoqe5oXVsyjz0B61ONS1LQBPmu4gi6ag=="],
@@ -2205,6 +2208,8 @@
     "eumenes-interact/zod": ["zod@4.6.6", "", {}, "sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA=="],
 
     "eumenes-pipeline/zod": ["zod@4.6.7", "", {}, "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="],
+
+    "eumenes-pursuit/zod": ["zod@4.6.6", "", {}, "sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA=="],
 
     "htmlparser2/entities": ["entities@7.0.1", "", {}, "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="],
 

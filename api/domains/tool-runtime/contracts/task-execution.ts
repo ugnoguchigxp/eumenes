@@ -48,6 +48,22 @@ export type ExecutionResult = {
 	code?: string;
 	/** Resource URIs the execution's children made (resource-uri plan §6.3). */
 	links?: string[];
+	/** A research owner's bounded report; source IDs are issued only after reading a guarded body. */
+	answer?: string;
+	sources?: Array<{
+		sourceId: string;
+		url: string;
+		title: string;
+		fetchedAt: string;
+	}>;
+	claims?: Array<{
+		text: string;
+		status: "verified" | "unknown" | "conflicting";
+		sourceIds: string[];
+	}>;
+	limitations?: string[];
+	assurance?: "model";
+	stopReason?: string;
 };
 export type ExecutionView = {
 	id: string;
@@ -78,6 +94,28 @@ export type ExecutionSource = {
 	amendments?: Array<{ messageId: string; request: string; digest: string }>;
 	responses?: Array<{ messageId: string; request: string; digest: string }>;
 };
+/** A registered task owner. Dialogue owns the TODO; this port owns the actual work. */
+export interface TaskLifecyclePort {
+	startInTransaction(
+		db: Database,
+		input: {
+			source: ExecutionSource;
+			request: string;
+			references: ExecutionReference[];
+			toolchainRevisionId?: string;
+			bindingRevisionId?: string;
+		},
+	): ExecutionView;
+	controlInTransaction(
+		db: Database,
+		conversationId: string,
+		input: unknown,
+		messageId: string,
+	): ExecutionView;
+	viewInTransaction(db: Database, id: string): ExecutionView | null;
+	cancelInTransaction?(db: Database, conversationId: string, id: string): void;
+	forgetInTransaction?(db: Database, id: string): void;
+}
 export type ChildExecution = {
 	id: string;
 	dispatchId?: string;

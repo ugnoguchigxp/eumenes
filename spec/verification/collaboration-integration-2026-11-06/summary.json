@@ -1,9 +1,9 @@
 {
 	"date": "2026-11-06",
-	"status": "implemented_and_fixture_verified; running-server acceptance pending",
+	"status": "runtime_accepted_with_guarded_interact; final_verify_pass",
 	"baseCommit": "e917e920f7b252c6f70a07dda1a119b0a2516bfc",
-	"snapshotDigest": "3fee9717d2abc4bba5e1e8e399dfafed57c31d5c75d84d866e7432ff821b9a54",
-	"snapshotManifest": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-05/candidate-v2-r8-manifest.json",
+	"snapshotDigest": "388163f41c4803e921351b79c4ff11c7d62d1725f6ce3e18d747f03a0588644b",
+	"snapshotManifest": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-06/server-acceptance/final-human-report-manifest.json",
 	"package": {
 		"package": "eumenes-collaboration",
 		"version": "0.2.0",
@@ -25,32 +25,37 @@
 			"failed": 1,
 			"assertions": 9302,
 			"files": 182,
-			"failure": "browser driver readText added by parallel interact work; exact driver-key test expects old list"
+			"failure": "browser driver readText added by parallel interact work; exact driver-key test expects old list",
+			"historical": true
 		},
 		{
 			"scope": "r5 dialogue/capabilities/collaboration/ui-compositions and existing UI specialist integration",
 			"passed": 649,
 			"failed": 0,
 			"assertions": 5109,
-			"files": 98
+			"files": 98,
+			"historical": true
 		},
 		{
 			"scope": "r7 final collaboration, privacy/forget, notice, legacy command/browser/media execution integration",
 			"passed": 27,
 			"failed": 0,
 			"assertions": 252,
-			"files": 12
+			"files": 12,
+			"historical": true
 		},
 		{
 			"scope": "web integration",
 			"passed": 34,
 			"failed": 0,
-			"files": 3
+			"files": 3,
+			"historical": true
 		},
 		{
 			"scope": "r7 complete typecheck",
 			"passed": true,
-			"files": 2881
+			"files": 2881,
+			"historical": true
 		},
 		{
 			"scope": "r7 own static checks",
@@ -78,11 +83,13 @@
 						"exitCode": 0
 					}
 				]
-			}
+			},
+			"historical": true
 		},
 		{
 			"scope": "r6 full web build, before forget-only r7 change",
-			"passed": true
+			"passed": true,
+			"historical": true
 		},
 		{
 			"scope": "required domain verify",
@@ -92,7 +99,8 @@
 				"candidate-v2-r2-verify.log",
 				"candidate-v2-r3-verify.log",
 				"candidate-v2-r5-verify.log"
-			]
+			],
+			"historical": true
 		},
 		{
 			"scope": "production ArtifactRenderer and DesignSystem in desktop/mobile Chromium; no HTTP server",
@@ -131,19 +139,22 @@
 						"fieldEditable": true
 					}
 				]
-			}
+			},
+			"historical": true
 		},
 		{
 			"scope": "r8 host observation labeling and specialist regression",
 			"passed": 36,
 			"failed": 0,
 			"assertions": 216,
-			"files": 8
+			"files": 8,
+			"historical": true
 		},
 		{
 			"scope": "r8 final complete typecheck",
 			"passed": true,
-			"files": 2881
+			"files": 2881,
+			"historical": true
 		},
 		{
 			"scope": "r8 final own static checks",
@@ -171,32 +182,61 @@
 						"exitCode": 0
 					}
 				]
-			}
+			},
+			"historical": true
 		},
 		{
 			"scope": "r9 required verify --domain collaboration",
 			"passed": true,
 			"steps": 12,
 			"outsideBoundaryWarnings": 5,
-			"notes": "Kanban dependencies outside this integration remain warnings; no whole-project success claimed"
+			"notes": "Kanban dependencies outside this integration remain warnings; no whole-project success claimed",
+			"historical": true
 		},
 		{
 			"scope": "r9 previously failing browser driver suite after parallel fix",
 			"passed": 27,
 			"failed": 0,
 			"assertions": 160,
-			"files": 1
+			"files": 1,
+			"historical": true
 		},
 		{
 			"scope": "current main global formatting/size checks after parallel updates",
 			"passed": true,
 			"formatFiles": 3905,
-			"sizeFiles": 2117
+			"sizeFiles": 2117,
+			"historical": true
 		},
 		{
 			"scope": "full affected-domain verify after shared fixes",
 			"status": "not_run",
-			"reason": "Selected application tests include actual Bun.serve HTTP servers; explicit server permission is pending"
+			"reason": "Selected application tests include actual Bun.serve HTTP servers; explicit server permission is pending",
+			"historical": true
+		},
+		{
+			"scope": "final authorized restart-phase 10-domain verification",
+			"status": "pass",
+			"domains": [
+				"collaboration",
+				"dialogue",
+				"capabilities",
+				"tool-runtime",
+				"agent-runtime",
+				"pipelines",
+				"browser",
+				"memory",
+				"ui-compositions",
+				"kanban"
+			],
+			"stages": 14,
+			"log": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-06/server-acceptance/final-human-report-verify-r2.log",
+			"report": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-06/server-acceptance/work-choice-snapshot/verification-reports/runs/2026-11-05T23-10-34-720Z-c8ac8ae9-ed90-4926-bd17-389263a03c93/report.json",
+			"snapshotDigest": "388163f41c4803e921351b79c4ff11c7d62d1725f6ce3e18d747f03a0588644b",
+			"backendTests": 1578,
+			"assertions": 12359,
+			"webTests": 125,
+			"designSystemTests": 58
 		}
 	],
 	"live": {
@@ -249,14 +289,50 @@
 		]
 	},
 	"limits": [
-		"No running Eumenes server started/stopped/restarted",
-		"No product DB/settings/keys copied or changed",
 		"No CI used",
 		"No messages sent to other Codex chats",
-		"Interact conversation pilot remains disabled; synthetic lifecycle tested; real external browsing not tested",
-		"Changes not committed/pushed in host: shared uncommitted prerequisite work belongs to parallel tasks"
+		"Product DB/settings/keys not copied; production settings not changed by this task",
+		"Production writes limited to own debug conversations, one retained reviewable UI, and two test timers which were cancelled",
+		"Interact conversational pilot stays disabled; isolated HTTP/real Chromium lifecycle passed, real external-site acceptance not performed",
+		"Existing Claude semantic/brevity failures remain unaccepted",
+		"Real speaker/microphone three-turn acceptance not performed; headless Chromium muted",
+		"At verification completion, post-restart fixes were uncommitted. The user subsequently requested commit/push of all main changes; Git history records publication."
 	],
 	"ownCodeHashes": {
+		"api/application/collaboration/collaboration-adapter.ts": "05604fc003bbf5ccb2cdbf40d968079aff9f331b635704f802334f6c2b8f6e61",
+		"api/application/collaboration/collaboration-backends.ts": "09135e9d0f582517e5e12587028ad0f31701eda0df0255ee596fa15a1988cda9",
+		"api/application/collaboration/collaboration-pipeline.test.ts": "f9e026dbbe482f7195598b19feca60dbb682f3043e5a458a86933f6cf851b650",
+		"api/application/toolchain/toolchain-history.test.ts": "68711430b9fbaf6a37e746a7b3c5c8bba55c5af577eaf7ce48614c89a17b45ce",
+		"api/domains/collaboration/contracts/index.ts": "399ee51cedae9b1f750e5f845c042fbfbc9c127baffc7ac38bc8f785d4c64e6d",
+		"api/domains/collaboration/service/work.ts": "59d963940c7ba7827cd28cef3fb0fa0cf4288355935a8682efe63d0d6b3d9f5f",
+		"api/domains/dialogue/contexts/local/router-work.context.toml": "fe5e296ae0e1911b9821109e745d0a127b98b640fa24f15c6599550260be5ba7",
+		"api/domains/dialogue/repository/specialist-observations.ts": "d6484dd3620b995457633de801fe6dc864d0e759d11dad38bfd41cedfe3916b7",
+		"api/domains/dialogue/service/execution-command.ts": "acbab6afbbe24f4d8d1dc78a33aa1d260ee6afbf4ce801dffdde277a7ee04643",
+		"api/domains/dialogue/service/routed-choice.ts": "325454d21424868862c88afcb1e8065c0112c6e8cc82c76bab93d1daf711701b",
+		"api/domains/dialogue/service/routed-router.ts": "b6c8d570d313f8077b29b0fc30a81bffa599098c148bcd47448e3a613a91352c",
+		"api/domains/dialogue/service/routed-work-choice.ts": "44f371210676230e0ded0b6552cbc876f74653e6ddb3a4d491165b785a8b7ad1",
+		"api/domains/dialogue/service/specialist-agent.ts": "b808701133b72db80fe1218c19f953340fae459bd9f2260bdceb03a6646349a9",
+		"api/domains/dialogue/service/specialist-host.ts": "f43da3347ca7c3538f16bb339631747e1287c9e65e58e7dd1e2a11b47530524c",
+		"api/domains/dialogue/service/specialist-notices.ts": "79cb05c9837f74be3f1a69dc3870582f11110e6e389a72baf1f2fce5b3aacdea",
+		"api/domains/dialogue/test/routed-work-choice.test.ts": "f1f1b2a5a49b1128be4aaadd1a3e384020244fc00dacc3af42fcb62958867416",
+		"api/domains/dialogue/test/routed-work-integration.test.ts": "c10e701064626ef3e56909807bb9e328f115017f2e1202922da26a22b6383502",
+		"api/domains/dialogue/test/specialist-document.test.ts": "73cd1a6d3ccf11163308bb06eae8bb1b9a62bea7e102040f9eae03696821ba25",
+		"api/domains/dialogue/test/specialist-notices.test.ts": "5164435eced07051640b5c7016e232fc050ec9b77f0ea31b8c53cb1a5af0cc41"
+	},
+	"currentOwnFilesMatchSnapshot": true,
+	"currentOwnFilesDifferentFromSnapshot": [],
+	"contextToolCalls": {
+		"initial_instructions": 1,
+		"context_compile": 1,
+		"compile_eval": 1
+	},
+	"latestWholeCodeSnapshot": {
+		"digest": "388163f41c4803e921351b79c4ff11c7d62d1725f6ce3e18d747f03a0588644b",
+		"manifest": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-06/server-acceptance/final-human-report-manifest.json",
+		"purpose": "Scoped fixes atop last passing 10-domain baseline; excludes subsequent concurrent main changes"
+	},
+	"permissionPending": null,
+	"historicalOwnCodeHashes": {
 		"api/application/toolchain/collaboration-package.test.ts": "5031305f167026433e1f062cac6ec27ee9d9a5e0b618ee4d9e83ca6c42083d70",
 		"api/application/toolchain/task-execution-port.ts": "5cc01cfc7358622ce324be036b3ca4586a5c38fa121b132c325da2c5e6360167",
 		"api/application/toolchain/task-execution-sources.ts": "ebc6fad22cca5f60033386bc8cae6a3ea6b21d75589063489f62778c875e9441",
@@ -301,24 +377,237 @@
 		"api/domains/dialogue/contexts/specialist-turn/rules.context.toml": "0279f99483743ff0901989ae60391965561047cc75d087edffa7fde3555915ae",
 		"api/domains/dialogue/contexts/specialist-turn/host-observation.context.toml": "4516b943e7ef579516997276cdc68adee19ad1c6006dcc803cc847b1637d9516"
 	},
-	"currentOwnFilesMatchSnapshot": true,
-	"currentOwnFilesDifferentFromSnapshot": [],
-	"contextToolCalls": {
-		"initial_instructions": 1,
-		"context_compile": 1,
-		"compile_eval": 1
+	"sourceHashScope": "Authored restart-phase implementation and regression fixes; historical import hashes retained separately",
+	"serverPermission": {
+		"approved": true,
+		"instruction": "はい。再起動して、検証していいです。",
+		"date": "2026-11-06",
+		"scope": "Main graceful restart; actual HTTP and browser verification"
 	},
-	"latestWholeCodeSnapshot": {
-		"digest": "b2ecd79f75684336711373d7fbceabfe2908d8ac0d04594b8ff5a37e690fc92d",
-		"manifest": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-05/candidate-v2-r9-manifest.json",
-		"purpose": "Concurrent global format/size and browser test updates resolved; own source identical to r8"
-	},
-	"permissionPending": {
-		"scope": "Remaining shared-main checks and server operations before running-server acceptance",
-		"requiredBy": [
-			"User-provided task-scope rule",
-			"/Users/y.noguchi/Code/eumenes/AGENTS.md:5"
+	"runningServerAcceptance": {
+		"date": "2026-11-06",
+		"serverRestart": {
+			"requestedByUser": true,
+			"backgroundJobsBeforeRestart": [],
+			"oldApiPid": 55122,
+			"oldDevPid": 55121,
+			"oldArgs": "bun scripts/dev.ts",
+			"signal": "SIGTERM",
+			"stoppedAt": "2026-11-05T23:05:10.305Z",
+			"startedAt": "2026-11-05T23:05:13.804Z",
+			"devLauncherPid": 60564,
+			"newApiPid": "60566"
+		},
+		"healthBeforeFinalDisplayRestart": {
+			"at": "2026-11-05T22:59:02.798Z",
+			"mainHealthy": true,
+			"webHealthy": true,
+			"pipelineSessionReturned": true,
+			"testTimers": [
+				{
+					"id": "7ad239bb-9fb4-48c5-ba92-c5da2e8c380a",
+					"state": "cancelled"
+				},
+				{
+					"id": "80ca0d88-123c-4b6c-8d70-873112e81d86",
+					"state": "cancelled"
+				}
+			],
+			"savedUiStillReadable": true,
+			"interactConversationalArtifactAvailable": false
+		},
+		"mainWebSmoke": {
+			"url": "http://127.0.0.1:5173",
+			"errors": [],
+			"httpFailures": [],
+			"title": "Eumenes",
+			"buttons": 24,
+			"bodyCharacters": 1315,
+			"overflow": false,
+			"passed": true
+		},
+		"modelObserved": "gpt-6-luna",
+		"modelTransport": "actual native codex app-server; saved keyless ChatGPT login",
+		"newPaidApiKeyCalls": 0,
+		"ui": {
+			"conversationId": "collab-main-ui-20261106-0703",
+			"sessionId": "746ad8f1-fcfd-4d94-984c-dd72c5d3d1fa",
+			"partialEdit": {
+				"passed": true,
+				"sameSession": true,
+				"onlyBodyChanged": true,
+				"otherPropertiesPreserved": true,
+				"unsaved": true
+			},
+			"savedRef": "b608ed5d-40ad-4878-b82c-a16155274ff1",
+			"savedRevision": 1,
+			"actualArtifactSaveButton": true,
+			"normalConversationReturn": true,
+			"persistedAfterRestart": true,
+			"expectedOptionalFormRead": "404 target_not_found because the saved work has no form"
+		},
+		"pipeline": {
+			"conversationId": "collab-main-pipeline-20261106-0750",
+			"sessionId": "5acc4a19-0450-47f4-9d33-116e5bee9962",
+			"childId": "f4f294ab-659e-49ec-b220-f839bb31260b",
+			"assertions": {
+				"passed": true,
+				"exactConfirmedDefinition": true,
+				"parentComposerCalls": 0,
+				"childOperations": 2,
+				"sameSpecialist": true,
+				"userInputs": 4,
+				"noSyntheticUserTurn": true,
+				"timerSeconds": [
+					1800,
+					2400
+				],
+				"cancelledTimers": [
+					{
+						"id": "7ad239bb-9fb4-48c5-ba92-c5da2e8c380a",
+						"action": "cancelled"
+					},
+					{
+						"id": "80ca0d88-123c-4b6c-8d70-873112e81d86",
+						"action": "cancelled"
+					}
+				],
+				"resultReply": "30分と40分のタイマーは、どちらも開始済みです。"
+			},
+			"evidence": "pipeline-live-r7.json + continuous actual-session pipeline-live-r8.json",
+			"titleCase": "r7 not passed; additional real user input in r8 explicitly requested title follow current duration",
+			"liveUserInputs": 4
+		},
+		"routingCases": [
+			{
+				"name": "actual mixed-score draft failure",
+				"observed": "collaboration.pipeline",
+				"passed": true
+			},
+			{
+				"name": "genuine multiple output execution",
+				"observed": "pipeline.execute",
+				"passed": true
+			},
+			{
+				"name": "single interactive UI with multiple parts",
+				"observed": "ui.compose",
+				"passed": true
+			},
+			{
+				"name": "same complete timer request with related handler information",
+				"observed": "pipeline.execute",
+				"passed": true
+			}
 		],
-		"approved": false
-	}
+		"finalScreen": {
+			"mode": "Read-only replay of saved native result and adopted reply; backend projection independently verified through actual in-process API; no model regeneration",
+			"results": [
+				{
+					"name": "desktop",
+					"width": 1440,
+					"height": 1100,
+					"errors": [],
+					"overflow": false,
+					"humanReport": "30分と40分のタイマーは、どちらも開始済みです。",
+					"rawExecutionJsonVisible": false
+				},
+				{
+					"name": "mobile",
+					"width": 390,
+					"height": 844,
+					"errors": [],
+					"overflow": false,
+					"humanReport": "30分と40分のタイマーは、どちらも開始済みです。",
+					"rawExecutionJsonVisible": false
+				}
+			]
+		},
+		"finalVerify": {
+			"status": "pass",
+			"domains": [
+				"collaboration",
+				"dialogue",
+				"capabilities",
+				"tool-runtime",
+				"agent-runtime",
+				"pipelines",
+				"browser",
+				"memory",
+				"ui-compositions",
+				"kanban"
+			],
+			"stages": 14,
+			"log": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-06/server-acceptance/final-human-report-verify-r2.log",
+			"report": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-06/server-acceptance/work-choice-snapshot/verification-reports/runs/2026-11-05T23-10-34-720Z-c8ac8ae9-ed90-4926-bd17-389263a03c93/report.json",
+			"snapshotDigest": "388163f41c4803e921351b79c4ff11c7d62d1725f6ce3e18d747f03a0588644b",
+			"backendTests": 1578,
+			"assertions": 12359,
+			"webTests": 125,
+			"designSystemTests": 58
+		},
+		"latestSharedTypecheck": {
+			"passed": true,
+			"files": 2912,
+			"log": "/Users/y.noguchi/Code/eumenes/verification-reports/collaboration-integration-2026-11-06/server-acceptance/completion-typecheck.log",
+			"note": "Point-in-time shared working tree; concurrent work can subsequently change it"
+		},
+		"protocolAndFailureRecord": [
+			"Initial full verify catalog fixture mismatch and one-hot collision fixed without weakening ranking assertions",
+			"Old snapshots accidentally matched by an unqualified test command; that result rejected, exact file paths rerun",
+			"Frozen snapshot initially lacked workspace-specific dependencies with a shared node_modules link; installed frozen dependencies, no source requirements changed",
+			"r3 live parent multi-score routing failure; no timer created; recorded existing execution ended partial",
+			"r4 attempted pinned session input refused by existing screen-form contract; no product permission broadened",
+			"r5 native doc.write unknown fields refused; repaired generic field-name feedback",
+			"r6 actual child used LARM-only and timed out; now inherits saved subagent route; runner status spelling also corrected to published completed/partial contract",
+			"r7 explicit-title expectation retained as failed; r8 used an explicit next real user instruction",
+			"Human-report full verify initially had one existing router-export test overrun 5000ms; isolated 5 tests pass, timeout/expectations unchanged; rerun without overlapping restart/render"
+		],
+		"postFinalRestartHealth": {
+			"at": "2026-11-05T23:16:32.827Z",
+			"mainApiHealthy": true,
+			"webHealthy": true,
+			"testTimersCancelled": 2,
+			"pipelineSessionReturned": true,
+			"savedUiReadable": true,
+			"interactPilotEnabled": false
+		}
+	},
+	"paidApiBudgetAtAcceptance": {
+		"capUsd": 10,
+		"accountedUsd": 6.765742,
+		"calls": [
+			{
+				"provider": "anthropic",
+				"status": "estimated",
+				"calls": 761,
+				"estimatedCostUsd": 2.7480315,
+				"unknownReservedUsd": 0
+			},
+			{
+				"provider": "anthropic",
+				"status": "pending",
+				"calls": 45,
+				"estimatedCostUsd": null,
+				"unknownReservedUsd": 2.320548
+			},
+			{
+				"provider": "openai",
+				"status": "estimated",
+				"calls": 779,
+				"estimatedCostUsd": 1.4647185,
+				"unknownReservedUsd": 0
+			},
+			{
+				"provider": "openai",
+				"status": "pending",
+				"calls": 4,
+				"estimatedCostUsd": null,
+				"unknownReservedUsd": 0.232444
+			}
+		],
+		"restartAcceptanceNewPaidApiCalls": 0,
+		"liveRoute": "saved Codex connection without credential; Codex CLI confirms ChatGPT login; no settings changes"
+	},
+	"updatedAt": "2026-11-05T23:14:57.166738+00:00"
 }

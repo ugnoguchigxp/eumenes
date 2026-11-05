@@ -9,7 +9,10 @@ import {
 	sessionById,
 	type SessionRecord,
 } from "../repository";
-import { observation } from "../repository/specialist-observations";
+import {
+	observation,
+	childReportRun,
+} from "../repository/specialist-observations";
 import type { DialogueDeps } from "./context";
 import { specialistExecutionSource } from "./specialist-source";
 import { sessionExpired } from "./specialist-core";
@@ -170,4 +173,22 @@ export function specialistObservation(
 	)
 		throw new Error("specialist_event_source_invalid");
 	return JSON.parse(found.event_json) as unknown;
+}
+
+/** Reuse the adopted explanation; the execution's structured summary remains model input only. */
+export function specialistResultText(
+	deps: DialogueDeps,
+	db: Database,
+	sessionId: string,
+	childId: string,
+) {
+	const session = sessionById(db, sessionId);
+	const id = session && childReportRun(db, sessionId, childId);
+	if (!session || !id) return null;
+	if (!specialistObservation(deps, db, id, session)) return null;
+	const answerId = byId(db, id)?.answerMessageId;
+	return answerId
+		? (deps.conversation.messageInTransaction(db, answerId)?.message.text ??
+				null)
+		: null;
 }

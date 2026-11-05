@@ -185,6 +185,16 @@ export type AgentAttemptRevocation = {
 	itemIds: readonly string[];
 };
 export interface InferencePort {
+	/** Exact usage of a finished receipt, for domain-owned metered workers. */
+	usageOfInTransaction?(
+		db: Database,
+		receipt: Receipt,
+	):
+		| (Omit<Usage, "model"> & {
+				model: string | null;
+				cacheReadTokens?: number | null;
+		  })
+		| null;
 	captureBackgroundControlInTransaction?(
 		db: Database,
 		input: BackgroundControl,

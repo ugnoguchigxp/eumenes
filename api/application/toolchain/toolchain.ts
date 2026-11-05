@@ -1,4 +1,7 @@
 import type { Database } from "bun:sqlite";
+import { createPursuit, type PursuitService } from "../../domains/pursuit";
+import { createPursuitAdapter } from "../pursuit/pursuit-adapter";
+import { createPursuitWebPort } from "../pursuit/web-port";
 import { createDoclingAdapter } from "../docling/docling-adapter";
 import { createDotsMessagingAdapter } from "../work/dots-messaging-adapter";
 import { createDotsDelegationAdapter } from "../work/dots-delegation-adapter";
@@ -220,6 +223,7 @@ function enabledBackends(options: ToolchainOptions) {
 	return new Set([
 		...(options.docling ? ["docling"] : []),
 		"task-execution",
+		...(options.webResearch !== false ? ["pursuit"] : []),
 		...(options.webResearch !== false ? ["web"] : []),
 		...(options.timers ? ["timer"] : []),
 		...(options.dots ? ["dots"] : []),
@@ -250,6 +254,7 @@ export async function createToolchain(
 	web: WebResearchService,
 	options: ToolchainOptions = {},
 ) {
+	let pursuitRuntime: PursuitService | undefined;
 	let taskRuntime:
 		import("../../domains/agent-runtime").AgentRuntime | undefined;
 	const shared =
@@ -272,6 +277,7 @@ export async function createToolchain(
 		...collaboration.adapters,
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
+		createPursuitAdapter(() => pursuitRuntime),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk
 			? [
@@ -381,6 +387,16 @@ export async function createToolchain(
 		bundleHost: () => bundleHostOf(registry),
 	});
 	await capabilities.seed();
+	pursuitRuntime =
+		options.webResearch === false
+			? undefined
+			: createPursuit({
+					store,
+					queue,
+					inference,
+					capabilities,
+					web: createPursuitWebPort(web, queue),
+				});
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(
 		web,
@@ -485,6 +501,7 @@ export async function createToolchain(
 	);
 	return {
 		capabilities,
+		pursuit: pursuitRuntime,
 		collaboration,
 		childOperations: children,
 		registry,

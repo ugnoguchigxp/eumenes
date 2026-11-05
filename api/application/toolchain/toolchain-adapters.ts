@@ -1,3 +1,4 @@
+import { describePursuitAdapter } from "../pursuit/pursuit-adapter";
 import {
 	DOCLING_ADAPTER_REF,
 	describeDoclingAdapter,
@@ -224,6 +225,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: DOTS_MESSAGING_ADAPTER_REF, describe: describeDotsMessagingAdapter },
 	{ ref: SHELL_ADAPTER_REF, describe: describeShellAdapter },
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
+	{ ref: "adapter:pursuit@1", describe: describePursuitAdapter },
 	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },

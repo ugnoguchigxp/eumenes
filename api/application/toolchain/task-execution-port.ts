@@ -27,6 +27,7 @@ import { taskExecutionStops } from "./task-execution-stops";
 import { reference, result, total } from "./task-execution-values";
 
 export type TaskExecutionHost = {
+	pursuit?: import("../../domains/pursuit").PursuitService;
 	collaboration?: CollaborationHost;
 	interact?: CollaborationInteract;
 	queue: import("../../domains/queue").QueueService;
@@ -64,6 +65,7 @@ export function sendExecutionNotice(
 	db: Database,
 	view: ExecutionView,
 	eventId: string,
+	projection: "summary" | "reference" = "summary",
 ): boolean {
 	const { dialogue, agents } = host;
 	if (
@@ -81,12 +83,44 @@ export function sendExecutionNotice(
 			workRef: view.id,
 			revision: view.revision,
 			status: view.status,
-			request: view.request.slice(0, 500),
-			question: view.question,
-			result: executionNoticeResult(view.result),
+			...(projection === "summary"
+				? {
+						request: view.request.slice(0, 500),
+						question: view.question,
+						result: executionNoticeResult(view.result),
+					}
+				: {}),
 		}),
 	});
 	return true;
+}
+function configurePursuit(
+	host: TaskExecutionHost,
+	port: ToolchainExecutionPort,
+) {
+	const { dialogue } = host;
+	if (host.pursuit) {
+		const pursuit = host.pursuit;
+		pursuit.configure({
+			...port,
+			deliverInTransaction(db, view, eventId) {
+				return !sendExecutionNotice(
+					{
+						dialogue,
+						agents: {
+							executions: {
+								sourceRunInTransaction: pursuit.sourceRunInTransaction,
+							},
+						},
+					},
+					db,
+					view,
+					eventId,
+					"reference",
+				);
+			},
+		});
+	}
 }
 /** Composition of public operations. Only execution types dispatch here; the model chooses the purpose. */
 export function configureTaskExecution(host: TaskExecutionHost) {
@@ -310,7 +344,8 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 					db,
 					d.revisionId,
 				);
-				return bound?.binding.document.execution === "task"
+				return bound?.binding.document.execution === "task" &&
+					bound.binding.document.adapterRef === "adapter:task-execution@1"
 					? [capabilities.toolchainSetInTransaction(db, d.revisionId)]
 					: [];
 			});
@@ -332,6 +367,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		},
 	};
 	agents.executions.configure(port);
+	configurePursuit(host, port);
 	configureCollaboration(host, port);
 	host.browser?.setTaskExecutionSource((db, frozen) => {
 		const child = (frozen as { execution?: ChildExecution } | null)?.execution;

@@ -186,6 +186,12 @@ export function createCollaborationWorks(now: () => number = Date.now) {
 		pending: (db: Database, workRef?: string) =>
 			pending(db).some((row) => workRef === undefined || row.id === workRef),
 		read: (db: Database, id: string) => work(db, id),
+		report(db: Database, id: string) {
+			const row = work(db, id);
+			if (!row || row.ended || !row.child_id) return null;
+			current(db, row);
+			return host().report?.(db, row.session_id, row.child_id) ?? null;
+		},
 		ownsChild(db: Database, childId: string, conversationId: string) {
 			return !!db
 				.query(

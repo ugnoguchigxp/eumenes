@@ -1,0 +1,11 @@
+{
+	"package": "eumenes-pursuit",
+	"version": "0.0.4",
+	"artifact": "eumenes-pursuit-0.0.4-7964f15d6308.tgz",
+	"sha256": "7964f15d630879bc37cbabfa3d5f65b3ef59a88e041854e7ebc569016704ee97",
+	"sourceGitCommit": "2b6af95044409b94ac6cfaef23db22db94d1e9ff",
+	"hostContract": "1.11",
+	"dbSchemaVersion": 8,
+	"verifiedWith": "543 local tests passed; 12 existing skips; typecheck/lint passed",
+	"files": 80
+}

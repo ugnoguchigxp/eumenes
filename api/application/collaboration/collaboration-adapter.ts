@@ -184,12 +184,14 @@ export function createCollaborationAdapter(
 								request: state.current.request,
 								summary:
 									child?.question?.prompt ??
-									child?.summary ??
+									works.report(db, state.workRef) ??
 									(steps.length
 										? steps
 												.map((step, index) => `${index + 1}. ${step.task}`)
 												.join("\n")
-										: "会話で内容を具体化します。"),
+										: child
+											? "作業の状態は上に表示しています。"
+											: "会話で内容を具体化します。"),
 								sections: steps.length
 									? [
 											{

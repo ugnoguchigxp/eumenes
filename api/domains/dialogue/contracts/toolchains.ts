@@ -34,6 +34,11 @@ export type ToolchainRoute = {
  * narrows the offer; the conversation model chooses, and the toolchain's sub-agent executes.
  */
 export interface ToolchainRoutingPort {
+	/** A bound task uses its registered owner, rather than a second generic planner. */
+	taskInTransaction?(
+		db: Database,
+		revisionId: string,
+	): import("../../tool-runtime").TaskLifecyclePort | undefined;
 	/** A query embedding of the request, or undefined when the provider is unavailable or slow. */
 	embedQuery(
 		text: string,

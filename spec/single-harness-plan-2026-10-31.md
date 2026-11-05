@@ -20,7 +20,7 @@
 | 部分 | 決め |
 | --- | --- |
 | ハーネス | 1つ（今の routed）。会話のモデルが LARM でもクラウドでも、回の流れは同じ。会話の route（`cloud-only` ならクラウドで推論）は今のまま |
-| 呼出しの設定 | 推論 low・出力の上限 4,096（考える分を含む）。クラウドでも同じ値（`CallSession.reasoning` の larm・cloud とも low） |
+| 呼出しの設定 | 出力の上限4,096（考える分を含む）。推論はLARMがlow、クラウド会話はhigh。2026-11-06の実モデル確認でlow/mediumが読む道具を選ばず、highで選べたため、既存CallSessionのlarm/cloud別指定を使って調整した。詳細は[Memory本流受入](memory-integration-2026-11-05.md) |
 | 選ぶ呼出しの口 | 今ある schema の口をそのまま使う。LARM は `response_format: json_schema`、OpenAI 互換のクラウドは `json_schema`、Codex は `outputSchema`、Claude Agent SDK は `outputFormat`。schema の口がない経路では会話の回だけ（今の扱い） |
 | Ruri の判定 | クラウドのモデルでも LARM の判定を使う。LARM が使えなければ判定なし（依頼の回が決める。今の `free`） |
 | 実行器 | 残す。担当探し・引き渡し・確認と承認・仕事・記憶の処理は、routed の回が今も `turn.act` で使っている |

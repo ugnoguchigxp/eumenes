@@ -241,7 +241,9 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 			event,
 		};
 	});
-	const memory = describeMemory(env);
+	const memory = describeMemory(env, {
+		includeInactive: requestRows.some((row) => row.kind === "forget"),
+	});
 	const shelves = describeShelves(env, requestRows, kept);
 	const digests: Record<string, string> = {};
 	const turns: CurateContext["turns"] = [];

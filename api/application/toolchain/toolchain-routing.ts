@@ -133,6 +133,8 @@ export function createToolchainRouting(
 	};
 	return {
 		embedQuery,
+		taskInTransaction: (db, revisionId) =>
+			registeredTask(capabilities, registry, db, revisionId),
 		cardInTransaction(db, revisionId) {
 			const d = capabilities
 				.toolchainsInTransaction(db)
@@ -369,5 +371,33 @@ function agentOf(
 			? { recentBytes: agent.memory.recentBytes }
 			: {}),
 		sharedTools: agent?.sharedTools ?? [],
+	};
+}
+
+/** Retained task owners remain reachable for cancellation and erasure after disablement. */
+function registeredTask(
+	capabilities: Capabilities,
+	registry: AdapterRegistry,
+	db: Database,
+	revisionId: string,
+): ReturnType<NonNullable<ToolchainRoutingPort["taskInTransaction"]>> {
+	const boundTask = capabilities.toolchainBindingInTransaction(db, revisionId, {
+		retained: true,
+	});
+	if (boundTask?.binding.document.execution !== "task") return undefined;
+	const adapter = registry.get(boundTask.binding.document.adapterRef);
+	const task = adapter?.task;
+	if (!task) throw new Error("task_lifecycle_unavailable");
+	return {
+		...task,
+		startInTransaction(tx, input) {
+			if (!adapter?.availableInTransaction(tx))
+				throw new Error("adapter_unavailable");
+			return task.startInTransaction(tx, {
+				...input,
+				toolchainRevisionId: revisionId,
+				bindingRevisionId: boundTask.binding.revisionId,
+			});
+		},
 	};
 }

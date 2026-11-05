@@ -1,3 +1,4 @@
+import { taskForWork } from "./task-work";
 import type { Database } from "bun:sqlite";
 import { byId } from "../repository";
 import type { WorkRow } from "../repository/work";
@@ -45,11 +46,13 @@ export function archiveByUserInTransaction(
 	if (row.archivedAt) return { row, jobs: [] };
 	// Task and pipeline work runs as an execution of its own (the run that handed it over is not its to stop);
 	// other work runs in the run that waits for it.
-	const executions = deps.agents?.executions;
+	const executions = taskForWork(deps, tx, row);
 	let job: string | null = null;
-	if (row.sourceRef && executions?.viewInTransaction(tx, row.sourceRef))
-		executions.cancelByUserInTransaction(tx, row.conversationId, row.sourceRef);
-	else job = stopWaitingRunInTransaction(deps, tx, row);
+	if (row.sourceRef && executions?.viewInTransaction(tx, row.sourceRef)) {
+		if (!executions.cancelInTransaction)
+			throw new Error("task_cancellation_unavailable");
+		executions.cancelInTransaction(tx, row.conversationId, row.sourceRef);
+	} else job = stopWaitingRunInTransaction(deps, tx, row);
 	ledger.reportInTransaction(tx, row.id, {
 		status: "done",
 		outcome: "cancelled",

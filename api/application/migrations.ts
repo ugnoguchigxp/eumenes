@@ -1,4 +1,6 @@
 import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
+import { migrations as pursuitCoreMigrations } from "eumenes-pursuit/sqlite";
+import { migrations as pursuitMigrations } from "../domains/pursuit";
 import { migrations as ocrMigrations } from "../domains/ocr";
 import { migrations as computeMigrations } from "../domains/compute";
 import { migrations as model3dMigrations } from "../domains/model3d";
@@ -168,6 +170,14 @@ const routerPackageMigrations: Migration[] = routerPackageSql.map((sql, i) => ({
 import { migrations as liveVoiceMigrations } from "../domains/live-voice";
 /** Every migration of the product, in no meaningful order. */
 const catalog: readonly Migration[] = [
+	...pursuitCoreMigrations.map((m, i) => ({
+		id: `pursuit-core/${String(i + 1).padStart(4, "0")}`,
+		sql: m.sql,
+		after: i
+			? [`pursuit-core/${String(i).padStart(4, "0")}`]
+			: ["queue/0001-init"],
+	})),
+	...pursuitMigrations,
 	...liveVoiceMigrations,
 	retiredContinuityMigration,
 	...conversationMigrations,

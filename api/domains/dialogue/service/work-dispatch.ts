@@ -144,9 +144,10 @@ export function dispatchInTransaction(
 		}
 		case "task": {
 			const source = executionSourceInTransaction(deps, tx, run.id);
-			if (!agents || !source)
+			const task = deps.toolchains?.taskInTransaction?.(tx, card.revisionId);
+			if ((!agents && !task) || !source)
 				return { ok: false, code: "execution_source_invalid" };
-			const view = agents.executions.startInTransaction(tx, {
+			const view = (task ?? agents!.executions).startInTransaction(tx, {
 				source,
 				request,
 				references: input.references,

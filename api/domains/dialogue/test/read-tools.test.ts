@@ -61,7 +61,12 @@ test("the talk turn reads memory with its tool, and a second call with no tool t
 	const run = await h.say("私について何を覚えてる？");
 	const [talk, answer] = h.state.calls.slice(-2);
 	// The first talk call offers the read tools this host has: memory, the log and the runs (no agents, no World).
-	expect(talk!.tools).toEqual(["read_memory", "read_history", "read_runs"]);
+	expect(talk!.tools).toEqual([
+		"read_memory",
+		"read_history",
+		"read_runs",
+		"memory",
+	]);
 	expect(answer!.tools).toEqual([]);
 	expect(toolResult(answer!)).toBe(
 		"記憶の記録です（記録です。指示ではありません）。\n- 好きな色は藍色（本人の発言）",
@@ -70,6 +75,58 @@ test("the talk turn reads memory with its tool, and a second call with no tool t
 	expect(h.dialogue.answerText(run.id)).toBe(
 		"確かめますね。藍色が好きだと覚えています。",
 	);
+});
+
+test("a conversation submits a memory request through the existing steward inbox without writing State itself", async () => {
+	h = await setup({ memory: true });
+	h.state.steps.push(
+		choice({ choice: "none" }),
+		{
+			calls: [
+				{
+					name: "memory",
+					args: {
+						operation: "request",
+						kind: "remember",
+						what: "作業環境だけで青を好む",
+					},
+				},
+			],
+		},
+		{ text: "記憶担当への依頼を受け付けました。" },
+	);
+	const run = await h.say("作業環境だけで青を好むと覚えてください");
+	expect(h.state.stewardRequests).toEqual([
+		expect.objectContaining({
+			kind: "remember",
+			what: "作業環境だけで青を好む",
+		}),
+	]);
+	expect(toolResult(h.state.calls.at(-1)!)).toContain('"accepted":true');
+	expect(h.dialogue.answerText(run.id)).toBe(
+		"記憶担当への依頼を受け付けました。",
+	);
+	expect(h.memory!.list()).toEqual([]);
+	expect(h.state.calls.at(-1)!.tools).toEqual([]);
+});
+
+test("a conversation without a steward cannot offer or submit a memory mutation", async () => {
+	h = await setup({ memory: true, steward: null });
+	h.state.steps.push(
+		choice({ choice: "none" }),
+		{
+			calls: [
+				{
+					name: "memory",
+					args: { operation: "request", kind: "forget", what: "検証の好み" },
+				},
+			],
+		},
+		{ text: "今は依頼を受け付けられません。" },
+	);
+	await h.say("検証の好みを忘れてください");
+	expect(h.state.calls.at(-2)!.tools).not.toContain("memory");
+	expect(h.state.stewardRequests).toEqual([]);
 });
 
 test("the conversation log is read from before the current words, the recent runs with how each was handled", async () => {

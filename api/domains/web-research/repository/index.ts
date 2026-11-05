@@ -14,6 +14,9 @@ CREATE INDEX web_research_runs_expiry ON web_research_runs(finished_at_ms);
 export const attemptTimeoutMigration = `
 ALTER TABLE web_research_runs ADD COLUMN attempt_timeout_ms INTEGER;
 `;
+export const acquisitionTimeoutMigration = `
+ALTER TABLE web_research_runs ADD COLUMN acquisition_timeout_ms INTEGER;
+`;
 export interface RunRow {
 	id: string;
 	request_id: string;
@@ -27,6 +30,7 @@ export interface RunRow {
 	error_code: string | null;
 	/** Absent before attemptTimeoutMigration is applied. */
 	attempt_timeout_ms?: number | null;
+	acquisition_timeout_ms?: number | null;
 }
 export const byId = (db: Database, id: string) =>
 	db
@@ -46,6 +50,7 @@ export function insert(
 	jobId: string,
 	now: number,
 	attemptTimeoutMs?: number,
+	acquisitionTimeoutMs?: number,
 ) {
 	const base = [
 		id,
@@ -57,7 +62,11 @@ export function insert(
 		now,
 	];
 	// Explicit column lists keep older schemas (without the appended column) working.
-	if (attemptTimeoutMs === undefined)
+	if (acquisitionTimeoutMs !== undefined)
+		db.query(
+			"INSERT INTO web_research_runs(id,request_id,input_digest,input_json,job_id,operation,status,created_at_ms,attempt_timeout_ms,acquisition_timeout_ms) VALUES (?,?,?,?,?,?,'queued',?,?,?)",
+		).run(...base, attemptTimeoutMs ?? null, acquisitionTimeoutMs);
+	else if (attemptTimeoutMs === undefined)
 		db.query(
 			"INSERT INTO web_research_runs(id,request_id,input_digest,input_json,job_id,operation,status,created_at_ms) VALUES (?,?,?,?,?,?,'queued',?)",
 		).run(...base);
@@ -104,6 +113,11 @@ export function sweepRuns(db: Database, now: number) {
 export const migrations: readonly Migration[] = [
 	{ id: "web-research/0001-init", sql: migration },
 	{ id: "web-research/0002-attempt-timeout", sql: attemptTimeoutMigration },
+	{
+		id: "web-research/0003-acquisition-timeout",
+		sql: acquisitionTimeoutMigration,
+		after: ["web-research/0002-attempt-timeout"],
+	},
 ];
 
 /** Runs that produced something to read (`completed`, `partial`), newest first. */

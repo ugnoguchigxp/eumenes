@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { cardDigest, type Card } from "eumenes_router";
-import { get } from "../repository";
+import { get, retainedDefinition } from "../repository";
 import { zSchema } from "./schema";
 import { createArtifacts } from "./artifacts";
 import { indexSearch, validateToolchain } from "./registry";
@@ -430,8 +430,14 @@ export function createToolchains(
 	 * The binding and artifact registration a bound toolchain revision names. An instant binding
 	 * has no screen, so its artifact is null.
 	 */
-	function bindingInTransaction(db: Database, toolchainRevisionId: string) {
-		const d = get(db, toolchainRevisionId);
+	function bindingInTransaction(
+		db: Database,
+		toolchainRevisionId: string,
+		options?: { retained: true },
+	) {
+		const d = options?.retained
+			? retainedDefinition(db, toolchainRevisionId)
+			: get(db, toolchainRevisionId);
 		if (d?.kind !== "toolchain" || !d.bindingRevisionId) return null;
 		const binding = storedBindingInTransaction(db, d.bindingRevisionId);
 		if (!binding) return null;

@@ -224,3 +224,8 @@ read_world: World に記録された対象と主張、取り込んだ資料を�
 | run の期限 | `dialogue/service/work-dispatch.ts` が、頼む package に `researchMs` があり run の期限が固定されていなければ、作成から `researchMs`＋30秒まで延ばす（サービス内検索のハードコードの360秒を置き換え） |
 
 検証（fixture）: `service-search-budget.test.ts`（会話履歴300秒、外の期限が短ければその内、Web検索・World は150秒）、`research-history.test.ts` H1（頼んだ run が作成から330秒）、サービス内検索の試験（330秒・360秒のまま）。agent-runtime の試験 159件、dialogue・capabilities の verify は成功。
+
+
+## 2026-11-06: 記憶の受付への接続
+
+Memory本流受入でRouterが明示的な記憶依頼を会話へ戻すことを確認したため、既存memory(operation=request)を会話のnative tool loopにも渡す。これはStateの直接更新ではなく、Routerのmemory.requestと同じ権限・引数検査・steward inboxへの受付である。Memoryが有効で整合しstewardが存在するときだけ公開し、1回1道具の上限を共有する。その他の外部操作の受付は追加しない。受付結果のJSONをモデルへ返し、acceptedは反映完了ではないと説明する。読取りと記憶依頼の動作試験・実会話結果は[Memory本流受入](memory-integration-2026-11-05.md)へ記録する。

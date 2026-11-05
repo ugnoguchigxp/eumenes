@@ -133,6 +133,8 @@ export function collaborationBackends(deps: {
 		return interact;
 	};
 	return {
+		report: (db, sessionId, childId) =>
+			dialogue.specialistResultTextInTransaction(db, sessionId, childId),
 		source: (db, runId) =>
 			dialogue.specialistExecutionSourceInTransaction(db, runId),
 		authority: dialogue.specialistAuthorityInTransaction,

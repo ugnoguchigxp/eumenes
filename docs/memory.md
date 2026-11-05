@@ -15,7 +15,7 @@
 
 - steward は memory、continuity、conversation を使う。dialogue は memory だけを見る。複数 domain への保存は、step の settle が1つの transaction の中で各 domain の公開操作を呼んで行う。
 - 通常の記憶の変更は会話で伝える（依頼キュー）。設定画面は閲覧と「メモリーの接続」の入り切りに限る。導入時の例外として、本人の許可を得た未確認Seed候補を追加する管理API・CLIがある（下記）。
-- 会話から明示的な記憶の依頼を渡すには、既存Routerのprofile設定と判断データの導入が必要である。設定は保存済みの接続とcatalogから選び、判断データは[Router導入手順](../spec/router-package-integration-2026-11-04.md#3-設定sqlite-が正本)の既存APIで取り込む。未設定や未導入で会話へ戻った場合、背景の記憶担当が保存したことと、明示依頼が受け付けられたことを区別して調べる。
+- 会話にも既存の `memory(operation=request)` を渡し、保存・訂正・忘却・目標の依頼を受け付ける。Memoryが有効で整合しstewardがある場合だけ公開し、読む道具と同じ会話loopから共通executor・依頼キューへ渡す。Routerの `memory.request` も同じ受付を使う。受付と反映完了を区別し、完了はstewardの結果とStateで確認する。Routerの設定・判断データは[既存の導入手順](../spec/router-package-integration-2026-11-04.md#3-設定sqlite-が正本)を使う。
 - profile 名・モデル名はコードに固定しない。steward の推論は会話と同じ route、同じ接続先で行われる。例外は World の記録（curate-world）で、設定 `world.curationResourceId` に登録済みのクラウドの会話モデルを選ぶと、その resource だけで推論する（未設定・resource がない・接続が無効・会話の route がクラウドを許可しないときは会話と同じ route）。
 
 ## パッケージの利用とSeedの導入
@@ -69,7 +69,7 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 | 経緯の step（次の再構成が適用する） | `summarize`、`refine-summary` | `log` から外れる出来事の要約、続いた要約のまとめ直し |
 | 手入れ step（会話の最後の出来事から10分後だけ） | `consolidate-memory`、`consolidate-goals` | 記憶の統合・停止・傾向、目標の整理 |
 
-会話の内容を読む step（`curate-memory`・`curate-goals`・`summarize`・`refine-summary`）は、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。どの step も、会話に動いている run（担当に渡して結果を待つ run を含む）がある間は始めず、run の終わりで始まる（保守の step は 30秒・2分・10分の待ち）。会話を読まない step（`curate-world`・`consolidate-memory` など）は自分の接続で推論するが、同じく利用者のための呼出し（会話・専門担当など）が始まると取り消される（LARM は1回に1つずつ推論するので、譲らないと利用者の呼出しが待たされる）。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。
+会話の内容を読む step（`curate-memory`・`curate-goals`・`summarize`・`refine-summary`）は、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。どの step も、会話に動いている run（担当に渡して結果を待つ run を含む）がある間は始めず、run の終わりで始まる（保守の step は 30秒・2分・10分の待ち）。会話を読まない step（`curate-world`・`consolidate-memory` など）は自分の接続で推論するが、同じく利用者のための呼出し（会話・専門担当など）が始まると取り消される（LARM は1回に1つずつ推論するので、譲らないと利用者の呼出しが待たされる）。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。明示依頼の対象はresolveで一度だけ処理し、通常のremember/updateへ重ねない。忘却依頼の入力には停止中の記憶も状態を明示して含め、過去の版を対象にできる。
 
 **実行単位**（`steward_unit`）は 1 step ＝ 1 ジョブ。同じ対象に開いている単位は 1 つだけである。
 

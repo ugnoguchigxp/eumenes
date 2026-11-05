@@ -51,6 +51,10 @@ export function createDeliveryBuffer(
 	}
 	return {
 		prune,
+		forget(runId: string) {
+			results.delete(runId);
+			bodies.forgetDelivery(runId);
+		},
 		close: () => results.clear(),
 		remember(runId: string, value: Acquisition) {
 			const publicResult = boundResult(value.result);

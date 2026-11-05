@@ -48,7 +48,9 @@ const title = z
 	.trim()
 	.min(1)
 	.max(120)
-	.describe("作業のタイトル。変えるときだけ書く。");
+	.describe(
+		"作業のタイトル。本文の修正で現在のタイトルが内容と矛盾する場合は、同じ編集で整合するタイトルも指定する。それ以外は今のタイトルを維持する。",
+	);
 const docEdit = z.strictObject({
 	baseRevision,
 	title: title.optional(),
@@ -132,7 +134,12 @@ export type DocOutcome =
 			index?: number;
 			count?: number;
 			revision?: number;
-			issues?: Array<{ path: string; rule: string }>;
+			issues?: Array<{
+				path: string;
+				rule: string;
+				keys?: string[];
+				expected?: string;
+			}>;
 			/** A whole-document draft was kept as the work's rejected draft. */
 			kept?: boolean;
 			/** Why an edit's `old` was not found, and the document's exact lines where it most likely was. */
@@ -273,6 +280,10 @@ export function runDocTool(
 			issues: parsed.error.issues.slice(0, 8).map((issue) => ({
 				path: issue.path.map(String).join(".") || "(root)",
 				rule: issue.code,
+				...(issue.code === "unrecognized_keys" ? { keys: issue.keys } : {}),
+				...("expected" in issue && typeof issue.expected === "string"
+					? { expected: issue.expected }
+					: {}),
 			})),
 		};
 	const current = document.readInTransaction(tx, turn.workRef);

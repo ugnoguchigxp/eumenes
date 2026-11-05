@@ -3,9 +3,13 @@ import type { SpeechPreparation } from "../../delivery";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
-import type { ReadToolName } from "../../capabilities";
+import { z } from "zod";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
-import type { AgentMessage, AgentToolCall } from "../contracts";
+import type {
+	AgentMessage,
+	AgentToolCall,
+	AgentToolDefinition,
+} from "../contracts";
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput } from "./conversation-output";
 import { availableReadTools, readToolDefinitions } from "./executor-read";
@@ -14,7 +18,7 @@ import type {
 	ToolExecutor,
 	ToolOutcome,
 } from "./executor-context";
-import { parseCall } from "./generation-tools";
+import { memoryArgs, parseCall, TOOL_NAMES } from "./generation-tools";
 import { INPUT_HEADINGS } from "./input-text";
 import { refusalText, toolResultText } from "./result-text";
 import { parseChoice, strictChoiceSchema } from "./routed-choice";
@@ -26,6 +30,11 @@ import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 const log = getLogger("dialogue");
 /** The host's words for a turn whose call failed before anything was said. */
 const SAID_FAILED = systemContext("dialogue.contexts.local.turn-failed", {});
+const MEMORY_REQUEST_TOOL: AgentToolDefinition = {
+	name: TOOL_NAMES.memory,
+	description: systemContext("dialogue.contexts.local.memory-request", {}),
+	parameters: z.toJSONSchema(memoryArgs.options[0]!),
+};
 
 export type RoutedTurnOptions = {
 	signal: AbortSignal;
@@ -154,7 +163,7 @@ function createTurn(
 		outputLimit: input.harness.call.outputLimit,
 		reasoning: {
 			larm: input.harness.call.reasoning,
-			cloud: input.harness.call.reasoning,
+			cloud: input.harness.call.cloudReasoning,
 		},
 		...(options.session?.context ? { context: options.session.context } : {}),
 		...(options.session?.refs ? { refs: options.session.refs } : {}),
@@ -325,10 +334,20 @@ function createTurn(
 				deps.larm.executeStream
 					? deps.store.read((db) => availableReadTools(deps, db))
 					: [];
+			log.info("dialogue.read_tools_offered", {
+				count: reads.length,
+				kind: reads.join(","),
+			});
 			const act = this.act;
 			// What this talk spoke, and whether it read: a call that fails after a read gets the host's words after it.
 			let spoken = "";
-			let readMade = false;
+			let toolMade = false;
+			const offeredTools = [
+				...readToolDefinitions(reads),
+				...(reads.includes("read_memory") && deps.steward
+					? [MEMORY_REQUEST_TOOL]
+					: []),
+			];
 			let reply: Awaited<
 				ReturnType<DialogueDeps["conversationAgent"]["respond"]>
 			>;
@@ -379,19 +398,19 @@ function createTurn(
 							}
 						},
 					},
-					tools: readToolPort(reads, act, () => {
-						readMade = true;
+					tools: conversationToolPort(offeredTools, act, () => {
+						toolMade = true;
 					}),
 					signal,
 					onDelta: (text) => {
 						spoken += text;
 						delta(text);
 					},
-					maxToolCalls: reads.length ? 1 : 0,
+					maxToolCalls: offeredTools.length ? 1 : 0,
 				});
 			} catch (error) {
 				const code = error instanceof Error ? error.message : "";
-				if (signal.aborted || !readMade || !callFailed(code)) throw error;
+				if (signal.aborted || !toolMade || !callFailed(code)) throw error;
 				log.warn("dialogue.turn_failed", { kind: "talk", reason: code });
 				said = [said, spoken.trim()].filter(Boolean).join("\n");
 				this.speak(SAID_FAILED);
@@ -414,13 +433,13 @@ function createTurn(
  * The talk turn's read tools (spec conversation-read-tools-design 2026-10-31): only those offered run, through the
  * turn's executor; any other name, or arguments that are no object, is refused and never run.
  */
-function readToolPort(
-	reads: readonly ReadToolName[],
+function conversationToolPort(
+	tools: readonly AgentToolDefinition[],
 	act: Turn["act"],
 	onRead: () => void,
 ) {
 	return {
-		tools: readToolDefinitions(reads),
+		tools,
 		async call(toolCall: AgentToolCall) {
 			let args: unknown;
 			try {
@@ -429,7 +448,7 @@ function readToolPort(
 				args = undefined;
 			}
 			if (
-				!(reads as string[]).includes(toolCall.name) ||
+				!tools.some((tool) => tool.name === toolCall.name) ||
 				!args ||
 				typeof args !== "object" ||
 				Array.isArray(args)
@@ -442,11 +461,19 @@ function readToolPort(
 				};
 			onRead();
 			const read = await act(toolCall.name, args as Record<string, unknown>);
+			if ("refused" in read)
+				return {
+					content: refusalText(read.refused.message, read.refused.repair ?? []),
+				};
+			const result = read.outcome.result;
 			return {
 				content:
-					"refused" in read
-						? refusalText(read.refused.message, read.refused.repair ?? [])
-						: String((read.outcome.result as { text?: unknown }).text ?? ""),
+					typeof result === "object" &&
+					result !== null &&
+					"text" in result &&
+					typeof result.text === "string"
+						? result.text
+						: (JSON.stringify(result) ?? ""),
 			};
 		},
 	};

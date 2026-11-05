@@ -42,10 +42,19 @@ type ReportSource = {
 	createdAt?: string;
 };
 type Report = {
+	answer?: string;
+	assurance?: string;
+	stopReason?: string;
+	status?: string;
 	outcome?: string;
 	coverage?: string;
 	summary?: string;
-	claims: Array<{ text?: string; evidence?: Array<{ sourceId?: string }> }>;
+	claims: Array<{
+		text?: string;
+		status?: string;
+		sourceIds?: string[];
+		evidence?: Array<{ sourceId?: string }>;
+	}>;
 	limitations?: string[];
 	sources: ReportSource[];
 	candidateResults?: unknown[];
@@ -83,13 +92,33 @@ function reportLines(report: Report): string[] {
 		report.sources.map((source) => [source.sourceId ?? "", source]),
 	);
 	const lines: string[] = [];
+	if (report.answer)
+		lines.push(
+			"回答案:",
+			...report.answer
+				.split(/\r?\n/)
+				.filter(Boolean)
+				.map((line) => `- ${lineText(line)}`),
+		);
+	if (report.assurance === "model")
+		lines.push("検証: モデルによる照合（厳密な証明ではない）");
+	if (report.stopReason) lines.push(`終了理由: ${lineText(report.stopReason)}`);
 	const claims = report.claims.filter((claim) => !!claim.text);
 	if (claims.length) {
-		lines.push("確認できたこと:");
+		lines.push(
+			claims.some(
+				(claim) => claim.status === "unknown" || claim.status === "conflicting",
+			)
+				? "主張と確認状態:"
+				: "確認できたこと:",
+		);
 		for (const claim of claims) {
 			const labels = [
 				...new Set(
-					(claim.evidence ?? []).flatMap((evidence) => {
+					(
+						claim.evidence ??
+						(claim.sourceIds ?? []).map((sourceId) => ({ sourceId }))
+					).flatMap((evidence) => {
 						const source = byId.get(evidence.sourceId ?? "");
 						const label = source ? sourceLabel(source) : null;
 						return label ? [label] : [];
@@ -97,7 +126,7 @@ function reportLines(report: Report): string[] {
 				),
 			];
 			lines.push(
-				`- ${lineText(claim.text!)}${labels.length ? `（${labels.join("、")}）` : ""}`,
+				`- ${claim.status === "unknown" ? "未確認: " : claim.status === "conflicting" ? "矛盾あり: " : ""}${lineText(claim.text!)}${labels.length ? `（${labels.join("、")}）` : ""}`,
 			);
 		}
 	}
@@ -199,7 +228,7 @@ export function resultText(
 		(uri) => source.resource(uri) ?? "リソース",
 	);
 	if (isReport(result)) {
-		const head = `${name}の調査が終わりました（${REPORT_OUTCOMES[result.outcome ?? (result.coverage === "partial" ? "partial" : "answered")] ?? "確認できました"}）。`;
+		const head = `${name}の調査が終わりました（${REPORT_OUTCOMES[result.outcome ?? (result.coverage === "partial" || outcome === "partial" ? "partial" : "answered")] ?? "確認できました"}）。`;
 		return {
 			text: [
 				head,

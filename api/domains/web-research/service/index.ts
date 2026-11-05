@@ -1,5 +1,6 @@
+import { createWebSubmission, requestDigest as digest } from "./submission";
+import { createWebErasure } from "./erasure";
 import { createDeliveryBuffer, boundResult } from "./delivery-buffer";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { HandlerDefinition, QueueService } from "../../queue";
@@ -9,14 +10,7 @@ import {
 	type ResearchRequest,
 	type ResearchRun,
 } from "../contracts";
-import {
-	byId,
-	byRequest,
-	insert,
-	finish,
-	running,
-	sweepRuns,
-} from "../repository";
+import { byId, finish, running, sweepRuns } from "../repository";
 import {
 	createWebAcquisition,
 	acquisitionError,
@@ -36,6 +30,7 @@ interface Prepared {
 	generation: number;
 	hit: CacheHit | null;
 	attemptTimeoutMs: number | null;
+	acquisitionTimeoutMs: number;
 }
 interface Executed extends Acquisition {
 	hit: CacheHit | null;
@@ -77,10 +72,6 @@ function acquiredBodies(value: Acquisition): AcquiredBody[] {
 		}))
 	);
 }
-const digest = (request: ResearchRequest) => {
-	const { requestId: _id, ...input } = request;
-	return createHash("sha256").update(JSON.stringify(input)).digest("hex");
-};
 
 function validateTimeout(acquisitionTimeoutMs: number) {
 	if (
@@ -145,13 +136,13 @@ export function createWebResearch({
 	}
 	function shared(input: Prepared, signal: AbortSignal): Promise<Acquisition> {
 		signal.throwIfAborted();
-		const key = `${input.generation}:${digest(input.request)}`;
+		const key = `${input.acquisitionTimeoutMs}:${input.generation}:${digest(input.request)}`;
 		let work = shares.get(key);
 		if (!work || work.controller.signal.aborted) {
 			const controller = new AbortController();
 			const deadline = AbortSignal.any([
 				controller.signal,
-				AbortSignal.timeout(acquisitionTimeoutMs),
+				AbortSignal.timeout(input.acquisitionTimeoutMs),
 			]);
 			const promise = new Promise<Acquisition>((resolve, reject) => {
 				const aborted = () =>
@@ -259,6 +250,8 @@ export function createWebResearch({
 					generation,
 					hit,
 					attemptTimeoutMs: run.attempt_timeout_ms ?? null,
+					acquisitionTimeoutMs:
+						run.acquisition_timeout_ms ?? acquisitionTimeoutMs,
 				},
 			};
 		},
@@ -454,84 +447,23 @@ export function createWebResearch({
 		});
 		return sweeping;
 	}
-	function submitInTransaction(
-		db: import("bun:sqlite").Database,
-		raw: unknown,
-		hostOptions?: {
-			deadlineAtMs: number;
-			parentJobId?: string;
-			lane: "interactive" | "background";
-			availableAtMs?: number;
-			/** 1..15000 ms, counted from execute start (never from Queue admission). */
-			attemptTimeoutMs?: number;
-		},
-	) {
-		if (closing) throw new Error("web_research_unavailable");
-		const attemptTimeoutMs = hostOptions?.attemptTimeoutMs;
-		if (
-			attemptTimeoutMs !== undefined &&
-			(!Number.isSafeInteger(attemptTimeoutMs) ||
-				attemptTimeoutMs < 1 ||
-				attemptTimeoutMs > 15000)
-		)
-			throw new Error("invalid_web_attempt_timeout");
-		const parsed = submitResearchSchema.safeParse(raw);
-		if (!parsed.success) throw new Error("invalid_web_research_input");
-		const request = parsed.data,
-			inputDigest = digest(request);
-		return (() => {
-			const existing = byRequest(db, request.requestId);
-			if (existing) {
-				if (existing.input_digest !== inputDigest)
-					throw new Error("request_conflict");
-				return { runId: existing.id, jobId: existing.job_id, fresh: false };
-			}
-			const runId = id();
-			const job = queue.enqueueInTransaction(db, {
-				scope: "web:owner",
-				kind: KIND,
-				dedupeKey: request.requestId,
-				payload: { runId },
-				subjectRef: runId,
-				lane: hostOptions?.lane ?? "background",
-				availableAtMs: hostOptions?.availableAtMs,
-				parentJobId: hostOptions?.parentJobId,
-				deadlineAtMs: Math.min(
-					Math.max(now(), hostOptions?.availableAtMs ?? 0) + 30000,
-					hostOptions?.deadlineAtMs ?? Infinity,
-				),
-				maxAttempts: 1,
-				// Serialize cache writes for a URL, including fresh bypasses, so older fetches cannot replace newer content.
-				concurrencyKey: cacheKey(request) ?? undefined,
-			});
-			insert(
-				db,
-				runId,
-				request,
-				inputDigest,
-				job.job.id,
-				now(),
-				attemptTimeoutMs,
-			);
-			return { runId, jobId: job.job.id, fresh: true };
-		})();
-	}
-	function cancelInTransaction(
-		db: import("bun:sqlite").Database,
-		runId: string,
-		reason: string,
-	) {
-		const run = byId(db, runId);
-		if (!run) return [];
-		queue.cancelInTransaction(db, run.job_id, reason);
-		return [run.job_id];
-	}
+	const submitInTransaction = createWebSubmission(
+		queue,
+		now,
+		id,
+		() => closing,
+		acquisitionTimeoutMs,
+	);
+	const erasure = createWebErasure(store, queue, (id) => {
+		delivery.forget(id);
+		rejectionReasons.delete(id);
+	});
 	return {
 		reviewCollected: async (input: import("llm-fetch").GuardReviewInput) =>
 			(await review?.(input))?.decision === "source_content",
 		savedBodies,
 		submitInTransaction,
-		cancelInTransaction,
+		...erasure,
 		async submit(raw: unknown) {
 			const result = await store.write((db) => submitInTransaction(db, raw));
 			queue.wake();

@@ -1,4 +1,6 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
+import type { Database } from "bun:sqlite";
+import type { Receipt } from "../contracts";
 import {
 	usagePageQuerySchema,
 	usageSchema,
@@ -34,6 +36,21 @@ const decode = (row: unknown) => {
 export function createUsageReader(store: SqliteStore) {
 	return {
 		...createActivityReader(store),
+		/** Exact completed receipt lookup for metered domain workers; never a latest-N guess. */
+		usageOfInTransaction(db: Database, receipt: Receipt) {
+			const row = db
+				.query(
+					`${select},a.cache_read_tokens AS cacheReadTokens ${from} WHERE a.id=? AND r.id=? AND a.ended IS NOT NULL`,
+				)
+				.get(receipt.attemptId, receipt.requestId);
+			return row
+				? {
+						...decodeRaw(row),
+						cacheReadTokens: (row as { cacheReadTokens: number | null })
+							.cacheReadTokens,
+					}
+				: null;
+		},
 		usage: () =>
 			store.read((db) =>
 				db

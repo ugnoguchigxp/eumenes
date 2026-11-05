@@ -18,10 +18,14 @@ import { waitFor } from "../../../infrastructure/wait-for";
  * The conversation harness (the conversation harness design, sections 4.1 to 4.3; the single harness plan): its
  * one value, the model's route chosen from the saved settings, and what each part of the value changes.
  */
-test("the harness: the routed turn's talk on the last two utterances, thinking at low within 4,096 tokens", () => {
+test("the harness: the last two utterances with local low and cloud high within 4,096 tokens", () => {
 	expect(localHarness.gates).toEqual({ systemCopy: true });
 	expect(localHarness.history).toEqual({ copyFilter: true, users: 2 });
-	expect(localHarness.call).toEqual({ reasoning: "low", outputLimit: 4096 });
+	expect(localHarness.call).toEqual({
+		reasoning: "low",
+		cloudReasoning: "high",
+		outputLimit: 4096,
+	});
 });
 
 test("the llm route is LARM only unless the saved route picks a usable cloud model", () => {
@@ -147,10 +151,10 @@ afterEach(async () => {
 });
 
 const lastCall = () => h!.state.calls.at(-1)!;
-/** Every call carries the one reasoning level for both sides: LARM and a cloud connection. */
+/** Every call carries the harness's independently specified levels for LARM and cloud. */
 const BOTH = {
 	larm: localHarness.call.reasoning,
-	cloud: localHarness.call.reasoning,
+	cloud: localHarness.call.cloudReasoning,
 };
 
 /** A routed turn with no judgement: the request turn chooses nothing, then the talk turn says `text`. */

@@ -1,0 +1,38 @@
+{
+	"version": 6,
+	"budget": {
+		"attempts": 200,
+		"wallMs": 7200000,
+		"attemptsPerHypothesis": 6,
+		"hypothesesPerStrategy": 4,
+		"strategies": 8,
+		"stepBacks": 40,
+		"rejectionsInRow": 3,
+		"transitions": 1500
+	},
+	"signals": {
+		"consecutiveFailures": 3,
+		"mismatchNotShrinking": 3,
+		"scopeGrowth": 3,
+		"revisits": 3,
+		"protectedTouches": 1,
+		"goalDrift": 3
+	},
+	"retry": {
+		"sameFingerprintWithReason": 1
+	},
+	"judge": {
+		"confidence": 0.7,
+		"guardYes": 0.8,
+		"mismatchBelow": 0.5,
+		"trajectoryPersist": 2
+	},
+	"restore": "protective",
+	"judgeState": {
+		"maxChars": 2500,
+		"textChars": 240
+	},
+	"consultation": {
+		"requireProgress": true
+	}
+}

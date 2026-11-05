@@ -1,3 +1,4 @@
+import { taskForWork } from "./task-work";
 import type { Database } from "bun:sqlite";
 import type { AnswerTicket } from "../../agent-runtime";
 import {
@@ -200,7 +201,8 @@ function taskNotice(
 		typeof raw.workRef !== "string"
 	)
 		return null;
-	const view = deps.agents?.executions.viewInTransaction(tx, raw.workRef);
+	const work = deps.work?.workOfSourceInTransaction(tx, raw.workRef);
+	const view = taskForWork(deps, tx, work)?.viewInTransaction(tx, raw.workRef);
 	if (!view || view.conversationId !== run.conversationId)
 		return { workRef: raw.workRef, report: null };
 	if (view.status === "waiting_user" && view.question)

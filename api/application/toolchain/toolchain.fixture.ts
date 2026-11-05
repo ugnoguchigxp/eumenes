@@ -85,7 +85,9 @@ const ANSWER_FILL = systemContext(
 	{},
 );
 const CONVERSATION_TOOLS = ["memory", "find_toolchain", "delegate", "work"].map(
-	(name) => ({ function: { name } }),
+	(name) => ({
+		function: { name },
+	}),
 );
 /** Trusted packet merged with the separate UNTRUSTED_MATERIALS message. */
 export function workerPacket(
@@ -272,6 +274,30 @@ export async function harness(options: HarnessOptions = {}) {
 		},
 		answer: async (messages, _signal, callOptions) => {
 			calls++;
+			if (options.pursuit) {
+				const system = messages[0]?.content ?? "";
+				const marker = system.lastIndexOf("OUTPUT_SCHEMA=");
+				const question = messages
+					.filter((m) => m.role === "user")
+					.at(-1)?.content;
+				let packet: { delegatedRequest?: unknown; state?: unknown } = {};
+				try {
+					packet = JSON.parse(question ?? "{}");
+				} catch {
+					/* Not a structured control call. */
+				}
+				if (
+					marker >= 0 &&
+					typeof packet.delegatedRequest === "string" &&
+					typeof packet.state === "string"
+				)
+					return JSON.stringify(
+						options.pursuit(
+							JSON.parse(system.slice(marker + "OUTPUT_SCHEMA=".length)),
+							messages,
+						),
+					);
+			}
 			if (messages[0]!.content.includes("転記された発話の主要な言語"))
 				return JSON.stringify({
 					status: "identified",
@@ -756,7 +782,7 @@ export async function harness(options: HarnessOptions = {}) {
 		}),
 	});
 	toolchainLinks.attachDialogue(dialogue);
-	if (options.everyday || options.pipelines) {
+	if (options.everyday || options.pipelines || options.pursuit) {
 		// The everyday task agent is suspended: its bundle is never seeded, so the fixtures of that
 		// implementation register it explicitly. Pipelines need only the parent execution's port.
 		const registered = options.everyday
@@ -770,6 +796,7 @@ export async function harness(options: HarnessOptions = {}) {
 			: { issues: [] };
 		if (registered.issues.length) throw new Error("dormant_bundle_rejected");
 		configureTaskExecution({
+			pursuit: toolchain.pursuit,
 			collaboration: toolchain.collaboration,
 			interact: browser?.interact,
 			memory,
@@ -822,6 +849,7 @@ export async function harness(options: HarnessOptions = {}) {
 		}),
 	});
 	toolchain.agents.start();
+	if (options.pursuit) toolchain.pursuit?.start();
 	queue.start();
 	const request = async (path: string, body?: unknown) =>
 		app.request(path, {
@@ -895,6 +923,7 @@ export async function harness(options: HarnessOptions = {}) {
 			return calls;
 		},
 		async close() {
+			await toolchain.pursuit?.close();
 			await browser?.service.disconnect();
 			await kanbanRuns?.disconnect();
 			terminals?.closeAll();

@@ -208,26 +208,7 @@ export interface InstantAdapter {
 
 export interface DomainAdapter {
 	/** Registered lifecycle of an artifact-free task binding. */
-	task?: {
-		startInTransaction(
-			db: Database,
-			input: {
-				source: import("./task-execution").ExecutionSource;
-				request: string;
-				references: import("./task-execution").ExecutionReference[];
-			},
-		): import("./task-execution").ExecutionView;
-		controlInTransaction(
-			db: Database,
-			conversationId: string,
-			input: unknown,
-			messageId: string,
-		): import("./task-execution").ExecutionView;
-		viewInTransaction(
-			db: Database,
-			id: string,
-		): import("./task-execution").ExecutionView | null;
-	};
+	task?: import("./task-execution").TaskLifecyclePort;
 	/** Domain-owned follow-up of an accepted asynchronous operation. No intent dispatch lives here. */
 	execution?: {
 		/** External processes stop outside the writer; false means stopping could not be confirmed. */

@@ -37,8 +37,8 @@ const space: VectorSpace = {
 	artifactDigest: "d1",
 	dimension: 8,
 };
-const oneHot = (i: number) =>
-	Array.from({ length: space.dimension }, (_, j) => (j === i ? 1 : 0));
+const oneHot = (i: number, dimension = space.dimension) =>
+	Array.from({ length: dimension }, (_, j) => (j === i ? 1 : 0));
 
 test("every builtin and bundled toolchain registers as a complete set with flat tool schemas", async () => {
 	const { store, capabilities } = await setup([
@@ -166,16 +166,18 @@ test("without vectors every available toolchain is offered; with vectors the top
 	);
 	// Toolchain i's passages point in direction i; the query points at web.search.
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
+	// Give every registered entry a distinct direction as the catalog grows.
+	const rankedSpace = { ...space, dimension: active.length };
 	await store.write((db) =>
 		capabilities.saveToolchainVectorsInTransaction(
 			db,
-			space,
+			rankedSpace,
 			active.flatMap((d, i) =>
 				toolchainPassages(d).map((text, item) => ({
 					revisionId: d.revisionId,
 					item,
 					text,
-					vector: oneHot(i % space.dimension),
+					vector: oneHot(i, rankedSpace.dimension),
 				})),
 			),
 		),
@@ -184,7 +186,10 @@ test("without vectors every available toolchain is offered; with vectors the top
 	const ranked = store.read((db) =>
 		capabilities.toolchainCandidatesInTransaction(db, {
 			text: "鎌倉の天気を教えて",
-			vector: { space, values: oneHot(web % space.dimension) },
+			vector: {
+				space: rankedSpace,
+				values: oneHot(web, rankedSpace.dimension),
+			},
 			available,
 		}),
 	);
@@ -196,8 +201,8 @@ test("without vectors every available toolchain is offered; with vectors the top
 		capabilities.toolchainCandidatesInTransaction(db, {
 			text: "鎌倉の天気を教えて",
 			vector: {
-				space: { ...space, revision: "r2" },
-				values: oneHot(web % space.dimension),
+				space: { ...rankedSpace, revision: "r2" },
+				values: oneHot(web, rankedSpace.dimension),
 			},
 			available,
 		}),

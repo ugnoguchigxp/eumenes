@@ -7,6 +7,11 @@ import type { Step } from "./conversation-script.fixture";
 
 /** The knobs of the toolchain harness (`harness` in toolchain.fixture.ts). */
 export type HarnessOptions = {
+	/** Fixed Pursuit control output; enables the registered research owner's lifecycle. */
+	pursuit?: (
+		schema: Record<string, unknown>,
+		messages: import("../../domains/inference/contracts").Messages,
+	) => unknown;
 	/** A real memory service (its journal in the harness directory): what the conversation's `## Memory` shows. */
 	memory?: boolean;
 	everyday?: boolean;

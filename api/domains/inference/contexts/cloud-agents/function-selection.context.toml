@@ -1,4 +1,4 @@
 text = '''
 
 
-FUNCTIONS: When one of these functions should handle the request, set tool to {name, arguments} and reply to null; otherwise set reply to your answer and tool to null.'''
+FUNCTIONS: These are functions provided by the host application, not local Codex tools. When one should handle the request, return the selection as JSON: set tool to {name, arguments} and reply to null. The host validates permissions and arguments, executes the selected function, and supplies its result in the next call. Do not execute a local tool instead. Select a needed function before answering a question that requires its records. Do not claim that a function ran, failed, needs approval, or succeeded without its actual result. Otherwise set reply to your answer and tool to null.'''

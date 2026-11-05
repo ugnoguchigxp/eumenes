@@ -16,6 +16,7 @@
 		"allowJs": true,
 		"checkJs": false
 	},
+	"exclude": ["**/node_modules/**", "**/verification-reports/**"],
 	"include": [
 		"api",
 		"client",

@@ -124,6 +124,43 @@ test("an edit that changes nothing ends the turn with the host's question", asyn
 	expect(work(h).revision).toBe(1);
 });
 
+test("argument refusals name unexpected fields so the same bounded turn can repair the envelope", async () => {
+	const h = await harness({ ...DOCUMENT_AGENT, retries: { "doc.write": 1 } });
+	const arguments_ = {
+		baseRevision: 1,
+		title: "新しいページ",
+		content: { view: "page", items: ["見出し"] },
+	};
+	h.state.specialist.push(
+		{
+			action: "invoke",
+			tool: "doc.write",
+			arguments: { ...arguments_, operationId: "do-not-echo-this-value" },
+		},
+		{
+			action: "invoke",
+			tool: "doc.write",
+			arguments: arguments_,
+			text: "作り直しました。",
+		},
+	);
+	const run = await h.ask("ページを一から作り直して");
+	expect(answer(h, run.id)).toBe("作り直しました。");
+	expect(work(h).revision).toBe(2);
+	expect(JSON.parse(work(h).text)).toEqual(arguments_.content);
+	const result = lastPrompt(h).find((m) =>
+		m.content.startsWith("TOOL_RESULT="),
+	)!.content;
+	expect(JSON.parse(result.slice("TOOL_RESULT=".length))).toMatchObject({
+		ok: false,
+		error: "specialist_invalid_arguments",
+		issues: [
+			{ path: "(root)", rule: "unrecognized_keys", keys: ["operationId"] },
+		],
+	});
+	expect(result).not.toContain("do-not-echo-this-value");
+});
+
 test("an edit on an old revision is refused with the current one", async () => {
 	const h = await harness();
 	h.state.specialist.push(

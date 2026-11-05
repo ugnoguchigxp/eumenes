@@ -17,6 +17,20 @@ export const observation = (db: Database, runId: string) =>
 			[string]
 		>("SELECT * FROM dialogue_specialist_observations WHERE run_id=?")
 		.get(runId);
+/** The accepted explanation of this session's exact child result, never a manual turn or a question. */
+export const childReportRun = (
+	db: Database,
+	sessionId: string,
+	childId: string,
+) =>
+	db
+		.query<{ id: string }, [string, string]>(
+			`SELECT r.id FROM dialogue_specialist_observations o JOIN dialogue_runs r ON r.id=o.run_id
+WHERE r.specialist_session_id=? AND r.source_kind='notice' AND r.status='completed' AND r.answer_message_id IS NOT NULL
+AND json_extract(o.event_json,'$.id')=? AND json_extract(o.event_json,'$.status') NOT IN ('running','waiting_user')
+ORDER BY r.seq DESC LIMIT 1`,
+		)
+		.get(sessionId, childId)?.id ?? null;
 export function forgetObservations(
 	db: Database,
 	messageIds: readonly string[],

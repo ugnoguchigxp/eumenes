@@ -45,7 +45,9 @@ export function registerRevision(
 		digest = hash(d);
 	const old = db
 		.query("SELECT definition_hash FROM capability_revisions WHERE id=?")
-		.get(rev) as { definition_hash: string } | null;
+		.get(rev) as {
+		definition_hash: string;
+	} | null;
 	if (old) {
 		if (old.definition_hash !== digest) {
 			if (origin === "builtin")
@@ -177,10 +179,12 @@ export function validateToolchain(
 			throw new Error("invalid_toolchain_tool_schema");
 	validateBinding(db, d, dependencies);
 	if (
-		(d.functionName === "execute_task") !==
-		(d.bindingRevisionId !== undefined &&
+		d.functionName === "execute_task" &&
+		!(
+			d.bindingRevisionId !== undefined &&
 			bindingInTransaction(db, d.bindingRevisionId)?.document.execution ===
-				"task")
+				"task"
+		)
 	)
 		throw new Error("toolchain_function_conflict");
 	const taken = db

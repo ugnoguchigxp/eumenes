@@ -10,7 +10,7 @@ export const migrations: readonly Migration[] = [
  id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE, kind TEXT NOT NULL,
  revision INTEGER NOT NULL DEFAULT 0, title TEXT NOT NULL DEFAULT '', document_json TEXT,
  source_json TEXT, busy_run_id TEXT, ended INTEGER NOT NULL DEFAULT 0,
- child_id TEXT, child_epoch INTEGER, child_digest TEXT, child_json TEXT, last_answer_message_id TEXT, last_start_message_id TEXT,
+ child_id TEXT, child_epoch INTEGER, child_digest TEXT, child_json TEXT, last_answer_message_id TEXT,
  rejected_json TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
 );
 CREATE INDEX collaboration_pending ON collaboration_works(ended,child_id);
@@ -23,6 +23,11 @@ CREATE TABLE collaboration_receipts (
  request_id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES collaboration_works(id) ON DELETE CASCADE,
  input_digest TEXT NOT NULL, result_json TEXT NOT NULL
 );`,
+	},
+	{
+		id: "collaboration/0002-start-message",
+		after: ["collaboration/0001-works"],
+		sql: "ALTER TABLE collaboration_works ADD COLUMN last_start_message_id TEXT;",
 	},
 ];
 export type WorkRow = {

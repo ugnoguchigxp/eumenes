@@ -24,6 +24,7 @@ import {
 	type Step,
 } from "./routed-actions";
 import { fieldsOf } from "./routed-fields";
+import { chooseWholeWork } from "./routed-work-choice";
 import {
 	decidedPart,
 	hostDecision,
@@ -363,6 +364,24 @@ async function carryOut(
 		case "again":
 			return askAgain(turn, consulted, decision.candidate);
 		case "run":
+			if (decision.row === 9 && decision.candidate.kind === "toolchain") {
+				const selected = await chooseWholeWork(
+					turn,
+					consulted.words,
+					decision.candidate,
+					consulted.candidates,
+				);
+				if ("step" in selected) return selected.step;
+				if (selected.candidate.id !== decision.candidate.id)
+					await consulted.retrace({ decided: selected.candidate.id });
+				return toolchain(
+					turn,
+					consulted,
+					selected.candidate,
+					decision.announce,
+					selected.fields,
+				);
+			}
 			return run(turn, consulted, decision.candidate, decision.announce);
 	}
 }
@@ -495,12 +514,14 @@ async function prepare(
 	c: Extract<RouteCandidate, { kind: "toolchain" | "read" }>,
 	announce: Announce,
 	redirected?: { trace: RouterTraceRecord; wrongId: string },
+	prefilled?: Fields,
 ): Promise<Prepared> {
 	const words = redirected
 		? `${redirected.trace.text}\n${turn.utterance}`
 		: consulted.words;
-	const filled =
-		c.card.execution === "pipeline"
+	const filled = prefilled
+		? { fields: prefilled }
+		: c.card.execution === "pipeline"
 			? { fields: { request: words } }
 			: await fieldsOf(turn, words, c);
 	if ("step" in filled) return filled;
@@ -551,8 +572,16 @@ async function toolchain(
 	consulted: Consulted,
 	c: Extract<RouteCandidate, { kind: "toolchain" | "read" }>,
 	announce: Announce,
+	prefilled?: Fields,
 ): Promise<Step> {
-	const prepared = await prepare(turn, consulted, c, announce);
+	const prepared = await prepare(
+		turn,
+		consulted,
+		c,
+		announce,
+		undefined,
+		prefilled,
+	);
 	return "step" in prepared ? prepared.step : prepared.go();
 }
 

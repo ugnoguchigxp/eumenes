@@ -189,6 +189,12 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "compute_discovery", recover: () => s.compute.refresh() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
 		{
+			name: "pursuit_recovery",
+			recover: async () => {
+				await s.toolchain.pursuit?.recover();
+			},
+		},
+		{
 			name: "visual_analysis_recovery",
 			recover: async () => {
 				await s.ocr.analyses?.recover();
@@ -234,6 +240,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			},
 		},
 		{ name: "agents_start", start: () => s.toolchain.agents.start() },
+		{ name: "pursuit_start", start: () => s.toolchain.pursuit?.start() },
 		{ name: "queue_start", start: () => s.queue.start() },
 		{
 			name: "task_report_delivery_start",
@@ -283,6 +290,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "browser", close: () => s.browser.close() },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
+		{ name: "pursuit", close: () => s.toolchain.pursuit?.close() },
 		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },
 		{ name: "shell", close: () => s.toolchain.shell.closeAll() },
 		{ name: "terminals", close: () => s.toolchain.terminals.closeAll() },

@@ -1,3 +1,4 @@
+import { taskForWork } from "./task-work";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Database } from "bun:sqlite";
 import type { ToolchainCard } from "../../capabilities";
@@ -485,6 +486,11 @@ export function createWorkLedger(
 		 */
 		forgetInTransaction(db: Database, messageIds: readonly string[]) {
 			const forgotten = forgetWork(db, messageIds, clock());
+			for (const item of forgotten) {
+				const row = workById(db, item.id);
+				if (row?.sourceRef)
+					taskForWork(deps, db, row)?.forgetInTransaction?.(db, row.sourceRef);
+			}
 			// The resources of a forgotten TODO are forgotten with it.
 			forgetWorkResources(db, forgotten, clock());
 			clearResults(db, forgotten);

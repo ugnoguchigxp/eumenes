@@ -203,10 +203,10 @@ export const taskBindingV1 = z.strictObject({
 	outputSchemaRef: schemaRef,
 	timeLimits: timeLimitsV1,
 	limits: z.strictObject({
-		parentCalls: z.number().int().min(2).max(12),
-		childCalls: z.number().int().min(1).max(6),
-		searches: z.number().int().min(1).max(3),
-		modelCalls: z.number().int().min(2).max(48),
+		parentCalls: z.number().int().min(2).max(120),
+		childCalls: z.number().int().min(1).max(32),
+		searches: z.number().int().min(1).max(12),
+		modelCalls: z.number().int().min(2).max(96),
 	}),
 });
 /**

@@ -49,6 +49,8 @@ export type Authority = {
 	active: boolean;
 };
 export type Ports = {
+	/** The owning specialist's adopted explanation of this exact child's terminal result. */
+	report?(db: Database, sessionId: string, childId: string): string | null;
 	source(db: Database, runId: string): Source | null;
 	authority(db: Database, sessionId: string): Authority | null;
 	available(db: Database, kind: CollaborationKind): boolean;

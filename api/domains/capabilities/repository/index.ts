@@ -34,6 +34,17 @@ export function get(db: Database, revisionId: string): FixedDefinition | null {
 	};
 }
 
+/** Immutable revision metadata for cancellation/erasure after publication or availability was revoked. */
+export function retainedDefinition(
+	db: Database,
+	revisionId: string,
+): Definition | null {
+	const row = db
+		.query("SELECT definition_json FROM capability_revisions WHERE id=?")
+		.get(revisionId) as { definition_json: string } | null;
+	return row ? (JSON.parse(row.definition_json) as Definition) : null;
+}
+
 /** Passage embeddings of toolchains, per vector space. Appended migration. */
 const toolchainVectorsMigration = `
 CREATE TABLE capability_toolchain_vectors(

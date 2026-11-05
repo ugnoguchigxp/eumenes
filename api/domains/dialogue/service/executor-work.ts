@@ -1,3 +1,4 @@
+import { taskForWork } from "./task-work";
 import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
 import type { WorkRow } from "../repository/work";
@@ -162,7 +163,7 @@ export function controlExecution(
 	state: (next?: typeof row) => Record<string, unknown>,
 ): ToolOutcome {
 	const { deps, input } = x;
-	const executions = deps.agents?.executions;
+	const executions = taskForWork(deps, tx, row);
 	const view = row.sourceRef
 		? executions?.viewInTransaction(tx, row.sourceRef)
 		: null;
