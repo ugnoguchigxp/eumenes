@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import {
@@ -62,7 +63,11 @@ import { createForget } from "./forget";
 import {
 	type BlockJournalEntry,
 	blockJournalPathOf,
+	intentOf,
+	intentsOf,
 	readJournal,
+	readJournalLenient,
+	setJournalAside,
 } from "./journal";
 import { createBackfill } from "./backfill";
 import { createLedger } from "./ledger";
@@ -143,12 +148,22 @@ export const NOMINAL_FIXED_TOKENS = 3000;
 const referencePlan = () =>
 	planWindow({ window: REFERENCE_WINDOW_TOKENS, fixed: NOMINAL_FIXED_TOKENS });
 
+/** A recovery step that must roll the recovery transaction back; `reason` is what `recover` reports. */
+class RecoveryStepFailed extends Error {
+	constructor(
+		readonly reason: string,
+		cause: unknown,
+	) {
+		super(reason, { cause });
+	}
+}
+
 export function createMemoryService(
 	store: SqliteStore,
 	conversation: ConversationService,
 	continuity: ContinuityService,
 	options: {
-		/** The forget journal; the block journal lives next to it (`blockJournalPathOf`). */
+		/** The forget journal (memory's intent rides in each entry's `hostIntent`). The block journal of earlier versions next to it (`blockJournalPathOf`) is imported once and set aside. */
 		journalPath: string;
 		clock?: () => string;
 		id?: () => string;
@@ -208,7 +223,10 @@ export function createMemoryService(
 		if (targets.size === 0) return;
 		const rows = db
 			.query("SELECT run_id, item_ids FROM memory_usage")
-			.all() as Array<{ run_id: string; item_ids: string }>;
+			.all() as Array<{
+			run_id: string;
+			item_ids: string;
+		}>;
 		const remove = db.query("DELETE FROM memory_usage WHERE run_id = ?");
 		for (const row of rows) {
 			const ids = JSON.parse(row.item_ids) as string[];
@@ -234,7 +252,7 @@ export function createMemoryService(
 
 	conversation.addRetractHook(dropVectorsOnRetract(conversation));
 
-	/** The block journal's message ids: hidden from the history even while the database does not know them (memory unhealthy). */
+	/** The journal's forgotten message ids: hidden from the history even while the database does not know them (memory unhealthy). */
 	const journalBlocked = new Set<string>();
 	const ledger = createLedger({ store, continuity, clock, journalBlocked });
 	const backfill = createBackfill({
@@ -264,12 +282,10 @@ export function createMemoryService(
 	const blockJournalPath = blockJournalPathOf(options.journalPath);
 	const forgetter = createForget({
 		journalPath: options.journalPath,
-		blockJournalPath,
 		journalBlocked,
 		access,
 		atMs,
 		clock,
-		id: newId,
 		windows,
 		conversation,
 		continuity,
@@ -304,19 +320,22 @@ export function createMemoryService(
 	}
 
 	/**
-	 * The block journal's lines, and its message ids kept in process for the history to hide (also while memory is
-	 * unhealthy). null when the journal cannot be read; the ids held so far then stay.
+	 * The message ids the journals say are forgotten, kept in process for the history to hide (also while memory is
+	 * unhealthy). Reads every line that parses: hiding more than the database knows is the safe side, and a damaged
+	 * journal must not let a forgotten message come back. The block journal of earlier versions counts until it is
+	 * imported.
 	 */
-	function readBlockJournal(): BlockJournalEntry[] | null {
-		try {
-			const lines = readJournal<BlockJournalEntry>(blockJournalPath);
-			journalBlocked.clear();
-			for (const line of lines)
-				for (const id of line.messageIds) journalBlocked.add(id);
-			return lines;
-		} catch {
-			return null;
-		}
+	function hideJournaledMessages(): void {
+		const entries = readJournalLenient(options.journalPath);
+		const legacy = readJournalLenient<BlockJournalEntry>(blockJournalPath);
+		journalBlocked.clear();
+		for (const { intent } of intentsOf(
+			entries.filter((entry) => typeof entry === "object" && entry !== null),
+		))
+			for (const id of intent.messageIds) journalBlocked.add(id);
+		for (const line of legacy)
+			for (const id of Array.isArray(line?.messageIds) ? line.messageIds : [])
+				journalBlocked.add(id);
 	}
 
 	async function recover(): Promise<{
@@ -334,7 +353,7 @@ export function createMemoryService(
 		try {
 			return await store.write((db) => {
 				// First of all, whatever else fails: the history must hide what the journal says is forgotten.
-				const blocks = readBlockJournal();
+				hideJournaledMessages();
 				try {
 					// A newer or tampered schema disables memory instead of being read.
 					assertMemorySchema(db);
@@ -347,7 +366,12 @@ export function createMemoryService(
 				} catch {
 					return fail("journal_unreadable");
 				}
-				if (blocks === null) return fail("block_journal_unreadable");
+				let legacy: BlockJournalEntry[];
+				try {
+					legacy = readJournal<BlockJournalEntry>(blockJournalPath);
+				} catch {
+					return fail("block_journal_unreadable");
+				}
 				if (verifyForgetJournal(entries).status !== "ok")
 					return fail("journal_chain_broken");
 				const result = reconcileForgetJournal(db, {
@@ -356,10 +380,26 @@ export function createMemoryService(
 					clock: { atMs: atMs() },
 				});
 				if (result.status !== "ok") return fail(result.reasonCode);
-				// Section 6.4 step 2, after the reconciliation (planning a forget needs the database at the journal's
-				// head): a forget whose intent was written but whose State forget never reached the forget journal is
-				// completed here. Items already in the forget journal were re-applied above.
+				// Re-applied forgets removed values the published layer may still hold.
+				let republish = result.reapplied > 0;
+				// Section 6.2 step 4 again for the entries the reconciliation re-applied (a rolled-back commit, a crash,
+				// a restored older database): their purge of memory's own data went with the database, so it runs again.
+				const reapplied = result.hostIntentsToReapply ?? [];
+				for (const { forgetId, hostIntent } of reapplied) {
+					const intent = intentOf(hostIntent);
+					if (
+						forgetter.purgeDerivedInTransaction(db, {
+							forgetId: intent.legacyBlockForgetId ?? forgetId,
+							conversationId: intent.conversationId,
+							itemIds: intent.itemIds,
+							messageIds: intent.messageIds,
+							derived: intent.derived,
+						})
+					)
+						republish = true;
+				}
 				let completedIntents = 0;
+				let imported = 0;
 				try {
 					const journaled = new Set(
 						entries.flatMap((entry) =>
@@ -368,23 +408,80 @@ export function createMemoryService(
 								.map((target) => target.id),
 						),
 					);
-					for (const line of blocks)
-						for (const id of line.itemIds)
-							if (!journaled.has(id) && forgetter.factOf(db, id) !== null) {
-								forgetter.forgetStateId(db, id, () => {});
-								journaled.add(id);
-								completedIntents++;
+					const stillThere = (ids: readonly string[]) =>
+						ids.filter(
+							(id) => !journaled.has(id) && forgetter.factOf(db, id) !== null,
+						);
+					// An intent whose items did not all reach an entry (a forget split over several entries that stopped
+					// after the first one): the remaining items are forgotten now. Planning needs the database at the
+					// journal's head, so this follows the reconciliation.
+					for (const { intent } of intentsOf(entries)) {
+						const missing = stillThere(intent.itemIds);
+						if (missing.length === 0) continue;
+						forgetter.forgetItems(db, missing, null, () => {});
+						for (const id of missing) journaled.add(id);
+						completedIntents += missing.length;
+					}
+					// The block journal of earlier versions: each line not yet imported becomes one forget journal entry
+					// (its intent, and the items it never got to forget), recognized afterwards by its forgetId.
+					const done = new Set(
+						intentsOf(entries).flatMap(({ intent }) =>
+							intent.legacyBlockForgetId ? [intent.legacyBlockForgetId] : [],
+						),
+					);
+					for (const line of legacy) {
+						if (done.has(line.forgetId)) {
+							// Imported already. Its purge went in the same transaction as the import, so a missing mark
+							// means it never ran (an older database, a failure): run it again.
+							if (!isBlockApplied(db, line.forgetId)) {
+								forgetter.purgeDerivedInTransaction(db, {
+									forgetId: line.forgetId,
+									conversationId: line.conversationId,
+									itemIds: line.itemIds,
+									messageIds: line.messageIds,
+									derived: line.derived,
+								});
+								republish = true;
 							}
-					if (completedIntents > 0) {
+							continue;
+						}
+						const missing = stillThere(line.itemIds);
+						const intent = {
+							conversationId: line.conversationId,
+							messageIds: line.messageIds,
+							itemIds: line.itemIds,
+							...(line.derived !== undefined ? { derived: line.derived } : {}),
+							legacyBlockForgetId: line.forgetId,
+						};
+						forgetter.forgetItems(db, missing, intent, () => {});
+						for (const id of missing) journaled.add(id);
+						done.add(line.forgetId);
+						if (!isBlockApplied(db, line.forgetId)) {
+							forgetter.purgeDerivedInTransaction(db, {
+								forgetId: line.forgetId,
+								conversationId: intent.conversationId,
+								itemIds: intent.itemIds,
+								messageIds: intent.messageIds,
+								derived: intent.derived,
+							});
+							republish = true;
+						}
+						imported++;
+					}
+					if (completedIntents > 0 || imported > 0) {
 						entries = readJournal(options.journalPath);
 						if (verifyForgetJournal(entries).status !== "ok")
 							return fail("journal_chain_broken");
 					}
-				} catch {
-					return fail("block_recovery_failed");
+					// Every line is in the forget journal now (durable): the old file is set aside. A rollback of this
+					// transaction only leaves the journal ahead of the database, which the next start re-applies.
+					if (existsSync(blockJournalPath)) setJournalAside(blockJournalPath);
+				} catch (error) {
+					// Roll the whole recovery back: nothing it applied half-way may be committed. Lines it already
+					// appended stay in the journal ahead of the database, and the next start re-applies them.
+					throw new RecoveryStepFailed("block_recovery_failed", error);
 				}
-				// Re-applied forgets removed values the published layer may still hold.
-				let republish = result.reapplied > 0 || completedIntents > 0;
+				if (completedIntents > 0 || imported > 0) republish = true;
 				// Receipts of every journaled forget are purged here too: a forget that was only re-applied
 				// (rolled-back commit, crash, restored old database) never ran the purge in its own transaction.
 				const forgottenIds = entries.flatMap((entry) =>
@@ -396,30 +493,20 @@ export function createMemoryService(
 				// The same holds for tendencies derived from a re-applied forget's items.
 				if (deleteTendenciesByEvidence(db, "state", forgottenIds) > 0)
 					republish = true;
-				// Section 6.2 step 4 again for the intents whose purge this database has not recorded (a restored
-				// older database has lost the marks, so it is run again for all of them).
-				let appliedAny = false;
-				for (const line of blocks) {
-					if (isBlockApplied(db, line.forgetId)) continue;
-					appliedAny = true;
-					if (
-						forgetter.purgeDerivedInTransaction(db, {
-							forgetId: line.forgetId,
-							conversationId: line.conversationId,
-							itemIds: line.itemIds,
-							messageIds: line.messageIds,
-							derived: line.derived,
-						})
-					)
-						republish = true;
-				}
 				// Units that started before something was (re)applied must not be adopted; a plain restart changes nothing.
-				if (result.reapplied > 0 || completedIntents > 0 || appliedAny)
+				if (
+					result.reapplied > 0 ||
+					completedIntents > 0 ||
+					imported > 0 ||
+					reapplied.length > 0
+				)
 					bumpForgetSeq(db);
 				if (republish) {
 					windows.recordImmediateInTransaction(db, "state_forget", null);
 					windows.purgeInTransaction(db);
 				}
+				// The imported lines' messages now come from the forget journal.
+				if (imported > 0) hideJournaledMessages();
 				healthy = true;
 				// Coming back from an unhealthy spell: what was said meanwhile is not learned.
 				if (wasUnhealthy) {
@@ -435,9 +522,11 @@ export function createMemoryService(
 						: {}),
 				};
 			});
-		} catch {
-			readBlockJournal();
-			return fail("recover_failed");
+		} catch (error) {
+			hideJournaledMessages();
+			return fail(
+				error instanceof RecoveryStepFailed ? error.reason : "recover_failed",
+			);
 		}
 	}
 

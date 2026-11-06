@@ -15,6 +15,8 @@ import { putTurnVector } from "../repository";
 import {
 	appendJournal,
 	blockJournalPathOf,
+	hostIntentOf,
+	intentsOf,
 	readJournal,
 	type BlockJournalEntry,
 } from "../service/journal";
@@ -289,19 +291,25 @@ test("a forget blocks the evidence of every version, the steward's picks and the
 		new Set(outcome.blockedMessageIds),
 	);
 	expect(s.purges[0]!.conversationId).toBe("c1");
-	// The intent is in the block journal.
-	const lines = readJournal<BlockJournalEntry>(blockPath(h));
-	expect(lines).toHaveLength(1);
-	expect(lines[0]).toMatchObject({
-		forgetId: outcome.forgetId,
-		conversationId: "c1",
-	});
-	expect(new Set(lines[0]!.itemIds)).toEqual(
+	// One forget is one forget journal line: both versions as targets, memory's intent in its hostIntent.
+	const entries = readJournal(journalPath(h));
+	expect(entries).toHaveLength(1);
+	expect(new Set(entries[0]!.targets.map((target) => target.id))).toEqual(
 		new Set([s.first.id, s.second.id]),
 	);
-	expect(new Set(lines[0]!.messageIds)).toEqual(
+	const intents = intentsOf(entries);
+	expect(intents).toHaveLength(1);
+	expect(intents[0]).toMatchObject({
+		forgetId: outcome.forgetId,
+		intent: { conversationId: "c1" },
+	});
+	expect(new Set(intents[0]!.intent.itemIds)).toEqual(
+		new Set([s.first.id, s.second.id]),
+	);
+	expect(new Set(intents[0]!.intent.messageIds)).toEqual(
 		new Set(outcome.blockedMessageIds),
 	);
+	expect(existsSync(blockPath(h))).toBe(false);
 });
 
 test("messages the steward found (alsoIn) are blocked with their partner, also when no item is forgotten", async () => {
@@ -370,8 +378,36 @@ const beforeRecovery = (s: Scenario) => {
 	);
 	return memory2;
 };
-const intentOf = (s: Scenario): BlockJournalEntry => ({
-	forgetId: "forget-crash",
+
+/** The forget journal entry a forget of the address writes (both versions, memory's intent), planned on `h`'s database. */
+const plannedEntry = (
+	s: Scenario,
+	versions: readonly string[],
+	intent: boolean,
+) => {
+	const { h } = s;
+	const planned = h.store.read((db) =>
+		planForget(db, {
+			contractVersion: CONTRACT_VERSIONS.lifecycle,
+			access: {
+				principal: PRINCIPAL,
+				scopeKeys: [PROFILE_SCOPE],
+				purpose: "memory.forget",
+				policyRevision: h.memory.policyRevisionInTransaction(db),
+			},
+			targets: versions.map((itemId) => ({
+				type: "state_item" as const,
+				itemId,
+				scopeKey: PROFILE_SCOPE,
+			})),
+			...(intent ? { hostIntent: hostIntentOf(intentOfAddress(s)) } : {}),
+			clock: { atMs: Date.parse(h.time.now) },
+		}),
+	);
+	if (planned.status !== "planned") throw new Error("not planned");
+	return planned.plan.entry;
+};
+const intentOfAddress = (s: Scenario) => ({
 	conversationId: "c1",
 	messageIds: [
 		s.address.answerMessageId!,
@@ -380,14 +416,17 @@ const intentOf = (s: Scenario): BlockJournalEntry => ({
 		s.old.answerMessageId!,
 	],
 	itemIds: [s.first.id, s.second.id],
-	at: s.h.time.now,
 });
 
-test("stop position 1: only the block journal was written. Start-up completes the State forget and the derived deletions; until then memory is not used", async () => {
+test("stop position 1: the forget journal line (both versions and the intent) was written, the database was not changed. Start-up completes the State forget and the derived deletions; until then memory is not used", async () => {
 	const s = await scenario();
 	const { h } = s;
-	appendJournal(blockPath(h), intentOf(s));
-	expect(existsSync(journalPath(h))).toBe(false);
+	appendJournal(
+		journalPath(h),
+		plannedEntry(s, [s.first.id, s.second.id], true),
+	);
+	// The database still has everything.
+	expect(h.memory.list(true)).toHaveLength(3);
 	const memory2 = beforeRecovery(s);
 	memory2.registerForgetPurge((_db, purge) => {
 		s.purges.push(purge);
@@ -399,28 +438,87 @@ test("stop position 1: only the block journal was written. Start-up completes th
 	).toBeNull();
 	expect(memory2.status().healthy).toBe(false);
 	const recovered = await memory2.recover();
-	expect(recovered.healthy).toBe(true);
+	expect(recovered).toMatchObject({ healthy: true, reapplied: 1 });
 	expectForgotten(s);
-	// Both versions are in the forget journal now.
-	const entries = readJournal(journalPath(h));
-	expect(entries).toHaveLength(2);
 	expect(s.purges.at(-1)?.messageIds.length).toBe(4);
 	// Idempotent: a second start changes nothing and journals nothing more.
 	const again = beforeRecovery(s);
 	expect((await again.recover()).healthy).toBe(true);
 	expectForgotten(s);
-	expect(readJournal(journalPath(h))).toHaveLength(2);
-	expect(readJournal(blockPath(h))).toHaveLength(1);
+	expect(readJournal(journalPath(h))).toHaveLength(1);
+	expect(existsSync(blockPath(h))).toBe(false);
 });
 
-test("stop position 2: the forget journal was written too (for one version), the database was not changed. The reconciliation and the derived deletions reach the same state", async () => {
+test("stop position 2: the transaction rolled back after the journal line was written. Recovery reaches the same state", async () => {
 	const s = await scenario();
 	const { h } = s;
-	appendJournal(blockPath(h), intentOf(s));
-	// Only the first of the two versions reached the forget journal before the stop.
+	await expect(
+		h.store.write((db) => {
+			h.memory.forgetInTransaction(db, {
+				conversationId: "c1",
+				itemIds: [s.second.id],
+				messageIds: [],
+			});
+			throw new Error("crash");
+		}),
+	).rejects.toThrow("crash");
+	// The journal holds the intent while the database has rolled back.
+	expect(readJournal(journalPath(h))).toHaveLength(1);
+	expect(intentsOf(readJournal(journalPath(h)))).toHaveLength(1);
+	const memory2 = beforeRecovery(s);
+	expect((await memory2.recover()).healthy).toBe(true);
+	// The first service reconciles itself too (it was queued behind the rolled-back transaction).
+	await h.memory.recover();
+	expectForgotten(s);
+	expect(readJournal(journalPath(h))).toHaveLength(1);
+});
+
+// ---- the block journal of earlier versions: imported once at start-up ----
+
+const legacyIntent = (s: Scenario): BlockJournalEntry => ({
+	forgetId: "forget-crash",
+	...intentOfAddress(s),
+	at: s.h.time.now,
+});
+
+test("earlier versions, stop position 1: only the block journal was written. Start-up imports it, completes the State forget and the derived deletions, and sets the file aside", async () => {
+	const s = await scenario();
+	const { h } = s;
+	appendJournal(blockPath(h), legacyIntent(s));
+	expect(existsSync(journalPath(h))).toBe(false);
+	const memory2 = beforeRecovery(s);
+	memory2.registerForgetPurge((_db, purge) => {
+		s.purges.push(purge);
+	});
+	expect(memory2.list(true)).toEqual([]);
+	expect(memory2.status().healthy).toBe(false);
+	const recovered = await memory2.recover();
+	expect(recovered.healthy).toBe(true);
+	expectForgotten(s);
+	// One forget journal entry carries both versions and the imported intent.
+	const entries = readJournal(journalPath(h));
+	expect(entries).toHaveLength(1);
+	expect(intentsOf(entries)[0]?.intent.legacyBlockForgetId).toBe(
+		"forget-crash",
+	);
+	expect(s.purges.at(-1)?.messageIds.length).toBe(4);
+	expect(existsSync(blockPath(h))).toBe(false);
+	expect(readJournal(`${blockPath(h)}.imported`)).toHaveLength(1);
+	// Idempotent: a second start changes nothing and journals nothing more.
+	const again = beforeRecovery(s);
+	expect((await again.recover()).healthy).toBe(true);
+	expectForgotten(s);
+	expect(readJournal(journalPath(h))).toHaveLength(1);
+});
+
+test("earlier versions, stop position 2: the forget journal was written too (for one version), the database was not changed. The reconciliation, the import and the derived deletions reach the same state", async () => {
+	const s = await scenario();
+	const { h } = s;
+	appendJournal(blockPath(h), legacyIntent(s));
+	// Only the first of the two versions reached the forget journal (format 1, as earlier versions wrote it).
 	const planned = h.store.read((db) =>
 		planForget(db, {
-			contractVersion: CONTRACT_VERSIONS.lifecycle,
+			contractVersion: 1,
 			access: {
 				principal: PRINCIPAL,
 				scopeKeys: [PROFILE_SCOPE],
@@ -436,39 +534,18 @@ test("stop position 2: the forget journal was written too (for one version), the
 		}),
 	);
 	if (planned.status !== "planned") throw new Error("not planned");
+	expect(planned.plan.entry.journalFormat).toBe(1);
 	appendJournal(journalPath(h), planned.plan.entry);
-	// The database still has everything.
 	expect(h.memory.list(true)).toHaveLength(3);
 	const memory2 = beforeRecovery(s);
 	expect(memory2.list(true)).toEqual([]);
 	const recovered = await memory2.recover();
 	expect(recovered).toMatchObject({ healthy: true, reapplied: 1 });
-	expect(readJournal(journalPath(h))).toHaveLength(2);
+	// The old entry, then the imported intent with the version it never got to forget.
+	const entries = readJournal(journalPath(h));
+	expect(entries).toHaveLength(2);
+	expect(entries[1]!.targets.map((target) => target.id)).toEqual([s.second.id]);
 	expectForgotten(s);
-});
-
-test("stop position 3: the transaction rolled back after both journals were written. Recovery reaches the same state", async () => {
-	const s = await scenario();
-	const { h } = s;
-	await expect(
-		h.store.write((db) => {
-			h.memory.forgetInTransaction(db, {
-				conversationId: "c1",
-				itemIds: [s.second.id],
-				messageIds: [],
-			});
-			throw new Error("crash");
-		}),
-	).rejects.toThrow("crash");
-	// Both journals hold the intent while the database has rolled back.
-	expect(readJournal<BlockJournalEntry>(blockPath(h))).toHaveLength(1);
-	expect(readJournal(journalPath(h))).toHaveLength(2);
-	const memory2 = beforeRecovery(s);
-	expect((await memory2.recover()).healthy).toBe(true);
-	// The first service reconciles itself too (it was queued behind the rolled-back transaction).
-	await h.memory.recover();
-	expectForgotten(s);
-	expect(readJournal<BlockJournalEntry>(blockPath(h))).toHaveLength(1);
 });
 
 test("an older database restored over the forget is brought to the same state by the journals", async () => {
@@ -508,7 +585,7 @@ test("an older database restored over the forget is brought to the same state by
 	memory.registerForgetPurge((_db, purge) => {
 		purges.push(purge);
 	});
-	expect(await memory.recover()).toMatchObject({ healthy: true, reapplied: 2 });
+	expect(await memory.recover()).toMatchObject({ healthy: true, reapplied: 1 });
 	expect(purges).toHaveLength(1);
 	// The same checks, on the restored database.
 	const restored = {

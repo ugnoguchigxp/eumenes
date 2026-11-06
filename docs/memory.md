@@ -8,7 +8,7 @@
 
 | domain | 持つもの |
 | --- | --- |
-| `memory` | 除外台帳（block ledger）と block journal、ContextWindow の保管と公開、パッケージ公開APIによるStateの保存・訂正・停止・忘却、傾向と派生データの削除 |
+| `memory` | 除外台帳（block ledger）と忘却 journal、ContextWindow の保管と公開、パッケージ公開APIによるStateの保存・訂正・停止・忘却、傾向と派生データの削除 |
 | `steward` | 判断のすべて。step ジョブ、指示文、出力の検証と正規化、依頼の inbox、判断記録 |
 | `continuity` | 会話の出来事の列、短期メモ（目的・決定・未解決・活動・メモ）の保存 |
 | `dialogue` | 会話。run の終わりで往復の登録と steward への通知を呼び、`compileContext` で Window を prompt に並べる |
@@ -22,7 +22,7 @@
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
-配布物は `vendor/eumenes-memory/eumenes-memory-0.0.2-3070b7dd6e4a.tgz` に固定する。元は独立リポジトリのmain、commit `5504945f838935fbff6401c962bdecb1d3b49956`。パッケージ版は0.0.2で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。`manifest.json`と配布内の`dist/release-manifest.json`で、元commit・ソースhash・配布内容のhashを照合する。旧tgzと依存参照は削除済み。SQLite契約は8で、既存SQL8本も同一であり、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.3-353a710c8012.tgz` に固定する。元は独立リポジトリの commit `5504945f838935fbff6401c962bdecb1d3b49956` に未コミットの変更を加えた作業ツリーで、`manifest.json` の `sourceHash` で特定する。パッケージ版は0.0.3（Lifecycle 契約版 2: 同じ scope の複数 target、`hostIntent`、journal format 2、`inTransaction` 必須）で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。`manifest.json`と配布内の`dist/release-manifest.json`で、元commit・ソースhash・配布内容のhashを照合する。旧tgzと依存参照は削除済み。SQLite契約は8で、既存SQL8本も同一であり、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
 
 会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
 
@@ -128,7 +128,11 @@ State（過去の版を含む）・usage・Window・傾向、World の派生、�
 
 ### journal と復旧
 
-忘却の前に、別ファイルの **block journal**（forget journal と同じ場所の `*.blocks.jsonl`）へ意図を 1 行書く（`{ forgetId, conversationId, messageIds, itemIds, at }`）。書く順は「block journal → forget journal → DB」。block journal の行は完遂すべき意図で、起動時にまだ忘却されていない `itemIds` を実行して完遂し、派生データの削除を冪等にやり直す。照合が終わるまで memory は `ready()` が false で、State も Window も使われない。DB を忘却前のバックアップに戻して起動しても、journal から同じ状態になる。
+忘却 1 回は forget journal の 1 行（eumenes-memory の entry、format 2）で、DB を変える前に書いて fsync する。行の `targets` は忘れる State の全版、`hostIntent` は memory 自身の意図（`memory.conversation` / `memory.messages` / `memory.items`、他ドメインの `derived` は `derived:<名前>`。ID だけで本文を含まない）。`hostIntent` はライブラリの hash の鎖に入るので、行の改ざん・欠落は起動時の照合で検出される。plan・追記・apply・派生データの削除は同じ writer transaction で行う。全版が 64 件を超えるときだけ行を分け、意図（全 `itemIds`）は最初の行に載せる。
+
+起動時は、まず読める全行の `memory.messages` で履歴を隠し、`reconcileForgetJournal` で照合する。照合が適用した行（transaction の rollback、古い DB の復元）は `hostIntentsToReapply` で返り、その意図の派生データの削除を冪等にやり直す。意図の `itemIds` のうちどの行にも載っていない残りがあれば忘れる。照合が終わるまで memory は `ready()` が false で、State も Window も使われない。DB を忘却前のバックアップに戻して起動しても、journal から同じ状態になる。
+
+以前の版は意図を別ファイルの block journal（`*.blocks.jsonl`、鎖なし）に書いていた。起動時に、まだ取り込んでいない行を 1 回だけ forget journal の entry に取り込み（`memory.legacy-block` に元の forgetId を残すので、途中で落ちても重複しない）、ファイルを `*.blocks.jsonl.imported` へ移す。
 
 ### 古い結果を採用しない
 
@@ -149,7 +153,7 @@ State（過去の版を含む）・usage・Window・傾向、World の派生、�
 - **World への反映**: 会話の outbox から World が受け付けた event（ユーザー発言と、採用されたアシスタントの回答）を、steward の実行単位 `world_events` が1往復分（最大2件）ずつ処理する。往復の完了は World を待たない。受付の後に World が steward を kick する。3回保留された event は `STEWARD_GAVE_UP` で終わる。
 - **振り分け**: curate-memory が往復ごとに「World・目標の処理が要るか」を判定し、発言の revision と digest に結び付けて記録する。要らない往復は推論しない。版が違う・判定がないときは処理する。
 - **回答での使い方**: ① 採用済みの目標を L1 の直後に置く（優先度順、1件120文字、全体 2KB、溢れは「ほか N 件」）。② 本人の発言（今回の入力、直前の往復）に出た既知の対象を名前・別名の一致（決定的、NFKC・小文字、曖昧な名前は除く）で最大5件引き、**名前だけ**を L4 の1行（`Worldに記録がある対象: freee、経費精算システム（内容は world_query で調べる）`）にする。主張の中身・ID は渡さない。対象が無い、または World が使えないときは何も入れない。③ World の中身は、会話の AI が直接読まない。`world_query`（toolchain `world.query`）の調査として、会話とは別の LARM セッション（auxiliary）で動く research sub-agent が `world.find`／`world.query` で読み、根拠つきの報告（Report）を返す。会話の AI はその報告（projection）だけを引用して答える。World の記録は本人と会話から作った記録で、外部で確認した事実ではない。`model_hypothesis` の主張は仮説として伝え、カバー範囲が partial のときは「影響がない」「依存がない」と言い切らない。仕様: [World の照会を sub-agent の調査にする](../spec/.archived/world-research-subagent-2026-10-15.md)。
-- **忘却**: World の主張・対象、目標を忘れるときは、その根拠の発言も記憶の除外台帳に入れる（同じ発言を根拠にした他の記憶・目標は消さない）。忘れる目標の ID は block journal の `derived.goalIds` に書き、起動時の照合でやり直す。除外台帳に入れた発言は World の source の忘却としても受け付ける。
+- **忘却**: World の主張・対象、目標を忘れるときは、その根拠の発言も記憶の除外台帳に入れる（同じ発言を根拠にした他の記憶・目標は消さない）。忘れる目標の ID は forget journal の行の `hostIntent`（`derived:goalIds`）に書き、起動時の照合でやり直す。除外台帳に入れた発言は World の source の忘却としても受け付ける。
 - **手動の変更はない**: World の主張の訂正・取り消し・忘却は会話で頼む（依頼キュー）。設定画面の World は閲覧だけ。
 - **World 側の巻き込み（意図した非対称）**: 記憶では、忘れた発言を根拠にした他の記憶は残す。World では、同じ窓（1往復分）から作られた主張が窓の全発言を根拠に持つため（パッケージの仕様）、その中の1発言が除外台帳に入る（記憶・主張・目標のどれを忘れても、根拠の発言は World の source の忘却に回る）と、同じ窓の他の主張も消える。窓を1往復に絞って範囲を小さくしている。
 - **既知の制約**:根拠の発言を取り出す処理は生きている主張しか対象にできない（取り消し済みの主張の根拠は漏れる）。World の手入れ（統合・仮説の取り下げ）は World 側の操作がないので未実装。
@@ -214,6 +218,6 @@ bun run logs -- --id <runId> --json     # 会話の run。往復の登録（dial
 1. 記憶が増えない: `steward.unit_*` が出ているか確認する。出ていなければ memory が接続されているか（設定画面「会話への接続」。`memory_unavailable` は忘却の照合が終わっていない、または journal が読めない）を確認する。出ていれば判断記録のタイムラインで、該当 step の「適用・却下と理由」を見る。`blocked_source`（除外済みメッセージ）、`limit_reached`、`item_changed`（競合）などの理由コードがある。
 2. step が失敗し続ける: `steward.unit_failed` の `reason` と、判断記録の `errorCode`、`durationMs`、`outputTokens` を見る。期限切れ（step の 5% 超）や出力が上限の8割を超える step は、要素の上限か step の上限を調整する対象である。
 3. 履歴の欠落: 往復の台帳で、対象の往復の印と履歴での扱いを見る。「見送り」は3回失敗して諦めたもの、「出さない」は `drop` か除外台帳による。
-4. 忘れたはずの内容が出る: 除外台帳（`memory_message_block`）と判断記録の消去状態を確認し、`stale_forget` で単位が破棄されているかを見る。block journal が残っていて照合が終わっていない場合は memory が使えない。
+4. 忘れたはずの内容が出る: 除外台帳（`memory_message_block`）と判断記録の消去状態を確認し、`stale_forget` で単位が破棄されているかを見る。forget journal の照合が終わっていない（または journal が読めない）場合は memory が使えない。
 
 **ログと判断記録に渡さないもの**: 会話本文・音声・認証情報・設定・Provider の生応答。ログには件数・理由コード・ID・所要時間だけを出す。判断記録の出力は正規化後のもので、忘却に触れたものは消える。

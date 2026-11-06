@@ -122,10 +122,19 @@ test("the forget fence moves with a forget and with a reconciliation that applie
 	// The forget's purge is recorded: a plain restart re-applies nothing and moves nothing.
 	await h.memory.recover();
 	expect(seq()).toBe(start + 1);
-	// A database that lost the record (an older copy restored) has the line applied again, and the fence moves.
-	await h.store.write((db) =>
-		db.query("DELETE FROM memory_block_applied").run(),
-	);
+	// A forget whose transaction rolled back after its line was written: the database has not recorded the
+	// entry, the reconciliation applies it, and the fence moves once.
+	const said = await h.exchange("別の話", "回答");
+	await expect(
+		h.store.write((db) => {
+			h.memory.forgetInTransaction(db, {
+				conversationId: "c1",
+				itemIds: [],
+				messageIds: [said.userId],
+			});
+			throw new Error("crash");
+		}),
+	).rejects.toThrow("crash");
 	await h.memory.recover();
 	expect(seq()).toBe(start + 2);
 	await h.memory.recover();

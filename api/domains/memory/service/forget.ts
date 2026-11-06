@@ -1,6 +1,6 @@
 import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
-import { CONTRACT_VERSIONS } from "eumenes-memory";
+import { CONTRACT_VERSIONS, LIMITS_LIFECYCLE } from "eumenes-memory";
 import type { AccessContext } from "eumenes-memory";
 import { applyForget, planForget, readStateFact } from "eumenes-memory/sqlite";
 import type { ConversationService } from "../../conversation";
@@ -26,21 +26,20 @@ import {
 	SEED_IMPORT_FENCE,
 } from "../repository";
 import type { ContextWindowStore } from "./context-window";
-import { appendJournal, type BlockJournalEntry } from "./journal";
+import { appendJournal, hostIntentOf, type ForgetIntent } from "./journal";
 
 const VERSION = 1 as const;
 const STATE_ID = /^state:[0-9a-f]{64}$/;
 
 /** What forgetting needs from the memory service around it. */
 export type ForgetDeps = {
+	/** The forget journal: every line is a library entry; memory's own intent rides in its `hostIntent`. */
 	journalPath: string;
-	blockJournalPath: string;
-	/** The message ids of the block journal, held in process (memory adds to it as soon as a line is written). */
+	/** The message ids the journal hides, held in process (memory adds to it as soon as a line is written). */
 	journalBlocked: Set<string>;
 	access: (db: Database, purpose: string) => AccessContext;
 	atMs: () => number;
 	clock: () => string;
-	id: () => string;
 	windows: ContextWindowStore;
 	conversation: ConversationService;
 	continuity: ContinuityService;
@@ -122,34 +121,73 @@ export function createForget(deps: ForgetDeps) {
 		}
 	}
 
-	/** Plan -> forget journal (fsync) -> apply for one State item. */
-	function forgetStateId(
+	/**
+	 * Plan -> forget journal (fsync) -> apply, in the writer transaction. The items go in entries of at most
+	 * `maxJournalTargets`; the intent (when given) rides on the first entry, so it is in the hash chain before
+	 * anything is deleted. One forget is one journal line (and one fsync) unless it has more items than that.
+	 * `onJournaled` is told before each line is written. Returns the first entry's forgetId.
+	 */
+	function forgetItems(
 		db: Database,
-		id: string,
+		itemIds: readonly string[],
+		intent: ForgetIntent | null,
 		onJournaled: () => void,
 	): { forgetId: string; completed: boolean } {
-		const planned = planForget(db, {
-			contractVersion: CONTRACT_VERSIONS.lifecycle,
-			access: access(db, "memory.forget"),
-			target: { type: "state_item", itemId: id, scopeKey: PROFILE_SCOPE },
-			clock: { atMs: atMs() },
-		});
-		if (planned.status !== "planned") return refuse("invalid_memory_item");
-		onJournaled();
-		appendJournal(deps.journalPath, planned.plan.entry);
-		const applied = applyForget(db, {
-			contractVersion: CONTRACT_VERSIONS.lifecycle,
-			entry: planned.plan.entry,
-			clock: { atMs: atMs() },
-		});
-		deps.purgeUsageFor(db, [id]);
-		windows.recordImmediateInTransaction(db, "state_forget", null);
-		// The rendered windows still hold the forgotten text.
-		windows.purgeInTransaction(db);
-		return {
-			forgetId: planned.plan.entry.forgetId,
-			completed: applied.completed,
-		};
+		const max = LIMITS_LIFECYCLE.maxJournalTargets;
+		const chunks: string[][] = [];
+		for (let i = 0; i < itemIds.length; i += max)
+			chunks.push(itemIds.slice(i, i + max));
+		if (chunks.length === 0) {
+			if (intent === null) return refuse("invalid_forget");
+			chunks.push([]);
+		}
+		const hostIntent = intent === null ? null : hostIntentOf(intent);
+		// The whole intent rides on one line: one too large for it is refused before anything is journaled (counted
+		// as the library counts it, before dedupe).
+		if (
+			hostIntent !== null &&
+			Object.values(hostIntent).reduce((n, ids) => n + ids.length, 0) >
+				LIMITS_LIFECYCLE.maxHostIntentIds
+		)
+			return refuse("forget_limit");
+		let forgetId: string | null = null;
+		let completed = true;
+		for (const [index, chunk] of chunks.entries()) {
+			const planned = planForget(db, {
+				contractVersion: CONTRACT_VERSIONS.lifecycle,
+				access: access(db, "memory.forget"),
+				...(chunk.length > 0
+					? {
+							targets: chunk.map((itemId) => ({
+								type: "state_item" as const,
+								itemId,
+								scopeKey: PROFILE_SCOPE,
+							})),
+						}
+					: {}),
+				...(index === 0 && hostIntent !== null ? { hostIntent } : {}),
+				clock: { atMs: atMs() },
+			});
+			if (planned.status !== "planned") return refuse("invalid_memory_item");
+			onJournaled();
+			if (index === 0 && intent !== null)
+				for (const id of intent.messageIds) deps.journalBlocked.add(id);
+			appendJournal(deps.journalPath, planned.plan.entry);
+			const applied = applyForget(db, {
+				contractVersion: CONTRACT_VERSIONS.lifecycle,
+				entry: planned.plan.entry,
+				clock: { atMs: atMs() },
+			});
+			forgetId ??= planned.plan.entry.forgetId;
+			completed = applied.completed && completed;
+		}
+		if (itemIds.length > 0) {
+			deps.purgeUsageFor(db, itemIds);
+			windows.recordImmediateInTransaction(db, "state_forget", null);
+			// The rendered windows still hold the forgotten text.
+			windows.purgeInTransaction(db);
+		}
+		return { forgetId: forgetId as string, completed };
 	}
 
 	/** The messages the versions of these items stand on (B1), read before the forget removes their provenance. */
@@ -257,12 +295,12 @@ export function createForget(deps: ForgetDeps) {
 	}
 	return {
 		factOf,
-		forgetStateId,
+		forgetItems,
 		purgeDerivedInTransaction,
 		/**
-		 * Section 6.2: block journal (the intent) -> forget_seq -> State forget (plan -> forget journal -> apply) ->
-		 * derived data. `onJournaled` is told before the first line is written: from then on a failure may leave
-		 * a journal ahead of the database, which the next recovery completes.
+		 * Section 6.2: one forget journal line (the State items and memory's intent in its `hostIntent`) ->
+		 * apply -> forget_seq -> derived data. `onJournaled` is told before the line is written: from then on a
+		 * failure may leave a journal ahead of the database, which the next recovery completes.
 		 */
 		forgetInTransaction(
 			db: Database,
@@ -295,36 +333,28 @@ export function createForget(deps: ForgetDeps) {
 				...evidenceMessages(db, itemIds),
 				...input.messageIds,
 			]);
-			const forgetId = deps.id();
-			const entry: BlockJournalEntry = {
-				forgetId,
+			const intent: ForgetIntent = {
 				conversationId: input.conversationId,
 				messageIds,
 				itemIds: [...itemIds],
 				...(derived !== undefined ? { derived } : {}),
-				at: deps.clock(),
 			};
-			onJournaled();
-			appendJournal<BlockJournalEntry>(deps.blockJournalPath, entry);
-			for (const id of messageIds) deps.journalBlocked.add(id);
+			const forgotten = forgetItems(db, [...itemIds], intent, onJournaled);
 			bumpForgetSeq(db);
 			windows.recordImmediateInTransaction(db, "state_forget", null);
-			let completed = true;
-			for (const id of itemIds)
-				completed = forgetStateId(db, id, onJournaled).completed && completed;
 			purgeDerivedInTransaction(db, {
-				forgetId,
+				forgetId: forgotten.forgetId,
 				conversationId: input.conversationId,
-				itemIds: entry.itemIds,
+				itemIds: intent.itemIds,
 				messageIds,
 				derived,
 			});
 			windows.purgeInTransaction(db);
 			return {
-				forgetId,
+				forgetId: forgotten.forgetId,
 				blockedMessageIds: messageIds,
-				forgottenItemIds: entry.itemIds,
-				completed,
+				forgottenItemIds: intent.itemIds,
+				completed: forgotten.completed,
 			};
 		},
 	};

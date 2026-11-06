@@ -9,12 +9,123 @@ import {
 	openSync,
 	readFileSync,
 	readSync,
+	renameSync,
 	writeSync,
 } from "node:fs";
-import type { ForgetJournalEntry } from "eumenes-memory/sqlite";
+import type {
+	ForgetJournalEntry,
+	HostForgetIntent,
+} from "eumenes-memory/sqlite";
 import type { ForgetDerived } from "../contracts";
 
-/** One line of the block journal: the intent of a forget, written before the database is touched. */
+/**
+ * What a forget means for memory's own data: the messages that leave the context, the State items (every version)
+ * and the other domains' derived ids. It rides in the forget journal entry's `hostIntent`, so the library's hash
+ * chain covers it (the separate block journal of earlier versions had no chain).
+ */
+export interface ForgetIntent {
+	conversationId: string;
+	messageIds: string[];
+	itemIds: string[];
+	derived?: ForgetDerived;
+	/** The forgetId of the block journal line this intent was imported from (absent for intents written directly). */
+	legacyBlockForgetId?: string;
+}
+const INTENT_KEYS = {
+	conversation: "memory.conversation",
+	messages: "memory.messages",
+	items: "memory.items",
+	legacyBlock: "memory.legacy-block",
+} as const;
+/** Other domains' `derived` names go under this prefix, apart from memory's own keys. */
+const DERIVED_PREFIX = "derived:";
+
+/** The `hostIntent` of a forget journal entry (ids only; the library sorts and dedupes them and drops empty lists). */
+export function hostIntentOf(intent: ForgetIntent): HostForgetIntent {
+	const hostIntent: Record<string, readonly string[]> = Object.create(null);
+	if (intent.conversationId !== "")
+		hostIntent[INTENT_KEYS.conversation] = [intent.conversationId];
+	hostIntent[INTENT_KEYS.messages] = intent.messageIds;
+	hostIntent[INTENT_KEYS.items] = intent.itemIds;
+	if (intent.legacyBlockForgetId !== undefined)
+		hostIntent[INTENT_KEYS.legacyBlock] = [intent.legacyBlockForgetId];
+	for (const [name, ids] of Object.entries(intent.derived ?? {}))
+		hostIntent[`${DERIVED_PREFIX}${name}`] = ids;
+	return hostIntent;
+}
+/** The intent a `hostIntent` carries (lists that were empty come back empty; no derived name comes back as none). */
+export function intentOf(hostIntent: HostForgetIntent): ForgetIntent {
+	// Lines read leniently (for hiding) may hold anything: only string lists count.
+	const list = (value: unknown): string[] =>
+		Array.isArray(value)
+			? value.filter((id): id is string => typeof id === "string")
+			: [];
+	const record: Record<string, unknown> =
+		typeof hostIntent === "object" && hostIntent !== null ? hostIntent : {};
+	// null-prototype: a derived name such as `__proto__` stays an own property.
+	const derived: Record<string, readonly string[]> = Object.create(null);
+	for (const [key, ids] of Object.entries(record))
+		if (key.startsWith(DERIVED_PREFIX))
+			derived[key.slice(DERIVED_PREFIX.length)] = list(ids);
+	const legacy = list(record[INTENT_KEYS.legacyBlock])[0];
+	return {
+		conversationId: list(record[INTENT_KEYS.conversation])[0] ?? "",
+		messageIds: list(record[INTENT_KEYS.messages]),
+		itemIds: list(record[INTENT_KEYS.items]),
+		...(Object.keys(derived).length > 0 ? { derived } : {}),
+		...(legacy !== undefined ? { legacyBlockForgetId: legacy } : {}),
+	};
+}
+/** The intents of the journal's entries, in journal order. */
+export function intentsOf(
+	entries: readonly ForgetJournalEntry[],
+): Array<{ forgetId: string; intent: ForgetIntent }> {
+	return entries.flatMap((entry) =>
+		entry.hostIntent
+			? [{ forgetId: entry.forgetId, intent: intentOf(entry.hostIntent) }]
+			: [],
+	);
+}
+
+/**
+ * Every line that parses, skipping the ones that do not: for hiding messages only (hiding more than the database
+ * knows is the safe side). Reconciliation reads with `readJournal`, which refuses a damaged journal.
+ */
+export function readJournalLenient<T = ForgetJournalEntry>(path: string): T[] {
+	if (!existsSync(path)) return [];
+	let text: string;
+	try {
+		text = readFileSync(path, "utf8");
+	} catch {
+		return [];
+	}
+	return text.split("\n").flatMap((line) => {
+		if (line.trim() === "") return [];
+		try {
+			return [JSON.parse(line) as T];
+		} catch {
+			return [];
+		}
+	});
+}
+
+/** Moves a journal aside (`<path>.imported`, or `.imported.<n>` when that exists) and makes the rename durable. */
+export function setJournalAside(path: string): void {
+	let target = `${path}.imported`;
+	for (let n = 1; existsSync(target); n++) target = `${path}.imported.${n}`;
+	renameSync(path, target);
+	const dir = openSync(dirname(path), "r");
+	try {
+		fsyncSync(dir);
+	} finally {
+		closeSync(dir);
+	}
+}
+
+/**
+ * One line of the block journal of earlier versions: the intent of a forget, written before the database was
+ * touched. New forgets carry their intent in the forget journal (`ForgetIntent`); startup imports these lines once.
+ */
 export interface BlockJournalEntry {
 	forgetId: string;
 	conversationId: string;
@@ -26,7 +137,7 @@ export interface BlockJournalEntry {
 	derived?: ForgetDerived;
 	at: string;
 }
-/** `<name>.blocks.jsonl` next to the forget journal (`<name>.jsonl`): the library validates the forget journal, so nothing else may enter it. */
+/** `<name>.blocks.jsonl` next to the forget journal (`<name>.jsonl`): where earlier versions kept the block journal (imported once at startup). */
 export function blockJournalPathOf(journalPath: string): string {
 	return journalPath.endsWith(".jsonl")
 		? `${journalPath.slice(0, -".jsonl".length)}.blocks.jsonl`

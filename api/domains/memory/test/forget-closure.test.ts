@@ -3,7 +3,14 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { configureLogging } from "../../../infrastructure/logger";
 import type { ForgetPurge } from "../contracts";
-import { appendJournal, blockJournalPathOf } from "../service/journal";
+import { CONTRACT_VERSIONS } from "eumenes-memory";
+import { planForget } from "eumenes-memory/sqlite";
+import { PRINCIPAL, PROFILE_SCOPE } from "../contracts";
+import {
+	appendJournal,
+	blockJournalPathOf,
+	hostIntentOf,
+} from "../service/journal";
 import type { BlockJournalEntry } from "../service/journal";
 import { setupMemory, type MemoryHarness } from "./memory.fixture";
 
@@ -237,7 +244,7 @@ test("a forget reaches the short-term events of the conversation, and only those
 	]);
 });
 
-test("a restart re-applies only the lines the database has not recorded", async () => {
+test("a restart re-applies only the entries the database has not recorded", async () => {
 	const h = await setup();
 	const purges: ForgetPurge[] = [];
 	h.memory.registerForgetPurge((_db, purge) => {
@@ -248,14 +255,64 @@ test("a restart re-applies only the lines the database has not recorded", async 
 	expect(purges).toHaveLength(1);
 	expect(await h.memory.recover()).toMatchObject({ healthy: true });
 	expect(purges).toHaveLength(1);
-	// A restored older database lost the marks: the line is applied again.
-	await h.store.write((db) =>
-		db.query("DELETE FROM memory_block_applied").run(),
+	// A forget whose transaction rolls back after its line was written: the database has not recorded that entry,
+	// so the reconciliation re-applies it and its purge runs again (once).
+	const e2 = await exchange(h, "好きな色は青です", "了解");
+	await expect(
+		h.store.write((db) => {
+			h.memory.forgetInTransaction(db, {
+				conversationId: "c1",
+				itemIds: [],
+				messageIds: [e2.inputMessageId],
+			});
+			throw new Error("crash");
+		}),
+	).rejects.toThrow("crash");
+	await h.memory.recover();
+	const after = purges.length;
+	expect(after).toBeGreaterThanOrEqual(3);
+	expect(
+		purges.slice(1).every((p) => p.messageIds.includes(e2.inputMessageId)),
+	).toBe(true);
+	await h.memory.recover();
+	expect(purges).toHaveLength(after);
+});
+
+test("while memory is unhealthy the forget journal's messages stay hidden, even when a later line is damaged", async () => {
+	const h = await setup();
+	const path = join(h.dir, "journal.jsonl");
+	// An entry whose message the database does not know (it never reached the database), then a torn line.
+	const planned = h.store.read((db) =>
+		planForget(db, {
+			contractVersion: CONTRACT_VERSIONS.lifecycle,
+			access: {
+				principal: PRINCIPAL,
+				scopeKeys: [PROFILE_SCOPE],
+				purpose: "memory.forget",
+				policyRevision: h.memory.policyRevisionInTransaction(db),
+			},
+			hostIntent: hostIntentOf({
+				conversationId: "c1",
+				messageIds: ["ghost-2"],
+				itemIds: [],
+			}),
+			clock: { atMs: Date.parse(h.time.now) },
+		}),
 	);
-	await h.memory.recover();
-	expect(purges).toHaveLength(2);
-	await h.memory.recover();
-	expect(purges).toHaveLength(2);
+	if (planned.status !== "planned") throw new Error("not planned");
+	writeFileSync(path, `${JSON.stringify(planned.plan.entry)}\n{not json\n`);
+	expect(await h.memory.recover()).toMatchObject({
+		healthy: false,
+		reason: "journal_unreadable",
+	});
+	expect([...h.memory.blockedMessageIds(["ghost-2", "visible"])]).toEqual([
+		"ghost-2",
+	]);
+	expect(
+		h.store.read((db) =>
+			h.memory.blockedMessageIdsOfConversationInTransaction(db, "c1"),
+		),
+	).toContain("ghost-2");
 });
 
 test("while memory is unhealthy the block journal's messages stay hidden, even those the database does not know", async () => {
