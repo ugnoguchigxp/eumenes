@@ -230,6 +230,60 @@
 				"人口減少の原因について競合する説明と反証を調べ、分からない点もまとめて"
 			],
 			"redirects": []
+		},
+		{
+			"kind": "toolchain",
+			"id": "web.research",
+			"revision": 5,
+			"title": "詳しいWeb調査",
+			"summary": "複数の公式資料・一次資料をWebで読み比べ、条件や制約、共通点と相違点、矛盾を出典付きで整理する。複数の論点を一つの調査として扱い、仮説と反証を検証しながら考察を深め、不明点を明記した報告を作る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"複数の資料の本文を照合し、条件・制約・限界を比較して根拠付きでまとめてほしい",
+				"相反する情報や競合する説明を一次資料に当たって検証したい",
+				"複数の問いを関連付け、調査方針や仮説を見直しながら掘り下げたい"
+			],
+			"avoidWhen": [
+				"定義・人物・指定URLの一項目など短い事実確認",
+				"専用担当で完結する天気・株価・ニュースの取得",
+				"外部への書込みや他者への送信"
+			],
+			"dependencies": ["package:pursuit.research@3"],
+			"functionName": "web_research",
+			"packageRevisionId": "package:pursuit.research@3",
+			"bindingRevisionId": "binding:pursuit.research@2",
+			"examples": [
+				"自治体の防災計画を公式資料で比較し、対象者と発動条件の違いを根拠付きで整理して",
+				"この技術の性能について食い違う主張を一次資料で検証し、成立条件と分からない点をまとめて",
+				"人口減少の原因について競合する説明と反証を調べて"
+			],
+			"redirects": []
+		},
+		{
+			"revision": 2,
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"kind": "resource-kind",
+			"id": "resource.report",
+			"title": "調査報告",
+			"summary": "Web調査と会話履歴調査、長考調査の報告",
+			"resourceKindData": {
+				"version": 1,
+				"label": "調査報告",
+				"owner": "web-research",
+				"actions": ["open", "read"],
+				"defaultAction": "read",
+				"producedBy": [
+					"web.search",
+					"web.service-search",
+					"history.research",
+					"web.research"
+				]
+			}
 		}
 	],
 	"bindings": [
@@ -278,7 +332,41 @@
 			}
 		}
 	],
-	"artifacts": [],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "pursuit.report",
+			"revision": 1,
+			"title": "調査報告",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "work-result",
+						"source": "pursuit-report",
+						"title": "調査報告"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "pursuit-report",
+					"adapterRef": "adapter:pursuit@1",
+					"query": "query:pursuit.report@1",
+					"target": "optional",
+					"paramsSchemaRef": "builtin:emptyInput"
+				}
+			],
+			"actionBindings": [],
+			"launcher": {
+				"label": "最新の調査報告",
+				"description": "直近に完了した調査の全文と出典を読む",
+				"order": 16
+			}
+		}
+	],
 	"schemas": [
 		{
 			"kind": "schema",

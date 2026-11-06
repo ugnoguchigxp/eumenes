@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-11-06T03:06:40.911935+00:00",
+  "campaign": "quality-20261105",
+  "capUsd": 15.0,
+  "reportedUsageUsd": 3.736388895,
+  "conservativeExposureUsd": 4.012664,
+  "providerExposureUsd": {
+    "claude": 2.304834,
+    "openai": 1.70783
+  },
+  "pendingCalls": 0,
+  "unresolvedCostCalls": 0,
+  "nativeValidationPaymentPath": "saved Codex SDK ChatGPT subscription login, no API credential; usage accounted separately, no zero-dollar API price assumed"
+}

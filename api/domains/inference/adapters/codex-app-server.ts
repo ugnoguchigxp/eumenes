@@ -229,6 +229,21 @@ export async function runCodexTurn(
 			capabilities: null,
 		});
 		send({ method: "initialized" });
+		// Empty TOML tables merge with user config; they do not remove inherited MCPs.
+		// Read names only and disable each for this thread, without copying credentials.
+		const loaded = (await request("config/read", {
+			includeLayers: false,
+			cwd: turn.cwd,
+		})) as { config?: { mcp_servers?: unknown } };
+		if (
+			!loaded?.config ||
+			typeof loaded.config !== "object" ||
+			Array.isArray(loaded.config)
+		)
+			throw fail("codex_config_invalid");
+		const servers = loaded.config.mcp_servers ?? {};
+		if (typeof servers !== "object" || Array.isArray(servers))
+			throw fail("codex_config_invalid");
 		const started = (await request("thread/start", {
 			model: turn.model,
 			cwd: turn.cwd,
@@ -236,6 +251,12 @@ export async function runCodexTurn(
 			sandbox: "read-only",
 			baseInstructions: turn.instructions,
 			ephemeral: true,
+			config: {
+				features: disabledFeatures,
+				mcp_servers: Object.fromEntries(
+					Object.keys(servers).map((name) => [name, { enabled: false }]),
+				),
+			},
 		})) as { thread?: { id?: string } };
 		threadId = started?.thread?.id;
 		if (!threadId) throw fail("codex_turn_failed");

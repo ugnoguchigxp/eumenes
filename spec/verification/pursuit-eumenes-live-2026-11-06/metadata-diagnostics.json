@@ -1,0 +1,166 @@
+{
+  "method": "saved local LARM providers, unchanged eumenes_router best-v2, isolated card index, no feedback or model changes",
+  "limitation": "All indexed cards treated as available. This is not the production conversation-path test.",
+  "results": [
+    {
+      "set": "development",
+      "mode": "baseline",
+      "case": "quick-location",
+      "expected": "web.search",
+      "actual": "web.search",
+      "passed": true,
+      "gate": 0.10002292349102823,
+      "defer": true
+    },
+    {
+      "set": "development",
+      "mode": "baseline",
+      "case": "quick-function",
+      "expected": "web.search",
+      "actual": "conversation.respond",
+      "passed": false,
+      "gate": 0.20747372193497482,
+      "defer": true
+    },
+    {
+      "set": "development",
+      "mode": "baseline",
+      "case": "quick-page",
+      "expected": "web.search",
+      "actual": "conversation.respond",
+      "passed": false,
+      "gate": 0.09364420253046837,
+      "defer": true
+    },
+    {
+      "set": "development",
+      "mode": "baseline",
+      "case": "deep-plans",
+      "expected": "web.research",
+      "actual": "web.research",
+      "passed": true,
+      "gate": 0.6282177203665757,
+      "defer": false
+    },
+    {
+      "set": "development",
+      "mode": "baseline",
+      "case": "deep-tech",
+      "expected": "web.research",
+      "actual": "conversation.respond",
+      "passed": false,
+      "gate": 0.26436214169488764,
+      "defer": true
+    },
+    {
+      "set": "development",
+      "mode": "baseline",
+      "case": "deep-studies",
+      "expected": "web.research",
+      "actual": "web.research",
+      "passed": true,
+      "gate": 0.09497015665567418,
+      "defer": true
+    },
+    {
+      "set": "development",
+      "mode": "baseline",
+      "case": "conversation",
+      "expected": "conversation.respond",
+      "actual": "conversation.respond",
+      "passed": true,
+      "gate": 0.5790091813260492,
+      "defer": false
+    },
+    {
+      "set": "development",
+      "mode": "draft",
+      "case": "quick-location",
+      "expected": "web.search",
+      "actual": "web.search",
+      "passed": true,
+      "gate": 0.9080661943521932,
+      "defer": false
+    },
+    {
+      "set": "development",
+      "mode": "draft",
+      "case": "quick-function",
+      "expected": "web.search",
+      "actual": "web.search",
+      "passed": true,
+      "gate": 0.7796369768513899,
+      "defer": false
+    },
+    {
+      "set": "development",
+      "mode": "draft",
+      "case": "quick-page",
+      "expected": "web.search",
+      "actual": "web.search",
+      "passed": true,
+      "gate": 0.1931641934261404,
+      "defer": true
+    },
+    {
+      "set": "development",
+      "mode": "draft",
+      "case": "deep-plans",
+      "expected": "web.research",
+      "actual": "web.research",
+      "passed": true,
+      "gate": 0.6964552894787613,
+      "defer": false
+    },
+    {
+      "set": "development",
+      "mode": "draft",
+      "case": "deep-tech",
+      "expected": "web.research",
+      "actual": "web.research",
+      "passed": true,
+      "gate": 0.43278646211054106,
+      "defer": false
+    },
+    {
+      "set": "development",
+      "mode": "draft",
+      "case": "deep-studies",
+      "expected": "web.research",
+      "actual": "web.research",
+      "passed": true,
+      "gate": 0.6171662854891695,
+      "defer": false
+    },
+    {
+      "set": "development",
+      "mode": "draft",
+      "case": "conversation",
+      "expected": "conversation.respond",
+      "actual": "conversation.respond",
+      "passed": true,
+      "gate": 0.5790091813260492,
+      "defer": false
+    },
+    {
+      "set": "heldout",
+      "mode": "draft",
+      "case": "quick",
+      "expected": "web.search",
+      "actual": "web.search",
+      "passed": true,
+      "gate": 0.8531785641885254,
+      "defer": false
+    },
+    {
+      "set": "heldout",
+      "mode": "draft",
+      "case": "research",
+      "expected": "web.research",
+      "actual": "web.research",
+      "passed": true,
+      "gate": 0.31570156237458485,
+      "defer": false
+    }
+  ]
+}

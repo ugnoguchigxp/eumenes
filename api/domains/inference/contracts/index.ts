@@ -224,6 +224,8 @@ export interface InferencePort {
 			subject: string;
 			deadline: number;
 			maxOutputTokens: number;
+			/** The host's bounded attempt limit, instead of the transport's default. */
+			attemptMs?: number;
 			/** Subagents without a dialogue parent follow the currently selected conversation LLM. */
 			route?: "subagent";
 			/** The output schema goes to the provider as a strict schema. */

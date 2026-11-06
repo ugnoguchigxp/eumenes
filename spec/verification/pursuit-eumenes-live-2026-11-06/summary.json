@@ -1,0 +1,88 @@
+{
+  "checkedAt": "2026-11-06T03:06:40.875211+00:00",
+  "result": "pass",
+  "entry": "Normal running Eumenes CLI chat, same saved router/model, no pinned toolchain",
+  "quick": {
+    "rootRunId": "a6cf2c9e-fbb2-4509-9f2c-090da708c383",
+    "selected": [
+      "toolchain:web.search@9"
+    ],
+    "modelCalls": 3,
+    "webOperations": 2,
+    "sourceCount": 1,
+    "outcome": "succeeded",
+    "pursuitStarted": false,
+    "completionSeconds": 82.861,
+    "answer": "WALの正式名称は **Write-Ahead Log** です。[SQLite公式資料](https://sqlite.org/wal.html)",
+    "resourceUri": "eumenes://report/agent%3A80603777-facd-401f-b97f-1e6909890b43",
+    "stillResolvableAfterFinalRestart": true
+  },
+  "research": {
+    "rootRunId": "f1ac0ae9-112a-44a0-8e8f-1c921f041653",
+    "ownerId": "c00fd9be-49af-4bd2-9fbf-6e4e0b9cbd3d",
+    "selected": [
+      "toolchain:web.research@5"
+    ],
+    "status": "completed",
+    "verified": true,
+    "verificationCount": 2,
+    "strategies": 2,
+    "hypotheses": 6,
+    "modelCalls": 55,
+    "webAcquisitions": 2,
+    "searches": 0,
+    "completionSeconds": 881.168,
+    "sources": [
+      {
+        "sourceId": "e1",
+        "url": "https://sqlite.org/wal.html",
+        "title": "Write-Ahead Logging",
+        "fetchedAt": "2026-11-06T02:50:28.175Z"
+      },
+      {
+        "sourceId": "e2",
+        "url": "https://sqlite.org/lockingv3.html",
+        "title": "File Locking And Concurrency In SQLite Version 3",
+        "fetchedAt": "2026-11-06T02:50:57.096Z"
+      }
+    ],
+    "claimStatuses": {
+      "verified": 5,
+      "unknown": 1
+    },
+    "noticeOutcome": "succeeded",
+    "resourceUri": "eumenes://report/pursuit%3Ac00fd9be-49af-4bd2-9fbf-6e4e0b9cbd3d",
+    "fullAnswerCharacters": 1195,
+    "openedCorrectTargetFromActualNotice": true,
+    "fullAnswerExactMatch": true
+  },
+  "conversationControl": {
+    "rootRunId": "bca04e0f-375c-4ab1-84bc-c2507d22f489",
+    "status": "completed",
+    "defaultConversationChosen": true,
+    "webTasks": 0,
+    "pursuitStarted": false,
+    "responsePresent": true
+  },
+  "differentTopicHoldout": {
+    "rootRunId": "f43fd087-9508-42bb-95e0-ed1449f59f8a",
+    "selected": [
+      "toolchain:web.search@9"
+    ],
+    "pursuitStarted": false,
+    "outcome": "partial",
+    "failureCodes": [
+      "web_bot_challenge"
+    ],
+    "answer": "JAXA公式サイトの本文を確認できなかったため、市を確認できませんでした。"
+  },
+  "inputsAndProductSourceUnchangedDuringFinalRun": true,
+  "routerAndPaymentSettingsUnchanged": true,
+  "ciRun": false,
+  "limits": [
+    "Fixed quick/research cases plus conversation and a different-topic control do not estimate overall routing accuracy.",
+    "Research verification is model-based, not formal proof.",
+    "External search bot challenges can still yield an honest partial result.",
+    "SDK subscription usage is separate from the paid API campaign; no zero-dollar API price is assumed."
+  ]
+}

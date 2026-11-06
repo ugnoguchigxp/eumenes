@@ -57,6 +57,7 @@ export function model(ctx: Context, id: string, epoch: number): ResearchModel {
 						ctx.now() + 120000,
 					),
 					maxOutputTokens: Math.min(request.maxOutputTokens, 8192),
+					attemptMs: Math.min(state.inferenceMs, 120000),
 					route: "subagent",
 				});
 				state.modelCalls++;

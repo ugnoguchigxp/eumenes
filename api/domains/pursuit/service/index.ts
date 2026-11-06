@@ -8,7 +8,7 @@ import { controls } from "./control";
 import { registerJobs } from "./jobs";
 import { end, forget, notice, reconcile } from "./lifecycle";
 import { collectWeb } from "./web";
-import { viewInTransaction } from "./view";
+import { reportInTransaction, viewInTransaction } from "./view";
 
 const log = getLogger("pursuit");
 export function createPursuit(deps: PursuitDeps) {
@@ -168,6 +168,7 @@ export function createPursuit(deps: PursuitDeps) {
 	};
 	return {
 		task,
+		reportInTransaction,
 		configure(port: SourcePort) {
 			source = port;
 		},

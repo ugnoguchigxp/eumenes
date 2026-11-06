@@ -21,3 +21,19 @@ test("a rejected answer stays editable and a successful answer clears it", async
 	await waitFor(() => expect(field).toHaveValue(""));
 	expect(screen.queryByRole("button", { name: "取消" })).toBeNull();
 });
+
+test("reports omit workspace-session claims unless the owner supplied session data", async () => {
+	const user = userEvent.setup();
+	const { rerender } = render(
+		<WorkResultPanel title="調査報告" status="完了" />,
+	);
+	await user.click(screen.getByRole("tab", { name: "成果" }));
+	const unconfirmed = "実作業Sessionの開始は未確認です。";
+	expect(screen.queryByText(unconfirmed)).toBeNull();
+	rerender(<WorkResultPanel title="調査報告" status="完了" sessions={[]} />);
+	expect(screen.getByText(unconfirmed)).toBeVisible();
+	rerender(
+		<WorkResultPanel title="調査報告" status="完了" sessions={["session"]} />,
+	);
+	expect(screen.getByText("実作業Session: 1件")).toBeVisible();
+});

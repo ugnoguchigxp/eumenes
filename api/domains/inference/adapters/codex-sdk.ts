@@ -32,6 +32,7 @@ export const disabledFeatures = Object.fromEntries(
 	[
 		"shell_tool",
 		"js_repl",
+		"code_mode_host",
 		"multi_agent",
 		"remote_plugin",
 		"apps",

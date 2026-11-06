@@ -19,6 +19,7 @@ const out = (m) => process.stdout.write(JSON.stringify(m)+"\\n");
 createInterface({input:process.stdin}).on("line",line=>{
 const m=JSON.parse(line);
 if(m.method==="initialize")out({id:m.id,result:{}});
+if(m.method==="config/read")out({id:m.id,result:{config:{}}});
 if(m.method==="thread/start")out({id:m.id,result:{thread:{id:"t"}}});
 if(m.method==="turn/start"){
 out({id:m.id,result:{turn:{id:"u"}}});
@@ -62,6 +63,51 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:"u",status:"completed
 				"fixture-a",
 			),
 		).toBeNull();
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test("an unreadable inherited MCP configuration never starts a model turn", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "isolation-codex-"));
+	const command = join(dir, "fixture");
+	const started = join(dir, "started");
+	await writeFile(
+		command,
+		`#!${process.execPath}
+import { createInterface } from "node:readline";
+import { writeFileSync } from "node:fs";
+const out = m => process.stdout.write(JSON.stringify(m)+"\\n");
+createInterface({input:process.stdin}).on("line", line => {
+ const m=JSON.parse(line);
+ if(m.method==="initialize")out({id:m.id,result:{}});
+ if(m.method==="config/read")out({id:m.id,result:JSON.parse(process.env.FIXTURE_CONFIG)});
+ if(m.method==="thread/start" || m.method==="turn/start")writeFileSync(${JSON.stringify(started)}, "unexpected");
+});
+`,
+		{ mode: 0o700 },
+	);
+	try {
+		for (const config of [
+			null,
+			{ config: [] },
+			{ config: { mcp_servers: [] } },
+		]) {
+			await expect(
+				runCodexTurn(
+					{ command, env: { FIXTURE_CONFIG: JSON.stringify(config) } },
+					{
+						cwd: dir,
+						model: "fixture",
+						instructions: "",
+						prompt: "",
+						signal: AbortSignal.timeout(5000),
+					},
+					(s) => new Error(s),
+				),
+			).rejects.toThrow("codex_config_invalid");
+			expect(await Bun.file(started).exists()).toBe(false);
+		}
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}

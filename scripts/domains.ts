@@ -454,10 +454,10 @@ export const domains = {
 	pursuit: {
 		tier: 3,
 		backend: "api/domains/pursuit",
-		web: null,
+		web: "web/src/domains/pursuit",
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "queue", "tool-runtime"],
+			api: ["capabilities", "inference", "queue", "resources", "tool-runtime"],
 			web: [],
 			test: [],
 		},

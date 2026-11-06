@@ -1,0 +1,13 @@
+{
+  "effectiveConfigRead": true,
+  "inheritedMcpRegistrationsBefore": 5,
+  "allInheritedRegistrationsWereEnabled": true,
+  "threadAfterExplicitIsolation": {
+    "serverCount": 5,
+    "advertisedMcpToolCount": 0
+  },
+  "modelTurnDispatched": false,
+  "method": "Actual installed Codex app-server: initialize, config/read, ephemeral thread/start with explicit per-server disable and complete feature overrides, mcpServerStatus/list. No existing user chat read or messaged.",
+  "configWrittenToDisk": false,
+  "credentialsCopied": false
+}

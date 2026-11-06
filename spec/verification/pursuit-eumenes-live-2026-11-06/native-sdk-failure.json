@@ -1,0 +1,35 @@
+{
+  "mode": "actual Eumenes conversation, autonomous routing",
+  "rootRunId": "c6745dd5-c7e8-4653-8f8d-ccb5096b0e7a",
+  "executionId": "41646eb2-860a-47ab-bb92-2e15d3595c62",
+  "status": "partial",
+  "modelCalls": 6,
+  "webCalls": 0,
+  "draftSaved": false,
+  "attempts": [
+    {
+      "tool": "give_up",
+      "state": "rejected",
+      "rejectionRules": [
+        "strategy_not_exhausted"
+      ]
+    },
+    {
+      "tool": "give_up",
+      "state": "rejected",
+      "rejectionRules": [
+        "strategy_not_exhausted"
+      ]
+    },
+    {
+      "tool": "functions.exec",
+      "state": "rejected",
+      "rejectionRules": [
+        "unknown_tool"
+      ]
+    }
+  ],
+  "verified": false,
+  "diagnosis": "Ambient Codex MCP registrations remained enabled despite empty-table override. The SDK acted as an execution agent and confused host-owned tool descriptions with its native tools. Host rejected the unknown tool proposal; no sources acquired.",
+  "passed": false
+}

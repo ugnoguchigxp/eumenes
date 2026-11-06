@@ -1,0 +1,395 @@
+{
+  "method": "Required local verify command on frozen copies of the same source changes, outside the repository to exclude old ignored validation source copies. No CI.",
+  "checks": [
+    {
+      "scope": "SDK isolation and registration/Pursuit revision update",
+      "result": "pass",
+      "startedAt": "2026-11-06T01:21:53.770Z",
+      "finishedAt": "2026-11-06T01:23:26.369Z",
+      "passTests": 511,
+      "testFiles": 99,
+      "steps": [
+        {
+          "name": "inventory",
+          "status": "pass",
+          "ms": 61
+        },
+        {
+          "name": "boundaries",
+          "status": "pass",
+          "ms": 2036
+        },
+        {
+          "name": "system-context",
+          "status": "pass",
+          "ms": 129
+        },
+        {
+          "name": "size-budget",
+          "status": "pass",
+          "ms": 934
+        },
+        {
+          "name": "sql-boundaries",
+          "status": "pass",
+          "ms": 1136
+        },
+        {
+          "name": "domain-docs",
+          "status": "pass",
+          "ms": 26
+        },
+        {
+          "name": "format",
+          "status": "pass",
+          "ms": 143
+        },
+        {
+          "name": "lint",
+          "status": "pass",
+          "ms": 251
+        },
+        {
+          "name": "design-system typecheck",
+          "status": "pass",
+          "ms": 189
+        },
+        {
+          "name": "design-system build",
+          "status": "pass",
+          "ms": 5809
+        },
+        {
+          "name": "typecheck",
+          "status": "pass",
+          "ms": 555
+        },
+        {
+          "name": "bun tests",
+          "status": "pass",
+          "ms": 80436
+        }
+      ],
+      "integrityErrors": []
+    },
+    {
+      "scope": "Final structured-completion role change",
+      "result": "pass",
+      "startedAt": "2026-11-06T01:37:31.101Z",
+      "finishedAt": "2026-11-06T01:37:53.093Z",
+      "passTests": 235,
+      "testFiles": 43,
+      "steps": [
+        {
+          "name": "inventory",
+          "status": "pass",
+          "ms": 65
+        },
+        {
+          "name": "boundaries",
+          "status": "pass",
+          "ms": 2085
+        },
+        {
+          "name": "system-context",
+          "status": "pass",
+          "ms": 126
+        },
+        {
+          "name": "size-budget",
+          "status": "pass",
+          "ms": 911
+        },
+        {
+          "name": "sql-boundaries",
+          "status": "pass",
+          "ms": 1308
+        },
+        {
+          "name": "domain-docs",
+          "status": "pass",
+          "ms": 22
+        },
+        {
+          "name": "format",
+          "status": "pass",
+          "ms": 149
+        },
+        {
+          "name": "lint",
+          "status": "pass",
+          "ms": 283
+        },
+        {
+          "name": "design-system typecheck",
+          "status": "pass",
+          "ms": 188
+        },
+        {
+          "name": "design-system build",
+          "status": "pass",
+          "ms": 5894
+        },
+        {
+          "name": "typecheck",
+          "status": "pass",
+          "ms": 579
+        },
+        {
+          "name": "bun tests",
+          "status": "pass",
+          "ms": 9272
+        }
+      ],
+      "integrityErrors": []
+    },
+    {
+      "scope": "Report resource, standalone artifact, existing task contract and consuming resources/tool-runtime",
+      "result": "pass",
+      "startedAt": "2026-11-06T02:27:25.638Z",
+      "finishedAt": "2026-11-06T02:29:04.315Z",
+      "passTests": 337,
+      "testFiles": 69,
+      "webPassTests": 13,
+      "steps": [
+        {
+          "name": "inventory",
+          "status": "pass",
+          "ms": 76
+        },
+        {
+          "name": "boundaries",
+          "status": "pass",
+          "ms": 2175
+        },
+        {
+          "name": "system-context",
+          "status": "pass",
+          "ms": 139
+        },
+        {
+          "name": "size-budget",
+          "status": "pass",
+          "ms": 1029
+        },
+        {
+          "name": "sql-boundaries",
+          "status": "pass",
+          "ms": 1137
+        },
+        {
+          "name": "domain-docs",
+          "status": "pass",
+          "ms": 25
+        },
+        {
+          "name": "format",
+          "status": "pass",
+          "ms": 160
+        },
+        {
+          "name": "lint",
+          "status": "pass",
+          "ms": 278
+        },
+        {
+          "name": "design-system typecheck",
+          "status": "pass",
+          "ms": 184
+        },
+        {
+          "name": "design-system build",
+          "status": "pass",
+          "ms": 6136
+        },
+        {
+          "name": "typecheck",
+          "status": "pass",
+          "ms": 617
+        },
+        {
+          "name": "bun tests",
+          "status": "pass",
+          "ms": 77338
+        },
+        {
+          "name": "web tests",
+          "status": "pass",
+          "ms": 6937
+        }
+      ],
+      "integrityErrors": []
+    },
+    {
+      "scope": "Final Web adapter and domain wiring",
+      "result": "pass",
+      "startedAt": "2026-11-06T02:33:09.629Z",
+      "finishedAt": "2026-11-06T02:33:31.308Z",
+      "passTests": 12,
+      "testFiles": 3,
+      "webPassTests": 0,
+      "steps": [
+        {
+          "name": "inventory",
+          "status": "pass",
+          "ms": 105
+        },
+        {
+          "name": "boundaries",
+          "status": "pass",
+          "ms": 2456
+        },
+        {
+          "name": "system-context",
+          "status": "pass",
+          "ms": 127
+        },
+        {
+          "name": "size-budget",
+          "status": "pass",
+          "ms": 974
+        },
+        {
+          "name": "sql-boundaries",
+          "status": "pass",
+          "ms": 1244
+        },
+        {
+          "name": "domain-docs",
+          "status": "pass",
+          "ms": 24
+        },
+        {
+          "name": "format",
+          "status": "pass",
+          "ms": 152
+        },
+        {
+          "name": "lint",
+          "status": "pass",
+          "ms": 318
+        },
+        {
+          "name": "design-system typecheck",
+          "status": "pass",
+          "ms": 200
+        },
+        {
+          "name": "design-system build",
+          "status": "pass",
+          "ms": 6209
+        },
+        {
+          "name": "typecheck",
+          "status": "pass",
+          "ms": 599
+        },
+        {
+          "name": "bun tests",
+          "status": "pass",
+          "ms": 8166
+        }
+      ],
+      "integrityErrors": []
+    },
+    {
+      "scope": "Final independent-control attempt budget and Pursuit propagation",
+      "result": "pass",
+      "startedAt": "2026-11-06T02:48:02.278Z",
+      "finishedAt": "2026-11-06T02:48:33.763Z",
+      "passTests": 248,
+      "testFiles": 46,
+      "steps": [
+        {
+          "name": "inventory",
+          "status": "pass",
+          "ms": 74
+        },
+        {
+          "name": "boundaries",
+          "status": "pass",
+          "ms": 2061
+        },
+        {
+          "name": "system-context",
+          "status": "pass",
+          "ms": 131
+        },
+        {
+          "name": "size-budget",
+          "status": "pass",
+          "ms": 898
+        },
+        {
+          "name": "sql-boundaries",
+          "status": "pass",
+          "ms": 1218
+        },
+        {
+          "name": "domain-docs",
+          "status": "pass",
+          "ms": 24
+        },
+        {
+          "name": "format",
+          "status": "pass",
+          "ms": 138
+        },
+        {
+          "name": "lint",
+          "status": "pass",
+          "ms": 299
+        },
+        {
+          "name": "design-system typecheck",
+          "status": "pass",
+          "ms": 188
+        },
+        {
+          "name": "design-system build",
+          "status": "pass",
+          "ms": 6812
+        },
+        {
+          "name": "typecheck",
+          "status": "pass",
+          "ms": 646
+        },
+        {
+          "name": "bun tests",
+          "status": "pass",
+          "ms": 17547
+        }
+      ],
+      "integrityErrors": []
+    }
+  ],
+  "smallNativeSdkRoleProbe": "passed; returned a host-owned report_draft proposal as JSON without workspace initialization",
+  "additionalFinalTests": [
+    {
+      "scope": "Public report API and server assembly registration",
+      "passTests": 5,
+      "testFiles": 2
+    },
+    {
+      "scope": "Actual workspace artifact renderer, full answer, source, target switch, hidden/empty/error/invalid states",
+      "passTests": 4,
+      "testFiles": 1
+    },
+    {
+      "scope": "Existing WorkResultPanel session display contract",
+      "passTests": 2,
+      "testFiles": 1
+    },
+    {
+      "scope": "Independent control/default/invalid/remaining attempt budget and full Pursuit API integration",
+      "passTests": 16,
+      "testFiles": 4
+    }
+  ],
+  "failedAttempts": [
+    "Optional task artifact extension rejected by unchanged contract test and removed.",
+    "An incremental verification copy retained reverted files; recreated from HEAD plus current changes and passed.",
+    "Report renderer composition test moved to workspace ownership to obey domain boundary; boundary expectations unchanged."
+  ]
+}

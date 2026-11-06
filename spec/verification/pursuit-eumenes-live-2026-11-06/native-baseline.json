@@ -1,0 +1,88 @@
+{
+  "mode": "actual running Eumenes CLI chat; no pinned toolchain",
+  "cases": [
+    {
+      "case": "quick",
+      "request": "SQLiteの公式Web資料を確認して、WALの正式名称を短く教えてください。出典リンクを1つ付けてください。",
+      "runId": "67f9d4bb-4ba5-46a9-a88f-62a9571e9147",
+      "entry": "route",
+      "decided": "conversation.respond",
+      "row": 7,
+      "answer": "公式Web資料を確認できないため、出典リンク付きではお答えできません。",
+      "passed": false,
+      "topCandidates": [
+        {
+          "id": "conversation.respond",
+          "kind": "conversation",
+          "raw": 0.13760979879916468,
+          "correction": 0,
+          "p": 0.13760979879916468,
+          "score": null
+        },
+        {
+          "id": "web.search",
+          "kind": "toolchain",
+          "raw": 0.11320698325806809,
+          "correction": 0,
+          "p": 0.11320698325806809,
+          "score": 0.2855762361647846
+        },
+        {
+          "id": "world.query",
+          "kind": "toolchain",
+          "raw": 0.09346702756098244,
+          "correction": 0,
+          "p": 0.09346702756098244,
+          "score": 0.1501853006465615
+        }
+      ],
+      "error": null
+    },
+    {
+      "case": "research",
+      "request": "SQLiteのWALとrollback journalについて、同時に複数の書込みが可能か、読取り中の書込みは可能か、チェックポイントが進まない条件は何かを比較してください。https://sqlite.org/wal.html と https://sqlite.org/lockingv3.html の公式本文を照合し、両立する条件と限界を出典付きで整理してください。本文で確認できない点は不明としてください。",
+      "runId": "15a60a0f-ec66-4855-8b48-93111fd93536",
+      "entry": "route",
+      "decided": "conversation.respond",
+      "row": 1,
+      "answer": "公式本文をこの場で確認できないため、出典と照合した比較はできません。本文を貼っていただければ、確認できる範囲で整理します。",
+      "passed": false,
+      "topCandidates": [
+        {
+          "id": "conversation.respond",
+          "kind": "conversation",
+          "raw": 0.7000628744438032,
+          "correction": 0,
+          "p": 0.7000628744438032,
+          "score": null
+        },
+        {
+          "id": "web.research",
+          "kind": "toolchain",
+          "raw": 0.08629673855854582,
+          "correction": 0,
+          "p": 0.08629673855854582,
+          "score": 0.280629874770962
+        },
+        {
+          "id": "browser.operate",
+          "kind": "toolchain",
+          "raw": 0.042056171196985154,
+          "correction": 0,
+          "p": 0.042056171196985154,
+          "score": 0.05028445408817379
+        }
+      ],
+      "error": null
+    }
+  ],
+  "structuredExperiment": {
+    "conversationId": "pursuit-route-live-20261106-quick-r2",
+    "rootRunId": "2687b25c-79ca-4bd5-a099-d826c60f7d30",
+    "requests": 3,
+    "decided": "pipeline.execute",
+    "taskStatus": "completed",
+    "adopted": false,
+    "routerSettingsRestored": true
+  }
+}

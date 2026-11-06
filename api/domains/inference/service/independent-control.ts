@@ -54,6 +54,7 @@ export function createIndependentControls(
 				subject: string;
 				deadline: number;
 				maxOutputTokens: number;
+				attemptMs?: number;
 				route?: "subagent";
 				structuredOutput?: boolean;
 			},
@@ -65,7 +66,11 @@ export function createIndependentControls(
 				input.deadline > Date.now() + 120_000 ||
 				!Number.isSafeInteger(input.maxOutputTokens) ||
 				input.maxOutputTokens < 1 ||
-				input.maxOutputTokens > 8192
+				input.maxOutputTokens > 8192 ||
+				(input.attemptMs !== undefined &&
+					(!Number.isSafeInteger(input.attemptMs) ||
+						input.attemptMs < 1000 ||
+						input.attemptMs > 120_000))
 			)
 				throw new Error("invalid_user_control");
 			const snapshot = structuredClone(snapshotInTransaction(db));
@@ -81,8 +86,8 @@ export function createIndependentControls(
 				snapshot,
 			);
 			db.query(
-				"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents='[]' WHERE id=? AND status='pending'",
-			).run(input.maxOutputTokens, requestId);
+				"UPDATE inference_requests SET mode='control',output_limit=?,attempt_ms=?,context_policy='exact',parents='[]' WHERE id=? AND status='pending'",
+			).run(input.maxOutputTokens, input.attemptMs ?? null, requestId);
 			if (input.structuredOutput)
 				db.query(
 					"UPDATE inference_requests SET structured_output=1 WHERE id=?",

@@ -1,0 +1,33 @@
+{
+  "method": "Fixed messages submitted through normal Eumenes CLI chat, without toolchain pins. Inputs were not edited during runs.",
+  "cases": [
+    {
+      "id": "quick",
+      "request": "SQLiteの公式Web資料を確認して、WALの正式名称を短く教えてください。出典リンクを1つ付けてください。",
+      "fileSha256": "da8f14000e91186b9c31755f8cebcb90ba7b99a13f2dc820c5d978d23eaa9de5",
+      "expectedSelection": "web.search",
+      "pinnedToolchain": null
+    },
+    {
+      "id": "research",
+      "request": "SQLiteのWALとrollback journalについて、同時に複数の書込みが可能か、読取り中の書込みは可能か、チェックポイントが進まない条件は何かを比較してください。https://sqlite.org/wal.html と https://sqlite.org/lockingv3.html の公式本文を照合し、両立する条件と限界を出典付きで整理してください。本文で確認できない点は不明としてください。",
+      "fileSha256": "8848c81dd005891da5e5a84cd4728dd5dcfc31b0a337290ee2c95ed893560815",
+      "expectedSelection": "web.research",
+      "pinnedToolchain": null
+    },
+    {
+      "id": "conversation-control",
+      "request": "こんにちは。今日は気分がいいです。",
+      "fileSha256": "872e555c7806af3f9105e4cfe6f1981d39428273780d5207c98620a7c9dcdc4d",
+      "expectedSelection": "conversation",
+      "pinnedToolchain": null
+    },
+    {
+      "id": "quick-holdout",
+      "request": "JAXAの公式サイトで、筑波宇宙センターがある市を確認し、出典リンクを1つ付けて短く教えてください。",
+      "fileSha256": "a4bda52964a18529add0de57aff129817d5093b8b14f6dd26ad11285bff31a63",
+      "expectedSelection": "web.search",
+      "pinnedToolchain": null
+    }
+  ]
+}

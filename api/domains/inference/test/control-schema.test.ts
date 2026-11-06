@@ -229,9 +229,10 @@ test("Claude Agent SDK gets outputFormat and its structured output becomes the t
 	expect(Object.keys(seen.options ?? {})).not.toContain("outputFormat");
 });
 
-test("Codex SDK passes the schema as turn outputSchema even without tools", async () => {
+test("Codex SDK isolates inherited MCP servers and passes the schema even without tools", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "eumenes-codex-schema-"));
 	const record = join(dir, "turn.json");
+	const threadRecord = join(dir, "thread.json");
 	const command = join(dir, "codex");
 	// A minimal app-server: answers the handshake, records turn/start, completes the turn.
 	await writeFile(
@@ -243,7 +244,11 @@ const out = (m) => process.stdout.write(JSON.stringify(m) + "\\n");
 createInterface({ input: process.stdin }).on("line", (line) => {
 	const m = JSON.parse(line);
 	if (m.method === "initialize") out({ id: m.id, result: {} });
-	else if (m.method === "thread/start") out({ id: m.id, result: { thread: { id: "t1" } } });
+	else if (m.method === "config/read") out({ id: m.id, result: { config: { mcp_servers: { ambient: { command: "unused", env: { SECRET: "fixture-private" } }, "team.research": { enabled: true } } } } });
+	else if (m.method === "thread/start") {
+		writeFileSync(${JSON.stringify(threadRecord)}, JSON.stringify(m.params));
+		out({ id: m.id, result: { thread: { id: "t1" } } });
+	}
 	else if (m.method === "turn/start") {
 		writeFileSync(${JSON.stringify(record)}, JSON.stringify(m.params));
 		out({ id: m.id, result: { turn: { id: "u1" } } });
@@ -274,6 +279,18 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 			const turn = JSON.parse(await readFile(record, "utf8"));
 			expect(turn.outputSchema).toEqual(schema);
 			expect(turn.effort).toBe(reasoningEffort);
+			const thread = JSON.parse(await readFile(threadRecord, "utf8"));
+			expect(thread.config.mcp_servers).toEqual({
+				ambient: { enabled: false },
+				"team.research": { enabled: false },
+			});
+			expect(thread.config.features).toMatchObject({
+				code_mode_host: false,
+				shell_tool: false,
+				apps: false,
+				plugins: false,
+			});
+			expect(JSON.stringify(thread)).not.toContain("fixture-private");
 		}
 	} finally {
 		await rm(dir, { recursive: true, force: true });

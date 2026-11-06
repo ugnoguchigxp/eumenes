@@ -1,0 +1,19 @@
+{
+  "case": "research-r5",
+  "rootRunId": "2fe0ceac-feb3-4489-9681-a8b3997cd37b",
+  "ownerId": "bc579294-378e-49c4-9087-43c8e5201507",
+  "failedRequestId": "8e4b6c92-cb3e-4e34-9420-093015dec3d9",
+  "attemptId": "cc4a2382-db55-4916-9685-7bff6ee81152",
+  "status": "partial",
+  "reason": "local_timeout",
+  "declaredRequestDeadlineMs": 120000,
+  "storedAttemptMs": null,
+  "effectiveCloudAttemptMs": 60000,
+  "actualAttemptMs": 60003,
+  "modelCalls": 34,
+  "acquiredDocuments": 2,
+  "verified": false,
+  "reportLinkDelivered": true,
+  "fullPartialReportOpenedFromActualNotification": true,
+  "resolution": "Pass the frozen host attempt limit through existing independent-control capture to common execution; no retries/fallback/overall budget increases."
+}

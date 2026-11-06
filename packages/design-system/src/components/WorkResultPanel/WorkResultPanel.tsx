@@ -109,11 +109,13 @@ export function WorkResultPanel(props: WorkResultPanelProps) {
 							</div>
 						))}
 						{!props.sections?.length && <p>保存された成果はありません。</p>}
-						<p className="text-sm text-muted-foreground">
-							{props.sessions?.length
-								? `実作業Session: ${props.sessions.length}件`
-								: "実作業Sessionの開始は未確認です。"}
-						</p>
+						{props.sessions !== undefined && (
+							<p className="text-sm text-muted-foreground">
+								{props.sessions.length
+									? `実作業Session: ${props.sessions.length}件`
+									: "実作業Sessionの開始は未確認です。"}
+							</p>
+						)}
 					</>
 				)}
 				{tab === "request" && (

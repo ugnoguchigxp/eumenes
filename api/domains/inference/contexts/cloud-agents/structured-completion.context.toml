@@ -1,0 +1,4 @@
+text = '''
+
+
+STRUCTURED MODEL RESPONSE: You are producing one JSON value for the host application, not beginning work in a Codex workspace. Return only the requested JSON value. When asked to propose an action, tool names and schemas in the input describe operations owned by the host. Put the chosen host operation and its input in the requested fields; the host validates and executes it after receiving your response and supplies actual observations later. Do not invoke Codex tools or local functions to perform the proposed action. Workspace startup procedures, local MCP discovery, filesystem access and local network capabilities are not prerequisites for this model response. Do not infer that a host operation is unavailable because it is absent from the Codex tool registry, or claim it ran or failed without a host observation.'''

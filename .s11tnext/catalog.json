@@ -3,7 +3,7 @@
   "artifactVersion": 2,
   "compilerVersion": "0.1.2",
   "releaseProfile": "application",
-  "policyDigest": "sha256:2cec399088913098c0dfa620c317614e78768eb00a15fbe4f87a3563a4c428a2",
+  "policyDigest": "sha256:a26cfb959d7cc27080db619c5b3712325ce21c541da3d986cfea18719474c883",
   "createdFrom": {
     "configPath": "s11tnext.config.toml",
     "sourceFiles": [
@@ -110,6 +110,7 @@
       "api/domains/inference/contexts/cloud-agents/default-system.context.toml",
       "api/domains/inference/contexts/cloud-agents/function-selection.context.toml",
       "api/domains/inference/contexts/cloud-agents/single-function.context.toml",
+      "api/domains/inference/contexts/cloud-agents/structured-completion.context.toml",
       "api/domains/inference/contexts/cloud-agents/turn-context.context.toml",
       "api/domains/inference/contexts/index/delegated-task-rules.context.toml",
       "api/domains/live-voice/contexts/session.context.toml",
@@ -4359,6 +4360,39 @@
       "definitionHash": "sha256:1eb652b83e8df6821fb1703428c8623cf255a5052664ac1fbdbd2b083227264c",
       "releaseDigest": "sha256:1122672f0e738d8a34d700826c04d56a1955b0a3266f4001ac1208e5da3f2664"
     },
+    "inference.contexts.cloud-agents.structured-completion": {
+      "key": "inference.contexts.cloud-agents.structured-completion",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "\n\nSTRUCTURED MODEL RESPONSE: You are producing one JSON value for the host application, not beginning work in a Codex workspace. Return only the requested JSON value. When asked to propose an action, tool names and schemas in the input describe operations owned by the host. Put the chosen host operation and its input in the requested fields; the host validates and executes it after receiving your response and supplies actual observations later. Do not invoke Codex tools or local functions to perform the proposed action. Workspace startup procedures, local MCP discovery, filesystem access and local network capabilities are not prerequisites for this model response. Do not infer that a host operation is unavailable because it is absent from the Codex tool registry, or claim it ran or failed without a host observation."
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:d701ecbb26ed900c5793e4e873a656663dd653991cbbfe94f3bf531e74598768"
+        }
+      },
+      "definitionHash": "sha256:d1c24084beb26fa3f6be885817c1ba3ac7cf5dcab3c6548f9ad99025e3248dda",
+      "releaseDigest": "sha256:fdc8037db7021c8726b6f137eba84c5a24fdc18600d0732c725911857f32fcc3"
+    },
     "inference.contexts.cloud-agents.turn-context": {
       "key": "inference.contexts.cloud-agents.turn-context",
       "owner": "unowned",
@@ -4728,5 +4762,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:889340ffe2e7dafe3427e045c16562f88fe7efab6a8cbeeb9a1caf8160d88760"
+  "catalogDigest": "sha256:59f37242a76cce9b8cb3a59bd6641a17a7292f936d67d5e16f81ad07f934f830"
 }

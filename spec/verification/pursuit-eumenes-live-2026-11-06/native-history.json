@@ -1,0 +1,46 @@
+[
+  {
+    "case": "research-r3",
+    "rootRunId": "d3a0cb9d-94d6-41d3-b7ec-1a9131422328",
+    "ownerId": "cfe11b65-6af3-409b-8b00-52a531000093",
+    "status": "cancelled",
+    "modelCalls": 5,
+    "verified": false,
+    "verificationCount": 0,
+    "reportLinks": 0,
+    "code": "pursuit_user_cancelled"
+  },
+  {
+    "case": "research-r4",
+    "rootRunId": "51372668-88df-4a31-80b3-ce9d19caeb52",
+    "ownerId": "e1308439-18d3-448e-a009-1f4e0a378ed1",
+    "status": "completed",
+    "modelCalls": 34,
+    "verified": true,
+    "verificationCount": 2,
+    "reportLinks": 0,
+    "code": null
+  },
+  {
+    "case": "research-r5",
+    "rootRunId": "2fe0ceac-feb3-4489-9681-a8b3997cd37b",
+    "ownerId": "bc579294-378e-49c4-9087-43c8e5201507",
+    "status": "partial",
+    "modelCalls": 34,
+    "verified": false,
+    "verificationCount": 0,
+    "reportLinks": 1,
+    "code": "local_timeout"
+  },
+  {
+    "case": "research-r6",
+    "rootRunId": "f1ac0ae9-112a-44a0-8e8f-1c921f041653",
+    "ownerId": "c00fd9be-49af-4bd2-9fbf-6e4e0b9cbd3d",
+    "status": "completed",
+    "modelCalls": 55,
+    "verified": true,
+    "verificationCount": 2,
+    "reportLinks": 1,
+    "code": null
+  }
+]

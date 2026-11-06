@@ -1,8 +1,50 @@
 import { afterEach, expect, test } from "bun:test";
 import { cleanup, messages, setup } from "./inference.fixture";
+import { get } from "../repository";
+import { attemptDuration } from "../service/attempt-work";
+import type { Request } from "../service/execute-types";
 
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
+});
+
+test("an independent control carries its declared attempt budget to cloud execution and preserves its deadline", async () => {
+	const h = await setup();
+	for (const attemptMs of [undefined, 120000]) {
+		const id = await h.store.write((db) =>
+			h.inference.captureUserControlInTransaction(db, {
+				subject: `execution:${crypto.randomUUID()}`,
+				deadline: Date.now() + 120000,
+				maxOutputTokens: 512,
+				route: "subagent",
+				...(attemptMs ? { attemptMs } : {}),
+			}),
+		);
+		const row = h.store.read((db) => get(db, id))!;
+		expect(row.attemptMs).toBe(attemptMs ?? null);
+		const request = {
+			row,
+			deadline: row.deadline,
+			env: { options: { cloudMs: 60000 } },
+		} as Request;
+		const budget = attemptDuration(request, "cloud");
+		expect(budget).toBeGreaterThan((attemptMs ?? 60000) - 1000);
+		expect(budget).toBeLessThanOrEqual(attemptMs ?? 60000);
+		request.deadline = Date.now() + 500;
+		expect(attemptDuration(request, "cloud")).toBeLessThanOrEqual(500);
+	}
+	for (const attemptMs of [0, 999, 120001, NaN, Infinity]) {
+		await expect(
+			h.store.write((db) =>
+				h.inference.captureUserControlInTransaction(db, {
+					subject: `execution:${crypto.randomUUID()}`,
+					deadline: Date.now() + 120000,
+					maxOutputTokens: 512,
+					attemptMs,
+				}),
+			),
+		).rejects.toThrow("invalid_user_control");
+	}
 });
 
 for (const mode of ["cloud-only", "larm-only"] as const)

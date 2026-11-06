@@ -1,0 +1,41 @@
+[
+  {
+    "file": "api/domains/capabilities/bundles/pursuit-research.bundle.json",
+    "allPriorEntriesUnchanged": {
+      "definitions": true,
+      "bindings": true,
+      "artifacts": true,
+      "schemas": true
+    },
+    "addedEntries": {
+      "definitions": [
+        "toolchain:web.research@5",
+        "resource-kind:resource.report@2"
+      ],
+      "bindings": [],
+      "artifacts": [
+        "artifact:pursuit.report@1"
+      ],
+      "schemas": []
+    },
+    "otherTopLevelFieldsUnchanged": true
+  },
+  {
+    "file": "api/domains/capabilities/bundles/web-shared-execution.bundle.json",
+    "allPriorEntriesUnchanged": {
+      "definitions": true,
+      "bindings": true,
+      "artifacts": true,
+      "schemas": true
+    },
+    "addedEntries": {
+      "definitions": [
+        "toolchain:web.search@9"
+      ],
+      "bindings": [],
+      "artifacts": [],
+      "schemas": []
+    },
+    "otherTopLevelFieldsUnchanged": true
+  }
+]

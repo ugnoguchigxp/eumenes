@@ -290,7 +290,16 @@ async function runCodex(
 			{
 				cwd,
 				model: call.model,
-				instructions: system + (tools ? codexFunctions(tools) : ""),
+				instructions:
+					system +
+					(tools
+						? codexFunctions(tools)
+						: call.outputSchema
+							? systemContext(
+									"inference.contexts.cloud-agents.structured-completion",
+									{},
+								)
+							: ""),
 				prompt,
 				...(call.reasoningEffort
 					? { reasoningEffort: call.reasoningEffort }

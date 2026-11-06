@@ -19,6 +19,7 @@ import { offlineBundleHost } from "./toolchain-adapters";
 const backends = new Set([
 	"docling",
 	"web",
+	"pursuit",
 	"history",
 	"timer",
 	"music",

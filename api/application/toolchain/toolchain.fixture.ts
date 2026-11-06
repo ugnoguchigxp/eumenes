@@ -60,6 +60,9 @@ import { appModules } from "../app-modules";
 import type { LarmPort } from "../../domains/larm";
 import { askModel, attachFixtureRouter } from "./router.fixture";
 import { researchAcquisition } from "./research-acquisition.fixture";
+import { createResourceAccess } from "../resources/access";
+import { createPursuitReportResourceAdapter } from "../../domains/pursuit";
+import type { ResourceKind } from "../../domains/resources";
 export { forbidden } from "./research-acquisition.fixture";
 import {
 	answerByScript,
@@ -761,6 +764,16 @@ export async function harness(options: HarnessOptions = {}) {
 			})
 		: undefined;
 	await memory?.recover();
+	const resources = options.pursuit
+		? createResourceAccess({
+				store,
+				kinds: () =>
+					store.read((db) =>
+						toolchain.capabilities.resourceKindsInTransaction(db),
+					) as ResourceKind[],
+				adapters: [createPursuitReportResourceAdapter(store)],
+			})
+		: undefined;
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		excalidraw: drawingOperations,
@@ -771,6 +784,15 @@ export async function harness(options: HarnessOptions = {}) {
 		conversation,
 		continuity,
 		...(memory ? { memory } : {}),
+		...(resources
+			? {
+					resources: {
+						registry: resources.registry,
+						producesInTransaction: (db, toolchainId) =>
+							toolchain.capabilities.producesInTransaction(db, toolchainId),
+					},
+				}
+			: {}),
 		larm: inference,
 		queue,
 		agents: toolchain.agents,
@@ -813,6 +835,7 @@ export async function harness(options: HarnessOptions = {}) {
 			inference,
 			browser: browser?.service,
 			media: taskMediaPorts({ image, music, excalidraw: drawingOperations }),
+			...(resources ? { resources: resources.registry } : {}),
 			legacy: taskLegacyPorts(dialogue),
 		});
 	}
@@ -847,6 +870,7 @@ export async function harness(options: HarnessOptions = {}) {
 			toolchainHistory: toolchain.history,
 			toolchainActions: toolchain.actionRequests,
 			...toolchain,
+			...(resources ? { resources: { access: resources } } : {}),
 		}),
 	});
 	toolchain.agents.start();

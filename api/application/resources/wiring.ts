@@ -25,6 +25,10 @@ import { createModel3dResourceAdapter } from "../../domains/model3d";
 import { createMusicResourceAdapters } from "../../domains/music";
 import { createOcrResourceAdapter } from "../../domains/ocr";
 import {
+	createPursuitReportResourceAdapter,
+	PURSUIT_REPORT_RESOURCE_PREFIX,
+} from "../../domains/pursuit";
+import {
 	combineKindAdapters,
 	type ResourceKind,
 } from "../../domains/resources";
@@ -88,6 +92,10 @@ export function buildResources(deps: {
 		{
 			prefix: AGENT_REPORT_RESOURCE_PREFIX,
 			adapter: createAgentReportResourceAdapter({ store }),
+		},
+		{
+			prefix: PURSUIT_REPORT_RESOURCE_PREFIX,
+			adapter: createPursuitReportResourceAdapter(store),
 		},
 	]);
 	const access = createResourceAccess({

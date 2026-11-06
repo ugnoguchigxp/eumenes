@@ -171,6 +171,38 @@
 				"component": "ResearchTaskCard"
 			},
 			"general": true
+		},
+		{
+			"revision": 9,
+			"aliases": [],
+			"tags": [],
+			"kind": "toolchain",
+			"id": "web.search",
+			"functionName": "web_search",
+			"title": "Web検索",
+			"summary": "公開Webの情報や公式ページを素早く確認し、短い回答と出典リンクを返す。用語・名称・場所・日付・仕様の一項目や指定ページの内容など、一度の事実確認を担当する",
+			"useWhen": [
+				"公式サイトやWeb資料を確認し、出典付きで簡潔に答えてほしい",
+				"用語の意味・正式名称・所在地・日付などを一つ調べたい",
+				"指定URLの本文から必要な情報を確かめたい"
+			],
+			"avoidWhen": [
+				"ニュースの整理",
+				"複数資料の比較",
+				"天気予報・株価など、専用の担当がある事柄"
+			],
+			"examples": [
+				"国立国会図書館の所在地を公式サイトで確認して",
+				"この関数の返り値を公式ドキュメントで調べ、リンクを添えて短く教えて",
+				"このページに載っている受付時間を確認して"
+			],
+			"dependencies": ["package:web.recipe@6"],
+			"packageRevisionId": "package:web.recipe@6",
+			"artifact": {
+				"kind": "component",
+				"component": "ResearchTaskCard"
+			},
+			"general": true
 		}
 	],
 	"bindings": [],
