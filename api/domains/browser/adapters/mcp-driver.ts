@@ -82,8 +82,10 @@ const INSPECT_ELEMENT_BODY = `(el) => {
   const type = tag === 'input' || tag === 'button' ? String(el.type || '').toLowerCase() : '';
   const typed = type ? { type } : {};
   const role = String(el.getAttribute('role') || '').trim().toLowerCase() === 'button' ? { role: 'button' } : {};
+  const raw = tag === 'a' || tag === 'area' ? el.getAttribute('href') : undefined;
+  const link = raw === undefined ? {} : { href: raw === null ? null : String(raw).slice(0, 200) };
   const form = el.form || el.closest('form');
-  if (!form) return { tag, ...typed, ...role, inForm: false, submits: false };
+  if (!form) return { tag, ...typed, ...role, ...link, inForm: false, submits: false };
   const own = tag === 'input' || tag === 'button' ? method(el.getAttribute('formmethod')) : '';
   const formMethod = own || method(form.method) || 'get';
   const fields = Array.from(form.elements);
@@ -92,7 +94,7 @@ const INSPECT_ELEMENT_BODY = `(el) => {
   let submits = false;
   if (isSubmitter(el)) submits = true;
   else if (isTextField(el)) submits = fields.some(isSubmitter) || fields.filter(isTextField).length === 1;
-  return { tag, ...typed, ...role, inForm: true, formMethod, submits };
+  return { tag, ...typed, ...role, ...link, inForm: true, formMethod, submits };
 }`;
 const INSPECT_TARGET_FUNCTION = INSPECT_ELEMENT_BODY;
 const INSPECT_FOCUSED_FUNCTION = `() => (${INSPECT_ELEMENT_BODY})(document.activeElement)`;
@@ -721,7 +723,7 @@ function evaluated(result: string | undefined, code: string) {
 
 function inspected(result: string | undefined): TargetInfo {
 	const value = evaluated(result, "inspect_invalid");
-	const { tag, type, inForm, formMethod, submits, role } = value;
+	const { tag, type, inForm, formMethod, submits, role, href } = value;
 	if (
 		typeof tag !== "string" ||
 		tag.length > 40 ||
@@ -730,13 +732,17 @@ function inspected(result: string | undefined): TargetInfo {
 		(type !== undefined && (typeof type !== "string" || type.length > 40)) ||
 		(formMethod !== undefined &&
 			(typeof formMethod !== "string" || formMethod.length > 20)) ||
-		(role !== undefined && role !== "button")
+		(role !== undefined && role !== "button") ||
+		(href !== undefined &&
+			href !== null &&
+			(typeof href !== "string" || href.length > 200))
 	)
 		throw new BrowserDriverError("inspect_invalid", false);
 	return {
 		tag,
 		...(type !== undefined ? { type } : {}),
 		...(role === "button" ? { role } : {}),
+		...(href !== undefined ? { href: href as string | null } : {}),
 		inForm,
 		...(formMethod !== undefined ? { formMethod } : {}),
 		submits,

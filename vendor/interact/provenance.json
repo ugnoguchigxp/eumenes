@@ -1,14 +1,14 @@
 {
 	"package": "eumenes-interact",
-	"version": "0.1.1",
-	"archive": "eumenes-interact-0.1.1-c120d878ffe2.tgz",
-	"archiveSha256": "c120d878ffe217bd302d1fb60a255e6744e9a98865c8483b9bdf54bc3f3e266f",
+	"version": "0.1.2",
+	"archive": "eumenes-interact-0.1.2-93b6ee06794b.tgz",
+	"archiveSha256": "93b6ee06794b516e55badc84797143809170e53ed4f1321ccc3046496bc05291",
 	"sourceRepository": "eumenes_interact",
-	"sourceCommit": "d459f1bf94ca871676a993d524e613879cf93411",
-	"sourceTreeSha256": "49617e3a017980305d164781cb02bde831ffdb9effb6c023a5fe6c0038547806",
-	"skillSha256": "701516361de7e572183b88fafb93a245bcf72ea3ebe9836de60d255890572fed",
+	"sourceCommit": "32bc0aaa4ff840c7a76baacff5bc64ef95836229",
+	"sourceTreeSha256": "53c56fba507bf20ecd503874f786fb0c977b02b6cbfc2cb2395f5ce37c7f5453",
+	"skillSha256": "dfa652393ad76d38b3c0c7237176cc830c604117d242de7499701be039f47fae",
 	"contractVersion": 2,
 	"coreFormatVersion": 1,
-	"limits": "Build inputs are not all included in upstream source digest; exact archive and all packaged files are pinned for this pilot. See upstream F12.",
-	"distributionManifestSha256": "3bbf581e753e3e1ed20efc260ef15d9f598932f93d15ec304326099ed8a7e201"
+	"limits": "The source digest includes the build inputs (tsconfig, manifest generator; upstream F12). The exact archive and every packaged file stay pinned.",
+	"distributionManifestSha256": "287da41b36e769dffaf5e071f15863c8d9ef2e39a9438fb9c6546aac79cceb6d"
 }

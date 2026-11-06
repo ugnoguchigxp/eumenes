@@ -55,7 +55,14 @@ export function createInteractApproval(
 		const url = new URL(seen.url!);
 		url.search = "";
 		url.hash = "";
-		const valueDigest = c.action === "page.fill" ? interactHash(c.text) : null;
+		// What the approval is for: the typed text, or a navigation's destination (an approval of one URL must not
+		// open another one from the same page; eumenes-interact 0.1.2 R21).
+		const valueDigest =
+			c.action === "page.fill"
+				? interactHash(c.text)
+				: c.action === "browser.navigate"
+					? interactHash(c.url)
+					: null;
 		const snapshotDigest = interactHash({ body: seen.body, url: seen.url });
 		const match = {
 			taskId: ctx.runId,
@@ -125,6 +132,7 @@ export function interactApprovalText(
 		"この操作を一度実行してよいですか。",
 		`操作: ${command.action}`,
 		`ページ: ${url.href}`,
+		...(command.action === "browser.navigate" ? [`宛先: ${command.url}`] : []),
 		...("element" in command ? [`対象: ${command.element}`] : []),
 		...(command.action === "page.fill" ? [`入力: ${command.text}`] : []),
 		...(command.action === "page.press" ? [`キー: ${command.key}`] : []),

@@ -18,9 +18,10 @@ const ARTIFACT = "artifact:browser.interact.workspace@1";
 const invoke = (tool: string, args: unknown, text: string | null = null) =>
 	JSON.stringify({ action: "invoke", tool, arguments: args, text });
 
-test("canonical Skill and pinned 134-file distribution match the registered operator", () => {
+test("canonical Skill and pinned 158-file distribution match the registered operator", () => {
 	const release = loadInteractRelease();
-	expect(Object.keys(release.manifest.files)).toHaveLength(134);
+	// 0.1.2 adds the host contract and conformance vectors and the split part executor to the archive.
+	expect(Object.keys(release.manifest.files)).toHaveLength(158);
 	expect(systemContext("browser.contexts.interact.skill", {})).toBe(
 		release.body,
 	);

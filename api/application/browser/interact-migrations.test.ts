@@ -16,7 +16,8 @@ test("package migrations follow the existing browser tail and upgrade an old dat
 		migrations.filter(
 			(m) =>
 				!m.id.startsWith("interact-package/") &&
-				m.id !== "browser/0007-interact",
+				// The browser domain's own interact tables, and what was added on top of them later (0008).
+				!/^browser\/\d{4}-interact/.test(m.id),
 		),
 	);
 	try {

@@ -77,6 +77,11 @@ export type TargetInfo = {
 	type?: string;
 	/** Present when the element is `[role=button]`. */
 	role?: "button";
+	/**
+	 * An `<a>`/`<area>`'s own href attribute (null when it has none). Playwright MCP's snapshot shows no `/url`
+	 * for `role=menuitem` links, so eumenes-interact 0.1.2 reads it here to tell a menu link from a script action.
+	 */
+	href?: string | null;
 	inForm: boolean;
 	formMethod?: string;
 	submits: boolean;

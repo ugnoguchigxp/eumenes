@@ -17,6 +17,7 @@ import {
 	Refusal,
 	type PartExecutionPort,
 	type Executed,
+	type ExecuteOptions,
 } from "eumenes-interact/parts";
 import {
 	recordOperationIntent,
@@ -206,6 +207,7 @@ export function createInteractExecution(
 
 	async function operate(
 		call: Extract<HostCall, { kind: "operate" }>,
+		options?: ExecuteOptions,
 	): Promise<Executed> {
 		const command = call.command;
 		const translated = driverAction(command);
@@ -214,9 +216,12 @@ export function createInteractExecution(
 				kind: "outcome",
 				outcome: { kind: "refused", code: "unsupported", retryable: false },
 			};
+		// A navigation the part declared as needing approval is always shown against a page: after a failed
+		// operation the last observation is gone, so it is taken again rather than skipping the approval.
 		const seen =
 			command.action === "browser.navigate"
-				? observation
+				? (observation ??
+					(call.declaredEffect === "navigation" ? null : await observe()))
 				: observed(
 						call.tabRef!,
 						call.observationRef,
@@ -231,9 +236,13 @@ export function createInteractExecution(
 					deps.memory.request,
 				);
 			else if (call.inputProvenance?.kind === "grant") {
+				// The value is bound to its site and to what it was approved for (eumenes-interact 0.1.2, R19).
 				if (
-					grants.use(call.inputProvenance.inputValueRef, seen?.url ?? "") !==
-					command.text
+					grants.use(
+						call.inputProvenance.inputValueRef,
+						seen?.url ?? "",
+						options?.grantPurpose,
+					) !== command.text
 				)
 					throw new Refusal("grant_mismatch", false);
 			} else throw new Refusal("grant_source_mismatch", false);
@@ -345,7 +354,20 @@ export function createInteractExecution(
 			(() => {
 				throw new Error("tab_lost");
 			})(),
-		execute: (call) => dispatchPart(call, { observe, operate, list }),
+		// `recoverable` is never granted here: an unknown outcome always ends the run (HOST-CONTRACT duty 3).
+		execute: (call, options) =>
+			dispatchPart(call, {
+				observe,
+				operate: (c) => operate(c, options),
+				list,
+			}),
+		// Read-only, and only for a ref of the tab's latest observation: whether a menu link has an href (R18).
+		inspectTarget: async (tab, ref, target) => {
+			observed(tab, ref ?? (await observe()).observationRef, target);
+			const info = await deps.driver.inspectTarget(target);
+			active();
+			return info;
+		},
 		extract: async (tab, ref, target, max) => {
 			const fresh = ref ?? (await observe()).observationRef;
 			observed(tab, fresh, target);
