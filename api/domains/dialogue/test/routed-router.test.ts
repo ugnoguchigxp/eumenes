@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { STRUCTURE_PROMPT } from "eumenes_router";
+import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { confirmationResourceUris } from "../repository/resources";
 import {
 	EDIT,
@@ -477,8 +477,15 @@ test("routeStructured: one request with a reference routes the masked utterance;
 	});
 	const [call] = r.structureCalls;
 	expect(call!.messages).toEqual([
-		{ role: "system", content: STRUCTURE_PROMPT.system },
-		{ role: "user", content: "発言: この音楽に合う画像を作って" },
+		{ role: "system", content: TURN_STRUCTURE_PROMPT.system },
+		{
+			role: "user",
+			content: JSON.stringify({
+				text: "この音楽に合う画像を作って",
+				previousAgent: null,
+				pending: [],
+			}),
+		},
 	]);
 	expect(call!.control).toMatchObject({
 		taskId: "router-structure",
@@ -513,21 +520,22 @@ test("routeStructured: no request is the conversation, with nothing scored; requ
 		"画像も作って",
 	]);
 	expect(h!.dialogue.answerText(waiting.id)).toBe(
-		"パイプラインを利用できません。",
+		"依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。",
 	);
 	expect(h!.todos()).toHaveLength(0);
 	expect(trace(1).decided).not.toBe(MUSIC.id);
 });
 
-test("routeStructured: a structure model that fails gives no structure, and the whole utterance is routed as route() does", async () => {
+test("routeStructured: a failed structure model leaves the entire request unperformed without direct fallback", async () => {
 	const r = await start({ entry: "routeStructured" });
 	r.structures.push(new Error("cloud_http_529"));
-	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));
-	const waiting = await h!.say("この音楽に合う画像を作って", "queued");
-	expect(waiting.announcement).toBe("「画像」に頼みます。");
-	expect(r.routes.map((route) => route.text)).toEqual([
-		"この音楽に合う画像を作って",
-	]);
+	const stopped = await h!.say("この音楽に合う画像を作って");
+	expect(h!.dialogue.answerText(stopped.id)).toContain(
+		"今回の作業はまだ実施していません",
+	);
+	expect(r.routes).toEqual([]);
+	expect(h!.todos()).toHaveLength(0);
+	expect(h!.state.selections.every((selection) => !selection.toolchainId)).toBe(true);
 });
 
 test("routeStructured: a mixed multi-job request never falls back to running only its first tool", async () => {
@@ -542,7 +550,7 @@ test("routeStructured: a mixed multi-job request never falls back to running onl
 	h!.state.steps.push({ text: "パイプラインを利用できません。" });
 	const waiting = await h!.say("辛い物が好きと覚えて、画像も作って");
 	expect(h!.dialogue.answerText(waiting.id)).toBe(
-		"パイプラインを利用できません。",
+		"依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。",
 	);
 	expect(h!.todos()).toHaveLength(0);
 	expect(trace().decided).not.toBe(IMAGE.id);

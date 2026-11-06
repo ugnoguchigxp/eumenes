@@ -215,6 +215,19 @@
       "log": "commit-selection-tests.log"
     },
     "originalTreeTestIssue": "ignored historical source copies under artifacts were discovered as test candidates; no exclusions or expectations weakened",
-    "verificationSelectionSha256": "83dd7f28edace1b6216b91d7f5fa3052cae4b64254d31021a6749f8c4870f981"
+    "verificationSelectionSha256": "83dd7f28edace1b6216b91d7f5fa3052cae4b64254d31021a6749f8c4870f981",
+    "firstCommit": "23fafa8a180af74c6157e4b7eee50cebbdb0e827",
+    "additionalParallelRouterUpdate": {
+      "typecheck": "pass",
+      "contextCheck": "pass",
+      "fixedSnapshotTests": {
+        "passed": 27,
+        "failed": 0,
+        "log": "commit-router-fixed.log"
+      },
+      "fixedCodeAndPackageInputs": 114,
+      "sourceChangedAfterSnapshot": false,
+      "includedByUserAuthorization": "commit and push all changes"
+    }
   }
 }

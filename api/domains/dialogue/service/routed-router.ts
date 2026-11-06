@@ -268,8 +268,14 @@ async function consult(
 		});
 	else log.warn("dialogue.router_failed", { reason: error ?? "router_failed" });
 	return {
-		candidates, words, decision, latest, retrace: trace,
-		...(result?.structure?.kind === "answer" ? { answerText: result.structure.text } : {}),
+		candidates,
+		words,
+		decision,
+		latest,
+		retrace: trace,
+		...(result?.structure?.kind === "answer"
+			? { answerText: result.structure.text }
+			: {}),
 	};
 }
 
@@ -334,7 +340,9 @@ export async function routerTurn(
 	// A router that failed leaves the turn to the talk turn (row 10); nothing is promised.
 	if (!consulted.decision) {
 		if (router.settings.entry === "routeStructured") {
-			turn.speak(systemContext("dialogue.contexts.local.router-unperformed", {}));
+			turn.speak(
+				systemContext("dialogue.contexts.local.router-unperformed", {}),
+			);
 			return "done";
 		}
 		return "talk";
@@ -368,10 +376,13 @@ async function carryOut(
 ): Promise<Step> {
 	switch (decision.to) {
 		case "clarify":
-			return askBack(turn, systemContext("dialogue.contexts.local.router-clarify", {
-				question: decision.question,
-				unhandled: decision.unhandled.join("\n"),
-			}));
+			return askBack(
+				turn,
+				systemContext("dialogue.contexts.local.router-clarify", {
+					question: decision.question,
+					unhandled: decision.unhandled.join("\n"),
+				}),
+			);
 		case "conversation":
 			return "talk";
 		case "ask":
@@ -507,7 +518,11 @@ async function run(
 			if (c.operation === "decline")
 				return declineConfirmation(turn, c.confirmation);
 			if (c.operation === "discard") return discard(turn, c);
-			return answerQuestion(turn, c.todo, consulted.answerText ?? turn.utterance);
+			return answerQuestion(
+				turn,
+				c.todo,
+				consulted.answerText ?? turn.utterance,
+			);
 	}
 }
 

@@ -86,3 +86,6 @@ Context MCP: 今回の実装分はcontext_compile 1回、compile_eval 1回。先
 補正後の全体型検査は2,955ファイルで成功。関連するverification-selection/verificationの18試験は、ローカルの過去検証コピーを含まない固定コピーで成功した。原本での同試験は過去コピーを試験候補として拾ったため14成功・4失敗だった。検出対象やtimeout、期待値は弱めていない。結果は`commit-selection-tests.log`と`summary.json`のcommitPreparationに保存した。
 
 この型補正のContext MCPはcontext_compile/compile_eval各1回。先行調査・実装を含む会話累計は各3回。
+
+
+コミット時点の全変更を`23fafa8a`としてmainへpushした後、並行作業のRouter更新が追加された。利用者の全変更commit/push承認の範囲として追加分も取り込み、型検査・生成catalogの鮮度・配布物照合を確認した。更新中の原本ではRouter試験2件が失敗したが、その後の最新ソース・配布物を固定したコピーでは27件成功・0件失敗だった。確認後の114コード/package入力のhash一致を確認し、実装や試験期待値はこのcommit作業側で変更していない。結果は`commit-router-fixed.log`に保存した。

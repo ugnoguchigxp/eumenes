@@ -3,7 +3,7 @@
   "artifactVersion": 2,
   "compilerVersion": "0.1.2",
   "releaseProfile": "application",
-  "policyDigest": "sha256:a26cfb959d7cc27080db619c5b3712325ce21c541da3d986cfea18719474c883",
+  "policyDigest": "sha256:15040d679e5ec3981a700796b8faa82170dd82635b6a689fa5cca67a31d3b99b",
   "createdFrom": {
     "configPath": "s11tnext.config.toml",
     "sourceFiles": [
@@ -74,6 +74,7 @@
       "api/domains/dialogue/contexts/local/router-cancel-ask.context.toml",
       "api/domains/dialogue/contexts/local/router-cancel.context.toml",
       "api/domains/dialogue/contexts/local/router-check.context.toml",
+      "api/domains/dialogue/contexts/local/router-clarify.context.toml",
       "api/domains/dialogue/contexts/local/router-conversation.context.toml",
       "api/domains/dialogue/contexts/local/router-decline-target.context.toml",
       "api/domains/dialogue/contexts/local/router-decline.context.toml",
@@ -87,6 +88,7 @@
       "api/domains/dialogue/contexts/local/router-redirect.context.toml",
       "api/domains/dialogue/contexts/local/router-request.context.toml",
       "api/domains/dialogue/contexts/local/router-switch-ask.context.toml",
+      "api/domains/dialogue/contexts/local/router-unperformed.context.toml",
       "api/domains/dialogue/contexts/local/router-work.context.toml",
       "api/domains/dialogue/contexts/local/turn-failed.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/host-observation.context.toml",
@@ -2820,6 +2822,62 @@
       "definitionHash": "sha256:e39417eafc9cd5b128c92b0ef4ce3853a3afc260c30d8cbbe79d6da07e9c332c",
       "releaseDigest": "sha256:239186d77bdaf67c781f6e76323865da8037ad8e880e4551f1778623cb38d68a"
     },
+    "dialogue.contexts.local.router-clarify": {
+      "key": "dialogue.contexts.local.router-clarify",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {
+        "question": {
+          "required": true,
+          "type": "string",
+          "trust": "untrusted",
+          "placement": "delimited-context",
+          "encoding": "delimited-text"
+        },
+        "unhandled": {
+          "required": true,
+          "type": "string",
+          "trust": "untrusted",
+          "placement": "delimited-context",
+          "encoding": "delimited-text"
+        }
+      },
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "variable",
+                  "name": "question"
+                },
+                {
+                  "type": "literal",
+                  "value": "\nまだ実施していない依頼:\n"
+                },
+                {
+                  "type": "variable",
+                  "name": "unhandled"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:78e4691ffe42d52050f9976ee715b2ebbaba459064222a0264a127f05af0afe6"
+        }
+      },
+      "definitionHash": "sha256:2b310cdcb8962b4dfd9b4e1dda5ff0835c18fa19b453ba0442972d080936cfb5",
+      "releaseDigest": "sha256:1358a3814ad0eafa3c5a5ffb9ac1c5e46cf4979ca1142a304e8b60775ceec7c0"
+    },
     "dialogue.contexts.local.router-conversation": {
       "key": "dialogue.contexts.local.router-conversation",
       "owner": "unowned",
@@ -3494,6 +3552,39 @@
       },
       "definitionHash": "sha256:81a8a6c0777f76c7130f0b68a5c057d40c345cc4121236018d3a5b18c1fdd100",
       "releaseDigest": "sha256:b8f89f13613512372c595ca9d46d93e6d9f0805cc13b64f9280b7063b03a958a"
+    },
+    "dialogue.contexts.local.router-unperformed": {
+      "key": "dialogue.contexts.local.router-unperformed",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:75258f9fe098fe7fbe01b54eb0bf84a8703332757176b885d81a4bcc04858d56"
+        }
+      },
+      "definitionHash": "sha256:ae08961a3e4c0883e9a33733dfb3723b0fa554afb3475b495057bb4e7e856081",
+      "releaseDigest": "sha256:232ea5f9e4d2f45d5d30bbe9792701883d49a9c98a718e0459f018c82b76a48f"
     },
     "dialogue.contexts.local.router-work": {
       "key": "dialogue.contexts.local.router-work",
@@ -4762,5 +4853,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:c5ca6d3c7b7ce8cbab8aaf96a297a531d7736ee7e1fe0b6fdfd72f6fafb3696f"
+  "catalogDigest": "sha256:c913f5796a53b295b2395cccfcba6f24e3418c88e0d2a704f2ee754e2e49fee1"
 }

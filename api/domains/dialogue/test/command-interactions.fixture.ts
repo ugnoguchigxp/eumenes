@@ -435,6 +435,7 @@ export async function setup(
 		continuity,
 		dialogue,
 		interactions: dialogue.interactions,
+		larm,
 		state,
 		calls,
 		workChanged,

@@ -8,7 +8,7 @@ import pkg from "eumenes-memory/package.json";
 import worldPkg from "eumenes-world-model/package.json";
 import worldDistribution from "eumenes-world-model/distribution-manifest.json";
 import routerPkg from "eumenes_router/package.json";
-import { contractVersions, STRUCTURE_PROMPT } from "eumenes_router";
+import { contractVersions, TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { migrations as routerSql } from "eumenes_router/sqlite";
 
 const root = join(import.meta.dir, "../..");
@@ -124,7 +124,13 @@ const routerManifest = JSON.parse(
 test("the vendored router package matches its manifest, package.json, the lockfile and the installed copy", () => {
 	const artifact = read(`vendor/router/${routerManifest.artifact}`);
 	expect(routerManifest.package).toBe("eumenes_router");
-	expect(routerManifest.source.dirty).toBe(false);
+	expect(routerManifest.source.dirty).toBe(true);
+	expect(routerManifest.source.patch.file).toBe("adoption-source.patch");
+	expect(
+		createHash("sha256")
+			.update(read(`vendor/router/${routerManifest.source.patch.file}`))
+			.digest("hex"),
+	).toBe(routerManifest.source.patch.sha256);
 	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
 		routerManifest.sha256,
 	);
@@ -140,7 +146,7 @@ test("the vendored router package matches its manifest, package.json, the lockfi
 	expect(routerPkg.version).toBe(routerManifest.version);
 	expect(contractVersions).toEqual(routerManifest.contractVersions);
 	expect(routerSql.length).toBe(routerManifest.dbSchemaVersion);
-	expect(STRUCTURE_PROMPT.version).toBe(
+	expect(TURN_STRUCTURE_PROMPT.version).toBe(
 		routerManifest.entries.routeStructured.structurePrompt,
 	);
 	const lock = read("bun.lock").toString();
