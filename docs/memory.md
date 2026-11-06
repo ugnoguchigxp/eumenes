@@ -22,7 +22,7 @@
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
-配布物は `vendor/eumenes-memory/eumenes-memory-0.0.3-353a710c8012.tgz` に固定する。元は独立リポジトリの commit `5504945f838935fbff6401c962bdecb1d3b49956` に未コミットの変更を加えた作業ツリーで、`manifest.json` の `sourceHash` で特定する。パッケージ版は0.0.3（Lifecycle 契約版 2: 同じ scope の複数 target、`hostIntent`、journal format 2、`inTransaction` 必須）で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。`manifest.json`と配布内の`dist/release-manifest.json`で、元commit・ソースhash・配布内容のhashを照合する。旧tgzと依存参照は削除済み。SQLite契約は8で、既存SQL8本も同一であり、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.4-9c0e85aa2fa3.tgz` に固定する。元は独立リポジトリの commit `5504945f838935fbff6401c962bdecb1d3b49956` に未コミットの変更を加えた作業ツリーで、`manifest.json` の `sourceHash` で特定する。パッケージ版は0.0.4（0.0.3 で Lifecycle 契約版 2: 同じ scope の複数 target、`hostIntent`、journal format 2、`inTransaction` 必須。0.0.4 で復元後の ID 衝突の回避、本人確認の根拠の保存、memory record の出典の `representation` 必須、忘却した他人の subject の消去）で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。`manifest.json`と配布内の`dist/release-manifest.json`で、元commit・ソースhash・配布内容のhashを照合する。旧tgzと依存参照は削除済み。SQLite契約は8で、既存SQL8本も同一であり、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
 
 会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
 
@@ -128,7 +128,7 @@ State（過去の版を含む）・usage・Window・傾向、World の派生、�
 
 ### journal と復旧
 
-忘却 1 回は forget journal の 1 行（eumenes-memory の entry、format 2）で、DB を変える前に書いて fsync する。行の `targets` は忘れる State の全版、`hostIntent` は memory 自身の意図（`memory.conversation` / `memory.messages` / `memory.items`、他ドメインの `derived` は `derived:<名前>`。ID だけで本文を含まない）。`hostIntent` はライブラリの hash の鎖に入るので、行の改ざん・欠落は起動時の照合で検出される。plan・追記・apply・派生データの削除は同じ writer transaction で行う。全版が 64 件を超えるときだけ行を分け、意図（全 `itemIds`）は最初の行に載せる。
+忘却 1 回は forget journal の 1 行（eumenes-memory の entry、format 2）で、DB を変える前に書いて fsync する。行の `targets` は忘れる State の全版、`hostIntent` は memory 自身の意図（`memory.conversation` / `memory.messages` / `memory.items`、他ドメインの `derived` は `derived:<名前>`。ID だけで本文を含まない）。`hostIntent` はライブラリの hash の鎖に入るので、行の偶発的な破損・切り詰め・食い違いは起動時の照合で検出される（鍵なしの鎖なので、悪意のある書き換えは防げない。journal は DB のバックアップと別の媒体に置く）。plan・追記・apply・派生データの削除は同じ writer transaction で行う。全版が 64 件を超えるときだけ行を分け、意図（全 `itemIds`）は最初の行に載せる。
 
 起動時は、まず読める全行の `memory.messages` で履歴を隠し、`reconcileForgetJournal` で照合する。照合が適用した行（transaction の rollback、古い DB の復元）は `hostIntentsToReapply` で返り、その意図の派生データの削除を冪等にやり直す。意図の `itemIds` のうちどの行にも載っていない残りがあれば忘れる。照合が終わるまで memory は `ready()` が false で、State も Window も使われない。DB を忘却前のバックアップに戻して起動しても、journal から同じ状態になる。
 

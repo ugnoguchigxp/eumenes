@@ -16,7 +16,7 @@
         "eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.3-e7b4096d5bd5.tgz",
         "eumenes-collaboration": "file:vendor/collaboration/eumenes-collaboration-0.2.0-b407ecd8372b.tgz",
         "eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.1-c120d878ffe2.tgz",
-        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.3-353a710c8012.tgz",
+        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.4-9c0e85aa2fa3.tgz",
         "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
         "eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz",
@@ -1353,7 +1353,7 @@
 
     "eumenes-interact": ["eumenes-interact@vendor/interact/eumenes-interact-0.1.1-c120d878ffe2.tgz", { "dependencies": { "jsonrepair": "3.15.0", "zod": "4.6.6" } }, "sha512-gxk4e0mQDD8yrTtnEbZomgAXJ+5UR7L2i6sxG3WaNqsvxJPFlcQ239D2Vj+yEVPZ8RtfC/jjD4lRsOwMj+fM7w=="],
 
-    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.3-353a710c8012.tgz", {}, "sha512-z/lndlGS9RfKDl+4TyC7sgwwznK5vpWDCI6r1b//jFEHC7wTYzvY+C6JeV28g2W386dLkmoK0iRwbocx9NNwrg=="],
+    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.4-9c0e85aa2fa3.tgz", {}, "sha512-81U4t4dIjnMC1cd/QGsi8lh27Eyw7m9xhg5/mmgyOnJl5jHPf5P3bniiuo0bOwNa83iUEVTZ5eWAb9bHorDidA=="],
 
     "eumenes-pipeline": ["eumenes-pipeline@vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz", { "dependencies": { "zod": "4.6.7" } }, "sha512-aqEYhMhMv0oNEztE797S6UJzvYU02Rpf1cS5LBxJNWLMk9LnlmsKmkAw8dpzSbgW5Z05rFJcHKq//nHWz42skg=="],
 

@@ -1,8 +1,8 @@
 {
 	"package": "eumenes-memory",
-	"version": "0.0.3",
-	"artifact": "eumenes-memory-0.0.3-353a710c8012.tgz",
-	"sha256": "353a710c80125057f14c3d83a1e23b1ed1b228af3b0a98de985f2ba1115f7434",
+	"version": "0.0.4",
+	"artifact": "eumenes-memory-0.0.4-9c0e85aa2fa3.tgz",
+	"sha256": "9c0e85aa2fa3106fc5ed939f465e8aa687158390b880a17e72adfe63a79fb8c9",
 	"contractVersions": {
 		"records": 1,
 		"state": 1,
@@ -10,8 +10,8 @@
 		"external": 1
 	},
 	"dbSchemaVersion": 8,
-	"verifiedWith": "eumenes_memory: local tests and verify:package (Bun and Node consumers) on the working tree; see spec/improvement-design.md (A1-A3)",
+	"verifiedWith": "eumenes_memory: bun run verify (837 tests) and verify:package (Bun and Node consumers) on the working tree; see spec/improvement-design.md",
 	"sourceGitCommit": "5504945f838935fbff6401c962bdecb1d3b49956",
-	"sourceHash": "9a8fbc2ca0f945498fe8035a31f01298f890bcbfe1192df047b49c81f3fcc3ec",
+	"sourceHash": "fcbe97ecdfac85a77eacd270960c45e53e85ffab600bf365513575536b82ef59",
 	"sourceTreeState": "uncommitted changes on top of sourceGitCommit; identify the source by sourceHash"
 }
