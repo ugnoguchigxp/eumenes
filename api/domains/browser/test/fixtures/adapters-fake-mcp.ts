@@ -76,7 +76,7 @@ function writeOutputs() {
 	return snapshotName;
 }
 
-function pageText(cfg: Config, opts: { result?: string; code?: string }) {
+function pageText(_cfg: Config, opts: { result?: string; code?: string }) {
 	const tab = tabs[selected];
 	const snapshotName = writeOutputs();
 	const lines: string[] = [];

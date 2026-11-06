@@ -1,9 +1,15 @@
 import { expect, test } from "bun:test";
-import type { LarmCallOptions, LarmPort } from "../../larm";
-import { emotionSchema, type Emotion } from "../../delivery";
 import { settle } from "../../../infrastructure/wait-for";
 import { createContinuityService } from "../../continuity";
-import { setup, say, until, wav } from "./settings-voice.fixture";
+import { emotionSchema, type Emotion } from "../../delivery";
+import type { LarmCallOptions, LarmPort } from "../../larm";
+import {
+	createSettingsVoiceFixture,
+	say,
+	until,
+	wav,
+} from "./settings-voice.fixture";
+const { setup } = createSettingsVoiceFixture();
 
 function gate<T>() {
 	let resolve!: (value: T) => void;

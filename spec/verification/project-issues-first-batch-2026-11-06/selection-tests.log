@@ -1,0 +1,51 @@
+bun test v1.4.4 (38afee6c8)
+
+scripts/verification-selection.test.ts:
+(pass) pipeline verification includes its fixture-composed execution and adopted package [157.87ms]
+(pass) explicit integration ownership joins direct imports once and stays scoped [226.36ms]
+(pass) a missing declared integration test fails instead of silently shrinking verification [0.57ms]
+(pass) the pipeline verify plan executes the declared integrations [416.37ms]
+
+scripts/verification.test.ts:
+(pass) verification selection and runner coverage > repeated domains form a union, with strict argument validation and legacy support [0.10ms]
+(pass) verification selection and runner coverage > old verify runs and acceptance outputs are pruned to the kept counts [5.42ms]
+(pass) verification selection and runner coverage > application tests that import a domain entry join that domain [205.06ms]
+(pass) verification selection and runner coverage > owned DS tests dispatch once to the unit project [1.92ms]
+(pass) verification selection and runner coverage > inventory includes generated Storybook sources and explicit browser exclusions [63.12ms]
+(pass) verification selection and runner coverage > production plan builds DS before root check/tests and never rebuilds at web build [342.30ms]
+(pass) a domain run performs every static check of a full run, over the whole repository [985.26ms]
+[verify] static
+[verify] static: 1 finding(s) outside the selection (not failing; all in report.json)
+  other: finding
+[verify] pass: 2 ms; /tmp/eumenes-verify-l7LvVD/verification-reports/runs/2026-11-06T08-20-34-847Z-bf34e47b-6e1b-489b-84d2-5a122c14b120/report.json
+(pass) verification evidence and integrity > warnings outside the selection pass the step and are recorded [266.84ms]
+[verify] build: /Users/y.noguchi/.bun/bin/bun -e process.exit(7)
+[verify] fail: 16 ms; /tmp/eumenes-verify-ZwPdGL/verification-reports/runs/2026-11-06T08-20-35-113Z-cdbc1d1c-f630-460e-b8fe-bf7284e55ba5/report.json
+Error: build failed (7)
+[verify] ok: /Users/y.noguchi/.bun/bin/bun -e process.exit(0)
+[verify] pass: 8 ms; /tmp/eumenes-verify-ZwPdGL/verification-reports/runs/2026-11-06T08-20-35-392Z-3009693c-022d-4665-b62a-62a5de427fb9/report.json
+(pass) verification evidence and integrity > failed preparation blocks consumers and preserves earlier reports [551.06ms]
+[verify] ok: /Users/y.noguchi/.bun/bin/bun -e process.exit(0)
+[verify] bun tests: /Users/y.noguchi/.bun/bin/bun -e console.log('(fail) sample > case'); process.exit(1)
+(fail) sample > case
+[verify] fail: 17 ms; /tmp/eumenes-verify-R4zpAI/verification-reports/runs/2026-11-06T08-20-35-664Z-d29596c7-dea2-493a-a158-048ba68fb97a/report.json
+Error: bun tests failed (1)
+(pass) verification evidence and integrity > a command step keeps its log, and a failure names the failing test [281.84ms]
+(pass) verification evidence and integrity > output hash covers names and bytes, rejects missing outputs [4.49ms]
+[verify] consumer
+[verify] invalidated: 3 ms; /tmp/eumenes-verify-SoGqBj/verification-reports/runs/2026-11-06T08-20-35-951Z-18309402-226c-4d1b-9a54-4af5934e880d/report.json
+DesignSystem dist changed during verification
+[verify] consumer
+[verify] invalidated: 2 ms; /tmp/eumenes-verify-FgGOm6/verification-reports/runs/2026-11-06T08-20-36-226Z-70754b84-bef5-4e9d-a806-1196e41160d4/report.json
+DesignSystem output hash failed: Error: Missing build output: index.mjs
+(pass) verification evidence and integrity > a successful consumer cannot pass after dist changes or disappears [541.88ms]
+[verify] consumer
+[verify] invalidated: 3 ms; /tmp/eumenes-verify-ESqVEh/verification-reports/runs/2026-11-06T08-20-36-492Z-44a2e823-60cf-4755-80e9-17ca4e1e8bbd/report.json
+Source changed during verification
+(pass) verification evidence and integrity > source edits invalidate results even if all commands succeeded [270.17ms]
+(pass) verification evidence and integrity > SIGTERM records interruption and never launches later commands [299.37ms]
+
+ 18 pass
+ 0 fail
+ 97 expect() calls
+Ran 18 tests across 2 files. [4.80s]

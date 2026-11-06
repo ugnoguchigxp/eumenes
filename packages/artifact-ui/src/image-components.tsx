@@ -1,13 +1,13 @@
 import {
-	ImageWorkspace,
 	ImageCreationForm,
 	ImageGallery,
 	ImagePreview,
+	ImageWorkspace,
 	type ImageWorkspaceProps,
 } from "@eumenes/design-system";
+import { useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
 import { isSafeImageUrl } from "./contracts";
-import { useAction } from "./components";
 export type ImageWorkspaceResource = Omit<
 	ImageWorkspaceProps,
 	| "onGenerate"

@@ -6,13 +6,13 @@ import {
 	CardTitle,
 	Textarea,
 } from "@eumenes/design-system";
+import { useId, useState } from "react";
+import { Feedback, useAction } from "./action";
+import type { ArtifactRequest } from "./contracts";
 import {
 	DotsConnectionGuide,
 	type DotsConnectionSetup,
 } from "./dots-connection-guide";
-import { useId, useState } from "react";
-import type { ArtifactRequest } from "./contracts";
-import { useAction, Feedback } from "./components";
 export type DotsMessagingResource = {
 	kind: "dots-messaging";
 	setup?: DotsConnectionSetup;

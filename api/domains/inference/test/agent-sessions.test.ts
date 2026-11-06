@@ -2,30 +2,31 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore } from "../../../infrastructure/sqlite";
 import {
-	createSettings,
-	migration as settingsMigration,
-	epochsMigration as settingsEpochsMigration,
-} from "../../settings";
-import {
+	controlMigration,
 	createInference,
+	diagnosticsMigration,
+	migrations as inferenceMigrations,
 	migration,
 	parentsMigration,
-	diagnosticsMigration,
-	controlMigration,
-	migrations as inferenceMigrations,
 } from "..";
-import type { CloudAgentCall, CloudAgents } from "../adapters/cloud-agents";
+import { openStore } from "../../../infrastructure/sqlite";
+import { waitFor } from "../../../infrastructure/wait-for";
+import {
+	createSettings,
+	epochsMigration as settingsEpochsMigration,
+	migration as settingsMigration,
+} from "../../settings";
+import type { CloudAgentCall } from "../adapters/cloud-agent-shared";
+import type { CloudAgents } from "../adapters/cloud-agents";
 import type { Receipt } from "../contracts";
-import { createAgentSweeper } from "../service/agent-sweep";
 import {
 	acquireAgentSession,
 	releaseTaskSessions,
 	sweepTaskSessions,
 	TASK_SESSION_TTL_MS,
 } from "../service/agent-session";
-import { waitFor } from "../../../infrastructure/wait-for";
+import { createAgentSweeper } from "../service/agent-sweep";
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => {

@@ -1,24 +1,24 @@
-import { useVoiceTurn } from "./turn";
-import { queueChunks, type ChunkQueue } from "./chunk-player";
-import { requestPreview, type RecognitionCandidate } from "./preview";
-import { commitIdleInput } from "./input-commit";
-import { useTranscription } from "./transcription";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
-import {
-	type AudioController,
-	type CreateAudio,
-	type AudioStore,
-	createAudioController,
-} from "../../audio";
-import { invalidateDialogueViews } from "../../dialogue";
 import type { Settings } from "../../../../../api/domains/settings/contracts";
-import type { AvatarCue } from "../../avatar";
-import { queryRoots } from "../../../queryKeys";
-import { createVoiceMachine, isCurrent } from "./machine";
-import { createInputLedger } from "./input-timing";
+import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
 import { describeError } from "../../../errorMessages";
+import {
+	createAudioController,
+	type AudioController,
+	type AudioStore,
+	type CreateAudio,
+} from "../../audio";
+import type { AvatarCue } from "../../avatar";
+import { type ChunkQueue } from "./chunk-player";
+import { commitIdleInput } from "./input-commit";
+import { createInputLedger } from "./input-timing";
+import { createVoiceMachine, isCurrent } from "./machine";
+import { followVoicePlayback } from "./playback";
+import { requestPreview, type RecognitionCandidate } from "./preview";
+import { createSegmentUploader } from "./segment-upload";
+import { useTranscription } from "./transcription";
+import { useVoiceTurn } from "./turn";
 /** `noticeQuiet` holds a reply chunk while a notice sounds on the screen (spec tts-single-lane §4.4). */
 export function useVoiceDialogue(
 	client: VoiceDialogueClient,
@@ -64,140 +64,26 @@ export function useVoiceDialogue(
 	const [active, setActive] = useState(false);
 	const turn = useVoiceTurn(client, turnId);
 	useEffect(() => {
-		const value = turn.data;
-		if (!value) return;
-		if (value.status === "failed")
-			// Keep the failure visible when restoring a previous accepted turn.
-			// eslint-disable-next-line react/set-state-in-effect
-			setError(
-				value.error ? describeError(value.error) : "音声処理に失敗しました",
-			);
-		const pending = replacement.current;
-		if (pending?.id === value.utteranceId) {
-			if (
-				value.text?.trim() &&
-				value.runId &&
-				!["failed", "cancelled", "interrupted"].includes(value.status)
-			) {
-				replacement.current = null;
-				machine.dispatch({
-					type: "turn_selected",
-					utteranceId: value.utteranceId,
-				});
-				if (
-					pending.previous &&
-					pending.previous !== value.utteranceId &&
-					options.current?.bargeIn !== false
-				) {
-					controller.current?.stopPlayback();
-					cancelPlayback();
-					void client.voiceCancel(pending.previous).catch(() => {});
-				}
-			} else if (
-				["completed", "failed", "cancelled", "interrupted"].includes(
-					value.status,
-				)
-			) {
-				replacement.current = null;
-				setTurnId(pending.previous);
-				setRecognitionId(pending.previous);
-				return;
-			}
-		}
-		if (value.runId && value.text)
-			invalidateDialogueViews(cache, client.identity, "main");
-		const active = machine.get().session;
-		const valid = () =>
-			!!active && isCurrent(machine.get(), active.token, value.utteranceId);
-		if (
-			value.audioChunks !== undefined &&
-			active &&
-			value.sessionId === active.id &&
-			value.generation === active.generation &&
-			valid()
-		) {
-			if (["failed", "cancelled", "interrupted"].includes(value.status)) {
-				controller.current?.stopPlayback();
-				cancelPlayback();
-				return;
-			}
-			let playback = queue.current;
-			if (playback?.id !== value.utteranceId) {
-				const installed = machine.dispatch({
-					type: "player_installed",
-					id: value.utteranceId,
-				});
-				playback = {
-					id: value.utteranceId,
-					epoch: installed.player!.epoch,
-					tail: Promise.resolve(),
-				};
-				queue.current = playback;
-			}
-			queueChunks(value, playback, {
-				client,
-				cache,
-				controller: () => controller.current,
-				volume: () => options.current?.outputVolume,
-				delivered: (key) => machine.get().delivered.has(key),
-				markDelivered: (key) =>
-					machine.dispatch({ type: "delivered_marked", key }),
-				queued: () => machine.get().player?.epoch === playback.epoch,
-				valid,
-				setSubtitle,
-				setAvatarCue,
-				noticeQuiet,
-				fail: (e) => {
-					if (!valid()) return;
-					setError(describeError(e));
-					controller.current?.stopPlayback();
-					cancelPlayback();
-					machine.dispatch({ type: "turn_released" });
-					void client.voiceCancel(value.utteranceId).catch(() => {});
-				},
-			});
-			return;
-		}
-
-		if (
-			value.status === "ready" &&
-			active &&
-			value.sessionId === active.id &&
-			value.generation === active.generation &&
-			machine.get().current === value.utteranceId &&
-			!machine.get().delivered.has(value.utteranceId)
-		) {
-			machine.dispatch({ type: "delivered_marked", key: value.utteranceId });
-			void client
-				.voiceAudio(value.utteranceId)
-				.then((bytes) => {
-					if (!valid()) return;
-					return controller.current?.play(
-						bytes,
-						() => {
-							void client
-								.voicePlayed(value.utteranceId)
-								.then(() =>
-									cache.invalidateQueries({
-										queryKey: [
-											queryRoots.voiceDialogue,
-											client.identity,
-											turnId,
-										],
-									}),
-								)
-								.catch((e) => setError(describeError(e)));
-						},
-						{
-							waitForPrevious: options.current?.bargeIn === false,
-							volume: options.current?.outputVolume,
-							shouldPlay: valid,
-						},
-					);
-				})
-				.catch((e) => setError(describeError(e)));
-		}
+		followVoicePlayback({
+			value: turn.data,
+			client,
+			cache,
+			turnId,
+			machine,
+			controller,
+			options,
+			replacement,
+			queue,
+			cancelPlayback,
+			setError,
+			setTurnId,
+			setRecognitionId,
+			setSubtitle,
+			setAvatarCue,
+			noticeQuiet,
+		});
 	}, [turn.data, client, cache, turnId, machine, cancelPlayback, noticeQuiet]);
+
 	useEffect(() => {
 		const value = turn.data;
 		if (
@@ -297,92 +183,25 @@ export function useVoiceDialogue(
 					// Energy alone cannot distinguish speech from noise. Keep the answer
 					// until the replacement has a nonempty accepted transcript.
 				},
-				(wav, timing) => {
-					const active = machine.get().session;
-					if (!inputLive() || !active || active.failed) return;
-					const pauseAfterUpload = active.pending >= 2;
-					const old = machine.get().current;
-					const pending = candidate.current;
-					if (pending) {
-						pending.finalized = true;
-						pending.controller?.abort();
-						pending.latest = undefined;
-					}
-					candidate.current = null;
-					setInputVersion((v) => v + 1);
-					const id = pending?.id ?? crypto.randomUUID();
-					setRecognitionId(id);
-					// Also becomes the current turn and drops the previous turn's delivered chunks.
-					const sequence = machine.dispatch({
-						type: "segment_accepted",
-						utteranceId: id,
-						preserveCurrent: true,
-					}).session!.sequence;
-					const uploads = upload.current;
-					if (!uploads) return;
-					uploads.tail = uploads.tail
-						.then(async () => {
-							if (!live() || machine.get().session?.failed) return;
-							try {
-								await client.voiceSend(
-									active.id,
-									active.generation,
-									sequence,
-									id,
-									wav,
-								);
-							} catch (error) {
-								if (!(error instanceof TypeError) || !live()) throw error;
-								await new Promise((resolve) => setTimeout(resolve, 250));
-								if (!live()) return;
-								await client.voiceSend(
-									active.id,
-									active.generation,
-									sequence,
-									id,
-									wav,
-								);
-							}
-							if (!live()) return;
-							inputs.current.uploaded(id, timing);
-							replacement.current = { id, previous: old };
-							setTurnId(id);
-							await cache.invalidateQueries({
-								queryKey: [queryRoots.voiceDialogue, client.identity, id],
-							});
-						})
-						.catch((e) => {
-							if (!live()) return;
-							setError(describeError(e));
-							// The failed upload also drops any unsent segments behind it.
-							candidate.current?.controller?.abort();
-							candidate.current = null;
-							setPreviewText(null);
-							machine.dispatch({
-								type: "upload_failed",
-								sessionToken,
-								previous: old,
-							});
-							suspendInput();
-							setRecognitionId(old);
-							cancelPlayback();
-							if (old)
-								void cache.invalidateQueries({
-									queryKey: [queryRoots.voiceDialogue, client.identity, old],
-								});
-						})
-						.finally(() => {
-							machine.dispatch({ type: "upload_settled", sessionToken });
-							if (live()) setInputVersion((v) => v + 1);
-						});
-					if (pauseAfterUpload) {
-						// Retain this final segment, then prevent more recording from piling up.
-						suspendInput();
-						setError(
-							"録音を送信待ちに追加しました。送信が進んだらマイクを再開してください。",
-						);
-					}
-				},
+				createSegmentUploader({
+					client,
+					cache,
+					machine,
+					candidate,
+					upload,
+					inputs,
+					replacement,
+					setInputVersion,
+					setRecognitionId,
+					setPreviewText,
+					setTurnId,
+					setError,
+					suspendInput,
+					cancelPlayback,
+					live,
+					inputLive,
+					sessionToken,
+				}),
 				{
 					...options.current,
 					onPartial: (wav) => {

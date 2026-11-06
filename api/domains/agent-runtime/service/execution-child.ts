@@ -36,7 +36,7 @@ export function executionChild(
 		execute: (input, { signal }) =>
 			ctx.port().execute(input.prepared, input.child, signal),
 		classify: () => "fail",
-		settleInTransaction(db, claim, input, outcome) {
+		settleInTransaction(db, claim, _input, outcome) {
 			const active = ops.active(
 				db,
 				claim.payload.id,

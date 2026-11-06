@@ -10,13 +10,13 @@ import {
 	type ToolOutcome,
 } from "./executor-context";
 import { delegate } from "./executor-delegation";
+import { read } from "./executor-read";
 import { answered, find } from "./executor-search";
 import { work } from "./executor-work";
-import { read } from "./executor-read";
 
 export async function memory(
 	x: ExecutorContext,
-	call: ParsedCall,
+	_call: ParsedCall,
 	args: MemoryArgs,
 ): Promise<ToolOutcome> {
 	const { deps, input, current, acted, handle, actionKey } = x;

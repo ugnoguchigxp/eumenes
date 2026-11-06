@@ -5,8 +5,8 @@ import {
 	type WorkListMenuProps,
 	type WorkResultPanelProps,
 } from "@eumenes/design-system";
+import { Feedback, useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
-import { Feedback, useAction } from "./components";
 export type WorkMenuResource = {
 	kind: "work-menu";
 	revision: number;

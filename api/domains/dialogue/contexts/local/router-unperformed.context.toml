@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/routed-router.ts
+text = '''依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。'''

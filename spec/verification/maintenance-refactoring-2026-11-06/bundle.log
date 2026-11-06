@@ -1,0 +1,4 @@
+$ bun scripts/bundle-budget.ts
+bundle-budget: entryGzip: 190320 B exceeds the recorded 112035 B (limit 114275 B)
+bundle-budget: initialGzip: 337177 B exceeds the recorded 259653 B (limit 264846 B)
+error: script "bundle:check" exited with code 1

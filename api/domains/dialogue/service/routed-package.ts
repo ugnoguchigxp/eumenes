@@ -232,7 +232,7 @@ async function analyzeOf(
 export type Routed = {
 	parts: ReadonlyArray<{ text: string; result: RouteResult }>;
 	decision: PackageDecision;
-	structure: StructuredResult["structure"];
+	structure: StructuredResult["structure"] | null;
 };
 
 /** The package's evidence part; a multi-job pipeline keeps the full original request. */
@@ -255,6 +255,8 @@ export function hostDecision(
 			? { row: 9, to: "run", candidate: pipelineCandidate, announce: "fixed" }
 			: null;
 	switch (decision.to) {
+		case "clarify":
+			return decision;
 		case "conversation":
 			return decision;
 		case "ask": {

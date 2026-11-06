@@ -1,5 +1,5 @@
 import type { VisualAnalysisProps } from "@eumenes/design-system";
-import type { useAction } from "./components";
+import type { useAction } from "./action";
 export function visualAnalysisActions(
 	action: ReturnType<typeof useAction>,
 	resource: VisualAnalysisProps & { selectedId?: string },

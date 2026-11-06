@@ -2,9 +2,9 @@ import {
 	Model3dWorkspace,
 	type Model3dWorkspaceProps,
 } from "@eumenes/design-system";
+import { useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
 import { isSafeImageUrl } from "./contracts";
-import { useAction } from "./components";
 import { useArtifactRuntime } from "./runtime";
 
 /** What the host supplies for the 3D model screen; operations come from dispatch. */

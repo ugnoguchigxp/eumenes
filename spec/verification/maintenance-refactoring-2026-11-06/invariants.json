@@ -1,0 +1,26 @@
+[
+  {
+    "before": "api/application/settings/settings-adapter.test.ts",
+    "after": [
+      "api/application/settings/settings-adapter.test.ts",
+      "api/application/settings/settings-connections.test.ts",
+      "api/application/settings/settings-bundle.test.ts"
+    ],
+    "testCount": 33,
+    "exact": true
+  },
+  {
+    "before": "api/domains/voice-dialogue/test/settings-integration.test.ts",
+    "after": [
+      "api/domains/voice-dialogue/test/settings-integration.test.ts",
+      "api/domains/voice-dialogue/test/settings-input.test.ts",
+      "api/domains/voice-dialogue/test/settings-speech.test.ts"
+    ],
+    "testCount": 30,
+    "exact": true
+  },
+  {
+    "datasetSql": 21,
+    "exact": true
+  }
+]

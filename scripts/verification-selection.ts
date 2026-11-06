@@ -67,11 +67,24 @@ export function sourceFiles(root: string, directory: string): string[] {
 		.sort();
 }
 
-/** Application tests that import one of the selected domains' public entries. */
+/** Direct domain imports plus declared integration ownership for fixture-composed tests. */
 export function integrationTestFiles(root: string, selected: Domain[]) {
 	const wanted = new Set(selected);
-	return sourceFiles(root, "api/application").filter((path) => {
-		if (!testPattern.test(path)) return false;
+	const declared = new Set<string>(
+		selected.flatMap((domain) => {
+			const info = domains[domain];
+			return "integrationTests" in info ? [...info.integrationTests] : [];
+		}),
+	);
+	const files = sourceFiles(root, "api/application").filter((path) =>
+		testPattern.test(path),
+	);
+	const available = new Set(files);
+	for (const path of declared)
+		if (!available.has(path))
+			throw new Error(`integration_test_missing:${path}`);
+	return files.filter((path) => {
+		if (declared.has(path)) return true;
 		return applicationDomainEntries(
 			path,
 			readFileSync(join(root, path), "utf8"),

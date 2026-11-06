@@ -2,24 +2,25 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore } from "../../../infrastructure/sqlite";
 import {
-	createSettings,
-	migration as settingsMigration,
-	epochsMigration as settingsEpochsMigration,
-} from "../../settings";
-import {
+	controlMigration,
 	createInference,
+	diagnosticsMigration,
+	migrations as inferenceMigrations,
 	migration,
 	parentsMigration,
-	diagnosticsMigration,
-	controlMigration,
-	migrations as inferenceMigrations,
 } from "..";
+import { openStore } from "../../../infrastructure/sqlite";
 import type { LarmPort } from "../../larm";
-import { REASONING_ALLOWANCE_TOKENS } from "../service/attempt-work";
+import {
+	createSettings,
+	epochsMigration as settingsEpochsMigration,
+	migration as settingsMigration,
+} from "../../settings";
 import type { Settings } from "../../settings/contracts";
-import type { CloudAgentCall, CloudAgents } from "../adapters/cloud-agents";
+import type { CloudAgentCall } from "../adapters/cloud-agent-shared";
+import type { CloudAgents } from "../adapters/cloud-agents";
+import { REASONING_ALLOWANCE_TOKENS } from "../service/attempt-work";
 
 type CloudAgentResult = Awaited<ReturnType<CloudAgents["run"]>>;
 

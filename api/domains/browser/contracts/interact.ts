@@ -1,10 +1,10 @@
-import { z } from "zod";
 import type {
 	CoreState,
 	PartCall,
 	PartResult,
 	PreparedStep,
 } from "eumenes-interact";
+import { z } from "zod";
 import type { BrowserDriver } from "./ports";
 
 export const interactStart = z.strictObject({
@@ -25,7 +25,6 @@ export const interactAnswer = interactTarget.extend({
 	approved: z.boolean().optional(),
 	text: z.string().trim().min(1).max(4000).optional(),
 });
-export type InteractStart = z.infer<typeof interactStart>;
 export type InteractAnswer = z.infer<typeof interactAnswer>;
 export type InteractDriver = BrowserDriver & {
 	readText(

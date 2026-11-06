@@ -1,0 +1,1016 @@
+{
+  "configuration": {
+    "datasetHash": "64909a5f9bde7c5752bb0788401c94c696b0a0367d06ae6ebfbedef13b1a5077",
+    "entry": "route",
+    "settingsHash": "71d7a841a1733b9044e84e98b9bfdfc7f20de1fcdd11f4ae62a3ffb0b1278ba2",
+    "source": "adopted-package",
+    "variants": [
+      "baseline",
+      "A"
+    ],
+    "callsPerCaseAndVariant": 1,
+    "dispatch": false
+  },
+  "rows": [
+    {
+      "id": "known-a",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 240,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.9331858968903273
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.09107093227994607
+        },
+        {
+          "id": "compute.python",
+          "p": 0.015628195558978816
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-a",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 258,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.9331858968903273
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.09107093227994607
+        },
+        {
+          "id": "compute.python",
+          "p": 0.015628195558978816
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-b",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 238,
+      "to": "run",
+      "row": 3,
+      "candidate": "compute.python",
+      "top": [
+        {
+          "id": "compute.python",
+          "p": 0.3040244690451458
+        },
+        {
+          "id": "timers.manage",
+          "p": 0.2075847496771823
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.19812079461807552
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-b",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 187,
+      "to": "run",
+      "row": 3,
+      "candidate": "compute.python",
+      "top": [
+        {
+          "id": "compute.python",
+          "p": 0.30408484120064755
+        },
+        {
+          "id": "timers.manage",
+          "p": 0.20761461515900992
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.19815909065094445
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-c",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 287,
+      "to": "run",
+      "row": 3,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.47019112002675245
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.24767860163818628
+        },
+        {
+          "id": "compute.python",
+          "p": 0.10630706989148879
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-c",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 199,
+      "to": "run",
+      "row": 3,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.4703150234235966
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.24777255974561843
+        },
+        {
+          "id": "compute.python",
+          "p": 0.1063497041117804
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-d",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 270,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.8756994653621027
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.07491650211667875
+        },
+        {
+          "id": "timers.manage",
+          "p": 0.05878070146544329
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-d",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 218,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.8756994653621027
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.07491650211667875
+        },
+        {
+          "id": "timers.manage",
+          "p": 0.05878070146544329
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-answer-1",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 304,
+      "to": "run",
+      "row": 3,
+      "candidate": "compute.python",
+      "top": [
+        {
+          "id": "compute.python",
+          "p": 0.24980510446435367
+        },
+        {
+          "id": "timers.manage",
+          "p": 0.20088775993870445
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.1048549306393911
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-answer-1",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 236,
+      "to": "run",
+      "row": 3,
+      "candidate": "compute.python",
+      "top": [
+        {
+          "id": "compute.python",
+          "p": 0.2499766761722694
+        },
+        {
+          "id": "timers.manage",
+          "p": 0.20098557280979948
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.10493061760908182
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 294,
+      "to": "run",
+      "row": 3,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.5149144673565221
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.2689808826003214
+        },
+        {
+          "id": "compute.python",
+          "p": 0.07102934079369197
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 233,
+      "to": "run",
+      "row": 3,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.5162574816354548
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.2699130771063428
+        },
+        {
+          "id": "compute.python",
+          "p": 0.0787753964070681
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 224,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.5154154469828334
+        },
+        {
+          "id": "music.create",
+          "p": 0.11788322114615943
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.0814500804236949
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 177,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.5154154469828334
+        },
+        {
+          "id": "music.create",
+          "p": 0.11788322114615943
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.0814500804236949
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "short-answer",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 271,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.771591721947618
+        },
+        {
+          "id": "web.search",
+          "p": 0.05638278184505166
+        },
+        {
+          "id": "music.create",
+          "p": 0.04262146903674987
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "short-answer",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 218,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.7747918345705601
+        },
+        {
+          "id": "web.search",
+          "p": 0.06302117226647333
+        },
+        {
+          "id": "music.create",
+          "p": 0.04775498371341809
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "topic-change",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 381,
+      "to": "conversation",
+      "row": 7,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.5594436041750561
+        },
+        {
+          "id": "read_memory",
+          "p": 0.08561502720372019
+        },
+        {
+          "id": "weather.forecast",
+          "p": 0.04618962138862287
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "topic-change",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 332,
+      "to": "conversation",
+      "row": 7,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.5597234968547441
+        },
+        {
+          "id": "read_memory",
+          "p": 0.08568364255987308
+        },
+        {
+          "id": "weather.forecast",
+          "p": 0.046223570231504946
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "decline-work",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 263,
+      "to": "run",
+      "row": 3,
+      "candidate": "compute.python",
+      "top": [
+        {
+          "id": "compute.python",
+          "p": 0.15269161749524854
+        },
+        {
+          "id": "t2.cancel",
+          "p": 0.10941832435380518
+        },
+        {
+          "id": "dots.delegate",
+          "p": 0.04884776525193207
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "decline-work",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 224,
+      "to": "run",
+      "row": 3,
+      "candidate": "compute.python",
+      "top": [
+        {
+          "id": "compute.python",
+          "p": 0.1506719904467453
+        },
+        {
+          "id": "t2.cancel",
+          "p": 0.1064256849218479
+        },
+        {
+          "id": "dots.delegate",
+          "p": 0.048147853471581015
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "draft-only",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 294,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.405454790791802
+        },
+        {
+          "id": "collaboration.pipeline",
+          "p": 0.08944179850850842
+        },
+        {
+          "id": "weather.forecast",
+          "p": 0.07961585723154668
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "draft-only",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 241,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.405454790791802
+        },
+        {
+          "id": "collaboration.pipeline",
+          "p": 0.08944179850850842
+        },
+        {
+          "id": "weather.forecast",
+          "p": 0.07961585723154668
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "ambiguous-answer",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 414,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.7462729583791817
+        },
+        {
+          "id": "web.search",
+          "p": 0.04722398169418334
+        },
+        {
+          "id": "music.create",
+          "p": 0.035422603559738
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "ambiguous-answer",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 269,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.7507417499450455
+        },
+        {
+          "id": "web.search",
+          "p": 0.058689197040509254
+        },
+        {
+          "id": "music.create",
+          "p": 0.044195793796605515
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "revoked-answer",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 167,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.8096976778105328
+        },
+        {
+          "id": "web.search",
+          "p": 0.07056461980262542
+        },
+        {
+          "id": "music.create",
+          "p": 0.05401129081355099
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "revoked-answer",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 168,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.8096976778105328
+        },
+        {
+          "id": "web.search",
+          "p": 0.07056461980262542
+        },
+        {
+          "id": "music.create",
+          "p": 0.05401129081355099
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "mixed-reply-new-work",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 366,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.9701804566516569
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.041459525817561724
+        },
+        {
+          "id": "stock.quote",
+          "p": 0.00656115108606322
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "mixed-reply-new-work",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 319,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.9703881722135265
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.04150209286753469
+        },
+        {
+          "id": "stock.quote",
+          "p": 0.007309086163386614
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-dependent",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 222,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.7116855896604537
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.28742904662774427
+        },
+        {
+          "id": "compute.python",
+          "p": 0.0417762815664163
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-dependent",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 170,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.7117192805277517
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.2874512673026811
+        },
+        {
+          "id": "compute.python",
+          "p": 0.041779246867215035
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-independent",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 252,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.8977066263615021
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.06190834858496038
+        },
+        {
+          "id": "timers.manage",
+          "p": 0.03195589411466016
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-independent",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 197,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.8977066263615021
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.06190834858496038
+        },
+        {
+          "id": "timers.manage",
+          "p": 0.03195589411466016
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-same-tool",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 227,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.6672542267144477
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.1233212029112957
+        },
+        {
+          "id": "music.create",
+          "p": 0.08340044451581989
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-same-tool",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 176,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "top": [
+        {
+          "id": "timers.manage",
+          "p": 0.6672542267144477
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.1233212029112957
+        },
+        {
+          "id": "music.create",
+          "p": 0.08340044451581989
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-answer",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 267,
+      "to": "conversation",
+      "row": 7,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.4408815790587972
+        },
+        {
+          "id": "t4.answer",
+          "p": 0.2335718061572033
+        },
+        {
+          "id": "ui.compose",
+          "p": 0.08142949201240848
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-answer",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 210,
+      "to": "conversation",
+      "row": 7,
+      "candidate": null,
+      "top": [
+        {
+          "id": "conversation.respond",
+          "p": 0.4401438502969898
+        },
+        {
+          "id": "t4.answer",
+          "p": 0.2416953672524168
+        },
+        {
+          "id": "ui.compose",
+          "p": 0.08133385594580426
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-discussion",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 255,
+      "to": "run",
+      "row": 2,
+      "candidate": "image.create",
+      "top": [
+        {
+          "id": "image.create",
+          "p": 0.6308832200524487
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.2552427953387629
+        },
+        {
+          "id": "music.create",
+          "p": 0.1474674490117775
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-discussion",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 191,
+      "to": "run",
+      "row": 2,
+      "candidate": "image.create",
+      "top": [
+        {
+          "id": "image.create",
+          "p": 0.6308832200524487
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.2552427953387629
+        },
+        {
+          "id": "music.create",
+          "p": 0.1474674490117775
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-new-topic",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 396,
+      "to": "run",
+      "row": 3,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.3868310712412443
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.11633014895705161
+        },
+        {
+          "id": "read_runs",
+          "p": 0.032194498097384214
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-new-topic",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 317,
+      "to": "run",
+      "row": 3,
+      "candidate": "weather.forecast",
+      "top": [
+        {
+          "id": "weather.forecast",
+          "p": 0.3869801436656149
+        },
+        {
+          "id": "conversation.respond",
+          "p": 0.11639394654700431
+        },
+        {
+          "id": "read_runs",
+          "p": 0.03220822831345125
+        }
+      ],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    }
+  ]
+}

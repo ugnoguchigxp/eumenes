@@ -1,17 +1,14 @@
+import type { AccountInfo, query } from "@anthropic-ai/claude-agent-sdk";
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import type { AccountInfo, query } from "@anthropic-ai/claude-agent-sdk";
 import { defaults } from "../../settings";
 import { settingsSchema, type Connection } from "../../settings/contracts";
-import {
-	codexReplyPrefix,
-	createCloudAgents,
-	type CloudAgentCall,
-	type CloudAgents,
-} from "../adapters/cloud-agents";
-import { cloudRequest, type CloudEnv } from "../service/cloud";
+import { codexReplyPrefix } from "../adapters/cloud-agent-codex";
+import { type CloudAgentCall } from "../adapters/cloud-agent-shared";
+import { createCloudAgents, type CloudAgents } from "../adapters/cloud-agents";
 import type { RequestRow } from "../repository";
+import { cloudRequest, type CloudEnv } from "../service/cloud";
 
 const connectionId = crypto.randomUUID();
 const resourceId = crypto.randomUUID();

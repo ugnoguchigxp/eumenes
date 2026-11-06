@@ -1,44 +1,27 @@
+import { installStudioEnvironment } from "./model-environment.js";
+import { createAvatarGeometry } from "./model-geometry.js";
+import { createAvatarHitTest } from "./model-hit-test.js";
+import { createAvatarMaterials } from "./model-materials.js";
 // @ts-check
 // Model-local aliases remain loose; Three.js itself uses its published type definitions.
 /** @typedef {any} ThreeColor A color accepted by THREE.Color. */
 /** @typedef {any} ThreeObject A THREE.Object3D / Vector3 / Curve instance. */
 import * as THREE from "three";
+import { createPerformer, defaultLayers } from "./performer.ts";
+import { createSecondaryMotion } from "./secondary.ts";
 import {
 	armInfluence,
 	boneNames,
 	createSkeleton,
 	setInfluences,
-	skinningGLSL,
-	torsoInfluence,
 } from "./skeleton.ts";
-import { createPerformer, defaultLayers } from "./performer.ts";
-import { createSecondaryMotion } from "./secondary.ts";
 
 // The motion catalog ships with the renderer chunk so the lab never loads three.js early.
-export { motions } from "./motions/index.ts";
 export { motionGroups } from "./clips.ts";
+export { motions } from "./motions/index.ts";
 const TAU = Math.PI * 2;
 const clamp = THREE.MathUtils.clamp;
 // Every skinned vertex follows its two bones, then keeps the faint living shimmer.
-const commonDeform = `
-uniform float uTime; uniform float uEnergy;
-${skinningGLSL}
-vec3 skinNormal(vec3 n){return normalize(mat3(skinMatrix())*n);}
-vec3 deform(vec3 p){
- p=(skinMatrix()*vec4(p,1.)).xyz;
- p.x+=sin(p.y*2.1+uTime*.7)*cos(p.z*2.8+uTime*.4)*.004;
- p.z+=sin(p.y*3.+p.x*2.-uTime*.6)*.004;
- return p;
-}
-`;
-// Rigid parts parented to a bone (core, its orbits) need no skinning.
-const rigidDeform =
-	"uniform float uTime;uniform float uEnergy;vec3 deform(vec3 p){return p;}";
-const noiseGLSL = `
-float hash(vec3 p){p=fract(p*.3183099+vec3(.1,.2,.3));p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
-float noise(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
-float fbm(vec3 p){return .55*noise(p)+.28*noise(p*2.07)+.14*noise(p*4.17);}
-`;
 /** @param {HTMLElement} host */
 export function createLightAvatar(host) {
 	const renderer = new THREE.WebGLRenderer({
@@ -123,414 +106,25 @@ export function createLightAvatar(host) {
 		const gaussian = () =>
 			Math.sqrt(-2 * Math.log(Math.max(0.00001, random()))) *
 			Math.cos(TAU * random());
+		/** @type {THREE.Material[]} */
 		const materials = [];
-		// A small procedural studio environment supplies soft reflection bands.
-		// These cards are rendered into the environment map only, never the stage.
-		const studio = new THREE.Scene();
-		studio.background = new THREE.Color("#03050a");
-		const lightCanvas = document.createElement("canvas");
-		lightCanvas.width = 64;
-		lightCanvas.height = 128;
-		const lightContext = /** @type {CanvasRenderingContext2D} */ (
-				lightCanvas.getContext("2d")
-			),
-			gradient = lightContext.createRadialGradient(32, 64, 5, 32, 64, 66);
-		gradient.addColorStop(0, "white");
-		gradient.addColorStop(0.62, "#aaaaaa");
-		gradient.addColorStop(1, "black");
-		lightContext.fillStyle = gradient;
-		lightContext.fillRect(0, 0, 64, 128);
-		const studioTexture = own(new THREE.CanvasTexture(lightCanvas));
-		for (const [
-			position,
-			size,
-			color,
-		] of /** @type {[[number, number, number], [number, number], [number, number, number]][]} */ ([
-			[
-				[-3, 1, 3],
-				[1.1, 5.8],
-				[5, 4.3, 3.3],
-			],
-			[
-				[3, 1.2, 2],
-				[1.4, 5.2],
-				[2.5, 3.4, 5],
-			],
-			[
-				[0, 4, -1],
-				[4, 1.2],
-				[3.8, 3.2, 2.8],
-			],
-			[
-				[2, -1, -3],
-				[0.8, 5],
-				[1.9, 1.5, 1.8],
-			],
-		])) {
-			const card = new THREE.Mesh(
-				own(new THREE.PlaneGeometry(size[0], size[1])),
-				own(
-					new THREE.MeshBasicMaterial({
-						map: studioTexture,
-						color: new THREE.Color(color[0], color[1], color[2]),
-						side: THREE.DoubleSide,
-						toneMapped: false,
-					}),
-				),
-			);
-			card.position.set(position[0] ?? 0, position[1] ?? 0, position[2] ?? 0);
-			card.lookAt(0, 0.4, 0);
-			studio.add(card);
-		}
-		const environmentCube = own(
-			new THREE.WebGLCubeRenderTarget(128, { type: THREE.HalfFloatType }),
-		);
-		const cubeCamera = new THREE.CubeCamera(0.1, 20, environmentCube);
-		cubeCamera.update(renderer, studio);
-		const pmrem = own(new THREE.PMREMGenerator(renderer)),
-			environment = own(pmrem.fromCubemap(environmentCube.texture));
-		scene.environment = environment.texture;
-		release(environmentCube);
-		release(pmrem);
-		studio.traverse((/** @type {any} */ o) => {
-			release(o.geometry);
-			release(o.material);
-		});
-		release(studioTexture);
-		const keyLight = new THREE.DirectionalLight("#fff0d7", 2.8);
-		keyLight.position.set(-3, 4, 4);
-		scene.add(keyLight);
-		const fillLight = new THREE.DirectionalLight("#bcd9ff", 1.3);
-		fillLight.position.set(3, 1, -2);
-		scene.add(fillLight);
-		const pearlMaterial = (fold = false) => {
-			const m = own(
-				new THREE.MeshPhysicalMaterial({
-					color: "#fff0da",
-					metalness: 0,
-					roughness: fold ? 0.12 : 0.095,
-					transmission: fold ? 0.87 : 0.97,
-					thickness: fold ? 0.035 : 0.15,
-					ior: 1.38,
-					clearcoat: 1,
-					clearcoatRoughness: 0.08,
-					iridescence: fold ? 0.45 : 0.65,
-					iridescenceIOR: 1.3,
-					iridescenceThicknessRange: [180, 410],
-					attenuationColor: "#ffeac5",
-					attenuationDistance: 2.5,
-					envMapIntensity: 1.25,
-					emissive: "#9a733b",
-					emissiveIntensity: 0.025,
-					transparent: true,
-					opacity: fold ? 0.48 : 0.46,
-					depthWrite: false,
-					side: THREE.DoubleSide,
-				}),
-			);
-			m.onBeforeCompile = (/** @type {any} */ shader) => {
-				Object.assign(shader.uniforms, uniforms);
-				shader.vertexShader = commonDeform + shader.vertexShader;
-				shader.vertexShader = shader.vertexShader.replace(
-					"#include <beginnormal_vertex>",
-					"#include <beginnormal_vertex>\nobjectNormal=skinNormal(objectNormal);",
-				);
-				shader.vertexShader = shader.vertexShader.replace(
-					"#include <begin_vertex>",
-					"#include <begin_vertex>\ntransformed=deform(transformed);",
-				);
-			};
-			m.customProgramCacheKey = () => `saaa-pearl-${fold}-skinned`;
-			materials.push(m);
-			return m;
-		};
-		const spiritGlass = pearlMaterial(),
-			foldGlass = pearlMaterial(true);
-		const baseSpiritCompile = spiritGlass.onBeforeCompile;
-		spiritGlass.onBeforeCompile = (/** @type {any} */ shader, renderer) => {
-			baseSpiritCompile(shader, renderer);
-			shader.vertexShader =
-				"varying float vTorsoHeight;\n" + shader.vertexShader;
-			shader.vertexShader = shader.vertexShader.replace(
-				"transformed=deform(transformed);",
-				"transformed=deform(transformed);vTorsoHeight=position.y;",
-			);
-			shader.fragmentShader =
-				"varying float vTorsoHeight;\n" + shader.fragmentShader;
-			shader.fragmentShader = shader.fragmentShader.replace(
-				"#include <color_fragment>",
-				"#include <color_fragment>\ndiffuseColor.a*=.25+.75*smoothstep(-1.3,.35,vTorsoHeight);",
-			);
-		};
-		spiritGlass.customProgramCacheKey = () => "saaa-pearl-torso";
-		/** @param {ThreeColor} color */
-		const surfaceMaterial = (
-			color,
-			opacity = 0.28,
-			soft = false,
-			fade = false,
-		) => {
-			const m = own(
-				new THREE.ShaderMaterial({
-					uniforms: {
-						...uniforms,
-						uColor: { value: color },
-						uOpacity: { value: opacity },
-						uSoft: { value: soft ? 1 : 0 },
-						uBodyFade: { value: fade ? 1 : 0 },
-					},
-					transparent: true,
-					depthWrite: false,
-					side: THREE.DoubleSide,
-					blending: THREE.AdditiveBlending,
-					vertexShader:
-						commonDeform +
-						`varying vec3 vN;varying vec3 vV;varying vec3 vP;varying vec2 vUv;void main(){vec3 p=deform(position);vec4 mv=modelViewMatrix*vec4(p,1.);vN=normalize(normalMatrix*skinNormal(normal));vV=normalize(-mv.xyz);vP=p;vUv=uv;gl_Position=projectionMatrix*mv;}`,
-					fragmentShader:
-						noiseGLSL +
-						`uniform vec3 uColor;uniform float uOpacity;uniform float uSoft;uniform float uBodyFade;uniform float uTime;uniform float uEnergy;varying vec3 vN;varying vec3 vV;varying vec3 vP;varying vec2 vUv;void main(){float rim=pow(1.-abs(dot(normalize(vN),normalize(vV))),2.3);float w=fbm(vP*3.+vec3(uTime*.12));float veins=pow(max(0.,sin(vUv.x*55.+vUv.y*19.+w*8.-uTime*.35)),mix(28.,85.,uSoft));float a=(.075+rim*(.55-.33*uSoft)+veins*(.16-.13*uSoft)+w*.035)*(uOpacity/.28);a*=mix(1.,.25+.75*smoothstep(-1.3,.35,vP.y),uBodyFade);vec3 c=mix(uColor,vec3(.56,.76,1.),pow(w,4.)*.65);float sheen=pow(max(0.,dot(normalize(vN),normalize(vec3(-.55,.65,1.)))),8.);c=mix(c,mix(uColor,vec3(.76,.83,1.),smoothstep(.48,.66,w)*.48),uSoft);gl_FragColor=vec4(c*(.65+uSoft*.18+rim*(1.-.65*uSoft)+veins*.6+uEnergy*.15+sheen*uSoft*.28),a);}`,
-				}),
-			);
-			materials.push(m);
-			return m;
-		};
-		/** @param {ThreeColor} color */
-		const lineMaterial = (color, opacity = 0.3, skinned = true) => {
-			const m = own(
-				new THREE.ShaderMaterial({
-					uniforms: {
-						...uniforms,
-						uColor: { value: color },
-						uOpacity: { value: opacity },
-					},
-					transparent: true,
-					depthWrite: false,
-					blending: THREE.AdditiveBlending,
-					vertexShader:
-						(skinned ? commonDeform : rigidDeform) +
-						`varying float vY;void main(){vY=position.y;gl_Position=projectionMatrix*modelViewMatrix*vec4(deform(position),1.);}`,
-					fragmentShader: `uniform vec3 uColor;uniform float uOpacity;uniform float uTime;varying float vY;void main(){float p=.6+.4*sin(vY*3.-uTime*.8);gl_FragColor=vec4(uColor*(.85+p*.4),uOpacity*(.4+p*.6));}`,
-				}),
-			);
-			materials.push(m);
-			return m;
-		};
-		/** @param {ThreeColor} color */
-		const pointMaterial = (
-			color,
-			size = 1,
-			alpha = 0.65,
-			cloud = false,
-			skinned = true,
-		) => {
-			const m = own(
-				new THREE.ShaderMaterial({
-					uniforms: {
-						...uniforms,
-						uColor: { value: color },
-						uSize: { value: size },
-						uAlpha: { value: alpha },
-						uPixelRatio: { value: renderer.getPixelRatio() },
-						// Sparkles burst away from the core (bind space, or the core bone's own).
-						uBurst: {
-							value: skinned
-								? new THREE.Vector3(0, 0.06, 0.15)
-								: new THREE.Vector3(),
-						},
-					},
-					transparent: true,
-					depthWrite: false,
-					blending: THREE.AdditiveBlending,
-					vertexShader:
-						(skinned ? commonDeform : rigidDeform) +
-						`uniform float uSize;uniform float uPixelRatio;uniform float uFlow;uniform float uSparkle;uniform vec3 uBurst;attribute float aSize;attribute float aPhase;varying float vAlpha;void main(){vec3 p=deform(position);float phase=aPhase+uFlow*(.22+uEnergy*.38);p.x+=sin(phase+p.y*1.3)*(.013+uEnergy*.03);p.y+=sin(phase*1.5)*(.017+uEnergy*.024);vec3 away=p-uBurst;p+=away/(length(away)+.05)*uSparkle*(.06+.42*fract(aPhase*3.7));vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;gl_PointSize=clamp(aSize*uSize*uPixelRatio*(6.5/-mv.z)*(1.+uSparkle*.5),.6,${cloud ? "72." : "12."});vAlpha=.5+.5*sin(aPhase+uTime*.8);}`,
-					fragmentShader: `uniform vec3 uColor;uniform float uAlpha;uniform float uEnergy;uniform float uSparkle;varying float vAlpha;void main(){vec2 p=gl_PointCoord-.5;float d=dot(p,p);if(d>.25)discard;float a=${cloud ? "exp(-d*17.)*pow(1.-d*4.,1.5)" : "exp(-d*29.)"};gl_FragColor=vec4(uColor*(1.+uEnergy*.35+uSparkle*.7),a*uAlpha*(.45+vAlpha*.55));}`,
-				}),
-			);
-			materials.push(m);
-			return m;
-		};
-		/**
-		 * @param {number[][]} list
-		 * @param {ThreeColor} color
-		 * @param {import("./skeleton.ts").Influence[] | null} influences null for rigid bone children
-		 */
-		function makePoints(
-			list,
-			color,
-			influences,
-			size = 1,
-			alpha = 0.65,
-			cloud = false,
-		) {
-			const geo = own(new THREE.BufferGeometry());
-			geo.setAttribute(
-				"position",
-				new THREE.Float32BufferAttribute(list.flat(), 3),
-			);
-			const sizes = [],
-				phases = [];
-			for (let i = 0; i < list.length; i++) {
-				sizes.push(cloud ? 15 + random() * 35 : 0.55 + random() * 1.8);
-				phases.push(random() * TAU);
-			}
-			geo.setAttribute("aSize", new THREE.Float32BufferAttribute(sizes, 1));
-			geo.setAttribute("aPhase", new THREE.Float32BufferAttribute(phases, 1));
-			if (influences) setInfluences(geo, influences);
-			return new THREE.Points(
-				geo,
-				pointMaterial(color, size, alpha, cloud, Boolean(influences)),
-			);
-		}
-		/** @param {ThreeColor} color */
-		function glow(color, size = 1) {
-			const mat = own(
-				new THREE.ShaderMaterial({
-					uniforms: { uColor: { value: color } },
-					transparent: true,
-					depthWrite: false,
-					blending: THREE.AdditiveBlending,
-					side: THREE.DoubleSide,
-					vertexShader: `varying vec2 vUv;void main(){vUv=uv;vec4 p=modelViewMatrix*vec4(0.,0.,0.,1.);p.xy+=position.xy*vec2(length(modelMatrix[0].xyz),length(modelMatrix[1].xyz));gl_Position=projectionMatrix*p;}`,
-					fragmentShader: `uniform vec3 uColor;varying vec2 vUv;void main(){float r=length(vUv-.5)*2.;float a=exp(-r*r*8.)*.7+exp(-r*r*34.)*.7;gl_FragColor=vec4(uColor,a);}`,
-				}),
-			);
-			materials.push(mat);
-			const g = new THREE.Mesh(own(new THREE.PlaneGeometry(1, 1)), mat);
-			g.scale.setScalar(size);
-			return g;
-		}
-		/** @type {Record<string, [number, number, number, number][]>} */
-		const profiles = {
-			b: [
-				[0, -1.96, 0, 0.008],
-				[0.12, -1.48, 0, 0.09],
-				[0.26, -0.89, 0, 0.17],
-				[0.4, -0.24, 0, 0.22],
-				[0.52, 0.25, 0, 0.265],
-				[0.6, 0.61, 0, 0.145],
-				[0.65, 0.82, 0, 0.21],
-				[0.72, 1.08, 0, 0.48],
-				[0.8, 1.4, 0, 0.61],
-				[0.87, 1.68, 0, 0.53],
-				[0.92, 1.81, -0.055, 0.38],
-				[0.946, 1.9, -0.17, 0.21],
-				[0.965, 1.995, -0.285, 0.1],
-				[0.98, 2.095, -0.29, 0.047],
-				[0.992, 2.15, -0.22, 0.021],
-				[1, 2.14, -0.15, 0.003],
-			],
-		};
-		/**
-		 * @param {number} u
-		 * @param {string} kind
-		 * @returns {[number, number, number]}
-		 */
-		function profile(u, kind) {
-			const p = /** @type {[number, number, number, number][]} */ (
-				profiles[kind]
-			);
-			/** @param {number} row @returns {[number, number, number, number]} */
-			const at = (row) =>
-				/** @type {[number, number, number, number]} */ (p[row]);
-			let i = 0;
-			while (i < p.length - 2 && u > at(i + 1)[0]) i++;
-			const a = at(i),
-				b = at(i + 1),
-				t = clamp((u - a[0]) / (b[0] - a[0]), 0, 1);
-			const smooth = t * t * (3 - 2 * t);
-			if (kind === "b") {
-				const prev = at(Math.max(0, i - 1)),
-					next = at(Math.min(p.length - 1, i + 2)),
-					span = b[0] - a[0];
-				/** @param {1 | 2 | 3} column */
-				const hermite = (column) => {
-					const ma = (b[column] - prev[column]) / (b[0] - prev[0]),
-						mb = (next[column] - a[column]) / (next[0] - a[0]);
-					return (
-						(2 * t * t * t - 3 * t * t + 1) * a[column] +
-						(t * t * t - 2 * t * t + t) * span * ma +
-						(-2 * t * t * t + 3 * t * t) * b[column] +
-						(t * t * t - t * t) * span * mb
-					);
-				};
-				return [hermite(1), hermite(2), Math.max(0.001, hermite(3))];
-			}
-			return [
-				THREE.MathUtils.lerp(a[1], b[1], t),
-				THREE.MathUtils.lerp(a[2], b[2], smooth),
-				THREE.MathUtils.lerp(a[3], b[3], smooth),
-			];
-		}
-		/**
-		 * @param {number} u
-		 * @param {number} phi
-		 */
-		const shellPoint = (u, phi, kind = "b", scale = 1) => {
-			const [y, cx, r] = profile(u, kind),
-				fold = 1 + 0.008 * Math.cos(phi * 4);
-			return new THREE.Vector3(
-				cx + Math.cos(phi) * r * scale * fold,
-				y,
-				Math.sin(phi) * r * scale * 0.94 * fold,
-			);
-		};
-
-		/** @param {THREE.BufferGeometry} geo Torso parts follow the bones by height. */
-		const byHeight = (geo) => {
-			const position = geo.getAttribute("position");
-			return setInfluences(
-				geo,
-				Array.from({ length: position.count }, (_, i) =>
-					torsoInfluence(position.getY(i)),
-				),
-			);
-		};
-		/** @param {number[][]} list */
-		const heightInfluences = (list) =>
-			list.map((p) => torsoInfluence(/** @type {number} */ (p[1])));
-		/** @param {string} kind */
-		function shellGeometry(kind) {
-			const positions = [],
-				uvs = [],
-				indices = [],
-				rows = 72,
-				cols = 48;
-			for (let i = 0; i <= rows; i++)
-				for (let j = 0; j <= cols; j++) {
-					const t = i / rows,
-						u =
-							kind === "b"
-								? t < 0.72
-									? (t / 0.72) * 0.87
-									: 0.87 + ((t - 0.72) / 0.28) * 0.13
-								: t,
-						p = shellPoint(u, (j / cols) * TAU, kind);
-					positions.push(p.x, p.y, p.z);
-					uvs.push(j / cols, u);
-				}
-			for (let i = 0; i < rows; i++)
-				for (let j = 0; j < cols; j++) {
-					const k = i * (cols + 1) + j;
-					indices.push(
-						k,
-						k + cols + 1,
-						k + 1,
-						k + 1,
-						k + cols + 1,
-						k + cols + 2,
-					);
-				}
-			const geo = own(new THREE.BufferGeometry());
-			geo.setAttribute(
-				"position",
-				new THREE.Float32BufferAttribute(positions, 3),
-			);
-			geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-			geo.setIndex(indices);
-			geo.computeVertexNormals();
-			return byHeight(geo);
-		}
+		installStudioEnvironment({ own, release, renderer, scene });
+		const {
+			spiritGlass,
+			foldGlass,
+			surfaceMaterial,
+			lineMaterial,
+			makePoints,
+			glow,
+		} = createAvatarMaterials({ own, uniforms, renderer, materials, random });
+		const {
+			profile,
+			shellPoint,
+			byHeight,
+			heightInfluences,
+			shellGeometry,
+			ribbonGeometry,
+		} = createAvatarGeometry(own);
 		/**
 		 * Eyes ride the `eyes` bone; gaze and openness are set per frame.
 		 * @param {ThreeObject} group
@@ -734,64 +328,6 @@ export function createLightAvatar(host) {
 				addCoreParticles(bone("core"));
 			}
 			return group;
-		}
-
-		/**
-		 * @param {ThreeObject} curve
-		 * @param {number} width
-		 */
-		function ribbonGeometry(curve, width, twist = 0, rootWidth = 0) {
-			const positions = [],
-				uvs = [],
-				indices = [],
-				rows = 72,
-				cols = 8;
-			for (let j = 0; j <= rows; j++) {
-				const u = j / rows,
-					p = curve.getPoint(u),
-					t = curve.getTangent(u);
-				const side = new THREE.Vector3(
-					-t.y,
-					t.x,
-					Math.sin(u * 8) * 0.45,
-				).normalize();
-				side.applyAxisAngle(t, twist * Math.sin(u * Math.PI));
-				const normal = new THREE.Vector3().crossVectors(t, side).normalize();
-				const r =
-					width *
-					(Math.pow(Math.sin(Math.PI * u), 0.7) +
-						rootWidth * Math.pow(1 - u, 3));
-				for (let k = 0; k <= cols; k++) {
-					const v = (k / cols) * 2 - 1,
-						q = p
-							.clone()
-							.addScaledVector(side, r * v)
-							.addScaledVector(normal, Math.cos((v * Math.PI) / 2) * r * 0.42);
-					positions.push(q.x, q.y, q.z);
-					uvs.push(k / cols, u);
-				}
-			}
-			for (let j = 0; j < rows; j++)
-				for (let k = 0; k < cols; k++) {
-					const i = j * (cols + 1) + k;
-					indices.push(
-						i,
-						i + cols + 1,
-						i + 1,
-						i + 1,
-						i + cols + 1,
-						i + cols + 2,
-					);
-				}
-			const geo = own(new THREE.BufferGeometry());
-			geo.setAttribute(
-				"position",
-				new THREE.Float32BufferAttribute(positions, 3),
-			);
-			geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-			geo.setIndex(indices);
-			geo.computeVertexNormals();
-			return geo;
 		}
 		/** @param {ThreeObject} group */
 		function addArms(group) {
@@ -1074,10 +610,6 @@ export function createLightAvatar(host) {
 		scene.add(trail);
 		let trailReady = false;
 		const tipWorld = new THREE.Vector3(),
-			hitCenter = new THREE.Vector3(),
-			hitEnd = new THREE.Vector3(),
-			hitEdge = new THREE.Vector3(),
-			cameraRight = new THREE.Vector3(),
 			scratch = new THREE.Vector3(),
 			eyesWorld = new THREE.Vector3(),
 			eyesForward = new THREE.Vector3(),
@@ -1198,55 +730,7 @@ export function createLightAvatar(host) {
 			renderer.setRenderTarget(null);
 			renderer.render(quadScene, quadCamera);
 		}
-		/**
-		 * Projects a world point and a radius at its depth to canvas pixels (mutates `world`).
-		 * @param {THREE.Vector3} world
-		 * @param {number} radius
-		 * @param {DOMRect} rect
-		 */
-		function toScreen(world, radius, rect) {
-			hitEdge.copy(world).addScaledVector(cameraRight, radius).project(camera);
-			world.project(camera);
-			const x = ((world.x + 1) / 2) * rect.width,
-				y = ((1 - world.y) / 2) * rect.height;
-			return { x, y, r: Math.abs(((hitEdge.x + 1) / 2) * rect.width - x) };
-		}
-		/**
-		 * Screen-space test against the last drawn pose: a ball for the head, a capsule from the
-		 * tail to the neck for the body. The head wins where both overlap.
-		 * @param {number} clientX
-		 * @param {number} clientY
-		 * @returns {"head" | "body" | null}
-		 */
-		function hitTest(clientX, clientY) {
-			const rect = renderer.domElement.getBoundingClientRect();
-			if (!rect.width || !rect.height) return null;
-			const px = clientX - rect.left,
-				py = clientY - rect.top;
-			cameraRight.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
-			const head = toScreen(
-				bone("head").localToWorld(hitCenter.set(0, 0.45, 0)),
-				0.6,
-				rect,
-			);
-			if (Math.hypot(px - head.x, py - head.y) <= head.r) return "head";
-			const a = toScreen(
-				bone("tail_01").getWorldPosition(hitCenter),
-				0.6,
-				rect,
-			);
-			const b = toScreen(bone("neck").getWorldPosition(hitEnd), 0.6, rect);
-			const dx = b.x - a.x,
-				dy = b.y - a.y;
-			const t = clamp(
-				((px - a.x) * dx + (py - a.y) * dy) / (dx * dx + dy * dy || 1),
-				0,
-				1,
-			);
-			return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy)) <= a.r
-				? "body"
-				: null;
-		}
+		const hitTest = createAvatarHitTest(renderer, camera, bone);
 		resize();
 		render();
 		return {

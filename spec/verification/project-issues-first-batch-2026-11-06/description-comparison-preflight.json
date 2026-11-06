@@ -1,0 +1,296 @@
+{
+  "configuration": {
+    "datasetHash": "64909a5f9bde7c5752bb0788401c94c696b0a0367d06ae6ebfbedef13b1a5077",
+    "entry": "route",
+    "settingsHash": "71d7a841a1733b9044e84e98b9bfdfc7f20de1fcdd11f4ae62a3ffb0b1278ba2",
+    "source": "adopted-package",
+    "variants": [
+      "baseline",
+      "A"
+    ],
+    "callsPerCaseAndVariant": 1,
+    "dispatch": false
+  },
+  "rows": [
+    {
+      "id": "known-a",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-a",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-b",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-b",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-c",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-c",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-d",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-d",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-answer-1",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-answer-1",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "short-answer",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "short-answer",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "topic-change",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "topic-change",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "decline-work",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "decline-work",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "draft-only",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "draft-only",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "ambiguous-answer",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "ambiguous-answer",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "revoked-answer",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "revoked-answer",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "mixed-reply-new-work",
+      "split": "dev",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "mixed-reply-new-work",
+      "split": "dev",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-dependent",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-dependent",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-independent",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-independent",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-same-tool",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-same-tool",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-answer",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-answer",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-discussion",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-discussion",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-new-topic",
+      "split": "holdout",
+      "variant": "baseline",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    },
+    {
+      "id": "holdout-new-topic",
+      "split": "holdout",
+      "variant": "A",
+      "elapsedMs": 0,
+      "error": "larm_invalid_route_request"
+    }
+  ]
+}

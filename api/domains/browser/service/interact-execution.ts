@@ -1,27 +1,21 @@
-import {
-	createInteractApproval,
-	interactApprovalText,
-} from "./interact-approval";
-import { createInteractCapture } from "./interact-capture";
 import type { Database } from "bun:sqlite";
 import type {
 	AdapterCommand,
+	HostCall,
 	ObservationEnvelope,
 	OperationResult,
-	HostCall,
 } from "eumenes-interact";
-import { shapeObservation } from "eumenes-interact";
 import {
 	assertQuoted,
 	InputGrants,
 	Refusal,
-	type PartExecutionPort,
 	type Executed,
 	type ExecuteOptions,
+	type PartExecutionPort,
 } from "eumenes-interact/parts";
 import {
-	recordOperationIntent,
 	markOperationDispatched,
+	recordOperationIntent,
 	settleOperation,
 } from "eumenes-interact/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -29,16 +23,22 @@ import type { InteractDriver, InteractMemory } from "../contracts/interact";
 import type {
 	CaptureFiles,
 	DriverAction,
-	ImageEncoder,
 	HostResolver,
+	ImageEncoder,
 } from "../contracts/ports";
 import { consumeApproval } from "../repository/approvals";
-import { urlVerdict } from "./policy";
+import {
+	createInteractApproval,
+	interactApprovalText,
+} from "./interact-approval";
 import {
 	interactHash,
 	interactIso,
 	type InteractAuthority,
 } from "./interact-authority";
+import { createInteractCapture } from "./interact-capture";
+import { createInteractObservations } from "./interact-observations";
+import { urlVerdict } from "./policy";
 
 export type InteractExecutionContext = {
 	runId: string;
@@ -107,16 +107,6 @@ export function createInteractExecution(
 	initial: InteractExecutionContext,
 ) {
 	let ctx = initial;
-	let observation: ObservationEnvelope | null = null;
-	let refs = new Set<string>();
-	let tabGeneration = 0;
-	let tabs: {
-		tabRef: string;
-		status: "open";
-		current: boolean;
-		url: string;
-		title: string;
-	}[] = [];
 	const grants = new InputGrants(deps.now, () => crypto.randomUUID());
 	const policy = {
 		now: deps.now,
@@ -143,66 +133,14 @@ export function createInteractExecution(
 		const v = await urlVerdict(policy, url);
 		if (!v.ok) throw new Error(v.code);
 	};
-	async function list() {
-		active();
-		const raw = await deps.driver.listTabs();
-		for (const t of raw) await allowed(t.url);
-		active();
-		tabs = raw.map((t) => ({
-			tabRef: `t${t.index}`,
-			status: "open",
-			current: t.current,
-			url: t.url,
-			title: t.title,
-		}));
-		return tabs;
-	}
-	async function observe() {
-		active();
-		const raw = await deps.driver.snapshot(ctx.signal);
-		await allowed(raw.url);
-		const target = (await list()).find((t) => t.current);
-		if (!target) throw new Error("tab_lost");
-		const shaped = shapeObservation("arm1", {
-			body: raw.snapshot,
-			url: raw.url,
-			title: raw.title,
-			truncated: false,
-			missing: [],
-		});
-		refs = new Set(shaped.refs);
-		observation = {
-			...shaped,
-			observationRef: crypto.randomUUID(),
-			platform: "playwright-mcp",
-			sessionId: ctx.runId,
-			target: { kind: "tab", tabRef: target.tabRef },
-			generation: tabGeneration,
-			capturedAt: interactIso(deps.now()),
-			url: raw.url,
-			title: raw.title,
-			missing: [],
-		};
-		return observation;
-	}
-	function observed(
-		tabRef: string,
-		ref: string | undefined,
-		target: string | null = null,
-	) {
-		active();
-		if (
-			!observation ||
-			observation.target.kind !== "tab" ||
-			observation.target.tabRef !== tabRef ||
-			observation.observationRef !== ref ||
-			observation.generation !== tabGeneration ||
-			(target !== null && !refs.has(target))
-		)
-			throw new Refusal("observation_stale", false);
-		return observation;
-	}
 
+	const observations = createInteractObservations(
+		deps,
+		() => ctx,
+		active,
+		allowed,
+	);
+	const { list, observe, observed } = observations;
 	const approval = createInteractApproval(deps, () => ctx, check);
 
 	async function operate(
@@ -220,7 +158,7 @@ export function createInteractExecution(
 		// operation the last observation is gone, so it is taken again rather than skipping the approval.
 		const seen =
 			command.action === "browser.navigate"
-				? (observation ??
+				? (observations.current() ??
 					(call.declaredEffect === "navigation" ? null : await observe()))
 				: observed(
 						call.tabRef!,
@@ -328,9 +266,7 @@ export function createInteractExecution(
 				status: "indeterminate",
 				code: "operation_outcome_unknown",
 			};
-		tabGeneration++;
-		observation = null;
-		refs.clear();
+		observations.invalidate();
 		return {
 			kind: "outcome",
 			outcome: {
@@ -380,15 +316,9 @@ export function createInteractExecution(
 	};
 	return {
 		port,
-		snapshotDigest: () =>
-			observation
-				? interactHash({ body: observation.body, url: observation.url })
-				: null,
+		snapshotDigest: observations.snapshotDigest,
 		grants,
-		tabs: {
-			get: (id: string) => tabs.find((t) => t.tabRef === id),
-			open: () => tabs,
-		},
+		tabs: observations.tabs,
 		setContext(next: InteractExecutionContext) {
 			ctx = next;
 		},
@@ -409,7 +339,10 @@ export function createInteractExecution(
 				!outcome.outcome.observation
 			)
 				throw new Error("browser_interact_navigation_failed");
-			return { tabs, observation: outcome.outcome.observation };
+			return {
+				tabs: observations.tabs.open(),
+				observation: outcome.outcome.observation,
+			};
 		},
 		save: capture.save,
 	};

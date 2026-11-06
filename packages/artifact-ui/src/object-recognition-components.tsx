@@ -1,11 +1,11 @@
-import { visualAnalysisActions } from "./visual-analysis-actions";
 import {
 	ObjectRecognitionWorkspace,
 	type ObjectRecognitionWorkspaceProps,
 } from "@eumenes/design-system";
+import { useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
-import { useAction } from "./components";
 import { useArtifactRuntime } from "./runtime";
+import { visualAnalysisActions } from "./visual-analysis-actions";
 export type ObjectRecognitionResource = Omit<
 	ObjectRecognitionWorkspaceProps,
 	| "onAnalysisOpen"

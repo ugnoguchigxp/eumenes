@@ -1,0 +1,51 @@
+bun test v1.4.4 (38afee6c8)
+
+scripts/verification-selection.test.ts:
+(pass) pipeline verification includes its fixture-composed execution and adopted package [506.81ms]
+(pass) explicit integration ownership joins direct imports once and stays scoped [226.79ms]
+(pass) a missing declared integration test fails instead of silently shrinking verification [0.69ms]
+(pass) the pipeline verify plan executes the declared integrations [4859.55ms]
+
+scripts/verification.test.ts:
+(pass) verification selection and runner coverage > repeated domains form a union, with strict argument validation and legacy support [0.23ms]
+(pass) verification selection and runner coverage > old verify runs and acceptance outputs are pruned to the kept counts [10.04ms]
+(pass) verification selection and runner coverage > application tests that import a domain entry join that domain [228.66ms]
+(pass) verification selection and runner coverage > owned DS tests dispatch once to the unit project [1.50ms]
+(pass) verification selection and runner coverage > inventory includes generated Storybook sources and explicit browser exclusions [103.25ms]
+(pass) verification selection and runner coverage > production plan builds DS before root check/tests and never rebuilds at web build [344.27ms]
+(pass) a domain run performs every static check of a full run, over the whole repository [1005.28ms]
+[verify] static
+[verify] static: 1 finding(s) outside the selection (not failing; all in report.json)
+  other: finding
+[verify] pass: 2 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-wcey1g/verification-reports/runs/2026-11-06T08-54-24-204Z-b654170f-f73e-43ab-b96c-429a4cb773aa/report.json
+(pass) verification evidence and integrity > warnings outside the selection pass the step and are recorded [273.00ms]
+[verify] build: /Users/y.noguchi/.bun/bin/bun -e process.exit(7)
+[verify] fail: 25 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-SWdida/verification-reports/runs/2026-11-06T08-54-24-476Z-ccc22c9e-94ee-4246-b9eb-6e7c75e189bc/report.json
+Error: build failed (7)
+[verify] ok: /Users/y.noguchi/.bun/bin/bun -e process.exit(0)
+[verify] pass: 19 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-SWdida/verification-reports/runs/2026-11-06T08-54-24-773Z-b7757d94-7860-4ab0-a9a6-55f2767b6266/report.json
+(pass) verification evidence and integrity > failed preparation blocks consumers and preserves earlier reports [681.32ms]
+[verify] ok: /Users/y.noguchi/.bun/bin/bun -e process.exit(0)
+[verify] bun tests: /Users/y.noguchi/.bun/bin/bun -e console.log('(fail) sample > case'); process.exit(1)
+(fail) sample > case
+[verify] fail: 35 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-zQFtkD/verification-reports/runs/2026-11-06T08-54-25-157Z-6fcc1fb2-882f-4b2d-9176-f431af85e990/report.json
+Error: bun tests failed (1)
+(pass) verification evidence and integrity > a command step keeps its log, and a failure names the failing test [290.30ms]
+(pass) verification evidence and integrity > output hash covers names and bytes, rejects missing outputs [7.06ms]
+[verify] consumer
+[verify] invalidated: 3 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-RMJge4/verification-reports/runs/2026-11-06T08-54-25-455Z-e7aba855-52d1-4235-81ce-468cc20a6180/report.json
+DesignSystem dist changed during verification
+[verify] consumer
+[verify] invalidated: 2 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-JcPoZ2/verification-reports/runs/2026-11-06T08-54-25-726Z-2676f35a-c557-410a-b566-9c4926c1d706/report.json
+DesignSystem output hash failed: Error: Missing build output: index.mjs
+(pass) verification evidence and integrity > a successful consumer cannot pass after dist changes or disappears [525.06ms]
+[verify] consumer
+[verify] invalidated: 2 ms; /var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-verify-cCwrtH/verification-reports/runs/2026-11-06T08-54-25-980Z-adb441d9-d76e-4e9f-b156-179b1eb0ee7a/report.json
+Source changed during verification
+(pass) verification evidence and integrity > source edits invalidate results even if all commands succeeded [249.74ms]
+(pass) verification evidence and integrity > SIGTERM records interruption and never launches later commands [336.19ms]
+
+ 18 pass
+ 0 fail
+ 97 expect() calls
+Ran 18 tests across 2 files. [9.76s]

@@ -1,15 +1,15 @@
-import { taskForWork } from "./task-work";
 import type { Database } from "bun:sqlite";
 import type { Run } from "../contracts";
 import type { WorkRow } from "../repository/work";
 import type { DialogueDeps } from "./context";
 import { type ParsedCall, type WorkArgs } from "./generation-tools";
-import { hideUris, type DocumentRefs } from "./work-items";
 import { CHECK_MAX_TOKENS } from "./input-text";
 import { resultText } from "./result-text";
 import { madeOf } from "./state-text";
-import { resultFields } from "./work-ledger";
+import { taskForWork } from "./task-work";
 import { dispatchInTransaction } from "./work-dispatch";
+import { hideUris, type DocumentRefs } from "./work-items";
+import { resultFields } from "./work-ledger";
 import { stopWaitingRunInTransaction } from "./work-stop";
 
 import {
@@ -40,7 +40,7 @@ function todoView(row: WorkRow, refs: DocumentRefs): Record<string, unknown> {
 /* The operations on the conversation's TODOs (section 6.1). */
 export async function work(
 	x: ExecutorContext,
-	call: ParsedCall,
+	_call: ParsedCall,
 	given: WorkArgs,
 ): Promise<ToolOutcome> {
 	const { deps, current, acted, handle } = x;

@@ -3,11 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "../../../infrastructure/sqlite";
-import { migrations as settingsMigrations } from "../../settings";
 import type { Connection, Resource } from "../../settings";
-import { claudeUsage } from "../adapters/cloud-agents";
-import { migrations } from "../repository";
+import { migrations as settingsMigrations } from "../../settings";
+import { claudeUsage } from "../adapters/cloud-agent-claude";
 import type { RequestRow } from "../repository";
+import { migrations } from "../repository";
 import { chatUsage, cloudRequest, type CloudEnv } from "../service/cloud";
 
 function expectSubset(usage: ReturnType<typeof claudeUsage>) {

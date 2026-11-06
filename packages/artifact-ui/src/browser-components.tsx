@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
 import {
 	BrowserSettings,
 	BrowserWorkspace,
 	type BrowserWorkspaceProps,
 } from "@eumenes/design-system";
+import { useEffect, useState } from "react";
+import { useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
-import { useAction } from "./components";
 import { useArtifactRuntime, type ArtifactRuntime } from "./runtime";
 
 /** What the host supplies for the browser screen; operations come from dispatch. */

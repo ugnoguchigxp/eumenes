@@ -241,6 +241,7 @@ function redirects(
 export type Announce = "fixed" | "try" | "partial" | "none";
 export type RouteDecision =
 	| { row: 1 | 7 | 8; to: "conversation" }
+	| { row: 8; to: "clarify"; question: string; unhandled: readonly string[] }
 	| { row: 8; to: "ask"; options: [RouteCandidate, RouteCandidate] }
 	| {
 			row: 2 | 3 | 4 | 5 | 6 | 9;
@@ -257,6 +258,7 @@ export function decidedId(decision: RouteDecision): string | null {
 		case "conversation":
 			return CONVERSATION_ID;
 		case "ask":
+		case "clarify":
 			// The user decides between the two: nothing is decided yet.
 			return null;
 		default:

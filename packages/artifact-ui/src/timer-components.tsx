@@ -1,6 +1,6 @@
 import { TimerWorkspace } from "@eumenes/design-system";
+import { Feedback, useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
-import { Feedback, useAction } from "./components";
 
 export function TimerWorkspaceView({ request }: { request: ArtifactRequest }) {
 	const action = useAction(request);

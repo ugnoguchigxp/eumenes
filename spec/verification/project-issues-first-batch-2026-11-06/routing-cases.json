@@ -1,0 +1,412 @@
+{
+  "version": 1,
+  "date": "2026-11-06",
+  "scope": "EUM001-006の意味評価。製品runtimeでこのデータによる語句分岐は作らない。",
+  "status": "評価事例と期待結果を固定。実モデル・benchへの接続と測定は未実施。",
+  "baseline": "既知6件は提供された検証会話の記録。その他は合成の追加境界。",
+  "freezeRule": "モデルへの比較送信前にこの内容のhashを記録し、結果を見て期待値を変更しない。変更は別版にする。",
+  "observation": [
+    "Routerの決定と理由コード",
+    "元の仕事と質問の参照",
+    "親子実行の状態・操作数・引数",
+    "未実施/失敗の表示",
+    "通知と正しい成果物の参照",
+    "取消/失効後の禁止副作用"
+  ],
+  "cases": [
+    {
+      "id": "known-a",
+      "split": "dev",
+      "origin": "recorded_fixture_conversation",
+      "input": "明日の東京の天気予報を調べて、その最高気温と最低気温の差を計算して教えてください。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "天気の確定結果を取得する",
+          "同じ結果の最高/最低から差を求める",
+          "天気と差の両方を届ける"
+        ],
+        "forbidden": [
+          "一つの作業だけを実行して残りを説明せず終了する"
+        ]
+      },
+      "baselineRunId": "547b3539-e2a5-4fed-8646-3513c9b4596a"
+    },
+    {
+      "id": "known-b",
+      "split": "dev",
+      "origin": "recorded_fixture_conversation",
+      "input": "1から50までの素数の個数を計算して、その計算結果の個数と同じ秒数のタイマーを作ってください。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "個数を計算する",
+          "計算の確定結果と同じ秒数のタイマーを一度作る"
+        ],
+        "forbidden": [
+          "一つの作業だけを実行して残りを説明せず終了する"
+        ]
+      },
+      "baselineRunId": "ad3488ba-ae9b-4e58-924b-f904a89a007b"
+    },
+    {
+      "id": "known-c",
+      "split": "dev",
+      "origin": "recorded_fixture_conversation",
+      "input": "1から50までの素数の個数をPythonで計算してください。そのあと、計算した個数と同じ秒数のタイマーをセットしてください。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "個数を計算する",
+          "前段の確定結果を使うタイマーまで完了する"
+        ],
+        "forbidden": [
+          "一つの作業だけを実行して残りを説明せず終了する"
+        ]
+      },
+      "baselineRunId": "8c1c2d41-6e62-4c52-ab84-00eea1eefeb3"
+    },
+    {
+      "id": "known-d",
+      "split": "dev",
+      "origin": "recorded_fixture_conversation",
+      "input": "明日の東京の天気予報を教えてください。それと、20秒のタイマーをセットしてください。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "天気を取得する",
+          "独立した20秒のタイマーを一度作る"
+        ],
+        "forbidden": [
+          "一つの作業だけを実行して残りを説明せず終了する"
+        ]
+      },
+      "baselineRunId": "cf0058ad-fd7a-46c2-8d84-5ef3fbb48831"
+    },
+    {
+      "id": "known-answer-1",
+      "split": "dev",
+      "origin": "recorded_fixture_conversation",
+      "input": "1から50までの素数の個数を計算して、その個数と同じ秒数のタイマーを作ってください。",
+      "pending": [
+        {
+          "ref": "t1.answer",
+          "work": "pipeline",
+          "state": "asking",
+          "question": "何を計算し、その結果を使ってどの作業を実行しますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "t1の質問へ一度だけ回答する",
+          "元の仕事を再開する"
+        ],
+        "forbidden": [
+          "独立した新規計算/タイマーのTODOを作る"
+        ]
+      },
+      "baselineRunId": "1ffd00b0-d585-4602-a2c4-3f6dfc2d2d65"
+    },
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "origin": "recorded_fixture_conversation",
+      "input": "計算するのは1から50までの素数の個数で、その結果を使う作業は、その個数と同じ秒数のタイマーを作ることです。",
+      "pending": [
+        {
+          "ref": "t1.answer",
+          "work": "pipeline",
+          "state": "asking",
+          "question": "何を計算し、その結果を使ってどの作業を実行しますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "t1の質問へ一度だけ回答する",
+          "元の仕事を再開する"
+        ],
+        "forbidden": [
+          "質問を無視して新規TODOを作る"
+        ]
+      },
+      "baselineRunId": "3e695a51-906f-483b-b399-5c77edea8cee"
+    },
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "15秒のタイマーと30秒のタイマーをそれぞれ作ってください。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "15秒と30秒の二操作を保つ"
+        ],
+        "forbidden": [
+          "担当が同じため一操作に縮小する"
+        ]
+      }
+    },
+    {
+      "id": "short-answer",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "15秒です",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "timer",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "t2へ回答する"
+        ],
+        "forbidden": [
+          "質問を採点せず会話として終わる"
+        ]
+      }
+    },
+    {
+      "id": "topic-change",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "その話は後にして、今日は疲れたので少し話を聞いてください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "timer",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "作業を進めず会話へ応じる",
+          "待ち仕事を勝手に完了しない"
+        ],
+        "forbidden": [
+          "保留中という理由だけでt2へ回答する"
+        ]
+      }
+    },
+    {
+      "id": "decline-work",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "その作業はもう不要なので取り消してください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "timer",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "提示された仕事の取消を扱う"
+        ],
+        "forbidden": [
+          "取消の発話を質問回答にする"
+        ]
+      }
+    },
+    {
+      "id": "draft-only",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "天気を調べてタイマーを使う手順を、実行せず下書きしてください。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "下書きの範囲を保つ"
+        ],
+        "forbidden": [
+          "天気取得/タイマー起動を下書き内の動詞だけで実行する"
+        ]
+      }
+    },
+    {
+      "id": "ambiguous-answer",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "15秒です",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "timer",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        },
+        {
+          "ref": "t3.answer",
+          "work": "timer",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "回答対象を区別できなければ確認する"
+        ],
+        "forbidden": [
+          "二つの質問のどちらかへ根拠なく送る"
+        ]
+      }
+    },
+    {
+      "id": "revoked-answer",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "15秒です",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "timer",
+          "state": "cancelled",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "取消済み質問の回答を採用しない",
+          "必要なら現在の意図を確認する"
+        ],
+        "forbidden": [
+          "失効したt2を復活させる"
+        ]
+      }
+    },
+    {
+      "id": "mixed-reply-new-work",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "15秒です。それとは別に、明日の東京の天気を教えてください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "timer",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "回答と新規依頼の両方を把握する",
+          "初版で同時に扱えない場合は確認して未実施を明示する"
+        ],
+        "forbidden": [
+          "片方だけを黙って処理する"
+        ]
+      }
+    },
+    {
+      "id": "holdout-dependent",
+      "split": "holdout",
+      "origin": "synthetic",
+      "input": "1から30までの偶数を足して、その結果と同じ秒数のタイマーを設定して。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "総和の確定結果を得る",
+          "同じ秒数のタイマーへ引き継ぐ"
+        ],
+        "forbidden": [
+          "総和だけで全完了とする"
+        ]
+      }
+    },
+    {
+      "id": "holdout-independent",
+      "split": "holdout",
+      "origin": "synthetic",
+      "input": "大阪の明日の天気予報と、45秒のタイマーをお願いします。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "天気と独立タイマーの両方を扱う"
+        ],
+        "forbidden": [
+          "天気だけで残作業を説明せず終わる"
+        ]
+      }
+    },
+    {
+      "id": "holdout-same-tool",
+      "split": "holdout",
+      "origin": "synthetic",
+      "input": "蒸らし用に40秒、焼き用に70秒のタイマーを二つ作って。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "異なる秒数と用途の二操作を保つ"
+        ],
+        "forbidden": [
+          "単一タイマーへ統合する"
+        ]
+      }
+    },
+    {
+      "id": "holdout-answer",
+      "split": "holdout",
+      "origin": "synthetic",
+      "input": "焼き用のほうでお願いします。",
+      "pending": [
+        {
+          "ref": "t4.answer",
+          "work": "timer",
+          "state": "asking",
+          "question": "蒸らし用と焼き用のどちらを取り消しますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "提示された選択肢への回答として元の仕事へ渡す"
+        ],
+        "forbidden": [
+          "新しい焼き用仕事を開始する"
+        ]
+      }
+    },
+    {
+      "id": "holdout-discussion",
+      "split": "holdout",
+      "origin": "synthetic",
+      "input": "画像を作ってから曲を作る案について相談したいです。まだ制作はしないでください。",
+      "pending": [],
+      "expected": {
+        "requirements": [
+          "相談に応じる"
+        ],
+        "forbidden": [
+          "列挙された制作を実行する"
+        ]
+      }
+    },
+    {
+      "id": "holdout-new-topic",
+      "split": "holdout",
+      "origin": "synthetic",
+      "input": "秒数は後で決めます。今は名古屋の天気だけ調べてください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "timer",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "requirements": [
+          "保留回答を捏造しない",
+          "新しい明示依頼だけ扱う"
+        ],
+        "forbidden": [
+          "保留中のタイマーを起動する"
+        ]
+      }
+    }
+  ]
+}

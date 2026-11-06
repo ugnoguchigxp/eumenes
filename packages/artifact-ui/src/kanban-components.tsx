@@ -4,8 +4,8 @@ import {
 	type KanbanBoardProps,
 	type KanbanBoardQueue,
 } from "@eumenes/design-system";
+import { Feedback, useAction } from "./action";
 import type { ArtifactEvent, ArtifactRequest } from "./contracts";
-import { Feedback, useAction } from "./components";
 
 /*
  * The board source as the Kanban domain publishes it (`KanbanBoardView` in

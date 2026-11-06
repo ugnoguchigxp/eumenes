@@ -1,7 +1,13 @@
 import { expect, test } from "bun:test";
-import type { LarmPort } from "../../larm";
 import { systemContext } from "../../../infrastructure/system-context";
-import { setup, say, until, wav } from "./settings-voice.fixture";
+import type { LarmPort } from "../../larm";
+import {
+	createSettingsVoiceFixture,
+	say,
+	until,
+	wav,
+} from "./settings-voice.fixture";
+const { setup } = createSettingsVoiceFixture();
 
 /**
  * The local harness's routed turn on the real request lifecycle (the local harness rebuild plan, section 4.5): a call

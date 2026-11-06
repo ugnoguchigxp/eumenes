@@ -2,8 +2,8 @@ import {
 	ComputeWorkspace,
 	type ComputeWorkspaceProps,
 } from "@eumenes/design-system";
+import { useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
-import { useAction } from "./components";
 export type ComputeWorkspaceResource = Pick<
 	ComputeWorkspaceProps,
 	"jobs" | "available" | "selectedJobId"

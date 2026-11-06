@@ -17,7 +17,7 @@ test("rolled-back and stale rejections are not logged as committed failures", as
 		},
 	});
 	try {
-		const _root = await h.start("root");
+		await h.start("root");
 
 		const t = h.task(
 			h.agents.list("root").find((t) => t.kind === "worker")!.id,

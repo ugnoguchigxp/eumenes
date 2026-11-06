@@ -2,8 +2,8 @@ import {
 	RecordsWorkspace,
 	type RecordsWorkspaceProps,
 } from "@eumenes/design-system";
+import { useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
-import { useAction } from "./components";
 
 export type RecordsResource = Omit<
 	RecordsWorkspaceProps,

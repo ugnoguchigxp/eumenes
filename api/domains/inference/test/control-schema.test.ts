@@ -1,15 +1,13 @@
+import type { query } from "@anthropic-ai/claude-agent-sdk";
 import { expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { query } from "@anthropic-ai/claude-agent-sdk";
-import {
-	createCloudAgents,
-	type CloudAgentCall,
-} from "../adapters/cloud-agents";
-import { cloudRequest, type CloudEnv } from "../service/cloud";
-import type { RequestRow } from "../repository";
 import type { Connection, Resource } from "../../settings/contracts";
+import { type CloudAgentCall } from "../adapters/cloud-agent-shared";
+import { createCloudAgents } from "../adapters/cloud-agents";
+import type { RequestRow } from "../repository";
+import { cloudRequest, type CloudEnv } from "../service/cloud";
 
 // The schema of a structured-output control request (the options execute.ts builds for it) reaches every route.
 const schema = {

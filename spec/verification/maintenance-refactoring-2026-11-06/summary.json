@@ -1,0 +1,220 @@
+{
+  "base": "3eb6a54032cd54548df299f1a93ec5df2e2bdd64",
+  "date": "2026-11-06",
+  "mode": "fixture and muted headless WebGL; no live provider or physical device acceptance",
+  "ownedCodeFiles": 93,
+  "verificationRoot": "/tmp/eumenes-maintenance-verify-20261106",
+  "codeMatchesVerifiedSnapshot": true,
+  "sharedDesignSystemOutput": {
+    "originalDistBefore": "b1fdaafb5a53f92bef6669393927e367f943cfd9575cc636ea59f62bb60eb9ad",
+    "originalDistAfter": "b1fdaafb5a53f92bef6669393927e367f943cfd9575cc636ea59f62bb60eb9ad",
+    "unchanged": true
+  },
+  "verification": [
+    {
+      "file": "verify-23-domains.json",
+      "runId": "2026-11-06T08-22-41-114Z-65e74de6-1239-4005-8af6-60db9aa810f7",
+      "domains": [
+        "memory",
+        "steward",
+        "world",
+        "browser",
+        "inference",
+        "dialogue",
+        "audio",
+        "voice-dialogue",
+        "live-voice",
+        "conversation",
+        "attitude-dataset",
+        "delivery",
+        "artifact",
+        "settings",
+        "agent-runtime",
+        "capabilities",
+        "toolchain-history",
+        "ocr",
+        "object-recognition",
+        "model3d",
+        "ui-compositions",
+        "timers",
+        "queue"
+      ],
+      "result": "pass",
+      "integrityErrors": []
+    },
+    {
+      "file": "verify-final-3-domains.json",
+      "runId": "2026-11-06T08-30-11-852Z-8e509732-6684-48b0-b73d-c901f1d958f0",
+      "domains": [
+        "browser",
+        "inference",
+        "artifact"
+      ],
+      "result": "pass",
+      "integrityErrors": []
+    }
+  ],
+  "tests": {
+    "before": {
+      "api": 1102,
+      "web": 208
+    },
+    "verify23": {
+      "api": 2808,
+      "web": 525,
+      "designSystem": 90,
+      "total": 3423
+    },
+    "verifyFinal3": {
+      "api": 864,
+      "web": 126,
+      "designSystem": 58,
+      "total": 1048,
+      "overlap": true
+    },
+    "migrationGolden": 17
+  },
+  "size": {
+    "over800TsFilesBefore": 1,
+    "over800TsFilesAfter": 0,
+    "over300FunctionsBefore": 23,
+    "over300FunctionsAfter": 21,
+    "over1000TestFilesBefore": 3,
+    "over1000TestFilesAfter": 0,
+    "budgetRelaxed": false,
+    "jsAndCssExcludedFromExistingRatchet": true,
+    "files": [
+      {
+        "path": "api/application/agency/host.ts",
+        "before": 854,
+        "after": 604
+      },
+      {
+        "path": "api/domains/memory/service/index.ts",
+        "before": 772,
+        "after": 511
+      },
+      {
+        "path": "api/domains/browser/service/interact-execution.ts",
+        "before": 454,
+        "after": 387
+      },
+      {
+        "path": "api/domains/inference/adapters/cloud-agents.ts",
+        "before": 785,
+        "after": 47
+      },
+      {
+        "path": "api/domains/browser/adapters/mcp-driver.ts",
+        "before": 777,
+        "after": 432
+      },
+      {
+        "path": "api/domains/attitude-dataset/service/index.ts",
+        "before": 648,
+        "after": 117
+      },
+      {
+        "path": "packages/artifact-ui/src/components.tsx",
+        "before": 745,
+        "after": 7
+      },
+      {
+        "path": "packages/artifact-ui/src/collection-components.tsx",
+        "before": 757,
+        "after": 562
+      },
+      {
+        "path": "packages/artifact-ui/src/service-test-components.tsx",
+        "before": 755,
+        "after": 547
+      },
+      {
+        "path": "packages/artifact-ui/src/ui-studio-components.tsx",
+        "before": 700,
+        "after": 510
+      },
+      {
+        "path": "web/src/domains/audio/controller/index.ts",
+        "before": 737,
+        "after": 456
+      },
+      {
+        "path": "web/src/domains/voice-dialogue/hooks/index.ts",
+        "before": 528,
+        "after": 347
+      },
+      {
+        "path": "web/src/components/domains/conversation/light-avatar/model.js",
+        "before": 1316,
+        "after": 800
+      },
+      {
+        "path": "api/application/settings/settings-adapter.test.ts",
+        "before": 1617,
+        "after": 571
+      },
+      {
+        "path": "web/src/domains/settings-data/settings.fixture.tsx",
+        "before": 1135,
+        "after": 442
+      },
+      {
+        "path": "api/domains/voice-dialogue/test/settings-integration.test.ts",
+        "before": 1001,
+        "after": 526
+      }
+    ]
+  },
+  "unused": {
+    "localsAndParameters": 0,
+    "remainingKnipReports": [
+      "toolchainPassages: used by application tests and fixtures",
+      "INPUT_HEADINGS: used by application fixtures",
+      "SourcePort: used by pursuit fixture"
+    ],
+    "unusedFiles": 0
+  },
+  "knownExistingFailure": {
+    "check": "bundle:check",
+    "beforeAlsoFails": true,
+    "budgetChanged": false,
+    "comparison": "bundle-comparison.json"
+  },
+  "review": {
+    "performedBy": "implementer; no independent review claimed",
+    "llmInstructionsOrSemanticDecisionsChanged": false,
+    "schemaMigrationOrPublicHttpContractChanged": false,
+    "newFallbackRetryOrPriority": false,
+    "knownUnresolvedRefactorDefects": []
+  },
+  "excludedParallelChanges": [
+    "docs/verification.md",
+    "scripts/domains.ts",
+    "scripts/verification-selection.ts",
+    "scripts/verification-selection.test.ts",
+    "spec/README.md",
+    "spec/project-issues-2026-11-06.md",
+    "spec/project-issues-first-batch-2026-11-06.md",
+    "spec/pipeline-0.1.0-hardening-2026-11-06.md",
+    "spec/verification/pipeline-0.1.0-2026-11-06/live/"
+  ],
+  "commitPreparation": {
+    "authorization": "all working tree changes, commit and push",
+    "typeFix": "scripts/verification-selection.ts: Set<string> for membership tests against arbitrary file paths",
+    "runtimeBehaviorChanged": false,
+    "rootTypecheck": {
+      "files": 2955,
+      "result": "pass"
+    },
+    "selectionTests": {
+      "result": "pass",
+      "passed": 18,
+      "failed": 0,
+      "location": "fixed tracked-source copy",
+      "log": "commit-selection-tests.log"
+    },
+    "originalTreeTestIssue": "ignored historical source copies under artifacts were discovered as test candidates; no exclusions or expectations weakened",
+    "verificationSelectionSha256": "83dd7f28edace1b6216b91d7f5fa3052cae4b64254d31021a6749f8c4870f981"
+  }
+}

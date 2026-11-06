@@ -1,0 +1,7 @@
+$ knip --include files,exports,types
+Unused exports (2)
+toolchainPassages  api/domains/capabilities/index.ts:8:2
+INPUT_HEADINGS     api/domains/dialogue/index.ts:17:10  
+Unused exported types (1)
+SourcePort  type  api/domains/pursuit/index.ts:3:32
+error: script "deadcode" exited with code 1

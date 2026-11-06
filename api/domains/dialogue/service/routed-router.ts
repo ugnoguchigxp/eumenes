@@ -61,6 +61,8 @@ type Consulted = {
 	words: string;
 	/** Null when the router failed or timed out (row 10). */
 	decision: RouteDecision | null;
+	/** The current utterance's literal answer span, validated by the structured router. */
+	answerText?: string;
 	/** The previous routed turn of the conversation, within the correction window. */
 	latest: RouterTraceRecord | null;
 	/** Writes the turn's trace again with these parts changed (a redirect carried out, a question asked once more). */
@@ -167,11 +169,16 @@ async function consult(
 				: null;
 		const routeTurn: RouteTurn = {
 			state: {
-				text,
+				text: settings.entry === "routeStructured" ? turn.utterance : text,
 				previousAgent: routed.previousReply,
 				previousUser: routed.earlier.at(-1) ?? null,
 			},
 			dynamic,
+			pending: routed.pending.questions.map((q) => ({
+				ref: `t${q.ref}.answer`,
+				title: q.title,
+				question: q.question,
+			})),
 			retained: input.retained.map((entry) => entry.card.id),
 			available: (id) =>
 				id === CONVERSATION_ID || id === MEMORY_ID || available.has(id),
@@ -260,7 +267,10 @@ async function consult(
 			durationMs,
 		});
 	else log.warn("dialogue.router_failed", { reason: error ?? "router_failed" });
-	return { candidates, words, decision, latest, retrace: trace };
+	return {
+		candidates, words, decision, latest, retrace: trace,
+		...(result?.structure?.kind === "answer" ? { answerText: result.structure.text } : {}),
+	};
 }
 
 /** Corrections that name different right answers are taken out of use and left for the user's review. */
@@ -322,7 +332,13 @@ export async function routerTurn(
 		: turn.utterance;
 	const consulted = await consult(turn, router, words);
 	// A router that failed leaves the turn to the talk turn (row 10); nothing is promised.
-	if (!consulted.decision) return "talk";
+	if (!consulted.decision) {
+		if (router.settings.entry === "routeStructured") {
+			turn.speak(systemContext("dialogue.contexts.local.router-unperformed", {}));
+			return "done";
+		}
+		return "talk";
+	}
 	const step = await carryOut(turn, consulted, consulted.decision);
 	if (typeof step === "string") return step;
 	// The host could not carry it out: it says so, and the router's choice is not made again.
@@ -351,6 +367,11 @@ async function carryOut(
 	decision: RouteDecision,
 ): Promise<Step> {
 	switch (decision.to) {
+		case "clarify":
+			return askBack(turn, systemContext("dialogue.contexts.local.router-clarify", {
+				question: decision.question,
+				unhandled: decision.unhandled.join("\n"),
+			}));
 		case "conversation":
 			return "talk";
 		case "ask":
@@ -486,7 +507,7 @@ async function run(
 			if (c.operation === "decline")
 				return declineConfirmation(turn, c.confirmation);
 			if (c.operation === "discard") return discard(turn, c);
-			return answerQuestion(turn, c.todo, turn.utterance);
+			return answerQuestion(turn, c.todo, consulted.answerText ?? turn.utterance);
 	}
 }
 

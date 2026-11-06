@@ -2,9 +2,9 @@ import {
 	DrawingWorkspace,
 	type DrawingWorkspaceProps,
 } from "@eumenes/design-system";
-import type { ArtifactRequest } from "./contracts";
-import { useAction } from "./components";
 import { z } from "zod";
+import { useAction } from "./action";
+import type { ArtifactRequest } from "./contracts";
 export type DrawingResource = Omit<
 	DrawingWorkspaceProps,
 	"onNew" | "onOpen" | "onRefresh" | "onDelete" | "onBrowse"

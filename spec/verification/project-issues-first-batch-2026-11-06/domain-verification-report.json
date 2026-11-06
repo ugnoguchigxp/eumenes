@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-11-06T08-18-45-752Z-b5a67cac-7a32-4947-a76c-3b27f9683aa7",
+  "startedAt": "2026-11-06T08:18:45.752Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "pipelines"
+    ]
+  },
+  "baseCommit": "3eb6a54032cd54548df299f1a93ec5df2e2bdd64",
+  "revision": "9537cfd4a3aa4469cff0d643e688e08e8c270d7b934260f4645f3fa8220abf99",
+  "runtime": {
+    "bun": "1.4.4",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "pass",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 63
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 2262
+    },
+    {
+      "name": "system-context",
+      "status": "pass",
+      "ms": 123
+    },
+    {
+      "name": "size-budget",
+      "status": "pass",
+      "ms": 1096,
+      "warnings": [
+        "size-budget: new function over 300 lines: api/domains/browser/service/interact-execution.ts#createInteractExecution (312)",
+        "size-budget: api/domains/memory/service/index.ts#createMemoryService grew 530 -> 602 (limit 300)"
+      ]
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "pass",
+      "ms": 1347
+    },
+    {
+      "name": "domain-docs",
+      "status": "pass",
+      "ms": 15
+    },
+    {
+      "name": "format",
+      "status": "pass",
+      "ms": 152
+    },
+    {
+      "name": "lint",
+      "status": "pass",
+      "ms": 275
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "pass",
+      "ms": 240,
+      "log": "steps/09-design-system-typecheck.log",
+      "exitCode": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "pass",
+      "ms": 6988,
+      "log": "steps/10-design-system-build.log",
+      "exitCode": 0
+    },
+    {
+      "name": "typecheck",
+      "status": "pass",
+      "ms": 996,
+      "warnings": [
+        "scripts/verification-selection.ts(87,20): error TS2345: Argument of type 'string' is not assignable to parameter of type '\"api/application/pipelines/pipeline-execution.test.ts\" | \"api/application/pipelines/vendor.test.ts\"'."
+      ]
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/application/pipelines/pipeline-execution.test.ts",
+        "./api/application/pipelines/vendor.test.ts"
+      ],
+      "status": "pass",
+      "ms": 1261,
+      "log": "steps/12-bun-tests.log",
+      "exitCode": 0
+    }
+  ],
+  "totalMs": 15187,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true,
+    "inputRevision": "9537cfd4a3aa4469cff0d643e688e08e8c270d7b934260f4645f3fa8220abf99",
+    "distAfterBuild": "2acc12cdd8bdeb17267446fbe82654b12e104aa7db56402af618132a95ae2553",
+    "distAfterConsumers": "2acc12cdd8bdeb17267446fbe82654b12e104aa7db56402af618132a95ae2553"
+  },
+  "finalRevision": "9537cfd4a3aa4469cff0d643e688e08e8c270d7b934260f4645f3fa8220abf99",
+  "finishedAt": "2026-11-06T08:19:01.389Z"
+}

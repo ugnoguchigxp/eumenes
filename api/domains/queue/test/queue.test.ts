@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createQueue, migration, type HandlerDefinition } from "..";
+import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { waitFor as until } from "../../../infrastructure/wait-for";
 
 const listAttempts = (db: Database, jobId: string) =>
@@ -79,7 +79,7 @@ interface Control {
 	ignoreSignal: boolean;
 }
 function fakeHandler(
-	store: SqliteStore,
+	_store: SqliteStore,
 	control: Control,
 	extra: Partial<
 		HandlerDefinition<{ id: string }, { id: string }, string>

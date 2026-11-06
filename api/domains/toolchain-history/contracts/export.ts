@@ -105,5 +105,4 @@ export const routerExportSchema = z.object({
 		),
 	}),
 });
-export type ExportCard = z.infer<typeof exportCardSchema>;
 export type RouterExport = z.infer<typeof routerExportSchema>;

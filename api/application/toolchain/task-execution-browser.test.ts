@@ -1,26 +1,26 @@
-import { taskPlan, taskItem } from "./task-plan.fixture";
 import { expect, test } from "bun:test";
-import { harness } from "./toolchain.fixture";
-import { afterUtterance, toolResults } from "./conversation-script.fixture";
-import { handOverTask } from "./task-delegation.fixture";
 import { createBrowser } from "../../domains/browser";
 import {
+	fakeBrave,
 	FakeDriver,
 	FakeEncoder,
 	FakeFiles,
 	fakeResolver,
-	fakeBrave,
 } from "../../domains/browser/test/fakes";
+import { waitFor } from "../../infrastructure/wait-for";
+import { registerBrowserEffects } from "../browser/browser-effects";
+import { createTaskRunner } from "../browser/browser-task-runner";
 import {
 	fakeInference,
-	observation,
-	invoke,
 	finish,
+	invoke,
 	lastResult,
+	observation,
 } from "../browser/browser-task.fixture";
-import { createTaskRunner } from "../browser/browser-task-runner";
-import { registerBrowserEffects } from "../browser/browser-effects";
-import { waitFor } from "../../infrastructure/wait-for";
+import { afterUtterance, toolResults } from "./conversation-script.fixture";
+import { handOverTask } from "./task-delegation.fixture";
+import { taskItem, taskPlan } from "./task-plan.fixture";
+import { harness } from "./toolchain.fixture";
 
 const VIDEO = "https://example.com/watch?v=selected";
 const ORIGINAL =
@@ -190,7 +190,7 @@ test("one public request searches, passes the exact result URL to a browser chil
 				},
 			});
 		},
-		taskStep: (tools, messages) => {
+		taskStep: (_tools, messages) => {
 			const packet = JSON.parse(messages.at(-1)!.content);
 			if (packet.plan.required)
 				return taskPlan(

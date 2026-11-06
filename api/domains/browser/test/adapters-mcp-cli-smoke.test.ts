@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ALLOWED_MCP_TOOLS, pinnedCliLaunch } from "../adapters/mcp-driver";
+import { pinnedCliLaunch } from "../adapters/mcp-driver";
+import { ALLOWED_MCP_TOOLS } from "../adapters/mcp-driver-tools";
 import { startMcpSession } from "../adapters/mcp-session";
 
 /**

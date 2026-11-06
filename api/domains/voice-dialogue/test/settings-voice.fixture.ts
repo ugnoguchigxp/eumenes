@@ -2,36 +2,32 @@ import { afterEach } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createVoiceDialogue, migrations as voiceMigrations } from "..";
 import { openStore, orderMigrations } from "../../../infrastructure/sqlite";
 import {
-	createConversationService,
-	migrations as conversationMigrations,
-} from "../../conversation";
-import {
-	createContinuityService,
 	migrations as continuityMigrations,
+	createContinuityService,
 } from "../../continuity";
+import {
+	migrations as conversationMigrations,
+	createConversationService,
+} from "../../conversation";
 import {
 	createDialogueService,
 	migrations as dialogueMigrations,
 } from "../../dialogue";
+import {
+	createInference,
+	migrations as inferenceMigrations,
+} from "../../inference";
+import type { LarmPort } from "../../larm";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import { migrations as schedulerMigrations } from "../../scheduler";
 import {
 	createSettings,
 	migrations as settingsMigrations,
 } from "../../settings";
-import {
-	createInference,
-	migrations as inferenceMigrations,
-} from "../../inference";
-import { createVoiceDialogue, migrations as voiceMigrations } from "..";
-import type { LarmPort } from "../../larm";
 import { testConversationAgent } from "./conversation-agent.fixture";
-const cleanup: Array<() => Promise<void>> = [];
-afterEach(async () => {
-	for (const close of cleanup.splice(0)) await close();
-});
 /** A chat completion that says `text` (a conversation reply is plain text; no call closes it). */
 export function completion(text: string) {
 	return {
@@ -51,7 +47,22 @@ export function wav() {
 	b.set(new TextEncoder().encode("WAVE"), 8);
 	return b;
 }
-export async function setup(
+export function createSettingsVoiceFixture() {
+	const cleanup: Array<() => Promise<void>> = [];
+	afterEach(async () => {
+		for (const close of cleanup.splice(0)) await close();
+	});
+	return {
+		setup: (
+			...args: Parameters<typeof setup> extends [unknown, ...infer Args]
+				? Args
+				: never
+		) => setup(cleanup, ...args),
+	};
+}
+
+async function setup(
+	cleanup: Array<() => Promise<void>>,
 	fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
 	local: Partial<LarmPort> = {},
 ) {
@@ -177,3 +188,8 @@ export async function say(
 	const turn = h.voice.get(id)!;
 	if (turn.status === "input_ready") await h.voice.commit(id, turn.revision);
 }
+
+export const ready = (): ReturnType<LarmPort["status"]> => ({
+	state: "ready",
+	capabilities: ["llm", "asr", "tts"],
+});

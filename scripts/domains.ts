@@ -227,6 +227,10 @@ export const domains = {
 		backend: "api/domains/pipelines",
 		web: null,
 		components: null,
+		integrationTests: [
+			"api/application/pipelines/pipeline-execution.test.ts",
+			"api/application/pipelines/vendor.test.ts",
+		],
 		depends: {
 			api: [],
 			web: [],

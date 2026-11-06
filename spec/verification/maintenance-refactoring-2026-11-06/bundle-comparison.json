@@ -1,0 +1,52 @@
+{
+  "before": {
+    "entryGzip": 189738,
+    "initialGzip": 336595,
+    "files": {
+      "assets/index-v0HOl25l.js": 189738,
+      "assets/rolldown-runtime-BCiCTKAo.js": 713,
+      "assets/query-BdOFaZc_.js": 25799,
+      "assets/radix-_g6Nll25.js": 44237,
+      "assets/react-9lStHr2n.js": 55755,
+      "assets/zod-mUMWkQKK.js": 20353
+    }
+  },
+  "after": {
+    "entryGzip": 190320,
+    "initialGzip": 337177,
+    "files": {
+      "assets/index-DB2b1tEv.js": 190320,
+      "assets/rolldown-runtime-BCiCTKAo.js": 713,
+      "assets/query-BdOFaZc_.js": 25799,
+      "assets/radix-_g6Nll25.js": 44237,
+      "assets/react-9lStHr2n.js": 55755,
+      "assets/zod-mUMWkQKK.js": 20353
+    }
+  },
+  "delta": {
+    "entryGzip": 582,
+    "initialGzip": 582
+  },
+  "recorded": {
+    "entryGzip": 112035,
+    "initialGzip": 259653
+  },
+  "baselineAgainstRecorded": {
+    "failures": [
+      "entryGzip: 189738 B exceeds the recorded 112035 B (limit 114275 B)",
+      "initialGzip: 336595 B exceeds the recorded 259653 B (limit 264846 B)"
+    ],
+    "notices": []
+  },
+  "finalAgainstRecorded": {
+    "failures": [
+      "entryGzip: 190320 B exceeds the recorded 112035 B (limit 114275 B)",
+      "initialGzip: 337177 B exceeds the recorded 259653 B (limit 264846 B)"
+    ],
+    "notices": []
+  },
+  "finalAgainstBefore": {
+    "failures": [],
+    "notices": []
+  }
+}

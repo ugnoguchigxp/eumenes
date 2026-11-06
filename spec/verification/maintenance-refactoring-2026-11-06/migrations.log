@@ -1,0 +1,25 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/migrations.test.ts:
+(pass) GOLDEN: the legacy order and every deployed SQL string are byte-for-byte unchanged [0.22ms]
+(pass) a database that holds a migration this code does not know refuses to start [486.77ms]
+(pass) a migration with `after` is applied after its dependencies, wherever it sits in the list [16.68ms]
+(pass) migration ordering is stable and rejects cycles, unknown dependencies and duplicate ids [0.15ms]
+(pass) the memory package's migrations keep their order and every one is applied; the first four stay contiguous [0.16ms]
+(pass) host migrations are frozen: the count and the retired slot never move [0.01ms]
+(pass) every migration is named once, and none outside the frozen order exists yet without `after` [0.18ms]
+(pass) a fresh database gets every migration and passes the memory schema check [454.59ms]
+(pass) an applied migration that is rewritten later stops startup with its id only [14.46ms]
+(pass) an existing 0.3.3 host database upgrades without rewriting migration checksums or losing data [458.25ms]
+(pass) World source/goal migrations are appended last and upgrade an already-deployed database [459.94ms]
+(pass) with the full production migrations, retracting a message referenced by a dialogue run tombstones it [449.98ms]
+(pass) World's package migrations stay contiguous, and timers is appended after them [0.33ms]
+(pass) a fresh database gets the World schema; World is OFF and its schema is current [471.59ms]
+(pass) an already-deployed database (data present, no World yet) upgrades and keeps its data [524.34ms]
+(pass) a drifted World schema disables World; an edited World migration stops startup [586.16ms]
+(pass) research/history metadata migrations append after the frozen legacy order and upgrade without copying message bodies [508.81ms]
+
+ 17 pass
+ 0 fail
+ 738 expect() calls
+Ran 17 tests across 1 file. [4.98s]

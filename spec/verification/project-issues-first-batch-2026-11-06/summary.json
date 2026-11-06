@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-06",
+  "baseCommit": "3eb6a54032cd54548df299f1a93ec5df2e2bdd64",
+  "scope": "固定した前回基準と今回担当の4ファイル。保守性の並行変更は含めない。",
+  "baseline": {
+    "selection": [],
+    "regressionCommand": "bun test scripts/verification-selection.test.ts",
+    "exitCode": 1,
+    "passed": 0,
+    "failed": 4
+  },
+  "final": {
+    "selectionTests": {
+      "command": "env -i PATH=<runtime path> TMPDIR=/tmp bun test ./scripts/verification-selection.test.ts ./scripts/verification.test.ts",
+      "exitCode": 0,
+      "passed": 18,
+      "failed": 0
+    },
+    "pipelineIntegration": {
+      "command": "env -i PATH=<runtime path> TMPDIR=/tmp bun test ./api/application/pipelines/pipeline-execution.test.ts ./api/application/pipelines/vendor.test.ts",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0
+    },
+    "domain": {
+      "command": "env -i PATH=<runtime path> TMPDIR=/tmp bun run verify -- --domain pipelines",
+      "exitCode": 0,
+      "result": "pass",
+      "totalMs": 15187,
+      "revision": "9537cfd4a3aa4469cff0d643e688e08e8c270d7b934260f4645f3fa8220abf99",
+      "finalRevision": "9537cfd4a3aa4469cff0d643e688e08e8c270d7b934260f4645f3fa8220abf99"
+    }
+  },
+  "ownedFiles": {
+    "scripts/domains.ts": "3a48848a91e43bf1d7c35bb809d88a352bb737d7db079878ffe0cf8eed71b235",
+    "scripts/verification-selection.ts": "50e50f6131862c7cc8abc75a8bbdbbefc26dc84c743e758486735a80c46342f4",
+    "scripts/verification-selection.test.ts": "1c0179ef4fbe72afa153b890c411f38028245af8475e45b08d21666adfec54f7",
+    "docs/verification.md": "e024f7c8d3afef8ca3d4e2e55027808a1fc12da08e344350c39ab35d2e91a68b"
+  },
+  "excluded": "CI、製品DBと設定、サーバー操作、新規live、保守性の別改修の受入",
+  "routerContractProbe": {
+    "input": "合成の短い回答と有効なt1.answer候補。構造出力はrequests=[]。",
+    "actualDecision": {
+      "row": 1,
+      "to": "conversation"
+    },
+    "scoringCalls": 0,
+    "interpretation": "構造解析へ切り替えるだけでは保留回答を保証しない。実モデルの失敗率ではない。"
+  }
+}

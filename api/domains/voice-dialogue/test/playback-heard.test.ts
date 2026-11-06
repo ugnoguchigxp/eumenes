@@ -1,6 +1,12 @@
 import { expect, test } from "bun:test";
 import { createContinuityService } from "../../continuity";
-import { say, setup, until, wav } from "./settings-voice.fixture";
+import {
+	createSettingsVoiceFixture,
+	say,
+	until,
+	wav,
+} from "./settings-voice.fixture";
+const { setup } = createSettingsVoiceFixture();
 
 /** How far a spoken answer reached the user is logged as its `delivered` event (the ContextWindow spec, 8.1). */
 /** The `delivered` events the host logged for the main conversation, as the fields it wrote. */

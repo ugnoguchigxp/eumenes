@@ -1,56 +1,43 @@
-import { existsSync } from "node:fs";
-import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
-import {
-	CONTRACT_VERSIONS,
-	sliceUtf8Range,
-	verifyForgetJournal,
-} from "eumenes-memory";
 import type { AccessContext } from "eumenes-memory";
+import { sliceUtf8Range } from "eumenes-memory";
+import pkg from "eumenes-memory/package.json";
+import type { StateItem } from "eumenes-memory/sqlite";
 import {
-	assertMemorySchema,
-	reconcileForgetJournal,
-} from "eumenes-memory/sqlite";
-import type { ForgetJournalEntry, StateItem } from "eumenes-memory/sqlite";
+	planWindow,
+	REFERENCE_WINDOW_TOKENS,
+	type WindowPlan,
+} from "../../../infrastructure/context-budget";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import type { ConversationService } from "../../conversation";
 import type { ContinuityService } from "../../continuity";
+import type { ConversationService } from "../../conversation";
 import {
+	PRINCIPAL,
+	PROFILE_SCOPE,
 	type ForgetInput,
 	type ForgetOutcome,
 	type ForgetPurge,
 	type MemoryEmbed,
 	type MemoryItemDto,
 	type MemoryStatus,
-	PRINCIPAL,
-	PROFILE_SCOPE,
 	type PreparedWindow,
 	type SettleResult,
 	type TurnRecall,
 } from "../contracts";
+import type { MemorySeed } from "../contracts/seeds";
 import {
-	bumpForgetSeq,
-	deleteTendenciesByEvidence,
 	getUsage,
 	insertUsage,
-	isBlockApplied,
 	provenanceOf,
 	pruneUsage,
-	readSettings,
-	writeSettings,
 	purgeSeedSources,
+	readSettings,
 	SEED_NAMESPACE,
+	writeSettings,
 } from "../repository";
-import type { MemorySeed } from "../contracts/seeds";
-import { createSeedImport } from "./seeds";
-import { seedEvidence } from "./seed-sources";
+import { deleteUsage, purgeUsageFor } from "../repository/usage";
 import { createAgentVectors } from "./agent-vectors";
-import {
-	REFERENCE_WINDOW_TOKENS,
-	planWindow,
-	type WindowPlan,
-} from "../../../infrastructure/context-budget";
-import { guardContinuity } from "./continuity-guard";
+import { createBackfill } from "./backfill";
 import {
 	createContextWindowStore,
 	type CheckedItems,
@@ -58,25 +45,19 @@ import {
 	type ReadItemsInput,
 	type WindowSnapshot,
 } from "./context-window";
+import { guardContinuity } from "./continuity-guard";
 import { createCuration } from "./curation";
-import { createForget } from "./forget";
-import {
-	type BlockJournalEntry,
-	blockJournalPathOf,
-	intentOf,
-	intentsOf,
-	readJournal,
-	readJournalLenient,
-	setJournalAside,
-} from "./journal";
-import { createBackfill } from "./backfill";
-import { createLedger } from "./ledger";
-import { recallTurns, type RecallInput } from "./turn-recall";
-import { dropVectorsOnRetract } from "./retract-vectors";
-import { createMemoryViews } from "./views";
-import { validityOf } from "./validity";
-import pkg from "eumenes-memory/package.json";
 import { executionReferences } from "./execution-references";
+import { createForget } from "./forget";
+import { createLedger } from "./ledger";
+import { createMemoryRecovery } from "./recovery";
+import { dropVectorsOnRetract } from "./retract-vectors";
+import { seedEvidence } from "./seed-sources";
+import { createSeedImport } from "./seeds";
+import { listAllState } from "./state-snapshot";
+import { recallTurns, type RecallInput } from "./turn-recall";
+import { validityOf } from "./validity";
+import { createMemoryViews } from "./views";
 
 const PACKAGE_VERSION = pkg.version;
 
@@ -148,16 +129,6 @@ export const NOMINAL_FIXED_TOKENS = 3000;
 const referencePlan = () =>
 	planWindow({ window: REFERENCE_WINDOW_TOKENS, fixed: NOMINAL_FIXED_TOKENS });
 
-/** A recovery step that must roll the recovery transaction back; `reason` is what `recover` reports. */
-class RecoveryStepFailed extends Error {
-	constructor(
-		readonly reason: string,
-		cause: unknown,
-	) {
-		super(reason, { cause });
-	}
-}
-
 export function createMemoryService(
 	store: SqliteStore,
 	conversation: ConversationService,
@@ -176,9 +147,7 @@ export function createMemoryService(
 	const windowPlan = options.windowPlan ?? referencePlan;
 	const clock = options.clock ?? (() => new Date().toISOString());
 	const newId = options.id ?? (() => crypto.randomUUID());
-	let healthy = false;
-	/** Set by a failed recovery, cleared by the next good one. */
-	let wasUnhealthy = false;
+	const health = { healthy: false, wasUnhealthy: false };
 	/**
 	 * The policy revision access() puts into every AccessContext. Other domains
 	 * (World) that must present the SAME revision to Memory read it here, never
@@ -217,37 +186,6 @@ export function createMemoryService(
 		return result.items;
 	}
 
-	/** Removes receipts that reference any of the given items, in one pass over the (pruned, bounded) table. */
-	function purgeUsageFor(db: Database, itemIds: Iterable<string>) {
-		const targets = new Set(itemIds);
-		if (targets.size === 0) return;
-		const rows = db
-			.query("SELECT run_id, item_ids FROM memory_usage")
-			.all() as Array<{
-			run_id: string;
-			item_ids: string;
-		}>;
-		const remove = db.query("DELETE FROM memory_usage WHERE run_id = ?");
-		for (const row of rows) {
-			const ids = JSON.parse(row.item_ids) as string[];
-			if (ids.some((id) => targets.has(id))) remove.run(row.run_id);
-		}
-	}
-
-	/** A transient failure (busy queue, closing) must not leave memory off until the next restart. */
-	async function recoverWithRetry() {
-		let result = await recover();
-		for (
-			let attempt = 0;
-			attempt < 3 && result.reason === "recover_failed";
-			attempt++
-		) {
-			await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
-			result = await recover();
-		}
-		return result;
-	}
-
 	guardContinuity(continuity, () => windowPlan().sections.state);
 
 	conversation.addRetractHook(dropVectorsOnRetract(conversation));
@@ -268,18 +206,17 @@ export function createMemoryService(
 		clock,
 		id: newId,
 		atMs,
-		ready: () => healthy,
+		ready: () => health.healthy,
 		scoped,
 	};
 	const curation = createCuration(curationDeps);
 	const seedImport = createSeedImport(curationDeps);
 	const executionRefs = executionReferences({
 		access,
-		ready: (db) => healthy && readSettings(db).enabled,
+		ready: (db) => health.healthy && readSettings(db).enabled,
 		now: atMs,
 	});
 	const purgeHooks = referencePurgeHooks(executionRefs);
-	const blockJournalPath = blockJournalPathOf(options.journalPath);
 	const forgetter = createForget({
 		journalPath: options.journalPath,
 		journalBlocked,
@@ -289,7 +226,7 @@ export function createMemoryService(
 		windows,
 		conversation,
 		continuity,
-		ready: () => healthy,
+		ready: () => health.healthy,
 		purgeUsageFor,
 		purgeHooks,
 	});
@@ -297,12 +234,24 @@ export function createMemoryService(
 		store,
 		continuity,
 		windows,
-		healthy: () => healthy,
+		healthy: () => health.healthy,
 	});
 	const vectors = createAgentVectors({
 		conversation,
 		atMs,
 		embed: options.embed,
+	});
+
+	const { recover: recoverWithRetry } = createMemoryRecovery({
+		store,
+		health,
+		journalPath: options.journalPath,
+		journalBlocked,
+		atMs,
+		forgetter,
+		windows,
+		ledger,
+		backfill,
 	});
 
 	function setEnabledInTransaction(
@@ -316,218 +265,7 @@ export function createMemoryService(
 			// What was said while memory was off is never learned.
 			if (enabled) ledger.skipUncuratedEventsInTransaction(db);
 		}
-		return { enabled, healthy };
-	}
-
-	/**
-	 * The message ids the journals say are forgotten, kept in process for the history to hide (also while memory is
-	 * unhealthy). Reads every line that parses: hiding more than the database knows is the safe side, and a damaged
-	 * journal must not let a forgotten message come back. The block journal of earlier versions counts until it is
-	 * imported.
-	 */
-	function hideJournaledMessages(): void {
-		const entries = readJournalLenient(options.journalPath);
-		const legacy = readJournalLenient<BlockJournalEntry>(blockJournalPath);
-		journalBlocked.clear();
-		for (const { intent } of intentsOf(
-			entries.filter((entry) => typeof entry === "object" && entry !== null),
-		))
-			for (const id of intent.messageIds) journalBlocked.add(id);
-		for (const line of legacy)
-			for (const id of Array.isArray(line?.messageIds) ? line.messageIds : [])
-				journalBlocked.add(id);
-	}
-
-	async function recover(): Promise<{
-		healthy: boolean;
-		reapplied: number;
-		reason?: string;
-		/** The database was older than the journal: change-feed subscribers must drop their cursors. */
-		feedResyncRequired?: true;
-	}> {
-		const fail = (reason: string) => {
-			healthy = false;
-			wasUnhealthy = true;
-			return { healthy, reapplied: 0, reason };
-		};
-		try {
-			return await store.write((db) => {
-				// First of all, whatever else fails: the history must hide what the journal says is forgotten.
-				hideJournaledMessages();
-				try {
-					// A newer or tampered schema disables memory instead of being read.
-					assertMemorySchema(db);
-				} catch {
-					return fail("schema_mismatch");
-				}
-				let entries: ForgetJournalEntry[];
-				try {
-					entries = readJournal(options.journalPath);
-				} catch {
-					return fail("journal_unreadable");
-				}
-				let legacy: BlockJournalEntry[];
-				try {
-					legacy = readJournal<BlockJournalEntry>(blockJournalPath);
-				} catch {
-					return fail("block_journal_unreadable");
-				}
-				if (verifyForgetJournal(entries).status !== "ok")
-					return fail("journal_chain_broken");
-				const result = reconcileForgetJournal(db, {
-					contractVersion: CONTRACT_VERSIONS.lifecycle,
-					entries,
-					clock: { atMs: atMs() },
-				});
-				if (result.status !== "ok") return fail(result.reasonCode);
-				// Re-applied forgets removed values the published layer may still hold.
-				let republish = result.reapplied > 0;
-				// Section 6.2 step 4 again for the entries the reconciliation re-applied (a rolled-back commit, a crash,
-				// a restored older database): their purge of memory's own data went with the database, so it runs again.
-				const reapplied = result.hostIntentsToReapply ?? [];
-				for (const { forgetId, hostIntent } of reapplied) {
-					const intent = intentOf(hostIntent);
-					if (
-						forgetter.purgeDerivedInTransaction(db, {
-							forgetId: intent.legacyBlockForgetId ?? forgetId,
-							conversationId: intent.conversationId,
-							itemIds: intent.itemIds,
-							messageIds: intent.messageIds,
-							derived: intent.derived,
-						})
-					)
-						republish = true;
-				}
-				let completedIntents = 0;
-				let imported = 0;
-				try {
-					const journaled = new Set(
-						entries.flatMap((entry) =>
-							entry.targets
-								.filter((target) => target.type === "state_item")
-								.map((target) => target.id),
-						),
-					);
-					const stillThere = (ids: readonly string[]) =>
-						ids.filter(
-							(id) => !journaled.has(id) && forgetter.factOf(db, id) !== null,
-						);
-					// An intent whose items did not all reach an entry (a forget split over several entries that stopped
-					// after the first one): the remaining items are forgotten now. Planning needs the database at the
-					// journal's head, so this follows the reconciliation.
-					for (const { intent } of intentsOf(entries)) {
-						const missing = stillThere(intent.itemIds);
-						if (missing.length === 0) continue;
-						forgetter.forgetItems(db, missing, null, () => {});
-						for (const id of missing) journaled.add(id);
-						completedIntents += missing.length;
-					}
-					// The block journal of earlier versions: each line not yet imported becomes one forget journal entry
-					// (its intent, and the items it never got to forget), recognized afterwards by its forgetId.
-					const done = new Set(
-						intentsOf(entries).flatMap(({ intent }) =>
-							intent.legacyBlockForgetId ? [intent.legacyBlockForgetId] : [],
-						),
-					);
-					for (const line of legacy) {
-						if (done.has(line.forgetId)) {
-							// Imported already. Its purge went in the same transaction as the import, so a missing mark
-							// means it never ran (an older database, a failure): run it again.
-							if (!isBlockApplied(db, line.forgetId)) {
-								forgetter.purgeDerivedInTransaction(db, {
-									forgetId: line.forgetId,
-									conversationId: line.conversationId,
-									itemIds: line.itemIds,
-									messageIds: line.messageIds,
-									derived: line.derived,
-								});
-								republish = true;
-							}
-							continue;
-						}
-						const missing = stillThere(line.itemIds);
-						const intent = {
-							conversationId: line.conversationId,
-							messageIds: line.messageIds,
-							itemIds: line.itemIds,
-							...(line.derived !== undefined ? { derived: line.derived } : {}),
-							legacyBlockForgetId: line.forgetId,
-						};
-						forgetter.forgetItems(db, missing, intent, () => {});
-						for (const id of missing) journaled.add(id);
-						done.add(line.forgetId);
-						if (!isBlockApplied(db, line.forgetId)) {
-							forgetter.purgeDerivedInTransaction(db, {
-								forgetId: line.forgetId,
-								conversationId: intent.conversationId,
-								itemIds: intent.itemIds,
-								messageIds: intent.messageIds,
-								derived: intent.derived,
-							});
-							republish = true;
-						}
-						imported++;
-					}
-					if (completedIntents > 0 || imported > 0) {
-						entries = readJournal(options.journalPath);
-						if (verifyForgetJournal(entries).status !== "ok")
-							return fail("journal_chain_broken");
-					}
-					// Every line is in the forget journal now (durable): the old file is set aside. A rollback of this
-					// transaction only leaves the journal ahead of the database, which the next start re-applies.
-					if (existsSync(blockJournalPath)) setJournalAside(blockJournalPath);
-				} catch (error) {
-					// Roll the whole recovery back: nothing it applied half-way may be committed. Lines it already
-					// appended stay in the journal ahead of the database, and the next start re-applies them.
-					throw new RecoveryStepFailed("block_recovery_failed", error);
-				}
-				if (completedIntents > 0 || imported > 0) republish = true;
-				// Receipts of every journaled forget are purged here too: a forget that was only re-applied
-				// (rolled-back commit, crash, restored old database) never ran the purge in its own transaction.
-				const forgottenIds = entries.flatMap((entry) =>
-					entry.targets
-						.filter((target) => target.type === "state_item")
-						.map((target) => target.id),
-				);
-				purgeUsageFor(db, forgottenIds);
-				// The same holds for tendencies derived from a re-applied forget's items.
-				if (deleteTendenciesByEvidence(db, "state", forgottenIds) > 0)
-					republish = true;
-				// Units that started before something was (re)applied must not be adopted; a plain restart changes nothing.
-				if (
-					result.reapplied > 0 ||
-					completedIntents > 0 ||
-					imported > 0 ||
-					reapplied.length > 0
-				)
-					bumpForgetSeq(db);
-				if (republish) {
-					windows.recordImmediateInTransaction(db, "state_forget", null);
-					windows.purgeInTransaction(db);
-				}
-				// The imported lines' messages now come from the forget journal.
-				if (imported > 0) hideJournaledMessages();
-				healthy = true;
-				// Coming back from an unhealthy spell: what was said meanwhile is not learned.
-				if (wasUnhealthy) {
-					ledger.skipUncuratedEventsInTransaction(db);
-					wasUnhealthy = false;
-				}
-				backfill.runInTransaction(db);
-				return {
-					healthy,
-					reapplied: result.reapplied,
-					...(result.feedResyncRequired === true
-						? { feedResyncRequired: true as const }
-						: {}),
-				};
-			});
-		} catch (error) {
-			hideJournaledMessages();
-			return fail(
-				error instanceof RecoveryStepFailed ? error.reason : "recover_failed",
-			);
-		}
+		return { enabled, healthy: health.healthy };
 	}
 
 	return {
@@ -540,11 +278,14 @@ export function createMemoryService(
 		policyRevisionInTransaction,
 		windows,
 		status(): MemoryStatus {
-			return { enabled: store.read((db) => readSettings(db).enabled), healthy };
+			return {
+				enabled: store.read((db) => readSettings(db).enabled),
+				healthy: health.healthy,
+			};
 		},
 		/** Memory is switched on and its journals are consistent (the steward only works then). */
 		readyInTransaction: (db: Database): boolean =>
-			healthy && readSettings(db).enabled,
+			health.healthy && readSettings(db).enabled,
 		setEnabled(enabled: boolean): Promise<MemoryStatus> {
 			return store.write((db) => setEnabledInTransaction(db, enabled));
 		},
@@ -556,7 +297,7 @@ export function createMemoryService(
 		recover: recoverWithRetry,
 		list(includeInactive = false): MemoryItemDto[] {
 			// Fail closed: with an inconsistent journal a forgotten value may still be in this database.
-			if (!healthy) return [];
+			if (!health.healthy) return [];
 			return store.read((db) => {
 				const result = listAllState(db, {
 					...scoped(db, "memory.list"),
@@ -570,7 +311,7 @@ export function createMemoryService(
 		/** The read tool `read_memory`'s read, in a read of its own; null when memory is off or unhealthy. */
 		check(input: CheckItemsInput): CheckedItems | null {
 			return store.read((db) =>
-				healthy && readSettings(db).enabled
+				health.healthy && readSettings(db).enabled
 					? windows.checkItemsInTransaction(db, input)
 					: null,
 			);
@@ -605,7 +346,7 @@ export function createMemoryService(
 					// Only when an entry may have reached a journal ahead of the rolled-back database: reconcile
 					// before anything else runs. Rejections before the journal (validation, queue full) change nothing.
 					if (journaled) {
-						healthy = false;
+						health.healthy = false;
 						await recoverWithRetry();
 						// The journal carries the forget to completion; the caller must not assume it finished.
 						throw new Error("memory_forget_incomplete");
@@ -627,7 +368,7 @@ export function createMemoryService(
 				return forgotten;
 			} catch (error) {
 				if (!journaled) throw error;
-				healthy = false;
+				health.healthy = false;
 				void recoverWithRetry();
 				throw new Error("memory_forget_incomplete");
 			}
@@ -651,7 +392,7 @@ export function createMemoryService(
 			db: Database,
 			conversationId: string,
 		): WindowSnapshot | null {
-			if (!healthy || !readSettings(db).enabled) return null;
+			if (!health.healthy || !readSettings(db).enabled) return null;
 			return windows.readForRunInTransaction(db, conversationId);
 		},
 		/**
@@ -662,14 +403,14 @@ export function createMemoryService(
 			db: Database,
 			conversationId: string,
 		): WindowSnapshot | null {
-			if (!healthy || !readSettings(db).enabled) return null;
+			if (!health.healthy || !readSettings(db).enabled) return null;
 			return windows.storedInTransaction(db, conversationId);
 		},
 		/** The window plan of the saved model: background work sizes its inputs from it. */
 		windowPlan,
 		/** The memory tool's read; null when memory is off or unhealthy (nothing is handed over then). */
 		readItemsInTransaction: (db: Database, input: ReadItemsInput) =>
-			healthy && readSettings(db).enabled
+			health.healthy && readSettings(db).enabled
 				? windows.readItemsInTransaction(db, input)
 				: null,
 		/**
@@ -677,7 +418,7 @@ export function createMemoryService(
 		 * null when memory is off or unhealthy, or nothing qualifies.
 		 */
 		recallTurnsInRead(db: Database, input: RecallInput): TurnRecall | null {
-			if (!healthy || !readSettings(db).enabled) return null;
+			if (!health.healthy || !readSettings(db).enabled) return null;
 			return recallTurns(db, conversation, input);
 		},
 		/**
@@ -689,7 +430,7 @@ export function createMemoryService(
 			runId: string,
 			window: PreparedWindow,
 		): SettleResult {
-			if (!healthy || !readSettings(db).enabled)
+			if (!health.healthy || !readSettings(db).enabled)
 				return { ok: false, reason: "memory_unavailable" };
 			if (String(readSettings(db).revision) !== window.policyRevision)
 				return { ok: false, reason: "memory_stale" };
@@ -711,7 +452,7 @@ export function createMemoryService(
 			db: Database,
 			conversationId: string,
 		): WindowSnapshot | null {
-			if (!healthy || !readSettings(db).enabled) return null;
+			if (!health.healthy || !readSettings(db).enabled) return null;
 			return windows.republishInTransaction(db, conversationId);
 		},
 		/** What a run keeps of a window for the adoption check (the texts stay in its prompt). */
@@ -752,9 +493,7 @@ export function createMemoryService(
 			pruneUsage(db);
 		},
 		/** The adoption failed after the receipt was written: no answer exists, so no receipt may either. */
-		discardUsageInTransaction(db: Database, runId: string) {
-			db.query("DELETE FROM memory_usage WHERE run_id = ?").run(runId);
-		},
+		discardUsageInTransaction: deleteUsage,
 		usage(runId: string) {
 			return store.read((db) => getUsage(db, runId));
 		},

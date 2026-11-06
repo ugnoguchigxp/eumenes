@@ -1,6 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { carriedToolCalls } from "./tool-exchange";
-import { recordUtteranceInTransaction } from "./utterances";
 import { isSystemPrompt } from "../contracts";
 import { saveAnnouncement } from "../repository";
 import {
@@ -8,6 +6,7 @@ import {
 	saveConfirmationRefs,
 } from "../repository/resources";
 import { referencesOfUris, resolveDelegateRefs } from "./delegate-refs";
+import { eventText } from "./event-text";
 import {
 	TOOL_NAMES,
 	requestRequired,
@@ -15,11 +14,11 @@ import {
 	type DelegateArgs,
 	type ParsedCall,
 } from "./generation-tools";
-import { eventText } from "./event-text";
 import { sessionTargetsInTransaction } from "./specialist-context";
+import { carriedToolCalls } from "./tool-exchange";
+import { recordUtteranceInTransaction } from "./utterances";
 import { dispatchInTransaction } from "./work-dispatch";
 
-import { instant } from "./executor-search";
 import {
 	HandoverRefused,
 	IMPACT_ORDER,
@@ -29,6 +28,7 @@ import {
 	type Request,
 	type ToolOutcome,
 } from "./executor-context";
+import { instant } from "./executor-search";
 
 /* Delegations: the announced handover, the confirmation before a change and its approval (sections 6.5, 6.7). */
 /**
@@ -258,7 +258,7 @@ function targetOf(
 /** A confirmation before a change (section 6.7): saved, never executed; the generation's speech states it. */
 export function confirm(
 	x: ExecutorContext,
-	call: ParsedCall,
+	_call: ParsedCall,
 	chosen: Omit<Request, "announcement">,
 	impact: string,
 ): Promise<ToolOutcome> {

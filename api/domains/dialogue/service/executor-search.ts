@@ -1,5 +1,5 @@
-import type { ToolchainCard } from "../../capabilities";
 import { getLogger } from "../../../infrastructure/logger";
+import type { ToolchainCard } from "../../capabilities";
 import { isSystemPrompt } from "../contracts";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import { availableToolchainsInTransaction } from "./delegate-conversation";
@@ -8,9 +8,9 @@ import { TOOL_NAMES, toolRejection, type ParsedCall } from "./generation-tools";
 import { sessionTargetsInTransaction } from "./specialist-context";
 
 import {
+	candidateOf,
 	type ExecutorContext,
 	type ToolOutcome,
-	candidateOf,
 } from "./executor-context";
 
 const log = getLogger("dialogue");
@@ -88,7 +88,7 @@ export async function find(
 /** An instant toolchain answers inside the generation: no announcement and no TODO (section 6.5). */
 export async function instant(
 	x: ExecutorContext,
-	call: ParsedCall,
+	_call: ParsedCall,
 	card: ToolchainCard,
 	raw: Record<string, unknown> | undefined,
 	signal: AbortSignal,

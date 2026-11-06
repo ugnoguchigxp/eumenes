@@ -1,12 +1,12 @@
-import { Button } from "@eumenes/design-system";
 import {
+	Button,
 	TerminalWorkspace,
 	type TerminalOutput,
 	type TerminalSize,
 } from "@eumenes/design-system";
 import { useEffect, useMemo, useRef } from "react";
+import { useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
-import { useAction } from "./components";
 import { useArtifactRuntime } from "./runtime";
 
 export type TerminalSessionResource = {

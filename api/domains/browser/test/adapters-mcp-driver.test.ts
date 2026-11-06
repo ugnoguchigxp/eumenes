@@ -9,17 +9,15 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { waitFor as until } from "../../../infrastructure/wait-for";
+import { createMcpBrowserDriver } from "../adapters/mcp-driver";
+import { ALLOWED_MCP_TOOLS } from "../adapters/mcp-driver-tools";
 import type {
 	BrowserDriver,
 	DriverAction,
 	DriverConnectionState,
 } from "../contracts/ports";
 import { BrowserDriverError } from "../contracts/ports";
-import { waitFor as until } from "../../../infrastructure/wait-for";
-import {
-	ALLOWED_MCP_TOOLS,
-	createMcpBrowserDriver,
-} from "../adapters/mcp-driver";
 
 const FAKE = join(import.meta.dir, "fixtures", "adapters-fake-mcp.ts");
 const NEVER = new AbortController().signal;

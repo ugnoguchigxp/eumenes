@@ -2,8 +2,8 @@ import {
 	UsageDashboard,
 	type UsageDashboardData,
 } from "@eumenes/design-system";
+import { useAction } from "./action";
 import type { ArtifactRequest } from "./contracts";
-import { useAction } from "./components";
 export type UsageDashboardResource = UsageDashboardData & {
 	kind: "usage-dashboard";
 	busy?: boolean;

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "files": {
+    "routing-cases.json": "64909a5f9bde7c5752bb0788401c94c696b0a0367d06ae6ebfbedef13b1a5077"
+  },
+  "cases": 20,
+  "dev": 14,
+  "holdout": 6,
+  "productOrModelResults": "未測定"
+}
