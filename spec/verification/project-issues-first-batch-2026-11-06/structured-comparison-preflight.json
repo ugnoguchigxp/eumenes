@@ -1,0 +1,156 @@
+{
+  "configuration": {
+    "datasetHash": "64909a5f9bde7c5752bb0788401c94c696b0a0367d06ae6ebfbedef13b1a5077",
+    "entry": "routeStructured",
+    "structurePrompt": "turn-structure-v2",
+    "settingsHash": "71d7a841a1733b9044e84e98b9bfdfc7f20de1fcdd11f4ae62a3ffb0b1278ba2",
+    "source": "adopted-package",
+    "variants": [
+      "B"
+    ],
+    "callsPerCaseAndVariant": 1,
+    "dispatch": false
+  },
+  "rows": [
+    {
+      "id": "known-a",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 9,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "known-b",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 3,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "known-c",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 4,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "known-d",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 2,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "known-answer-1",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 3,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 2,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 3,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "short-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 2,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "topic-change",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 0,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "decline-work",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 1,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "draft-only",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 1,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "ambiguous-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 3,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "revoked-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 2,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "mixed-reply-new-work",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 1,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "holdout-dependent",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 2,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "holdout-independent",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 1,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "holdout-same-tool",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 0,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "holdout-answer",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 0,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "holdout-discussion",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 0,
+      "error": "evaluation_failed"
+    },
+    {
+      "id": "holdout-new-topic",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 0,
+      "error": "evaluation_failed"
+    }
+  ]
+}

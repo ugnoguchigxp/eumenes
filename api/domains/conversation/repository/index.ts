@@ -92,7 +92,7 @@ export type OutboxOptions = {
 	/** When true a missing outbox table is an error instead of "not recorded". */
 	required: boolean;
 };
-function textRevision(text: string): TextRevision {
+export function textRevision(text: string): TextRevision {
 	const digest = createHash("sha256").update(text).digest("hex");
 	return { revision: `sha256:${digest}`, digest };
 }
@@ -184,7 +184,7 @@ const outboxEvent = (row: OutboxRow): OutboxEvent => ({
 	speaker: row.speaker,
 	occurredAt: row.occurred_at,
 });
-function insertEvent(
+export function insertEvent(
 	db: Database,
 	options: OutboxOptions,
 	event: {
@@ -389,7 +389,9 @@ export function recordAnswerDelivery(
 	const parsed = speechDeliverySchema.parse(delivery);
 	const old = db
 		.query("SELECT delivery FROM answer_deliveries WHERE run_id=?")
-		.get(runId) as { delivery: string } | null;
+		.get(runId) as {
+		delivery: string;
+	} | null;
 	if (old) {
 		const previous = speechDeliverySchema.parse(JSON.parse(old.delivery));
 		// An accepted answer-wide decision is stable. A fallback may be retried on replay.

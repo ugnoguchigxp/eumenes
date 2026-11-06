@@ -1,0 +1,9 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/backup-restore.test.ts:
+(pass) offline backup restores history, encrypted fixture credentials and queued work; latest forget journal prevents resurrection [1668.81ms]
+
+ 1 pass
+ 0 fail
+ 20 expect() calls
+Ran 1 test across 1 file. [2.36s]

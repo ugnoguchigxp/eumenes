@@ -1,0 +1,91 @@
+{
+  "scope": "synthetic verification runs; join only UUID run/job/inference/attempt IDs; nested spans must not be added as wall time",
+  "invalidRecords": 0,
+  "result": {
+    "quick": {
+      "rootRunId": "a6cf2c9e-fbb2-4509-9f2c-090da708c383",
+      "matchedRecords": 92,
+      "relatedIds": 28,
+      "first": "2026-11-06T10:39:23.910+09:00",
+      "last": "2026-11-06T10:40:46.724+09:00",
+      "stages": {
+        "larm/provider_ready/ok": {
+          "count": 1,
+          "totalMs": 0.03516700000182027,
+          "maxMs": 0.03516700000182027
+        },
+        "larm/response_headers/ok": {
+          "count": 1,
+          "totalMs": 168.3634579999998,
+          "maxMs": 168.3634579999998
+        },
+        "inference/provider/ok": {
+          "count": 8,
+          "totalMs": 81661.47654100001,
+          "maxMs": 19351.970209000006
+        }
+      },
+      "providerSpans": [
+        {
+          "durationMs": 13227.60441700001,
+          "role": "pursuit"
+        },
+        {
+          "durationMs": 11653.810874999996,
+          "role": "agent"
+        },
+        {
+          "durationMs": 19351.970209000006,
+          "role": "pursuit"
+        },
+        {
+          "durationMs": 4764.889750000002,
+          "role": "background"
+        },
+        {
+          "durationMs": 8489.49545799999,
+          "role": "agent"
+        },
+        {
+          "durationMs": 10189.431041000003,
+          "role": "pursuit"
+        },
+        {
+          "durationMs": 5140.840875000009,
+          "role": "background"
+        },
+        {
+          "durationMs": 8843.433915999994,
+          "role": "agent"
+        }
+      ],
+      "providerUnionMs": 71755.74584960938,
+      "wallSpanMs": 82814
+    },
+    "research": {
+      "rootRunId": "f1ac0ae9-112a-44a0-8e8f-1c921f041653",
+      "matchedRecords": 25,
+      "relatedIds": 4,
+      "first": "2026-11-06T11:49:20.171+09:00",
+      "last": "2026-11-06T11:50:08.700+09:00",
+      "stages": {
+        "larm/provider_ready/ok": {
+          "count": 1,
+          "totalMs": 0.03825000000142609,
+          "maxMs": 0.03825000000142609
+        },
+        "larm/response_headers/ok": {
+          "count": 1,
+          "totalMs": 239.09479199999987,
+          "maxMs": 239.09479199999987
+        },
+        "inference/provider/ok": {
+          "count": 1,
+          "totalMs": 27904.699083000003,
+          "maxMs": 27904.699083000003
+        }
+      },
+      "coverage": "root dialogue only; the asynchronous owner calls are outside this ID graph; do not treat this as 55-call measurement"
+    }
+  }
+}

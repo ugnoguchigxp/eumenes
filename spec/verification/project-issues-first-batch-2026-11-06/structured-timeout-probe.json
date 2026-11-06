@@ -1,0 +1,36 @@
+{
+  "configuration": {
+    "datasetHash": "64909a5f9bde7c5752bb0788401c94c696b0a0367d06ae6ebfbedef13b1a5077",
+    "entry": "routeStructured",
+    "structurePrompt": "turn-structure-v2",
+    "structureTimeoutMs": 30000,
+    "settingsHash": "71d7a841a1733b9044e84e98b9bfdfc7f20de1fcdd11f4ae62a3ffb0b1278ba2",
+    "source": "adopted-package",
+    "variants": [
+      "B"
+    ],
+    "callsPerCaseAndVariant": 1,
+    "dispatch": false
+  },
+  "rows": [
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 7208,
+      "to": "run",
+      "row": 5,
+      "candidate": "t1.answer",
+      "structure": {
+        "kind": "answer",
+        "ref": "t1.answer",
+        "text": "計算するのは1から50までの素数の個数で、その結果を使う作業は、その個数と同じ秒数のタイマーを作ることです。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    }
+  ]
+}

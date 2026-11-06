@@ -14,7 +14,18 @@ README の「検証」の詳細です。
 
 検証順序は境界・サイズ等の確認、format、lint、DesignSystem通常型検査、DesignSystem build、rootの型検査（`bun check --no-pretty --all`、全体）、試験です。全件では最後にWeb buildを行い、続けて `scripts/bundle-budget.ts` で初期JS（entryと起動時に読むchunk）のgzipサイズを `scripts/bundle-budget.json` の記録値と比べます。2%を超えて増えると失敗し、5%を超えて減った場合は `--write` で記録を更新します。DesignSystemは再ビルドしません。DS通常型検査は試験・storiesを含み、build用型検査はこれらを除外するため両方必要です。DSソースはDS専用設定で検査し、root設定へ混在させません。キャッシュstampを検証合格の根拠にせず、毎回buildします。`test:domain` 単独は試験の実行のみで、この準備・整合確認を含みません。
 
-DesignSystemの `dist` は共有です。`verify` の実行中は開発サーバー・ブラウザ試験・別のbuildを重ねないでください。検証同士はlockで排他しますが、他の利用者までlockするものではありません。build直後と全consumer終了時の出力パス・内容のhashを比較し、変更・欠落・読み取り失敗があれば結果を無効にします。前後で元に戻る一時的な変更や、他プロセスへの影響は検出・防止できません。snapshotによる隔離は後続段階です。
+同じcheckoutではDesignSystemの `dist` が共有されます。`verify` の実行中は同じ出力を使う開発サーバー・ブラウザ試験・別のbuildを重ねないでください。検証同士はlockで排他しますが、他の利用者までlockするものではありません。build直後と全consumer終了時の出力パス・内容のhashを比較し、変更・欠落・読み取り失敗があれば結果を無効にします。前後で元に戻る一時的な変更や、他プロセスへの影響は検出・防止できません。
+
+### 並行作業中の固定コピー
+
+2026-11-06、作業用の検証コピーで入力・workspace依存・生成物を分離し、関連7domainの検証と前後hash一致を確認しました。`verify`自身による自動コピーは未実装です。コピーを用意する場合は次を揃えます。
+
+1. 基準commitと未コミットの対象ソースを固定します。製品のDB、鍵、`.env`、ログ、既存の検証生成物は複製しません。新branchや稼働中サーバーの操作は不要です。基準commitを解決できる独立した検証用metadataを持たせ、元checkoutのindexや生成物を更新しないようにします。
+2. ルートだけでなく、各workspaceの依存も解決します。第三者依存への読み取り用リンクを使う場合も、`@eumenes/*` 等のworkspace依存はコピー側のpackageを指すようにします。DesignSystem等の出力先はコピー内の実ディレクトリにし、元の `dist` へリンクしません。
+3. コピー内で部分・結合・対象domainの順に確認します。Bunの試験ファイルは `./path/to/file.test.ts` と明示します。`./`を省いた検索指定では、無関係なartifacts内の旧コピーまで実行される場合があります。
+4. reportの基準commit、入力hash/終了hash、integrityErrors、対象・利用側domainを保存します。原本へ結果を対応付けるときは対象ソースもhashで照合します。検証後に別作業の変更が増えた場合、その変更まで検証済みとはしません。
+
+[実施結果と入力照合](../spec/verification/project-issues-first-batch-2026-11-06/README.md)を参照してください。fixtureの成功はliveや実機器の受入を代替しません。
 
 各実行には対象、基準commit、前後の入力hash、Bun・OS・runner、工程ごとの時間と状態、停止理由、DS出力hashを保存します。コマンドを実行する工程は、その出力を run ディレクトリの `steps/` に残し、失敗した工程は `(fail)`・`FAIL `・`×` の行（該当がなければ末尾40行）を最大50件、`steps[].failures` に残します。`pass`、`fail`、`interrupted`、`invalidated` を区別し、到達しなかった工程は `not_run` です。実行中は `running` を保存するため、強制終了やホスト停止で残った記録を合格として扱えません。SIGINT/SIGTERMでは実行中の子プロセス群を停止して記録を確定します。CI（GitHub Actions の `verify`）は手動で起動したときだけ動き、push と PR では動きません（2026-10-27）。起動した場合は成功・失敗の両方でレポートと準備時間をartifactへ保存します。verify の終了時に、`runs/` は新しい順に20件と `latest.json` が指す run だけを残し、`nl-acceptance/` は新しい順に5件だけを残します。CIの保持期間は7日です。
 

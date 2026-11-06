@@ -4,7 +4,13 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { route, type RoutePorts, type RouteTurn } from "eumenes_router";
+import {
+	route,
+	routeStructured,
+	TURN_STRUCTURE_PROMPT,
+	type RoutePorts,
+	type RouteTurn,
+} from "eumenes_router";
 import { createClient } from "../client";
 import {
 	readApiToken,
@@ -15,10 +21,17 @@ import { createLarm, createLarmPlayground } from "../api/domains/larm";
 import { createToolchainHistory } from "../api/domains/toolchain-history";
 import { dynamicCandidates } from "../api/domains/dialogue/service/routed-route";
 import { systemContext } from "../api/infrastructure/system-context";
+import { routerIssueInference } from "./router-issue-inference";
 import { liveLarmSettings } from "./live-larm";
 
 const { values } = parseArgs({
-	options: { run: { type: "boolean" }, out: { type: "string" } },
+	options: {
+		run: { type: "boolean" },
+		out: { type: "string" },
+		case: { type: "string" },
+		structured: { type: "boolean" },
+		"structure-timeout-ms": { type: "string" },
+	},
 });
 if (!values.run || !values.out) throw new Error("usage_requires_run_and_out");
 const file = resolve(
@@ -56,6 +69,15 @@ const client = createClient(
 	readApiToken(process.env, dbPath),
 );
 const settings = await client.routerSettings();
+const structureTimeoutMs = Number(
+	values["structure-timeout-ms"] ?? settings.structureTimeoutMs,
+);
+if (
+	!Number.isInteger(structureTimeoutMs) ||
+	structureTimeoutMs < 1000 ||
+	structureTimeoutMs > 30000
+)
+	throw new Error("invalid_structure_timeout");
 const saved = liveLarmSettings();
 const token = resolveLarmToken(process.env);
 if (!settings.profile || !saved.baseUrl || !token)
@@ -78,12 +100,15 @@ const db = new Database(dbPath, { readonly: true });
 const store = { read: <T>(fn: (tx: Database) => T) => fn(db) } as SqliteStore;
 const history = createToolchainHistory(store);
 const rows: unknown[] = [];
+const inference = values.structured ? await routerIssueInference(dbPath) : null;
 const configuration = {
 	datasetHash,
-	entry: "route",
+	entry: values.structured ? "routeStructured" : "route",
+	structurePrompt: values.structured ? TURN_STRUCTURE_PROMPT.version : null,
+	structureTimeoutMs,
 	settingsHash: digest(settings),
 	source: "adopted-package",
-	variants: ["baseline", "A"],
+	variants: values.structured ? ["B"] : ["baseline", "A"],
 	callsPerCaseAndVariant: 1,
 	dispatch: false,
 };
@@ -136,7 +161,9 @@ try {
 				}
 			: card,
 	);
-	for (const item of cases) {
+	for (const item of cases.filter(
+		(item) => !values.case || item.id === values.case,
+	)) {
 		const active = item.pending.filter((q) => q.state === "asking");
 		const questions = active.map((q) => ({
 			ref: Number(q.ref.slice(1).split(".")[0]),
@@ -160,15 +187,22 @@ try {
 			switching: null,
 			titles: () => new Map(),
 		});
-		for (const variant of ["baseline", "A"] as const) {
+		for (const variant of values.structured
+			? (["B"] as const)
+			: (["baseline", "A"] as const)) {
 			const turn: RouteTurn = {
 				state: {
 					text: item.input,
 					previousAgent: routed.previousReply,
 					previousUser: null,
 				},
+				pending: active.map((q) => ({
+					ref: q.ref,
+					title: q.work,
+					question: q.question,
+				})),
 				dynamic:
-					variant === "baseline"
+					variant !== "A"
 						? dynamic
 						: dynamic.map((c) =>
 								c.kind === "pending" && c.operation === "answer"
@@ -187,33 +221,44 @@ try {
 			};
 			const started = performance.now();
 			try {
-				const result = await route(
-					{
-						embed,
-						rerank: (input) =>
-							scorer.route!(input, AbortSignal.timeout(settings.timeoutMs)),
-						read: {
-							cards: () => (variant === "baseline" ? cards : revised),
-							lexical: (text) => history.routerLexicalInTransaction(db, text),
-							nearFeedback: (query) =>
-								history.nearRouterFeedbackInTransaction(db, {
-									...query,
-									vector: [...query.vector],
-								}),
-						},
-						model,
-						settings: {
-							accept: settings.accept,
-							low: settings.low,
-							margin: settings.margin,
-							approve: settings.approve,
-							multi: settings.multi,
-							feedbackNear: settings.feedbackNear,
-							feedbackWeight: settings.feedbackWeight,
-						},
+				const ports: RoutePorts = {
+					embed,
+					rerank: (input) =>
+						scorer.route!(input, AbortSignal.timeout(settings.timeoutMs)),
+					read: {
+						cards: () => (variant === "A" ? revised : cards),
+						lexical: (text) => history.routerLexicalInTransaction(db, text),
+						nearFeedback: (query) =>
+							history.nearRouterFeedbackInTransaction(db, {
+								...query,
+								vector: [...query.vector],
+							}),
 					},
-					turn,
-				);
+					model,
+					settings: {
+						accept: settings.accept,
+						low: settings.low,
+						margin: settings.margin,
+						approve: settings.approve,
+						multi: settings.multi,
+						feedbackNear: settings.feedbackNear,
+						feedbackWeight: settings.feedbackWeight,
+					},
+				};
+				const result = inference
+					? await routeStructured(
+							{
+								...ports,
+								analyze: (prompt) =>
+									inference.analyze(
+										prompt,
+										structureTimeoutMs,
+										settings.structureResourceId,
+									),
+							},
+							turn,
+						)
+					: await route(ports, turn);
 				const decision = result.decision;
 				rows.push({
 					id: item.id,
@@ -223,13 +268,32 @@ try {
 					to: decision.to,
 					row: decision.row,
 					candidate: "candidate" in decision ? decision.candidate.id : null,
-					top: result.corrected
+					structure: "structure" in result ? result.structure : null,
+					steps:
+						decision.to === "pipeline"
+							? decision.steps.map((step) => ({
+									candidate: step.candidate.id,
+									after: step.after,
+									decision: step.decision.to,
+								}))
+							: null,
+					top: ("corrected" in result ? result.corrected : [])
 						.slice(0, 3)
 						.map((r) => ({ id: r.candidate.id, p: r.p })),
 					catalogHash,
 					memoryHash,
 				});
 			} catch (error) {
+				if (values.structured && rows.length === 0 && error instanceof Error)
+					console.error(
+						JSON.stringify({
+							failureKind: error.name,
+							frames: error.stack
+								?.split("\n")
+								.filter((line) => line.trimStart().startsWith("at "))
+								.slice(0, 6),
+						}),
+					);
 				rows.push({
 					id: item.id,
 					split: item.split,
@@ -248,6 +312,7 @@ try {
 		}
 	}
 } finally {
+	await inference?.close();
 	await scorer.close();
 	db.close();
 }

@@ -1,0 +1,31 @@
+{
+  "baseCommit": "fb34d9f60b069801057ae185e97184bd1a5670c4",
+  "result": "pass",
+  "totalMs": 136623,
+  "inputRevision": "41c170ef3e9c683ca85b20b2a3ebb0e045e1bdc368c4fd32480d0294978ffd41",
+  "finalRevision": "41c170ef3e9c683ca85b20b2a3ebb0e045e1bdc368c4fd32480d0294978ffd41",
+  "integrityErrors": [],
+  "apiTests": 1198,
+  "webTests": 32,
+  "packageTests": 102,
+  "partialSelectionAndRestoreTests": 6,
+  "designSystemUnchanged": true,
+  "codeMismatches": [],
+  "sourceScope": "7 selected domains, final fixed snapshot; no server restart or CI",
+  "liveRouting": {
+    "A": {
+      "results": 40,
+      "cases": 20,
+      "changedDestinations": 0,
+      "adopted": false
+    },
+    "B": {
+      "responses": 14,
+      "timeouts": 6,
+      "cases": 20,
+      "timeoutMs": 15000,
+      "accepted": false,
+      "remaining": "cancel dispatch; same-tool request ambiguity; discussion/draft side effects require end-to-end; original saved timeout is 8000 ms"
+    }
+  }
+}

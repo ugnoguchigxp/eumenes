@@ -97,8 +97,12 @@ export function createLifecycleCtx(options: LifecycleOptions) {
 		scope: ScopeRef,
 		operationKey: string,
 		operation: WorldApplyRequest["operation"],
+		initial = false,
 	): WorldApplyResult {
-		const result = world.applyInWriter(db, {
+		const apply = initial
+			? world.receiveInitialInputInWriter
+			: world.applyInWriter;
+		const result = apply(db, {
 			access: {
 				principal: scope.principal,
 				scopeKeys: [scope.scopeKey],

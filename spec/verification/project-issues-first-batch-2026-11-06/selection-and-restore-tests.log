@@ -1,0 +1,18 @@
+bun test v1.4.4 (38afee6c8)
+
+scripts/verification-selection.test.ts:
+(pass) pipeline verification includes its fixture-composed execution and adopted package [183.09ms]
+(pass) explicit integration ownership joins direct imports once and stays scoped [251.95ms]
+(pass) a missing declared integration test fails instead of silently shrinking verification [0.82ms]
+(pass) the pipeline verify plan executes the declared integrations [1276.63ms]
+
+api/application/backup-restore.test.ts:
+(pass) offline backup restores history, encrypted fixture credentials and queued work; latest forget journal prevents resurrection [1567.13ms]
+
+api/domains/dialogue/test/routed-package.test.ts:
+(pass) pipeline mapping preserves the requirement that every part can be executed by the host [0.09ms]
+
+ 6 pass
+ 0 fail
+ 34 expect() calls
+Ran 6 tests across 3 files. [3.87s]

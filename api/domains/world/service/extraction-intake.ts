@@ -113,6 +113,8 @@ export type ReceiveContext = {
 	usable: (db: Database) => { ok: true } | { ok: false; reason: SkipReason };
 	ports: Pick<IntakePorts, "isAdoptedAnswer" | "blockedMessageIds">;
 	now: () => number;
+	/** Initial synchronization cannot complete after an unexpected receipt refusal. */
+	requireReceipt?: boolean;
 };
 
 export type ReceiveReport = {
@@ -226,6 +228,8 @@ export function receiveSourceChanges(
 		// A forgotten event is not an input any more: nothing to receive, nothing to wait for.
 		const reason = "reasonCode" in result ? result.reasonCode : "NOT_APPLIED";
 		if (reason === "TOMBSTONED") continue;
+		if (ctx.requireReceipt)
+			throw new Error(`initial_receipt_refused:${reason}`);
 		// Any other refusal is deterministic (a retry would be refused again). It
 		// must not hold the cursor: a retraction or a correction on the same
 		// page may not wait for it. The input is recorded as never extracted.

@@ -1,3 +1,4 @@
+import { initialSourceSyncStarted } from "../repository/initial-sync";
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
 import { sha256Hex } from "../../../infrastructure/digest";
@@ -67,6 +68,27 @@ const PROTECTIVE_KINDS: ReadonlySet<WorldOperation["kind"]> = new Set([
 	"restore.finish",
 	"rebuild",
 ]);
+
+/** Only initial inbox staging may precede the ON flag; it cannot adopt or extract content. */
+function writeGuard(
+	db: Database,
+	request: WorldApplyRequest,
+	gate: WorldHostGate | undefined,
+	initial: boolean,
+) {
+	if (
+		initial &&
+		(request.operation?.kind !== "inbox.receive" ||
+			readHostState(db).initialSyncComplete)
+	)
+		return refusal("rejected", "INVALID_INPUT");
+	if (PROTECTIVE_KINDS.has(request.operation?.kind)) return null;
+	if (gate && !gate.isOpen())
+		return refusal("blocked", "WORLD_RECOVERY_REQUIRED");
+	if (!readHostState(db).enabled && !initial)
+		return refusal("blocked", "WORLD_DISABLED");
+	return null;
+}
 
 export type WorldServiceOptions = {
 	store: SqliteStore;
@@ -179,18 +201,15 @@ export function createWorldService(options: WorldServiceOptions) {
 	let entityGeneration = 0;
 
 	/** Writer-side apply: throws MemoryRegistrationRejected so the caller's transaction rolls back. */
-	function applyInWriter(
+	function applyChecked(
 		db: Database,
 		request: WorldApplyRequest,
+		initial = false,
 	): WorldApplyResult {
 		requireTransaction(db);
 		const op = request.operation;
-		if (!PROTECTIVE_KINDS.has(op?.kind)) {
-			if (options.gate && !options.gate.isOpen())
-				return refusal("blocked", "WORLD_RECOVERY_REQUIRED");
-			if (!readHostState(db).enabled)
-				return refusal("blocked", "WORLD_DISABLED");
-		}
+		const denied = writeGuard(db, request, options.gate, initial);
+		if (denied) return denied;
 		const access = accessOf(db, request);
 		const inputs = operationInputs(op);
 		// Plan before any write: an over-large input set is refused, not cut off.
@@ -349,6 +368,9 @@ export function createWorldService(options: WorldServiceOptions) {
 			store.write((db) => writeEnabled(db, enabled)),
 		setEnabledInWriter: writeEnabled,
 		/** True once the host recorded `markInitialSyncComplete` (turning World ON needs it). */
+		initialSourceSyncStartedInTransaction: initialSourceSyncStarted,
+		initialSyncCompleteInTransaction: (db: Database): boolean =>
+			readHostState(db).initialSyncComplete,
 		initialSyncComplete: (): boolean =>
 			store.readSnapshot((db) => readHostState(db).initialSyncComplete),
 		/** The host's explicit statement that the first full feed pass is done. */
@@ -357,11 +379,15 @@ export function createWorldService(options: WorldServiceOptions) {
 
 		/** The AccessContext a request gets (with the policy revision Memory also sees). */
 		accessInTransaction: accessOf,
-		applyInWriter,
+		applyInWriter: (db: Database, request: WorldApplyRequest) =>
+			applyChecked(db, request),
+		/** Initial metadata-only inbox receipt while OFF; gate and all normal checks still apply. */
+		receiveInitialInputInWriter: (db: Database, request: WorldApplyRequest) =>
+			applyChecked(db, request, true),
 		/** One World operation in its own writer transaction, with typed refusals. */
 		async apply(request: WorldApplyRequest): Promise<WorldApplyResult> {
 			try {
-				return await store.write((db) => applyInWriter(db, request));
+				return await store.write((db) => applyChecked(db, request));
 			} catch (error) {
 				return typedFailure(error);
 			}

@@ -1,3 +1,5 @@
+import type { AccessContext } from "eumenes-memory";
+import type { SourceAdapter, SourceChange } from "../contracts";
 import type { Database } from "bun:sqlite";
 import { type ScopeRef } from "eumenes-world-model";
 import { writeExtractFeedScopeSet } from "../repository/extraction";
@@ -27,6 +29,23 @@ import {
 import type { LifecycleCtx } from "./lifecycle-lock";
 import type { ForgetOps } from "./lifecycle-forget";
 import { createMemoryFeed } from "./lifecycle-feed-memory";
+
+/** Initial replay stages only the currently authorized revision; protective changes still run first. */
+function currentSourceChanges(
+	db: Database,
+	adapter: SourceAdapter,
+	access: AccessContext,
+	changes: readonly SourceChange[],
+) {
+	return changes.filter((change) => {
+		const current = adapter.resolveCurrent(db, access, change.source);
+		return (
+			current.status === "available" &&
+			current.revision === change.revision &&
+			current.digest === change.digest
+		);
+	});
+}
 
 export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 	const {
@@ -76,9 +95,16 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 	/** Whether this writer callback may hand extraction input to World (decided once per page). */
 	function receiveUsable(
 		db: Database,
+		initial = false,
 	): { ok: true } | { ok: false; reason: "WORLD_OFF" | "GATE_CLOSED" } {
 		if (options.gate && !options.gate.isOpen())
 			return { ok: false, reason: "GATE_CLOSED" };
+		if (
+			initial &&
+			!world.initialSyncCompleteInTransaction(db) &&
+			world.statusInTransaction(db).schema === "current"
+		)
+			return { ok: true };
 		return world.statusInTransaction(db).usable
 			? { ok: true }
 			: { ok: false, reason: "WORLD_OFF" };
@@ -153,6 +179,7 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 	async function consumeSourceChanges(
 		scope: ScopeRef,
 		settings: { namespace?: string; limit?: number } = {},
+		initial = false,
 	): Promise<ConsumeReport> {
 		const adapter = adapters.get(settings.namespace ?? "conversation");
 		if (!adapter)
@@ -178,6 +205,10 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 		};
 		try {
 			out = await store.write((db) => {
+				const staging =
+					initial ||
+					(world.initialSourceSyncStartedInTransaction(db) &&
+						!world.initialSyncCompleteInTransaction(db));
 				const cursor = world.feedCursor(db, "source", scope);
 				// A different Scope set discards the cursor: the feed is read again.
 				const scopeKeys = scopeSetOf(options.scopes ?? [], scope);
@@ -226,18 +257,22 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 				// remaining additions persisted as extraction input (P4-01). The
 				// receipt and the cursor save are ONE writer callback: if it fails
 				// (database, Writer) nothing of it remains and the cursor stays.
-				const state = receiveUsable(db);
+				const state = receiveUsable(db, staging);
 				const receipt = receiveSourceChanges(
 					db,
 					{
-						worldOp,
+						worldOp: (db, scope, key, op) =>
+							worldOp(db, scope, key, op, staging),
 						usable: () => state,
+						requireReceipt: staging,
 						ports: { ...NO_INTAKE_PORTS, ...options.intake },
 						now,
 					},
 					scope,
 					{ scopeKeys, restoreEpoch: cursor.restoreEpoch },
-					ordered,
+					staging
+						? currentSourceChanges(db, adapter, access, ordered)
+						: ordered,
 				);
 				world.saveFeedCursorInWriter(db, "source", scope, page.nextCursor);
 				writeExtractFeedScopeSet(
@@ -300,7 +335,12 @@ export function createFeedOps(ctx: LifecycleCtx, forget: ForgetOps) {
 		feedStages,
 		consumeMemoryChanges: createMemoryFeed(ctx, forget, { invalidateKeys })
 			.consumeMemoryChanges,
-		consumeSourceChanges,
+		consumeSourceChanges: (
+			scope: ScopeRef,
+			settings?: { namespace?: string; limit?: number },
+		) => consumeSourceChanges(scope, settings),
+		consumeInitialSourceChanges: (scope: ScopeRef) =>
+			consumeSourceChanges(scope, {}, true),
 	};
 }
 export type FeedHelpers = {

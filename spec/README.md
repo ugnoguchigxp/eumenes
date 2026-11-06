@@ -8,7 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
-| [全体課題の第1段階と振り分け改善案](project-issues-first-batch-2026-11-06.md) | EUM001〜004の現行契約と設計案、EUM005の選択漏れ修正・固定検証成功、EUM006の20事例を記録。判断方式・失敗時動作の変更は設計合意前で未実装。保守性の別改修と分離 |
+| [全体課題の第1段階と振り分け改善案](project-issues-first-batch-2026-11-06.md) | 案Aの実比較を不採用とし、合意済み案Bの構造契約4/2を実装。package102件と7domain/API1,198・Web32件が成功。実モデルは時間切れ・取消等の残件があり未受入。EUM005と復元演習EUM013は完了。EUM003の最終報告段は追加設計の合意待ち |
 | [Eumenes 全体課題一覧](project-issues-2026-11-06.md) | 2026-11-06の全体評価を修正・調査・受入用の33課題へ整理。事象、発生条件、影響、原因の確度、根拠、関連箇所、依存関係、完了条件を記載。個別機能は8単位で追跡。保守性の別改修と外部展開時の条件付き課題を区別し、CI検証は対象外 |
 | [自律基盤の改善調査・設計](agency-autonomy-improvement-design-2026-11-05.md) / [P0・P1 実装依頼・受入計画](agency-shadow-p0-p1-implementation-request-2026-11-05.md) | 2026-11-05、調査・文書レビュー済みの設計案。DeepSeek参考実装との差分、P0の基準測定とP1の予約前Shadow、指標・受入条件・採用／不採用／保留を整理。レビュー10分類の指摘を修正し記録。作成時は文書化のみ許可で、実装・測定は未承認・未着手だった。同日、利用者がP0だけをClaude Code／Codex SDKへの委譲実装として承認。P0のfixture計測基盤を実装・受入検証済み（r1→親レビューR1〜R5→r2で受入、正本配置後に最終確認。[P0報告](verification/agency-shadow-p0-p1/p0-report.md)）。コード変更はAgencyの`eval/initiative`だけで、製品runtime・SystemContext・権限・設定・依存・配布物は不変。P1は結果確認待ちで未着手。実モデルの意味評価・holdout・live計量・製品反映は未実施 |
 | [共同作業サブエージェントの本流導入](collaboration-integration-2026-11-05.md) / [承認済み接続案](collaboration-followup-design-2026-11-05.md) / [検証記録](verification/collaboration-integration-2026-11-06/summary.json) | 共通coreを本流sessionへ接続。再起動後、保存済みLunaでUIの作成・部分修正・保存・復帰、新Pipelineの共同編集・別発言での確認・実操作・同一担当への結果返却を確認。interactは隔離した試験運用の範囲。費用と未確認事項は導入記録に明記 |

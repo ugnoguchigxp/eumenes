@@ -44,7 +44,9 @@ export const memoryPolicyRevision = (db: Database): string =>
 		(
 			db
 				.query("SELECT revision FROM memory_host_settings WHERE id = 1")
-				.get() as { revision: number }
+				.get() as {
+				revision: number;
+			}
 		).revision,
 	);
 
@@ -147,7 +149,10 @@ export async function addMessage(
 }
 
 /** The CURRENT ref of a conversation message, as the host adapter reports it. */
-export function currentRef(h: Harness, id: string): SourceRef {
+export function currentRef(
+	h: Pick<Harness, "store" | "conversation">,
+	id: string,
+): SourceRef {
 	const state = h.store.read((db) =>
 		h.conversation.sourceInTransaction(db, id),
 	);

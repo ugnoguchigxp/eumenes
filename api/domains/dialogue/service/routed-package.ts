@@ -172,8 +172,8 @@ export function portsOf(
 /**
  * The structure model (`routeStructured`; spec router-package-integration 2026-11-04 §1 #8): the package's prompt as
  * it was measured, sent once to the saved structure resource (else the conversation route) as a background control
- * request with low reasoning effort. A model that fails or is slow gives no structure: the package then routes the
- * whole utterance, as `route` does.
+ * request with low reasoning effort. A failed or slow model returns no valid structure; the structured path stops
+ * before work starts, and never falls back to routing a partial request.
  */
 async function analyzeOf(
 	turn: Turn,
@@ -249,6 +249,19 @@ export function hostDecision(
 	hostOf: (c: PackageCandidate) => RouteCandidate | null,
 	pipelineCandidate?: RouteCandidate,
 ): RouteDecision | null {
+	// A planner can only execute registered tools. Do not lose a pending/control
+	// decision, or an unavailable part, by replacing the full step set with a plan.
+	if (
+		decision.to === "pipeline" &&
+		decision.steps.some(
+			(step) =>
+				step.decision.to !== "run" ||
+				(step.candidate.kind !== "toolchain" &&
+					step.candidate.kind !== "read") ||
+				!hostOf(step.candidate),
+		)
+	)
+		return null;
 	// The pinned router exposes row 9 as `run/partial` in route(), and `pipeline` in routeStructured().
 	if (isPipelineDecision(decision))
 		return pipelineCandidate

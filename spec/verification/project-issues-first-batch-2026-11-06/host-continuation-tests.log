@@ -1,0 +1,42 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/dialogue/test/structured-continuation.test.ts:
+(pass) a structured answer resumes the same question and work once, without a new routing score [96.05ms]
+(pass) a mixed reply asks about the whole unperformed scope and leaves the existing question open [77.53ms]
+(pass) an invented question reference fails before answering or starting a replacement job [78.69ms]
+
+api/domains/dialogue/test/routed-router.test.ts:
+(pass) the package decides with no model call: a sure toolchain is offered by the host, handed the words and announced in the host's words (row 2) [86.10ms]
+(pass) the conversation leads when no tool scores: the turn talks, with one call and no choice [74.78ms]
+(pass) a toolchain best-v2 is not sure of is asked to try, in the host's words (row 3) [75.43ms]
+(pass) an unsure toolchain that changes what exists is confirmed first (row 4), and a yes above the approval line approves it (row 5) [73.85ms]
+(pass) a yes below the approval line asks the host's question again and leaves the confirmation open; a sure no closes it [72.50ms]
+(pass) route(): row 9 never dispatches only the first job when no planner is available [69.56ms]
+(pass) a router that fails, is slow, has no memory or no embedding leaves the turn to the talk turn; the trace says why (row 10) [403.81ms]
+(pass) a toolchain with inputs is filled by the one-candidate call, the only model call, held to that candidate [68.56ms]
+(pass) a fill that finds nothing to ask for leaves the turn to the talk turn; one that asks back keeps the request it asked about [71.62ms]
+(pass) a hand-over the host refuses, or an instant toolchain that cannot answer, is said in the host's failure words, with no call to try again [70.33ms]
+(pass) a memory request is filled by the one-candidate call and taken by the host's operation [68.50ms]
+(pass) a work is checked, corrected or cancelled by the package's decision: the host's operation, the host's words [111.65ms]
+(pass) a doubted hand-over is redone elsewhere: the work is cancelled, the same words go to the other toolchain, and the correction is kept [81.48ms]
+(pass) the turns before go to the reranker's port, and the user's utterance before the words goes to the toolchain with them [74.89ms]
+(pass) a correction near the utterance moves the decision, never to a sure one; disagreeing ones apply none and are put out of use; weight 0 turns them off [155.01ms]
+(pass) with no profile saved there is no router: the turn talks, and nothing is offered or embedded [67.92ms]
+(pass) with the router on the user-intent judge is not asked: the package sees the tools and the open confirmations together [69.34ms]
+(pass) the resources State presents go with a hand-over the router decided, for the agent to pick from [1088.77ms]
+(pass) routeStructured: one request with a reference routes the masked utterance; the structure model is the saved resource, at low effort [70.36ms]
+(pass) routeStructured: no request is the conversation, with nothing scored; requests of two tools never dispatch a partial first job when the pipeline is unavailable [72.35ms]
+(pass) routeStructured: a failed structure model leaves the entire request unperformed without direct fallback [66.21ms]
+(pass) routeStructured: a mixed multi-job request never falls back to running only its first tool [66.10ms]
+
+api/application/vendor.test.ts:
+(pass) the vendored memory package matches its manifest, package.json, the lockfile and the installed copy [0.70ms]
+(pass) the memory distribution identifies its source and verifies the installed published files [18.70ms]
+(pass) the vendored world-model package matches its manifest, package.json, the lockfile and the installed copy [1.71ms]
+(pass) the vendored agency package matches its manifest, package.json, the lockfile and the installed copy [0.85ms]
+(pass) the vendored router package matches its manifest, package.json, the lockfile and the installed copy [0.58ms]
+
+ 30 pass
+ 0 fail
+ 315 expect() calls
+Ran 30 tests across 3 files. [3.64s]

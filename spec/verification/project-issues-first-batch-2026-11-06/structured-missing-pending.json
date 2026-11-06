@@ -1,0 +1,409 @@
+{
+  "configuration": {
+    "datasetHash": "64909a5f9bde7c5752bb0788401c94c696b0a0367d06ae6ebfbedef13b1a5077",
+    "entry": "routeStructured",
+    "structurePrompt": "turn-structure-v2",
+    "settingsHash": "71d7a841a1733b9044e84e98b9bfdfc7f20de1fcdd11f4ae62a3ffb0b1278ba2",
+    "source": "adopted-package",
+    "variants": [
+      "B"
+    ],
+    "callsPerCaseAndVariant": 1,
+    "dispatch": false
+  },
+  "rows": [
+    {
+      "id": "known-a",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 7182,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "明日の東京の天気予報を調べて",
+            "target": null,
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "その最高気温と最低気温の差を計算して教えてください。",
+            "target": null,
+            "inputs": [
+              "明日の東京の天気予報"
+            ],
+            "after": [
+              0
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "weather.forecast",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "weather.forecast",
+          "after": [
+            0
+          ],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-b",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 6852,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "1から50までの素数の個数を計算して",
+            "target": null,
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "その計算結果の個数と同じ秒数のタイマーを作ってください。",
+            "target": "タイマー",
+            "inputs": [
+              "その計算結果の個数"
+            ],
+            "after": [
+              0
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "compute.python",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [
+            0
+          ],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-c",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 7262,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "1から50までの素数の個数をPythonで計算してください。",
+            "target": null,
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "計算した個数と同じ秒数のタイマーをセットしてください。",
+            "target": "タイマー",
+            "inputs": [
+              "計算した個数"
+            ],
+            "after": [
+              0
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "compute.python",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [
+            0
+          ],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-d",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 8005,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "known-answer-1",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 6475,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "1から50までの素数の個数を計算して",
+            "target": null,
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "その個数と同じ秒数のタイマーを作ってください。",
+            "target": "タイマー",
+            "inputs": [
+              "その個数"
+            ],
+            "after": [
+              0
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "compute.python",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [
+            0
+          ],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 8002,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 8002,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "short-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 8002,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "topic-change",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 7398,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "decline-work",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 6175,
+      "to": "run",
+      "row": 3,
+      "candidate": "compute.python",
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "その作業はもう不要なので取り消してください。",
+            "target": null,
+            "inputs": [],
+            "after": []
+          }
+        ]
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "draft-only",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 6045,
+      "to": "run",
+      "row": 2,
+      "candidate": "timers.manage",
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "天気を調べてタイマーを使う手順を、実行せず下書きしてください。",
+            "target": "手順",
+            "inputs": [],
+            "after": []
+          }
+        ]
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "ambiguous-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 8004,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "revoked-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 6264,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "mixed-reply-new-work",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 8004,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "holdout-dependent",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 8004,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "holdout-independent",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 8003,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "holdout-same-tool",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 8002,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "holdout-answer",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 4389,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-discussion",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 4387,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-new-topic",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 5966,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "今は名古屋の天気だけ調べてください。",
+            "target": null,
+            "inputs": [
+              "名古屋"
+            ],
+            "after": []
+          }
+        ]
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    }
+  ]
+}

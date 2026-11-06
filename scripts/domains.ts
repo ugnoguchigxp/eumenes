@@ -320,6 +320,7 @@ export const domains = {
 		backend: "api/domains/settings",
 		web: "web/src/domains/settings",
 		components: null,
+		integrationTests: ["api/application/backup-restore.test.ts"],
 		depends: {
 			api: [],
 			web: [],
@@ -403,6 +404,7 @@ export const domains = {
 		backend: "api/domains/memory",
 		web: null,
 		components: null,
+		integrationTests: ["api/application/backup-restore.test.ts"],
 		depends: {
 			api: ["continuity", "conversation", "tool-runtime"],
 			web: [],

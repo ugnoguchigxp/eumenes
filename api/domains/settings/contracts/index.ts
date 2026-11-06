@@ -244,7 +244,7 @@ export const routerSettingsSchema = z
 		entry: z.enum(routerEntries).default("route"),
 		/** The cloud LLM resource the structure model runs on (`routeStructured`); null keeps the conversation route. */
 		structureResourceId: z.uuid().nullable().default(null),
-		/** How long a turn waits for the structure model before it routes the whole utterance. */
+		/** How long a turn waits for structure before leaving the whole request unperformed. */
 		structureTimeoutMs: routerStructureTimeoutMs.default(8000),
 		/** How long a turn waits for the router (each call) before it goes on without it. */
 		timeoutMs: routerTimeoutMs.default(2000),

@@ -1,3 +1,4 @@
+import { backfillConversationSources } from "./initial-sync";
 import { randomBytes } from "node:crypto";
 import {
 	chmodSync,
@@ -298,8 +299,20 @@ export function createWorldAssembly(
 		return "PAGE_LIMIT";
 	}
 
+	let syncing: Promise<InitialSyncReport> | null = null;
+
 	/** A cursor the secret no longer authenticates is an unusable cursor: re-sync everything. */
 	async function consumeSource(): Promise<ConsumeReport> {
+		if (syncing)
+			return {
+				resync: false,
+				changes: 0,
+				forgets: [],
+				invalidated: 0,
+				hasMore: false,
+				blocked: "INITIAL_SYNC_IN_PROGRESS",
+				rejectedRoots: 0,
+			};
 		try {
 			return await lifecycle.consumeSourceChanges(scope);
 		} catch (error) {
@@ -310,20 +323,36 @@ export function createWorldAssembly(
 		}
 	}
 
-	async function initialSync(): Promise<InitialSyncReport> {
+	async function runInitialSync(): Promise<InitialSyncReport> {
 		if (service.initialSyncComplete()) return { complete: true };
 		if (!gate.isOpen())
 			return { complete: false, reason: gate.reason() ?? "RECOVERY_REQUIRED" };
+		await lifecycle.prepareInitialSourceSync(scope);
+		const backfill = await backfillConversationSources({
+			store,
+			conversation: options.conversation,
+			maxPages: SYNC_MAX_PAGES,
+			closed: () => closed,
+		});
+		if (backfill !== null) return { complete: false, reason: backfill };
 		const seen = { changes: 0 };
 		for (const consume of [
-			consumeSource,
+			() => lifecycle.consumeInitialSourceChanges(scope),
 			() => lifecycle.consumeMemoryChanges(scope),
 		]) {
 			const why = await drain(consume, SYNC_MAX_PAGES, seen);
 			if (why !== null) return { complete: false, reason: why };
 		}
+		if ((await lifecycle.resumeForgets()).some((r) => !r.complete))
+			return { complete: false, reason: "FORGET_PENDING" };
 		await service.markInitialSyncComplete();
 		return { complete: true };
+	}
+
+	function initialSync(): Promise<InitialSyncReport> {
+		return (syncing ??= runInitialSync().finally(() => {
+			syncing = null;
+		}));
 	}
 
 	/** Applies the mode to the persistent ON/OFF flag once the gate is open. */

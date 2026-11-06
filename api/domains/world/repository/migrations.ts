@@ -1,3 +1,4 @@
+import { initialSyncMigration } from "./initial-sync";
 import { documentsMigration } from "./documents";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { extractionMigration } from "./extraction";
@@ -41,5 +42,10 @@ export const migrations: readonly Migration[] = [
 		id: "world/0011-documents",
 		after: ["world/0010-forget-origin"],
 		sql: documentsMigration,
+	},
+	{
+		id: "world/0012-initial-source-sync",
+		after: ["world/0011-documents"],
+		sql: initialSyncMigration,
 	},
 ];

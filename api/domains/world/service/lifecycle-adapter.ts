@@ -5,6 +5,7 @@ import {
 	listIntakesOfScope,
 	type IntakeRow,
 } from "../repository/lifecycle";
+import { prepareInitialSourceSync } from "../repository/initial-sync";
 import { createFeedOps } from "./lifecycle-feed";
 import { createForgetOps } from "./lifecycle-forget";
 import { createLifecycleCtx } from "./lifecycle-lock";
@@ -104,6 +105,12 @@ export function createWorldLifecycle(options: LifecycleOptions) {
 		startRestore: () => recover.recoverWorld({ restored: true }),
 		consumeMemoryChanges: feed.consumeMemoryChanges,
 		consumeSourceChanges: feed.consumeSourceChanges,
+		consumeInitialSourceChanges: feed.consumeInitialSourceChanges,
+		prepareInitialSourceSync: (scope: ScopeRef) =>
+			store.write((db) => {
+				if (!options.world.initialSyncCompleteInTransaction(db))
+					prepareInitialSourceSync(db, scope);
+			}),
 		/** Each checkpoint stage of both feeds (owner, scanned, received, applied). */
 		feedStages: feed.feedStages,
 	};

@@ -1,3 +1,4 @@
+import { backfillSourceEvents } from "../repository/source-backfill";
 import { createAttachments } from "./attachments";
 import { linkAttachments } from "../repository/attachments";
 import type { Database } from "bun:sqlite";
@@ -191,6 +192,9 @@ export function createConversationService(
 		retract(input: { messageId: string; at?: string }): Promise<ChangeResult> {
 			return store.write((db) => retractInTransaction(db, input));
 		},
+		/** Backfill one page of confirmed pre-outbox messages in the caller's writer. */
+		backfillSourceEventsInTransaction: (db: Database, after = 0, limit = 200) =>
+			backfillSourceEvents(db, outbox, after, limit),
 		/** Outbox events after `after` (exclusive), oldest first. Gaps in seq are normal. */
 		changesInTransaction(
 			db: Database,

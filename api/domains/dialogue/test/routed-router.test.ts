@@ -535,7 +535,9 @@ test("routeStructured: a failed structure model leaves the entire request unperf
 	);
 	expect(r.routes).toEqual([]);
 	expect(h!.todos()).toHaveLength(0);
-	expect(h!.state.selections.every((selection) => !selection.toolchainId)).toBe(true);
+	expect(h!.state.selections.every((selection) => !selection.toolchainId)).toBe(
+		true,
+	);
 });
 
 test("routeStructured: a mixed multi-job request never falls back to running only its first tool", async () => {

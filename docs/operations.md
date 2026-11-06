@@ -20,7 +20,7 @@
 
 ## 保全
 
-- 既定 DB は `data/eumenes.sqlite3`（`EUMENES_DB` で変更）。DB と `data/keys/` 内の鍵は一緒に保全する。
+- 既定 DB は `data/eumenes.sqlite3`（`EUMENES_DB` で変更）。DB、`data/keys/` 内の鍵、Memory/Worldの忘却journalを一緒に保全する。
 - `bun run db:backup` は API 停止中に DB のバックアップを作る（起動中は拒否される）。作り方は [logging.md](logging.md) の「DBの手動バックアップ」。
 - LARM の接続先は SQLite に保存済みの設定が正本。接続先の環境変数を要求したり、同じ接続先を利用者に再確認したりしない。
 
@@ -41,7 +41,9 @@ DB は WAL モードで開く。実行中の変更は `<DBパス>-wal` と `<DB�
 
 このコードが知らない migration が DB に記録されていると、起動は `migration_unknown_applied` で拒否する。新しい版の DB を古いコードで開いた場合がそれにあたる。拒否は migration を適用する前に起きる。
 
-手順は未実行（文書のみ）。
+忘却journalも復元対象に含める。既定の `memory-forget-journal.jsonl`、同じ場所の `world-forget-journal.jsonl`、旧版のblock journalが残っている場合はそれも保全する。`EUMENES_MEMORY_JOURNAL` / `EUMENES_WORLD_JOURNAL` を指定した環境ではその実ファイルを使う。DBを古いbackupへ戻す場合も、保全できている最新の忘却journalを失わないようにする。復元後のrecoverで後から忘却した参照元を再失効させる。journalを失った古いDBだけでは、その後の忘却を再構成できない。
+
+2026-11-06、検証専用のDB・鍵・ダミー認証情報で、backupと別ディレクトリへの復元を実施した。会話と未着手job、暗号化credentialの読取り、鍵欠落/別鍵の拒否、新しいmigrationを持つDBの拒否、異なる世代のWAL/SHMの退避、古いDB＋最新Memory journalによる参照失効を確認した。忘却はAIの参照元を失効させる契約であり、元の会話ログの物理削除とは異なる。実製品のDB/鍵を複製した演習ではない。Worldのjournal復旧は別のworld domain試験で扱う。[全体課題の記録](../spec/project-issues-2026-11-06.md)と `api/application/backup-restore.test.ts` を参照。
 
 ## 受入の状態管理
 

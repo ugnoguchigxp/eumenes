@@ -10,7 +10,10 @@ import { resolveLarmToken } from "../api/infrastructure/auth-config";
 
 export async function routerIssueInference(dbPath: string) {
 	const keyDir = process.env.EUMENES_KEY_DIR || join(dirname(dbPath), "keys");
-	if (!process.env.EUMENES_SECRET_KEY && !existsSync(join(keyDir, "settings.key")))
+	if (
+		!process.env.EUMENES_SECRET_KEY &&
+		!existsSync(join(keyDir, "settings.key"))
+	)
 		throw new Error("saved_settings_key_unavailable");
 	const db = new Database(dbPath, { readonly: true });
 	// Any attempted upgrade is rejected by SQLite; the evaluation never opens a product writer.
@@ -27,27 +30,82 @@ export async function routerIssueInference(dbPath: string) {
 		memory = {
 			read: (fn) => fn(requestDb),
 			readSnapshot: (fn) => requestDb.transaction(fn)(requestDb),
-			write: async (fn) => { const result = requestDb.transaction(fn)(requestDb); for (const notify of committed) notify(); return result; },
-			onCommit: (fn) => { committed.add(fn); return () => { committed.delete(fn); }; },
-			close: async () => { requestDb.close(); },
-		};
-		const inference = createInference(memory, {
-			...saved,
-			inTransaction: () => saved.get(),
-			// Evaluation connections have their own identity, so closing them cannot release the live host's lease.
-			derivedKey: () => undefined,
-		}, { token: resolveLarmToken(process.env), cloudAgents: createCloudAgents(process.env) });
-		return {
-			async analyze(prompt: { system: string; user: string }, timeoutMs: number, resourceId: string | null) {
-				const deadline = Date.now() + timeoutMs;
-				const id = await memory!.write((tx) => inference.captureBackgroundControlInTransaction(tx, {
-					taskId: "router-structure-eval", decisionId: crypto.randomUUID(), authorityEpoch: 1, executionGeneration: 1,
-					deadline, taskDeadline: deadline, maxOutputTokens: 1024, route: resourceId ? { resourceId } : "conversation",
-				}));
-				const receipt = await inference.executeControl(id, [{ role: "system", content: prompt.system }, { role: "user", content: prompt.user }], AbortSignal.timeout(timeoutMs), { instructions: "", outputSchema: { type: "object" }, reasoningEffort: "low" }, { sessionRole: "auxiliary" });
-				return typeof receipt.value === "string" ? receipt.value : new TextDecoder().decode(receipt.value);
+			write: async (fn) => {
+				const result = requestDb.transaction(fn)(requestDb);
+				for (const notify of committed) notify();
+				return result;
 			},
-			async close() { await inference.close(); await memory!.close(); db.close(); },
+			onCommit: (fn) => {
+				committed.add(fn);
+				return () => {
+					committed.delete(fn);
+				};
+			},
+			close: async () => {
+				requestDb.close();
+			},
 		};
-	} catch (error) { await memory?.close(); db.close(); throw error; }
+		const inference = createInference(
+			memory,
+			{
+				...saved,
+				inTransaction: () => saved.get(),
+				valid: (_tx, snapshot, purpose, connection) =>
+					saved.valid(db, snapshot, purpose, connection),
+				// Evaluation connections have their own identity, so closing them cannot release the live host's lease.
+				derivedKey: () => undefined,
+			},
+			{
+				token: resolveLarmToken(process.env),
+				cloudAgents: createCloudAgents(process.env),
+			},
+		);
+		return {
+			async analyze(
+				prompt: { system: string; user: string },
+				timeoutMs: number,
+				resourceId: string | null,
+			) {
+				const deadline = Date.now() + timeoutMs;
+				const id = await memory!.write((tx) =>
+					inference.captureBackgroundControlInTransaction(tx, {
+						taskId: "router-structure-eval",
+						decisionId: crypto.randomUUID(),
+						authorityEpoch: 1,
+						executionGeneration: 1,
+						deadline,
+						taskDeadline: deadline,
+						maxOutputTokens: 1024,
+						route: resourceId ? { resourceId } : "conversation",
+					}),
+				);
+				const receipt = await inference.executeControl(
+					id,
+					[
+						{ role: "system", content: prompt.system },
+						{ role: "user", content: prompt.user },
+					],
+					AbortSignal.timeout(timeoutMs),
+					{
+						instructions: "",
+						outputSchema: { type: "object" },
+						reasoningEffort: "low",
+					},
+					{ sessionRole: "auxiliary" },
+				);
+				return typeof receipt.value === "string"
+					? receipt.value
+					: new TextDecoder().decode(receipt.value);
+			},
+			async close() {
+				await inference.close();
+				await memory!.close();
+				db.close();
+			},
+		};
+	} catch (error) {
+		await memory?.close();
+		db.close();
+		throw error;
+	}
 }
