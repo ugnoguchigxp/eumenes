@@ -1,6 +1,6 @@
 # Pursuitによる長考Webリサーチの取込
 
-状態: 実装計画。2026-11-06の利用者による取込依頼に基づく。前提資料は `agent-roles-and-pursuit-integration-design-2026-11-03.md`。今回は研究担当に絞り、Pipeline制作、共有下書きの編集、自律的な目標の開始を含めない。
+状態: 取込・実API検証・サーバー反映完了。2026-11-06の利用者による取込依頼に基づく。前提資料は `agent-roles-and-pursuit-integration-design-2026-11-03.md`。今回は研究担当に絞り、Pipeline制作、共有下書きの編集、自律的な目標の開始を含めない。
 
 ## 目的と現在の差
 
@@ -18,7 +18,7 @@
 
 coreには二つの接続上の不足がある。`ToolPort.invoke()`は最終結果まで一つのPromiseで待ち、再開時に未確定started試行をinterruptedにする。既存Web取得は別のQueue jobで確定するため、親jobを待たせる接続では推論枠・Queue枠を保持し、受付と完了を区別して再開できない。また、受入条件の削除禁止triggerがあり、ホストの忘却を反映するAPIがない。これらは§8.4/8.5で既に挙げられた不足であり、専用の題材処理で回避しない。
 
-## coreの追加契約（次版、後方互換）
+## 実装したcoreの追加契約（後方互換）
 
 1. 道具の受付をホストの同一writer transactionで予約する任意の `ToolPort.deferInTransaction` を追加する。coreが確定したpursuit/attempt IDを渡し、ホストは既存Queueへ一度受付しoperation IDを返す。coreのpending記録と子受付を同一transactionで保存する。既存の同期結果portはそのまま使える。
 2. pendingの試行は `step()` で再実行せず、pending参照を返す。ホストは推論・Queue枠を解放して子結果を待つ。`completeTool` は同一pursuit・attempt・operationの確定結果だけを一度採用し、既存settlementへ戻す。取消・忘却・期限後の結果は採用しない。
@@ -31,10 +31,10 @@ coreには二つの接続上の不足がある。`ToolPort.invoke()`は最終結
 
 | 接続 | 入口と正本 |
 | --- | --- |
-| 会話→担当 | `toolchain:web.research@2`、function `web_research`、`binding:pursuit.research@2`、`adapter:pursuit@1` |
-| 担当の指示 | `profile:pursuit.research@1` と `skill:pursuit.research@1`、`package:pursuit.research@1` |
+| 会話→担当 | `toolchain:web.research@4`、function `web_research`、`binding:pursuit.research@2`、`adapter:pursuit@1` |
+| 担当の指示 | `profile:pursuit.research@1` と `skill:pursuit.research@3`、`package:pursuit.research@3` |
 | 受付→開始 | 同期のtask受付が出所・期限・依頼・起動jobを保存。writer外で固定operationKeyによりcoreを開始し、対応保存前の障害でも同じcoreを回収 |
-| 推論 | 既存inferenceの独立subagent呼出し。計画・生成・振り返り・受入照合は別文脈。使用量を同じ仕事へ帰属 |
+| 推論 | 既存inferenceのsubagent経路を使う独立したauxiliary呼出し。計画・生成・振り返り・受入照合は別文脈。使用量を同じ仕事へ帰属 |
 | 取得 | 既存Web domainへpending試行を同一transactionで受付。完了結果の所有・世代・出所を確認してcoreへ渡す |
 | 相談 | coreの相談IDとホストの質問IDを対応。待機中は推論しない。利用者の実際の回答messageを検査して再開 |
 | 訂正・取消 | 条件の訂正では旧実行を失効し、新しい実行へ参照を引き継ぐ。取消後に新規取得・結果採用をしない |
@@ -60,3 +60,43 @@ Pursuitの方針・仮説・観測を保持し、調査の部品ごとの未達�
 5. live: 実モデルの担当選択、実Webからの根拠付き報告、会話への結果返却を少数の事前固定ケースで確認する。API費用は既存の承認上限15ドルを引き継ぎ、前回からの累計を消さない。稼働中サーバーへの反映と隔離した固定試験を区別して記録する。
 
 実装だけ、受付だけ、fixtureだけを製品の取込完了とは扱わない。各段階の結果・未確認点・残作業を記録し、3ラウンドまたは新しい根拠のない反復では進め方を見直す。
+
+
+## 実装結果
+
+coreは`eumenes-pursuit@0.0.4`、元commitは`2b6af95044409b94ac6cfaef23db22db94d1e9ff`、host契約1.11、DB schema8。vendorのtgzとchecksum、public export、migration SQLの整合を試験した。standalone/eval、設定DB、認証情報は配布物に含めない。
+
+高速の`web_search`は従来の担当と時間枠を使う。`web_research`は登録済みtask ownerへ直接委譲し、Pursuitだけが調査の次の一手を決める。旧親エージェントの計画ループは重ねない。選択条件、問いの分解、調査語、出典の選択、反証、充足判断はモデルが扱う。
+
+実測で、取得した本文を再読するだけになり、最後まで回答案が残らない問題を確認した。既存の機能・情報を次のように使い直した。
+
+- 読取りも仮説の試行に数えて、見直し役へ戻す。未検証と表示した調査メモも次の判断へ渡す。最終合否の条件は維持した。
+- 回答案を早く保存し、各仮説の対象に`report.json`を含めて、同じ仮説の中で判明事項を回答へ反映する。元の骨組みで確認結果を上書きしない。
+- 毎回のモデル入力へ、ホストが保持する現在の回答案と取得済み資料の索引を渡す。本文は必要な範囲を再読し、検索の未一致を事実の不在として扱わない。
+- Webの保存本文を再利用し、先頭12,000文字の表示で切れた後半も読めるようにした。独立検証には、実際に読んだ後半の範囲も渡す。
+- 長い調査だけ、本文の取得と安全検査に最大120秒を使える。短い検索の30秒枠とHTTP取得1試行の既存上限は維持した。
+
+時間は30分、担当の実行は100回、調査・レビュー・受入検証の推論は80回、Web操作は24回、検索は8回を上限とする。本文の安全検査はWeb担当の管理下で別に記録する。100回はホストの実行回数であり、core内部の状態遷移数へ読み替えない。coreには既存の内部遷移上限1,500も残る。相談・子取得の待機中には推論を行わない。訂正による新しい世代でも、消費済み回数と元の期限は引き継ぐ。
+
+開始済みの仕事は、対応するcoreに保存された開始入力を再利用する。ホストの初期設定を更新した後の再起動でも、目標・受入条件・方針の予算を作り直さない。core受付直後にホスト側の対応保存が途切れた場合も、operation keyから既存入力を回収する。Webを無効化した後も、過去の仕事を取消・忘却するownerは残る。
+
+既存の保護付きWeb取得で、検索・本文取得・再読・取消・失効を接続できたため、今回の取込では検索providerの追加を必要としなかった。モデルと接続先はユーザーの保存済み設定を使う。製品コードにLunaやClaudeを固定していない。
+
+## 検証結果と確認範囲
+
+記録は[verification/pursuit-integration-2026-11-06/summary.json](verification/pursuit-integration-2026-11-06/summary.json)、[実調査の結果](verification/pursuit-integration-2026-11-06/live-research.json)、[費用台帳の集計](verification/pursuit-integration-2026-11-06/budget.json)に保存した。
+
+- core: 543件成功、既存の12件skip、型・lint成功。
+- 変更ドメインと関連する利用側: 883件成功、0件失敗、143ファイル、5,029 assertions。型、書式、lint、domain/SQL境界、サイズ、bundle整合を確認。mainのcommitと今回の差分だけを使う凍結した環境でも検証した。CIは依頼どおり実行していない。
+- 固定試験: Queue枠の解放、同じcoreへの再開、相談への実回答、訂正時の世代失効、取消、期限、忘却、遅延結果、出典IDの偽造拒否、保存本文の後半、取得予算の分離、無効化後の忘却を確認。設定更新後の再開が失敗する例を再現し、保存済み入力の再利用で解消した。
+- 実モデルの担当選択: 短い定義確認では`web.search`、複数本文の比較では`web.research`を選んだ。保存済みのルーターと同じrerank documentを使った2ケースであり、全会話経路の採択閾値を網羅した試験ではない。
+- 実Web・実API: 同じ事前固定のSQLite公式2資料の比較依頼で、Lunaが回答案を更新し、根拠IDの整合と独立した内容検証に合格した。statusはcompleted、verifiedはtrue、出典2件、会話への結果採用も確認した。調査・レビュー・検証65回と本文安全検査2回、計67回のAPI呼出し。未完了だった先行実行と介入理由も[live-history.json](verification/pursuit-integration-2026-11-06/live-history.json)へ残した。
+- サーバー: 実行中の仕事がないことを確認して通常のdev入口から再起動。認証付きstatus/capabilitiesが200を返し、`toolchain:web.research@4`、`package:pursuit.research@3`、`skill:pursuit.research@3`の有効登録を確認した。
+
+API通し検証は、隔離した構成で実Luna Responses APIを検証用LarmPortへ接続し、実際のinference権限・Queue・Web保護・会話への採用を通した。ホスト側のこのtransportではtoken receiptを報告できないためnullのまま保ち、正確なAPI使用量は元プロジェクトの台帳で集計した。既存Codex/Claude SDK接続の全認証・全設定の組合せを個別に通したものではない。
+
+通し検証終了後には、再起動時の保存入力再利用だけを追加修正した。新規受付の入力と動作は変えず、変更後に旧入力・対応保存前の障害の再現試験と関連883件の回帰を実施したため、同じ有料通し試験の反復は省略した。資料の内容充足はモデルによる検証であり、厳密な証明とは表示しない。今回の1題の成功をすべての調査の成功率へ一般化しない。
+
+Claude/OpenAIの元キャンペーン`quality-20261105`を継続した。報告済み使用量による累計は$3.736388895。中断した1呼出しを予約上限$0.2745で保守的に計上し、丸めも含む累計の上限計上額は$4.012664 / $15、未確定の予約は0件。今回の統合作業の報告済みAPI費用は$0.33102682、最終通し試験分は$0.084741015。請求書の照合額ではなく、SDK使用量と確認済み単価による算定である。`.zprofile`の認証情報を使い、プロジェクト用`.env`や鍵のコピーは作成していない。
+
+最後の差分点検では、題材固有の語句による担当選択や意味分類、SQLite専用の回答処理は追加していない。専用の処理は、永続的な道具の受付、出所と権限の検査、上限、受入条件、取消・忘却・再起動の契約に限る。

@@ -4,6 +4,7 @@ import {
 	type PursuitRuntime,
 	type PursuitStore,
 } from "eumenes-pursuit";
+import { findPursuitByOperation, loadPursuit } from "eumenes-pursuit/sqlite";
 import policy from "./policy.json";
 import { current, type Context } from "./context";
 import { stateOf } from "../repository";
@@ -42,6 +43,14 @@ export function core(ctx: Context, id: string, epoch: number) {
 	const startInput = ctx.store.readSnapshot((db) => {
 		const row = current(ctx, db, id, epoch),
 			state = stateOf(row);
+		// Restart with the accepted input, including the crash window before core_id was saved.
+		const existingId =
+			row.core_id ?? findPursuitByOperation(db, operationKey(id, epoch));
+		if (existingId) {
+			const existing = loadPursuit(db, existingId);
+			if (!existing) throw new Error("pursuit_core_missing");
+			return existing.input;
+		}
 		return {
 			goal: state.request,
 			acceptance: criteria,
@@ -54,7 +63,6 @@ export function core(ctx: Context, id: string, epoch: number) {
 					...policy.budget,
 					wallMs: row.deadline - row.created_at,
 					attempts: state.limits.childCalls * 3,
-					transitions: state.limits.parentCalls,
 				},
 			}),
 			conditions: {

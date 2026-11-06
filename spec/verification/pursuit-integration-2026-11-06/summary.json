@@ -1,0 +1,215 @@
+{
+  "at": "2026-11-06T00:26:26.377Z",
+  "sourceBaseCommit": "eb922e99cca45406acbe8e304987ae787b0fe273",
+  "core": {
+    "package": "eumenes-pursuit",
+    "version": "0.0.4",
+    "artifact": "eumenes-pursuit-0.0.4-7964f15d6308.tgz",
+    "sha256": "7964f15d630879bc37cbabfa3d5f65b3ef59a88e041854e7ebc569016704ee97",
+    "sourceGitCommit": "2b6af95044409b94ac6cfaef23db22db94d1e9ff",
+    "hostContract": "1.11",
+    "dbSchemaVersion": 8,
+    "verifiedWith": "543 local tests passed; 12 existing skips; typecheck/lint passed",
+    "files": 80
+  },
+  "definition": {
+    "toolchain": "toolchain:web.research@4",
+    "binding": "binding:pursuit.research@2",
+    "profile": "profile:pursuit.research@1",
+    "skill": "skill:pursuit.research@3",
+    "package": "package:pursuit.research@3"
+  },
+  "hostRegression": {
+    "pass": 883,
+    "fail": 0,
+    "assertions": 5029,
+    "files": 143,
+    "seconds": 109.79,
+    "scope": [
+      "pursuit",
+      "capabilities",
+      "dialogue",
+      "inference",
+      "web-research",
+      "application/pursuit",
+      "task-execution",
+      "task-execution-browser",
+      "task-execution-media",
+      "search-agents-check",
+      "toolchain"
+    ],
+    "logSha256": "c7fdf8d8a6a6ce56a726e14eda5bca47dab2e4ed11b71b7e797451139e67b7cc",
+    "frozenInputManifestSha256": "426511819e1711d4edaaa2754c3d1a85b379e01c5fe327bbb8aeb7e684d5c245"
+  },
+  "typecheck": {
+    "passed": true,
+    "log": "$ bun check\n✓ No type errors in 2,988 files [692.54ms]"
+  },
+  "staticChecks": [
+    {
+      "check": "format",
+      "exitCode": 0,
+      "logSha256": "6f6f6126b75dd3e278b5da526f9442264de4022f285bf92f5b91e5e8592763d3"
+    },
+    {
+      "check": "lint",
+      "exitCode": 0,
+      "logSha256": "9873a1a980f9b55d5bf050e8d6630e834c513be9995c7984137c9dd511fcbbbc"
+    },
+    {
+      "check": "size",
+      "exitCode": 0,
+      "logSha256": "d67797179117c0a24b8a471d8fd526885e0a3b09ff06a12261c63653e1e03a5a"
+    },
+    {
+      "check": "domain-boundaries",
+      "exitCode": 0,
+      "logSha256": "506acc5035e02c1635c0b316a6c98d3028ab47599b39ab0f55cc73f292b882bd"
+    },
+    {
+      "check": "sql-boundaries",
+      "exitCode": 0,
+      "logSha256": "4e2dc991448129c80c59232707cd079a814859e4dab58e274924df516a1c1e2b"
+    },
+    {
+      "check": "bundle",
+      "exitCode": 0,
+      "logSha256": "efc1032ebff92f96776c8b65f6b4838366b5b8e3123f0523005fc668a284c653"
+    }
+  ],
+  "ciExecuted": false,
+  "live": {
+    "record": "live-research.json",
+    "status": "completed",
+    "coreVerified": true,
+    "sources": 2,
+    "providerCalls": 67,
+    "researchModelCalls": 65,
+    "dialogueAdopted": true,
+    "scope": "One fixed public-source comparison; router selection separately measured. Native API transport used through host inference, not a claim of every SDK/provider combination."
+  },
+  "budget": {
+    "campaign": "quality-20261105",
+    "capUsd": 15,
+    "reportedUsageUsd": 3.7363888949999957,
+    "conservativeExposureUsd": 4.012664,
+    "pendingCalls": 0,
+    "unresolvedCostCalls": 0,
+    "unreportedButResolvedCalls": 1,
+    "upperBoundReconciliations": [
+      {
+        "callId": "28807e29-c8a6-41aa-b879-2e961440c99e",
+        "upperBoundUsd": 0.2745,
+        "basis": "Integration round6 stopped after repeated overlapping read-only source observations with no report; in-flight Responses request was aborted. Existing full-context maximum-token reservation is retained as a conservative liability, not a measured charge. No tariff or campaign ceiling changed."
+      }
+    ],
+    "integrationReportedUsageUsd": 0.33102682000000017,
+    "finalLiveCalls": 67,
+    "finalLiveReportedUsageUsd": 0.08474101499999999,
+    "providerExposureUsd": {
+      "claude": 2.304834,
+      "openai": 1.70783
+    },
+    "tariffSource": "https://developers.openai.com/api/docs/pricing",
+    "note": "Usage-based calculation at the fixed verified tariff, not invoice reconciliation. Exposure includes per-call upward rounding and the full pre-dispatch upper bound of one interrupted request; unknown usage was never treated as zero. Earlier Claude/OpenAI campaign spend is retained."
+  },
+  "runtime": {
+    "at": "2026-11-06T00:21:47.379Z",
+    "service": "eumenes",
+    "capabilitiesHttpStatus": 200,
+    "researchPackagePresent": true,
+    "revisions": [
+      {
+        "kind": "toolchain",
+        "id": "web.research",
+        "active_revision_id": "toolchain:web.research@4",
+        "enabled": 1
+      },
+      {
+        "kind": "package",
+        "id": "pursuit.research",
+        "active_revision_id": "package:pursuit.research@3",
+        "enabled": 1
+      },
+      {
+        "kind": "skill",
+        "id": "pursuit.research",
+        "active_revision_id": "skill:pursuit.research@3",
+        "enabled": 1
+      }
+    ]
+  },
+  "upgradeRegression": {
+    "before": "Failed: accepted orphan core became failed when host defaults changed",
+    "after": "Passed: operation lookup recovers and reuses the accepted immutable input",
+    "includedInFinalRegression": true
+  },
+  "liveThenUpgradeNote": "No product inputs were edited during a live run. After the successful paid run, only preservation of existing accepted input on restart was added; new-start behavior stayed identical. The upgrade regression and final 883-test run validate that final change.",
+  "sourceInputs": {
+    "api/application/migrations.ts": "e930dc31d7129fbb9cfa13c9b15b027edf8dfba9ca8cee291f2c2be3e99d3863",
+    "api/application/server-services.ts": "e561d463de6770becd3bea9b213a1c522bb04c16c52e3af13a299cfa6f8e6fbf",
+    "api/application/server-lifecycles.ts": "fd10d255e6ea47a3d29ac2d931cc133f7a22dc6f1b309341c244fe303bd114cf",
+    "api/application/toolchain/task-execution-adapter.ts": "46fafd0b773f3db7204f71b9219ba70588c14934fc54692ac9b929cc761deeca",
+    "api/application/toolchain/task-execution-port.ts": "fe95097ea49721068511932932730afec26d50f98b1cd9180a1f48a0054c1234",
+    "api/application/toolchain/toolchain-adapters.ts": "9adafa1510ac0773d5931e8bb6ad85adab4c8e42b7a62bed86113e50dc9b411d",
+    "api/application/toolchain/toolchain-routing.ts": "53383cae61f6b72b485186edcbb06b4952e8df9a92e109f0ae7f8b3427f24f87",
+    "api/application/toolchain/toolchain.ts": "6e3c546e1956e12a6d7b15d907152f7981cea9000123504bfd89f76949280123",
+    "api/application/toolchain/toolchain.fixture.ts": "38224960e353b10f705f7fdcda86ad102c9a0c89a8f2b59cd65818746959b259",
+    "api/application/toolchain/toolchain-harness-options.fixture.ts": "ba204a9ac60c5bfcd88f4b426094f605db1b8b4c5e780c1d7648275ac096e841",
+    "api/domains/capabilities/contracts/bindings.ts": "3e61bcd4bff4a088048a2cd9591653f0aa36f0495646cbf94750d86132499b84",
+    "api/domains/capabilities/repository/index.ts": "8179453c369f5f10746e3d0e1cce61c6d49ffa562e06a34c8668624423a9eac4",
+    "api/domains/capabilities/service/registry.ts": "70baba3072c5cffaf4c48958c4da1768c411df6ade8fdfa6c3d445a868aa9124",
+    "api/domains/capabilities/service/toolchains.ts": "ff4a586e23db0cc832fb93429e3c9e2e7b97ce7a888bcc4eda1efef706230f86",
+    "api/domains/dialogue/contracts/toolchains.ts": "aee9829e97b587e0e8b2d6d92a2b9bad453ca6bb9eef6c03727480e817635246",
+    "api/domains/dialogue/service/executor-work.ts": "b6a2a2925e3f563f14ea6b6bcbd5f5bb21d93c58173473901c59e9505bc60b0a",
+    "api/domains/dialogue/service/result-intake.ts": "54da06094ed617b2b427edfa2091ce3aaa389d95e35ec5d68c5402887ba0b297",
+    "api/domains/dialogue/service/result-text.ts": "10dc9be6be2c432a9531454b911c20b17fc8bbaae01e69ad10d9a2def6ebdc41",
+    "api/domains/dialogue/service/task-work.ts": "62c3f2ac4d8d750c76e80582cfa584a9724c7a9855a11c10ffec5eed2ed4cbab",
+    "api/domains/dialogue/service/work-dispatch.ts": "48aee1d328f34544fea154e361a9a5b8eb22cbae75dee39c65979e99be0772fb",
+    "api/domains/dialogue/service/work-ledger.ts": "a9e86698fbec13e5e06306633d0ca35fcafcf234a480aa94a1f99dd517a4e93f",
+    "api/domains/dialogue/service/work-stop.ts": "deff714c2b7906a398cd39842da77126fe9b09556ac8a0ebb65ccf7b77f805f0",
+    "api/domains/dialogue/test/pursuit-result.test.ts": "73305c6fe88053a817dec2c69bf363052cdd1b22d2d16c9d48894f2153af1ebd",
+    "api/domains/inference/contracts/index.ts": "179e72bb0f3223aeaf8705cb9f54e39bd8a19b6c535a97980fa9eef309201e32",
+    "api/domains/inference/service/usage.ts": "d59176d51ccb171d762cc6476608f9c107724de786b72d29144f60b34445fada",
+    "api/domains/inference/test/receipt-usage.test.ts": "04e7a80e392a71eb05267463487868fdc1068d2809423b1a8cfa188457a892c0",
+    "api/domains/tool-runtime/contracts/adapters.ts": "03bd5b23699fac5db1e88532319b453bef9e66f457e2bc1d4ff4639adb0a68f5",
+    "api/domains/tool-runtime/contracts/task-execution.ts": "49e3af03bb4efa1e28297e487391fa8d814b1bc230c5eea0b57a7ac303320f16",
+    "api/domains/web-research/service/index.ts": "2821e4320e7a8884dec8a8bf84212d49c82a3f2b8192e98a2b6a0e9cb45e798f",
+    "api/domains/web-research/service/delivery-buffer.ts": "5332a2a44e91be4d626200a4075a8feaa784c62da83009731be5a49e8793050b",
+    "scripts/domains.ts": "8d8fe3d822cfa3909b9b3c2bb62c067961d610230da933574b99beca17a1509b",
+    "scripts/toolchain-bundle.ts": "685343bafd1b1fd2f5386e1c67875ab4dd8b61f6a36c21d200f7196e4a651e04",
+    "package.json": "867f746d806fe41510a35d8071904f6582037a40767f45af442c7b32f6f38c5a",
+    "vendor/pursuit/manifest.json": "42eeb963083f5c61d818baef6ecb2e02010d549fb5f511ff73ed5fbd90db541e",
+    "api/domains/capabilities/bundles/pursuit-research.bundle.json": "4a30261117b310c0ab2e4af2dc1ecf482f57a5926731245f707d2ceb01a1507d",
+    "api/domains/pursuit/index.ts": "2507af6915884e7861ba2dd5ba999f70254d4e76970cd487ba7129cfe3ad316e",
+    "api/domains/pursuit/repository/index.ts": "cdcb4fc7cc9351b6696c2afc037a6f716e2d062c40b1c5c33545ed69cc6d5afb",
+    "api/domains/pursuit/test/pursuit.fixture.ts": "dd1f0add3872a71964c216676f59915965a4f8fde2d5cd7ed079695c177efa33",
+    "api/domains/pursuit/test/model.fixture.ts": "bbf1cb00dfb82cc8f8f60686ce4611df65af8097691a7809e6c4fa9d1ddfea85",
+    "api/domains/pursuit/test/lifecycle.test.ts": "050f70b1ddb0e4a209864ae22a2b9b76941743154940faa30149927b536ad6dd",
+    "api/domains/pursuit/contracts/index.ts": "421360eb2c8757c954e729e404e728260ea1cb6b285393ad0238a69ff7f0236e",
+    "api/domains/pursuit/service/policy.json": "e9dd25a774d2d9dc840f2a9d5e34f5bffc6e5c8d3367872cbe1ae409c6ae6ad5",
+    "api/domains/pursuit/service/lifecycle.ts": "f738413204611bb6b64b5e74a719452658d1ff83283356355ed2c1f19c5fdf3a",
+    "api/domains/pursuit/service/context.ts": "eef96300b36dd0a9c1d987c777f2c3a2b3fdd228c11e0e344130c0f0f246822a",
+    "api/domains/pursuit/service/view.ts": "b74895f600a56b165310b909822bde70670c272fd15d4ddbed2900ca6205d08d",
+    "api/domains/pursuit/service/jobs.ts": "aba76136087790bd4951bd8b0c72ade2af24502ebb59c5c22e3387deee35df4d",
+    "api/domains/pursuit/service/model.ts": "bbf1133eec454fa32a78b3f0f858c6d84e23d361de36bdf7297b9acf2d372549",
+    "api/domains/pursuit/service/core.ts": "c87ef63a97ce2fed4a27a54d0be94daa5d0f8a2099d9075ef13409659f93acb4",
+    "api/domains/pursuit/service/control.ts": "85e83b08389f72bdfd740e230c2a2497514ce099109366f9e7fc01cb9b59a4e0",
+    "api/domains/pursuit/service/acceptance.ts": "5a2da6cbfb3f6741ea878b1bb0c176c33f68cea5f8e33b94223bc523fb6c67c2",
+    "api/domains/pursuit/service/tools.ts": "fa9f05c3fc5f6475d4b1ada557fe0b52c6cde9499382ddc758e5aa2ed0a6151e",
+    "api/domains/pursuit/service/index.ts": "4da049779dd39be43a78c8508b5c1eb0e71319aede508ab85af69897e884c9e9",
+    "api/domains/pursuit/service/web.ts": "95d989e8d02439270ee12ebb6121d8fca3bcc69f9bebdc4c78e8f8139aa8645c",
+    "api/application/pursuit/pursuit-adapter.ts": "f02d1071fc9135412221ed43098437de372a7173de46761718c829c33ff756b4",
+    "api/application/pursuit/vendor.test.ts": "78c323b24dbd248c7bc9de63e955e03f5d10f42c6aa0b92c3712cb1e7825a3a0",
+    "api/application/pursuit/pursuit-integration.test.ts": "e491603b86750a0d982ad695d2cb52a67d38ddb5245580676d4a998022850ab1",
+    "api/application/pursuit/web-port.ts": "04466cb267aafe721ee0637080f1d3d45b670f13ae43ae097f41f85b0f23102d",
+    "api/domains/web-research/service/erasure.ts": "02af8284b79660b5d7fd6801c958d8a4a41d536dcf231bd82f16b41d6810f8fd",
+    "api/application/toolchain/toolchain.test.ts": "a21b314fd925ee6a9862482d9f4c85844ee6e5f240c97ee1b2c8f791c3008650",
+    "api/domains/web-research/repository/index.ts": "6b9cd1817fea4c75ee1ad94e16c3856440faa470d7ac10222f0206bca800bc5f",
+    "api/domains/web-research/service/submission.ts": "3792f6a1ca0db69082217f025a087c70ea87e93daf6349ab51d159f57d29c322",
+    "api/domains/web-research/test/attempt-timeout.test.ts": "5c239bf36e3f3ae1e232a17fc9e74957842e6b37e5e8cd299d5d225b3e93cad5",
+    "api/application/toolchain/web-content-review.ts": "6ad8d7f68e8fbdc72041e8537ba21bd429e54b1938371afc8b5ceb2005919c9a",
+    "api/application/server-core.ts": "6419dea05b0cd06149a2663f0716438c1d0f3a54b4318ad7c61d1d578e79d4a5",
+    "api/domains/pursuit/test/upgrade.test.ts": "eb5c0e9be900152068b2a38bcd78db75b726ebd9ec8c6615086a0059dfadbb29"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "campaign": "quality-20261105",
+  "capUsd": 15,
+  "reportedUsageUsd": 3.7363888949999957,
+  "conservativeExposureUsd": 4.012664,
+  "pendingCalls": 0,
+  "unresolvedCostCalls": 0,
+  "unreportedButResolvedCalls": 1,
+  "upperBoundReconciliations": [
+    {
+      "callId": "28807e29-c8a6-41aa-b879-2e961440c99e",
+      "upperBoundUsd": 0.2745,
+      "basis": "Integration round6 stopped after repeated overlapping read-only source observations with no report; in-flight Responses request was aborted. Existing full-context maximum-token reservation is retained as a conservative liability, not a measured charge. No tariff or campaign ceiling changed."
+    }
+  ],
+  "integrationReportedUsageUsd": 0.33102682000000017,
+  "finalLiveCalls": 67,
+  "finalLiveReportedUsageUsd": 0.08474101499999999,
+  "providerExposureUsd": {
+    "claude": 2.304834,
+    "openai": 1.70783
+  },
+  "tariffSource": "https://developers.openai.com/api/docs/pricing",
+  "note": "Usage-based calculation at the fixed verified tariff, not invoice reconciliation. Exposure includes per-call upward rounding and the full pre-dispatch upper bound of one interrupted request; unknown usage was never treated as zero. Earlier Claude/OpenAI campaign spend is retained."
+}

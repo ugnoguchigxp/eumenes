@@ -1,0 +1,42 @@
+[
+  {
+    "id": "quick",
+    "text": "SQLiteのWALという略語は何ですか。公式ページ一つで短く教えてください。",
+    "expected": "web.search",
+    "answer": {
+      "choice": "web.search",
+      "probabilities": {
+        "web.search": 0.8170437064133887,
+        "web.research": 0.18295629358661128
+      },
+      "scores": {
+        "web.search": 0.16781733018505038,
+        "web.research": 0.043205484722104545
+      },
+      "model": "eumenes-ruri-context-v1",
+      "headRevision": "conv20-structure-v1-s0-167add95d136c921",
+      "calibrationRevision": "unfitted-temperature-1-v1"
+    },
+    "pass": true
+  },
+  {
+    "id": "research",
+    "text": "SQLiteのWALについて、同時に複数の書込みが可能か、読取り中の書込みは可能か、チェックポイントが終わらない条件は何か。公式のWALとlockingv3の資料を照合し、両立する条件と限界を出典付きで整理してください。",
+    "expected": "web.research",
+    "answer": {
+      "choice": "web.research",
+      "probabilities": {
+        "web.search": 0.3051086471751214,
+        "web.research": 0.6948913528248787
+      },
+      "scores": {
+        "web.search": 0.062134138527933445,
+        "web.research": 0.1311049968442129
+      },
+      "model": "eumenes-ruri-context-v1",
+      "headRevision": "conv20-structure-v1-s0-167add95d136c921",
+      "calibrationRevision": "unfitted-temperature-1-v1"
+    },
+    "pass": true
+  }
+]

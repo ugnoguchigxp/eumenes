@@ -1,0 +1,77 @@
+{
+	"fixedQuestion": "SQLiteのWALについて、同時に複数の書込みが可能か、読取り中の書込みは可能か、チェックポイントが進まない条件は何か。https://sqlite.org/wal.html と https://sqlite.org/lockingv3.html の公式本文を照合し、WALとrollback journalの違い、両立する条件と限界を出典付きで整理してください。本文で確認できない点は不明としてください。",
+	"history": [
+		{
+			"round": 7,
+			"status": "partial",
+			"providerCalls": 46,
+			"verified": false,
+			"reason": "追求全体の手順数の上限に達しました"
+		},
+		{
+			"round": 8,
+			"status": "partial",
+			"providerCalls": 45,
+			"verified": false,
+			"reason": "追求全体の手順数の上限に達しました"
+		},
+		{
+			"round": 9,
+			"status": "partial",
+			"providerCalls": 52,
+			"verified": false,
+			"reason": "追求全体の手順数の上限に達しました"
+		},
+		{
+			"round": 10,
+			"status": "partial",
+			"providerCalls": 48,
+			"verified": true,
+			"reason": "追求全体の手順数の上限に達しました"
+		},
+		{
+			"round": 11,
+			"status": "completed",
+			"providerCalls": 67,
+			"verified": true,
+			"reason": "report.jsonには、WALで同時に複数の書込みができるか、読取り中の書込み、チェックポイントの進行制限、rollback journalとの違いと共存条件が、指定された公式本文へのリンク付きで整理されています。本文で網羅性を確認できない追加のチェックポイント停止条件は不明と明示され、lockingv3のロック説明をrollback-modeに限定する注意も含まれています。"
+		}
+	],
+	"interventions": [
+		{
+			"round": 6,
+			"callId": "28807e29-c8a6-41aa-b879-2e961440c99e",
+			"basis": "Integration round6 stopped after repeated overlapping read-only source observations with no report; in-flight Responses request was aborted. Existing full-context maximum-token reservation is retained as a conservative liability, not a measured charge. No tariff or campaign ceiling changed.",
+			"upperBoundUsd": 0.2745,
+			"at": "2026-11-05T23:44:49.917Z",
+			"campaignExposureUsd": 3.720127
+		},
+		{
+			"round": 7,
+			"basis": "Round7 ended naturally as partial at the unchanged 100-transition limit: 46 transport calls, 28 attempts, 5 hypotheses, 2 strategies and no draft. No kill or charge reconciliation occurred. Inspection identified that verified-only findings hid labelled research notes across hypotheses. Round8 switches only scratch-memory visibility to all, retaining the same final acceptance, authority and ceilings.",
+			"pending": [],
+			"campaignExposureUsd": 3.766742,
+			"at": "2026-11-05T23:50:17.527Z"
+		},
+		{
+			"round": 8,
+			"outcome": "natural partial stop at unchanged transition limit",
+			"evidence": "45 transport calls, 5 hypotheses, 2 strategies, no report despite retained labelled findings",
+			"decision": "Change only skill instructions to create an incomplete report early and update it throughout research; new immutable skill/package/toolchain revisions. No changes to acceptance or budget.",
+			"verification": "same predeclared SQLite request and actual guarded source fetches retained"
+		},
+		{
+			"round": 9,
+			"outcome": "natural partial at unchanged transition limit",
+			"evidence": "52 transport calls; skeleton persisted but no verified claims. Repeated same URLs, with no persistent source index in model packets and later hypotheses declaring no report target.",
+			"change": "Expose canonical source index and current draft; require report target and updates within each hypothesis through skill instructions. Literal source-find contract clarified. No new semantic code branches, no acceptance/ceiling changes."
+		},
+		{
+			"round": 10,
+			"outcome": "natural partial with two sources and a complete draft; independent checker correctly rejected a missing rollback-journal buffer-stage qualification",
+			"evidence": "48 transport calls; correction began but core internal-transition ceiling mapped from parentCalls stopped it before the update. Each host step records multiple core transitions.",
+			"change": "Keep parentCalls=100 as a host execution bound checked before the next engine step. Retain the core own default internal-transition safeguard1500. External ceilings unchanged:80 research/control calls,24 Web operations,8 searches,30min; financial cap15. No rubric change or forced approval."
+		}
+	],
+	"setupRounds": "Earlier private LARM runs established strict-schema, connection and Web-review timing requirements. They are transport/setup observations, not successful live research evidence. All local logs are retained under artifacts/pursuit-integration-20261106."
+}

@@ -1,0 +1,26 @@
+{
+  "at": "2026-11-06T00:21:47.379Z",
+  "service": "eumenes",
+  "capabilitiesHttpStatus": 200,
+  "researchPackagePresent": true,
+  "revisions": [
+    {
+      "kind": "toolchain",
+      "id": "web.research",
+      "active_revision_id": "toolchain:web.research@4",
+      "enabled": 1
+    },
+    {
+      "kind": "package",
+      "id": "pursuit.research",
+      "active_revision_id": "package:pursuit.research@3",
+      "enabled": 1
+    },
+    {
+      "kind": "skill",
+      "id": "pursuit.research",
+      "active_revision_id": "skill:pursuit.research@3",
+      "enabled": 1
+    }
+  ]
+}

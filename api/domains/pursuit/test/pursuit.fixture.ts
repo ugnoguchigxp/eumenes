@@ -32,6 +32,7 @@ export async function fixture(
 		erased = new Set<string>(),
 		notices: unknown[] = [];
 	const gradePrompts: string[] = [];
+	const modelPackets: Array<Record<string, any>> = [];
 	const script = researchScript(options),
 		receiptIds = new Set<string>();
 	const inference: InferencePort = {
@@ -49,6 +50,7 @@ export async function fixture(
 		captureUserControlInTransaction: () => crypto.randomUUID(),
 		async executeControl(requestId, _messages, _signal, control) {
 			calls++;
+			modelPackets.push(JSON.parse(_messages.at(-1)!.content));
 			if (
 				(control?.outputSchema as { properties?: { passed?: unknown } })
 					?.properties?.passed
@@ -164,7 +166,7 @@ export async function fixture(
 			},
 			request,
 			references: [],
-			toolchainRevisionId: "toolchain:web.research@3",
+			toolchainRevisionId: "toolchain:web.research@4",
 			bindingRevisionId: "binding:pursuit.research@2",
 		}),
 	);
@@ -175,6 +177,7 @@ export async function fixture(
 	return {
 		dir,
 		gradePrompts,
+		modelPackets,
 		id: execution.id,
 		notices,
 		cancelled,

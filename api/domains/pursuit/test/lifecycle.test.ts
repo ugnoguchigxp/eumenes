@@ -3,7 +3,7 @@ import { waitFor, settle } from "../../../infrastructure/wait-for";
 import { loadPursuit } from "eumenes-pursuit/sqlite";
 import { fixture } from "./pursuit.fixture";
 import { citationIntegrity } from "../service/tools";
-import { rowOf } from "../repository";
+import { rowOf, save, stateOf } from "../repository";
 
 test("research releases the inference worker while Web waits, recovers the same core, and delivers a verified report once", async () => {
 	const f = await fixture({ unknownUsage: true });
@@ -256,6 +256,21 @@ test("deep source reads persist the body and supply confirmed later passages to 
 		await waitFor(() => f.view()?.status === "completed");
 		expect(f.gradePrompts.some((p) => p.includes(marker))).toBe(true);
 		expect(
+			f.modelPackets.some(
+				(packet) =>
+					packet.sources.some(
+						(source: { evidence: string; totalCharacters: number }) =>
+							source.evidence === "e1" &&
+							source.totalCharacters === body.length,
+					) && packet.report?.completion === "complete",
+			),
+		).toBe(true);
+		expect(
+			f.modelPackets.every((packet) =>
+				packet.sources.every((source: object) => !("text" in source)),
+			),
+		).toBe(true);
+		expect(
 			f
 				.store()
 				.read(
@@ -277,6 +292,28 @@ test("deep source reads persist the body and supply confirmed later passages to 
 		};
 		expect(output.documents[0]!.text.length).toBe(12000);
 		expect(output.documents[0]!.totalCharacters).toBe(body.length);
+	} finally {
+		await f.close();
+	}
+});
+
+test("the host execution ceiling stops before another model call, independently of core bookkeeping transitions", async () => {
+	const f = await fixture();
+	try {
+		f.start();
+		await waitFor(() => f.view()?.status === "waiting_child");
+		const calls = f.calls();
+		await f.store().write((db) => {
+			const row = rowOf(db, f.id)!;
+			const state = stateOf(row);
+			// Exercise the persisted host ceiling at the already executed boundary.
+			state.limits.parentCalls = row.step;
+			save(db, row, state, Date.now());
+		});
+		await f.finishWeb();
+		await waitFor(() => f.view()?.status === "failed");
+		expect(f.calls()).toBe(calls);
+		expect(f.view()?.result?.code).toBe("pursuit_step_budget_exceeded");
 	} finally {
 		await f.close();
 	}

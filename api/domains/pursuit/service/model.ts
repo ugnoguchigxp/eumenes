@@ -4,7 +4,7 @@ import { agentSystemMessage } from "../../inference";
 import { LlmOutputError, type LlmResult } from "eumenes-pursuit";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import { current, type Context } from "./context";
-import { save, stateOf } from "../repository";
+import { documents, save, stateOf } from "../repository";
 
 /** Stateless inference, using the host's selected subagent route and its usage ledger. */
 /** Structural boundary: host and portable core may use different Zod versions. */
@@ -62,7 +62,18 @@ export function model(ctx: Context, id: string, epoch: number): ResearchModel {
 				state.modelCalls++;
 				row.active_request = requestId;
 				save(db, row, state, ctx.now());
-				return { requestId, state };
+				return {
+					requestId,
+					state,
+					sources: documents(db, row).map((doc) => ({
+						evidence: doc.id,
+						url: doc.url,
+						title: doc.title,
+						fetchedAt: doc.fetched_at,
+						totalCharacters: doc.text.length,
+						truncated: !!doc.truncated,
+					})),
+				};
 			});
 			try {
 				const { state } = captured;
@@ -76,6 +87,8 @@ export function model(ctx: Context, id: string, epoch: number): ResearchModel {
 					originalRequest: state.source.request,
 					delegatedRequest: state.request,
 					referenceDescriptions: state.references,
+					sources: captured.sources,
+					report: state.draft,
 					remaining: {
 						modelCalls: state.limits.modelCalls - state.modelCalls,
 						externalCalls: state.limits.childCalls - state.webCalls,

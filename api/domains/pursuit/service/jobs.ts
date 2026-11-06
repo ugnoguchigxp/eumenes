@@ -29,6 +29,18 @@ export function registerJobs(ctx: Context) {
 				row.job_id !== claim.jobId
 			)
 				return { status: "stale", reason: "pursuit_run_stale" };
+			// A host execution is one engine step; the core may record several internal transitions in it.
+			if (row.step > stateOf(row).limits.parentCalls) {
+				row.job_id = null;
+				end(
+					ctx,
+					db,
+					row,
+					stateOf(row).draft ? "partial" : "failed",
+					"pursuit_step_budget_exceeded",
+				);
+				return { status: "stale", reason: "pursuit_step_budget_exceeded" };
+			}
 			if (row.deadline <= ctx.now()) {
 				row.job_id = null;
 				end(

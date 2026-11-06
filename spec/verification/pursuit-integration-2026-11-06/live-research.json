@@ -1,0 +1,157 @@
+{
+  "question": "SQLiteのWALについて、同時に複数の書込みが可能か、読取り中の書込みは可能か、チェックポイントが進まない条件は何か。https://sqlite.org/wal.html と https://sqlite.org/lockingv3.html の公式本文を照合し、WALとrollback journalの違い、両立する条件と限界を出典付きで整理してください。本文で確認できない点は不明としてください。",
+  "model": "gpt-6-luna",
+  "transport": "Native Responses API in an isolated LarmPort validation adapter; real host inference authority, Queue, guarded Web owner and dialogue adoption retained",
+  "result": {
+    "status": "completed",
+    "summary": "WALでは書込みは一度に一つだが、読取りと書込みは並行できる。rollback journalでは書込み準備と読取りは共存し得るが、DB本体への書込みには排他的なEXCLUSIVEロックが必要。WALチェックポイントは読取りend markを越えるところで停止し得る。",
+    "fulfilled": [
+      "すべての主張の出典IDを今回取得した本文に照合",
+      "回答は指定された両公式本文の根拠に沿って、WALでは書込みが一度に一つで読取りと書込みは並行可能なこと、読取りの固定end markを越えるチェックポイントが停止し得ることを説明しています。rollback journalについては、RESERVEDロックと読取りの共存、EXCLUSIVEロック取得時の制約をWALのロック方式と混同せず整理しています。チェックポイント停止条件の網羅性や本文で確かめられない追加条件は不明と明示しており、要求された限界も扱っています。"
+    ],
+    "missing": [
+      "lockingv3本文はrollback-modeのロックを説明し、WALのロックは別資料で扱うと明記するため、ロック段階の説明はrollback journal方式に限定した。",
+      "チェックポイントについて本文で確認した進行制限は読取りend markによるもの。本文が停止条件を網羅しているかは確認できず、追加条件の有無は不明とした。"
+    ],
+    "refs": [
+      "e1",
+      "e2"
+    ],
+    "answer": "## 同時に複数の書込みは可能か\nどちらの方式でも、複数の書込みが同時にデータベースへ反映されるとは説明されていません。WALではWALファイルが一つで、書込みは一度に一つです。[WAL公式資料](https://sqlite.org/wal.html) rollback journal方式では書込みにRESERVEDロックは一つしか認められず、データベースファイルへ書くには他のロックと共存できないEXCLUSIVEロックが必要です。[ロック公式資料](https://sqlite.org/lockingv3.html)\n\n## 読取り中の書込み\n**WAL:** 読取りと書込みは並行可能です。読取り側は開始時点のWALのend markをトランザクション中固定し、その時点に対応する一貫した内容を読みます。書込み側はWAL末尾へ追記します。[WAL公式資料](https://sqlite.org/wal.html)\n\n**rollback journal:** 書込み側は、将来書き込む予定でも、RESERVEDロック中はまだデータベースファイルを変更せずに読み取っており、複数のSHARED読取りロックと共存できます。変更の反映にはEXCLUSIVEロックが必要です。既存のSHAREDロックが残っていれば、書込み側はEXCLUSIVEを得るまで待つことがあります。PENDINGロック中は新たなSHAREDロックは許されませんが、既存のSHAREDロックは継続できます。EXCLUSIVEロックは他のロックと共存しません。したがって、rollback journal方式では読取りと書込みの準備・ジャーナル記録は共存し得ますが、データベース本体への書込みは読取りロックが解消するまで進められません。[ロック公式資料](https://sqlite.org/lockingv3.html)\n\n## チェックポイントが進まない条件\nWALのチェックポイントは、現在の読取り側のいずれかのend markを越えるWALページに達すると停止します。そこを越えてデータベース本体を更新すると、その読取りが必要とする内容を上書きし得るためです。チェックポイントは進捗位置を記録し、次回はその位置から再開します。長時間の読取りトランザクションはチェックポイントの進行を妨げ得ます。[WAL公式資料](https://sqlite.org/wal.html)\n\nWALを先頭へ巻き戻して再利用する条件として本文が挙げるのは、WALの全内容がデータベースへ転送・同期済みであり、かつWALを使う読取り側がいないことです。同資料で確認できたチェックポイントの進行制限は上記のend markによるものです。指定本文がほかの停止条件を網羅しているとは確認できないため、追加条件の有無は不明です。[WAL公式資料](https://sqlite.org/wal.html)\n\n## 方式の違いと限界\nrollback journal方式は変更前の内容をrollback journalに記録し、変更をデータベースファイルへ反映します。反映時にはEXCLUSIVEロックが必要で、その間ほかのロックとは共存できません。WAL方式は元データをデータベースファイルに保ったまま変更をWALへ追記し、読取りと書込みを並行させますが、書込みは一度に一つです。読取りend markがチェックポイントの進行を制限する点もWALの限界です。[WAL公式資料](https://sqlite.org/wal.html) [ロック公式資料](https://sqlite.org/lockingv3.html)\n\nロック公式資料はrollback-modeのロックを扱い、WALのロック方式は別資料を参照するよう明記しています。したがって同資料のロック段階をWALへそのまま適用していません。上記は指定された二つの本文で確認できる範囲の比較です。",
+    "claims": [
+      {
+        "text": "WALでは書込みは一度に一つであり、読取りと書込みは並行可能。",
+        "status": "verified",
+        "sourceIds": [
+          "e1"
+        ]
+      },
+      {
+        "text": "WAL読取りはトランザクション中固定のend markを使い、書込み側はWAL末尾へ追記する。",
+        "status": "verified",
+        "sourceIds": [
+          "e1"
+        ]
+      },
+      {
+        "text": "WALチェックポイントは現在の読取り側のend markを越えるページで停止し、進捗位置から次回再開する。長時間読取りは進行を妨げ得る。",
+        "status": "verified",
+        "sourceIds": [
+          "e1"
+        ]
+      },
+      {
+        "text": "WALを先頭へ巻き戻して再利用するには、WAL全体のDBへの転送・同期と、WALを使う読取り側がいないことが必要。",
+        "status": "verified",
+        "sourceIds": [
+          "e1"
+        ]
+      },
+      {
+        "text": "rollback journal方式では単一のRESERVEDロックは複数のSHAREDロックと共存可能だが、DB本体への書込みにはEXCLUSIVEロックが必要で、既存SHAREDロックがあれば取得まで待つことがある。",
+        "status": "verified",
+        "sourceIds": [
+          "e2"
+        ]
+      },
+      {
+        "text": "PENDING中は新規SHAREDロックを許さないが既存SHAREDロックは継続可能。EXCLUSIVEは他のロックと共存しない。",
+        "status": "verified",
+        "sourceIds": [
+          "e2"
+        ]
+      },
+      {
+        "text": "指定本文が示すもの以外にチェックポイントの停止条件があるかは、本文から網羅性を確認できず不明。",
+        "status": "unknown",
+        "sourceIds": []
+      }
+    ],
+    "sources": [
+      {
+        "sourceId": "e1",
+        "url": "https://sqlite.org/wal.html",
+        "title": "Write-Ahead Logging",
+        "fetchedAt": "2026-11-06T00:11:24.026Z"
+      },
+      {
+        "sourceId": "e2",
+        "url": "https://sqlite.org/lockingv3.html",
+        "title": "File Locking And Concurrency In SQLite Version 3",
+        "fetchedAt": "2026-11-06T00:11:41.319Z"
+      }
+    ],
+    "limitations": [
+      "lockingv3本文はrollback-modeのロックを説明し、WALのロックは別資料で扱うと明記するため、ロック段階の説明はrollback journal方式に限定した。",
+      "チェックポイントについて本文で確認した進行制限は読取りend markによるもの。本文が停止条件を網羅しているかは確認できず、追加条件の有無は不明とした。"
+    ],
+    "assurance": "model",
+    "stopReason": "指定されたSQLite公式本文e1・e2を照合し、依頼された比較・共存条件・チェックポイント制限を根拠付きで記述した。未確認の追加チェックポイント条件は不明と明示した。報告を読み戻して最終照合する。"
+  },
+  "core": {
+    "status": "completed",
+    "report": {
+      "pursuitId": "6ad94c46-a3a6-4bf3-915c-ce1705591700",
+      "outcome": "completed",
+      "verified": true,
+      "reason": "report.jsonには、WALで同時に複数の書込みができるか、読取り中の書込み、チェックポイントの進行制限、rollback journalとの違いと共存条件が、指定された公式本文へのリンク付きで整理されています。本文で網羅性を確認できない追加のチェックポイント停止条件は不明と明示され、lockingv3のロック説明をrollback-modeに限定する注意も含まれています。",
+      "criteria": [
+        {
+          "id": "citations",
+          "passed": true,
+          "evidence": "すべての主張の出典IDを今回取得した本文に照合",
+          "assurance": "exact"
+        },
+        {
+          "id": "answer",
+          "passed": true,
+          "evidence": "回答は指定された両公式本文の根拠に沿って、WALでは書込みが一度に一つで読取りと書込みは並行可能なこと、読取りの固定end markを越えるチェックポイントが停止し得ることを説明しています。rollback journalについては、RESERVEDロックと読取りの共存、EXCLUSIVEロック取得時の制約をWALのロック方式と混同せず整理しています。チェックポイント停止条件の網羅性や本文で確かめられない追加条件は不明と明示しており、要求された限界も扱っています。",
+          "assurance": "model"
+        }
+      ],
+      "needs": [],
+      "refs": [
+        {
+          "kind": "source",
+          "uri": "https://sqlite.org/wal.html",
+          "note": "e1"
+        },
+        {
+          "kind": "source",
+          "uri": "https://sqlite.org/lockingv3.html",
+          "note": "e2"
+        }
+      ],
+      "stats": {
+        "attempts": 42,
+        "rejected": 0,
+        "hypotheses": 7,
+        "strategies": 2,
+        "stepBacks": 6,
+        "consultations": 0
+      },
+      "findings": {
+        "total": 18,
+        "checked": []
+      }
+    },
+    "strategies": 2,
+    "hypotheses": 7
+  },
+  "adoptedByDialogue": true,
+  "hostResearchModelCalls": 65,
+  "totalProviderCalls": 67,
+  "startedAt": "2026-11-06T00:10:52.535Z",
+  "finishedAt": "2026-11-06T00:17:55.343Z",
+  "acquisitionCalls": [
+    {
+      "operation": "read",
+      "url": "https://sqlite.org/wal.html"
+    },
+    {
+      "operation": "read",
+      "url": "https://sqlite.org/lockingv3.html"
+    }
+  ],
+  "usageReceiptNote": "The validation LarmPort transport does not publish native token receipts to host inference, so host usage stays null. Exact provider usage and costs are held in the canonical campaign meter and summarized separately."
+}
