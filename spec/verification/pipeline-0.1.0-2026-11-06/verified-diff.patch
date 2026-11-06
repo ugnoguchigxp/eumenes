@@ -1,0 +1,401 @@
+diff --git a/api/application/pipelines/vendor.test.ts b/api/application/pipelines/vendor.test.ts
+index 356743a2..8f5da296 100644
+--- a/api/application/pipelines/vendor.test.ts
++++ b/api/application/pipelines/vendor.test.ts
+@@ -3,9 +3,12 @@ import { readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { createHash } from "node:crypto";
+ import {
++	bindSourceRequest,
+ 	CONTRACT_VERSION,
+ 	createCatalogView,
+ 	checkDefinition,
++	isRunnable,
++	parseJsonStrict,
+ } from "eumenes-pipeline";
+ const root = join(import.meta.dir, "../../..");
+ const read = (p: string) => readFileSync(join(root, p));
+@@ -39,4 +42,9 @@ test("pipeline archive, manifest, lock and installed runtime agree", () => {
+ 	expect(
+ 		checkDefinition({ formatVersion: 1, inputs: [], steps: [] }, catalog).ok,
+ 	).toBe(false);
++	// 0.1.0 host hardening is present in the installed runtime.
++	expect(manifest.version).toBe("0.1.0");
++	expect(parseJsonStrict('{"a":1,"a":2}').ok).toBe(false);
++	expect(typeof bindSourceRequest).toBe("function");
++	expect(typeof isRunnable).toBe("function");
+ });
+diff --git a/api/domains/agent-runtime/repository/executions.ts b/api/domains/agent-runtime/repository/executions.ts
+index 969ad7d2..d9528647 100644
+--- a/api/domains/agent-runtime/repository/executions.ts
++++ b/api/domains/agent-runtime/repository/executions.ts
+@@ -90,6 +90,15 @@ export type ParentState = {
+ 		repaired: boolean;
+ 		draft?: string;
+ 		correction?: string;
++		/**
++		 * Whether the planner's copy of the request matched the bound original; when it did not, the
++		 * copy's first 500 characters and its full length. Erased with this state on forget.
++		 */
++		requestEcho?: {
++			matched: boolean;
++			written?: string;
++			writtenLength?: number;
++		};
+ 	};
+ 	plan?: {
+ 		revision: number;
+diff --git a/api/domains/agent-runtime/service/execution-compose.ts b/api/domains/agent-runtime/service/execution-compose.ts
+index 05c29e1c..a60887ad 100644
+--- a/api/domains/agent-runtime/service/execution-compose.ts
++++ b/api/domains/agent-runtime/service/execution-compose.ts
+@@ -5,7 +5,12 @@ import type {
+ } from "eumenes-pipeline";
+ import { estimateMessageTokens, type Receipt } from "../../inference";
+ import type { HandlerDefinition } from "../../queue";
+-import { checkPipelineDefinition, parsePipelineOutcome } from "../../pipelines";
++import {
++	bindPipelineRequest,
++	checkPipelineDefinition,
++	parsePipelineJson,
++	parsePipelineOutcome,
++} from "../../pipelines";
+ import { saveExecution } from "../repository/executions";
+ import { executionPayload } from "./execution-step";
+ import { PIPELINE_COMPOSE, type ExecutionContext } from "./execution-context";
+@@ -27,7 +32,10 @@ type Output = {
+ 	receipt: Receipt;
+ 	outcome?: AuthoringOutcome;
+ 	invalid?: { output: string; issues: string };
++	requestEcho?: { matched: boolean; written?: string; writtenLength?: number };
+ };
++/** Bounds the recorded copy so a long paraphrase cannot push the parent state past its capacity. */
++const ECHO_CHARS = 500;
+ /** LARM is the imported inference port's transport; its receipt stays under the existing revocation contract. */
+ export function executionCompose(
+ 	ctx: ExecutionContext,
+@@ -186,16 +194,18 @@ export function executionCompose(
+ 				prompt: input.messages[1]!.content,
+ 			});
+ 			if (!result.ok || !receipt) throw new Error("pipeline_inference_failed");
+-			let raw: unknown;
+-			try {
+-				raw = JSON.parse(result.text);
+-			} catch {
++			const json = parsePipelineJson(result.text);
++			if (!json.ok)
+ 				return {
+ 					receipt,
+-					invalid: { output: result.text, issues: "invalid_json" },
++					invalid: {
++						output: result.text,
++						issues: `invalid_json:${json.errors
++							.map((e) => `${e.code}@${e.position ?? "?"}`)
++							.join(",")}`,
++					},
+ 				};
+-			}
+-			const parsed = parsePipelineOutcome(raw);
++			const parsed = parsePipelineOutcome(json.value);
+ 			if (!parsed.success)
+ 				return {
+ 					receipt,
+@@ -208,8 +218,12 @@ export function executionCompose(
+ 					},
+ 				};
+ 			if (parsed.data.status === "ready") {
+-				const check = checkPipelineDefinition(
++				const bound = bindPipelineRequest(
+ 					parsed.data.definition,
++					input.request,
++				);
++				const check = checkPipelineDefinition(
++					bound.definition,
+ 					input.catalog,
+ 					input.request,
+ 				);
+@@ -224,6 +238,17 @@ export function executionCompose(
+ 								.slice(0, 4000),
+ 						},
+ 					};
++				return {
++					receipt,
++					outcome: { ...parsed.data, definition: bound.definition },
++					requestEcho: bound.matched
++						? { matched: true }
++						: {
++								matched: false,
++								written: bound.written.slice(0, ECHO_CHARS),
++								writtenLength: bound.written.length,
++							},
++				};
+ 			}
+ 			return { receipt, outcome: parsed.data };
+ 		},
+@@ -264,6 +289,8 @@ export function executionCompose(
+ 				return "applied";
+ 			}
+ 			p.draft = undefined;
++			if (outcome.result.requestEcho)
++				p.requestEcho = outcome.result.requestEcho;
+ 			pipeline.composed(db, row, state, outcome.result.outcome!);
+ 			return "applied";
+ 		},
+diff --git a/api/domains/agent-runtime/test/pipeline-execution.test.ts b/api/domains/agent-runtime/test/pipeline-execution.test.ts
+index 7922b477..f8b00e18 100644
+--- a/api/domains/agent-runtime/test/pipeline-execution.test.ts
++++ b/api/domains/agent-runtime/test/pipeline-execution.test.ts
+@@ -129,7 +129,7 @@ test("one-off definition uses pinned entries, declared references, selected fina
+ 	expect(result.summary).not.toContain("first");
+ });
+ 
+-test("a model-modified request is never dispatched, even after its single repair", async () => {
++test("a model-modified request is bound to the original without a repair, and the copy is recorded", async () => {
+ 	const h = await fixture([]);
+ 	const definition = {
+ 		...h.definition,
+@@ -148,10 +148,130 @@ test("a model-modified request is never dispatched, even after its single repair
+ 	};
+ 	const started = await h.start();
+ 	h.run();
+-	await waitFor(() => h.get(started.id).status === "partial");
+-	expect(h.children).toHaveLength(0);
++	await waitFor(() => h.get(started.id).status === "completed");
++	expect(calls).toBe(1);
++	expect(h.children).toHaveLength(1);
++	const state = JSON.parse(
++		(
++			h.store.read((db) =>
++				db
++					.query("SELECT state_json FROM agent_executions WHERE id=?")
++					.get(started.id),
++			) as { state_json: string }
++		).state_json,
++	);
++	expect(state.pipeline.definition.request).toBe(h.source.request);
++	expect(state.pipeline.executionPlan.request).toBe(h.source.request);
++	expect(state.pipeline.requestEcho).toEqual({
++		matched: false,
++		written: "changed by model",
++		writtenLength: "changed by model".length,
++	});
++});
++
++test("a reviewed collaborative draft with a changed request is still refused", async () => {
++	const h = await fixture([]);
++	const draft = (request: string, requestId: string) =>
++		h.store.write((db) =>
++			h.runtime.startPipelineInTransaction(db, {
++				source: { ...h.source, specialistSessionId: "draft-session" },
++				requestId,
++				toolchainRevisionId: "toolchain:pipeline.execute@1",
++				definition: { ...h.definition, request },
++			}),
++		);
++	expect((await draft(h.source.request, "draft-original")).id).toBeString();
++	await expect(
++		Promise.resolve().then(() => draft("changed by model", "draft-changed")),
++	).rejects.toThrow("pipeline_definition_invalid");
++});
++
++test("duplicate keys are a structural defect: one repair, then stop", async () => {
++	const h = await fixture([]);
++	const valid = JSON.stringify({ status: "ready", definition: h.definition });
++	const duplicated = `{"status":"needs_input","status":"ready","definition":${JSON.stringify(h.definition)}}`;
++	expect(JSON.parse(duplicated).status).toBe("ready");
++	const texts = [duplicated, valid];
++	let calls = 0;
++	h.inference.executeStream = async (requestId, messages) => {
++		h.seen.push(JSON.parse(messages.at(-1)!.content));
++		return {
++			requestId,
++			attemptId: crypto.randomUUID(),
++			value: texts[calls++]!,
++		};
++	};
++	const repaired = await h.start();
++	h.run();
++	await waitFor(() => h.get(repaired.id).status === "completed");
+ 	expect(calls).toBe(2);
+-	expect(h.get(started.id).result?.code).toBe("pipeline_definition_invalid");
++	expect(String(h.seen[1]!.contractErrors)).toContain(
++		"invalid_json:duplicate_key@",
++	);
++
++	const g = await fixture([]);
++	let again = 0;
++	g.inference.executeStream = async (requestId) => {
++		again++;
++		return { requestId, attemptId: crypto.randomUUID(), value: duplicated };
++	};
++	const stopped = await g.start();
++	g.run();
++	await waitFor(() => g.get(stopped.id).status === "partial");
++	expect(again).toBe(2);
++	expect(g.children).toHaveLength(0);
++	expect(g.get(stopped.id).result?.code).toBe("pipeline_definition_invalid");
++});
++
++test("the recorded copy is bounded, an exact copy records only a match, and forgetting erases it", async () => {
++	const stateOf = (h: { store: { read: Function } }, id: string) =>
++		JSON.parse(
++			(
++				h.store.read((db: import("bun:sqlite").Database) =>
++					db
++						.query("SELECT state_json FROM agent_executions WHERE id=?")
++						.get(id),
++				) as { state_json: string }
++			).state_json,
++		);
++	const exact = await readyFixture();
++	const first = await exact.start();
++	exact.run();
++	await waitFor(() => exact.get(first.id).status === "completed");
++	expect(stateOf(exact, first.id).pipeline.requestEcho).toEqual({
++		matched: true,
++	});
++
++	const h = await fixture([]);
++	const long = "言い換えた依頼".repeat(200);
++	const definition = { ...h.definition, request: long };
++	h.inference.executeStream = async (requestId) => ({
++		requestId,
++		attemptId: crypto.randomUUID(),
++		value: JSON.stringify({ status: "ready", definition }),
++	});
++	const started = await h.start();
++	h.run();
++	await waitFor(() => h.get(started.id).status === "completed");
++	expect(stateOf(h, started.id).pipeline.requestEcho).toEqual({
++		matched: false,
++		written: long.slice(0, 500),
++		writtenLength: long.length,
++	});
++	await h.store.write((db) =>
++		h.runtime.purgeSourcesInTransaction(db, {
++			messageIds: [h.source.messageId],
++			itemIds: [],
++		}),
++	);
++	expect(stateOf(h, started.id)).not.toHaveProperty("pipeline");
++	expect(
++		JSON.stringify(
++			h.store.read((db) =>
++				db.query("SELECT * FROM agent_executions WHERE id=?").get(started.id),
++			),
++		),
++	).not.toContain("言い換えた依頼");
+ });
+ 
+ test("needs_input waits without side effects; the answer keeps the original request and re-enters authoring", async () => {
+diff --git a/api/domains/pipelines/index.ts b/api/domains/pipelines/index.ts
+index 9f318999..150b1d27 100644
+--- a/api/domains/pipelines/index.ts
++++ b/api/domains/pipelines/index.ts
+@@ -1,6 +1,8 @@
+ export { migrations } from "./repository";
+ export {
++	bindPipelineRequest,
+ 	checkPipelineDefinition,
++	parsePipelineJson,
+ 	parsePipelineOutcome,
+ 	CONTRACT_VERSION,
+ } from "./service/definition";
+diff --git a/api/domains/pipelines/service/definition.ts b/api/domains/pipelines/service/definition.ts
+index 1e687095..444910b5 100644
+--- a/api/domains/pipelines/service/definition.ts
++++ b/api/domains/pipelines/service/definition.ts
+@@ -1,10 +1,13 @@
+ /** The imported short contract is the only pipeline definition/check implementation. */
+ import {
+ 	authoringOutcome,
++	bindSourceRequest,
+ 	checkDefinition,
+ 	createCatalogView,
+ 	CONTRACT_VERSION,
++	parseJsonStrict,
+ 	type ComponentRecord,
++	type PipelineDefinition,
+ } from "eumenes-pipeline";
+ export { CONTRACT_VERSION };
+ export function checkPipelineDefinition(
+@@ -21,3 +24,17 @@ export function checkPipelineDefinition(
+ export function parsePipelineOutcome(raw: unknown) {
+ 	return authoringOutcome.safeParse(raw);
+ }
++/** Planner output is read strictly: duplicate keys and excess nesting are structural defects. */
++export function parsePipelineJson(text: string) {
++	return parseJsonStrict(text);
++}
++/**
++ * The host owns the original request: a model's copy is replaced before checking and returned as
++ * evidence, so a copying slip neither reaches the plan nor goes unrecorded.
++ */
++export function bindPipelineRequest(
++	definition: PipelineDefinition,
++	sourceRequest: string,
++) {
++	return bindSourceRequest(definition, sourceRequest);
++}
+diff --git a/bun.lock b/bun.lock
+index 80e7c704..8f6e63f5 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -17,7 +17,7 @@
+         "eumenes-collaboration": "file:vendor/collaboration/eumenes-collaboration-0.2.0-b407ecd8372b.tgz",
+         "eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.1-c120d878ffe2.tgz",
+         "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.3-353a710c8012.tgz",
+-        "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz",
++        "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
+         "eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz",
+         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz",
+         "eumenes_router": "file:vendor/router/eumenes_router-0.0.1-5db35839bd54.tgz",
+@@ -1355,7 +1355,7 @@
+ 
+     "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.3-353a710c8012.tgz", {}, "sha512-z/lndlGS9RfKDl+4TyC7sgwwznK5vpWDCI6r1b//jFEHC7wTYzvY+C6JeV28g2W386dLkmoK0iRwbocx9NNwrg=="],
+ 
+-    "eumenes-pipeline": ["eumenes-pipeline@vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz", { "dependencies": { "zod": "4.6.7" } }, "sha512-qXv0ICKg9jSqlp8xay2iF0bI4aQ3eHD3pcdZT2ymNo8repRnwDiJnOs6Cp4cAh1YvKFmtclqxftWXY0oOZjitQ=="],
++    "eumenes-pipeline": ["eumenes-pipeline@vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz", { "dependencies": { "zod": "4.6.7" } }, "sha512-aqEYhMhMv0oNEztE797S6UJzvYU02Rpf1cS5LBxJNWLMk9LnlmsKmkAw8dpzSbgW5Z05rFJcHKq//nHWz42skg=="],
+ 
+     "eumenes-pursuit": ["eumenes-pursuit@vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz", { "dependencies": { "zod": "4.6.6" } }, "sha512-clOrPYsA7pYR+ntf6gJlDBhcaRpKVaG4HX/3WoAnk3MdgGmXDIpE8D+tozsvH6s39JVIjdCb7yNej57wE+fA0Q=="],
+ 
+diff --git a/package.json b/package.json
+index 9f53b0cb..d16770bd 100644
+--- a/package.json
++++ b/package.json
+@@ -55,7 +55,7 @@
+ 		"eumenes-collaboration": "file:vendor/collaboration/eumenes-collaboration-0.2.0-b407ecd8372b.tgz",
+ 		"eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.1-c120d878ffe2.tgz",
+ 		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.3-353a710c8012.tgz",
+-		"eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz",
++		"eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
+ 		"eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz",
+ 		"eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz",
+ 		"eumenes_router": "file:vendor/router/eumenes_router-0.0.1-5db35839bd54.tgz",
+diff --git a/vendor/pipeline/manifest.json b/vendor/pipeline/manifest.json
+index de0ac7fb..b45613f0 100644
+--- a/vendor/pipeline/manifest.json
++++ b/vendor/pipeline/manifest.json
+@@ -1,14 +1,14 @@
+ {
+ 	"package": "eumenes-pipeline",
+-	"version": "0.0.0",
+-	"artifact": "eumenes-pipeline-0.0.0-32f778cb14b4.tgz",
+-	"sha256": "9ba750c488610ad39d280931e861e6d8fb6a6e44f118ce5900cb80ce8fcc62c9",
+-	"sizeBytes": 16494,
+-	"sourceDigest": "32f778cb14b455abd2e2e4e69f560768668a658306846e63362ef8064005e0f7",
+-	"sourceFiles": 20,
+-	"gitSha": "6640de20103626039b7f87f7a4849005657bc2aa",
++	"version": "0.1.0",
++	"artifact": "eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
++	"sha256": "4c60c46ab77040b3ff4ed23433ca0ae9bd2e689efb8ea1db67da9234d8570f4f",
++	"sizeBytes": 20125,
++	"sourceDigest": "a859fd16ce46b3650de68cca70e55c2a2e4f122be9786622c071c2deb22f9ad4",
++	"sourceFiles": 22,
++	"gitSha": "ce001d6187b00b3ee676574d495d064f095c8b9c",
+ 	"dirty": true,
+-	"builtAt": "2026-11-05T12:23:38.218Z",
++	"builtAt": "2026-11-06T05:56:59.605Z",
+ 	"verification": {
+ 		"packContents": "passed",
+ 		"tarballContents": "passed",

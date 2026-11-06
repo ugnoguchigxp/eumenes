@@ -5,7 +5,12 @@ import type {
 } from "eumenes-pipeline";
 import { estimateMessageTokens, type Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
-import { checkPipelineDefinition, parsePipelineOutcome } from "../../pipelines";
+import {
+	bindPipelineRequest,
+	checkPipelineDefinition,
+	parsePipelineJson,
+	parsePipelineOutcome,
+} from "../../pipelines";
 import { saveExecution } from "../repository/executions";
 import { executionPayload } from "./execution-step";
 import { PIPELINE_COMPOSE, type ExecutionContext } from "./execution-context";
@@ -27,7 +32,10 @@ type Output = {
 	receipt: Receipt;
 	outcome?: AuthoringOutcome;
 	invalid?: { output: string; issues: string };
+	requestEcho?: { matched: boolean; written?: string; writtenLength?: number };
 };
+/** Bounds the recorded copy so a long paraphrase cannot push the parent state past its capacity. */
+const ECHO_CHARS = 500;
 /** LARM is the imported inference port's transport; its receipt stays under the existing revocation contract. */
 export function executionCompose(
 	ctx: ExecutionContext,
@@ -186,16 +194,18 @@ export function executionCompose(
 				prompt: input.messages[1]!.content,
 			});
 			if (!result.ok || !receipt) throw new Error("pipeline_inference_failed");
-			let raw: unknown;
-			try {
-				raw = JSON.parse(result.text);
-			} catch {
+			const json = parsePipelineJson(result.text);
+			if (!json.ok)
 				return {
 					receipt,
-					invalid: { output: result.text, issues: "invalid_json" },
+					invalid: {
+						output: result.text,
+						issues: `invalid_json:${json.errors
+							.map((e) => `${e.code}@${e.position ?? "?"}`)
+							.join(",")}`,
+					},
 				};
-			}
-			const parsed = parsePipelineOutcome(raw);
+			const parsed = parsePipelineOutcome(json.value);
 			if (!parsed.success)
 				return {
 					receipt,
@@ -208,8 +218,12 @@ export function executionCompose(
 					},
 				};
 			if (parsed.data.status === "ready") {
-				const check = checkPipelineDefinition(
+				const bound = bindPipelineRequest(
 					parsed.data.definition,
+					input.request,
+				);
+				const check = checkPipelineDefinition(
+					bound.definition,
 					input.catalog,
 					input.request,
 				);
@@ -224,6 +238,17 @@ export function executionCompose(
 								.slice(0, 4000),
 						},
 					};
+				return {
+					receipt,
+					outcome: { ...parsed.data, definition: bound.definition },
+					requestEcho: bound.matched
+						? { matched: true }
+						: {
+								matched: false,
+								written: bound.written.slice(0, ECHO_CHARS),
+								writtenLength: bound.written.length,
+							},
+				};
 			}
 			return { receipt, outcome: parsed.data };
 		},
@@ -264,6 +289,8 @@ export function executionCompose(
 				return "applied";
 			}
 			p.draft = undefined;
+			if (outcome.result.requestEcho)
+				p.requestEcho = outcome.result.requestEcho;
 			pipeline.composed(db, row, state, outcome.result.outcome!);
 			return "applied";
 		},

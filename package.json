@@ -55,7 +55,7 @@
 		"eumenes-collaboration": "file:vendor/collaboration/eumenes-collaboration-0.2.0-b407ecd8372b.tgz",
 		"eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.1-c120d878ffe2.tgz",
 		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.3-353a710c8012.tgz",
-		"eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.0.0-32f778cb14b4.tgz",
+		"eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
 		"eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz",
 		"eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-be38c74a8016.tgz",
 		"eumenes_router": "file:vendor/router/eumenes_router-0.0.1-5db35839bd54.tgz",

@@ -129,7 +129,7 @@ test("one-off definition uses pinned entries, declared references, selected fina
 	expect(result.summary).not.toContain("first");
 });
 
-test("a model-modified request is never dispatched, even after its single repair", async () => {
+test("a model-modified request is bound to the original without a repair, and the copy is recorded", async () => {
 	const h = await fixture([]);
 	const definition = {
 		...h.definition,
@@ -148,10 +148,130 @@ test("a model-modified request is never dispatched, even after its single repair
 	};
 	const started = await h.start();
 	h.run();
-	await waitFor(() => h.get(started.id).status === "partial");
-	expect(h.children).toHaveLength(0);
+	await waitFor(() => h.get(started.id).status === "completed");
+	expect(calls).toBe(1);
+	expect(h.children).toHaveLength(1);
+	const state = JSON.parse(
+		(
+			h.store.read((db) =>
+				db
+					.query("SELECT state_json FROM agent_executions WHERE id=?")
+					.get(started.id),
+			) as { state_json: string }
+		).state_json,
+	);
+	expect(state.pipeline.definition.request).toBe(h.source.request);
+	expect(state.pipeline.executionPlan.request).toBe(h.source.request);
+	expect(state.pipeline.requestEcho).toEqual({
+		matched: false,
+		written: "changed by model",
+		writtenLength: "changed by model".length,
+	});
+});
+
+test("a reviewed collaborative draft with a changed request is still refused", async () => {
+	const h = await fixture([]);
+	const draft = (request: string, requestId: string) =>
+		h.store.write((db) =>
+			h.runtime.startPipelineInTransaction(db, {
+				source: { ...h.source, specialistSessionId: "draft-session" },
+				requestId,
+				toolchainRevisionId: "toolchain:pipeline.execute@1",
+				definition: { ...h.definition, request },
+			}),
+		);
+	expect((await draft(h.source.request, "draft-original")).id).toBeString();
+	await expect(
+		Promise.resolve().then(() => draft("changed by model", "draft-changed")),
+	).rejects.toThrow("pipeline_definition_invalid");
+});
+
+test("duplicate keys are a structural defect: one repair, then stop", async () => {
+	const h = await fixture([]);
+	const valid = JSON.stringify({ status: "ready", definition: h.definition });
+	const duplicated = `{"status":"needs_input","status":"ready","definition":${JSON.stringify(h.definition)}}`;
+	expect(JSON.parse(duplicated).status).toBe("ready");
+	const texts = [duplicated, valid];
+	let calls = 0;
+	h.inference.executeStream = async (requestId, messages) => {
+		h.seen.push(JSON.parse(messages.at(-1)!.content));
+		return {
+			requestId,
+			attemptId: crypto.randomUUID(),
+			value: texts[calls++]!,
+		};
+	};
+	const repaired = await h.start();
+	h.run();
+	await waitFor(() => h.get(repaired.id).status === "completed");
 	expect(calls).toBe(2);
-	expect(h.get(started.id).result?.code).toBe("pipeline_definition_invalid");
+	expect(String(h.seen[1]!.contractErrors)).toContain(
+		"invalid_json:duplicate_key@",
+	);
+
+	const g = await fixture([]);
+	let again = 0;
+	g.inference.executeStream = async (requestId) => {
+		again++;
+		return { requestId, attemptId: crypto.randomUUID(), value: duplicated };
+	};
+	const stopped = await g.start();
+	g.run();
+	await waitFor(() => g.get(stopped.id).status === "partial");
+	expect(again).toBe(2);
+	expect(g.children).toHaveLength(0);
+	expect(g.get(stopped.id).result?.code).toBe("pipeline_definition_invalid");
+});
+
+test("the recorded copy is bounded, an exact copy records only a match, and forgetting erases it", async () => {
+	const stateOf = (h: { store: { read: Function } }, id: string) =>
+		JSON.parse(
+			(
+				h.store.read((db: import("bun:sqlite").Database) =>
+					db
+						.query("SELECT state_json FROM agent_executions WHERE id=?")
+						.get(id),
+				) as { state_json: string }
+			).state_json,
+		);
+	const exact = await readyFixture();
+	const first = await exact.start();
+	exact.run();
+	await waitFor(() => exact.get(first.id).status === "completed");
+	expect(stateOf(exact, first.id).pipeline.requestEcho).toEqual({
+		matched: true,
+	});
+
+	const h = await fixture([]);
+	const long = "言い換えた依頼".repeat(200);
+	const definition = { ...h.definition, request: long };
+	h.inference.executeStream = async (requestId) => ({
+		requestId,
+		attemptId: crypto.randomUUID(),
+		value: JSON.stringify({ status: "ready", definition }),
+	});
+	const started = await h.start();
+	h.run();
+	await waitFor(() => h.get(started.id).status === "completed");
+	expect(stateOf(h, started.id).pipeline.requestEcho).toEqual({
+		matched: false,
+		written: long.slice(0, 500),
+		writtenLength: long.length,
+	});
+	await h.store.write((db) =>
+		h.runtime.purgeSourcesInTransaction(db, {
+			messageIds: [h.source.messageId],
+			itemIds: [],
+		}),
+	);
+	expect(stateOf(h, started.id)).not.toHaveProperty("pipeline");
+	expect(
+		JSON.stringify(
+			h.store.read((db) =>
+				db.query("SELECT * FROM agent_executions WHERE id=?").get(started.id),
+			),
+		),
+	).not.toContain("言い換えた依頼");
 });
 
 test("needs_input waits without side effects; the answer keeps the original request and re-enters authoring", async () => {

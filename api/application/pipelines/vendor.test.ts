@@ -3,9 +3,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import {
+	bindSourceRequest,
 	CONTRACT_VERSION,
 	createCatalogView,
 	checkDefinition,
+	isRunnable,
+	parseJsonStrict,
 } from "eumenes-pipeline";
 const root = join(import.meta.dir, "../../..");
 const read = (p: string) => readFileSync(join(root, p));
@@ -39,4 +42,9 @@ test("pipeline archive, manifest, lock and installed runtime agree", () => {
 	expect(
 		checkDefinition({ formatVersion: 1, inputs: [], steps: [] }, catalog).ok,
 	).toBe(false);
+	// 0.1.0 host hardening is present in the installed runtime.
+	expect(manifest.version).toBe("0.1.0");
+	expect(parseJsonStrict('{"a":1,"a":2}').ok).toBe(false);
+	expect(typeof bindSourceRequest).toBe("function");
+	expect(typeof isRunnable).toBe("function");
 });

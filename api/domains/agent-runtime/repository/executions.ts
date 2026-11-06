@@ -90,6 +90,15 @@ export type ParentState = {
 		repaired: boolean;
 		draft?: string;
 		correction?: string;
+		/**
+		 * Whether the planner's copy of the request matched the bound original; when it did not, the
+		 * copy's first 500 characters and its full length. Erased with this state on forget.
+		 */
+		requestEcho?: {
+			matched: boolean;
+			written?: string;
+			writtenLength?: number;
+		};
 	};
 	plan?: {
 		revision: number;
