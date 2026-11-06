@@ -1,0 +1,197 @@
+[
+ {
+  "runId": "547b3539-e2a5-4fed-8646-3513c9b4596a",
+  "conversation": "verify-pipeline-010-20261106-a",
+  "utterance": "明日の東京の天気予報を調べて、その最高気温と最低気温の差を計算して教えてください。",
+  "entry": "route",
+  "row": 2,
+  "decided": "weather.forecast",
+  "top": [
+   {
+    "id": "weather.forecast",
+    "kind": "toolchain",
+    "p": 0.933
+   },
+   {
+    "id": "conversation.respond",
+    "kind": "conversation",
+    "p": 0.091
+   },
+   {
+    "id": "compute.python",
+    "kind": "toolchain",
+    "p": 0.016
+   }
+  ],
+  "pipelineExecuteP": null,
+  "pendingAnswerCandidate": null
+ },
+ {
+  "runId": "ad3488ba-ae9b-4e58-924b-f904a89a007b",
+  "conversation": "verify-pipeline-010-20261106-b",
+  "utterance": "1から50までの素数の個数を計算して、その計算結果の個数と同じ秒数のタイマーを作ってください。",
+  "entry": "route",
+  "row": 3,
+  "decided": "compute.python",
+  "top": [
+   {
+    "id": "compute.python",
+    "kind": "toolchain",
+    "p": 0.304
+   },
+   {
+    "id": "timers.manage",
+    "kind": "toolchain",
+    "p": 0.208
+   },
+   {
+    "id": "conversation.respond",
+    "kind": "conversation",
+    "p": 0.198
+   }
+  ],
+  "pipelineExecuteP": 0.015,
+  "pendingAnswerCandidate": null
+ },
+ {
+  "runId": "8c1c2d41-6e62-4c52-ab84-00eea1eefeb3",
+  "conversation": "verify-pipeline-010-20261106-c",
+  "utterance": "1から50までの素数の個数をPythonで計算してください。そのあと、計算した個数と同じ秒数のタイマーをセットしてください。",
+  "entry": "route",
+  "row": 3,
+  "decided": "timers.manage",
+  "top": [
+   {
+    "id": "timers.manage",
+    "kind": "toolchain",
+    "p": 0.47
+   },
+   {
+    "id": "conversation.respond",
+    "kind": "conversation",
+    "p": 0.248
+   },
+   {
+    "id": "compute.python",
+    "kind": "toolchain",
+    "p": 0.106
+   }
+  ],
+  "pipelineExecuteP": 0.011,
+  "pendingAnswerCandidate": null
+ },
+ {
+  "runId": "cf0058ad-fd7a-46c2-8d84-5ef3fbb48831",
+  "conversation": "verify-pipeline-010-20261106-d",
+  "utterance": "明日の東京の天気予報を教えてください。それと、20秒のタイマーをセットしてください。",
+  "entry": "route",
+  "row": 2,
+  "decided": "weather.forecast",
+  "top": [
+   {
+    "id": "weather.forecast",
+    "kind": "toolchain",
+    "p": 0.876
+   },
+   {
+    "id": "conversation.respond",
+    "kind": "conversation",
+    "p": 0.075
+   },
+   {
+    "id": "timers.manage",
+    "kind": "toolchain",
+    "p": 0.059
+   }
+  ],
+  "pipelineExecuteP": null,
+  "pendingAnswerCandidate": null
+ },
+ {
+  "runId": "13d3a5e5-484e-4dbe-9569-8413165a8f67",
+  "conversation": "verify-pipeline-010-20261106-e",
+  "utterance": "計算結果を使って別の作業を実行して",
+  "entry": "route",
+  "row": 2,
+  "decided": "pipeline.execute",
+  "top": [
+   {
+    "id": "pipeline.execute",
+    "kind": "toolchain",
+    "p": 0.911
+   },
+   {
+    "id": "compute.python",
+    "kind": "toolchain",
+    "p": 0.071
+   },
+   {
+    "id": "conversation.respond",
+    "kind": "conversation",
+    "p": 0.035
+   }
+  ],
+  "pipelineExecuteP": 0.911,
+  "pendingAnswerCandidate": null
+ },
+ {
+  "runId": "1ffd00b0-d585-4602-a2c4-3f6dfc2d2d65",
+  "conversation": "verify-pipeline-010-20261106-e",
+  "utterance": "1から50までの素数の個数を計算して、その個数と同じ秒数のタイマーを作ってください。",
+  "entry": "route",
+  "row": 3,
+  "decided": "compute.python",
+  "top": [
+   {
+    "id": "compute.python",
+    "kind": "toolchain",
+    "p": 0.25
+   },
+   {
+    "id": "timers.manage",
+    "kind": "toolchain",
+    "p": 0.201
+   },
+   {
+    "id": "conversation.respond",
+    "kind": "conversation",
+    "p": 0.105
+   }
+  ],
+  "pipelineExecuteP": 0.004,
+  "pendingAnswerCandidate": {
+   "id": "t1.answer",
+   "p": 0.006
+  }
+ },
+ {
+  "runId": "3e695a51-906f-483b-b399-5c77edea8cee",
+  "conversation": "verify-pipeline-010-20261106-e",
+  "utterance": "計算するのは1から50までの素数の個数で、その結果を使う作業は、その個数と同じ秒数のタイマーを作ることです。",
+  "entry": "route",
+  "row": 3,
+  "decided": "timers.manage",
+  "top": [
+   {
+    "id": "timers.manage",
+    "kind": "toolchain",
+    "p": 0.447
+   },
+   {
+    "id": "t2.check",
+    "kind": "work",
+    "p": 0.301
+   },
+   {
+    "id": "conversation.respond",
+    "kind": "conversation",
+    "p": 0.222
+   }
+  ],
+  "pipelineExecuteP": 0.01,
+  "pendingAnswerCandidate": {
+   "id": "t1.answer",
+   "p": 0.009
+  }
+ }
+]

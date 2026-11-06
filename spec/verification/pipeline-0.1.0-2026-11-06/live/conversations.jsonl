@@ -1,0 +1,19 @@
+{"conversationId": "verify-pipeline-010-20261106-a", "runId": "547b3539-e2a5-4fed-8646-3513c9b4596a", "type": "message", "role": "user", "text": "明日の東京の天気予報を調べて、その最高気温と最低気温の差を計算して教えてください。"}
+{"conversationId": "verify-pipeline-010-20261106-a", "runId": "547b3539-e2a5-4fed-8646-3513c9b4596a", "type": "message", "role": "assistant", "text": "明日（11/7）の東京都は晴れ、最高21℃・最低12℃、降水確率は最大10%です（東京地方の予報・11時発表）。"}
+{"conversationId": "verify-pipeline-010-20261106-b", "runId": "ad3488ba-ae9b-4e58-924b-f904a89a007b", "type": "message", "role": "user", "text": "1から50までの素数の個数を計算して、その計算結果の個数と同じ秒数のタイマーを作ってください。"}
+{"conversationId": "verify-pipeline-010-20261106-b", "runId": "ad3488ba-ae9b-4e58-924b-f904a89a007b", "type": "announcement", "role": "assistant", "text": "「計算」に頼んでみます。"}
+{"conversationId": "verify-pipeline-010-20261106-c", "runId": "8c1c2d41-6e62-4c52-ab84-00eea1eefeb3", "type": "message", "role": "user", "text": "1から50までの素数の個数をPythonで計算してください。そのあと、計算した個数と同じ秒数のタイマーをセットしてください。"}
+{"conversationId": "verify-pipeline-010-20261106-c", "runId": "8c1c2d41-6e62-4c52-ab84-00eea1eefeb3", "type": "announcement", "role": "assistant", "text": "「タイマー」に頼んでみます。"}
+{"conversationId": "verify-pipeline-010-20261106-d", "runId": "cf0058ad-fd7a-46c2-8d84-5ef3fbb48831", "type": "message", "role": "user", "text": "明日の東京の天気予報を教えてください。それと、20秒のタイマーをセットしてください。"}
+{"conversationId": "verify-pipeline-010-20261106-d", "runId": "cf0058ad-fd7a-46c2-8d84-5ef3fbb48831", "type": "message", "role": "assistant", "text": "明日（11/7）の東京都は晴れ、最高21℃・最低12℃、降水確率は最大10%です（東京地方の予報・11時発表）。"}
+{"conversationId": "verify-pipeline-010-20261106-e", "runId": "13d3a5e5-484e-4dbe-9569-8413165a8f67", "type": "message", "role": "user", "text": "計算結果を使って別の作業を実行して"}
+{"conversationId": "verify-pipeline-010-20261106-e", "runId": "13d3a5e5-484e-4dbe-9569-8413165a8f67", "type": "announcement", "role": "assistant", "text": "「パイプライン」に頼みます。"}
+{"conversationId": "verify-pipeline-010-20261106-e", "runId": "13d3a5e5-484e-4dbe-9569-8413165a8f67", "type": "message", "role": "assistant", "text": "「パイプライン」に頼みます。"}
+{"conversationId": "verify-pipeline-010-20261106-e", "runId": "1ffd00b0-d585-4602-a2c4-3f6dfc2d2d65", "type": "message", "role": "user", "text": "1から50までの素数の個数を計算して、その個数と同じ秒数のタイマーを作ってください。"}
+{"conversationId": "verify-pipeline-010-20261106-e", "runId": "1ffd00b0-d585-4602-a2c4-3f6dfc2d2d65", "type": "announcement", "role": "assistant", "text": "「計算」に頼んでみます。"}
+{"conversationId": "verify-pipeline-010-20261106-e", "runId": null, "type": "message", "role": "assistant", "text": "計算結果: 15"}
+{"conversationId": "verify-pipeline-010-20261106-e", "runId": "3e695a51-906f-483b-b399-5c77edea8cee", "type": "message", "role": "user", "text": "計算するのは1から50までの素数の個数で、その結果を使う作業は、その個数と同じ秒数のタイマーを作ることです。"}
+{"conversationId": "verify-pipeline-010-20261106-e", "runId": "3e695a51-906f-483b-b399-5c77edea8cee", "type": "announcement", "role": "assistant", "text": "「タイマー」に頼んでみます。"}
+{"conversationId": "verify-pipeline-010-20261106-f", "runId": "1093fc72-f2fe-4b69-9a8e-db2690a0c29c", "type": "message", "role": "user", "text": "計算結果を使って別の作業を実行して。1から50までの素数の個数を計算し、その個数と同じ秒数のタイマーを作ってください。"}
+{"conversationId": "verify-pipeline-010-20261106-f", "runId": "1093fc72-f2fe-4b69-9a8e-db2690a0c29c", "type": "announcement", "role": "assistant", "text": "「パイプライン」に頼みます。"}
+{"conversationId": "verify-pipeline-010-20261106-f", "runId": "1093fc72-f2fe-4b69-9a8e-db2690a0c29c", "type": "message", "role": "assistant", "text": "「パイプライン」に頼みます。"}

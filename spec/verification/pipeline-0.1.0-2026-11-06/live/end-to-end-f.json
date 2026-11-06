@@ -1,0 +1,56 @@
+{
+ "executionId": "9d11f6ad-1a31-4229-9422-c1980d253c58",
+ "state": "completed",
+ "result": {
+  "summary": "{\"version\":1,\"kind\":\"timer_action\",\"action\":\"started\",\"observedAt\":\"2026-11-06T08:31:09.617Z\",\"items\":[{\"id\":\"57ffb44c-55fa-40d1-8d6f-90ff72228ad7\",\"revision\":0,\"label\":\"タイマー\",\"state\":\"active\",\"durationSeconds\":15,\"remainingSeconds\":15,\"dueAt\":\"2026-11-06T08:31:24.612Z\"}],\"complete\":true,\"errorCode\":null}\n配送: 計算した素数の個数と、その個数と同じ秒数で開始したタイマーの結果を伝える。",
+  "fulfilled": [
+   "1から50までの素数の個数を計算してください。",
+   "先行手順の結果を確認し、その素数の個数と同じ秒数でタイマーを開始してください。"
+  ],
+  "missing": [],
+  "refs": [
+   "result:8ad8f95e-978f-458f-8954-f5c445c1038f"
+  ],
+  "links": [],
+  "status": "completed"
+ },
+ "plannerCalls": 1,
+ "repaired": false,
+ "requestEcho": {
+  "matched": true
+ },
+ "contractVersion": "p0-3",
+ "definition": {
+  "request": "計算結果を使って別の作業を実行して。1から50までの素数の個数を計算し、その個数と同じ秒数のタイマーを作ってください。",
+  "steps": [
+   {
+    "id": "count-primes",
+    "bundle": "compute.python",
+    "task": "1から50までの素数の個数を計算してください。",
+    "from": [
+     "request"
+    ],
+    "result": "1から50までの素数の個数。"
+   },
+   {
+    "id": "start-timer",
+    "bundle": "timers.manage",
+    "task": "先行手順の結果を確認し、その素数の個数と同じ秒数でタイマーを開始してください。",
+    "from": [
+     "count-primes"
+    ],
+    "result": "指定された秒数で開始したタイマーの結果。"
+   }
+  ],
+  "output": {
+   "from": [
+    "start-timer"
+   ],
+   "deliver": "計算した素数の個数と、その個数と同じ秒数で開始したタイマーの結果を伝える。"
+  }
+ },
+ "childStates": {
+  "count-primes": "completed",
+  "start-timer": "completed"
+ }
+}
