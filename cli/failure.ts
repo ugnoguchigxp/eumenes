@@ -5,6 +5,18 @@ export class CliInputError extends Error {}
 
 /** Keep interactive commands and the CLI entry point's diagnostics and exit codes consistent. */
 export function cliFailure(error: unknown, fallbackExitCode = 2) {
+	// The client already waited for a starting backend (see `startingWaitMs`).
+	if (
+		error instanceof ApiError &&
+		error.status === 503 &&
+		error.message === "server_starting"
+	)
+		return {
+			exitCode: 5,
+			lines: [
+				"The backend is still starting (waited 60 seconds). Run the command again once it is ready.",
+			],
+		};
 	if (error instanceof ApiError)
 		return {
 			exitCode: error.status === 401 ? 2 : 3,

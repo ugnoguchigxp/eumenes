@@ -18,7 +18,10 @@ function mockClient() {
 		settings: async () => settingsFixture(),
 		conversation: async () => ({ id: "main", revision: 0, messages: [] }),
 		runs: async () => [],
-		status: async () => ({ larm: { state: "ready", error: null } }),
+		status: async () => ({
+			phase: "ready",
+			larm: { state: "ready", error: null },
+		}),
 		inferenceUsage: async () => [],
 		timerNotifications: async () => ({
 			serverNow: new Date().toISOString(),

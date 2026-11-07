@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { hash } from "../../capabilities";
 
 export const agencyMigration = `
 CREATE TABLE dialogue_agency_state (
@@ -203,7 +204,7 @@ export function revokeAgency(db: Database, id: string) {
 		"UPDATE dialogue_agency_state SET epoch=epoch+1,snapshot_json=NULL,idle_json=NULL,source_refs_json='[]' WHERE conversation_id=?",
 	).run(id);
 	db.query(
-		"UPDATE dialogue_agency_work SET revoked=1,question='',source_refs_json='[]' WHERE conversation_id=?",
+		"UPDATE dialogue_agency_work SET revoked=1,question='',source_refs_json='[]',authority_json=NULL WHERE conversation_id=?",
 	).run(id);
 }
 /** A saved intent, not a user's message, owns this research. Terminal or withdrawn work authorizes no new reads. */
@@ -236,6 +237,7 @@ export function autonomousResearchSource(
 	if (
 		!r ||
 		r.revoked ||
+		!!r.authority_json ||
 		r.returned ||
 		r.deadline <= now ||
 		agencyEpoch(db, r.conversation_id) !== r.epoch ||
@@ -254,22 +256,81 @@ export function autonomousResearchSource(
 }
 export function revokeAgencyWork(db: Database, id: string) {
 	db.query(
-		"UPDATE dialogue_agency_work SET revoked=1,question='',source_refs_json='[]' WHERE root_id=?",
+		"UPDATE dialogue_agency_work SET revoked=1,question='',source_refs_json='[]',authority_json=NULL WHERE root_id=?",
 	).run(id);
 }
 
 /** A separate grant for general actions; old read-only research rows never acquire it. */
-export function autonomousActionSource(db: Database, root: string, now: number): import("../../tool-runtime").ExecutionSource | null {
- const work = agencyWork(db, root);
- if (!work || work.revoked || !work.authority_json || (!work.returned && (work.deadline <= now || !currentAgencyWork(db, work)))) return null;
- const record = db.query("SELECT epoch,settings_digest FROM dialogue_agency_state WHERE conversation_id=?").get(work.conversation_id) as {epoch:number;settings_digest:string}|null;
- const authority = JSON.parse(work.authority_json) as {version:number;settingsDigest:string;policyDigest:string};
- if (authority.version !== 1 || record?.epoch !== work.epoch || record.settings_digest !== authority.settingsDigest) return null;
- return { origin:"autonomous", messageId:null, conversationId:work.conversation_id, runId:root, request:work.question, digest: authority.policyDigest, agency:{epoch:work.epoch,ticketId:work.ticket_id,capabilityRevisionId:work.toolchain_revision_id,policyDigest:authority.policyDigest} };
+export function autonomousActionSource(
+	db: Database,
+	root: string,
+	now: number,
+	settings?: { agency: unknown; general: unknown },
+): import("../../tool-runtime").ExecutionSource | null {
+	const work = agencyWork(db, root);
+	if (
+		!work ||
+		work.revoked ||
+		!work.authority_json ||
+		(!work.returned && (work.deadline <= now || !currentAgencyWork(db, work)))
+	)
+		return null;
+	const record = db
+		.query(
+			"SELECT epoch,settings_digest FROM dialogue_agency_state WHERE conversation_id=?",
+		)
+		.get(work.conversation_id) as {
+		epoch: number;
+		settings_digest: string;
+	} | null;
+	const authority = JSON.parse(work.authority_json) as {
+		version: number;
+		settingsDigest: string;
+		policyDigest: string;
+		settingsStateDigest?: string;
+		inputDigest?: string;
+	};
+	if (
+		authority.version !== 1 ||
+		record?.epoch !== work.epoch ||
+		record.settings_digest !== authority.settingsDigest ||
+		(settings !== undefined &&
+			authority.settingsStateDigest !==
+				hash({ agency: settings.agency, general: settings.general }))
+	)
+		return null;
+	return {
+		origin: "autonomous",
+		messageId: null,
+		conversationId: work.conversation_id,
+		runId: root,
+		request: work.question,
+		digest: authority.policyDigest,
+		agency: {
+			epoch: work.epoch,
+			ticketId: work.ticket_id,
+			capabilityRevisionId: work.toolchain_revision_id,
+			policyDigest: authority.policyDigest,
+		},
+	};
 }
-export function authorizeAgencyAction(db: Database, root: string, authority: {settingsDigest:string;policyDigest:string}, now: number) {
- db.query("UPDATE dialogue_agency_work SET authority_json=?,created_at=? WHERE root_id=? AND authority_json IS NULL").run(JSON.stringify({version:1,...authority}),now,root);
+export function authorizeAgencyAction(
+	db: Database,
+	root: string,
+	authority: {
+		settingsDigest: string;
+		policyDigest: string;
+		settingsStateDigest?: string;
+		inputDigest?: string;
+	},
+	now: number,
+) {
+	db.query(
+		"UPDATE dialogue_agency_work SET authority_json=?,created_at=? WHERE root_id=? AND authority_json IS NULL",
+	).run(JSON.stringify({ version: 1, ...authority }), now, root);
 }
 export function linkAgencyExecution(db: Database, root: string, id: string) {
- db.query("UPDATE dialogue_agency_work SET execution_id=? WHERE root_id=?").run(id,root);
+	db.query(
+		"UPDATE dialogue_agency_work SET execution_id=? WHERE root_id=?",
+	).run(id, root);
 }

@@ -1,7 +1,7 @@
 import { configureLogging, getLogger } from "../infrastructure/logger";
 import { resolveApiToken } from "../infrastructure/auth-config";
 import { loadProcessConfig } from "../infrastructure/config";
-import { createApp } from "./app";
+import { createApp, createStartingFetch } from "./app";
 import { appModules } from "./app-modules";
 import {
 	createLifecycleRunner,
@@ -43,7 +43,13 @@ async function main() {
 			log.info("server.shutdown_started");
 			// Let the startup step in flight finish before anything closes.
 			await gate.settled();
-			const ok = runner ? await runner.closeAll(SHUTDOWN_DEADLINE_MS) : true;
+			// Before the services are built the listening socket is the only resource.
+			const ok = runner
+				? await runner.closeAll(SHUTDOWN_DEADLINE_MS)
+				: await (server?.stop(true) ?? Promise.resolve()).then(
+						() => true,
+						() => false,
+					);
 			log.info("server.shutdown_completed", { reason: ok ? "ok" : "failed" });
 			return ok;
 		})());
@@ -65,12 +71,28 @@ async function main() {
 			EUMENES_DB: config.dbPath,
 			EUMENES_KEY_DIR: config.env.EUMENES_KEY_DIR,
 		});
+		// The server listens first (spec server-listen-first-startup 2026-11-07): until recovery and start are done it
+		// only says it is starting, so no request sees state that is not recovered yet.
+		try {
+			server = Bun.serve({
+				hostname: config.host,
+				port: config.port,
+				idleTimeout: 60,
+				fetch: createStartingFetch(token, config.origin),
+			});
+		} catch (error) {
+			if ((error as { code?: unknown } | null)?.code === "EADDRINUSE")
+				throw new Error("port_in_use");
+			throw error;
+		}
+		const listening = server;
+		log.info("server.listening", { port: listening.port });
 		const services = await gate.step(async () => {
 			const built = await buildServices(config);
 			runner = createLifecycleRunner(
 				createLifecycles(built, {
 					name: "http",
-					close: () => server?.stop(true),
+					close: () => listening.stop(true),
 				}),
 			);
 			return built;
@@ -89,22 +111,11 @@ async function main() {
 			modules: appModules(appServices(services, [token])),
 		});
 		await gate.step(() => {
-			try {
-				server = Bun.serve({
-					hostname: config.host,
-					port: config.port,
-					idleTimeout: 60,
-					fetch: app.fetch,
-				});
-			} catch (error) {
-				if ((error as { code?: unknown } | null)?.code === "EADDRINUSE")
-					throw new Error("port_in_use");
-				throw error;
-			}
+			listening.reload({ fetch: app.fetch });
 		});
-		if (stopping || !server) return;
-		log.info("server.listening", { port: (server as { port: number }).port });
-		// LARM connections begin only once the server listens; startup never waits behind them.
+		if (stopping) return;
+		log.info("server.ready");
+		// LARM connections begin only once the server is ready; startup never waits behind them.
 		services.inference.startRouter();
 		// Probe once so the UI reports a real result before the first message.
 		void services.inference.connect().then(

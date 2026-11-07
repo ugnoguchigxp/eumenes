@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import {
 	agencyMigration,
+	agencyActionsMigration,
 	dispatchClockMigration,
 	claimAgencyDispatch,
 	saveAgency,
@@ -10,12 +11,14 @@ import {
 	revokeAgency,
 	insertAgencyWork,
 	autonomousResearchSource,
+	autonomousActionSource,
 } from "../repository/agency";
 import { createAgencyStatePort } from "../service/agency-state";
 function fixture() {
 	const db = new Database(":memory:");
 	db.exec(agencyMigration);
 	db.exec(dispatchClockMigration);
+	db.exec(agencyActionsMigration);
 	const record = {
 		conversationId: "c",
 		epoch: 0,
@@ -70,6 +73,7 @@ test("only an actual current autonomous work authorizes research and expiry revo
 		expect(autonomousResearchSource(db, "root", 2)).not.toHaveProperty(
 			"messageId",
 		);
+		expect(autonomousActionSource(db, "root", 2)).toBeNull();
 		expect(autonomousResearchSource(db, "root", 10)).toBeNull();
 		revokeAgency(db, "c");
 		expect(autonomousResearchSource(db, "root", 3)).toBeNull();

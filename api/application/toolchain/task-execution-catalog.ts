@@ -42,7 +42,11 @@ export function taskChildContext(host: TaskExecutionHost) {
 			)
 		)
 			throw new Error("toolchain_unavailable");
-		if (child.source.origin === "autonomous" && !taskAutonomy(host, { available })(db, child.chainRevisionId).automatic) throw new Error("agency_approval_required");
+		if (
+			child.source.origin === "autonomous" &&
+			!taskAutonomy(host, { available })(db, child.chainRevisionId).automatic
+		)
+			throw new Error("agency_approval_required");
 		return routing.resolveInTransaction(db, child.chainRevisionId);
 	}
 	function live(db: Database, child: ChildExecution) {

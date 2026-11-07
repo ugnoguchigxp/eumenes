@@ -3,7 +3,7 @@ import {
 	MarkdownWorkspace,
 	type MarkdownCurrent,
 	type MarkdownDraft,
-} from "@eumenes/design-system";
+} from "@eumenes/design-system/markdown";
 import { useArtifactRuntime } from "./runtime";
 import { useAction, Feedback } from "./action";
 import type { ArtifactRequest } from "./contracts";

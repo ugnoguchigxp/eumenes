@@ -178,13 +178,46 @@ test("SIGTERM after startup shuts down through closeAll and exits 0", async () =
 	const dir = tempDir();
 	const server = spawnServer(dir, "0");
 	try {
-		await server.waitFor("server.listening");
+		await server.waitFor("server.ready");
 		server.child.kill("SIGTERM");
 		const [code] = await Promise.all([server.child.exited, server.drain()]);
 		expect(code).toBe(0);
 		const events = server.events().map((entry) => entry.event);
 		expect(events).toContain("server.shutdown_started");
 		expect(events).toContain("server.shutdown_completed");
+	} finally {
+		server.child.kill("SIGKILL");
+	}
+}, 40_000);
+
+test("the server listens before recovery, then becomes ready with the real API (spec server-listen-first-startup)", async () => {
+	const dir = tempDir();
+	const server = spawnServer(dir, "0");
+	try {
+		await server.waitFor("server.ready");
+		const events = server.events();
+		const order = events.map((entry) => entry.event);
+		const at = (event: string) => order.indexOf(event);
+		expect(at("server.starting")).toBeLessThan(at("server.listening"));
+		expect(at("server.listening")).toBeLessThan(at("server.recovery_started"));
+		expect(at("server.recovery_completed")).toBeLessThan(at("server.ready"));
+		const port = events.find(
+			(entry) => entry.event === "server.listening",
+		)?.port;
+		const status = await fetch(`http://127.0.0.1:${port}/api/status`, {
+			headers: { Authorization: `Bearer ${"t".repeat(32)}` },
+		});
+		expect(status.status).toBe(200);
+		expect(await status.json()).toMatchObject({
+			service: "eumenes",
+			phase: "ready",
+		});
+		// The real API's auth answers again once it is ready.
+		expect((await fetch(`http://127.0.0.1:${port}/api/status`)).status).toBe(
+			401,
+		);
+		server.child.kill("SIGTERM");
+		await Promise.all([server.child.exited, server.drain()]);
 	} finally {
 		server.child.kill("SIGKILL");
 	}
@@ -206,7 +239,7 @@ test("a busy port fails with port_in_use after closing", async () => {
 			(entry) => entry.event === "server.startup_failed",
 		);
 		expect(failed?.reason).toBe("port_in_use");
-		// The services were closed before the process gave up.
+		// The port is checked first, before any service is built; the shutdown still completes.
 		expect(events.map((entry) => entry.event)).toContain(
 			"server.shutdown_completed",
 		);

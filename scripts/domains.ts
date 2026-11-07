@@ -10,6 +10,10 @@ export const domains = {
 		backend: "api/domains/markdown",
 		web: "web/src/domains/markdown",
 		components: "packages/design-system/src/components/MarkdownWorkspace",
+		integrationTests: [
+			"api/application/markdown/markdown-registration.test.ts",
+			"api/application/toolchain/capability-seed.test.ts",
+		],
 		depends: { api: ["queue", "resources"], web: ["resources"], test: [] },
 	},
 	collaboration: {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toggleList, indentList, outdentList } from "@platejs/list";
+import { FootnoteReferencePlugin } from "@platejs/footnote/react";
 import { TablePlugin } from "@platejs/table/react";
 import type { MarkdownEditor } from "./editor";
 
@@ -14,7 +15,7 @@ export function MarkdownToolbar({
 			null,
 		),
 		[value, setValue] = useState("");
-	const run = (action: () => void) => {
+	const run = (action: () => void, history = true) => {
 		if (disabled) return;
 		// Native selection can precede Slate's debounced selectionchange (e.g. Shift+End then click).
 		const selection = window.getSelection();
@@ -25,16 +26,22 @@ export function MarkdownToolbar({
 				})
 			: null;
 		if (range) editor.tf.select(range);
-		action();
+		if (history) editor.tf.withNewBatch(action);
+		else action();
 		editor.tf.focus();
 	};
-	const button = (label: string, text: string, action: () => void) => (
+	const button = (
+		label: string,
+		text: string,
+		action: () => void,
+		history = true,
+	) => (
 		<button
 			type="button"
 			title={label}
 			aria-label={label}
 			onMouseDown={(e) => e.preventDefault()}
-			onClick={() => run(action)}
+			onClick={() => run(action, history)}
 			disabled={disabled}
 		>
 			{text}
@@ -104,14 +111,19 @@ export function MarkdownToolbar({
 type Controls = {
 	editor: MarkdownEditor;
 	disabled: boolean;
-	button: (label: string, text: string, action: () => void) => React.ReactNode;
+	button: (
+		label: string,
+		text: string,
+		action: () => void,
+		history?: boolean,
+	) => React.ReactNode;
 	run: (action: () => void) => void;
 };
 function TextTools({ editor, disabled, button, run }: Controls) {
 	return (
 		<div className="ds-markdown-tools">
-			{button("元に戻す", "↶", () => editor.tf.undo())}
-			{button("やり直す", "↷", () => editor.tf.redo())}
+			{button("元に戻す", "↶", () => editor.tf.undo(), false)}
+			{button("やり直す", "↷", () => editor.tf.redo(), false)}
 			<select
 				aria-label="見出し"
 				disabled={disabled}
@@ -327,9 +339,7 @@ function BlockTools({
 }
 
 function insertFootnote(editor: MarkdownEditor) {
-	editor.tf.insertNodes({
-		type: "footnoteDefinition",
-		identifier: crypto.randomUUID(),
-		children: [{ type: "p", children: [{ text: "" }] }],
-	});
+	editor
+		.getTransforms(FootnoteReferencePlugin)
+		.insert.footnote({ focusDefinition: true });
 }

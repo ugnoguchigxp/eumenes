@@ -22,6 +22,14 @@
       }
     },
     {
+      "name": "ime-cancellation-and-remote-update-keep-current-input",
+      "ok": true,
+      "detail": {
+        "cancelled": true,
+        "osIme": false
+      }
+    },
+    {
       "name": "toolbar-formatting-and-table-reach-editor-data",
       "ok": true,
       "detail": {
@@ -175,13 +183,18 @@
     },
     {
       "name": "font-colors-alignment-heading-save",
-      "ok": false,
-      "error": "TimeoutError: evaluate: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-node-type=\"p\"]').last()\u001b[22m\n"
+      "ok": true,
+      "detail": {
+        "saved": true,
+        "align": "center"
+      }
     },
     {
       "name": "lists-indent-checkbox-save",
-      "ok": false,
-      "error": "TimeoutError: waitForFunction: Timeout 3000ms exceeded."
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
     },
     {
       "name": "insert-save-a",
@@ -206,8 +219,12 @@
     },
     {
       "name": "emoji-clear-format-undo-redo",
-      "ok": false,
-      "error": "Error: undo format"
+      "ok": true,
+      "detail": {
+        "emoji": true,
+        "undo": true,
+        "redo": true
+      }
     },
     {
       "name": "narrow-artifact-layout",

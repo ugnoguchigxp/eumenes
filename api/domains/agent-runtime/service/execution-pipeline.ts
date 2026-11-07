@@ -168,6 +168,7 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 		input: {
 			source: ExecutionSource;
 			toolchainRevisionId: string;
+			deadline?: number;
 			references?: ExecutionReference[];
 			/** A collaborative draft already reviewed by the user. Revalidated against the current catalog. */
 			definition?: unknown;
@@ -277,7 +278,10 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 			JSON.stringify(input.source),
 			input.source.request,
 			JSON.stringify(state),
-			ctx.now() + control.runMs,
+			Math.min(
+				ctx.now() + control.runMs,
+				input.deadline ?? Number.POSITIVE_INFINITY,
+			),
 			ctx.now(),
 			ctx.now(),
 		);

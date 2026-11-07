@@ -36,13 +36,28 @@ export function taskExecutionDispatch(
 			if (kind === "command")
 				return {
 					kind,
-					input: dialogue.executionCommands.prepareInTransaction(db, child, child.source.origin === "autonomous" ? host.registry && host.routing && taskAutonomy(host, context)(db, child.chainRevisionId).operations : undefined),
+					input: dialogue.executionCommands.prepareInTransaction(
+						db,
+						child,
+						child.source.origin === "autonomous"
+							? host.registry &&
+									host.routing &&
+									taskAutonomy(host, context)(db, child.chainRevisionId)
+										.operations
+							: undefined,
+					),
 				} as const;
-			if (kind === "instant")
+			if (kind === "instant") {
+				const parsed = routing
+					.cardInTransaction(db, child.chainRevisionId)
+					?.instant?.parse(child.arguments ?? {});
+				if (!parsed?.ok) throw new Error("invalid_input");
 				return {
 					kind,
 					run: routing.instantInTransaction?.(db, child.chainRevisionId),
+					arguments: parsed.value,
 				} as const;
+			}
 			if (kind === "research") {
 				agents.startInTransaction(db, {
 					rootRunId: child.source.runId,
@@ -97,6 +112,7 @@ export function taskExecutionDispatch(
 					  }
 					| {
 							kind: "instant";
+							arguments: Record<string, unknown>;
 							run: ReturnType<
 								NonNullable<ToolchainRoutingPort["instantInTransaction"]>
 							>;
@@ -104,7 +120,9 @@ export function taskExecutionDispatch(
 					| { kind: "research" | "media" | "session"; result: ChildResult }
 				);
 			if (prepared.kind === "instant") {
-				const answer = await prepared.run?.run(child.arguments ?? {}, signal);
+				const answer = await prepared.run?.run(prepared.arguments, signal, {
+					conversationId: child.source.conversationId,
+				});
 				if (answer?.ok)
 					return result(
 						"completed",
@@ -121,6 +139,12 @@ export function taskExecutionDispatch(
 					);
 				return store.write((db) => {
 					live(db, child);
+					if (
+						child.source.origin === "autonomous" &&
+						!taskAutonomy(host, context)(db, prepared.run!.fallback!.revisionId)
+							.automatic
+					)
+						throw new Error("agency_approval_required");
 					const target = routing.resolveInTransaction(
 						db,
 						prepared.run!.fallback!.revisionId,
@@ -172,8 +196,12 @@ export function taskExecutionDispatch(
 				}
 				const command = translated.invocation;
 				if (child.source.origin === "autonomous") {
-					const policy = host.registry.get(command.adapterRef)?.describe().operations.get(command.operationName);
-					if (policy?.effect !== "read" && policy?.autonomy !== "create") throw new Error("agency_approval_required");
+					const policy = host.registry
+						.get(command.adapterRef)
+						?.describe()
+						.operations.get(command.operationName);
+					if (policy?.effect !== "read" && policy?.autonomy !== "create")
+						throw new Error("agency_approval_required");
 				}
 				const actionCapability = capabilities.prepareBoundInTransaction(
 					db,

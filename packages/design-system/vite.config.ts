@@ -63,7 +63,10 @@ export default defineConfig({
 	},
 	build: {
 		lib: {
-			entry: path.resolve(__dirname, "src/index.ts"),
+			entry: {
+				index: path.resolve(__dirname, "src/index.ts"),
+				markdown: path.resolve(__dirname, "src/markdown.ts"),
+			},
 			formats: ["es", "cjs"],
 			fileName: (format) => `[name].${format === "es" ? "mjs" : "js"}`,
 		},

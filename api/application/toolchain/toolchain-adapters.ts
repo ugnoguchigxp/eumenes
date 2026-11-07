@@ -321,11 +321,8 @@ export function createRegistryActions(
 	return {
 		executeInTransaction(db, request) {
 			agents().validateActionOwnerInTransaction(db, request.owner);
-			const [runId, epoch] = request.originToken.split(":");
-			if (
-				runId !== request.owner.rootRunId ||
-				Number(epoch) !== request.owner.cancelEpoch
-			)
+			const runId = request.owner.rootRunId;
+			if (request.originToken !== `${runId}:${request.owner.cancelEpoch}`)
 				throw new Error("origin_invalid");
 			const execution = agents().executionOriginInTransaction(
 				db,
@@ -334,7 +331,11 @@ export function createRegistryActions(
 			const source = execution
 				? { ...execution.source, taskId: request.owner.taskId }
 				: readActionOriginInTransaction(db, runId!);
-			if (!source || (!execution && !source.messageId) || source.taskId !== request.owner.taskId)
+			if (
+				!source ||
+				(!execution && !source.messageId) ||
+				source.taskId !== request.owner.taskId
+			)
 				throw new Error("origin_invalid");
 			const adapter = adapterOf(request.adapterRef);
 			if (!adapter.describe().operations.has(request.operationName))
@@ -344,7 +345,22 @@ export function createRegistryActions(
 				input: request.arguments,
 				requestId: request.requestId,
 				issuedAt: request.issuedAt,
-				origin: execution ? {kind:"task",execution,owner:request.owner,runId:request.owner.rootRunId,conversationId:source.conversationId,messageId:source.messageId} : {kind:"conversation",owner:request.owner,runId:request.owner.rootRunId,conversationId:source.conversationId,messageId: source.messageId!},
+				origin: execution
+					? {
+							kind: "task",
+							execution,
+							owner: request.owner,
+							runId: request.owner.rootRunId,
+							conversationId: source.conversationId,
+							messageId: source.messageId,
+						}
+					: {
+							kind: "conversation",
+							owner: request.owner,
+							runId: request.owner.rootRunId,
+							conversationId: source.conversationId,
+							messageId: source.messageId!,
+						},
 			});
 			return {
 				kind: "local_action",

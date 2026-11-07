@@ -35,6 +35,8 @@ export type ToolchainRedirect = { when: string; toolchainId: string };
 
 /** What the host needs to run a toolchain. Host-owned: not stored in nor hashed into a revision. */
 export type ToolchainRuntimeMeta = {
+	/** Declared effect of a host-native execution contract; absent requires an operation-level grant. */
+	autonomy?: "read" | "create";
 	/**
 	 * research: an agent-runtime worker with the package's profile, SKILL and tools.
 	 * command: a command sub-agent turns the request into one typed operation of the package.

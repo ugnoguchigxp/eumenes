@@ -236,7 +236,11 @@ export interface DomainAdapter {
 		/** Operation name → its input schema ref and whether it changes state. */
 		operations: ReadonlyMap<
 			string,
-			{ inputSchemaRef: string; effect: "read" | "write"; /** Independent new output only; never modify, publish or send. */ autonomy?: "create" }
+			{
+				inputSchemaRef: string;
+				effect: "read" | "write";
+				/** Independent new output only; never modify, publish or send. */ autonomy?: "create";
+			}
 		>;
 		/** Registered read queries (`query:timers.current@1`) for OpenUI sources. */
 		queries: ReadonlySet<string>;
@@ -258,6 +262,8 @@ export interface DomainAdapter {
 		/** The adapter answers instant bindings (it has `instant`). */
 		instant?: boolean;
 		task?: boolean;
+		/** Effect of its task/pipeline lifecycle under the common execution authority. */
+		autonomy?: "read" | "create";
 		/** Runs task pipelines (binding execution "pipeline"). */
 		pipeline?: boolean;
 		/**

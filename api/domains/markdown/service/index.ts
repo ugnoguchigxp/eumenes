@@ -1,4 +1,5 @@
 import { createArchiveRecovery } from "./archive-recovery";
+import { encodeArchive } from "./archive-format";
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -217,6 +218,13 @@ export function createMarkdown(deps: {
 					throw new Error("revision_conflict");
 				if (document.revision !== input.expectedRevision)
 					throw new Error("revision_conflict");
+				// Enforce the Desk wire format limit before accepting a job or sending any POST.
+				encodeArchive(
+					document.id,
+					document.title,
+					JSON.parse(document.content_json),
+					source.markdown,
+				);
 				if (document.save_job_id) throw new Error("markdown_save_in_progress");
 				if (document.save_state === "unknown")
 					throw new Error("markdown_archive_unknown");

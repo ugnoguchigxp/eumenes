@@ -118,6 +118,7 @@ test.each(["127.0.0.1", "localhost"])(
 			expect(response?.status, dev.output()).toBe(200);
 			expect(await response!.json()).toMatchObject({
 				service: "eumenes",
+				phase: "ready",
 				larm: { state: "unconfigured", capabilities: [] },
 			});
 			const browserResponse = await fetch(url, {

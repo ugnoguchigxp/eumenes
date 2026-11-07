@@ -507,6 +507,8 @@ export function createSettingsAdapter(
 	settings: SettingsAdapterPorts,
 	options: { fields: SettingsFieldLookup },
 ): DomainAdapter {
+	// `afterCommit` runs after every writer commit that flushes the adapters; only an applied document is a change.
+	let applyPending = false;
 	return {
 		ref: SETTINGS_ADAPTER_REF,
 		describe: describeSettingsAdapter,
@@ -575,6 +577,7 @@ export function createSettingsAdapter(
 				if (error instanceof ZodError) throw new Error("invalid_settings");
 				throw error;
 			}
+			applyPending = true;
 			// Field and structure ids and the revision only: no values or secrets in the receipt.
 			const receipt = {
 				version: 1,
@@ -658,6 +661,10 @@ export function createSettingsAdapter(
 			};
 		},
 		targetInput: () => ({}),
-		afterCommit: () => settings.notifyChanged(),
+		afterCommit: () => {
+			if (!applyPending) return;
+			applyPending = false;
+			settings.notifyChanged();
+		},
 	};
 }

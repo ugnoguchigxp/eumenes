@@ -11,6 +11,7 @@ import {
 	emotionName,
 	runRespond,
 	type AgencyRuntime,
+	defaultLimits,
 	type CycleOutcome,
 	type IdlePlanner,
 	type LlmPort,
@@ -177,11 +178,26 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 
 	function armReview(c: Conv) {
 		if (!deps.state || !on() || c.reviewTimer !== undefined) return;
+		const pendingAction = () => {
+			const snap = c.runtime.snapshot();
+			return snap.observations.some(
+				(o) =>
+					o.seq > snap.cursor &&
+					(o.kind === "action.observed" || o.kind === "delivery.observed"),
+			);
+		};
+		const readyAt = () =>
+			(c.runtime.snapshot().state.lastOutboundAt ?? nowMs()) +
+			defaultLimits.outboundIntervalMs;
 		c.reviewTimer = setTimer(() => {
 			delete c.reviewTimer;
 			if (!on() || convs.get(c.id) !== c) return;
-			if (c.background) return armReview(c);
-			void runCycle(c, "review_due").finally(() => armReview(c));
+			if (c.background || (pendingAction() && nowMs() < readyAt()))
+				return armReview(c);
+			void runCycle(
+				c,
+				pendingAction() ? "result_received" : "review_due",
+			).finally(() => armReview(c));
 		}, 60_000);
 	}
 
@@ -361,7 +377,6 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		c.id === activeId && c.planner.checkpoint().unanswered < cfg.maxUnanswered;
 
 	const { deliver } = createAgencyDelivery({
-		onToolResult: (c) => { c.toolResultReady = true; },
 		deps,
 		nowMs,
 		save,
@@ -528,7 +543,6 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		}
 		if (on() && convs.get(c.id) === c && c.planner === cy.planner)
 			c.scheduler.rearm();
-		if (c.toolResultReady && on() && convs.get(c.id) === c) { c.toolResultReady = false; launch(c,"result_received"); }
 		return outcome;
 	}
 

@@ -7,7 +7,8 @@ import { createDoclingAdapter } from "../docling/docling-adapter";
 import { createDotsMessagingAdapter } from "../work/dots-messaging-adapter";
 import { createDotsDelegationAdapter } from "../work/dots-delegation-adapter";
 import {
-	autonomousResearchSource, autonomousActionSource,
+	autonomousResearchSource,
+	autonomousActionSource,
 	readActionOriginInTransaction,
 } from "../../domains/dialogue";
 import { createChildOperations } from "./child-operations";
@@ -188,11 +189,11 @@ function researchSourceResolver(
 		const origin =
 			agents().executionOriginInTransaction(db, owner)?.source ??
 			readActionOriginInTransaction(db, owner.rootRunId);
-        if (origin && "origin" in origin && origin.origin === "autonomous") {
-          const current = autonomousActionSource(db,origin.runId,Date.now());
-          if (!current) throw new Error("source_ref_invalid");
-          return current;
-        }
+		if (origin && "origin" in origin && origin.origin === "autonomous") {
+			const current = autonomousActionSource(db, origin.runId, Date.now());
+			if (!current) throw new Error("source_ref_invalid");
+			return current;
+		}
 		const request =
 			origin?.messageId &&
 			options.browser?.requests.userMessageInTransaction(db, origin.messageId);

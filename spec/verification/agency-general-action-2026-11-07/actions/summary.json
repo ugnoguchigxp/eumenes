@@ -1,0 +1,115 @@
+{
+	"implementation": "implemented; fixed-model execution path validated; live acceptance pending",
+	"baselineHead": "e4a84f05b8fffb0eb0cf910733d1d9d5900ecb53",
+	"isolation": "detached HEAD plus listed action source overlay; concurrent Markdown/startup changes excluded",
+	"final": {
+		"backend": {
+			"passed": 140,
+			"failed": 0,
+			"files": 27,
+			"expects": 788
+		},
+		"typecheck": "pass (3,056 files)",
+		"ownedLint": "pass",
+		"ownedFormat": "pass",
+		"ownedSize": "pass",
+		"sourceMatchesWorkspace": true,
+		"documentationOnlyUpdatesAfterCodeValidation": [
+			"docs/toolchain-extension.md",
+			"spec/agency-general-action-design-2026-11-07.md"
+		]
+	},
+	"widerBeforeFinalRevocationAndLifecycleGuards": {
+		"passed": 1514,
+		"failed": 1,
+		"files": 263,
+		"expects": 10445,
+		"seconds": 233.91,
+		"failure": "fresh initialization: fixture backend list omits markdown; toolchain:markdown.collaborate@1 unavailable",
+		"rawLogRetained": false,
+		"evidence": "aggregate observed in tool execution output; later scoped run reused the original raw-log path; source manifest retained"
+	},
+	"web": {
+		"testsPassed": 67,
+		"testFilesPassed": 14,
+		"testFilesFailedBeforeTests": 10,
+		"cause": "ERR_UNKNOWN_FILE_EXTENSION for katex.min.css through unchanged DesignSystem Markdown export",
+		"status": "incomplete; not a passing web gate"
+	},
+	"domainVerify": {
+		"selected": [
+			"dialogue",
+			"agent-runtime",
+			"tool-runtime",
+			"capabilities",
+			"memory",
+			"resources",
+			"image",
+			"music",
+			"pursuit",
+			"settings",
+			"queue"
+		],
+		"passedGates": [
+			"inventory",
+			"boundaries",
+			"system-context",
+			"size-budget",
+			"sql-boundaries",
+			"domain-docs"
+		],
+		"stoppedAt": "format",
+		"baselineFormatFailures": [
+			"api/domains/capabilities/bundles/browser-interact.bundle.json",
+			"tests/browser/chat-image-attachments.spec.ts"
+		],
+		"status": "failed; later gates executed separately"
+	},
+	"repositoryLint": {
+		"status": "failed",
+		"baselineFailure": "spec/verification/markdown-full-bundle-2026-11-07/fixture.tsx"
+	},
+	"designSystem": {
+		"typecheck": "pass",
+		"build": "pass",
+		"sourceUnchangedByThisTask": true
+	},
+	"regressions": [
+		"image/music with real Memory provenance and public forgetting",
+		"research/instant/command/pipeline/registered task through shared execution",
+		"question to TODO and continuation from real user answer",
+		"speech cap and busy-host timer pacing; search and restart continuation",
+		"settings/capability revocation, cancellation, forgetting and late-response rejection",
+		"concurrent/daily limits and immutable replay",
+		"task cancellation and erasure lifecycle required for automatic registration",
+		"old autonomous research cannot acquire action authority"
+	],
+	"live": {
+		"status": "not run",
+		"reason": "explicit server-operation permission pending",
+		"serverStartedStoppedOrRestarted": false,
+		"realModelOrGenerationCalls": false,
+		"browserDeviceAcceptance": false
+	},
+	"contextStill": {
+		"contextCompileCalls": 2,
+		"compileEvalCalls": 2
+	},
+	"remaining": [
+		"live model chooses useful actions or waiting from interests without explicit creation requests",
+		"saved generation services; delivery/opening on user Web screen; stop and late result acceptance",
+		"baseline global format/lint/Markdown fixture and CSS import failures owned by other work"
+	],
+	"diffReview": {
+		"topicOrKeywordRulesAdded": false,
+		"fabricatedUserRunsAdded": false,
+		"secondPlannerForSelectedSingleCapability": false,
+		"unrelatedWorkspaceChangesPreserved": true
+	},
+	"documentationLinks": {
+		"newDesignAndVerificationLinks": "valid",
+		"preexistingBrokenLink": "../api/domains/agent-runtime/service/timer-operation.ts",
+		"presentInHead": true,
+		"unchangedByThisTask": true
+	}
+}

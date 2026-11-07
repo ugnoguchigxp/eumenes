@@ -23,7 +23,7 @@ import { monitoringClient } from "./monitoring";
 import { toolchainHistoryClient } from "./toolchain-history";
 import { settingsClient } from "./settings";
 import { serviceTestsClient } from "./service-tests";
-import { createTransport } from "./transport";
+import { createTransport, type TransportOptions } from "./transport";
 import { tasksClient } from "./tasks";
 import { timersClient } from "./timers";
 import { terminalsClient } from "./terminals";
@@ -35,8 +35,12 @@ import { webResearchClient } from "./web-research";
 
 export { ApiError, ApiConnectionError } from "./transport";
 export { readSse } from "./sse";
-export function createClient(baseUrl: string, token?: string) {
-	const transport = createTransport(baseUrl, token);
+export function createClient(
+	baseUrl: string,
+	token?: string,
+	options?: TransportOptions,
+) {
+	const transport = createTransport(baseUrl, token, options);
 	return {
 		...doclingClient(transport),
 		...markdownClient(transport),

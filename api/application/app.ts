@@ -49,18 +49,56 @@ export function answerError(error: Error, c: Context) {
 	log.warn("http.rejected", { reason: message, status });
 	return c.json({ error: message }, status);
 }
+/** The headers every API answer carries; the starting answer has no route to add them through. */
+const securityHeaders = {
+	"X-Content-Type-Options": "nosniff",
+	"Referrer-Policy": "no-referrer",
+	"X-Frame-Options": "DENY",
+	"Content-Security-Policy":
+		"default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+};
+
+/**
+ * What the server answers while its services start (spec server-listen-first-startup 2026-11-07 §4): an authorized
+ * `GET /api/status` says it is starting, everything else is 503 `server_starting`. It processes no request, reads
+ * nothing and logs nothing; `createApp` replaces it once recovery and start are done.
+ */
+export function createStartingFetch(token: string, origin: string) {
+	const expected = `Bearer ${token}`;
+	return (request: Request): Response => {
+		const requestOrigin = request.headers.get("origin");
+		if (
+			request.method === "GET" &&
+			new URL(request.url).pathname === "/api/status" &&
+			// The real API refuses a foreign origin; the starting answer gives it nothing either.
+			(requestOrigin === null || requestOrigin === origin) &&
+			safeEqual(request.headers.get("authorization") ?? "", expected)
+		)
+			return Response.json(
+				{ service: "eumenes", phase: "starting" },
+				{ headers: { ...securityHeaders, "Cache-Control": "no-store" } },
+			);
+		return Response.json(
+			{ error: "server_starting" },
+			{
+				status: 503,
+				headers: {
+					...securityHeaders,
+					"Cache-Control": "no-store",
+					"Retry-After": "1",
+				},
+			},
+		);
+	};
+}
+
 export function createApp(options: AppOptions) {
 	const app = new Hono();
 	app.use("*", async (c, next) => {
 		await next();
-		c.header("X-Content-Type-Options", "nosniff");
-		c.header("Referrer-Policy", "no-referrer");
-		c.header("X-Frame-Options", "DENY");
 		// API responses are never rendered as documents, so allow nothing.
-		c.header(
-			"Content-Security-Policy",
-			"default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
-		);
+		for (const [name, value] of Object.entries(securityHeaders))
+			c.header(name, value);
 	});
 	app.use("/api/*", async (c, next) => {
 		const requestId = crypto.randomUUID();

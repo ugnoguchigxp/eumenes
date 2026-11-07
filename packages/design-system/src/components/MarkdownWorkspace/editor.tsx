@@ -46,9 +46,17 @@ const safeUrl = (value: unknown) =>
 function Element(props: PlateElementProps) {
 	const { element, children, editor } = props;
 	const type = element.type;
+	const attributes = {
+		...props.attributes,
+		"data-node-type": type,
+		"data-list-style":
+			typeof element.listStyleType === "string"
+				? element.listStyleType
+				: undefined,
+	};
 	if (type === "a")
 		return (
-			<PlateElement {...props} as="span">
+			<PlateElement {...props} attributes={attributes} as="span">
 				<a
 					href={safeUrl(element.url)}
 					target="_blank"
@@ -60,7 +68,7 @@ function Element(props: PlateElementProps) {
 		);
 	if (type === "img")
 		return (
-			<PlateElement {...props}>
+			<PlateElement {...props} attributes={attributes}>
 				<span contentEditable={false}>
 					<img
 						src={safeUrl(element.url)}
@@ -80,7 +88,11 @@ function Element(props: PlateElementProps) {
 			maxExpand: 1000,
 		});
 		return (
-			<PlateElement {...props} as={type === "equation" ? "div" : "span"}>
+			<PlateElement
+				{...props}
+				attributes={attributes}
+				as={type === "equation" ? "div" : "span"}
+			>
 				<span
 					contentEditable={false}
 					dangerouslySetInnerHTML={{ __html: html }}
@@ -91,7 +103,7 @@ function Element(props: PlateElementProps) {
 	}
 	if (type === "hr")
 		return (
-			<PlateElement {...props}>
+			<PlateElement {...props} attributes={attributes}>
 				<span contentEditable={false}>
 					<hr />
 				</span>
@@ -100,7 +112,7 @@ function Element(props: PlateElementProps) {
 		);
 	if (type === "toc")
 		return (
-			<PlateElement {...props}>
+			<PlateElement {...props} attributes={attributes}>
 				<nav contentEditable={false} aria-label="目次">
 					<strong>目次</strong>
 					{editor.children
@@ -114,7 +126,7 @@ function Element(props: PlateElementProps) {
 		);
 	if (type === "toggle")
 		return (
-			<PlateElement {...props}>
+			<PlateElement {...props} attributes={attributes}>
 				<details open>
 					<summary contentEditable={false}>詳細</summary>
 					{children}
@@ -123,7 +135,7 @@ function Element(props: PlateElementProps) {
 		);
 	if (type === "footnoteReference")
 		return (
-			<PlateElement {...props} as="sup">
+			<PlateElement {...props} attributes={attributes} as="sup">
 				<span contentEditable={false}>
 					[{String(element.identifier ?? "1")}]
 				</span>
@@ -155,13 +167,8 @@ function Element(props: PlateElementProps) {
 	return (
 		<PlateElement
 			{...props}
+			attributes={attributes}
 			as={tag}
-			data-node-type={type}
-			data-list-style={
-				typeof element.listStyleType === "string"
-					? element.listStyleType
-					: undefined
-			}
 			style={
 				type === "column"
 					? { width: String(element.width ?? "50%") }
@@ -225,8 +232,34 @@ export function createMarkdownEditor(document?: MarkdownDocument): PlateEditor {
 			FontSizePlugin,
 			TextAlignPlugin,
 			LineHeightPlugin,
-			IndentPlugin,
-			ListPlugin,
+			IndentPlugin.configure({
+				inject: {
+					targetPlugins: [
+						"p",
+						"h1",
+						"h2",
+						"h3",
+						"h4",
+						"h5",
+						"h6",
+						"blockquote",
+					],
+				},
+			}),
+			ListPlugin.configure({
+				inject: {
+					targetPlugins: [
+						"p",
+						"h1",
+						"h2",
+						"h3",
+						"h4",
+						"h5",
+						"h6",
+						"blockquote",
+					],
+				},
+			}),
 			LinkPlugin,
 			CodeBlockPlugin,
 			TablePlugin,

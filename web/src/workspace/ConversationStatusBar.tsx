@@ -134,7 +134,7 @@ export function ConversationStatusBar({
 			{(status.isError ||
 				changesState === "failed" ||
 				["failed", "unconfigured", "idle"].includes(
-					status.data?.larm.state ?? "",
+					(status.data?.phase === "ready" && status.data.larm.state) || "",
 				)) && (
 				<Button
 					variant="secondary"

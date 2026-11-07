@@ -110,7 +110,7 @@ export function createExecutionStore(ctx: ExecutionContext) {
 		row: ExecutionRow,
 		state: ParentState,
 		code: string,
-		status: ExecutionStatus = "partial",
+		status: ExecutionStatus = state.single ? "failed" : "partial",
 	) {
 		finish(db, row, state, status, {
 			summary: code,
@@ -249,7 +249,13 @@ export function createExecutionStore(ctx: ExecutionContext) {
 						: "operation_indeterminate"),
 			);
 		if (state.single)
-			finish(db, row, state, result.state === "completed" ? "completed" : result.state === "cancelled" ? "cancelled" : result.state === "failed" ? "failed" : "partial", { summary: result.summary, fulfilled: result.state === "completed" ? [row.request] : [], missing: result.state === "completed" ? [] : [result.code ?? result.state], refs: [reference.ref], ...(result.code ? { code: result.code } : {}) });
+			finish(
+				db,
+				row,
+				state,
+				selectedStatus(result),
+				selectedResult(row, result, reference.ref),
+			);
 		else if (state.pipeline && advance) advance(db, row, state, result);
 		else enqueue(db, row, state);
 	}
@@ -314,7 +320,8 @@ function followsControl(
 	db: Database,
 	state: ParentState,
 ) {
-	if (state.single) return !!ctx.port().cardInTransaction(db, state.single.chainRevisionId);
+	if (state.single)
+		return !!ctx.port().cardInTransaction(db, state.single.chainRevisionId);
 	return state.pipeline
 		? state.pipeline.contractVersion === "p0-3" &&
 				ctx
@@ -394,5 +401,24 @@ function childLauncher(
 			"INSERT INTO agent_execution_steps(id,execution_id,request_revision,ordinal,input_digest,input_json,state) VALUES(?,?,?,?,?,?,'queued')",
 		).run(id, row.id, row.request_revision, state.ordinal, hash(child), body);
 		enqueue(db, row, state, true);
+	};
+}
+
+function selectedStatus(result: ChildResult): ExecutionStatus {
+	return result.state === "completed"
+		? "completed"
+		: result.state === "cancelled"
+			? "cancelled"
+			: result.state === "failed"
+				? "failed"
+				: "partial";
+}
+function selectedResult(row: ExecutionRow, result: ChildResult, ref: string) {
+	return {
+		summary: result.summary,
+		fulfilled: result.state === "completed" ? [row.request] : [],
+		missing: result.state === "completed" ? [] : [result.code ?? result.state],
+		refs: [ref],
+		...(result.code ? { code: result.code } : {}),
 	};
 }

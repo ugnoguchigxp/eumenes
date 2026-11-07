@@ -92,6 +92,7 @@ contracts("dialogue client", [
 
 const larmStatus = {
 	service: "larm",
+	phase: "ready" as const,
 	larm: { state: "ready", capabilities: ["llm", "tts"] },
 };
 contracts("larm client", [

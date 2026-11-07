@@ -51,7 +51,7 @@
 			"dependencies": ["package:markdown.collaborate@1"],
 			"kind": "toolchain",
 			"id": "markdown.collaborate",
-			"revision": 1,
+			"revision": 2,
 			"title": "文書の共同編集",
 			"summary": "Markdown文書をアーティファクトで共同編集し、Docling Deskに保存する",
 			"examples": [
@@ -60,8 +60,8 @@
 				"保存した文書を開いて見出しを直したい"
 			],
 			"packageRevisionId": "package:markdown.collaborate@1",
-			"bindingRevisionId": "binding:markdown.collaborate@1",
-			"artifactRevisionId": "artifact:markdown.workspace@1",
+			"bindingRevisionId": "binding:markdown.collaborate@2",
+			"artifactRevisionId": "artifact:markdown.workspace@2",
 			"functionName": "markdown_edit",
 			"redirects": []
 		},
@@ -90,12 +90,12 @@
 		{
 			"kind": "binding",
 			"id": "markdown.collaborate",
-			"revision": 1,
+			"revision": 2,
 			"execution": "session",
 			"adapterRef": "adapter:markdown@1",
 			"availabilityRef": "availability:markdown@1",
 			"tools": [],
-			"artifactRevisionId": "artifact:markdown.workspace@1",
+			"artifactRevisionId": "artifact:markdown.workspace@2",
 			"session": {
 				"targetSchemaRef": "schema:markdown-target@1"
 			},
@@ -123,7 +123,7 @@
 		{
 			"kind": "artifact",
 			"id": "markdown.workspace",
-			"revision": 1,
+			"revision": 2,
 			"title": "Markdown",
 			"variants": [
 				{
@@ -151,7 +151,7 @@
 					"actionId": "new",
 					"eventAction": "markdown-new",
 					"source": "markdown-workspace",
-					"inputSchemaRef": "schema:markdown-new@1",
+					"inputSchemaRef": "schema:markdown-new@2",
 					"operationId": "markdown.new",
 					"inputAdapterRef": "input:markdown.new@1",
 					"effect": "write"
@@ -160,7 +160,7 @@
 					"actionId": "apply",
 					"eventAction": "markdown-apply",
 					"source": "markdown-workspace",
-					"inputSchemaRef": "schema:markdown-apply@1",
+					"inputSchemaRef": "schema:markdown-apply@2",
 					"operationId": "markdown.apply",
 					"inputAdapterRef": "input:markdown.apply@1",
 					"effect": "write"
@@ -169,7 +169,7 @@
 					"actionId": "archive",
 					"eventAction": "markdown-archive",
 					"source": "markdown-workspace",
-					"inputSchemaRef": "schema:markdown-archive@1",
+					"inputSchemaRef": "schema:markdown-archive@2",
 					"operationId": "markdown.archive",
 					"inputAdapterRef": "input:markdown.archive@1",
 					"effect": "write"
@@ -241,7 +241,7 @@
 		{
 			"kind": "schema",
 			"id": "markdown-new",
-			"revision": 1,
+			"revision": 2,
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,
@@ -263,7 +263,7 @@
 		{
 			"kind": "schema",
 			"id": "markdown-apply",
-			"revision": 1,
+			"revision": 2,
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,
@@ -295,7 +295,7 @@
 		{
 			"kind": "schema",
 			"id": "markdown-archive",
-			"revision": 1,
+			"revision": 2,
 			"schema": {
 				"type": "object",
 				"additionalProperties": false,

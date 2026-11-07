@@ -1,0 +1,98 @@
+{
+  "recordedAt": "2026-11-07T04:49:55.999557+00:00",
+  "storageRegistrationCompositionMigrations": {
+    "passed": 40,
+    "failed": 0,
+    "assertions": 950
+  },
+  "allBundleSeed": {
+    "passed": 3,
+    "assertions": 370
+  },
+  "capabilities": {
+    "passed": 258,
+    "failed": 0,
+    "assertions": 3239
+  },
+  "artifact": {
+    "bunPassed": 336,
+    "webPassed": 74
+  },
+  "resources": {
+    "bunPassed": 15,
+    "webPassed": 13
+  },
+  "webWorkspace": {
+    "passed": 18
+  },
+  "browser": {
+    "passed": 32,
+    "pageErrors": 0,
+    "osIme": false
+  },
+  "typecheck": {
+    "workspaceFiles": 3060,
+    "snapshotFiles": 3059,
+    "passed": true
+  },
+  "domainLint": true,
+  "domainSize": {
+    "passed": true,
+    "files": 18
+  },
+  "bundleCheck": true,
+  "designSystemBuild": true,
+  "webBuild": true,
+  "regulatedVerify": {
+    "passed": false,
+    "blockers": [
+      "unrelated ignored source copies in workspace inventory",
+      "dialogue to settings dependency in isolated snapshot",
+      "unrelated 15 format failures in isolated selected-domain run"
+    ]
+  },
+  "wholeWebGzipBudget": {
+    "passed": false,
+    "withoutMarkdown": {
+      "entry": 195184,
+      "initial": 342041
+    },
+    "withMarkdownAtComparison": {
+      "entry": 196928,
+      "initial": 343785
+    },
+    "editorLazyChunkApproxKiBGzip": 414
+  },
+  "liveDocling": {
+    "checkedAt": "2026-11-07T04:48:46.150Z",
+    "mode": "read-only",
+    "serviceState": "stopped",
+    "ok": false,
+    "error": "docling_must_already_be_running"
+  },
+  "liveRegistration": {
+    "checkedAt": "2026-11-07T04:49:09.112Z",
+    "mode": "read-only",
+    "artifacts": [
+      {
+        "revision": 1,
+        "status": 200
+      },
+      {
+        "revision": 2,
+        "status": 404
+      }
+    ]
+  },
+  "sourceSha256": {
+    "api/domains/markdown/service/archive-format.ts": "c17e3ef0e9388ca6bf225de2a172271ca485b6de8fd32c99cb73a1f6a6a62cc8",
+    "api/domains/markdown/contracts/index.ts": "bd0e35cc3b03a57e24700674bf2d75c91d7ef31afd2c2c987171ca317b857af7",
+    "api/domains/markdown/test/workspace.test.ts": "e8f28c0cd6a70d276cd27dc07dc24b7bbe5dd9b147789fbbfe7ddcae6cfbcb68",
+    "api/domains/capabilities/bundles/markdown.bundle.json": "f090475388af923b7219a21f8ad1a832c2ae0e709d65e61d17660a319b6f226a",
+    "packages/design-system/src/components/MarkdownWorkspace/MarkdownWorkspace.tsx": "e00093d7abb5cbb7a70b4ea0d9f958231ebf0dd84bf0db87626b90a4fb04bc37",
+    "packages/design-system/src/components/MarkdownWorkspace/editor.tsx": "67e11f1c571fa13751276c5a3722f30ab56b90c6de60c51407ae9bc8da52ba1e",
+    "packages/design-system/src/components/MarkdownWorkspace/toolbar.tsx": "f759cc17ff7ba937ef0e49f385e6dc7a119ebc20468e80459976a3536a7a3aaf",
+    "packages/artifact-ui/src/markdown-components.tsx": "98e3f0dcf8d03d6400c290dde879cbcd49cb805096382bc652bec7ad0b565497",
+    "web/src/domains/markdown/toolchain-adapter.tsx": "f197aeca4ae51fe8445a464afdff7eb5062bf5e7071d7038d0e9e0099ca2d67d"
+  }
+}

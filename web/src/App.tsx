@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { createClient } from "../../client";
 import { createAudioStore } from "./domains/audio";
 import { Workspace } from "./workspace/Workspace";
+import { ServerReady } from "./workspace/ServerReady";
 import { drawingLocation } from "./domains/excalidraw/location";
 
 const DrawingEditor = lazy(() => import("./domains/excalidraw/DrawingEditor"));
@@ -40,7 +41,9 @@ export function App() {
 					/>
 				</Suspense>
 			) : (
-				<Workspace client={client} store={store} />
+				<ServerReady client={client}>
+					<Workspace client={client} store={store} />
+				</ServerReady>
 			)}
 		</QueryClientProvider>
 	);

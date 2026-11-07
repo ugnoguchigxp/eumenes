@@ -557,6 +557,7 @@ test("the removed dedicated LLM selections are not part of the settings document
 test("agency defaults, also for saved documents without it", async () => {
 	const h = await setup();
 	const defaultAgency = {
+		actions: { enabled: true, maxConcurrent: 1, dailyLimit: 3 },
 		idleSec: 20,
 		maxUnanswered: 1,
 		interests: [],
@@ -586,6 +587,7 @@ test("agency persists through apply", async () => {
 	const h = await setup();
 	const s = h.settings.get();
 	s.agency = {
+		actions: { enabled: false, maxConcurrent: 2, dailyLimit: 5 },
 		idleSec: 0,
 		maxUnanswered: 10,
 		interests: ["a", "b", "c"],

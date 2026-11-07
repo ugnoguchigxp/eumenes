@@ -217,10 +217,18 @@ const larmStatusSchema: z.ZodType<LarmStatus> = z.object({
 	chatInput: chatInputSchema.optional(),
 	error: z.string().optional(),
 });
-export const statusResponseSchema = z.object({
+/** The status of a server whose services are up (spec server-listen-first-startup 2026-11-07 §5). */
+export const readyStatusSchema = z.object({
 	service: z.string(),
+	phase: z.literal("ready"),
 	larm: larmStatusSchema,
 });
+/** `/api/status`: while the services start the server only says so; then the LARM status follows. */
+export const statusResponseSchema = z.discriminatedUnion("phase", [
+	z.object({ service: z.string(), phase: z.literal("starting") }),
+	readyStatusSchema,
+]);
+export type StatusResponse = z.infer<typeof statusResponseSchema>;
 
 /** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
 export const errorStatus = {

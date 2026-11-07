@@ -95,7 +95,7 @@ export function createResultCollector(input: {
 			.then(() => {
 				for (const r of results) {
 					const c = convs.get(r.conversationId);
-					if (c) launch(c, "review_due");
+					if (c && !r.general) launch(c, "review_due");
 				}
 			})
 			.catch((error) => {

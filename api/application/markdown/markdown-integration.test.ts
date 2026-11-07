@@ -105,7 +105,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 		await say("見出しと最後の段落を直して");
 		expect(prompts).toHaveLength(2);
 		const sourcePath =
-			"/api/toolchain-artifacts/artifact:markdown.workspace@1/sources/markdown-workspace?params=" +
+			"/api/toolchain-artifacts/artifact:markdown.workspace@2/sources/markdown-workspace?params=" +
 			encodeURIComponent(JSON.stringify({ workRef: owner.workRef }));
 		const source = await (await h.request(sourcePath)).json();
 		expect(source.data.current.title).toBe("企画");
@@ -120,7 +120,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 		expect(staged.status).toBe(201);
 		const { id: stageId } = await staged.json();
 		const artifact = await (
-			await h.request("/api/toolchain-artifacts/artifact:markdown.workspace@1")
+			await h.request("/api/toolchain-artifacts/artifact:markdown.workspace@2")
 		).json();
 		const event = {
 			version: 1,
@@ -128,7 +128,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 			eventCreatedAt: new Date().toISOString(),
 			eventExpiresAt: new Date(Date.now() + 60000).toISOString(),
 			artifactId: "fixture-tab",
-			artifactRevisionId: "artifact:markdown.workspace@1",
+			artifactRevisionId: "artifact:markdown.workspace@2",
 			source: "markdown-workspace",
 			sourceRevision: source.revision,
 			actionId: "archive",

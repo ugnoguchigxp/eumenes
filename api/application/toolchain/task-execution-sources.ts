@@ -19,17 +19,36 @@ export function taskExecutionSources(
 	const checkingReferences = new Set<string>();
 	const port: ReturnType<typeof taskExecutionSources> = {
 		validSourceInTransaction(db, source) {
+			if (
+				source.origin === "autonomous" &&
+				(!source.agency ||
+					!host.routing.cardInTransaction(
+						db,
+						source.agency.capabilityRevisionId,
+					))
+			)
+				return false;
+			if (
+				source.origin === "autonomous" &&
+				host.settings?.inTransaction(db).agency.actions?.enabled === false
+			)
+				return false;
 			const current =
 				source.origin === "autonomous"
-					? autonomousActionSource(db, source.runId, Date.now())
-					: source.specialistSessionId !== undefined
-					? dialogue.specialistExecutionSourceInTransaction(
+					? autonomousActionSource(
 							db,
 							source.runId,
-							source.specialistSessionId,
-							source.specialistEpoch,
+							Date.now(),
+							host.settings?.inTransaction(db),
 						)
-					: dialogue.executionSourceInTransaction(db, source.runId);
+					: source.specialistSessionId !== undefined
+						? dialogue.specialistExecutionSourceInTransaction(
+								db,
+								source.runId,
+								source.specialistSessionId,
+								source.specialistEpoch,
+							)
+						: dialogue.executionSourceInTransaction(db, source.runId);
 			const { amendments, responses, ...original } = source;
 			return (
 				!!current &&

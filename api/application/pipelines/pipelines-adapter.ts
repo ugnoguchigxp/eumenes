@@ -9,6 +9,7 @@ export const describePipelinesAdapter = () => ({
 	projections: new Set<string>(),
 	availability: "availability:pipelines@2",
 	pipeline: true,
+	autonomy: "create" as const,
 });
 /** Pipeline work uses the existing parent execution and its TODO; it has no separate screen or mutation API. */
 export function createPipelinesAdapter(

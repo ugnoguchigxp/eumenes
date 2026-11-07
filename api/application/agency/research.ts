@@ -27,10 +27,26 @@ export function researchTools(
 	const catalog = state
 		? store.read((db) => state.catalogInTransaction(db))
 		: [];
-    if (state?.generalActionsAvailable()) return [
-      { name:"find_toolchain", requiresApproval:false, input:{sources:[],complete:true}, description:'関心に基づく行動に使える担当を既存カタログから探します。toolInputはJSON文字列 {"query":"必要な能力・目的"}。結果のrevisionId、requiresApproval、reason、必要ならargumentsSchemaを読み、次の機会にdelegateを選びます。検索は行動の実行ではありません。' },
-      { name:"delegate", requiresApproval:false, input:{sources:catalog.map(c=>`capability:${c.revisionId}`),complete:true}, description:'発見済みの担当へ自発的な調査・制作・読み取り操作を依頼します。toolInputはJSON文字列 {"revisionId":"検索結果のrevisionId","question":"目的と完了条件","arguments":{}}。argumentsは担当がargumentsSchemaを返した場合の実引数です。requiresApproval=trueの担当は実行せず、必要なら利用者へ具体案を確認します。受付と完了を区別し、結果は後でwork.returnedとして届きます。' }
-    ];
+	if (state?.generalActionsAvailable())
+		return [
+			{
+				name: "find_toolchain",
+				requiresApproval: false,
+				input: { sources: [], complete: true },
+				description:
+					'関心に基づく行動に使える担当を既存カタログから探します。toolInputはJSON文字列 {"query":"必要な能力・目的"}。結果のrevisionId、requiresApproval、reason、必要ならargumentsSchemaを読み、次の機会にdelegateを選びます。検索は行動の実行ではありません。',
+			},
+			{
+				name: "delegate",
+				requiresApproval: false,
+				input: {
+					sources: catalog.map((c) => `capability:${c.revisionId}`),
+					complete: true,
+				},
+				description:
+					'発見済みの担当へ自発的な調査・制作・読み取り操作を依頼します。toolInputはJSON文字列 {"revisionId":"検索結果のrevisionId","question":"目的と完了条件","arguments":{}}。argumentsは担当がargumentsSchemaを返した場合の実引数です。requiresApproval=trueの担当は実行せず、必要なら利用者へ具体案を確認します。受付と完了を区別し、結果は後でwork.returnedとして届きます。',
+			},
+		];
 	return catalog.length
 		? [
 				{
@@ -71,7 +87,7 @@ export function researchInput(
 		candidateId: ticket.candidateId,
 		question: parsed.data.question,
 		revisionId: parsed.data.revisionId,
-		...(parsed.data.arguments ? { arguments:parsed.data.arguments } : {}),
+		...(parsed.data.arguments ? { arguments: parsed.data.arguments } : {}),
 		deadline: (attempt?.startedAt ?? now) + 30 * 60000,
 		sourceRefs: [
 			...new Set([

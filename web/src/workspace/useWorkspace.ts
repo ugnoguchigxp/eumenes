@@ -220,9 +220,10 @@ export function useWorkspace({
 			void invalidateAllButLive(cache);
 		},
 	});
-	const connectionError = status.data?.larm.error;
+	const larm = status.data?.phase === "ready" ? status.data.larm : undefined;
+	const connectionError = larm?.error;
 	const connectionState =
-		status.data?.larm.state ?? (status.isError ? "failed" : "connecting");
+		larm?.state ?? (status.isError ? "failed" : "connecting");
 	const latestRun = runs.data?.at(-1);
 	const activeRun = runs.data
 		?.slice()

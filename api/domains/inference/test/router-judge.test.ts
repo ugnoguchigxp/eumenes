@@ -23,6 +23,7 @@ function harness(router: Partial<Settings["router"]>, started = true) {
 	const listeners = new Set<() => void>();
 	const made: Array<{ profile: string | undefined; closed: boolean }> = [];
 	const clients: Array<string | undefined> = [];
+	const connects = { count: 0 };
 	const judge = createRouterJudge({
 		settings: {
 			get: () => saved,
@@ -46,7 +47,9 @@ function harness(router: Partial<Settings["router"]>, started = true) {
 						headRevision: null,
 						calibrationRevision: null,
 					}),
-					connect: async () => {},
+					connect: async () => {
+						connects.count++;
+					},
 					close: async () => {
 						record.closed = true;
 					},
@@ -61,7 +64,7 @@ function harness(router: Partial<Settings["router"]>, started = true) {
 		next(saved);
 		for (const fn of listeners) fn();
 	};
-	return { judge, made, clients, change };
+	return { judge, made, clients, connects, change };
 }
 const signal = () => new AbortController().signal;
 const input = {
@@ -94,6 +97,18 @@ test("before the server listens no LARM connection is made; start makes it", asy
 	expect(h.made).toEqual([]);
 	h.judge.start();
 	expect(h.made).toEqual([{ profile: "router-a", closed: false }]);
+	await h.judge.close();
+});
+
+test("a settings notice that leaves the router's profile and origin does not connect again", async () => {
+	const h = harness({ profile: "router-a" });
+	expect(h.connects.count).toBe(1);
+	for (let i = 0; i < 30; i++)
+		h.change((s) => {
+			s.router.accept = 0.7;
+		});
+	expect(h.connects.count).toBe(1);
+	expect(h.made).toHaveLength(1);
 	await h.judge.close();
 });
 

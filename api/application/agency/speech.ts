@@ -66,7 +66,12 @@ export function persistSpeech(
 		at: new Date(at).toISOString(),
 		...(todoRefs.length ? { todoRefs } : {}),
 	});
-	deps.state?.linkFindingsInTransaction(db,conversationId,messageId,ticket.findingWorkRefs ?? []);
+	deps.state?.linkFindingsInTransaction(
+		db,
+		conversationId,
+		messageId,
+		ticket.findingWorkRefs ?? [],
+	);
 	return "appended";
 }
 export const speechReceipt = (

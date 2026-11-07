@@ -12,9 +12,9 @@ export const MARKDOWN_ADAPTER_REF = "adapter:markdown@1";
 const query = "query:markdown.workspace@1";
 const operations = ["new", "apply", "archive"] as const;
 export const markdownDomainSchemas = {
-	"domain:markdown.new@1": newInput,
-	"domain:markdown.apply@1": applyInput,
-	"domain:markdown.archive@1": saveInput,
+	"domain:markdown.new@2": newInput,
+	"domain:markdown.apply@2": applyInput,
+	"domain:markdown.archive@2": saveInput,
 	"domain:markdown.receipt@1": z.strictObject({
 		documentId: z.uuid(),
 		revision: z.number().int().positive(),
@@ -41,7 +41,7 @@ export const describeMarkdownAdapter = () => ({
 	operations: new Map(
 		operations.map((name) => [
 			`markdown.${name}`,
-			{ inputSchemaRef: `domain:markdown.${name}@1`, effect: "write" as const },
+			{ inputSchemaRef: `domain:markdown.${name}@2`, effect: "write" as const },
 		]),
 	),
 	queries: new Set([query]),

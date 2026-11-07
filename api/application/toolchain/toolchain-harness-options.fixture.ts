@@ -8,6 +8,8 @@ import type { Step } from "./conversation-script.fixture";
 /** The knobs of the toolchain harness (`harness` in toolchain.fixture.ts). */
 export type HarnessOptions = {
 	webResearch?: boolean;
+	/** Compose the real resource registry for autonomous output delivery. */
+	resources?: boolean;
 	/** Fixed Pursuit control output; enables the registered research owner's lifecycle. */
 	pursuit?: (
 		schema: Record<string, unknown>,

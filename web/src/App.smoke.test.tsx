@@ -18,6 +18,7 @@ function mockClient() {
 		conversation: async () => ({ id: "main", revision: 0, messages: [] }),
 		runs: async () => [],
 		status: async () => ({
+			phase: "ready",
 			larm: { state: "ready", error: null },
 		}),
 		inferenceUsage: async () => [],

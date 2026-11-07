@@ -16,8 +16,72 @@ export class ApiConnectionError extends TypeError {
 		super("api_connection_failed");
 	}
 }
-export function createTransport(baseUrl: string, token?: string) {
+/** How often a client that waits for a starting server asks it again. */
+const STARTING_POLL_MS = 1000;
+/** One status question is bounded: a server busy in synchronous startup work must not hold the wait past its limit. */
+const STARTING_PROBE_MS = 2000;
+const pause = (ms: number, signal?: AbortSignal | null) =>
+	new Promise<void>((resolve, reject) => {
+		signal?.throwIfAborted();
+		const abort = () => {
+			clearTimeout(timer);
+			reject(signal!.reason);
+		};
+		const timer = setTimeout(() => {
+			signal?.removeEventListener("abort", abort);
+			resolve();
+		}, ms);
+		signal?.addEventListener("abort", abort, { once: true });
+	});
+/** The 503 a starting server answers everything but its status with (spec server-listen-first-startup §4). */
+async function refusedWhileStarting(response: Response) {
+	if (response.status !== 503) return false;
+	const body: unknown = await response
+		.clone()
+		.json()
+		.catch(() => null);
+	return (body as { error?: unknown } | null)?.error === "server_starting";
+}
+
+export type TransportOptions = {
+	/**
+	 * How long a request refused by a starting server waits before it is sent again (the CLI). Without it the 503 is
+	 * the caller's: the Web holds its workspace until the status is ready instead.
+	 */
+	startingWaitMs?: number;
+};
+
+export function createTransport(
+	baseUrl: string,
+	token?: string,
+	options: TransportOptions = {},
+) {
 	const base = new URL(baseUrl);
+	/**
+	 * Whether to keep waiting: the server says it is starting, refuses with 503 as a starting server does, or gave no
+	 * answer in time. Any other answer (ready, or the real API's refusal) ends the wait.
+	 */
+	async function starting(signal?: AbortSignal | null) {
+		const response = await fetch(new URL("/api/status", base), {
+			headers: token ? { Authorization: `Bearer ${token}` } : {},
+			cache: "no-store",
+			signal: AbortSignal.any([
+				...(signal ? [signal] : []),
+				AbortSignal.timeout(STARTING_PROBE_MS),
+			]),
+		}).catch(() => null);
+		signal?.throwIfAborted();
+		if (!response || response.status === 503) {
+			await response?.body?.cancel();
+			return true;
+		}
+		if (!response.ok) {
+			await response.body?.cancel();
+			return false;
+		}
+		const body: unknown = await response.json().catch(() => null);
+		return (body as { phase?: unknown } | null)?.phase === "starting";
+	}
 	if (
 		!["http:", "https:"].includes(base.protocol) ||
 		base.username ||
@@ -29,18 +93,31 @@ export function createTransport(baseUrl: string, token?: string) {
 	return {
 		identity: base.origin,
 		async call(path: string, init: RequestInit = {}) {
-			const response = await fetch(new URL(path, base), {
-				...init,
-				headers: {
-					...(token ? { Authorization: `Bearer ${token}` } : {}),
-					...init.headers,
-				},
-				cache: "no-store",
-			}).catch((error: unknown) => {
-				if (error instanceof TypeError && !init.signal?.aborted)
-					throw new ApiConnectionError();
-				throw error;
-			});
+			const send = () =>
+				fetch(new URL(path, base), {
+					...init,
+					headers: {
+						...(token ? { Authorization: `Bearer ${token}` } : {}),
+						...init.headers,
+					},
+					cache: "no-store",
+				}).catch((error: unknown) => {
+					if (error instanceof TypeError && !init.signal?.aborted)
+						throw new ApiConnectionError();
+					throw error;
+				});
+			let response = await send();
+			// A starting server processed nothing, so the same request is sent once more when it is ready.
+			if (
+				options.startingWaitMs &&
+				!(init.body instanceof ReadableStream) &&
+				(await refusedWhileStarting(response))
+			) {
+				const deadline = Date.now() + options.startingWaitMs;
+				while (Date.now() < deadline && (await starting(init.signal)))
+					await pause(STARTING_POLL_MS, init.signal);
+				response = await send();
+			}
 			if (!response.ok) {
 				const body: unknown = await response
 					.json()

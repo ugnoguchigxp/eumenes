@@ -26,7 +26,11 @@ export const describeComputeAdapter = () => ({
 	>(
 		operations.map(([name, inputSchemaRef, effect]) => [
 			name,
-			{ inputSchemaRef, effect, ...(name === "compute.submit" ? { autonomy: "create" as const } : {}) },
+			{
+				inputSchemaRef,
+				effect,
+				...(name === "compute.submit" ? { autonomy: "create" as const } : {}),
+			},
 		]),
 	),
 	queries: new Set(["query:compute.workspace@1"]),

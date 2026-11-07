@@ -50,6 +50,18 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 - `ready` の検査済み定義だけを実行する。`needs_input` は既存の質問、`unsupported` は未達の結果にする。構造修復は一回まで。
 - Routerの複数作業判定は、この入口へ元依頼全体を渡す。旧テンプレートの入力展開・値抽出・制作画面・公開APIは撤去済み。既存の保存revisionは書き換えず、旧実行経路は提供しない。
 
+### Agencyの自律行動へ公開する（2026-11-07）
+
+Agencyは既存の能力検索と実行契約を使う。話題や利用者の語句による分岐は追加しない。`find_toolchain`の返却にはrevision、実行可否と理由、instantの実引数schemaが含まれ、`delegate`の選択後に共通実行へ接続する。[設計と検証](../spec/agency-general-action-design-2026-11-07.md)を参照する。
+
+- command / instantでは、登録adapterの`describe().operations`にある`effect: "read"`を自動実行できる。書込みのうち独立した新規成果物を作る操作だけに`autonomy: "create"`を明示する。既存物の変更・送信・公開・削除へ付けない。command担当へ渡す操作を絞り、実行直前にも同じ条件を検査する。
+- task / pipelineのownerは`describe().autonomy`へ`"read"`または`"create"`を宣言する。taskには実在する`start / view / control / cancel / forget`の公開操作が必要で、取消・忘却を欠く担当は自動実行しない。子の実行にも共通portの出所・操作権限・期限を適用する。pipelineは既存の共通実行を使い、非許可の部品を選択・実行できない。
+- host-nativeの既存能力は`ToolchainRuntimeMeta.autonomy`で同じ副作用を宣言する。未宣言の能力を、名前や`minImpact`の推測だけで自動実行可能にしない。会話を専有するsessionは既存handoffの確認へ進む。
+- 成果物は既存の`producedBy`、ResourceAdapterの`fromResultInTransaction`とURI解決に接続する。受付を完成として扱わない。確定した結果だけをTODO・会話の成果物一覧へ登録する。
+- 自律実行の`ExecutionSource`は`origin: "autonomous"`、`messageId: null`。保存済みのAgency ticketと権限記録が発行元であり、利用者発言やmanual/voice runを作って代用しない。古い読み取り専用の自律調査記録も一般の操作権限に昇格させない。
+
+初期設定は`agency.actions = { enabled: true, maxConcurrent: 1, dailyLimit: 3 }`。設定APIから確認・変更し、日次枠は会話scopeごとに日本時間の午前0時で区切る。同じticketの再照会は新しい枠を消費せず、結果回収は枠を使い切っても続く。設定・能力の変更、取消、忘却、期限切れで失効した結果は採用しない。音楽の生成と再生は別の操作であり、可聴出力は利用者のWeb画面だけで行う。
+
 ### 1.1 Seedと初期化
 
 ツールチェーン関係のSeedは次のファイルを正本とする。製品DBのダンプをSeedとして保存しない。

@@ -8,7 +8,9 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
-| [Markdown共同編集・Plate最小構成の採用検証](verification/markdown-plate-2026-11-07/README.md) | 2026-11-07、隔離検証完了。本番採用保留。Markdown27ケースの保持、Chromiumの日本語composition、AIと未保存入力・保存応答・復元時の競合、SQLite永続化を確認。改行・表配置・リンクtitle等の保持とフル装飾に未達。Artifact内だけの画像案を作成、共同編集はcollaborator切替を前提。本体への登録・UI実装は未着手 |
+| [Markdown共同編集フルbundle・設計](markdown-collaboration-full-bundle-design-2026-11-07.md) | 2026-11-07、Docling Desk保存を優先したPlate編集・collaborator・Artifactの接続。固定試験済み、実Docling保存の受入待ち。[検証記録](verification/markdown-full-bundle-2026-11-07/README.md) |
+| [サーバー先行起動の設計](server-listen-first-startup-design-2026-11-07.md) | 2026-11-07、合意済み（利用者回答「はい。」）・L1〜L3 実装済み・fixture 検証済み（bun 529件・vitest 92件、型0件）。実機の再起動確認は未実施。HTTP を最初に listen し、復旧・開始の間は「起動中」（token 付き status は 200 `phase:"starting"`、他は 503 `server_starting`）だけを返す。準備完了で `server.reload` により本来のアプリへ差し替える。復旧・開始の順序と fail-closed は不変。Web は ready まで起動中の表示、CLI は 503 を受けたら最大60秒待って同じ要求を送り直す |
+| [Markdown共同編集・Plate最小構成の採用検証](verification/markdown-plate-2026-11-07/README.md) | 2026-11-07、隔離検証完了。本番採用保留。Markdown27ケースの保持、Chromiumの日本語composition、AIと未保存入力・保存応答・復元時の競合、SQLite永続化を確認。改行・表配置・リンクtitle等の保持とフル装飾に未達。Artifact内だけの画像案を作成、共同編集はcollaborator切替を前提。最小構成時点の記録。本体構築は上記フルbundle設計で継続 |
 | [クラウドLLMの画像入力 調査と実装計画](cloud-image-input-implementation-plan-2026-11-07.md) | 推奨案D1〜D3で実装。Codexのネイティブ画像入力、経路別能力確認とUI、他クラウドの送信変換を接続。固定試験71件・Web8件・ブラウザー4件・型・ビルド成功。許可後に稼働API・Webへ反映し、Lunaへの実画像送信で図形の色・個数・配置と英数字の認識、回答採用、再読込を確認。能力を公開しない接続の有効化と全体gateの既存課題は残る |
 | [全体課題の第1段階と振り分け改善案](project-issues-first-batch-2026-11-06.md) | 案A不採用、案Bと合意済み取消先選択を実装。現在は契約7/5・指示v8。回答/取消・計画・計算snapshot・厳密出力の接続を修正し、自然依頼の二子実行と同じ親への回答/取消を観測。意味品質・遅延は未受入。EUM005と復元演習EUM013は完了。EUM003の完了報告・通知の追加案は利用者不要のため撤回・対応対象外 |
 | [構造解析で取消先を選ぶ追加設計](router-cancellation-structure-design-2026-11-06.md) | 利用者合意済み。既存仕事の有限参照をLLMが選び、既存の権限・状態検査を通す。全文一致、native schema送受信、取消後の質問閉鎖を実装。品質受入は続行記録で追跡 |

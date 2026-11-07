@@ -1,10 +1,15 @@
-import { createAgencyActions, type AgencyActionDeps } from "./agency-actions";
+import { agencyResults } from "./agency-results";
+import { eraseAgencyActionWork } from "./agency-action-work";
+import {
+	createAgencyActions,
+	stopAgencyExecution,
+	type AgencyActionDeps,
+} from "./agency-actions";
 import { agencyForgetting } from "./agency-forgetting";
 import { refreshAgencyDependencies } from "./agency-memory";
 import { staleAgencySources } from "./agency-sources";
 import type { Database } from "bun:sqlite";
 import {
-	currentAgencyWork,
 	revokeAgencyWork,
 	agencyRecords,
 	claimAgencyDispatch,
@@ -16,7 +21,6 @@ import {
 	agencyWork,
 	insertAgencyWork,
 	linkAgencyWork,
-	returnAgencyWork,
 	revokeAgency,
 	type AgencyRecord,
 } from "../repository/agency";
@@ -31,40 +35,48 @@ import {
 	replaceAgencyDependents,
 } from "../repository/agency-observations";
 
-export function createAgencyStatePort(deps: AgencyActionDeps & {
-	agents?: AgentRuntime;
-	toolchains?: ToolchainRoutingPort | undefined;
-	now: () => number;
-	memory?: Pick<MemoryService, "referenceInputs">;
-}) {
+export function createAgencyStatePort(
+	deps: AgencyActionDeps & {
+		agents?: AgentRuntime;
+		toolchains?: ToolchainRoutingPort | undefined;
+		now: () => number;
+		memory?: Pick<MemoryService, "referenceInputs">;
+	},
+) {
 	const actions = createAgencyActions(deps);
 	const revoke = (db: Database, id: string) => {
 		for (const w of agencyWorks(db, id, true)) {
-			if (w.execution_id) deps.agents?.executions.forgetInTransaction(db,w.execution_id);
+			if (w.execution_id) eraseAgencyActionWork(db, w.execution_id, deps.now());
+			if (w.execution_id) stopAgencyExecution(deps, db, w, true);
 			deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
 		}
 		revokeAgency(db, id);
 	};
 	const catalog = (db: Database) =>
-		actions.available() ? actions.catalog(db) : (deps.toolchains?.catalogInTransaction(db) ?? []).flatMap((entry) => {
-			// Runtime routes are execution contracts, not semantic topic judgments.
-			// They are checked first: a card reads the whole toolchain set, and this runs per agency checkpoint.
-			if (
-				entry.runtime.binding ||
-				(entry.runtime.route !== "web" && entry.runtime.route !== "history")
-			)
-				return [];
-			const card = deps.toolchains!.cardInTransaction(db, entry.revisionId);
-			return card && (card.minImpact === undefined || card.minImpact === "none")
-				? [
-						{
-							revisionId: card.revisionId,
-							title: card.title,
-							description: card.summary,
-						},
-					]
-				: [];
-		});
+		actions.available()
+			? actions.catalog(db)
+			: (deps.toolchains?.catalogInTransaction(db) ?? []).flatMap((entry) => {
+					// Runtime routes are execution contracts, not semantic topic judgments.
+					// They are checked first: a card reads the whole toolchain set, and this runs per agency checkpoint.
+					if (
+						entry.runtime.binding ||
+						(entry.runtime.route !== "web" && entry.runtime.route !== "history")
+					)
+						return [];
+					const card = deps.toolchains!.cardInTransaction(db, entry.revisionId);
+					return card &&
+						(card.minImpact === undefined || card.minImpact === "none")
+						? [
+								{
+									revisionId: card.revisionId,
+									title: card.title,
+									description: card.summary,
+									requiresApproval: false,
+									reason: "available",
+								},
+							]
+						: [];
+				});
 	return {
 		quarantineLegacyInTransaction(db: Database) {
 			for (const record of agencyRecords(db))
@@ -149,7 +161,21 @@ export function createAgencyStatePort(deps: AgencyActionDeps & {
 		catalogInTransaction: catalog,
 		findCapabilities: actions.find,
 		generalActionsAvailable: actions.available,
-		linkFindingsInTransaction(db: Database, conversationId: string, messageId: string, ticketIds: readonly string[]) { actions.link(db,conversationId,messageId,agencyWorks(db,conversationId,true).filter((w)=>ticketIds.includes(w.ticket_id)).flatMap((w)=>w.execution_id ? [w.execution_id] : [])); },
+		linkFindingsInTransaction(
+			db: Database,
+			conversationId: string,
+			messageId: string,
+			ticketIds: readonly string[],
+		) {
+			actions.link(
+				db,
+				conversationId,
+				messageId,
+				agencyWorks(db, conversationId, true)
+					.filter((w) => ticketIds.includes(w.ticket_id))
+					.flatMap((w) => (w.execution_id ? [w.execution_id] : [])),
+			);
+		},
 		startInTransaction(
 			db: Database,
 			input: {
@@ -167,7 +193,7 @@ export function createAgencyStatePort(deps: AgencyActionDeps & {
 				arguments?: Record<string, unknown>;
 			},
 		) {
-			if (actions.available()) return actions.start(db,input);
+			if (actions.available()) return actions.start(db, input);
 			if (!deps.agents || !deps.toolchains)
 				throw new Error("agency_research_unavailable");
 			if (
@@ -222,127 +248,9 @@ export function createAgencyStatePort(deps: AgencyActionDeps & {
 			linkAgencyWork(db, input.rootId, result.taskId);
 			return result.taskId;
 		},
-		resultsInTransaction(db: Database) {
-			return agencyWorks(db).flatMap((w) => {
-				if (!currentAgencyWork(db, w))
-					return [
-						{
-							rootId: w.root_id,
-							conversationId: w.conversation_id,
-							epoch: w.epoch,
-							ticketId: w.ticket_id,
-							status: "interrupted" as const,
-							workStatus: "interrupted" as const,
-							summary: "意図の終了または撤回により中止しました。",
-							cancel: true,
-						},
-					];
-                if (w.execution_id) {
-                  const view = actions.result(db,w.root_id);
-                  if (!view?.result) return [];
-                  return [{cancel:false,rootId:w.root_id,conversationId:w.conversation_id,epoch:w.epoch,ticketId:w.ticket_id,status:view.status === "completed" || view.status === "partial" ? "succeeded" as const : view.status === "cancelled" || view.status === "interrupted" ? "interrupted" as const : "failed" as const,workStatus:view.status === "completed" ? "succeeded" as const : view.status === "partial" ? "partial" as const : view.status === "cancelled" || view.status === "interrupted" ? "interrupted" as const : "failed" as const,summary:JSON.stringify(view.result)}];
-                }
-				const task = w.task_id
-					? deps.agents?.getInTransaction(db, w.task_id)
-					: null;
-				if (
-					!task ||
-					![
-						"completed",
-						"failed",
-						"cancelled",
-						"interrupted",
-						"ready_for_answer",
-					].includes(task.status)
-				)
-					return [];
-				let summary = task.errorCode ?? task.status;
-				let partial = false;
-				let successful =
-					["completed", "ready_for_answer"].includes(task.status) &&
-					!task.errorCode;
-				if (successful) {
-					try {
-						if (task.status === "ready_for_answer") {
-							const ticket = deps.agents!.prepareAnswerInTransaction(
-								db,
-								w.root_id,
-							);
-							if (!deps.agents!.validAnswerInTransaction(db, ticket))
-								throw new Error("agency_result_invalidated");
-						}
-						const report = deps.agents!.reportInTransaction(db, w.task_id!);
-						if (!report) throw new Error("agency_result_invalidated");
-						partial = report.coverage === "partial";
-						summary = JSON.stringify(report);
-					} catch {
-						successful = false;
-						summary = "agency_result_invalidated";
-					}
-				}
-				return [
-					{
-						cancel: false,
-						rootId: w.root_id,
-						conversationId: w.conversation_id,
-						epoch: w.epoch,
-						ticketId: w.ticket_id,
-						status: successful
-							? ("succeeded" as const)
-							: task.status === "cancelled" || task.status === "interrupted"
-								? ("interrupted" as const)
-								: ("failed" as const),
-						workStatus:
-							task.errorCode === "clarification_required"
-								? ("question" as const)
-								: successful
-									? partial
-										? ("partial" as const)
-										: ("succeeded" as const)
-									: task.status === "cancelled" || task.status === "interrupted"
-										? ("interrupted" as const)
-										: ("failed" as const),
-						summary:
-							summary.length > 12000
-								? summary.slice(0, 12000) + "（結果の残りは省略）"
-								: summary,
-					},
-				];
-			});
-		},
-		returnedInTransaction(db: Database, rootId: string) {
-			const w = agencyWork(db, rootId);
-			let adopted = true;
-            if (w?.execution_id) {
-              if (!currentAgencyWork(db,w)) { returnAgencyWork(db,rootId); return false; }
-              const view = actions.result(db,rootId);
-              if (!view?.result) return false;
-              actions.synchronize(db,view);
-              returnAgencyWork(db,rootId);
-              return true;
-            }
-			if (
-				w?.task_id &&
-				deps.agents?.getInTransaction(db, w.task_id)?.status ===
-					"ready_for_answer"
-			) {
-				try {
-					const ticket = deps.agents.prepareAnswerInTransaction(db, rootId);
-					deps.agents.completeAnswerInTransaction(db, ticket);
-				} catch {
-					adopted = false;
-					deps.agents.failAnswerInTransaction(
-						db,
-						rootId,
-						"agency_result_invalidated",
-					);
-				}
-			}
-			returnAgencyWork(db, rootId);
-			return adopted;
-		},
+		...agencyResults(deps, actions),
 		cancelInTransaction(db: Database, id: string) {
-			actions.cancel(db,id);
+			actions.cancel(db, id);
 			deps.agents?.deleteTaskDataInTransaction(db, id);
 			revokeAgencyWork(db, id);
 		},

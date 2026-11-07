@@ -1,3 +1,4 @@
+import { taskAutonomy } from "../toolchain/task-autonomy";
 import type { Database } from "bun:sqlite";
 import type { ComponentRecord } from "eumenes-pipeline";
 import type { TaskExecutionHost } from "../toolchain/task-execution-port";
@@ -15,6 +16,11 @@ export function pipelineComponents(
 		.filter(
 			(e) =>
 				!["session", "read", "task", "pipeline"].includes(e.runtime.execution),
+		)
+		.filter(
+			(e) =>
+				source.origin !== "autonomous" ||
+				taskAutonomy(host, context)(db, e.revisionId).automatic,
 		)
 		.flatMap((e) => {
 			const publicCard = host.routing.cardInTransaction(db, e.revisionId);

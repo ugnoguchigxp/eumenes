@@ -82,8 +82,10 @@ export function createRouterJudge(deps: {
 				.connect()
 				.catch(() => {});
 	}
+	// Only a change of the router's profile or LARM origin concerns the held port; other settings changes leave it.
 	const unsubscribe = deps.settings.onChange(() => {
-		if (held && keyOf(deps.settings.get()) !== held.key) drop();
+		if (held && keyOf(deps.settings.get()) === held.key) return;
+		drop();
 		warm();
 	});
 	/** The held port of the saved settings. */

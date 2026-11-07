@@ -1,0 +1,23 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/action-safety.test.ts:
+ 95 | 				);
+ 96 | 			expect(
+ 97 | 				h.store.read((db) =>
+ 98 | 					h.executionPort!.validSourceInTransaction(db, source),
+ 99 | 				),
+100 | 			).toBe(false);
+           ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/action-safety.test.ts:100:6)
+(fail) capability stops an accepted autonomous operation and rejects its late response [937.58ms]
+
+ 0 pass
+ 7 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [1425.00ms]

@@ -14,6 +14,11 @@
 		"./styles": {
 			"types": "./src/styles.d.ts",
 			"default": "./dist/design-system.css"
+		},
+		"./markdown": {
+			"types": "./dist/markdown.d.ts",
+			"import": "./dist/markdown.mjs",
+			"require": "./dist/markdown.js"
 		}
 	},
 	"files": [

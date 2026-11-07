@@ -16,7 +16,7 @@ import {
 	createWebResearch,
 	type WebResearchService,
 } from "../domains/web-research";
-import { createApp } from "./app";
+import { createApp, createStartingFetch } from "./app";
 import { appModules } from "./app-modules";
 import { createChanges, type Changes } from "./events";
 import { settle, waitFor } from "../infrastructure/wait-for";
@@ -136,6 +136,7 @@ test("status polling is passive and explicit reconnect requires auth and origin"
 	expect(connections).toBe(1);
 	expect(await response.json()).toEqual({
 		service: "eumenes",
+		phase: "ready",
 		larm: { state: "ready", capabilities: ["llm"] },
 	});
 });
@@ -642,4 +643,49 @@ test("API responses carry a deny-all Content-Security-Policy", async () => {
 	expect(response.headers.get("content-security-policy")).toContain(
 		"default-src 'none'",
 	);
+});
+
+test("while services start only an authorized status says so; everything else is 503 (spec server-listen-first-startup §4)", async () => {
+	const token = "s".repeat(32);
+	const starting = createStartingFetch(token, "http://127.0.0.1:5173");
+	const status = starting(
+		new Request("http://127.0.0.1/api/status", {
+			headers: { Authorization: `Bearer ${token}` },
+		}),
+	);
+	expect(status.status).toBe(200);
+	expect(await status.json()).toEqual({
+		service: "eumenes",
+		phase: "starting",
+	});
+	expect(status.headers.get("x-content-type-options")).toBe("nosniff");
+	for (const request of [
+		new Request("http://127.0.0.1/api/status"),
+		new Request("http://127.0.0.1/api/status", {
+			headers: { Authorization: "Bearer wrong" },
+		}),
+		new Request("http://127.0.0.1/api/conversations", {
+			headers: { Authorization: `Bearer ${token}` },
+		}),
+		new Request("http://127.0.0.1/api/status", {
+			method: "POST",
+			headers: { Authorization: `Bearer ${token}` },
+		}),
+		new Request("http://127.0.0.1/oauth/google/callback?code=x"),
+		new Request("http://127.0.0.1/api/status", {
+			headers: {
+				Authorization: `Bearer ${token}`,
+				Origin: "http://evil.example",
+			},
+		}),
+		new Request("http://127.0.0.1/api/status", {
+			method: "OPTIONS",
+			headers: { Origin: "http://127.0.0.1:5173" },
+		}),
+	]) {
+		const refused = starting(request);
+		expect(refused.status).toBe(503);
+		expect(refused.headers.get("retry-after")).toBe("1");
+		expect(await refused.json()).toEqual({ error: "server_starting" });
+	}
 });

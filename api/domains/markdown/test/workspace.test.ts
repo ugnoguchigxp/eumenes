@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { sha256Hex } from "../../../infrastructure/digest";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import {
@@ -28,6 +29,35 @@ const document = (text: string): EditorDocument => ({
 		},
 	],
 	originalMarkdown: "# 元の原文\r\n\r\n日本語  \r\n",
+});
+test("archive v2 preserves frontmatter and rejects changes; legacy v1 remains readable", () => {
+	const documentId = crypto.randomUUID(),
+		name = "保存形式の確認",
+		doc = document("装飾付きの日本語"),
+		markdown = "---\ntitle: メタ情報\n---\n\n本文\n",
+		raw = encodeArchive(documentId, name, doc, markdown),
+		expected = { documentId, title: name, document: doc, markdown };
+	expect(raw.startsWith("\n---\n")).toBe(true);
+	expect(decodeArchive(raw)).toEqual(expected);
+	expect(() => decodeArchive(raw.replace("本文", "変更"))).toThrow(
+		"markdown_source_invalid",
+	);
+	expect(() =>
+		decodeArchive(raw.replace(documentId, crypto.randomUUID())),
+	).toThrow("markdown_source_invalid");
+	const payload = Buffer.from(
+		JSON.stringify({
+			documentId,
+			title: name,
+			document: doc,
+			markdownDigest: sha256Hex(markdown),
+		}),
+	).toString("base64");
+	expect(
+		decodeArchive(
+			`<!-- eumenes-plate-document:v1\n${payload}\n-->\n${markdown}`,
+		),
+	).toEqual(expected);
 });
 async function flush() {
 	for (let i = 0; i < 30; i++) await new Promise((r) => setImmediate(r));
@@ -261,6 +291,20 @@ test.each(["failure", "configuration", "cancel", "interrupt"])(
 	},
 );
 test("staged input keeps the ledger small, is single-use and rejects malformed editor trees", async () => {
+	const invalid = fixture();
+	await expect(
+		invalid.service.stage({
+			document: { ...emptyDocument(), nodes: [{ text: "root leaf" }] },
+		}),
+	).rejects.toThrow();
+	await expect(
+		invalid.service.stage({
+			document: {
+				...emptyDocument(),
+				nodes: [{ type: "p", text: "root leaf with element type" }],
+			},
+		}),
+	).rejects.toThrow();
 	const h = fixture(),
 		doc = document("あ".repeat(50000)),
 		staged = await h.service.stage({ document: doc });
@@ -431,4 +475,25 @@ test("database reopen retains pending work and last Desk baseline without a vers
 	await service.open("desk-id", new AbortController().signal);
 	expect(view().document).toEqual(document("利用者の初稿"));
 	expect(view().dirty).toBe(false);
+});
+
+test("Desk UTF8 envelope limit is rejected before accepting or submitting a save", async () => {
+	const h = fixture(),
+		created = await h.create(document("x".repeat(600000)));
+	const stageId = (
+		await h.service.stage({
+			document: h.view(created.documentId).document,
+			markdown: "あ".repeat(450000),
+		})
+	).id;
+	await expect(
+		h.invoke("markdown.archive", {
+			documentId: created.documentId,
+			expectedRevision: 1,
+			stageId,
+		}),
+	).rejects.toThrow("markdown_document_too_large");
+	expect(h.calls()).toBe(0);
+	expect(h.queue.list().items).toHaveLength(0);
+	expect(h.view(created.documentId).saveState).toBe("unsaved");
 });

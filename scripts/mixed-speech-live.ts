@@ -54,7 +54,8 @@ if (import.meta.main) {
 			if (backend.exitCode !== null)
 				throw new Error("isolated_backend_start_failed");
 			try {
-				await client.status();
+				if ((await client.status()).phase !== "ready")
+					throw new Error("starting");
 				ready = true;
 				break;
 			} catch {

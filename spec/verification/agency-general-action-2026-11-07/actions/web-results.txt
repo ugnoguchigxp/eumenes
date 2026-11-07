@@ -1,0 +1,69 @@
+
+ RUN  v4.1.8 <fixed-checkout>
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ❯ web/src/domains/resources/ResourceChips.test.tsx (0 test)
+ ❯ web/src/components/domains/music/LibraryArtifact.test.tsx (0 test)
+ ❯ web/src/domains/music/use-music-runtime.test.tsx (0 test)
+ ❯ web/src/domains/image/use-image-runtime.test.tsx (0 test)
+ ❯ web/src/domains/agent-runtime/toolchain-adapter.test.tsx (0 test)
+ ❯ web/src/domains/music/toolchain-adapter.test.tsx (0 test)
+ ❯ web/src/components/domains/music/MusicArtifact.test.tsx (0 test)
+ ❯ web/src/domains/image/image-artifact.test.tsx (0 test)
+ ❯ web/src/domains/music/toolchain-adapter.focus.test.tsx (0 test)
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ ❯ web/src/domains/image/toolchain-adapter.test.tsx (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 10 ⎯⎯⎯⎯⎯⎯
+
+ FAIL  web/src/domains/agent-runtime/toolchain-adapter.test.tsx [ web/src/domains/agent-runtime/toolchain-adapter.test.tsx ]
+ FAIL  web/src/domains/image/image-artifact.test.tsx [ web/src/domains/image/image-artifact.test.tsx ]
+ FAIL  web/src/domains/image/toolchain-adapter.test.tsx [ web/src/domains/image/toolchain-adapter.test.tsx ]
+ FAIL  web/src/domains/image/use-image-runtime.test.tsx [ web/src/domains/image/use-image-runtime.test.tsx ]
+ FAIL  web/src/domains/music/toolchain-adapter.test.tsx [ web/src/domains/music/toolchain-adapter.test.tsx ]
+ FAIL  web/src/domains/music/use-music-runtime.test.tsx [ web/src/domains/music/use-music-runtime.test.tsx ]
+ FAIL  web/src/domains/resources/ResourceChips.test.tsx [ web/src/domains/resources/ResourceChips.test.tsx ]
+ FAIL  web/src/components/domains/music/LibraryArtifact.test.tsx [ web/src/components/domains/music/LibraryArtifact.test.tsx ]
+ FAIL  web/src/components/domains/music/MusicArtifact.test.tsx [ web/src/components/domains/music/MusicArtifact.test.tsx ]
+TypeError: Unknown file extension ".css" for <fixed-checkout>/node_modules/.bun/katex@0.16.22/node_modules/katex/dist/katex.min.css
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  web/src/domains/music/toolchain-adapter.focus.test.tsx [ web/src/domains/music/toolchain-adapter.focus.test.tsx ]
+Error: [vitest] There was an error when mocking a module. If you are using "vi.mock" factory, make sure there are no top level variables inside, since this call is hoisted to top of the file. Read more: https://vitest.dev/api/vi.html#vi-mock
+ ❯ web/src/domains/music/toolchain-adapter.focus.test.tsx:3:1
+      1| import { QueryClient, QueryClientProvider } from "@tanstack/react-quer…
+      2| import { cleanup, renderHook, waitFor } from "@testing-library/react";
+      3| import { requestPlayback } from "@eumenes/design-system";
+       | ^
+      4| import { useState, type ReactNode } from "react";
+      5| import { afterEach, expect, test, vi } from "vitest";
+
+Caused by: TypeError: Unknown file extension ".css" for <fixed-checkout>/node_modules/.bun/katex@0.16.22/node_modules/katex/dist/katex.min.css
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_UNKNOWN_FILE_EXTENSION' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+
+ Test Files  10 failed | 14 passed (24)
+      Tests  67 passed (67)
+   Start at  13:42:28
+   Duration  9.03s (transform 6.78s, setup 553ms, import 3.92s, tests 1.94s, environment 35.09s)
+

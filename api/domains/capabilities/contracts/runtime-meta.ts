@@ -84,17 +84,34 @@ const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
 const toolchains: Readonly<
 	Record<string, import("./toolchains").ToolchainRuntimeMeta>
 > = {
-	"web.search": { execution: "research", route: "web" },
-	"web.service-search": { execution: "research", route: "web" },
-	"history.research": { execution: "research", route: "history" },
-	"world.query": { execution: "research", route: "world", requires: "world" },
+	"web.search": { execution: "research", route: "web", autonomy: "read" },
+	"web.service-search": {
+		execution: "research",
+		route: "web",
+		autonomy: "read",
+	},
+	"history.research": {
+		execution: "research",
+		route: "history",
+		autonomy: "read",
+	},
+	"world.query": {
+		execution: "research",
+		route: "world",
+		requires: "world",
+		autonomy: "read",
+	},
 	"excalidraw.edit": { execution: "excalidraw", requires: "excalidraw" },
 	"object-recognition.manage": {
 		execution: "command",
 		requires: "object-recognition",
 	},
-	"image.create": { execution: "image", requires: "image" },
-	"music.create": { execution: "music-create", requires: "music" },
+	"image.create": { execution: "image", requires: "image", autonomy: "create" },
+	"music.create": {
+		execution: "music-create",
+		requires: "music",
+		autonomy: "create",
+	},
 	"music.library": { execution: "music-playback", requires: "music" },
 };
 /** Host metadata of a toolchain by definition id (e.g. `web.search`). */

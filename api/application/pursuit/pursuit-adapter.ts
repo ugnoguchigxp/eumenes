@@ -12,6 +12,7 @@ export function describePursuitAdapter() {
 		projections: new Set<string>(),
 		availability: "availability:pursuit@1",
 		task: true,
+		autonomy: "read" as const,
 	};
 }
 /** Registered lifecycle; the dialogue's common task path selects this owner. */

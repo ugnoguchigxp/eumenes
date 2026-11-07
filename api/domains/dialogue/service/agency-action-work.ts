@@ -1,26 +1,71 @@
 import type { Database } from "bun:sqlite";
 import type { ExecutionView } from "../../tool-runtime";
 import type { ResourceRegistry } from "../../resources";
-import { insertWork, workBySource, updateWork, archiveWork } from "../repository/work";
+import {
+	insertWork,
+	workBySource,
+	updateWork,
+	archiveWork,
+} from "../repository/work";
+import { eraseWorkBySource } from "../repository/work";
+import { forgetWorkResources } from "../repository/resources";
 import { setWorkLinks } from "../repository/resources";
 import { createResourceLedger } from "./resource-ledger";
 import type { AgencyWorkRow } from "../repository/agency";
 
-export function agencyActionWork(resources: ResourceRegistry | undefined, now: () => number) {
-	const ledger = createResourceLedger({ clock: () => new Date(now()).toISOString(), id: () => crypto.randomUUID() });
+export function agencyActionWork(
+	resources: ResourceRegistry | undefined,
+	now: () => number,
+) {
+	const ledger = createResourceLedger({
+		clock: () => new Date(now()).toISOString(),
+		id: () => crypto.randomUUID(),
+	});
 	return {
-		start(db: Database, work: AgencyWorkRow, view: ExecutionView, card: { id: string; title: string }) {
+		start(
+			db: Database,
+			work: AgencyWorkRow,
+			view: ExecutionView,
+			card: { id: string; title: string },
+		) {
 			if (workBySource(db, view.id)) return;
-			insertWork(db, { id: crypto.randomUUID(), conversationId: work.conversation_id, runId: work.root_id,
-				toolchainId: card.id, toolchainRevisionId: work.toolchain_revision_id, execution: "task",
-				request: work.question, title: `[${card.title}] ${work.question.slice(0,160)}`, sourceRef: view.id,
-				dedupeKey: work.root_id, createdAt: new Date(now()).toISOString(), messageIds: [] });
+			insertWork(db, {
+				id: crypto.randomUUID(),
+				conversationId: work.conversation_id,
+				runId: work.root_id,
+				toolchainId: card.id,
+				toolchainRevisionId: work.toolchain_revision_id,
+				execution: "task",
+				request: work.question,
+				title: `[${card.title}] ${work.question.slice(0, 160)}`,
+				sourceRef: view.id,
+				dedupeKey: work.root_id,
+				createdAt: new Date(now()).toISOString(),
+				messageIds: [],
+			});
 		},
 		sync(db: Database, view: ExecutionView) {
 			const work = workBySource(db, view.id);
 			if (!work || work.status === "done") return;
-			if (view.status === "waiting_user" && view.question && work.questionId !== view.question.id) {
-				if (!updateWork(db, work.id, work.revision, { status: "waiting", questionId: view.question.id, question: view.question.prompt }, new Date(now()).toISOString())) throw new Error("agency_work_changed");
+			if (
+				view.status === "waiting_user" &&
+				view.question &&
+				work.questionId !== view.question.id
+			) {
+				if (
+					!updateWork(
+						db,
+						work.id,
+						work.revision,
+						{
+							status: "waiting",
+							questionId: view.question.id,
+							question: view.question.prompt,
+						},
+						new Date(now()).toISOString(),
+					)
+				)
+					throw new Error("agency_work_changed");
 				return;
 			}
 			if (!view.result) return;
@@ -30,13 +75,63 @@ export function agencyActionWork(resources: ResourceRegistry | undefined, now: (
 				return { uri, kind: found.resource.kind, label: found.resource.label };
 			});
 			setWorkLinks(db, work.id, links);
-			ledger.enterLinksInTransaction(db, { conversationId: view.conversationId, workId: work.id, links });
-			const outcome = view.status === "completed" ? "succeeded" : view.status === "cancelled" ? "cancelled" : view.status === "interrupted" ? "interrupted" : view.status === "failed" ? "failed" : "partial";
-			if (!updateWork(db, work.id, work.revision, { status:"done", outcome, questionId:null, question:null, result: view.result }, new Date(now()).toISOString())) throw new Error("agency_work_changed");
+			ledger.enterLinksInTransaction(db, {
+				conversationId: view.conversationId,
+				workId: work.id,
+				links,
+			});
+			const outcome =
+				view.status === "completed"
+					? "succeeded"
+					: view.status === "cancelled"
+						? "cancelled"
+						: view.status === "interrupted"
+							? "interrupted"
+							: view.status === "failed"
+								? "failed"
+								: "partial";
+			if (
+				!updateWork(
+					db,
+					work.id,
+					work.revision,
+					{
+						status: "done",
+						outcome,
+						questionId: null,
+						question: null,
+						result: view.result,
+					},
+					new Date(now()).toISOString(),
+				)
+			)
+				throw new Error("agency_work_changed");
 			archiveWork(db, work.id, new Date(now()).toISOString());
 		},
-		link(db: Database, conversationId: string, messageId: string, executionIds: string[]) {
-			ledger.linkMessageToWorkInTransaction(db, conversationId, messageId, executionIds.flatMap((id) => {const w=workBySource(db,id);return w?[w.id]:[];}));
+		link(
+			db: Database,
+			conversationId: string,
+			messageId: string,
+			executionIds: string[],
+		) {
+			ledger.linkMessageToWorkInTransaction(
+				db,
+				conversationId,
+				messageId,
+				executionIds.flatMap((id) => {
+					const w = workBySource(db, id);
+					return w ? [w.id] : [];
+				}),
+			);
 		},
 	};
+}
+
+export function eraseAgencyActionWork(
+	db: Database,
+	executionId: string,
+	now: number,
+) {
+	const at = new Date(now).toISOString();
+	forgetWorkResources(db, eraseWorkBySource(db, executionId, at), at);
 }

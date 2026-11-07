@@ -102,18 +102,21 @@ export async function startIsolated(options: {
 			);
 		}
 		await fx.waitUntil(
-			async () =>
-				(
-					await fetch(
-						new URL(
-							options.fixture.stack === "fixture"
-								? "/api/timers"
-								: "/api/status",
-							apiUrl,
-						),
-						{ headers: { authorization: `Bearer ${token}` } },
-					)
-				).ok,
+			async () => {
+				const response = await fetch(
+					new URL(
+						options.fixture.stack === "fixture" ? "/api/timers" : "/api/status",
+						apiUrl,
+					),
+					{ headers: { authorization: `Bearer ${token}` } },
+				);
+				// A starting product backend answers its status with `phase: "starting"` and nothing else.
+				return (
+					response.ok &&
+					(options.fixture.stack === "fixture" ||
+						(await response.json()).phase === "ready")
+				);
+			},
 			{ message: "api_not_ready" },
 		);
 		if (options.fixture.stack === "product") {

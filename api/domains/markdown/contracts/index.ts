@@ -67,7 +67,14 @@ function nodesValid(nodes: unknown[]): boolean {
 			return false;
 		return node.children.every((child) => visit(child, depth + 1));
 	}
-	return nodes.every((node) => visit(node, 0));
+	return nodes.every(
+		(node) =>
+			!!node &&
+			typeof node === "object" &&
+			typeof (node as Record<string, unknown>).type === "string" &&
+			Array.isArray((node as Record<string, unknown>).children) &&
+			visit(node, 0),
+	);
 }
 export const editorDocumentSchema = z
 	.strictObject({
@@ -164,6 +171,7 @@ export type ArchivePort = {
 	): Promise<ArchiveEntry>;
 };
 export const errorStatus = {
+	markdown_document_too_large: 422,
 	markdown_not_found: 404,
 	markdown_document_invalid: 422,
 	markdown_apply_invalid: 422,

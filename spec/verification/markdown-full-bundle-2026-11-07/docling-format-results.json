@@ -1,0 +1,12 @@
+{
+  "htmlReadable": true,
+  "editorDataHidden": true,
+  "indexIsBodyOnly": true,
+  "frontmatterUntouched": true,
+  "renderer": "Docling Desk content.render + catalog.evidence_body",
+  "sourceSha256": {
+    "content.py": "eb16cec7e15a396cc2f4383f050fdeaa2a6f09de4d50c69d1339a579bbf4bc37",
+    "catalog.py": "b4e835d6a4948b7d536b304707bfbc6021514d6f76769220db46c93a4e49e554"
+  },
+  "renderedHtml": "<hr />\n<h2 id=\"h-fc4916719b8a-1\">title: メタ情報</h2>\n<h1 id=\"h-15a0d665f066-1\">保存の本文</h1>\n<p>日本語の内容を保存します。</p>\n<h2 id=\"h-3b7d5ebde240-1\">書き出し原本</h2>\n<p>この文書の編集データはEumenesで復元できます。</p>\n"
+}

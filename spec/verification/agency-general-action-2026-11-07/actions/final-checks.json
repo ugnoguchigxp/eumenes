@@ -1,0 +1,34 @@
+{
+  "steps": [
+    {
+      "name": "typecheck",
+      "exit": 0,
+      "seconds": 0.72,
+      "log": "final-typecheck.txt"
+    },
+    {
+      "name": "lint",
+      "exit": 0,
+      "seconds": 0.09,
+      "log": "final-lint.txt"
+    },
+    {
+      "name": "format",
+      "exit": 0,
+      "seconds": 0.03,
+      "log": "final-format.txt"
+    },
+    {
+      "name": "size",
+      "exit": 0,
+      "seconds": 0.27,
+      "log": "final-size.txt"
+    },
+    {
+      "name": "backend",
+      "exit": 0,
+      "seconds": 32.63,
+      "log": "final-backend.txt"
+    }
+  ]
+}

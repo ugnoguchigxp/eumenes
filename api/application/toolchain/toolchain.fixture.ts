@@ -1,3 +1,5 @@
+import { offeredKinds } from "./toolchain-command.fixture";
+import { fixtureResources } from "./toolchain-resources.fixture";
 import { collaborationInstructions } from "eumenes-collaboration";
 import { createContinuityService } from "../../domains/continuity";
 import { createAnalysisFactory } from "../media/analysis";
@@ -62,9 +64,6 @@ import type { LarmPort } from "../../domains/larm";
 import { askModel, attachFixtureRouter } from "./router.fixture";
 import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { researchAcquisition } from "./research-acquisition.fixture";
-import { createResourceAccess } from "../resources/access";
-import { createPursuitReportResourceAdapter } from "../../domains/pursuit";
-import type { ResourceKind } from "../../domains/resources";
 export { forbidden } from "./research-acquisition.fixture";
 import {
 	answerByScript,
@@ -773,16 +772,13 @@ export async function harness(options: HarnessOptions = {}) {
 			})
 		: undefined;
 	await memory?.recover();
-	const resources = options.pursuit
-		? createResourceAccess({
-				store,
-				kinds: () =>
-					store.read((db) =>
-						toolchain.capabilities.resourceKindsInTransaction(db),
-					) as ResourceKind[],
-				adapters: [createPursuitReportResourceAdapter(store)],
-			})
-		: undefined;
+	const resources = fixtureResources(
+		store,
+		toolchain.capabilities,
+		options,
+		image,
+		music,
+	);
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		excalidraw: drawingOperations,
@@ -829,6 +825,7 @@ export async function harness(options: HarnessOptions = {}) {
 			: { issues: [] };
 		if (registered.issues.length) throw new Error("dormant_bundle_rejected");
 		executionPort = configureTaskExecution({
+			settings,
 			pursuit: toolchain.pursuit,
 			collaboration: toolchain.collaboration,
 			interact: browser?.interact,
@@ -898,6 +895,7 @@ export async function harness(options: HarnessOptions = {}) {
 		});
 	return {
 		executionPort,
+		resources: resources?.registry,
 		dir,
 		memory,
 		dotsWork,
@@ -978,29 +976,6 @@ export async function harness(options: HarnessOptions = {}) {
 			await excalidraw?.close();
 			await store.close();
 			rmSync(dir, { recursive: true, force: true });
-		},
-	};
-}
-
-/**
- * Only the first check's schema has a condition's kind: an answer without one is an operation condition there,
- * and a later check's answer carries none.
- */
-function offeredKinds(
-	tools: import("../../infrastructure/chat-stream").NativeTool[],
-	step: { name: string; arguments: Record<string, unknown> },
-) {
-	const kinded = JSON.stringify(tools).includes('"kind"');
-	const conditions = step.arguments.conditions as
-		Array<Record<string, unknown>> | undefined;
-	if (!Array.isArray(conditions)) return step;
-	return {
-		...step,
-		arguments: {
-			...step.arguments,
-			conditions: conditions.map(({ kind, ...c }) =>
-				kinded ? { ...c, kind: kind ?? "operation" } : c,
-			),
 		},
 	};
 }

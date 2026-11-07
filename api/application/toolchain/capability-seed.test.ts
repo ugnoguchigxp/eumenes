@@ -26,6 +26,7 @@ const backends = new Set([
 	"dots",
 	"image",
 	"ui-compositions",
+	"markdown",
 	"excalidraw",
 	"object-recognition",
 	"ocr",

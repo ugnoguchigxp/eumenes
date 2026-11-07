@@ -87,7 +87,12 @@ export type ExecutionSource = {
 	messageId: string | null;
 	/** A persisted Agency work owns autonomous execution; never a user-message identity. */
 	origin?: "autonomous";
-	agency?: { epoch: number; ticketId: string; capabilityRevisionId: string; policyDigest: string };
+	agency?: {
+		epoch: number;
+		ticketId: string;
+		capabilityRevisionId: string;
+		policyDigest: string;
+	};
 	runId: string;
 	request: string;
 	digest: string;
@@ -107,6 +112,7 @@ export interface TaskLifecyclePort {
 			references: ExecutionReference[];
 			toolchainRevisionId?: string;
 			bindingRevisionId?: string;
+			deadline?: number;
 		},
 	): ExecutionView;
 	controlInTransaction(
@@ -171,7 +177,10 @@ export type ChildResult = {
 export interface ToolchainExecutionPort {
 	/** Shared domain-task lifecycle, also callable by research invocation owners. */
 	childOperations?: import("./child-operation").ChildOperationPort;
-	autonomyInTransaction?(db: Database, revisionId: string): { automatic: boolean; reason: string; operations: string[] };
+	autonomyInTransaction?(
+		db: Database,
+		revisionId: string,
+	): { automatic: boolean; reason: string; operations: string[] };
 	validSourceInTransaction(db: Database, source: ExecutionSource): boolean;
 	controlSourceInTransaction(
 		db: Database,

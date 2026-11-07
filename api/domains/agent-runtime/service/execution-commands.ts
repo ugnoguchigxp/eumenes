@@ -31,6 +31,7 @@ export function executionCommands(
 			source: ExecutionSource;
 			request: string;
 			references: ExecutionReference[];
+			deadline?: number;
 		},
 	) {
 		if (!available(db)) throw new Error("execution_unavailable");
@@ -103,7 +104,10 @@ export function executionCommands(
 			JSON.stringify(input.source),
 			input.request,
 			JSON.stringify(state),
-			now() + control.runMs,
+			Math.min(
+				now() + control.runMs,
+				input.deadline ?? Number.POSITIVE_INFINITY,
+			),
 			now(),
 			now(),
 		);

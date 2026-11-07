@@ -29,6 +29,7 @@ export const describeTaskAdapter = () => ({
 	projections: new Set<string>(),
 	availability: "availability:task-execution@1",
 	task: true,
+	autonomy: "create" as const,
 });
 
 /** A ledger TODO as the page read returns it (the dialogue ledger owns the record). */
@@ -93,6 +94,8 @@ export function createTaskAdapter(
 		ref: TASK_ADAPTER_REF,
 		describe: describeTaskAdapter,
 		task: {
+			forgetInTransaction: (db, id) =>
+				runtime()?.executions.forgetInTransaction(db, id),
 			cancelInTransaction: (db, conversationId, id) =>
 				runtime()?.executions.cancelByUserInTransaction(db, conversationId, id),
 			startInTransaction: (db, input) => {

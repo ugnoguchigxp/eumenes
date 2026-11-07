@@ -22,15 +22,19 @@ export function executionCommands(deps: DialogueDeps) {
 		child.source.origin === "autonomous"
 			? autonomousActionSource(db, child.source.runId, Date.now())
 			: child.source.specialistSessionId !== undefined
-			? specialistExecutionSource(
-					deps,
-					db,
-					child.source.runId,
-					child.source.specialistSessionId,
-					child.source.specialistEpoch,
-				)
-			: executionSourceInTransaction(deps, db, child.source.runId);
-	function prepareInTransaction(db: Database, child: ChildExecution, allowedOperations?: readonly string[]) {
+				? specialistExecutionSource(
+						deps,
+						db,
+						child.source.runId,
+						child.source.specialistSessionId,
+						child.source.specialistEpoch,
+					)
+				: executionSourceInTransaction(deps, db, child.source.runId);
+	function prepareInTransaction(
+		db: Database,
+		child: ChildExecution,
+		allowedOperations?: readonly string[],
+	) {
 		const run = byId(db, child.source.runId);
 		const source = sourceOf(db, child);
 		if (
@@ -45,14 +49,20 @@ export function executionCommands(deps: DialogueDeps) {
 			child.chainRevisionId,
 		);
 		if (child.source.origin === "autonomous") {
- if (!set.binding || !allowedOperations?.length) throw new Error("agency_approval_required");
- const tools = set.binding.tools.filter((tool) => allowedOperations.includes(tool.operationName));
- set = { ...set, binding: { ...set.binding, tools } };
- }
+			if (!set.binding || !allowedOperations?.length)
+				throw new Error("agency_approval_required");
+			const tools = set.binding.tools.filter((tool) =>
+				allowedOperations.includes(tool.operationName),
+			);
+			set = { ...set, binding: { ...set.binding, tools } };
+		}
 		const loaded = commandSource(
 			deps,
 			db,
-			run ?? { id: child.source.runId, conversationId: child.source.conversationId },
+			run ?? {
+				id: child.source.runId,
+				conversationId: child.source.conversationId,
+			},
 			set,
 			{ toolchainRevisionId: child.chainRevisionId },
 			child,

@@ -176,7 +176,6 @@ export * from "./components/ExternalAppLauncher";
 export * from "./components/VisualAnalysis";
 export * from "./components/UsageDashboard";
 
-export { MarkdownWorkspace } from "./components/MarkdownWorkspace/MarkdownWorkspace";
 export type {
 	MarkdownCurrent,
 	MarkdownDocument,

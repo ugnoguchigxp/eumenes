@@ -1,3 +1,5 @@
+import { stopAgencyExecution } from "./agency-actions";
+import { eraseAgencyActionWork } from "./agency-action-work";
 import type { Database } from "bun:sqlite";
 import {
 	prepareForgetting,
@@ -38,6 +40,7 @@ const affected = (input: InputContext, refs: ReadonlySet<string>) =>
 
 export function agencyForgetting(deps: {
 	agents?: AgentRuntime;
+	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	memory?: Pick<MemoryService, "referenceInputs">;
 	now(): number;
 }) {
@@ -69,7 +72,9 @@ export function agencyForgetting(deps: {
 				) {
 					if (!record.sourceRefs.some((ref) => refs.has(ref))) continue;
 					for (const work of agencyWorks(db, record.conversationId, true)) {
-						if (work.execution_id) deps.agents?.executions.forgetInTransaction(db,work.execution_id);
+						if (work.execution_id)
+							eraseAgencyActionWork(db, work.execution_id, deps.now());
+						if (work.execution_id) stopAgencyExecution(deps, db, work, true);
 						deps.agents?.deleteTaskDataInTransaction(db, work.root_id);
 					}
 					revokeAgency(db, record.conversationId);
@@ -86,7 +91,9 @@ export function agencyForgetting(deps: {
 								refs.has(ref),
 							))
 					) {
-						if (work.execution_id) deps.agents?.executions.forgetInTransaction(db,work.execution_id);
+						if (work.execution_id)
+							eraseAgencyActionWork(db, work.execution_id, deps.now());
+						if (work.execution_id) stopAgencyExecution(deps, db, work, true);
 						deps.agents?.deleteTaskDataInTransaction(db, work.root_id);
 						revokeAgencyWork(db, work.root_id);
 					}

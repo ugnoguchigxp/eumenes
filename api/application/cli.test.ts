@@ -934,3 +934,60 @@ test("CLI without a token file exits 2 and creates no keys directory", async () 
 	expect(stderr).toContain("api_token_not_found");
 	expect(readdirSync(dir)).toEqual([]);
 });
+
+test("a command waits while the backend is starting and runs once it is ready (spec server-listen-first-startup §6)", async () => {
+	let statusCalls = 0;
+	const order: string[] = [];
+	const server = Bun.serve({
+		hostname: "127.0.0.1",
+		port: 0,
+		fetch(req) {
+			const path = new URL(req.url).pathname;
+			// The services come up after the second status question.
+			const ready = statusCalls >= 2;
+			if (path === "/api/status") {
+				statusCalls++;
+				order.push(`status:${ready ? "ready" : "starting"}`);
+				return Response.json(
+					ready
+						? {
+								service: "eumenes",
+								phase: "ready",
+								larm: { state: "unconfigured", capabilities: [] },
+							}
+						: { service: "eumenes", phase: "starting" },
+				);
+			}
+			order.push(`${path}:${ready ? 200 : 503}`);
+			if (!ready)
+				return Response.json(
+					{ error: "server_starting" },
+					{ status: 503, headers: { "Retry-After": "1" } },
+				);
+			return Response.json({
+				enabled: true,
+				entries: 0,
+				bytes: 0,
+				generation: 1,
+				lastSweepAt: null,
+			});
+		},
+	});
+	try {
+		const result = await cli(
+			["web", "cache", "--json"],
+			`http://127.0.0.1:${server.port}`,
+		);
+		expect(result.code).toBe(0);
+		// Refused while starting, then sent once more when the status said ready.
+		expect(order).toEqual([
+			"/api/web-research/cache/status:503",
+			"status:starting",
+			"status:starting",
+			"status:ready",
+			"/api/web-research/cache/status:200",
+		]);
+	} finally {
+		await server.stop(true);
+	}
+}, 20_000);

@@ -1,3 +1,4 @@
+import type { ToolchainExecutionPort } from "../domains/tool-runtime";
 import { buildAnalysisFactory } from "./media/visual-perception";
 import { createLiveBridge } from "./media/live-bridge";
 import { createLateResources } from "./resources/late";
@@ -222,17 +223,22 @@ export async function buildServices(
 			)
 		: undefined;
 	const liveBridge = createLiveBridge();
-	let agencyExecution: import("../domains/tool-runtime").ToolchainExecutionPort | undefined;
-	const agencyDeps = {
-		store,
-		conversation,
-		inference,
-		settings,
-		memory,
-		research: { agents: toolchain.agents, toolchains, store, settings, resources: resources.access.registry, execution: () => agencyExecution },
-	};
+	let agencyExecution: ToolchainExecutionPort | undefined;
 	const agency = assembleAgency(
-		{ ...agencyDeps, ...liveBridge.agency },
+		{
+			...core,
+			memory,
+			research: {
+				agents: toolchain.agents,
+				toolchains,
+				store,
+				settings,
+				resources: resources.access.registry,
+				producesInTransaction: toolchain.capabilities.producesInTransaction,
+				execution: () => agencyExecution,
+			},
+			...liveBridge.agency,
+		},
 		() => dialogue,
 	);
 	const dialogue = createDialogueService({
@@ -281,6 +287,7 @@ export async function buildServices(
 	links.attachDialogue(dialogue);
 	if (enabled && toolchains)
 		agencyExecution = configureTaskExecution({
+			settings,
 			pursuit: toolchain.pursuit,
 			collaboration: toolchain.collaboration,
 			interact: browser.interact,

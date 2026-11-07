@@ -160,19 +160,6 @@
 	display: flex;
 	gap: 20px;
 }
-.ds-markdown-content [data-list-style="disc"]:before {
-	content: "•";
-	position: absolute;
-	left: -18px;
-}
-.ds-markdown-content [data-list-style="decimal"] {
-	counter-increment: md-list;
-}
-.ds-markdown-content [data-list-style="decimal"]:before {
-	content: counter(md-list) ".";
-	position: absolute;
-	left: -24px;
-}
 .ds-markdown-content input[type="checkbox"] {
 	margin-right: 8px;
 }

@@ -661,3 +661,13 @@ export function useConfirmation(db: Database, id: string, at: string): boolean {
 			.run(at, id, at).changes === 1
 	);
 }
+
+/** Remove copied bodies of one autonomous work while preserving its identity and replay key. */
+export function eraseWorkBySource(db: Database, sourceRef: string, at: string) {
+	const row = workBySource(db, sourceRef);
+	if (!row) return [];
+	db.query(
+		"UPDATE dialogue_work SET request='',title='',question=NULL,question_id=NULL,result_json=NULL,status='done',outcome='cancelled',archived_at=COALESCE(archived_at,?),revision=revision+1,updated_at=? WHERE id=?",
+	).run(at, at, row.id);
+	return [row];
+}

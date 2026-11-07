@@ -1,0 +1,34 @@
+{
+  "api/domains/capabilities/bundles/browser-interact.bundle.json": {
+    "matchesHead": true,
+    "headSha256": "89731708ea58c0bb87239f8be6c30dba5d4ba80a6f6de4db2a554b2dbf06ca06"
+  },
+  "tests/browser/chat-image-attachments.spec.ts": {
+    "matchesHead": true,
+    "headSha256": "e85087d6ad1af35b2abbe99097c1eaef7d6700697ef4c7b54b27f96d1153121a"
+  },
+  "api/application/toolchain/capability-seed.test.ts": {
+    "matchesHead": true,
+    "headSha256": "b7bc45a5a4468141752febf456bbac43a49418ef9f7f8f90f67611d679b80de5"
+  },
+  "spec/verification/markdown-full-bundle-2026-11-07/fixture.tsx": {
+    "matchesHead": true,
+    "headSha256": "69a1b6143fa621e152d143a1642595e0e61105700725a801a14357cf34cb5a96"
+  },
+  "packages/design-system/src/index.ts": {
+    "matchesHead": true,
+    "headSha256": "fe9dd87ca290dbe5a4688f9f89e627b2cd508bc2626571ea2e5385d9413bfbd0"
+  },
+  "packages/design-system/src/components/MarkdownWorkspace/editor.tsx": {
+    "matchesHead": true,
+    "headSha256": "978102ffedf523b1af420934c7cb5bdc59d6cd79a0b4c850bf5e11dbce7dde69"
+  },
+  "packages/design-system/vite.config.ts": {
+    "matchesHead": true,
+    "headSha256": "4055268a4a757e501cbd4917ab4490226ba2095828fd97d78af4dd28e526e1f3"
+  },
+  "vitest.config.ts": {
+    "matchesHead": true,
+    "headSha256": "40fda9e91048555324289198cc176c049ea723ab19c2f9211e43f86daabd3ac3"
+  }
+}

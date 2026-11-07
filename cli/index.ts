@@ -2,6 +2,12 @@ import { routerExportSinceSchema } from "../api/domains/toolchain-history/contra
 import { resolve } from "node:path";
 import { createClient } from "../client";
 import { cliFailure } from "./failure";
+
+/**
+ * How long a request waits for a starting backend, which refuses everything but its status with 503 (spec
+ * server-listen-first-startup 2026-11-07 §6). The client sends the same request once more when it is ready.
+ */
+const STARTING_WAIT_MS = 60_000;
 import { submitSchema } from "../api/domains/dialogue/contracts";
 import { readApiToken } from "../api/infrastructure/auth-config";
 import { commands } from "./commands";
@@ -186,6 +192,7 @@ try {
 			process.env,
 			resolve(import.meta.dir, "../data/eumenes.sqlite3"),
 		),
+		{ startingWaitMs: STARTING_WAIT_MS },
 	);
 } catch (error) {
 	console.error(

@@ -12,7 +12,16 @@ export async function recoverTickets(
 ) {
 	for (const ticket of c.runtime.snapshot().continuity?.issued ?? []) {
 		if (ticket.action === "tool" && ticket.toolName === "find_toolchain") {
-			c.runtime.recordResult({ticketId:ticket.id,status:"interrupted",at:now,resultText:"検索の返却前に再起動しました。必要な検索は次の機会に判断します。"},resultInput(c,ticket.id));
+			c.runtime.recordResult(
+				{
+					ticketId: ticket.id,
+					status: "interrupted",
+					at: now,
+					resultText:
+						"検索の返却前に再起動しました。必要な検索は次の機会に判断します。",
+				},
+				resultInput(c, ticket.id),
+			);
 		} else if (ticket.action === "tool" && deps.state) {
 			try {
 				const input = researchInput(

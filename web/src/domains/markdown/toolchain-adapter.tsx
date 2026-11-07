@@ -92,7 +92,10 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 				show: setTargetRef,
 			};
 		}, [selected, visible, artifactRevisionId, setTargetRef]);
-		useEffect(() => live.attach(latest.current), [selected, visible]);
+		useEffect(
+			() => live.attach(latest.current),
+			[selected, visible, artifactRevisionId, setTargetRef],
+		);
 		const snapshot: Snapshot = data
 			? {
 					"markdown-workspace": {
@@ -226,6 +229,8 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 			},
 			refresh,
 			describeRejection(code) {
+				if (code === "markdown_document_too_large")
+					return "Doclingに保存できる容量を超えています。文書を短くしてから保存してください。";
 				if (code === "revision_conflict")
 					return "別の編集が先に反映されています。入力内容を保持しているので、最新の文書を確認してください。";
 				return undefined;

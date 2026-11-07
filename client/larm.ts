@@ -1,4 +1,7 @@
-import { statusResponseSchema } from "../api/domains/larm/contracts";
+import {
+	readyStatusSchema,
+	statusResponseSchema,
+} from "../api/domains/larm/contracts";
 import {
 	playbackScreenSchema,
 	imageInputSchema,
@@ -41,7 +44,7 @@ export function larmClient(transport: Transport) {
 		status: async () =>
 			callJson(transport, statusResponseSchema, "/api/status"),
 		connectLarm: async () =>
-			callJson(transport, statusResponseSchema, "/api/larm/connect", {
+			callJson(transport, readyStatusSchema, "/api/larm/connect", {
 				method: "POST",
 			}),
 	};

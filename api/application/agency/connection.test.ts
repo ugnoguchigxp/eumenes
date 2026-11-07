@@ -252,7 +252,7 @@ for (const target of ["larm", "cloud"] as const) {
 			else expect(call.role).toBe("auxiliary");
 		}
 		expect(captured[2]!.messages[0]!.content).toContain(
-			"用途はこの機会に会話へ参加するかの判断",
+			"用途はこの機会の発話・行動・待機の判断",
 		);
 		// Prefix is captured once before each logical call; the retry reuses it.
 		expect(tasks).toEqual(["", ""]);

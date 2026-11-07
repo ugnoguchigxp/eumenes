@@ -130,7 +130,10 @@ export function createPursuit(deps: PursuitDeps) {
 				state: "queued",
 				epoch: 0,
 				revision: 0,
-				deadline: now + binding.timeLimits.runMs,
+				deadline: Math.min(
+					now + binding.timeLimits.runMs,
+					input.deadline ?? Number.POSITIVE_INFINITY,
+				),
 				step: 0,
 				core_id: null,
 				data_json: JSON.stringify(state),

@@ -89,7 +89,6 @@ export type Conv = {
 	scheduler: ReturnType<typeof createIdleScheduler>;
 	generation: number;
 	background: AbortController | null;
-	toolResultReady?: boolean;
 	preparedContext?: Messages;
 	/** Used by ephemeral hosts without a durable state port. */
 	lastDispatchAt?: number;

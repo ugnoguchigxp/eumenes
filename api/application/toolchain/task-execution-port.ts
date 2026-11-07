@@ -1,3 +1,5 @@
+import { pipelineContract } from "../pipelines/pipeline-contract";
+import { adoptTaskResources } from "./task-execution-resources";
 import { autonomousActionSource } from "../../domains/dialogue";
 import { taskAutonomy } from "./task-autonomy";
 import { pipelineComponents } from "../pipelines/component-catalog";
@@ -30,6 +32,10 @@ import { reference, result, total } from "./task-execution-values";
 
 export type TaskExecutionHost = {
 	pursuit?: import("../../domains/pursuit").PursuitService;
+	settings?: Pick<
+		import("../../domains/settings").SettingsService,
+		"inTransaction"
+	>;
 	collaboration?: CollaborationHost;
 	interact?: CollaborationInteract;
 	queue: import("../../domains/queue").QueueService;
@@ -70,11 +76,19 @@ export function sendExecutionNotice(
 	projection: "summary" | "reference" = "summary",
 ): boolean {
 	const { dialogue, agents } = host;
+	const root = agents.executions.sourceRunInTransaction(db, view.id) ?? "";
+	if (autonomousActionSource(db, root, Date.now()) && !view.question)
+		return true;
 	if (
 		!dialogue.executionSourceInTransaction(
 			db,
 			agents.executions.sourceRunInTransaction(db, view.id) ?? "",
-		) && !autonomousActionSource(db, agents.executions.sourceRunInTransaction(db,view.id) ?? "", Date.now())
+		) &&
+		!autonomousActionSource(
+			db,
+			agents.executions.sourceRunInTransaction(db, view.id) ?? "",
+			Date.now(),
+		)
 	)
 		return false;
 	dialogue.notifyInTransaction(db, {
@@ -162,7 +176,15 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 						runId: source.runId,
 						text: query,
 						query: vector,
-						available: new Set(available(db, source.runId).map((e) => e.id)),
+						available: new Set(
+							available(db, source.runId)
+								.filter(
+									(e) =>
+										source.origin !== "autonomous" ||
+										port.autonomyInTransaction?.(db, e.revisionId).automatic,
+								)
+								.map((e) => e.id),
+						),
 						strict: true,
 					}).cards,
 			);
@@ -194,11 +216,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		},
 		adoptInTransaction(db, child, outcome) {
 			resolve(db, child);
-            if (outcome.state === "completed" && host.resources) {
-              const card = routing.cardInTransaction(db, child.chainRevisionId);
-              const links = card ? capabilities.producesInTransaction(db,card.id).flatMap((kind) => host.resources!.adapter(kind)?.fromResultInTransaction(db, outcome.output, {conversationId:child.source.conversationId,runId:child.source.runId}) ?? []).map((resource) => resource.uri) : [];
-              outcome.links = [...new Set([...(outcome.links ?? []), ...links])];
-            }
+			adoptTaskResources(host, db, child, outcome);
 			const ref = reference.parse(outcome.ref);
 			if (ref.kind === "research" && outcome.state !== "running")
 				return (
@@ -297,12 +315,15 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		revokeDeliveryInTransaction: dialogue.revokeExecutionNoticeInTransaction,
 		deliveryStateInTransaction: dialogue.noticeDeliveryInTransaction,
 		deliverInTransaction(db, view, eventId) {
-			const root = agents.executions.sourceRunInTransaction(db,view.id);
-            if (root && autonomousActionSource(db,root,Date.now())) {
-              if (view.question) { sendExecutionNotice(host,db,view,eventId); return false; }
-              return true;
-            }
-            // The durable collaboration watcher delivers to the owning specialist session.
+			const root = agents.executions.sourceRunInTransaction(db, view.id);
+			if (root && autonomousActionSource(db, root, Date.now())) {
+				if (view.question) {
+					sendExecutionNotice(host, db, view, eventId);
+					return false;
+				}
+				return true;
+			}
+			// The durable collaboration watcher delivers to the owning specialist session.
 			if (host.collaboration?.works.ownsChild(db, view.id, view.conversationId))
 				return true;
 			if (
@@ -317,35 +338,8 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		},
 		// A run follows the revision it started from (its definition is frozen in the run): a later revision of the
 		// same pipeline does not stop it; withdrawing the planner or its adapter does.
-		pipelineInTransaction(db, toolchainRevisionId) {
-			const id = /^toolchain:(.+)@[1-9][0-9]*$/.exec(toolchainRevisionId)?.[1];
-			if (
-				!id ||
-				!capabilities.toolchainsInTransaction(db).some((d) => d.id === id)
-			)
-				return null;
-			const bound = capabilities.toolchainBindingInTransaction(
-				db,
-				toolchainRevisionId,
-			);
-			const binding = bound?.binding.document;
-			if (
-				binding?.execution !== "pipeline" ||
-				!registry.get(binding.adapterRef)?.availableInTransaction(db)
-			)
-				return null;
-			return {
-				bindingRevisionId: bound!.binding.revisionId,
-				instructions: (() => {
-					const set = capabilities.toolchainSetInTransaction(
-						db,
-						toolchainRevisionId,
-					);
-					return [set.profile, ...set.skills].join("\n\n");
-				})(),
-				runMs: binding.timeLimits.runMs,
-			};
-		},
+		pipelineInTransaction: (db, revisionId) =>
+			pipelineContract(host, db, revisionId),
 		pipelineCatalogInTransaction: (db, source) =>
 			pipelineComponents(host, context, db, source),
 		stepToolchainInTransaction: (db, toolchainId, source) =>

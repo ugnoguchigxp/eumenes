@@ -1,0 +1,5 @@
+$ oxlint --deny-warnings --format unix
+spec/verification/markdown-full-bundle-2026-11-07/fixture.tsx:11:55: Cannot reassign variables declared outside of the component/hook [Error/react(globals)]
+
+1 problem
+error: script "lint" exited with code 1
