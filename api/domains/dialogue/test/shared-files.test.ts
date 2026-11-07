@@ -35,7 +35,9 @@ function shared(resources: ReturnType<typeof fakeResources>) {
 		},
 		/** A file made elsewhere (a sub-agent's write) that is recent but was never numbered. */
 		unnumbered(id: string, label: string) {
-			recent.unshift(resources.make("scratch", id, label, undefined, label, "x"));
+			recent.unshift(
+				resources.make("scratch", id, label, undefined, label, "x"),
+			);
 		},
 	};
 }
@@ -64,7 +66,11 @@ test("an input's shared file is numbered, linked to its message and presented; t
 	const resources = fakeResources();
 	const files = shared(resources);
 	h = await setup({ resources: resources.access, sharedFiles: files.port });
-	const uri = files.attach("img-1", "IMG_2041.jpg", "利用者が添付、画像 1600×1200");
+	const uri = files.attach(
+		"img-1",
+		"IMG_2041.jpg",
+		"利用者が添付、画像 1600×1200",
+	);
 	const run = await say("これを見て");
 	expect(stateOf()).toContain(
 		"提示中:\n- a1「IMG_2041.jpg」（利用者が添付、画像 1600×1200）",
@@ -78,7 +84,9 @@ test("an input's shared file is numbered, linked to its message and presented; t
 	expect(
 		h.store.read(
 			(db) =>
-				db.query("SELECT source FROM dialogue_resources WHERE uri=?").get(uri) as {
+				db
+					.query("SELECT source FROM dialogue_resources WHERE uri=?")
+					.get(uri) as {
 					source: string;
 				},
 		).source,

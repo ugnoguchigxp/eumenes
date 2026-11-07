@@ -376,11 +376,11 @@ const resourceReadPackage = {
 		"profile:history.research@1",
 		"skill:history.research@2",
 		"tool:history.search@1",
-		"tool:resource.read@2",
+		"tool:resource.read@3",
 	],
 	profileRevisionId: "profile:history.research@1",
 	requiredSkillRevisionIds: ["skill:history.research@2"],
-	toolRevisionIds: ["tool:history.search@1", "tool:resource.read@2"],
+	toolRevisionIds: ["tool:history.search@1", "tool:resource.read@3"],
 };
 const readAction = (uri: string) => ({
 	action: "invoke",

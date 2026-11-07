@@ -969,6 +969,16 @@ select:focus-visible {
 .draft-file small {
 	width: auto;
 }
+.scratch-viewer-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 0 0 8px;
+	overflow-wrap: anywhere;
+}
+.scratch-viewer-meta small {
+	color: var(--muted-foreground);
+}
 .scratch-viewer-image {
 	display: block;
 	max-width: 100%;

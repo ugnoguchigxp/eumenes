@@ -1,8 +1,10 @@
 import { createMarkdownResourceAdapter } from "../../domains/markdown";
 import {
 	createScratchResourceAdapter,
+	SCRATCH_RESOURCE_KIND,
 	type ScratchStore,
 } from "../../domains/scratch";
+import { sharedFiles } from "../scratch/scratch-composition";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import {
@@ -58,7 +60,10 @@ const CONVERSATIONS = ["main"] as const;
  */
 export function buildResources(deps: {
 	store: SqliteStore;
-	capabilities: Pick<Capabilities, "resourceKindsInTransaction">;
+	capabilities: Pick<
+		Capabilities,
+		"resourceKindsInTransaction" | "producesInTransaction"
+	>;
 	gateway: () => LarmPlayground;
 	events: Pick<EventStore, "eventInTransaction" | "logInTransaction">;
 	webResearch: Pick<WebResearchService, "get">;
@@ -131,6 +136,20 @@ export function buildResources(deps: {
 			}),
 		],
 	});
-	return { access };
+	return {
+		access,
+		/** What the dialogue reaches: the registry, the kinds each toolchain makes, and the shared files. */
+		dialogue: {
+			registry: access.registry,
+			// Any toolchain may return a shared file it wrote (spec/server-scratch-cache-design-2026-11-07.md §3).
+			producesInTransaction: (db: Database, toolchainId: string) => {
+				const kinds = deps.capabilities.producesInTransaction(db, toolchainId);
+				return deps.scratch && !kinds.includes(SCRATCH_RESOURCE_KIND)
+					? [...kinds, SCRATCH_RESOURCE_KIND]
+					: kinds;
+			},
+			...(deps.scratch ? { sharedFiles: sharedFiles(deps.scratch) } : {}),
+		},
+	};
 }
 export type Resources = ReturnType<typeof buildResources>;

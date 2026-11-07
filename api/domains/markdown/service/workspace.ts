@@ -23,7 +23,14 @@ export function view(db: Database, documentId: string) {
 		revision: value.revision,
 		sourceId: value.source_id,
 		markdown: value.markdown,
-		remote: value.source_id ? { id: value.source_id, etag: value.remote_revision, namespace: value.remote_namespace, path: value.remote_path } : null,
+		remote: value.source_id
+			? {
+					id: value.source_id,
+					etag: value.remote_revision,
+					namespace: value.remote_namespace,
+					path: value.remote_path,
+				}
+			: null,
 		conflict: value.conflict_json ? JSON.parse(value.conflict_json) : null,
 		archivedRevision: value.archived_revision,
 		dirty: value.revision !== value.archived_revision,

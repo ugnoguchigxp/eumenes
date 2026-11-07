@@ -1,0 +1,13 @@
+{
+  "checkedAt": "2026-11-07T09:15:13.830Z",
+  "existingUploadApi": true,
+  "sameIdOnResend": true,
+  "sameCreatedAt": true,
+  "jsonRoundtrip": true,
+  "exactOriginal": true,
+  "exactMarkdown": true,
+  "stylePreserved": true,
+  "doclingUnchanged": true,
+  "scratchId": "20df71e7-414c-4f3f-9237-ab678469a760",
+  "conversation": "verification-markdown-cache-20261107"
+}

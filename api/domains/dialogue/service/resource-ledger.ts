@@ -29,6 +29,8 @@ export type ResourceAccess = {
 	registry: ResourceRegistry;
 	/** The resource kinds a toolchain's results create (capabilities `producesInTransaction`). */
 	producesInTransaction(db: Database, toolchainId: string): string[];
+	/** The user's input as shared files and the conversation's recent ones (absent: none are entered or shown). */
+	sharedFiles?: import("../contracts/resources").SharedFilesPort;
 };
 
 /** The number the model reads a resource by: `a<ref>`. */

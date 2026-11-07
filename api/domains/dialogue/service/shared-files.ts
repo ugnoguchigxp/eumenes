@@ -16,7 +16,7 @@ export const SHARED_LINES = 6;
  * input as it is: the message is still accepted, only without their numbers.
  */
 export async function sharedInputUris(
-	deps: Pick<DialogueDeps, "sharedFiles">,
+	deps: Pick<DialogueDeps, "resources">,
 	input: {
 		requestId: string;
 		conversationId: string;
@@ -25,9 +25,10 @@ export async function sharedInputUris(
 		fileIds?: string[];
 	},
 ): Promise<string[] | undefined> {
-	if (!deps.sharedFiles) return undefined;
+	const sharedFiles = deps.resources?.sharedFiles;
+	if (!sharedFiles) return undefined;
 	try {
-		return await deps.sharedFiles.inputUris({
+		return await sharedFiles.inputUris({
 			requestId: input.requestId,
 			conversationId: input.conversationId,
 			text: input.text,
@@ -104,12 +105,13 @@ export function attachedLinesInTransaction(
 
 /** The `共有中` lines: the conversation's recent shared files that have a number and are not presented. */
 export function sharedLinesInTransaction(
-	deps: Pick<DialogueDeps, "resources" | "resourceLedger" | "sharedFiles">,
+	deps: Pick<DialogueDeps, "resources" | "resourceLedger">,
 	db: Database,
 	conversationId: string,
 	shown: ReadonlySet<string>,
 ): string[] {
-	const { sharedFiles, resourceLedger: ledger } = deps;
+	const { resourceLedger: ledger } = deps;
+	const sharedFiles = deps.resources?.sharedFiles;
 	if (!sharedFiles || !ledger) return [];
 	const lines: string[] = [];
 	// Recent files without a number (an attachment never sent, a write no TODO returned) are passed over.

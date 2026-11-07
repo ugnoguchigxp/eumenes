@@ -33,12 +33,12 @@ function state(count = 0) {
 		add: vi.fn(),
 		addLibrary: vi.fn(),
 		library: { images, loading: false, open: vi.fn(), refresh: vi.fn() },
+		files: { items: [], busy: false, add: vi.fn() },
 	};
 	return {
 		attachments,
 		value: {
 			attachments,
-			files: { items: [], busy: false, add: vi.fn() },
 			submit: { isPending: false },
 		} as unknown as WorkspaceState,
 	};
@@ -97,14 +97,16 @@ test("the attach menu also picks other files, which the draft lists and can drop
 	render(<ChatImageInput state={s.value} />);
 	fireEvent.click(screen.getByRole("button", { name: "ファイルを添付" }));
 	fireEvent.click(
-		await screen.findByRole("menuitem", { name: "ファイルを選ぶ…（Markdown・PDFなど）" }),
+		await screen.findByRole("menuitem", {
+			name: "ファイルを選ぶ…（Markdown・PDFなど）",
+		}),
 	);
 	expect(click).toHaveBeenCalledOnce();
 	const picker = screen.getByLabelText<HTMLInputElement>("添付ファイルを選択");
 	expect(picker.accept).toBe(".md,.markdown,.txt,.csv,.json,.pdf,.glb");
 	const file = new File(["# 仕様"], "仕様.md");
 	fireEvent.change(picker, { target: { files: [file] } });
-	expect((s.value.files.add as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith([file]);
+	expect(s.attachments.files.add).toHaveBeenCalledWith([file]);
 	click.mockRestore();
 	cleanup();
 	const remove = vi.fn();
@@ -112,10 +114,12 @@ test("the attach menu also picks other files, which the draft lists and can drop
 		<ChatFilePreviews
 			state={
 				{
-					files: {
-						items: [{ id: "f1", name: "仕様.md", size: 2048, file }],
-						busy: false,
-						remove,
+					attachments: {
+						files: {
+							items: [{ id: "f1", name: "仕様.md", size: 2048, file }],
+							busy: false,
+							remove,
+						},
 					},
 					submit: { isPending: false },
 				} as unknown as WorkspaceState

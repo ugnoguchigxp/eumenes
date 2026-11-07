@@ -16,7 +16,7 @@ export function usePanelFileDrop(state: WorkspaceState) {
 		const images = files.filter(isImage);
 		const others = files.filter((file) => !isImage(file));
 		if (images.length) state.attachments.add(images);
-		if (others.length) state.files.add(others);
+		if (others.length) state.attachments.files.add(others);
 	};
 	// The listeners below attach once; they read the latest callbacks through this ref.
 	const latest = useRef({ add: route, edit: state.editInput });

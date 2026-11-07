@@ -13,6 +13,7 @@ export function actionHost(
 		discover?: boolean;
 		speakFirst?: boolean;
 		inputTokens?: number;
+		afterRecall?: boolean;
 	} = {},
 ) {
 	let now = Date.now(),
@@ -52,10 +53,33 @@ export function actionHost(
 			const candidate = (
 				request.purpose === "update" ? d.state.candidates : d.candidates
 			).find((c: any) => c.state !== "closed");
-			const step = steps[phase];
+			const recalled = d.observations?.some(
+				(o: { kind: string }) => o.kind === "recall.offered",
+			);
+			const step =
+				options.afterRecall && phase > 0 && !recalled
+					? undefined
+					: steps[phase];
 			const value =
 				request.purpose === "update"
 					? updated({
+							interestOps:
+								options.afterRecall && !d.state.interests?.length
+									? [
+											{
+												op: "interest.add",
+												id: null,
+												localId: "interest",
+												expectedRevision: null,
+												status: null,
+												topic: "散歩を楽しむ",
+												origin: "user_relation",
+												reason: "継続して楽しむ関心",
+												derivedFrom: null,
+												evidenceRefs: ["interest-user"],
+											},
+										]
+									: [],
 							ops:
 								candidate || !step
 									? []

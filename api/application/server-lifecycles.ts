@@ -127,7 +127,7 @@ function createIntervalWorkers(s: Services) {
  * timers), world,
  * scheduler, service tests, voice, excalidraw, Claude Code sessions,
  * agents, the browser (its MCP child), queue,
- * web research, dialogue, inference, datasets, store.
+ * web research, dialogue, inference, shared files, datasets, store.
  */
 export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 	const {

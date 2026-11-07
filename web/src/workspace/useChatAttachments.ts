@@ -7,6 +7,7 @@ import {
 	type Attachment,
 } from "../../../api/domains/conversation/contracts";
 import { describeError } from "../errorMessages";
+import { useChatFiles } from "./useChatFiles";
 import {
 	imageContentUrl,
 	libraryLoadError,
@@ -32,6 +33,8 @@ export function useChatAttachments(
 	conversationId: string,
 ) {
 	const settingsRevision = useSettings(client).data?.revision;
+	// The other files a message carries are shared files, uploaded beside the images on send.
+	const files = useChatFiles(client, conversationId);
 	const [capability, setCapability] = useState<ImageInputStatus>();
 	const check = useRef<AbortController | null>(null);
 	const [checking, setChecking] = useState(false);
@@ -241,5 +244,6 @@ export function useChatAttachments(
 		clear,
 		busy: busy || checking,
 		error,
+		files,
 	};
 }

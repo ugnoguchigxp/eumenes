@@ -1,4 +1,7 @@
-import { estimateTextTokens, headWithin } from "../../../infrastructure/context-budget";
+import {
+	estimateTextTokens,
+	headWithin,
+} from "../../../infrastructure/context-budget";
 import { jstDisplay } from "../../../infrastructure/jst-time";
 import { isScratchImage, isScratchText, type ScratchItem } from "../contracts";
 
@@ -50,25 +53,48 @@ function described(item: ScratchItem) {
 	return headWithin(lines.join("\n"), READ_PAGE_TOKENS, "…").text;
 }
 
+/** The most bytes one page decodes: more than the read bound holds in any script. */
+export const PAGE_WINDOW_BYTES = 8 * 1024;
+
+/** The first character boundary at or after `at` (a UTF-8 continuation byte is `10xxxxxx`). */
+function boundary(bytes: Uint8Array, at: number) {
+	let i = at;
+	while (i < bytes.length && (bytes[i]! & 0xc0) === 0x80) i++;
+	return i;
+}
+
 /**
- * One page of the item for `resource.read` (§9.2): a text item from `offset` (characters) within the read bound,
- * with the offset of the rest on the last line; any other item is described.
+ * One page of the item for `resource.read` (§9.2). A text item is read from `page`: its bytes from byte `start`
+ * (at most `PAGE_WINDOW_BYTES`, never the whole file), cut to the read bound, with the byte position of the rest on
+ * the last line. Any other item is described.
  */
-export function readPage(item: ScratchItem, text: string | null, offset = 0) {
-	if (!isScratchText(item.mime) || text === null) return described(item);
-	const chars = [...text];
-	const start = Math.min(Math.max(0, Math.floor(offset)), chars.length);
+export function readPage(
+	item: ScratchItem,
+	page: { start: number; bytes: Uint8Array } | null,
+) {
+	if (!isScratchText(item.mime) || !page) return described(item);
+	// A position inside a character moves on to the next one.
+	const skip = boundary(page.bytes, 0);
+	const start = Math.min(page.start + skip, item.bytes);
+	const window = page.bytes.subarray(skip);
 	const head = (end: number) =>
-		`一時ファイル「${item.name}」（${kindText(item.mime)} ${sizeText(item.bytes)}、${start.toLocaleString("en-US")}〜${end.toLocaleString("en-US")}字／全${chars.length.toLocaleString("en-US")}字）`;
-	if (start >= chars.length) return `${head(start)}\n（ここで終わりです）`;
-	const footer = "\n続き: offset 0000000";
+		`一時ファイル「${item.name}」（${kindText(item.mime)} ${sizeText(item.bytes)}、位置 ${start}〜${end}／全 ${item.bytes}）`;
+	if (start >= item.bytes || !window.length)
+		return `${head(start)}\n（ここで終わりです）`;
+	const footer = `\n続き: offset ${item.bytes}`;
 	const budget =
 		READ_PAGE_TOKENS -
-		estimateTextTokens(head(chars.length)) -
+		estimateTextTokens(head(item.bytes)) -
 		estimateTextTokens(footer);
-	const body = headWithin(chars.slice(start).join(""), budget, "").text;
-	const end = start + [...body].length;
-	return end < chars.length
+	// `stream` keeps a character cut at the window's end out of the text instead of a replacement mark.
+	const text = new TextDecoder().decode(window, { stream: true });
+	const body = headWithin(text, budget, "").text;
+	const used = Math.min(
+		window.length,
+		boundary(window, new TextEncoder().encode(body).length),
+	);
+	const end = start + used;
+	return end < item.bytes
 		? `${head(end)}\n${body}\n続き: offset ${end}`
 		: `${head(end)}\n${body}`;
 }

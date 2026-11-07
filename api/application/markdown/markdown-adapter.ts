@@ -12,8 +12,14 @@ export const MARKDOWN_ADAPTER_REF = "adapter:markdown@1";
 const query = "query:markdown.workspace@1";
 const operations = ["new", "apply", "archive"] as const;
 export const markdownDomainSchemas = {
-	"domain:markdown.new@2": newInput,
-	"domain:markdown.apply@2": applyInput,
+	"domain:markdown.new@2": newInput.safeExtend({
+		title: z.string().trim().min(1).max(200),
+	}),
+	"domain:markdown.apply@2": applyInput.safeExtend({
+		title: z.string().trim().min(1).max(200),
+	}),
+	"domain:markdown.new@3": newInput,
+	"domain:markdown.apply@3": applyInput,
 	"domain:markdown.archive@2": saveInput,
 	"domain:markdown.receipt@1": z.strictObject({
 		documentId: z.uuid(),
@@ -38,12 +44,28 @@ function input(
 }
 export const describeMarkdownAdapter = () => ({
 	owner: "markdown",
-	operations: new Map(
-		operations.map((name) => [
-			`markdown.${name}`,
-			{ inputSchemaRef: `domain:markdown.${name}@2`, effect: "write" as const },
-		]),
-	),
+	operations: new Map<string, { inputSchemaRef: string; effect: "write" }>([
+		...operations.map(
+			(name) =>
+				[
+					`markdown.${name}`,
+					{
+						inputSchemaRef: `domain:markdown.${name}@2`,
+						effect: "write" as const,
+					},
+				] as const,
+		),
+		...(["new", "apply"] as const).map(
+			(name) =>
+				[
+					`markdown.${name}.v2`,
+					{
+						inputSchemaRef: `domain:markdown.${name}@3`,
+						effect: "write" as const,
+					},
+				] as const,
+		),
+	]),
 	queries: new Set([query]),
 	inputAdapters: new Map(
 		operations.map((name) => [

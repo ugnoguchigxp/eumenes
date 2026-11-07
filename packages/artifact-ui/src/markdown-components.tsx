@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { markdownCacheFile } from "./markdown-cache";
 import {
 	MarkdownWorkspace,
 	type MarkdownCurrent,
 	type MarkdownDraft,
+	type MarkdownLibraryEntry,
 } from "@eumenes/design-system/markdown";
 import { useArtifactRuntime } from "./runtime";
 import { useAction, Feedback } from "./action";
@@ -13,22 +15,33 @@ export type MarkdownResource = {
 	revision: number;
 	current: MarkdownCurrent | null;
 	documents: { id: string; title: string }[];
-	library: { sourceId: string; title: string }[];
+	library: MarkdownLibraryEntry[];
+	libraryStatus?: "idle" | "loading" | "ready" | "error";
+	libraryHasMore?: boolean;
+	namespaces?: string[];
+	capabilities?: {
+		maxMarkdownBytes: number;
+		maxRecoveryBytes: number;
+		maxRequestBytes: number;
+	};
 	archiveAvailable: boolean;
+	archiveError?: string;
+	cacheAvailable?: boolean;
 	sessionState: "active" | "suspended" | null;
 	busy: boolean;
 };
 function recover(key: string, id: string): MarkdownDraft | null {
 	try {
 		const raw = localStorage.getItem(key);
-		if (!raw || raw.length > 1_100_000) return null;
+		if (!raw || new TextEncoder().encode(raw).length > 8 * 1024 * 1024 + 8192)
+			return null;
 		const value = JSON.parse(raw);
 		if (
 			value.documentId !== id ||
 			!Number.isInteger(value.baseRevision) ||
 			value.baseRevision < 1 ||
 			typeof value.title !== "string" ||
-			value.title.length > 200 ||
+			new TextEncoder().encode(value.title).length > 4096 ||
 			value.document?.formatVersion !== 1 ||
 			!Array.isArray(value.document.nodes) ||
 			!value.document.nodes.length
@@ -98,9 +111,8 @@ export function MarkdownWorkspaceView({
 		);
 		return receipt?.status === "accepted" ? receipt.value : undefined;
 	}
-	const local = (name: "markdown-select" | "markdown-open", id: string) => {
-		void action.send(name, { id });
-	};
+	const local = (name: "markdown-select" | "markdown-open", id: string) =>
+		action.send(name, { id });
 	return (
 		<>
 			<MarkdownWorkspace
@@ -122,7 +134,10 @@ export function MarkdownWorkspaceView({
 					}
 				}}
 				onNew={async (title, document) => {
-					const stageId = await stage(document);
+					const stageId = await stage(
+						document,
+						document.originalMarkdown ?? undefined,
+					);
 					return !!stageId && action.send("markdown-new", { title, stageId });
 				}}
 				onApply={async (draft) => {
@@ -148,10 +163,29 @@ export function MarkdownWorkspaceView({
 						})
 					);
 				}}
+				onCache={async (draft, markdown, requestId) => {
+					const file = markdownCacheFile(draft, markdown);
+					const receipt = await runtime.uploadFile?.(action.source, file, {
+						purpose: "markdown-cache",
+						requestId,
+					});
+					return receipt?.status === "accepted";
+				}}
 				onSelect={(id) => local("markdown-select", id)}
 				onOpen={(id) => local("markdown-open", id)}
 				onReconcile={(id) => void action.send("markdown-reconcile", { id })}
 				onLibrary={() => void action.send("markdown-library", {})}
+				onMore={() => void action.send("markdown-more", {})}
+				onResolve={(id, revision, etag) =>
+					action.send("markdown-resolve", {
+						id,
+						revision: String(revision),
+						etag,
+					})
+				}
+				onReload={(id, revision) =>
+					action.send("markdown-reload", { id, revision: String(revision) })
+				}
 				onReturn={() => void action.send("markdown-return", {})}
 				onResume={() => void action.send("markdown-resume", {})}
 			/>

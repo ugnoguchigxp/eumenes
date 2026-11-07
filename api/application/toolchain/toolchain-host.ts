@@ -27,6 +27,7 @@ import { createWorldResearchPorts } from "../world/world-research-ports";
 import type { WorldAdapterPorts } from "../world/world-adapter";
 import type { WorldAssembly } from "../world/world";
 import type { UiCompositionsService } from "../../domains/ui-compositions";
+import { sharedWrites } from "../scratch/scratch-composition";
 import type { LateResources } from "../resources/late";
 
 type SessionLive = (tx: Database, sessionId: string) => boolean;
@@ -160,9 +161,7 @@ export async function createHostToolchain(
 		embed?: Embed;
 		/** The registry, ledger and screen commands, reached once the dialogue exists. */
 		resources?: LateResources;
-		/** The sub-agents' `scratch.write` (absent: it is not offered). */
-		sharedWrite?: import("../../domains/agent-runtime").SharedWritePort;
-		/** The conversation's shared files (3D generation's attached images). */
+		/** The conversation's shared files: the sub-agents' `scratch.write` and 3D generation's attached images. */
 		scratch?: import("../../domains/scratch").ScratchStore;
 		/** This server's loopback URL for Claude Code hooks, and the change publisher. */
 		terminalHooks?: { baseUrl: string; publish: () => void };
@@ -219,8 +218,9 @@ export async function createHostToolchain(
 			stock: {},
 			embed: s.embed,
 			...(s.resources ? { resources: s.resources } : {}),
-			...(s.sharedWrite ? { sharedWrite: s.sharedWrite } : {}),
-			...(s.scratch ? { scratch: s.scratch } : {}),
+			...(s.scratch
+				? { scratch: s.scratch, sharedWrite: sharedWrites(s.scratch) }
+				: {}),
 		},
 	);
 	loadedCapabilities = toolchain.capabilities;

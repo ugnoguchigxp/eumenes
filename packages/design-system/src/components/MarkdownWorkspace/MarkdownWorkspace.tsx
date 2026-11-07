@@ -1,126 +1,179 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useReducer } from "react";
 import { Plate, PlateContent } from "platejs/react";
+import { FileText, FolderOpen, PencilLine, Plus, Upload } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../Tabs";
+import { MarkdownFileBrowser } from "./file-browser";
+import { useCacheAutosave } from "./use-cache-autosave";
 import {
 	createMarkdownEditor,
 	importMarkdown,
 	serializeMarkdown,
-	exportWarning,
 } from "./editor";
 import { MarkdownToolbar } from "./toolbar";
+import { MarkdownSaveNotice } from "./save-notice";
+import { MarkdownDocumentFooter } from "./document-footer";
+import { MarkdownDocumentBar } from "./document-bar";
 import type { MarkdownCurrent, MarkdownWorkspaceProps } from "./types";
 import "./markdown-workspace.css";
 
 const signature = (title: string, document: unknown) =>
 	JSON.stringify({ title, document });
-function download(text: string, name: string) {
-	const url = URL.createObjectURL(
-		new Blob([text], { type: "text/markdown;charset=utf-8" }),
-	);
-	const a = document.createElement("a");
-	a.href = url;
-	a.download = name;
-	a.click();
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 	const input = useRef<HTMLInputElement>(null);
+	const { onLibrary } = props;
+	const [view, setView] = useState(props.current ? "editor" : "files");
+	const [localDraftId, setLocalDraftId] = useState(
+		props.recovery?.documentId ?? null,
+	);
+	const libraryRequested = useRef(false);
+	const previousId = useRef(props.current?.id);
+	useEffect(() => {
+		if (view === "files" && !libraryRequested.current) {
+			libraryRequested.current = true;
+			onLibrary();
+		}
+	}, [view, onLibrary]);
+	useEffect(() => {
+		if (props.current?.id && props.current.id !== previousId.current)
+			setView("editor");
+		previousId.current = props.current?.id;
+	}, [props.current?.id]);
+	function changeView(value: string) {
+		setView(value);
+		if (value === "files") {
+			libraryRequested.current = true;
+			onLibrary();
+		}
+	}
 	return (
 		<section className="ds-markdown-workspace" aria-label="Markdown文書">
-			<header className="ds-markdown-header">
-				<strong>Markdown</strong>
-				<div>
-					<button
-						disabled={props.pending}
-						onClick={() =>
-							void props.onNew("無題", {
-								formatVersion: 1,
-								nodes: [{ type: "p", children: [{ text: "" }] }],
-								originalMarkdown: null,
-							})
-						}
-					>
-						新規
-					</button>
-					<button
-						disabled={props.pending}
-						onClick={() => input.current?.click()}
-					>
-						Markdownを読込
-					</button>
-					<button disabled={props.pending} onClick={props.onLibrary}>
-						Doclingから開く
-					</button>
-					{props.sessionState === "active" && (
-						<button onClick={props.onReturn}>通常の会話へ</button>
-					)}
-					{props.sessionState === "suspended" && (
-						<button onClick={props.onResume}>共同編集を再開</button>
-					)}
-				</div>
-			</header>
-			<input
-				ref={input}
-				hidden
-				type="file"
-				accept=".md,.markdown,text/markdown,text/plain"
-				onChange={async (e) => {
-					const file = e.target.files?.[0];
-					if (!file) return;
-					if (file.size > 262144) {
-						window.alert("Markdownは256 KB以内で読み込んでください。");
-						return;
-					}
-					const text = await file.text();
-					await props.onNew(
-						file.name.replace(/\.(md|markdown)$/i, "") || "無題",
-						importMarkdown(text),
-					);
-					e.target.value = "";
-				}}
-			/>
-			{props.documents.length > 0 && (
-				<select
-					className="ds-markdown-documents"
-					aria-label="作業中の文書"
-					value={props.current?.id ?? ""}
-					onChange={(e) => props.onSelect(e.target.value)}
-				>
-					<option value="" disabled>
-						文書を選択
-					</option>
-					{props.documents.map((d) => (
-						<option key={d.id} value={d.id}>
-							{d.title}
-						</option>
-					))}
-				</select>
-			)}
-			{props.library.length > 0 && (
-				<div className="ds-markdown-library" aria-label="Doclingの文書">
-					{props.library.map((item) => (
-						<button
-							key={item.sourceId}
-							disabled={props.pending}
-							onClick={() => props.onOpen(item.sourceId)}
+			<Tabs
+				value={view}
+				onValueChange={changeView}
+				className="ds-markdown-views"
+			>
+				<header className="ds-markdown-header">
+					<strong>
+						<FileText size={20} />
+						文書
+					</strong>
+					<TabsList aria-label="文書の表示">
+						<TabsTrigger value="files" icon={FolderOpen}>
+							ファイル一覧
+						</TabsTrigger>
+						<TabsTrigger
+							value="editor"
+							icon={PencilLine}
+							disabled={!props.current}
 						>
-							{item.title}
+							編集
+						</TabsTrigger>
+					</TabsList>
+					<div className="ds-markdown-header-actions">
+						<button
+							disabled={props.pending}
+							onClick={() =>
+								void props.onNew("無題", {
+									formatVersion: 1,
+									nodes: [{ type: "p", children: [{ text: "" }] }],
+									originalMarkdown: null,
+								})
+							}
+						>
+							<Plus size={16} />
+							新規文書
 						</button>
-					))}
-				</div>
-			)}
-			{props.current ? (
-				<DocumentEditor
-					key={props.current.id}
-					{...props}
-					current={props.current}
+						<button
+							disabled={props.pending}
+							onClick={() => input.current?.click()}
+						>
+							<Upload size={16} />
+							Markdownを読み込む
+						</button>
+						{props.sessionState === "active" && (
+							<button onClick={props.onReturn}>通常の会話へ</button>
+						)}
+						{props.sessionState === "suspended" && (
+							<button onClick={props.onResume}>共同編集を再開</button>
+						)}
+					</div>
+				</header>
+				<input
+					ref={input}
+					hidden
+					type="file"
+					accept=".md,.markdown,text/markdown,text/plain"
+					onChange={async (e) => {
+						const file = e.target.files?.[0];
+						if (!file) return;
+						if (
+							file.size >
+							(props.capabilities?.maxMarkdownBytes ?? 8 * 1024 * 1024)
+						) {
+							window.alert("読み込めるMarkdownの容量を超えています。");
+							return;
+						}
+						let text: string;
+						try {
+							text = new TextDecoder("utf-8", {
+								fatal: true,
+								ignoreBOM: true,
+							}).decode(await file.arrayBuffer());
+						} catch {
+							window.alert("UTF-8のMarkdownを選んでください。");
+							return;
+						}
+						await props.onNew(
+							file.name.replace(/\.(md|markdown)$/i, "") || "無題",
+							importMarkdown(text),
+						);
+						e.target.value = "";
+					}}
 				/>
-			) : (
-				<div className="ds-markdown-empty">
-					文書を作成するか、MarkdownやDocling
-					Deskの文書を開いてください。会話から文書のどの部分でも編集を依頼できます。
-				</div>
-			)}
+				<TabsContent
+					value="files"
+					forceMount
+					hidden={view !== "files"}
+					className="ds-markdown-files-view"
+				>
+					<MarkdownFileBrowser
+						{...props}
+						localInput={localDraftId === props.current?.id}
+						onEditLocal={async (id) => {
+							if ((await props.onSelect(id)) !== false) setView("editor");
+						}}
+						onEditRemote={async (id) => {
+							if ((await props.onOpen(id)) !== false) setView("editor");
+						}}
+					/>
+				</TabsContent>
+				<TabsContent
+					value="editor"
+					forceMount
+					hidden={view !== "editor"}
+					className="ds-markdown-editor-view"
+				>
+					{props.current ? (
+						<DocumentEditor
+							key={props.current.id}
+							{...props}
+							current={props.current}
+							onDraft={(draft) => {
+								setLocalDraftId(draft?.documentId ?? null);
+								props.onDraft(draft);
+							}}
+						/>
+					) : (
+						<div className="ds-markdown-empty">
+							一覧から文書を開くか、新規文書を作成してください。
+						</div>
+					)}
+				</TabsContent>
+			</Tabs>
 			{props.message && <output aria-live="polite">{props.message}</output>}
+			{props.archiveError && (
+				<output aria-live="polite">{props.archiveError}</output>
+			)}
 		</section>
 	);
 }
@@ -135,19 +188,24 @@ function DocumentEditor(
 	const base = useRef(recovery?.baseRevision ?? props.current.revision);
 	const [dirty, setDirty] = useState(!!recovery),
 		dirtyRef = useRef(!!recovery);
+	const [changeEpoch, changedEpoch] = useReducer((n: number) => n + 1, 0);
 	const [conflict, setConflict] = useState(
 		!!recovery && recovery.baseRevision !== props.current.revision,
 	);
 	const [composing, setComposing] = useState(false),
 		composingRef = useRef(false);
-	const [source, setSource] = useState(false);
 	const original = useRef(initial.originalMarkdown);
 	const [originalMarkdown, setOriginalMarkdown] = useState(
 		initial.originalMarkdown,
 	);
-	const shown = useRef(JSON.stringify(editor.children));
+	const [initialRendered] = useState(() => JSON.stringify(editor.children));
+	const shown = useRef(initialRendered);
+	// Plate adds display IDs during initialization. Keep the stored tree until the rendered value changes.
+	const pristine = useRef(initial);
+	const rendered = useRef(initialRendered);
 	const submitted = useRef<string | null>(null),
 		saveIntent = useRef<{ signature: string; markdown: string } | null>(null);
+	const reloadIntent = useRef<string | null>(null);
 	const acknowledged = useRef<{ signature: string; revision: number } | null>(
 		null,
 	);
@@ -162,7 +220,10 @@ function DocumentEditor(
 	const getDocument = useCallback(
 		() => ({
 			formatVersion: 1 as const,
-			nodes: editor.children,
+			nodes:
+				JSON.stringify(editor.children) === rendered.current
+					? pristine.current.nodes
+					: editor.children,
 			originalMarkdown: original.current,
 		}),
 		[editor],
@@ -178,13 +239,52 @@ function DocumentEditor(
 		[props.current.id, getDocument],
 	);
 	const changed = () => {
+		changedEpoch();
 		dirtyRef.current = true;
 		setDirty(true);
 		persist();
 	};
+	const cacheState = useCacheAutosave({
+		enabled: !!props.cacheAvailable && !!props.onCache,
+		composing,
+		change: changeEpoch,
+		documentId: props.current.id,
+		revision: props.current.revision,
+		snapshot() {
+			const document = structuredClone(getDocument());
+			const markdown =
+				JSON.stringify(document) === JSON.stringify(props.current.document) &&
+				props.current.markdown != null
+					? props.current.markdown
+					: serializeMarkdown(editor);
+			return {
+				draft: {
+					documentId: props.current.id,
+					baseRevision: base.current,
+					title: name.current,
+					document,
+				},
+				markdown,
+			};
+		},
+		save: (draft, markdown, requestId) =>
+			props.onCache!(draft, markdown, requestId),
+	});
 	useEffect(() => {
 		const remote = props.current;
 		if (remote.revision <= base.current) return;
+		if (reloadIntent.current !== null) {
+			const same =
+				signature(name.current, getDocument()) === reloadIntent.current;
+			reloadIntent.current = null;
+			if (!same || composingRef.current) {
+				setConflict(true);
+				return;
+			}
+			dirtyRef.current = false;
+			setDirty(false);
+			props.onDraft(null);
+		}
 		const sig = signature(remote.title, remote.document);
 		if (submitted.current === sig) {
 			base.current = remote.revision;
@@ -193,8 +293,11 @@ function DocumentEditor(
 			const same = signature(name.current, getDocument()) === sig;
 			dirtyRef.current = !same;
 			setDirty(!same);
-			if (same) props.onDraft(null);
-			else persist();
+			if (same) {
+				pristine.current = remote.document;
+				rendered.current = JSON.stringify(editor.children);
+				props.onDraft(null);
+			} else persist();
 			acknowledged.current = { signature: sig, revision: remote.revision };
 			return;
 		}
@@ -207,6 +310,8 @@ function DocumentEditor(
 		setOriginalMarkdown(original.current);
 		editor.tf.setValue(structuredClone(remote.document.nodes));
 		shown.current = JSON.stringify(editor.children);
+		rendered.current = shown.current;
+		pristine.current = remote.document;
 		setTitle(remote.title);
 		setConflict(false);
 	}, [props, composing, editor, getDocument, persist]);
@@ -220,32 +325,30 @@ function DocumentEditor(
 	}, [props]);
 	async function apply(save: boolean) {
 		if (composingRef.current || conflict) return;
-		const trimmed = title.trim();
-		if (!trimmed) return;
-		name.current = trimmed;
-		setTitle(trimmed);
+		if (!title.length || new TextEncoder().encode(title).length > 4096) return;
 		const document = getDocument(),
-			sig = signature(trimmed, document);
+			sig = signature(title, document);
+		const markdown =
+			JSON.stringify(document) === JSON.stringify(props.current.document) &&
+			props.current.markdown !== null &&
+			props.current.markdown !== undefined
+				? props.current.markdown
+				: serializeMarkdown(editor);
 		if (!dirty) {
-			if (save)
-				await props.onSave(
-					props.current.id,
-					base.current,
-					serializeMarkdown(editor),
-				);
+			if (save) await props.onSave(props.current.id, base.current, markdown);
 			return;
 		}
 		submitted.current = sig;
 		if (save)
 			saveIntent.current = {
 				signature: sig,
-				markdown: serializeMarkdown(editor),
+				markdown,
 			};
 		if (
 			!(await props.onApply({
 				documentId: props.current.id,
 				baseRevision: base.current,
-				title: trimmed,
+				title,
 				document,
 			}))
 		) {
@@ -255,55 +358,20 @@ function DocumentEditor(
 	}
 	return (
 		<>
-			<div className="ds-markdown-documentbar">
-				<input
-					aria-label="文書名"
-					maxLength={200}
-					value={title}
-					onChange={(e) => {
-						name.current = e.target.value;
-						setTitle(e.target.value);
-						changed();
-					}}
-				/>
-				<span aria-live="polite">
-					{composing
-						? "日本語入力中"
-						: conflict
-							? "更新の競合あり"
-							: dirty
-								? "入力中の変更あり"
-								: props.current.saveState === "unknown"
-									? "保存結果の確認が必要"
-									: props.current.saveState === "saving"
-										? "Doclingに保存中…"
-										: props.current.dirty
-											? "作業用下書き"
-											: "Doclingに保存済み"}
-				</span>
-				<button
-					disabled={
-						props.pending || composing || conflict || !title.trim() || !dirty
-					}
-					onClick={() => void apply(false)}
-				>
-					下書きに反映
-				</button>
-				<button
-					disabled={
-						props.pending ||
-						composing ||
-						conflict ||
-						!title.trim() ||
-						!props.archiveAvailable ||
-						props.current.saveState === "saving" ||
-						props.current.saveState === "unknown"
-					}
-					onClick={() => void apply(true)}
-				>
-					Doclingに保存
-				</button>
-			</div>
+			<MarkdownDocumentBar
+				{...props}
+				cacheState={cacheState}
+				title={title}
+				composing={composing}
+				conflict={conflict}
+				dirty={dirty}
+				onTitle={(value) => {
+					name.current = value;
+					setTitle(value);
+					changed();
+				}}
+				onCommit={apply}
+			/>
 			{conflict && (
 				<div className="ds-markdown-notice" role="alert">
 					別の編集が先に反映されています。入力中の内容は保持しています。Markdownを書き出して残すか、変更を破棄して最新の文書を読み込んでください。
@@ -321,6 +389,8 @@ function DocumentEditor(
 							setOriginalMarkdown(original.current);
 							editor.tf.setValue(structuredClone(r.document.nodes));
 							shown.current = JSON.stringify(editor.children);
+							rendered.current = shown.current;
+							pristine.current = r.document;
 							setTitle(r.title);
 							dirtyRef.current = false;
 							setDirty(false);
@@ -332,19 +402,34 @@ function DocumentEditor(
 					</button>
 				</div>
 			)}
-			{props.current.saveError && (
-				<div className="ds-markdown-notice" role="alert">
-					Doclingへの保存を確認できませんでした。作業用下書きは保持しています。Doclingの内容を確認してください。
-					<button
-						disabled={props.pending}
-						onClick={() => props.onReconcile(props.current.id)}
-					>
-						保存状態を確認
-					</button>
-					{props.current.saveError === "markdown_archive_conflict" &&
-						" Docling側で文書が変更されています。"}
-				</div>
-			)}
+			<MarkdownSaveNotice
+				{...props}
+				composing={composing}
+				onKeep={async () => {
+					submitted.current = signature(
+						props.current.title,
+						props.current.document,
+					);
+					if (
+						!(await props.onResolve?.(
+							props.current.id,
+							props.current.revision,
+							props.current.conflict!.entry.revision,
+						))
+					)
+						submitted.current = null;
+				}}
+				onLoad={async () => {
+					reloadIntent.current = signature(name.current, getDocument());
+					if (
+						!(await props.onReload?.(
+							props.current.sourceId!,
+							props.current.revision,
+						))
+					)
+						reloadIntent.current = null;
+				}}
+			/>
 			<Plate
 				editor={editor}
 				onValueChange={() => {
@@ -370,39 +455,12 @@ function DocumentEditor(
 					}}
 				/>
 			</Plate>
-			<footer className="ds-markdown-footer">
-				<span>
-					{props.busy
-						? "共同編集の応答待ち"
-						: "文書のどの部分でも会話から編集を依頼できます"}
-				</span>
-				<button onClick={() => setSource(!source)}>Markdownを確認</button>
-				<button
-					onClick={() =>
-						download(serializeMarkdown(editor), `${title || "無題"}.md`)
-					}
-				>
-					Markdownを書出
-				</button>
-				{originalMarkdown !== null && (
-					<button
-						onClick={() =>
-							download(originalMarkdown!, `${title || "無題"}-取込原文.md`)
-						}
-					>
-						取込原文
-					</button>
-				)}
-			</footer>
-			<small className="ds-markdown-warning">{exportWarning}</small>
-			{source && (
-				<textarea
-					aria-label="書出しMarkdown（確認用）"
-					className="ds-markdown-source"
-					readOnly
-					value={serializeMarkdown(editor)}
-				/>
-			)}
+			<MarkdownDocumentFooter
+				editor={editor}
+				title={title}
+				originalMarkdown={originalMarkdown}
+				busy={props.busy}
+			/>
 		</>
 	);
 }

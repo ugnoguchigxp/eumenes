@@ -126,8 +126,8 @@ function invokeStepTool(
 	input: StepInput,
 	p: NonNullable<ReturnType<RuntimeContext["state"]["prepared"]["get"]>>,
 	action: Extract<ControlAction, { action: "invoke" }>,
-	resourceRead?: StoredRead,
-	sharedWrite?: StoredWrite,
+	/** What the host's own tools did while the step ran (`resource.read`, `scratch.write`). */
+	host: Pick<StepOutput, "resourceRead" | "sharedWrite"> = {},
 ) {
 	const { tools } = ctx.deps;
 	const { catalogs, bindings } = ctx.state;
@@ -148,11 +148,11 @@ function invokeStepTool(
 		input.resourceUris,
 	);
 	if (tool.tool.id === RESOURCE_READ_TOOL) {
-		readResource(ctx, ops, db, t, claim, action, resourceRead);
+		readResource(ctx, ops, db, t, claim, action, host.resourceRead);
 		return;
 	}
 	if (tool.tool.id === SCRATCH_WRITE_TOOL) {
-		writeShared(ctx, ops, db, t, claim, action, sharedWrite);
+		writeShared(ctx, ops, db, t, claim, action, host.sharedWrite);
 		return;
 	}
 	if (isHistory(p) && toolRuntimeOf(tool.tool.revisionId)?.cursorPaging) {
@@ -238,7 +238,8 @@ function readResource(
 	read: StoredRead | undefined,
 ) {
 	const args = action.arguments as { uri?: string; offset?: number };
-	const uri = args.uri === undefined ? undefined : parseResourceUri(args.uri)?.uri;
+	const uri =
+		args.uri === undefined ? undefined : parseResourceUri(args.uri)?.uri;
 	if (
 		!ctx.deps.resources ||
 		!read ||
@@ -434,8 +435,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 						input,
 						p,
 						action,
-						outcome.result.resourceRead,
-						outcome.result.sharedWrite,
+						outcome.result,
 					),
 			);
 		} else {
@@ -469,7 +469,6 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 				["failed", "not_found"].includes(
 					(action.report as { outcome?: string }).outcome ?? "",
 				) &&
-				// The host's own tools acquire nothing: only the package's tools count here.
 				input.grants.some((g) => !g.replayOnly && !HOST_TOOLS.has(g.id)) &&
 				!tools
 					.invocationsInTransaction(db, t.id)
@@ -491,8 +490,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					input,
 					p,
 					action,
-					outcome.result.resourceRead,
-					outcome.result.sharedWrite,
+					outcome.result,
 				);
 			} else if (input.search) {
 				saveSearchReport(db, t, action.report, input.catalog, tools, now(), {

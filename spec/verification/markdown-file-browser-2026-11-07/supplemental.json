@@ -1,0 +1,83 @@
+{
+  "mode": "independent-checks-after-blocked-inventory",
+  "canonicalVerify": "blocked",
+  "checkedAt": "2026-11-07T09:17:02.544Z",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "blocked",
+      "reason": "Canonical verify stopped on unowned copied tests under artifacts/pursuit-integration-20261106; no inventory exclusions changed."
+    },
+    {
+      "name": "boundaries",
+      "status": "passed",
+      "details": {
+        "warnings": [
+          "client/agency.ts: client import ../api/domains/dialogue/contracts/agency-status must use api/domains/<domain>/contracts"
+        ]
+      }
+    },
+    {
+      "name": "system-context",
+      "status": "passed",
+      "details": {
+        "warnings": [
+          "/Users/y.noguchi/Code/eumenes/.s11tnext/catalog.json: error S11TNEXT_BUILD_STALE: Generated output is missing or stale"
+        ]
+      }
+    },
+    {
+      "name": "size-budget",
+      "status": "passed",
+      "details": {
+        "warnings": [
+          "size-budget: packages/design-system/src/components/ImagePicker/ImagePicker.tsx#ImagePicker grew 376 -> 402 (limit 300)",
+          "size-budget: new function over 300 lines: web/src/workspace/useWorkspace.ts#useWorkspace (302)"
+        ]
+      }
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "passed",
+      "details": {
+        "warnings": []
+      }
+    },
+    {
+      "name": "domain-docs",
+      "status": "passed",
+      "details": {
+        "warnings": []
+      }
+    },
+    {
+      "name": "format",
+      "status": "failed",
+      "error": "run format:check failed (1)\napi/application/agency/attention.ts\napi/application/agency/continuity.fixture.ts\napi/application/agency/continuity.test.ts\napi/application/agency/host.ts\napi/application/agency/reconsider.ts\napi/application/agency/review.ts\napi/application/agency/routes.ts\napi/domains/capabilities/bundles/browser-interact.bundle.json\napi/domains/dialogue/contracts/agency-status.ts\nclient/agency.ts\ntests/browser/chat-image-attachments.spec.ts\nweb/src/workspace/useAgencyAttention.ts\n$ bun fmt --check\n12 files need formatting. Run bun fmt to fix them.\nerror: script \"format:check\" exited with code 1"
+    },
+    {
+      "name": "lint",
+      "status": "passed",
+      "details": {
+        "warnings": [
+          "spec/verification/markdown-full-bundle-2026-11-07/fixture.tsx:11:55: Cannot reassign variables declared outside of the component/hook [Error/react(globals)]"
+        ]
+      }
+    },
+    {
+      "name": "bun tests",
+      "status": "passed",
+      "exitCode": 0
+    },
+    {
+      "name": "web tests",
+      "status": "passed",
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "status": "passed",
+      "exitCode": 0
+    }
+  ]
+}

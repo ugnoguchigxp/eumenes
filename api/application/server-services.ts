@@ -4,7 +4,6 @@ import { createLiveBridge } from "./media/live-bridge";
 import { createLateResources } from "./resources/late";
 import { buildResources } from "./resources/wiring";
 import { buildMarkdown } from "./markdown/markdown-composition";
-import { sharedFiles, sharedWrites } from "./scratch/scratch-composition";
 import { buildDocling } from "./docling/docling-composition";
 import { createDotsMessages } from "./work/dots-messages";
 import { createDotsWork } from "./work/dots-work";
@@ -156,7 +155,6 @@ export async function buildServices(
 	const lateResources = createLateResources(store);
 	const { toolchain, links } = await createHostToolchain({
 		resources: lateResources,
-		sharedWrite: sharedWrites(core.scratch),
 		scratch: core.scratch,
 		docling,
 		dotsWork: createDotsWork({
@@ -238,7 +236,7 @@ export async function buildServices(
 				store,
 				settings,
 				resources: resources.access.registry,
-				producesInTransaction: toolchain.capabilities.producesInTransaction,
+				producesInTransaction: resources.dialogue.producesInTransaction,
 				execution: () => agencyExecution,
 			},
 			...liveBridge.agency,
@@ -247,12 +245,7 @@ export async function buildServices(
 	);
 	const dialogue = createDialogueService({
 		externalOutput: liveBridge.externalOutput,
-		resources: {
-			registry: resources.access.registry,
-			producesInTransaction: (db, toolchainId) =>
-				toolchain.capabilities.producesInTransaction(db, toolchainId),
-		},
-		sharedFiles: sharedFiles(core.scratch),
+		resources: resources.dialogue,
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
 		logFile: () => config.logFile,

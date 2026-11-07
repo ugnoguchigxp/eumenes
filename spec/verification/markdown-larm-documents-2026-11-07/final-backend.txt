@@ -1,0 +1,67 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/app.test.ts:
+(pass) status polling is passive and explicit reconnect requires auth and origin [506.03ms]
+(pass) auth and origin apply to the new endpoints [506.26ms]
+(pass) register → fire → history → pause/resume → cancel through the API [501.24ms]
+(pass) full queue is reported as 503 for submissions [507.24ms]
+(pass) authenticated SSE notifies a background commit and the existing API supplies the snapshot [506.81ms]
+(pass) replay endpoints split text and synthesize one clause, with auth and limits [477.86ms]
+(pass) sample endpoint validates unsaved voice settings and returns audio [485.28ms]
+(pass) oversized JSON bodies are rejected with 413 and normal requests pass [472.38ms]
+(pass) responses carry anti-framing security headers [471.87ms]
+(pass) requests with both Content-Length and Transfer-Encoding are rejected [479.60ms]
+(pass) error codes map to HTTP statuses through the table [0.14ms]
+(pass) Web research is authenticated, validates malformed JSON, and does not claim an unavailable cache was cleared [495.48ms]
+(pass) modules mount in order behind the shared auth and origin checks [0.44ms]
+(pass) service-test uploads share a budget of two; other service-test routes stay reachable [2.64ms]
+(pass) CORS preflight allows every method the API serves [0.22ms]
+(pass) stream-bounded upload routes skip the 1MiB JSON cap by exact path only [0.20ms]
+(pass) malformed percent-encoding in a path parameter does not return 500 [0.22ms]
+(pass) API responses carry a deny-all Content-Security-Policy [503.89ms]
+(pass) while services start only an authorized status says so; everything else is 503 (spec server-listen-first-startup §4) [0.28ms]
+
+api/application/markdown/markdown-integration.test.ts:
+(pass) conversation switches to collaborator, edits arbitrary document ranges and reaches registered save through the ledger [666.78ms]
+(pass) the authenticated upload route accepts documents above the shared 1 MiB cap and keeps its own 20 MiB bound [618.94ms]
+
+api/domains/markdown/test/workspace.test.ts:
+(pass) archive v2 preserves frontmatter and rejects changes; legacy v1 remains readable [0.47ms]
+(pass) Plate decorations and exact imported original survive native recovery and reopen [10.74ms]
+(pass) stale user or collaborator edit cannot overwrite the current document [7.59ms]
+(pass) save freezes its snapshot and leaves newer typing dirty after completion [10.56ms]
+(pass) unconfirmed failure never becomes saved or retries [612.88ms]
+(pass) unconfirmed configuration never becomes saved or retries [10.96ms]
+(pass) unconfirmed cancel never becomes saved or retries [11.15ms]
+(pass) unconfirmed interrupt never becomes saved or retries [10.01ms]
+(pass) staged input keeps the ledger small, is single-use and rejects malformed editor trees [18.75ms]
+(pass) startup recovery settles a persisted running save with no prepared in-memory input [10.33ms]
+(pass) explicit GET reconciliation confirms the frozen snapshot and preserves later edits [9.85ms]
+(pass) repeated 404s remain unknown without another PUT; different content becomes conflict [1317.91ms]
+(pass) database reopen retains pending work and last Desk baseline without a version history [24.93ms]
+(pass) native UTF8 limits reject oversized staging without submitting a save [22.58ms]
+
+api/domains/markdown/test/document-files.test.ts:
+(pass) reopening maps a stable remote ID and preserves opaque recovery and exact Markdown on title-only update [7.82ms]
+(pass) only an empty recovery accepts a completed Plate import at the same ETag [8.02ms]
+(pass) ID and frozen input persist before dispatch, definite rejection reuses the ID and writes stay serialized [8.64ms]
+(pass) 412 preserves local content, GETs latest and requires explicit resolution before using its ETag [8.41ms]
+(pass) a lost PUT response is confirmed by exact digest, title, namespace and path without a resend [6.15ms]
+(pass) 412 remains a conflict even when latest content matches the attempted save [7.69ms]
+
+api/domains/docling/test/documents.test.ts:
+(pass) resident listing discovers capabilities and preserves encoded cursors without leases [1.13ms]
+(pass) create and update preserve exact strings and the quoted ETag, with only permitted fields [0.95ms]
+(pass) PUT disconnect is classified without any automatic resend [0.17ms]
+(pass) PUT 503 is classified without any automatic resend [0.10ms]
+(pass) PUT 412 is classified without any automatic resend [0.09ms]
+(pass) PUT wrong-digest is classified without any automatic resend [0.11ms]
+(pass) PUT wrong-etag is classified without any automatic resend [0.09ms]
+(pass) contract mismatch and byte limits stop a write before dispatch [0.26ms]
+(pass) unsafe conditions and update routing fields are refused [0.37ms]
+(pass) a changed connection fences a late response [0.11ms]
+
+ 51 pass
+ 0 fail
+ 283 expect() calls
+Ran 51 tests across 5 files. [9.85s]

@@ -18,8 +18,11 @@ test("preparing is visible and cancellable until microphone frames arrive", () =
 	const state = {
 		voice: { active: true, pause },
 		phase: "listening",
-		attachments: { items: [], busy: false },
-		files: { items: [], busy: false },
+		attachments: {
+			items: [],
+			busy: false,
+			files: { items: [], busy: false },
+		},
 		status: {},
 		specialist: { addressee: { kind: "normal", label: "会話" } },
 		mute: { muted: false, ready: true, busy: false },
@@ -61,8 +64,11 @@ test("the edit state names itself, sends as an update, stops with Esc and shows 
 	const base = {
 		voice: { active: false },
 		phase: "idle",
-		attachments: { items: [], busy: false },
-		files: { items: [], busy: false },
+		attachments: {
+			items: [],
+			busy: false,
+			files: { items: [], busy: false },
+		},
 		status: {},
 		specialist: { addressee: { kind: "normal", label: "会話" } },
 		mute: { muted: false, ready: true, busy: false },
@@ -120,8 +126,11 @@ test("the memory keeper is lit while a step runs and offers the error report fro
 	const base = {
 		voice: { active: false },
 		phase: "idle",
-		attachments: { items: [], busy: false },
-		files: { items: [], busy: false },
+		attachments: {
+			items: [],
+			busy: false,
+			files: { items: [], busy: false },
+		},
 		status: {},
 		specialist: { addressee: { kind: "normal", label: "会話" } },
 		mute: { muted: false, ready: true, busy: false },
@@ -194,8 +203,11 @@ test("Live starts beside send, offers settings, and turns both legacy routes OFF
 	const base = {
 		voice: { active: false },
 		phase: "idle",
-		attachments: { items: [], busy: false },
-		files: { items: [], busy: false },
+		attachments: {
+			items: [],
+			busy: false,
+			files: { items: [], busy: false },
+		},
 		status: {},
 		specialist: { addressee: { kind: "normal", label: "会話" } },
 		mute: { muted: false, ready: true, busy: false },

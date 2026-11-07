@@ -1,4 +1,5 @@
 import { routerExportClient } from "./router-export";
+import { agencyClient } from "./agency";
 import { visualAnalysisClient } from "./visual-analysis";
 import { markdownClient } from "./markdown";
 import { doclingClient } from "./docling";
@@ -43,6 +44,7 @@ export function createClient(
 ) {
 	const transport = createTransport(baseUrl, token, options);
 	return {
+		...agencyClient(transport),
 		...doclingClient(transport),
 		...markdownClient(transport),
 		...computeClient(transport),

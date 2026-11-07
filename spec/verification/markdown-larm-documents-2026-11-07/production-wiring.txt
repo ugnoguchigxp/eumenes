@@ -1,0 +1,9 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/markdown/markdown-server-wiring.test.ts:
+(pass) production app assembly mounts resident Markdown routes even when Desk has no connection [855.79ms]
+
+ 1 pass
+ 0 fail
+ 7 expect() calls
+Ran 1 test across 1 file. [1323.00ms]

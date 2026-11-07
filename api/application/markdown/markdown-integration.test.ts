@@ -5,16 +5,24 @@ import type { ArchivePort } from "../../domains/markdown";
 const archive: ArchivePort = {
 	available: () => true,
 	binding: () => "fixture",
-	list: async () => [],
+	capabilities: async () => ({
+		maxMarkdownBytes: 8388608,
+		maxRecoveryBytes: 8388608,
+		maxRequestBytes: 20971520,
+		maxPageSize: 100,
+	}),
+	list: async () => ({ items: [], namespaces: ["eumenes"], nextCursor: null }),
 	read: async () => {
 		throw new Error("unused");
 	},
 	save: async (input) => ({
-		sourceId: "desk-source",
+		sourceId: input.sourceId,
 		documentId: input.documentId,
 		title: input.title,
 		revision: "desk-r1",
-		path: `${input.documentId}.md`,
+		path: input.path,
+		namespace: input.namespace,
+		contentDigest: input.contentDigest,
 	}),
 };
 test("conversation switches to collaborator, edits arbitrary document ranges and reaches registered save through the ledger", async () => {
@@ -105,7 +113,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 		await say("見出しと最後の段落を直して");
 		expect(prompts).toHaveLength(2);
 		const sourcePath =
-			"/api/toolchain-artifacts/artifact:markdown.workspace@2/sources/markdown-workspace?params=" +
+			"/api/toolchain-artifacts/artifact:markdown.workspace@3/sources/markdown-workspace?params=" +
 			encodeURIComponent(JSON.stringify({ workRef: owner.workRef }));
 		const source = await (await h.request(sourcePath)).json();
 		expect(source.data.current.title).toBe("企画");
@@ -120,7 +128,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 		expect(staged.status).toBe(201);
 		const { id: stageId } = await staged.json();
 		const artifact = await (
-			await h.request("/api/toolchain-artifacts/artifact:markdown.workspace@2")
+			await h.request("/api/toolchain-artifacts/artifact:markdown.workspace@3")
 		).json();
 		const event = {
 			version: 1,
@@ -128,7 +136,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 			eventCreatedAt: new Date().toISOString(),
 			eventExpiresAt: new Date(Date.now() + 60000).toISOString(),
 			artifactId: "fixture-tab",
-			artifactRevisionId: "artifact:markdown.workspace@2",
+			artifactRevisionId: "artifact:markdown.workspace@3",
 			source: "markdown-workspace",
 			sourceRevision: source.revision,
 			actionId: "archive",
@@ -149,13 +157,59 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 		for (let i = 0; i < 40; i++) await new Promise((r) => setImmediate(r));
 		const final = await (await h.request(sourcePath)).json();
 		expect(final.data.current).toMatchObject({
-			sourceId: "desk-source",
+			sourceId: expect.stringMatching(/^wiki-[a-f0-9]{32}$/),
 			saveState: "saved",
 			dirty: false,
 		});
 		const replay = await h.request("/api/toolchain-actions", event);
 		expect(replay.status).toBe(200);
 		expect(replay.headers.get("idempotent-replay")).toBe("true");
+	} finally {
+		await h.close();
+	}
+});
+
+test("the authenticated upload route accepts documents above the shared 1 MiB cap and keeps its own 20 MiB bound", async () => {
+	const h = await harness({ markdown: archive });
+	try {
+		const body = JSON.stringify({
+			document: {
+				formatVersion: 1,
+				nodes: [{ type: "p", children: [{ text: "日本語".repeat(150000) }] }],
+				originalMarkdown: null,
+			},
+		});
+		const post = (
+			text: string,
+			token = "fixture-token-for-toolchain-browser",
+		) =>
+			h.app.request("/api/markdown/inputs", {
+				method: "POST",
+				headers: {
+					authorization: `Bearer ${token}`,
+					"content-type": "application/json",
+					"content-length": String(Buffer.byteLength(text)),
+				},
+				body: text,
+			});
+		expect(Buffer.byteLength(body)).toBeGreaterThan(1024 * 1024);
+		expect((await post(body, "wrong-token")).status).toBe(401);
+		const saved = await post(body);
+		expect(saved.status).toBe(201);
+		expect(await saved.json()).toMatchObject({ id: expect.any(String) });
+		const tooBig = await post(" ".repeat(20 * 1024 * 1024 + 1));
+		expect(tooBig.status).toBe(413);
+		expect(await tooBig.json()).toEqual({ error: "payload_too_large" });
+		const ordinary = await h.app.request("/api/runs", {
+			method: "POST",
+			headers: {
+				authorization: "Bearer fixture-token-for-toolchain-browser",
+				"content-type": "application/json",
+				"content-length": String(Buffer.byteLength(body)),
+			},
+			body,
+		});
+		expect(ordinary.status).toBe(413);
 	} finally {
 		await h.close();
 	}

@@ -723,8 +723,16 @@ export async function setup(options: SetupOptions = {}) {
 		...(options.agency ? { agency: options.agency } : {}),
 		...(options.worldContext ? { worldContext: options.worldContext } : {}),
 		...(options.agents ? { agents: options.agents as never } : {}),
-		...(options.resources ? { resources: options.resources } : {}),
-		...(options.sharedFiles ? { sharedFiles: options.sharedFiles } : {}),
+		...(options.resources
+			? {
+					resources: {
+						...options.resources,
+						...(options.sharedFiles
+							? { sharedFiles: options.sharedFiles }
+							: {}),
+					},
+				}
+			: {}),
 		...(options.keeper ? { keeper: options.keeper } : {}),
 	});
 	if (options.autoStart !== false) queue.start();

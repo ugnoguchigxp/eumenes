@@ -1,0 +1,2 @@
+$ bun fmt --check packages/design-system/src/components/MarkdownWorkspace packages/design-system/src/components/ActionButton/SaveButton.tsx packages/design-system/src/markdown.ts packages/artifact-ui/src/markdown-components.tsx packages/artifact-ui/src/markdown-cache.ts packages/artifact-ui/src/markdown-cache.test.ts web/src/domains/markdown/toolchain-adapter.tsx web/src/domains/markdown/uploads.ts web/src/domains/markdown/uploads.test.ts
+All 24 files are formatted.

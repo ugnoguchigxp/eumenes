@@ -491,7 +491,12 @@ export const domains = {
 		backend: "api/domains/dialogue",
 		web: "web/src/domains/dialogue",
 		components: null,
-		integrationTests: ["api/application/agency/archive-recovery.test.ts"],
+		integrationTests: [
+			"api/application/agency/archive-recovery.test.ts",
+			"api/application/agency/continuity.test.ts",
+			"api/application/agency/continuity-actions.test.ts",
+			"api/application/agency/routes.test.ts",
+		],
 		depends: {
 			api: [
 				"agent-runtime",

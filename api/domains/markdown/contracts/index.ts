@@ -101,7 +101,10 @@ export const emptyDocument = (): EditorDocument => ({
 	originalMarkdown: null,
 });
 export const id = z.string().uuid();
-export const title = z.string().min(1).refine((v) => new TextEncoder().encode(v).length <= 4096);
+export const title = z
+	.string()
+	.min(1)
+	.refine((v) => new TextEncoder().encode(v).length <= 4096);
 export const applyInput = z.strictObject({
 	documentId: id,
 	expectedRevision: z.number().int().positive(),
@@ -115,7 +118,18 @@ export const saveInput = z.strictObject({
 	stageId: id,
 });
 export const openInput = z.strictObject({
-	sourceId: z.string().min(1).max(200),
+	sourceId: z.string().regex(/^wiki-[a-f0-9]{32}$/),
+	stageId: id.optional(),
+	expectedEtag: z
+		.string()
+		.regex(/^"[a-f0-9]{64}"$/)
+		.optional(),
+	replaceRevision: z.number().int().positive().optional(),
+});
+export const resolveInput = z.strictObject({
+	documentId: id,
+	expectedRevision: z.number().int().positive(),
+	etag: z.string().regex(/^"[a-f0-9]{64}"$/),
 });
 export function checkDocument(text: string) {
 	let value: unknown;
@@ -151,28 +165,51 @@ export type ArchiveEntry = {
 	namespace: string;
 	contentDigest: string;
 };
-export type ArchivedDocument = { entry: ArchiveEntry; markdown: string; recovery: string };
+export type ArchivedDocument = {
+	entry: ArchiveEntry;
+	markdown: string;
+	recovery: string;
+};
 export type ArchiveSave = {
-	documentId: string; title: string; markdown: string; recovery: string;
-	sourceId: string; remoteRevision: string | null; binding: string;
-	namespace: string; path: string; contentDigest: string;
+	documentId: string;
+	title: string;
+	markdown: string;
+	recovery: string;
+	sourceId: string;
+	remoteRevision: string | null;
+	binding: string;
+	namespace: string;
+	path: string;
+	contentDigest: string;
 };
 export class ArchiveFailure extends Error {
-	constructor(readonly code: string, readonly outcome: "unknown" | "conflict" | "failed", readonly httpStatus?: number) { super(code); }
+	constructor(
+		readonly code: string,
+		readonly outcome: "unknown" | "conflict" | "failed",
+		readonly httpStatus?: number,
+	) {
+		super(code);
+	}
 }
 export type ArchivePort = {
 	available(): boolean;
 	binding(): string | null;
-	capabilities(signal: AbortSignal): Promise<{ maxMarkdownBytes: number; maxRecoveryBytes: number; maxRequestBytes: number; maxPageSize: number }>;
-	list(signal: AbortSignal, cursor?: string): Promise<{ items: ArchiveEntry[]; namespaces: string[]; nextCursor: string | null }>;
-	read(
-		sourceId: string,
+	capabilities(signal: AbortSignal): Promise<{
+		maxMarkdownBytes: number;
+		maxRecoveryBytes: number;
+		maxRequestBytes: number;
+		maxPageSize: number;
+	}>;
+	list(
 		signal: AbortSignal,
-	): Promise<ArchivedDocument>;
-	save(
-		input: ArchiveSave,
-		signal: AbortSignal,
-	): Promise<ArchiveEntry>;
+		cursor?: string,
+	): Promise<{
+		items: ArchiveEntry[];
+		namespaces: string[];
+		nextCursor: string | null;
+	}>;
+	read(sourceId: string, signal: AbortSignal): Promise<ArchivedDocument>;
+	save(input: ArchiveSave, signal: AbortSignal): Promise<ArchiveEntry>;
 };
 export const errorStatus = {
 	markdown_document_too_large: 422,
@@ -192,5 +229,8 @@ export const errorStatus = {
 
 export const stageInput = z.strictObject({
 	document: editorDocumentSchema,
-	markdown: z.string().refine((v) => new TextEncoder().encode(v).length <= 8 * 1024 * 1024).optional(),
+	markdown: z
+		.string()
+		.refine((v) => new TextEncoder().encode(v).length <= 8 * 1024 * 1024)
+		.optional(),
 });

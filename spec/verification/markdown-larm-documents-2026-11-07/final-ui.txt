@@ -1,0 +1,25 @@
+$ vitest run --project unit src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx (5 tests) 334ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  16:26:13
+   Duration  1.56s (transform 133ms, setup 109ms, import 527ms, tests 334ms, environment 509ms)
+

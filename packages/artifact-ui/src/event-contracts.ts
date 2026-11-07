@@ -7,6 +7,9 @@ export type ArtifactEvent = {
 	revision: number;
 	action:
 		| "markdown-reconcile"
+		| "markdown-more"
+		| "markdown-resolve"
+		| "markdown-reload"
 		| "markdown-new"
 		| "markdown-apply"
 		| "markdown-archive"

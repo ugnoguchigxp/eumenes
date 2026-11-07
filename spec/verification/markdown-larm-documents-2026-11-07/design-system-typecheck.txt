@@ -1,0 +1,11 @@
+$ bun check
+src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx(156,23): error TS2550: Property 'withResolvers' does not exist on type 'PromiseConstructor'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2024' or later.
+src/components/MarkdownWorkspace/MarkdownWorkspace.tsx(305,5): error TS2322: Type '(save: boolean) => Promise<void>' is not assignable to type '((draft: MarkdownDraft) => Promise<boolean>) & ((save: boolean) => Promise<void>)'.
+  Type '(save: boolean) => Promise<void>' is not assignable to type '(draft: MarkdownDraft) => Promise<boolean>'.
+    Types of parameters 'save' and 'draft' are incompatible.
+      Type 'MarkdownDraft' is not assignable to type 'boolean'.
+Found 2 errors in 2 files, checked 532 files [287.46ms]
+
+  1  src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx:156
+  1  src/components/MarkdownWorkspace/MarkdownWorkspace.tsx:305
+error: script "typecheck" exited with code 1

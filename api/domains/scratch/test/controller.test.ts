@@ -8,7 +8,8 @@ import { createScratchStore } from "../service/store";
 
 const roots: string[] = [];
 afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+	for (const root of roots.splice(0))
+		rmSync(root, { recursive: true, force: true });
 });
 function app() {
 	const root = mkdtempSync(join(tmpdir(), "scratch-http-"));
@@ -32,7 +33,14 @@ test("uploads a user file and serves it with safe headers", async () => {
 	form.append("file", new File(["# 見出し"], "仕様.md", { type: "" }));
 	const created = await hono.request(upload(form));
 	expect(created.status).toBe(201);
-	const item = (await created.json()) as { id: string; uri: string; mime: string; maker: string; origin: string; contentUrl: string };
+	const item = (await created.json()) as {
+		id: string;
+		uri: string;
+		mime: string;
+		maker: string;
+		origin: string;
+		contentUrl: string;
+	};
 	expect(item).toMatchObject({
 		id: requestId,
 		uri: `eumenes://scratch/${requestId}`,
@@ -42,7 +50,9 @@ test("uploads a user file and serves it with safe headers", async () => {
 	});
 	const content = await hono.request(item.contentUrl);
 	expect(content.status).toBe(200);
-	expect(content.headers.get("Content-Type")).toBe("text/markdown; charset=utf-8");
+	expect(content.headers.get("Content-Type")).toBe(
+		"text/markdown; charset=utf-8",
+	);
 	expect(content.headers.get("X-Content-Type-Options")).toBe("nosniff");
 	expect(content.headers.get("Content-Disposition")).toStartWith("inline;");
 	expect(await content.text()).toBe("# 見出し");
@@ -63,9 +73,9 @@ test("a PDF downloads as an attachment; unknown ids and types are refused", asyn
 	const content = await hono.request(`/api/scratch/${item.id}/content`);
 	expect(content.headers.get("Content-Disposition")).toStartWith("attachment;");
 	expect((await hono.request("/api/scratch/not-a-uuid")).status).toBe(404);
-	expect(
-		(await hono.request(`/api/scratch/${requestId}/content`)).status,
-	).toBe(404);
+	expect((await hono.request(`/api/scratch/${requestId}/content`)).status).toBe(
+		404,
+	);
 	const form = new FormData();
 	form.append("file", new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }));
 	const refused = await hono.request(upload(form));
@@ -73,7 +83,11 @@ test("a PDF downloads as an attachment; unknown ids and types are refused", asyn
 });
 
 test("the type comes from the browser when known, else from the extension", () => {
-	expect(fileMime({ name: "a.bin", type: "application/json" })).toBe("application/json");
-	expect(fileMime({ name: "model.GLB", type: "application/octet-stream" })).toBe("model/gltf-binary");
+	expect(fileMime({ name: "a.bin", type: "application/json" })).toBe(
+		"application/json",
+	);
+	expect(
+		fileMime({ name: "model.GLB", type: "application/octet-stream" }),
+	).toBe("model/gltf-binary");
 	expect(fileMime({ name: "page.html", type: "text/html" })).toBeNull();
 });

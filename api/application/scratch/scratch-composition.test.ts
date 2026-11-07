@@ -17,12 +17,19 @@ import { sharedImageImports } from "./shared-image-import";
 /** The application's parts of the shared files (spec/server-scratch-cache-design-2026-11-07.md §3・§9.1・§11.1). */
 const roots: string[] = [];
 afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+	for (const root of roots.splice(0))
+		rmSync(root, { recursive: true, force: true });
 });
 function store() {
 	const root = mkdtempSync(join(tmpdir(), "scratch-app-"));
 	roots.push(root);
-	return createScratchStore({ root, freeBytes: () => null });
+	// Each use is a later moment, so "most recently used" never ties within one millisecond.
+	let clock = 0;
+	return createScratchStore({
+		root,
+		freeBytes: () => null,
+		now: () => ++clock,
+	});
 }
 const png = (width: number, height: number) =>
 	sharp({ create: { width, height, channels: 3, background: "#3a8" } })
@@ -46,7 +53,10 @@ const attachment = (over: Partial<Attachment> = {}): Attachment => ({
 test("an attachment is shared under its own id as the image the user sent; a BMP as the image the model reads", async () => {
 	const s = store();
 	const original = await png(16, 8);
-	await attachmentSharing(s)(attachment(), { original, normalized: await png(8, 4) });
+	await attachmentSharing(s)(attachment(), {
+		original,
+		normalized: await png(8, 4),
+	});
 	const item = s.get("11111111-1111-4111-8111-111111111111")!;
 	expect(item).toMatchObject({
 		name: "IMG_2041.png",
@@ -61,7 +71,11 @@ test("an attachment is shared under its own id as the image the user sent; a BMP
 		attachment({ id: bmpId, originalMime: "image/bmp", name: "scan.bmp" }),
 		{ original: new Uint8Array([66, 77]), normalized: await png(8, 4) },
 	);
-	expect(s.get(bmpId)).toMatchObject({ mime: "image/png", width: 8, height: 4 });
+	expect(s.get(bmpId)).toMatchObject({
+		mime: "image/png",
+		width: 8,
+		height: 4,
+	});
 });
 
 test("an input's attachments are shared; a long text also becomes a file under the request's id", async () => {
@@ -76,13 +90,24 @@ test("an input's attachments are shared; a long text also becomes a file under t
 		requestId,
 		conversationId: "main",
 		text: "これを見て",
-		attachmentIds: ["11111111-1111-4111-8111-111111111111", "44444444-4444-4444-8444-444444444444"],
+		attachmentIds: [
+			"11111111-1111-4111-8111-111111111111",
+			"44444444-4444-4444-8444-444444444444",
+		],
 		fileIds: [],
 	});
 	// The attachment the store does not have (never uploaded here) is left out.
-	expect(short).toEqual(["eumenes://scratch/11111111-1111-4111-8111-111111111111"]);
+	expect(short).toEqual([
+		"eumenes://scratch/11111111-1111-4111-8111-111111111111",
+	]);
 	const text = "仕様".repeat(PASTE_CHARS);
-	const long = await port.inputUris({ requestId, conversationId: "main", text, attachmentIds: [], fileIds: [] });
+	const long = await port.inputUris({
+		requestId,
+		conversationId: "main",
+		text,
+		attachmentIds: [],
+		fileIds: [],
+	});
 	expect(long).toEqual([`eumenes://scratch/${requestId}`]);
 	expect(s.get(requestId)).toMatchObject({
 		name: "貼り付けた文章 13:58",
@@ -91,15 +116,44 @@ test("an input's attachments are shared; a long text also becomes a file under t
 	});
 	// A resent request finds the same file.
 	expect(
-		await port.inputUris({ requestId, conversationId: "main", text, attachmentIds: [], fileIds: [] }),
+		await port.inputUris({
+			requestId,
+			conversationId: "main",
+			text,
+			attachmentIds: [],
+			fileIds: [],
+		}),
 	).toEqual(long);
-	expect(port.recentUris("main", 1)).toEqual([`eumenes://scratch/${requestId}`]);
+	expect(port.recentUris("main", 1)).toEqual([
+		`eumenes://scratch/${requestId}`,
+	]);
 	// A file the user uploaded is taken; an agent's write named as the user's file is not.
 	const fileId = "77777777-7777-4777-8777-777777777777";
-	await s.put({ id: fileId, conversationId: "main", name: "仕様.md", mime: "text/markdown", data: new Uint8Array([35]), origin: "attached", maker: "利用者" });
-	const written = await s.put({ conversationId: "main", name: "下書き.md", mime: "text/markdown", data: new Uint8Array([36]), origin: "written", maker: "Web調査" });
+	await s.put({
+		id: fileId,
+		conversationId: "main",
+		name: "仕様.md",
+		mime: "text/markdown",
+		data: new Uint8Array([35]),
+		origin: "attached",
+		maker: "利用者",
+	});
+	const written = await s.put({
+		conversationId: "main",
+		name: "下書き.md",
+		mime: "text/markdown",
+		data: new Uint8Array([36]),
+		origin: "written",
+		maker: "Web調査",
+	});
 	expect(
-		await port.inputUris({ requestId: crypto.randomUUID(), conversationId: "main", text: "", attachmentIds: [], fileIds: [fileId, written.id] }),
+		await port.inputUris({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: "",
+			attachmentIds: [],
+			fileIds: [fileId, written.id],
+		}),
 	).toEqual([`eumenes://scratch/${fileId}`]);
 });
 
@@ -113,7 +167,10 @@ test("a sub-agent's write is the conversation's file made by its title; an overs
 	);
 	expect(done.ok).toBe(true);
 	const id = (done as { uri: string }).uri.replace("eumenes://scratch/", "");
-	expect(s.get(id)).toMatchObject({ origin: "written", maker: "詳しいWeb調査" });
+	expect(s.get(id)).toMatchObject({
+		origin: "written",
+		maker: "詳しいWeb調査",
+	});
 	expect(
 		await port.write(
 			{ name: "大きい.txt", mime: "text/plain", text: "あ".repeat(400_000) },
@@ -154,23 +211,33 @@ test("a held shared image is saved once into the LARM library and its artifact r
 	const imports = sharedImageImports(s, () => client);
 	const key = "55555555-5555-4555-8555-555555555555";
 	imports.hold(item.id, key);
-	expect(await imports.artifact(item.id, key, AbortSignal.timeout(3000))).toBe("lib-art-1");
+	expect(await imports.artifact(item.id, key, AbortSignal.timeout(3000))).toBe(
+		"lib-art-1",
+	);
 	expect(sent).toHaveLength(1);
 	expect(sent[0]!.key).toBe(key);
 	imports.release(key);
-	expect(() => imports.hold("66666666-6666-4666-8666-666666666666", key)).toThrow(
-		"model3d_image_not_found",
+	expect(() =>
+		imports.hold("66666666-6666-4666-8666-666666666666", key),
+	).toThrow("model3d_image_not_found");
+	const failing = sharedImageImports(
+		s,
+		() =>
+			({
+				...client,
+				send: async () => {
+					throw new Error("image_import_refused");
+				},
+			}) as never,
 	);
-	const failing = sharedImageImports(s, () => ({
-		...client,
-		send: async () => {
-			throw new Error("image_import_refused");
-		},
-	}) as never);
-	await expect(failing.artifact(item.id, key, AbortSignal.timeout(1000))).rejects.toThrow(
-		"model3d_source_import_failed",
-	);
-	expect(sharedImageImports(s, () => null).artifact(item.id, key, AbortSignal.timeout(1000))).rejects.toThrow(
-		"model3d_larm_unconfigured",
-	);
+	await expect(
+		failing.artifact(item.id, key, AbortSignal.timeout(1000)),
+	).rejects.toThrow("model3d_source_import_failed");
+	expect(
+		sharedImageImports(s, () => null).artifact(
+			item.id,
+			key,
+			AbortSignal.timeout(1000),
+		),
+	).rejects.toThrow("model3d_larm_unconfigured");
 });

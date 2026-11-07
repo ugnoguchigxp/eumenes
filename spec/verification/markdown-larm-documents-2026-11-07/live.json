@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-11-07T06:58:41.098Z",
+  "mode": "live-file-api",
+  "serviceBefore": "stopped",
+  "capabilities": {
+    "contractVersion": "larm.docling-files.v1",
+    "basePath": "/v1/docling/documents",
+    "requiresDocling": false,
+    "methods": [
+      "GET",
+      "PUT"
+    ],
+    "maxRequestBytes": 20971520,
+    "maxMarkdownBytes": 8388608,
+    "maxRecoveryBytes": 8388608,
+    "maxPageSize": 100,
+    "contentDigest": "sha256(ascii(markdownSha256 + LF + recoverySha256))"
+  },
+  "namespaces": [
+    "eumenes"
+  ],
+  "listing": true,
+  "remoteId": "wiki-be84689c56ab456e9aa3f062965bfdb0",
+  "controlId": "wiki-8b8ca3be8fc34f99940530c2023e8462",
+  "putCount": 6,
+  "exactMarkdown": true,
+  "exactRecovery": true,
+  "exactOriginal": true,
+  "sameDocument": true,
+  "otherDocumentUnchanged": true,
+  "lostResponseConfirmedWithoutResend": true,
+  "staleEtagRejectedAndLocalRetained": true,
+  "explicitConflictResolution": true,
+  "newerTypingRemainsUnsaved": true,
+  "serviceAfter": "stopped",
+  "ok": true
+}

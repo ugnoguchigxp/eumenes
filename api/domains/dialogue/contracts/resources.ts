@@ -5,7 +5,8 @@ import type { Database } from "bun:sqlite";
  * the conversation has met, numbered `a<n>` for the model. The URI is the identity; the model never sees it.
  */
 /** `attached`: the user's input as a shared file (an attachment, a long paste). */
-export type ConversationResourceSource = "work" | "found" | "viewed" | "attached";
+export type ConversationResourceSource =
+	"work" | "found" | "viewed" | "attached";
 
 export type ConversationResource = {
 	id: string;

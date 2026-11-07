@@ -3,10 +3,16 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { openStore } from "../../infrastructure/sqlite";
-import { createCapabilities } from "../../domains/capabilities";
+import {
+	createCapabilities,
+	bundleFiles,
+	capabilityBundleV1,
+} from "../../domains/capabilities";
 import { migrations } from "../migrations";
 import { offlineBundleHost } from "../toolchain/toolchain-adapters";
-import bundle from "../../domains/capabilities/bundles/markdown.bundle.json";
+const bundle = capabilityBundleV1.parse(
+	bundleFiles().find((b) => b.name === "markdown.bundle.json")!.raw,
+);
 
 test("seeding upgrades the published editor without rewriting v1, and repeated seeding is stable", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-markdown-registration-")),
@@ -30,7 +36,9 @@ test("seeding upgrades the published editor without rewriting v1, and repeated s
 			pins: [],
 			definitions: [],
 			artifacts: [artifact],
-			schemas: bundle.schemas.map((s) => ({ ...s, revision: 1 })),
+			schemas: bundle.schemas
+				.filter((s) => s.revision <= 2)
+				.map((s) => ({ ...s, revision: 1 })),
 		};
 		const imported = await store.write((db) =>
 			capabilities.importBundleInTransaction(db, old, offlineBundleHost(), {}),
@@ -51,15 +59,15 @@ test("seeding upgrades the published editor without rewriting v1, and repeated s
 				.read((db) => capabilities.artifactsInTransaction(db))
 				.filter((a) => a.artifactId === "markdown.workspace")
 				.map((a) => a.artifactRevisionId),
-		).toEqual(["artifact:markdown.workspace@2"]);
+		).toEqual(["artifact:markdown.workspace@3"]);
 		expect(
 			store
 				.read((db) => capabilities.toolchainsInTransaction(db))
 				.find((t) => t.id === "markdown.collaborate"),
 		).toMatchObject({
-			revisionId: "toolchain:markdown.collaborate@2",
-			bindingRevisionId: "binding:markdown.collaborate@2",
-			artifactRevisionId: "artifact:markdown.workspace@2",
+			revisionId: "toolchain:markdown.collaborate@3",
+			bindingRevisionId: "binding:markdown.collaborate@3",
+			artifactRevisionId: "artifact:markdown.workspace@3",
 		});
 	} finally {
 		await store.close();

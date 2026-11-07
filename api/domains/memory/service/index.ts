@@ -1,3 +1,4 @@
+import { createSharedHostPort } from "./shared-host";
 import { purgeHostInputs } from "../repository/host-inputs";
 import { createReferenceInputs } from "./reference-input";
 import { createMemoryMaintenance } from "./maintenance";
@@ -352,6 +353,18 @@ export function createMemoryService(
 			includeInactive = false,
 		): readonly StateItem[] =>
 			stateItems(db, includeInactive, "memory.steward"),
+		/** Owner-side connection for the shared CLI/MCP; startup binds an explicit local transport. */
+		sharedHost: createSharedHostPort({
+			store,
+			journalPath: options.journalPath,
+			conversation,
+			forgetter,
+			windows,
+			health,
+			blocked: ledger.isBlockedInTransaction,
+			isReady: () =>
+				health.healthy && store.read((db) => readSettings(db).enabled),
+		}),
 		executionReferencesInTransaction: executionRefs.issueInTransaction,
 		executionReferenceInTransaction: executionRefs.readInTransaction,
 		/**

@@ -1,0 +1,32 @@
+$ vitest run --project unit src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx (3 tests) 82ms
+ ✓ |unit| src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx (4 tests) 254ms
+
+ Test Files  2 passed (2)
+      Tests  7 passed (7)
+   Start at  16:06:09
+   Duration  1.45s (transform 188ms, setup 159ms, import 684ms, tests 336ms, environment 933ms)
+

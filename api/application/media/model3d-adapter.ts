@@ -83,8 +83,12 @@ const SOURCE_IMAGES = 5;
  * Images a 3D generation may start from, as host refs: the images the user attached to this conversation (shared
  * files, newest used first; spec/server-scratch-cache-design-2026-11-07.md §11.1), then the ones it generated.
  */
-function sourceImages(db: Database, shared?: ScratchStore) {
-	const attached = (shared?.list("main") ?? [])
+function sourceImages(
+	db: Database,
+	shared: ScratchStore | undefined,
+	conversationId: string,
+) {
+	const attached = (shared?.list(conversationId) ?? [])
 		.filter((item) => isScratchImage(item.mime) && item.origin === "attached")
 		.slice(0, SOURCE_IMAGES)
 		.map((item) => ({
@@ -116,10 +120,11 @@ export function createModel3dAdapter(
 	service: Model3dService,
 	shared?: ScratchStore,
 ): DomainAdapter {
-	function snapshot(db: Database) {
+	// A conversation's own attachments; the generated images are the one conversation's, as before.
+	function snapshot(db: Database, context?: { conversationId: string }) {
 		return {
 			...service.snapshotInTransaction(db, OWNER),
-			images: sourceImages(db, shared),
+			images: sourceImages(db, shared, context?.conversationId ?? "main"),
 		};
 	}
 	return {
@@ -180,7 +185,9 @@ export function createModel3dAdapter(
 				request.origin.kind === "task"
 			) {
 				// The conversation may only name what its snapshot showed.
-				const shown = snapshot(db);
+				const shown = snapshot(db, {
+					conversationId: request.origin.conversationId,
+				});
 				if (
 					input.assetRef &&
 					!shown.assets.some((a) => a.assetRef === input.assetRef)

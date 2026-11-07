@@ -64,6 +64,7 @@
 | [model3d.md](model3d.md) | インスタント3Dモデル（LARMの3D生成・保存済みモデルの検索・表示・変更・削除）。実LARMの受入は未実施 |
 | [browser.md](browser.md) | ブラウザ（Braveのタブへの接続・ページ操作・撮影。Playwright MCP Bridge、Braveのパス、接続の手順、確定操作とページ由来の値の承認、保護のため停止したタブ、プライバシー）。実機のBraveの受入は未実施 |
 | [chat-images.md](chat-images.md) | チャット入力へのJPG・PNG・BMP添付 |
+| [scratch.md](scratch.md) | 一時ファイル（共有）。添付・長い貼り付け・担当の書出しに `a<n>` を付けて担当間で受け渡す、起動中だけの置き場（2 GiB）。`resource.read` の `offset`、`scratch.write`、添付画像から3D。実LARM・実機器は未確認 |
 | [excalidraw.md](excalidraw.md) | Excalidrawの編集・保存・再表示 |
 | [object-recognition.md](object-recognition.md) | 静止画・短い動画の物体検出 |
 | [ocr.md](ocr.md) | 画像・短い動画のOCRと補正案。実gateway・実カメラは未受入 |

@@ -196,10 +196,28 @@
 	background: #fff8e8;
 	color: #634a13;
 }
+.ds-markdown-notice button {
+	background: transparent;
+	color: inherit;
+	border-color: currentColor;
+}
 .ds-markdown-library {
 	display: flex;
 	gap: 6px;
 	flex-wrap: wrap;
 	padding: 10px 16px;
 	background: var(--muted, #f4f7f9);
+}
+.ds-markdown-save-status {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	text-align: end;
+}
+.ds-markdown-save-status small {
+	font-size: 10px;
+	color: var(--muted-foreground, #67788c);
+}
+.ds-markdown-save-status small[data-state="error"] {
+	color: var(--destructive, #b54545);
 }

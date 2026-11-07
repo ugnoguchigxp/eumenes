@@ -36,8 +36,7 @@ function volumeFree(path: string): number | null {
 }
 
 /** Control characters and line breaks never reach a label the conversation reads. */
-const cleanName = (name: string) =>
-	name.replace(/[\u0000-\u001f\u007f]+/g, " ");
+const cleanName = (name: string) => name.replace(/\p{Cc}+/gu, " ");
 
 /**
  * The server-lifetime file store (spec/server-scratch-cache-design-2026-11-07.md §5〜§7). Content lives in files
@@ -54,6 +53,8 @@ export function createScratchStore(options: ScratchStoreOptions) {
 	/** `<conversationId>:<sha256>` of an item put without its own id. */
 	const byDigest = new Map<string, string>();
 	const leases = new Map<string, Map<string, number>>();
+	/** The write in progress per id (or per conversation and content without one). */
+	const inflight = new Map<string, Promise<ScratchItem>>();
 	let used = 0;
 	/** Bytes of writes still on their way to disk. */
 	let reserved = 0;
@@ -95,6 +96,15 @@ export function createScratchStore(options: ScratchStoreOptions) {
 			items.size + 1 > limits.items ||
 			(startFree !== null && startFree + freed - size < limits.minFreeBytes);
 		if (!over(limits.capacityBytes)) return;
+		// Refuse before evicting anything when even every unleased item would not make room.
+		const evictable = [...items.values()].filter((item) => !leased(item.id));
+		const all = evictable.reduce((sum, item) => sum + item.bytes, 0);
+		if (
+			used - all + reserved + size > limits.capacityBytes ||
+			items.size - evictable.length + 1 > limits.items ||
+			(startFree !== null && startFree + all - size < limits.minFreeBytes)
+		)
+			throw new Error("scratch_capacity");
 		const before = { items: items.size, bytes: used };
 		const reason =
 			startFree !== null && startFree - size < limits.minFreeBytes
@@ -102,11 +112,8 @@ export function createScratchStore(options: ScratchStoreOptions) {
 				: items.size + 1 > limits.items
 					? "items"
 					: "capacity";
-		for (const item of [...items.values()].sort(
-			(a, b) => a.usedAt - b.usedAt,
-		)) {
+		for (const item of evictable.sort((a, b) => a.usedAt - b.usedAt)) {
 			if (!over(limits.targetBytes)) break;
-			if (leased(item.id)) continue;
 			freed += item.bytes;
 			remove(item);
 		}
@@ -154,13 +161,19 @@ export function createScratchStore(options: ScratchStoreOptions) {
 		async put(input: ScratchPut & { id?: string }): Promise<ScratchItem> {
 			if (!(scratchMimes as readonly string[]).includes(input.mime))
 				throw new Error("scratch_type_unsupported");
-			const name = scratchName.safeParse(cleanName(input.name));
+			// A long name keeps its head; one with nothing left is refused.
+			const name = scratchName.safeParse(
+				[...cleanName(input.name).trim()].slice(0, limits.nameChars).join(""),
+			);
 			if (!name.success) throw new Error("scratch_name_invalid");
 			if (input.data.length === 0) throw new Error("scratch_empty");
 			if (input.data.length > limits.itemBytes)
 				throw new Error("scratch_too_large");
 			const digest = createHash("sha256").update(input.data).digest("hex");
 			const key = `${input.conversationId}:${digest}`;
+			const slot = input.id ? `id:${input.id}` : `content:${key}`;
+			// A concurrent put of the same id or content waits for the first and finds what it stored.
+			while (inflight.has(slot)) await inflight.get(slot)!.catch(() => {});
 			const existing = input.id
 				? items.get(input.id)
 				: items.get(byDigest.get(key) ?? "");
@@ -173,49 +186,48 @@ export function createScratchStore(options: ScratchStoreOptions) {
 				existing.usedAt = now();
 				return existing;
 			}
-			ensureDir();
-			makeRoom(input.data.length);
-			const id = input.id ?? newId();
-			const temp = join(dir, `.${id}.${randomUUID()}`);
-			reserved += input.data.length;
-			let raced: ScratchItem | undefined;
+			const write = (async () => {
+				ensureDir();
+				makeRoom(input.data.length);
+				const id = input.id ?? newId();
+				const temp = join(dir, `.${id}.${randomUUID()}`);
+				reserved += input.data.length;
+				try {
+					await Bun.write(temp, input.data);
+					await rename(temp, pathOf(id));
+				} catch (error) {
+					await rm(temp, { force: true });
+					throw error;
+				} finally {
+					reserved -= input.data.length;
+				}
+				const at = now();
+				const item: ScratchItem = {
+					id,
+					conversationId: input.conversationId,
+					name: name.data,
+					mime: input.mime,
+					bytes: input.data.length,
+					digest,
+					origin: input.origin,
+					maker: input.maker,
+					...(input.width ? { width: input.width } : {}),
+					...(input.height ? { height: input.height } : {}),
+					...(input.annotation ? { annotation: input.annotation } : {}),
+					createdAt: at,
+					usedAt: at,
+				};
+				items.set(id, item);
+				if (!input.id) byDigest.set(key, id);
+				used += item.bytes;
+				return item;
+			})();
+			inflight.set(slot, write);
 			try {
-				await Bun.write(temp, input.data);
-				// A concurrent put of the same id or content finished first: keep its file.
-				raced = input.id ? items.get(id) : items.get(byDigest.get(key) ?? "");
-				if (raced) await rm(temp, { force: true });
-				else await rename(temp, pathOf(id));
-			} catch (error) {
-				await rm(temp, { force: true });
-				throw error;
+				return await write;
 			} finally {
-				reserved -= input.data.length;
+				if (inflight.get(slot) === write) inflight.delete(slot);
 			}
-			if (raced) {
-				if (raced.digest !== digest) throw new Error("request_conflict");
-				raced.usedAt = now();
-				return raced;
-			}
-			const at = now();
-			const item: ScratchItem = {
-				id,
-				conversationId: input.conversationId,
-				name: name.data,
-				mime: input.mime,
-				bytes: input.data.length,
-				digest,
-				origin: input.origin,
-				maker: input.maker,
-				...(input.width ? { width: input.width } : {}),
-				...(input.height ? { height: input.height } : {}),
-				...(input.annotation ? { annotation: input.annotation } : {}),
-				createdAt: at,
-				usedAt: at,
-			};
-			items.set(id, item);
-			if (!input.id) byDigest.set(key, id);
-			used += item.bytes;
-			return item;
 		},
 		/** The item without touching it; null when it is not (or no longer) here. */
 		get(id: string): ScratchItem | null {
@@ -238,6 +250,15 @@ export function createScratchStore(options: ScratchStoreOptions) {
 			if (!item) throw new Error("item_not_found");
 			item.usedAt = now();
 			return new Uint8Array(await Bun.file(pathOf(id)).arrayBuffer());
+		},
+		/** Bytes `start`〜`end` of the item, touched; only that range is read from the file. */
+		async slice(id: string, start: number, end: number): Promise<Uint8Array> {
+			const item = items.get(id);
+			if (!item) throw new Error("item_not_found");
+			item.usedAt = now();
+			return new Uint8Array(
+				await Bun.file(pathOf(id)).slice(start, end).arrayBuffer(),
+			);
 		},
 		/** The conversation's items, most recently used first. */
 		list(conversationId: string): ScratchItem[] {

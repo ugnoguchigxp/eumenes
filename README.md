@@ -32,7 +32,7 @@ Eumenesは、**ユーザーを継続的に理解し、任された仕事を進�
 | 記憶と再利用 | 記憶担当が会話の往復から保存・要約・忘却を判断する。会話には趣向・傾向だけを固定で入れ、詳しい中身は `memory` ツールで読む。記憶の停止・撤回・忘却、Seed候補のpreview/importを実装。整理の実行中・失敗は会話画面の「メモリー整理」に出す（fixture検証済み）。記憶の有効設定と接続状態に従う。ツールチェーンの選択履歴と保存済み取得手順も再利用する。 |
 | Personal World | 基盤・部分実装。会話・Memoryの変更取り込み、条件付きの抽出、根拠付き主張の照会・訂正・忘却、依存・影響の判断照会を実装。有効化は設定の `world.enabled`（既定は無効）で、環境変数 `EUMENES_WORLD` は読まない。会話には文脈係がWorldに記録がある対象の名前を候補として入れ、主張はWorld照会の担当（`world.query`）が根拠付きで報告する。収集資料は会話と分けた台帳に置ける。内容が残ったままオフにすると、次回起動は忘却の反映だけの保護モードになる。実モデルの抽出品質や継続仕事への接続など、目指す全体像には残件がある。[実装と制約](api/domains/world/README.md)を参照。 |
 | タイマー・予約 | 会話またはタイマー画面からの開始・一時停止・再開・取消と、満了通知。一回・固定間隔の会話予約はAPI（`/api/schedules`）から作り、Eumenes起動中に実行する。予約の作成画面はない。 |
-| 画像・音楽・3D | 画像の生成・一覧・取得・削除、楽曲・効果音の生成、保存曲の検索・お気に入り・プレイリスト・再生を接続。LARM側の対応サービスが必要。画像の参照画像編集は未対応。3Dモデルの生成・一覧・表示・名前とタグの変更・削除は実装・固定試験済みで、端末画像のLARM取込は本番LARMで確認済み。3D生成のliveと会話からの受入は未実施。 |
+| 画像・音楽・3D | 画像の生成・一覧・取得・削除、楽曲・効果音の生成、保存曲の検索・お気に入り・プレイリスト・再生を接続。LARM側の対応サービスが必要。画像の参照画像編集は未対応。3Dモデルの生成・一覧・表示・名前とタグの変更・削除は実装・固定試験済みで、端末画像のLARM取込は本番LARMで確認済み。会話の添付画像からの生成（一時ファイル経由、2026-11-07）は固定試験のみ。3D生成のliveと会話からの受入は未実施。 |
 | 計算 | 数値・記号計算、統計・回帰・作図のPythonを、LARMのCPU計算サービスへジョブで送り、状態・取消・成果物を「計算」画面で扱う。実装・固定試験、実CPUでの計算・PNG/CSVの取得・画面表示を確認済み。会話の最終文までの通し受入は未完了。 |
 | 図・物体認識・文字認識 | Excalidraw編集画面の準備・保存図の再表示、静止画・短い動画の物体検出と会話への追加、画像・短い動画のOCRと補正案、範囲選択とQR読取り。両画面の「詳細分析」（説明・検索・マスク）は実LARMと稼働画面で確認済み（2026-10-25）。OCRの正式gatewayは画像・動画・取消の実接続を確認済み（2026-10-17）。補正品質の受入は未達で、実カメラの受入は未実施。各gatewayと専用の接続・認証設定が必要。 |
 | 文章ナレッジベース | 「文章ナレッジベース管理」を開くとDocling Deskの起動を要求し、準備できたら別タブで開いてログインする。文書の取り込み・Word/PDFの閲覧・OCRはDocling側の画面で行う。別タブの入口とWord/PDFの操作は以前に実接続で確認済み。表示時の起動要求（2026-10-27）は実装・fixture検証済みで、実接続の再受入と配備は未実施。 |
@@ -40,6 +40,7 @@ Eumenesは、**ユーザーを継続的に理解し、任された仕事を進�
 | ブラウザ操作 | 利用者のBraveのタブにPlaywright MCP Bridgeで接続し、タブ一覧・撮影・ページ操作（確定操作は承認）を画面「ブラウザ」と会話から行う。Braveの実行ファイルのパスは設定に保存する。実装・固定試験済み。実機のBraveでの受入と実LLMの操作判断は未実施。LARMへの保存は未実装。 |
 | パイプライン | `eumenes-pipeline` 0.1.0を採用。今回の原依頼から、公開部品による1〜8件の短い定義を作り、既存の親子実行で直列に結果を渡す。旧list/publish APIは廃止済み。固定結合は成功。通常会話で依存・独立・同担当の二操作、質問後の同じ仕事への回答と取消をlive確認した。構造出力のばらつき、子の内容品質、保存設定での反復受入は残る。追加の完了報告・通知文の品質は受入条件に含めない。[現在の課題](spec/project-issues-2026-11-06.md) |
 | リソースURI | 生成物や会話の出来事を `eumenes://<種類>/<ID>` で指し、解決・種類をまたぐ検索のAPIと、会話の吹き出しのチップから開く。実装・固定試験済み。live・実機器は未実施。会話からの `resources` 担当と画面への指示は削除済み。 |
+| 一時ファイル（共有） | サーバーの起動中だけ残るファイル置き場（`eumenes://scratch/<uuid>`、合計2 GiB、古い順に自動で掃除、再起動で消える）。添付画像・画像以外の添付（Markdown・テキスト・CSV・JSON・PDF・GLB）・2,000字を超える貼り付けに番号 `a<n>` を付け、Stateの「提示中」「共有中」に出す。担当へは `refs` で渡し、担当は共通の `resource.read`（`offset` で続き）で読み、`scratch.write` で書き出して `finish.links` で返す。添付画像から3Dモデルを作れる。実装・固定試験済み（2026-11-07）。実LARMでの添付→3D、担当間の往復、実画面・実機器は未確認。[一時ファイル](docs/scratch.md) |
 | 作業ボード | タスクボードでカードを登録し、Claude CodeまたはCodexへ順番に依頼する。会話からの直接依頼は「Claude Code」画面の作業依頼表を使う。commitとpushはボード上の人の操作に限る。固定試験とブラウザfixtureはあり、実 `claude` のフック確認は記録済み。自然言語受入とCodex側の最終受入は未完了。 |
 | 画面の自由制作 | 登録済みの部品（見出し・本文・カード・フォームのほか、画像・紙芝居・状態と式・数式・電卓・図解）の範囲で、会話または「UI自由制作」から協働型の担当とOpenUI画面を作り、同じ作品を手直しできる。任意のHTML・外部API実行は対象外。固定試験・ブラウザE2E済み。実モデル（live）は未実施。 |
 | 再起動時の扱い | キュー上の未着手ジョブ、タイマー満了、会話予約は再起動後に再開する。実行中だった会話生成・音声ターン・担当の仕事は中断（`backend_restarted`／`backend_stopped`）として記録し、自動では再開しない。LARMの接続は終了時に解放せず、次の起動で同じ接続に戻る（別プロセスのliveで入力キャッシュの再利用を確認。backend再起動後の実会話では未確認）。再起動をまたぐ仕事の継続は到達点であり、現状は未実装。 |
@@ -151,7 +152,7 @@ EUMENES_LIVE_ASR_WAV=/absolute/path/speech.wav EUMENES_LIVE_EXPECT_TEXT=こん�
 
 [docs索引](docs/README.md)と[domain一覧・所有境界](docs/domains.md)が文書の入口です。用途別には以下を参照してください。
 
-- 調査・拡張：[ツールチェーン](docs/toolchain.md)、[Web取得](docs/web-research.md)、[登録と拡張](docs/toolchain-extension.md)、[拡張の検証](docs/toolchain-extension-verification.md)、[リソースURI](docs/resources.md)
+- 調査・拡張：[ツールチェーン](docs/toolchain.md)、[Web取得](docs/web-research.md)、[登録と拡張](docs/toolchain-extension.md)、[拡張の検証](docs/toolchain-extension-verification.md)、[リソースURI](docs/resources.md)、[一時ファイル（共有）](docs/scratch.md)
 - 制作・観測：[画像](docs/images.md)、[チャットの画像入力](docs/chat-images.md)、[音楽を含むLARMサービス](docs/larm.md)、[3Dモデル](docs/model3d.md)、[計算](docs/compute.md)、[Excalidraw](docs/excalidraw.md)、[物体認識](docs/object-recognition.md)、[OCR](docs/ocr.md)、[文章ナレッジベース](docs/docling.md)、[OpenUI](docs/openui-artifact.md)
 - 作業：[タスクボード](docs/kanban.md)、[Claude Code画面](docs/terminals.md)、[CLI画面](docs/shell.md)、[ブラウザ](docs/browser.md)、[dots](docs/dots.md)、[委任タスクの基盤](docs/delegated-tasks.md)、[Codex SDK runner](docs/coding-runner.md)
 - 運用・設計：[設定](docs/settings.md)、[記憶](docs/memory.md)、[Google連携](docs/google-accounts.md)、[SSE通知](docs/realtime.md)、[spec索引](spec/README.md)

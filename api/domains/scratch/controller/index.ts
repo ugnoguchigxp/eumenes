@@ -34,7 +34,9 @@ const byExtension: Record<string, ScratchMime> = {
 };
 
 /** The file's type: the browser's when it is one the store takes, otherwise by its extension. */
-export function fileMime(file: Pick<File, "name" | "type">): ScratchMime | null {
+export function fileMime(
+	file: Pick<File, "name" | "type">,
+): ScratchMime | null {
 	const type = file.type.split(";")[0]!.trim().toLowerCase();
 	if ((scratchMimes as readonly string[]).includes(type))
 		return type as ScratchMime;
@@ -73,7 +75,10 @@ export function registerScratch(app: Hono, store: ScratchStore) {
 				limit: scratchLimits.itemBytes + 16384,
 				missing: "invalid_scratch_input",
 				tooLarge: "scratch_too_large",
-				signal: AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(120000)]),
+				signal: AbortSignal.any([
+					c.req.raw.signal,
+					AbortSignal.timeout(120000),
+				]),
 			});
 			let form: FormData;
 			try {

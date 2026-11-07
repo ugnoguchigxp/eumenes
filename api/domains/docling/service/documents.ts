@@ -57,7 +57,8 @@ const path = text(2048).refine(
 	(v) =>
 		[...v].length <= 512 &&
 		v === v.trim() &&
-		!/[\\\u0000-\u001f\u007f]/.test(v) &&
+		!v.includes("\\") &&
+		![...v].some((c) => c.codePointAt(0)! < 32 || c.codePointAt(0) === 127) &&
 		/\.(md|markdown)$/.test(v) &&
 		v.split("/").every((p) => p !== "" && p !== "." && p !== ".."),
 );

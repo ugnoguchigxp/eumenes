@@ -34,7 +34,9 @@ test("a shared Markdown file is shown as it is written, with who made it", async
 	);
 	expect(await screen.findByText("| 社名 | 月額 |")).toBeTruthy();
 	expect(screen.getByText("価格表.md")).toBeTruthy();
-	expect(screen.getByText(/詳しいWeb調査・2KB・サーバーの再起動で消えます/)).toBeTruthy();
+	expect(
+		screen.getByText(/詳しいWeb調査・2KB・サーバーの再起動で消えます/),
+	).toBeTruthy();
 });
 
 test("a PDF is offered as a download; a file that is gone says so", async () => {

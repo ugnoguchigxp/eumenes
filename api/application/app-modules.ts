@@ -1,4 +1,5 @@
 import { registerRouterMemory } from "./toolchain/router-memory";
+import { registerAgency } from "./agency/routes";
 import {
 	registerRouterExport,
 	type createRouterExport,
@@ -109,6 +110,7 @@ export type AppModule = { mount(app: Hono): void };
 
 /** The services a production or test composition may route to. Only the core five are mandatory. */
 export type AppServices = {
+	agency?: Parameters<typeof registerAgency>[1];
 	liveVoice?: {
 		live: LiveVoiceService;
 		displayed: (id: string, notice: string) => Promise<void>;
@@ -155,7 +157,7 @@ export type AppServices = {
 	routerMemory?: Parameters<typeof registerRouterMemory>[1];
 	timers?: TimersService;
 	/** Resource URIs (absent: the routes do not exist). */
-	resources?: Resources;
+	resources?: Pick<Resources, "access">;
 	/** PTY sessions of the terminal screen (absent: the routes do not exist). */
 	shell?: ShellService;
 	terminals?: TerminalsService;
@@ -178,6 +180,7 @@ export type AppServices = {
 export function appModules(services: AppServices): AppModule[] {
 	const s = services;
 	const modules: Array<AppModule | undefined> = [
+		s.agency && { mount: (app) => registerAgency(app, s.agency!) },
 		s.liveVoice && {
 			mount: (app) =>
 				registerLiveVoice(app, {

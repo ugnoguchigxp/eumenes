@@ -1,7 +1,6 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
 import { checkRefusal, isCapacityBusy } from "../../larm";
 import { doclingPrepared, type DoclingConnection } from "../contracts";
-import { createDoclingWiki } from "./wiki";
 import { createDoclingDocuments } from "./documents";
 import type { DocumentFileConnection } from "../contracts/documents";
 
@@ -25,7 +24,6 @@ export function createDocling(deps: {
 			connection: () => deps.fileConnection?.() ?? null,
 			fetch: deps.fetch,
 		}),
-		wiki: createDoclingWiki(deps),
 		status: deps.status,
 		/** The conversation tool only returns the artifact; its Web adapter requests startup. */
 		prepare: () =>

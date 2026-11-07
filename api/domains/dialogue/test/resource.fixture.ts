@@ -109,7 +109,13 @@ export function fakeResources(
 			text = label,
 			note?: string,
 		) {
-			items.set(id, { kind, label, createdAt, text, ...(note ? { note } : {}) });
+			items.set(id, {
+				kind,
+				label,
+				createdAt,
+				text,
+				...(note ? { note } : {}),
+			});
 			return formatResourceUri(kind, id);
 		},
 		/** The owner deletes it. */

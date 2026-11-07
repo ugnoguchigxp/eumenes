@@ -29,15 +29,8 @@ import {
 	reservedExecutionCalls,
 } from "./execution-children";
 import type { ChildExecution } from "../../tool-runtime";
-import {
-	RESOURCE_READ_TOOL,
-	SCRATCH_WRITE_TOOL,
-	allowedUris,
-	type StoredRead,
-	type StoredWrite,
-} from "./resource-access";
-import { scratchWrite } from "../../capabilities";
-import { parseResourceUri } from "../../resources";
+import { allowedUris } from "./resource-access";
+import { requestedRead, requestedWrite } from "./host-tools";
 
 import {
 	createStepActions,
@@ -61,90 +54,6 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 		resources: !!ctx.deps.resources,
 		sharedWrite: !!ctx.deps.sharedWrite,
 	});
-	/** The read a `resource.read` invocation asks for, made now because the host's port is async. */
-	async function requestedRead(
-		input: StepInput,
-		action: unknown,
-		signal: AbortSignal,
-	): Promise<StoredRead | undefined> {
-		const invoke = action as {
-			action?: string;
-			tool?: string;
-			arguments?: { uri?: unknown; offset?: unknown };
-		} | null;
-		if (
-			!ctx.deps.resources ||
-			invoke?.action !== "invoke" ||
-			invoke.tool !== RESOURCE_READ_TOOL ||
-			!input.grants.some((g) => g.id === RESOURCE_READ_TOOL && !g.replayOnly)
-		)
-			return undefined;
-		const parsed =
-			typeof invoke.arguments?.uri === "string"
-				? parseResourceUri(invoke.arguments.uri)
-				: null;
-		// An unlisted URI is never read; the action is then rejected as `unknown_resource` when it is applied.
-		if (!parsed || !input.resourceUris.has(parsed.uri)) return undefined;
-		const offset =
-			typeof invoke.arguments?.offset === "number" &&
-			Number.isInteger(invoke.arguments.offset) &&
-			invoke.arguments.offset > 0
-				? invoke.arguments.offset
-				: undefined;
-		const at = offset === undefined ? {} : { offset };
-		try {
-			return {
-				uri: parsed.uri,
-				...at,
-				...(await ctx.deps.resources.read(
-					parsed.uri,
-					signal,
-					offset === undefined ? undefined : at,
-				)),
-			};
-		} catch (error) {
-			return { uri: parsed.uri, ...at, ok: false, code: safeCode(error) };
-		}
-	}
-	/**
-	 * The file a `scratch.write` invocation asks for, written now because the host's port is async. Its arguments
-	 * are checked again when the action is applied; one the schema refuses is never written.
-	 */
-	async function requestedWrite(
-		input: StepInput,
-		action: unknown,
-		signal: AbortSignal,
-	): Promise<StoredWrite | undefined> {
-		const invoke = action as {
-			action?: string;
-			tool?: string;
-			arguments?: unknown;
-		} | null;
-		const conversationId = input.execution?.source.conversationId;
-		if (
-			!ctx.deps.sharedWrite ||
-			!conversationId ||
-			invoke?.action !== "invoke" ||
-			invoke.tool !== SCRATCH_WRITE_TOOL ||
-			!input.grants.some((g) => g.id === SCRATCH_WRITE_TOOL && !g.replayOnly)
-		)
-			return undefined;
-		const args = scratchWrite.safeParse(invoke.arguments);
-		if (!args.success) return undefined;
-		const maker = prepared.get(input.taskId)?.package.title ?? "担当";
-		try {
-			return {
-				name: args.data.name,
-				...(await ctx.deps.sharedWrite.write(
-					args.data,
-					{ conversationId, maker },
-					signal,
-				)),
-			};
-		} catch (error) {
-			return { name: args.data.name, ok: false, code: safeCode(error) };
-		}
-	}
 
 	const handler: HandlerDefinition<
 		{ taskId: string; stepId: string },
@@ -304,10 +213,10 @@ export function createStepHandler(ctx: RuntimeContext, ops: TaskOps) {
 			const output = parseControlOutput(receipt.value);
 			const resourceRead = output.invalid
 				? undefined
-				: await requestedRead(input, output.action, signal);
+				: await requestedRead(ctx, input, output.action, signal);
 			const sharedWrite = output.invalid
 				? undefined
-				: await requestedWrite(input, output.action, signal);
+				: await requestedWrite(ctx, input, output.action, signal);
 			return {
 				receipt,
 				...output,

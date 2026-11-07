@@ -21,6 +21,7 @@ const quietWriteRoutes = new Set([
  * Exact path match only; never a prefix.
  */
 const streamBoundedRoutes = new Set([
+	"/api/markdown/inputs",
 	"/api/object-recognition",
 	"/api/ocr",
 	"/api/voice/turns",

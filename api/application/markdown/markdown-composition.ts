@@ -1,75 +1,102 @@
 import {
 	createMarkdown,
-	decodeArchive,
-	encodeArchive,
+	ArchiveFailure,
 	type ArchivePort,
+	type ArchiveEntry,
 } from "../../domains/markdown";
-import type { DoclingService } from "../../domains/docling";
+import {
+	DocumentFileError,
+	type DocumentSummary,
+	type DoclingService,
+} from "../../domains/docling";
 import type { QueueService } from "../../domains/queue";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 
+const entry = (d: DocumentSummary): ArchiveEntry => ({
+	sourceId: d.id,
+	title: d.title,
+	revision: d.etag,
+	namespace: d.namespace,
+	path: d.path,
+	contentDigest: d.contentDigest,
+});
+function failure(error: unknown): never {
+	if (error instanceof DocumentFileError) {
+		const conflict = error.status === 412;
+		throw new ArchiveFailure(
+			conflict
+				? "markdown_archive_conflict"
+				: error.uncertain
+					? "markdown_archive_unknown"
+					: `markdown_${error.code}`,
+			conflict ? "conflict" : error.uncertain ? "unknown" : "failed",
+			error.status ?? undefined,
+		);
+	}
+	throw new ArchiveFailure("markdown_archive_unknown", "unknown");
+}
 export function markdownArchive(docling: DoclingService): ArchivePort {
-	const wiki = docling.wiki;
+	const files = docling.documents;
 	return {
-		available: wiki.available,
-		binding: wiki.binding,
-		async list(signal) {
-			return (await wiki.list(signal)).map((entry) => ({
-				sourceId: entry.id,
-				documentId: entry.path.slice(0, -3),
-				title: entry.title,
-				revision: entry.revision,
-				path: entry.path,
-			}));
+		available: files.available,
+		binding: files.binding,
+		async capabilities(signal) {
+			try {
+				return await files.capabilities(signal);
+			} catch (e) {
+				return failure(e);
+			}
+		},
+		async list(signal, cursor) {
+			try {
+				const page = await files.list(signal, cursor);
+				return {
+					items: page.documents.map(entry),
+					namespaces: page.namespaces,
+					nextCursor: page.nextCursor,
+				};
+			} catch (e) {
+				return failure(e);
+			}
 		},
 		async read(sourceId, signal) {
-			const saved = await wiki.read(sourceId, signal),
-				decoded = decodeArchive(saved.text);
-			if (saved.article.path !== `${decoded.documentId}.md`)
-				throw new Error("markdown_source_invalid");
-			return {
-				entry: {
-					sourceId,
-					documentId: decoded.documentId,
-					title: decoded.title,
-					revision: saved.article.revision,
-					path: saved.article.path,
-				},
-				document: decoded.document,
-			};
+			try {
+				const d = await files.read(sourceId, signal);
+				return { entry: entry(d), markdown: d.markdown, recovery: d.recovery };
+			} catch (e) {
+				return failure(e);
+			}
 		},
 		async save(input, signal) {
 			try {
-				const saved = await wiki.save(
-					{
-						documentId: input.documentId,
-						title: input.title,
-						text: encodeArchive(
-							input.documentId,
-							input.title,
-							input.document,
-							input.markdown,
-						),
-						sourceId: input.sourceId,
-						remoteRevision: input.remoteRevision,
-						binding: input.binding,
-					},
-					signal,
-				);
-				return {
-					sourceId: saved.id,
-					documentId: input.documentId,
-					title: saved.title,
-					revision: saved.revision,
-					path: saved.path,
+				if (!input.remoteRevision) {
+					const { namespaces } = await files.list(signal);
+					if (!namespaces.includes(input.namespace))
+						throw new ArchiveFailure(
+							"markdown_namespace_unavailable",
+							"failed",
+						);
+				}
+				const body = {
+					markdown: input.markdown,
+					recovery: input.recovery,
+					title: input.title,
 				};
-			} catch (error) {
-				throw new Error(
-					error instanceof Error &&
-						error.message === "docling_document_conflict"
-						? "markdown_archive_conflict"
-						: "markdown_archive_unknown",
+				const saved = await files.put(
+					input.sourceId,
+					input.remoteRevision
+						? body
+						: { ...body, namespace: input.namespace, path: input.path },
+					input.remoteRevision
+						? { kind: "update", etag: input.remoteRevision }
+						: { kind: "create" },
+					signal,
+					input.binding,
 				);
+				return entry(saved);
+			} catch (e) {
+				if (e instanceof ArchiveFailure) throw e;
+				return failure(e);
 			}
 		},
 	};

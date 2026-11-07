@@ -1,6 +1,6 @@
 # インスタント3Dモデル
 
-文章、または LARM の画像ライブラリにある画像から 3D モデル（GLB）を作り、保存済みのモデルを探して表示し、タイトル・タグの変更や削除をする。設計は [設計書](../spec/instant-3d-model-toolchain-design-2026-10-18.md)。
+文章、LARM の画像ライブラリにある画像、または会話に添付した画像から 3D モデル（GLB）を作り、保存済みのモデルを探して表示し、タイトル・タグの変更や削除をする。設計は [設計書](../spec/instant-3d-model-toolchain-design-2026-10-18.md)。
 
 ## 接続
 
@@ -38,7 +38,9 @@ Googleフォトは基本プロフィールと別の追加同意が必要。Googl
 
 ## 会話
 
-toolchain `model3d.studio@2`（関数 `model3d_studio`、表示名「インスタント3Dモデル」）。command 担当が `open`・`generate`・`find`・`show`・`update`・`delete`・`cancel` から一つを選ぶ。対象は snapshot にあるホストの ref（`assetRef`・`generationRef`・`imageRef`）だけを受け付ける。生成の成功と、編集・印刷に向く品質は区別し、警告を伝える。編集には Blender 4.0 以降か WebP テクスチャ対応のビューアを使う。
+toolchain `model3d.studio@3`（関数 `model3d_studio`、表示名「インスタント3Dモデル」）。command 担当が `open`・`generate`・`find`・`show`・`update`・`delete`・`cancel` から一つを選ぶ。対象は snapshot にあるホストの ref（`assetRef`・`generationRef`・`imageRef`）だけを受け付ける。
+
+snapshot の `images` は、依頼した会話の添付画像（origin `attached`、[一時ファイル](scratch.md) `eumenes://scratch/<uuid>`）を先に、生成画像（origin `generated`）を後に、合わせて5件まで並べる。添付画像を選ぶと、host が source `{type:"shared-image", id}` に変え、生成ジョブの最初の段（stage `source_import`、表示「元画像を保存中」）で WebP・長辺2000px以下にして LARM 画像ライブラリへ取り込み、その画像で `image-artifact` の生成へ進む。取り込んだ画像はライブラリに残る。一時ファイルが消えていれば `model3d_image_not_found`、取込の失敗は `model3d_source_import_failed` で、作り直さない。実LARMでの添付→3Dは未確認。生成の成功と、編集・印刷に向く品質は区別し、警告を伝える。編集には Blender 4.0 以降か WebP テクスチャ対応のビューアを使う。
 
 ## 確認
 

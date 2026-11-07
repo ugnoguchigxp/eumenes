@@ -29,6 +29,7 @@ export function createConversationLifecycle(input: {
 	clearTimer: (handle: unknown) => void;
 	digest: () => string;
 	clearTopics: () => void;
+	preferredConversation?: () => string | null;
 }) {
 	const {
 		deps,
@@ -123,6 +124,12 @@ export function createConversationLifecycle(input: {
 	}
 
 	function activate(c: Conv) {
+		const preferred = input.preferredConversation?.();
+		if (preferred && preferred !== c.id) {
+			c.planner.setPaused(true, nowMs());
+			c.scheduler.rearm();
+			return;
+		}
 		if (state.activeId !== c.id) {
 			const previous = state.activeId ? convs.get(state.activeId) : undefined;
 			if (previous) {

@@ -122,6 +122,8 @@ export default defineConfig({
 				extends: true,
 				test: {
 					name: "unit",
+					// Math imports KaTeX CSS; transform it through Vite, as the consuming Web app does.
+					server: { deps: { inline: [/@platejs\/math/] } },
 					include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
 					environment: "jsdom",
 					globals: true,

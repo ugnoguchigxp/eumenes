@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-11-07T07:28:33.639Z",
+  "backendFocused": {
+    "pass": 51,
+    "fail": 0
+  },
+  "productionAssembly": {
+    "pass": 1,
+    "fail": 0
+  },
+  "plateUi": {
+    "pass": 5,
+    "fail": 0
+  },
+  "webAdapter": {
+    "pass": 3,
+    "fail": 0
+  },
+  "rootTypecheck": true,
+  "designSystemTypecheck": true,
+  "build": true,
+  "focusedLint": true,
+  "focusedFormat": true,
+  "focusedSize": true,
+  "diffWhitespace": true,
+  "canonicalVerify": "blocked_by_unowned_archived_test_copies",
+  "realBrowserConflictConfirmation": "unconfirmed",
+  "productionApiConflictResolutionAndSave": true,
+  "contextCompileCount": 6,
+  "compileEvalCount": 6
+}

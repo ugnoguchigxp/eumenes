@@ -1,0 +1,1 @@
+✓ No type errors in 3,103 files [744.64ms]

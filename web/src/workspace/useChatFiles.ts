@@ -33,7 +33,9 @@ export function useChatFiles(client: EumenesClient, conversationId: string) {
 			return;
 		}
 		if (files.some((f) => !ACCEPTED.test(f.name))) {
-			setError("Markdown・テキスト・CSV・JSON・PDF・GLBのファイルを選んでください。");
+			setError(
+				"Markdown・テキスト・CSV・JSON・PDF・GLBのファイルを選んでください。",
+			);
 			return;
 		}
 		if (files.some((f) => f.size > scratchLimits.itemBytes)) {

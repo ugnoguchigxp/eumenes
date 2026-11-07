@@ -15,7 +15,10 @@ export const RESOURCE_READS_MAX = 8;
 /** The sub-agent tool that writes a shared file (spec/server-scratch-cache-design-2026-11-07.md §9.1). */
 export const SCRATCH_WRITE_TOOL = "scratch.write";
 export const SCRATCH_WRITES_MAX = 8;
-/** The tools the host binds and answers itself: they never reach the tool runtime and use none of its budget. */
+/**
+ * The tools the host binds and answers itself: they never reach the tool runtime, use none of its budget and
+ * acquire nothing (a worker that only used them has not invoked a tool before it finishes).
+ */
 export const HOST_TOOLS: ReadonlySet<string> = new Set([
 	RESOURCE_READ_TOOL,
 	SCRATCH_WRITE_TOOL,
@@ -41,8 +44,7 @@ export interface ResourceReadPort {
 }
 
 export type SharedWriteOutcome =
-	| { ok: true; uri: string; bytes: number }
-	| { ok: false; code: string };
+	{ ok: true; uri: string; bytes: number } | { ok: false; code: string };
 /** What the host provides to write a shared file for `scratch.write`; without it the tool is not offered. */
 export interface SharedWritePort {
 	write(

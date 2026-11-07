@@ -1,0 +1,2 @@
+$ bun scripts/size-budget.ts packages/design-system/src/components/MarkdownWorkspace packages/design-system/src/components/ActionButton/SaveButton.tsx packages/artifact-ui/src/markdown-components.tsx packages/artifact-ui/src/markdown-cache.ts web/src/domains/markdown
+size-budget ok (16 files)

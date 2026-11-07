@@ -5,29 +5,19 @@ import type {
 	MarkdownResource,
 	Snapshot,
 } from "@eumenes/artifact-ui/contracts";
-import { editorDocumentSchema } from "../../../../api/domains/markdown/contracts";
+import { markdownCurrentSchema } from "../../../../client/markdown";
 import { formatResourceUri } from "../../../../api/domains/resources/contracts";
 import {
 	createLiveScreen,
 	type WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
+import { markdownUploads } from "./uploads";
 import { useSpecialistBridge } from "../toolchain-artifacts/specialist-bridge";
 
 const sourceSchema = z.object({
 	kind: z.literal("markdown-workspace"),
 	revision: z.number(),
-	current: z
-		.object({
-			id: z.uuid(),
-			title: z.string(),
-			document: editorDocumentSchema,
-			revision: z.number(),
-			sourceId: z.string().nullable(),
-			dirty: z.boolean(),
-			saveState: z.string(),
-			saveError: z.string().nullable(),
-		})
-		.nullable(),
+	current: markdownCurrentSchema.nullable(),
 	documents: z.array(z.object({ id: z.string(), title: z.string() })),
 	archiveAvailable: z.boolean(),
 });
@@ -40,6 +30,7 @@ const live = createLiveScreen<{
 export const markdownWebAdapter: WebArtifactAdapter = {
 	adapterRef: "adapter:markdown@1",
 	useArtifact({
+		conversationId,
 		client,
 		artifactRevisionId,
 		targetRef,
@@ -54,6 +45,10 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 				? bridge.session
 				: null;
 		const [library, setLibrary] = useState<MarkdownResource["library"]>([]);
+		const [libraryStatus, setLibraryStatus] =
+			useState<MarkdownResource["libraryStatus"]>("idle");
+		const [nextCursor, setNextCursor] = useState<string | null>(null);
+		const [namespaces, setNamespaces] = useState<string[]>([]);
 		const root = useMemo(
 			() => ["markdown-workspace", client.identity, artifactRevisionId],
 			[client.identity, artifactRevisionId],
@@ -70,6 +65,12 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 					session ? { workRef: session.workRef } : {},
 				),
 			refetchInterval: visible ? 1500 : false,
+		});
+		const capabilities = useQuery({
+			queryKey: [...root, "capabilities"],
+			enabled: visible,
+			queryFn: ({ signal }) => client.markdownCapabilities(signal),
+			refetchInterval: visible ? 60000 : false,
 		});
 		const refresh = useCallback(() => {
 			void cache.invalidateQueries({ queryKey: root });
@@ -102,6 +103,18 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 						...data,
 						revision: query.data!.revision,
 						library,
+						libraryStatus,
+						cacheAvailable: !!conversationId,
+						namespaces,
+						libraryHasMore: nextCursor !== null,
+						capabilities: capabilities.data,
+						archiveAvailable:
+							data.archiveAvailable &&
+							capabilities.isSuccess &&
+							!capabilities.isError,
+						archiveError: capabilities.isError
+							? "Docling文書APIに接続できません。接続設定と権限を確認してください。"
+							: undefined,
 						sessionState:
 							session?.state === "active" || session?.state === "suspended"
 								? session.state
@@ -129,28 +142,38 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 						: { kind: "loading" },
 			snapshot,
 			targetOf: () => targetRef,
-			async uploadFile(_source, file) {
-				try {
-					if (file.size > 2 * 1024 * 1024) throw new Error("too_large");
-					const value = await client.markdownStage(
-						JSON.parse(await file.text()),
-					);
-					return { status: "accepted", message: "", value: value.id };
-				} catch {
-					return {
-						status: "rejected",
-						message:
-							"文書の下書きを受け付けられませんでした。内容は画面に保持しています。",
-					};
-				}
-			},
+			uploadFile: markdownUploads(
+				client,
+				conversationId,
+				capabilities.data?.maxRequestBytes,
+			),
 			async local(binding, event) {
 				switch (binding.eventAction) {
 					case "markdown-select":
 						return select(String(event.values.id));
+					case "markdown-reload":
 					case "markdown-open": {
 						try {
-							const doc = await client.markdownOpen(String(event.values.id));
+							const sourceId = String(event.values.id),
+								remote = await client.markdownPreview(sourceId);
+							let stageId: string | undefined;
+							if (remote.document === null) {
+								const { importMarkdown } =
+									await import("@eumenes/design-system/markdown");
+								stageId = (
+									await client.markdownStage({
+										document: importMarkdown(remote.markdown),
+										markdown: remote.markdown,
+									})
+								).id;
+							}
+							const doc = await client.markdownOpen(sourceId, undefined, {
+								stageId,
+								expectedEtag: remote.entry.revision,
+								...(binding.eventAction === "markdown-reload"
+									? { replaceRevision: Number(event.values.revision) }
+									: {}),
+							});
 							return select(doc.id);
 						} catch {
 							return {
@@ -160,6 +183,26 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 							};
 						}
 					}
+					case "markdown-resolve":
+						try {
+							await client.markdownResolve(
+								String(event.values.id),
+								Number(event.values.revision),
+								String(event.values.etag),
+							);
+							refresh();
+							return {
+								status: "accepted",
+								message:
+									"手元の編集を残しました。内容を確認してDoclingに保存してください。",
+							};
+						} catch {
+							return {
+								status: "rejected",
+								message:
+									"文書の状態が変わりました。手元の編集を保持しています。保存状態を再確認してください。",
+							};
+						}
 					case "markdown-reconcile":
 						try {
 							await client.markdownReconcile(String(event.values.id));
@@ -175,11 +218,31 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 									"保存状態を確認できませんでした。後でもう一度確認してください。",
 							};
 						}
+					case "markdown-more":
 					case "markdown-library":
 						try {
-							setLibrary((await client.markdownLibrary()).items);
+							const more = binding.eventAction === "markdown-more";
+							if (more && !nextCursor)
+								return { status: "accepted", message: "" };
+							setLibraryStatus("loading");
+							const page = await client.markdownLibrary(
+								undefined,
+								more ? nextCursor! : undefined,
+							);
+							setLibrary((previous) => [
+								...new Map(
+									[...(more ? previous : []), ...page.items].map((d) => [
+										d.sourceId,
+										d,
+									]),
+								).values(),
+							]);
+							setNamespaces(page.namespaces);
+							setNextCursor(page.nextCursor);
+							setLibraryStatus("ready");
 							return { status: "accepted", message: "" };
 						} catch {
+							setLibraryStatus("error");
 							return {
 								status: "rejected",
 								message: "Doclingの一覧を取得できませんでした。",

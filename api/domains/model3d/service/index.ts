@@ -41,6 +41,28 @@ const log = getLogger("model3d");
 const FOLLOW_MS = 60 * 60_000;
 const ACTIVE_LIMIT = 3;
 
+/** A shared source image stays until the submit has saved it to the LARM library (scratch spec §11.1). */
+function holdSharedSource(
+	shared: Model3dSharedImages | undefined,
+	source: Model3dSource,
+	generationId: string,
+) {
+	if (source.type !== "shared-image") return;
+	if (!shared) throw new Error("model3d_image_not_found");
+	shared.hold(source.id, generationId);
+}
+
+/** A cancelled generation's shared source image, if it was still waiting to be sent, is no longer needed. */
+function releasedAfter<T>(
+	shared: Model3dSharedImages | undefined,
+	generationId: string,
+	cancel: () => T,
+): T {
+	const result = cancel();
+	shared?.release(generationId);
+	return result;
+}
+
 export function createModel3d(deps: {
 	store: SqliteStore;
 	queue: QueueService;
@@ -153,7 +175,7 @@ export function createModel3d(deps: {
 		pollMs: deps.pollMs ?? 3000,
 		waitMs: (deps.pollMs ?? 3000) * 3,
 		followMs: deps.followMs ?? FOLLOW_MS,
-		...(deps.sharedImages ? { sharedImages: deps.sharedImages } : {}),
+		sharedImages: deps.sharedImages,
 	});
 
 	function createInTransaction(
@@ -187,11 +209,7 @@ export function createModel3d(deps: {
 		if (activeGenerationCount(db, input.owner) >= ACTIVE_LIMIT)
 			throw new Error("model3d_capacity");
 		const id = crypto.randomUUID();
-		// The shared file stays until the submit has saved it to the LARM library.
-		if (input.source.type === "shared-image") {
-			if (!deps.sharedImages) throw new Error("model3d_image_not_found");
-			deps.sharedImages.hold(input.source.id, id);
-		}
+		holdSharedSource(deps.sharedImages, input.source, id);
 		const now = Date.now();
 		db.query(
 			`INSERT INTO model3d_generations(id,owner,conversation_id,origin,request_id,idempotency_key,title,tags_json,
@@ -221,7 +239,9 @@ export function createModel3d(deps: {
 		return generationView(generationRow(db, id)!);
 	}
 	const cancelInTransaction = (db: Database, owner: string, id: string) =>
-		cancelGeneration(db, queue, enqueue, owner, id);
+		releasedAfter(deps.sharedImages, id, () =>
+			cancelGeneration(db, queue, enqueue, owner, id),
+		);
 	let lastStatus: { available: boolean; reason: string | null } | null = null;
 	const assets = createModel3dAssets(store, deps.larm, (status) => {
 		lastStatus = status;

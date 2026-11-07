@@ -1385,16 +1385,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "用途はF状態の更新です。一回の反応や共有のために意図・候補・継続的な関心を作る必要はありません。その場の会話は後のselectが観測から直接判断できます。更新不要ならops/interestOps/reconciliationsを空配列にします。\n自律的な調査・制作・確認など、実行して達成する目的には、根拠・目的・何が分かると判断が進むかを持つintentと、対応する実行可能なcandidateを作ります。tool候補は提示された能力と具体的な目的に結びつけます。担当が未発見ならfind_toolchainの候補を作り、発見した結果を受けてdelegateの候補を作ります。発話だけで完了したことにせず、実行の受付・待機・結果を区別します。利用者の選択そのものを自分の未完了の仕事にしません。必要な層だけを使い、belief/desireの先行作成は不要です。\n既存のid/revisionを照合し、拒否・訂正・解決・採用済み通常応答を反映します。自分の発話や時間経過だけで外部の問いを解決・再開しません。receiptで閉じた候補をreconciliationsへ再送しません。validationCodesがあれば拒否された案を最新状態と契約に照らして修正します。各操作の必須項目・遷移・独立根拠は出力契約に従います。summary等は発話ではありません。"
+                  "value": "用途はF状態の更新です。一回の反応や共有のために意図・候補・継続的な関心を作る必要はありません。その場の会話は後のselectが観測から直接判断できます。更新不要ならops/interestOps/reconciliationsを空配列にします。\n会話や公開された記憶に、続けて楽しむ関心、試したいこと、有用な成果を届けられる未充足の目的がある場合は、関心と今行う仕事を区別して保持・検討します。明示的な制作依頼を待つ必要はありません。recall.offeredは保持した関心を見直す機会であり、行動や発話の命令ではありません。前回からの差、既存の成果、拒否・撤回、冷却と許可を踏まえ、役立つ次の一手がなければ待機します。関心の再提示や時間経過だけを新しい利用者の希望や外界の変化として扱いません。\n自律的な調査・制作・確認など、実行して達成する目的には、根拠・目的・何が分かると判断が進むかを持つintentと、対応する実行可能なcandidateを作ります。tool候補は提示された能力と具体的な目的に結びつけます。担当が未発見ならfind_toolchainの候補を作り、発見した結果を受けてdelegateの候補を作ります。発話だけで完了したことにせず、実行の受付・待機・結果を区別します。利用者の選択そのものを自分の未完了の仕事にしません。必要な層だけを使い、belief/desireの先行作成は不要です。\n既存のid/revisionを照合し、拒否・訂正・解決・採用済み通常応答を反映します。自分の発話や時間経過だけで外部の問いを解決・再開しません。receiptで閉じた候補をreconciliationsへ再送しません。validationCodesがあれば拒否された案を最新状態と契約に照らして修正します。各操作の必須項目・遷移・独立根拠は出力契約に従います。summary等は発話ではありません。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:00234f2c47e0f6e2a992477386b1d32aab252c428f4dc5fb5e20a630cc8d09a8"
+          "artifactHash": "sha256:60f6daaf76c079a7be8e59a0cc59a3a77b9964a77ccfe1e7e0d429b337737374"
         }
       },
-      "definitionHash": "sha256:031ef04652936cca17eb4a07c17c1dc05ce94d45e507c960e468ff28963ba8f6",
-      "releaseDigest": "sha256:843bea4cfae98b02b7b4dd87369a7b7fe14db43b9018ca1e5ac0366c4a636082"
+      "definitionHash": "sha256:fe7afdf9f658ea0deb603f1c5696c697618c20a43256d4b62d80a44c341fce03",
+      "releaseDigest": "sha256:8209024e7f277771a98453656c26085ff9d0f95c1162534ac0a890431dded944"
     },
     "dialogue.contexts.agency.utterance": {
       "key": "dialogue.contexts.agency.utterance",
@@ -4864,5 +4864,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:b04990af9cd471b73f6c45ad4970a8cbc73541e50b99ec1a5f0fd410593b31a7"
+  "catalogDigest": "sha256:77a367e4fd36c53e3e00b178d7af69303f085fb717ecddaf8d5d4166f1ee2a50"
 }

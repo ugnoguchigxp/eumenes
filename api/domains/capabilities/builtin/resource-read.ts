@@ -5,11 +5,12 @@ import type { Definition } from "../contracts";
  * spec/server-scratch-cache-design-2026-11-07.md §9): reading a resource, and writing a shared file. The
  * agent-runtime host binds them itself (no package lists them) and answers them through its ports: a read refuses
  * any URI that was not handed to the execution or returned by one of its tools. They have no `backend`, so every
- * host registers them. Revision 2 of `resource.read` reads on from an `offset`.
+ * host registers them. Revision 3 of `resource.read` reads on from an `offset`, the position the previous read
+ * named (revision 2 described it as a character count and is kept as it was registered).
  */
 export const resourceReadBuiltins: Definition[] = [
 	{
-		revision: 2,
+		revision: 3,
 		aliases: [],
 		tags: [],
 		useWhen: [],

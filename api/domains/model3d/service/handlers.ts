@@ -146,7 +146,7 @@ function registerSubmit(deps: Deps) {
 	};
 	/**
 	 * A shared image becomes a LARM library image first (§11.1 of the scratch spec): saved once under the generation's
-	 * id, then sent as any library image. The file is let go once LARM has it or the save failed.
+	 * id, then sent as any library image.
 	 */
 	async function librarySource(
 		input: Input,
@@ -161,17 +161,24 @@ function registerSubmit(deps: Deps) {
 			if (r?.state === "submitting" && r.stage !== SOURCE_IMPORT_STAGE)
 				patchGeneration(db, r.id, { stage: SOURCE_IMPORT_STAGE });
 		});
+		return {
+			type: "image-artifact",
+			id: await shared.artifact(source.id, input.id, bounded(signal)),
+		};
+	}
+	/**
+	 * Fixes the body once, then sends it; the lost-response rule sends the same key once more. A shared source image
+	 * is let go once this try ends: LARM has its library copy, or the generation failed.
+	 */
+	async function send(input: Input, signal: AbortSignal) {
 		try {
-			return {
-				type: "image-artifact",
-				id: await shared.artifact(source.id, input.id, bounded(signal)),
-			};
+			return await fixAndSend(input, signal);
 		} finally {
-			shared.release(input.id);
+			if (input.source.type === "shared-image")
+				deps.sharedImages?.release(input.id);
 		}
 	}
-	/** Fixes the body once, then sends it; the lost-response rule sends the same key once more. */
-	async function send(input: Input, signal: AbortSignal) {
+	async function fixAndSend(input: Input, signal: AbortSignal) {
 		const larm = larmOf(deps);
 		let { body, path } = input;
 		if (!body || !path) {

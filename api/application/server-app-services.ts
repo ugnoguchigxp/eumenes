@@ -4,6 +4,7 @@ import { registerDots } from "./work/dots-http";
 
 export function appServices(s: Services, secrets: readonly string[] = []) {
 	return {
+		agency: s.agency,
 		capabilities: s.toolchain.capabilities,
 		searchCheck: s.searchCheck,
 		agents: s.toolchain.agents,
@@ -28,6 +29,7 @@ export function appServices(s: Services, secrets: readonly string[] = []) {
 		music: s.music,
 		image: s.image,
 		docling: s.docling,
+		markdown: s.markdown,
 		excalidraw: s.excalidraw,
 		drawingOperations: s.drawingOperations,
 		objectRecognition: s.objectRecognition,

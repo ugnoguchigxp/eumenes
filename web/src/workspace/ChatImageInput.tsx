@@ -47,7 +47,7 @@ function MenuIcon({ children }: { children: ReactNode }) {
 export function ChatImageInput({ state }: { state: WorkspaceState }) {
 	const picker = useRef<HTMLInputElement>(null);
 	const filePicker = useRef<HTMLInputElement>(null);
-	const files = state.files;
+	const files = state.attachments.files;
 	const [libraryOpen, setLibraryOpen] = useState(false);
 	const images = state.attachments;
 	const library = images.library;
@@ -293,7 +293,7 @@ export function ChatImagePreviews({ state }: { state: WorkspaceState }) {
 
 /** The files besides images the next message carries: shared with the agents on send, never shown to the model. */
 export function ChatFilePreviews({ state }: { state: WorkspaceState }) {
-	const files = state.files;
+	const files = state.attachments.files;
 	if (!files.items.length && !files.error) return null;
 	return (
 		<div className="chat-image-input">

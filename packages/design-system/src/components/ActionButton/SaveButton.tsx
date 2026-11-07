@@ -17,3 +17,9 @@ export const SaveButton: React.FC<ActionButtonProps> = ({
 };
 
 SaveButton.displayName = "SaveButton";
+
+/** The save action with a consistent icon-only presentation and accessible label. */
+export const SaveIconButton: React.FC<
+	Omit<ActionButtonProps, "iconOnly" | "alwaysFull">
+> = (props) => <SaveButton {...props} iconOnly />;
+SaveIconButton.displayName = "SaveIconButton";

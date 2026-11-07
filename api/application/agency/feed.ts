@@ -224,7 +224,8 @@ export function createAgencyFeed(input: {
 		}
 		for (const [conversationId, pendingState] of pending) {
 			const c = convs.get(conversationId);
-			if (pendingState.turnEnd && c && conversationId === state.activeId) {
+			// Every scope may consider silent work on its own input; speech still requires the active display.
+			if (pendingState.turnEnd && c) {
 				workChanged.delete(conversationId);
 				newWork(c);
 				launch(c, "turn_end");

@@ -169,10 +169,10 @@ dev の watch による再起動でも中身は消える。
 
 ### 9.2 `resource.read` の `offset`
 
-`resource.read` に省略できる `offset`（文字数）を足す。ResourceAdapter の `read` に `{ offset }` を渡し、一時ファイルの文書は `offset` から既存の上限（600 token）まで返す。続きがあれば最後の行に書く。ほかの kind は `offset` を無視して今の通りに返す。
+`resource.read` に省略できる `offset`（位置。実装は UTF-8 のバイト位置、§15.2）を足す。ResourceAdapter の `read` に `{ offset }` を渡し、一時ファイルの文書は `offset` から既存の上限（600 token）まで返す。続きがあれば最後の行に書く。ほかの kind は `offset` を無視して今の通りに返す。
 
 ```text
-一時ファイル「議事録_1107.md」（Markdown 24KB、2,400〜4,800字）
+一時ファイル「議事録_1107.md」（Markdown 24KB、位置 2400〜4800／全 24576）
 …本文…
 続き: offset 4800
 ```
@@ -281,6 +281,12 @@ DesignSystem・OpenUI の追加は[登録手順](../docs/toolchain-extension.md)
 | ログ | `items`・`usedBytes` | `count`・`bytes`（既存のログ欄） | ログの欄は固定の一覧 |
 | 閲覧画面 | `adapter:scratch@1` の OpenUI 画面、Markdown は描画 | 会話欄のダイアログ（画像は表示、テキスト・Markdown・CSV・JSON はそのまま、ほかはダウンロード） | Web に Markdown の描画部品が無い。画面の新設は別作業 |
 | 「提示中」への表示で最終使用を更新 | 更新する | 更新しない（読出し・`refs` の引渡し・貸出・HTTP の取得で更新） | 毎ターンの表示で時刻を進めると、表示中の6件が消えなくなる |
+| 書込みの部品 | `api/infrastructure/atomic-file.ts` | 同じディレクトリの一時名へ `Bun.write` してから `rename`（非同期、fsync なし） | `atomic-file.ts` は同期書込みと fsync で、100 MiB では event loop を止める。再起動で消える置き場に永続の保証は要らない。途中のファイルが正式な名前に出ない点は同じ |
+| 層の参照 | ほかの domain を参照しない | `resources` の契約（`ResourceAdapter`・`formatResourceUri`）だけを参照する（`scripts/domains.ts` の depends も `resources`） | リソースの持ち主の domain はすべて同じ形で `resources` の契約に依存する |
+| HTTP の経路 | §10 の2経路 | 加えて `POST /api/conversations/:id/scratch?requestId=`（multipart、欄 `file` の1件） | §12 の添付ボタンが必要とする受け口。`requestId` を項目の id にして再送を冪等にする |
+| `scratch.write` の 1 MiB | 1 MiB | 入力の schema は 1,048,576 字まで、application の書出し口が UTF-8 で 1 MiB を超えるものを `scratch_too_large` で断る | 字数とバイト数の両方で抑える |
+| 「共有中」を出すターン | 毎ターン | 会話の実行があるターン（利用者の発言・ホストの知らせ）。背景の呼出し（記憶担当・agency の背景・prewarm）の State には出さない | agency の背景の委譲は `refs` を渡せず、番号を出しても使えない |
+| domain の内部 API（§3「後」） | domain の adapter が結果を一時ファイルに包んで返す | application の adapter が `ScratchStore.put`（origin `written`、作り手は担当の表示名）で書き、結果に `eumenes://scratch/<uuid>` を入れる。scratch の `fromResultInTransaction` が結果の中の、同じ会話で origin `written` の項目だけを拾う。`resources.dialogue.producesInTransaction` は全ツールチェーンに `scratch` を足す（agency の背景作業の結果にも同じ関数を使う） | kind `scratch` の `producedBy` は空で、どの担当の結果からも台帳に入らなかった（2026-11-07 の漏れの確認で修正）。利用者の添付は担当の成果として登録し直さない |
 
 ### 15.3 固定試験
 
@@ -294,4 +300,51 @@ DesignSystem・OpenUI の追加は[登録手順](../docs/toolchain-extension.md)
 | `api/application/scratch/scratch-composition.test.ts`（添付の共有・BMP、貼り付け・`fileIds`、書出しと大きさの上限、ライブラリ取込） | 4 | 成功 |
 | Web（`ChatImageInput`・`ConversationComposer`・`ScratchViewer`・`ResourceChips`） | 既存＋新規 | 成功 |
 
-domain verify の結果は §15.4。
+### 15.4 レビューと修正
+
+独立レビュー1回（正しさ・セキュリティ）の指摘6件をすべて直した。
+
+| 指摘 | 重大度 | 修正 |
+| --- | --- | --- |
+| 大きなテキストの `resource.read` が全文を code point の配列に展開し、メモリと CPU を使い切る（約20M字で RSS 4.5GB） | 高 | ファイルの `offset` から 8KB だけを読む（`store.slice`）。`offset` は UTF-8 のバイト位置で、文字の途中は次の文字の境界へ進める。このため `resource.read` を revision 3 にした（revision 2 は登録済みの本文のまま） |
+| 同じ id の並行 `put` で使用量が二重に計上される | 中 | id（id が無ければ会話と内容）ごとに書込みを直列にし、後続は先の結果を返す |
+| 空きが5 GiB未満のボリュームで、`put` のたびに貸出中以外を全部消したうえで失敗する | 中 | 貸出中以外を全部消しても入らない書込みは、何も消さずに 507 で断る |
+| 121〜200字のファイル名の添付が共有されない | 低 | 名前を先頭120字で切る（空になるときだけ断る） |
+| 3D の添付画像の一覧が会話 `main` 固定 | 低 | 依頼した会話の添付を出し、その会話の項目だけを受ける |
+| 取消・送信前の失敗で 3D の貸出が残る | 低 | 送信の試行が終われば成否にかかわらず手放す。取消でも手放す。保持の表は貸出の期限（30分）で自動的に消す |
+
+レビューで問題なしとされた範囲: id は全て uuid で検証してからパスにする（パストラバーサルなし）、配信は SVG・HTML を受けず `nosniff`・CSP・画像と `text/*` 以外は添付として配信、本文上限の除外は認証と Origin の検査の後、会話をまたぐ参照なし、State へ出す名前は制御文字を除く、ログに本文・ファイル名を出さない、`dialogue/0038` の作り直しは全列・索引・UNIQUE を保つ。
+
+### 15.5 起動の確認と verify
+
+| 確認 | 結果 |
+| --- | --- |
+| 本番 DB の写しで `buildServices`→停止 | 成功。適用済みマイグレーション（`dialogue/0038` を含む）の checksum 不一致なし。`resource.read@3`・`scratch.write@1`・`skill:model3d.studio@3`・`toolchain:model3d.studio@3` を登録 |
+| 写しでの起動中の警告（本変更の外） | `browser-interact.bundle.json` の `skill:browser.interact.operator@1` が登録済みの本文と違い、bundle が読み飛ばされる |
+| `bun run verify -- --domain scratch …` | inventory の段で停止。`artifacts/pursuit-integration-20261106/` 配下の 4,205 件の試験が実行経路に無いため（本変更の外）。後続の段を個別に実行した |
+| 境界・SystemContext・SQL境界・domain文書 | 成功（境界の指摘は markdown の試験1件で本変更の外） |
+| サイズ予算 | 本変更のファイルは予算内（残る3件は ImagePicker・MarkdownWorkspace・useWorkspace で本変更の前から） |
+| 型 | 本変更のファイルにエラーなし（markdown・docling の並行作業中のエラーは残る） |
+| 書式・lint | 本変更の91ファイルで指摘なし |
+| 試験 | §15.3 と、関係 domain・application の一式（結果は §15.6） |
+
+### 15.6 試験の結果（修正後）
+
+| 範囲 | 結果 |
+| --- | --- |
+| `api/domains/{scratch,dialogue,agent-runtime,model3d,conversation,capabilities,resources}`、`api/application/{scratch,media,resources,toolchain}`、`app`・`server`（停止順に `scratch` を追加）・`migrations`・`lifecycle`、登録済み統合試験 | 1,211件成功 |
+| Web（`web/src/workspace`・`domains/resources`・`domains/model3d`・`domains/dialogue`） | 142件成功・1件失敗。失敗は `shell-artifact.test.tsx`（CLI 画面の source 取得が error になる。本変更の外で、本変更の前から） |
+
+live（実 LARM での添付→3D、書出し→別担当の読取り）、サーバー反映後の画面での確認、実機器は未実施。
+
+### 15.7 漏れの確認と文書（2026-11-07）
+
+利用者の指摘「READMEなのか機能一覧かわかりませんが、そちらに反映してないのか、他のエージェントが識別出来ていませんね」を受け、§1〜§14 をコード・試験と突き合わせ直した（独立の確認1回）。
+
+| 確認 | 結果 |
+| --- | --- |
+| 実装の漏れ | §3「後」の行（domain の adapter が結果を一時ファイルで返す）が台帳に入らなかった。§15.2 の最終行のとおり実装した。試験は `api/domains/scratch/test/store.test.ts`（結果の中の URI のうち、同じ会話・origin `written` だけを拾う）と `api/application/server.test.ts`（組み立てた services の `producesInTransaction` が `scratch` を含む） |
+| §15.2 に無かった差 | 書込みの部品・層の参照・HTTP の受け口・`scratch.write` の字数とバイト数・「共有中」を出すターンの5件を §15.2 に足した |
+| 文書 | 機能一覧と文書の索引に一時ファイルが無かった。`docs/scratch.md` を新設し、`README.md`（機能表・文書の一覧・3D の行）、`docs/README.md`、`docs/chat-images.md`（画像以外の添付・添付画像の共有）、`docs/resources.md`（提示中・共有中・ホストの道具・登録元 `attached`）、`docs/model3d.md`（添付画像からの生成・`model3d.studio@3`）、`docs/toolchain-extension.md`（担当に付く共通の道具と一時ファイルの使い方）、`api/domains/scratch/README.md`（`offset` はバイト位置）を直した |
+| アプリ内の識別 | Router の選択呼出しが `## State` 全体（提示中・共有中）を読み、引継ぎは State の `a<n>` を最大8件 `refs` に付ける（`routed-router.ts`）。3D担当の SKILL は origin `attached` を知っている。担当に付く `resource.read`・`scratch.write` は道具の一覧に出る |
+| 試験（修正後） | `api/domains/{scratch,dialogue,agent-runtime}`・`api/application/{scratch,resources,agency,media}`・`server.test.ts` で927件成功。Web（`ScratchViewer`・`ChatImageInput`・`ConversationComposer`・`domains/resources`）で23件成功。書式・lint・境界・domain 表は成功。型は本変更のファイルにエラーなし（残る5件は並行作業中の `packages/artifact-ui` の Markdown） |

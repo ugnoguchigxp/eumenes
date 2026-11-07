@@ -19,7 +19,7 @@ export const resourceRead = z.strictObject({
 		.max(100_000_000)
 		.optional()
 		.describe(
-			"続きを読む位置（文字数）。前に読んだ結果の最後の行「続き: offset N」のNをそのまま写す。最初から読むときは省略する。",
+			"続きを読む位置。前に読んだ結果の最後の行「続き: offset N」のNをそのまま写す。最初から読むときは省略する。",
 		),
 });
 

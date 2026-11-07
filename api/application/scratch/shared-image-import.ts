@@ -1,7 +1,11 @@
 import { prepareImageUpload } from "../../domains/image";
 import type { LarmPlayground } from "../../domains/larm";
 import type { Model3dSharedImages } from "../../domains/model3d";
-import { isScratchImage, type ScratchStore } from "../../domains/scratch";
+import {
+	isScratchImage,
+	scratchLimits,
+	type ScratchStore,
+} from "../../domains/scratch";
 
 /** How long one save reads a receipt LARM is still saving (the capture save's budget). */
 const POLL_BUDGET_MS = 2 * 60_000;
@@ -35,13 +39,20 @@ export function sharedImageImports(
 		holds.get(key)?.();
 		holds.delete(key);
 	};
+	/** A hold no generation let go of (one that ended before its send) ends with the store's lease. */
+	const expire = (key: string, held: () => void) =>
+		setTimeout(() => {
+			if (holds.get(key) === held) release(key);
+		}, scratchLimits.leaseMs).unref();
 	return {
 		hold(id, key) {
 			const item = store.get(id);
 			if (!item || !isScratchImage(item.mime))
 				throw new Error("model3d_image_not_found");
 			release(key);
-			holds.set(key, store.lease(id));
+			const held = store.lease(id);
+			holds.set(key, held);
+			expire(key, held);
 		},
 		release,
 		async artifact(id, key, signal) {

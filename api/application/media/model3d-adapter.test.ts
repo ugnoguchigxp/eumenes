@@ -142,8 +142,9 @@ test("an image the user attached is offered first and becomes the generation's s
 	const root = mkdtempSync(join(tmpdir(), "eumenes-model3d-shared-"));
 	cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
 	const shared = createScratchStore({ root, freeBytes: () => null });
+	// The asking conversation's own attachment (`conversation.conversationId`).
 	const photo = await shared.put({
-		conversationId: "main",
+		conversationId: "c1",
 		name: "IMG_2041.jpg",
 		mime: "image/jpeg",
 		data: new Uint8Array([1, 2, 3]),
@@ -152,7 +153,7 @@ test("an image the user attached is offered first and becomes the generation's s
 	});
 	// A text file and an agent's write are not attached images.
 	await shared.put({
-		conversationId: "main",
+		conversationId: "c1",
 		name: "メモ.md",
 		mime: "text/markdown",
 		data: new Uint8Array([35]),
@@ -161,11 +162,25 @@ test("an image the user attached is offered first and becomes the generation's s
 	});
 	const { store, adapter, held, service } = setup(shared);
 	const uri = `eumenes://scratch/${photo.id}`;
-	const snapshot = store.read((db) => adapter.snapshotInTransaction(db)) as {
+	const snapshot = store.read((db) =>
+		adapter.snapshotInTransaction(db, { conversationId: "c1" }),
+	) as {
 		images: Array<{ imageRef: string; title: string; origin: string }>;
 	};
+	// Another conversation does not see it.
+	expect(
+		(
+			store.read((db) => adapter.snapshotInTransaction(db)) as {
+				images: unknown[];
+			}
+		).images,
+	).toEqual([]);
 	expect(snapshot.images).toEqual([
-		expect.objectContaining({ imageRef: uri, title: "IMG_2041.jpg", origin: "attached" }),
+		expect.objectContaining({
+			imageRef: uri,
+			title: "IMG_2041.jpg",
+			origin: "attached",
+		}),
 	]);
 	const receipt = await store.write((db) =>
 		adapter.invokeInTransaction(db, {
@@ -176,9 +191,12 @@ test("an image the user attached is offered first and becomes the generation's s
 			origin: conversation,
 		}),
 	);
-	const generationRef = (receipt.receipt as { generation: { generationRef: string } })
-		.generation.generationRef;
-	expect(service.get(CONVERSATION_DEFAULT_PRINCIPAL, generationRef).source).toEqual({
+	const generationRef = (
+		receipt.receipt as { generation: { generationRef: string } }
+	).generation.generationRef;
+	expect(
+		service.get(CONVERSATION_DEFAULT_PRINCIPAL, generationRef).source,
+	).toEqual({
 		type: "shared-image",
 		id: photo.id,
 	});

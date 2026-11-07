@@ -20,9 +20,11 @@ eumenes://<kind>/<id>[?action=open|play|read]
 
 | 読み手 | 見せ方 |
 | --- | --- |
-| 会話エージェント | 番号 `a<n>` だけ（`## State` の仕事の行と提示中の行）。URI と ID は見せない |
+| 会話エージェント（Router の選択） | 番号 `a<n>` だけ（`## State` の仕事・提示中・共有中の行）。URI と ID は見せない。担当への引継ぎは State に出た `a<n>` を最大8件 `refs` に付ける |
 | agency | 見せない。`HostTodo` の `title`（`[担当名] 依頼文`）と `nextActions`（種類の操作の言葉）で種類を伝える |
-| サブエージェント | `RESOURCES` 区画に URI・種類・表示名・要約。`resource.read` で読み、作ったものを `finish.links` に書く |
+| サブエージェント | `RESOURCES` 区画に URI・種類・表示名・要約。ホストが付ける `resource.read`（一時ファイルの文書は `offset` で続き）で読み、`scratch.write` で一時ファイルに書き出し、作ったものを `finish.links` に書く |
+
+台帳の登録元には `work`（担当が作った）・`viewed`（画面に表示中だった）・`attached`（利用者の添付・長い貼り付け、2026-11-07）がある。持ち主のない内容は kind `scratch` の[一時ファイル](scratch.md)になる。
 | Web | URI（吹き出しのチップ、Markdown の `eumenes://` リンク、画面への指示） |
 
 ## 種類を足す

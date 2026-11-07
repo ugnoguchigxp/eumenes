@@ -291,14 +291,14 @@ export function ConversationComposer({
 							disabled={
 								(!draft.trim() &&
 									!state.attachments.items.length &&
-									!state.files.items.length) ||
+									!state.attachments.files.items.length) ||
 								(automaticInput &&
 									!state.attachments.items.length &&
-									!state.files.items.length) ||
+									!state.attachments.files.items.length) ||
 								submit.isPending ||
 								(!!live?.active && live.session?.status !== "active") ||
 								state.attachments.busy ||
-								state.files.busy
+								state.attachments.files.busy
 							}
 							aria-label="送信"
 						>

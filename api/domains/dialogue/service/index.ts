@@ -38,7 +38,6 @@ import {
 	createResourceLedger,
 	type ResourceAccess,
 } from "./resource-ledger";
-import type { SharedFilesPort } from "../contracts/resources";
 import { withAttachmentNotes } from "./attachment-context";
 import { eventText } from "./event-text";
 import { createOperationPorts } from "./operation-ports";
@@ -174,8 +173,6 @@ interface DialogueServiceOptions {
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	/** The resource registry and the kinds each toolchain makes; without it the conversation has no resources. */
 	resources?: ResourceAccess;
-	/** The user's input as shared files and the conversation's recent ones (absent: none are entered or shown). */
-	sharedFiles?: SharedFilesPort;
 	specialist?: import("../contracts").SpecialistPort;
 	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
 	logFile?: () => string | undefined;
@@ -237,7 +234,6 @@ export function createDialogueService({
 	conversationAgent,
 	toolchains,
 	resources,
-	sharedFiles,
 	specialist,
 	logFile,
 	keeper: keeperOptions,
@@ -263,7 +259,6 @@ export function createDialogueService({
 		conversationAgent,
 		toolchains,
 		resources,
-		...(sharedFiles ? { sharedFiles } : {}),
 		specialist,
 		...(logFile ? { logFile } : {}),
 	};

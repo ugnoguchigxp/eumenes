@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-11-07T09:21:19.959Z",
+  "doclingDocumentsBefore": 5,
+  "doclingDocumentsAfter": 5,
+  "doclingUnchanged": true,
+  "previousBootCacheStatus": 404,
+  "userRestartedServer": true,
+  "observed": {
+    "fileView": true,
+    "folderNavigation": true,
+    "breadcrumb": true,
+    "saveIsIconOnly": true,
+    "typingAutoSavedToCache": true,
+    "doclingStatusRemainedUnsaved": true,
+    "viewSwitchPreservedTitleAndBody": true
+  },
+  "screenshots": [
+    "folders.png",
+    "editor-cache.png"
+  ]
+}

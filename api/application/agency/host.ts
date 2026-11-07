@@ -11,7 +11,6 @@ import {
 	emotionName,
 	runRespond,
 	type AgencyRuntime,
-	defaultLimits,
 	type CycleOutcome,
 	type IdlePlanner,
 	type LlmPort,
@@ -51,6 +50,9 @@ import { agencyReplyParts } from "./system-context";
 import { selectMemoryTopics } from "./topics";
 import type { AgencyWork } from "./work";
 import { captureHostInput } from "./input";
+import { createReview } from "./review";
+import { createAttention } from "./attention";
+import { offerReconsideration } from "./reconsider";
 export type { AgencyHostDeps, AgencySettings } from "./host-types";
 
 const samePersona = (a: HostPersona, b: HostPersona) =>
@@ -138,6 +140,25 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			cursor = value;
 		},
 	};
+	const on = () => started && !closed;
+	const attention = createAttention({
+		deps,
+		convs,
+		now: nowMs,
+		activeId: () => activeId,
+		convOf: (id) => convOf(id),
+		activate: (c) => activate(c),
+		save,
+		available: () => on() && memory.status().healthy,
+		prune: () => prune(),
+	});
+	const armReview = createReview({
+		enabled: () => !!deps.state && on(),
+		convs,
+		now: nowMs,
+		setTimer,
+		run: (c, trigger) => runCycle(c, trigger),
+	});
 	const {
 		convOf,
 		abortBackground,
@@ -163,6 +184,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		clearTopics: () => {
 			topicsCache = null;
 		},
+		preferredConversation: attention.preferred,
 	});
 	const collectReturns = createResultCollector({
 		deps,
@@ -175,33 +197,6 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		inflight,
 	});
 	const trackSave = checkpoint.trackSave;
-
-	function armReview(c: Conv) {
-		if (!deps.state || !on() || c.reviewTimer !== undefined) return;
-		const pendingAction = () => {
-			const snap = c.runtime.snapshot();
-			return snap.observations.some(
-				(o) =>
-					o.seq > snap.cursor &&
-					(o.kind === "action.observed" || o.kind === "delivery.observed"),
-			);
-		};
-		const readyAt = () =>
-			(c.runtime.snapshot().state.lastOutboundAt ?? nowMs()) +
-			defaultLimits.outboundIntervalMs;
-		c.reviewTimer = setTimer(() => {
-			delete c.reviewTimer;
-			if (!on() || convs.get(c.id) !== c) return;
-			if (c.background || (pendingAction() && nowMs() < readyAt()))
-				return armReview(c);
-			void runCycle(
-				c,
-				pendingAction() ? "result_received" : "review_due",
-			).finally(() => armReview(c));
-		}, 60_000);
-	}
-
-	const on = () => started && !closed;
 
 	// ---- feed -------------------------------------------------------------
 
@@ -403,6 +398,13 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	async function cycleBody(cy: Cycle): Promise<CycleOutcome> {
 		const { c, runtime, trigger, controller } = cy;
 		if (controller.signal.aborted) return "aborted";
+		if (trigger === "review_due" && cfg.actions?.enabled !== false)
+			offerReconsideration(
+				c,
+				nowMs(),
+				c.id === activeId ? topicsNow() : [],
+				(input) => store.read((db) => currentInput(deps, db, input)),
+			);
 		const opportunity: Opportunity = {
 			id: `o${++c.opportunities}`,
 			at: nowMs(),
@@ -777,6 +779,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		invalidateTopics() {
 			topicsCache = null;
 		},
+		attend: attention.attend,
+		status: attention.status,
 		/** Read-only diagnostics of one conversation's runtime (tests, support). */
 		inspect(conversationId: string) {
 			const c = convs.get(conversationId);

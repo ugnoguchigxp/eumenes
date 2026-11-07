@@ -255,6 +255,8 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
 
 担当が作るもの（画像・曲・報告など）は、種類の登録（`resource-kind`）と持ち主の domain の `ResourceAdapter`、画面の Web adapter の `focus`・`viewing` で、会話から `a<n>` として開く・再生する・読めるようにする。手順は [リソースURI](resources.md)。
 
+持ち主の domain が無い中間の成果（表・下書き・抜き書き）は、新しい kind を作らずに[一時ファイル](scratch.md)を使う。ホストが全担当（誘導型の Web 調査を除く）に `resource.read`（`offset` で続き）と `scratch.write` を付けるので、package に同名の道具を登録しない。書き出した URI を `finish.links` に書けば会話の `a<n>` になる。添付画像など一時ファイルの画像を受ける担当は、snapshot に `eumenes://scratch/<uuid>` を出し、取り込みは application の port で行う（例: `api/application/media/model3d-adapter.ts`・`api/application/scratch/shared-image-import.ts`）。
+
 ### 5.4 現在の制約
 
 - 新しい見た目が必要なら[§10 E](#10-e-designsystemopenuiartifactを追加する)でDesignSystem部品とOpenUI viewを追加する。

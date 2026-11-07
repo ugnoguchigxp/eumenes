@@ -1,6 +1,5 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type { useChatAttachments } from "./useChatAttachments";
-import type { ChatFiles } from "./useChatFiles";
 import type {
 	Addressee,
 	RunViewing,
@@ -13,7 +12,6 @@ export function chatSend(
 	input: ChatDraft,
 	setInput: Dispatch<SetStateAction<ChatDraft>>,
 	images: ReturnType<typeof useChatAttachments>,
-	files: ChatFiles,
 	submit: ReturnType<typeof useSubmit>,
 	automaticInput: boolean,
 	watchRun: (id: string) => void,
@@ -25,6 +23,7 @@ export function chatSend(
 	return (event: FormEvent) => {
 		event.preventDefault();
 		const text = input.text.trim();
+		const { files } = images;
 		const carried = images.items.length + files.items.length;
 		if (
 			(!text && !carried) ||

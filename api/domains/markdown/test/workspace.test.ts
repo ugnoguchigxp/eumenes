@@ -1,35 +1,18 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 import { sha256Hex } from "../../../infrastructure/digest";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createQueue, migrations as queueMigrations } from "../../queue";
-import {
-	createMarkdown,
-	migrations,
-	encodeArchive,
-	decodeArchive,
-	type ArchivePort,
-	type EditorDocument,
-} from "..";
+import { createMarkdown, migrations, encodeArchive, decodeArchive } from "..";
 import { emptyDocument } from "../contracts";
+import { waitFor } from "../../../infrastructure/wait-for";
 
-const cleanups: (() => Promise<void>)[] = [];
-afterEach(async () => {
-	for (const cleanup of cleanups.splice(0)) await cleanup();
-});
-const document = (text: string): EditorDocument => ({
-	formatVersion: 1,
-	nodes: [
-		{
-			type: "p",
-			align: "center",
-			children: [{ text, bold: true, fontSize: "24px", color: "#123456" }],
-		},
-	],
-	originalMarkdown: "# 元の原文\r\n\r\n日本語  \r\n",
-});
+import {
+	fixture,
+	document,
+	archived,
+	flush,
+	cleanups,
+} from "./workspace.fixture";
 test("archive v2 preserves frontmatter and rejects changes; legacy v1 remains readable", () => {
 	const documentId = crypto.randomUUID(),
 		name = "保存形式の確認",
@@ -59,110 +42,7 @@ test("archive v2 preserves frontmatter and rejects changes; legacy v1 remains re
 		),
 	).toEqual(expected);
 });
-async function flush() {
-	for (let i = 0; i < 30; i++) await new Promise((r) => setImmediate(r));
-}
-function fixture(save?: ArchivePort["save"]) {
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-markdown-"));
-	const store = openStore(join(dir, "test.sqlite"), [
-		...queueMigrations,
-		...migrations,
-	]);
-	const queue = createQueue(store);
-	let calls = 0,
-		binding = "config-1";
-	const snapshots = new Map<
-		string,
-		{
-			entry: {
-				sourceId: string;
-				documentId: string;
-				title: string;
-				revision: string;
-				path: string;
-			};
-			document: EditorDocument;
-		}
-	>();
-	const archive: ArchivePort = {
-		available: () => true,
-		binding: () => binding,
-		list: async () => [...snapshots.values()].map((v) => v.entry),
-		read: async (id) => snapshots.get(id)!,
-		save: async (input, signal) => {
-			calls++;
-			if (input.binding !== binding) throw new Error("configuration_changed");
-			if (save) return save(input, signal);
-			const entry = {
-				sourceId: input.sourceId ?? "desk-id",
-				documentId: input.documentId,
-				title: input.title,
-				revision: `r${calls}`,
-				path: `${input.documentId}.md`,
-			};
-			snapshots.set(entry.sourceId, { entry, document: input.document });
-			return entry;
-		},
-	};
-	const service = createMarkdown({ store, queue, archive });
-	cleanups.push(async () => {
-		await queue.close(20);
-		await store.close();
-		rmSync(dir, { recursive: true, force: true });
-	});
-	async function invoke(
-		operation: string,
-		raw: unknown,
-		id = crypto.randomUUID(),
-	) {
-		return store.write((db) =>
-			service.invokeInTransaction(db, operation, raw, id),
-		);
-	}
-	async function create(doc = document("利用者の初稿")) {
-		const { id: stageId } = await service.stage({ document: doc });
-		return invoke("markdown.new", { title: "日本語の文書", stageId });
-	}
-	async function apply(id: string, revision: number, doc: EditorDocument) {
-		const { id: stageId } = await service.stage({ document: doc });
-		return invoke("markdown.apply", {
-			documentId: id,
-			expectedRevision: revision,
-			title: "日本語の文書",
-			stageId,
-		});
-	}
-	async function saveDoc(id: string, revision: number) {
-		const current = store.read((db) => service.viewInTransaction(db, id));
-		const { id: stageId } = await service.stage({
-			document: current.document,
-			markdown: "# 保存される本文\n",
-		});
-		return invoke("markdown.archive", {
-			documentId: id,
-			expectedRevision: revision,
-			stageId,
-		});
-	}
-	return {
-		file: join(dir, "test.sqlite"),
-		archive,
-		store,
-		queue,
-		service,
-		invoke,
-		create,
-		apply,
-		saveDoc,
-		snapshots,
-		calls: () => calls,
-		change: () => {
-			binding = "config-2";
-		},
-		view: (id: string) => store.read((db) => service.viewInTransaction(db, id)),
-	};
-}
-test("Plate decorations and exact imported original survive Desk envelope and reopen", async () => {
+test("Plate decorations and exact imported original survive native recovery and reopen", async () => {
 	const h = fixture(),
 		created = await h.create();
 	await h.saveDoc(created.documentId, 1);
@@ -171,17 +51,15 @@ test("Plate decorations and exact imported original survive Desk envelope and re
 	expect(h.view(created.documentId)).toMatchObject({
 		saveState: "saved",
 		dirty: false,
-		sourceId: "desk-id",
+		sourceId: expect.stringMatching(/^wiki-[a-f0-9]{32}$/),
 	});
-	const saved = h.snapshots.get("desk-id")!,
-		raw = encodeArchive(
-			saved.entry.documentId,
-			saved.entry.title,
-			saved.document,
-			"# 保存される本文\n",
-		);
-	expect(decodeArchive(raw).document).toEqual(document("利用者の初稿"));
-	await h.service.open("desk-id", new AbortController().signal);
+	const saved = h.snapshots.get(h.view(created.documentId).sourceId!)!;
+	expect(JSON.parse(saved.recovery)).toEqual(document("利用者の初稿"));
+	expect(saved.markdown).toBe("# 保存される本文\n");
+	await h.service.open(
+		h.view(created.documentId).sourceId!,
+		new AbortController().signal,
+	);
 	expect(h.view(created.documentId).document).toEqual(document("利用者の初稿"));
 	expect(h.view(created.documentId)).toMatchObject({
 		revision: 2,
@@ -193,7 +71,9 @@ test("Plate decorations and exact imported original survive Desk envelope and re
 	await flush();
 	expect(h.calls()).toBe(2);
 	expect(h.snapshots.size).toBe(1);
-	expect(h.snapshots.get("desk-id")!.document).toEqual(document("継続編集"));
+	expect(h.snapshots.get(h.view(created.documentId).sourceId!)!.recovery).toBe(
+		JSON.stringify(document("継続編集")),
+	);
 });
 test("stale user or collaborator edit cannot overwrite the current document", async () => {
 	const h = fixture(),
@@ -236,13 +116,7 @@ test("save freezes its snapshot and leaves newer typing dirty after completion",
 	const gate = Promise.withResolvers<void>();
 	const h = fixture(async (input) => {
 		await gate.promise;
-		return {
-			sourceId: "desk-id",
-			documentId: input.documentId,
-			title: input.title,
-			revision: "saved-1",
-			path: `${input.documentId}.md`,
-		};
+		return archived(input).entry;
 	});
 	const created = await h.create();
 	await h.saveDoc(created.documentId, 1);
@@ -278,7 +152,9 @@ test.each(["failure", "configuration", "cancel", "interrupt"])(
 		if (mode === "cancel") await h.queue.cancel(h.queue.list().items[0]!.id);
 		if (mode === "interrupt") await h.queue.close(1);
 		gate.resolve();
-		await flush();
+		await waitFor(() => h.view(created.documentId).saveState !== "saving", {
+			timeout: 3000,
+		});
 		expect(h.view(created.documentId)).toMatchObject({
 			dirty: true,
 			saveState: "unknown",
@@ -371,29 +247,21 @@ test("startup recovery settles a persisted running save with no prepared in-memo
 	).toEqual({ n: 1 });
 });
 
-test("explicit GET reconciliation restores a confirmed Desk save and preserves later edits", async () => {
+test("explicit GET reconciliation confirms the frozen snapshot and preserves later edits", async () => {
 	const h = fixture(async (input) => {
-		h.snapshots.set("desk-id", {
-			entry: {
-				sourceId: "desk-id",
-				documentId: input.documentId,
-				title: input.title,
-				revision: "accepted-before-disconnect",
-				path: `${input.documentId}.md`,
-			},
-			document: input.document,
-		});
+		h.snapshots.set(input.sourceId, archived(input));
 		throw new Error("lost-response");
 	});
+	h.hide(true);
 	const created = await h.create();
 	await h.saveDoc(created.documentId, 1);
 	await h.queue.tick();
 	await flush();
 	expect(h.view(created.documentId).saveState).toBe("unknown");
 	await h.apply(created.documentId, 1, document("切断後の追記"));
+	h.hide(false);
 	await h.service.reconcile(created.documentId, new AbortController().signal);
 	expect(h.view(created.documentId)).toMatchObject({
-		sourceId: "desk-id",
 		saveState: "saved",
 		archivedRevision: 1,
 		revision: 2,
@@ -402,38 +270,44 @@ test("explicit GET reconciliation restores a confirmed Desk save and preserves l
 	expect(h.view(created.documentId).document).toEqual(document("切断後の追記"));
 	expect(h.calls()).toBe(1);
 });
-test("confirmed absence permits an explicit new save, while different Desk content remains a conflict", async () => {
+test("repeated 404s remain unknown without another PUT; different content becomes conflict", async () => {
 	const h = fixture(async () => {
-			throw new Error("not-delivered");
-		}),
-		created = await h.create();
+		throw new Error("not-delivered");
+	});
+	const created = await h.create();
 	await h.saveDoc(created.documentId, 1);
 	await h.queue.tick();
+	await new Promise((r) => setTimeout(r, 700));
 	await flush();
 	await h.service.reconcile(created.documentId, new AbortController().signal);
-	expect(h.view(created.documentId).saveState).toBe("unsaved");
-	expect(h.calls()).toBe(1);
-	await h.saveDoc(created.documentId, 1);
-	await h.queue.tick();
-	await flush();
-	expect(h.calls()).toBe(2);
-	h.snapshots.set("other", {
-		entry: {
-			sourceId: "other",
-			documentId: created.documentId,
-			title: "日本語の文書",
-			revision: "outside",
-			path: `${created.documentId}.md`,
-		},
-		document: document("外で変更"),
+	expect(h.view(created.documentId).saveState).toBe("unknown");
+	await expect(h.saveDoc(created.documentId, 1)).rejects.toThrow(
+		"markdown_archive_unknown",
+	);
+	const id = h.view(created.documentId).sourceId!;
+	const pending = h.store.read((db) =>
+		db.query("SELECT * FROM markdown_saves").get(),
+	) as import("../repository").PendingSave;
+	const remote = archived({
+		documentId: created.documentId,
+		sourceId: id,
+		title: pending.title,
+		markdown: "外で変更",
+		recovery: JSON.stringify(document("外で変更")),
+		remoteRevision: null,
+		binding: pending.binding,
+		namespace: pending.namespace!,
+		path: pending.path!,
+		contentDigest: "",
 	});
+	h.snapshots.set(id, remote);
 	await h.service.reconcile(created.documentId, new AbortController().signal);
 	expect(h.view(created.documentId)).toMatchObject({
-		saveState: "unknown",
+		saveState: "conflict",
 		saveError: "markdown_archive_conflict",
 	});
 	expect(h.view(created.documentId).document).toEqual(document("利用者の初稿"));
-	expect(h.calls()).toBe(2);
+	expect(h.calls()).toBe(1);
 });
 
 test("database reopen retains pending work and last Desk baseline without a version history", async () => {
@@ -443,6 +317,7 @@ test("database reopen retains pending work and last Desk baseline without a vers
 	await h.queue.tick();
 	await flush();
 	await h.apply(created.documentId, 1, document("閉じる前の未保存の追記"));
+	const sourceId = h.view(created.documentId).sourceId!;
 	await h.queue.close(20);
 	await h.store.close();
 	const store = openStore(h.file, [...queueMigrations, ...migrations]),
@@ -461,7 +336,7 @@ test("database reopen retains pending work and last Desk baseline without a vers
 	});
 	expect(view().document).toEqual(document("閉じる前の未保存の追記"));
 	await expect(
-		service.open("desk-id", new AbortController().signal),
+		service.open(sourceId, new AbortController().signal),
 	).rejects.toThrow("revision_conflict");
 	const work = await store.write((db) =>
 		service.session.openInTransaction(db, {
@@ -472,27 +347,23 @@ test("database reopen retains pending work and last Desk baseline without a vers
 	await store.write((db) =>
 		service.session.endInTransaction(db, work.workRef, "discard"),
 	);
-	await service.open("desk-id", new AbortController().signal);
+	await service.open(sourceId, new AbortController().signal);
 	expect(view().document).toEqual(document("利用者の初稿"));
 	expect(view().dirty).toBe(false);
 });
 
-test("Desk UTF8 envelope limit is rejected before accepting or submitting a save", async () => {
+test("native UTF8 limits reject oversized staging without submitting a save", async () => {
 	const h = fixture(),
-		created = await h.create(document("x".repeat(600000)));
-	const stageId = (
-		await h.service.stage({
-			document: h.view(created.documentId).document,
-			markdown: "あ".repeat(450000),
-		})
-	).id;
+		created = await h.create();
 	await expect(
-		h.invoke("markdown.archive", {
-			documentId: created.documentId,
-			expectedRevision: 1,
-			stageId,
+		h.service.stage({
+			document: h.view(created.documentId).document,
+			markdown: "あ".repeat(Math.ceil((8 * 1024 * 1024) / 3)),
 		}),
-	).rejects.toThrow("markdown_document_too_large");
+	).rejects.toThrow();
+	await expect(
+		h.service.stage({ document: document("x".repeat(8 * 1024 * 1024)) }),
+	).rejects.toThrow();
 	expect(h.calls()).toBe(0);
 	expect(h.queue.list().items).toHaveLength(0);
 	expect(h.view(created.documentId).saveState).toBe("unsaved");

@@ -68,6 +68,12 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 			EUMENES_WORLD: "protect",
 		}),
 	);
+	// Any toolchain's result may name a shared file it wrote (spec/server-scratch-cache-design-2026-11-07.md §3).
+	expect(
+		services.store.read((db) =>
+			services.resources.dialogue.producesInTransaction(db, "web.research"),
+		),
+	).toContain("scratch");
 	const items = createLifecycles(services, { name: "http", close: () => {} });
 	const recoveries = items
 		.filter((item) => item.recover)
@@ -119,6 +125,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"monitoring",
 		"dialogue",
 		"inference",
+		"scratch",
 		"attitude_dataset",
 		"dataset_store",
 		"store",
