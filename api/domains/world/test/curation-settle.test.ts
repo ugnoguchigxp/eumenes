@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { createWorldDocuments } from "..";
+import { sha256Hex } from "../../../infrastructure/digest";
 import type { PreparedCuration } from "..";
 import { SCOPE, addMessage, entityOp, worldEdges } from "./fixture";
 import {
@@ -16,6 +18,50 @@ import {
 } from "./curation-fixture";
 
 // World curation: stale settles, bad answers and released prepares. See curation-fixture.ts for the shared rig.
+
+test("owner archive during inference fences the old curation result without deleting its inputs", async () => {
+	const { life, rig } = await started();
+	try {
+		await withService(life);
+		await addMessage(life, "m1", TEXT);
+		await received(life);
+		const docs = createWorldDocuments(life.store);
+		const content = "部品記録";
+		await docs.import(SCOPE, {
+			id: "parts-doc",
+			revision: "v1",
+			title: "部品記録",
+			collection: "parts",
+			manifestDigest: "a".repeat(64),
+			content,
+			digest: `sha256:${sha256Hex(content)}`,
+		});
+		const prepared = await life.store.write((db) =>
+			rig.curation.prepareCurationInTransaction(db, {
+				scope: SCOPE,
+				eventIds: pending(rig).map((e) => e.eventId),
+			}),
+		);
+		if (prepared.status !== "ready") throw new Error(prepared.status);
+		await docs.maintenance.apply(SCOPE, {
+			active: false,
+			refs: [{ kind: "document", id: "parts-doc", revision: "v1" }],
+		});
+		const result = await life.store.write((db) =>
+			rig.curation.settleCurationInTransaction(db, {
+				prepared: prepared.prepared,
+				output: { entities: [], claims: [claimOf()] },
+			}),
+		);
+		expect(result).toEqual({ status: "stale", reason: "working_set_changed" });
+		expect(assertionRows(life)).toHaveLength(0);
+		expect(
+			life.store.read((db) => life.conversation.messageInTransaction(db, "m1")),
+		).not.toBeNull();
+	} finally {
+		await life.cleanup();
+	}
+});
 
 test("a result is not adopted when the world moved since prepare, and its Memory dependents are given back", async () => {
 	const { life, rig } = await started();

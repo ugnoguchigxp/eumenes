@@ -1,0 +1,571 @@
+{
+  "configuration": {
+    "datasetHash": "64909a5f9bde7c5752bb0788401c94c696b0a0367d06ae6ebfbedef13b1a5077",
+    "entry": "routeStructured",
+    "structurePrompt": "turn-structure-v8",
+    "structureTimeoutMs": 30000,
+    "reasoningEffort": "low",
+    "structuredOutput": true,
+    "settingsHash": "71d7a841a1733b9044e84e98b9bfdfc7f20de1fcdd11f4ae62a3ffb0b1278ba2",
+    "source": "adopted-package",
+    "variants": [
+      "B"
+    ],
+    "callsPerCaseAndVariant": 1,
+    "dispatch": false
+  },
+  "rows": [
+    {
+      "id": "known-a",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 6655,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "明日の東京の天気予報を調べて",
+            "target": null,
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "その最高気温と最低気温の差を計算して教えてください。",
+            "target": null,
+            "inputs": [
+              "その最高気温と最低気温"
+            ],
+            "after": [
+              0
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "weather.forecast",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "weather.forecast",
+          "after": [
+            0
+          ],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-b",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 7927,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "1から50までの素数の個数を計算して",
+            "target": "計算結果の個数",
+            "inputs": [
+              "1から50まで"
+            ],
+            "after": []
+          },
+          {
+            "text": "その計算結果の個数と同じ秒数のタイマーを作ってください。",
+            "target": "タイマー",
+            "inputs": [
+              "その計算結果の個数と同じ秒数"
+            ],
+            "after": [
+              0
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "compute.python",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [
+            0
+          ],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-c",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 7900,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "1から50までの素数の個数をPythonで計算してください",
+            "target": null,
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "計算した個数と同じ秒数のタイマーをセットしてください",
+            "target": "タイマー",
+            "inputs": [
+              "計算した個数"
+            ],
+            "after": [
+              0
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "compute.python",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [
+            0
+          ],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-d",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5807,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "明日の東京の天気予報を教えてください。",
+            "target": null,
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "20秒のタイマーをセットしてください。",
+            "target": null,
+            "inputs": [],
+            "after": []
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "weather.forecast",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-answer-1",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5953,
+      "to": "run",
+      "row": 5,
+      "candidate": "t1.answer",
+      "structure": {
+        "kind": "answer",
+        "ref": "t1.answer",
+        "text": "1から50までの素数の個数を計算して、その個数と同じ秒数のタイマーを作ってください。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "known-answer-2",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5266,
+      "to": "run",
+      "row": 5,
+      "candidate": "t1.answer",
+      "structure": {
+        "kind": "answer",
+        "ref": "t1.answer",
+        "text": "計算するのは1から50までの素数の個数で、その結果を使う作業は、その個数と同じ秒数のタイマーを作ることです。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5747,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "15秒のタイマー",
+            "target": "15秒のタイマー",
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "30秒のタイマーをそれぞれ作ってください。",
+            "target": "30秒のタイマー",
+            "inputs": [],
+            "after": []
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "timers.manage",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "short-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 4482,
+      "to": "run",
+      "row": 5,
+      "candidate": "t2.answer",
+      "structure": {
+        "kind": "answer",
+        "ref": "t2.answer",
+        "text": "15秒です",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "topic-change",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5458,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "decline-work",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 4691,
+      "to": "run",
+      "row": 6,
+      "candidate": "t2.cancel",
+      "structure": {
+        "kind": "control",
+        "ref": "t2.cancel",
+        "text": "その作業はもう不要なので取り消してください。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "draft-only",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 4476,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "ambiguous-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 6341,
+      "to": "clarify",
+      "row": 8,
+      "candidate": null,
+      "structure": {
+        "kind": "clarify",
+        "question": "「15秒です」は、どちらの保留中のタイマー（t2 または t3）への回答ですか？",
+        "unhandled": [
+          "15秒です"
+        ],
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "revoked-answer",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 4560,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "mixed-reply-new-work",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5075,
+      "to": "clarify",
+      "row": 8,
+      "candidate": null,
+      "structure": {
+        "kind": "clarify",
+        "question": "15秒のタイマー設定と、明日の東京の天気の確認の両方を今進めてよいですか？",
+        "unhandled": [
+          "15秒です。それとは別に、明日の東京の天気を教えてください。"
+        ],
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-dependent",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 6010,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "1から30までの偶数を足して",
+            "target": null,
+            "inputs": [
+              "1から30までの偶数"
+            ],
+            "after": []
+          },
+          {
+            "text": "その結果と同じ秒数のタイマーを設定して。",
+            "target": "タイマー",
+            "inputs": [
+              "その結果と同じ秒数"
+            ],
+            "after": [
+              0
+            ]
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "compute.python",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [
+            0
+          ],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-independent",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 7157,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "大阪の明日の天気予報",
+            "target": null,
+            "inputs": [
+              "大阪",
+              "明日"
+            ],
+            "after": []
+          },
+          {
+            "text": "45秒のタイマーをお願いします。",
+            "target": "45秒のタイマー",
+            "inputs": [],
+            "after": []
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "weather.forecast",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-same-tool",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 5240,
+      "error": "structure_invalid"
+    },
+    {
+      "id": "holdout-answer",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 6083,
+      "to": "run",
+      "row": 5,
+      "candidate": "t4.answer",
+      "structure": {
+        "kind": "answer",
+        "ref": "t4.answer",
+        "text": "焼き用のほうでお願いします。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-discussion",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 4890,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "holdout-new-topic",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 7243,
+      "to": "clarify",
+      "row": 8,
+      "candidate": null,
+      "structure": {
+        "kind": "clarify",
+        "question": "タイマー秒数の回答は保留したまま、「名古屋の天気を調べる」新しい依頼だけ実行しますか？",
+        "unhandled": [
+          "秒数は後で決めます。",
+          "今は名古屋の天気だけ調べてください。"
+        ],
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    }
+  ]
+}

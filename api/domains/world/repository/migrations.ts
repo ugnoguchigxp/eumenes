@@ -1,4 +1,5 @@
 import { initialSyncMigration } from "./initial-sync";
+import { workingSetMigration } from "./working-set";
 import { documentsMigration } from "./documents";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { extractionMigration } from "./extraction";
@@ -47,5 +48,10 @@ export const migrations: readonly Migration[] = [
 		id: "world/0012-initial-source-sync",
 		after: ["world/0011-documents"],
 		sql: initialSyncMigration,
+	},
+	{
+		id: "world/0013-working-set",
+		after: ["world/0012-initial-source-sync"],
+		sql: workingSetMigration,
 	},
 ];

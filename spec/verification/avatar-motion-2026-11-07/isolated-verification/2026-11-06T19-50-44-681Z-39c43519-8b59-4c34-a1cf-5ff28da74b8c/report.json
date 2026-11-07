@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "runId": "2026-11-06T19-50-44-681Z-39c43519-8b59-4c34-a1cf-5ff28da74b8c",
+  "startedAt": "2026-11-06T19:50:44.681Z",
+  "scope": {
+    "all": false,
+    "selected": [
+      "avatar",
+      "audio",
+      "conversation",
+      "voice-dialogue"
+    ]
+  },
+  "baseCommit": "0559873582e75c822ccc3d442e153e0f0a25711b",
+  "revision": "d1b4441f11184e2ef73b9ae63a24eed0a0aacf9dc9daf16f3ece23dede026e0c",
+  "runtime": {
+    "bun": "1.4.4",
+    "node": "26.3.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "ci": false,
+    "runner": null
+  },
+  "result": "fail",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "pass",
+      "ms": 82
+    },
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "ms": 2252
+    },
+    {
+      "name": "system-context",
+      "status": "pass",
+      "ms": 187
+    },
+    {
+      "name": "size-budget",
+      "status": "pass",
+      "ms": 984
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "fail",
+      "ms": 673,
+      "error": "Error: scripts/sql-boundaries.ts failed (1)\nerror: Cannot find package 'standardwebhooks' from '/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-avatar-verify-uqwmnhz1/packages/dots-mcp/src/index.ts'\n\nBun v1.4.4 (macOS arm64)"
+    },
+    {
+      "name": "domain-docs",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "format",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "lint",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "design-system typecheck",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "typecheck"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "design-system build",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "run",
+        "--cwd",
+        "packages/design-system",
+        "build"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "typecheck",
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "bun tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "test",
+        "./api/application/agency/connection.test.ts",
+        "./api/application/app.test.ts",
+        "./api/application/browser/browser-composition.test.ts",
+        "./api/application/browser/interact-integration.test.ts",
+        "./api/application/migrations.test.ts",
+        "./api/application/timers/timer-announcements.test.ts",
+        "./api/application/work/tasks-http.test.ts",
+        "./api/application/world/memory-adapter.test.ts",
+        "./api/application/world/world-acceptance-p3.test.ts",
+        "./api/application/world/world-initial-sync.test.ts",
+        "./api/application/world/world.test.ts",
+        "./api/domains/conversation/test/attachments.test.ts",
+        "./api/domains/conversation/test/bounded-read.test.ts",
+        "./api/domains/conversation/test/conversation.test.ts",
+        "./api/domains/conversation/test/history.test.ts",
+        "./api/domains/conversation/test/input-migration.test.ts",
+        "./api/domains/conversation/test/input.test.ts",
+        "./api/domains/conversation/test/message-delivery.test.ts",
+        "./api/domains/conversation/test/outbox.test.ts",
+        "./api/domains/conversation/test/source-backfill.test.ts",
+        "./api/domains/voice-dialogue/test/migration.test.ts",
+        "./api/domains/voice-dialogue/test/playback-heard.test.ts",
+        "./api/domains/voice-dialogue/test/replay-announcement.test.ts",
+        "./api/domains/voice-dialogue/test/routed-voice.test.ts",
+        "./api/domains/voice-dialogue/test/sentences.test.ts",
+        "./api/domains/voice-dialogue/test/settings-input.test.ts",
+        "./api/domains/voice-dialogue/test/settings-integration.test.ts",
+        "./api/domains/voice-dialogue/test/settings-speech.test.ts",
+        "./api/domains/voice-dialogue/test/speech-claims.test.ts",
+        "./api/domains/voice-dialogue/test/spoken-text.test.ts",
+        "./api/domains/voice-dialogue/test/streaming-speech.test.ts",
+        "./api/domains/voice-dialogue/test/upload.test.ts",
+        "./api/domains/voice-dialogue/test/voice.test.ts"
+      ],
+      "status": "not_run",
+      "ms": 0
+    },
+    {
+      "name": "web tests",
+      "command": [
+        "/Users/y.noguchi/.bun/bin/bun",
+        "x",
+        "--no-install",
+        "vitest",
+        "run",
+        "web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx",
+        "web/src/components/domains/conversation/LightAvatarBackground.test.tsx",
+        "web/src/components/domains/conversation/LightAvatarMotionLab.test.tsx",
+        "web/src/components/domains/conversation/MessageList.test.tsx",
+        "web/src/components/domains/conversation/light-avatar/clips.test.ts",
+        "web/src/components/domains/conversation/light-avatar/idle.test.ts",
+        "web/src/components/domains/conversation/light-avatar/performer.test.ts",
+        "web/src/components/domains/conversation/markdownRenderer.test.ts",
+        "web/src/domains/audio/live-pcm.test.ts",
+        "web/src/domains/audio/test/assistant-speech.test.ts",
+        "web/src/domains/audio/test/audio.test.ts",
+        "web/src/domains/audio/test/capture.test.ts",
+        "web/src/domains/audio/test/performance.test.ts",
+        "web/src/domains/audio/test/screen-output.test.ts",
+        "web/src/domains/audio/test/segment-timing.test.ts",
+        "web/src/domains/audio/test/speech-detector.test.ts",
+        "web/src/domains/audio/test/speech-model.test.ts",
+        "web/src/domains/audio/test/timer-output.test.tsx",
+        "web/src/domains/audio/test/tone.test.ts",
+        "web/src/domains/avatar/test/face.test.ts",
+        "web/src/domains/avatar/test/idle.test.ts",
+        "web/src/domains/avatar/test/playback.test.ts",
+        "web/src/domains/conversation/test/hooks.test.tsx",
+        "web/src/domains/voice-dialogue/test/automatic.test.tsx",
+        "web/src/domains/voice-dialogue/test/capture.test.tsx",
+        "web/src/domains/voice-dialogue/test/chunk-player.test.ts",
+        "web/src/domains/voice-dialogue/test/corrections.test.tsx",
+        "web/src/domains/voice-dialogue/test/hooks.test.tsx",
+        "web/src/domains/voice-dialogue/test/input-timing.test.ts",
+        "web/src/domains/voice-dialogue/test/input.test.tsx",
+        "web/src/domains/voice-dialogue/test/machine.test.ts",
+        "web/src/domains/voice-dialogue/test/replay.test.tsx"
+      ],
+      "status": "not_run",
+      "ms": 0
+    }
+  ],
+  "totalMs": 4706,
+  "integrityErrors": [],
+  "build": {
+    "sharedOutput": true
+  },
+  "stopReason": "Error: scripts/sql-boundaries.ts failed (1)\nerror: Cannot find package 'standardwebhooks' from '/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-avatar-verify-uqwmnhz1/packages/dots-mcp/src/index.ts'\n\nBun v1.4.4 (macOS arm64)",
+  "finalRevision": "d1b4441f11184e2ef73b9ae63a24eed0a0aacf9dc9daf16f3ece23dede026e0c",
+  "finishedAt": "2026-11-06T19:50:55.703Z"
+}

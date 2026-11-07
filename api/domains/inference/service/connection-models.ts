@@ -1,3 +1,4 @@
+import { codexModels } from "../adapters/codex-models";
 import { workersModels } from "./workers-ai-models";
 import Anthropic from "@anthropic-ai/sdk";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -47,6 +48,13 @@ async function apiKeyModels(
 		models.push({
 			id: model.id,
 			displayName: model.display_name || model.id,
+			...(model.capabilities?.image_input
+				? {
+						inputModalities: model.capabilities.image_input.supported
+							? ["text", "image"]
+							: ["text"],
+					}
+				: {}),
 			contextWindow:
 				Number.isSafeInteger(model.max_input_tokens) &&
 				model.max_input_tokens! > 0
@@ -131,6 +139,7 @@ export function createConnectionModels(
 		fetch?: typeof fetch;
 		claudeQuery?: typeof query;
 		now?: () => number;
+		codexExecutable?: string;
 		store?: SqliteStore;
 	} = {},
 ): ConnectionModelsService {
@@ -161,6 +170,7 @@ function createListing(
 		fetch?: typeof fetch;
 		claudeQuery?: typeof query;
 		now?: () => number;
+		codexExecutable?: string;
 	},
 ): ConnectionModelsService {
 	const now = options.now ?? Date.now;
@@ -173,13 +183,15 @@ function createListing(
 			if (
 				!connection ||
 				!connection.enabled ||
-				(connection.kind !== "cloudflare-workers-ai" &&
+				(connection.kind !== "codex-sdk" &&
+					connection.kind !== "cloudflare-workers-ai" &&
 					(connection.kind !== "claude-agent-sdk" || !connection.auth))
 			)
 				return null;
 			const auth: AgentAuth = connection.auth ?? "api-key";
 			const credential = settings.credential(connection);
-			if (!credential) throw new Error("cloud_credential_unavailable");
+			if (!credential && connection.kind !== "codex-sdk")
+				throw new Error("cloud_credential_unavailable");
 			const key = JSON.stringify([
 				connection.id,
 				connection.epoch,
@@ -203,18 +215,32 @@ function createListing(
 					!current.enabled ||
 					current.epoch !== connection.epoch ||
 					current.kind !== connection.kind ||
+					current.auth !== connection.auth ||
+					current.envRef !== connection.envRef ||
 					current.accountId !== connection.accountId ||
 					current.baseUrl !== connection.baseUrl
 				)
 					throw new Error("stale_connection_settings");
 			};
-			if (connection.kind === "cloudflare-workers-ai") {
-				const value = await workersModels(
-					connection,
-					credential,
-					options.fetch ?? fetch,
-					signal,
-				);
+			if (
+				connection.kind === "cloudflare-workers-ai" ||
+				connection.kind === "codex-sdk"
+			) {
+				const value =
+					connection.kind === "codex-sdk"
+						? await codexModels(
+								environment,
+								connection,
+								credential,
+								signal,
+								options.codexExecutable,
+							)
+						: await workersModels(
+								connection,
+								credential!,
+								options.fetch ?? fetch,
+								signal,
+							);
 				assertCurrent();
 				for (const [k, entry] of cache)
 					if (now() - entry.at >= ttlMs) cache.delete(k);
@@ -228,14 +254,14 @@ function createListing(
 					auth === "api-key"
 						? await apiKeyModels(
 								connection,
-								credential,
+								credential!,
 								options.fetch ?? fetch,
 								signal,
 							)
 						: await subscriptionModels(
 								environment,
 								connection,
-								credential,
+								credential!,
 								options.claudeQuery ?? query,
 								signal,
 							);

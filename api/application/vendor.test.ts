@@ -93,7 +93,18 @@ const agencyManifest = JSON.parse(
 test("the vendored agency package matches its manifest, package.json, the lockfile and the installed copy", () => {
 	const artifact = read(`vendor/agency/${agencyManifest.artifact}`);
 	expect(agencyManifest.package).toBe("eumenes-agency");
-	expect(agencyManifest.dirty).toBe(false);
+	// The adopted candidate includes measured, uncommitted core fixes. Bind that exact diff as well as the artifact.
+	expect(agencyManifest.dirty).toBe(true);
+	expect(agencyManifest.adoptionSource.baseCommit).toBe(agencyManifest.gitSha);
+	expect(
+		createHash("sha256")
+			.update(read(`vendor/agency/${agencyManifest.adoptionSource.patchFile}`))
+			.digest("hex"),
+	).toBe(agencyManifest.adoptionSource.patchSha256);
+	expect(agencyManifest.adoptionSource.sourceHash).toMatch(/^[a-f0-9]{64}$/);
+	expect(
+		Object.keys(agencyManifest.adoptionSource.sourceFiles).length,
+	).toBeGreaterThan(0);
 	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
 		agencyManifest.sha256,
 	);

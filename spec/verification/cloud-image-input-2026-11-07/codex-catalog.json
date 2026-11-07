@@ -1,0 +1,13 @@
+{
+  "lane": "live-metadata-only",
+  "settingsRevision": 170,
+  "connectionKind": "codex-sdk",
+  "selectedModel": "gpt-6-luna",
+  "catalogModels": 11,
+  "selectedModelFound": true,
+  "inputModalities": [
+    "text",
+    "image"
+  ],
+  "modelInferencePerformed": false
+}

@@ -1,0 +1,56 @@
+{
+  "started": "2026-11-06T11:14:53.975Z",
+  "conversationId": "verify-eum001-weather-diff-20261106",
+  "entry": "routeStructured",
+  "structureTimeoutMs": 30000,
+  "exitCode": 0,
+  "stdout": "{\"type\":\"message\",\"updated\":false,\"id\":\"50e320b0-4bd9-49b0-9476-d4279936037f\",\"conversationId\":\"verify-eum001-weather-diff-20261106\",\"role\":\"user\",\"text\":\"明日の東京の天気予報を調べて、その最高気温と最低気温の差を計算して教えてください。\",\"createdAt\":\"2026-11-06T11:14:54.061Z\",\"runId\":\"09833c87-b3d2-4af1-b1e8-00cf624278aa\"}\n{\"type\":\"announcement\",\"updated\":false,\"id\":\"announcement:09833c87-b3d2-4af1-b1e8-00cf624278aa\",\"conversationId\":\"verify-eum001-weather-diff-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:14:54.061Z\",\"runId\":\"09833c87-b3d2-4af1-b1e8-00cf624278aa\"}\n{\"type\":\"message\",\"updated\":false,\"id\":\"ce78102e-74b2-4cc5-8e93-366f865c1ce2\",\"conversationId\":\"verify-eum001-weather-diff-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:15:09.726Z\",\"runId\":\"09833c87-b3d2-4af1-b1e8-00cf624278aa\"}\n",
+  "stderr": "",
+  "runs": [
+    {
+      "id": "09833c87-b3d2-4af1-b1e8-00cf624278aa",
+      "agentTaskId": null,
+      "requestId": "0d5ac528-6b05-49bb-8b1b-652f30ce4ebe",
+      "conversationId": "verify-eum001-weather-diff-20261106",
+      "utteranceId": null,
+      "status": "completed",
+      "revision": 2,
+      "inputMessageId": "50e320b0-4bd9-49b0-9476-d4279936037f",
+      "answerMessageId": "ce78102e-74b2-4cc5-8e93-366f865c1ce2",
+      "announcement": "「パイプライン」に頼みます。",
+      "error": null,
+      "jobId": "a62a34bf-27a3-4d18-afe5-8d35f0bd049f",
+      "deadlineAt": "2026-11-06T11:17:54.061Z",
+      "deadlineFixed": false,
+      "sourceKind": "manual",
+      "scheduleId": null,
+      "occurrenceId": null,
+      "specialistSessionId": null,
+      "pinnedToolchainId": null,
+      "createdAt": "2026-11-06T11:14:54.061Z",
+      "updatedAt": "2026-11-06T11:15:09.726Z"
+    }
+  ],
+  "conversation": {
+    "id": "verify-eum001-weather-diff-20261106",
+    "revision": 2,
+    "messages": [
+      {
+        "id": "50e320b0-4bd9-49b0-9476-d4279936037f",
+        "conversationId": "verify-eum001-weather-diff-20261106",
+        "role": "user",
+        "text": "明日の東京の天気予報を調べて、その最高気温と最低気温の差を計算して教えてください。",
+        "createdAt": "2026-11-06T11:14:54.061Z",
+        "runId": "09833c87-b3d2-4af1-b1e8-00cf624278aa"
+      },
+      {
+        "id": "ce78102e-74b2-4cc5-8e93-366f865c1ce2",
+        "conversationId": "verify-eum001-weather-diff-20261106",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T11:15:09.726Z",
+        "runId": "09833c87-b3d2-4af1-b1e8-00cf624278aa"
+      }
+    ]
+  }
+}

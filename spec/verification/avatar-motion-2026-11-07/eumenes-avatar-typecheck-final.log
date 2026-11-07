@@ -1,0 +1,9 @@
+tests/browser/avatar-view.spec.ts(45,33): error TS2532: Object is possibly 'undefined'.
+tests/browser/avatar-view.spec.ts(45,55): error TS2532: Object is possibly 'undefined'.
+tests/browser/avatar-view.spec.ts(50,62): error TS2532: Object is possibly 'undefined'.
+tests/browser/avatar-view.spec.ts(50,80): error TS2532: Object is possibly 'undefined'.
+tests/browser/avatar-view.spec.ts(57,33): error TS2532: Object is possibly 'undefined'.
+tests/browser/avatar-view.spec.ts(57,55): error TS2532: Object is possibly 'undefined'.
+tests/browser/avatar-view.spec.ts(75,33): error TS2532: Object is possibly 'undefined'.
+tests/browser/avatar-view.spec.ts(75,55): error TS2532: Object is possibly 'undefined'.
+Found 8 errors in 1 file, checked 2,976 files [843.38ms]

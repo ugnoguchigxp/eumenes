@@ -28,7 +28,11 @@ function structure(raw: string) {
 		executeControl: async (...args: Parameters<typeof original>) => {
 			if (args[0] !== "structure-fixture") return original(...args);
 			prompts.push(args[1].at(-1)!.content);
-			return { requestId: args[0], attemptId: "structure", value: raw };
+			return {
+				requestId: args[0],
+				attemptId: "structure",
+				value: JSON.stringify({ decision: JSON.parse(raw) }),
+			};
 		},
 	});
 	return prompts;
@@ -74,6 +78,9 @@ test("a mixed reply asks about the whole unperformed scope and leaves the existi
 	const run = await h.say("15秒です。天気も調べて");
 	expect(h.dialogue.answerText(run.id)).toContain("まだ実施していない依頼");
 	expect(h.dialogue.answerText(run.id)).toContain("天気も調べて");
+	expect(h.dialogue.answerText(run.id)).not.toContain(
+		"S11TNEXT_DELIMITED_CONTEXT",
+	);
 	expect(h.interaction()).toMatchObject({
 		id: before.id,
 		status: "waiting_input",
@@ -99,4 +106,68 @@ test("an invented question reference fails before answering or starting a replac
 	});
 	expect(h.todos()).toHaveLength(1);
 	expect(h.started).toHaveLength(0);
+});
+
+test("structured cancellation reaches the same command and rejects a later answer to its closed question", async () => {
+	h = await setup({ questions: [] });
+	await h.asked("何秒ですか", "builtin:answerText");
+	const todo = h.todos()[0]!;
+	const interaction = h.interaction()!;
+	const scores = h.state.routerAsked.length;
+	const prompts = structure(
+		'{"control":{"ref":"t1.cancel","text":"その作業を取り消してください"}}',
+	);
+	await h.say("その作業を取り消してください");
+	expect(h.todos()).toHaveLength(0);
+	expect(h.archived()).toMatchObject([{ id: todo.id, outcome: "cancelled" }]);
+	expect(h.interaction()?.status).toBe("cancelled");
+	await expect(
+		h.interactions.answer(interaction.id, {
+			eventId: crypto.randomUUID(),
+			questionId: interaction.question!.questionId,
+			expectedRevision: interaction.revision,
+			input: "15秒です",
+		}),
+	).rejects.toThrow("interaction_closed");
+	expect(h.state.routerAsked).toHaveLength(scores);
+	expect(JSON.parse(prompts[0]!).controls).toEqual([
+		{ ref: "t1.cancel", title: todo.title },
+	]);
+	const after = structure('{"answer":{"ref":"t1.answer","text":"15秒です"}}');
+	await h.say("15秒です");
+	expect(JSON.parse(after[0]!).pending).toEqual([]);
+	expect(JSON.parse(after[0]!).controls).toEqual([]);
+	expect(h.archived()).toHaveLength(1);
+	expect(h.started).toHaveLength(0);
+});
+
+test("a model's partial answer or cancellation cannot omit the rest of the utterance", async () => {
+	h = await setup({ questions: [] });
+	await h.asked("何秒ですか", "builtin:answerText");
+	const before = h.interaction()!;
+	const scores = h.state.routerAsked.length;
+	for (const [text, raw] of [
+		[
+			"15秒です。それとは別に天気を調べてください。",
+			'{"answer":{"ref":"t1.answer","text":"15秒です"}}',
+		],
+		[
+			"その話は後にして、少し話を聞いてください。",
+			'{"control":{"ref":"t1.cancel","text":"その話は後にして"}}',
+		],
+	]) {
+		structure(raw!);
+		const run = await h.say(text!);
+		expect(h.dialogue.answerText(run.id)).toContain(
+			"今回の作業はまだ実施していません",
+		);
+		expect(h.interaction()).toMatchObject({
+			id: before.id,
+			status: "waiting_input",
+			revision: before.revision,
+		});
+	}
+	expect(h.todos()).toHaveLength(1);
+	expect(h.started).toHaveLength(0);
+	expect(h.state.routerAsked).toHaveLength(scores);
 });

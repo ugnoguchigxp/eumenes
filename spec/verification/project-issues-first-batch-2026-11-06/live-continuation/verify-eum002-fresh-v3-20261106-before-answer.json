@@ -1,0 +1,51 @@
+{
+  "question": {
+    "kind": "task_question",
+    "workRef": "0a7b11cb-72ce-4e1d-bf67-b7d751ae91ce",
+    "revision": 0,
+    "status": "waiting_user",
+    "request": "計算結果を使って別の作業を実行して。",
+    "question": {
+      "id": "a9c27215-18e2-4deb-8ead-4a9f553c7863",
+      "prompt": "何を計算し、その計算結果を使ってどの作業を実行しますか？",
+      "expiresAt": 1793965155497,
+      "inputSchema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 8000
+      }
+    },
+    "result": null
+  },
+  "conversation": {
+    "id": "verify-eum002-fresh-v3-20261106",
+    "revision": 3,
+    "messages": [
+      {
+        "id": "85f8e5fc-3d9d-4e2c-b421-f5fe0757ea10",
+        "conversationId": "verify-eum002-fresh-v3-20261106",
+        "role": "user",
+        "text": "計算結果を使って別の作業を実行して。",
+        "createdAt": "2026-11-06T11:09:14.961Z",
+        "runId": "17d19110-df32-4459-b8a9-741d2f2c3781"
+      },
+      {
+        "id": "8851098d-f859-4099-9c08-d187f5d890c7",
+        "conversationId": "verify-eum002-fresh-v3-20261106",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T11:09:15.513Z",
+        "runId": "17d19110-df32-4459-b8a9-741d2f2c3781"
+      },
+      {
+        "id": "b8493c1d-d146-4d99-b807-d82f68fb921c",
+        "conversationId": "verify-eum002-fresh-v3-20261106",
+        "role": "user",
+        "text": "{\"kind\":\"task_question\",\"workRef\":\"0a7b11cb-72ce-4e1d-bf67-b7d751ae91ce\",\"revision\":0,\"status\":\"waiting_user\",\"request\":\"計算結果を使って別の作業を実行して。\",\"question\":{\"id\":\"a9c27215-18e2-4deb-8ead-4a9f553c7863\",\"prompt\":\"何を計算し、その計算結果を使ってどの作業を実行しますか？\",\"expiresAt\":1793965155497,\"inputSchema\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":8000}},\"result\":null}",
+        "presentation": "artifact",
+        "createdAt": "2026-11-06T11:09:23.494Z",
+        "runId": "17c9a484-8498-40c6-ace0-bcd8b74cbad4"
+      }
+    ]
+  }
+}

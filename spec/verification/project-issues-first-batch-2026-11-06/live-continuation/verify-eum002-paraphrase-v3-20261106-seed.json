@@ -1,0 +1,56 @@
+{
+  "started": "2026-11-06T11:16:43.257Z",
+  "conversationId": "verify-eum002-paraphrase-v3-20261106",
+  "entry": "route",
+  "structureTimeoutMs": 30000,
+  "exitCode": 0,
+  "stdout": "{\"type\":\"message\",\"updated\":false,\"id\":\"542d3110-5b3e-4341-9e4f-ab9f8c478063\",\"conversationId\":\"verify-eum002-paraphrase-v3-20261106\",\"role\":\"user\",\"text\":\"計算結果を使って別の作業を実行して。\",\"createdAt\":\"2026-11-06T11:16:43.354Z\",\"runId\":\"7d8b4e6f-d710-477a-8af8-49bec28697bf\"}\n{\"type\":\"announcement\",\"updated\":false,\"id\":\"announcement:7d8b4e6f-d710-477a-8af8-49bec28697bf\",\"conversationId\":\"verify-eum002-paraphrase-v3-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:16:43.354Z\",\"runId\":\"7d8b4e6f-d710-477a-8af8-49bec28697bf\"}\n{\"type\":\"message\",\"updated\":false,\"id\":\"2bf459ef-0179-4a21-a5c8-0ec6efb9329c\",\"conversationId\":\"verify-eum002-paraphrase-v3-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:16:43.985Z\",\"runId\":\"7d8b4e6f-d710-477a-8af8-49bec28697bf\"}\n",
+  "stderr": "",
+  "runs": [
+    {
+      "id": "7d8b4e6f-d710-477a-8af8-49bec28697bf",
+      "agentTaskId": null,
+      "requestId": "ffcfb50a-004b-4899-84e8-74bd902c88f7",
+      "conversationId": "verify-eum002-paraphrase-v3-20261106",
+      "utteranceId": null,
+      "status": "completed",
+      "revision": 2,
+      "inputMessageId": "542d3110-5b3e-4341-9e4f-ab9f8c478063",
+      "answerMessageId": "2bf459ef-0179-4a21-a5c8-0ec6efb9329c",
+      "announcement": "「パイプライン」に頼みます。",
+      "error": null,
+      "jobId": "4ecf53f7-94e2-4aa7-9bd2-420f150e4566",
+      "deadlineAt": "2026-11-06T11:19:43.354Z",
+      "deadlineFixed": false,
+      "sourceKind": "manual",
+      "scheduleId": null,
+      "occurrenceId": null,
+      "specialistSessionId": null,
+      "pinnedToolchainId": null,
+      "createdAt": "2026-11-06T11:16:43.354Z",
+      "updatedAt": "2026-11-06T11:16:43.985Z"
+    }
+  ],
+  "conversation": {
+    "id": "verify-eum002-paraphrase-v3-20261106",
+    "revision": 2,
+    "messages": [
+      {
+        "id": "542d3110-5b3e-4341-9e4f-ab9f8c478063",
+        "conversationId": "verify-eum002-paraphrase-v3-20261106",
+        "role": "user",
+        "text": "計算結果を使って別の作業を実行して。",
+        "createdAt": "2026-11-06T11:16:43.354Z",
+        "runId": "7d8b4e6f-d710-477a-8af8-49bec28697bf"
+      },
+      {
+        "id": "2bf459ef-0179-4a21-a5c8-0ec6efb9329c",
+        "conversationId": "verify-eum002-paraphrase-v3-20261106",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T11:16:43.985Z",
+        "runId": "7d8b4e6f-d710-477a-8af8-49bec28697bf"
+      }
+    ]
+  }
+}

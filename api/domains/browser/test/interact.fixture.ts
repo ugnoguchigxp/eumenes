@@ -55,15 +55,37 @@ export const unmet = part("done", {
 	evidence: [],
 });
 export function done(input: Parameters<InteractInference>[0]) {
-	const text = input.prepared.messages.map((m) => m.content).join("\n");
-	const ids = [...text.matchAll(/"resultId"\s*:\s*"([^"]+)"/g)].map(
-		(m) => m[1],
-	);
+	const ids = input.prepared.messages.flatMap((m) => {
+		if (!m.content.startsWith("PART_RESULT=")) return [];
+		const result = JSON.parse(m.content.slice("PART_RESULT=".length));
+		return result.status === "completed" && result.code !== "capture_prepared"
+			? [result.resultId as string]
+			: [];
+	});
 	return part("done", {
 		answer: "確認しました",
 		outcome: "achieved",
 		basis: "observed",
 		evidence: [...new Set(ids)],
+	});
+}
+export const capturePrepare = part("page.capture", {
+	range: "viewport",
+	item: null,
+	phase: "prepare",
+});
+export function captureSave(input: Parameters<InteractInference>[0]) {
+	const text = input.prepared.messages.map((m) => m.content).join("\n");
+	const confirmation = [...text.matchAll(/"confirmation":"([^"]+)"/g)].at(
+		-1,
+	)?.[1];
+	if (!confirmation) throw new Error("fixture_confirmation_missing");
+	return part("page.capture", {
+		range: "viewport",
+		item: null,
+		phase: "save",
+		confirmation,
+		assessment: "The observed viewport matches the fixed capture request.",
 	});
 }
 export async function interactFixture(

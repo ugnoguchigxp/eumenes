@@ -1,3 +1,6 @@
+import { imageMessageParts } from "../../../infrastructure/chat-image-parts";
+import { cloudImages, checkImageRequest } from "./cloud-images";
+import type { ConnectionModelsService } from "./connection-models";
 import { workersSpeechRequest } from "../adapters/workers-ai-speech";
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import { readBounded } from "../../../infrastructure/bounded-read";
@@ -38,6 +41,7 @@ export type CloudEnv = {
 	settings: Pick<SettingsService, "credential">;
 	fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 	agents?: CloudAgents;
+	models?: ConnectionModelsService;
 };
 
 function bounded(response: Response, limit: number) {
@@ -64,8 +68,6 @@ function fitMessages(
 	input: Messages,
 	context?: { instructionCount: number; historyCount: number },
 ) {
-	if (input.some((m) => m.images?.length))
-		throw new Error("image_not_supported");
 	const messages = [...input];
 	const window = resource.contextWindow ?? 0;
 	// A control request's own output limit (a long draft) within a quarter of the window; else the default.
@@ -73,6 +75,9 @@ function fitMessages(
 		? Math.min(row.outputLimit, Math.floor(window / 4))
 		: Math.min(OUTPUT_RESERVE_DEFAULT_TOKENS, Math.floor(window / 4));
 	const budget = window - reserve - FIT_MARGIN_TOKENS;
+	// Image requests stay intact; the provider enforces the image-token budget (D2).
+	if (input.some((m) => m.images?.length))
+		return { messages, reserve, context };
 	const sizes = messages.map((message) => estimateMessageTokens([message]));
 	let tokens = sizes.reduce((sum, size) => sum + size, 0);
 	let split = context;
@@ -243,8 +248,6 @@ async function agentRequest(
 	options?: import("../../larm").LarmCallOptions,
 	role?: CallSessionRole,
 ) {
-	if (input.some((m) => m.images?.length))
-		throw new Error("image_not_supported");
 	if (row.purpose !== "llm") throw new Error("cloud_agent_purpose_unsupported");
 	if (!env.agents) throw new Error("cloud_agent_unavailable");
 	// Fit first: dropping history turns changes the split the session resumes from.
@@ -335,6 +338,14 @@ export async function cloudRequest(
 	options?: import("../../larm").LarmCallOptions,
 	role?: CallSessionRole,
 ) {
+	if (row.purpose === "llm")
+		input = await cloudImages(
+			input as Messages,
+			connection,
+			resource,
+			env.models,
+			signal,
+		);
 	const credential = env.settings.credential(connection);
 	if (isAgentConnection(connection))
 		return agentRequest(
@@ -411,7 +422,7 @@ export async function cloudRequest(
 			);
 			body = {
 				model: resource.model,
-				messages,
+				messages: messages.map(imageMessageParts),
 				...(options?.tools?.length && options.toolOutputFormat !== "json-schema"
 					? {
 							tools: options.tools,
@@ -439,6 +450,11 @@ export async function cloudRequest(
 			};
 		}
 		init.headers = { ...init.headers, "Content-Type": "application/json" };
+		if (
+			row.purpose === "llm" &&
+			(input as Messages).some((m) => m.images?.length)
+		)
+			checkImageRequest(body);
 		init.body = JSON.stringify(body);
 	}
 	const path =

@@ -1,0 +1,222 @@
+$ bun scripts/test-domain.ts --domain avatar --domain conversation
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/connection.test.ts:
+205 | 							condition: "F",
+206 | 							interestFormation: true,
+207 | 							hostTodos: true,
+208 | 							utteranceEmotion: true,
+209 | 						});
+210 | 			expect(system).toBe(
+                        ^
+error: expect(received).toBe(expected)
+
+@@ -18,10 +18,10 @@
+  🙂: 平静 / 😊: 嬉しい / 😄: 楽しんでいる / 😏: 苦笑・皮肉まじりの笑い / 🤔: 好奇心 / 👏: 感心 / 😌: 安心 / 😳: 照れ / 😮: 驚き / 😕: 困惑 / 😢: 悲しい / 🙏: 申し訳ない / 😟: 心配 / 😒: 嫌だ / 😠: 怒り
+  
+  出力契約（Eumenes が公開契約を確認して採用）:
+  JSON object: action (speak/tool/reflect/wait/discard), candidateRef ({id, revision} or null), utterance, toolName, toolInput, evidenceRefs, valueNow, userBurden, lossIfWait, conflicts (string or null), reason. Nullable output fields remain present.
+  For speak, utterance is the final text addressed to the user: the actual explanation or question, not instructions describing what to say. When null falls back to candidate content, that content must already be suitable as the final utterance.
+- By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.
++ F conversation participation is enabled. speak may set candidateRef to null when utterance is non-null and evidenceRefs includes an actual external observation ID supplied in conversationEvidenceRefs. A speech using a candidate must reference a current non-tool candidate. tool/discard still require a presented candidateRef with its current revision; tool accepts only tool candidates and uses the candidate's toolName/toolInput. wait may reference a candidate.
+  A speak using a presented closed intent with lastReturn may set candidateRef to null. Provide the final utterance and cite the ref supplied for that intent in findingRefs (or the evidence ID of the matching work.returned observation for lastReturn.workRef). The original request alone does not qualify.
+  Evidence refs are presented observation IDs, evidence on presented notes, open intents or offered candidates, interest:<id> for presented formed or standing interests, or memory:<id>, context:<id>, todo:<id> for the corresponding presented host data. Unknown evidence refs, stale candidate revisions, unavailable/approval-required tools, outbound interval violations and invalidated opportunities are rejected before reservation. Tickets do not execute tools; execution and receipts belong to the host.
+  emotion is one of the schema's emoji values or null. It is read for speak only; absence of a usable value does not supply a default emotion.
+  出力は指定された JSON Schema に従い、前置きや説明用の Markdown は付けません。"
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/connection.test.ts:210:19)
+(fail) assembled host reaches larm with one exact purpose system, including a retry [543.41ms]
+205 | 							condition: "F",
+206 | 							interestFormation: true,
+207 | 							hostTodos: true,
+208 | 							utteranceEmotion: true,
+209 | 						});
+210 | 			expect(system).toBe(
+                        ^
+error: expect(received).toBe(expected)
+
+@@ -18,10 +18,10 @@
+  🙂: 平静 / 😊: 嬉しい / 😄: 楽しんでいる / 😏: 苦笑・皮肉まじりの笑い / 🤔: 好奇心 / 👏: 感心 / 😌: 安心 / 😳: 照れ / 😮: 驚き / 😕: 困惑 / 😢: 悲しい / 🙏: 申し訳ない / 😟: 心配 / 😒: 嫌だ / 😠: 怒り
+  
+  出力契約（Eumenes が公開契約を確認して採用）:
+  JSON object: action (speak/tool/reflect/wait/discard), candidateRef ({id, revision} or null), utterance, toolName, toolInput, evidenceRefs, valueNow, userBurden, lossIfWait, conflicts (string or null), reason. Nullable output fields remain present.
+  For speak, utterance is the final text addressed to the user: the actual explanation or question, not instructions describing what to say. When null falls back to candidate content, that content must already be suitable as the final utterance.
+- By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.
++ F conversation participation is enabled. speak may set candidateRef to null when utterance is non-null and evidenceRefs includes an actual external observation ID supplied in conversationEvidenceRefs. A speech using a candidate must reference a current non-tool candidate. tool/discard still require a presented candidateRef with its current revision; tool accepts only tool candidates and uses the candidate's toolName/toolInput. wait may reference a candidate.
+  A speak using a presented closed intent with lastReturn may set candidateRef to null. Provide the final utterance and cite the ref supplied for that intent in findingRefs (or the evidence ID of the matching work.returned observation for lastReturn.workRef). The original request alone does not qualify.
+  Evidence refs are presented observation IDs, evidence on presented notes, open intents or offered candidates, interest:<id> for presented formed or standing interests, or memory:<id>, context:<id>, todo:<id> for the corresponding presented host data. Unknown evidence refs, stale candidate revisions, unavailable/approval-required tools, outbound interval violations and invalidated opportunities are rejected before reservation. Tickets do not execute tools; execution and receipts belong to the host.
+  emotion is one of the schema's emoji values or null. It is read for speak only; absence of a usable value does not supply a default emotion.
+  出力は指定された JSON Schema に従い、前置きや説明用の Markdown は付けません。"
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/connection.test.ts:210:19)
+(fail) assembled host reaches cloud with one exact purpose system, including a retry [217.40ms]
+
+api/application/app.test.ts:
+(pass) status polling is passive and explicit reconnect requires auth and origin [789.96ms]
+(pass) auth and origin apply to the new endpoints [974.48ms]
+(pass) register → fire → history → pause/resume → cancel through the API [644.14ms]
+(pass) full queue is reported as 503 for submissions [483.19ms]
+(pass) authenticated SSE notifies a background commit and the existing API supplies the snapshot [487.45ms]
+(pass) replay endpoints split text and synthesize one clause, with auth and limits [491.64ms]
+(pass) sample endpoint validates unsaved voice settings and returns audio [481.63ms]
+(pass) oversized JSON bodies are rejected with 413 and normal requests pass [479.46ms]
+(pass) responses carry anti-framing security headers [490.73ms]
+(pass) requests with both Content-Length and Transfer-Encoding are rejected [477.42ms]
+(pass) error codes map to HTTP statuses through the table [0.16ms]
+(pass) Web research is authenticated, validates malformed JSON, and does not claim an unavailable cache was cleared [473.58ms]
+(pass) modules mount in order behind the shared auth and origin checks [0.33ms]
+(pass) service-test uploads share a budget of two; other service-test routes stay reachable [2.33ms]
+(pass) CORS preflight allows every method the API serves [0.15ms]
+(pass) stream-bounded upload routes skip the 1MiB JSON cap by exact path only [0.15ms]
+(pass) malformed percent-encoding in a path parameter does not return 500 [0.17ms]
+(pass) API responses carry a deny-all Content-Security-Policy [466.31ms]
+
+api/application/browser/browser-composition.test.ts:
+(pass) MCP output and captures live in two managed folders next to the database [0.17ms]
+(pass) a connection builds the driver with the path saved at that moment [25.20ms]
+(pass) closing the assembly stops the child and records nothing [37.14ms]
+(pass) a completion is added to its conversation once, under a stable id [13.04ms]
+(pass) tasks can be started only where the model calls are assembled [58.85ms]
+(pass) the adapter reads only a saved user message of the conversation [15.44ms]
+
+api/application/browser/interact-integration.test.ts:
+(pass) canonical Skill and pinned 162-file distribution match the registered operator [14.72ms]
+(pass) isolated HTTP pilot uses the common action ledger, real browser, explicit capture approval and authenticated WebP deletion [3800.22ms]
+
+api/application/migrations.test.ts:
+(pass) GOLDEN: the legacy order and every deployed SQL string are byte-for-byte unchanged [0.18ms]
+(pass) a database that holds a migration this code does not know refuses to start [893.68ms]
+(pass) a migration with `after` is applied after its dependencies, wherever it sits in the list [16.40ms]
+(pass) migration ordering is stable and rejects cycles, unknown dependencies and duplicate ids [0.12ms]
+(pass) the memory package's migrations keep their order and every one is applied; the first four stay contiguous [0.14ms]
+(pass) host migrations are frozen: the count and the retired slot never move [0.01ms]
+(pass) every migration is named once, and none outside the frozen order exists yet without `after` [0.16ms]
+(pass) a fresh database gets every migration and passes the memory schema check [503.36ms]
+(pass) an applied migration that is rewritten later stops startup with its id only [16.39ms]
+(pass) an existing 0.3.3 host database upgrades without rewriting migration checksums or losing data [505.90ms]
+(pass) World source/goal migrations are appended last and upgrade an already-deployed database [489.48ms]
+(pass) with the full production migrations, retracting a message referenced by a dialogue run tombstones it [487.07ms]
+(pass) World's package migrations stay contiguous, and timers is appended after them [0.20ms]
+(pass) a fresh database gets the World schema; World is OFF and its schema is current [512.25ms]
+(pass) an already-deployed database (data present, no World yet) upgrades and keeps its data [560.71ms]
+(pass) a drifted World schema disables World; an edited World migration stops startup [518.63ms]
+(pass) research/history metadata migrations append after the frozen legacy order and upgrade without copying message bodies [526.09ms]
+
+api/application/timers/timer-announcements.test.ts:
+(pass) a three-minute tool request posts one assistant completion at the deadline and survives recovery [1127.14ms]
+(pass) cancelling before the deadline creates neither an assistant completion nor an audible notice [690.93ms]
+(pass) the announcement participates in the caller transaction and replays without a duplicate [760.16ms]
+
+api/application/work/tasks-http.test.ts:
+(pass) task HTTP bodies are rejected while streaming past the bound, before the peer finishes sending [592.84ms]
+(pass) HTTP rejects spoofed origins and arbitrary state, authenticates tasks, and validates query limits [915.86ms]
+(pass) API client and CLI register, read and cancel through authenticated HTTP; unavailable execution stays explicit [1490.64ms]
+
+api/application/world/memory-adapter.test.ts:
+(pass) describe offers the memory queries and the one write (the connection switch), for the UI only [572.61ms]
+(pass) the shipped memory bundle registers against this adapter plus the existing ones with no issue [932.60ms]
+(pass) status shows the connection and the switch needs a healthy memory to turn on [514.31ms]
+(pass) items page, search and sort; memory content cannot be changed by hand [528.34ms]
+(pass) tendencies, short-term notes and the context are read [547.87ms]
+(pass) the steward timeline shows decisions with their proposal, result and window change, and the event log [482.99ms]
+(pass) the memory bundle runs through the action ledger: only the connection switch is offered [537.30ms]
+
+api/application/world/world-acceptance-p3.test.ts:
+(pass) the conversation input carries no World material: no target hint, no claim text, no ids [800.50ms]
+(pass) A34 (host side) the host consumes only the vendored World tgz: package.json points at it [0.44ms]
+(pass) A34-A41 World OFF (protect) + Memory OFF + model stopped: a forget is still processed and completes [548.33ms]
+(pass) A38 Memory unavailable: World content is deleted at once, the forget stays pending (never complete) and finishes when Memory is back [884.37ms]
+
+api/application/world/world-initial-sync.test.ts:
+(pass) a pre-outbox message already forgotten in Memory is never received during initial sync [572.97ms]
+(pass) initial sync receives pre-outbox messages before enabling; restart and resend do not duplicate them [528.99ms]
+(pass) upgrade revokes the old outbox-only completion; interrupted initial sync resumes without duplicating receipts [565.82ms]
+
+api/application/world/world.test.ts:
+(pass) startup mode: setting off and no content assembles nothing [465.36ms]
+(pass) startup mode: setting off but World holds content means protect (forgetting keeps flowing, World stays OFF) [491.74ms]
+(pass) startup mode: setting on runs the initial sync and then turns World ON, with the curation operations [451.07ms]
+(pass) cursor secret: host-owned file (dir 0700, file 0600), created once, stable, never from the database; env overrides; short values fail [3.66ms]
+(pass) cursor secret: keyDir moves the key out of the db dir and keeps the old key's value [4.84ms]
+(pass) journal path sits next to the Memory journal [0.02ms]
+(pass) protect: recovery opens the gate, World stays OFF, and turning it ON runs the initial sync first [460.59ms]
+(pass) protect forces an enabled World OFF at startup; on turns it ON once the initial sync is done [487.58ms]
+(pass) a closed gate (corrupt World journal) skips the passes and keeps World closed; nothing throws [464.00ms]
+(pass) idle passes write nothing: no commit, so no change-stream traffic and no feedback loop [750.38ms]
+(pass) a retraction reaches World by commit notification alone [479.49ms]
+(pass) a changed cursor secret does not wedge the feed: the stored cursor is reset through a restore and the feed is read again [484.00ms]
+
+api/domains/conversation/test/attachments.test.ts:
+(pass) JPG PNG BMP fully decode; normalized pixels, alpha and EXIF match previews [11.21ms]
+(pass) rejects broken and mismatched images and predecode dimensions [2.56ms]
+(pass) attachment owner, conversation, replay identity and restart persistence [22.98ms]
+(pass) a host annotation is kept with the attachment metadata and bounded in size [12.64ms]
+
+api/domains/conversation/test/bounded-read.test.ts:
+(pass) an invalid stored delivery is dropped for that row only [8.72ms]
+(pass) get keeps the newest 200 messages and reports hasMore [9.68ms]
+(pass) turnsBefore returns the preceding messages oldest first [9.30ms]
+
+api/domains/conversation/test/conversation.test.ts:
+(pass) conversation saves and survives reopen; second writer is refused [18.56ms]
+(pass) answer motion can arrive before text, keeps the first choice, and survives upgrade/reopen [24.74ms]
+(pass) answer-wide delivery persists provenance, upgrades fallback, and keeps an adopted none stable [13.81ms]
+(pass) ordinal reads: messages after a cursor, the newest ordinal and the n-th newest user message skip retracted rows [11.10ms]
+(pass) the retract hook runs inside the retraction while the message is still readable, and also for a missing message [9.55ms]
+
+api/domains/conversation/test/history.test.ts:
+(pass) H1/H5/H6/H8: exact search and ordered context exclude drafts, retractions, another conversation and the current request [11.59ms]
+(pass) H2/H3: 240 turns, identical timestamps and sparse rowids paginate without duplicate/lost IDs; 500-row scan returns a cursor even on zero matches [36.95ms]
+(pass) a time range is applied before the scan: an old message behind more than one scan of newer ones is found at once [26.57ms]
+(pass) H2/H3: a large single message is scanned in finite chunks and a boundary-spanning match is not lost; read continues in Unicode positions [22.95ms]
+(pass) H4/H7: correction, append, retraction, TTL and restart invalidate cursors/views before adoption [10.49ms]
+(pass) one owner cannot use the whole search-session capacity; its oldest search is dropped [33.99ms]
+
+api/domains/conversation/test/input-migration.test.ts:
+(pass) the deployed input migration keeps its recorded checksum [0.04ms]
+(pass) a deployed input database upgrades without losing cuts, utterances, state or migration history [26.70ms]
+(pass) 0013 keeps the checksum it ran with, and a database that went through 0014 has the column again [18.96ms]
+(pass) a fresh database stores and reads the cut's memory digest [9.79ms]
+
+api/domains/conversation/test/input.test.ts:
+(pass) utterances are numbered in order, a message's utterance is written once, and only standing ones are read [9.59ms]
+(pass) a forget keeps only that an utterance existed, cuts the next input when it was shown, and moves the revision [10.18ms]
+(pass) retracting a message reaches its utterance and drops the state made from the conversation [7.04ms]
+(pass) a correction rewrites the user's utterance in place, never the announcement sharing its message, and moves the revision [7.37ms]
+(pass) an agent's utterance keeps its turn's tool calls, written once, and a forget takes them out with its text [9.61ms]
+(pass) a state version is appended only on the version it was made from [10.97ms]
+
+api/domains/conversation/test/message-delivery.test.ts:
+(pass) a runless message keeps its host delivery; a message without one has none [10.42ms]
+(pass) without the table a host delivery is refused, never dropped [7.89ms]
+
+api/domains/conversation/test/outbox.test.ts:
+(pass) append records an added event with memory-compatible revision, no text [8.31ms]
+(pass) principal and scope are injectable [8.93ms]
+(pass) message save and outbox event roll back together on a mid-save exception [13.07ms]
+(pass) correction changes the revision, emits corrected, and replay is idempotent [10.39ms]
+(pass) retraction removes the text, emits retracted once, and blocks correction/re-add [11.78ms]
+(pass) seq is increasing with gaps allowed and drafts have no path to the outbox [8.36ms]
+(pass) a database without the outbox migration keeps working unless required [8.10ms]
+(pass) correction scrubs the digest of superseded revisions but keeps seq order and the newest digest [7.02ms]
+(pass) without the retraction column reads and corrections work and retraction fails clearly [7.78ms]
+(pass) outboxHead is the newest seq and 0 before any event [7.37ms]
+
+api/domains/conversation/test/source-backfill.test.ts:
+(pass) source backfill is bounded, atomic, idempotent and uses current live revisions [11.08ms]
+
+2 tests failed:
+(fail) assembled host reaches larm with one exact purpose system, including a retry [543.41ms]
+(fail) assembled host reaches cloud with one exact purpose system, including a retry [217.40ms]
+
+ 116 pass
+ 2 fail
+ 1435 expect() calls
+Ran 118 tests across 20 files. [37.43s]
+error: script "test:domain" exited with code 1

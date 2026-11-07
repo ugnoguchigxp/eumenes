@@ -3,7 +3,6 @@ import { referenceJson } from "../../../infrastructure/reference-json";
 import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import { classifyValidity, periodFromStateMs } from "eumenes-memory";
-import { latestMemoryChangeSeq } from "eumenes-memory/sqlite";
 import { PRINCIPAL, PROFILE_SCOPE } from "../contracts";
 import {
 	activeTendencies,
@@ -73,7 +72,9 @@ const WINDOW_FORMAT = 2;
 
 /** The package's change counter for the shared profile: it moves whenever State there changes. */
 function latestStateChange(db: Database, policyRevision: string): number {
-	const changes = latestMemoryChangeSeq(db, {
+	// Record captures (for example an Agency observation archive) do not change the user's State.
+	// Include every live status; explicit forgets also move the host's immediate-change fence.
+	const states = listAllState(db, {
 		contractVersion: CONTRACT_VERSION,
 		access: {
 			principal: PRINCIPAL,
@@ -81,10 +82,11 @@ function latestStateChange(db: Database, policyRevision: string): number {
 			purpose: "dialogue.read",
 			policyRevision,
 		},
-		scopeKeys: [PROFILE_SCOPE],
+		scopeKey: PROFILE_SCOPE,
+		includeInactive: true,
 	});
-	if (changes.status !== "ok") throw new Error("memory_blocked");
-	return changes.seq;
+	if (states.status !== "ok") throw new Error("memory_blocked");
+	return states.items.reduce((seq, item) => Math.max(seq, item.updatedSeq), 0);
 }
 
 interface PartialDateLike {

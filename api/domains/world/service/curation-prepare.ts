@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { workingSetDigest } from "../repository/working-set";
 import { prepareExtraction, type ScopeRef } from "eumenes-world-model";
 import {
 	listExtractEventsByIds,
@@ -219,6 +220,7 @@ export function createPrepare(ctx: CurationCtx) {
 					windowId,
 					forgetEpoch: world.forgetEpoch(db, scope),
 					entityDigest: digest,
+					workingSetDigest: workingSetDigest(db, scope),
 					events,
 					dependencies,
 					dependentIds: planned.dependents.map((d) => d.externalId),

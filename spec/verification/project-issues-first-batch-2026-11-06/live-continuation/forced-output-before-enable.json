@@ -1,0 +1,10 @@
+{
+  "measurement": "forced answer schema transport only; not a routing-quality result",
+  "elapsedMs": 7750,
+  "structure": null,
+  "shape": {
+    "json": false,
+    "length": 298
+  },
+  "recordSource": "safe diagnostic summary from the original tool log; raw provider text is not copied"
+}

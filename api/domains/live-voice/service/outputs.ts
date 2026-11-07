@@ -1,6 +1,9 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { Runtime } from "./runtime";
 import type { createLiveDelivery } from "./delivery";
+import type { Database } from "bun:sqlite";
+import { addSessionInput } from "../repository/inputs";
+import type { LiveOutputOrigin } from "../contracts";
 export function bindOutputs({
 	store,
 	runtimes,
@@ -10,6 +13,7 @@ export function bindOutputs({
 	send,
 	sendState,
 	delivery,
+	validProposal,
 }: {
 	store: SqliteStore;
 	runtimes: Map<string, Runtime>;
@@ -23,6 +27,7 @@ export function bindOutputs({
 	send: (id: string, event: unknown) => void;
 	sendState: (id: string) => void;
 	delivery: ReturnType<typeof createLiveDelivery>;
+	validProposal(db: Database, outputId: number, text: string): boolean;
 }) {
 	return store.onCommit(() => {
 		for (const id of runtimes.keys()) {
@@ -46,6 +51,16 @@ export function bindOutputs({
 			if (!outputs.length) continue;
 			enqueue(id, async () => {
 				for (const out of outputs) {
+					if (!store.read((db) => validProposal(db, out.id, out.text))) {
+						await store.write((db) =>
+							db
+								.query(
+									"UPDATE live_voice_outputs SET text='',sent=1 WHERE id=?",
+								)
+								.run(out.id),
+						);
+						continue;
+					}
 					// Settled work may outlive its input turn; normal reply drafts still need that version.
 					if (out.run_id && out.kind !== "report") {
 						try {
@@ -65,12 +80,37 @@ export function bindOutputs({
 								.query("SELECT sent FROM live_voice_outputs WHERE id=?")
 								.get(out.id) as { sent: number } | null,
 					);
-					if (pending?.sent) continue;
-					await store.write((db) => {
-						db.query("UPDATE live_voice_outputs SET sent=1 WHERE id=?").run(
-							out.id,
-						);
+					if (!pending || pending.sent) continue;
+					const claimed = await store.write((db) => {
+						if (!validProposal(db, out.id, out.text)) return false;
+						const claim =
+							db
+								.query(
+									"UPDATE live_voice_outputs SET sent=1 WHERE id=? AND sent=0",
+								)
+								.run(out.id).changes === 1;
+						if (claim) {
+							const origin = db
+								.query("SELECT origin_input FROM live_voice_outputs WHERE id=?")
+								.get(out.id) as { origin_input: string | null };
+							if (origin.origin_input)
+								addSessionInput(
+									db,
+									id,
+									(JSON.parse(origin.origin_input) as LiveOutputOrigin).input,
+								);
+						}
+						return claim;
 					});
+					if (!claimed) continue;
+					if (!store.read((db) => validProposal(db, out.id, out.text))) {
+						await store.write((db) =>
+							db
+								.query("UPDATE live_voice_outputs SET text='' WHERE id=?")
+								.run(out.id),
+						);
+						continue;
+					}
 					const d = out.run_id
 						? store.read(
 								(db) =>

@@ -1,0 +1,13 @@
+{
+  "backendPassed": 118,
+  "webPassed": 84,
+  "browserPassed": 5,
+  "typecheckedFiles": 2976,
+  "fullVerify": "blocked at inventory by existing artifacts/pursuit-integration-20261106 source snapshots",
+  "previewSeconds": 10,
+  "previewFrames": 120,
+  "renderErrors": [],
+  "serverRestarted": false,
+  "contextCompileTotal": 2,
+  "compileEvalTotal": 2
+}

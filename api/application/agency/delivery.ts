@@ -1,3 +1,5 @@
+import { combineInput, observationInput } from "./input";
+import { resultInput } from "./memory";
 import { defaultLimits } from "eumenes-agency";
 import type { Database } from "bun:sqlite";
 import type { ActionTicket, ActionReceipt, CycleOutcome } from "eumenes-agency";
@@ -10,7 +12,7 @@ export function createAgencyDelivery(config: {
 	deps: AgencyHostDeps;
 	nowMs: () => number;
 	save(c: Conv): Promise<boolean>;
-	isCurrent(cy: Cycle, db: Database, action: ActionTicket["action"]): boolean;
+	isCurrent(cy: Cycle, db: Database, ticket: ActionTicket): boolean;
 }) {
 	const { deps, nowMs, save } = config;
 	const { store } = deps;
@@ -34,7 +36,7 @@ export function createAgencyDelivery(config: {
 					nowMs(),
 				);
 				await store.write((db) => {
-					if (!config.isCurrent(cy, db, ticket.action))
+					if (!config.isCurrent(cy, db, ticket))
 						throw new Error("agency_origin_stale");
 					deps.state!.startInTransaction(db, input);
 				});
@@ -75,8 +77,7 @@ export function createAgencyDelivery(config: {
 			outcome = await store.write((db) => {
 				// Re-checked inside the writer transaction: the setting as committed (not the cached copy),
 				// and nothing may have been said since the opportunity.
-				if (text === "" || !config.isCurrent(cy, db, ticket.action))
-					return "stale";
+				if (text === "" || !config.isCurrent(cy, db, ticket)) return "stale";
 				at = nowMs();
 				const interval = defaultLimits.outboundIntervalMs;
 				const allowed = deps.state
@@ -96,6 +97,7 @@ export function createAgencyDelivery(config: {
 					at,
 					ticket,
 					evidenceRefs,
+					input: resultInput(c, ticket.id),
 				});
 			});
 		} catch (error) {
@@ -155,11 +157,26 @@ export function createAgencyDelivery(config: {
 			return;
 		}
 		try {
-			cy.runtime.recordResult({
-				ticketId: ticket.id,
-				at: nowMs(),
-				...result,
-			});
+			let input = resultInput(cy.c, ticket.id);
+			if (
+				ticket.action === "speak" &&
+				result.status === "succeeded" &&
+				!result.speechHandoff
+			) {
+				const id = `agency:${cy.c.scope}:${ticket.id}`;
+				input = combineInput(
+					input,
+					deps.store.read((db) => observationInput(deps, db, id)),
+				);
+			}
+			cy.runtime.recordResult(
+				{
+					ticketId: ticket.id,
+					at: nowMs(),
+					...result,
+				},
+				input,
+			);
 			log.info("agency.receipt", {
 				subjectId: c.id,
 				attemptId: ticket.id,

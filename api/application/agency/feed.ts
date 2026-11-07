@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
-import type { AgencyRuntime, Opportunity } from "eumenes-agency";
+import type { AgencyRuntime, Opportunity, InputContext } from "eumenes-agency";
+import { combineInput, observationInput } from "./input";
 import type { OutboxEvent } from "../../domains/conversation";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { getLogger } from "../../infrastructure/logger";
@@ -19,11 +20,12 @@ export function createAgencyFeed(input: {
 	todosNow: (c: Conv) => ReturnType<AgencyWork["todosInTransaction"]>;
 	launch: (c: Conv, trigger: Opportunity["trigger"]) => void;
 	trackSave: (c: Conv) => void;
+	retract(c: Conv, sourceId: string): Promise<void>;
 	collectReturns: () => void;
 	inflight: Set<Promise<unknown>>;
 	lifecycle: Pick<
 		ReturnType<typeof createConversationLifecycle>,
-		"convOf" | "dropConv" | "resetConv" | "invalidate" | "activate" | "prune"
+		"convOf" | "dropConv" | "invalidate" | "activate" | "prune"
 	>;
 }) {
 	const {
@@ -38,8 +40,7 @@ export function createAgencyFeed(input: {
 		collectReturns,
 		inflight,
 	} = input;
-	const { convOf, dropConv, resetConv, invalidate, activate, prune } =
-		input.lifecycle;
+	const { convOf, dropConv, invalidate, activate, prune } = input.lifecycle;
 	const { store, conversation } = deps;
 	const workChanged = new Set<string>();
 
@@ -59,19 +60,33 @@ export function createAgencyFeed(input: {
 		const fresh = [...now].some((key) => !c.reportable.has(key));
 		c.reportable = now;
 		if (fresh)
-			observe(c, {
-				id: `work:${crypto.randomUUID()}`,
-				kind: "source.changed",
-				actor: "host",
-				occurredAt: nowMs(),
-				text: JSON.stringify({ todos: todosNow(c) }),
-			});
+			observe(
+				c,
+				{
+					id: `work:${crypto.randomUUID()}`,
+					kind: "source.changed",
+					actor: "host",
+					occurredAt: nowMs(),
+					text: JSON.stringify({
+						todos: todosNow(c).map(({ input: _input, ...todo }) => todo),
+					}),
+				},
+				combineInput(
+					...todosNow(c).map(
+						(todo) => todo.input ?? { sources: [], complete: false },
+					),
+				),
+			);
 		return fresh;
 	}
 
-	function observe(c: Conv, input: Parameters<AgencyRuntime["observe"]>[0]) {
+	function observe(
+		c: Conv,
+		input: Parameters<AgencyRuntime["observe"]>[0],
+		context: InputContext,
+	) {
 		try {
-			c.runtime.observe(input);
+			c.runtime.observe(input, context);
 			log.info("agency.observation_received", {
 				subjectId: c.id,
 				kind: input.kind,
@@ -98,23 +113,9 @@ export function createAgencyFeed(input: {
 		if (event.kind === "retracted") {
 			const c = convs.get(event.conversationId);
 			if (!c) return;
-			// The core cannot forget one observation: the conversation's agency starts over without it
-			// (new runtime and planner; nothing of the old idle backoff survives).
-			resetConv(c, "retracted");
-			if (deps.state) {
-				const task = store
-					.write((tx) => deps.state!.revokeInTransaction(tx, c.id))
-					.then(() => {
-						if (convs.get(c.id) === c) {
-							c.epoch = store.read((tx) =>
-								deps.state!.epochInTransaction(tx, c.id),
-							);
-							trackSave(c);
-						}
-					});
-				inflight.add(task);
-				task.finally(() => inflight.delete(task));
-			}
+			const task = input.retract(c, event.sourceId).then(() => trackSave(c));
+			inflight.add(task);
+			void task.finally(() => inflight.delete(task));
 			pending.delete(c.id);
 			return;
 		}
@@ -123,6 +124,7 @@ export function createAgencyFeed(input: {
 		const source = conversation.sourceInTransaction(db, event.sourceId);
 		if (source.state !== "available") return;
 		const message = source.message;
+		if (deps.memory.isBlockedInTransaction?.(db, message.id)) return;
 		const c = convOf(event.conversationId);
 		c.touched = nowMs();
 		const occurredAt = Date.parse(event.occurredAt);
@@ -136,16 +138,30 @@ export function createAgencyFeed(input: {
 			pending.set(c.id, { turnEnd: false });
 		}
 		if (message.presentation !== "artifact" && message.text.trim() !== "")
-			observe(c, {
-				id:
-					event.kind === "added"
-						? event.sourceId
-						: `${event.sourceId}:c${event.seq}`,
-				kind: event.kind === "added" ? "exchange.adopted" : "correction",
-				actor: speaker === "user" ? "user" : "agent",
-				occurredAt: at,
-				text: message.text,
-			});
+			observe(
+				c,
+				{
+					id:
+						event.kind === "added"
+							? event.sourceId
+							: `${event.sourceId}:c${event.seq}`,
+					kind: event.kind === "added" ? "exchange.adopted" : "correction",
+					actor: speaker === "user" ? "user" : "agent",
+					occurredAt: at,
+					text: message.text,
+				},
+				combineInput(
+					observationInput(deps, db, message.id),
+					speaker === "assistant" &&
+						message.runId &&
+						deps.memory.referenceInputs
+						? (deps.memory.referenceInputs.readRunInTransaction(
+								db,
+								message.runId,
+							) ?? { sources: [], complete: false })
+						: { sources: [], complete: true },
+				),
+			);
 		if (event.kind === "added" && speaker === "assistant") {
 			// A new silence starts at every assistant message (also a timer's announcement).
 			c.planner.enter();

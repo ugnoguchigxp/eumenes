@@ -1,3 +1,4 @@
+import { backgroundInput } from "./background-input";
 import type { Database } from "bun:sqlite";
 import { systemContext } from "../../../infrastructure/system-context";
 import { systemCopyCheck } from "./conversation-output";
@@ -341,6 +342,7 @@ export function conversationPrefixFrom(
 		system: string;
 		window: WindowSnapshot | null;
 		pending: ReadonlySet<string>;
+		requireProvenance?: boolean;
 	},
 ): ConversationPrefix {
 	const store = deps.conversation.input;
@@ -350,9 +352,38 @@ export function conversationPrefixFrom(
 	// (section 5.5 #1). The generation's gate keeps new ones out; this keeps out those kept before it, and the
 	// agency's, which no generation gate checks.
 	const copies = history.copyFilter ? systemCopyCheck(input.system) : null;
+	const requireProvenance =
+		input.requireProvenance ??
+		deps.memory?.referenceInputs.afterForgettingInTransaction(tx) ??
+		false;
 	const after = store
 		.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
-		.filter((u) => !(copies && u.speaker === "agent" && copies(u.text)));
+		.filter((u) => {
+			if (copies && u.speaker === "agent" && copies(u.text)) return false;
+			if (
+				u.messageId &&
+				deps.memory?.isSourceRevokedInTransaction(tx, u.messageId)
+			)
+				return false;
+			if (!requireProvenance || u.speaker === "user") return true;
+			if (!u.messageId) return false;
+			const source = deps.conversation.sourceInTransaction(tx, u.messageId);
+			if (source.state !== "available") return false;
+			const inherited = source.message.runId
+				? deps.memory?.referenceInputs.readRunInTransaction(
+						tx,
+						source.message.runId,
+					)
+				: (deps.memory?.referenceInputs.readMessageInTransaction(
+						tx,
+						u.messageId,
+					) ?? deps.agency?.inputForMessageInTransaction?.(tx, u.messageId));
+			return (
+				!!inherited?.complete &&
+				(!deps.memory ||
+					deps.memory.referenceInputs.isCurrentInTransaction(tx, inherited))
+			);
+		});
 	const recent = recentUtterances(after, input.pending, history.users);
 	const said = after.filter(
 		(u) =>
@@ -445,6 +476,7 @@ export function backgroundPrefixInTransaction(
 	deps: DialogueDeps,
 	tx: Database,
 	conversationId: string,
+	requireProvenance?: boolean,
 ): ConversationPrefix | null {
 	let window: WindowSnapshot | null = null;
 	try {
@@ -457,6 +489,7 @@ export function backgroundPrefixInTransaction(
 		system: conversationSystem(deps, tx, conversationId),
 		window,
 		pending: pendingMessageIdsInTransaction(deps, tx, conversationId),
+		...(requireProvenance ? { requireProvenance } : {}),
 	});
 }
 
@@ -492,8 +525,17 @@ export function backgroundTaskInTransaction(
 	conversationId: string,
 	task: string,
 	sections: ReadonlyArray<string | null> = [],
-): { messages: BackgroundMessage[] } | null {
-	const prefix = backgroundPrefixInTransaction(deps, tx, conversationId);
+	requireProvenance?: boolean,
+): {
+	messages: BackgroundMessage[];
+	input?: import("../../memory").ReferenceInput;
+} | null {
+	const prefix = backgroundPrefixInTransaction(
+		deps,
+		tx,
+		conversationId,
+		requireProvenance,
+	);
 	if (!prefix) return null;
 	const nowMs = Date.parse(deps.clock());
 	const state = stateText(
@@ -516,6 +558,7 @@ export function backgroundTaskInTransaction(
 		}),
 	);
 	return {
+		input: backgroundInput(deps, tx, conversationId, prefix),
 		messages: taskMessages(prefix, [state, ...sections], task).map(
 			backgroundMessage,
 		),
@@ -535,6 +578,15 @@ export function conversationTaskPort(deps: DialogueDeps) {
 			db: Database,
 			conversationId: string,
 			task: string,
-		) => backgroundTaskInTransaction(deps, db, conversationId, task),
+			options?: { requireProvenance?: boolean },
+		) =>
+			backgroundTaskInTransaction(
+				deps,
+				db,
+				conversationId,
+				task,
+				[],
+				options?.requireProvenance,
+			),
 	};
 }

@@ -19,7 +19,7 @@ test("autonomous intent dispatches real research, receives a result, survives re
 	});
 	const catalog = h.store.read(port.catalogInTransaction);
 	expect(catalog.length).toBeGreaterThan(0);
-	const card = catalog.find((c) => c.id.includes("web"))!;
+	const card = catalog.find((c) => c.revisionId.includes("web"))!;
 	expect(card).toBeDefined();
 	const llm: LlmPort = {
 		async complete(request) {
@@ -63,7 +63,7 @@ test("autonomous intent dispatches real research, receives a result, survives re
 									toolInput: returned
 										? null
 										: JSON.stringify({
-												revisionId: card.id,
+												revisionId: card.revisionId,
 												question: "東京の天気を確認し根拠を示す",
 											}),
 									applyWhen: "静かな機会",
@@ -241,7 +241,15 @@ test("autonomous intent dispatches real research, receives a result, survives re
 				autonomousResearchSource(db, row.root_id, Date.now()),
 			),
 		).toBeNull();
-		expect(h.store.read(port.recordsInTransaction)).toHaveLength(0);
+		const redacted = h.store.read(port.recordsInTransaction);
+		expect(redacted).toHaveLength(1);
+		const redactedSnapshot = redacted[0]!
+			.snapshot as import("eumenes-agency").AgencySnapshot;
+		expect(redactedSnapshot.state.intents).toHaveLength(0);
+		expect(redactedSnapshot.state.attempts).toHaveLength(0);
+		expect(
+			redactedSnapshot.observations.some((o) => o.id === "autonomy-user"),
+		).toBe(false);
 		expect(
 			h.store.read((db) =>
 				h.toolchain.agents.reportInTransaction(

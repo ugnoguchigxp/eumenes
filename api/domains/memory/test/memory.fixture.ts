@@ -1,3 +1,4 @@
+import { hostInputsMigration } from "../repository/host-inputs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -64,6 +65,7 @@ export const memoryTestMigrations = [
 	specialistBlockReasonMigration,
 	executionReferencesMigration,
 	...memoryPackageMigrations,
+	hostInputsMigration,
 	// Last, so a test that opens a database without it (the earlier design's) keeps every other position.
 	retireExchangeLedgerMigration,
 ];

@@ -1,16 +1,2 @@
 # Source: api/domains/dialogue/service/routed-router.ts
-text = '''[[question]]
-まだ実施していない依頼:
-[[unhandled]]'''
-
-[variables.question]
-type = "string"
-trust = "untrusted"
-placement = "delimited-context"
-encoding = "delimited-text"
-
-[variables.unhandled]
-type = "string"
-trust = "untrusted"
-placement = "delimited-context"
-encoding = "delimited-text"
+text = '''まだ実施していない依頼:'''

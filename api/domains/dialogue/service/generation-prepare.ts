@@ -1,3 +1,4 @@
+import { backgroundInput } from "./background-input";
 import type { Database } from "bun:sqlite";
 import { reportNoticeInTransaction } from "./report-notice";
 import { getLogger } from "../../../infrastructure/logger";
@@ -421,6 +422,16 @@ export function createPrepare(
 			pending: pendingIds,
 		});
 		const { texts, final, attachments } = pendingInput(deps, tx, pending);
+		if (memory?.referenceInputs) {
+			const context = backgroundInput(deps, tx, conversationId, prefix);
+			const pendingInput = memory.referenceInputs.captureInTransaction(tx, {
+				messageIds: [...pendingIds],
+			});
+			memory.referenceInputs.recordRunInTransaction(tx, run.id, {
+				sources: [...new Set([...context.sources, ...pendingInput.sources])],
+				complete: context.complete && pendingInput.complete,
+			});
+		}
 		const noticeText = notice
 			? (conversation.messageInTransaction(tx, run.inputMessageId)?.message
 					.text ?? null)

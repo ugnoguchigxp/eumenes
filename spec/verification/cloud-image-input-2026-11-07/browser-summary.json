@@ -1,0 +1,53 @@
+{
+  "lane": "browser-fixture",
+  "cases": [
+    {
+      "title": "wide and narrow composer keeps upload below the full-width input",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 6427
+        }
+      ]
+    },
+    {
+      "title": "full chat paste and drop, picker, thumbnail removal, image-only send, reload and explicit past-image reattachment",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 25268
+        }
+      ]
+    },
+    {
+      "title": "bad upload preserves draft and attachment, unsupported files and count limits explain rejection",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 9289
+        }
+      ]
+    },
+    {
+      "title": "cloud-only composer sends images without requiring a LARM connection",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 6706
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "startTime": "2026-11-06T22:28:23.835Z",
+    "duration": 50155.578,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

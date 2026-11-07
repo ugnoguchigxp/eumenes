@@ -42,6 +42,7 @@ test("both runtime purposes send the complete Eumenes system; observations stay 
 							? agencyOutputContract("update", {
 									toolNames: [],
 									condition: "F",
+									conversationParticipation: true,
 									interestFormation: true,
 									hostTodos: true,
 									utteranceEmotion: true,
@@ -50,6 +51,7 @@ test("both runtime purposes send the complete Eumenes system; observations stay 
 									findings: true,
 									toolNames: [],
 									condition: "F",
+									conversationParticipation: true,
 									interestFormation: true,
 									hostTodos: true,
 									utteranceEmotion: true,

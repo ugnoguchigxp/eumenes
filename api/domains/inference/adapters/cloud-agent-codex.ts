@@ -148,7 +148,8 @@ export async function runCodex(
 	const cwd = await mkdtemp(join(tmpdir(), AGENT_ROOT_PREFIX));
 	const untrack = trackClaudeRoot(cwd);
 	try {
-		const { system, prompt } = promptParts(call.messages);
+		const { system, prompt, images } = promptParts(call.messages);
+
 		const tools = call.tools?.length ? call.tools : undefined;
 		// Without a key the CLI keeps its own login; a key binds the saved API host.
 		const keyed: CodexRuntime = call.credential
@@ -175,6 +176,7 @@ export async function runCodex(
 								)
 							: ""),
 				prompt,
+				images,
 				...(call.reasoningEffort
 					? { reasoningEffort: call.reasoningEffort }
 					: {}),

@@ -6,7 +6,9 @@ import type {
 	createIdleScheduler,
 	LlmPort,
 	LlmRequest,
+	InputContext,
 } from "eumenes-agency";
+import type { Messages } from "../../domains/inference";
 import type { ConversationService } from "../../domains/conversation";
 import type { MemoryService } from "../../domains/memory";
 import type { Settings } from "../../domains/settings";
@@ -43,7 +45,12 @@ export type AgencyHostDeps = {
 		onChange(listener: () => void): () => void;
 	};
 	/** The user's State items are the topic material (hostTopics mode). */
-	memory: Pick<MemoryService, "status" | "list">;
+	memory: Pick<MemoryService, "status" | "list"> &
+		Partial<Pick<MemoryService, "referenceInputs" | "isBlockedInTransaction">>;
+	/** Frozen conversation prefix and State, including all host input dependencies. */
+	captureContext?(
+		conversationId: string,
+	): { messages: Messages; input: InputContext } | null;
 	/**
 	 * Builds the background LLM port of one conversation. `next` names each call (unique decision id, the
 	 * conversation's current execution generation); the host wraps the port to log.
@@ -81,6 +88,7 @@ export type Conv = {
 	scheduler: ReturnType<typeof createIdleScheduler>;
 	generation: number;
 	background: AbortController | null;
+	preparedContext?: Messages;
 	/** Used by ephemeral hosts without a durable state port. */
 	lastDispatchAt?: number;
 	opportunities: number;

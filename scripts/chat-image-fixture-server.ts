@@ -2,7 +2,49 @@ import { harness } from "../api/application/toolchain/toolchain.fixture";
 import { imageLarmFixture } from "../api/domains/larm/test/chat-input.fixture";
 const f = imageLarmFixture();
 await f.p.connect();
-const h = await harness({ model: f.p, timers: true });
+const model = "fixture-cloud-vision";
+const cloud: { imageCount: number; mimes: string[] }[] = [];
+const h = await harness({
+	model: f.p,
+	timers: true,
+	inferenceOptions: {
+		connectionModels: {
+			list: async () => ({
+				models: [
+					{
+						id: model,
+						displayName: model,
+						contextWindow: 262144,
+						inputModalities: ["text", "image"],
+					},
+				],
+				account: { auth: "subscription", subscriptionType: null },
+			}),
+		},
+		cloudAgents: {
+			run: async (call) => {
+				const images = call.messages.flatMap((m) => m.images ?? []);
+				cloud.push({
+					imageCount: images.length,
+					mimes: images.map((i) => i.mime),
+				});
+				const text = call.messages[0]!.content.includes("FUNCTIONS=")
+					? JSON.stringify({
+							decision: "answer",
+							functionName: "",
+							request: "",
+							questionRef: "",
+						})
+					: "画像を確認しました。";
+				call.onDelta?.(text);
+				return { text };
+			},
+		},
+	},
+});
+h.app.get("/api/chat-image-fixture/cloud", (c) =>
+	c.json({ model, requests: cloud }),
+);
 h.app.get("/api/chat-image-fixture/requests", (c) =>
 	c.json(
 		f.requests.map((r) => ({

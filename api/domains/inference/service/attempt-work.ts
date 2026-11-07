@@ -295,6 +295,7 @@ export function startWork(
 				settings: env.settings,
 				fetch: env.options.fetch,
 				agents: env.options.cloudAgents,
+				models: env.options.connectionModels,
 			},
 			row,
 			args.sent,

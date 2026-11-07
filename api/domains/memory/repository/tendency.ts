@@ -121,6 +121,30 @@ export function listActiveTendencies(db: Database): TendencyFull[] {
 			.all() as Record<string, unknown>[]
 	).map(mapTendency);
 }
+
+export function listStoredTendencies(db: Database): TendencyFull[] {
+	return (
+		db
+			.query(`SELECT ${tendencyColumns} FROM memory_tendency ORDER BY id`)
+			.all() as Record<string, unknown>[]
+	).map(mapTendency);
+}
+
+export function restoreTendency(
+	db: Database,
+	id: string,
+	expectedRevision: number,
+	now: string,
+): boolean {
+	const result = db
+		.query(
+			"UPDATE memory_tendency SET status='active', revision=revision+1, updated_at=? WHERE id=? AND revision=? AND status='retired'",
+		)
+		.run(now, id, expectedRevision);
+	if (result.changes !== 1) return false;
+	bumpTendencyRevision(db);
+	return true;
+}
 function bumpTendencyRevision(db: Database) {
 	db.query(
 		"UPDATE memory_tendency_revision SET revision = revision + 1 WHERE id = 1",

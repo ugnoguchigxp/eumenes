@@ -6,6 +6,8 @@ import { openStore } from "../../../infrastructure/sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import bundle from "../bundles/pipeline-execution.bundle.json";
+import { retainedDefinition } from "../repository";
 const host: BundleHost = {
 	adapters: new Map([
 		[
@@ -80,6 +82,58 @@ test("seed installs p0-3 idempotently, preserves an old binding body, and refuse
 		expect(
 			store.read((db) => caps.toolchainsInTransaction(db)).map((c) => c.id),
 		).toContain("pipeline.execute");
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("planner instruction upgrade preserves old revisions and selects the new skill once", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-pipeline-upgrade-"));
+	const store = openStore(join(dir, "db"), migrations);
+	const caps = createCapabilities(store, new Set(), { bundleHost: () => host });
+	try {
+		const old = {
+			...bundle,
+			definitions: bundle.definitions.filter((d) => d.revision === 1),
+		};
+		await store.write((db) => caps.importBundleInTransaction(db, old, host));
+		const previous = store.read((db) =>
+			retainedDefinition(db, "skill:pipeline.execute@1"),
+		);
+		const upgraded = await store.write((db) =>
+			caps.importBundleInTransaction(db, bundle, host),
+		);
+		expect(upgraded.issues).toEqual([]);
+		expect(upgraded.registered).toEqual([
+			"skill:pipeline.execute@2",
+			"package:pipeline.execute@2",
+			"toolchain:pipeline.execute@2",
+		]);
+		expect(
+			store.read((db) => retainedDefinition(db, "skill:pipeline.execute@1")),
+		).toEqual(previous);
+		expect(
+			store
+				.read((db) => caps.toolchainsInTransaction(db))
+				.find((c) => c.id === "pipeline.execute")?.revisionId,
+		).toBe("toolchain:pipeline.execute@2");
+		const selected = store.read((db) =>
+			caps.toolchainSetInTransaction(db, "toolchain:pipeline.execute@2"),
+		);
+		expect(selected.package.revisionId).toBe("package:pipeline.execute@2");
+		expect(selected.package.requiredSkillRevisionIds).toEqual([
+			"skill:pipeline.execute@2",
+		]);
+		expect(selected.skills).toEqual([
+			bundle.definitions.find((d) => d.kind === "skill" && d.revision === 2)!
+				.body!,
+		]);
+		expect(
+			await store.write((db) =>
+				caps.importBundleInTransaction(db, bundle, host),
+			),
+		).toEqual({ issues: [], registered: [] });
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

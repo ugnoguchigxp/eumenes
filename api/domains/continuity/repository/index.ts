@@ -174,6 +174,24 @@ export function transitionItem(
 	if (item) bump(db, item.conversationId);
 	return true;
 }
+
+/** Owner maintenance restores a closed note without rewriting its text, sources or expiry. */
+export function restoreItem(
+	db: Database,
+	id: string,
+	expectedRevision: number,
+	now: string,
+): boolean {
+	const result = db
+		.query(
+			"UPDATE continuity_items SET status='active', revision=revision+1, updated_at=? WHERE id=? AND revision=? AND status IN ('resolved','retracted')",
+		)
+		.run(now, id, expectedRevision);
+	if (result.changes !== 1) return false;
+	const item = getItem(db, id);
+	if (item) bump(db, item.conversationId);
+	return true;
+}
 /**
  * Physically deletes every note that came from any of the messages (one source in the set is enough) and returns
  * their ids. A forgotten message must

@@ -9,6 +9,7 @@ export {
 	/** @public */ seedImportMigration,
 } from "./repository";
 export type { MemoryService } from "./service";
+export type { ReferenceInput } from "./service/reference-input";
 export { NOMINAL_FIXED_TOKENS, createMemoryService } from "./service";
 export type {
 	MemoryItemDto,

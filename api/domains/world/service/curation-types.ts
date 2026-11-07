@@ -105,6 +105,8 @@ export type CurationHostTable = {
 	forgetEpoch: string;
 	/** The digest of the Scope's entities at prepare; a held window is remembered under it. */
 	entityDigest: string;
+	/** Owner selection changed during inference: the old result cannot restore excluded material. */
+	workingSetDigest?: string;
 	events: CurationHostEvent[];
 	/** What the model saw, whole sources, sorted: the manifest of every claim made from it. */
 	dependencies: SourceRef[];
@@ -232,6 +234,7 @@ export type CurationSettleResult =
 			reason:
 				| "world_unavailable"
 				| "forget_epoch_changed"
+				| "working_set_changed"
 				| "input_changed"
 				| "input_version_changed"
 				| "source_blocked"

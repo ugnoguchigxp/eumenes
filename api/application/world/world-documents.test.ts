@@ -55,34 +55,41 @@ test("collected seed reaches the existing worker and report without becoming a p
 	expect(h.workerMessages.join("")).toContain("観測未提供");
 });
 
-test("withdrawn collected evidence cannot be adopted after it was read", async () => {
-	const h = await boot([
-		search,
-		read,
-		async (packet) => {
-			await h.store.write((db) =>
-				db
-					.query(
-						`UPDATE world_host_document SET withdrawn=1, content='', title='', collection='', manifest_digest='' WHERE principal=?1 AND scope_key=?2 AND id=?3`,
-					)
-					.run(SCOPE.principal, SCOPE.scopeKey, seed.id),
-			);
-			return report(packet);
-		},
-	]);
-	await h.world.documents.import(SCOPE, seed);
-	await h.ask("収集資料から搬入規程の対象を調べて");
-	expect(h.packets).toHaveLength(3);
-	const error = h.store.read((db) =>
-		db.query("SELECT error_code FROM agent_tasks WHERE kind='worker'").get(),
-	) as { error_code: string };
-	expect(error.error_code).toBe("evidence_invalidated");
-	const rows = h.store.read((db) =>
-		db.query("SELECT report_json FROM agent_reports").all(),
-	);
-	expect(rows).toHaveLength(0);
-	// The fixed host rules name the kind in prose; a source object of that kind or the document's text would be a leak.
-	const parentText = h.reported();
-	expect(parentText).not.toContain('"kind":"world_document"');
-	expect(parentText).not.toContain("西工房");
-});
+for (const mode of ["withdrawn", "archived"] as const)
+	test(`${mode} collected evidence cannot be adopted after it was read`, async () => {
+		const h = await boot([
+			search,
+			read,
+			async (packet) => {
+				if (mode === "archived")
+					await h.world.documents.maintenance.apply(SCOPE, {
+						active: false,
+						refs: [{ kind: "document", id: seed.id, revision: seed.revision }],
+					});
+				else
+					await h.store.write((db) =>
+						db
+							.query(
+								`UPDATE world_host_document SET withdrawn=1, content='', title='', collection='', manifest_digest='' WHERE principal=?1 AND scope_key=?2 AND id=?3`,
+							)
+							.run(SCOPE.principal, SCOPE.scopeKey, seed.id),
+					);
+				return report(packet);
+			},
+		]);
+		await h.world.documents.import(SCOPE, seed);
+		await h.ask("収集資料から搬入規程の対象を調べて");
+		expect(h.packets).toHaveLength(3);
+		const error = h.store.read((db) =>
+			db.query("SELECT error_code FROM agent_tasks WHERE kind='worker'").get(),
+		) as { error_code: string };
+		expect(error.error_code).toBe("evidence_invalidated");
+		const rows = h.store.read((db) =>
+			db.query("SELECT report_json FROM agent_reports").all(),
+		);
+		expect(rows).toHaveLength(0);
+		// The fixed host rules name the kind in prose; a source object of that kind or the document's text would be a leak.
+		const parentText = h.reported();
+		expect(parentText).not.toContain('"kind":"world_document"');
+		expect(parentText).not.toContain("西工房");
+	});

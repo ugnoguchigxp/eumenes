@@ -1,0 +1,12 @@
+
+Running 5 tests using 1 worker
+
+(node:37077) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/browser/avatar-control.spec.ts:34:1 › replay hook drives the real face and mouth, returns to the conversation phase, and idles with a swaying torso (11.4s)
+  ✓  2 tests/browser/avatar-control.spec.ts:136:1 › real Hiyori WebGL follows TTS and Live playback only, closes and survives remounts (3.8s)
+  ✓  3 tests/browser/avatar-control.spec.ts:259:1 › missing model files never prevent startup, conversation controls or switching backgrounds (515ms)
+  ✓  4 tests/browser/avatar-control.spec.ts:324:1 › the installed background works with the production content policy and owns one cancellable draw loop (2.6s)
+  ✓  5 tests/browser/avatar-view.spec.ts:33:1 › background mode adjusts real WebGL framing, keeps it across chat toggles, and works on mobile with reduced motion (2.9s)
+
+  5 passed (21.8s)

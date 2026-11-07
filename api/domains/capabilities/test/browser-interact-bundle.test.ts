@@ -48,6 +48,20 @@ test("pilot bundle registers immutably, with shared components and no unsupporte
 	const store = openStore(join(dir, "db"), migrations);
 	const caps = createCapabilities(store, new Set(), { bundleHost: () => host });
 	try {
+		const previous = {
+			...bundle,
+			definitions: bundle.definitions.filter(
+				(d) =>
+					!(
+						d.kind === "skill" &&
+						d.id === "browser.interact.operator" &&
+						d.revision === 2
+					),
+			),
+		};
+		await store.write((db) =>
+			caps.importBundleInTransaction(db, previous, host),
+		);
 		const check = await store.write((db) =>
 			caps.importBundleInTransaction(db, bundle, host, { dryRun: true }),
 		);

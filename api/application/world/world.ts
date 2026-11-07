@@ -466,7 +466,7 @@ export function createWorldAssembly(
 		curation,
 		context,
 		claims,
-		documents: createWorldDocuments(options.store),
+		documents: createWorldDocuments(options.store, service),
 		claimsContext: () => ({
 			principal: scope.principal,
 			scopeKeys: [scope.scopeKey],

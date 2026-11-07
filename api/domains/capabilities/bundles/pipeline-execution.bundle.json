@@ -74,6 +74,65 @@
 				"計算結果を使って別の作業を実行して"
 			],
 			"redirects": []
+		},
+		{
+			"kind": "skill",
+			"id": "pipeline.execute",
+			"revision": 2,
+			"title": "短い手順定義",
+			"summary": "原文・部品・依存・最終配送を保持する",
+			"aliases": [],
+			"tags": [],
+			"dependencies": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"body": "一つのJSONだけを返します。作れる場合は {\"status\":\"ready\",\"definition\":{\"request\":\"元依頼そのまま\",\"steps\":[{\"id\":\"英小文字から始まる小文字・数字・ハイフン40字以内\",\"bundle\":\"公開入口ID\",\"task\":\"担当への依頼2000字以内\",\"from\":[\"request または先行手順ID\"],\"result\":\"期待する結果500字以内\"}],\"output\":{\"from\":[\"最終配送する手順ID\"],\"deliver\":\"届け方1000字以内\"}}}。手順は1〜8件で直列、fromは元依頼か先行手順の結果全体です。argumentsは型付き引数を宣言する部品だけにリテラルJSONで指定でき、動的な値は結果とtaskから実行担当が解釈します。式・再帰・値抽出専用手順・架空の部品は作りません。足りない情報があれば {\"status\":\"needs_input\",\"questions\":[\"必要な質問\"]}、部品が無ければ {\"status\":\"unsupported\",\"reasons\":[\"理由\"]} とします。修復時は機械検査で示された契約違反だけを直します。出力前に参照・原文・配送を確認し、計画の生成だけで終了します。 手順1件は公開部品への1回の呼出しです。異なる対象や引数で別々の作成・更新・取消を求められた場合、同じ部品でも操作ごとに別手順にします。公開カードに一回で複数対象を扱えると明記されている場合だけ、その範囲でまとめられます。元依頼と回答が指定した全ての対象・条件・個数を各手順へ割り当て、一件の成功で未実施の操作まで完了と見なさないよう確認します。"
+		},
+		{
+			"kind": "package",
+			"id": "pipeline.execute",
+			"revision": 2,
+			"title": "パイプライン実行",
+			"summary": "今回の依頼の計画を作る",
+			"aliases": [],
+			"tags": [],
+			"dependencies": [
+				"profile:pipeline.execute@1",
+				"skill:pipeline.execute@2"
+			],
+			"useWhen": [],
+			"avoidWhen": [],
+			"schemaKey": "emptyInput",
+			"profileRevisionId": "profile:pipeline.execute@1",
+			"requiredSkillRevisionIds": ["skill:pipeline.execute@2"],
+			"toolRevisionIds": []
+		},
+		{
+			"kind": "toolchain",
+			"id": "pipeline.execute",
+			"revision": 2,
+			"title": "パイプライン",
+			"summary": "複数の公開担当を順に組み合わせ、依頼ごとの短い定義と結果の受渡しに沿って実行する",
+			"aliases": [],
+			"tags": [],
+			"dependencies": ["package:pipeline.execute@2"],
+			"useWhen": [
+				"複数の担当の結果を受け渡して一つの依頼を満たす",
+				"一つの依頼に複数の成果物や順番のある作業がある"
+			],
+			"avoidWhen": [
+				"一つの担当の機能内で完結する依頼",
+				"対話型の編集作業を継続する"
+			],
+			"packageRevisionId": "package:pipeline.execute@2",
+			"bindingRevisionId": "binding:pipeline.execute@2",
+			"functionName": "execute_pipeline",
+			"examples": [
+				"調べた内容を画像とBGMの両方に使って",
+				"資料を読んで図を作り結果を整理して",
+				"計算結果を使って別の作業を実行して"
+			],
+			"redirects": []
 		}
 	],
 	"bindings": [

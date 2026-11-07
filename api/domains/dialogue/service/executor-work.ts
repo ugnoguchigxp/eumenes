@@ -115,7 +115,7 @@ export async function work(
 			// Finished work is not answered, amended or cancelled: its result stays as it was reported.
 			if (row.status === "done")
 				return { result: { ok: false, code: "todo_done", ...state() } };
-			if (row.execution === "task")
+			if (row.execution === "task" || row.execution === "pipeline")
 				return controlExecution(x, tx, run, row, args, record, state);
 			if (args.operation === "answer")
 				return answerCommand(x, tx, run, row, args, record, state);

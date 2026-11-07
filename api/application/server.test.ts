@@ -69,6 +69,18 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		}),
 	);
 	const items = createLifecycles(services, { name: "http", close: () => {} });
+	const recoveries = items
+		.filter((item) => item.recover)
+		.map((item) => item.name);
+	expect(recoveries.indexOf("agency_recovery")).toBeGreaterThan(
+		recoveries.indexOf("memory_recovery"),
+	);
+	expect(recoveries.indexOf("agency_recovery")).toBeLessThan(
+		recoveries.indexOf("agents_recovery"),
+	);
+	expect(recoveries.indexOf("agency_recovery")).toBeLessThan(
+		recoveries.indexOf("queue_recovery"),
+	);
 	expect(
 		items
 			.filter((item) => item.close)
@@ -96,6 +108,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"terminals",
 		"shell",
 		"kanban",
+		"pursuit",
 		"agents",
 		"capabilities",
 		"browser",

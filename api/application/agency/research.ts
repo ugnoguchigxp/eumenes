@@ -1,4 +1,8 @@
-import { projectAgencyState, type AgencySnapshot } from "eumenes-agency";
+import {
+	projectAgencyState,
+	type AgencySnapshot,
+	type InputContext,
+} from "eumenes-agency";
 import type { Database } from "bun:sqlite";
 import type { AgencyHostDeps, Conv } from "./host-types";
 import { z } from "zod";
@@ -11,7 +15,7 @@ import {
 } from "eumenes-agency";
 import type { AgencyStatePort } from "../../domains/dialogue";
 import type { SqliteStore } from "../../infrastructure/sqlite";
-const request = z.strictObject({
+export const agencyResearchRequest = z.strictObject({
 	revisionId: z.string().min(1),
 	question: z.string().trim().min(1).max(2000),
 });
@@ -27,7 +31,11 @@ export function researchTools(
 				{
 					name: "delegate",
 					requiresApproval: false,
-					description: `関心に基づく読み取り調査を委譲します。toolInputはrevisionIdとquestionを持つJSON文字列です。revisionIdには次の一覧から選んだ項目のidをそのまま写し、questionには調べたい問いと受入条件を書きます。一覧: ${JSON.stringify(catalog)}`,
+					input: {
+						sources: catalog.map((c) => `capability:${c.revisionId}`),
+						complete: true,
+					},
+					description: `関心に基づく読み取り調査を委譲します。toolInputはrevisionIdとquestionを持つJSON文字列です。revisionIdには次の一覧から選んだ項目のrevisionIdをそのまま写し、questionには調べたい問いと受入条件を書きます。引数schema: ${JSON.stringify(z.toJSONSchema(agencyResearchRequest))}。一覧: ${JSON.stringify(catalog)}`,
 				},
 			]
 		: [];
@@ -43,7 +51,7 @@ export function researchInput(
 	// Execution retains the selected capability's enforced model/tool limits.
 	const d = delegationRequest(ticket, runtime.snapshot().state, now);
 	if (!d || !ticket.candidateId) throw new Error("agency_delegation_invalid");
-	const parsed = request.safeParse(JSON.parse(d.question));
+	const parsed = agencyResearchRequest.safeParse(JSON.parse(d.question));
 	if (!parsed.success) throw new Error("agency_delegation_invalid");
 	const snap = runtime.snapshot();
 	const attempt = snap.state.attempts.find((a) => a.id === ticket.id);
@@ -59,7 +67,14 @@ export function researchInput(
 		question: parsed.data.question,
 		revisionId: parsed.data.revisionId,
 		deadline: (attempt?.startedAt ?? now) + 30 * 60000,
-		sourceRefs: intent.evidence,
+		sourceRefs: [
+			...new Set([
+				...intent.evidence,
+				...(snap.provenance?.entries.find(
+					([key]) => key === `attempt:${ticket.id}`,
+				)?.[1].sources ?? []),
+			]),
+		],
 	};
 }
 export function snapshotRefs(runtime: AgencyRuntime): string[] {
@@ -67,6 +82,7 @@ export function snapshotRefs(runtime: AgencyRuntime): string[] {
 	return [
 		...new Set([
 			...s.observations.map((o) => o.id),
+			...(s.provenance?.entries.flatMap(([, input]) => input.sources) ?? []),
 			...s.state.intents.flatMap((i) => i.evidence),
 			...(s.state.interests ?? []).flatMap((i) => i.evidence),
 			...s.state.candidates.flatMap((c) => c.evidence),
@@ -74,12 +90,12 @@ export function snapshotRefs(runtime: AgencyRuntime): string[] {
 	];
 }
 
-export function projectionLines(
+export function projectionContext(
 	deps: AgencyHostDeps,
 	convs: ReadonlyMap<string, Conv>,
 	db: Database,
 	id: string,
-): readonly string[] {
+): { lines: readonly string[]; input: InputContext } {
 	const record = deps.state
 		?.recordsInTransaction(db)
 		.find((r) => r.conversationId === id);
@@ -89,13 +105,32 @@ export function projectionLines(
 			? projectAgencyState("F", snapshot.state, 8, snapshot.observations)
 			: null
 		: convs.get(id)?.runtime.projection(8);
-	return (projection?.items ?? []).map((i) => JSON.stringify(i));
+	const inputs = new Map(
+		snapshot?.provenance?.entries ??
+			convs.get(id)?.runtime.snapshot().provenance?.entries,
+	);
+	const shown = (projection?.items ?? []).map(
+		(item) =>
+			inputs.get(
+				item.kind === "finding"
+					? `intent:${item.id.slice("finding:".length)}`
+					: `${item.kind}:${item.id}`,
+			) ?? { sources: [], complete: false },
+	);
+	return {
+		lines: (projection?.items ?? []).map((i) => JSON.stringify(i)),
+		input: {
+			sources: [...new Set(shown.flatMap((input) => input.sources))],
+			complete: shown.every((input) => input.complete),
+		},
+	};
 }
 
 export function waitingForWork(runtime: AgencyRuntime): boolean {
 	const s = runtime.snapshot();
 	return (
-		s.cursor === s.observations.length &&
+		s.cursor ===
+			Math.max(s.compactedThrough ?? 0, ...s.observations.map((o) => o.seq)) &&
 		s.state.intents.some((i) => !!i.workRef)
 	);
 }

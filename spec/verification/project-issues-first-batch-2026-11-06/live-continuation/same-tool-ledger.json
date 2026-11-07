@@ -1,0 +1,69 @@
+{
+  "work": [
+    {
+      "id": "4756feb3-fbe0-4d78-99c2-646d39e8f089",
+      "ref": 1,
+      "conversationId": "verify-eum001002-same-tool-20261106-1958",
+      "runId": "ff099877-6778-4448-8fec-6deec4f707dd",
+      "toolchainId": "timers.manage",
+      "toolchainRevisionId": "toolchain:timers.manage@6",
+      "execution": "command",
+      "request": "10秒のタイマーと25秒のタイマーをそれぞれ1つずつ作ってください。",
+      "title": "10秒のタイマーと25秒のタイマーをそれぞれ1つずつ作ってください。",
+      "status": "done",
+      "outcome": "succeeded",
+      "revision": 2,
+      "questionId": null,
+      "question": null,
+      "result": {
+        "version": 1,
+        "kind": "timer_action",
+        "action": "started",
+        "observedAt": "2026-11-06T10:54:10.817Z",
+        "items": [
+          {
+            "id": "6fa58290-4a5c-417e-9f95-0024f5794c73",
+            "revision": 0,
+            "label": "タイマー",
+            "state": "active",
+            "durationSeconds": 10,
+            "remainingSeconds": 10,
+            "dueAt": "2026-11-06T10:54:20.801Z"
+          }
+        ],
+        "complete": true,
+        "errorCode": null
+      },
+      "sourceRef": "4965ebf4-c8e4-43c0-8a7b-6c419655892e",
+      "archivedAt": "2026-11-06T10:54:10.817Z",
+      "noticeReadAt": null,
+      "createdAt": "2026-11-06T10:53:58.454Z",
+      "updatedAt": "2026-11-06T10:54:10.817Z",
+      "messageIds": [
+        "032a1376-1b63-4413-9e0c-735b387e5e76"
+      ]
+    }
+  ],
+  "trace": {
+    "runId": "ff099877-6778-4448-8fec-6deec4f707dd",
+    "conversationId": "verify-eum001002-same-tool-20261106-1958",
+    "messageId": "032a1376-1b63-4413-9e0c-735b387e5e76",
+    "messageIds": [
+      "032a1376-1b63-4413-9e0c-735b387e5e76"
+    ],
+    "text": "10秒のタイマーと25秒のタイマーをそれぞれ1つずつ作ってください。",
+    "decided": "timers.manage",
+    "workId": "4756feb3-fbe0-4d78-99c2-646d39e8f089",
+    "set": [
+      "timers.manage",
+      "conversation.respond",
+      "ui.compose"
+    ],
+    "row": 2,
+    "mode": "on",
+    "createdAt": 1793962438439
+  },
+  "executions": [
+    null
+  ]
+}

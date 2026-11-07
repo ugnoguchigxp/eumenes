@@ -1,3 +1,4 @@
+import { connectionAccess } from "./connection-access";
 import { createProbes } from "./probes";
 import { createRequestValidity } from "./request-validity";
 import { createRequestStatus } from "./request-status";
@@ -513,11 +514,8 @@ export function createInference(
 		validRequest(id: string) {
 			return store.read((db) => valid(db, id));
 		},
-		connect: () => port(settings.get()).connect(),
+		...connectionAccess(settings, port, options.connectionModels),
 		...screenOperations(screen),
-		prepareVoice: (signal: AbortSignal) =>
-			port(settings.get()).prepareVoice?.(signal) ?? Promise.resolve(),
-		status: () => port(settings.get()).status(),
 		onChange(listener: () => void) {
 			listeners.add(listener);
 			return () => {

@@ -476,6 +476,10 @@ test("routeStructured: one request with a reference routes the masked utterance;
 		request: "この音楽に合う画像を作って",
 	});
 	const [call] = r.structureCalls;
+	expect(call!.control.structuredOutput).toBe(true);
+	expect(call!.options).toMatchObject({
+		outputSchema: { type: "object", required: ["decision"] },
+	});
 	expect(call!.messages).toEqual([
 		{ role: "system", content: TURN_STRUCTURE_PROMPT.system },
 		{
@@ -484,6 +488,7 @@ test("routeStructured: one request with a reference routes the masked utterance;
 				text: "この音楽に合う画像を作って",
 				previousAgent: null,
 				pending: [],
+				controls: [],
 			}),
 		},
 	]);

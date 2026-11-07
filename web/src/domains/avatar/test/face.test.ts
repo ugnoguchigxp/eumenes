@@ -36,3 +36,38 @@ test("intensity blends with neutral and malformed amplitudes cannot leave a mout
 	expect(zero.ParamMouthOpenY).toBe(0);
 	expect(full.ParamMouthOpenY).toBe(0.7);
 });
+
+test.each(["thinking", "distant"] as const)(
+	"%s has its own face without changing the speech opening",
+	(motion) => {
+		const face = createFace(() => 0)(1, 1, motion, 0.4);
+		expect(face.ParamBrowLY).not.toBe(0);
+		expect(face.ParamMouthForm).toBeLessThan(0);
+		expect(face.ParamMouthOpenY).toBe(0.4);
+	},
+);
+
+test("neutral softly changes its face without an emotion cue or a speaking mouth", () => {
+	const face = createFace(() => 0);
+	const still = face(0, 0, "neutral", 0);
+	expect(still.ParamEyeLSmile).toBe(0);
+	expect(still.ParamMouthForm).toBe(0);
+	let maxSmile = 0;
+	let previous = still.ParamEyeLSmile;
+	for (let frame = 1; frame <= 12 * 24; frame++) {
+		const values = face(frame / 24, 1 / 24, "neutral", 0);
+		maxSmile = Math.max(maxSmile, values.ParamEyeLSmile);
+		expect(values.ParamEyeLSmile).toBeLessThanOrEqual(0.4);
+		expect(Math.abs(values.ParamEyeLSmile - previous)).toBeLessThan(0.03);
+		expect(values.ParamMouthOpenY).toBe(0);
+		previous = values.ParamEyeLSmile;
+	}
+	expect(maxSmile).toBeGreaterThan(0.35);
+	const emotion = face(12.5, 1, "downcast", 0.45);
+	expect(emotion.ParamMouthForm).toBeLessThan(-0.45);
+	expect(emotion.ParamEyeLSmile).toBeLessThan(0.01);
+	expect(emotion.ParamMouthOpenY).toBe(0.45);
+	const zero = createFace(() => 0)(4, 1, "neutral", 0, 0);
+	expect(zero.ParamEyeLSmile).toBe(0);
+	expect(zero.ParamMouthForm).toBe(0);
+});

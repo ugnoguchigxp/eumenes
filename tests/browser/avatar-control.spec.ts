@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type {} from "./avatar-control.fixture";
+import type {} from "./avatar-replay.fixture";
 import sharp from "sharp";
 let directory: string;
 test.beforeAll(() => {
@@ -15,7 +16,7 @@ test.beforeAll(() => {
 			`
  const worklet = await Bun.build({entrypoints:["web/src/domains/audio/worklet/recorder.worklet.ts"],outdir:${JSON.stringify(directory)},target:"browser"});if(!worklet.success)throw new Error(worklet.logs.join("\\n"));
  const source = await Bun.file(${JSON.stringify(directory)}+"/recorder.worklet.js").text();
- const result = await Bun.build({entrypoints:["tests/browser/avatar-control.fixture.ts", "tests/browser/avatar-lifecycle.fixture.tsx"],outdir:${JSON.stringify(directory)},target:"browser",format:"iife",define:{"process.env.NODE_ENV":JSON.stringify("production")},plugins:[{name:"worklet-url",setup(b){
+ const result = await Bun.build({entrypoints:["tests/browser/avatar-control.fixture.ts", "tests/browser/avatar-lifecycle.fixture.tsx", "tests/browser/avatar-replay.fixture.tsx"],outdir:${JSON.stringify(directory)},target:"browser",format:"iife",define:{"process.env.NODE_ENV":JSON.stringify("production")},plugins:[{name:"worklet-url",setup(b){
  b.onResolve({filter:/recorder.worklet.ts\\?worker&url$/},()=>({path:"recorder-url",namespace:"worklet-url"}));
  b.onResolve({filter:/vad.worker.ts\\?worker$/},()=>({path:"vad-worker",namespace:"vad-worker"}));
  b.onLoad({filter:/.*/,namespace:"vad-worker"},()=>({contents:'export default class extends Worker { constructor(){super("/unused-vad.js");} }',loader:"js"}));
@@ -28,6 +29,119 @@ test.beforeAll(() => {
 });
 test.afterAll(() => {
 	if (directory) rmSync(directory, { recursive: true, force: true });
+});
+
+test("replay hook drives the real face and mouth, returns to the conversation phase, and keeps framing stable while the head idles", async ({
+	playwright,
+}) => {
+	test.skip(
+		!existsSync("web/public/live2d/hiyori/Hiyori.moc3"),
+		"The local model is not installed.",
+	);
+	const browser = await playwright.chromium.launch({
+		args: [
+			"--mute-audio",
+			"--use-gl=angle",
+			"--use-angle=swiftshader",
+			"--enable-unsafe-swiftshader",
+		],
+	});
+	const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
+	const errors: string[] = [];
+	page.on("pageerror", (error) => errors.push(error.message));
+	try {
+		await page.route("http://127.0.0.1/**", (route) => {
+			const path = new URL(route.request().url()).pathname;
+			if (path.startsWith("/live2d/"))
+				return route.fulfill({ path: resolve("web/public", "." + path) });
+			if (path === "/api/voice/replay/sentences")
+				return route.fulfill({ json: { sentences: ["確認用の発話です。"] } });
+			if (path === "/api/voice/replay/audio")
+				return route.fulfill({
+					path: resolve(
+						"web/src/domains/settings/sounds/task-completed-en-male.wav",
+					),
+					contentType: "audio/wav",
+					headers: { "X-Avatar-Motion": "joyful" },
+				});
+			if (path === "/fixture.js")
+				return route.fulfill({
+					contentType: "text/javascript; charset=utf-8",
+					body: readFileSync(join(directory, "avatar-replay.fixture.js")),
+				});
+			return route.fulfill({
+				contentType: "text/html; charset=utf-8",
+				body: '<body><div id="root"></div><script src="/fixture.js"></script></body>',
+			});
+		});
+		await page.goto("http://127.0.0.1/__avatar_replay__");
+		await page.addStyleTag({
+			content: readFileSync(
+				join(directory, "avatar-lifecycle.fixture.css"),
+				"utf8",
+			),
+		});
+		await expect(page.locator(".hiyori-avatar-background")).toHaveAttribute(
+			"data-avatar-state",
+			"ready",
+		);
+		const stats = () => page.evaluate(() => window.avatarReplayStats());
+		await expect
+			.poll(async () => (await stats())?.ParamBrowLY)
+			.toBeGreaterThan(0.2);
+		await page.getByRole("button", { name: "読み上げる", exact: true }).click();
+		await expect(page.getByLabel("発話の状態")).toHaveText("joyful");
+		await expect
+			.poll(async () => (await stats())?.ParamMouthOpenY, { intervals: [50] })
+			.toBeGreaterThan(0.1);
+		await expect
+			.poll(async () => (await stats())?.ParamEyeLSmile, { intervals: [50] })
+			.toBeGreaterThan(0.3);
+		await page.screenshot({ path: "test-results/hiyori-replay-speaking.png" });
+		await page
+			.getByRole("button", { name: "読み上げを止める", exact: true })
+			.click();
+		await expect.poll(async () => (await stats())?.ParamMouthOpenY).toBe(0);
+		await expect
+			.poll(async () => (await stats())?.ParamEyeLSmile)
+			.toBeLessThan(0.01);
+		await expect
+			.poll(async () => (await stats())?.ParamBrowLY)
+			.toBeGreaterThan(0.2);
+		await page.getByRole("button", { name: "読み上げる", exact: true }).click();
+		await expect(page.getByLabel("発話の状態")).toHaveText("joyful");
+		await expect(page.getByLabel("発話の状態")).toHaveText("idle");
+		await expect.poll(async () => (await stats())?.ParamMouthOpenY).toBe(0);
+		await page.getByRole("button", { name: "待機する", exact: true }).click();
+		const before = await stats();
+		const framing = await page.evaluate(() => window.avatarReplayMatrix());
+		expect(framing).toHaveLength(16);
+		await expect
+			.poll(async () =>
+				Math.abs((await stats())!.ParamAngleX! - before!.ParamAngleX!),
+			)
+			.toBeGreaterThan(8);
+		expect(Math.abs((await stats())!.ParamBodyAngleX!)).toBeLessThanOrEqual(
+			2.5,
+		);
+		expect(Math.abs((await stats())!.ParamBodyAngleZ!)).toBeLessThanOrEqual(
+			1.5,
+		);
+		expect(await page.evaluate(() => window.avatarReplayMatrix())).toEqual(
+			framing,
+		);
+		await expect
+			.poll(async () => (await stats())?.ParamMouthForm)
+			.toBeGreaterThan(0.1);
+		await expect
+			.poll(async () => (await stats())?.ParamEyeLSmile)
+			.toBeGreaterThan(0.1);
+		expect((await stats())?.ParamMouthOpenY).toBe(0);
+		await page.screenshot({ path: "test-results/hiyori-idle-after.png" });
+		expect(errors).toEqual([]);
+	} finally {
+		await browser.close();
+	}
 });
 
 test("real Hiyori WebGL follows TTS and Live playback only, closes and survives remounts", async ({

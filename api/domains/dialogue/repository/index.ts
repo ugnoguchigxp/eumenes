@@ -1,5 +1,6 @@
 import { agencyMigration, dispatchClockMigration } from "./agency";
 import { specialistObservationsMigration } from "./specialist-observations";
+import { agencyObservationsMigration } from "./agency-observations";
 import { intentAnswerRouteMigration, intentJudgmentsMigration } from "./intent";
 import type { Database } from "bun:sqlite";
 import {
@@ -456,6 +457,11 @@ export const migrations: readonly Migration[] = [
 		sql: dispatchClockMigration,
 	},
 	specialistObservationsMigration,
+	{
+		id: "dialogue/0036-agency-observations",
+		after: ["dialogue/0035-specialist-observations"],
+		sql: agencyObservationsMigration,
+	},
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

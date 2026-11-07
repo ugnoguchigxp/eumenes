@@ -1,3 +1,5 @@
+import type { SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import { checkImageRequest } from "../service/cloud-images";
 import {
 	createSdkMcpServer,
 	query,
@@ -174,7 +176,7 @@ export type GatedQuery = {
 export async function startGatedQuery(
 	startQuery: typeof query,
 	auth: AgentAuth,
-	prompt: string | null,
+	prompt: SDKUserMessage["message"]["content"] | null,
 	options: Options,
 	connectionId?: string,
 ): Promise<GatedQuery> {
@@ -223,11 +225,37 @@ export async function runClaudeAgent(
 	if (!call.credential) throw new Error("cloud_credential_unavailable");
 	const { auth, credential } = call;
 	const session = call.session;
-	const { system, history, prompt } = promptParts(
+	const { system, history, prompt, images } = promptParts(
 		call.messages,
 		session?.role === "main" ? session.context : undefined,
 	);
+	const content: SDKUserMessage["message"]["content"] = images.length
+		? [
+				{ type: "text", text: prompt },
+				...images.map((image) => ({
+					type: "image" as const,
+					source: {
+						type: "base64" as const,
+						media_type: image.mime as "image/png" | "image/jpeg",
+						data: Buffer.from(image.bytes).toString("base64"),
+					},
+				})),
+			]
+		: prompt;
 	const tools = call.tools ?? [];
+	const systemPrompt = tools.length
+		? system +
+			"\n\n" +
+			systemContext("inference.contexts.cloud-agents.single-function", {})
+		: system;
+	if (images.length)
+		checkImageRequest({
+			system: systemPrompt,
+			content,
+			tools,
+			schema: call.outputSchema,
+		});
+
 	let captured: NativeToolCall | undefined;
 	const abortController = new AbortController();
 	// A function call ends the turn: the host, not the agent, executes it.
@@ -267,7 +295,7 @@ export async function runClaudeAgent(
 			gated = await startGatedQuery(
 				startQuery,
 				auth,
-				prompt,
+				content,
 				{
 					abortController,
 					cwd,
@@ -279,14 +307,8 @@ export async function runClaudeAgent(
 						...(session ? { projectDirName: `eumenes-${session.role}` } : {}),
 					}),
 					model: call.model,
-					systemPrompt: tools.length
-						? system +
-							"\n\n" +
-							systemContext(
-								"inference.contexts.cloud-agents.single-function",
-								{},
-							)
-						: system,
+					systemPrompt,
+					settings: { autoCompactEnabled: false },
 					tools: [],
 					allowedTools: tools.map((t) => `mcp__eumenes__${t.function.name}`),
 					mcpServers: server ? { eumenes: server } : {},

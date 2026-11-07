@@ -125,7 +125,9 @@ test("unknown and non-Claude connections are not found", async () => {
 	const service = createConnectionModels(settingsWith(), {});
 	const signal = new AbortController().signal;
 	expect(await service.list(crypto.randomUUID(), signal)).toBeNull();
-	expect(await service.list(codexId, signal)).toBeNull();
+	await expect(service.list(codexId, signal)).rejects.toThrow(
+		"cloud_agent_codex_unavailable",
+	);
 });
 
 test("a connection without a credential fails before any request", async () => {
@@ -248,7 +250,7 @@ test("the models route maps results and failures to HTTP", async () => {
 				`/api/inference/connections/${codexId}/models`,
 			)
 		).status,
-	).toBe(404);
+	).toBe(502);
 	const missing = await mount(credentialless).request(
 		`/api/inference/connections/${apiKeyId}/models`,
 	);

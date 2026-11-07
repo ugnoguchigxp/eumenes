@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { agencyOutputContract } from "eumenes-agency";
+import { agencyOutputContract, llmOutputJsonSchema } from "eumenes-agency";
 import { agencyBackgroundSystem } from "./system-context";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
@@ -12,7 +12,6 @@ import { waitFor, settle } from "../../infrastructure/wait-for";
 import { systemContext } from "../../infrastructure/system-context";
 import { assembleAgency } from "./assembly";
 import { shareNullableSchemas } from "./schema";
-import { z } from "zod";
 import { choice, pendingUpdate } from "./host.fixture";
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -147,6 +146,10 @@ for (const target of ["larm", "cloud"] as const) {
 				conversationTaskInTransaction: (_db, _id, task) => {
 					tasks.push(task);
 					return {
+						input: {
+							sources: ["fixture-memory", "fixture-history"],
+							complete: true,
+						},
 						messages: [
 							{ role: "system", content: "NORMAL_SYSTEM_MUST_BE_REPLACED" },
 							{ role: "user", content: "MEMORY_SENTINEL" },
@@ -195,6 +198,7 @@ for (const target of ["larm", "cloud"] as const) {
 					? agencyOutputContract("update", {
 							toolNames: [],
 							condition: "F",
+							conversationParticipation: true,
 							interestFormation: true,
 							hostTodos: true,
 							utteranceEmotion: true,
@@ -203,6 +207,7 @@ for (const target of ["larm", "cloud"] as const) {
 							findings: true,
 							toolNames: [],
 							condition: "F",
+							conversationParticipation: true,
 							interestFormation: true,
 							hostTodos: true,
 							utteranceEmotion: true,
@@ -238,18 +243,35 @@ for (const target of ["larm", "cloud"] as const) {
 			).not.toContain(system);
 			expect(call.schema).toMatchObject({ type: "object" });
 			expect(call.schema).toEqual(
-				shareNullableSchemas(z.toJSONSchema(outputContract.schema)),
+				shareNullableSchemas(
+					llmOutputJsonSchema<unknown>(outputContract.schema),
+				),
 			);
 			if (target === "cloud")
 				expect(call.session).toBeUndefined(); // no persisted conversation session is resumed
 			else expect(call.role).toBe("auxiliary");
 		}
 		expect(captured[2]!.messages[0]!.content).toContain(
-			"今回の機会に会話へ参加するか",
+			"用途はこの機会に会話へ参加するかの判断",
 		);
-		for (const task of tasks)
-			expect(JSON.parse(task).observations).toContainEqual(
+		// Prefix is captured once before each logical call; the retry reuses it.
+		expect(tasks).toEqual(["", ""]);
+		for (const call of captured) {
+			const data = JSON.parse(
+				call.messages.at(-1)!.content.split("## Task\n").at(-1)!,
+			);
+			expect(data.observations).toContainEqual(
 				expect.objectContaining({ text: "OBSERVATION_SENTINEL" }),
 			);
+		}
+		expect(
+			host
+				.inspect("connected")
+				?.snapshot.provenance?.entries.some(
+					([, input]) =>
+						input.sources.includes("fixture-memory") &&
+						input.sources.includes("fixture-history"),
+				),
+		).toBe(true);
 	});
 }

@@ -1,0 +1,56 @@
+{
+  "started": "2026-11-06T11:02:26.884Z",
+  "conversationId": "verify-eum001-same-tool-v3-20261106",
+  "entry": "routeStructured",
+  "structureTimeoutMs": 30000,
+  "exitCode": 0,
+  "stdout": "{\"type\":\"message\",\"updated\":false,\"id\":\"743934c7-41f2-4fd7-8c79-04166257019d\",\"conversationId\":\"verify-eum001-same-tool-v3-20261106\",\"role\":\"user\",\"text\":\"10秒のタイマーと25秒のタイマーをそれぞれ1つずつ作ってください。\",\"createdAt\":\"2026-11-06T11:02:26.974Z\",\"runId\":\"8bfb5044-ee5a-471e-9ddc-c8ef79423c68\"}\n{\"type\":\"announcement\",\"updated\":false,\"id\":\"announcement:8bfb5044-ee5a-471e-9ddc-c8ef79423c68\",\"conversationId\":\"verify-eum001-same-tool-v3-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:02:26.974Z\",\"runId\":\"8bfb5044-ee5a-471e-9ddc-c8ef79423c68\"}\n{\"type\":\"message\",\"updated\":false,\"id\":\"27a80554-6f0e-41ad-b3f1-f071da5813c0\",\"conversationId\":\"verify-eum001-same-tool-v3-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:02:40.338Z\",\"runId\":\"8bfb5044-ee5a-471e-9ddc-c8ef79423c68\"}\n",
+  "stderr": "",
+  "runs": [
+    {
+      "id": "8bfb5044-ee5a-471e-9ddc-c8ef79423c68",
+      "agentTaskId": null,
+      "requestId": "0168aa4f-fbe6-401d-83b6-9fb42c289725",
+      "conversationId": "verify-eum001-same-tool-v3-20261106",
+      "utteranceId": null,
+      "status": "completed",
+      "revision": 2,
+      "inputMessageId": "743934c7-41f2-4fd7-8c79-04166257019d",
+      "answerMessageId": "27a80554-6f0e-41ad-b3f1-f071da5813c0",
+      "announcement": "「パイプライン」に頼みます。",
+      "error": null,
+      "jobId": "c32383ae-7750-42f8-9586-afa7e428a28c",
+      "deadlineAt": "2026-11-06T11:05:26.974Z",
+      "deadlineFixed": false,
+      "sourceKind": "manual",
+      "scheduleId": null,
+      "occurrenceId": null,
+      "specialistSessionId": null,
+      "pinnedToolchainId": null,
+      "createdAt": "2026-11-06T11:02:26.974Z",
+      "updatedAt": "2026-11-06T11:02:40.338Z"
+    }
+  ],
+  "conversation": {
+    "id": "verify-eum001-same-tool-v3-20261106",
+    "revision": 2,
+    "messages": [
+      {
+        "id": "743934c7-41f2-4fd7-8c79-04166257019d",
+        "conversationId": "verify-eum001-same-tool-v3-20261106",
+        "role": "user",
+        "text": "10秒のタイマーと25秒のタイマーをそれぞれ1つずつ作ってください。",
+        "createdAt": "2026-11-06T11:02:26.974Z",
+        "runId": "8bfb5044-ee5a-471e-9ddc-c8ef79423c68"
+      },
+      {
+        "id": "27a80554-6f0e-41ad-b3f1-f071da5813c0",
+        "conversationId": "verify-eum001-same-tool-v3-20261106",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T11:02:40.338Z",
+        "runId": "8bfb5044-ee5a-471e-9ddc-c8ef79423c68"
+      }
+    ]
+  }
+}

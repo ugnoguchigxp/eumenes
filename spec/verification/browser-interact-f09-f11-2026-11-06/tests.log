@@ -1,0 +1,499 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/browser/test/resource-adapter.test.ts:
+(pass) a finished capture maps to its resource; unfinished, failed and foreign ones map to nothing [11.26ms]
+(pass) get returns the screen target and the image path, and null otherwise; an unknown tab falls back to the range [8.53ms]
+(pass) search is newest first, filters by tab title, host and period [7.99ms]
+(pass) read names the time, size and host only (never the path or query) and cuts a long title with a marker [8.96ms]
+
+api/domains/browser/test/navigation.test.ts:
+(pass) only http and https are opened [0.16ms]
+(pass) embedded credentials are refused
+(pass) loopback and private addresses are only open for the Eumenes web origin [0.10ms]
+(pass) the API paths of the web origin are never opened [0.03ms]
+
+api/domains/browser/test/purge.test.ts:
+(pass) every way a task ends erases its saved core state; a runner's light end state is kept as given [56.56ms]
+(pass) typed values and approval values are erased when the task ends or the approval expires [36.12ms]
+(pass) a finished task's operations keep only the page's origin and path [18.80ms]
+(pass) sweep deletes what ended more than 7 days ago and keeps active work [20.82ms]
+(pass) an exception after the operation was sent makes it indeterminate and stops the task, never a retryable refusal [20.07ms]
+
+api/domains/browser/test/policy.test.ts:
+(pass) a name that resolves to a loopback, private or link-local address is private [27.93ms]
+(pass) a page an action ended on is checked before it is adopted; the tab is blocked and keeps nothing of it [18.15ms]
+(pass) an internal page after a navigation is blocked the same way [16.04ms]
+(pass) a snapshot of a page the host must not adopt is discarded [13.81ms]
+(pass) a tab whose name later resolves to a private address is blocked when its list entry is checked [14.49ms]
+(pass) tab list entries for internal or private pages never become operable tabs [14.56ms]
+(pass) a tab opened to a page that redirects somewhere private gets no ref [18.54ms]
+
+api/domains/browser/test/interact.test.ts:
+(pass) queue executes public parts, verifies completion, persists only metadata [22.37ms]
+(pass) idempotent admission is owner/conversation scoped and rejects changed payload [13.06ms]
+(pass) confirmation is bound to question/revision/generation and consumes exactly once [18.87ms]
+(pass) denial never sends the pending effect [15.80ms]
+(pass) answers cannot reset the overall model-call budget [20.44ms]
+(pass) parent-linked answers/forget must use the parent's lifecycle [18.55ms]
+(pass) capture requires explicit approval; resource ownership, WebP and forget propagate [27.56ms]
+(pass) unverified or missing completion evidence never becomes completed [15.26ms]
+(pass) review failure yields partial [21.67ms]
+(pass) an unknown dispatch is recorded once, never replayed [17.67ms]
+(pass) cancel during an ignored inference abort releases queue and cannot accept late completion [33.58ms]
+(pass) cancel during completion review prevents a completed result [32.11ms]
+(pass) expiry and revoked source end the saved run without adopting output [15.89ms]
+(pass) restart sweeps transient-context runs to failure and never resumes operations [33.81ms]
+(pass) a changed capture target asks again before any bytes are saved [19.20ms]
+(pass) a revoked source cancels late output [16.46ms]
+(pass) cancellation during cleanup cannot publish completed [14.89ms]
+(pass) capture TTL, metadata TTL and orphan cleanup remove their owned records/files [17.23ms]
+(pass) a read redirected to a forbidden destination is withheld from inference [15.30ms]
+(pass) a capture that navigates during acquisition is never published [18.97ms]
+
+api/domains/browser/test/script.test.ts:
+(pass) a cancelled task cannot publish a late Script or initiate a connection [17.04ms]
+(pass) a new Script revision prevents adoption of a capture that is still encoding [31.51ms]
+
+api/domains/browser/test/captures.test.ts:
+(pass) a viewport capture is measured, shot once, encoded once and kept as a checked lossy file [36.83ms]
+(pass) 2500 pixels pass and 2501 are refused on either side, before anything is shot [54.25ms]
+(pass) the PNG header is checked again after the shot [45.80ms]
+(pass) a page that changed between measure and capture is not adopted [25.94ms]
+(pass) a changed generation between measure and capture is not adopted either [18.67ms]
+(pass) an encoding that is not lossy, or does not match, is refused and its temp file removed [18.27ms]
+(pass) cancelling while the shot is out stops the capture and leaves no file [80.27ms]
+(pass) a capture past its deadline expires instead of succeeding [117.61ms]
+(pass) losing the connection fails the capture [20.12ms]
+(pass) a lost tab or a busy tab fails the capture with its own code [40.65ms]
+(pass) a task's capture uses the task's lease [29.18ms]
+(pass) an element capture needs a current observation and a ref inside it [15.82ms]
+(pass) the same request is accepted once and a changed one conflicts [15.09ms]
+(pass) only a local_ready capture of its owner is readable, and only by its managed ref [41.50ms]
+(pass) temp files no row points at are removed, and the ones a capture owns are kept [11.94ms]
+(pass) adopted images no row points at are removed too, and a capture's own image is kept [15.25ms]
+(pass) cancelling a task during capture encoding prevents the late image from being adopted [28.94ms]
+(pass) a credential revision change during encoding prevents adopting an image from the old connection [17.97ms]
+
+api/domains/browser/test/connection.test.ts:
+(pass) without the Brave path the browser is not configured and connect is refused [9.04ms]
+(pass) the setting is saved as an absolute path and an empty path clears it [10.40ms]
+(pass) the setting must be an existing executable regular file [9.90ms]
+(pass) an existing standard install is offered only while no path is saved [10.53ms]
+(pass) the chosen file is checked but not saved, and a cancelled dialog chooses nothing [10.60ms]
+(pass) one dialog at a time, and none without a picker [21.57ms]
+(pass) nothing is offered when no standard install exists [8.88ms]
+(pass) connecting waits for the user's tab, then the tabs get refs and the browser is available [12.31ms]
+(pass) a connect timeout is a failure the screen can explain, and nothing reconnects [42.17ms]
+(pass) a driver that cannot start ends as mcp_unavailable [11.59ms]
+(pass) the user's disconnect ends the connection and every tab ref stops working [45.09ms]
+(pass) Brave closing ends the connection through the driver's state change [16.60ms]
+(pass) a backend restart ends the old connection, loses its tabs and leaves operations indeterminate [31.48ms]
+
+api/domains/browser/test/adapters-capture-files.test.ts:
+(pass) write, adopt, read and remove follow the capture id only [4.00ms]
+(pass) unadopted temp files are listed, and listing before any write is empty [2.05ms]
+(pass) traversal and foreign names are impossible in ids and refs [0.87ms]
+(pass) adopt only renames the temp file of the same capture id [1.61ms]
+(pass) files are private to the owner and unrelated names in the directory are ignored [1.86ms]
+
+api/domains/browser/test/controller.test.ts:
+(pass) the setting is read and saved over HTTP, and a relative path is refused [14.86ms]
+(pass) the open tabs are readable [15.50ms]
+(pass) capture content is served only to its owner, as an inline lossy WebP [18.27ms]
+(pass) a conversation keeps its own recent tasks even after more than twenty tasks in other chats [157.63ms]
+
+api/domains/browser/test/tasks.test.ts:
+(pass) a task needs the step runner, a live connection, a known tab and an allowed URL [23.43ms]
+(pass) each model step is one queue job; the core state is stored as JSON and handed to the next step [16.19ms]
+(pass) the runner acts through the task's api: observe, operate, grants and captures [26.85ms]
+(pass) needs_input and failed endings carry their text and code [32.16ms]
+(pass) a runner that throws ends the task as failed with a safe code [17.22ms]
+(pass) the same request starts one task and a changed one conflicts [18.25ms]
+(pass) cancelling aborts the running step and nothing runs after it [59.54ms]
+(pass) a task past its deadline expires, announces it and refuses further operations [16.25ms]
+(pass) losing the connection fails a task that had nothing in flight [15.17ms]
+(pass) the screen's source reports availability, tabs, tasks and captures with a changing revision [13.51ms]
+
+api/domains/browser/test/adapters-webp-encoder.test.ts:
+(pass) pngSize reads the IHDR without decoding and rejects anything else [3.16ms]
+(pass) encodeWebp makes a lossy, metadata-free WebP at quality 75 with the right hash [388.98ms]
+(pass) metadata and an alpha channel in the PNG do not leak into the output [23.03ms]
+(pass) inspectWebp flags lossless files and rejects malformed ones [4.75ms]
+(pass) input over the pixel limit is refused before decoding, and an aborted signal stops the work [207.17ms]
+
+api/domains/browser/test/research-collection.test.ts:
+(pass) collect returns actual observed hrefs and non-actionable text across arbitrary sites [0.74ms]
+(pass) the link inventory preserves observed item and collection links without classifying them [0.14ms]
+(pass) stale, invented, oversized and excess selections are refused without loss of accepted pages [0.27ms]
+(pass) guard attempts remain bounded even when no collection was accepted [0.03ms]
+(pass) ARIA annotations are not link labels and quoted labels retain their actual text [0.04ms]
+
+api/domains/browser/test/history-values.test.ts:
+(pass) item 1: variables survive a republish, and the values of every revision stay out of the history [33.09ms]
+(pass) item 1: the values of every Script revision of every task in a chain stay out [45.73ms]
+(pass) item 2: the code kept with an operation holds no typed value unless it is the user's own words [20.20ms]
+(pass) item 3: a value in a URL's path, query or fragment and in the place is replaced; the code is made again from the URL [29.14ms]
+(pass) item 5: the declared effect of a click, press or type is kept; only commit marks the history [29.57ms]
+
+api/domains/browser/test/histories.test.ts:
+(pass) a completed run becomes a history without the values of that run [29.30ms]
+(pass) the Script's title must describe the procedure: a variable value in it is refused [17.96ms]
+(pass) a Script may follow only a history the owner has; stored Scripts without title still read [34.48ms]
+(pass) §4: a run that followed a history replaces it; a deleted one is created anew [65.14ms]
+(pass) §4: a completed run with nothing to keep, and runs that did not complete, leave no history [90.64ms]
+(pass) §4: a failed or indeterminate run counts against the history it followed and keeps its content [53.44ms]
+(pass) §4: a task continued after an approval gathers the operations of the chain (at most three) [80.53ms]
+(pass) §5: values the user allowed are never kept; the user's own quoted words are [28.81ms]
+(pass) §5: select, press and wait keep their parameters with the run's values replaced [29.04ms]
+(pass) a capture is recorded after the operations of its step; a declared commit marks the history [52.24ms]
+(pass) histories are kept when the tasks that made them are purged after seven days [28.61ms]
+(pass) §5.1: a variable of the followed history is typed without asking, only where the history typed it [35.97ms]
+(pass) §5.1: no history in the Script, or a history with an operation that needed approval, asks as before [46.38ms]
+(pass) an approved value for a variable stays that variable, so the next run needs no approval [54.60ms]
+(pass) a variable the final Script no longer declares is kept as a redacted value [30.85ms]
+
+api/domains/browser/test/approvals.test.ts:
+(pass) a click that submits a non-GET form needs approval and nothing is dispatched [18.79ms]
+(pass) GET forms, dialog forms and links run without approval [17.97ms]
+(pass) a button or role=button whose effect is unknown needs approval on every site [17.99ms]
+(pass) the model's own commit declaration needs approval without any inspection [18.80ms]
+(pass) pressing Enter or Space inspects the focused element; other keys do not [17.52ms]
+(pass) a click on an Eumenes page needs approval even outside a form, and that approval is used once [31.76ms]
+(pass) Enter on an Eumenes page needs approval without inspection; reading the page does not [17.21ms]
+(pass) typing with submit inspects the field; typing without submit does not [18.14ms]
+(pass) a failing inspection stops the operation before it is sent [16.66ms]
+(pass) a task that ends needs_input stores pending approvals; a follow-up that approves moves them and the operation runs once [30.83ms]
+(pass) without approvePending, from another conversation or owner, or after 10 minutes nothing moves [37.56ms]
+(pass) an approval is bound to the page, element and action it was given for [26.03ms]
+(pass) a value the request did not contain is approved as an input grant and its digest ties the typing to the approval [25.46ms]
+(pass) an approval for another typed value does not match [25.13ms]
+
+api/domains/browser/test/tabs.test.ts:
+(pass) a tab whose URL changed is lost, never swapped for a similar tab [20.18ms]
+(pass) a closed tab is lost, and closing a tab before it shifts indexes without making it match another [21.61ms]
+(pass) closing a tab through the host keeps the others addressable [22.85ms]
+(pass) driver call sequences never overlap: select and act are one section per connection [67.11ms]
+(pass) a tab leased to a task is busy for another task and for a standalone call [42.73ms]
+(pass) an expired lease is reclaimed with a new epoch and the old holder is refused [1517.69ms]
+(pass) a lease never runs past the task's deadline [19.83ms]
+(pass) the lease is renewed while an operation runs [137.75ms]
+(pass) tabs sharing a URL keep their refs while nothing moves, and none is re-bound once an index shifts [15.34ms]
+(pass) a duplicate that appears next to a tracked tab does not take its ref [13.86ms]
+
+api/domains/browser/test/observation.test.ts:
+(pass) the limits are 32 KiB, depth 12 and 200 refs [0.01ms]
+(pass) a small snapshot passes whole with its refs [0.03ms]
+(pass) the cut falls between whole nodes and only refs in the text are actionable [1.05ms]
+(pass) the byte limit counts UTF-8 and never cuts inside a node [0.59ms]
+(pass) a node's continuation lines stay with it [0.02ms]
+(pass) nodes deeper than the limit are left out with their subtree [0.04ms]
+(pass) collection compaction keeps deeply wrapped links actionable within the existing limits [0.13ms]
+(pass) compaction preserves named, stateful, interactive and text-bearing generic nodes [0.01ms]
+
+api/domains/browser/test/adapters-mcp-response.test.ts:
+(pass) a tab list result and its linked snapshot file are parsed [0.23ms]
+(pass) an inline snapshot keeps the yaml body and ignores the events section [0.04ms]
+(pass) snapshot text that looks like markup is not split into sections [0.02ms]
+(pass) a page without a title and a link with an absolute path are accepted [0.01ms]
+(pass) a link can never name a file outside the output directory
+(pass) images are collected and error sections mark the result as failed [0.06ms]
+(pass) tab lists tolerate odd titles, empty sessions and unrelated text [0.01ms]
+(pass) tool errors become stable codes without keeping their text [0.04ms]
+(pass) a failure before the action started is not dispatched; one that may have run is [0.08ms]
+(pass) snapshot text that imitates the closing fence and a section cannot inject one [0.02ms]
+(pass) the Playwright code MCP reports is read without its fence; page text cannot forge it [0.03ms]
+
+api/domains/browser/test/interact-knowledge.test.ts:
+(pass) public site seeds preserve origin/provenance/revision and never claim live verification [15.13ms]
+
+api/domains/browser/test/replays.test.ts:
+(pass) a replay opens a new tab at the place and runs the code with the values, then counts on the history [18.87ms]
+(pass) while disconnected the replay connects first [17.71ms]
+(pass) a replay that cannot connect fails as browser_disconnected and counts as a failure [17.05ms]
+(pass) a failure of the code ends the replay with a classified code; counts follow [29.64ms]
+(pass) the time limit ends a replay that does not finish as replay_timeout [48.28ms]
+(pass) cancel stops the code; the replay stays running, and busy, until it has really stopped, then ends as cancelled without counting [56.54ms]
+(pass) a cancel that comes before the job begins ends the replay without running anything [17.82ms]
+(pass) the time limit does not end the replay until the code has stopped [168.34ms]
+(pass) one replay at a time, and not beside a task or a capture of the owner [24.68ms]
+(pass) refusals: unknown history, changed revision, values, operations without code, rejected code, blocked addresses [15.70ms]
+(pass) a name that resolves to a private address is refused when the replay runs [17.52ms]
+(pass) a replay that was running when the backend restarted failed as interrupted [21.70ms]
+(pass) the workspace source lists the newest ten replays, newest first, and its revision moves with them [81.64ms]
+(pass) the ledger keeps no values and no code [18.02ms]
+(pass) the history detail carries exactly what a start would run and why it would be refused [17.48ms]
+
+api/domains/browser/test/adapters-mcp-cli-smoke.test.ts:
+(pass) the pinned CLI starts under this runtime and lists the tools the driver uses [135.22ms]
+
+api/domains/browser/test/history-views.test.ts:
+(pass) values: URL queries, typed arguments, literals and plain text lose the run's values [0.12ms]
+(pass) §7: the source has the variables, a heading per step, the code as run and the escaped names [0.10ms]
+(pass) §7: a source over 24,000 characters is cut with the number of omitted operations [0.10ms]
+(pass) REST: the list is newest first, at most 100, never cached; a detail has the source; others' ids are 404 [18.91ms]
+(pass) REFERENCE catalog: the newest twelve, each bounded; the operator view has the steps and actions [17.85ms]
+(pass) delete: at the revision shown; a changed revision conflicts and nothing is deleted [14.60ms]
+(pass) Script v2: the title is required; variables are named, at most five and without duplicates [0.47ms]
+(pass) item 3: a value in a path segment, query value or fragment is replaced after decoding; the rest stays [0.15ms]
+(pass) item 6: a value is replaced only inside the string literals of a code line [0.05ms]
+(pass) item 7: U+2028 and U+2029 break a line in the source like a newline [0.07ms]
+(pass) item 8: the title check and every replacement use one matcher [0.11ms]
+
+api/domains/browser/test/interact-migrations.test.ts:
+(pass) the applied interact migration retains its deployed checksum [0.02ms]
+(pass) capture upgrade preserves old files without inventing their missing metadata [19.77ms]
+
+api/domains/browser/test/replay-code.test.ts:
+(pass) §3.2: the recorded code of a search-and-play history passes [0.17ms]
+(pass) page.goto takes a string or the one template, and its address is worked out with the run's values [0.04ms]
+(pass) names: only page, vars, Math.floor/random, the fixed words, Playwright's methods and the code's own declarations [0.09ms]
+(pass) computed member reads, arrows and the page-side JavaScript APIs are refused [0.10ms]
+(pass) a template may hold only encodeURIComponent(vars.<declared>) [0.04ms]
+(pass) page.goto never takes anything but a string literal or the template [0.04ms]
+(pass) code that cannot be split into tokens with certainty is refused [0.07ms]
+(pass) regular expressions are not part of the language; a division is read only where it cannot be a regex [0.03ms]
+(pass) a declared name is visible from its declaration to the end of its block [0.05ms]
+(pass) nothing can be assigned, so the checked address is the one that runs [0.12ms]
+(pass) §6: generated forms are accepted: contentFrame, frame filters, the wait codes MCP writes [0.13ms]
+(pass) MCP's wait-for-seconds code is rewritten to its allowed equivalent, exactly and nothing else [0.07ms]
+(pass) an operation that would type the redaction placeholder cannot be replayed [0.01ms]
+(pass) the preview is the plan of a start: the same lines, whole, and the same refusals [3.40ms]
+(pass) assembly: operations in seq order, a navigation without code as goto, captures skipped, the rest need code [0.03ms]
+(pass) assembly embeds the values as frozen JSON in a strict function, so a value is never read as code [0.15ms]
+(pass) the tab address is https://<place> with each {{name}} encoded [0.02ms]
+
+api/domains/browser/test/contracts.test.ts:
+(pass) every code a task or tab can end with has its own Japanese label [0.04ms]
+
+api/domains/browser/test/operations.test.ts:
+(pass) an observation gives refs that work once; any action on the tab invalidates them [17.43ms]
+(pass) a newer observation replaces the older one, and a ref of another tab's observation is refused [15.31ms]
+(pass) only refs inside the cut text are actionable [14.49ms]
+(pass) navigation targets are checked before anything reaches the browser [14.09ms]
+(pass) an unknown or malformed operation is refused [14.87ms]
+(pass) an operation that may have reached the page is indeterminate, stops its task and is never repeated [17.37ms]
+(pass) a driver exception after dispatch is indeterminate; a refusal before dispatch is a plain failure [12.55ms]
+(pass) the ledger records each operation with its digest and state [16.04ms]
+(pass) a cancelled task's late operation is refused before it is sent [18.68ms]
+(pass) opening and closing tabs go through the ledger and the URL check [14.30ms]
+(pass) a value from the current request becomes a grant bound to origin and purpose [19.22ms]
+(pass) a reformatted value is granted on a quote from the request; a quote that is not in the request is refused [17.47ms]
+(pass) a quote must be at least two characters and the value at most 4x the quote plus 32 [18.77ms]
+(pass) a user-approved grant is the only other way, and a finished task takes its grants with it [18.93ms]
+(pass) a grant expires with its time, and typing needs a task [18.73ms]
+(pass) a late response from a revoked connection is not adopted into the operation result or tab state [16.02ms]
+
+api/domains/browser/test/adapters-mcp-driver.test.ts:
+(pass) connect starts the pinned child with only three env vars and a managed output dir [36.44ms]
+(pass) without a saved executable the driver is not configured and starts nothing [0.75ms]
+(pass) connect waits for the user and ends as connect_timeout, stopping the child [507.51ms]
+(pass) aborting the connect signal ends as user; a failing connect page ends as mcp_unavailable [339.48ms]
+(pass) a child that exits mid-session reports process_exited and fails the call honestly [34.91ms]
+(pass) an action that dies with the child is reported as dispatched [33.95ms]
+(pass) a closed browser reported by MCP ends the session as browser_closed [137.24ms]
+(pass) disconnect stops the child, reports user and leaves nothing in the output dir [36.15ms]
+(pass) tab operations parse the tab list from the result section [36.75ms]
+(pass) a new tab accepts only http(s) and an integer index [29.66ms]
+(pass) an inline snapshot is returned whole and MCP's side files are deleted [27.40ms]
+(pass) a file-linked snapshot is read from the output dir and then deleted [28.31ms]
+(pass) actions map to the allowlisted tools with `target` refs and report the resulting page [39.98ms]
+(pass) refs that are not snapshot refs are refused before anything is sent [29.43ms]
+(pass) tool failures map to honest codes [37.98ms]
+(pass) a hung call times out as dispatched and an abort sends a cancel notification [871.13ms]
+(pass) measuring runs only the two fixed functions and rounds up [33.41ms]
+(pass) inspection runs one fixed read-only function and validates what it returns [39.46ms]
+(pass) measuring rejects results that are not positive finite sizes [38.84ms]
+(pass) screenshots come from the image content and ask for CSS-pixel PNG [34.98ms]
+(pass) only allowlisted tools are ever sent, and the driver exposes no generic call [55.24ms]
+(pass) calls before connect or after disconnect are refused without reaching a child [0.55ms]
+(pass) Bridge token is only passed as child env and extension tabs never leave the adapter [28.73ms]
+(pass) runReplay sends the code as the only argument, keeps no response and clears the output dir [77.37ms]
+(pass) a failing replay throws a classified driver error without the response text [86.25ms]
+(pass) an aborted replay closes its tab, which stops the code; the call returns only then, and the session stays [53.55ms]
+(pass) an aborted replay whose code does not stop ends the child after the grace period [156.54ms]
+
+api/domains/capabilities/test/command-agent-binding.test.ts:
+(pass) a command binding takes agent.turn as the policy of its single-shot task, and stays valid without it [8.40ms]
+(pass) the bundle check accepts the existing command binding with or without agent.turn [135.25ms]
+(pass) the bundle check refuses retries that name a tool the binding does not have [97.03ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) enum values must also satisfy bounds and formats at every nested node [2.91ms]
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.14ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [0.71ms]
+(pass) optional string bounds preserve explicit constraints and the overall value capacity [0.14ms]
+(pass) a rejected value schema reports where and why, never its keys or values [0.04ms]
+
+api/domains/capabilities/test/instant-binding.test.ts:
+(pass) the shipped weather bundle is seeded: an instant toolchain with a binding and no artifact [47.87ms]
+(pass) an instant binding has no field filled from the host's values: its arguments are the model's [48.81ms]
+(pass) an adapter that does not answer instant bindings is refused [50.96ms]
+(pass) an instant toolchain that also names an artifact is refused [47.59ms]
+(pass) an instant binding takes exactly one tool [48.15ms]
+(pass) the shipped stock bundle is an instant toolchain [43.23ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [5822.18ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [21.81ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [13.85ms]
+(pass) seed still rejects a changed newest builtin revision [7.32ms]
+(pass) history and timer catalogue selection can be enabled independently [25.41ms]
+
+api/domains/capabilities/test/toolchain-candidates.test.ts:
+(pass) the current request embedding selects music.create despite past choices and unrelated text matches [114.43ms]
+(pass) the current request embedding selects image.create despite past choices and unrelated text matches [103.00ms]
+(pass) the current request embedding selects excalidraw.edit despite past choices and unrelated text matches [118.25ms]
+(pass) strict discovery has no all-catalog fallback and returns the top four [100.30ms]
+(pass) the search fills each kind's slots: the three closest dedicated toolchains, and general ones near the closest candidate [56.67ms]
+(pass) the router's offer is exactly the ids given, in their order, read tools among them; the router's cards are valid [51.03ms]
+(pass) a router passage is the name, the summary and the first two use cases, at most the criterion's length [0.07ms]
+
+api/domains/capabilities/test/task-binding.test.ts:
+(pass) task binding is bounded, has no artifact and rejects unknown execution kinds [1.14ms]
+(pass) the dormant task bundle is never seeded, registers explicitly without a dummy artifact, and survives reseeding [433.68ms]
+(pass) a host with the earlier task result schema upgrades by new revisions and preserves its old binding [14.13ms]
+
+api/domains/capabilities/test/resource-kinds.test.ts:
+(pass) the 12 builtin kinds load with their actions, default and owner [109.67ms]
+(pass) action labels fall back to the global action words and a kind can override them [104.36ms]
+(pass) produces lists the kinds a toolchain creates and the candidate card carries it [96.63ms]
+(pass) an invalid registration is rejected and stores nothing [8.94ms]
+(pass) a bundle can register a kind and refuses an invalid one [8.77ms]
+(pass) revisions are versioned: seeding again changes nothing, a changed revision conflicts, a new one supersedes [197.92ms]
+
+api/domains/capabilities/test/timer-compatibility.test.ts:
+(pass) timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state [0.45ms]
+(pass) the bound-command inputs accept exactly the shapes the UI and the questions send [0.34ms]
+
+api/domains/capabilities/test/pipeline-bundle.test.ts:
+(pass) seed installs p0-3 idempotently, preserves an old binding body, and refuses its execution contract [70.86ms]
+(pass) planner instruction upgrade preserves old revisions and selects the new skill once [11.57ms]
+
+api/domains/capabilities/test/docling-bundle.test.ts:
+(pass) Docling menu revision seeds once and preserves earlier revisions (existing=%s) [11.48ms]
+(pass) Docling menu revision seeds once and preserves earlier revisions (existing=%s) [10.74ms]
+
+api/domains/capabilities/test/browser-interact-bundle.test.ts:
+(pass) pilot bundle registers immutably, with shared components and no unsupported host contracts [12.50ms]
+
+api/domains/capabilities/test/music-versions.test.ts:
+(pass) V3 describes music/vocals/SFX without changing historical schemas [0.91ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+(pass) profile validity compares instants with mixed fractional-second precision [0.59ms]
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [16.27ms]
+
+api/domains/capabilities/test/image.test.ts:
+(pass) image seed is additive, repeatable and published with one flat request schema [27.47ms]
+(pass) image model-selection bundle upgrades legacy definitions without rewriting their revisions [81.12ms]
+
+api/domains/capabilities/test/steward-request-retire.test.ts:
+(pass) the steward.request items lose their active entry, search and embedding; their revisions stay as history [19.43ms]
+
+api/domains/capabilities/test/standalone-artifacts-forms.test.ts:
+(pass) structure actions must be registered by the document's adapter with its input schema [8.49ms]
+(pass) collection sources, paging and row actions are checked against this artifact's bindings [9.13ms]
+(pass) row input keys must be top-level properties of the action's input, on write and structure actions only [7.90ms]
+(pass) the create form must match the action input and keep secrets declared [8.92ms]
+(pass) form options come from fixed values or a registered query of the source's adapter [9.22ms]
+(pass) a row edit form adds fields to the row-built input without overlapping it [7.93ms]
+(pass) form defaults fit their control, and refresh-while keeps to an existing source [9.49ms]
+(pass) structure actions can be row actions and create actions, and ids may be generated [9.16ms]
+(pass) a clean-draft requirement names a registered document that the artifact uses [10.05ms]
+
+api/domains/capabilities/test/dots-messaging-revision.test.ts:
+(pass) messaging v2 seeds without re-registering or replacing an installation's archived v1 [17.95ms]
+
+api/domains/capabilities/test/bundles.test.ts:
+(pass) the shipped bundle's pin is the stored digest and its toolchain is data-driven [74.05ms]
+(pass) a bundle the host cannot run is skipped whole, and without a host nothing is added [199.57ms]
+(pass) old revisions keep their JSON and hash, and publication moves back and forth [149.39ms]
+(pass) rolling the pointer back to the unbound revision removes the chain from the offer until a bound revision is published [99.15ms]
+(pass) the dry run lists every problem and writes nothing [23.57ms]
+(pass) each kind of reference problem is refused [109.85ms]
+(pass) a failing toolchain rolls back its documents and keeps the published revision [18.57ms]
+(pass) documents are immutable: the same id with other content is a conflict, the same content a no-op [23.57ms]
+(pass) binding fields belong to toolchains only and need a matching binding [14.94ms]
+(pass) a bound tool is prepared with its own schema and only from an active package [44.77ms]
+(pass) a timer start without a duration is defined as the 3 minute default, not as a question [43.75ms]
+(pass) stored schemas are served as validators; unknown and domain references are not [15.40ms]
+(pass) a bound toolchain is shown by its artifact registration: artifact is optional there, and unbound ones still need one [46.52ms]
+(pass) question schemas must be readable validators and the choice field one of their fields [61.49ms]
+(pass) an install already at revision 5 is upgraded to the latest, and revision 5 stays a valid rollback target [56.96ms]
+(pass) toolchain publication over HTTP is compare-and-set and can roll back [64.48ms]
+
+api/domains/capabilities/test/session-binding.test.ts:
+(pass) a session binding passes the check and registers as a toolchain with the session execution [56.19ms]
+(pass) a session binding's references are all checked [88.88ms]
+(pass) a session binding with command-only fields or an unknown execution is refused [54.83ms]
+(pass) the registry refuses a session binding whose tool schema differs from the package tool's [53.23ms]
+(pass) a session binding may carry its own time limits: each 10 s to 60 min, inference <= turn <= run [5.05ms]
+
+api/domains/capabilities/test/settings-google.test.ts:
+(pass) Google settings bundle exposes no AI definitions or bindings [0.01ms]
+
+api/domains/capabilities/test/standalone-artifacts.test.ts:
+(pass) launcher artifacts are published without a toolchain, with the final entry shape [9.70ms]
+(pass) a newer revision switches the published pointer, an old one is a rollback, and re-import keeps the choice [10.76ms]
+(pass) fields are checked against the adapter that owns the document [8.31ms]
+(pass) a field id is unique across the whole published catalog, but a revision may keep its own [8.16ms]
+(pass) draft documents, navigation targets and apply operations must be registered [7.34ms]
+(pass) a refused bundle publishes nothing [6.87ms]
+(pass) a navigate-by-value map is checked for every target, and a default value stays display-only [7.62ms]
+(pass) a field must agree with what the document schema says about its path [7.87ms]
+(pass) confidential values travel only in declared input properties of every write that applies the document [6.26ms]
+(pass) source params schemas must resolve [5.46ms]
+(pass) revisions of one artifact id inside a bundle may carry the same fields [5.67ms]
+(pass) artifact publication over HTTP is compare-and-set [7.37ms]
+
+api/domains/capabilities/test/json-schema-subset.test.ts:
+(pass) the finite subset becomes a strict validator with the stated bounds [0.62ms]
+(pass) anything outside the subset is refused with its path, never dropped [0.17ms]
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [7.24ms]
+
+api/domains/capabilities/test/web-guided.test.ts:
+(pass) the Web bundle seeds the current revisions and reseeding changes nothing [84.08ms]
+
+api/application/browser/interact-migrations.test.ts:
+(pass) package migrations follow the existing browser tail and upgrade an old database without rewriting applied SQL [804.62ms]
+
+api/application/browser/interact-integration.test.ts:
+(pass) canonical Skill and pinned 162-file distribution match the registered operator [18.18ms]
+(pass) isolated HTTP pilot uses the common action ledger, real browser, explicit capture approval and authenticated WebP deletion [3323.02ms]
+
+api/application/browser/interact-inference.test.ts:
+(pass) shared control receives the canonical Skill, typed schema and unchanged reference data [11.20ms]
+(pass) a late control receipt is cancelled rather than accepted under revoked authority [11.93ms]
+(pass) the wire translation neither interprets free text nor invents approval [0.07ms]
+(pass) pilot stays unavailable to ordinary conversation discovery [10.78ms]
+(pass) the existing child contract resumes the same run and preserves partial status [18.12ms]
+(pass) capture resource navigation resolves the exact image and enforces conversation scope [21.88ms]
+
+api/domains/dialogue/test/command-interactions.test.ts:
+(pass) the offer comes from the catalog: bound chains by adapter availability, the rest by host capability [142.89ms]
+(pass) a delegation to a command toolchain opens a command TODO and hands the run to the command job [71.85ms]
+(pass) a delegation ends the generation: the model is not called again after the work was handed over [71.84ms]
+(pass) a command chain without a binding or with an unknown backend is refused before any execution [214.33ms]
+(pass) a bound chain runs through the generic action route with the binding's adapter and operation [68.15ms]
+(pass) arguments that the binding's schema rejects never reach the agent runtime [69.69ms]
+(pass) an operation without an interaction carries no frozen stamp [68.86ms]
+(pass) the command sub-agent runs as a sub-agent of its run, as one call [68.28ms]
+
+api/domains/dialogue/test/command-interactions-lifecycle.test.ts:
+(pass) an answer whose request id already belongs to another run is a conflict, not a link [73.57ms]
+(pass) a failed operation ends the interaction without a receipt [72.83ms]
+(pass) answers are refused for a stale question or revision, an invalid value, or a changed version [70.63ms]
+(pass) an answer past the question's time is expired, not resumed [68.70ms]
+(pass) maintenance expires open questions and ends interactions whose run is gone [72.17ms]
+(pass) an answer and its new run commit together: a refused job leaves the question open [76.59ms]
+(pass) at most three questions are asked; the fourth stops the operation [83.05ms]
+(pass) interactions are bounded: open and total capacity refuse a new one, and ending keeps the body for 30 days [76.53ms]
+(pass) ended interactions lose their bodies after 30 days and their rows after 30 more [74.33ms]
+(pass) an interaction whose run ended without finishing it is closed [178.75ms]
+
+ 379 pass
+ 0 fail
+ 2923 expect() calls
+Ran 379 tests across 57 files. [25.83s]

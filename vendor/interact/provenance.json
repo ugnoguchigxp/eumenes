@@ -1,14 +1,15 @@
 {
 	"package": "eumenes-interact",
-	"version": "0.1.2",
-	"archive": "eumenes-interact-0.1.2-93b6ee06794b.tgz",
-	"archiveSha256": "93b6ee06794b516e55badc84797143809170e53ed4f1321ccc3046496bc05291",
+	"version": "0.1.3",
+	"archive": "eumenes-interact-0.1.3-be8c07de742b.tgz",
+	"archiveSha256": "be8c07de742be96572c1a727e68acf94caafdeb24645d4e377c67dd58c328af5",
 	"sourceRepository": "eumenes_interact",
-	"sourceCommit": "32bc0aaa4ff840c7a76baacff5bc64ef95836229",
-	"sourceTreeSha256": "53c56fba507bf20ecd503874f786fb0c977b02b6cbfc2cb2395f5ce37c7f5453",
-	"skillSha256": "dfa652393ad76d38b3c0c7237176cc830c604117d242de7499701be039f47fae",
-	"contractVersion": 2,
+	"sourceCommit": "1c3b8a6df183ab96bd59e7540e1f3977ab4f19c0",
+	"sourceTreeSha256": "fda6b0d06ec721919ceddcde6339e95b6f94037d803ec49b8283ae811e9d4a99",
+	"skillSha256": "2f0bbfa0e6ee273b9f18474aff121214ba84af8c05f0c431bfd5f76e3be666ee",
+	"contractVersion": 3,
 	"coreFormatVersion": 1,
-	"limits": "The source digest includes the build inputs (tsconfig, manifest generator; upstream F12). The exact archive and every packaged file stay pinned.",
-	"distributionManifestSha256": "287da41b36e769dffaf5e071f15863c8d9ef2e39a9438fb9c6546aac79cceb6d"
+	"limits": "Working-tree build over sourceCommit; sourceTreeSha256 covers the exact source/build inputs. adoption-source.patch preserves the uncommitted source changes. Every packaged file and the archive are pinned.",
+	"distributionManifestSha256": "4cc5ff85138ece98619ae7894a610919aa6e1d3027178de6180122e65dae8eca",
+	"adoptionSourcePatchSha256": "67b7209967587406775af815d1780f9e046cf2567a812aa92bcbdfa9dac0ae3f"
 }

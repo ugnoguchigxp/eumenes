@@ -179,6 +179,11 @@ async function consult(
 				title: q.title,
 				question: q.question,
 			})),
+			controls: dynamic.flatMap((candidate) =>
+				candidate.kind === "work" && candidate.operation === "cancel"
+					? [{ ref: candidate.id, title: candidate.title }]
+					: [],
+			),
 			retained: input.retained.map((entry) => entry.card.id),
 			available: (id) =>
 				id === CONVERSATION_ID || id === MEMORY_ID || available.has(id),
@@ -378,10 +383,11 @@ async function carryOut(
 		case "clarify":
 			return askBack(
 				turn,
-				systemContext("dialogue.contexts.local.router-clarify", {
-					question: decision.question,
-					unhandled: decision.unhandled.join("\n"),
-				}),
+				[
+					decision.question,
+					systemContext("dialogue.contexts.local.router-clarify", {}),
+					...decision.unhandled,
+				].join("\n"),
 			);
 		case "conversation":
 			return "talk";

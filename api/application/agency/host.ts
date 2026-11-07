@@ -1,7 +1,13 @@
+import { archiveOf, resultInput } from "./memory";
+import { currentInput, staleInputSources } from "./input";
 import type { Database } from "bun:sqlite";
 import type { AgencySnapshot, IdleCheckpoint } from "eumenes-agency";
 import {
 	createIdleScheduler,
+	prepareForgetting,
+	prepareCompaction,
+	HOST_RULES_VERSION,
+	INSTRUCTION_VERSION,
 	emotionName,
 	runRespond,
 	type AgencyRuntime,
@@ -31,13 +37,19 @@ import type {
 	HostPersona,
 } from "./host-types";
 import { hostPlanner, recoverTickets } from "./recovery";
-import { projectionLines, researchTools, waitingForWork } from "./research";
+import {
+	projectionContext,
+	researchTools,
+	waitingForWork,
+	snapshotRefs,
+} from "./research";
 import { createResultCollector } from "./returns";
 import { createHostRuntime } from "./runtime";
 import { deliveryEmotionOf } from "./speech";
 import { agencyReplyParts } from "./system-context";
 import { selectMemoryTopics } from "./topics";
 import type { AgencyWork } from "./work";
+import { captureHostInput } from "./input";
 export type { AgencyHostDeps, AgencySettings } from "./host-types";
 
 const samePersona = (a: HostPersona, b: HostPersona) =>
@@ -94,7 +106,13 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	/** The open TODOs of the conversation (the dialogue ledger); attached once the dialogue service exists. */
 	let work: AgencyWork | null = null;
 	const restored = new Map<string, AgencyRecord>();
-	const digest = () => JSON.stringify({ agency: cfg, persona });
+	const digest = () =>
+		JSON.stringify({
+			agency: cfg,
+			persona,
+			HOST_RULES_VERSION,
+			INSTRUCTION_VERSION,
+		});
 	const checkpoint = createCheckpoint({
 		deps,
 		inflight,
@@ -125,11 +143,11 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		invalidate,
 		activate,
 		dropConv,
-		resetConv,
 		resetAll,
 		prune,
 	} = createConversationLifecycle({
 		deps,
+		inflight,
 		convs,
 		restored,
 		state,
@@ -190,7 +208,16 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			const status = memory.status();
 			const topics =
 				status.enabled && status.healthy
-					? selectMemoryTopics(memory.list(), now)
+					? selectMemoryTopics(memory.list(), now, (item) =>
+							deps.memory.referenceInputs
+								? store.read((db) =>
+										deps.memory.referenceInputs!.captureInTransaction(db, {
+											itemIds: [item.id],
+											itemRevisions: { [item.id]: item.revision },
+										}),
+									)
+								: { sources: [`memory:${item.id}`], complete: false },
+						)
 					: [];
 			topicsCache = { at: now, topics };
 			return topics;
@@ -222,11 +249,33 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			decisionId: `${sanitize(c.id)}.${scope}.${request.purpose}.${++c.calls}`,
 			generation: c.generation,
 			conversationId: c.id,
+			...(c.preparedContext
+				? {
+						messages: c.preparedContext.map((message, index, messages) =>
+							index === messages.length - 1
+								? { ...message, content: message.content + request.prompt }
+								: { ...message },
+						),
+					}
+				: {}),
 		}));
 		return {
 			async complete<T>(request: LlmRequest<T>, signal: AbortSignal) {
 				try {
+					const current = () => {
+						const valid = store.read((db) =>
+							currentInput(
+								deps,
+								db,
+								request.input ?? { sources: [], complete: false },
+							),
+						);
+						if (!valid)
+							throw new DOMException("agency_input_stale", "AbortError");
+					};
+					current();
 					const result = await inner.complete(request, signal);
+					current();
 					log.info("agency.llm_call", {
 						subjectId: c.id,
 						purpose: request.purpose,
@@ -265,6 +314,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			todos: () => todosNow(c),
 			topics: topicsNow,
 			llm: wrapLlm(c, newScope()),
+			input: () => captureHostInput(deps, c, { agency: cfg, persona }),
+			archive: archiveOf(deps, c),
 		});
 	}
 
@@ -313,7 +364,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		deps,
 		nowMs,
 		save,
-		isCurrent: (cy, db, action) => {
+		isCurrent: (cy, db, ticket) => {
+			const action = ticket.action;
 			const { c } = cy;
 			const committed = deps.settings.inTransaction(db);
 			return (
@@ -324,6 +376,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 				c.generation === cy.mine &&
 				c.runtime === cy.runtime &&
 				convs.get(c.id) === c &&
+				currentInput(deps, db, resultInput(c, ticket.id)) &&
 				conversation.latestOrdinalInTransaction(db, c.id) === cy.ordinal &&
 				!deps.conversationBusy(db, c.id) &&
 				!inference.foregroundBusy()
@@ -391,11 +444,30 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		return deliver(cy, decision.ticket, decision.evidenceRefs);
 	}
 
+	async function refreshSources(c: Conv) {
+		const stale = store.read((db) =>
+			staleInputSources(deps, db, snapshotRefs(c.runtime)),
+		);
+		if (!stale.length) return;
+		applySourceChange(c, stale);
+		topicsCache = null;
+		if (deps.state)
+			await store.write((db) =>
+				deps.state!.forgetInTransaction(db, {
+					messageIds: [],
+					itemIds: [],
+					sourceRefs: stale,
+				}),
+			);
+	}
+
 	async function cycle(
 		c: Conv,
 		trigger: Opportunity["trigger"],
 	): Promise<CycleOutcome> {
 		if (!on() || convs.get(c.id) !== c) return "halted";
+		if (!memory.status().healthy) return "aborted";
+		await refreshSources(c);
 		if (
 			trigger === "idle" &&
 			(c.background || hostBusy(c) || waitingForWork(c.runtime))
@@ -435,7 +507,23 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		} finally {
 			if (c.background === controller) c.background = null;
 			if (trigger !== "review_due") cy.planner.leave(nowMs());
-			if (convs.get(c.id) === c) await save(c);
+			if (on() && convs.get(c.id) === c) await refreshSources(c);
+			if (
+				on() &&
+				convs.get(c.id) === c &&
+				(await save(c)) &&
+				deps.memory.referenceInputs &&
+				deps.state &&
+				!c.background
+			) {
+				const plan = prepareCompaction(c.runtime.snapshot());
+				if (plan.archive.length) {
+					const old = c.runtime;
+					c.generation++;
+					c.runtime = newRuntime(c, plan.checkpoint);
+					old.setEnabled(false);
+				}
+			}
 		}
 		if (on() && convs.get(c.id) === c && c.planner === cy.planner)
 			c.scheduler.rearm();
@@ -474,7 +562,35 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		trackSave,
 		collectReturns,
 		inflight,
-		lifecycle: { convOf, dropConv, resetConv, invalidate, activate, prune },
+		lifecycle: { convOf, dropConv, invalidate, activate, prune },
+		retract(c, sourceId) {
+			const input = c.runtime
+				.snapshot()
+				.provenance?.entries.find(
+					([key]) => key === `observation:${sourceId}`,
+				)?.[1];
+			const refs = deps.memory.referenceInputs?.messageReferences(
+				input?.sources ?? [],
+				sourceId,
+			) ?? [sourceId];
+			applySourceChange(c, refs);
+			if (c.runtime.snapshot().observations.length === 0) {
+				c.scheduler.dispose();
+				c.planner = newPlanner(c.id);
+				c.scheduler = newScheduler(c);
+				c.scheduler.rearm();
+			}
+			if (!deps.state) return Promise.resolve();
+			return store
+				.write((db) =>
+					deps.state!.forgetInTransaction(db, {
+						messageIds: [],
+						itemIds: [],
+						sourceRefs: refs,
+					}),
+				)
+				.then(() => undefined);
+		},
 	});
 	// ---- feed handling ----------------------------------------------------
 
@@ -507,12 +623,26 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		log.info("agency.settings_applied", {});
 	}
 
+	/** Replace only the dependent state; independent outstanding tickets retain their identity. */
+	function applySourceChange(c: Conv, refs: readonly string[]) {
+		const snapshot = prepareForgetting(c.runtime.snapshot(), refs).checkpoint;
+		c.generation++;
+		abortBackground(c);
+		const old = c.runtime;
+		c.runtime = newRuntime(c, snapshot);
+		old.setEnabled(false);
+	}
+
 	// ---- public ---------------------------------------------------------------
 
 	const dialoguePort: AgencyLayerPort = {
-		stateForContextInTransaction(db, id) {
-			return projectionLines(deps, convs, db, id);
-		},
+		isCurrentInputInTransaction: (db, input) => currentInput(deps, db, input),
+		inputForMessageInTransaction: (db, id) =>
+			deps.state?.messageInputInTransaction(db, id) ?? null,
+		inputForContextInTransaction: (db, id) =>
+			projectionContext(deps, convs, db, id).input,
+		stateForContextInTransaction: (db, id) =>
+			projectionContext(deps, convs, db, id).lines,
 		workChangedInTransaction(_db, conversationId) {
 			workChanged.add(conversationId);
 		},
@@ -537,6 +667,13 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	};
 
 	return {
+		/** Complete the legacy fence before the server starts any execution worker. */
+		async recover() {
+			if (deps.state)
+				await store.write((db) =>
+					deps.state!.quarantineLegacyInTransaction(db),
+				);
+		},
 		/** Reads the settings, subscribes to commits and settings changes. The feed starts at its end. */
 		start() {
 			if (started || closed) return;
@@ -554,9 +691,18 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 					restored.set(record.conversationId, record);
 			for (const id of restored.keys()) {
 				const c = convOf(id);
-				const task = recoverTickets(deps, c, nowMs())
+				const task = refreshSources(c)
+					.then(() => recoverTickets(deps, c, nowMs()))
 					.then(() => save(c))
-					.then(() => c.scheduler.rearm());
+					.then(() => {
+						if (on() && convs.get(c.id) === c) c.scheduler.rearm();
+					})
+					.catch((error) => {
+						if (convs.get(c.id) === c) dropConv(c, "restore_failed");
+						log.warn("agency.restore_failed", {
+							reason: toErrorCode(error, "restore_failed"),
+						});
+					});
 				inflight.add(task);
 				task.finally(() => inflight.delete(task));
 			}
@@ -566,9 +712,13 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		},
 		async close() {
 			if (closed) return;
-			await Promise.all([...convs.values()].map((c) => save(c)));
 			closed = true;
 			for (const stop of stoppers.splice(0)) stop();
+			for (const c of convs.values()) {
+				invalidate(c, "closed");
+				c.scheduler.dispose();
+			}
+			await Promise.all([...convs.values()].map((c) => save(c)));
 			resetAll("closed");
 			await Promise.allSettled(inflight);
 		},
@@ -580,10 +730,25 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		},
 		forgetInTransaction(
 			db: Database,
-			purge: { messageIds: readonly string[]; itemIds: readonly string[] },
+			purge: {
+				messageIds: readonly string[];
+				itemIds: readonly string[];
+				forgetIds?: readonly string[];
+			},
 		) {
 			topicsCache = null;
+			const refs = [
+				...purge.messageIds,
+				...purge.itemIds.map((id) => `memory:${id}`),
+			];
+			for (const c of convs.values()) applySourceChange(c, refs);
 			deps.state?.forgetInTransaction(db, purge);
+		},
+		planForgetInTransaction(
+			db: Database,
+			input: { messageIds: readonly string[]; itemIds: readonly string[] },
+		) {
+			return deps.state?.planForgetInTransaction(db, input) ?? {};
 		},
 		/** Memory forgot something: the cached topics may name it. */
 		invalidateTopics() {

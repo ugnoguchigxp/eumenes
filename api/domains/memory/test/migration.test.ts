@@ -20,6 +20,7 @@ import {
 	retireExchangeLedgerMigration,
 	dropWindowPrefetchMigration,
 } from "../repository";
+import { hostInputsMigration } from "../repository/host-inputs";
 import {
 	createContinuityService,
 	migrations as continuityMigrations,
@@ -41,6 +42,7 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 		path,
 		all.filter(
 			(m) =>
+				m.sql !== hostInputsMigration &&
 				m.sql !== executionReferencesMigration &&
 				m.sql !== seedImportMigration &&
 				m.sql !== retireExchangeLedgerMigration &&

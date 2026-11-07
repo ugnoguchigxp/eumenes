@@ -41,7 +41,7 @@ export function ConversationBackground({
 		return (
 			<ErrorBoundary label="avatar">
 				<Suspense fallback={null}>
-					<HiyoriAvatarBackground {...avatar} />
+					<HiyoriAvatarBackground {...avatar} interactive={interactive} />
 				</Suspense>
 			</ErrorBoundary>
 		);

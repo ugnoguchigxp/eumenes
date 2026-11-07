@@ -1,5 +1,6 @@
 import {
 	LlmCallError,
+	llmOutputJsonSchema,
 	LlmOutputError,
 	SystemContextConfigurationError,
 	type LlmPort,
@@ -37,6 +38,8 @@ export type AgencyCallIdentity = {
 	generation: number;
 	/** The conversation the call is about: its prompt prefix is shared when `task` gives one. */
 	conversationId?: string;
+	/** Exact messages fixed before the core's input dependency validation. */
+	messages?: Messages;
 };
 
 export type AgencyLlmPortDeps = {
@@ -71,7 +74,7 @@ function callError(error: unknown, signal: AbortSignal): never {
 	const code = toErrorCode(error, "inference_failed");
 	// The call yielded its LARM slot to the foreground: an abort from below, so the core neither tries it again at
 	// once (the foreground has just begun) nor counts it against the batch.
-	if (code === "larm_preempted") {
+	if (code === "larm_preempted" || code === "cancelled") {
 		const yielded = new Error(code);
 		yielded.name = "AbortError";
 		throw yielded;
@@ -99,7 +102,9 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 				BACKGROUND_OUTPUT_LIMIT,
 				Math.max(1, Math.floor(request.maxOutputTokens)),
 			);
-			const outputSchema = shareNullableSchemas(z.toJSONSchema(request.schema));
+			const outputSchema = shareNullableSchemas(
+				llmOutputJsonSchema(request.schema),
+			);
 			if (!DECISION_ID.test(identity.decisionId))
 				throw new LlmCallError("invalid_background_control", false);
 
@@ -124,8 +129,9 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 			}
 
 			const conversationId = identity.conversationId;
-			const prefix =
-				conversationId && deps.task
+			const prefix = identity.messages
+				? { messages: identity.messages }
+				: conversationId && deps.task
 					? deps.task(conversationId, request.prompt)
 					: null;
 			const messages: Messages = [

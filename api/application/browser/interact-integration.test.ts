@@ -18,10 +18,10 @@ const ARTIFACT = "artifact:browser.interact.workspace@1";
 const invoke = (tool: string, args: unknown, text: string | null = null) =>
 	JSON.stringify({ action: "invoke", tool, arguments: args, text });
 
-test("canonical Skill and pinned 158-file distribution match the registered operator", () => {
+test("canonical Skill and pinned 162-file distribution match the registered operator", () => {
 	const release = loadInteractRelease();
 	// 0.1.2 adds the host contract and conformance vectors and the split part executor to the archive.
-	expect(Object.keys(release.manifest.files)).toHaveLength(158);
+	expect(Object.keys(release.manifest.files)).toHaveLength(162);
 	expect(systemContext("browser.contexts.interact.skill", {})).toBe(
 		release.body,
 	);
@@ -38,7 +38,7 @@ test.skipIf(!existsSync(CHROME))(
 			fetch(req) {
 				return new URL(req.url).pathname === "/fixture"
 					? new Response(
-							'<!DOCTYPE html><title>Pilot fixture</title><nav>OMIT-NAV</nav><main><h1>Public result</h1><p>Result 42</p><p style="display:none">OMIT-HIDDEN</p></main>',
+							'<!DOCTYPE html><title>Pilot fixture</title><nav>OMIT-NAV</nav><main><h1>Public result</h1><p>Result 42</p><a href="/fixture?choice=1">Unfamiliar choice</a><p style="display:none">OMIT-HIDDEN</p></main>',
 							{ headers: { "content-type": "text/html" } },
 						)
 					: app
@@ -54,11 +54,36 @@ test.skipIf(!existsSync(CHROME))(
 				arguments: null,
 				text: "作業の対象を確認してください。",
 			}),
+			invoke("page.find", {
+				text: null,
+				role: null,
+				within: null,
+				cursor: null,
+				inspect: true,
+			}),
 			invoke("page.read", { target: null, maxChars: 1000 }),
-			invoke("page.capture", { range: "viewport", item: null }),
+			invoke("page.capture", {
+				range: "viewport",
+				item: null,
+				phase: "prepare",
+			}),
+			(messages) => {
+				const raw = messages.map((m) => m.content).join("\n");
+				const token = [...raw.matchAll(/"confirmation":"([^"]+)"/g)].at(
+					-1,
+				)?.[1];
+				if (!token) throw new Error("fixture_confirmation_missing");
+				return invoke("page.capture", {
+					range: "viewport",
+					item: null,
+					phase: "save",
+					confirmation: token,
+					assessment: "The observed viewport contains the fixture result.",
+				});
+			},
 			invoke(
 				"done",
-				{ evidence: ["r1", "r2"], outcome: "achieved", basis: "observed" },
+				{ evidence: ["r2", "r4"], outcome: "achieved", basis: "observed" },
 				"Result 42を確認し、撮影を保存しました。",
 			),
 			JSON.stringify({
@@ -102,7 +127,7 @@ test.skipIf(!existsSync(CHROME))(
 					(db) =>
 						h!.toolchain.capabilities.instructionInTransaction(
 							db,
-							"skill:browser.interact.operator@1",
+							loadInteractRelease().skill.ref,
 						).body,
 				),
 			).toBe(loadInteractRelease().body);
@@ -192,8 +217,10 @@ test.skipIf(!existsSync(CHROME))(
 			);
 			const q = status();
 			expect(q.question?.kind).toBe("capture");
-			const readResult = model.state.calls[2]!.find((m) =>
-				m.content.startsWith("PART_RESULT="),
+			const readResult = model.state.calls[3]!.find(
+				(m) =>
+					m.content.startsWith("PART_RESULT=") &&
+					m.content.includes('"part":"page.read"'),
 			)!.content;
 			expect(readResult).toContain("Result 42");
 			expect(readResult).not.toContain("OMIT-HIDDEN");
@@ -214,7 +241,7 @@ test.skipIf(!existsSync(CHROME))(
 			expect(answer.body.status).toBe("accepted");
 			await until(() => status().state === "completed", { timeout: 20000 });
 			const end = status();
-			expect(end.calls).toBe(5);
+			expect(end.calls).toBe(7);
 			expect(end.captures).toHaveLength(1);
 			const image = await api(
 				`/api/browser/captures/${end.captures[0]!.captureId}/content`,
@@ -249,7 +276,7 @@ test.skipIf(!existsSync(CHROME))(
 				`/api/browser/captures/${end.captures[0]!.captureId}/content`,
 			);
 			expect(gone.status).toBe(404);
-			expect(model.state.subjects).toHaveLength(5);
+			expect(model.state.subjects).toHaveLength(7);
 			expect(
 				model.state.sessions.every((s: any) => s.sessionRole === "auxiliary"),
 			).toBe(true);

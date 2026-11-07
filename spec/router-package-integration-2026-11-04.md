@@ -1,6 +1,6 @@
 # 担当の振り分けを eumenes_router パッケージにする（2026-11-04）
 
-2026-11-06の契約4/構造契約2の変更と利用者合意は[全体課題の第1段階](project-issues-first-batch-2026-11-06.md)を正本とする。下表は導入時の契約2の履歴。現在の構造経路は保留参照を受け、解析失敗時の全文振り分けfallbackを行わない。保存設定の切替・実モデル受入は同実施記録で区別する。
+2026-11-06の変更と利用者合意は[全体課題の第1段階](project-issues-first-batch-2026-11-06.md)と[取消先の構造選択](router-cancellation-structure-design-2026-11-06.md)を正本とする。現在はroute契約7 / structure契約5、指示 `turn-structure-v8`。下表は導入時の契約2の履歴である。現在の構造経路は全文、有効な保留質問、取消可能な仕事の有限参照を受ける。packageが生成するschemaを `structuredOutput:true` とともに既存background controlへ渡し、`decision` 内の回答・新規作業・会話・確認・取消を検査する。回答・取消は全文一致を要求する。解析失敗時の全文振り分けfallbackは行わない。保存設定の切替・実モデル受入は同実施記録で区別する。
 
 利用者の指示（2026-11-04）:「commit、pushしていいです。eumenesへの移植していいです。現在eumenesのroutingをしている箇所の実装は削除して構いません。このtarballが使われて、然るべき動きになっているか確認してください」
 

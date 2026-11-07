@@ -184,6 +184,19 @@ export type WorldRecords = {
  * opportunity when work changes.
  */
 export interface AgencyLayerPort {
+	isCurrentInputInTransaction?(
+		db: Database,
+		input: { sources: readonly string[]; complete: boolean },
+	): boolean;
+	inputForMessageInTransaction?(
+		db: Database,
+		messageId: string,
+	): { sources: readonly string[]; complete: boolean } | null;
+	/** All input dependencies of the rendered projection, separate from citations. */
+	inputForContextInTransaction?(
+		db: Database,
+		conversationId: string,
+	): { sources: readonly string[]; complete: boolean };
 	/** Settled reference data, never system instructions. */
 	stateForContextInTransaction?(
 		db: Database,

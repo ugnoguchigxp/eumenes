@@ -1,0 +1,200 @@
+{
+	"date": "2026-11-07",
+	"status": "local_verified_pending_runtime_acceptance",
+	"ci": false,
+	"paidProviderCalls": 0,
+	"productionServerOperations": false,
+	"productionDatabaseMigration": false,
+	"agency": {
+		"artifact": "eumenes-agency-0.1.5-03cde67996b0-fe73a06453bf.tgz",
+		"sha256": "fe73a06453bf824c18ec6d32789784ed364991f8304165883d99777391cd8e81",
+		"sourceHash": "df8fcddc5f21b2c4c0a96932097bfb660dd60480a7423eca2d5182377bd89339",
+		"patchSha256": "85e67ed8debaf08b6db1b75e28b10a00b9e6cde2855fa71b7b4f7ea1497c5d44",
+		"instructionVersion": "p0e-instructions-29",
+		"hostRulesVersion": "host-rules-26"
+	},
+	"memory": {
+		"packageVersion": "0.0.4",
+		"upstreamLibraryChanged": false,
+		"hostAdapterChanged": true
+	},
+	"apiBudgetUsd": {
+		"cumulativeConservativeUpper": 9.15078549,
+		"additionalValidationCost": 0,
+		"cap": 10
+	},
+	"checks": [
+		{
+			"command": "bun run verify",
+			"cwd": "/Users/y.noguchi/Code/eumenes_agency",
+			"status": "pass",
+			"passed": 949,
+			"skipped": 25,
+			"todo": 1,
+			"failed": 0,
+			"evidenceSha256": "36603d940fb1d3e8c354ec7ee0ca2269258c82a95ddd327c288dc6d32fa047ed"
+		},
+		{
+			"command": "bun run test:domain -- --domain dialogue --domain memory --domain live-voice --domain agent-runtime --domain tool-runtime --domain inference --domain conversation --domain capabilities",
+			"status": "pass",
+			"backend": {
+				"passed": 1478,
+				"failed": 0,
+				"files": 259
+			},
+			"relatedWeb": {
+				"passed": 103,
+				"failed": 0,
+				"files": 16
+			},
+			"evidenceSha256": "b4b2027a8f58f35f7455b05178fc5ca24befe95beaa8c52460621a8848b8625f",
+			"note": "Wide regression before the final recovery fence; affected recovery tests were rerun below."
+		},
+		{
+			"command": "bun test ./api/application/agency ./api/application/vendor.test.ts ./api/application/media/live-voice.test.ts ./api/domains/memory/test/reference-input.test.ts",
+			"status": "pass",
+			"passed": 116,
+			"failed": 0,
+			"evidenceSha256": "e3e32b2502911cfc77ccea14ff698838d1b280878c693886fc98758c2902b559"
+		},
+		{
+			"command": "bun test ./api/application/agency ./api/domains/dialogue/test/agency-state.test.ts ./api/application/vendor.test.ts",
+			"status": "pass",
+			"passed": 107,
+			"failed": 0,
+			"evidenceSha256": "57115be4107c70187c0652ba93568fd018524a045aded90f1f845ea2a3ec2fce"
+		},
+		{
+			"command": "bun test ./api/application/server.test.ts --test-name-pattern 'importing server|separate process|shutdown order|startupFailureReason'",
+			"status": "pass",
+			"passed": 4,
+			"filteredOut": 2,
+			"failed": 0,
+			"note": "The two tests that actually start a server were intentionally not run.",
+			"evidenceSha256": "cdcb2eda836a7db013fd3f7024498ed692b3e294d3b3f813ff5708ad2407369b"
+		},
+		{
+			"command": "bun run verify -- --domain dialogue --domain memory --domain live-voice --domain agent-runtime --domain tool-runtime --domain inference --domain conversation --domain capabilities",
+			"status": "blocked_before_tests",
+			"reason": "Existing artifacts/pursuit-integration-20261106 copies have no inventory execution route. No exclusion or success criteria was changed. Equivalent test selection and existing static-check functions were executed directly."
+		},
+		{
+			"command": "bun fmt --check <68 owned TypeScript files>",
+			"status": "pass",
+			"files": 68
+		}
+	],
+	"static": [
+		{
+			"check": "boundaries",
+			"status": "pass",
+			"warnings": []
+		},
+		{
+			"check": "system-context",
+			"status": "pass",
+			"warnings": []
+		},
+		{
+			"check": "size-budget",
+			"status": "pass",
+			"warnings": []
+		},
+		{
+			"check": "sql-boundaries",
+			"status": "pass",
+			"warnings": []
+		},
+		{
+			"check": "domain-docs",
+			"status": "pass",
+			"warnings": []
+		},
+		{
+			"check": "lint",
+			"status": "pass",
+			"warnings": []
+		},
+		{
+			"check": "typecheck",
+			"status": "pass",
+			"warnings": []
+		}
+	],
+	"remainingAcceptance": [
+		"Explicit permission for production server stop/start/restart and migration",
+		"A cost-bounded live path for the saved cloud-only route",
+		"Real conversation and autonomous speech acceptance",
+		"Three audio exchanges in the user Eumenes Web"
+	],
+	"sourceFiles": {
+		"api/application/agency/assembly.ts": "a1783f741edc94a4bf4eeb89608fa13ece7ece87113f138890186ddd05aa955a",
+		"api/application/agency/autonomy.test.ts": "f7c982fa936e46161c19055f1f662d430857de34f95c4229a7d7dc5286ecd520",
+		"api/application/agency/backlog.test.ts": "dd4df0cfd29bedab47105a06232c69e06dbd28e54b6cc95f1071b7152818a0c4",
+		"api/application/agency/checkpoint.ts": "4f458aae8f1db7cd92cfcbea187a0f5c11c78d3940eeca02c892cd6499a85d07",
+		"api/application/agency/connection.test.ts": "e077ab277775f9f29108386addc7d17292a5654e426d74656ec93d2756fad31c",
+		"api/application/agency/conversation-lifecycle.ts": "8973d703edefb5ead4e6201e38bb7d181685695b49ebe51b376176d4502f07ad",
+		"api/application/agency/delivery.ts": "a0b48e30d1d02b35d80a01f9a9381196a5b63e5b2b7b849c1c8e149aaa19367e",
+		"api/application/agency/diagnostics.ts": "2f34fc9f895615ad8e6bab35a1b0a2274f61b72277d91bd35f9b98c01193df3b",
+		"api/application/agency/feed.ts": "321bfd5750df49f0f1e0a8ad4720062cb04637af61536ffd7e2549e9ff466f0e",
+		"api/application/agency/host-types.ts": "4be5272d5110aae03dd95c322ad924afc1d7eda4fd53e1410eb538d22bc89a52",
+		"api/application/agency/host.test.ts": "b93e0bd2521095f7a9318306f4e211ab5656f81833ed46e3202e7848dc0a2459",
+		"api/application/agency/host.ts": "609c7288ae6b694ff6fe74c6fcfa44e326bdc70492046664248080a62f94c9de",
+		"api/application/agency/input.ts": "7e4432286916c128a7102412c47543f9078893d1ddc4d6d56df6d55e259a9373",
+		"api/application/agency/llm-port.ts": "0485a1080ac4945f58803b8145d78e79624b718ab4d07e8b983b69d000bf6459",
+		"api/application/agency/memory-integration.test.ts": "8bdd53b665086362eb2723e26df6c5143a44a5362d9fa2209f1e808fe00e254a",
+		"api/application/agency/memory.ts": "c52e725a7bcd3e23ebb57ca7814a5f8bcde31078c1f12eb970f8e2d99c9278eb",
+		"api/application/agency/recovery.test.ts": "348b82b20bb2add633cae4151e0cd98ed1cd45e8894582eeecab80f0a739dfaf",
+		"api/application/agency/recovery.ts": "e0329ace0f24e26b222f9401c28bfcbdfacc088831ae6b642af95e65caba1a1c",
+		"api/application/agency/research.ts": "6fb9572a1889e20577db45354e70b658b677fc16a2e7e71b7f3d818400d16e80",
+		"api/application/agency/returns.ts": "ee697db447af7c4760482273bbeb90f6ee77857fe660197c91b0c4c723b850a2",
+		"api/application/agency/runtime.ts": "5b61a31e7942a24be0562ee373d299f59cac5181739306d0b0b881a618f6c5c1",
+		"api/application/agency/schema.test.ts": "69cbebc99e1f8e41521e7ece5b6cdf9bb6cab961d80952241edda84b43ee99e0",
+		"api/application/agency/speech.ts": "46270a94685380f8d3a9f60fc4fe7564087ee78ff279f000586c0b243e647dcf",
+		"api/application/agency/system-context.test.ts": "fcacd36430ee83baed3dae11331c222c2014ba8a93eeb72e40b01d2604924ca3",
+		"api/application/agency/topics.ts": "6609d2494ec6bad3e96a975eeba561ad94f35157e0b1344078a9940bf6ac82dd",
+		"api/application/agency/work.ts": "8f3312a8a2ce87f315616a3612abd0128fd028baff1e1c5a016b2b89d61792e8",
+		"api/application/media/live-bridge.ts": "00e9d177f5a451ac688274fb616845e19633f7883050f22a01062398bb65aebc",
+		"api/application/media/live-voice.ts": "bfe3a030670c0898654323e314c30f8d457bf6f2b943f4290081ce9b59328631",
+		"api/application/server-lifecycles.ts": "5d70fab23a3bf6c44cff73455fae12aeab376f9b2ec987abe7b0815359851bea",
+		"api/application/server-services.ts": "cb708f0e75aae848927a631274bbbb745f61a1caaa710a8cb6a1e1b7f3c297c5",
+		"api/application/server.test.ts": "5ffcadb65839aa1fda114670aece89762c641f7318af934f23c558186b560640",
+		"api/application/vendor.test.ts": "656e44de56bdbc7c4f8cbf7d7abf0eb8ee5e57929227e4bbef78e508fbe958ec",
+		"api/domains/dialogue/contracts/index.ts": "09e284fc913c5a6d5863dda99f916b7e0d9c7cc6424ad42400d40109362f2de6",
+		"api/domains/dialogue/repository/agency-observations.ts": "4ecfe27697601af2f19d536401ad8a443e357ee148cc46caab7fe816105c3fd8",
+		"api/domains/dialogue/repository/agency.ts": "4d04f3b5491d6a71ded656966721dfae0d0d0ede0a32cd4b2f112fd96143a40f",
+		"api/domains/dialogue/repository/index.ts": "a84f9a5e32d7e4ea74ec22731791264007b9a023199d1e042baac6918bc5057e",
+		"api/domains/dialogue/repository/work.ts": "f3d1e1cbe7e8bad83b84e8a6b0f171ab49361ad27a87d1ef6eeb69382a6ae42e",
+		"api/domains/dialogue/service/agency-forgetting.ts": "7e4bf4b88725e4e38394d8e33ab1fd65fd4b44785c022d19cb9b44909602d1f7",
+		"api/domains/dialogue/service/agency-memory.ts": "1eef78e58d53e59fea62fcfaa6dd1ac0bbdd06ed01db45072abdb28f7017bad3",
+		"api/domains/dialogue/service/agency-sources.ts": "e45103c364c809194966fc38072954095fee2eaefed6fa70ce0856ea5b3be54e",
+		"api/domains/dialogue/service/agency-state.ts": "5b0df39824625a0be6383c837e57a7ce3e671472027f111a540a906bc8b49555",
+		"api/domains/dialogue/service/background-input.ts": "699f2c2775e9672671c5ccf1db2b0400c09684dfd5b22874efa8ff52847a7de8",
+		"api/domains/dialogue/service/conversation-input.ts": "8e7c0d06a01605a7ab6e5fefb5ee6af22e4644e7dcac90d95cba94d749f782db",
+		"api/domains/dialogue/service/generation-prepare.ts": "14f637af6a7284b3e64a9423945f504fa814671e4ffdae2e24c96bc3e74c394d",
+		"api/domains/dialogue/service/work-ledger.ts": "eb4b5af3730b5085ca5cd303fa22a84a5dcb9c3a8b1d39fc51033a5f8b754260",
+		"api/domains/dialogue/test/agency-sources.test.ts": "573d6d03ab69a5bdd3b899ce8978e2470f490a7a0d7913b1d00e23d500286e38",
+		"api/domains/live-voice/contracts/index.ts": "b4b5bf7aab6d7fb0fe229bcaefcf76b4cb9c5356f8109fb8f1592db0557215f5",
+		"api/domains/live-voice/repository/index.ts": "d5614c36ef6bdf0705fb85c344d904da9d7f6d43126c6d87c89606573bd37a14",
+		"api/domains/live-voice/repository/inputs.ts": "26fdf8e3d0ee7110eae296d8e9be848fa8495d9e656623afca99c0234debcc5f",
+		"api/domains/live-voice/service/index.ts": "5e3fd4cc417dd836dd86cf2137f64445fc617c490ca519442a27e7c34cfa85bf",
+		"api/domains/live-voice/service/outputs.ts": "c0e50e570742d984ffd0c646a68a68b38b2001eed99970d8e895ec1af6ce8a3d",
+		"api/domains/live-voice/service/proposals.ts": "70bd4f2d8369128597f280cfbd6232ba377b41b48f66bd7899f375b680aa8b75",
+		"api/domains/live-voice/service/protocol.ts": "56f21d4b44837b2df57cb531fc972a324b19b32e0b797f0f12d9ff24c7fe2492",
+		"api/domains/live-voice/service/start.ts": "cd4d38a9d25fc7d00d21aeb767bf12ddf76fcf3c4f74685559542b269eee9350",
+		"api/domains/live-voice/service/transcripts.ts": "5729f32d90386fd7ad3f7689a62042e41e062d21fed8c31129b97601c671df5a",
+		"api/domains/live-voice/test/live.fixture.ts": "3a06904645db588c8b0fb8471e1a6f642a8265fe92e4f40800709542515ae7ab",
+		"api/domains/live-voice/test/provenance.test.ts": "ba10b2d2646dccdcbbc6ac33abc1ea71ac7b82623e23fdc9d9bbc470f0ab5ef7",
+		"api/domains/memory/contracts/index.ts": "0b4b29e89a443d78342aa7571587ce25d233c8af99c015e6cd91b106cb1e12d6",
+		"api/domains/memory/index.ts": "add0ec59a547a4a45a395f21543a10848d22a98e08754cc28f8f28969b3c0f0e",
+		"api/domains/memory/repository/host-inputs.ts": "885b68f27018f94c9132b605da88152f8ea949fa02916ff83176b5f446508732",
+		"api/domains/memory/repository/index.ts": "f76ff20fd4da9ca7a25aabc06763e58ecad2069bab0c140a8149eccac81d8570",
+		"api/domains/memory/service/context-window.ts": "4e91369b97855b017fef77d1449e7f2ca0e87392a87d6b01b3a1c945f3de3617",
+		"api/domains/memory/service/forget.ts": "6b8100f9a82cf4b3a4174d75612fbead2621331e04c6486f6d106f1fcb53ba17",
+		"api/domains/memory/service/index.ts": "9a576b7fc660d71c2ece311db8d38140f2855c53eb00b2f733c0553d4e2efbfb",
+		"api/domains/memory/service/reference-input.ts": "c73729cd6d0e81d70d1b56102fead951430f4826bff16ed224aaefd994e35680",
+		"api/domains/memory/test/memory.fixture.ts": "698825f43c32ef096a0830259c3b72235122456dbc79372a4afeb5faabbf2382",
+		"api/domains/memory/test/migration.test.ts": "ef69660b47252ef63238f1892e25cf1657075a1f23cd019b01e317df903278a9",
+		"api/domains/memory/test/reference-input.test.ts": "5900c1b4ef6dd1ba3e4ec245260c1a85130dcee6458d18dfa5929aa032f981ed"
+	}
+}

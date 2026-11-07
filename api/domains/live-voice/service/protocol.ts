@@ -1,8 +1,9 @@
 /** UTF-8 byte budget also bounds byte-level tokens, with room for message framing (8192 tokens/128 messages). */
-export function historyInput(
-	history: Array<{ role: "user" | "assistant"; text: string }>,
-) {
+export function selectHistory<
+	T extends { role: "user" | "assistant"; text: string },
+>(history: T[]) {
 	let bytes = 6000;
+	const selected: T[] = [];
 	const kept: Array<{
 		type: "message";
 		role: "user" | "assistant";
@@ -19,7 +20,8 @@ export function historyInput(
 			text = point + text;
 			bytes -= length;
 		}
-		if (text)
+		if (text) {
+			selected.unshift(message);
 			kept.unshift({
 				type: "message",
 				role: message.role,
@@ -30,10 +32,14 @@ export function historyInput(
 					},
 				],
 			});
+		}
 		if (bytes < 4) break;
 	}
-	return kept;
+	return { messages: kept, selected };
 }
+export const historyInput = (
+	history: Array<{ role: "user" | "assistant"; text: string }>,
+) => selectHistory(history).messages;
 export function validPcm(audio: string, limit: number) {
 	const bytes = Buffer.from(audio, "base64");
 	return (

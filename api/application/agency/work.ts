@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { HostTodo } from "eumenes-agency";
+import type { HostTodo, InputContext } from "eumenes-agency";
 import type { DialogueService } from "../../domains/dialogue";
 
 /** Characters of one TODO line (the agency prompt stays short). */
@@ -12,16 +12,23 @@ const oneLine = (text: string, max: number) => {
 	return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
 
-type LedgerTodo = ReturnType<DialogueService["todosInTransaction"]>[number];
+type LedgerTodo = Omit<
+	ReturnType<DialogueService["todosInTransaction"]>[number],
+	"input"
+> & { input?: InputContext };
 
 /**
  * A TODO as the agency sees it: open work, or a question the sub-agent asks the user. The title names the toolchain
  * the work went to (`[画像の作成] …`), so the agency knows what kind of work it was. Finished work is archived as it
  * finishes and told by its notice on screen: the agency is never given it (the TODO completion notice design).
  */
-export function hostTodoOf(item: LedgerTodo): HostTodo | null {
+export function hostTodoOf(
+	item: LedgerTodo,
+	input?: InputContext,
+): HostTodo | null {
 	const base = {
 		id: item.id,
+		...(input ? { input } : {}),
 		title: oneLine(
 			item.toolchainTitle
 				? `[${item.toolchainTitle}] ${item.title}`
@@ -45,13 +52,22 @@ export function hostTodoOf(item: LedgerTodo): HostTodo | null {
  * questions to ask.
  */
 export function createAgencyWork(deps: {
-	dialogue: Pick<DialogueService, "todosInTransaction">;
+	inputFor?: (db: Database, item: LedgerTodo) => InputContext;
+	dialogue: {
+		todosInTransaction(
+			db: Database,
+			conversationId: string,
+		): readonly LedgerTodo[];
+	};
 }) {
 	return {
 		todosInTransaction(db: Database, conversationId: string): HostTodo[] {
 			return deps.dialogue
 				.todosInTransaction(db, conversationId)
-				.flatMap((item) => hostTodoOf(item) ?? []);
+				.flatMap(
+					(item) =>
+						hostTodoOf(item, deps.inputFor?.(db, item) ?? item.input) ?? [],
+				);
 		},
 	};
 }

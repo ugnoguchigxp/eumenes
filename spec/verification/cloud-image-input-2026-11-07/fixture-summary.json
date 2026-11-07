@@ -1,0 +1,87 @@
+{
+  "lane": "fixture",
+  "implementationFiles": {
+    "api/infrastructure/chat-image-parts.ts": "a27f970b4499d04cadea8e89b54a2e721a3f93ca1ee60b8488806617f390239c",
+    "api/domains/larm/service/chat-request.ts": "714da5bd0a6d1cd5e97e25cc2dddd4772d6bd32dde12ec09243bd63dcb042423",
+    "api/domains/inference/adapters/codex-transport.ts": "aa24a66488e32bf594d4028f7fc7fd968f89a94805fe8dbbf6ca4e09ba302ad4",
+    "api/domains/inference/adapters/codex-models.ts": "4e0fd369ee595ef842e01eb0df2fa0431a3a1a828eed4586116c88a76a00fac0",
+    "api/domains/inference/adapters/codex-app-server.ts": "5d5a4a176519062ee21a36a2fbc8f024bec76b5c850e03d3bb7c0b222a502ffe",
+    "api/domains/inference/adapters/cloud-agent-shared.ts": "6910e88e0dbc766fc5edc64cc3263e38a5b4e3576b51ebaf4614a4885017d108",
+    "api/domains/inference/adapters/cloud-agent-codex.ts": "7aebed5c99d3b8b47fc563eb5baaf4e973a2433b3d9167b1dafae330d6353316",
+    "api/domains/inference/adapters/cloud-agent-claude.ts": "357433475f08066a083ef398d77ab8fa40754c2b03c0071c2ca836de2a9ccb86",
+    "api/domains/inference/adapters/claude-session.ts": "83230a7dde1a02bb911e7c390d4044f6e73f82745ff235b11f47674efb379182",
+    "api/domains/inference/service/cloud-images.ts": "6ff874c1f8a1ee0388c1e6e732894aabe20a49212d3b7b0326969b45b3760ffc",
+    "api/domains/inference/service/image-input.ts": "3292883d0becce4a9bebb2e6158f019150437ebeb86fbf0d473f177f20d15bd8",
+    "api/domains/inference/service/connection-access.ts": "62774f01b9992995015fba4c528d632bbdd796fe0a076aff8fdd83d762201a29",
+    "api/domains/inference/service/cloud.ts": "d07750bf088ee25590f4346b9fcdf4af39ad000e59a4ac55e7a5c3a3befa26c5",
+    "api/domains/inference/service/connection-models.ts": "31e18fe0c32645affaaaec8e5cc996f7341dc6cdff33d370be785daf22271659",
+    "api/domains/inference/service/execute-types.ts": "d261c2419b2a10d20a5f1a8750004aa516af1ad27a9d8824f2ead10b48fee20b",
+    "api/domains/inference/service/attempt-work.ts": "518616e4048c93a948e7c39314e577c432afc9adfef2f3c2b0f439497003e544",
+    "api/domains/inference/service/index.ts": "526133fe10f3bfe873f7c883a280ccc2cbde553c7e10a99bef770253ff15518e",
+    "api/domains/inference/contracts/image-input.ts": "2ffb8a5e6e708c0aa7a46d81c7fd5904ff0bd627093e7d8d255dbf3161b7246d",
+    "api/domains/inference/contracts/index.ts": "1dac6e49c83b5b2dee961042a2542c61280b06fad1a6521da1b7b55d51461634",
+    "api/domains/inference/controller/index.ts": "82780bef86bf0ec34a9b180f34b1dde1fd6068672c23d874d05524de46010cfe",
+    "client/larm.ts": "80794feffe9fe4590a8d2390c82828c913554676c635e675e2d3521b2b9cd34a",
+    "web/src/workspace/useChatAttachments.ts": "abfffbc0d04f19de3ce5c813fc4fe8c5acabeec6f636a7b4c2a50bc2461db5a2",
+    "web/src/workspace/ChatImageInput.tsx": "7e1c46e23f31185c8fa7b1c8c2580948ed9c01b3d35da0ea03f3a83f2d0014bf",
+    "web/src/errorMessages.ts": "34d9c7660e57ca10fc12e9928691dd484e248428f5abcd4db5aae56b9dcdb475",
+    "scripts/chat-image-fixture-server.ts": "4e94d84414025daa4287251dd236478b57c5600cdcaf4ef411821eab1304f965",
+    "tests/browser/chat-image-attachments.spec.ts": "e85087d6ad1af35b2abbe99097c1eaef7d6700697ef4c7b54b27f96d1153121a"
+  },
+  "snapshotDifferences": [],
+  "targetedBackend": {
+    "pass": 71,
+    "fail": 0,
+    "files": 10,
+    "assertions": 397
+  },
+  "web": {
+    "pass": 8,
+    "fail": 0,
+    "files": 2
+  },
+  "broadBackend": {
+    "pass": 1444,
+    "fail": 1,
+    "files": 214,
+    "assertions": 13629,
+    "knownFailure": "dialogue/test/specialist.test.ts returning: unsaved work",
+    "beforeImplementationControlReproduced": true
+  },
+  "typecheck": "pass",
+  "webBuild": "pass",
+  "browser": {
+    "pass": 4,
+    "fail": 0,
+    "durationMs": 50200,
+    "muted": true,
+    "ownedServersStopped": true
+  },
+  "live": "image-inference-not-run",
+  "gates": "blocked by existing format/lint/size issues; see README",
+  "liveMetadata": {
+    "lane": "live-metadata-only",
+    "settingsRevision": 170,
+    "connectionKind": "codex-sdk",
+    "selectedModel": "gpt-6-luna",
+    "catalogModels": 11,
+    "selectedModelFound": true,
+    "inputModalities": [
+      "text",
+      "image"
+    ],
+    "modelInferencePerformed": false
+  },
+  "additionalClientRegression": {
+    "name": "client/larm.test.ts screen notification",
+    "result": "existing failure: mock 204 response is parsed as JSON",
+    "headClientControlReproduced": true
+  },
+  "largeImageEchoRegression": {
+    "validPngBytes": ">2 MiB",
+    "before": "cloud_agent_output_limit",
+    "after": "pass",
+    "oversizedAnswerRejected": true,
+    "normalOutputLimitsUnchanged": true
+  }
+}

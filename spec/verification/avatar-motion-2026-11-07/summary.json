@@ -1,0 +1,29 @@
+{
+  "backend": {
+    "passed": 209,
+    "failed": 0,
+    "files": 33
+  },
+  "web": {
+    "passed": 227,
+    "failed": 0,
+    "files": 32
+  },
+  "browser": {
+    "passed": 4,
+    "failed": 0,
+    "provider": "fixture; muted WebGL"
+  },
+  "live": {
+    "ttsStatus": 200,
+    "motion": "agreeing",
+    "maximumMouthOpen": 0.633,
+    "userConfirmedLipSync": true
+  },
+  "verification": "Full gate blocked by unrelated inventory/format issues; final global typecheck has errors only in concurrently added avatar-view.spec.ts.",
+  "serverRestarted": true,
+  "contextCompileCount": 1,
+  "compileEvalCount": 1,
+  "serverRestartedBy": "user",
+  "deploymentCheck": "Running Web serves all four updated avatar modules (HTTP 200); user-visible motion after reload is not observed."
+}

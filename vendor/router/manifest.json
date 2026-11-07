@@ -1,21 +1,23 @@
 {
 	"package": "eumenes_router",
 	"version": "0.0.2",
-	"artifact": "eumenes_router-0.0.2-f1498a60b326.tgz",
-	"sha256": "f1498a60b326a9050a2dfd3ca9b10fa2e6080c8a3e0782350e73f7c80f978c11",
+	"artifact": "eumenes_router-0.0.2-ee0f02404f6b.tgz",
+	"sha256": "ee0f02404f6b7928f44721bad253bb6c3a23cf596370285485f84b96ae268c82",
 	"source": {
-		"commit": "070b00ce5393048a015c40c073cccd41a69d85c0",
+		"commit": "f89b1326d85b9fb370896f3ddd8992e340751128",
 		"dirty": true,
+		"treeDigest": "da9e0cbcc17ff3f28beb9ee490ebe458fba6df6f9f2e597deb28ef87cd635d1e",
 		"patch": {
 			"file": "adoption-source.patch",
-			"sha256": "b6b54c727284e30cb322ed4930b4ab69e2fb12c620edd5bda061b4159175852e"
+			"sha256": "6d42e6cbe2af7099d00ed1db6a4f4229e7523641c15a05f0f81c4acc70028f03",
+			"apply": "git apply --unidiff-zero adoption-source.patch"
 		}
 	},
 	"contractVersions": {
 		"cards": 1,
-		"route": 4,
+		"route": 7,
 		"feedback": 1,
-		"structure": 2
+		"structure": 5
 	},
 	"dbSchemaVersion": 1,
 	"entries": {
@@ -43,7 +45,7 @@
 				"model",
 				"settings"
 			],
-			"structurePrompt": "turn-structure-v2"
+			"structurePrompt": "turn-structure-v8"
 		}
 	},
 	"bestV2": {
@@ -61,5 +63,5 @@
 			"note": "the host imports it (importExamplesInTransaction); made from utterances, it is not in the tarball"
 		}
 	},
-	"verifiedWith": "eumenes_router: typecheck, lint, format, required offline Python regressions, bun test 102 pass / 0 skip / 0 fail, mainline parity ran; tarball checksum and isolated consumer on built JavaScript/SQLite passed; wrong checksum refused"
+	"verifiedWith": "eumenes_router: typecheck, lint, format, required offline Python regressions, bun test 114 pass / 0 skip / 0 todo / 0 fail, mainline parity ran; tarball checksum and isolated consumer on built JavaScript/SQLite passed; wrong checksum refused"
 }

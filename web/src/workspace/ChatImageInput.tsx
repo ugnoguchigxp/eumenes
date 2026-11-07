@@ -68,7 +68,11 @@ export function ChatImageInput({ state }: { state: WorkspaceState }) {
 
 export function ChatImagePreviews({ state }: { state: WorkspaceState }) {
 	const images = state.attachments;
-	const input = state.status.data?.larm.chatInput;
+	const capability = images.capability;
+	const input =
+		capability?.primary.source === "larm"
+			? capability.primary.chatInput
+			: undefined;
 	if (!images.items.length && !images.error) return null;
 	return (
 		<div className="chat-image-input">
@@ -127,6 +131,29 @@ export function ChatImagePreviews({ state }: { state: WorkspaceState }) {
 					LARMの推論監査に画像が保存されます（最長
 					{Math.ceil(input.retention.maxRetentionSeconds / 86400)}日
 					{input.retention.encrypted ? "・暗号化" : ""}）。
+				</small>
+			)}
+			{images.items.length > 0 &&
+				capability &&
+				capability.primary.source !== "larm" && (
+					<small>
+						添付画像は選択中のクラウド接続先へ送ります。画像の保持は接続先・アカウントの設定に従います。
+					</small>
+				)}
+			{images.items.length > 0 && capability?.fallback && (
+				<small>
+					許可済みのクラウド代替先の画像入力：
+					{
+						(
+							{
+								supported: "確認済み",
+								unsupported: "未対応",
+								unknown: "不明",
+								failed: "確認失敗",
+							} as const
+						)[capability.fallback.status]
+					}
+					。
 				</small>
 			)}
 			{images.error && (

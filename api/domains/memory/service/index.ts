@@ -1,3 +1,6 @@
+import { purgeHostInputs } from "../repository/host-inputs";
+import { createReferenceInputs } from "./reference-input";
+import { createMemoryMaintenance } from "./maintenance";
 import type { Database } from "bun:sqlite";
 import type { AccessContext } from "eumenes-memory";
 import { sliceUtf8Range } from "eumenes-memory";
@@ -193,6 +196,16 @@ export function createMemoryService(
 	/** The journal's forgotten message ids: hidden from the history even while the database does not know them (memory unhealthy). */
 	const journalBlocked = new Set<string>();
 	const ledger = createLedger({ store, continuity, clock, journalBlocked });
+	const referenceInputs = createReferenceInputs({
+		access,
+		healthy: () => health.healthy,
+		enabled: (db) => readSettings(db).enabled,
+		blocked: ledger.isSourceRevokedInTransaction,
+		forgetSeq: ledger.forgetSeqInTransaction,
+		conversation,
+		items: (db) => stateItems(db, true).map((item) => toDto(db, item)),
+		now: atMs,
+	});
 	const backfill = createBackfill({
 		conversation,
 		continuity,
@@ -217,6 +230,18 @@ export function createMemoryService(
 		now: atMs,
 	});
 	const purgeHooks = referencePurgeHooks(executionRefs);
+	purgeHooks.push((db, purge) =>
+		purgeHostInputs(
+			db,
+			new Set([
+				...purge.messageIds,
+				...purge.itemIds.map((id) => `memory:${id}`),
+			]),
+		),
+	);
+	const forgetPlans: Array<
+		NonNullable<import("./forget").ForgetDeps["planHooks"]>[number]
+	> = [];
 	const forgetter = createForget({
 		journalPath: options.journalPath,
 		journalBlocked,
@@ -229,6 +254,7 @@ export function createMemoryService(
 		ready: () => health.healthy,
 		purgeUsageFor,
 		purgeHooks,
+		planHooks: forgetPlans,
 	});
 	const views = createMemoryViews({
 		store,
@@ -269,6 +295,9 @@ export function createMemoryService(
 	}
 
 	return {
+		maintenance: createMemoryMaintenance(store, curationDeps, (db) =>
+			stateItems(db, true, "memory.maintenance"),
+		),
 		previewSeeds(input: { seeds: readonly MemorySeed[] }) {
 			return store.read((db) => seedImport.preview(db, input));
 		},
@@ -284,6 +313,7 @@ export function createMemoryService(
 			};
 		},
 		/** Memory is switched on and its journals are consistent (the steward only works then). */
+		referenceInputs,
 		readyInTransaction: (db: Database): boolean =>
 			health.healthy && readSettings(db).enabled,
 		setEnabled(enabled: boolean): Promise<MemoryStatus> {
@@ -377,8 +407,12 @@ export function createMemoryService(
 		 * Registers a purge that runs inside every forget's transaction, and again for every block journal line at
 		 * startup (so it must be idempotent). The steward deletes its decisions and inbox bodies here.
 		 */
-		registerForgetPurge(hook: (db: Database, purge: ForgetPurge) => void) {
+		registerForgetPurge(
+			hook: (db: Database, purge: ForgetPurge) => void,
+			plan?: NonNullable<import("./forget").ForgetDeps["planHooks"]>[number],
+		) {
 			purgeHooks.push(hook);
+			if (plan) forgetPlans.push(plan);
 		},
 		/** Embedding of the turns and of queries, and the turn-vector store (the steward uses them). */
 		vectors,

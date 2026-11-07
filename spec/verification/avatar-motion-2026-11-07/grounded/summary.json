@@ -1,0 +1,24 @@
+{
+  "webPassed": 98,
+  "browserPassed": 6,
+  "partialPassed": 35,
+  "beforeFootRegion": {
+    "horizontalFootTravel": 8.257229784836682,
+    "verticalFootTravel": 9.953077136172055,
+    "minimumFootCenterX": 336.77149451817655,
+    "maximumFootCenterX": 345.02872430301323
+  },
+  "afterFootRegion": {
+    "horizontalFootTravel": 0.08417753326102684,
+    "verticalFootTravel": 0.057857396533677274,
+    "minimumFootCenterX": 341.5651731160896,
+    "maximumFootCenterX": 341.64935064935065
+  },
+  "measurement": "centroid of pixels with red channel >35 in bottom 20% of 700x700 full-body frames; 40 samples over 10s at 100% zoom",
+  "typecheck": "6 errors in 5 concurrently changed agency/dialogue files; none in modified avatar sources",
+  "verify": "blocked at inventory by existing artifacts snapshots",
+  "renderErrors": [],
+  "serverRestarted": false,
+  "contextCompileTotal": 4,
+  "compileEvalTotal": 4
+}

@@ -28,7 +28,7 @@ export function loadInteractRelease() {
 		manifest.commit !== provenance.sourceCommit ||
 		manifest.sourceTreeSha256 !== provenance.sourceTreeSha256 ||
 		manifest.skillSha256 !== provenance.skillSha256 ||
-		manifest.contractVersion !== 2 ||
+		manifest.contractVersion !== 3 ||
 		manifest.coreFormatVersion !== 1
 	)
 		throw new Error("interact_distribution_mismatch");
@@ -50,7 +50,7 @@ export function loadInteractRelease() {
 			.replace(/^---\n[\s\S]*?\n---\n/, "")
 			.trim(),
 		skill: {
-			ref: "skill:browser.interact.operator@1",
+			ref: "skill:browser.interact.operator@2",
 			digest: `sha256:${hash(bytes)}`,
 		},
 	};

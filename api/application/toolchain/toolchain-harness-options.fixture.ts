@@ -22,6 +22,10 @@ export type HarnessOptions = {
 	compose?: (
 		messages: import("../../domains/inference/contracts").Messages,
 	) => unknown;
+	/** Script the package's structural judgment independently from planning and command execution. */
+	structure?: (
+		messages: import("../../domains/inference/contracts").Messages,
+	) => unknown;
 	computePort?: ComputePort;
 	dots?: boolean;
 	discoveryTarget?: (query: string) => string;
@@ -36,6 +40,10 @@ export type HarnessOptions = {
 		messages: import("../../domains/inference/contracts").Messages,
 	) => { name: string; arguments: Record<string, unknown> };
 	model?: LarmPort;
+	/** Cloud transport seams for end-to-end attachment verification, with no external calls. */
+	inferenceOptions?: Parameters<
+		typeof import("../../domains/inference").createInference
+	>[2];
 	/** Script only the collaborative specialist, retaining the real parent/command fixture. */
 	specialist?: (
 		messages: import("../../domains/inference/contracts").Messages,

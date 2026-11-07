@@ -298,6 +298,18 @@ export function createInteractExecution(
 				list,
 			}),
 		// Read-only, and only for a ref of the tab's latest observation: whether a menu link has an href (R18).
+		choices: async (tab, ref, target, offset, limit) => {
+			observed(tab, ref, target);
+			if (!deps.driver.readChoices) throw new Refusal("unsupported", false);
+			const result = await deps.driver.readChoices(
+				target,
+				offset,
+				limit,
+				ctx.signal,
+			);
+			active();
+			return result;
+		},
 		inspectTarget: async (tab, ref, target) => {
 			observed(tab, ref ?? (await observe()).observationRef, target);
 			const info = await deps.driver.inspectTarget(target);

@@ -1,0 +1,19 @@
+{
+  "work": [],
+  "trace": {
+    "runId": "2d7d145c-abd6-4061-ac21-d53bd6b5cacc",
+    "conversationId": "verify-eum001002-question-seed-20261106-1958",
+    "messageId": "975db00a-f243-4a11-bead-66865d293588",
+    "messageIds": [
+      "975db00a-f243-4a11-bead-66865d293588"
+    ],
+    "text": "計算結果を使って別の作業を実行してください。",
+    "decided": null,
+    "workId": null,
+    "set": [],
+    "row": 8,
+    "mode": "on",
+    "createdAt": 1793962455880
+  },
+  "executions": []
+}

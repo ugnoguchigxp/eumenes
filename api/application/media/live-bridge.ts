@@ -1,5 +1,4 @@
 import { createConversationPrewarm } from "../conversation-prewarm";
-import type { Database } from "bun:sqlite";
 import type { Core } from "../server-core";
 import type { DialogueService } from "../../domains/dialogue";
 import type { ContinuityService } from "../../domains/continuity";
@@ -7,6 +6,8 @@ import type { MemoryService } from "../../domains/memory";
 import type { ExternalOutputPort } from "../../domains/dialogue/contracts/external-output";
 import { createVoiceDialogue } from "../../domains/voice-dialogue";
 import { buildLiveVoice } from "./live-voice";
+import type { SpeechRouter } from "../agency/speech";
+import type { AgencyLayerPort } from "../../domains/dialogue/contracts";
 /** Resolves the composition cycle without exposing Live's repository to dialogue or agency. */
 export function createLiveBridge() {
 	let liveVoice: ReturnType<typeof buildLiveVoice> | undefined;
@@ -27,8 +28,9 @@ export function createLiveBridge() {
 	return {
 		externalOutput,
 		agency: {
-			routeSpeechInTransaction: (tx: Database, id: string, text: string) =>
-				liveVoice?.live.proposeInTransaction(tx, id, text) ?? false,
+			routeSpeechInTransaction: ((tx, id, text, origin) =>
+				liveVoice?.live.proposeInTransaction(tx, id, text, origin) ??
+				false) satisfies SpeechRouter,
 		},
 		attach({
 			store,
@@ -39,6 +41,7 @@ export function createLiveBridge() {
 			dialogue,
 			continuity,
 			memory,
+			agency,
 			serviceTests,
 		}: Pick<
 			Core,
@@ -52,6 +55,7 @@ export function createLiveBridge() {
 			dialogue: DialogueService;
 			continuity: ContinuityService;
 			memory: MemoryService;
+			agency?: AgencyLayerPort;
 		}) {
 			// The latest conversation's prompt is read ahead when it would be cold (started, shown, idle while shown).
 			const prewarm = createConversationPrewarm({
@@ -75,6 +79,8 @@ export function createLiveBridge() {
 				conversation,
 				continuity,
 				dialogue,
+				memory,
+				agency,
 				stopLegacy: async () => {
 					await voice.pauseAll();
 					await serviceTests.pauseVoice();
@@ -86,6 +92,10 @@ export function createLiveBridge() {
 				(tx) => !live.activeInTransaction(tx, "main"),
 			);
 			memory.registerForgetPurge((tx, purge) => {
+				live.purgeSourcesInTransaction(tx, [
+					...purge.messageIds,
+					...purge.itemIds.map((id) => `memory:${id}`),
+				]);
 				for (const id of purge.messageIds)
 					live.purgeInTransaction(
 						tx,

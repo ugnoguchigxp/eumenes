@@ -83,7 +83,7 @@ export function promptParts(messages: Messages, context?: ContextSplit) {
 	);
 	const { turns: history, pending } = normalizeHistory(parts.history);
 	const turns = [...pending, ...parts.turn];
-	const prompt =
+	let prompt =
 		turns.length === 1 && turns[0]!.role === "user"
 			? turns[0]!.content
 			: (context
@@ -107,13 +107,24 @@ export function promptParts(messages: Messages, context?: ContextSplit) {
 						};
 					}),
 				);
-	if (!prompt.trim()) throw fail("empty_prompt");
+	const images = parts.turn.flatMap((m) => m.images ?? []);
+	if (images.length) {
+		let next = 1;
+		const references = parts.turn.flatMap((m, i) =>
+			m.images?.length
+				? [{ message: i + 1, images: m.images.map(() => next++) }]
+				: [],
+		);
+		prompt += "\n\nAttached image references: " + JSON.stringify(references);
+	}
+	if (!prompt.trim() && !images.length) throw fail("empty_prompt");
 	return {
 		system:
 			parts.instructions.join("\n\n") ||
 			systemContext("inference.contexts.cloud-agents.default-system", {}),
 		history,
 		prompt,
+		images,
 	};
 }
 

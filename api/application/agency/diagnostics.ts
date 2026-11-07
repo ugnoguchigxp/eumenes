@@ -3,7 +3,6 @@ import { getLogger } from "../../infrastructure/logger";
 import type { Conv } from "./host-types";
 
 const log = getLogger("agency");
-const LOG_REASON_CHARS = 120;
 
 export function logCalls(c: Conv, calls: readonly CallOutcome[]) {
 	for (const call of calls)
@@ -30,7 +29,5 @@ export function logDecision(
 		source: decision.source,
 		outcome: superseded ? "superseded" : "current",
 		validationCode: decision.rejectCodes.join(","),
-		// The model's own short rationale, cut; never a message body.
-		reason: decision.reason.slice(0, LOG_REASON_CHARS),
 	});
 }

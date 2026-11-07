@@ -1,6 +1,7 @@
 import { statusResponseSchema } from "../api/domains/larm/contracts";
 import {
 	playbackScreenSchema,
+	imageInputSchema,
 	type ScreenDetails,
 } from "../api/domains/inference/contracts";
 import { callJson, json, type Transport } from "./transport";
@@ -33,6 +34,10 @@ export function larmClient(transport: Transport) {
 				`/api/inference/screen/${encodeURIComponent(id)}`,
 				{ signal },
 			),
+		imageInput: async (signal?: AbortSignal) =>
+			callJson(transport, imageInputSchema, "/api/inference/image-input", {
+				signal,
+			}),
 		status: async () =>
 			callJson(transport, statusResponseSchema, "/api/status"),
 		connectLarm: async () =>

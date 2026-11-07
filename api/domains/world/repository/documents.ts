@@ -38,6 +38,7 @@ export function searchDocuments(
 		.query(
 			`SELECT id, revision, title, collection FROM world_host_document
 	 WHERE principal=?1 AND scope_key=?2 AND withdrawn=0
+	 AND NOT EXISTS (SELECT 1 FROM world_host_use_exclusion e WHERE e.principal=world_host_document.principal AND e.scope_key=world_host_document.scope_key AND e.kind='document' AND e.id=world_host_document.id AND e.revision=world_host_document.revision)
 	 AND (instr(lower(title), lower(?3))>0 OR instr(lower(content), lower(?3))>0)
 	 ORDER BY id LIMIT 11 OFFSET ?4`,
 		)
@@ -53,6 +54,7 @@ export function pageDocuments(
 	query: WorldDocumentPageInput,
 ) {
 	const where = `principal=?1 AND scope_key=?2 AND withdrawn=0
+	 AND NOT EXISTS (SELECT 1 FROM world_host_use_exclusion e WHERE e.principal=world_host_document.principal AND e.scope_key=world_host_document.scope_key AND e.kind='document' AND e.id=world_host_document.id AND e.revision=world_host_document.revision)
 	 AND (?3='' OR instr(lower(title),lower(?3))>0 OR instr(lower(content),lower(?3))>0
 	 OR instr(lower(collection),lower(?3))>0 OR instr(lower(id),lower(?3))>0)`;
 	const total = (

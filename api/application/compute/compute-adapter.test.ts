@@ -73,6 +73,39 @@ test("registered adapter exposes four schemas and stable receipts, then tracks a
 		),
 	).rejects.toThrow("compute_not_found");
 });
+
+test("command snapshots offer only jobs in the current conversation and keep the screen owner-wide", async () => {
+	const f = await fixture();
+	clean.push(f.close);
+	const adapter = createComputeAdapter(f.service);
+	const first = await f.service.submit(
+		owner,
+		"first",
+		{ code: "result = 2" },
+		crypto.randomUUID(),
+	);
+	const second = await f.service.submit(
+		owner,
+		"second",
+		{ code: "result = 3" },
+		crypto.randomUUID(),
+	);
+	const snapshot = (conversationId: string) =>
+		f.store.read((db) =>
+			adapter.snapshotInTransaction(db, { conversationId }),
+		) as { jobs: Array<{ id: string }>; selectedJobId: string | null };
+	expect(snapshot("first").jobs.map((job) => job.id)).toEqual([first.jobId]);
+	expect(snapshot("first").selectedJobId).toBeNull();
+	expect(snapshot("second").jobs.map((job) => job.id)).toEqual([second.jobId]);
+	expect(snapshot("second").selectedJobId).toBe(second.jobId);
+	expect(snapshot("empty")).toMatchObject({ jobs: [], selectedJobId: null });
+	const screen = f.store.read((db) =>
+		adapter.sourceInTransaction!(db, "query:compute.workspace@1", undefined),
+	) as { data: { jobs: Array<{ id: string }> } };
+	expect(new Set(screen.data.jobs.map((job) => job.id))).toEqual(
+		new Set([first.jobId, second.jobId]),
+	);
+});
 test("authenticated host integration serves stored PNG and downloads SVG without inline HTML", async () => {
 	const f = await fixture();
 	clean.push(f.close);

@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { LiveConversationPort } from "../contracts";
 import { session } from "../repository";
+import { addSessionInput, sessionInput } from "../repository/inputs";
 
 type Segment = {
 	id: string;
@@ -25,13 +26,21 @@ export function publishSegments(
 		)
 		.all(id) as Segment[]) {
 		if (!segment.text.trim() || row.test) continue;
-		conversation.publish(db, {
+		const input = sessionInput(db, id);
+		const published = conversation.publish(db, {
 			id: segment.id,
 			conversationId: row.conversation_id,
 			role: segment.speaker,
 			text: segment.text,
 			at: new Date(Date.parse(row.started_at) + segment.start_ms).toISOString(),
+			input,
 		});
+		if (segment.speaker === "user")
+			addSessionInput(
+				db,
+				id,
+				published ?? { sources: [segment.id], complete: false },
+			);
 		db.query("UPDATE live_voice_segments SET message_id=id WHERE id=?").run(
 			segment.id,
 		);

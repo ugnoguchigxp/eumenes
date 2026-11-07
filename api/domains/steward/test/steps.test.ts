@@ -238,7 +238,7 @@ test("elements that cannot be saved are dropped one by one", async () => {
 	]);
 });
 
-test("the evidence is the user's message, found by quote or else the whole message; the agent's words are no evidence", async () => {
+test("a mismatched quote and the agent's words cannot become evidence of a saved memory", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", {
 		...empty,
@@ -255,7 +255,7 @@ test("the evidence is the user's message, found by quote or else the whole messa
 	const { inputMessageId } = await h.exchange("辛いものが好きです", "なるほど");
 	await h.drain();
 	const items = h.memory.list();
-	expect(items).toHaveLength(2);
+	expect(items).toHaveLength(1);
 	expect(items.every((i) => i.sourceMessageIds.join() === inputMessageId)).toBe(
 		true,
 	);
@@ -267,7 +267,7 @@ test("the evidence is the user's message, found by quote or else the whole messa
 	}>;
 	expect(results.map((r) => r.quoteMatched ?? r.code)).toEqual([
 		true,
-		false,
+		"invalid_source",
 		"unknown_evidence",
 	]);
 });

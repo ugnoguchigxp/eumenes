@@ -1,0 +1,58 @@
+{
+  "configuration": {
+    "datasetHash": "64909a5f9bde7c5752bb0788401c94c696b0a0367d06ae6ebfbedef13b1a5077",
+    "entry": "routeStructured",
+    "structurePrompt": "turn-structure-v2",
+    "structureTimeoutMs": 30000,
+    "settingsHash": "71d7a841a1733b9044e84e98b9bfdfc7f20de1fcdd11f4ae62a3ffb0b1278ba2",
+    "source": "adopted-package",
+    "variants": [
+      "B"
+    ],
+    "callsPerCaseAndVariant": 1,
+    "dispatch": false
+  },
+  "rows": [
+    {
+      "id": "same-tool-two",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5261,
+      "to": "pipeline",
+      "row": 9,
+      "candidate": null,
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "15秒のタイマー",
+            "target": null,
+            "inputs": [],
+            "after": []
+          },
+          {
+            "text": "30秒のタイマー",
+            "target": null,
+            "inputs": [],
+            "after": []
+          }
+        ]
+      },
+      "steps": [
+        {
+          "candidate": "timers.manage",
+          "after": [],
+          "decision": "run"
+        },
+        {
+          "candidate": "timers.manage",
+          "after": [],
+          "decision": "run"
+        }
+      ],
+      "top": [],
+      "catalogHash": "fefcc1275b7329974f40002b8ee910db51d3be1b321306dd2126ca21c011d7f9",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    }
+  ]
+}

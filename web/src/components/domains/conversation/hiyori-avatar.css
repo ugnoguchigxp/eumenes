@@ -22,6 +22,65 @@
 .hiyori-avatar-unavailable {
 	display: none;
 }
+
+.hiyori-view-controls {
+	position: absolute;
+	left: max(16px, env(safe-area-inset-left));
+	bottom: max(36px, env(safe-area-inset-bottom));
+	box-sizing: border-box;
+	width: min(260px, calc(100% - 32px));
+	max-height: calc(100% - 100px);
+	overflow: auto;
+	pointer-events: auto;
+	border: 1px solid #46536a;
+	border-radius: 12px;
+	background: #101927ed;
+	color: #e4eaf4;
+	font-size: 13px;
+	box-shadow: 0 8px 24px #0005;
+}
+.hiyori-view-controls summary {
+	padding: 12px 14px;
+	cursor: pointer;
+}
+.hiyori-view-fields {
+	display: grid;
+	gap: 12px;
+	padding: 0 14px 14px;
+}
+.hiyori-view-fields label {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 4px;
+}
+.hiyori-view-fields output {
+	font-variant-numeric: tabular-nums;
+	color: #b9c3d5;
+}
+.hiyori-view-fields input {
+	grid-column: 1 / -1;
+	width: 100%;
+	min-height: 28px;
+	margin: 0;
+	accent-color: #acd4ff;
+}
+.hiyori-view-actions {
+	display: flex;
+	gap: 8px;
+}
+.hiyori-view-actions button {
+	flex: 1;
+	min-height: 36px;
+	border: 1px solid #52617a;
+	border-radius: 8px;
+	background: #243249;
+	color: inherit;
+	cursor: pointer;
+}
+.hiyori-view-controls :focus-visible {
+	outline: 2px solid #acd4ff;
+	outline-offset: 2px;
+}
 .hiyori-avatar-background:is(
 		[data-avatar-state="load-failed"],
 		[data-avatar-state="render-failed"],

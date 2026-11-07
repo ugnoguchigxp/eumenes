@@ -41,11 +41,32 @@ export function assembleAgency(
 	const state =
 		deps.state ??
 		(deps.research
-			? createAgencyStatePort({ ...deps.research, now: Date.now })
+			? createAgencyStatePort({
+					...deps.research,
+					...(deps.memory.referenceInputs
+						? { memory: { referenceInputs: deps.memory.referenceInputs } }
+						: {}),
+					now: Date.now,
+				})
 			: undefined);
 	return createAgencyHost({
 		...deps,
 		...(state ? { state } : {}),
+		captureContext: (conversationId) =>
+			store.read((db) => {
+				const captured = dialogue().conversationTaskInTransaction(
+					db,
+					conversationId,
+					"",
+					{ requireProvenance: true },
+				);
+				return captured
+					? {
+							messages: structuredClone(captured.messages),
+							input: captured.input ?? { sources: [], complete: false },
+						}
+					: null;
+			}),
 		conversationBusy: (db, conversationId) =>
 			dialogue().conversationHasActiveRunInTransaction(db, conversationId),
 		recordSpokeInTransaction: (db, input) =>
@@ -55,11 +76,6 @@ export function assembleAgency(
 				store,
 				inference,
 				next,
-				// Share the conversation's reference data and route; the port supplies its exact purpose system.
-				task: (conversationId, task) =>
-					store.read((db) =>
-						dialogue().conversationTaskInTransaction(db, conversationId, task),
-					),
 				// The receipt of a control call carries no token counts: read them from the attempt record.
 				attemptUsage: (attemptId) => {
 					const used = inference.usage().find((a) => a.id === attemptId);

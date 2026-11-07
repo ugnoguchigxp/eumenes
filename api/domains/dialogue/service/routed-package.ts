@@ -4,6 +4,7 @@ import {
 	type RouteCandidate as PackageCandidate,
 	type RouteDecision as PackageDecision,
 	type RoutePorts,
+	type Analyze,
 	type RouteResult,
 	type RouteTurn,
 	type StructuredResult,
@@ -178,7 +179,7 @@ export function portsOf(
 async function analyzeOf(
 	turn: Turn,
 	router: ActiveRouter,
-	prompt: { version: string; system: string; user: string },
+	prompt: Parameters<Analyze>[0],
 ): Promise<string> {
 	const { deps, input } = turn;
 	const { larm } = deps;
@@ -197,6 +198,7 @@ async function analyzeOf(
 				deadline,
 				taskDeadline: deadline,
 				maxOutputTokens: STRUCTURE_OUTPUT_TOKENS,
+				structuredOutput: true,
 				route: settings.structureResourceId
 					? { resourceId: settings.structureResourceId }
 					: "conversation",
@@ -211,7 +213,7 @@ async function analyzeOf(
 			AbortSignal.any([turn.signal, timeout]),
 			{
 				instructions: "",
-				outputSchema: { type: "object" },
+				outputSchema: prompt.outputSchema,
 				reasoningEffort: "low",
 			},
 			{ sessionRole: "auxiliary" },

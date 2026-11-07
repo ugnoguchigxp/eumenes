@@ -62,7 +62,11 @@ export async function routerIssueInference(dbPath: string) {
 		);
 		return {
 			async analyze(
-				prompt: { system: string; user: string },
+				prompt: {
+					system: string;
+					user: string;
+					outputSchema: Record<string, unknown>;
+				},
 				timeoutMs: number,
 				resourceId: string | null,
 			) {
@@ -76,6 +80,7 @@ export async function routerIssueInference(dbPath: string) {
 						deadline,
 						taskDeadline: deadline,
 						maxOutputTokens: 1024,
+						structuredOutput: true,
 						route: resourceId ? { resourceId } : "conversation",
 					}),
 				);
@@ -88,7 +93,7 @@ export async function routerIssueInference(dbPath: string) {
 					AbortSignal.timeout(timeoutMs),
 					{
 						instructions: "",
-						outputSchema: { type: "object" },
+						outputSchema: prompt.outputSchema,
 						reasoningEffort: "low",
 					},
 					{ sessionRole: "auxiliary" },

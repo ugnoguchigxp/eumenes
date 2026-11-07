@@ -595,3 +595,44 @@ test("a one-shot call has no session options and no fixed project key", async ()
 	expect(options.sessionId).toBeUndefined();
 	expect(options.env!.CLAUDE_CODE_PROJECT_DIR_NAME).toBeUndefined();
 });
+
+test("Claude image blocks remain withheld until authentication and reach the SDK as images", async () => {
+	const image = {
+		mime: "image/png" as const,
+		bytes: new Uint8Array([1, 2, 3]),
+		width: 1,
+		height: 1,
+	};
+	for (const account of [
+		apiKeyAccount,
+		{ ...apiKeyAccount, apiProvider: "gateway" as const },
+	]) {
+		const { claudeQuery, seen } = fakeClaude(account);
+		const running = createCloudAgents(ambient, { claudeQuery }).run(
+			claudeCall({
+				messages: [{ role: "user", content: "compare", images: [image] }],
+			}),
+		);
+		if (account.apiProvider === "gateway") {
+			await expect(running).rejects.toThrow("cloud_agent_auth_mismatch");
+			expect(seen.yielded).toEqual([]);
+		} else {
+			await running;
+			const message = seen.yielded[0] as {
+				message: { content: Array<{ type: string; source?: unknown }> };
+			};
+			expect(message.message.content.map((p) => p.type)).toEqual([
+				"text",
+				"image",
+			]);
+			expect(message.message.content[1]!.source).toEqual({
+				type: "base64",
+				media_type: "image/png",
+				data: "AQID",
+			});
+			expect(seen.params!.options!.settings).toEqual({
+				autoCompactEnabled: false,
+			});
+		}
+	}
+});

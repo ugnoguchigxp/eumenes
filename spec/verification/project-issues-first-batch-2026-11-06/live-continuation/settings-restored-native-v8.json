@@ -1,0 +1,17 @@
+{
+  "observedAt": "2026-11-06T12:22:20.033Z",
+  "entry": "route",
+  "structureTimeoutMs": 8000,
+  "structureResourceIsNull": true,
+  "profileConfigured": true,
+  "restored": true,
+  "installed": {
+    "contractVersions": {
+      "cards": 1,
+      "route": 7,
+      "feedback": 1,
+      "structure": 5
+    },
+    "prompt": "turn-structure-v8"
+  }
+}

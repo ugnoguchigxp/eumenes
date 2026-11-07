@@ -244,5 +244,7 @@ export function autonomousResearchSource(
 	};
 }
 export function revokeAgencyWork(db: Database, id: string) {
-	db.query("UPDATE dialogue_agency_work SET revoked=1 WHERE root_id=?").run(id);
+	db.query(
+		"UPDATE dialogue_agency_work SET revoked=1,question='',source_refs_json='[]' WHERE root_id=?",
+	).run(id);
 }

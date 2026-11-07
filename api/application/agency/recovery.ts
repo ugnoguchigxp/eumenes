@@ -2,6 +2,8 @@ import { createIdlePlanner, type IdleCheckpoint } from "eumenes-agency";
 import type { AgencySettings } from "./host-types";
 import type { AgencyHostDeps, Conv } from "./host-types";
 import { researchInput } from "./research";
+import { resultInput } from "./memory";
+import { currentInput } from "./input";
 /** Persisted tickets are reconciled by their real effects; a missing voice receipt is never replayed. */
 export async function recoverTickets(
 	deps: AgencyHostDeps,
@@ -19,16 +21,21 @@ export async function recoverTickets(
 					c.epoch,
 					now,
 				);
-				await deps.store.write((db) =>
-					deps.state!.startInTransaction(db, input),
-				);
-			} catch {
-				c.runtime.recordResult({
-					ticketId: ticket.id,
-					status: "interrupted",
-					at: now,
-					resultText: "再起動時に実行先または期限を確認できませんでした。",
+				await deps.store.write((db) => {
+					if (!currentInput(deps, db, resultInput(c, ticket.id)))
+						throw new Error("agency_input_stale");
+					deps.state!.startInTransaction(db, input);
 				});
+			} catch {
+				c.runtime.recordResult(
+					{
+						ticketId: ticket.id,
+						status: "interrupted",
+						at: now,
+						resultText: "再起動時に実行先または期限を確認できませんでした。",
+					},
+					resultInput(c, ticket.id),
+				);
 			}
 		} else if (ticket.action === "speak") {
 			const source = deps.store.read((db) =>
@@ -37,15 +44,19 @@ export async function recoverTickets(
 					`agency:${c.scope}:${ticket.id}`,
 				),
 			);
-			c.runtime.recordResult({
-				ticketId: ticket.id,
-				status: source.state === "available" ? "succeeded" : "outcome_unknown",
-				at: now,
-				resultText:
-					source.state === "available"
-						? source.message.text
-						: "再起動前の音声配信結果は未確認です。",
-			});
+			c.runtime.recordResult(
+				{
+					ticketId: ticket.id,
+					status:
+						source.state === "available" ? "succeeded" : "outcome_unknown",
+					at: now,
+					resultText:
+						source.state === "available"
+							? source.message.text
+							: "再起動前の音声配信結果は未確認です。",
+				},
+				resultInput(c, ticket.id),
+			);
 		}
 	}
 }

@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "date": "2026-11-06",
+  "scope": "合意済み取消契約の実モデル比較。モデルへの初送信前に固定。",
+  "cases": [
+    {
+      "id": "cancel-one",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "その作業はもう不要なので取り消してください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "タイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "control",
+        "ref": "t2.cancel",
+        "forbidden": [
+          "新規TODO作成",
+          "回答扱い"
+        ]
+      }
+    },
+    {
+      "id": "cancel-specific-two",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "運動のタイマーを作る作業は中止してください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "台所のタイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        },
+        {
+          "ref": "t3.answer",
+          "work": "運動のタイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "control",
+        "ref": "t3.cancel",
+        "forbidden": [
+          "t2の取消",
+          "新規TODO作成"
+        ]
+      }
+    },
+    {
+      "id": "cancel-ambiguous",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "その作業は取り消してください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "タイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        },
+        {
+          "ref": "t3.answer",
+          "work": "タイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "clarify",
+        "forbidden": [
+          "どちらかを推測して取消",
+          "新規TODO作成"
+        ]
+      }
+    },
+    {
+      "id": "cancel-mixed",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "その作業を取り消して、12秒のタイマーを新しく作ってください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "タイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "clarify",
+        "forbidden": [
+          "一部だけの先行実行"
+        ]
+      }
+    },
+    {
+      "id": "cancel-discussion",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "作業を取り消すと何が起きるのか説明してください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "タイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "conversation",
+        "forbidden": [
+          "取消の実行"
+        ]
+      }
+    },
+    {
+      "id": "cancel-stale",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "さっきの作業を取り消してください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "タイマーを作る",
+          "state": "cancelled",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "clarify",
+        "forbidden": [
+          "取消済みt2の復活",
+          "新規TODO作成"
+        ]
+      }
+    },
+    {
+      "id": "answer-with-control",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "15秒です。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "タイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "answer",
+        "ref": "t2.answer",
+        "forbidden": [
+          "取消",
+          "新規TODO作成"
+        ]
+      }
+    },
+    {
+      "id": "topic-with-control",
+      "split": "dev",
+      "origin": "synthetic",
+      "input": "明日の京都の天気予報を教えてください。",
+      "pending": [
+        {
+          "ref": "t2.answer",
+          "work": "タイマーを作る",
+          "state": "asking",
+          "question": "何秒にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "requests",
+        "forbidden": [
+          "保留作業の取消",
+          "質問回答扱い"
+        ]
+      }
+    },
+    {
+      "id": "cancel-other-domain",
+      "split": "holdout",
+      "origin": "synthetic",
+      "input": "画像変換は続けて、レポートを作る作業だけを取り消してください。",
+      "pending": [
+        {
+          "ref": "t4.answer",
+          "work": "レポートを作る",
+          "state": "asking",
+          "question": "どの資料を使いますか？"
+        },
+        {
+          "ref": "t5.answer",
+          "work": "画像を変換する",
+          "state": "asking",
+          "question": "どの形式にしますか？"
+        }
+      ],
+      "expected": {
+        "to": "control",
+        "ref": "t4.cancel",
+        "forbidden": [
+          "t5の取消",
+          "新規TODO作成"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "interactions": [],
+  "conversation": {
+    "id": "verify-eum001-b-20261106-1955",
+    "revision": 4,
+    "messages": [
+      {
+        "id": "6ea3f086-c954-4bb0-9ec6-ca940b01a3e8",
+        "conversationId": "verify-eum001-b-20261106-1955",
+        "role": "user",
+        "text": "1から50までの素数の個数を計算して、その計算結果の個数と同じ秒数のタイマーを作ってください。",
+        "createdAt": "2026-11-06T10:52:24.355Z",
+        "runId": "a3204900-2493-4ae7-b1f5-88752729260b"
+      },
+      {
+        "id": "eca062ec-d364-4dfd-95b9-df396e8a62fa",
+        "conversationId": "verify-eum001-b-20261106-1955",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T10:52:37.913Z",
+        "runId": "a3204900-2493-4ae7-b1f5-88752729260b"
+      },
+      {
+        "id": "db590dcd-32f9-4162-97a6-cb219a18dc1c",
+        "conversationId": "verify-eum001-b-20261106-1955",
+        "role": "user",
+        "text": "{\"kind\":\"task_result\",\"workRef\":\"c82865f4-49b6-4e64-9e67-d2dbe193bc80\",\"revision\":0,\"status\":\"completed\",\"request\":\"1から50までの素数の個数を計算して、その計算結果の個数と同じ秒数のタイマーを作ってください。\",\"question\":null,\"result\":{\"summary\":\"{\\\"version\\\":1,\\\"kind\\\":\\\"timer_action\\\",\\\"action\\\":\\\"started\\\",\\\"observedAt\\\":\\\"2026-11-06T10:53:11.930Z\\\",\\\"items\\\":[{\\\"id\\\":\\\"dd985714-46eb-45e7-ae71-9b64490f5237\\\",\\\"revision\\\":0,\\\"label\\\":\\\"タイマー\\\",\\\"state\\\":\\\"active\\\",\\\"durationSeconds\\\":15,\\\"remainingSeconds\\\":15,\\\"dueAt\\\":\\\"2026-11-06T10:53:26.927Z\\\"}],\\\"complete\\\":true,\\\"errorCode\\\":null}\\n配送: 素数の個数と、同じ秒数でタイマーを開始した結果を伝える。\",\"fulfilled\":[\"1から50までに含まれる素数の個数を計算してください。\",\"先行結果の素数の個数と同じ秒数でタイマーを開始してください。\"],\"missing\":[],\"refs\":[\"result:aab0bf8f-9475-44f9-a7b7-a0046ce9fedf\"],\"links\":[],\"status\":\"completed\"}}",
+        "presentation": "artifact",
+        "createdAt": "2026-11-06T10:53:11.959Z",
+        "runId": "17d9f8de-a78c-470a-894c-5ce272499e11"
+      },
+      {
+        "id": "timer-completion:17aef548-e4c7-4c0b-af90-d9d8c8bf0ab1",
+        "conversationId": "verify-eum001-b-20261106-1955",
+        "role": "assistant",
+        "text": "15秒のタイマーが終了しました。",
+        "createdAt": "2026-11-06T10:53:26.934Z",
+        "runId": null
+      }
+    ]
+  }
+}

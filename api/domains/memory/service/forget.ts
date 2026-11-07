@@ -2,7 +2,12 @@ import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
 import { CONTRACT_VERSIONS, LIMITS_LIFECYCLE } from "eumenes-memory";
 import type { AccessContext } from "eumenes-memory";
-import { applyForget, planForget, readStateFact } from "eumenes-memory/sqlite";
+import {
+	applyForget,
+	planForget,
+	readStateFact,
+	getForgetReceipt,
+} from "eumenes-memory/sqlite";
 import type { ConversationService } from "../../conversation";
 import type { ContinuityService } from "../../continuity";
 import {
@@ -49,6 +54,12 @@ export type ForgetDeps = {
 	purgeUsageFor: (db: Database, itemIds: Iterable<string>) => void;
 	/** The derived-data purges other domains registered (the steward's decisions and inbox). */
 	purgeHooks: ReadonlyArray<(db: Database, purge: ForgetPurge) => void>;
+	planHooks?: ReadonlyArray<
+		(
+			db: Database,
+			input: { messageIds: readonly string[]; itemIds: readonly string[] },
+		) => ForgetDerived
+	>;
 };
 
 /** A record of string lists; memory checks the shape only, never the meaning. */
@@ -77,6 +88,25 @@ function deleteTurnVectorsOf(db: Database, messageIds: string[]): number {
 	deleteTurnVectors(db, present);
 	return present.length;
 }
+/** Library lifecycle targets for State and host-derived Records share the same journal. */
+function forgetTargets(
+	itemIds: readonly string[],
+	intent: ForgetIntent | null,
+): import("eumenes-memory/sqlite").ForgetTarget[] {
+	return [
+		...itemIds.map((itemId) => ({
+			type: "state_item" as const,
+			itemId,
+			scopeKey: PROFILE_SCOPE,
+		})),
+		...(intent?.derived?.["memory.records"] ?? []).map((recordId) => ({
+			type: "record" as const,
+			recordId,
+			scopeKey: PROFILE_SCOPE,
+		})),
+	];
+}
+
 export function createForget(deps: ForgetDeps) {
 	const { access, atMs, windows, conversation, continuity } = deps;
 
@@ -132,11 +162,12 @@ export function createForget(deps: ForgetDeps) {
 		itemIds: readonly string[],
 		intent: ForgetIntent | null,
 		onJournaled: () => void,
-	): { forgetId: string; completed: boolean } {
+	): { forgetId: string; forgetIds: string[]; completed: boolean } {
 		const max = LIMITS_LIFECYCLE.maxJournalTargets;
-		const chunks: string[][] = [];
-		for (let i = 0; i < itemIds.length; i += max)
-			chunks.push(itemIds.slice(i, i + max));
+		const targets = forgetTargets(itemIds, intent);
+		const chunks: (typeof targets)[] = [];
+		for (let i = 0; i < targets.length; i += max)
+			chunks.push(targets.slice(i, i + max));
 		if (chunks.length === 0) {
 			if (intent === null) return refuse("invalid_forget");
 			chunks.push([]);
@@ -151,6 +182,7 @@ export function createForget(deps: ForgetDeps) {
 		)
 			return refuse("forget_limit");
 		let forgetId: string | null = null;
+		const forgetIds: string[] = [];
 		let completed = true;
 		for (const [index, chunk] of chunks.entries()) {
 			const planned = planForget(db, {
@@ -158,11 +190,7 @@ export function createForget(deps: ForgetDeps) {
 				access: access(db, "memory.forget"),
 				...(chunk.length > 0
 					? {
-							targets: chunk.map((itemId) => ({
-								type: "state_item" as const,
-								itemId,
-								scopeKey: PROFILE_SCOPE,
-							})),
+							targets: chunk,
 						}
 					: {}),
 				...(index === 0 && hostIntent !== null ? { hostIntent } : {}),
@@ -179,6 +207,7 @@ export function createForget(deps: ForgetDeps) {
 				clock: { atMs: atMs() },
 			});
 			forgetId ??= planned.plan.entry.forgetId;
+			forgetIds.push(planned.plan.entry.forgetId);
 			completed = applied.completed && completed;
 		}
 		if (itemIds.length > 0) {
@@ -187,7 +216,7 @@ export function createForget(deps: ForgetDeps) {
 			// The rendered windows still hold the forgotten text.
 			windows.purgeInTransaction(db);
 		}
-		return { forgetId: forgetId as string, completed };
+		return { forgetId: forgetId as string, forgetIds, completed };
 	}
 
 	/** The messages the versions of these items stand on (B1), read before the forget removes their provenance. */
@@ -237,6 +266,7 @@ export function createForget(deps: ForgetDeps) {
 		db: Database,
 		purge: Omit<ForgetPurge, "derived"> & {
 			forgetId: string;
+			forgetIds?: readonly string[];
 			derived?: ForgetDerived;
 		},
 	): boolean {
@@ -288,6 +318,7 @@ export function createForget(deps: ForgetDeps) {
 				messageIds: existing,
 				conversationId: purge.conversationId,
 				derived: purge.derived ?? {},
+				forgetIds: purge.forgetIds ?? [purge.forgetId],
 			});
 		// This line's purge is in the database now; a restored older database lacks the mark and runs it again.
 		markBlockApplied(db, purge.forgetId, now);
@@ -333,6 +364,15 @@ export function createForget(deps: ForgetDeps) {
 				...evidenceMessages(db, itemIds),
 				...input.messageIds,
 			]);
+			for (const plan of deps.planHooks ?? []) {
+				const planned = plan(db, { messageIds, itemIds: [...itemIds] });
+				if (!isDerived(planned)) return refuse("invalid_forget");
+				for (const [key, ids] of Object.entries(planned))
+					derived = {
+						...derived,
+						[key]: [...new Set([...(derived?.[key] ?? []), ...ids])],
+					};
+			}
 			const intent: ForgetIntent = {
 				conversationId: input.conversationId,
 				messageIds,
@@ -344,6 +384,7 @@ export function createForget(deps: ForgetDeps) {
 			windows.recordImmediateInTransaction(db, "state_forget", null);
 			purgeDerivedInTransaction(db, {
 				forgetId: forgotten.forgetId,
+				forgetIds: forgotten.forgetIds,
 				conversationId: input.conversationId,
 				itemIds: intent.itemIds,
 				messageIds,
@@ -354,7 +395,14 @@ export function createForget(deps: ForgetDeps) {
 				forgetId: forgotten.forgetId,
 				blockedMessageIds: messageIds,
 				forgottenItemIds: intent.itemIds,
-				completed: forgotten.completed,
+				completed: forgotten.forgetIds.every((forgetId) => {
+					const receipt = getForgetReceipt(db, {
+						contractVersion: CONTRACT_VERSIONS.lifecycle,
+						access: access(db, "memory.forget"),
+						forgetId,
+					});
+					return receipt.status === "found" && receipt.receipt.completed;
+				}),
 			};
 		},
 	};

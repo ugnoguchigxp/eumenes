@@ -73,8 +73,13 @@ function result(
 	};
 }
 /** Keep saved code and large outputs out of the next command's finite input budget. */
-function commandSnapshot(service: ComputeService, db: Database, owner: string) {
-	const current = service.snapshotInTransaction(db, owner);
+function commandSnapshot(
+	service: ComputeService,
+	db: Database,
+	owner: string,
+	conversationId?: string,
+) {
+	const current = service.snapshotInTransaction(db, owner, conversationId);
 	let remaining = 12000;
 	const jobs = current.jobs
 		.slice(0, 10)
@@ -97,7 +102,13 @@ function commandSnapshot(service: ComputeService, db: Database, owner: string) {
 			remaining -= Buffer.byteLength(JSON.stringify(j));
 			return remaining >= 0;
 		});
-	return { ...current, jobs };
+	return {
+		...current,
+		jobs,
+		selectedJobId: jobs.some((job) => job.id === current.selectedJobId)
+			? current.selectedJobId
+			: null,
+	};
 }
 export function createComputeAdapter(service: ComputeService): DomainAdapter {
 	const owner = CONVERSATION_DEFAULT_PRINCIPAL;
@@ -106,7 +117,8 @@ export function createComputeAdapter(service: ComputeService): DomainAdapter {
 		describe: describeComputeAdapter,
 		availableInTransaction: (db) => service.availableInTransaction(db),
 		artifactAvailableInTransaction: () => true,
-		snapshotInTransaction: (db) => commandSnapshot(service, db, owner),
+		snapshotInTransaction: (db, context) =>
+			commandSnapshot(service, db, owner, context?.conversationId),
 		invokeInTransaction(db, request) {
 			const conversationId =
 				request.origin.kind === "conversation" || request.origin.kind === "task"

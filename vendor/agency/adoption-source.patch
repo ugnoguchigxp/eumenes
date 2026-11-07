@@ -1,0 +1,104 @@
+diff --git a/src/application/model-call.ts b/src/application/model-call.ts
+index 0bfe05c..1eb49aa 100644
+--- a/src/application/model-call.ts
++++ b/src/application/model-call.ts
+@@ -55,6 +55,7 @@ export const isApplied = (o: CallOutcome) =>
+ const isAbort = (e: unknown) => e instanceof Error && e.name === "AbortError";
+ 
+ interface CallSpec<T> {
++	readonly input?: import("../contracts/memory.ts").InputContext;
+ 	readonly purpose: LlmPurpose;
+ 	readonly at: number;
+ 	readonly system: string;
+@@ -89,6 +90,7 @@ const attempt = async <T>(
+ 			llm.complete(
+ 				{
+ 					purpose: spec.purpose,
++					...(spec.input ? { input: structuredClone(spec.input) } : {}),
+ 					system: spec.system,
+ 					prompt: spec.prompt,
+ 					schema: spec.schema,
+diff --git a/src/application/output-contract.ts b/src/application/output-contract.ts
+index d90925e..f7e9f4a 100644
+--- a/src/application/output-contract.ts
++++ b/src/application/output-contract.ts
+@@ -16,6 +16,8 @@ export interface OutputContractOptions {
+ 	readonly condition: Exclude<Condition, "B0">;
+ 	readonly hostTodos?: boolean;
+ 	readonly findings?: boolean;
++	/** F opt-in; describes the same candidate-free speech capability enforced by runtime. */
++	readonly conversationParticipation?: boolean;
+ 	readonly utteranceEmotion?: boolean;
+ 	/** Condition I (F only): the update also carries interestOps. */
+ 	readonly interestFormation?: boolean;
+@@ -102,7 +104,9 @@ export function agencyOutputContract(
+ 			"For speak, utterance is the final text addressed to the user: the actual explanation or question, not instructions describing what to say. When null falls back to candidate content, that content must already be suitable as the final utterance.",
+ 			condition === "B1"
+ 				? "B1 has no candidates. discard is unavailable. speak requires utterance and evidenceRefs. tool requires an available toolName and toolInput. A note ID used as evidence is resolved to that note's evidence."
+-				: "By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
++				: condition === "F" && options.conversationParticipation
++					? "F conversation participation is enabled. speak may set candidateRef to null when utterance is non-null and evidenceRefs includes an actual external observation ID supplied in conversationEvidenceRefs. A speech using a candidate must reference a current non-tool candidate. tool/discard still require a presented candidateRef with its current revision; tool accepts only tool candidates and uses the candidate's toolName/toolInput. wait may reference a candidate."
++					: "By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
+ 			...(options.findings && condition !== "B1"
+ 				? [
+ 						"A speak using a presented closed intent with lastReturn may set candidateRef to null. Provide the final utterance and cite the ref supplied for that intent in findingRefs (or the evidence ID of the matching work.returned observation for lastReturn.workRef). The original request alone does not qualify.",
+diff --git a/src/application/runtime.ts b/src/application/runtime.ts
+index 6d27035..645e756 100644
+--- a/src/application/runtime.ts
++++ b/src/application/runtime.ts
+@@ -200,6 +200,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
+ 		condition: condition === "B0" ? ("B2" as const) : condition,
+ 		hostTodos,
+ 		findings: deps.findings === true,
++		conversationParticipation: conversation,
+ 		interestFormation,
+ 		utteranceEmotion: emotionMode,
+ 		...(deps.constrainToolNames
+@@ -639,6 +640,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
+ 			{
+ 				purpose: "update",
+ 				at,
++				input: callInput,
+ 				system: resolvedSystem.value,
+ 				prompt,
+ 				schema: updateContract.schema,
+@@ -1119,6 +1121,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
+ 			{
+ 				purpose: "select",
+ 				at: opp.at,
++				input: selectionInput,
+ 				system: resolvedSystem.value,
+ 				prompt,
+ 				schema: selectContract.schema,
+diff --git a/src/contracts/ports.ts b/src/contracts/ports.ts
+index 73daffd..8080df8 100644
+--- a/src/contracts/ports.ts
++++ b/src/contracts/ports.ts
+@@ -1,8 +1,14 @@
+ import { z } from "zod";
+ 
++/** Serialize with the package's schema implementation; hosts may use a different Zod release. */
++export const llmOutputJsonSchema = <T>(schema: z.ZodType<T>) =>
++	z.toJSONSchema(schema);
++
+ export type LlmPurpose = "update" | "select" | "respond";
+ 
+ export interface LlmRequest<T> {
++	/** Exact dependencies captured for this call. Host validation only; never add to model messages. */
++	readonly input?: import("./memory.ts").InputContext;
+ 	readonly purpose: LlmPurpose;
+ 	readonly system: string;
+ 	readonly prompt: string;
+diff --git a/src/contracts/runtime.ts b/src/contracts/runtime.ts
+index 36e0a85..3863e03 100644
+--- a/src/contracts/runtime.ts
++++ b/src/contracts/runtime.ts
+@@ -182,7 +182,7 @@ export interface StandingInterest {
+ export const RECENT_OBSERVATION_WINDOW = 30;
+ 
+ /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
+-export const HOST_RULES_VERSION = "host-rules-25";
++export const HOST_RULES_VERSION = "host-rules-26";
+ 
+ /** One background model call (or a host decision not to make one). */
+ export interface CallOutcome {

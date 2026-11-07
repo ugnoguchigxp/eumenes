@@ -261,6 +261,41 @@ function finishedViews(deps: Pick<DialogueDeps, "clock" | "toolchains">) {
 	};
 }
 
+/** The request and producing run behind a host TODO, captured in the same writer snapshot. */
+function workInput(
+	deps: Pick<DialogueDeps, "memory">,
+	db: Database,
+	row: WorkRow,
+) {
+	const own = deps.memory?.referenceInputs.captureInTransaction(db, {
+		messageIds: row.messageIds,
+	});
+	const run = deps.memory?.referenceInputs.readRunInTransaction(db, row.runId);
+	return {
+		sources: [
+			...(own?.sources ?? row.messageIds),
+			...(run?.sources ?? []),
+			`host-work:${JSON.stringify([row.id, row.revision])}`,
+		],
+		complete: !!own?.complete && !!run?.complete,
+	};
+}
+
+/** Host-facing TODO data and its complete input footprint belong to this ledger. */
+function hostTodo(
+	deps: Pick<DialogueDeps, "memory" | "toolchains">,
+	db: Database,
+	row: WorkRow,
+) {
+	const title = toolchainTitleOf(deps.toolchains, db, row);
+	return {
+		...itemsOf(db, [row])[0]!,
+		...(title ? { toolchainTitle: title } : {}),
+		createdAt: row.createdAt,
+		input: workInput(deps, db, row),
+	};
+}
+
 /**
  * The conversation's TODO ledger: a TODO per piece of work handed to a toolchain, its state as the work's owner
  * reports it, each reported question or result as an event of the log, the archive as the work finishes with its
@@ -273,6 +308,7 @@ export function createWorkLedger(
 		| "id"
 		| "continuity"
 		| "toolchains"
+		| "memory"
 		| "resources"
 		| "resourceLedger"
 		| "externalOutput"
@@ -322,14 +358,7 @@ export function createWorkLedger(
 			})),
 		/** The unarchived TODOs as the host's other parts see them: the model's view, the toolchain and the request time. */
 		hostTodosInTransaction: (db: Database, conversationId: string) =>
-			openWork(db, conversationId).map((row) => {
-				const title = toolchainTitleOf(deps.toolchains, db, row);
-				return {
-					...itemsOf(db, [row])[0]!,
-					...(title ? { toolchainTitle: title } : {}),
-					createdAt: row.createdAt,
-				};
-			}),
+			openWork(db, conversationId).map((row) => hostTodo(deps, db, row)),
 		workInTransaction: workById,
 		/** The TODO the model names `t<ref>`. */
 		workByRefInTransaction: workByRef,

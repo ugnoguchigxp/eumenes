@@ -1,3 +1,4 @@
+import { persistMemory } from "./memory";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import type { AgencyRecord } from "../../domains/dialogue";
@@ -48,24 +49,47 @@ export function createCheckpoint(input: {
 				)
 					return false;
 				for (const x of captures)
-					if (!deps.state!.saveInTransaction(db, x.record, input.nowMs()))
+					if (
+						!deps.state!.saveInTransaction(
+							db,
+							persistMemory(deps, db, x.record),
+							input.nowMs(),
+						)
+					)
 						throw new Error("agency_checkpoint_stale");
 				deps.state!.saveFeedInTransaction(db, feed.cursor, feed.activeId);
 				return true;
 			});
 		},
 	};
+	let queued: Conv | undefined;
+	let saving: Promise<void> | undefined;
+	function drain() {
+		if (saving || !queued) return;
+		const task = (async () => {
+			while (queued) {
+				const next = queued;
+				queued = undefined;
+				await api.save(next);
+			}
+		})().catch((error) =>
+			getLogger("agency").warn("agency.checkpoint_failed", {
+				reason: toErrorCode(error, "checkpoint_failed"),
+			}),
+		);
+		saving = task;
+		input.inflight.add(task);
+		void task.finally(() => {
+			saving = undefined;
+			input.inflight.delete(task);
+			drain();
+		});
+	}
 	return {
 		...api,
 		trackSave(c: Conv) {
-			const task = api.save(c).catch((error) =>
-				getLogger("agency").warn("agency.checkpoint_failed", {
-					subjectId: c.id,
-					reason: toErrorCode(error, "checkpoint_failed"),
-				}),
-			);
-			input.inflight.add(task);
-			task.finally(() => input.inflight.delete(task));
+			queued = c;
+			drain();
 		},
 	};
 }

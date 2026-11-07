@@ -16,6 +16,7 @@ const MAX_CONVERSATIONS = 20;
 
 export function createConversationLifecycle(input: {
 	deps: AgencyHostDeps;
+	inflight: Set<Promise<unknown>>;
 	convs: Map<string, Conv>;
 	restored: Map<string, AgencyRecord>;
 	state: { activeId: string | null };
@@ -59,15 +60,32 @@ export function createConversationLifecycle(input: {
 					)
 				: undefined);
 		restored.delete(id);
+		const legacy =
+			!!previous && !(previous.snapshot as AgencySnapshot).provenance;
+		if (legacy && deps.state) {
+			// Old checkpoints cannot certify the inputs of their derived state.
+			const quarantine = store
+				.write((db) => deps.state!.revokeInTransaction(db, id))
+				.catch((error) =>
+					log.warn("agency.restore_quarantined", {
+						reason: error instanceof Error ? error.name : "restore_failed",
+					}),
+				);
+			input.inflight.add(quarantine);
+			void quarantine.finally(() => input.inflight.delete(quarantine));
+		}
 		const c = {
 			epoch:
-				previous?.epoch ??
+				(legacy ? previous!.epoch + 1 : previous?.epoch) ??
 				(deps.state
 					? store.read((db) => deps.state!.epochInTransaction(db, id))
 					: 0),
 			id,
-			scope: previous?.scope ?? newScope(),
-			planner: newPlanner(id, previous?.idle as IdleCheckpoint | undefined),
+			scope: legacy ? newScope() : (previous?.scope ?? newScope()),
+			planner: newPlanner(
+				id,
+				legacy ? undefined : (previous?.idle as IdleCheckpoint | undefined),
+			),
 			generation: 1,
 			background: null,
 			opportunities: 0,
@@ -75,7 +93,10 @@ export function createConversationLifecycle(input: {
 			touched: nowMs(),
 			reportable: new Set<string>(),
 		} as unknown as Conv;
-		c.runtime = newRuntime(c, previous?.snapshot as AgencySnapshot | undefined);
+		c.runtime = newRuntime(
+			c,
+			legacy ? undefined : (previous?.snapshot as AgencySnapshot | undefined),
+		);
 		if (previous && previous.settingsDigest !== digest())
 			c.runtime.invalidate("settings.changed", nowMs());
 		c.scheduler = newScheduler(c);
@@ -124,27 +145,6 @@ export function createConversationLifecycle(input: {
 		convs.delete(c.id);
 	}
 
-	/** Starts a conversation over in place: new runtime, planner and scheduler. */
-	function resetConv(c: Conv, reason: string) {
-		if (deps.state)
-			c.epoch = store.read((db) => deps.state!.epochInTransaction(db, c.id));
-		c.generation++;
-		abortBackground(c);
-		c.runtime.invalidate(reason, nowMs());
-		c.runtime.setEnabled(false);
-		c.scheduler.dispose();
-		c.scope = newScope();
-		c.planner = newPlanner(c.id);
-		c.runtime = newRuntime(c);
-		c.scheduler = newScheduler(c);
-		c.scheduler.rearm();
-		log.info("agency.invalidated", {
-			subjectId: c.id,
-			reason,
-			generation: c.generation,
-		});
-	}
-
 	/** Drops every conversation (settings change, OFF, close). */
 	function resetAll(reason: string) {
 		for (const c of convs.values()) dropConv(c, reason);
@@ -174,7 +174,6 @@ export function createConversationLifecycle(input: {
 		invalidate,
 		activate,
 		dropConv,
-		resetConv,
 		resetAll,
 		prune,
 	};

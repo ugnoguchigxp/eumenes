@@ -15,6 +15,13 @@ export function registerInference(
 	models?: ConnectionModelsService,
 ) {
 	registerScreenPresence(app, service);
+	app.get("/api/inference/image-input", async (c) =>
+		c.json(
+			await service.imageInput(
+				AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(30_000)]),
+			),
+		),
+	);
 	if (models)
 		app.get("/api/inference/connections/:id/models", async (c) => {
 			const query = parseQuery(c, modelsQuery, { code: "invalid_request" });

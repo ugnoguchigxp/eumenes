@@ -6,6 +6,10 @@ Memory registration, forget/restore lifecycle, the names-only context hint, `wor
 
 ## Assembly (`api/application/world/world.ts`)
 
+Owner maintenance can remove selected claims and collected documents from ordinary use without deleting or retracting their contents. `GET /api/world/maintenance` includes stored usable material and its `active` flag. `POST /api/world/maintenance/preview` and `/apply` take `{ active, refs: [{ kind, id, revision }] }`, where kind is `claim` or `document` and revision is a string. Scope comes only from the authenticated host. All refs must match, or the whole transaction is refused. Restore uses the same operation with `active: true`; unavailable sources and withdrawn documents cannot be restored by it.
+
+`world/0013-working-set` stores only the selected IDs and revisions. Ordinary claim snapshots, document lists/search/reads and report adoption exclude them. Owner inventory uses a separate host read, with the same authorization and source checks. A curation result prepared before this selection changed is stale. No model-facing archive tool or automatic classifier is added. This is separate from forgetting, and retains original bytes and origin. See [the approved cleanup scope](../../../spec/memory-world-default-set-proposal-2026-11-07.md).
+
 `server.ts` builds World through `assembleServerWorld` (`api/application/server-world.ts`)
 and `createWorldAssembly`. The mode is decided once at backend startup by
 `resolveWorldMode` from the saved setting `world.enabled` (SQLite settings document,

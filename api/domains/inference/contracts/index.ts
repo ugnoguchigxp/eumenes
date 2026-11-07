@@ -418,6 +418,7 @@ export const connectionModelsSchema = z.object({
 		z.object({
 			id: z.string(),
 			displayName: z.string(),
+			inputModalities: z.array(z.enum(["text", "image"])).optional(),
 			purpose: z.enum(["asr", "tts"]).optional(),
 			speech: z
 				.object({
@@ -453,3 +454,5 @@ export const errorStatus = {
 	screen_presence_expired: 409,
 } as const satisfies Record<string, HttpErrorStatus>;
 export * from "./screen-presence";
+
+export * from "./image-input";

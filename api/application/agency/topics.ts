@@ -1,4 +1,4 @@
-import type { HostTopic } from "eumenes-agency";
+import type { HostTopic, InputContext } from "eumenes-agency";
 import type { MemoryItemDto } from "../../domains/memory";
 
 /** Topic seeds per opportunity (the agency prompt stays short). */
@@ -16,6 +16,7 @@ type TopicSource = Pick<
 	| "status"
 	| "validFromMs"
 	| "validUntilMs"
+	| "revision"
 >;
 
 const oneLine = (text: string) => {
@@ -33,6 +34,7 @@ const oneLine = (text: string) => {
 export function selectMemoryTopics(
 	items: readonly TopicSource[],
 	nowMs: number,
+	inputFor?: (item: TopicSource) => InputContext,
 ): HostTopic[] {
 	const rank = (kind: string) => {
 		const index = (TOPIC_KINDS as readonly string[]).indexOf(kind);
@@ -60,7 +62,11 @@ export function selectMemoryTopics(
 		const text = oneLine(item.text);
 		if (seen.has(text)) continue;
 		seen.add(text);
-		topics.push({ id: item.id, text });
+		topics.push({
+			id: item.id,
+			text,
+			...(inputFor ? { input: inputFor(item) } : {}),
+		});
 		if (topics.length >= MAX_TOPICS) break;
 	}
 	return topics;

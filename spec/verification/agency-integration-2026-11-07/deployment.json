@@ -1,0 +1,83 @@
+{
+	"completedAt": "2026-11-06T22:39:56.520007+00:00",
+	"status": "deployed_live_conversation_acceptance_pending",
+	"authorization": "稼働反映はやってください。実会話確認は私がします",
+	"api": {
+		"url": "http://127.0.0.1:8787",
+		"pid": 67290,
+		"parentPid": 67289,
+		"command": "bun run start",
+		"health": {
+			"apiStatus": 200,
+			"service": "eumenes",
+			"memoryHttpStatus": 200,
+			"memoryHealthy": true,
+			"memoryEnabled": true
+		}
+	},
+	"web": {
+		"url": "http://127.0.0.1:5173",
+		"pid": 67435,
+		"command": "Node Vite with the existing dev proxy credential allowlist",
+		"health": [
+			{
+				"name": "web",
+				"httpStatus": 200,
+				"contentType": "text/html",
+				"durationMs": 20
+			},
+			{
+				"name": "proxy",
+				"httpStatus": 200,
+				"contentType": "application/json",
+				"durationMs": 20,
+				"service": "eumenes"
+			},
+			{
+				"name": "memory",
+				"httpStatus": 200,
+				"contentType": "application/json",
+				"durationMs": 20,
+				"healthy": true,
+				"enabled": true
+			}
+		]
+	},
+	"backup": {
+		"path": "/Users/y.noguchi/Code/eumenes/data/eumenes.sqlite3.manual-20261106223139002.bak",
+		"integrityCheck": "ok via official offline backup",
+		"mode": "0600"
+	},
+	"migration": {
+		"appliedOldSql": "live-voice/0003-output-origins",
+		"oldChecksum": "matched by normal openStore validation before backup",
+		"newMigration": "live-voice/0004-session-inputs",
+		"note": "Restored the already-applied migration SQL and moved session input_json to a new migration. Migration checksum verification was never bypassed."
+	},
+	"agency": {
+		"version": "0.1.5",
+		"artifact": "eumenes-agency-0.1.5-03cde67996b0-fe73a06453bf.tgz",
+		"sha256": "fe73a06453bf824c18ec6d32789784ed364991f8304165883d99777391cd8e81"
+	},
+	"verification": {
+		"liveVoiceAndHostTests": {
+			"passed": 33,
+			"failed": 0
+		},
+		"typecheck": "pass",
+		"conversationSent": false,
+		"paidProviderTestCalls": 0,
+		"ci": false
+	},
+	"startupNotes": [
+		"The combined dev manager hit its 30-second startup deadline after recovery completed; the API was then started separately as before, with Web started separately.",
+		"Unauthenticated proxy requests without browser same-origin headers were rejected as designed; browser-origin proxy status and memory status both returned 200.",
+		"Startup logged browser.interact.operator@1 revision_conflict/bundle_skipped; that unrelated bundle was not modified.",
+		"Runtime logged Agency agency_input_stale guards and embedding_failed. Live conversation behavior was not verified and remains for the user."
+	],
+	"changedSourceHashes": {
+		"api/domains/live-voice/repository/index.ts": "f8c6f761435520e686ce1c1ac58f5a5e9ec35caf11a2c8228d69d3a494e7a642",
+		"api/domains/live-voice/test/migration.test.ts": "a52450fcbc438322507bbd9811fafac66157a9256c7d24a53ecffc0a7972e052"
+	},
+	"previousLocalVerification": "validation.json"
+}

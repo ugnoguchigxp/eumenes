@@ -1,12 +1,17 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { queryRoots } from "../queryKeys";
-import { useEffect, useRef, useState } from "react";
+import { useSettings } from "../domains/settings";
+import type { ImageInputStatus } from "../../../api/domains/inference/contracts";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import {
 	attachmentLimits,
 	type Attachment,
 } from "../../../api/domains/conversation/contracts";
 import { describeError } from "../errorMessages";
+
+const acceptsImages = (status: ImageInputStatus | undefined) =>
+	status?.primary.status === "supported" ||
+	(status?.primary.status === "failed" &&
+		status.fallback?.status === "supported");
 
 export type DraftImage = {
 	id: string;
@@ -18,7 +23,9 @@ export function useChatAttachments(
 	client: EumenesClient,
 	conversationId: string,
 ) {
-	const cache = useQueryClient();
+	const settingsRevision = useSettings(client).data?.revision;
+	const [capability, setCapability] = useState<ImageInputStatus>();
+	const check = useRef<AbortController | null>(null);
 	const [checking, setChecking] = useState(false);
 	const [items, setItems] = useState<DraftImage[]>([]);
 	const current = useRef(items);
@@ -27,24 +34,44 @@ export function useChatAttachments(
 	const urls = useRef(new Set<string>());
 	useEffect(
 		() => () => {
+			check.current?.abort();
 			for (const url of urls.current) URL.revokeObjectURL(url);
 		},
 		[],
 	);
-	function checkConnection() {
+	const checkConnection = useCallback(() => {
+		check.current?.abort();
+		const controller = new AbortController();
+		check.current = controller;
 		setChecking(true);
+		setCapability(undefined);
+		setError(undefined);
 		void client
-			.connectLarm()
+			.imageInput(controller.signal)
 			.then((status) => {
-				cache.setQueryData([queryRoots.larm, client.identity], status);
-				if (!status.larm.chatInput)
+				if (controller.signal.aborted) return;
+				setCapability(status);
+				if (!acceptsImages(status))
 					setError(
-						"この接続先の画像入力を確認できません。接続を再確認してください。",
+						"選択中の接続先の画像入力を確認できません。接続先を確認してください。",
 					);
 			})
-			.catch((e) => setError(describeError(e)))
-			.finally(() => setChecking(false));
-	}
+			.catch((e) => {
+				if (!controller.signal.aborted) setError(describeError(e));
+			})
+			.finally(() => {
+				if (!controller.signal.aborted) setChecking(false);
+			});
+	}, [client]);
+
+	useEffect(() => {
+		if (current.current.length) checkConnection();
+		// Each revision selects a new route. Old requests are aborted by checkConnection.
+		return () => {
+			check.current?.abort();
+		};
+	}, [checkConnection, settingsRevision]);
+
 	function add(files: File[]) {
 		setError(undefined);
 		if (current.current.length + files.length > attachmentLimits.maxImages) {
@@ -108,6 +135,12 @@ export function useChatAttachments(
 		setBusy(true);
 		setError(undefined);
 		try {
+			if (snapshot.length && !acceptsImages(capability))
+				throw new Error(
+					capability?.primary.status === "unsupported"
+						? "image_not_supported"
+						: "image_capability_unknown",
+				);
 			const ids: string[] = [];
 			for (const item of snapshot) {
 				const saved =
@@ -129,6 +162,7 @@ export function useChatAttachments(
 	}
 	return {
 		items,
+		capability,
 		add,
 		addSaved,
 		remove,

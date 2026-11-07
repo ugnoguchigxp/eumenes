@@ -43,12 +43,13 @@ export function splitMessages(
 	const history: Turn[] = [];
 	const turn: Messages = [];
 	for (const message of rest) {
-		if (history.length < wanted && message.role !== "system")
+		if (history.length < wanted && message.role !== "system") {
+			if (message.images?.length) throw new Error("image_history_unsupported");
 			history.push({
 				role: message.role as Turn["role"],
 				content: message.content,
 			});
-		else turn.push(message);
+		} else turn.push(message);
 	}
 	if (history.length < wanted) throw invalid();
 	return {

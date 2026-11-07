@@ -1,3 +1,4 @@
+import { capturePrepare, captureSave } from "./interact.fixture";
 import { afterEach, expect, test } from "bun:test";
 import { getRun, listOperations } from "eumenes-interact/sqlite";
 import { createBrowserResourceAdapter } from "..";
@@ -143,7 +144,7 @@ test("parent-linked answers/forget must use the parent's lifecycle", async () =>
 });
 test("capture requires explicit approval; resource ownership, WebP and forget propagate", async () => {
 	const f = await fixture({
-		responses: [part("page.capture", { range: "viewport", item: null }), done],
+		responses: [capturePrepare, captureSave, done],
 	});
 	const v = await f.start();
 	const q = await f.wait(v.runId, "needs_input");
@@ -282,7 +283,7 @@ test("restart sweeps transient-context runs to failure and never resumes operati
 
 test("a changed capture target asks again before any bytes are saved", async () => {
 	const f = await fixture({
-		responses: [part("page.capture", { range: "viewport", item: null }), done],
+		responses: [capturePrepare, captureSave, capturePrepare, captureSave, done],
 	});
 	const v = await f.start();
 	const first = await f.wait(v.runId, "needs_input");
@@ -295,7 +296,7 @@ test("a changed capture target asks again before any bytes are saved", async () 
 	);
 	expect(f.files.final.size).toBe(0);
 	expect(f.driver.calls).not.toContain("screenshot");
-	expect(f.status(v.runId).calls).toBe(1);
+	expect(f.status(v.runId).calls).toBe(4);
 	await f.answer(v.runId, { approved: true });
 	await f.wait(v.runId, "completed");
 	expect(f.files.final.size).toBe(1);
@@ -342,7 +343,7 @@ test("capture TTL, metadata TTL and orphan cleanup remove their owned records/fi
 	let now = Date.now();
 	const f = await fixture({
 		now: () => now,
-		responses: [part("page.capture", { range: "viewport", item: null }), done],
+		responses: [capturePrepare, captureSave, done],
 	});
 	const v = await f.start();
 	await f.wait(v.runId, "needs_input");
@@ -378,7 +379,7 @@ test("a read redirected to a forbidden destination is withheld from inference", 
 });
 test("a capture that navigates during acquisition is never published", async () => {
 	const f = await fixture({
-		responses: [part("page.capture", { range: "viewport", item: null })],
+		responses: [capturePrepare, captureSave],
 	});
 	const v = await f.start();
 	await f.wait(v.runId, "needs_input");

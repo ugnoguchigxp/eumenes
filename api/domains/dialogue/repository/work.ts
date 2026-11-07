@@ -496,6 +496,7 @@ export function readWorkNotice(db: Database, id: string, at: string): boolean {
 }
 
 export type ConfirmationRow = {
+	messageIds?: readonly string[];
 	id: string;
 	/** The conversation's number of the confirmation (`c<ref>`). */
 	ref: number;
@@ -520,6 +521,9 @@ export type ConfirmationRow = {
 };
 function mapConfirmation(row: Record<string, unknown>): ConfirmationRow {
 	return {
+		messageIds: JSON.parse(
+			(row.message_ids_json as string | null) ?? "[]",
+		) as string[],
 		id: row.id as string,
 		ref: row.ref as number,
 		conversationId: row.conversation_id as string,

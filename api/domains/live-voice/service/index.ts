@@ -9,6 +9,7 @@ import {
 	type LiveEvent,
 } from "../contracts";
 import { active, latest, session, snapshot } from "../repository";
+import { sessionInput } from "../repository/inputs";
 import { liveConfig } from "./config";
 import { publishSegments, purgeMessage } from "./transcripts";
 import { createLiveDelivery } from "./delivery";
@@ -19,6 +20,8 @@ import { createReceiver } from "./receiver";
 import { createStarter } from "./start";
 import { bindOutputs } from "./outputs";
 import { fetchModels } from "./models";
+import { createProposals } from "./proposals";
+import type { LiveOutputOrigin } from "../contracts";
 
 // Bun supports authenticated WebSocket construction; the DOM declaration omits this server-only overload.
 const ServerSocket = WebSocket as unknown as new (
@@ -37,6 +40,7 @@ export function createLiveVoice({
 	connect = defaultConnect,
 	clock = () => new Date().toISOString(),
 	stopLegacy = async () => {},
+	validateProposal,
 }: {
 	store: SqliteStore;
 	settings: SettingsService;
@@ -44,7 +48,13 @@ export function createLiveVoice({
 	connect?: ConnectLive;
 	clock?: () => string;
 	stopLegacy?: () => Promise<void>;
+	validateProposal?: (
+		db: Database,
+		conversationId: string,
+		origin: LiveOutputOrigin,
+	) => boolean;
 }) {
+	const proposals = createProposals(validateProposal);
 	const runtimes = new Map<string, Runtime>();
 	const isActive = (conversationId: string) =>
 		store.read((db) => !!active(db, conversationId));
@@ -86,7 +96,11 @@ export function createLiveVoice({
 			const cfg = liveConfig(settings, false);
 			return (
 				cfg.connection.id === row.connection_id &&
-				cfg.connection.epoch === row.connection_epoch
+				cfg.connection.epoch === row.connection_epoch &&
+				(!conversation.validInput ||
+					store.read((db) =>
+						conversation.validInput!(db, sessionInput(db, id)),
+					))
 			);
 		} catch {
 			return false;
@@ -191,6 +205,7 @@ export function createLiveVoice({
 		send,
 		sendState,
 		delivery,
+		validProposal: proposals.validInTransaction,
 	});
 	const unsubscribe = settings.onChange(() => {
 		for (const id of runtimes.keys())
@@ -288,14 +303,8 @@ export function createLiveVoice({
 				),
 			);
 		},
-		proposeInTransaction(db: Database, conversationId: string, text: string) {
-			const row = active(db, conversationId);
-			if (!row || row.test) return false;
-			db.query(
-				"INSERT INTO live_voice_outputs(session_id,text,kind) VALUES(?,?,'commentary')",
-			).run(row.id, text);
-			return true;
-		},
+		proposeInTransaction: proposals.proposeInTransaction,
+		purgeSourcesInTransaction: proposals.purgeSourcesInTransaction,
 	};
 }
 export type LiveVoiceService = ReturnType<typeof createLiveVoice>;

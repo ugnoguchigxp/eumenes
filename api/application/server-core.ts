@@ -10,7 +10,11 @@ import {
 } from "../domains/attitude-dataset";
 import { createConversationService } from "../domains/conversation";
 import { createSettings } from "../domains/settings";
-import { createInference, createCloudAgents } from "../domains/inference";
+import {
+	createInference,
+	createCloudAgents,
+	createConnectionModels,
+} from "../domains/inference";
 import { localHarness } from "../domains/dialogue";
 import { createQueue } from "../domains/queue";
 import { createActivityRecorder } from "../domains/larm";
@@ -61,7 +65,12 @@ export async function buildCore(
 		judge: createActivityRecorder(),
 		embedding: createActivityRecorder(),
 	};
+	const connectionModels = createConnectionModels(settings, config.env, {
+		store,
+		codexExecutable: config.researchCodexExecutable,
+	});
 	const inference = createInference(store, settings, {
+		connectionModels,
 		cloudAgents: createCloudAgents(config.env, {
 			codexExecutable: config.researchCodexExecutable,
 		}),
@@ -97,6 +106,7 @@ export async function buildCore(
 		datasetStore,
 		attitudeDataset,
 		inference,
+		connectionModels,
 		unsubscribeStatus,
 		serviceTests,
 		queue,

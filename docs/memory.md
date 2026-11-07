@@ -20,6 +20,17 @@
 
 ## パッケージの利用とSeedの導入
 
+### 本人用の一括整理
+
+本人が対象を選んで日常利用から外す場合に限り、認証済み管理APIを使える。通常の記憶変更は従来どおり会話から行う。設定画面やLLMのツールには管理操作を追加していない。
+
+- `GET /api/memory/maintenance?conversationId=main` は停止中を含む本人のState・傾向と、指定会話の短期メモを返す。
+- `POST /api/memory/maintenance/preview` と `/apply` は `{ conversationId, active, refs: [{ kind, id, revision }] }`。kindは`state`・`note`・`tendency`、revisionは正の整数。active=falseで利用を停止し、trueで復帰する。
+- 全参照の存在・版を検査し、1件でも不一致なら全件を適用しない。本文・出典・originを書き換えず、完全忘却された内容を復活させない。復帰でも引用元、既存の件数・文脈上限を確認する。過去版や紛争中のStateはこの操作で採用し直さない。
+- 変更は既存の単一writer内で行い、会話の公開窓を破棄する。古い背景推論を採用しないため、既存の記憶失効連番も進める。この連番の移動自体は忘却や原会話の削除ではない。
+
+適用前にpreviewで対象を照合する。停止・復帰後は返された新しいrevisionを使う。全件指定や語句による自動選択はなく、復帰は本人が明示した対象だけに行う。[整理方針](../spec/memory-world-default-set-proposal-2026-11-07.md)を参照。
+
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
 配布物は `vendor/eumenes-memory/eumenes-memory-0.0.4-9c0e85aa2fa3.tgz` に固定する。元は独立リポジトリの commit `5504945f838935fbff6401c962bdecb1d3b49956` に未コミットの変更を加えた作業ツリーで、`manifest.json` の `sourceHash` で特定する。パッケージ版は0.0.4（0.0.3 で Lifecycle 契約版 2: 同じ scope の複数 target、`hostIntent`、journal format 2、`inTransaction` 必須。0.0.4 で復元後の ID 衝突の回避、本人確認の根拠の保存、memory record の出典の `representation` 必須、忘却した他人の subject の消去）で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。`manifest.json`と配布内の`dist/release-manifest.json`で、元commit・ソースhash・配布内容のhashを照合する。旧tgzと依存参照は削除済み。SQLite契約は8で、既存SQL8本も同一であり、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。

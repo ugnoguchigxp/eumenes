@@ -1,0 +1,91 @@
+{
+  "lane": "live-production-web",
+  "verifiedAt": "2026-11-06T22:54:16.227Z",
+  "authorization": "production restart, image submission, real-model recognition",
+  "runtime": {
+    "apiStatus": 200,
+    "webStatus": 200,
+    "service": "eumenes",
+    "serversLeftRunning": true
+  },
+  "settings": {
+    "revision": 170,
+    "mode": "cloud-only",
+    "model": "gpt-6-luna",
+    "changed": false
+  },
+  "capability": {
+    "revision": 170,
+    "primary": {
+      "source": "codex-sdk",
+      "status": "supported"
+    }
+  },
+  "conversationId": "main",
+  "runId": "313780cb-414b-4393-a4e1-8f19ba5b0199",
+  "requestId": "b93d4a44-941c-49b2-8c20-00c7baf79609",
+  "jobId": "4e4b4d76-269c-4dc8-8010-e4624c9ff917",
+  "status": "completed",
+  "createdAt": "2026-11-06T22:50:05.647Z",
+  "updatedAt": "2026-11-06T22:50:19.228Z",
+  "input": {
+    "messageId": "109269ed-2b5a-43cb-aa12-77b6e6bb36e3",
+    "text": "画像入力の動作確認です。添付画像だけを見て、各色の図形の種類・個数・位置と、画像に書かれた英数字をそのまま教えてください。外部検索や画像生成はせず、この画像の内容を日本語で答えてください。",
+    "file": "live-input.png",
+    "fileBytes": 13005,
+    "sha256": "3fdf08656effca3c6b9771ed466b71f6f50d3d856832b21ef99afa75edf9a104",
+    "attachments": [
+      {
+        "id": "8ad6d66e-c6b4-41fb-a2ed-95acc2e5e400",
+        "mime": "image/png",
+        "width": 960,
+        "height": 640,
+        "size": 11233,
+        "hasAnnotation": false
+      }
+    ]
+  },
+  "answer": {
+    "messageId": "6dbeca89-1722-4d13-80e3-87b774bc059d",
+    "text": "赤い円が3個あり、上段の左・中央・右にあります。青い正方形が2個あり、下段の左・中央にあります。緑の三角形が1個あり、下段の右にあります。画像の英数字は「R7K4」です。"
+  },
+  "inference": {
+    "id": "e1a28ba2-ec2a-4552-a6aa-a2924a4b026a",
+    "requestId": "4bddfb72-035b-4866-b992-01bc4b29b625",
+    "model": "gpt-6-luna",
+    "source": "cloud",
+    "status": "succeeded",
+    "accepted": 1,
+    "billingPath": "codex",
+    "inputTokens": 11474,
+    "outputTokens": 166,
+    "started": 1794005409988,
+    "ended": 1794005419212
+  },
+  "recognitionChecks": {
+    "redCirclesThreeTopRow": true,
+    "blueSquaresTwoLowerLeftAndCenter": true,
+    "greenTriangleOneLowerRight": true,
+    "imageTextR7K4": true,
+    "answerNotProvidedInPromptOrFileName": true,
+    "assessment": "visually compared input PNG with the adopted model answer"
+  },
+  "web": {
+    "reloaded": true,
+    "attachmentCount": 1,
+    "image": {
+      "width": 960,
+      "height": 640,
+      "complete": true
+    },
+    "answerVisible": true,
+    "pageErrors": [],
+    "muted": true
+  },
+  "startup": {
+    "initialFailure": "old database owner still closing after listening port closed",
+    "secondAttempt": "combined dev readiness check timed out",
+    "finalMode": "documented individual API and Web startup; health and recognition succeeded",
+    "codeChangesForStartup": false
+  }
+}

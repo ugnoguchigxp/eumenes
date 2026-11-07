@@ -1,3 +1,7 @@
+import {
+	capturePrepare,
+	captureSave,
+} from "../../domains/browser/test/interact.fixture";
 import { expect, test } from "bun:test";
 import { partCallJsonSchema } from "eumenes-interact";
 import { interactFixture } from "../../domains/browser/test/interact.fixture";
@@ -264,13 +268,9 @@ test("the existing child contract resumes the same run and preserves partial sta
 import { until } from "../../domains/browser/test/fakes";
 
 test("capture resource navigation resolves the exact image and enforces conversation scope", async () => {
-	const capture = JSON.stringify({
-		part: "page.capture",
-		args: { range: "viewport", item: null },
-	});
 	const f = await interactFixture({
 		owner: OWNER,
-		responses: [capture, capture, done],
+		responses: [capturePrepare, captureSave, capturePrepare, captureSave, done],
 	});
 	try {
 		const v = await f.start();

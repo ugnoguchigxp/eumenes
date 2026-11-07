@@ -1,4 +1,4 @@
-import type { ChatContentPart } from "../contracts/chat-input";
+import { imageMessageParts } from "../../../infrastructure/chat-image-parts";
 import type { LarmPort, LarmCallOptions } from "../contracts";
 import { nativeToolOptions } from "../../../infrastructure/chat-stream";
 import { operationSchema } from "./operation-schema";
@@ -31,28 +31,7 @@ export function chatRequest(
 		...(options?.promptCacheKey
 			? { prompt_cache_key: options.promptCacheKey }
 			: {}),
-		messages: messages.map(
-			({ images, role, content: text, tool_calls, tool_call_id }) => {
-				const m = {
-					role,
-					content: text,
-					...(tool_calls ? { tool_calls } : {}),
-					...(tool_call_id ? { tool_call_id } : {}),
-				};
-				if (!images?.length) return m;
-				const content: ChatContentPart[] = m.content
-					? [{ type: "text", text: m.content }]
-					: [];
-				for (const image of images)
-					content.push({
-						type: "image_url",
-						image_url: {
-							url: `data:${image.mime};base64,${Buffer.from(image.bytes).toString("base64")}`,
-						},
-					});
-				return { ...m, content };
-			},
-		),
+		messages: messages.map(imageMessageParts),
 		...(options?.jsonOutput
 			? {
 					temperature: 0,

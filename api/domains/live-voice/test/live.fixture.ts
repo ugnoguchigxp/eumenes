@@ -11,7 +11,12 @@ import {
 	migrations as conversationMigrations,
 } from "../../conversation";
 import { createLiveVoice, migrations } from "..";
-import type { LiveSocket } from "../contracts";
+import type {
+	LiveSocket,
+	LiveConversationPort,
+	LiveOutputOrigin,
+} from "../contracts";
+import type { Database } from "bun:sqlite";
 
 export class Peer extends EventTarget {
 	readyState = 0;
@@ -41,7 +46,17 @@ export async function until(check: () => boolean) {
 		await Bun.sleep(2);
 	}
 }
-export async function setup() {
+export async function setup(
+	options: {
+		history?: LiveConversationPort["history"];
+		validInput?: LiveConversationPort["validInput"];
+		validateProposal?: (
+			db: Database,
+			conversationId: string,
+			origin: LiveOutputOrigin,
+		) => boolean;
+	} = {},
+) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-live-"));
 	const dbPath = join(dir, "test.db");
 	const store = openStore(dbPath, [
@@ -86,6 +101,7 @@ export async function setup() {
 	const service = createLiveVoice({
 		store,
 		settings,
+		validateProposal: options.validateProposal,
 		connect: () => peer as unknown as LiveSocket,
 		stopLegacy: async () => {
 			stopped++;
@@ -93,8 +109,9 @@ export async function setup() {
 		conversation: {
 			persona: () => ({ role: "会話の役割", style: "会話の口調" }),
 			ensure: () => {},
-			history: () => [],
-			publish: (tx, input) =>
+			history: options.history ?? (() => []),
+			validInput: options.validInput,
+			publish: (tx, input) => {
 				conversation.appendInTransaction(tx, {
 					id: input.id,
 					conversationId: input.conversationId,
@@ -102,7 +119,11 @@ export async function setup() {
 					text: input.text,
 					createdAt: input.at,
 					runId: null,
-				}),
+				});
+				return input.role === "user"
+					? { sources: [input.id], complete: true }
+					: input.input;
+			},
 			delegate(tx, input) {
 				const id = crypto.randomUUID();
 				delegates.push({ ...input, id });

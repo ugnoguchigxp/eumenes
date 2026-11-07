@@ -1,11 +1,14 @@
 import {
 	createAgencyRuntime,
 	defaultBudget,
+	RECENT_OBSERVATION_WINDOW,
 	type LlmPort,
 	type HostTodo,
 	type HostTopic,
 	type AgencyRestore,
 	type ToolCapability,
+	type InputContext,
+	type ObservationArchive,
 } from "eumenes-agency";
 import type { Settings } from "../../domains/settings";
 import { agencyBackgroundSystem } from "./system-context";
@@ -20,34 +23,45 @@ export function createHostRuntime(input: {
 	todos(): readonly HostTodo[];
 	restore?: AgencyRestore;
 	tools?: readonly ToolCapability[];
+	input?: () => InputContext;
+	archive?: ObservationArchive;
 }) {
 	const { agency, persona } = input;
 	return createAgencyRuntime({
 		condition: "F",
+		conversationParticipation: true,
 		now: input.now,
 		planOnOpportunity: true,
 		repairUpdates: true,
 		constrainToolNames: true,
 		findings: true,
+		archive: input.archive,
 		...(input.restore ? { restore: input.restore } : {}),
 		interestFormation: true,
 		hostTopics: true,
 		hostTodos: true,
 		...(agency.emotion ? { utteranceEmotion: true } : {}),
 		systemContext: {
-			update: (data) =>
-				agencyBackgroundSystem("update", data, persona, agency.emotion),
-			select: (data) =>
-				agencyBackgroundSystem("select", data, persona, agency.emotion),
+			update: (data) => ({
+				value: agencyBackgroundSystem("update", data, persona, agency.emotion),
+				input: input.input?.() ?? { sources: [], complete: false },
+			}),
+			select: (data) => ({
+				value: agencyBackgroundSystem("select", data, persona, agency.emotion),
+				input: input.input?.() ?? { sources: [], complete: false },
+			}),
 		},
 		standingInterests: agency.interests.map((text, index) => ({
 			id: `persona-${index + 1}`,
 			text,
+			input: { sources: [], complete: true },
 		})),
 		todos: input.todos,
 		topics: input.topics,
 		budget: {
 			...defaultBudget,
+			// Consume a burst in one bounded update instead of spending the call window catching up.
+			batchSize: RECENT_OBSERVATION_WINDOW,
 			updateMaxOutputTokens: 2400,
 			selectMaxOutputTokens: 1000,
 		},

@@ -18,8 +18,10 @@ const bundlePath = new URL(
 );
 const bundle = JSON.parse(readFileSync(bundlePath, "utf8"));
 const operator = bundle.definitions.find(
-	(d: { kind: string; id: string }) =>
-		d.kind === "skill" && d.id === "browser.interact.operator",
+	(d: { kind: string; id: string; revision: number }) =>
+		d.kind === "skill" &&
+		d.id === "browser.interact.operator" &&
+		d.revision === 2,
 );
 if (!operator) throw new Error("interact_operator_skill_missing");
 if (process.argv.includes("--check")) {

@@ -1,0 +1,195 @@
+{
+  "configuration": {
+    "datasetHash": "98ed3faa07f23f065737146f1fa1315ce264fa43fa1f634da07412f36df87747",
+    "entry": "routeStructured",
+    "structurePrompt": "turn-structure-v7",
+    "structureTimeoutMs": 30000,
+    "reasoningEffort": "low",
+    "structuredOutput": true,
+    "settingsHash": "71d7a841a1733b9044e84e98b9bfdfc7f20de1fcdd11f4ae62a3ffb0b1278ba2",
+    "source": "adopted-package",
+    "variants": [
+      "B"
+    ],
+    "callsPerCaseAndVariant": 1,
+    "dispatch": false
+  },
+  "rows": [
+    {
+      "id": "cancel-one",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 4814,
+      "to": "run",
+      "row": 6,
+      "candidate": "t2.cancel",
+      "structure": {
+        "kind": "control",
+        "ref": "t2.cancel",
+        "text": "その作業はもう不要なので取り消してください。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "cancel-specific-two",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5851,
+      "to": "run",
+      "row": 6,
+      "candidate": "t3.cancel",
+      "structure": {
+        "kind": "control",
+        "ref": "t3.cancel",
+        "text": "運動のタイマーを作る作業は中止してください。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "cancel-ambiguous",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 4961,
+      "to": "run",
+      "row": 6,
+      "candidate": "t2.cancel",
+      "structure": {
+        "kind": "control",
+        "ref": "t2.cancel",
+        "text": "その作業は取り消してください。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "cancel-mixed",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 8742,
+      "to": "clarify",
+      "row": 8,
+      "candidate": null,
+      "structure": {
+        "kind": "clarify",
+        "question": "12秒のタイマーを新しく作る指示は、保留中のタイマー設定への回答と、既存のタイマー作業の取消のどちらとして扱いますか？",
+        "unhandled": [
+          "その作業を取り消して、12秒のタイマーを新しく作ってください。"
+        ],
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "cancel-discussion",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 7291,
+      "to": "run",
+      "row": 5,
+      "candidate": "t2.answer",
+      "structure": {
+        "kind": "answer",
+        "ref": "t2.answer",
+        "text": "作業を取り消すと何が起きるのか説明してください。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "cancel-stale",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 5060,
+      "to": "conversation",
+      "row": 1,
+      "candidate": null,
+      "structure": {
+        "kind": "conversation",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "answer-with-control",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 4677,
+      "to": "run",
+      "row": 5,
+      "candidate": "t2.answer",
+      "structure": {
+        "kind": "answer",
+        "ref": "t2.answer",
+        "text": "15秒です。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "topic-with-control",
+      "split": "dev",
+      "variant": "B",
+      "elapsedMs": 6520,
+      "to": "run",
+      "row": 2,
+      "candidate": "weather.forecast",
+      "structure": {
+        "kind": "requests",
+        "requests": [
+          {
+            "text": "明日の京都の天気予報を教えてください。",
+            "target": null,
+            "inputs": [],
+            "after": []
+          }
+        ]
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    },
+    {
+      "id": "cancel-other-domain",
+      "split": "holdout",
+      "variant": "B",
+      "elapsedMs": 5001,
+      "to": "run",
+      "row": 6,
+      "candidate": "t4.cancel",
+      "structure": {
+        "kind": "control",
+        "ref": "t4.cancel",
+        "text": "画像変換は続けて、レポートを作る作業だけを取り消してください。",
+        "requests": []
+      },
+      "steps": null,
+      "top": [],
+      "catalogHash": "529c169a531b743191ed9c2bd547fd1b5b29a05e2652b945a6938bff274852e1",
+      "memoryHash": "bb48cb47b7d2150b4c5551fc5b3d27780f57ef8b924e22f752afe29ff93946d4"
+    }
+  ]
+}

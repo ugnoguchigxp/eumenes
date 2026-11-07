@@ -15,11 +15,7 @@ import { toolchainForgetPurge } from "./toolchain/toolchain-forget";
 import { createSearchCheck } from "./toolchain/toolchain-search-check";
 import { taskMediaPorts } from "./toolchain/task-media-execution";
 import { taskLegacyPorts } from "./toolchain/task-legacy-execution";
-import {
-	REFERENCE_WINDOW_TOKENS,
-	planWindow,
-	createConnectionModels,
-} from "../domains/inference";
+import { REFERENCE_WINDOW_TOKENS, planWindow } from "../domains/inference";
 import { NOMINAL_FIXED_TOKENS, createMemoryService } from "../domains/memory";
 import { createOcr } from "../domains/ocr";
 import { createScheduler } from "../domains/scheduler";
@@ -272,7 +268,10 @@ export async function buildServices(
 				}
 			: {}),
 	});
-	memory.registerForgetPurge(agency.forgetInTransaction);
+	memory.registerForgetPurge(
+		agency.forgetInTransaction,
+		agency.planForgetInTransaction,
+	);
 	links.attachDialogue(dialogue);
 	if (enabled && toolchains)
 		configureTaskExecution({
@@ -303,7 +302,14 @@ export async function buildServices(
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
 	memory.registerForgetPurge(toolchainForgetPurge(toolchain));
-	const audioDeps = { ...core, conversation, continuity, dialogue, memory };
+	const audioDeps = {
+		...core,
+		conversation,
+		continuity,
+		dialogue,
+		memory,
+		agency: agency.dialoguePort,
+	};
 	const { voice, liveVoice, prewarm } = liveBridge.attach(audioDeps);
 	const monitoring = createMonitoring({
 		remote: createLarmCollector({
@@ -345,7 +351,7 @@ export async function buildServices(
 		datasetStore: core.datasetStore,
 		attitudeDataset: core.attitudeDataset,
 		inference,
-		connectionModels: createConnectionModels(settings, config.env, { store }),
+		connectionModels: core.connectionModels,
 		serviceTests,
 		docling,
 		excalidraw: media.excalidraw,

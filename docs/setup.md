@@ -20,6 +20,10 @@ backend は `127.0.0.1:8787` のみで待ち受けます。API・Viteともに�
 - 音声が始まらない: ブラウザのマイク許可と、発話検出モデルの読み込みを確認する。読み込めない場合は音声入力を開始しない仕様。
 - 障害の追跡は `bun run logs -- --level warn` から runId・jobId で絞る（[logging.md](logging.md)、[operations.md](operations.md)）。
 
+## vendorの配布物
+
+`vendor/` のパッケージ配布物は、最新の採用版を各パッケージ1個だけ保持します。採用版は `package.json`・`bun.lock`・manifest（またはprovenance）の参照を揃え、更新時に未使用になった旧版・候補の配布物と対応する `.sha256` を削除します。採用版のチェックサム、来歴、ライセンス、必要なパッチは一緒に保持します。
+
 ## DesignSystem
 
 DesignSystem は `packages/design-system` にソースとビルド設定を持つ workspace package です。元の `main` から取り込み、Eumenes 内では `@eumenes/design-system` として管理します。`bun run build:design-system` で再ビルドでき、元の MIT ライセンスを同梱しています。

@@ -1,0 +1,178 @@
+$ bun scripts/test-domain.ts --domain avatar --domain conversation
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/connection.test.ts:
+(pass) assembled host reaches larm with one exact purpose system, including a retry [90.17ms]
+(pass) assembled host reaches cloud with one exact purpose system, including a retry [77.99ms]
+
+api/application/app.test.ts:
+(pass) status polling is passive and explicit reconnect requires auth and origin [441.35ms]
+(pass) auth and origin apply to the new endpoints [436.82ms]
+(pass) register → fire → history → pause/resume → cancel through the API [456.85ms]
+(pass) full queue is reported as 503 for submissions [442.52ms]
+(pass) authenticated SSE notifies a background commit and the existing API supplies the snapshot [432.81ms]
+(pass) replay endpoints split text and synthesize one clause, with auth and limits [428.34ms]
+(pass) sample endpoint validates unsaved voice settings and returns audio [430.62ms]
+(pass) oversized JSON bodies are rejected with 413 and normal requests pass [426.18ms]
+(pass) responses carry anti-framing security headers [432.87ms]
+(pass) requests with both Content-Length and Transfer-Encoding are rejected [426.21ms]
+(pass) error codes map to HTTP statuses through the table [0.11ms]
+(pass) Web research is authenticated, validates malformed JSON, and does not claim an unavailable cache was cleared [426.71ms]
+(pass) modules mount in order behind the shared auth and origin checks [0.36ms]
+(pass) service-test uploads share a budget of two; other service-test routes stay reachable [1.79ms]
+(pass) CORS preflight allows every method the API serves [0.14ms]
+(pass) stream-bounded upload routes skip the 1MiB JSON cap by exact path only [0.16ms]
+(pass) malformed percent-encoding in a path parameter does not return 500 [0.17ms]
+(pass) API responses carry a deny-all Content-Security-Policy [424.18ms]
+
+api/application/browser/browser-composition.test.ts:
+(pass) MCP output and captures live in two managed folders next to the database [0.07ms]
+(pass) a connection builds the driver with the path saved at that moment [22.49ms]
+(pass) closing the assembly stops the child and records nothing [38.60ms]
+(pass) a completion is added to its conversation once, under a stable id [15.20ms]
+(pass) tasks can be started only where the model calls are assembled [59.98ms]
+(pass) the adapter reads only a saved user message of the conversation [15.09ms]
+
+api/application/browser/interact-integration.test.ts:
+(pass) canonical Skill and pinned 162-file distribution match the registered operator [12.66ms]
+(pass) isolated HTTP pilot uses the common action ledger, real browser, explicit capture approval and authenticated WebP deletion [3643.72ms]
+
+api/application/migrations.test.ts:
+(pass) GOLDEN: the legacy order and every deployed SQL string are byte-for-byte unchanged [0.16ms]
+(pass) a database that holds a migration this code does not know refuses to start [453.48ms]
+(pass) a migration with `after` is applied after its dependencies, wherever it sits in the list [15.35ms]
+(pass) migration ordering is stable and rejects cycles, unknown dependencies and duplicate ids [0.11ms]
+(pass) the memory package's migrations keep their order and every one is applied; the first four stay contiguous [0.13ms]
+(pass) host migrations are frozen: the count and the retired slot never move [0.01ms]
+(pass) every migration is named once, and none outside the frozen order exists yet without `after` [0.15ms]
+(pass) a fresh database gets every migration and passes the memory schema check [439.00ms]
+(pass) an applied migration that is rewritten later stops startup with its id only [12.34ms]
+(pass) an existing 0.3.3 host database upgrades without rewriting migration checksums or losing data [445.55ms]
+(pass) World source/goal migrations are appended last and upgrade an already-deployed database [449.47ms]
+(pass) with the full production migrations, retracting a message referenced by a dialogue run tombstones it [434.61ms]
+(pass) World's package migrations stay contiguous, and timers is appended after them [0.13ms]
+(pass) a fresh database gets the World schema; World is OFF and its schema is current [432.65ms]
+(pass) an already-deployed database (data present, no World yet) upgrades and keeps its data [459.10ms]
+(pass) a drifted World schema disables World; an edited World migration stops startup [450.51ms]
+(pass) research/history metadata migrations append after the frozen legacy order and upgrade without copying message bodies [459.62ms]
+
+api/application/timers/timer-announcements.test.ts:
+(pass) a three-minute tool request posts one assistant completion at the deadline and survives recovery [537.51ms]
+(pass) cancelling before the deadline creates neither an assistant completion nor an audible notice [505.09ms]
+(pass) the announcement participates in the caller transaction and replays without a duplicate [498.83ms]
+
+api/application/work/tasks-http.test.ts:
+(pass) task HTTP bodies are rejected while streaming past the bound, before the peer finishes sending [433.28ms]
+(pass) HTTP rejects spoofed origins and arbitrary state, authenticates tasks, and validates query limits [431.13ms]
+(pass) API client and CLI register, read and cancel through authenticated HTTP; unavailable execution stays explicit [1145.76ms]
+
+api/application/world/memory-adapter.test.ts:
+(pass) describe offers the memory queries and the one write (the connection switch), for the UI only [469.26ms]
+(pass) the shipped memory bundle registers against this adapter plus the existing ones with no issue [430.82ms]
+(pass) status shows the connection and the switch needs a healthy memory to turn on [429.45ms]
+(pass) items page, search and sort; memory content cannot be changed by hand [439.39ms]
+(pass) tendencies, short-term notes and the context are read [454.73ms]
+(pass) the steward timeline shows decisions with their proposal, result and window change, and the event log [443.93ms]
+(pass) the memory bundle runs through the action ledger: only the connection switch is offered [441.78ms]
+
+api/application/world/world-acceptance-p3.test.ts:
+(pass) the conversation input carries no World material: no target hint, no claim text, no ids [601.97ms]
+(pass) A34 (host side) the host consumes only the vendored World tgz: package.json points at it [0.41ms]
+(pass) A34-A41 World OFF (protect) + Memory OFF + model stopped: a forget is still processed and completes [468.73ms]
+(pass) A38 Memory unavailable: World content is deleted at once, the forget stays pending (never complete) and finishes when Memory is back [794.60ms]
+
+api/application/world/world-initial-sync.test.ts:
+(pass) a pre-outbox message already forgotten in Memory is never received during initial sync [436.57ms]
+(pass) initial sync receives pre-outbox messages before enabling; restart and resend do not duplicate them [441.49ms]
+(pass) upgrade revokes the old outbox-only completion; interrupted initial sync resumes without duplicating receipts [531.64ms]
+
+api/application/world/world.test.ts:
+(pass) startup mode: setting off and no content assembles nothing [579.47ms]
+(pass) startup mode: setting off but World holds content means protect (forgetting keeps flowing, World stays OFF) [512.59ms]
+(pass) startup mode: setting on runs the initial sync and then turns World ON, with the curation operations [762.68ms]
+(pass) cursor secret: host-owned file (dir 0700, file 0600), created once, stable, never from the database; env overrides; short values fail [5.88ms]
+(pass) cursor secret: keyDir moves the key out of the db dir and keeps the old key's value [7.34ms]
+(pass) journal path sits next to the Memory journal [0.02ms]
+(pass) protect: recovery opens the gate, World stays OFF, and turning it ON runs the initial sync first [443.44ms]
+(pass) protect forces an enabled World OFF at startup; on turns it ON once the initial sync is done [472.67ms]
+(pass) a closed gate (corrupt World journal) skips the passes and keeps World closed; nothing throws [486.31ms]
+(pass) idle passes write nothing: no commit, so no change-stream traffic and no feedback loop [766.25ms]
+(pass) a retraction reaches World by commit notification alone [496.19ms]
+(pass) a changed cursor secret does not wedge the feed: the stored cursor is reset through a restore and the feed is read again [473.78ms]
+
+api/domains/conversation/test/attachments.test.ts:
+(pass) JPG PNG BMP fully decode; normalized pixels, alpha and EXIF match previews [9.64ms]
+(pass) rejects broken and mismatched images and predecode dimensions [2.00ms]
+(pass) attachment owner, conversation, replay identity and restart persistence [19.92ms]
+(pass) a host annotation is kept with the attachment metadata and bounded in size [10.51ms]
+
+api/domains/conversation/test/bounded-read.test.ts:
+(pass) an invalid stored delivery is dropped for that row only [7.32ms]
+(pass) get keeps the newest 200 messages and reports hasMore [8.93ms]
+(pass) turnsBefore returns the preceding messages oldest first [7.42ms]
+
+api/domains/conversation/test/conversation.test.ts:
+(pass) conversation saves and survives reopen; second writer is refused [13.98ms]
+(pass) answer motion can arrive before text, keeps the first choice, and survives upgrade/reopen [20.05ms]
+(pass) answer-wide delivery persists provenance, upgrades fallback, and keeps an adopted none stable [11.15ms]
+(pass) ordinal reads: messages after a cursor, the newest ordinal and the n-th newest user message skip retracted rows [6.90ms]
+(pass) the retract hook runs inside the retraction while the message is still readable, and also for a missing message [7.31ms]
+
+api/domains/conversation/test/history.test.ts:
+(pass) H1/H5/H6/H8: exact search and ordered context exclude drafts, retractions, another conversation and the current request [9.19ms]
+(pass) H2/H3: 240 turns, identical timestamps and sparse rowids paginate without duplicate/lost IDs; 500-row scan returns a cursor even on zero matches [34.07ms]
+(pass) a time range is applied before the scan: an old message behind more than one scan of newer ones is found at once [23.20ms]
+(pass) H2/H3: a large single message is scanned in finite chunks and a boundary-spanning match is not lost; read continues in Unicode positions [20.33ms]
+(pass) H4/H7: correction, append, retraction, TTL and restart invalidate cursors/views before adoption [9.24ms]
+(pass) one owner cannot use the whole search-session capacity; its oldest search is dropped [43.51ms]
+
+api/domains/conversation/test/input-migration.test.ts:
+(pass) the deployed input migration keeps its recorded checksum [0.04ms]
+(pass) a deployed input database upgrades without losing cuts, utterances, state or migration history [23.69ms]
+(pass) 0013 keeps the checksum it ran with, and a database that went through 0014 has the column again [18.36ms]
+(pass) a fresh database stores and reads the cut's memory digest [9.26ms]
+
+api/domains/conversation/test/input.test.ts:
+(pass) utterances are numbered in order, a message's utterance is written once, and only standing ones are read [9.95ms]
+(pass) a forget keeps only that an utterance existed, cuts the next input when it was shown, and moves the revision [8.87ms]
+(pass) retracting a message reaches its utterance and drops the state made from the conversation [10.12ms]
+(pass) a correction rewrites the user's utterance in place, never the announcement sharing its message, and moves the revision [10.16ms]
+(pass) an agent's utterance keeps its turn's tool calls, written once, and a forget takes them out with its text [9.83ms]
+(pass) a state version is appended only on the version it was made from [8.25ms]
+
+api/domains/conversation/test/message-delivery.test.ts:
+(pass) a runless message keeps its host delivery; a message without one has none [8.79ms]
+(pass) without the table a host delivery is refused, never dropped [6.29ms]
+
+api/domains/conversation/test/outbox.test.ts:
+(pass) append records an added event with memory-compatible revision, no text [6.80ms]
+(pass) principal and scope are injectable [6.40ms]
+(pass) message save and outbox event roll back together on a mid-save exception [7.56ms]
+(pass) correction changes the revision, emits corrected, and replay is idempotent [8.20ms]
+(pass) retraction removes the text, emits retracted once, and blocks correction/re-add [8.86ms]
+(pass) seq is increasing with gaps allowed and drafts have no path to the outbox [8.78ms]
+(pass) a database without the outbox migration keeps working unless required [7.41ms]
+(pass) correction scrubs the digest of superseded revisions but keeps seq order and the newest digest [10.09ms]
+(pass) without the retraction column reads and corrections work and retraction fails clearly [8.37ms]
+(pass) outboxHead is the newest seq and 0 before any event [10.74ms]
+
+api/domains/conversation/test/source-backfill.test.ts:
+(pass) source backfill is bounded, atomic, idempotent and uses current live revisions [9.71ms]
+
+ 118 pass
+ 0 fail
+ 1465 expect() calls
+Ran 118 tests across 20 files. [29.30s]
+
+ RUN  v4.1.8 /Users/y.noguchi/Code/eumenes
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  12 passed (12)
+      Tests  82 passed (82)
+   Start at  04:58:30
+   Duration  2.76s (transform 1.64s, setup 207ms, import 4.59s, tests 838ms, environment 8.72s)
+

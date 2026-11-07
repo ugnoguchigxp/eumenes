@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { excludedRefs, workingSetDigest } from "../repository/working-set";
 import type { SourceState } from "eumenes-memory";
 import type { Entity, ProjectionEntry } from "eumenes-world-model";
 import { utf8Length, type CurationCtx } from "./curation-ctx";
@@ -58,6 +59,12 @@ export function verifyWorld(
 	if (ctx.unusable(db)) return "world_unavailable";
 	if (ctx.world.forgetEpoch(db, scope) !== host.forgetEpoch)
 		return "forget_epoch_changed";
+	if (
+		host.workingSetDigest !== undefined
+			? host.workingSetDigest !== workingSetDigest(db, scope)
+			: excludedRefs(db, scope).length > 0
+	)
+		return "working_set_changed";
 	const found = host.events.map((e) => ctx.receivedEvent(db, scope, e.eventId));
 	const rows = found.flatMap((row) => (row === null ? [] : [row]));
 	if (rows.length !== found.length) return "input_changed";

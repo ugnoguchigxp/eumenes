@@ -1,6 +1,8 @@
 import { loadCubismCore } from "./load";
 import type { AvatarMotion } from "../../../../../api/domains/delivery/contracts";
 import { createFace } from "./face";
+import { idleParameters } from "./idle";
+import { defaultAvatarView, type AvatarView } from "../view";
 
 const contexts = new Set<WebGLRenderingContext>();
 const home = "/live2d/hiyori/";
@@ -148,14 +150,14 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 				motion: AvatarMotion,
 				mouthOpen: number,
 				intensity = 1,
+				view: AvatarView = defaultAvatarView,
 			) {
 				if (disposed) return;
 				const dt = Math.min(0.1, Math.max(0, time - last));
 				last = time;
 				model.loadParameters();
-				set("ParamBreath", (1 - Math.cos((time * Math.PI) / 2.5)) * 0.25);
-				set("ParamAngleX", Math.sin(time * 0.7) * 2);
-				set("ParamAngleZ", Math.sin(time * 0.45) * 1.2);
+				for (const [key, value] of Object.entries(idleParameters(time)))
+					set(key, value);
 				physics.evaluate(model, dt);
 				const values = face(time, dt, motion, mouthOpen, intensity);
 				for (const [key, value] of Object.entries(values)) set(key, value);
@@ -166,7 +168,9 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 				gl.clearColor(0, 0, 0, 0);
 				gl.clear(gl.COLOR_BUFFER_BIT);
 				const projection = new sdk.CubismMatrix44();
-				projection.scale(canvas.height / canvas.width, 1);
+				projection.scale((canvas.height / canvas.width) * view.zoom, view.zoom);
+				// Anchor the zoom near the head (10% from the top), cropping below it.
+				projection.translate(view.x * 2, 0.8 * (1 - view.zoom) - view.y * 2);
 				projection.multiplyByMatrix(matrix);
 				renderer.setMvpMatrix(projection);
 				renderer.setRenderState(null, [0, 0, canvas.width, canvas.height]);

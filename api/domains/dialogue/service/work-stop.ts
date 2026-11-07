@@ -16,6 +16,15 @@ export function stopWaitingRunInTransaction(
 	row: WorkRow,
 	except?: string,
 ): string | null {
+	// A command's question outlives the turn that asked it. Close its authority
+	// even when that turn already completed, before considering its running job.
+	if (row.execution === "command")
+		deps.interactions?.endForRunInTransaction(
+			tx,
+			row.runId,
+			"cancel_requested",
+			{ includeWaiting: true },
+		);
 	const waiting = byId(tx, row.runId);
 	if (
 		!waiting ||

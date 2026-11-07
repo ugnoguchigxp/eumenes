@@ -5,6 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 test.setTimeout(60000);
+test.use({ launchOptions: { args: ["--mute-audio"] } });
 const fixture = createFixture();
 let origin: string;
 let webDir: string;
@@ -71,7 +72,7 @@ test("wide and narrow composer keeps upload below the full-width input", async (
 	);
 });
 
-test("full chat paste and drop, picker, thumbnail removal, image-only send, reload and past-image resend", async ({
+test("full chat paste and drop, picker, thumbnail removal, image-only send, reload and explicit past-image reattachment", async ({
 	page,
 }) => {
 	const errors: string[] = [];
@@ -150,18 +151,55 @@ test("full chat paste and drop, picker, thumbnail removal, image-only send, relo
 	const requests = await page.evaluate(async () =>
 		(await fetch("/api/chat-image-fixture/requests")).json(),
 	);
-	const generated = requests.filter(
-		(r: { operation: string }) => r.operation === "generate",
+
+	const talks = requests.filter(
+		(r: {
+			operation: string;
+			body: { messages: Array<{ content: unknown }> };
+		}) =>
+			r.operation === "generate" &&
+			typeof r.body.messages[0]?.content === "string" &&
+			r.body.messages[0].content.startsWith("## Role"),
 	);
-	expect(generated).toHaveLength(2);
-	for (const r of generated)
-		expect(
-			r.body.messages.flatMap((m: { content: unknown }) =>
-				Array.isArray(m.content)
-					? m.content.filter((p: { type: string }) => p.type === "image_url")
-					: [],
+	expect(talks).toHaveLength(2);
+	const imageCount = (r: { body: { messages: Array<{ content: unknown }> } }) =>
+		r.body.messages.flatMap((m) =>
+			Array.isArray(m.content)
+				? m.content.filter((p: { type: string }) => p.type === "image_url")
+				: [],
+		).length;
+	expect(talks.map(imageCount)).toEqual([3, 0]);
+	await page
+		.getByLabel("添付画像を選択")
+		.setInputFiles(
+			await Promise.all(
+				files.map(async (f) => ({
+					name: f.name,
+					mimeType: f.type,
+					buffer: Buffer.from(await f.arrayBuffer()),
+				})),
 			),
-		).toHaveLength(3);
+		);
+	await expect(page.locator(".draft-image")).toHaveCount(3);
+	await input.fill("添付し直した画像を比較して");
+	await page.getByRole("button", { name: "送信", exact: true }).click();
+	await expect(page.locator(".message-assistant")).toHaveCount(3);
+	const resent = await page.evaluate(async () =>
+		(await fetch("/api/chat-image-fixture/requests")).json(),
+	);
+	const lastTalk = resent
+		.filter(
+			(r: {
+				operation: string;
+				body: { messages: Array<{ content: unknown }> };
+			}) =>
+				r.operation === "generate" &&
+				typeof r.body.messages[0]?.content === "string" &&
+				r.body.messages[0].content.startsWith("## Role"),
+		)
+		.at(-1);
+	expect(imageCount(lastTalk)).toBe(3);
+
 	await page.setViewportSize({ width: 390, height: 844 });
 	expect(
 		await page.evaluate(
@@ -222,4 +260,80 @@ test("bad upload preserves draft and attachment, unsupported files and count lim
 		buffer: Buffer.from(await f.arrayBuffer()),
 	});
 	await expect(page.locator(".draft-image")).toHaveCount(1);
+});
+
+test("cloud-only composer sends images without requiring a LARM connection", async ({
+	page,
+	request,
+}) => {
+	const settings = await (await request.get(origin + "/api/settings")).json();
+	const fixture = await (
+		await request.get(origin + "/api/chat-image-fixture/cloud")
+	).json();
+	const connectionId = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	settings.connections.push({
+		id: connectionId,
+		kind: "codex-sdk",
+		name: "fixture",
+		baseUrl: "https://example.invalid/v1",
+		enabled: true,
+		epoch: 0,
+		envRef: null,
+	});
+	settings.resources.push({
+		id,
+		connectionId,
+		purpose: "llm",
+		model: fixture.model,
+		contextWindow: 262144,
+		voice: null,
+	});
+	settings.routes.llm = {
+		...settings.routes.llm,
+		mode: "cloud-only",
+		cloudAllowed: true,
+		fallbackId: id,
+	};
+	const applied = await request.post(origin + "/api/settings/apply", {
+		data: {
+			requestId: crypto.randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys: [],
+		},
+	});
+	expect(applied.ok()).toBe(true);
+	await page.goto(origin);
+	const input = page.getByRole("textbox", { name: "メッセージ", exact: true });
+	await expect(input).toBeVisible();
+	let larmConnects = 0;
+	page.on("request", (r) => {
+		if (r.url().endsWith("/api/larm/connect")) larmConnects++;
+	});
+	const file = (await syntheticImages())[1]!;
+	await page
+		.getByLabel("添付画像を選択")
+		.setInputFiles({
+			name: file.name,
+			mimeType: file.type,
+			buffer: Buffer.from(await file.arrayBuffer()),
+		});
+	await expect(
+		page.getByText("添付画像は選択中のクラウド接続先へ送ります。", {
+			exact: false,
+		}),
+	).toBeVisible();
+	const before = await page.locator(".message-assistant").count();
+	await input.fill("");
+	await page.getByRole("button", { name: "送信", exact: true }).click();
+	await expect(page.locator(".message-assistant")).toHaveCount(before + 1);
+	const result = await (
+		await request.get(origin + "/api/chat-image-fixture/cloud")
+	).json();
+	expect(
+		result.requests.some((r: { imageCount: number }) => r.imageCount === 1),
+	).toBe(true);
+	expect(larmConnects).toBe(0);
+	await expect(page.locator(".draft-image")).toHaveCount(0);
 });

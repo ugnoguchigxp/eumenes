@@ -33,6 +33,19 @@ UPDATE live_voice_sessions SET usage_confirmed=0 WHERE observed_seconds IS NULL;
 CREATE INDEX live_voice_usage_started ON live_voice_sessions(started_at);
 `,
 	},
+	{
+		id: "live-voice/0003-output-origins",
+		after: ["live-voice/0002-usage"],
+		sql: `ALTER TABLE live_voice_outputs ADD COLUMN origin_key TEXT;
+ALTER TABLE live_voice_outputs ADD COLUMN origin_input TEXT;
+ALTER TABLE live_voice_outputs ADD COLUMN origin_version INTEGER;
+CREATE UNIQUE INDEX live_voice_output_origin ON live_voice_outputs(origin_key) WHERE origin_key IS NOT NULL;`,
+	},
+	{
+		id: "live-voice/0004-session-inputs",
+		after: ["live-voice/0003-output-origins"],
+		sql: "ALTER TABLE live_voice_sessions ADD COLUMN input_json TEXT;",
+	},
 ];
 
 export type SessionRow = {

@@ -9,11 +9,13 @@ import { hostDelivery, type DeliveryEmotion } from "../../domains/delivery";
 export const deliveryEmotionOf = (emotion: EmotionName): DeliveryEmotion =>
 	emotion === "calm" ? "none" : emotion;
 import type { AgencyHostDeps } from "./host";
+import type { InputContext } from "eumenes-agency";
 /** Proposal acceptance is separate from the actual speech transcript and playback evidence. */
 export type SpeechRouter = (
 	db: Database,
 	conversationId: string,
 	text: string,
+	origin?: { id: string; ordinal: number; input: InputContext },
 ) => boolean;
 export function persistSpeech(
 	deps: AgencyHostDeps,
@@ -25,6 +27,7 @@ export function persistSpeech(
 		at,
 		ticket,
 		evidenceRefs,
+		input,
 	}: {
 		conversationId: string;
 		messageId: string;
@@ -32,9 +35,16 @@ export function persistSpeech(
 		at: number;
 		ticket: ActionTicket;
 		evidenceRefs: readonly string[];
+		input: InputContext;
 	},
 ): "routed" | "appended" {
-	if (deps.routeSpeechInTransaction?.(db, conversationId, text))
+	if (
+		deps.routeSpeechInTransaction?.(db, conversationId, text, {
+			id: messageId,
+			ordinal: deps.conversation.latestOrdinalInTransaction(db, conversationId),
+			input,
+		})
+	)
 		return "routed";
 	deps.conversation.appendInTransaction(db, {
 		id: messageId,
@@ -47,6 +57,7 @@ export function persistSpeech(
 			? { delivery: hostDelivery(deliveryEmotionOf(ticket.emotion)) }
 			: {}),
 	});
+	deps.memory.referenceInputs?.recordMessageInTransaction(db, messageId, input);
 	const todoRefs = reportedTodoIds(evidenceRefs);
 	deps.recordSpokeInTransaction(db, {
 		conversationId,

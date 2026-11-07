@@ -1,0 +1,56 @@
+{
+  "started": "2026-11-06T11:15:10.165Z",
+  "conversationId": "verify-eum001-weather-timer-20261106",
+  "entry": "routeStructured",
+  "structureTimeoutMs": 30000,
+  "exitCode": 0,
+  "stdout": "{\"type\":\"message\",\"updated\":false,\"id\":\"6e6e4214-f6df-48e7-b8d9-45899015a1a0\",\"conversationId\":\"verify-eum001-weather-timer-20261106\",\"role\":\"user\",\"text\":\"明日の東京の天気予報を教えてください。それと、20秒のタイマーをセットしてください。\",\"createdAt\":\"2026-11-06T11:15:10.289Z\",\"runId\":\"3ea682b4-e9dc-49b0-b7d8-5a5e43a778c7\"}\n{\"type\":\"announcement\",\"updated\":false,\"id\":\"announcement:3ea682b4-e9dc-49b0-b7d8-5a5e43a778c7\",\"conversationId\":\"verify-eum001-weather-timer-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:15:10.289Z\",\"runId\":\"3ea682b4-e9dc-49b0-b7d8-5a5e43a778c7\"}\n{\"type\":\"message\",\"updated\":false,\"id\":\"1e1ee859-2532-41ec-8610-152f45c033d9\",\"conversationId\":\"verify-eum001-weather-timer-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:15:39.679Z\",\"runId\":\"3ea682b4-e9dc-49b0-b7d8-5a5e43a778c7\"}\n",
+  "stderr": "",
+  "runs": [
+    {
+      "id": "3ea682b4-e9dc-49b0-b7d8-5a5e43a778c7",
+      "agentTaskId": null,
+      "requestId": "c160abf2-d98f-4a62-8af6-38c573c82144",
+      "conversationId": "verify-eum001-weather-timer-20261106",
+      "utteranceId": null,
+      "status": "completed",
+      "revision": 2,
+      "inputMessageId": "6e6e4214-f6df-48e7-b8d9-45899015a1a0",
+      "answerMessageId": "1e1ee859-2532-41ec-8610-152f45c033d9",
+      "announcement": "「パイプライン」に頼みます。",
+      "error": null,
+      "jobId": "8e5038e0-9332-484f-b032-e0573380be55",
+      "deadlineAt": "2026-11-06T11:18:10.289Z",
+      "deadlineFixed": false,
+      "sourceKind": "manual",
+      "scheduleId": null,
+      "occurrenceId": null,
+      "specialistSessionId": null,
+      "pinnedToolchainId": null,
+      "createdAt": "2026-11-06T11:15:10.289Z",
+      "updatedAt": "2026-11-06T11:15:39.679Z"
+    }
+  ],
+  "conversation": {
+    "id": "verify-eum001-weather-timer-20261106",
+    "revision": 2,
+    "messages": [
+      {
+        "id": "6e6e4214-f6df-48e7-b8d9-45899015a1a0",
+        "conversationId": "verify-eum001-weather-timer-20261106",
+        "role": "user",
+        "text": "明日の東京の天気予報を教えてください。それと、20秒のタイマーをセットしてください。",
+        "createdAt": "2026-11-06T11:15:10.289Z",
+        "runId": "3ea682b4-e9dc-49b0-b7d8-5a5e43a778c7"
+      },
+      {
+        "id": "1e1ee859-2532-41ec-8610-152f45c033d9",
+        "conversationId": "verify-eum001-weather-timer-20261106",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T11:15:39.679Z",
+        "runId": "3ea682b4-e9dc-49b0-b7d8-5a5e43a778c7"
+      }
+    ]
+  }
+}

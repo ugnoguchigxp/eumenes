@@ -155,6 +155,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			},
 		},
 		{
+			name: "agency_recovery",
+			recover: () => s.agency.recover(),
+		},
+		{
 			// World recovery follows Memory's and precedes every queue/worker start. It never aborts startup:
 			// a failed recovery leaves World's gate closed (fail closed) and is retried by its poll.
 			name: "world_recovery",

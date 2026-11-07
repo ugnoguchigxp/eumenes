@@ -163,7 +163,7 @@ describe("opportunities", () => {
 		expect(correction?.actor).toBe("user");
 	});
 
-	test("a retraction starts the conversation's runtime over", async () => {
+	test("a retraction removes dependent data and new grounded input continues", async () => {
 		const h = harness();
 		await exchange(h, 1);
 		await waitFor(() => h.calls.select === 1);
@@ -174,12 +174,12 @@ describe("opportunities", () => {
 			() => h.host.inspect("c1")?.snapshot.observations.length === 0,
 		);
 		expect(h.host.inspect("c1")?.generation).toBeGreaterThan(before);
-		// The new runtime sees only what follows.
+		// The legacy host supplies no input manifest for agent replies; they fail closed after retraction.
 		await exchange(h, 2);
 		await waitFor(() => h.calls.select === 2);
 		expect(
 			h.host.inspect("c1")?.snapshot.observations.map((o) => o.id),
-		).toEqual(["u2", "a2"]);
+		).toEqual(["u2"]);
 	});
 });
 
@@ -655,8 +655,12 @@ describe("review fixes", () => {
 		await waitFor(() => strict.log.ids.length >= 4);
 		await h.conversation.retract({ messageId: "u2" });
 		await waitFor(
-			() => h.host.inspect("c1")?.snapshot.observations.length === 0,
+			() =>
+				!h.host.inspect("c1")?.snapshot.observations.some((o) => o.id === "u2"),
 		);
+		expect(
+			h.host.inspect("c1")?.snapshot.observations.some((o) => o.id === "u1"),
+		).toBe(true);
 		await exchange(h, 3);
 		await waitFor(() => strict.log.ids.length >= 6);
 		await settle();

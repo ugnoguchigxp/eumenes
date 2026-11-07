@@ -277,6 +277,8 @@ export type ForgetOutcome = {
 };
 /** What a derived-data purge is told (the steward registers one: decisions, inbox bodies). */
 export type ForgetPurge = {
+	/** All journal entries written by this forget (one on journal replay). */
+	forgetIds?: readonly string[];
 	itemIds: readonly string[];
 	messageIds: readonly string[];
 	conversationId: string;

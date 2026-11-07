@@ -297,8 +297,15 @@ export function createInteractionRuns(
 		},
 
 		/** The run serving an open interaction ended without finishing it. */
-		endForRunInTransaction(tx: Database, runId: string, code: string) {
-			const row = openInteractionOfRun(tx, runId);
+		endForRunInTransaction(
+			tx: Database,
+			runId: string,
+			code: string,
+			options: { includeWaiting?: boolean } = {},
+		) {
+			const row =
+				openInteractionOfRun(tx, runId) ??
+				(options.includeWaiting ? waitingInteractionOfRun(tx, runId) : null);
 			if (row) settle(tx, row, "cancelled", code);
 		},
 		/** The question the run's command sub-agent asked, while it waits for the answer. */

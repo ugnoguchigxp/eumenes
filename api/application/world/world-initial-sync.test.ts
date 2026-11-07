@@ -170,7 +170,12 @@ test("upgrade revokes the old outbox-only completion; interrupted initial sync r
 	const path = join(dir, "db.sqlite3");
 	let store = openStore(
 		path,
-		migrations.filter((m) => m.id !== "world/0012-initial-source-sync"),
+		migrations.filter(
+			(m) =>
+				!["world/0012-initial-source-sync", "world/0013-working-set"].includes(
+					m.id,
+				),
+		),
 	);
 	try {
 		await store.write((db) => {

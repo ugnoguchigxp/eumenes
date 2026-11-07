@@ -1,22 +1,39 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { readAssistantMouth } from "../../../domains/audio";
-import { createHiyori, type AvatarCue } from "../../../domains/avatar";
+import {
+	createHiyori,
+	readAvatarView,
+	saveAvatarView,
+	type AvatarCue,
+} from "../../../domains/avatar";
+import { HiyoriViewControls } from "./HiyoriViewControls";
 import "./hiyori-avatar.css";
 
 /** Animation stays outside React; unmount, tab hiding and context loss cancel its single loop. */
 export function HiyoriAvatarBackground({
 	active,
 	cue = null,
+	phase = "neutral",
+	interactive = false,
 }: {
 	active: boolean;
 	cue?: AvatarCue | null;
-	phase?: string;
+	phase?: "neutral" | "listening" | "thinking";
+	interactive?: boolean;
 }) {
 	const host = useRef<HTMLDivElement>(null);
-	const latest = useRef(cue);
+	const [view, setView] = useState(readAvatarView);
+	const viewRef = useRef(view);
+	const redraw = useRef<(() => void) | undefined>(undefined);
+	const latest = useRef({ cue, phase });
 	useEffect(() => {
-		latest.current = cue;
-	}, [cue]);
+		latest.current = { cue, phase };
+	}, [cue, phase]);
+	useEffect(() => {
+		saveAvatarView(view);
+		viewRef.current = view;
+		redraw.current?.();
+	}, [view]);
 	useEffect(() => {
 		const element = host.current;
 		if (!element || !active) return;
@@ -56,9 +73,12 @@ export function HiyoriAvatarBackground({
 				try {
 					model.render(
 						reduced.matches ? 0 : (timestamp - origin) / 1000,
-						reduced.matches ? "neutral" : (latest.current?.motion ?? "neutral"),
+						reduced.matches
+							? "neutral"
+							: (latest.current.cue?.motion ?? latest.current.phase),
 						reduced.matches ? 0 : readAssistantMouth(),
-						latest.current?.intensity,
+						latest.current.cue?.intensity,
+						viewRef.current,
 					);
 				} catch {
 					element.dataset.avatarState = "render-failed";
@@ -76,6 +96,7 @@ export function HiyoriAvatarBackground({
 				document.visibilityState === "hidden" ? "paused" : "ready";
 			draw(performance.now());
 		};
+		redraw.current = sync;
 		element.dataset.avatarState = "loading";
 		void createHiyori(element, abort.signal)
 			.then((loaded) => {
@@ -99,6 +120,7 @@ export function HiyoriAvatarBackground({
 		document.addEventListener("visibilitychange", sync);
 		reduced.addEventListener("change", sync);
 		return () => {
+			redraw.current = undefined;
 			abort.abort();
 			release();
 			document.removeEventListener("visibilitychange", sync);
@@ -115,6 +137,9 @@ export function HiyoriAvatarBackground({
 				桃瀬ひよりを読み込めませんでした。他の背景に切り替えて引き続き利用できます。
 			</output>
 			<span className="hiyori-avatar-credit">桃瀬ひより © Live2D Inc.</span>
+			{interactive && active && (
+				<HiyoriViewControls view={view} onChange={setView} />
+			)}
 		</div>
 	);
 }

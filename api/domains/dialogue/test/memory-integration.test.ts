@@ -36,7 +36,7 @@ async function rememberFact(
 ) {
 	// The user's own utterance that carries the fact: answered by a plain step, queued in front of the others.
 	h!.state.steps.unshift(...reply("覚えました。"));
-	const first = await h!.say("私の話です", "completed");
+	const first = await h!.say(text, "completed");
 	return saveItem(h!.store, h!.memory!, {
 		conversationId: "main",
 		messageId: first.inputMessageId,
@@ -89,7 +89,7 @@ test("a forgotten fact leaves the next prompt, and the messages it came from sta
 	const next = h.state.calls.at(-1)!.messages[1]!.content;
 	expect(next).not.toContain(SPICY);
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toContain(
-		"私の話です",
+		SPICY,
 	);
 });
 
@@ -120,7 +120,7 @@ test("a forget of a fact shown while the answer is generated makes that answer s
 test("an addition or a republish during generation does not expire the answer", async () => {
 	h = await setup({ memory: true });
 	h.state.steps.unshift(...reply("覚えました。"));
-	const base = await h.say("私の話です", "completed");
+	const base = await h.say(`${SPICY}。甘いものも好き`, "completed");
 	await saveItem(h.store, h.memory!, {
 		conversationId: "main",
 		messageId: base.inputMessageId,

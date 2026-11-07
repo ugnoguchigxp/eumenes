@@ -1,10 +1,9 @@
 import { expect, test } from "bun:test";
-import { agencyOutputContract } from "eumenes-agency";
-import { z } from "zod";
+import { agencyOutputContract, llmOutputJsonSchema } from "eumenes-agency";
 import { shareNullableSchemas } from "./schema";
 
 test("transport factoring preserves the F schema when shared references are expanded", () => {
-	const original = z.toJSONSchema(
+	const original = llmOutputJsonSchema(
 		agencyOutputContract("update", { condition: "F", interestFormation: true })
 			.schema,
 	);

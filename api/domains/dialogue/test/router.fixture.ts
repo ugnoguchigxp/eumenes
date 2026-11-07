@@ -121,7 +121,13 @@ export async function startRouter(
 			const next = structures.shift();
 			if (next === undefined) throw new Error("fixture_structure_missing");
 			if (next instanceof Error) throw next;
-			return { requestId, attemptId: "structure", value: next };
+			let value = next;
+			try {
+				value = JSON.stringify({ decision: JSON.parse(next) });
+			} catch {
+				/* Deliberately malformed fixture. */
+			}
+			return { requestId, attemptId: "structure", value };
 		},
 	});
 	return { h, routes, scripts, structures, structureCalls };

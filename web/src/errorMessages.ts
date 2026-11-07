@@ -94,7 +94,15 @@ const messages: Record<string, string> = {
 	image_mime_mismatch:
 		"画像の形式とデータが一致しません。保存し直して追加してください。",
 	image_not_supported:
-		"選択したモデルでは画像を送れません。画像入力対応のLARMモデルを選んでください。",
+		"選択した接続先では画像を送れません。画像入力に対応する接続先を選んでください。",
+	image_capability_unknown:
+		"選択した接続先の画像対応を確認できません。接続先の対応情報を確認してください。",
+	image_context_compacted:
+		"接続先で画像を含む入力が再構成されたため、回答を採用できませんでした。",
+	image_model_changed:
+		"送信中に画像の認識先が変わったため、回答を採用できませんでした。",
+	image_history_unsupported:
+		"画像を含む履歴をこの接続先へ復元できません。必要な画像を再添付してください。",
 	image_reference_unsupported: "画像の送信形式が接続先に対応していません。",
 	image_role_unsupported: "画像はユーザーの発言に添付してください。",
 	image_detail_unsupported: "画像の詳細指定が接続先に対応していません。",

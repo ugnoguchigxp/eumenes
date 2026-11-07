@@ -1,3 +1,5 @@
+import { persistMemory, resultInput } from "./memory";
+import { staleInputSources } from "./input";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { snapshotRefs } from "./research";
@@ -32,40 +34,60 @@ export function createResultCollector(input: {
 						deps.state!.epochInTransaction(db, c.id) !== c.epoch
 					)
 						continue;
+					const origin = resultInput(c, r.ticketId);
+					const stale = staleInputSources(deps, db, origin.sources);
+					if (stale.length) {
+						deps.state!.forgetInTransaction(db, {
+							messageIds: [],
+							itemIds: [],
+							sourceRefs: stale,
+						});
+						dropConv(c, "source_changed");
+						continue;
+					}
 					if (r.cancel) deps.state!.cancelInTransaction(db, r.rootId);
 					// Adopt while the persisted intent still authorizes evidence reads;
 					// recording work.returned below releases that authority in this same write.
 					const adopted = deps.state!.returnedInTransaction(db, r.rootId);
 					const summary = adopted ? r.summary : "agency_result_invalidated";
 
-					c.runtime.observe({
-						id: `return:${r.rootId}`,
-						kind: "work.returned",
-						actor: "tool",
-						occurredAt: nowMs(),
-						workRef: r.ticketId,
-						workStatus: adopted ? r.workStatus : "failed",
-						text: summary,
-					});
-					c.runtime.recordResult({
-						ticketId: r.ticketId,
-						status: adopted ? r.status : "failed",
-						at: nowMs(),
-						resultText: summary,
-					});
-					deps.state!.saveInTransaction(
-						db,
+					c.runtime.observe(
 						{
-							conversationId: c.id,
-							epoch: c.epoch,
-							scope: c.scope,
-							snapshot: c.runtime.snapshot(),
-							idle: c.planner.checkpoint(),
-							settingsDigest: digest(),
-							sourceRefs: snapshotRefs(c.runtime),
+							id: `return:${r.rootId}`,
+							kind: "work.returned",
+							actor: "tool",
+							occurredAt: nowMs(),
+							workRef: r.ticketId,
+							workStatus: adopted ? r.workStatus : "failed",
+							text: summary,
 						},
-						nowMs(),
+						resultInput(c, r.ticketId),
 					);
+					c.runtime.recordResult(
+						{
+							ticketId: r.ticketId,
+							status: adopted ? r.status : "failed",
+							at: nowMs(),
+							resultText: summary,
+						},
+						resultInput(c, r.ticketId),
+					);
+					if (
+						!deps.state!.saveInTransaction(
+							db,
+							persistMemory(deps, db, {
+								conversationId: c.id,
+								epoch: c.epoch,
+								scope: c.scope,
+								snapshot: c.runtime.snapshot(),
+								idle: c.planner.checkpoint(),
+								settingsDigest: digest(),
+								sourceRefs: snapshotRefs(c.runtime),
+							}),
+							nowMs(),
+						)
+					)
+						throw new Error("agency_checkpoint_stale");
 				}
 			})
 			.then(() => {

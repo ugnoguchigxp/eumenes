@@ -1,3 +1,7 @@
+import {
+	inspectChoicesFunction,
+	parseChoicesInspection,
+} from "eumenes-interact/adapters/playwright-mcp";
 import type {
 	BrowserDriver,
 	CaptureRange,
@@ -135,7 +139,12 @@ export function createReaders(
 	callTool: CallTool,
 ): Pick<
 	BrowserDriver,
-	"inspectTarget" | "inspectFocused" | "measure" | "screenshot" | "readText"
+	| "inspectTarget"
+	| "inspectFocused"
+	| "measure"
+	| "screenshot"
+	| "readText"
+	| "readChoices"
 > {
 	/** Inspection only reads attributes, so whatever goes wrong never reached the page's state. */
 	const inspectCall = async (args: Record<string, unknown>) => {
@@ -146,6 +155,19 @@ export function createReaders(
 		}
 	};
 	return {
+		async readChoices(ref, offset, limit, signal) {
+			const result = await callTool(
+				"browser_evaluate",
+				{
+					function: inspectChoicesFunction(offset, limit, ref !== null),
+					...(ref !== null
+						? { target: refOf(ref), element: "observed choices" }
+						: {}),
+				},
+				signal,
+			);
+			return parseChoicesInspection(result.result);
+		},
 		async readText(ref, maxChars, signal) {
 			if (!Number.isSafeInteger(maxChars) || maxChars < 100 || maxChars > 50000)
 				throw new BrowserDriverError("extraction_limit_invalid", false);

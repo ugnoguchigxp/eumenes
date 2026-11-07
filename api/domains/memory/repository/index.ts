@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { seedImportMigration } from "./seeds";
+import { hostInputsMigration } from "./host-inputs";
 export * from "./seeds";
 export * from "./window";
 export * from "./tendency";
@@ -275,5 +276,10 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0011-drop-window-prefetch",
 		after: ["memory/0010-retire-exchange-ledger"],
 		sql: dropWindowPrefetchMigration,
+	},
+	{
+		id: "memory/0012-host-inputs",
+		after: ["memory/0011-drop-window-prefetch"],
+		sql: hostInputsMigration,
 	},
 ];

@@ -1,0 +1,1238 @@
+{
+  "conversationId": "verify-eum002-native-v8-cancel-20261106",
+  "observedAt": "2026-11-06T12:19:39.485Z",
+  "works": [
+    {
+      "id": "f3a85658-4129-407d-9e86-6e8f03d253b6",
+      "ref": 1,
+      "conversationId": "verify-eum002-native-v8-cancel-20261106",
+      "runId": "5a6b79ff-99d7-40dc-b95e-2516dcf94b9d",
+      "toolchainId": "pipeline.execute",
+      "toolchainRevisionId": "toolchain:pipeline.execute@2",
+      "execution": "pipeline",
+      "request": "計算結果を使って別の作業を実行して。",
+      "title": "計算結果を使って別の作業を実行して。",
+      "status": "done",
+      "outcome": "cancelled",
+      "revision": 3,
+      "questionId": null,
+      "question": null,
+      "result": null,
+      "sourceRef": "1861b9f9-b11c-443a-a821-e70bef13a74f",
+      "archivedAt": "2026-11-06T12:18:43.527Z",
+      "noticeReadAt": null,
+      "createdAt": "2026-11-06T12:18:29.532Z",
+      "updatedAt": "2026-11-06T12:18:43.527Z",
+      "messageIds": [
+        "335736a7-2861-4141-81af-a8cc8dfedf6e"
+      ]
+    }
+  ],
+  "executions": [
+    {
+      "id": "1861b9f9-b11c-443a-a821-e70bef13a74f",
+      "state": "cancelled",
+      "request": "計算結果を使って別の作業を実行して。",
+      "result": {
+        "summary": "cancel_requested",
+        "fulfilled": [],
+        "missing": [
+          "cancel_requested"
+        ],
+        "refs": [],
+        "code": "cancel_requested",
+        "status": "cancelled"
+      },
+      "question": null,
+      "pipeline": {
+        "contractVersion": "p0-3",
+        "toolchainRevisionId": "toolchain:pipeline.execute@2",
+        "catalog": [
+          {
+            "card": {
+              "entry": "browser.capture",
+              "bundle": "browser.capture",
+              "title": "ブラウザの撮影",
+              "summary": "利用者のBraveに接続し、開いているタブやEumenesの画面を画像として保存する",
+              "useWhen": [
+                "今のタブやEumenesの画面を画像として保存したい",
+                "ページ全体を一枚の画像にしたい",
+                "ブラウザへの接続を始めたい",
+                "撮影の状況を知りたい・撮影をやめたい"
+              ],
+              "avoidWhen": [
+                "新しい絵や写真を作りたい",
+                "公開情報の検索や本文の取得だけで足りる"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:browser.capture@6",
+              "definitionHash": "34d7e3d6acdfa613825da942b480bd89d0160b3435f6cebe3aa089f572d8d2df",
+              "packageRevisionId": "package:browser.capture@1",
+              "bindingRevisionId": "binding:browser.capture@6",
+              "bindingDigest": "3f6974f4d01941b5ec30ecdf1971447c0f1a7c7444206cb6a0aaeabd47281baf",
+              "adapterRef": "adapter:browser@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:browser.workspace.open@1",
+                "tool:browser.connect@1",
+                "tool:browser.capture.start@1",
+                "tool:browser.capture.status@1",
+                "tool:browser.capture.cancel@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "browser.operate",
+              "bundle": "browser.operate",
+              "title": "ブラウザの操作",
+              "summary": "利用者のBraveのタブやEumenesの画面を読み取り、操作する",
+              "useWhen": [
+                "開いているタブやEumenesの画面を読み取って操作したい",
+                "URLを開いて、ページの中を探す・入力する・開く",
+                "ブラウザへの接続を始めたい",
+                "操作の状況を知りたい・操作をやめたい"
+              ],
+              "avoidWhen": [
+                "公開情報の検索や本文の取得だけで足りる",
+                "タブを画像として保存したいだけ"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:browser.operate@8",
+              "definitionHash": "eac0ecb999b52b007e5d2a5d6de09f9fa360d2937d4fdd2b31b5938e636b75dc",
+              "packageRevisionId": "package:browser.operate@5",
+              "bindingRevisionId": "binding:browser.operate@6",
+              "bindingDigest": "0d6e8b72d228e40a6be01130b14a2e2ab24f022f0a992542af9b54dd6a8491e4",
+              "adapterRef": "adapter:browser@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:browser.workspace.open@1",
+                "tool:browser.connect@1",
+                "tool:browser.task.start@3",
+                "tool:browser.task.status@1",
+                "tool:browser.task.cancel@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "claude-code.repair",
+              "bundle": "claude-code.repair",
+              "title": "エラー修正",
+              "summary": "発生したエラーを Claude Code に調べさせ、承認された範囲で修正させる",
+              "useWhen": [
+                "発生したエラーの原因調査と修正を頼みたい",
+                "失敗した実行を調べて直してほしい"
+              ],
+              "avoidWhen": [
+                "エラーが起きていない作業を頼みたい",
+                "エラーの意味や一般的な説明を聞いているだけ",
+                "Claude Code の使い方を聞いているだけ"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:claude-code.repair@2",
+              "definitionHash": "877315713a4473301828898f6c69159141c2063998439e16803eeb39eaac4dbf",
+              "packageRevisionId": "package:claude-code.repair@2",
+              "bindingRevisionId": "binding:claude-code.repair@2",
+              "bindingDigest": "18846aa5d0ccfcde0c778f254f408db5a875d7d475d0f38d47e09999b56e26d5",
+              "adapterRef": "adapter:terminals@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:claude-code.request@2"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "claude-code.request",
+              "bundle": "claude-code.request",
+              "title": "Claude Code",
+              "summary": "Claude Code にコーディング作業を依頼し、画面で進み具合を見る",
+              "useWhen": [
+                "コードの実装・修正・調査・テストを Claude Code に頼みたい",
+                "Claude Code を開いて作業を始めさせたい"
+              ],
+              "avoidWhen": [
+                "プログラミングの一般的な質問に答えるだけ",
+                "Claude Code の使い方や料金を聞いているだけ"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:claude-code.request@4",
+              "definitionHash": "21eddecb6dcdf1db82e7263f1d13d250f2577ec3548de932f70c18c76cce2b49",
+              "packageRevisionId": "package:claude-code.request@2",
+              "bindingRevisionId": "binding:claude-code.request@2",
+              "bindingDigest": "f6c45bbb022705e49106f289d8a8a149e4bdb600f6aa06718ff053c0f2708fbc",
+              "adapterRef": "adapter:terminals@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:claude-code.request@2"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "cli.run",
+              "bundle": "cli.run",
+              "title": "CLI",
+              "summary": "シェルコマンドを実行し、終了コードと出力を受け取る",
+              "useWhen": [
+                "CLIコマンドを実行して結果を知りたい",
+                "ファイル一覧やgitの状態などをコマンドで確認・操作したい"
+              ],
+              "avoidWhen": [
+                "コードの実装・修正をClaude Codeに任せたい",
+                "コマンドの使い方を聞いているだけ"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:cli.run@4",
+              "definitionHash": "139b2e0b4103cf3a1d36080dee4f3fbcf82a47f95ee6948a9c828d79ac4376e5",
+              "packageRevisionId": "package:cli.run@1",
+              "bindingRevisionId": "binding:cli.run@2",
+              "bindingDigest": "9e8e891543bb7ddf1b2b9a97701cd54dfcb15ffc18aee129b9fe454891df75c5",
+              "adapterRef": "adapter:shell@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:cli.run@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "codex-tasks.manage",
+              "bundle": "codex-tasks.manage",
+              "title": "Codexへの開発依頼",
+              "summary": "Codexを指定した新規タスクと既存Codexカードの続行・状況確認",
+              "useWhen": [
+                "Codexを明示した新規依頼",
+                "Codex担当の既存カードへの追加依頼・回答・停止"
+              ],
+              "avoidWhen": [
+                "Claudeへの依頼",
+                "担当をまたぐボードの整理"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:codex-tasks.manage@2",
+              "definitionHash": "4ed4b8d15baf95a4f66efae121abf8673bd73c07beb938e3e83a42cec561f4fb",
+              "packageRevisionId": "package:codex-tasks.manage@1",
+              "bindingRevisionId": "binding:codex-tasks.manage@2",
+              "bindingDigest": "6e4aea025c6855fe0dc151be928bddabd684d860cadd47136c4df189333b7d38",
+              "adapterRef": "adapter:codex-tasks@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:codex-tasks.request@1",
+                "tool:codex-tasks.list@1",
+                "tool:codex-tasks.followup@1",
+                "tool:codex-tasks.cancel@1",
+                "tool:codex-tasks.stop@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "compute.python",
+              "bundle": "compute.python",
+              "title": "計算",
+              "summary": "Pythonで数値・記号計算、統計・回帰・作図を実行し、状態・取消・結果・成果物を扱う",
+              "useWhen": [
+                "数値計算・記号計算・統計・回帰・最適化・作図が必要",
+                "計算の状態・結果・取消・成果物を扱う"
+              ],
+              "avoidWhen": [],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:compute.python@1",
+              "definitionHash": "26d98cc61d821a43d045c8cd2cf7debb3887b48fe8c51b6d8abd3c412210b04a",
+              "packageRevisionId": "package:compute.python@1",
+              "bindingRevisionId": "binding:compute.command@1",
+              "bindingDigest": "b772c44f29bd022a588be5472cf0cb885eb87b4dddc2f6939b5eb5ba930de543",
+              "adapterRef": "adapter:compute@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:python_submit@1",
+                "tool:python_status@1",
+                "tool:python_cancel@1",
+                "tool:python_artifact@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "docling.desk",
+              "bundle": "docling.desk",
+              "title": "文章ナレッジベース管理",
+              "summary": "文書の取り込み・閲覧用の画面を準備し、別タブで開く入口",
+              "useWhen": [
+                "文章ナレッジベース管理の画面を開きたい",
+                "Docling Deskを開きたい",
+                "PDFやWordを取り込み・閲覧する文書画面を使いたい"
+              ],
+              "avoidWhen": [
+                "文書の内容を説明してほしいだけ",
+                "添付画像の文字を今すぐ読み取りたい"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:docling.desk@2",
+              "definitionHash": "74411f3c9cecdc6915be9176ef41e9032b7724f95e8436648fac43d29246bef4",
+              "packageRevisionId": "package:docling.desk@2",
+              "bindingRevisionId": "binding:docling.desk@2",
+              "bindingDigest": "b83dace7a7de6fe6f7258b5ffd37779a1c2bb4530d95b8a251c8d22f535abfbe",
+              "adapterRef": "adapter:docling@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:docling.open@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "excalidraw.edit",
+              "bundle": "excalidraw.edit",
+              "title": "図を描く・編集する",
+              "summary": "Excalidrawの図を作成・編集し、保存済みの図を再表示する",
+              "useWhen": [
+                "図を描きたい",
+                "保存済みの図を編集したい",
+                "Excalidrawを開きたい"
+              ],
+              "avoidWhen": [],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:excalidraw.edit@1",
+              "definitionHash": "c7b5ad31efe03fc153bc911dde45efcc31ad1b21273781b99337ccc03e25da99",
+              "packageRevisionId": "package:excalidraw.edit@1",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:excalidraw.open@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "history.research",
+              "bundle": "history.research",
+              "title": "会話履歴の調査",
+              "summary": "保存済みの会話ログを、何週間・何か月も前まで遡って探し、誰がいつ何を言ったか・何を決めたかを根拠つきで報告する（読み取り専用。時間がかかるので、終わったら知らせる）。会話の記録全体から経緯を洗い出す依頼や、登録済みの要件に沿った履歴調査に使う。さっき・今朝など最近の発言を確かめるだけの依頼と、Web の公開情報は対象外",
+              "useWhen": [
+                "「先月話した〜を会話履歴から探して」「半年前に決めた〜を調べて」と、かなり前の会話を探したい",
+                "「これまでの会話から〜の経緯をまとめて」と、会話の記録全体から話の流れや根拠を洗い出したい",
+                "「いつ〜と言ったか履歴から全部探して」と、古い会話を含めて発言を洗い出したい"
+              ],
+              "avoidWhen": [
+                "さっき・今朝など最近の発言を確かめるだけ",
+                "Webの公開情報の確認"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:history.research@2",
+              "definitionHash": "d3f2870487c85a95d61723021ca964865fe95cc75f733c35d351ecfa31d6e8c0",
+              "packageRevisionId": "package:history.research@3",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:history.search@1",
+                "tool:history.read@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "image.create",
+              "bundle": "image.create",
+              "title": "画像生成",
+              "summary": "LARMで新しい画像を生成する、画像の制作プロンプト編集画面を開く、保存済み画像の一覧を開く実操作。画面を開く依頼にもこの関数を実行する。自然文の返答だけでは画面は開かない",
+              "useWhen": [
+                "写真やイラストなどの画像を作ってほしい",
+                "話題や場面に合う絵・イラスト・写真を新しく作ってほしい（「〜の絵を描いて」「〜に合う画像を作って」）",
+                "画像の制作プロンプトを編集したい",
+                "以前に生成した画像を見たい"
+              ],
+              "avoidWhen": [
+                "参照画像を編集する"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:image.create@3",
+              "definitionHash": "775dbc0d2d519e05ef702c3e158c1949af5ba7151dcb0892da14e1215defdb63",
+              "packageRevisionId": "package:image.create@2",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:image.generate@2"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "kanban.manage",
+              "bundle": "kanban.manage",
+              "title": "タスクボード",
+              "summary": "共通ボードの登録・整理・実行と担当をまたぐ状況確認",
+              "useWhen": [
+                "作業をタスクとして登録・整理したい",
+                "登録したタスクを実行キューに入れたい・状況を知りたい"
+              ],
+              "avoidWhen": [
+                "Codexを明示した新規依頼（codex_tasksを使う）",
+                "ボードに保存しない直接作業"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:kanban.manage@4",
+              "definitionHash": "a807f3907fe96b1364408cec6eaaf11861405fda0c6769a39f6eba74ae1a24ef",
+              "packageRevisionId": "package:kanban.manage@2",
+              "bindingRevisionId": "binding:kanban.manage@4",
+              "bindingDigest": "cfbd833adc8f182e6ba3ceff101ba33b84cb7af5344b0a30575877c74d9b005c",
+              "adapterRef": "adapter:kanban@2",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:kanban.add@2",
+                "tool:kanban.add-run@1",
+                "tool:kanban.list@2",
+                "tool:kanban.edit@2",
+                "tool:kanban.move@2",
+                "tool:kanban.run@2",
+                "tool:kanban.followup@2",
+                "tool:kanban.cancel@2",
+                "tool:kanban.remove@2"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "model3d.studio",
+              "bundle": "model3d.studio",
+              "title": "インスタント3Dモデル",
+              "summary": "文章や作った画像から3Dモデルを作り、保存済みの3Dモデルを探して表示・名前とタグの変更・削除をする",
+              "useWhen": [
+                "3Dモデル・立体・フィギュアのような形を作りたい",
+                "作った画像を立体にしたい",
+                "前に作った3Dモデルを見たい・探したい",
+                "3Dモデルの名前やタグを変えたい・消したい",
+                "3Dモデルの生成をやめたい"
+              ],
+              "avoidWhen": [
+                "平面の画像だけが欲しい",
+                "画面の背景の銀河やモデルの表示を変えたい"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:model3d.studio@2",
+              "definitionHash": "02898c27406de98e766079a3b093affc45af8b3af1d58bb673e29c360cc97a4f",
+              "packageRevisionId": "package:model3d.studio@2",
+              "bindingRevisionId": "binding:model3d.command@1",
+              "bindingDigest": "2867dcecc58410459e86e63794554586b6d32b7d8da95a8c45d8ec8b399cfac1",
+              "adapterRef": "adapter:model3d@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:model3d.open@1",
+                "tool:model3d.generate@1",
+                "tool:model3d.find@1",
+                "tool:model3d.show@1",
+                "tool:model3d.update@1",
+                "tool:model3d.delete@1",
+                "tool:model3d.cancel@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "music.create",
+              "bundle": "music.create",
+              "title": "音楽・効果音制作",
+              "summary": "歌なし音楽・BGM、ボーカル・歌詞付き音楽、効果音を新しく生成する。作成済みの曲の再生には使わない",
+              "useWhen": [
+                "新しい音楽・歌・BGM・効果音を作ってほしい",
+                "場面・時間帯・気分に合う曲やBGMを新しく作ってほしい（「〜に合う曲を作って」「〜向けのBGMを作って」）"
+              ],
+              "avoidWhen": [
+                "保存済みの音声を再生する"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:music.create@4",
+              "definitionHash": "dfb29801057202f3e50e7b59b8d907132110ce92c70bc47de6b6cf7000666af8",
+              "packageRevisionId": "package:music.create@3",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:music.generate@3"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "music.library",
+              "bundle": "music.library",
+              "title": "音楽の再生・プレイリスト",
+              "summary": "作った曲や保存済みの曲を再生し、プレイリストとプレイヤーを開く。<state>の曲(a1など)はrefsで渡すと、その曲を再生する",
+              "useWhen": [
+                "作った曲・さっきの曲・保存済みの曲を再生してほしい（「再生して」「流して」「聴かせて」）",
+                "完成の報告のあとで「はい、再生して」と頼んでいる",
+                "お気に入りやライブラリ、プレイリストを開きたい"
+              ],
+              "avoidWhen": [
+                "新しい曲を作る"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:music.library@2",
+              "definitionHash": "c985e0aef41b05db0a85740f031a1b10ce70fc56235ac00bb709b5f1a56650cc",
+              "packageRevisionId": "package:music.playback@2",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:music.library@2"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "object-recognition.manage",
+              "bundle": "object-recognition.manage",
+              "title": "映っている物を調べる",
+              "summary": "ブラウザのカメラ・選択した画像や短い動画の物体検出画面を開き、保存済みの物体名・座標・時刻を読む、解析を取消する実操作。利用者の承諾後にカメラや画面を撮影し、表示中の画像と検出結果を会話のLLMに見せる。OCRとは別",
+              "useWhen": [
+                "カメラに映っている物を調べたい",
+                "画像や動画の物体と位置を確認したい",
+                "物体認識の進捗確認・取消",
+                "服装や手元の物・画面の内容をカメラや画面の撮影で見てほしい",
+                "表示中の画像について聞きたい"
+              ],
+              "avoidWhen": [],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:object-recognition.manage@2",
+              "definitionHash": "90b2bb804c13a349679562d2a50226bacf4d5f71cc40ebc42c3fa0cedef9aa68",
+              "packageRevisionId": "package:object-recognition.manage@2",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:object-recognition.manage@2"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "ocr.manage",
+              "bundle": "ocr.manage",
+              "title": "文字を読み取る",
+              "summary": "画像・カメラ・短い動画から文字を読み、保存済み原文を参照する",
+              "useWhen": [
+                "画像や写真の文字を読みたい",
+                "動画に映る文字を調べたい",
+                "OCRの履歴や結果を確認・中止したい"
+              ],
+              "avoidWhen": [
+                "物体の種類や位置だけを調べたい"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:ocr.manage@6",
+              "definitionHash": "65116bdf5e5fd0936c98adeeb335c0121d784accb85211bfd5dc6290783b025b",
+              "packageRevisionId": "package:ocr.manage@1",
+              "bindingRevisionId": "binding:ocr.command@6",
+              "bindingDigest": "1c70b2e2c2eb09a877e0482aae1c8f439b47ba3e0c58b6788b59e2b54f541b22",
+              "adapterRef": "adapter:ocr@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:ocr.open@1",
+                "tool:ocr.read@1",
+                "tool:ocr.cancel@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "stock.quote",
+              "bundle": "stock.quote",
+              "title": "株価",
+              "summary": "特定の会社の現在の株価（現在値・前日比・時刻）を、言われた会社名またはティッカーから特定して即答する。担当への依頼文や予告は不要で、この関数の呼び出しがそのまま回答になる。一社の現在の株価の依頼はWeb検索より先にこの担当を使う。値動きの推移・チャート、指標や財務、ニュース、複数社の比較は対象外",
+              "useWhen": [
+                "「ソフトバンクの株価は？」「トヨタの株価を教えて」と、特定の会社の今の株価を質問している",
+                "「AAPLはいくら？」「アップルの株価」など、ティッカーや米国企業の現在の株価を質問している",
+                "前の発言の続きで「ソニーは？」と、別の会社の株価を質問している"
+              ],
+              "avoidWhen": [
+                "過去の値動きの推移やチャート、先週・去年の株価を質問している",
+                "PER・配当・時価総額・業績など、株価以外の指標や財務を質問している",
+                "株価に関するニュースや値動きの理由を質問している",
+                "複数の会社の株価を比べて質問している",
+                "為替・指数・仮想通貨・投資信託の値を質問している"
+              ],
+              "arguments": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60,
+                    "description": "株価を知りたい会社名またはティッカー・証券コード。言われたとおりに書く（例: ソフトバンク、トヨタ自動車、AAPL、9434）。株価・円・「の」などの語は含めない。"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": false
+              },
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "instant",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:stock.quote@1",
+              "definitionHash": "a2265c2c8736449145c1abfa2e3ec06d6de9a83e69350d4a59b971a5c52d6b48",
+              "packageRevisionId": "package:stock.quote@1",
+              "bindingRevisionId": "binding:stock.quote@1",
+              "bindingDigest": "6209e41c3c794d488247bb0e0e171c8ff4a0678b14ebdd7ee656b5b447449b6d",
+              "adapterRef": "adapter:stock@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:stock.quote@1"
+              ],
+              "inputSchemaRefs": [
+                "builtin:stockQuote"
+              ],
+              "outputSchemaRef": null,
+              "inputOrigin": "catalog"
+            }
+          },
+          {
+            "card": {
+              "entry": "timers.manage",
+              "bundle": "timers.manage",
+              "title": "タイマー",
+              "summary": "相対時間のタイマーを開始・確認・取消する。時間の指定がなければ3分で開始する",
+              "useWhen": [
+                "何分後に知らせてほしい",
+                "タイマーを起動したい",
+                "タイマーの残り時間を知りたい",
+                "タイマーを止めたい"
+              ],
+              "avoidWhen": [
+                "時刻指定の予定",
+                "繰り返しのアラーム"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "command",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:timers.manage@6",
+              "definitionHash": "5c868a6725c11de18a6ec44212788fe130d5bb25725aa5be73233f9a9137b66b",
+              "packageRevisionId": "package:timers.manage@2",
+              "bindingRevisionId": "binding:timers.command@4",
+              "bindingDigest": "18154729eec9f8581603ad38fbdc426995712fdd68d5d0749401df6b002b1fb1",
+              "adapterRef": "adapter:timers@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:timer.start@1",
+                "tool:timer.list@1",
+                "tool:timer.cancel@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "weather.forecast",
+              "bundle": "weather.forecast",
+              "title": "天気予報",
+              "summary": "今日・明日・明後日の天気予報（天気・最高最低気温・降水確率）を、言われた地名から気象庁の予報で即答する。担当への依頼文や予告は不要で、この関数の呼び出しがそのまま回答になる。今日から3日目までの天気の依頼はWeb検索より先にこの担当を使う。3日より先・時刻ごと・現在の気温は対象外",
+              "useWhen": [
+                "「今日の天気は？」「明日の横浜の天気を教えて」と、今日・明日・明後日の天気を質問している",
+                "雨が降るか・傘が要るか・気温はどれくらいか・暑いか寒いかなど、今日から3日目までの天気の様子を質問している",
+                "前の発言の続きで「明日は？」「明後日は？」と、別の日の天気を質問している"
+              ],
+              "avoidWhen": [
+                "4日以上先の天気や週間予報を質問している",
+                "「午後3時の天気」「夜の気温」など時刻ごとの天気を質問している",
+                "「今の気温」「現在の降水量」など現在の観測値を質問している",
+                "過去の天気や、台風・警報・注意報の詳細を質問している"
+              ],
+              "arguments": {
+                "type": "object",
+                "properties": {
+                  "place": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 30,
+                    "description": "天気を知りたい場所。依頼の地名をそのまま書く（例: 鎌倉、横浜、湘南、北海道）。市区町村・地域・都道府県のどれでもよい。"
+                  },
+                  "prefecture": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 5,
+                    "description": "その場所がある都道府県（例: 神奈川県）。依頼に無くても、知っている場所なら書く。"
+                  },
+                  "day": {
+                    "type": "string",
+                    "enum": [
+                      "today",
+                      "tomorrow",
+                      "day_after"
+                    ],
+                    "description": "天気を知りたい日。today=今日、tomorrow=明日、day_after=明後日。日付や曜日で言われたときは今日からの日数で選ぶ。"
+                  }
+                },
+                "required": [
+                  "place",
+                  "prefecture",
+                  "day"
+                ],
+                "additionalProperties": false
+              },
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "instant",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:weather.forecast@2",
+              "definitionHash": "992645b4c041434c6da96e369011d9fdc1a832ab81b064d6390f3a72c64186ec",
+              "packageRevisionId": "package:weather.forecast@2",
+              "bindingRevisionId": "binding:weather.forecast@2",
+              "bindingDigest": "efb9762fe3ccb142f7f601b039079117ef8de59d0d1751bf9710df173bcee4d3",
+              "adapterRef": "adapter:weather@1",
+              "bundleSource": "binding-document",
+              "toolRevisionIds": [
+                "tool:weather.forecast@2"
+              ],
+              "inputSchemaRefs": [
+                "builtin:weatherPlace"
+              ],
+              "outputSchemaRef": null,
+              "inputOrigin": "catalog"
+            }
+          },
+          {
+            "card": {
+              "entry": "web.search",
+              "bundle": "web.search",
+              "title": "Web検索",
+              "summary": "公開Webの情報や公式ページを素早く確認し、短い回答と出典リンクを返す。用語・名称・場所・日付・仕様の一項目や指定ページの内容など、一度の事実確認を担当する",
+              "useWhen": [
+                "公式サイトやWeb資料を確認し、出典付きで簡潔に答えてほしい",
+                "用語の意味・正式名称・所在地・日付などを一つ調べたい",
+                "指定URLの本文から必要な情報を確かめたい"
+              ],
+              "avoidWhen": [
+                "ニュースの整理",
+                "複数資料の比較",
+                "天気予報・株価など、専用の担当がある事柄"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:web.search@9",
+              "definitionHash": "f868f86c7ac251c9e5a06b444b2025a6aafe4408cd8bef187dc5ce867bad3016",
+              "packageRevisionId": "package:web.recipe@6",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:recipe.find@1",
+                "tool:web.lookup@2",
+                "tool:web.read@1",
+                "tool:web.find@1",
+                "tool:web.read_saved@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "web.service-search",
+              "bundle": "web.service-search",
+              "title": "サービス内検索",
+              "summary": "指定されたサービス・サイト内の検索を使って探す。検索できない場合は対象ドメインを含む外部検索で補う",
+              "useWhen": [
+                "サービスやドメインを指定してその中の動画・投稿・記事などを探したい",
+                "指定サイトの検索欄を使って検索したい"
+              ],
+              "avoidWhen": [
+                "ページの更新・投稿・購入などの操作"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:web.service-search@5",
+              "definitionHash": "2444943fd707e4c95752108af5de5a580ba7f4530b46a9344e1b16dee83668fa",
+              "packageRevisionId": "package:web.service-search@4",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:browser.research@1",
+                "tool:web.lookup@2",
+                "tool:web.read@2"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          },
+          {
+            "card": {
+              "entry": "world.query",
+              "bundle": "world.query",
+              "title": "World照会",
+              "summary": "Worldに保存された記録から、影響・依存・関連・不足している情報・仮定の比較を調べ、根拠つきの報告で質問に答える（読み取り専用。事実の申告や記憶の依頼には使わない）。取り込まれた収集資料の検索・原文確認にも使う",
+              "useWhen": [
+                "「〜を変えると何に影響する？」と、変更や停止の影響を質問している",
+                "「〜は何に依存している？」と、依存関係を質問している",
+                "「〜に関係が深いものは？」と、関連するものを質問している",
+                "「AとBではどちらが…？」と、二つの仮定や案を比べて質問している",
+                "「判断に足りない情報は？」と、まだ分かっていないことや不足している根拠を質問している",
+                "「〜にすると…はどうなりそう？」と、変更や移行の結果を質問している",
+                "「〜の担当は誰？」「〜について誰に聞けばいい？」と、物事の担当や関係者を質問している",
+                "「World の記録だと…」と、World に記録された内容を質問している",
+                "取り込んだ収集資料や規程を根拠に、内容・適用条件・判断の不足を質問している"
+              ],
+              "avoidWhen": [
+                "利用者が事実や状況を述べているだけで、質問していない（「〜は〇〇に依存しています」「〜に変えました」）",
+                "覚えてほしい・忘れてほしい・訂正したい・目標を登録または片付けたい（記憶ツールの依頼を使う）",
+                "本人の好みや習慣など、本人についての記憶を聞いているだけ",
+                "雑談や一般知識の質問"
+              ],
+              "output": {
+                "schemaRef": null,
+                "origin": "missing"
+              },
+              "effects": [
+                "read",
+                "write"
+              ],
+              "mayAskUser": true
+            },
+            "execution": "unbound",
+            "enabled": true,
+            "support": "partial",
+            "reasons": [
+              "completed output is host-confirmed; no public completed-result schema"
+            ],
+            "evidence": {
+              "toolchainRevisionId": "toolchain:world.query@8",
+              "definitionHash": "7229b5dd08d5a431343d386909840d2bddbce040a686f927da1b164f16a1c760",
+              "packageRevisionId": "package:world.query@5",
+              "bindingRevisionId": null,
+              "bindingDigest": null,
+              "adapterRef": null,
+              "bundleSource": null,
+              "toolRevisionIds": [
+                "tool:world.find@1",
+                "tool:world.query@2",
+                "tool:world.documents@1"
+              ],
+              "inputSchemaRefs": [],
+              "outputSchemaRef": null,
+              "inputOrigin": "missing"
+            }
+          }
+        ],
+        "initialRefs": [],
+        "definition": null,
+        "executionPlan": null,
+        "cursor": 0,
+        "children": {},
+        "results": {},
+        "repaired": false
+      },
+      "observations": []
+    }
+  ]
+}

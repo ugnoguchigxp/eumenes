@@ -10,7 +10,7 @@ import {
 import { active } from "../repository";
 import type { Runtime } from "./runtime";
 import { liveConfig, liveInstructions } from "./config";
-import { historyInput } from "./protocol";
+import { selectHistory } from "./protocol";
 export function createStarter({
 	store,
 	settings,
@@ -89,6 +89,10 @@ export function createStarter({
 				cfg.live.model,
 				cfg.connection.name,
 			);
+			db.query("UPDATE live_voice_sessions SET input_json=? WHERE id=?").run(
+				JSON.stringify({ sources: [], complete: true }),
+				id,
+			);
 		});
 		let socket: LiveSocket;
 		try {
@@ -115,33 +119,62 @@ export function createStarter({
 			() => void finish(id, "failed", "live_stream_not_attached"),
 			10000,
 		);
-		socket.addEventListener("open", () => {
-			try {
-				const history = input.test
-					? []
-					: store.read((db) => conversation.history(db, input.conversationId));
-				const kept = historyInput(history);
-				send(id, {
-					type: "session.start",
-					session: {
-						model: cfg.live.model,
-						instructions: liveInstructions(
-							cfg,
-							conversation.persona(cfg.persona),
-						),
-						audio: {
-							format: { type: "audio/pcm", rate: 24000 },
-							...(cfg.live.voice ? { output: { voice: cfg.live.voice } } : {}),
+		socket.addEventListener("open", () =>
+			enqueue(id, async () => {
+				try {
+					const { kept, footprint } = await store.write((db) => {
+						const history = input.test
+							? []
+							: conversation.history(db, input.conversationId);
+						const selected = selectHistory(history);
+						const footprint = {
+							sources: [
+								...new Set(
+									selected.selected.flatMap((m) => m.input?.sources ?? []),
+								),
+							],
+							complete: selected.selected.every((m) => m.input?.complete),
+						};
+						db.query(
+							"UPDATE live_voice_sessions SET input_json=? WHERE id=? AND status='connecting'",
+						).run(JSON.stringify(footprint), id);
+						return { kept: selected.messages, footprint };
+					});
+					if (
+						!store.read(
+							(db) =>
+								active(db, input.conversationId)?.id === id &&
+								(!conversation.validInput ||
+									conversation.validInput(db, footprint)),
+						)
+					) {
+						await finish(id, "interrupted", "live_history_changed");
+						return;
+					}
+					send(id, {
+						type: "session.start",
+						session: {
+							model: cfg.live.model,
+							instructions: liveInstructions(
+								cfg,
+								conversation.persona(cfg.persona),
+							),
+							audio: {
+								format: { type: "audio/pcm", rate: 24000 },
+								...(cfg.live.voice
+									? { output: { voice: cfg.live.voice } }
+									: {}),
+							},
+							input: kept,
+							store: false,
+							delegation: { type: "client" },
 						},
-						input: kept,
-						store: false,
-						delegation: { type: "client" },
-					},
-				});
-			} catch {
-				void finish(id, "failed", "live_connect_failed");
-			}
-		});
+					});
+				} catch {
+					void finish(id, "failed", "live_connect_failed");
+				}
+			}),
+		);
 		socket.addEventListener("message", (event) =>
 			enqueue(id, () => receive(id, (event as MessageEvent).data)),
 		);

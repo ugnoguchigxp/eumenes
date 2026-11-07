@@ -1,0 +1,21 @@
+{
+  "webPassed": 99,
+  "browserPassed": 6,
+  "partialPassed": 36,
+  "typecheck": "5 errors in 4 concurrently changed agency files; no errors in changed avatar files",
+  "fullVerify": "blocked by existing artifacts source snapshots at inventory",
+  "before": {
+    "minCenterX": 340.5253729412779,
+    "maxCenterX": 353.34480060801144,
+    "horizontalTravel": 12.819427666733532
+  },
+  "after": {
+    "minCenterX": 266.16565123206067,
+    "maxCenterX": 433.0283166109253,
+    "horizontalTravel": 166.86266537886462
+  },
+  "measurement": "horizontal centroid of bright clothing/skin-coloured pixels, 700x700, 40 samples over 10 seconds, zoom 170%",
+  "serverRestarted": false,
+  "contextCompileTotal": 3,
+  "compileEvalTotal": 3
+}

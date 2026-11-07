@@ -66,7 +66,12 @@ export type LiveConversationPort = {
 	history(
 		tx: Database,
 		conversationId: string,
-	): Array<{ role: "user" | "assistant"; text: string }>;
+	): Array<{
+		role: "user" | "assistant";
+		text: string;
+		input?: LiveReferenceInput;
+	}>;
+	validInput?(tx: Database, input: LiveReferenceInput): boolean;
 	publish(
 		tx: Database,
 		input: {
@@ -75,8 +80,9 @@ export type LiveConversationPort = {
 			role: "user" | "assistant";
 			text: string;
 			at: string;
+			input?: LiveReferenceInput;
 		},
-	): void;
+	): LiveReferenceInput | void;
 	delegate(
 		tx: Database,
 		input: {
@@ -116,3 +122,12 @@ export const errorStatus = {
 	live_storage_failed: 503,
 	live_request_conflict: 409,
 } as const;
+export type LiveOutputOrigin = {
+	id: string;
+	ordinal: number;
+	input: { sources: readonly string[]; complete: boolean };
+};
+export type LiveReferenceInput = {
+	sources: readonly string[];
+	complete: boolean;
+};

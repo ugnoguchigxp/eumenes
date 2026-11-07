@@ -8,8 +8,12 @@ type Expression = {
 	form: number;
 };
 const neutral: Expression = { smile: 0, eyes: 1, brow: 0, cheek: 0, form: 0 };
-// Model presentation only: the existing delivery classifier has already chosen the motion.
-const expressions: Partial<Record<AvatarMotion, Partial<Expression>>> = {
+// Model presentation only: selected motions keep their presets; neutral can gently smile at rest.
+const expressions: Record<AvatarMotion, Partial<Expression>> = {
+	neutral: {},
+	speaking: {},
+	thinking: { eyes: 0.9, brow: 0.25, form: -0.15 },
+	distant: { eyes: 0.8, brow: -0.3, form: -0.35 },
 	agreeing: { smile: 0.35, eyes: 0.9, form: 0.5 },
 	joyful: { smile: 0.9, eyes: 0.72, brow: 0.2, cheek: 0.25, form: 0.9 },
 	listening: { eyes: 0.88, brow: -0.15, form: 0.2 },
@@ -48,7 +52,17 @@ export function createFace(random = Math.random) {
 		mouth: number,
 		intensity = 1,
 	) => {
-		const preset = { ...neutral, ...expressions[motion] };
+		const smile = ((1 - Math.cos(time * 0.8)) / 2) ** 2;
+		const preset =
+			motion === "neutral"
+				? {
+						smile: smile * 0.4,
+						eyes: 1 - smile * 0.12,
+						brow: smile * 0.12,
+						cheek: smile * 0.08,
+						form: smile * 0.5,
+					}
+				: { ...neutral, ...expressions[motion] };
 		const strength = Number.isFinite(intensity)
 			? Math.max(0, Math.min(1, intensity))
 			: 1;

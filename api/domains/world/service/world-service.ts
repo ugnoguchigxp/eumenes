@@ -1,4 +1,5 @@
 import { initialSourceSyncStarted } from "../repository/initial-sync";
+import { excludedRefs } from "../repository/working-set";
 import type { Database } from "bun:sqlite";
 import { randomUUID } from "node:crypto";
 import { sha256Hex } from "../../../infrastructure/digest";
@@ -296,6 +297,7 @@ export function createWorldService(options: WorldServiceOptions) {
 	function readSnapshotInTransaction(
 		db: Database,
 		request: WorldReadRequest,
+		includeExcluded = false,
 	): WorldReadResult {
 		requireTransaction(db);
 		if (options.gate && !options.gate.isOpen())
@@ -316,7 +318,24 @@ export function createWorldService(options: WorldServiceOptions) {
 		const first = readWorldSnapshot(db, build([]));
 		if (first.status !== "ready") return first;
 		const wanted = assertionSourceRefs(first.snapshot.assertions);
-		if (wanted.length === 0) return first;
+		const visible = (result: WorldReadResult): WorldReadResult => {
+			if (includeExcluded || result.status !== "ready") return result;
+			const excluded = new Set(
+				excludedRefs(db, request.scope)
+					.filter((r) => r.kind === "claim")
+					.map((r) => JSON.stringify([r.id, r.revision])),
+			);
+			return {
+				...result,
+				snapshot: {
+					...result.snapshot,
+					assertions: result.snapshot.assertions.filter(
+						(a) => !excluded.has(JSON.stringify([a.id, String(a.revision)])),
+					),
+				},
+			};
+		};
+		if (wanted.length === 0) return visible(first);
 		const resolved = resolveSources(
 			db,
 			adapters,
@@ -326,7 +345,9 @@ export function createWorldService(options: WorldServiceOptions) {
 			"lenient",
 			isStateItem,
 		);
-		return readWorldSnapshot(db, build(resolved.ok ? resolved.states : []));
+		return visible(
+			readWorldSnapshot(db, build(resolved.ok ? resolved.states : [])),
+		);
 	}
 
 	/**
@@ -395,6 +416,9 @@ export function createWorldService(options: WorldServiceOptions) {
 		typedFailure,
 
 		readSnapshot: readSnapshotInTransaction,
+		/** Owner inventory only; still enforces scope, source and recovery checks. */
+		readStoredSnapshot: (db: Database, request: WorldReadRequest) =>
+			readSnapshotInTransaction(db, request, true),
 		readHistory: readHistoryInTransaction,
 		async read(request: WorldReadRequest): Promise<WorldReadResult> {
 			try {

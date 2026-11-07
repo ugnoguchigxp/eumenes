@@ -1,4 +1,7 @@
 import type { Database } from "bun:sqlite";
+import { isExcluded } from "../repository/working-set";
+import { createWorldMaintenance } from "./maintenance";
+import type { WorldService } from "./world-service";
 import { sha256Hex } from "../../../infrastructure/digest";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
@@ -15,8 +18,9 @@ import {
 } from "../repository/documents";
 
 /** Host-owned reference material. Import is not extraction, adoption, or verification of external truth. */
-export function createWorldDocuments(store: SqliteStore) {
+export function createWorldDocuments(store: SqliteStore, world?: WorldService) {
 	const api = {
+		maintenance: createWorldMaintenance(store, world),
 		pageInTransaction(
 			db: Database,
 			scope: WorldDocumentScope,
@@ -78,7 +82,12 @@ export function createWorldDocuments(store: SqliteStore) {
 				};
 			}
 			const doc = readDocument(db, scope, input.documentId!);
-			if (!doc || doc.withdrawn) throw new Error("not_found");
+			if (
+				!doc ||
+				doc.withdrawn ||
+				isExcluded(db, scope, "document", doc.id, doc.revision)
+			)
+				throw new Error("not_found");
 			const chars = [...doc.content];
 			if (offset >= chars.length) throw new Error("invalid_offset");
 			// At most 8 KiB even for four-byte characters; boundaries never split a code point.
@@ -101,7 +110,12 @@ export function createWorldDocuments(store: SqliteStore) {
 			revision: string,
 		) {
 			const doc = readDocument(db, scope, id);
-			return !!doc && !doc.withdrawn && doc.revision === revision;
+			return (
+				!!doc &&
+				!doc.withdrawn &&
+				doc.revision === revision &&
+				!isExcluded(db, scope, "document", doc.id, doc.revision)
+			);
 		},
 	};
 	return api;

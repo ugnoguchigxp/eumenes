@@ -1,0 +1,146 @@
+{
+  "snapshot": "/Users/y.noguchi/.codex/visualizations/2026/11/06/01a1afc0-bfdf-78f0-9f21-44654ae4ba47/seventh-batch/snapshot",
+  "baseCommit": "0559873582e75c822ccc3d442e153e0f0a25711b",
+  "productFiles": [
+    {
+      "path": "api/application/compute/compute-adapter.ts",
+      "snapshotSha256": "680be0ef6afe67ffb3add1c957359c4db6634d74fe3cc580e120a989671e4403",
+      "rootSha256": "680be0ef6afe67ffb3add1c957359c4db6634d74fe3cc580e120a989671e4403",
+      "matches": true
+    },
+    {
+      "path": "api/application/compute/compute-adapter.test.ts",
+      "snapshotSha256": "9b1c65f8ccbe0121873f0e54d60f2cf789b79494bf48a7b6d28e9d81f4a0e220",
+      "rootSha256": "9b1c65f8ccbe0121873f0e54d60f2cf789b79494bf48a7b6d28e9d81f4a0e220",
+      "matches": true
+    },
+    {
+      "path": "api/application/pipelines/pipeline-execution.test.ts",
+      "snapshotSha256": "7cf26f4a24a50c74cc5b5eb1071aa8b2acee01df462496914e991175e44e4510",
+      "rootSha256": "7cf26f4a24a50c74cc5b5eb1071aa8b2acee01df462496914e991175e44e4510",
+      "matches": true
+    },
+    {
+      "path": "api/application/toolchain/toolchain-harness-options.fixture.ts",
+      "snapshotSha256": "79bd41c17c73064599cb5d61e7c10008084533195bec799f8fae3163d07f8a1f",
+      "rootSha256": "79bd41c17c73064599cb5d61e7c10008084533195bec799f8fae3163d07f8a1f",
+      "matches": true
+    },
+    {
+      "path": "api/application/toolchain/toolchain.fixture.ts",
+      "snapshotSha256": "0265ada4186892987b55af41a18add8292c318ad2ab7992fcff9fffd2904003a",
+      "rootSha256": "0265ada4186892987b55af41a18add8292c318ad2ab7992fcff9fffd2904003a",
+      "matches": true
+    },
+    {
+      "path": "api/domains/capabilities/bundles/pipeline-execution.bundle.json",
+      "snapshotSha256": "869d5762d4ac2afcb1115fa7751daddb1e34cf848ac444740e6c9f086ea9e14f",
+      "rootSha256": "869d5762d4ac2afcb1115fa7751daddb1e34cf848ac444740e6c9f086ea9e14f",
+      "matches": true
+    },
+    {
+      "path": "api/domains/capabilities/test/pipeline-bundle.test.ts",
+      "snapshotSha256": "401bc60f2ea29e2a3d41e59e83dbc4b2f68e0d4b4f66f7e71be8ff666d7a0389",
+      "rootSha256": "401bc60f2ea29e2a3d41e59e83dbc4b2f68e0d4b4f66f7e71be8ff666d7a0389",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/contexts/local/router-clarify.context.toml",
+      "snapshotSha256": "72c5e416138d38aa0de7a300b7752466ec50f4d044e9b237b26dc5f3b2e8d0be",
+      "rootSha256": "72c5e416138d38aa0de7a300b7752466ec50f4d044e9b237b26dc5f3b2e8d0be",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/service/executor-work.ts",
+      "snapshotSha256": "2a1c752e5eda97f0dddf8c1e98a62bade7cd8f074f207b605716325171fb7987",
+      "rootSha256": "2a1c752e5eda97f0dddf8c1e98a62bade7cd8f074f207b605716325171fb7987",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/service/interaction-runs.ts",
+      "snapshotSha256": "df1c504328616b03a3a7118cbb3ff3ab78e658bbaa7bbd1bac1dc229e95318e8",
+      "rootSha256": "df1c504328616b03a3a7118cbb3ff3ab78e658bbaa7bbd1bac1dc229e95318e8",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/service/routed-package.ts",
+      "snapshotSha256": "a456e50f39fd0133ea05412bc98a4d25a1e138e48492d5991728d21e720a979f",
+      "rootSha256": "a456e50f39fd0133ea05412bc98a4d25a1e138e48492d5991728d21e720a979f",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/service/routed-router.ts",
+      "snapshotSha256": "f8247481289ee83dd94e1bc4f7ffe4a2ff1e65a9542cdb404b0605fa55492a67",
+      "rootSha256": "f8247481289ee83dd94e1bc4f7ffe4a2ff1e65a9542cdb404b0605fa55492a67",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/service/work-stop.ts",
+      "snapshotSha256": "a61ce2de92d0c4091e909b049985703b3c31e2f9d4fdb94ffb48aef2fd2619c4",
+      "rootSha256": "a61ce2de92d0c4091e909b049985703b3c31e2f9d4fdb94ffb48aef2fd2619c4",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/test/routed-router.test.ts",
+      "snapshotSha256": "98da3e0d04cb19d0e7424d56ec916bafbfdb1374e4903d046e73f6d951af13ca",
+      "rootSha256": "98da3e0d04cb19d0e7424d56ec916bafbfdb1374e4903d046e73f6d951af13ca",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/test/router.fixture.ts",
+      "snapshotSha256": "20754c75f2d6a04d62a3e2f328a0ad31a9eb992ee00e2d1deea4611bc8acd00b",
+      "rootSha256": "20754c75f2d6a04d62a3e2f328a0ad31a9eb992ee00e2d1deea4611bc8acd00b",
+      "matches": true
+    },
+    {
+      "path": "api/domains/dialogue/test/structured-continuation.test.ts",
+      "snapshotSha256": "81da0f49c4edf072e55f306feb800a295d37cfb64a4d3af1dfbaceffc3798205",
+      "rootSha256": "81da0f49c4edf072e55f306feb800a295d37cfb64a4d3af1dfbaceffc3798205",
+      "matches": true
+    },
+    {
+      "path": "vendor/router/adoption-source.patch",
+      "snapshotSha256": "6d42e6cbe2af7099d00ed1db6a4f4229e7523641c15a05f0f81c4acc70028f03",
+      "rootSha256": "6d42e6cbe2af7099d00ed1db6a4f4229e7523641c15a05f0f81c4acc70028f03",
+      "matches": true
+    },
+    {
+      "path": "vendor/router/manifest.json",
+      "snapshotSha256": "ee1fdff0ad39d25e6e3e1644f431e43ef86116145cb788619ae348e031d760fe",
+      "rootSha256": "ee1fdff0ad39d25e6e3e1644f431e43ef86116145cb788619ae348e031d760fe",
+      "matches": true
+    },
+    {
+      "path": "vendor/router/eumenes_router-0.0.2-ee0f02404f6b.tgz",
+      "snapshotSha256": "ee0f02404f6b7928f44721bad253bb6c3a23cf596370285485f84b96ae268c82",
+      "rootSha256": "ee0f02404f6b7928f44721bad253bb6c3a23cf596370285485f84b96ae268c82",
+      "matches": true
+    },
+    {
+      "path": "vendor/router/eumenes_router-0.0.2-ee0f02404f6b.tgz.sha256",
+      "snapshotSha256": "f3260338dc32abb39aa4ee4a033b6b5442451e56ef5d1fa721e4d2fffec650be",
+      "rootSha256": "f3260338dc32abb39aa4ee4a033b6b5442451e56ef5d1fa721e4d2fffec650be",
+      "matches": true
+    }
+  ],
+  "diagnosticOnlyPostChanges": [
+    "scripts/router-issue-eval.ts",
+    "scripts/router-issue-inference.ts"
+  ],
+  "normalization": {
+    "path": "api/domains/capabilities/bundles/browser-interact.bundle.json",
+    "snapshotSha256": "a11fa79fff5ffcc0fddf466a02ac22b844a487a7489795c678f4938c6be3df6c",
+    "note": "Copy-only formatting before verify. Other browser work continued separately; its current state is outside this acceptance."
+  },
+  "independentWorkPreserved": [
+    "Browser/Interact changes and vendored adoption",
+    "retired vendor artifacts and setup policy"
+  ],
+  "ci": false,
+  "generatedPromptEntry": {
+    "key": "dialogue.contexts.local.router-clarify",
+    "matches": true,
+    "note": "Whole catalogs also contain independent Browser changes."
+  },
+  "routerDependencyMatches": true
+}

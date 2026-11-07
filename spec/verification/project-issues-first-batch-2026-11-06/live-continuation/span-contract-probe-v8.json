@@ -1,0 +1,35 @@
+{
+  "case": "holdout-same-tool",
+  "prompt": "turn-structure-v8",
+  "elapsedMs": 7223,
+  "valid": true,
+  "kind": [
+    "requests"
+  ],
+  "requests": [
+    {
+      "keys": [
+        "text",
+        "target",
+        "inputs",
+        "after"
+      ],
+      "textLiteral": true,
+      "targetLiteral": true,
+      "inputLiterals": [],
+      "afterValid": true
+    },
+    {
+      "keys": [
+        "text",
+        "target",
+        "inputs",
+        "after"
+      ],
+      "textLiteral": true,
+      "targetLiteral": true,
+      "inputLiterals": [],
+      "afterValid": true
+    }
+  ]
+}

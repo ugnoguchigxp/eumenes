@@ -1,3 +1,6 @@
+import { agencyForgetting } from "./agency-forgetting";
+import { refreshAgencyDependencies } from "./agency-memory";
+import { staleAgencySources } from "./agency-sources";
 import type { Database } from "bun:sqlite";
 import {
 	currentAgencyWork,
@@ -16,25 +19,39 @@ import {
 	revokeAgency,
 	type AgencyRecord,
 } from "../repository/agency";
+import type { MemoryService } from "../../memory";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
+import {
+	agencyObservations,
+	saveAgencyObservation,
+	deleteAgencyObservation,
+	agencyDependents,
+	replaceAgencyDependents,
+} from "../repository/agency-observations";
 
 export function createAgencyStatePort(deps: {
 	agents?: AgentRuntime;
 	toolchains?: ToolchainRoutingPort | undefined;
 	now: () => number;
+	memory?: Pick<MemoryService, "referenceInputs">;
 }) {
+	const revoke = (db: Database, id: string) => {
+		for (const w of agencyWorks(db, id, true))
+			deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
+		revokeAgency(db, id);
+	};
 	const catalog = (db: Database) =>
 		(deps.toolchains?.catalogInTransaction(db) ?? []).flatMap((entry) => {
 			const card = deps.toolchains!.cardInTransaction(db, entry.revisionId);
 			// Runtime routes are execution contracts, not semantic topic judgments.
 			return card &&
-				(card.minImpact ?? "read") === "read" &&
+				(card.minImpact === undefined || card.minImpact === "none") &&
 				!entry.runtime.binding &&
 				(entry.runtime.route === "web" || entry.runtime.route === "history")
 				? [
 						{
-							id: card.revisionId,
+							revisionId: card.revisionId,
 							title: card.title,
 							description: card.summary,
 						},
@@ -42,7 +59,81 @@ export function createAgencyStatePort(deps: {
 				: [];
 		});
 	return {
-		recordsInTransaction: agencyRecords,
+		quarantineLegacyInTransaction(db: Database) {
+			for (const record of agencyRecords(db))
+				if (
+					!(record.snapshot as import("eumenes-agency").AgencySnapshot)
+						.provenance
+				)
+					revoke(db, record.conversationId);
+		},
+		staleSourcesInTransaction: (db: Database, refs: readonly string[]) =>
+			staleAgencySources(
+				db,
+				refs,
+				catalog(db).map((c) => c.revisionId),
+			),
+		observationsInTransaction: agencyObservations,
+		messageInputInTransaction(db: Database, messageId: string) {
+			for (const record of agencyRecords(db)) {
+				const snapshot =
+					record.snapshot as import("eumenes-agency").AgencySnapshot;
+				const attempt = snapshot.state.attempts?.find(
+					(a) => messageId === `agency:${record.scope}:${a.id}`,
+				);
+				if (!attempt) continue;
+				return (
+					snapshot.provenance?.entries.find(
+						([key]) => key === `attempt:${attempt.id}`,
+					)?.[1] ?? null
+				);
+			}
+			return null;
+		},
+		refreshDependenciesInTransaction(
+			db: Database,
+			conversationId: string,
+			scope: string,
+			refs: readonly string[],
+		) {
+			refreshAgencyDependencies(db, deps.memory, conversationId, scope, refs);
+		},
+		saveObservationInTransaction: saveAgencyObservation,
+		deleteObservationInTransaction: deleteAgencyObservation,
+		dependentsInTransaction: agencyDependents,
+		replaceDependentsInTransaction: replaceAgencyDependents,
+		recordsInTransaction(db: Database) {
+			return agencyRecords(db).map((record) => {
+				const snap =
+					record.snapshot as import("eumenes-agency").AgencySnapshot & {
+						memoryObservations?: boolean;
+					};
+				if (!snap.memoryObservations) return record;
+				if (!deps.memory) throw new Error("agency_memory_unavailable");
+				const rows = agencyObservations(db, record.conversationId).filter(
+					(row) => row.scope === record.scope,
+				);
+				const observations = snap.observations.map((observation) => {
+					if (snap.forgottenRefs?.includes(observation.id)) return observation;
+					const row = rows.find((row) => row.observationId === observation.id);
+					const found =
+						row &&
+						deps.memory!.referenceInputs.readRecordInTransaction(db, {
+							recordId: row.ref.id,
+							revision: row.ref.revision,
+						});
+					if (!found || found.ref.digest !== row!.ref.digest)
+						throw new Error("agency_archive_unavailable");
+					const entry = JSON.parse(
+						found.content,
+					) as import("eumenes-agency").ArchivedObservation;
+					if (entry.observation.id !== observation.id)
+						throw new Error("agency_archive_mismatch");
+					return entry.observation;
+				});
+				return { ...record, snapshot: { ...snap, observations } };
+			});
+		},
 		claimDispatchInTransaction: claimAgencyDispatch,
 		epochInTransaction: agencyEpoch,
 		feedInTransaction: agencyFeed,
@@ -77,7 +168,7 @@ export function createAgencyStatePort(deps: {
 				if (found.revoked) throw new Error("agency_origin_stale");
 				return found.task_id;
 			}
-			if (!catalog(db).some((c) => c.id === input.revisionId))
+			if (!catalog(db).some((c) => c.revisionId === input.revisionId))
 				throw new Error("agency_capability_unavailable");
 			const resolved = deps.toolchains.resolveInTransaction(
 				db,
@@ -229,29 +320,8 @@ export function createAgencyStatePort(deps: {
 			deps.agents?.deleteTaskDataInTransaction(db, id);
 			revokeAgencyWork(db, id);
 		},
-		revokeInTransaction(db: Database, id: string) {
-			for (const w of agencyWorks(db, id, true))
-				deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
-			revokeAgency(db, id);
-		},
-		forgetInTransaction(
-			db: Database,
-			input: { messageIds: readonly string[]; itemIds: readonly string[] },
-		) {
-			const refs = new Set([
-				...input.messageIds,
-				...input.itemIds.map((id) => `memory:${id}`),
-			]);
-			const ids = agencyRecords(db)
-				.filter((r) => r.sourceRefs.some((ref) => refs.has(ref)))
-				.map((r) => r.conversationId);
-			for (const id of ids) {
-				for (const w of agencyWorks(db, id, true))
-					deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
-				revokeAgency(db, id);
-			}
-			return ids;
-		},
+		revokeInTransaction: revoke,
+		...agencyForgetting(deps),
 	};
 }
 export type AgencyStatePort = ReturnType<typeof createAgencyStatePort>;

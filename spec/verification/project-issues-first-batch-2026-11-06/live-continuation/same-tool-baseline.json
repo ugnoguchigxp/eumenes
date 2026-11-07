@@ -1,0 +1,45 @@
+{
+  "conversationId": "verify-eum001002-same-tool-20261106-1958",
+  "exitCode": 0,
+  "stdout": "{\"type\":\"message\",\"updated\":false,\"id\":\"032a1376-1b63-4413-9e0c-735b387e5e76\",\"conversationId\":\"verify-eum001002-same-tool-20261106-1958\",\"role\":\"user\",\"text\":\"10秒のタイマーと25秒のタイマーをそれぞれ1つずつ作ってください。\",\"createdAt\":\"2026-11-06T10:53:51.478Z\",\"runId\":\"ff099877-6778-4448-8fec-6deec4f707dd\"}\n{\"type\":\"announcement\",\"updated\":false,\"id\":\"announcement:ff099877-6778-4448-8fec-6deec4f707dd\",\"conversationId\":\"verify-eum001002-same-tool-20261106-1958\",\"role\":\"assistant\",\"text\":\"「タイマー」に頼みます。\",\"createdAt\":\"2026-11-06T10:53:51.478Z\",\"runId\":\"ff099877-6778-4448-8fec-6deec4f707dd\"}\n",
+  "stderr": "",
+  "runs": [
+    {
+      "id": "ff099877-6778-4448-8fec-6deec4f707dd",
+      "agentTaskId": "7d7a35d0-a681-41ce-abbc-e46aa0f10dd0",
+      "requestId": "85af3d95-c42f-4155-b205-0747e2d41166",
+      "conversationId": "verify-eum001002-same-tool-20261106-1958",
+      "utteranceId": null,
+      "status": "completed",
+      "revision": 6,
+      "inputMessageId": "032a1376-1b63-4413-9e0c-735b387e5e76",
+      "answerMessageId": null,
+      "announcement": "「タイマー」に頼みます。",
+      "error": null,
+      "jobId": "04041aff-840d-4b8d-a2a9-84f7f1597777",
+      "deadlineAt": "2026-11-06T10:56:51.478Z",
+      "deadlineFixed": false,
+      "sourceKind": "manual",
+      "scheduleId": null,
+      "occurrenceId": null,
+      "specialistSessionId": null,
+      "pinnedToolchainId": null,
+      "createdAt": "2026-11-06T10:53:51.478Z",
+      "updatedAt": "2026-11-06T10:54:10.820Z"
+    }
+  ],
+  "conversation": {
+    "id": "verify-eum001002-same-tool-20261106-1958",
+    "revision": 1,
+    "messages": [
+      {
+        "id": "032a1376-1b63-4413-9e0c-735b387e5e76",
+        "conversationId": "verify-eum001002-same-tool-20261106-1958",
+        "role": "user",
+        "text": "10秒のタイマーと25秒のタイマーをそれぞれ1つずつ作ってください。",
+        "createdAt": "2026-11-06T10:53:51.478Z",
+        "runId": "ff099877-6778-4448-8fec-6deec4f707dd"
+      }
+    ]
+  }
+}

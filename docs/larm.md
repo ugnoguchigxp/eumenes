@@ -174,9 +174,11 @@ TTSの合成は backend 全体で同時に1件。音声対話の句・読み上�
 | --- | --- |
 | `route` | `questions.route`（choice）に、パッケージが offer した criteria（名前と説明、渡した順）を送り、選ばれた1件・全 criteria の確率（合計1）・`scores`（criteria ごとの独立の点数。パッケージは必須とする）・`head_revision`／`calibration_revision` を読む。`state` は最新の発言の `text` だけ（文脈判定の契約は履歴を受けない）で、先頭400字。criteria は1〜128件、名前は英字で始まる ASCII（最大96字）、説明は最大4096字。上限はパッケージの `ROUTE_LIMITS` |
 
-要求が上限を破る場合は送らず（`larm_invalid_route_request`）、応答が形に合わない場合（criteria の外の選択・欠けた確率・範囲外の値）は `larm_invalid_route_response`、`truncated: true` または `criteria_dropped` がある場合は `larm_route_truncated` で失敗し、部分の答えは使わない。router の接続でない口（`decisionOnly` でない）は `larm_route_port_required`。呼び手は各呼出しの時間を `timeoutMs` で区切り、失敗・時間切れでは会話の回にする。欄の抽出（旧 `routeFields`）はない。欄の要る担当は会話のモデルの1候補の欄埋めで埋める。
+要求が上限を破る場合は送らず（`larm_invalid_route_request`）、応答が形に合わない場合（criteria の外の選択・欠けた確率・範囲外の値）は `larm_invalid_route_response`、`truncated: true` または `criteria_dropped` がある場合は `larm_route_truncated` で失敗し、部分の答えは使わない。router の接続でない口（`decisionOnly` でない）は `larm_route_port_required`。呼び手は採点呼出しの時間を `timeoutMs` で区切る。直接 `route` の失敗・時間切れは既存の会話経路へ戻る。`routeStructured` は構造・部分の採点に失敗しても直接経路へ戻さず、依頼全体を未実施として扱う。欄の抽出（旧 `routeFields`）はない。欄の要る担当は会話のモデルの1候補の欄埋めで埋める。
 
-設定は SQLite の設定文書の `router`（表情判定の設定とは別）。`profile` は保存するまで空（保存すると発言の回をすべてパッケージが決める。意図判定はない）、`entry`（`route`・`routeStructured`、初期 `route`）、`structureResourceId`（構造の判断のクラウド LLM 資源、初期 null。利用者の発言と直前のエージェントの返答をパッケージの指示文とともに送る）、`structureTimeoutMs`（初期 8000）、`timeoutMs`（LARM の1呼出しの待ち、初期 2000）、決定表の閾値 `accept`（τ採用 0.6）・`low`（τ低 0.3）・`margin`（δ 0.15）・`approve`（τ承認 0.85）・`multi`（τ多 0.5）、訂正の記憶の `feedbackNear`（0.95）・`feedbackWeight`（0 で訂正の補正なし、初期 2）。best-v2 の記憶は設定ではなくパッケージの表に入れる（発言から作ったので Git にない）。取込みは今の LARM の埋め込みの空間に結び付けるので、同じ埋め込みモデル（catalog の `embeddingSpace`）で作った記憶だけを入れる。
+設定は SQLite の設定文書の `router`（表情判定の設定とは別）。`profile` は保存するまで空（保存すると発言の回をすべてパッケージが決める。意図判定はない）、`entry`（`route`・`routeStructured`、初期 `route`）、`structureResourceId`（構造の判断のクラウド LLM 資源、初期 null。現在発言の全文、直前の返答、有効な保留質問と取消候補の有限参照をパッケージの指示文とともに送る）、`structureTimeoutMs`（初期 8000）、`timeoutMs`（LARM の1呼出しの待ち、初期 2000）、決定表の閾値 `accept`（τ採用 0.6）・`low`（τ低 0.3）・`margin`（δ 0.15）・`approve`（τ承認 0.85）・`multi`（τ多 0.5）、訂正の記憶の `feedbackNear`（0.95）・`feedbackWeight`（0 で訂正の補正なし、初期 2）。best-v2 の記憶は設定ではなくパッケージの表に入れる（発言から作ったので Git にない）。取込みは今の LARM の埋め込みの空間に結び付けるので、同じ埋め込みモデル（catalog の `embeddingSpace`）で作った記憶だけを入れる。
+
+構造解析ではpackageの閉じたJSON Schemaを既存background controlの `structuredOutput:true` とともに渡す。回答・取消の本文は現在発言の全文、参照は提示集合に限定する。モデルが意味と対象を選び、packageとhostが形式・参照・会話・revision・状態・権限を検査する。解析失敗時は部分実行や自動再試行を行わない。[実装と受入記録](../spec/project-issues-first-batch-2026-11-06.md)を参照。
 
 ```sh
 bun run cli -- router import-memory <best-v2 の記憶の JSON>
@@ -191,7 +193,7 @@ API は `GET /api/settings/router` と `PATCH /api/settings/router`（変える�
 
 ## チャットの画像入力
 
-画像入力（JPG・PNG・BMP）は、Providerの`llm.vision`と`chatInput`を確認して使います。保存、履歴再送、正式token計数と保持説明は[チャット画像入力](chat-images.md)を参照してください。
+LARMの画像入力（JPG・PNG・BMP）は、Providerの`llm.vision`と`chatInput`を確認して使います。クラウド経路の対応確認と送信は別契約です。保存、再添付、token計数と保持説明は[チャット画像入力](chat-images.md)を参照してください。
 
 ## Docling Deskの入口
 

@@ -63,10 +63,19 @@ test("a quote that is found becomes the evidence range; the result and provenanc
 	);
 });
 
-test("a quote that is not found falls back to the whole user message and says so", async () => {
+test("a supplied quote that does not match is rejected without replacing its evidence", async () => {
+	const h = await setup();
+	const id = await h.say("user", "こんにちは");
+	expect(await h.curate([remember(id)])).toEqual([
+		{ status: "rejected", op: "remember", reason: "invalid_source" },
+	]);
+	expect(h.memory.list(true)).toEqual([]);
+});
+
+test("an omitted quote keeps the bounded user message as its evidence", async () => {
 	const h = await setup();
 	const id = await h.say("user", "私は辛いものが好きです");
-	for (const quote of ["全然ちがう文", null, ""]) {
+	for (const quote of [null, ""]) {
 		const result = only(
 			await h.curate([
 				remember(id, { key: `k.${String(quote).length}`, quote }),
@@ -86,10 +95,8 @@ test("a long message keeps the library's 1024-byte evidence limit: the matched q
 	const tail = "そして私は辛いものが好きでコーヒーも好きです";
 	const id = await h.say("user", `${filler}${tail}`);
 	const bytes = (text: string) => Buffer.byteLength(text, "utf8");
-	// Not found: the window around the words the fact shares, not the filler at the start.
-	const unmatched = only(
-		await h.curate([remember(id, { quote: "存在しない" })]),
-	);
+	// No quote supplied: preserve the existing bounded whole-message path.
+	const unmatched = only(await h.curate([remember(id, { quote: null })]));
 	if (unmatched.status !== "applied") throw new Error("rejected");
 	const window = itemOf(h, unmatched.id).evidence[0]!.quote!;
 	expect(bytes(window)).toBeLessThanOrEqual(1024);

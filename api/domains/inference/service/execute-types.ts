@@ -22,6 +22,7 @@ import type { SpeechLane } from "./speech-lane";
 export type InferenceOptions = {
 	/** Agent SDK providers for connections whose kind is not openai-compatible. */
 	cloudAgents?: CloudAgents;
+	connectionModels?: import("./connection-models").ConnectionModelsService;
 	/** Must use the selected model's tokenizer, including message framing. */
 	countControlTokens?: (messages: Messages) => number | null;
 	token?: string;

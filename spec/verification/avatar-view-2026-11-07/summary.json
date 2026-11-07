@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-07",
+  "baseline": {
+    "partialPassed": 19
+  },
+  "partial": {
+    "passed": 21,
+    "failed": 0
+  },
+  "domainTests": {
+    "command": "bun run test:domain -- --domain avatar --domain conversation",
+    "backendPassed": 118,
+    "webPassed": 82,
+    "failed": 0
+  },
+  "browser": {
+    "command": "bun x playwright test tests/browser/avatar-view.spec.ts tests/browser/avatar-control.spec.ts",
+    "passed": 5,
+    "failed": 0,
+    "mode": "fixture, real WebGL, muted; no server started",
+    "afterTestTypeFix": {
+      "command": "bun x playwright test tests/browser/avatar-view.spec.ts",
+      "passed": 1
+    }
+  },
+  "static": {
+    "typecheckFiles": 2976,
+    "typecheckErrors": 0,
+    "boundaryFiles": 2754,
+    "boundaries": "passed",
+    "targetLint": "passed",
+    "targetFormat": "passed",
+    "sizeBudget": "passed",
+    "domainDocs": "passed",
+    "diffCheck": "passed"
+  },
+  "verify": {
+    "command": "bun run verify -- --domain avatar --domain conversation",
+    "result": "blocked at inventory by unrelated artifacts/pursuit-integration-20261106 source copies; no full gate pass claimed",
+    "report": "verification-reports/runs/2026-11-06T19-56-41-748Z-f85d4939-2fe4-4c54-adfc-7cb00f5d1e84/report.json"
+  },
+  "liveProvider": "not run",
+  "realDevice": "not run",
+  "serverOperations": false,
+  "contextCompileCount": 1,
+  "compileEvalCount": 1,
+  "files": {
+    "web/src/components/ConversationBackground.tsx": "275685e3d526f2f053dcb4454298383d10f01abeeac442cc44472be2e64a2bf2",
+    "web/src/components/domains/conversation/HiyoriAvatarBackground.tsx": "1273276f1a2d70416c89f15dc14c56c7a4850c5fe6bf3e23c012553a3f428bfe",
+    "web/src/components/domains/conversation/HiyoriViewControls.tsx": "2a24babbad742ebec142e34b786324662530f6cc7ef7dcf2f59bfe3a44ee8f97",
+    "web/src/components/domains/conversation/hiyori-avatar.css": "068549f8dab219dbfaddd0af988ce8270e3a19a949043fafdba2ec39740a571f",
+    "web/src/domains/avatar/index.ts": "7d9d7cf6238066f9db23cc9165933ee4287f873e93a0e7260cb797889a00cb42",
+    "web/src/domains/avatar/live2d/model.ts": "07ba9ba157a161918814bc09dbb5d808b8ae81237e1d0cf938e2abc98dd5cc76",
+    "web/src/domains/avatar/view.ts": "90bd6049429fee5d96e0455ae448927658dc922ef406c99a691cd7aa31571640",
+    "web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx": "7f467adbfbf3f0cf1322d926feae493e0cd24f256e6577c8bfe7f47afb30f305",
+    "tests/browser/avatar-view.fixture.tsx": "20de192b7c4d62d1396c3ca8795f7324bec9868df70b3954e5dc648e95d1e930",
+    "tests/browser/avatar-view.spec.ts": "d400fcc368b4147fd2659e9ccc588c95860e42d1ab4f42a39cb6c55625b9ce89"
+  }
+}

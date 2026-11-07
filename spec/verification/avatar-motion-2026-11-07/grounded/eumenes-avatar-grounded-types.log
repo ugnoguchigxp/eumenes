@@ -1,0 +1,20 @@
+api/application/agency/autonomy.test.ts(22,37): error TS2339: Property 'id' does not exist on type '{ revisionId: string; title: string; description: string; }'.
+api/application/agency/autonomy.test.ts(66,30): error TS2339: Property 'id' does not exist on type '{ revisionId: string; title: string; description: string; }'.
+api/application/agency/connection.test.ts(241,41): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'ZodType<ParticipationOutput, unknown, $ZodTypeInternals<ParticipationOutput, unknown>> | ZodType<WireUpdate, unknown, $ZodTypeInternals<...>>' is not assignable to parameter of type '$ZodRegistry<{ id?: string | undefined; }, $ZodType<unknown, unknown, $ZodTypeInternals<unknown, unknown>>>'.
+      Type 'ZodType<ParticipationOutput, unknown, $ZodTypeInternals<ParticipationOutput, unknown>>' is missing the following properties from type '$ZodRegistry<{ id?: string | undefined; }, $ZodType<unknown, unknown, $ZodTypeInternals<unknown, unknown>>>': _meta, _schema, _map, _idmap, and 5 more.
+api/application/agency/llm-port.ts(104,61): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type 'ZodType<T, unknown, $ZodTypeInternals<T, unknown>>' is missing the following properties from type '$ZodRegistry<{ id?: string | undefined; }, $ZodType<unknown, unknown, $ZodTypeInternals<unknown, unknown>>>': _meta, _schema, _map, _idmap, and 5 more.
+api/application/agency/schema.test.ts(8,3): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Type 'ZodType<WireUpdate, unknown, $ZodTypeInternals<WireUpdate, unknown>>' is missing the following properties from type '$ZodRegistry<{ id?: string | undefined; }, $ZodType<unknown, unknown, $ZodTypeInternals<unknown, unknown>>>': _meta, _schema, _map, _idmap, and 5 more.
+api/domains/dialogue/service/background-input.ts(35,24): error TS2339: Property 'messageIds' does not exist on type 'ConfirmationRow'.
+Found 6 errors in 5 files, checked 2,980 files [1049.34ms]
+
+  2  api/application/agency/autonomy.test.ts:22
+  1  api/application/agency/connection.test.ts:241
+  1  api/application/agency/llm-port.ts:104
+  1  api/application/agency/schema.test.ts:8
+  1  api/domains/dialogue/service/background-input.ts:35

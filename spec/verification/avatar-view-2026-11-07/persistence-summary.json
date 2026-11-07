@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-07",
+  "behavior": "Automatically persist and restore Live2D zoom/x/y in the same browser, including reset.",
+  "regressionBeforeFix": "The recreated background received default zoom/x/y instead of 2.45/-0.17/0.09.",
+  "partial": {
+    "passed": 18,
+    "failed": 0
+  },
+  "web": {
+    "passed": 99,
+    "failed": 0,
+    "files": 13
+  },
+  "browser": {
+    "passed": 2,
+    "failed": 0,
+    "mode": "muted real WebGL; actual browser process closed/reopened with a temporary test profile; reload and background recreation; reset persistence"
+  },
+  "backend": {
+    "passed": 116,
+    "failed": 2,
+    "failureFile": "api/application/agency/connection.test.ts",
+    "reason": "system expectation differs from concurrently updated agency contract; outside persistence scope"
+  },
+  "typecheck": {
+    "failed": 5,
+    "files": [
+      "api/application/agency/autonomy.test.ts",
+      "api/application/agency/connection.test.ts",
+      "api/application/agency/llm-port.ts",
+      "api/application/agency/schema.test.ts"
+    ],
+    "persistenceTypeErrors": 0
+  },
+  "verify": {
+    "result": "blocked at inventory by unrelated artifacts source copies",
+    "report": "verification-reports/runs/2026-11-06T20-34-34-537Z-31b7f0e2-74f6-4db7-923b-c7d5181c64c9/report.json"
+  },
+  "static": {
+    "targetLint": "pass",
+    "targetFormat": "pass",
+    "boundaries": "pass (2755 files)",
+    "targetSizeBudget": "pass",
+    "diffCheck": "pass"
+  },
+  "serverOperations": false,
+  "userBrowserChanged": false,
+  "contextCompileCountThisTurn": 1,
+  "compileEvalCountThisTurn": 1,
+  "files": {
+    "web/src/domains/avatar/view.ts": "8ce1c0f3ac8d2e18bc17fe3ec08f7cccb783e2f46b234093a6884bf6c20250a0",
+    "web/src/domains/avatar/index.ts": "30feb9b8a6397b281a1a9996d97d336e5aa04231177e31972f6769c7bbbdf6c6",
+    "web/src/domains/avatar/test/view.test.ts": "9c0daabd46e389eba99b78c6d36f7309b8ddc44afa4c4ebc77ea4bc425f0bb35",
+    "web/src/components/domains/conversation/HiyoriAvatarBackground.tsx": "2d9e8653c4f0d8d1beddf215bfa083bf373d2acc33ee5e100fa21b34e2b55ee8",
+    "web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx": "a0cc5d4ee074a705850b501b95b3896c6df6ec1b87f071426980c2c193334c98",
+    "tests/browser/avatar-view.spec.ts": "085c237373a8447d6897d0248b72c53f73ae4cfd6040e894e5ae945de819602b",
+    "tests/browser/avatar-view.fixture.tsx": "caa81ef71e23336ab766f761119d292399fdad30093837088bf4ecf7fd81bb0d"
+  }
+}

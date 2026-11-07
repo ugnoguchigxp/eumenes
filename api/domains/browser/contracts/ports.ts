@@ -133,6 +133,13 @@ export interface BrowserDriver {
 	runReplay(code: string, signal: AbortSignal): Promise<void>;
 	/** Inspects the element of an observed ref on the current tab. Read-only: a failure never reached the page. */
 	inspectTarget(ref: string): Promise<TargetInfo>;
+	/** Fixed, read-only choices from an observed root. */
+	readChoices?(
+		ref: string | null,
+		offset: number,
+		limit: number,
+		signal: AbortSignal,
+	): Promise<import("eumenes-interact").InspectionResult>;
 	/** Inspects the focused element of the current tab (what a key press would act on). Read-only. */
 	inspectFocused(): Promise<TargetInfo>;
 	/** Planned CSS-pixel size of a capture of the current tab, measured by a fixed host function. */

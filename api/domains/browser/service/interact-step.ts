@@ -172,6 +172,7 @@ export function createInteractStep(deps: InteractStepDeps) {
 		};
 		if (
 			call.part === "page.capture" &&
+			call.args.phase === "save" &&
 			mem.captureApproval?.partDigest !== interactHash(call)
 		)
 			return captureQuestion();

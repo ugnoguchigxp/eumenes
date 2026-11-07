@@ -1,0 +1,56 @@
+{
+  "started": "2026-11-06T11:31:22.466Z",
+  "conversationId": "verify-eum002-cancel-v4-20261106",
+  "entry": "route",
+  "structureTimeoutMs": 30000,
+  "exitCode": 0,
+  "stdout": "{\"type\":\"message\",\"updated\":false,\"id\":\"c661f361-cb93-4bdf-80d0-d36d540693bf\",\"conversationId\":\"verify-eum002-cancel-v4-20261106\",\"role\":\"user\",\"text\":\"計算結果を使って別の作業を実行して。\",\"createdAt\":\"2026-11-06T11:31:22.565Z\",\"runId\":\"dd26c2ad-5106-4741-8ff7-4637cc066989\"}\n{\"type\":\"announcement\",\"updated\":false,\"id\":\"announcement:dd26c2ad-5106-4741-8ff7-4637cc066989\",\"conversationId\":\"verify-eum002-cancel-v4-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:31:22.565Z\",\"runId\":\"dd26c2ad-5106-4741-8ff7-4637cc066989\"}\n{\"type\":\"message\",\"updated\":false,\"id\":\"36803a7d-4734-40b0-96da-319c5ea2437a\",\"conversationId\":\"verify-eum002-cancel-v4-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:31:23.196Z\",\"runId\":\"dd26c2ad-5106-4741-8ff7-4637cc066989\"}\n",
+  "stderr": "",
+  "runs": [
+    {
+      "id": "dd26c2ad-5106-4741-8ff7-4637cc066989",
+      "agentTaskId": null,
+      "requestId": "3603c6d5-0308-42a7-953d-48ad362bfcfe",
+      "conversationId": "verify-eum002-cancel-v4-20261106",
+      "utteranceId": null,
+      "status": "completed",
+      "revision": 2,
+      "inputMessageId": "c661f361-cb93-4bdf-80d0-d36d540693bf",
+      "answerMessageId": "36803a7d-4734-40b0-96da-319c5ea2437a",
+      "announcement": "「パイプライン」に頼みます。",
+      "error": null,
+      "jobId": "4e75d770-3d9a-4cc5-9fc9-8de7e7dbed6c",
+      "deadlineAt": "2026-11-06T11:34:22.565Z",
+      "deadlineFixed": false,
+      "sourceKind": "manual",
+      "scheduleId": null,
+      "occurrenceId": null,
+      "specialistSessionId": null,
+      "pinnedToolchainId": null,
+      "createdAt": "2026-11-06T11:31:22.565Z",
+      "updatedAt": "2026-11-06T11:31:23.197Z"
+    }
+  ],
+  "conversation": {
+    "id": "verify-eum002-cancel-v4-20261106",
+    "revision": 2,
+    "messages": [
+      {
+        "id": "c661f361-cb93-4bdf-80d0-d36d540693bf",
+        "conversationId": "verify-eum002-cancel-v4-20261106",
+        "role": "user",
+        "text": "計算結果を使って別の作業を実行して。",
+        "createdAt": "2026-11-06T11:31:22.565Z",
+        "runId": "dd26c2ad-5106-4741-8ff7-4637cc066989"
+      },
+      {
+        "id": "36803a7d-4734-40b0-96da-319c5ea2437a",
+        "conversationId": "verify-eum002-cancel-v4-20261106",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T11:31:23.196Z",
+        "runId": "dd26c2ad-5106-4741-8ff7-4637cc066989"
+      }
+    ]
+  }
+}

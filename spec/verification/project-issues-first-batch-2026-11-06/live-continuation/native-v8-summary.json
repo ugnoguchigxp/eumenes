@@ -1,0 +1,131 @@
+{
+  "implementation": "approved finite cancellation references, same-owner continuation, closed cancelled question, distinct operation planning, scoped compute candidates, strict output transport",
+  "package": {
+    "package": "eumenes_router",
+    "version": "0.0.2",
+    "artifact": "eumenes_router-0.0.2-ee0f02404f6b.tgz",
+    "sha256": "ee0f02404f6b7928f44721bad253bb6c3a23cf596370285485f84b96ae268c82",
+    "source": {
+      "commit": "f89b1326d85b9fb370896f3ddd8992e340751128",
+      "dirty": true,
+      "treeDigest": "da9e0cbcc17ff3f28beb9ee490ebe458fba6df6f9f2e597deb28ef87cd635d1e",
+      "patch": {
+        "file": "adoption-source.patch",
+        "sha256": "6d42e6cbe2af7099d00ed1db6a4f4229e7523641c15a05f0f81c4acc70028f03",
+        "apply": "git apply --unidiff-zero adoption-source.patch"
+      }
+    },
+    "contractVersions": {
+      "cards": 1,
+      "route": 7,
+      "feedback": 1,
+      "structure": 5
+    },
+    "dbSchemaVersion": 1,
+    "entries": {
+      "route": {
+        "flavor": "direct",
+        "ports": [
+          "embed",
+          "rerank",
+          "read.cards",
+          "read.lexical",
+          "read.nearFeedback",
+          "model",
+          "settings"
+        ]
+      },
+      "routeStructured": {
+        "flavor": "structured",
+        "ports": [
+          "analyze",
+          "embed",
+          "rerank",
+          "read.cards",
+          "read.lexical",
+          "read.nearFeedback",
+          "model",
+          "settings"
+        ],
+        "structurePrompt": "turn-structure-v8"
+      }
+    },
+    "bestV2": {
+      "format": "best-v2.v2",
+      "version": "best-v2/2026-11-03",
+      "source": "4442fe7939835c60",
+      "deferBelow": 0.2989432082621926,
+      "extraTools": 10
+    },
+    "requires": {
+      "memory": {
+        "format": "best-v2-memory.v1",
+        "source": "4442fe7939835c60",
+        "dimension": 384,
+        "note": "the host imports it (importExamplesInTransaction); made from utterances, it is not in the tarball"
+      }
+    },
+    "verifiedWith": "eumenes_router: typecheck, lint, format, required offline Python regressions, bun test 114 pass / 0 skip / 0 todo / 0 fail, mainline parity ran; tarball checksum and isolated consumer on built JavaScript/SQLite passed; wrong checksum refused"
+  },
+  "fixture": {
+    "partial": 41,
+    "api": 1243,
+    "web": 37,
+    "designSystem": 4,
+    "domainResult": "pass",
+    "domainReport": "domain-native-v8-final-report.json",
+    "integrity": "native-v8-input-integrity.json"
+  },
+  "live": {
+    "native-v8-answer-ledger.json": {
+      "conversationId": "verify-eum002-native-v8-answer-20261106",
+      "workCount": 1,
+      "parents": [
+        {
+          "id": "b42c62f7-fcee-42dc-98af-af8b282095ce",
+          "state": "completed",
+          "children": 2,
+          "childStates": [
+            "completed",
+            "completed"
+          ]
+        }
+      ]
+    },
+    "native-v8-cancel-ledger.json": {
+      "conversationId": "verify-eum002-native-v8-cancel-20261106",
+      "workCount": 1,
+      "parents": [
+        {
+          "id": "1861b9f9-b11c-443a-a821-e70bef13a74f",
+          "state": "cancelled",
+          "children": 0,
+          "childStates": []
+        }
+      ]
+    },
+    "native-v8-two-ledger.json": {
+      "conversationId": "verify-eum001-native-v8-two-20261106",
+      "workCount": 1,
+      "parents": [
+        {
+          "id": "4043fbee-d762-4f96-95af-85697d4a6594",
+          "state": "completed",
+          "children": 2,
+          "childStates": [
+            "completed",
+            "completed"
+          ]
+        }
+      ]
+    }
+  },
+  "settingsRestored": true,
+  "unresolved": [
+    "structure output variability on a same-tool comparison case",
+    "unnecessary clarification for a clear independent request while another question is pending",
+    "weather child content quality in one prior live case",
+    "quality and latency acceptance at saved route/8000ms configuration"
+  ],
+  "ci": false
+}

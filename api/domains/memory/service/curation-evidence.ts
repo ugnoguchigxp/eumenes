@@ -63,8 +63,8 @@ export function createEvidence(deps: CurationDeps) {
 
 	/**
 	 * The evidence of an item written from a user message: the quote's byte range when the model's quote is found in
-	 * the message (spaces, punctuation and width forms forgiven), else the message itself (its best window when it is
-	 * longer than the library keeps). Never the assistant's words, never a blocked message.
+	 * the message (spaces, punctuation and width forms forgiven). A supplied quote must match; only an omitted
+	 * quote uses the message itself (bounded to the library's evidence limit).
 	 */
 	function evidenceFrom(
 		db: Database,
@@ -94,6 +94,8 @@ export function createEvidence(deps: CurationDeps) {
 		let span = quote ? locateQuoteSpan(text, quote) : null;
 		// Too short to evidence anything.
 		if (span && foldedLength(text.slice(span.start, span.end)) < 2) span = null;
+		if (quote?.trim() && span === null)
+			return { ok: false, reason: "invalid_source" };
 		const quoteMatched = span !== null;
 		const window = evidenceWindow(text, span, hint, MAX_QUOTE_BYTES);
 		if (window.end <= window.start)
@@ -138,10 +140,12 @@ export function createEvidence(deps: CurationDeps) {
 			if (isBlocked(db, ref.id) || sourceTombstoned(db, ref.id)) continue;
 			const found = conversation.messageInTransaction(db, ref.id);
 			if (!found) continue;
+			const host = hostMessageSource(found);
+			if (host.revision !== ref.revision || host.digest !== ref.digest)
+				continue;
 			const slice = sliceUtf8Range(found.message.text, ref.range);
 			if (slice.status !== "ok" || slice.text === "") continue;
 			if (byteLength(slice.text) > MAX_QUOTE_BYTES) continue;
-			const host = hostMessageSource(found);
 			out.push({
 				host,
 				evidence: { source: refOf(host, ref.range), quote: slice.text },

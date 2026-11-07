@@ -1,0 +1,56 @@
+{
+  "started": "2026-11-06T11:19:30.598Z",
+  "conversationId": "verify-eum001-holdout-dependent-v3-20261106",
+  "entry": "routeStructured",
+  "structureTimeoutMs": 30000,
+  "exitCode": 0,
+  "stdout": "{\"type\":\"message\",\"updated\":false,\"id\":\"62cb47a3-f35f-461e-89d9-ab91d62c294d\",\"conversationId\":\"verify-eum001-holdout-dependent-v3-20261106\",\"role\":\"user\",\"text\":\"1から30までの偶数を足して、その結果と同じ秒数のタイマーを設定して。\",\"createdAt\":\"2026-11-06T11:19:30.799Z\",\"runId\":\"ebe88f15-3e98-486b-8fb5-98916d514a9a\"}\n{\"type\":\"announcement\",\"updated\":false,\"id\":\"announcement:ebe88f15-3e98-486b-8fb5-98916d514a9a\",\"conversationId\":\"verify-eum001-holdout-dependent-v3-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:19:30.799Z\",\"runId\":\"ebe88f15-3e98-486b-8fb5-98916d514a9a\"}\n{\"type\":\"message\",\"updated\":false,\"id\":\"2d9aeaad-3f11-409e-9691-94e769ae54ac\",\"conversationId\":\"verify-eum001-holdout-dependent-v3-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:19:55.793Z\",\"runId\":\"ebe88f15-3e98-486b-8fb5-98916d514a9a\"}\n",
+  "stderr": "",
+  "runs": [
+    {
+      "id": "ebe88f15-3e98-486b-8fb5-98916d514a9a",
+      "agentTaskId": null,
+      "requestId": "9d85d194-c2cf-4cb0-90cf-c4cc430ed587",
+      "conversationId": "verify-eum001-holdout-dependent-v3-20261106",
+      "utteranceId": null,
+      "status": "completed",
+      "revision": 2,
+      "inputMessageId": "62cb47a3-f35f-461e-89d9-ab91d62c294d",
+      "answerMessageId": "2d9aeaad-3f11-409e-9691-94e769ae54ac",
+      "announcement": "「パイプライン」に頼みます。",
+      "error": null,
+      "jobId": "9ac7ba50-6a1d-422d-a3d2-19c959269802",
+      "deadlineAt": "2026-11-06T11:22:30.799Z",
+      "deadlineFixed": false,
+      "sourceKind": "manual",
+      "scheduleId": null,
+      "occurrenceId": null,
+      "specialistSessionId": null,
+      "pinnedToolchainId": null,
+      "createdAt": "2026-11-06T11:19:30.799Z",
+      "updatedAt": "2026-11-06T11:19:55.793Z"
+    }
+  ],
+  "conversation": {
+    "id": "verify-eum001-holdout-dependent-v3-20261106",
+    "revision": 2,
+    "messages": [
+      {
+        "id": "62cb47a3-f35f-461e-89d9-ab91d62c294d",
+        "conversationId": "verify-eum001-holdout-dependent-v3-20261106",
+        "role": "user",
+        "text": "1から30までの偶数を足して、その結果と同じ秒数のタイマーを設定して。",
+        "createdAt": "2026-11-06T11:19:30.799Z",
+        "runId": "ebe88f15-3e98-486b-8fb5-98916d514a9a"
+      },
+      {
+        "id": "2d9aeaad-3f11-409e-9691-94e769ae54ac",
+        "conversationId": "verify-eum001-holdout-dependent-v3-20261106",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T11:19:55.793Z",
+        "runId": "ebe88f15-3e98-486b-8fb5-98916d514a9a"
+      }
+    ]
+  }
+}

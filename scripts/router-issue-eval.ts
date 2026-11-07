@@ -29,13 +29,15 @@ const { values } = parseArgs({
 		run: { type: "boolean" },
 		out: { type: "string" },
 		case: { type: "string" },
+		"cases-file": { type: "string" },
 		structured: { type: "boolean" },
 		"structure-timeout-ms": { type: "string" },
 	},
 });
 if (!values.run || !values.out) throw new Error("usage_requires_run_and_out");
 const file = resolve(
-	"spec/verification/project-issues-first-batch-2026-11-06/routing-cases.json",
+	values["cases-file"] ??
+		"spec/verification/project-issues-first-batch-2026-11-06/routing-cases.json",
 );
 const bytes = readFileSync(file);
 const digest = (value: unknown) =>
@@ -43,10 +45,7 @@ const digest = (value: unknown) =>
 		.update(typeof value === "string" ? value : JSON.stringify(value))
 		.digest("hex");
 const frozen = JSON.parse(
-	readFileSync(
-		file.replace("routing-cases.json", "routing-cases.freeze.json"),
-		"utf8",
-	),
+	readFileSync(file.replace(/\.json$/, ".freeze.json"), "utf8"),
 );
 const datasetHash = createHash("sha256").update(bytes).digest("hex");
 if (!JSON.stringify(frozen).includes(datasetHash))
@@ -106,6 +105,8 @@ const configuration = {
 	entry: values.structured ? "routeStructured" : "route",
 	structurePrompt: values.structured ? TURN_STRUCTURE_PROMPT.version : null,
 	structureTimeoutMs,
+	reasoningEffort: "low",
+	structuredOutput: !!values.structured,
 	settingsHash: digest(settings),
 	source: "adopted-package",
 	variants: values.structured ? ["B"] : ["baseline", "A"],
@@ -201,6 +202,11 @@ try {
 					title: q.work,
 					question: q.question,
 				})),
+				controls: dynamic.flatMap((candidate) =>
+					candidate.kind === "work" && candidate.operation === "cancel"
+						? [{ ref: candidate.id, title: candidate.title }]
+						: [],
+				),
 				dynamic:
 					variant !== "A"
 						? dynamic

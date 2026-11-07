@@ -1,0 +1,22 @@
+{
+  "measurement": "forced answer schema transport only; not a routing-quality result",
+  "elapsedMs": 5966,
+  "structure": {
+    "kind": "answer",
+    "ref": "t1.answer",
+    "text": "計算するのは1から50までの素数の個数で、その結果を使う作業は、その個数と同じ秒数のタイマーを作ることです。",
+    "requests": []
+  },
+  "shape": {
+    "json": true,
+    "keys": [
+      "answer"
+    ],
+    "answer": {
+      "refSupplied": true,
+      "textType": "string",
+      "textLength": 54,
+      "textMatches": true
+    }
+  }
+}

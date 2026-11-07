@@ -14,6 +14,7 @@ import {
 	listItems,
 	deleteBySource,
 	transitionItem,
+	restoreItem,
 	updateItem,
 } from "../repository";
 
@@ -63,6 +64,31 @@ export function createContinuityService(
 		items: liveItems(db, conversationId),
 	});
 	return {
+		/** Owner management only, including closed notes; the regular snapshot remains active-only. */
+		ownerItemsInTransaction: (db: Database, conversationId: string) =>
+			listItems(db, conversationId, false),
+		restoreByOwnerInTransaction(
+			db: Database,
+			itemId: string,
+			expectedRevision: number,
+		): boolean {
+			const item = getItem(db, itemId);
+			if (
+				!item ||
+				item.revision !== expectedRevision ||
+				item.status === "active"
+			)
+				return false;
+			if (
+				item.expiresAt !== null &&
+				Date.parse(item.expiresAt) <= Date.parse(clock())
+			)
+				return false;
+			assertRoom(db, item.conversationId);
+			if (!restoreItem(db, itemId, expectedRevision, clock())) return false;
+			guard?.(db, item.conversationId);
+			return true;
+		},
 		setGuard(next: (db: Database, conversationId: string) => void) {
 			guard = next;
 		},

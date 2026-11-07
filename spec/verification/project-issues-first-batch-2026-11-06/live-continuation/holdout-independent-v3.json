@@ -1,0 +1,56 @@
+{
+  "started": "2026-11-06T11:19:56.327Z",
+  "conversationId": "verify-eum001-holdout-independent-v3-20261106",
+  "entry": "routeStructured",
+  "structureTimeoutMs": 30000,
+  "exitCode": 0,
+  "stdout": "{\"type\":\"message\",\"updated\":false,\"id\":\"68b9fd4b-7cc3-4a30-b36b-b86c26493025\",\"conversationId\":\"verify-eum001-holdout-independent-v3-20261106\",\"role\":\"user\",\"text\":\"大阪の明日の天気予報と、45秒のタイマーをお願いします。\",\"createdAt\":\"2026-11-06T11:19:56.463Z\",\"runId\":\"1ab9b520-f18d-4a27-9249-d404bd4f7006\"}\n{\"type\":\"announcement\",\"updated\":false,\"id\":\"announcement:1ab9b520-f18d-4a27-9249-d404bd4f7006\",\"conversationId\":\"verify-eum001-holdout-independent-v3-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:19:56.463Z\",\"runId\":\"1ab9b520-f18d-4a27-9249-d404bd4f7006\"}\n{\"type\":\"message\",\"updated\":false,\"id\":\"68cf7713-3521-44a0-a374-0934941a3f69\",\"conversationId\":\"verify-eum001-holdout-independent-v3-20261106\",\"role\":\"assistant\",\"text\":\"「パイプライン」に頼みます。\",\"createdAt\":\"2026-11-06T11:20:25.042Z\",\"runId\":\"1ab9b520-f18d-4a27-9249-d404bd4f7006\"}\n",
+  "stderr": "",
+  "runs": [
+    {
+      "id": "1ab9b520-f18d-4a27-9249-d404bd4f7006",
+      "agentTaskId": null,
+      "requestId": "46b64f21-0919-4cba-8ee7-87a6329574c0",
+      "conversationId": "verify-eum001-holdout-independent-v3-20261106",
+      "utteranceId": null,
+      "status": "completed",
+      "revision": 2,
+      "inputMessageId": "68b9fd4b-7cc3-4a30-b36b-b86c26493025",
+      "answerMessageId": "68cf7713-3521-44a0-a374-0934941a3f69",
+      "announcement": "「パイプライン」に頼みます。",
+      "error": null,
+      "jobId": "287bddeb-b3d0-4ae8-b4d6-83c803196cf5",
+      "deadlineAt": "2026-11-06T11:22:56.463Z",
+      "deadlineFixed": false,
+      "sourceKind": "manual",
+      "scheduleId": null,
+      "occurrenceId": null,
+      "specialistSessionId": null,
+      "pinnedToolchainId": null,
+      "createdAt": "2026-11-06T11:19:56.463Z",
+      "updatedAt": "2026-11-06T11:20:25.042Z"
+    }
+  ],
+  "conversation": {
+    "id": "verify-eum001-holdout-independent-v3-20261106",
+    "revision": 2,
+    "messages": [
+      {
+        "id": "68b9fd4b-7cc3-4a30-b36b-b86c26493025",
+        "conversationId": "verify-eum001-holdout-independent-v3-20261106",
+        "role": "user",
+        "text": "大阪の明日の天気予報と、45秒のタイマーをお願いします。",
+        "createdAt": "2026-11-06T11:19:56.463Z",
+        "runId": "1ab9b520-f18d-4a27-9249-d404bd4f7006"
+      },
+      {
+        "id": "68cf7713-3521-44a0-a374-0934941a3f69",
+        "conversationId": "verify-eum001-holdout-independent-v3-20261106",
+        "role": "assistant",
+        "text": "「パイプライン」に頼みます。",
+        "createdAt": "2026-11-06T11:20:25.042Z",
+        "runId": "1ab9b520-f18d-4a27-9249-d404bd4f7006"
+      }
+    ]
+  }
+}

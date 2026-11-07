@@ -1,0 +1,59 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/dialogue/test/routed-router.test.ts:
+(pass) the package decides with no model call: a sure toolchain is offered by the host, handed the words and announced in the host's words (row 2) [85.43ms]
+(pass) the conversation leads when no tool scores: the turn talks, with one call and no choice [71.90ms]
+(pass) a toolchain best-v2 is not sure of is asked to try, in the host's words (row 3) [71.10ms]
+(pass) an unsure toolchain that changes what exists is confirmed first (row 4), and a yes above the approval line approves it (row 5) [75.85ms]
+(pass) a yes below the approval line asks the host's question again and leaves the confirmation open; a sure no closes it [77.56ms]
+(pass) route(): row 9 never dispatches only the first job when no planner is available [67.77ms]
+(pass) a router that fails, is slow, has no memory or no embedding leaves the turn to the talk turn; the trace says why (row 10) [386.62ms]
+(pass) a toolchain with inputs is filled by the one-candidate call, the only model call, held to that candidate [67.30ms]
+(pass) a fill that finds nothing to ask for leaves the turn to the talk turn; one that asks back keeps the request it asked about [70.86ms]
+(pass) a hand-over the host refuses, or an instant toolchain that cannot answer, is said in the host's failure words, with no call to try again [70.96ms]
+(pass) a memory request is filled by the one-candidate call and taken by the host's operation [66.25ms]
+(pass) a work is checked, corrected or cancelled by the package's decision: the host's operation, the host's words [76.11ms]
+(pass) a doubted hand-over is redone elsewhere: the work is cancelled, the same words go to the other toolchain, and the correction is kept [69.81ms]
+(pass) the turns before go to the reranker's port, and the user's utterance before the words goes to the toolchain with them [70.35ms]
+(pass) a correction near the utterance moves the decision, never to a sure one; disagreeing ones apply none and are put out of use; weight 0 turns them off [138.06ms]
+(pass) with no profile saved there is no router: the turn talks, and nothing is offered or embedded [66.15ms]
+(pass) with the router on the user-intent judge is not asked: the package sees the tools and the open confirmations together [68.98ms]
+(pass) the resources State presents go with a hand-over the router decided, for the agent to pick from [1081.98ms]
+(pass) routeStructured: one request with a reference routes the masked utterance; the structure model is the saved resource, at low effort [69.02ms]
+(pass) routeStructured: no request is the conversation, with nothing scored; requests of two tools never dispatch a partial first job when the pipeline is unavailable [71.07ms]
+(pass) routeStructured: a failed structure model leaves the entire request unperformed without direct fallback [67.31ms]
+(pass) routeStructured: a mixed multi-job request never falls back to running only its first tool [67.07ms]
+
+api/domains/dialogue/test/structured-continuation.test.ts:
+(pass) a structured answer resumes the same question and work once, without a new routing score [75.68ms]
+(pass) a mixed reply asks about the whole unperformed scope and leaves the existing question open [70.59ms]
+(pass) an invented question reference fails before answering or starting a replacement job [70.03ms]
+(pass) structured cancellation reaches the same command and rejects a later answer to its closed question [73.56ms]
+(pass) a model's partial answer or cancellation cannot omit the rest of the utterance [74.64ms]
+
+api/application/pipelines/pipeline-execution.test.ts:
+(pass) conversation selects the imported planner and two actual timer commands complete under one pipeline TODO [735.71ms]
+(pass) conversation answer reaches the waiting pipeline owner without creating replacement work [597.24ms]
+(pass) conversation cancel reaches the waiting pipeline owner without creating replacement work [558.70ms]
+
+api/application/compute/compute-adapter.test.ts:
+(pass) registered adapter exposes four schemas and stable receipts, then tracks actual completion [27.14ms]
+(pass) command snapshots offer only jobs in the current conversation and keep the screen owner-wide [9.89ms]
+(pass) authenticated host integration serves stored PNG and downloads SVG without inline HTML [27.61ms]
+(pass) parent cancellation confirms remote termination outside the writer and does not claim it during 202 [78.30ms]
+
+api/domains/capabilities/test/pipeline-bundle.test.ts:
+(pass) seed installs p0-3 idempotently, preserves an old binding body, and refuses its execution contract [80.65ms]
+(pass) planner instruction upgrade preserves old revisions and selects the new skill once [12.54ms]
+
+api/application/vendor.test.ts:
+(pass) the vendored memory package matches its manifest, package.json, the lockfile and the installed copy [5.22ms]
+(pass) the memory distribution identifies its source and verifies the installed published files [26.04ms]
+(pass) the vendored world-model package matches its manifest, package.json, the lockfile and the installed copy [2.73ms]
+(pass) the vendored agency package matches its manifest, package.json, the lockfile and the installed copy [2.04ms]
+(pass) the vendored router package matches its manifest, package.json, the lockfile and the installed copy [2.84ms]
+
+ 41 pass
+ 0 fail
+ 405 expect() calls
+Ran 41 tests across 6 files. [6.05s]
