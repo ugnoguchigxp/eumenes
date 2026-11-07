@@ -24,6 +24,24 @@ CREATE TABLE dialogue_message_resources (
  PRIMARY KEY(message_id, ordinal), UNIQUE(message_id, resource_id));
 CREATE INDEX dialogue_message_resources_resource ON dialogue_message_resources(resource_id);`;
 
+/**
+ * The user's input as shared files (spec/server-scratch-cache-design-2026-11-07.md §6.1): a fourth source,
+ * `attached`. SQLite cannot change a CHECK, so the table is rebuilt with its rows and indexes.
+ */
+export const resourceAttachedMigration = `
+CREATE TABLE dialogue_resources_next (
+ id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, ref INTEGER NOT NULL,
+ uri TEXT NOT NULL, kind TEXT NOT NULL, label TEXT NOT NULL,
+ source TEXT NOT NULL CHECK(source IN ('work','found','viewed','attached')), work_id TEXT,
+ used_at TEXT NOT NULL, created_at TEXT NOT NULL, forgotten_at TEXT,
+ UNIQUE(conversation_id, ref), UNIQUE(conversation_id, uri));
+INSERT INTO dialogue_resources_next (id, conversation_id, ref, uri, kind, label, source, work_id, used_at, created_at, forgotten_at)
+ SELECT id, conversation_id, ref, uri, kind, label, source, work_id, used_at, created_at, forgotten_at FROM dialogue_resources;
+DROP TABLE dialogue_resources;
+ALTER TABLE dialogue_resources_next RENAME TO dialogue_resources;
+CREATE INDEX dialogue_resources_used ON dialogue_resources(conversation_id, forgotten_at, used_at);
+CREATE INDEX dialogue_resources_work ON dialogue_resources(work_id);`;
+
 /** What a finished TODO made (section 4.1): the links stay with the TODO, as `[{uri, kind, label}]`. */
 export const workLinksMigration = `ALTER TABLE dialogue_work ADD COLUMN links_json TEXT NOT NULL DEFAULT '[]';`;
 

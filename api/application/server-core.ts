@@ -9,6 +9,7 @@ import {
 	openAttitudeStore,
 } from "../domains/attitude-dataset";
 import { createConversationService } from "../domains/conversation";
+import { buildScratch } from "./scratch/scratch-composition";
 import { createSettings } from "../domains/settings";
 import {
 	createInference,
@@ -44,8 +45,10 @@ export async function buildCore(
 	const store = openStore(dbPath, migrations);
 	const changes = createChanges();
 	const unsubscribeCommits = store.onCommit(() => changes.publish());
+	const scratch = buildScratch(dbPath);
 	const conversation = createConversationService(store, {
 		requireOutbox: true,
+		attachmentStored: scratch.attachmentStored,
 	});
 	const settings = await createSettings(store, { dbPath, env: config.env });
 	const googleAccounts = createGoogleAccounts(store, {
@@ -100,6 +103,7 @@ export async function buildCore(
 		changes,
 		unsubscribeCommits,
 		conversation,
+		scratch: scratch.store,
 		settings,
 		googleAccounts,
 		ttsDictionary,

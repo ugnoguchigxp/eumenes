@@ -1,0 +1,60 @@
+[
+  {
+    "command": [
+      "bun",
+      "check"
+    ],
+    "exitCode": 0,
+    "output": "✓ No type errors in 3,061 files [671.60ms]\n"
+  },
+  {
+    "command": [
+      "bunx",
+      "oxlint",
+      "--deny-warnings",
+      "api/domains/memory/service/reference-input.ts",
+      "api/domains/dialogue/service/agency-forgetting.ts",
+      "api/domains/dialogue/service/agency-state.ts",
+      "api/domains/memory/test/reference-input.test.ts",
+      "api/application/agency/memory-integration.test.ts"
+    ],
+    "exitCode": 0,
+    "output": ""
+  },
+  {
+    "command": [
+      "bun",
+      "fmt",
+      "--check",
+      "api/domains/memory/service/reference-input.ts",
+      "api/domains/dialogue/service/agency-forgetting.ts",
+      "api/domains/dialogue/service/agency-state.ts",
+      "api/domains/memory/test/reference-input.test.ts",
+      "api/application/agency/memory-integration.test.ts"
+    ],
+    "exitCode": 0,
+    "output": "All 5 files are formatted.\n"
+  },
+  {
+    "command": [
+      "bun",
+      "scripts/size-budget.ts",
+      "api/domains/memory/service/reference-input.ts",
+      "api/domains/dialogue/service/agency-forgetting.ts",
+      "api/domains/dialogue/service/agency-state.ts",
+      "api/domains/memory/test/reference-input.test.ts",
+      "api/application/agency/memory-integration.test.ts"
+    ],
+    "exitCode": 0,
+    "output": "size-budget ok (3 files)\n"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exitCode": 0,
+    "output": ""
+  }
+]

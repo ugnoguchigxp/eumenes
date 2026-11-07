@@ -37,6 +37,6 @@ export function combineKindAdapters(
 				.sort(newestFirst)
 				.slice(0, query.limit);
 		},
-		read: (id, signal) => partOf(id).read(id, signal),
+		read: (id, signal, options) => partOf(id).read(id, signal, options),
 	};
 }

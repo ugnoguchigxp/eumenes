@@ -7,11 +7,18 @@ import type { DocumentRefs, TodoItem } from "./work-items";
 import { INPUT_HEADINGS, gapText, jstNowLine, lineText } from "./input-text";
 import { viewingLineInTransaction } from "./resource-context";
 import { viewedSpecialistTarget } from "./specialist-context";
+import {
+	attachedLinesInTransaction,
+	SHARED_LINES,
+	sharedLinesInTransaction,
+} from "./shared-files";
 
 /** Bounds of the host's fields of `## State` (the conversation input specification, section 7.1). */
 export const STATE_LIMITS = {
 	work: 8,
 	presented: 4,
+	/** The conversation's shared files not presented (spec/server-scratch-cache-design-2026-11-07.md §8.1). */
+	shared: SHARED_LINES,
 	/** A TODO archived this long ago is no longer named (its notice told the user it finished). */
 	archivedMs: 2 * 60 * 60 * 1000,
 	/** A gap this long since the last utterance is said in the `今` line. */
@@ -159,9 +166,15 @@ export function stateLinesInTransaction(
 		);
 	if (work.length) lines.push("仕事:", ...work.slice(0, STATE_LIMITS.work));
 
-	const presented = presentedLines(deps, tx, input, open);
+	const shown = new Set<string>();
+	const presented = presentedLines(deps, tx, input, open, shown);
 	if (presented.length)
 		lines.push("提示中:", ...presented.slice(0, STATE_LIMITS.presented));
+	const shared = input.run
+		? sharedLinesInTransaction(deps, tx, input.conversationId, shown)
+		: [];
+	if (shared.length)
+		lines.push("共有中:", ...shared.slice(0, STATE_LIMITS.shared));
 
 	// The context keeper's fields, only while it runs (it is off for now: the review fixes design C5).
 	const body = deps.contextKeeper ? input.state?.body : undefined;
@@ -197,10 +210,16 @@ function presentedLines(
 	tx: Database,
 	input: StateInput,
 	open: readonly TodoItem[],
+	/** The URIs presented here, so `共有中` leaves them out. */
+	shown: Set<string>,
 ): string[] {
 	const { refs } = input;
 	const lines: string[] = [];
 	if (input.run) {
+		// The input's own attachments and long paste, before what is on screen (§8.1).
+		lines.push(
+			...attachedLinesInTransaction(deps, tx, input.run.inputMessageId, shown),
+		);
 		const viewing = viewingLineInTransaction(deps, tx, input.run);
 		if (viewing) lines.push(`- ${lineText(viewing)}（画面に表示中）`);
 		const target = viewedSpecialistTarget(deps, tx, input.run);
@@ -219,6 +238,8 @@ function presentedLines(
 		tx,
 		message.id,
 	) ?? []) {
+		if (shown.has(row.uri)) continue;
+		shown.add(row.uri);
 		const ref = `a${row.ref}`;
 		const full = `${ref}「${lineText(row.label)}」`;
 		lines.push(`- ${named.has(full) ? ref : full}（直前の返事で示した）`);

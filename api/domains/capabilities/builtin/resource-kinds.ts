@@ -137,6 +137,16 @@ const rows: Row[] = [
 		producedBy: [],
 		summary: "会話の出来事の記録",
 	},
+	{
+		// The user's attachments and long pastes and what sub-agents write: the host and `scratch.write` make it.
+		kind: "scratch",
+		label: "一時ファイル",
+		owner: "scratch",
+		actions: ["open", "read"],
+		defaultAction: "open",
+		producedBy: [],
+		summary: "サーバーの稼働中だけ残る共有ファイル",
+	},
 ];
 
 const base = (): Pick<

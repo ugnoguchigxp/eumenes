@@ -686,9 +686,10 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		/** Complete the legacy fence before the server starts any execution worker. */
 		async recover() {
 			if (deps.state)
-				await store.write((db) =>
-					deps.state!.quarantineLegacyInTransaction(db),
-				);
+				await store.write((db) => {
+					deps.state!.quarantineLegacyInTransaction(db);
+					deps.state!.recoverForgottenInTransaction(db);
+				});
 		},
 		/** Reads the settings, subscribes to commits and settings changes. The feed starts at its end. */
 		start() {
@@ -750,6 +751,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 				messageIds: readonly string[];
 				itemIds: readonly string[];
 				forgetIds?: readonly string[];
+				derived?: import("../../domains/memory").ForgetPurge["derived"];
 			},
 		) {
 			topicsCache = null;
@@ -757,7 +759,12 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 				...purge.messageIds,
 				...purge.itemIds.map((id) => `memory:${id}`),
 			];
-			for (const c of convs.values()) applySourceChange(c, refs);
+			for (const c of convs.values())
+				applySourceChange(
+					c,
+					deps.state?.forgetReferencesInTransaction(db, c.id, c.scope, purge) ??
+						refs,
+				);
 			deps.state?.forgetInTransaction(db, purge);
 		},
 		planForgetInTransaction(

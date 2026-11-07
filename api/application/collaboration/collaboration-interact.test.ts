@@ -141,6 +141,8 @@ test("interact pilot stays unavailable by default; an enabled fixture returns ca
 		h.toolchain.registry.get(
 			"adapter:browser.interact@1",
 		)!.availableInTransaction = () => true;
+		// The catalog reads an adapter's availability once per synchronous pass; the swap is seen from the next one.
+		await Bun.sleep(0);
 		expect(available()).toBe(true);
 		const initial = await say(request);
 		expect(h.dialogue.answerText(initial.id), traces.at(-1)?.slice(-3500)).toBe(

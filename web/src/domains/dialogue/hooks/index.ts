@@ -44,19 +44,27 @@ export function useSubmit(client: DialogueClient, id: string) {
 				| {
 						text: string;
 						attachmentIds: string[];
+						/** The user's other files, already uploaded as shared files. */
+						fileIds?: string[];
 						viewing?: RunViewing;
 						addressee?: Addressee;
 				  },
 		) => {
-			const { text, attachmentIds, viewing, addressee } =
-				typeof value === "string"
-					? {
-							text: value,
-							attachmentIds: [],
-							viewing: undefined,
-							addressee: undefined,
-						}
-					: value;
+			const {
+				text,
+				attachmentIds,
+				fileIds = [],
+				viewing,
+				addressee,
+			} = typeof value === "string"
+				? {
+						text: value,
+						attachmentIds: [],
+						fileIds: [],
+						viewing: undefined,
+						addressee: undefined,
+					}
+				: value;
 			const previous = pending.current;
 			const request =
 				previous?.client === client &&
@@ -64,6 +72,8 @@ export function useSubmit(client: DialogueClient, id: string) {
 				previous.input.text === text &&
 				JSON.stringify(previous.input.attachmentIds ?? []) ===
 					JSON.stringify(attachmentIds) &&
+				JSON.stringify(previous.input.fileIds ?? []) ===
+					JSON.stringify(fileIds) &&
 				JSON.stringify(previous.input.viewing ?? null) ===
 					JSON.stringify(viewing ?? null) &&
 				JSON.stringify(previous.input.addressee ?? null) ===
@@ -76,6 +86,7 @@ export function useSubmit(client: DialogueClient, id: string) {
 								conversationId: id,
 								text,
 								...(attachmentIds.length ? { attachmentIds } : {}),
+								...(fileIds.length ? { fileIds } : {}),
 								...(viewing ? { viewing } : {}),
 								...(addressee ? { addressee } : {}),
 							},

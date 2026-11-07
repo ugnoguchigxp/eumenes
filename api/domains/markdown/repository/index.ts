@@ -32,6 +32,24 @@ ALTER TABLE markdown_workspaces ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0
 CREATE UNIQUE INDEX markdown_saves_document ON markdown_saves(document_id);
 `,
 	},
+	{
+		id: "markdown/0004-larm-document-files",
+		after: ["markdown/0003-created-unique-saves"],
+		sql: `
+ALTER TABLE markdown_workspaces ADD COLUMN remote_namespace TEXT;
+ALTER TABLE markdown_workspaces ADD COLUMN remote_path TEXT;
+ALTER TABLE markdown_workspaces ADD COLUMN remote_binding TEXT;
+ALTER TABLE markdown_workspaces ADD COLUMN markdown TEXT;
+ALTER TABLE markdown_workspaces ADD COLUMN saved_markdown TEXT;
+ALTER TABLE markdown_workspaces ADD COLUMN saved_recovery TEXT;
+ALTER TABLE markdown_workspaces ADD COLUMN conflict_json TEXT;
+ALTER TABLE markdown_saves ADD COLUMN namespace TEXT;
+ALTER TABLE markdown_saves ADD COLUMN path TEXT;
+ALTER TABLE markdown_saves ADD COLUMN recovery TEXT;
+ALTER TABLE markdown_saves ADD COLUMN content_digest TEXT;
+CREATE UNIQUE INDEX markdown_workspace_remote ON markdown_workspaces(source_id,remote_binding) WHERE source_id IS NOT NULL;
+`,
+	},
 ];
 export type Workspace = {
 	id: string;
@@ -48,6 +66,13 @@ export type Workspace = {
 	created_at: number;
 	saved_content_json: string | null;
 	saved_title: string | null;
+	remote_namespace: string | null;
+	remote_path: string | null;
+	remote_binding: string | null;
+	markdown: string | null;
+	saved_markdown: string | null;
+	saved_recovery: string | null;
+	conflict_json: string | null;
 };
 export type SessionRow = {
 	id: string;
@@ -84,4 +109,8 @@ export type PendingSave = {
 	source_id: string | null;
 	remote_revision: string | null;
 	binding: string;
+	namespace: string | null;
+	path: string | null;
+	recovery: string | null;
+	content_digest: string | null;
 };

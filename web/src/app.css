@@ -941,6 +941,54 @@ select:focus-visible {
 	color: var(--muted-foreground);
 	overflow-wrap: anywhere;
 }
+.draft-files {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	max-width: 100%;
+}
+.draft-file {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	max-width: 100%;
+	padding: 2px 4px 2px 10px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+}
+.draft-file-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.draft-file small {
+	width: auto;
+}
+.scratch-viewer-image {
+	display: block;
+	max-width: 100%;
+	max-height: 70vh;
+	margin: 0 auto;
+	object-fit: contain;
+	background: white;
+	border-radius: 8px;
+}
+.scratch-viewer-text {
+	max-height: 70vh;
+	margin: 0;
+	padding: 12px;
+	overflow: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font: 13px/1.6 var(--font-mono, ui-monospace, monospace);
+	background: var(--muted);
+	border-radius: 8px;
+}
 .message-image-trigger {
 	flex-shrink: 0;
 	align-self: flex-start;

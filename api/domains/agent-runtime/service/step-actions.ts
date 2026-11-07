@@ -4,7 +4,12 @@ import {
 	ValidationFailure,
 	validationIssues,
 } from "../../../infrastructure/validation-log";
-import { researchInput, toolRuntimeOf, zSchema } from "../../capabilities";
+import {
+	researchInput,
+	scratchWrite,
+	toolRuntimeOf,
+	zSchema,
+} from "../../capabilities";
 import type { Receipt, ControlContract } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import { parseResourceUri } from "../../resources";
@@ -41,14 +46,18 @@ import type { TaskOps } from "./task-ops";
 import { guidedAction, guidedWeb } from "./guided-contract";
 import { applyGuidedAction } from "./guided-step";
 import {
+	HOST_TOOLS,
 	RESOURCE_READ_TOOL,
 	RESOURCE_READS_MAX,
+	SCRATCH_WRITE_TOOL,
+	SCRATCH_WRITES_MAX,
 	checkLinks,
 	checkUriArguments,
 	loadResources,
 	readText,
 	saveResources,
 	type StoredRead,
+	type StoredWrite,
 } from "./resource-access";
 
 export type StepInput = {
@@ -77,6 +86,8 @@ export type StepOutput = {
 	diagnostic?: LogFields;
 	/** The read a `resource.read` invocation asked for, made while the step ran (the host's port is async). */
 	resourceRead?: StoredRead;
+	/** The file a `scratch.write` invocation wrote while the step ran. */
+	sharedWrite?: StoredWrite;
 };
 type StepHandler = HandlerDefinition<
 	{ taskId: string; stepId: string },
@@ -116,6 +127,7 @@ function invokeStepTool(
 	p: NonNullable<ReturnType<RuntimeContext["state"]["prepared"]["get"]>>,
 	action: Extract<ControlAction, { action: "invoke" }>,
 	resourceRead?: StoredRead,
+	sharedWrite?: StoredWrite,
 ) {
 	const { tools } = ctx.deps;
 	const { catalogs, bindings } = ctx.state;
@@ -137,6 +149,10 @@ function invokeStepTool(
 	);
 	if (tool.tool.id === RESOURCE_READ_TOOL) {
 		readResource(ctx, ops, db, t, claim, action, resourceRead);
+		return;
+	}
+	if (tool.tool.id === SCRATCH_WRITE_TOOL) {
+		writeShared(ctx, ops, db, t, claim, action, sharedWrite);
 		return;
 	}
 	if (isHistory(p) && toolRuntimeOf(tool.tool.revisionId)?.cursorPaging) {
@@ -221,9 +237,14 @@ function readResource(
 	action: Extract<ControlAction, { action: "invoke" }>,
 	read: StoredRead | undefined,
 ) {
-	const given = (action.arguments as { uri?: string }).uri;
-	const uri = given === undefined ? undefined : parseResourceUri(given)?.uri;
-	if (!ctx.deps.resources || !read || read.uri !== uri)
+	const args = action.arguments as { uri?: string; offset?: number };
+	const uri = args.uri === undefined ? undefined : parseResourceUri(args.uri)?.uri;
+	if (
+		!ctx.deps.resources ||
+		!read ||
+		read.uri !== uri ||
+		(read.offset ?? 0) !== (args.offset ?? 0)
+	)
 		throw new Error("resource_read_unavailable");
 	const stored = loadResources(db, t.id);
 	if (stored.reads.length >= RESOURCE_READS_MAX)
@@ -236,6 +257,34 @@ function readResource(
 			read.ok ? { ...read, text: readText(read.text) } : read,
 		],
 	});
+	ops.next(db, get(db, t.id)!, claim.jobId);
+}
+/**
+ * `scratch.write` is answered by the host like `resource.read`: the file was written while the step ran, and the
+ * outcome is kept on the task so the next step shows it and `finish.links` may name its URI.
+ */
+function writeShared(
+	ctx: RuntimeContext,
+	ops: TaskOps,
+	db: Tx,
+	t: Task,
+	claim: Claim,
+	action: Extract<ControlAction, { action: "invoke" }>,
+	write: StoredWrite | undefined,
+) {
+	const args = scratchWrite.safeParse(action.arguments);
+	if (!args.success)
+		throw new ValidationFailure("invalid_tool_input", [
+			{ validationPath: "tool", validationCode: "scratch_write_invalid" },
+		]);
+	if (!ctx.deps.sharedWrite || !write || write.name !== args.data.name)
+		throw new Error("scratch_write_unavailable");
+	const stored = loadResources(db, t.id);
+	if (stored.writes.length >= SCRATCH_WRITES_MAX)
+		throw new ValidationFailure("invalid_tool_input", [
+			{ validationPath: "tool", validationCode: "scratch_write_limit" },
+		]);
+	saveResources(db, t.id, { writes: [...stored.writes, write] });
 	ops.next(db, get(db, t.id)!, claim.jobId);
 }
 export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
@@ -386,6 +435,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 						p,
 						action,
 						outcome.result.resourceRead,
+						outcome.result.sharedWrite,
 					),
 			);
 		} else {
@@ -419,7 +469,8 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 				["failed", "not_found"].includes(
 					(action.report as { outcome?: string }).outcome ?? "",
 				) &&
-				input.grants.some((g) => !g.replayOnly) &&
+				// The host's own tools acquire nothing: only the package's tools count here.
+				input.grants.some((g) => !g.replayOnly && !HOST_TOOLS.has(g.id)) &&
 				!tools
 					.invocationsInTransaction(db, t.id)
 					.some((i) => toolRuntimeOf(i.toolRevisionId)?.operation !== "recipe")
@@ -441,6 +492,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					p,
 					action,
 					outcome.result.resourceRead,
+					outcome.result.sharedWrite,
 				);
 			} else if (input.search) {
 				saveSearchReport(db, t, action.report, input.catalog, tools, now(), {

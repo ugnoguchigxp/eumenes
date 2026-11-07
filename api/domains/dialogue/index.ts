@@ -31,3 +31,4 @@ export {
 } from "./repository/agency";
 export { createAgencyStatePort } from "./service/agency-state";
 export type { AgencyStatePort, AgencyRecord } from "./service/agency-state";
+export type { SharedFilesPort } from "./contracts/resources";

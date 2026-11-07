@@ -21,6 +21,8 @@ export type Model3dCommandInput = {
 	title?: string;
 	tags?: string[];
 	sourceImageRef?: string;
+	/** A shared image the host resolved from `sourceImageRef` (never written by the model). */
+	sharedImageId?: string;
 	query?: string;
 	assetRef?: string;
 	generationRef?: string;
@@ -96,9 +98,11 @@ export function createModel3dCommands(deps: {
 			case "open":
 				return { action: "open", state: "ready" };
 			case "generate": {
-				const source: Model3dSource = input.sourceImageRef
-					? { type: "image-artifact", id: input.sourceImageRef }
-					: { type: "prompt", prompt: input.prompt ?? "" };
+				const source: Model3dSource = input.sharedImageId
+					? { type: "shared-image", id: input.sharedImageId }
+					: input.sourceImageRef
+						? { type: "image-artifact", id: input.sourceImageRef }
+						: { type: "prompt", prompt: input.prompt ?? "" };
 				const generation = deps.createInTransaction(db, {
 					owner,
 					conversationId,

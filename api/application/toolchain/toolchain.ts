@@ -150,6 +150,10 @@ type ToolchainOptions = {
 	stock?: { fetch?: typeof fetch; now?: () => number };
 	/** The sub-agents' `resource.read` (absent: it is not offered). */
 	resources?: import("../resources/late").LateResources;
+	/** The sub-agents' `scratch.write` (absent: it is not offered). */
+	sharedWrite?: import("../../domains/agent-runtime").SharedWritePort;
+	/** The conversation's shared files, which 3D generation may start from (absent: none). */
+	scratch?: import("../../domains/scratch").ScratchStore;
 	/** The World investigation's reads (`world.find`, `world.query`), built over the agent runtime; the toolchain is offered only while World is usable. */
 	worldResearch?: (
 		runtime: () => import("../../domains/agent-runtime").AgentRuntime,
@@ -330,7 +334,9 @@ export async function createToolchain(
 				]
 			: []),
 		...(options.ocr ? [createOcrAdapter(options.ocr)] : []),
-		...(options.model3d ? [createModel3dAdapter(options.model3d)] : []),
+		...(options.model3d
+			? [createModel3dAdapter(options.model3d, options.scratch)]
+			: []),
 		...(options.compute ? [createComputeAdapter(options.compute)] : []),
 		...(options.browser
 			? [
@@ -494,6 +500,7 @@ export async function createToolchain(
 		reconcileThrottleMs: options.reconcileThrottleMs,
 		onSearchReport: recipes.onSearchReport,
 		...(options.resources ? { resources: options.resources.read } : {}),
+		...(options.sharedWrite ? { sharedWrite: options.sharedWrite } : {}),
 	});
 	taskRuntime = agents;
 	const vectors = createVectorRefresh(

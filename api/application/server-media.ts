@@ -9,6 +9,7 @@ import {
 } from "../domains/excalidraw";
 import { createImage } from "../domains/image";
 import type { ConversationService } from "../domains/conversation";
+import { sharedImageImports } from "./scratch/shared-image-import";
 import { createModel3d } from "../domains/model3d";
 import { createLarmPlayground, createLocalServices } from "../domains/larm";
 import { createMusic } from "../domains/music";
@@ -123,25 +124,31 @@ export function buildMedia(
 export function buildModel3d(
 	config: Config,
 	deps: {
-		core: Pick<Core, "store" | "queue" | "settings">;
+		core: Pick<Core, "store" | "queue" | "settings" | "scratch">;
 		conversation: ConversationService;
 	},
 ) {
 	const { store, queue, settings } = deps.core;
+	const playground = () => {
+		const s = settings.get();
+		if (!s.larm.baseUrl || !config.larmToken) return null;
+		return createLarmPlayground({
+			baseUrl: s.larm.baseUrl,
+			token: config.larmToken,
+			profile: s.larm.profile,
+			audience: s.larm.audience,
+			providerHosts: config.larmProviderHosts,
+		});
+	};
 	return createModel3d({
 		store,
 		queue,
-		larm: () => {
-			const s = settings.get();
-			if (!s.larm.baseUrl || !config.larmToken) return null;
-			return createLarmPlayground({
-				baseUrl: s.larm.baseUrl,
-				token: config.larmToken,
-				profile: s.larm.profile,
-				audience: s.larm.audience,
-				providerHosts: config.larmProviderHosts,
-			}).meshes;
-		},
+		larm: () => playground()?.meshes ?? null,
+		// An attached image becomes a LARM library image before its generation is sent (scratch spec §11.1).
+		sharedImages: sharedImageImports(
+			deps.core.scratch,
+			() => playground()?.imageImports ?? null,
+		),
 		announceInTransaction(tx, notice) {
 			const id = `model3d-notice:${notice.id}`;
 			if (deps.conversation.messageInTransaction(tx, id)) return;

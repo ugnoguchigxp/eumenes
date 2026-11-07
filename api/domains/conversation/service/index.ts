@@ -1,5 +1,5 @@
 import { backfillSourceEvents } from "../repository/source-backfill";
-import { createAttachments } from "./attachments";
+import { type AttachmentStored, createAttachments } from "./attachments";
 import { linkAttachments } from "../repository/attachments";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -69,6 +69,8 @@ export type ConversationServiceOptions = {
 	/** Fail instead of skipping the outbox when its migration is missing. */
 	requireOutbox?: boolean;
 	clock?: () => string;
+	/** Told after each attachment upload is stored. */
+	attachmentStored?: AttachmentStored;
 };
 
 export function createConversationService(
@@ -127,7 +129,11 @@ export function createConversationService(
 	return {
 		imageReferencesInTransaction: imageReferences,
 		recordImageAnswerInTransaction: recordImageAnswer,
-		...createAttachments(store, outbox.principal),
+		...createAttachments(
+			store,
+			outbox.principal,
+			serviceOptions.attachmentStored,
+		),
 		/**
 		 * What the conversation's input is built from (the conversation input specification, sections 6.3, 6.1.1 and
 		 * 7.4). Every function runs inside the caller's transaction.

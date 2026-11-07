@@ -1,0 +1,388 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/action-kinds.test.ts:
+(pass) Agency uses the registered research execution contract without a manufactured user run [1048.15ms]
+(pass) Agency uses the registered instant execution contract without a manufactured user run [963.29ms]
+(pass) Agency uses the registered pipeline execution contract without a manufactured user run [905.20ms]
+(pass) Agency uses the registered task execution contract without a manufactured user run [1208.00ms]
+(pass) an autonomous owner's question reaches its TODO and resumes only from a real user answer [1184.24ms]
+
+api/application/agency/action-safety.test.ts:
+(pass) an autonomous command cannot translate into an unapproved write, even if it claims user approval [886.97ms]
+(pass) settings stops an accepted autonomous operation and rejects its late response [953.25ms]
+(pass) forget stops an accepted autonomous operation and rejects its late response [813.12ms]
+(pass) cancel stops an accepted autonomous operation and rejects its late response [823.26ms]
+(pass) capability stops an accepted autonomous operation and rejects its late response [870.58ms]
+(pass) the concurrent action limit is transactional and a replay consumes no second slot [839.50ms]
+(pass) the daily action limit is transactional and a replay consumes no second slot [917.15ms]
+(pass) an accepted action survives host restart without a second operation or a second execution [903.36ms]
+
+api/application/agency/actions.test.ts:
+(pass) Agency delegates image creation through shared execution and returns a resource without a user request [1094.22ms]
+(pass) Agency delegates music creation through shared execution and returns a resource without a user request [1199.81ms]
+(pass) catalog result drives a further action after restart even when the speech cap is reached [1323.11ms]
+(pass) discovery and delegation retain a shared activity token ceiling [1140.12ms]
+
+api/application/agency/archive-recovery.test.ts:
+(pass) forgetting after capability discovery leaves readable checkpoints on restart [1016.24ms]
+(pass) forgetting an archived Memory Record also invalidates its Agency checkpoint [1032.02ms]
+
+api/application/agency/autonomy.test.ts:
+(pass) autonomous intent dispatches real research, receives a result, survives restart and is revoked on forget [551.04ms]
+
+api/application/agency/backlog.test.ts:
+(pass) a burst within the presented observation window reaches selection in the same opportunity [13.06ms]
+
+api/application/agency/connection.test.ts:
+(pass) assembled host reaches larm with one exact purpose system, including a retry [80.43ms]
+(pass) assembled host reaches cloud with one exact purpose system, including a retry [77.97ms]
+
+api/application/agency/host-work.test.ts:
+(pass) TODOs offered to the agency > open and asking TODOs reach the decision and the update, with the question; finished ones never do [10.98ms]
+(pass) TODOs offered to the agency > a failing ledger read offers no TODOs and does not stop the cycle [10.99ms]
+(pass) asking what work asks > an utterance that cites an asking TODO is stored with its todoRefs [13.48ms]
+(pass) asking what work asks > an utterance that cites no TODO carries no todoRefs [10.40ms]
+(pass) work that changed > a waiting work question cannot bypass the unanswered speech limit [14.22ms]
+(pass) work that changed > a question opens a result_received opportunity after the commit, in the conversation the user is in [14.96ms]
+(pass) work that changed > finished work opens no opportunity: its notice on screen tells it [11.82ms]
+(pass) work that changed > a change told in a transaction that rolled back opens nothing [12.39ms]
+(pass) work that changed > in a conversation the user is not in, it waits for the next turn there [20.14ms]
+(pass) work that changed > the question the opportunity asks is delivered as a runless message citing it [14.88ms]
+(pass) the conversation agent > the system parts are fixed by the settings: the interests and the spoken style, and the feeling rule only when the feeling is on [14.71ms]
+(pass) the conversation agent > a reply is one model call that answers in plain text [7.10ms]
+(pass) the conversation agent > the leading feeling emoji becomes the delivery emotion and is not spoken; calm is none [8.87ms]
+(pass) the conversation agent > with the feeling off the reply is left as it is and carries no emotion [6.06ms]
+(pass) the conversation agent > a tool call runs through the host's tools and the reply goes on with its result [7.27ms]
+(pass) the conversation agent > a tool that hands the work over ends the reply [6.80ms]
+
+api/application/agency/host.test.ts:
+(pass) start and settings > the feed starts at its end: what was said before start is never read [11.50ms]
+(pass) start and settings > agency settings immediately replace pending inference while retaining grounded state [13.16ms]
+(pass) start and settings > settings that are not the agency's change nothing [10.67ms]
+(pass) start and settings > switching the settings while a decision is pending appends nothing [13.20ms]
+(pass) opportunities > one reply makes one turn-end decision and the user message alone calls no model [11.00ms]
+(pass) opportunities > a runless assistant message (a timer's) is observed but opens no opportunity [8.63ms]
+(pass) opportunities > the user's active State items reach the decision as topics, bounded and stable [11.70ms]
+(pass) opportunities > two events of one commit are both observed, in order, and open one cycle [10.34ms]
+(pass) opportunities > a corrected message becomes a correction observation [11.81ms]
+(pass) opportunities > a retraction removes dependent data and new grounded input continues [17.61ms]
+(pass) delivery > accepted Live speech keeps the offered text separate from playback evidence [12.30ms]
+(pass) delivery > a spoken ticket becomes one runless assistant message with one terminal receipt [12.27ms]
+(pass) delivery > with emotion on, the utterance's feeling is stored as its host delivery; without one, none [30.02ms]
+(pass) delivery > with emotion off, the select is asked without the feeling rules [11.02ms]
+(pass) delivery > S5: a user message arriving during the decision appends nothing [16.44ms]
+(pass) delivery > S5: something said after the opportunity (without new input) interrupts the ticket [15.50ms]
+(pass) delivery > S5: a run still queued or running at the delivery time interrupts the ticket [14.89ms]
+(pass) delivery > the user speaking or being answered at the delivery time interrupts the ticket [15.05ms]
+(pass) delivery > a foreground request in progress blocks the opportunity without a model choice [8.88ms]
+(pass) delivery > S6: the same text at another opportunity is another ticket and another message [13.35ms]
+(pass) idle > a review with no work leaves the original idle deadline in place [77.14ms]
+(pass) idle > an exhausted call window defers idle without consuming a speech opportunity [27.58ms]
+(pass) idle > periodic review leaves a running idle update intact [71.44ms]
+(pass) idle > silence is retried at 20s, 40s, 80s and then given up [12.93ms]
+(pass) idle > one unanswered spoken remark ends automatic idle until the user speaks again [11.40ms]
+(pass) idle > pending speech is interrupted if the user switches conversations before delivery [13.75ms]
+(pass) idle > only the conversation the user spoke in last gets idle cycles [14.81ms]
+(pass) idle > a busy moment defers the cycle without spending the backoff [11.35ms]
+(pass) idle > a cycle whose call yielded to the foreground does not spend the backoff [11.70ms]
+(pass) idle > a new user message cancels the pending idle and restarts the silence [11.91ms]
+(pass) review fixes > decision ids stay unique when runtimes are recreated by settings changes and retractions [18.83ms]
+(pass) review fixes > close cancels an idle cycle without waiting for an uncooperative provider and rejects its late result [11.76ms]
+(pass) review fixes > a retraction gives the conversation a new idle planner [14.61ms]
+(pass) review fixes > the delivery fence reads the committed setting, not the cached one [12.94ms]
+(pass) review fixes > a replaced runtime neither delivers nor receives a receipt [11.01ms]
+(pass) review fixes > topics are cached for 30 seconds and re-read after a memory forget [12.21ms]
+(pass) review fixes > idle conversations are forgotten and the tracked set is bounded [12.62ms]
+
+api/application/agency/image-history.test.ts:
+(pass) image-only input and its analysis reach autonomous selection as one identifiable exchange [14.70ms]
+(pass) a host-recorded image answer reaches autonomous selection as execution evidence [12.30ms]
+
+api/application/agency/initiative-limits.test.ts:
+(pass) three invalid idle selections consume only their bounded technical retries [21.13ms]
+(pass) slow selection respects the actual delivery interval (durable=false) [17.76ms]
+(pass) slow selection respects the actual delivery interval (durable=true) [77.20ms]
+
+api/application/agency/interest-growth.test.ts:
+(pass) the actual host forms, promotes and withdraws F interests from new user evidence [17.37ms]
+
+api/application/agency/llm-port.test.ts:
+(pass) agency LLM port > captures a structured background control on the conversation route and returns usage and latency [0.41ms]
+(pass) agency LLM port > never asks for more than the background output limit [0.18ms]
+(pass) agency LLM port > a schema violation is an output error and rejects the control receipt [0.17ms]
+(pass) agency LLM port > unparseable output is an output error [0.08ms]
+(pass) agency LLM port > an already aborted signal calls nothing [0.03ms]
+(pass) agency LLM port > an abort during the call propagates and reaches inference through the signal [0.09ms]
+(pass) agency LLM port > a result that arrives after cancellation is not adopted [0.05ms]
+(pass) agency LLM port > inference failures become call errors; connection-class codes are retryable [0.11ms]
+(pass) agency LLM port > a call that yielded to the foreground is not tried again at once [0.04ms]
+(pass) agency LLM port > a capture refusal of inference is a non-retryable call error [0.06ms]
+(pass) agency LLM port > a receipt inference no longer accepts is not adopted [0.04ms]
+(pass) agency LLM port > an invalid decision id is refused before capture [0.04ms]
+(pass) agency LLM port on the conversation's prompt > the purpose system replaces the conversation system; only data goes into Task [0.11ms]
+(pass) missing host system never captures or calls inference [0.06ms]
+
+api/application/agency/memory-integration.test.ts:
+(pass) an untraceable reply after forgetting does not block independent autonomous decisions [99.15ms]
+(pass) candidate-free speech reaches the real host writer and Memory-backed checkpoint [77.36ms]
+(pass) forget removes A bodies and preserves independent B through result persistence and restart [102.11ms]
+(pass) uncited Memory topics invalidate their outputs, then unrelated conversation can speak again [86.67ms]
+(pass) legacy checkpoints are quarantined before new work, and shutdown confirms that quarantine [88.78ms]
+(pass) compacted observations remain in Memory, restore with bounded live state, and accept new conversation [185.81ms]
+(pass) Memory expiry during selection rejects the old output and new conversation recovers [84.55ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-message [102.74ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-message-with-record-ref [126.57ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-record [102.20ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-record-without-ref-or-provenance [97.19ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-receipt-without-ref-or-provenance [104.84ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for unknown-missing [85.77ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for unknown-missing-without-ref-or-provenance [82.28ms]
+
+api/application/agency/recovery.test.ts:
+(pass) restart preserves provenance for an independent pending speech (persisted) after unrelated forgetting [9.88ms]
+(pass) restart preserves provenance for an independent pending speech (unknown delivery) after unrelated forgetting [8.91ms]
+
+api/application/agency/schema.test.ts:
+(pass) transport factoring preserves the F schema when shared references are expanded [0.95ms]
+(pass) factoring preserves literals and existing definition names [0.09ms]
+
+api/application/agency/system-context.test.ts:
+(pass) both runtime purposes send the complete Eumenes system; observations stay in JSON data [10.13ms]
+(pass) hosts and calls keep their own persona, interests and emotion settings [22.55ms]
+(pass) a persona change rejects old pending speech (announced=true) [10.82ms]
+(pass) a persona change rejects old pending speech (announced=false) [11.25ms]
+(pass) the real dialogue composes Eumenes-owned reply parts and keeps user text outside system [79.84ms]
+
+api/application/agency/topics.test.ts:
+(pass) takes affirmed, active, currently valid preferences, habits and facts with their memory ids [0.08ms]
+(pass) is bounded, short, deduplicated and stable across input order [0.10ms]
+
+api/application/agency/work.test.ts:
+(pass) an open TODO is offered to the agency as todo, dated when it was requested [0.04ms]
+(pass) a TODO that waits for the user is offered as waiting, with the question the sub-agent asked [0.03ms]
+(pass) finished work is never offered to the agency: its notice on screen tells it [0.01ms]
+(pass) the agency reads the TODOs of the conversation from the dialogue ledger: open and asking ones only [0.11ms]
+(pass) the title names the toolchain the work went to, within the title length [0.02ms]
+
+api/application/lifecycle.test.ts:
+(pass) recover and start follow registration order; close is the reverse [0.21ms]
+(pass) items without a hook are skipped, so per-phase order is expressed as separate items [0.05ms]
+(pass) a recover failure aborts startup and stops later recoveries [0.04ms]
+(pass) a failing close is logged by name and never skips the rest; the result is false [0.06ms]
+(pass) the overall deadline abandons a hung close, starts nothing further, and reports failure [1.22ms]
+(pass) a close that finishes in time clears its deadline timer [0.03ms]
+(pass) intervalLifecycle skips a tick while the previous one runs, and close waits for it [4.54ms]
+(pass) intervalLifecycle stop and idle can be used apart, and a rejecting job is contained [2.74ms]
+(pass) terminator: a successful shutdown exits 0 and a failed one exits 1 [3.48ms]
+(pass) terminator: a second signal while shutting down exits 130 at once [1.73ms]
+(pass) terminator: Ctrl+C's SIGINT and the dev runner's SIGTERM are one request; Ctrl+C again forces [2.31ms]
+(pass) terminator: the 30 s process deadline exits 1 when shutdown never finishes [0.03ms]
+(pass) process guard: one rejection is logged and tolerated [0.04ms]
+(pass) process guard: more than 20 rejections in one window terminate; spread-out ones do not [0.10ms]
+(pass) process guard: an uncaught exception always terminates, without arguments [0.02ms]
+(pass) process guard: log fields never carry the error text [0.02ms]
+
+api/domains/dialogue/test/agency-sources.test.ts:
+(pass) TODO revision changes and withdrawn capabilities invalidate only their own source versions [66.52ms]
+
+api/domains/dialogue/test/agency-state.test.ts:
+(pass) forget fences late checkpoints and removes their saved bodies [0.40ms]
+(pass) only an actual current autonomous work authorizes research and expiry revokes it [0.32ms]
+(pass) a worker failure at ready_for_answer returns failure instead of waiting for a nonexistent report [0.28ms]
+(pass) evidence invalidated before adoption is rejected and the pending answer ends [0.27ms]
+(pass) actual dispatch time is atomic with the effect and survives subsequent checkpoints [0.24ms]
+
+api/domains/memory/test/api.test.ts:
+(pass) items carry their evidence, period and who asked for them [23.13ms]
+(pass) short-term notes of the named conversation only; expired notes are not listed [22.86ms]
+(pass) tendencies are listed; there is no route to read, change or delete them by hand [22.04ms]
+(pass) while the journal is inconsistent none of the reads shows a body [22.28ms]
+(pass) a note that expires does not change the long-term window [20.49ms]
+
+api/domains/memory/test/backfill.test.ts:
+(pass) the recent exchanges become handled said events, oldest first; the old summary is not carried over and the retired tables are dropped [31.36ms]
+(pass) a conversation that already has events is left alone, and blocked messages stay out [61.63ms]
+(pass) a long utterance keeps its head and a reference to the message [36.95ms]
+
+api/domains/memory/test/collaboration-source.test.ts:
+(pass) privacy exclusion permits session-local source use; forget and its unapplied journal remain revoked [0.18ms]
+
+api/domains/memory/test/context-window.test.ts:
+(pass) the first read publishes the profile and an unchanged input returns the same version and items [22.03ms]
+(pass) what the agent inferred is shown as an inference, never as the user's own words [20.79ms]
+(pass) a window stored before the sources were told apart is built again, so an inference stops reading as the user's words [22.53ms]
+(pass) an empty memory has an empty profile and is not treated as unavailable [18.82ms]
+(pass) additions wait in newMemories; a requested republish waits for the re-construction, which keeps the order and appends [24.84ms]
+(pass) the profile is not republished when the local date changes [22.41ms]
+(pass) stop, forget and the ON/OFF setting republish the profile at once [25.43ms]
+(pass) only a stop (or a forget) is immediate; additions, replacements and denials by the steward are not [23.37ms]
+(pass) an explicit correction republishes at once and leaves no old text; an inferred one keeps nothing of the old text either [23.31ms]
+(pass) the memory tool's query matches a natural Japanese sentence by character pairs [21.95ms]
+(pass) the read tool's memory read takes every current item without a query, matches by character pairs, and counts both [21.51ms]
+(pass) a rolled-back rebuild is discarded: the next read uses the committed row [19.78ms]
+(pass) the same inputs always give the same profile [18.88ms]
+(pass) an expired period is left out; a stated period is shown as absolute days [19.56ms]
+(pass) window validation: additions keep a run valid; stop, own-run changes, settings and pins decide the rest [21.36ms]
+(pass) usage receipts: adoption records the window it read [19.84ms]
+(pass) the continuity guard limits the short-term notes to the state section of the window plan [19.23ms]
+(pass) S0-3: expired items do not count toward the active-item limit [166.89ms]
+(pass) forgetting purges every stored window, also with memory OFF [47.89ms]
+(pass) a forget re-applied by recovery purges windows and records the immediate change [39.58ms]
+(pass) a validity boundary crossed by time refreshes the layers without waiting for the date to change [22.01ms]
+(pass) an unhealthy memory fails validation as unavailable [17.41ms]
+
+api/domains/memory/test/curation.test.ts:
+(pass) a quote that is found becomes the evidence range; the result and provenance say it matched [26.53ms]
+(pass) a supplied quote that does not match is rejected without replacing its evidence [19.75ms]
+(pass) an omitted quote keeps the bounded user message as its evidence [23.09ms]
+(pass) a long message keeps the library's 1024-byte evidence limit: the matched quote's start or the window that shares the most words [24.16ms]
+(pass) the assistant's words, another conversation's message and a missing message are not evidence [19.76ms]
+(pass) a blocked message is never evidence, even for an explicit request [21.15ms]
+(pass) the same key replaces the active item (no ACTIVE_EXISTS); the same value is not written again [23.06ms]
+(pass) an explicit request always writes a new, user-confirmed version, even for the same value [21.95ms]
+(pass) an element with an invalid key, text, date or kind is rejected alone; the others are written [22.63ms]
+(pass) validity bounds are stored with their precision [21.46ms]
+(pass) update rewrites an item at the revision the model saw; a changed item is item_changed [20.98ms]
+(pass) stop makes the item inactive and expires runs in flight; a stale revision is refused [23.81ms]
+(pass) merge carries the union of the evidence, replaces the key it keeps and stops the others [28.94ms]
+(pass) merge drops blocked and tombstoned evidence and is rejected when none is left [25.48ms]
+(pass) notes: add, update and close in the conversation; the source must be a usable message [25.83ms]
+(pass) tendencies: add, update and retire with live evidence of two distinct items [20.74ms]
+(pass) the active-item limit rejects a new key but not a replacement [82.45ms]
+(pass) curation is refused while memory is not usable [20.44ms]
+(pass) merge without a key keeps the newest source's key: that source is superseded, the others are stopped [21.64ms]
+
+api/domains/memory/test/execution-references.test.ts:
+(pass) delegated Memory is an issued item reference; unrelated additions and a rebuilt window leave it valid [25.11ms]
+(pass) forgetting immediately erases issued reference bodies and rejects forged refs [21.85ms]
+
+api/domains/memory/test/forget-cascade.test.ts:
+(pass) forgetting a State item deletes the tendencies that name it, and only those [23.72ms]
+(pass) forgetting one version of a fact deletes tendencies that name any version of it [24.82ms]
+(pass) a forget that fails leaves the tendencies alone [21.37ms]
+(pass) recovery removes tendencies derived from journaled forgets, also when the database still held them [24.67ms]
+(pass) more than five hundred item ids are deleted in chunks, with duplicates ignored [21.77ms]
+
+api/domains/memory/test/forget-closure.test.ts:
+(pass) forgetting a merged item also forgets what it was merged from [24.73ms]
+(pass) forgetting a merge source also forgets the merged item and the other sources [25.07ms]
+(pass) the lineage is followed through repeated merges and the versions of each fact [28.02ms]
+(pass) forgetting one item leaves the other items that rest on the same message [24.43ms]
+(pass) forgetting only a message blocks it without forgetting the items that rest on it [22.62ms]
+(pass) a replacement or merge by the steward does not expire a run in flight; a stop does [24.80ms]
+(pass) a forget reaches the short-term events of the conversation, and only those that stood on the message [22.77ms]
+(pass) a restart re-applies only the entries the database has not recorded [28.98ms]
+(pass) while memory is unhealthy the forget journal's messages stay hidden, even when a later line is damaged [23.27ms]
+(pass) while memory is unhealthy the block journal's messages stay hidden, even those the database does not know [23.62ms]
+(pass) one forget call takes at most five explicit items [20.65ms]
+(pass) notes: several sources, a refused blocked or foreign source, sources added by an update, any source forgotten deletes the note [22.15ms]
+
+api/domains/memory/test/forget-contract.test.ts:
+(pass) a forget blocks the evidence of every version, the steward's picks and the exchange partners, and removes what was derived [28.10ms]
+(pass) messages the steward found (alsoIn) are blocked with their partner, also when no item is forgotten [25.96ms]
+(pass) blocked messages stay blocked with memory switched off, and a block of a scheduled prompt is not upgraded away [26.63ms]
+(pass) stop position 1: the forget journal line (both versions and the intent) was written, the database was not changed. Start-up completes the State forget and the derived deletions; until then memory is not used [28.26ms]
+(pass) stop position 2: the transaction rolled back after the journal line was written. Recovery reaches the same state [26.77ms]
+(pass) earlier versions, stop position 1: only the block journal was written. Start-up imports it, completes the State forget and the derived deletions, and sets the file aside [28.70ms]
+(pass) earlier versions, stop position 2: the forget journal was written too (for one version), the database was not changed. The reconciliation, the import and the derived deletions reach the same state [29.07ms]
+(pass) an older database restored over the forget is brought to the same state by the journals [49.80ms]
+(pass) a corrupt block journal makes memory unusable instead of being skipped [25.81ms]
+
+api/domains/memory/test/forget-derived.test.ts:
+(pass) derived is written to the forget journal entry's intent and handed to the purge hook; a forget without it hands {} [28.97ms]
+(pass) a forget with only derived ids (no item, no message) is accepted; an empty one or a malformed one is refused before anything is journaled [20.12ms]
+(pass) the forget inside the caller's transaction hands derived too, and a rollback leaves the journal line to replay it [24.44ms]
+(pass) recovery replays derived only for the entries the reconciliation re-applied, not for the recorded ones [27.80ms]
+(pass) a block journal line of an earlier version is imported once, with its derived ids replayed [22.82ms]
+(pass) a purge that fails while a block journal line is imported rolls the recovery back; the next start completes it once [24.70ms]
+(pass) an older database restored over the forget gets derived replayed before memory is used again [37.32ms]
+
+api/domains/memory/test/forget.test.ts:
+(pass) forget removes every version of a fact beyond the 1000-row listing cap, and never another principal's item [139.33ms]
+(pass) forget refuses an unknown or foreign item before anything is journaled [21.91ms]
+(pass) a forget that fails after it was journaled reports memory_forget_incomplete (409) [340.06ms]
+
+api/domains/memory/test/ledger.test.ts:
+(pass) memory keeps no exchange or summary ledger: the conversation's flow is the continuity events [37.96ms]
+(pass) a blocked message is reported blocked, with the block journal's ids, per conversation and for the application [27.11ms]
+(pass) blocking a specialist session's messages is not a forget: the events keep their text [24.49ms]
+(pass) what is said while memory is off is skipped when memory is switched on; what is said after is offered [25.54ms]
+(pass) the forget fence moves with a forget and with a reconciliation that applied something, never otherwise [30.71ms]
+
+api/domains/memory/test/maintenance.test.ts:
+(pass) owner preview is read-only; state pause/resume retains text, source and unconfirmed origin [24.16ms]
+(pass) mixed stale references reject the whole operation and cannot target another conversation's note [23.61ms]
+(pass) notes and tendencies can be restored without inventing completion or new evidence [25.55ms]
+(pass) restore cannot bypass forgotten or blocked source material and HTTP validates owner input [23.73ms]
+(pass) restoring a paused State never silently rebinds evidence to a corrected source [22.91ms]
+
+api/domains/memory/test/memory.test.ts:
+(pass) save, stop and forget work without dialogue; memory is shared across conversations; no HTTP route changes it [24.23ms]
+(pass) policyRevisionInTransaction is the revision memory's access() uses and moves with the memory ON/OFF setting [18.21ms]
+
+api/domains/memory/test/migration.test.ts:
+(pass) adding the Seed migration preserves existing memory, conversation and connection settings [42.50ms]
+(pass) memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled_prompt blocks and drops the agent's tables [31.99ms]
+
+api/domains/memory/test/profile.test.ts:
+(pass) the published order keeps the previous items in place and appends new ones to their kind, oldest first [0.07ms]
+(pass) the keep order is kinds first, newest first inside a kind (never the showing order) [0.03ms]
+(pass) over the budget the user's own words are kept before inferences and observations [0.02ms]
+(pass) an item shows its text, source and absolute days; hidden fields stay out [0.03ms]
+(pass) days are Asia/Tokyo calendar days; an exclusive end shows its last day [0.04ms]
+(pass) the period the screen shows is in Asia/Tokyo days too, whatever the host's zone [0.02ms]
+
+api/domains/memory/test/quote.test.ts:
+(pass) an exact quote is returned as it is [0.01ms]
+(pass) whitespace differences are forgiven and the original slice is returned [0.04ms]
+(pass) full-width and half-width forms match through NFKC [0.02ms]
+(pass) a quote that is not in the text is null [0.01ms]
+(pass) surrogate pairs are never cut [0.02ms]
+(pass) punctuation differences are forgiven [0.02ms]
+(pass) the span is where the text was found, not where the first copy of its words is [0.01ms]
+(pass) folded length counts what is left after normalization
+(pass) a key is lower case [a-z0-9._-] and at most 64 characters [0.01ms]
+
+api/domains/memory/test/reference-input.test.ts:
+(pass) reference versions reject corrections, inactive items, wrong versions and forgotten messages [22.81ms]
+(pass) unrelated Record captures leave the State context window unchanged [19.13ms]
+(pass) only a confirmed Record tombstone counts as forgotten [21.89ms]
+(pass) origin lookup follows the public capture identity for plain and escaped Unicode strings [25.15ms]
+(pass) runless host speech inherits its actual input manifest and legacy speech remains unknown [21.08ms]
+
+api/domains/memory/test/seed-import.test.ts:
+(pass) public API preview/import is additive, preserves settings and identity, and distinguishes candidate sources [25.34ms]
+(pass) Seed contract rejects forged confirmation, duplicate identity and inconsistent byte ranges [0.38ms]
+(pass) transaction failure leaves neither State nor receipt nor source archive [20.82ms]
+(pass) capacity rejects the whole batch without changing existing memory [65.16ms]
+(pass) correction and partial forget persist across repeat import; candidate evidence can be consolidated without promotion [27.62ms]
+(pass) forget replay over pre-import database prevents Seed resurrection [37.31ms]
+(pass) forget replay over post-import database prevents Seed resurrection [38.68ms]
+
+api/domains/memory/test/specialist-block.test.ts:
+(pass) specialist-dialogue blocks are lifted on their own: other reasons stay blocked [21.96ms]
+(pass) the reason migration keeps every block row and accepts the new reason [33.33ms]
+
+api/domains/memory/test/state-snapshot.test.ts:
+(pass) all-page reads preserve history and tied-sequence order under the authorized scope [26.72ms]
+
+api/domains/memory/test/turn-recall.test.ts:
+(pass) vector encoding and the space key are the toolchain embeddings' (shared implementation, pinned values) [0.13ms]
+(pass) an exchange left out of nothing is found whole, once, even when both its messages match [21.42ms]
+(pass) a vector of another space, another conversation or a low score is ignored [21.66ms]
+(pass) the count limit holds, best matches first, and a hit must stay close to the best one [20.45ms]
+(pass) left-out messages, blocked messages and changed texts are never found [21.35ms]
+(pass) an exchange without an adopted answer is found by its user message alone [21.75ms]
+(pass) the search is off with memory off [20.35ms]
+(pass) the search gives up at the attempt cap [32.29ms]
+(pass) retracting a message drops its vector and its exchange partner's [20.07ms]
+(pass) there is no ordinal boundary: a hidden exchange between shown ones is found, and a shown one is not [19.36ms]
+
+api/domains/memory/test/vectors.test.ts:
+(pass) turns are embedded as passages, the query as a query; failures and a missing embedder cost only the vectors [38.86ms]
+(pass) saved turn vectors carry the digest of the whole message and are never kept for a blocked message [20.45ms]
+
+ 292 pass
+ 0 fail
+ 1717 expect() calls
+Ran 292 tests across 45 files. [27.23s]

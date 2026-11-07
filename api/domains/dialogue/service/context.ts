@@ -192,6 +192,8 @@ export interface Accept {
 	viewing?: RunViewing;
 	/** The addressee the sender saw; checked in the acceptance transaction. */
 	addressee?: Addressee;
+	/** The input's shared files (`SharedFilesPort.inputUris`), entered as `attached` and linked to its message. */
+	sharedUris?: string[];
 }
 /** Everything the dialogue service parts share: the injected ports. */
 export type DialogueDeps = {
@@ -210,6 +212,8 @@ export type DialogueDeps = {
 	resources?: ResourceAccess;
 	/** The conversation's resource ledger (`a<n>`); set by `createDialogueService` when `resources` is given. */
 	resourceLedger?: ResourceLedger;
+	/** The user's input as shared files, and the conversation's recent ones. */
+	sharedFiles?: import("../contracts/resources").SharedFilesPort;
 	memory?: MemoryService;
 	/** Told in the transaction in which a run ends, after its exchange is in memory's ledger. */
 	steward?: StewardPort;

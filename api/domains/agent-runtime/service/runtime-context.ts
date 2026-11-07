@@ -7,7 +7,7 @@ import type { QueueService } from "../../queue";
 import type { ToolRuntime } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import type { EvidenceCatalog } from "./evidence-catalog";
-import type { ResourceReadPort } from "./resource-access";
+import type { ResourceReadPort, SharedWritePort } from "./resource-access";
 
 export const STEP_KIND = "agent.step";
 export const terminal = new Set([
@@ -49,6 +49,8 @@ type RuntimeDeps = {
 	onSearchReport?: SearchReportHook;
 	/** Reads a resource by URI for the sub-agent tool `resource.read`; without it the tool is not offered. */
 	resources?: ResourceReadPort;
+	/** Writes a shared file for the sub-agent tool `scratch.write`; without it the tool is not offered. */
+	sharedWrite?: SharedWritePort;
 	autonomousResearch?: (
 		db: import("bun:sqlite").Database,
 		rootId: string,

@@ -1,5 +1,6 @@
 import { analysisErrors } from "../domains/larm/contracts/visual-perception";
 import { errorStatus as markdown } from "../domains/markdown/contracts";
+import { errorStatus as scratch } from "../domains/scratch/contracts";
 import { errorStatus as docling } from "../domains/docling/contracts";
 import { errorStatus as ocr } from "../domains/ocr/contracts";
 import { attachmentErrors } from "../domains/conversation/contracts";
@@ -74,6 +75,7 @@ const statusByCode = mergeErrorStatus(
 	analysisErrors,
 	docling,
 	markdown,
+	scratch,
 	attachmentErrors,
 	objectRecognition,
 	ocr,

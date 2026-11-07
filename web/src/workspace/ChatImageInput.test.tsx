@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { ChatImageInput } from "./ChatImageInput";
+import { ChatFilePreviews, ChatImageInput } from "./ChatImageInput";
 import type { WorkspaceState } from "./useWorkspace";
 
 beforeEach(() => {
@@ -38,6 +38,7 @@ function state(count = 0) {
 		attachments,
 		value: {
 			attachments,
+			files: { items: [], busy: false, add: vi.fn() },
 			submit: { isPending: false },
 		} as unknown as WorkspaceState,
 	};
@@ -88,4 +89,41 @@ test("a full draft explains the limit instead of offering more images", async ()
 		screen.getByText("添付は8枚までです。添付を外してから選んでください。"),
 	).toBeTruthy();
 	expect(screen.queryByRole("button", { name: "選んだ画像を使う" })).toBeNull();
+});
+
+test("the attach menu also picks other files, which the draft lists and can drop", async () => {
+	const s = state(0);
+	const click = vi.spyOn(HTMLInputElement.prototype, "click");
+	render(<ChatImageInput state={s.value} />);
+	fireEvent.click(screen.getByRole("button", { name: "ファイルを添付" }));
+	fireEvent.click(
+		await screen.findByRole("menuitem", { name: "ファイルを選ぶ…（Markdown・PDFなど）" }),
+	);
+	expect(click).toHaveBeenCalledOnce();
+	const picker = screen.getByLabelText<HTMLInputElement>("添付ファイルを選択");
+	expect(picker.accept).toBe(".md,.markdown,.txt,.csv,.json,.pdf,.glb");
+	const file = new File(["# 仕様"], "仕様.md");
+	fireEvent.change(picker, { target: { files: [file] } });
+	expect((s.value.files.add as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith([file]);
+	click.mockRestore();
+	cleanup();
+	const remove = vi.fn();
+	render(
+		<ChatFilePreviews
+			state={
+				{
+					files: {
+						items: [{ id: "f1", name: "仕様.md", size: 2048, file }],
+						busy: false,
+						remove,
+					},
+					submit: { isPending: false },
+				} as unknown as WorkspaceState
+			}
+		/>,
+	);
+	expect(screen.getByText("仕様.md")).toBeTruthy();
+	expect(screen.getByText("2KB")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "仕様.mdの添付を外す" }));
+	expect(remove).toHaveBeenCalledWith("f1");
 });

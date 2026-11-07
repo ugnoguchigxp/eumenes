@@ -107,7 +107,7 @@ test("catalog result drives a further action after restart even when the speech 
 	const a = actionHost(
 		h,
 		{ id: "timers.manage", question: "登録済みの予定を確認する" },
-		{ speakFirst: true, discover: true },
+		{ speakFirst: true, discover: true, inputTokens: 13_000 },
 	);
 	try {
 		await a.start();
@@ -151,6 +151,44 @@ test("catalog result drives a further action after restart even when the speech 
 		const context = h.commandContexts[0]!;
 		expect(context).not.toContain('"name":"timer.start"');
 		expect(h.parentContexts).toHaveLength(0);
+	} finally {
+		await a.close();
+		await h.close();
+	}
+}, 15000);
+
+test("discovery and delegation retain a shared activity token ceiling", async () => {
+	const h = await harness({
+		everyday: true,
+		timers: true,
+		discoveryTarget: () => "timer",
+	});
+	const a = actionHost(
+		h,
+		{ id: "timers.manage", question: "登録済みの予定を確認する" },
+		{ speakFirst: true, discover: true, inputTokens: 31_000 },
+	);
+	try {
+		await a.start();
+		await waitFor(() => a.host.inspect("agency-action")?.idle.unanswered === 1);
+		await a.advance(61_000);
+		await waitFor(() =>
+			a.host
+				.inspect("agency-action")!
+				.snapshot.observations.some((o) => o.kind === "action.observed"),
+		);
+		await a.restart();
+		await a.advance(61_000);
+		await waitFor(() =>
+			a.host
+				.inspect("agency-action")!
+				.snapshot.state.intents.some(
+					(i) => i.state === "held" && i.lastReason === "budget",
+				),
+		);
+		expect(a.rows()).toHaveLength(0);
+		expect(h.toolchain.agents.executions.list("agency-action")).toEqual([]);
+		expect(h.commandContexts).toHaveLength(0);
 	} finally {
 		await a.close();
 		await h.close();

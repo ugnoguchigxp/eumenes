@@ -212,6 +212,15 @@ export function createCapabilities(
 			};
 		},
 		getDefinitionInTransaction,
+		/** The active revision of a tool a host binds itself (`resource.read`, `scratch.write`); null when absent or disabled. */
+		activeToolInTransaction(db: Database, id: string): FixedDefinition | null {
+			const row = db
+				.query(
+					"SELECT active_revision_id FROM capability_items WHERE kind='tool' AND id=? AND enabled=1",
+				)
+				.get(id) as { active_revision_id: string } | null;
+			return row ? (closure(db, row.active_revision_id)[0] ?? null) : null;
+		},
 		registerBuiltinInTransaction,
 		...bound.api,
 		validateInTransaction: validate,

@@ -1,0 +1,116 @@
+{
+  "date": "2026-11-07",
+  "baseCommit": "fab11cdc08d23a57ced604717221c9d3d599acb5",
+  "incident": {
+    "event": "server.startup_failed",
+    "time": "2026-11-07T14:51:06.784+09:00",
+    "bootId": "42944fff-ba27-4cf9-95d8-9f855b526f30",
+    "reason": "agency_archive_unavailable",
+    "priorRepairDidNotResolveActualState": true
+  },
+  "authorizedDiagnosis": {
+    "userExplicitlyApprovedReadOnlyException": true,
+    "sqliteOpenedReadOnly": true,
+    "queryOnly": true,
+    "userOrRecordBodiesSelected": false,
+    "credentialsSelected": false,
+    "productionDataCopied": false,
+    "databaseChanges": false,
+    "serverOperations": false,
+    "result": "readonly-reader-coverage.json"
+  },
+  "actualState": {
+    "queryOnly": true,
+    "serverOperations": false,
+    "bodiesOrCredentialsSelected": false,
+    "missingObservationReferences": 61,
+    "affectedConversations": 19,
+    "allActors": {
+      "user": 61
+    },
+    "withProvenance": 0,
+    "recordStatuses": {
+      "forgotten": 61
+    },
+    "confirmedRecordTombstones": 61,
+    "blockedOriginalMessages": 0,
+    "unfinishedAutonomousWorkInAffectedConversations": 0
+  },
+  "priorBlindSpot": "Archived observation reference rows were already deleted and their input provenance absent, while original messages remained current. Earlier recovery required either the missing row or a stale original input.",
+  "fix": {
+    "identityContract": "eumenes-memory public domains/records/contracts/index.d.ts JSDoc: rec: + SHA-256(canonicalJson([principal, scopeKey, origin.namespace, origin.kind, origin.id]))",
+    "implementationBoundary": "Memory referenceInputs uses a string array JSON and existing sha256Hex, then public readRecord status; no private library import or product SQL",
+    "recovery": "Known tombstones for missing archived references are passed to native prepareForgetting within their persisted conversation/scope",
+    "unknownMissingStillRejected": true,
+    "originalMessagesNotBlockedOrReloaded": true,
+    "differentScopeWithSameObservationIdPreserved": true,
+    "newSemanticJudgementOrFallback": false,
+    "topicKeywordRulesAdded": false
+  },
+  "verification": {
+    "baselineSameState": {
+      "passed": 1,
+      "failed": 1,
+      "failure": "forgotten-record-without-ref-or-provenance still threw agency_archive_unavailable after recover",
+      "negative": "unknown missing without reference/provenance remained rejected"
+    },
+    "focused": {
+      "passed": 19,
+      "failed": 0,
+      "assertions": 103,
+      "files": 2,
+      "includes": [
+        "no reference or provenance, original message still current, Record forgotten",
+        "same native receipt ID retained in independent scope",
+        "unknown missing with and without provenance rejected",
+        "origin ID compatibility with public capture for plain and escaped Unicode strings"
+      ]
+    },
+    "related": {
+      "passed": 292,
+      "failed": 0,
+      "assertions": 1717,
+      "files": 45,
+      "seconds": 27.23,
+      "log": "missing-reference-backend.txt",
+      "testFiles": "missing-reference-test-files.json"
+    },
+    "checks": "missing-reference-checks.json",
+    "typecheck": "pass: 3061 files",
+    "ownedLintFormatSize": "pass",
+    "diffReview": "no topic-based decisions, private library imports, new execution loops or unrelated edits introduced",
+    "codeEditedDuringVerification": false
+  },
+  "readOnlyProductionCoverage": {
+    "checkedNonRedactedObservations": 71,
+    "missingReferences": 61,
+    "newProductionReaderConfirmedForgotten": 61,
+    "readerMismatches": 0,
+    "otherArchiveFailures": 0,
+    "databaseSizeAndModificationTimeUnchanged": true,
+    "actualStartupTested": false
+  },
+  "globalVerification": "Known domain verify inventory blocker in old artifacts/pursuit-integration-20261106 copies was unchanged; not retried without new evidence. Required backend files and owned static checks executed explicitly. Previous global boundary failure in untouched Markdown registration test remains separate.",
+  "remaining": [
+    "user starts server with this correction",
+    "verify actual startup success",
+    "resume live autonomous generation and Web acceptance"
+  ],
+  "contextStill": {
+    "contextCompileCalls": 5,
+    "compileEvalCalls": 5
+  },
+  "sourceDigests": {
+    "api/application/agency/host.ts": "46f04365fdd92c73bf3618a1b56f720200ae1e29126576d40f38b9250c61954e",
+    "api/application/agency/archive-recovery.test.ts": "9556a879f5ea014b0eb267e1427c74835588cb479c006af4fe896136e2438013",
+    "api/application/agency/memory-integration.test.ts": "825beb1e3e7fe82c9b4a4f9d4269d4f45e96ae5e83b2bd681d84f82f3a007d62",
+    "api/domains/dialogue/service/agency-forgetting.ts": "327769d56ba4a14df183089aa036b0fb1d3b9a9360cfd2739ca286207c8fd0db",
+    "api/domains/dialogue/service/agency-state.ts": "6364713fb996f6d34c7a7ca36059d05f0ccc692d20d8b2aecfefd3f5120bb5a4",
+    "api/domains/memory/service/reference-input.ts": "4447c06a2e4710df4bc1fc7d465327249edb5b7dcc26d7b86a5c9fd9063e7b1b",
+    "api/domains/memory/test/reference-input.test.ts": "f97efb28594ce28a976d9eb390c66e0160f72342467eccdab0691512a1692667",
+    "scripts/domains.ts": "e21a4f7877edab63ac40bafc3003f5a3b9f91509e66543d9a89996c335d9aa8b",
+    "api/application/agency/runtime.ts": "b3edb0b075fb28a9926c1bf27f20d6c193502c0b3fdc2669ea4e381db358d8a7",
+    "api/application/agency/action-host.fixture.ts": "a71eaed3b4ecd6e92c041be7090ea6b9f18efd5528ee47c373e44a13b1ae2752",
+    "api/application/agency/actions.test.ts": "ac9365cb028b71e8397f0a6c84159f945e71b2edd107f1002b25782524b327e7"
+  }
+}

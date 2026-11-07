@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const limits = {
-	bytes: 1_048_576,
-	originalChars: 262_144,
+	bytes: 8 * 1024 * 1024,
+	originalChars: 8 * 1024 * 1024,
 	nodes: 5000,
 	depth: 32,
 } as const;
@@ -101,7 +101,7 @@ export const emptyDocument = (): EditorDocument => ({
 	originalMarkdown: null,
 });
 export const id = z.string().uuid();
-export const title = z.string().trim().min(1).max(200);
+export const title = z.string().min(1).refine((v) => new TextEncoder().encode(v).length <= 4096);
 export const applyInput = z.strictObject({
 	documentId: id,
 	expectedRevision: z.number().int().positive(),
@@ -144,29 +144,33 @@ export function checkDocument(text: string) {
 }
 export type ArchiveEntry = {
 	sourceId: string;
-	documentId: string;
+	documentId?: string;
 	title: string;
 	revision: string;
 	path: string;
+	namespace: string;
+	contentDigest: string;
 };
+export type ArchivedDocument = { entry: ArchiveEntry; markdown: string; recovery: string };
+export type ArchiveSave = {
+	documentId: string; title: string; markdown: string; recovery: string;
+	sourceId: string; remoteRevision: string | null; binding: string;
+	namespace: string; path: string; contentDigest: string;
+};
+export class ArchiveFailure extends Error {
+	constructor(readonly code: string, readonly outcome: "unknown" | "conflict" | "failed", readonly httpStatus?: number) { super(code); }
+}
 export type ArchivePort = {
 	available(): boolean;
 	binding(): string | null;
-	list(signal: AbortSignal): Promise<ArchiveEntry[]>;
+	capabilities(signal: AbortSignal): Promise<{ maxMarkdownBytes: number; maxRecoveryBytes: number; maxRequestBytes: number; maxPageSize: number }>;
+	list(signal: AbortSignal, cursor?: string): Promise<{ items: ArchiveEntry[]; namespaces: string[]; nextCursor: string | null }>;
 	read(
 		sourceId: string,
 		signal: AbortSignal,
-	): Promise<{ entry: ArchiveEntry; document: EditorDocument }>;
+	): Promise<ArchivedDocument>;
 	save(
-		input: {
-			documentId: string;
-			title: string;
-			document: EditorDocument;
-			markdown: string;
-			sourceId: string | null;
-			remoteRevision: string | null;
-			binding: string;
-		},
+		input: ArchiveSave,
 		signal: AbortSignal,
 	): Promise<ArchiveEntry>;
 };
@@ -188,5 +192,5 @@ export const errorStatus = {
 
 export const stageInput = z.strictObject({
 	document: editorDocumentSchema,
-	markdown: z.string().max(524288).optional(),
+	markdown: z.string().refine((v) => new TextEncoder().encode(v).length <= 8 * 1024 * 1024).optional(),
 });

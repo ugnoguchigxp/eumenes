@@ -1,0 +1,159 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/action-kinds.test.ts:
+(pass) Agency uses the registered research execution contract without a manufactured user run [1168.44ms]
+(pass) Agency uses the registered instant execution contract without a manufactured user run [1105.54ms]
+(pass) Agency uses the registered pipeline execution contract without a manufactured user run [1006.48ms]
+(pass) Agency uses the registered task execution contract without a manufactured user run [1414.50ms]
+(pass) an autonomous owner's question reaches its TODO and resumes only from a real user answer [1389.92ms]
+
+api/application/agency/action-safety.test.ts:
+(pass) an autonomous command cannot translate into an unapproved write, even if it claims user approval [999.59ms]
+(pass) settings stops an accepted autonomous operation and rejects its late response [1092.92ms]
+(pass) forget stops an accepted autonomous operation and rejects its late response [1027.63ms]
+(pass) cancel stops an accepted autonomous operation and rejects its late response [1005.79ms]
+(pass) capability stops an accepted autonomous operation and rejects its late response [1120.08ms]
+(pass) the concurrent action limit is transactional and a replay consumes no second slot [1109.88ms]
+(pass) the daily action limit is transactional and a replay consumes no second slot [1107.06ms]
+(pass) an accepted action survives host restart without a second operation or a second execution [1217.54ms]
+
+api/application/agency/actions.test.ts:
+(pass) Agency delegates image creation through shared execution and returns a resource without a user request [1265.56ms]
+(pass) Agency delegates music creation through shared execution and returns a resource without a user request [1345.39ms]
+(pass) catalog result drives a further action after restart even when the speech cap is reached [1442.98ms]
+(pass) discovery and delegation retain a shared activity token ceiling [1315.05ms]
+
+api/application/agency/autonomy.test.ts:
+(pass) autonomous intent dispatches real research, receives a result, survives restart and is revoked on forget [571.33ms]
+
+api/application/agency/backlog.test.ts:
+(pass) a burst within the presented observation window reaches selection in the same opportunity [12.65ms]
+
+api/application/agency/connection.test.ts:
+(pass) assembled host reaches larm with one exact purpose system, including a retry [76.25ms]
+(pass) assembled host reaches cloud with one exact purpose system, including a retry [86.01ms]
+
+api/application/agency/host-work.test.ts:
+(pass) TODOs offered to the agency > open and asking TODOs reach the decision and the update, with the question; finished ones never do [11.68ms]
+(pass) TODOs offered to the agency > a failing ledger read offers no TODOs and does not stop the cycle [11.46ms]
+(pass) asking what work asks > an utterance that cites an asking TODO is stored with its todoRefs [10.11ms]
+(pass) asking what work asks > an utterance that cites no TODO carries no todoRefs [10.69ms]
+(pass) work that changed > a waiting work question cannot bypass the unanswered speech limit [13.28ms]
+(pass) work that changed > a question opens a result_received opportunity after the commit, in the conversation the user is in [15.57ms]
+(pass) work that changed > finished work opens no opportunity: its notice on screen tells it [10.08ms]
+(pass) work that changed > a change told in a transaction that rolled back opens nothing [10.48ms]
+(pass) work that changed > in a conversation the user is not in, it waits for the next turn there [16.73ms]
+(pass) work that changed > the question the opportunity asks is delivered as a runless message citing it [13.78ms]
+(pass) the conversation agent > the system parts are fixed by the settings: the interests and the spoken style, and the feeling rule only when the feeling is on [12.97ms]
+(pass) the conversation agent > a reply is one model call that answers in plain text [6.06ms]
+(pass) the conversation agent > the leading feeling emoji becomes the delivery emotion and is not spoken; calm is none [5.16ms]
+(pass) the conversation agent > with the feeling off the reply is left as it is and carries no emotion [5.36ms]
+(pass) the conversation agent > a tool call runs through the host's tools and the reply goes on with its result [5.62ms]
+(pass) the conversation agent > a tool that hands the work over ends the reply [5.83ms]
+
+api/application/agency/host.test.ts:
+(pass) start and settings > the feed starts at its end: what was said before start is never read [9.54ms]
+(pass) start and settings > agency settings immediately replace pending inference while retaining grounded state [14.39ms]
+(pass) start and settings > settings that are not the agency's change nothing [9.70ms]
+(pass) start and settings > switching the settings while a decision is pending appends nothing [10.68ms]
+(pass) opportunities > one reply makes one turn-end decision and the user message alone calls no model [9.28ms]
+(pass) opportunities > a runless assistant message (a timer's) is observed but opens no opportunity [6.73ms]
+(pass) opportunities > the user's active State items reach the decision as topics, bounded and stable [9.94ms]
+(pass) opportunities > two events of one commit are both observed, in order, and open one cycle [9.72ms]
+(pass) opportunities > a corrected message becomes a correction observation [10.74ms]
+(pass) opportunities > a retraction removes dependent data and new grounded input continues [13.61ms]
+(pass) delivery > accepted Live speech keeps the offered text separate from playback evidence [10.23ms]
+(pass) delivery > a spoken ticket becomes one runless assistant message with one terminal receipt [10.26ms]
+(pass) delivery > with emotion on, the utterance's feeling is stored as its host delivery; without one, none [30.47ms]
+(pass) delivery > with emotion off, the select is asked without the feeling rules [9.49ms]
+(pass) delivery > S5: a user message arriving during the decision appends nothing [10.91ms]
+(pass) delivery > S5: something said after the opportunity (without new input) interrupts the ticket [12.06ms]
+(pass) delivery > S5: a run still queued or running at the delivery time interrupts the ticket [12.34ms]
+(pass) delivery > the user speaking or being answered at the delivery time interrupts the ticket [12.70ms]
+(pass) delivery > a foreground request in progress blocks the opportunity without a model choice [8.01ms]
+(pass) delivery > S6: the same text at another opportunity is another ticket and another message [13.20ms]
+(pass) idle > a review with no work leaves the original idle deadline in place [100.60ms]
+(pass) idle > an exhausted call window defers idle without consuming a speech opportunity [27.41ms]
+(pass) idle > periodic review leaves a running idle update intact [86.29ms]
+(pass) idle > silence is retried at 20s, 40s, 80s and then given up [13.57ms]
+(pass) idle > one unanswered spoken remark ends automatic idle until the user speaks again [12.57ms]
+(pass) idle > pending speech is interrupted if the user switches conversations before delivery [12.92ms]
+(pass) idle > only the conversation the user spoke in last gets idle cycles [14.75ms]
+(pass) idle > a busy moment defers the cycle without spending the backoff [11.63ms]
+(pass) idle > a cycle whose call yielded to the foreground does not spend the backoff [11.46ms]
+(pass) idle > a new user message cancels the pending idle and restarts the silence [12.99ms]
+(pass) review fixes > decision ids stay unique when runtimes are recreated by settings changes and retractions [18.18ms]
+(pass) review fixes > close cancels an idle cycle without waiting for an uncooperative provider and rejects its late result [11.94ms]
+(pass) review fixes > a retraction gives the conversation a new idle planner [21.44ms]
+(pass) review fixes > the delivery fence reads the committed setting, not the cached one [24.69ms]
+(pass) review fixes > a replaced runtime neither delivers nor receives a receipt [11.67ms]
+(pass) review fixes > topics are cached for 30 seconds and re-read after a memory forget [13.60ms]
+(pass) review fixes > idle conversations are forgotten and the tracked set is bounded [16.35ms]
+
+api/application/agency/image-history.test.ts:
+(pass) image-only input and its analysis reach autonomous selection as one identifiable exchange [15.24ms]
+(pass) a host-recorded image answer reaches autonomous selection as execution evidence [13.45ms]
+
+api/application/agency/initiative-limits.test.ts:
+(pass) three invalid idle selections consume only their bounded technical retries [17.87ms]
+(pass) slow selection respects the actual delivery interval (durable=false) [16.13ms]
+(pass) slow selection respects the actual delivery interval (durable=true) [80.56ms]
+
+api/application/agency/interest-growth.test.ts:
+(pass) the actual host forms, promotes and withdraws F interests from new user evidence [17.43ms]
+
+api/application/agency/llm-port.test.ts:
+(pass) agency LLM port > captures a structured background control on the conversation route and returns usage and latency [0.45ms]
+(pass) agency LLM port > never asks for more than the background output limit [0.22ms]
+(pass) agency LLM port > a schema violation is an output error and rejects the control receipt [0.17ms]
+(pass) agency LLM port > unparseable output is an output error [0.10ms]
+(pass) agency LLM port > an already aborted signal calls nothing [0.04ms]
+(pass) agency LLM port > an abort during the call propagates and reaches inference through the signal [0.09ms]
+(pass) agency LLM port > a result that arrives after cancellation is not adopted [0.05ms]
+(pass) agency LLM port > inference failures become call errors; connection-class codes are retryable [0.11ms]
+(pass) agency LLM port > a call that yielded to the foreground is not tried again at once [0.04ms]
+(pass) agency LLM port > a capture refusal of inference is a non-retryable call error [0.06ms]
+(pass) agency LLM port > a receipt inference no longer accepts is not adopted [0.04ms]
+(pass) agency LLM port > an invalid decision id is refused before capture [0.04ms]
+(pass) agency LLM port on the conversation's prompt > the purpose system replaces the conversation system; only data goes into Task [0.11ms]
+(pass) missing host system never captures or calls inference [0.06ms]
+
+api/application/agency/memory-integration.test.ts:
+(pass) an untraceable reply after forgetting does not block independent autonomous decisions [108.30ms]
+(pass) candidate-free speech reaches the real host writer and Memory-backed checkpoint [80.33ms]
+(pass) forget removes A bodies and preserves independent B through result persistence and restart [115.46ms]
+(pass) uncited Memory topics invalidate their outputs, then unrelated conversation can speak again [95.98ms]
+(pass) legacy checkpoints are quarantined before new work, and shutdown confirms that quarantine [84.89ms]
+(pass) compacted observations remain in Memory, restore with bounded live state, and accept new conversation [199.62ms]
+(pass) Memory expiry during selection rejects the old output and new conversation recovers [83.18ms]
+
+api/application/agency/recovery.test.ts:
+(pass) restart preserves provenance for an independent pending speech (persisted) after unrelated forgetting [12.39ms]
+(pass) restart preserves provenance for an independent pending speech (unknown delivery) after unrelated forgetting [9.03ms]
+
+api/application/agency/schema.test.ts:
+(pass) transport factoring preserves the F schema when shared references are expanded [0.78ms]
+(pass) factoring preserves literals and existing definition names [0.08ms]
+
+api/application/agency/system-context.test.ts:
+(pass) both runtime purposes send the complete Eumenes system; observations stay in JSON data [11.70ms]
+(pass) hosts and calls keep their own persona, interests and emotion settings [25.53ms]
+(pass) a persona change rejects old pending speech (announced=true) [11.71ms]
+(pass) a persona change rejects old pending speech (announced=false) [10.44ms]
+(pass) the real dialogue composes Eumenes-owned reply parts and keeps user text outside system [84.69ms]
+
+api/application/agency/topics.test.ts:
+(pass) takes affirmed, active, currently valid preferences, habits and facts with their memory ids [0.07ms]
+(pass) is bounded, short, deduplicated and stable across input order [0.10ms]
+
+api/application/agency/work.test.ts:
+(pass) an open TODO is offered to the agency as todo, dated when it was requested [0.07ms]
+(pass) a TODO that waits for the user is offered as waiting, with the question the sub-agent asked [0.04ms]
+(pass) finished work is never offered to the agency: its notice on screen tells it [0.01ms]
+(pass) the agency reads the TODOs of the conversation from the dialogue ledger: open and asking ones only [0.14ms]
+(pass) the title names the toolchain the work went to, within the title length [0.02ms]
+
+ 117 pass
+ 0 fail
+ 595 expect() calls
+Ran 117 tests across 18 files. [23.78s]

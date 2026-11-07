@@ -1,5 +1,5 @@
 {
-	"implementation": "implemented; fixed-model execution path validated; live acceptance pending",
+	"implementation": "implemented; repeated startup failure diagnosed from authorized read-only metadata; 61 missing archived references confirmed forgotten and covered by corrected recovery; 292 related tests pass; actual startup and live creation pending",
 	"baselineHead": "e4a84f05b8fffb0eb0cf910733d1d9d5900ecb53",
 	"isolation": "detached HEAD plus listed action source overlay; concurrent Markdown/startup changes excluded",
 	"final": {
@@ -85,15 +85,16 @@
 		"old autonomous research cannot acquire action authority"
 	],
 	"live": {
-		"status": "not run",
-		"reason": "explicit server-operation permission pending",
+		"status": "partial; capability discovery succeeded, generation blocked by activity token budget",
+		"report": "live-after-restart.json",
 		"serverStartedStoppedOrRestarted": false,
-		"realModelOrGenerationCalls": false,
-		"browserDeviceAcceptance": false
+		"realModelCalls": true,
+		"realGenerationCalls": false,
+		"browserAcceptance": "existing user Web gallery inspected; generated artifact unavailable"
 	},
 	"contextStill": {
-		"contextCompileCalls": 2,
-		"compileEvalCalls": 2
+		"contextCompileCalls": 5,
+		"compileEvalCalls": 5
 	},
 	"remaining": [
 		"live model chooses useful actions or waiting from interests without explicit creation requests",
@@ -111,5 +112,26 @@
 		"preexistingBrokenLink": "../api/domains/agent-runtime/service/timer-operation.ts",
 		"presentInHead": true,
 		"unchangedByThisTask": true
+	},
+	"liveBudgetAdjustment": {
+		"report": "live-after-restart.json",
+		"relatedTestsPassed": 117,
+		"relatedTestsFailed": 0,
+		"runningServerHasAdjustment": false
+	},
+	"startupArchiveRecovery": {
+		"report": "startup-archive-recovery.json",
+		"relatedTestsPassed": 288,
+		"relatedTestsFailed": 0,
+		"nonServerStartupTestsPassed": 3,
+		"actualStartupPending": true
+	},
+	"missingReferenceRecovery": {
+		"report": "startup-missing-reference-recovery.json",
+		"explicitReadOnlyDiagnosisAuthorized": true,
+		"actualMissingReferencesConfirmedForgotten": 61,
+		"relatedTestsPassed": 292,
+		"relatedTestsFailed": 0,
+		"actualStartupPending": true
 	}
 }

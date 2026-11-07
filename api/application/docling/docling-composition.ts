@@ -1,8 +1,12 @@
 import { createDocling } from "../../domains/docling";
 import type { SettingsService } from "../../domains/settings";
 
-export function buildDocling(settings: SettingsService) {
+export function buildDocling(settings: SettingsService, credential?: string) {
 	return createDocling({
+		fileConnection() {
+			const baseUrl = settings.get().larm.baseUrl;
+			return baseUrl && credential ? { baseUrl, credential } : null;
+		},
 		connection() {
 			const saved = settings.doclingCredentials(),
 				larm = settings.get().larm;

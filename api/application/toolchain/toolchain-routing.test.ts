@@ -246,3 +246,23 @@ test("rehydrating an exact revision preserves its redirect conditions without ex
 		await store.close();
 	}
 });
+
+test("the catalog is computed once per pass, and a write on the connection is seen at once", async () => {
+	const h = await setup(true);
+	const store = h.store;
+	await h.publish(SESSION_REVISION);
+	const before = store.write((db) => {
+		const first = h.routing.catalogInTransaction(db);
+		const second = h.routing.catalogInTransaction(db);
+		// Same pass, unchanged data: the same entries (a fresh array each time).
+		expect(second).not.toBe(first);
+		expect(second).toEqual(first);
+		expect(first.some((e) => e.id === "timers.manage")).toBe(true);
+		// A write in the same pass makes the next answer read the registry again.
+		db.query(
+			"UPDATE capability_items SET enabled=0 WHERE kind='toolchain' AND id='timers.manage'",
+		).run();
+		return h.routing.catalogInTransaction(db);
+	});
+	expect((await before).some((e) => e.id === "timers.manage")).toBe(false);
+});

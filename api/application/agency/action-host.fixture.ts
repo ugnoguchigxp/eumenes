@@ -9,7 +9,11 @@ import type { harness } from "../toolchain/toolchain.fixture";
 export function actionHost(
 	h: Awaited<ReturnType<typeof harness>>,
 	action: { id: string; question: string; arguments?: Record<string, unknown> },
-	options: { discover?: boolean; speakFirst?: boolean } = {},
+	options: {
+		discover?: boolean;
+		speakFirst?: boolean;
+		inputTokens?: number;
+	} = {},
 ) {
 	let now = Date.now(),
 		phase = 0,
@@ -113,7 +117,7 @@ export function actionHost(
 			return {
 				value: request.schema.parse(value),
 				model: "fixture",
-				inputTokens: 1,
+				inputTokens: options.inputTokens ?? 1,
 				outputTokens: 1,
 				cacheReadTokens: 0,
 				latencyMs: 1,

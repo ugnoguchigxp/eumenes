@@ -5,6 +5,13 @@
  * allow-list in `depends`; raising a dependency means raising `tier` here.
  */
 export const domains = {
+	scratch: {
+		tier: 1,
+		backend: "api/domains/scratch",
+		web: null,
+		components: null,
+		depends: { api: ["resources"], web: [], test: [] },
+	},
 	markdown: {
 		tier: 1,
 		backend: "api/domains/markdown",
@@ -484,6 +491,7 @@ export const domains = {
 		backend: "api/domains/dialogue",
 		web: "web/src/domains/dialogue",
 		components: null,
+		integrationTests: ["api/application/agency/archive-recovery.test.ts"],
 		depends: {
 			api: [
 				"agent-runtime",

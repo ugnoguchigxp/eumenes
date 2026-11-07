@@ -25,14 +25,18 @@ export function ResourceChips({
 	messageId,
 	data,
 	onOpen,
+	exclude,
 }: {
 	messageId: string;
 	data: ConversationResourcesResponse | undefined;
 	onOpen: (uri: string, action: ResourceAction) => void;
+	/** URIs the message already shows another way (its own image attachments). */
+	exclude?: ReadonlySet<string>;
 }) {
 	const uris = data?.messages.find((m) => m.messageId === messageId)?.uris;
 	if (!data || !uris?.length) return null;
 	const chips = uris.flatMap((uri) => {
+		if (exclude?.has(uri)) return [];
 		const resource = data.resources.find((r) => r.uri === uri);
 		return resource && !resource.forgotten ? [resource] : [];
 	});

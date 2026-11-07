@@ -22,6 +22,9 @@ export function view(db: Database, documentId: string) {
 		document: editorDocumentSchema.parse(JSON.parse(value.content_json)),
 		revision: value.revision,
 		sourceId: value.source_id,
+		markdown: value.markdown,
+		remote: value.source_id ? { id: value.source_id, etag: value.remote_revision, namespace: value.remote_namespace, path: value.remote_path } : null,
+		conflict: value.conflict_json ? JSON.parse(value.conflict_json) : null,
 		archivedRevision: value.archived_revision,
 		dirty: value.revision !== value.archived_revision,
 		saveState: value.save_state,
@@ -32,16 +35,18 @@ export function create(
 	db: Database,
 	name: string,
 	document: EditorDocument = emptyDocument(),
+	markdown: string | null = null,
 ) {
 	const documentId = crypto.randomUUID();
 	db.query(
-		"INSERT INTO markdown_workspaces(id,title,content_json,revision,updated_at,created_at) VALUES(?,?,?,1,?,?)",
+		"INSERT INTO markdown_workspaces(id,title,content_json,revision,updated_at,created_at,markdown) VALUES(?,?,?,1,?,?,?)",
 	).run(
 		documentId,
 		titleSchema.parse(name),
 		JSON.stringify(editorDocumentSchema.parse(document)),
 		Date.now(),
 		Date.now(),
+		markdown,
 	);
 	return view(db, documentId);
 }
@@ -60,8 +65,8 @@ export function apply(
 	if (title === current.title && content === current.content_json)
 		return { revision: current.revision };
 	db.query(
-		"UPDATE markdown_workspaces SET title=?,content_json=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?",
-	).run(title, content, Date.now(), documentId, baseRevision);
+		"UPDATE markdown_workspaces SET title=?,content_json=?,markdown=CASE WHEN content_json=? THEN markdown ELSE NULL END,revision=revision+1,updated_at=? WHERE id=? AND revision=?",
+	).run(title, content, content, Date.now(), documentId, baseRevision);
 	return { revision: baseRevision + 1 };
 }
 export function replay<T>(

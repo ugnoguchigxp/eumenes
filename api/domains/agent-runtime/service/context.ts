@@ -95,15 +95,32 @@ export function workerContext(
 			JSON.parse(task.input_json ?? "{}").originalRequest ??
 			(prepared.input as { question: string }).question,
 	};
-	const reads = parseResources(task.resources_json).reads;
-	const resources = resourcesSection(execution, reads.length > 0);
+	const { reads, writes } = parseResources(task.resources_json);
+	const resources = resourcesSection(
+		execution,
+		reads.length > 0 || writes.length > 0,
+	);
 	const suppliedMaterials = {
 		...(reads.length
 			? {
 					resourceReads: reads.map((read) =>
 						read.ok
-							? { uri: read.uri, text: read.text }
+							? {
+									uri: read.uri,
+									...(read.offset ? { offset: read.offset } : {}),
+									text: read.text,
+								}
 							: { uri: read.uri, errorCode: read.code },
+					),
+				}
+			: {}),
+		// What this task wrote with `scratch.write`: the URIs it may return in `finish.links`.
+		...(writes.length
+			? {
+					sharedWrites: writes.map((write) =>
+						write.ok
+							? { name: write.name, uri: write.uri, bytes: write.bytes }
+							: { name: write.name, errorCode: write.code },
 					),
 				}
 			: {}),

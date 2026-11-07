@@ -14,8 +14,10 @@ export function createLateResources(store: SqliteStore) {
 		return registry;
 	};
 	const read: ResourceReadPort = {
-		read: async (uri, signal) => {
-			const result = await store.read((db) => need().read(db, uri, signal));
+		read: async (uri, signal, options) => {
+			const result = await store.read((db) =>
+				need().read(db, uri, signal, options),
+			);
 			return result.ok
 				? { ok: true, text: result.text }
 				: { ok: false, code: result.code };

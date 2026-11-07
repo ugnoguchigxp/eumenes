@@ -33,6 +33,7 @@ export function appServices(s: Services, secrets: readonly string[] = []) {
 		objectRecognition: s.objectRecognition,
 		ocr: s.ocr,
 		model3d: s.model3d,
+		scratch: s.scratch,
 		compute: s.compute,
 		browser: s.browser.service,
 		tasks: s.delegated.tasks,

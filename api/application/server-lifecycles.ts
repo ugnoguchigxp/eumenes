@@ -243,6 +243,8 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				void s.toolchain.stock?.maintain();
 			},
 		},
+		// This boot's shared files start empty; the last boot's are removed in the background.
+		{ name: "scratch_start", start: () => s.scratch.start() },
 		{ name: "agents_start", start: () => s.toolchain.agents.start() },
 		{ name: "pursuit_start", start: () => s.toolchain.pursuit?.start() },
 		{ name: "queue_start", start: () => s.queue.start() },
@@ -272,6 +274,8 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "store", close: () => s.store.close() },
 		{ name: "dataset_store", close: () => s.datasetStore.close() },
 		{ name: "attitude_dataset", close: () => s.attitudeDataset.close() },
+		// After the queue whose jobs read the files (reverse order: closed later).
+		{ name: "scratch", close: () => s.scratch.close() },
 		{
 			name: "inference",
 			close: () => Promise.race([s.inference.close(), Bun.sleep(5_000)]),

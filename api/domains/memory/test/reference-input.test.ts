@@ -75,6 +75,68 @@ test("unrelated Record captures leave the State context window unchanged", async
 	expect(next?.version).toBe(first?.version);
 });
 
+test("only a confirmed Record tombstone counts as forgotten", async () => {
+	const h = await setupMemory();
+	open.push(h);
+	const ref = await h.store.write((db) =>
+		h.memory.referenceInputs.captureRecordInTransaction(db, {
+			origin: {
+				namespace: "host-test",
+				kind: "observation",
+				id: "forget-record",
+			},
+			mediaType: "text/plain",
+			content: "忘却対象の観測本文",
+		}),
+	);
+	const forgotten = (id: string) =>
+		h.store.read((db) =>
+			h.memory.referenceInputs.isRecordForgottenInTransaction(db, id),
+		);
+	const unknownId = `${ref.id.slice(0, -1)}${ref.id.endsWith("0") ? "1" : "0"}`;
+	expect(forgotten(ref.id)).toBe(false);
+	expect(forgotten(unknownId)).toBe(false);
+	await h.memory.forget({
+		conversationId: "c1",
+		messageIds: [],
+		itemIds: [],
+		derived: { "memory.records": [ref.id] },
+	});
+	expect(forgotten(ref.id)).toBe(true);
+	expect(forgotten(unknownId)).toBe(false);
+});
+
+test("origin lookup follows the public capture identity for plain and escaped Unicode strings", async () => {
+	const h = await setupMemory();
+	open.push(h);
+	for (const id of ["scope:observation", '観測\\\"🍵']) {
+		const origin = { namespace: "host-test", kind: "observation", id };
+		const ref = await h.store.write((db) =>
+			h.memory.referenceInputs.captureRecordInTransaction(db, {
+				origin,
+				mediaType: "text/plain",
+				content: "検証用の観測本文",
+			}),
+		);
+		const forgotten = (value: typeof origin) =>
+			h.store.read((db) =>
+				h.memory.referenceInputs.isRecordOriginForgottenInTransaction(
+					db,
+					value,
+				),
+			);
+		expect(forgotten(origin)).toBe(false);
+		await h.memory.forget({
+			conversationId: "c1",
+			messageIds: [],
+			itemIds: [],
+			derived: { "memory.records": [ref.id] },
+		});
+		expect(forgotten(origin)).toBe(true);
+		expect(forgotten({ ...origin, id: id + ":other" })).toBe(false);
+	}
+});
+
 test("runless host speech inherits its actual input manifest and legacy speech remains unknown", async () => {
 	const h = await setupMemory();
 	open.push(h);

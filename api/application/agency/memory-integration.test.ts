@@ -452,3 +452,135 @@ test("Memory expiry during selection rejects the old output and new conversation
 	await h.exchange("after-expiry", "B", "新しい独立した話です");
 	expect(h.calls.at(-1)?.input?.sources).not.toContain(`memory:${item.id}`);
 });
+
+for (const loss of [
+	"forgotten-message",
+	"forgotten-message-with-record-ref",
+	"forgotten-record",
+	"forgotten-record-without-ref-or-provenance",
+	"forgotten-receipt-without-ref-or-provenance",
+	"unknown-missing",
+	"unknown-missing-without-ref-or-provenance",
+] as const) {
+	test(`startup reconciles confirmed forgetting but preserves failures for ${loss}`, async () => {
+		const h = await fixture();
+		let host = h.start();
+		await h.exchange("lost-input", "A", "復元してはならない観測本文");
+		await h.exchange("kept-input", "B", "独立した会話の観測本文");
+		await host.close();
+		const records = h.store.read((db) => h.state.recordsInTransaction(db));
+		const before = records.find((r) => r.conversationId === "A")!;
+		const kept = records.find((r) => r.conversationId === "B")!;
+		const receipt = loss.startsWith("forgotten-receipt");
+		const observationId = receipt
+			? (before.snapshot as AgencySnapshot).observations.find(
+					(o) => o.kind === "delivery.observed",
+				)!.id
+			: "lost-input";
+		const independentReceipt = receipt
+			? (kept.snapshot as AgencySnapshot).observations.find(
+					(o) => o.id === observationId,
+				)
+			: undefined;
+		if (receipt) expect(independentReceipt?.text.length).toBeGreaterThan(0);
+		const row = h.store.read((db) =>
+			h.state
+				.observationsInTransaction(db, "A")
+				.find((o) => o.observationId === observationId),
+		)!;
+		const unknown = loss.startsWith("unknown-missing");
+		const recordOnly = loss.startsWith("forgotten-record") || receipt;
+		const noProvenance = loss.endsWith("without-ref-or-provenance");
+		if (unknown) {
+			await h.store.write((db) =>
+				h.state.deleteObservationInTransaction(db, row),
+			);
+		} else {
+			await h.memory.forget({
+				conversationId: "A",
+				messageIds: recordOnly ? [] : ["lost-input"],
+				itemIds: [],
+				...(recordOnly ? { derived: { "memory.records": [row.ref.id] } } : {}),
+			});
+			if (recordOnly)
+				expect(
+					h.store.read((db) =>
+						h.memory.isBlockedInTransaction(db, "lost-input"),
+					),
+				).toBe(false);
+		}
+		if (!unknown || noProvenance) {
+			// Simulate the dangling checkpoint left by the previous host, without restoring Memory data.
+			await h.store.write((db) => {
+				const snapshot = before.snapshot as AgencySnapshot;
+				h.state.saveInTransaction(
+					db,
+					{
+						...before,
+						snapshot: {
+							...snapshot,
+							...(noProvenance
+								? {
+										provenance: {
+											version: 1,
+											entries: snapshot.provenance!.entries.filter(
+												([key]) => key !== `observation:${observationId}`,
+											),
+										},
+									}
+								: {}),
+							observations: snapshot.observations.map((o) => ({
+								...o,
+								text: "",
+							})),
+						},
+					},
+					h.now(),
+				);
+				if (
+					loss === "forgotten-record" ||
+					loss === "forgotten-message-with-record-ref"
+				)
+					h.state.saveObservationInTransaction(db, row);
+			});
+		}
+		expect(() =>
+			h.store.read((db) => h.state.recordsInTransaction(db)),
+		).toThrow("agency_archive_unavailable");
+		host = h.start(false);
+		await host.recover();
+		if (unknown) {
+			expect(() => host.start()).toThrow("agency_archive_unavailable");
+			return;
+		}
+		expect(() => host.start()).not.toThrow();
+		expect(
+			host
+				.inspect("A")!
+				.snapshot.observations.some(
+					(o) => o.id === observationId && o.text.length > 0,
+				),
+		).toBe(false);
+		if (receipt)
+			expect(
+				host
+					.inspect("B")!
+					.snapshot.observations.find((o) => o.id === observationId)?.text,
+			).toBe(independentReceipt!.text);
+		expect(
+			h.store.read(
+				(db) =>
+					h.state.recordsInTransaction(db).find((r) => r.conversationId === "B")
+						?.scope,
+			),
+		).toBe(kept.scope);
+		expect(
+			host
+				.inspect("B")!
+				.snapshot.observations.find((o) => o.id === "kept-input")?.text,
+		).toBe("独立した会話の観測本文");
+		h.calls.length = 0;
+		await h.exchange("fresh-input", "B", "新しい会話を続けます");
+		expect(JSON.stringify(h.calls)).not.toContain("復元してはならない観測本文");
+	});
+}

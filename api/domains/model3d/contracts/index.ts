@@ -14,15 +14,35 @@ export const model3dTitle = z.string().trim().min(1).max(80);
 export const model3dTag = z.string().trim().min(1).max(24);
 export const model3dTags = z.array(model3dTag).max(8);
 
-/** What the user asked to turn into 3D: a prompt drawn into a source image first, or a saved LARM image. */
+/**
+ * What the user asked to turn into 3D: a prompt drawn into a source image first, a saved LARM image, or a shared
+ * image the user attached (spec/server-scratch-cache-design-2026-11-07.md §11.1), saved to the LARM image library
+ * before the generation is sent.
+ */
 export const model3dSource = z.discriminatedUnion("type", [
 	z.strictObject({
 		type: z.literal("prompt"),
 		prompt: z.string().trim().min(1).max(2000),
 	}),
 	z.strictObject({ type: z.literal("image-artifact"), id: model3dId }),
+	z.strictObject({ type: z.literal("shared-image"), id: z.uuid() }),
 ]);
 export type Model3dSource = z.infer<typeof model3dSource>;
+
+/** The stage of a generation whose shared source image is being saved to the LARM image library. */
+export const SOURCE_IMPORT_STAGE = "source_import";
+
+/**
+ * The shared images a generation may start from, owned by the application (§11.1). The domain holds the file from
+ * the command until the image is in the LARM library, then sends the library image as today.
+ */
+export interface Model3dSharedImages {
+	/** Keeps the file for the generation `key`; throws `model3d_image_not_found` when it is gone. */
+	hold(id: string, key: string): void;
+	/** The LARM image artifact of the file, saved once under `key` (the same key returns the same artifact). */
+	artifact(id: string, key: string, signal: AbortSignal): Promise<string>;
+	release(key: string): void;
+}
 
 export const model3dCreate = z.strictObject({
 	requestId: z.uuid(),
@@ -79,6 +99,7 @@ export type Model3dFocus =
 /** The labels LARM publishes for its stages; stage and status are separate fields. */
 const stageLabels: Record<string, string> = {
 	queued: "受付済み・待機中",
+	[SOURCE_IMPORT_STAGE]: "元画像を保存中",
 	image: "元画像を生成中",
 	waiting_gpu: "生成枠・メモリの空きを待機中",
 	[LARM_CAPACITY_WAITING]:
@@ -99,7 +120,7 @@ export function stageLabel(
 ) {
 	if (deleted) return stageLabels.deleted!;
 	if (state === "submitting")
-		return stage === LARM_CAPACITY_WAITING
+		return stage === LARM_CAPACITY_WAITING || stage === SOURCE_IMPORT_STAGE
 			? stageLabels[stage]!
 			: "LARMへ送信中";
 	if (state === "completed" || state === "failed" || state === "cancelled")
@@ -135,6 +156,10 @@ const errorLabels: Record<string, string> = {
 	model3d_timeout: "待ち時間の上限を超えました。状態を再確認してください",
 	model3d_cancel_unconfirmed: "取消を確認できませんでした",
 	model3d_not_found: "LARMに該当する生成が見つかりません",
+	model3d_image_not_found:
+		"元画像の一時ファイルが見つかりません（サーバーの再起動で消えます）",
+	model3d_source_import_failed:
+		"元画像をLARMの画像ライブラリへ保存できませんでした",
 };
 export const errorLabel = (code: string | null) =>
 	code ? (errorLabels[code] ?? "生成に失敗しました") : null;

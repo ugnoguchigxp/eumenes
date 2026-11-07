@@ -4,6 +4,7 @@ import { z } from "zod";
 export const model3dSource = z.discriminatedUnion("type", [
 	z.strictObject({ type: z.literal("prompt"), prompt: z.string() }),
 	z.strictObject({ type: z.literal("image-artifact"), id: z.string() }),
+	z.strictObject({ type: z.literal("shared-image"), id: z.string() }),
 ]);
 export type Model3dSource = z.infer<typeof model3dSource>;
 

@@ -15,6 +15,8 @@ import {
 	registerModel3d,
 	type Model3dLarm,
 } from "../../domains/model3d";
+import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
+import { createScratchStore, type ScratchStore } from "../../domains/scratch";
 import {
 	createModel3dAdapter,
 	describeModel3dAdapter,
@@ -33,7 +35,7 @@ const saved = {
 	warnings: [],
 	hasSource: false,
 };
-function setup() {
+function setup(shared?: ScratchStore) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-model3d-adapter-"));
 	const store = openStore(join(dir, "db"), [
 		...queueMigrations,
@@ -51,13 +53,30 @@ function setup() {
 			});
 		},
 	} as unknown as Model3dLarm;
-	const service = createModel3d({ store, queue, larm: () => larm });
+	const held: string[] = [];
+	const service = createModel3d({
+		store,
+		queue,
+		larm: () => larm,
+		sharedImages: {
+			hold: (id, key) => {
+				held.push(`${id}:${key}`);
+			},
+			artifact: async () => "lib-1",
+			release: () => {},
+		},
+	});
 	cleanup.push(async () => {
 		await queue.close(100);
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	});
-	return { service, store, adapter: createModel3dAdapter(service) };
+	return {
+		service,
+		store,
+		held,
+		adapter: createModel3dAdapter(service, shared),
+	};
 }
 const conversation = {
 	kind: "conversation" as const,
@@ -117,6 +136,53 @@ test("the conversation may only name assets and images its snapshot showed", asy
 	};
 	expect(snapshot.assets).toEqual([]);
 	expect(snapshot.images).toEqual([]);
+});
+
+test("an image the user attached is offered first and becomes the generation's shared-image source", async () => {
+	const root = mkdtempSync(join(tmpdir(), "eumenes-model3d-shared-"));
+	cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
+	const shared = createScratchStore({ root, freeBytes: () => null });
+	const photo = await shared.put({
+		conversationId: "main",
+		name: "IMG_2041.jpg",
+		mime: "image/jpeg",
+		data: new Uint8Array([1, 2, 3]),
+		origin: "attached",
+		maker: "利用者",
+	});
+	// A text file and an agent's write are not attached images.
+	await shared.put({
+		conversationId: "main",
+		name: "メモ.md",
+		mime: "text/markdown",
+		data: new Uint8Array([35]),
+		origin: "written",
+		maker: "Web調査",
+	});
+	const { store, adapter, held, service } = setup(shared);
+	const uri = `eumenes://scratch/${photo.id}`;
+	const snapshot = store.read((db) => adapter.snapshotInTransaction(db)) as {
+		images: Array<{ imageRef: string; title: string; origin: string }>;
+	};
+	expect(snapshot.images).toEqual([
+		expect.objectContaining({ imageRef: uri, title: "IMG_2041.jpg", origin: "attached" }),
+	]);
+	const receipt = await store.write((db) =>
+		adapter.invokeInTransaction(db, {
+			operationName: "model3d.generate",
+			input: { prompt: "", title: "添付から", tags: [], sourceImageRef: uri },
+			requestId: crypto.randomUUID(),
+			issuedAt: new Date().toISOString(),
+			origin: conversation,
+		}),
+	);
+	const generationRef = (receipt.receipt as { generation: { generationRef: string } })
+		.generation.generationRef;
+	expect(service.get(CONVERSATION_DEFAULT_PRINCIPAL, generationRef).source).toEqual({
+		type: "shared-image",
+		id: photo.id,
+	});
+	expect(held).toEqual([`${photo.id}:${generationRef}`]);
 });
 
 test("a pipeline step may name an image its own conversation made; an image of another conversation still may not", async () => {

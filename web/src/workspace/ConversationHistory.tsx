@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import type { EumenesClient } from "../../../client";
 import type { Message } from "../../../api/domains/conversation/contracts";
 import { ResourceChips } from "../domains/resources";
+import { formatResourceUri } from "../../../api/domains/resources/contracts";
+import { SCRATCH_RESOURCE_KIND } from "../../../api/domains/scratch/contracts";
 import { LiveMessageList } from "./LiveMessageList";
 import { RunDetails, RunFailure } from "./RunDetails";
 import { ThinkingRow } from "./ThinkingRow";
@@ -43,11 +45,19 @@ export function ConversationHistory({
 	);
 	const renderInsideMessage = useCallback(
 		(message: Message) =>
-			message.role === "assistant" ? (
+			message.role === "assistant" || message.role === "user" ? (
 				<ResourceChips
 					messageId={message.id}
 					data={resourceData}
 					onOpen={(uri, action) => void openResource(uri, action)}
+					// A user's image is shown as the image itself; its other files and long paste are chips.
+					exclude={
+						new Set(
+							(message.attachments ?? []).map((a) =>
+								formatResourceUri(SCRATCH_RESOURCE_KIND, a.id),
+							),
+						)
+					}
 				/>
 			) : null,
 		[resourceData, openResource],

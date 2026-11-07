@@ -1,0 +1,710 @@
+[
+  {
+    "time": "2026-11-07T14:21:39.514+09:00",
+    "event": "agency.invalidated",
+    "subjectId": "agency-live-image-20261107-1423",
+    "reason": "input.changed"
+  },
+  {
+    "time": "2026-11-07T14:21:39.913+09:00",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1423",
+    "source": "user"
+  },
+  {
+    "time": "2026-11-07T14:22:00.815+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:22:01.975+09:00",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1423",
+    "source": "agent"
+  },
+  {
+    "time": "2026-11-07T14:22:13.337+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "ok",
+    "durationMs": 9733,
+    "promptTokens": 12444,
+    "completionTokens": 153
+  },
+  {
+    "time": "2026-11-07T14:22:27.515+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "ok",
+    "durationMs": 13274,
+    "promptTokens": 11921,
+    "completionTokens": 486
+  },
+  {
+    "time": "2026-11-07T14:22:27.516+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "llm",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:22:59.545+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "ok",
+    "durationMs": 10465,
+    "promptTokens": 12394,
+    "completionTokens": 152
+  },
+  {
+    "time": "2026-11-07T14:23:12.938+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "ok",
+    "durationMs": 12487,
+    "promptTokens": 11920,
+    "completionTokens": 403
+  },
+  {
+    "time": "2026-11-07T14:23:12.940+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "llm",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:23:13.753+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "silent",
+    "durationMs": 40000
+  },
+  {
+    "time": "2026-11-07T14:23:14.397+09:00",
+    "event": "agency.invalidated",
+    "subjectId": "agency-live-image-20261107-1423",
+    "reason": "input.changed"
+  },
+  {
+    "time": "2026-11-07T14:23:14.831+09:00",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1423",
+    "source": "user"
+  },
+  {
+    "time": "2026-11-07T14:23:31.438+09:00",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1423",
+    "source": "agent"
+  },
+  {
+    "time": "2026-11-07T14:23:55.994+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "ok",
+    "durationMs": 23231,
+    "promptTokens": 12768,
+    "completionTokens": 803
+  },
+  {
+    "time": "2026-11-07T14:24:08.904+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "ok",
+    "durationMs": 11987,
+    "promptTokens": 12794,
+    "completionTokens": 296
+  },
+  {
+    "time": "2026-11-07T14:24:08.906+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "tool",
+    "source": "llm",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:24:10.751+09:00",
+    "event": "agency.receipt",
+    "subjectId": "agency-live-image-20261107-1423",
+    "attemptId": "a3",
+    "status": "succeeded"
+  },
+  {
+    "time": "2026-11-07T14:24:51.840+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "ok",
+    "durationMs": 19343,
+    "promptTokens": 13982,
+    "completionTokens": 710
+  },
+  {
+    "time": "2026-11-07T14:25:04.938+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "ok",
+    "durationMs": 12205,
+    "promptTokens": 13568,
+    "completionTokens": 264
+  },
+  {
+    "time": "2026-11-07T14:25:04.939+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "rejected:outbound_interval",
+    "validationCode": "outbound_interval"
+  },
+  {
+    "time": "2026-11-07T14:25:04.939+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "rejected",
+    "outcome": "current",
+    "validationCode": "outbound_interval"
+  },
+  {
+    "time": "2026-11-07T14:25:05.780+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:25:36.421+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "ok",
+    "durationMs": 10020,
+    "promptTokens": 14228,
+    "completionTokens": 310
+  },
+  {
+    "time": "2026-11-07T14:25:49.167+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "ok",
+    "durationMs": 11851,
+    "promptTokens": 13614,
+    "completionTokens": 387
+  },
+  {
+    "time": "2026-11-07T14:25:49.168+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": "activity_budget"
+  },
+  {
+    "time": "2026-11-07T14:25:50.027+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:26:34.738+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "ok",
+    "durationMs": 24152,
+    "promptTokens": 14180,
+    "completionTokens": 1103
+  },
+  {
+    "time": "2026-11-07T14:26:46.764+09:00",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "ok",
+    "durationMs": 11113,
+    "promptTokens": 13611,
+    "completionTokens": 303
+  },
+  {
+    "time": "2026-11-07T14:26:46.765+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": "activity_budget"
+  },
+  {
+    "time": "2026-11-07T14:26:47.596+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:27:08.193+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:08.193+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:08.193+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:09.005+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:27:28.690+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:28.690+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:28.690+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:29.569+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:27:49.517+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:49.517+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:49.517+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:27:50.292+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:28:10.008+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:10.008+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:10.008+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:10.901+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:28:30.491+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:30.491+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:30.491+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:31.360+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:28:50.980+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:50.980+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:50.980+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:28:51.834+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:29:11.485+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:11.485+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:11.485+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:12.332+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:29:31.990+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:31.990+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:31.990+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:32.849+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:29:52.553+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:52.553+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:52.553+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:29:53.447+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:30:13.115+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:13.115+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:13.115+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:14.087+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:30:33.636+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:33.636+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:33.636+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:34.495+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:30:54.129+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:54.129+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:54.129+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:30:55.151+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:31:14.613+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:31:14.613+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:31:14.613+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:31:15.622+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  },
+  {
+    "time": "2026-11-07T14:31:35.089+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "update",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:31:35.089+09:00",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1423",
+    "purpose": "select",
+    "outcome": "skipped:budget",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:31:35.089+09:00",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1423",
+    "decision": "wait",
+    "source": "host_budget",
+    "outcome": "current",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T14:31:35.912+09:00",
+    "event": "agency.idle_cycle",
+    "subjectId": "agency-live-image-20261107-1423",
+    "outcome": "aborted",
+    "durationMs": 20000
+  }
+]

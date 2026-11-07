@@ -153,7 +153,8 @@ export function createApp(options: AppOptions) {
 			!streamBoundedRoutes.has(c.req.path) &&
 			!(
 				c.req.method === "POST" &&
-				/^\/api\/conversations\/[^/]+\/attachments$/.test(c.req.path)
+				// Uploads read their own bounded body (an image attachment, a shared file).
+				/^\/api\/conversations\/[^/]+\/(attachments|scratch)$/.test(c.req.path)
 			) &&
 			!(
 				c.req.method === "PUT" &&

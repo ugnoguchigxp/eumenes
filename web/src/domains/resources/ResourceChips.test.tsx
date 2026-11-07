@@ -136,3 +136,16 @@ test("a message without linked resources renders nothing", () => {
 	);
 	expect(loading.container.firstChild).toBeNull();
 });
+
+test("a URI the message already shows another way (its own image attachment) is left out", () => {
+	render(
+		<ResourceChips
+			messageId="m-1"
+			data={data}
+			onOpen={vi.fn()}
+			exclude={new Set(["eumenes://image/i1"])}
+		/>,
+	);
+	expect(screen.queryByText("決戦前")).toBeNull();
+	expect(screen.getByText("夜のドライブ")).toBeTruthy();
+});

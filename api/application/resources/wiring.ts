@@ -1,4 +1,8 @@
 import { createMarkdownResourceAdapter } from "../../domains/markdown";
+import {
+	createScratchResourceAdapter,
+	type ScratchStore,
+} from "../../domains/scratch";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import {
@@ -59,6 +63,7 @@ export function buildResources(deps: {
 	events: Pick<EventStore, "eventInTransaction" | "logInTransaction">;
 	webResearch: Pick<WebResearchService, "get">;
 	shell?: Pick<ShellService, "runInTransaction" | "recentInTransaction">;
+	scratch?: ScratchStore;
 }) {
 	const { store } = deps;
 	const owner = CONVERSATION_DEFAULT_PRINCIPAL;
@@ -113,6 +118,7 @@ export function buildResources(deps: {
 			createDrawingResourceAdapter({ store, conversationId: CONVERSATIONS[0] }),
 			createUiCompositionResourceAdapter({ store }),
 			createMarkdownResourceAdapter(store),
+			...(deps.scratch ? [createScratchResourceAdapter(deps.scratch)] : []),
 			reports,
 			createComputeResourceAdapter({ store, owner }),
 			createBrowserResourceAdapter({ store, owner, includeInteract: true }),

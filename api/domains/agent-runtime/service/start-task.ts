@@ -7,6 +7,7 @@ import { requestUrls } from "./request-urls";
 import { workerDeadline } from "./exploration";
 import { owner, type RuntimeContext } from "./runtime-context";
 import type { TaskOps } from "./task-ops";
+import { hostBindings } from "./host-tools";
 import { createActionOperation } from "./action-operation";
 
 export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
@@ -179,7 +180,10 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 					);
 				prepared.set(child.id, p);
 				prepared.set(root.id, p);
-				bindings.set(child.id, tools.bind(owner(child), p, child.deadline));
+				bindings.set(child.id, [
+					...tools.bind(owner(child), p, child.deadline),
+					...hostBindings(ctx, db, p, request.execution),
+				]);
 				const jobId = enqueue(db, child, input.parentJobId);
 				db.exec("RELEASE start_worker");
 				return { taskId: root.id, jobId };

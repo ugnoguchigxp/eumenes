@@ -1,0 +1,120 @@
+{
+  "date": "2026-11-07",
+  "baseCommit": "fab11cdc08d23a57ced604717221c9d3d599acb5",
+  "server": {
+    "userRestarted": true,
+    "agentStartedStoppedOrRestarted": false,
+    "bootId": "29ee6516-5e40-4a99-861e-0586f45851f3",
+    "readyAt": "2026-11-07T14:18:45.364+09:00",
+    "budgetAdjustmentAppliedToRunningServer": false
+  },
+  "live": {
+    "conversationId": "agency-live-image-20261107-1423",
+    "lane": "real CLI chat / saved LARM / real Agency update-select / existing user Web image gallery",
+    "explicitCreationRequest": false,
+    "firstInterestOnlyOutcome": "LLM wait",
+    "unmetNeedOutcome": "tool selection and succeeded capability-discovery receipt a3; subsequent selection held by activity_budget",
+    "firstSuccessfulToolAt": "2026-11-07T14:24:10.751+09:00",
+    "activityBudgetRejectionAt": "2026-11-07T14:25:49.168+09:00",
+    "outboundIntervalRejectionAlsoObserved": true,
+    "metadata": "live-agency-metadata.json",
+    "resources": 0,
+    "imageGenerations": 0,
+    "musicTracks": 0,
+    "generatedArtifactRendered": false,
+    "audioPlayed": false,
+    "databaseOpenedByClientOrCLI": false,
+    "testOnlyInterestMarkedAsSynthetic": true,
+    "testConversationStopAndForgetRequested": true,
+    "stopAcknowledged": true,
+    "forgetCompletionVerified": false
+  },
+  "cause": {
+    "nativeActivityTokens": 20000,
+    "successfulDiscoverySelection": {
+      "inputTokens": 12794,
+      "outputTokens": 296
+    },
+    "followingSelectionBeforeBudgetHold": {
+      "inputTokens": 13614,
+      "outputTokens": 387
+    },
+    "code": "Agency accounts full select input/output across discovery and delegation for the same intent; two such calls already exceed 20000",
+    "outboundIntervalRejectedSelection": {
+      "inputTokens": 13568,
+      "outputTokens": 264
+    }
+  },
+  "adjustment": {
+    "mechanism": "existing activityLimits in createHostRuntime",
+    "tokens": 60000,
+    "toolCalls": 3,
+    "elapsedMs": 1800000,
+    "scopeCallBudgetChanged": false,
+    "dailyOrConcurrencyLimitsChanged": false,
+    "inputTokensStillCounted": true,
+    "extraPlannerAdded": false,
+    "topicOrKeywordRulesAdded": false,
+    "authorityOrOperationPermissionsChanged": false
+  },
+  "fixedVerification": {
+    "baselineRegression": {
+      "inputTokensPerCall": 13000,
+      "passed": 0,
+      "failed": 1,
+      "failure": "search succeeds but no delegated return before wait_for_timeout at actions.test.ts:139 with native activity limit"
+    },
+    "adjustedFocused": {
+      "passed": 4,
+      "failed": 0,
+      "assertions": 45,
+      "positive": "13000 tokens per call: speech cap, discovery, restart, delegate and confirmed result",
+      "negative": "31000 tokens per call: discovery then restart preserves activity use and holds delegation above 60000"
+    },
+    "relatedAgency": {
+      "passed": 117,
+      "failed": 0,
+      "assertions": 595,
+      "files": 18,
+      "seconds": 23.78,
+      "log": "live-budget-backend.txt"
+    },
+    "typecheck": "pass: 3060 files",
+    "ownedLint": "pass",
+    "ownedFormat": "pass: 3 files",
+    "ownedSize": "pass",
+    "gitDiffCheck": "pass",
+    "productionCodeChangedDuringVerification": false,
+    "testHarnessCorrection": "negative fixture now reaches speech cap before discovery; avoids an early rejected idle selection consuming its scripted phase"
+  },
+  "domainVerify": {
+    "selected": [
+      "dialogue",
+      "agent-runtime",
+      "tool-runtime",
+      "settings",
+      "resources",
+      "image",
+      "music"
+    ],
+    "status": "failed before static gates or tests",
+    "stoppedAt": "inventory",
+    "cause": "existing copied test trees under artifacts/pursuit-integration-20261106 are scanned without execution routes or exclusions",
+    "runId": "2026-11-07T05-31-44-242Z-4030d007-a251-4c0f-a5df-ab140c19d8db",
+    "expectationsOrInventoryRulesWeakened": false
+  },
+  "sources": {
+    "api/application/agency/runtime.ts": "b3edb0b075fb28a9926c1bf27f20d6c193502c0b3fdc2669ea4e381db358d8a7",
+    "api/application/agency/action-host.fixture.ts": "a71eaed3b4ecd6e92c041be7090ea6b9f18efd5528ee47c373e44a13b1ae2752",
+    "api/application/agency/actions.test.ts": "ac9365cb028b71e8397f0a6c84159f945e71b2edd107f1002b25782524b327e7"
+  },
+  "contextStill": {
+    "contextCompileCalls": 3,
+    "compileEvalCalls": 3
+  },
+  "remaining": [
+    "user applies the activity-limit adjustment by restarting the server",
+    "repeat real autonomous creation and resource delivery; verify generated artifact on user Web",
+    "real music/research and stop/late-result acceptance remain unaccepted; fixed checks are recorded separately"
+  ]
+}

@@ -7,6 +7,7 @@
 <!-- domains:start -->
 | Domain | Tier | Backend 入口 | Web 入口 | Components | 依存 (api) | 依存 (web) | 依存 (試験のみ) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| `scratch` | 1 | `api/domains/scratch/index.ts` | なし | なし | `resources` | なし | なし |
 | `markdown` | 1 | `api/domains/markdown/index.ts` | `web/src/domains/markdown/` | `packages/design-system/src/components/MarkdownWorkspace/` | `queue`、`resources` | `resources` | なし |
 | `collaboration` | 3 | `api/domains/collaboration/index.ts` | `web/src/domains/collaboration/` | なし | なし | なし | なし |
 | `usage` | 4 | `api/domains/usage/index.ts` | `web/src/domains/usage/` | `packages/design-system/src/components/UsageDashboard/index.tsx` | なし | なし | なし |

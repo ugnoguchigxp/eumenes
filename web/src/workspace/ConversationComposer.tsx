@@ -1,6 +1,10 @@
 import { LiveComposerControls } from "./LiveComposerControls";
 import { useState } from "react";
-import { ChatImageInput, ChatImagePreviews } from "./ChatImageInput";
+import {
+	ChatFilePreviews,
+	ChatImageInput,
+	ChatImagePreviews,
+} from "./ChatImageInput";
 import { useStore } from "zustand";
 import type { AudioStore } from "../domains/audio";
 import { Button, Spinner, Textarea } from "../design-system";
@@ -185,6 +189,7 @@ export function ConversationComposer({
 			)}
 			<form className="chat-composer" onSubmit={send}>
 				{!editing && <ChatImagePreviews state={state} />}
+				{!editing && <ChatFilePreviews state={state} />}
 				<Textarea
 					aria-label="メッセージ"
 					value={draft}
@@ -284,11 +289,16 @@ export function ConversationComposer({
 						<Button
 							type="submit"
 							disabled={
-								(!draft.trim() && !state.attachments.items.length) ||
-								(automaticInput && !state.attachments.items.length) ||
+								(!draft.trim() &&
+									!state.attachments.items.length &&
+									!state.files.items.length) ||
+								(automaticInput &&
+									!state.attachments.items.length &&
+									!state.files.items.length) ||
 								submit.isPending ||
 								(!!live?.active && live.session?.status !== "active") ||
-								state.attachments.busy
+								state.attachments.busy ||
+								state.files.busy
 							}
 							aria-label="送信"
 						>

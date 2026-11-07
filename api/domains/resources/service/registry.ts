@@ -140,10 +140,14 @@ export function createResourceRegistry(input: {
 				.sort(newestFirst)
 				.slice(0, limit);
 		},
-		async read(db, uri, signal) {
+		async read(db, uri, signal, options) {
 			const resolved = resolve(db, uri, "read");
 			if (!resolved.ok) return resolved;
-			const { text } = await resolved.adapter.read(resolved.id, signal);
+			const { text } = await resolved.adapter.read(
+				resolved.id,
+				signal,
+				options,
+			);
 			return { ok: true, text };
 		},
 	};

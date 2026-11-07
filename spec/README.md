@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [一時ファイル（scratch）の設計](server-scratch-cache-design-2026-11-07.md) | 2026-11-07、合意済み（利用者回答「実装してください」）・P1〜P5 実装済み・fixture 検証済み。live（実 LARM での添付→3D、書出し→別担当の読取り）・サーバー反映・実機器は未実施。会話の前後で引用ID（台帳 `a<n>`）を付けてエージェント間で共有する、サーバー稼働中だけの置き場 `scratch` domain（`eumenes://scratch/<uuid>`、`<dataDir>/scratch/<bootId>/`、索引はメモリー、合計2 GiB・空き5 GiB未満でLRUにより1.5 GiBまで掃除）。前: 添付・2,000字超の貼り付け・画像以外のファイル（`fileIds`）を `attached` で台帳へ。中・後: 全担当にホストが付ける `scratch.write` と `resource.read@2` の `offset`、`finish.links`。State に「共有中」（6件）。添付画像はLARM画像ライブラリへ取り込んでから3D化。Web はファイル添付・チップ・閲覧ダイアログ。調整は §15 |
 | [Markdown共同編集フルbundle・設計](markdown-collaboration-full-bundle-design-2026-11-07.md) | 2026-11-07、Docling Desk保存を優先したPlate編集・collaborator・Artifactの接続。固定試験済み、実Docling保存の受入待ち。[検証記録](verification/markdown-full-bundle-2026-11-07/README.md) |
 | [サーバー先行起動の設計](server-listen-first-startup-design-2026-11-07.md) | 2026-11-07、合意済み（利用者回答「はい。」）・L1〜L3 実装済み・fixture 検証済み（bun 529件・vitest 92件、型0件）。実機の再起動確認は未実施。HTTP を最初に listen し、復旧・開始の間は「起動中」（token 付き status は 200 `phase:"starting"`、他は 503 `server_starting`）だけを返す。準備完了で `server.reload` により本来のアプリへ差し替える。復旧・開始の順序と fail-closed は不変。Web は ready まで起動中の表示、CLI は 503 を受けたら最大60秒待って同じ要求を送り直す |
 | [Markdown共同編集・Plate最小構成の採用検証](verification/markdown-plate-2026-11-07/README.md) | 2026-11-07、隔離検証完了。本番採用保留。Markdown27ケースの保持、Chromiumの日本語composition、AIと未保存入力・保存応答・復元時の競合、SQLite永続化を確認。改行・表配置・リンクtitle等の保持とフル装飾に未達。Artifact内だけの画像案を作成、共同編集はcollaborator切替を前提。最小構成時点の記録。本体構築は上記フルbundle設計で継続 |

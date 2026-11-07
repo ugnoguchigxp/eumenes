@@ -4,7 +4,8 @@ import type { Database } from "bun:sqlite";
  * The conversation's resource ledger (spec/resource-uri-implementation-plan-2026-10-25.md §4.2): every resource
  * the conversation has met, numbered `a<n>` for the model. The URI is the identity; the model never sees it.
  */
-export type ConversationResourceSource = "work" | "found" | "viewed";
+/** `attached`: the user's input as a shared file (an attachment, a long paste). */
+export type ConversationResourceSource = "work" | "found" | "viewed" | "attached";
 
 export type ConversationResource = {
 	id: string;
@@ -52,4 +53,24 @@ export interface ConversationResourcePort {
 		messageId: string,
 		resourceIds: readonly string[],
 	): void;
+}
+
+/**
+ * The conversation's shared files (spec/server-scratch-cache-design-2026-11-07.md §3・§8.1), owned by the
+ * application. Their URIs are ordinary resources; the dialogue only numbers and shows them.
+ */
+export interface SharedFilesPort {
+	/**
+	 * Before the input's transaction: the URIs of its shared files (its image attachments, its other files, a long
+	 * paste it writes now).
+	 */
+	inputUris(input: {
+		requestId: string;
+		conversationId: string;
+		text: string;
+		attachmentIds: readonly string[];
+		fileIds: readonly string[];
+	}): Promise<string[]>;
+	/** The conversation's shared files, most recently used first. */
+	recentUris(conversationId: string, limit: number): string[];
 }

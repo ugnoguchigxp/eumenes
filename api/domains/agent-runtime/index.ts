@@ -9,4 +9,7 @@ export {
 	createAgentReportResourceAdapter,
 	AGENT_REPORT_RESOURCE_PREFIX,
 } from "./service/resource-adapter";
-export type { ResourceReadPort } from "./service/resource-access";
+export type {
+	ResourceReadPort,
+	SharedWritePort,
+} from "./service/resource-access";

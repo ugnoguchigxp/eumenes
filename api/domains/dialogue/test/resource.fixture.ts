@@ -26,7 +26,22 @@ export const TRACK_KIND: ResourceKind = {
 	actionLabels: WORDS,
 };
 
-type Item = { kind: string; label: string; createdAt: string; text: string };
+export const SCRATCH_KIND: ResourceKind = {
+	kind: "scratch",
+	label: "一時ファイル",
+	owner: "scratch",
+	actions: ["open", "read"],
+	defaultAction: "open",
+	actionLabels: WORDS,
+};
+
+type Item = {
+	kind: string;
+	label: string;
+	createdAt: string;
+	text: string;
+	note?: string;
+};
 
 /**
  * Resources the way their owners keep them, as plain data: the registry is the real one, the adapters read this
@@ -39,7 +54,7 @@ export function fakeResources(
 	},
 ) {
 	const items = new Map<string, Item>();
-	const kinds = [IMAGE_KIND, TRACK_KIND];
+	const kinds = [IMAGE_KIND, TRACK_KIND, SCRATCH_KIND];
 	const adapter = (kind: ResourceKind): ResourceAdapter => ({
 		kind: kind.kind,
 		fromResultInTransaction: (_db, result) => {
@@ -70,6 +85,7 @@ export function fakeResources(
 					kind.defaultAction,
 					...kind.actions.filter((action) => action !== kind.defaultAction),
 				],
+				...(item.note ? { note: item.note } : {}),
 			};
 		},
 		search: async () => [],
@@ -91,8 +107,9 @@ export function fakeResources(
 			label: string,
 			createdAt = "2026-10-25T01:00:00.000Z",
 			text = label,
+			note?: string,
 		) {
-			items.set(id, { kind, label, createdAt, text });
+			items.set(id, { kind, label, createdAt, text, ...(note ? { note } : {}) });
 			return formatResourceUri(kind, id);
 		},
 		/** The owner deletes it. */

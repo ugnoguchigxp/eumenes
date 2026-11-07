@@ -1,0 +1,34 @@
+{
+  "kind": "read-only metadata coverage, not actual startup",
+  "queryOnly": {
+    "query_only": 1
+  },
+  "existingInputDiagnosis": {
+    "queryOnly": true,
+    "serverOperations": false,
+    "bodiesOrCredentialsSelected": false,
+    "missingObservationReferences": 61,
+    "affectedConversations": 19,
+    "allActors": {
+      "user": 61
+    },
+    "withProvenance": 0,
+    "recordStatuses": {
+      "forgotten": 61
+    },
+    "confirmedRecordTombstones": 61,
+    "blockedOriginalMessages": 0,
+    "unfinishedAutonomousWorkInAffectedConversations": 0
+  },
+  "currentArchiveCounts": {
+    "checked": 71,
+    "missing_references": 61,
+    "other_archive_failures": 0
+  },
+  "productionReaderConfirmedForgotten": 61,
+  "readerMismatches": 0,
+  "databaseSizeAndModificationTimeUnchanged": true,
+  "bodiesOrCredentialsSelected": false,
+  "productionDataCopied": false,
+  "serverOperations": false
+}

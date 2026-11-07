@@ -4,6 +4,13 @@ import { z } from "zod";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
 import { imageListInTransaction } from "../../domains/image";
 import type { Model3dService } from "../../domains/model3d";
+import { parseResourceUri } from "../../domains/resources";
+import {
+	isScratchImage,
+	SCRATCH_RESOURCE_KIND,
+	scratchUri,
+	type ScratchStore,
+} from "../../domains/scratch";
 import {
 	type AdapterResult,
 	type DomainAdapter,
@@ -70,24 +77,49 @@ function result(
 	};
 }
 
-/** Images this conversation generated, as host refs a 3D generation may start from. */
-function sourceImages(db: Database) {
-	return imageListInTransaction(db, "main")
+const SOURCE_IMAGES = 5;
+
+/**
+ * Images a 3D generation may start from, as host refs: the images the user attached to this conversation (shared
+ * files, newest used first; spec/server-scratch-cache-design-2026-11-07.md §11.1), then the ones it generated.
+ */
+function sourceImages(db: Database, shared?: ScratchStore) {
+	const attached = (shared?.list("main") ?? [])
+		.filter((item) => isScratchImage(item.mime) && item.origin === "attached")
+		.slice(0, SOURCE_IMAGES)
+		.map((item) => ({
+			imageRef: scratchUri(item.id),
+			title: item.name,
+			origin: "attached" as const,
+			createdAt: new Date(item.createdAt).toISOString(),
+		}));
+	const generated = imageListInTransaction(db, "main")
 		.filter((r) => r.state === "completed" && r.artifactId)
-		.slice(0, 5)
+		.slice(0, SOURCE_IMAGES - attached.length)
 		.map((r) => ({
 			imageRef: r.artifactId!,
 			title: r.title,
+			origin: "generated" as const,
 			description: r.description.slice(0, 200),
 			createdAt: new Date(r.createdAt).toISOString(),
 		}));
+	return [...attached, ...generated];
 }
 
-export function createModel3dAdapter(service: Model3dService): DomainAdapter {
+/** The shared image a `sourceImageRef` names (a `scratch` URI), or null for a library image. */
+function sharedImageOf(ref: string | undefined) {
+	const parsed = ref ? parseResourceUri(ref) : null;
+	return parsed?.kind === SCRATCH_RESOURCE_KIND ? parsed.id : null;
+}
+
+export function createModel3dAdapter(
+	service: Model3dService,
+	shared?: ScratchStore,
+): DomainAdapter {
 	function snapshot(db: Database) {
 		return {
 			...service.snapshotInTransaction(db, OWNER),
-			images: sourceImages(db),
+			images: sourceImages(db, shared),
 		};
 	}
 	return {
@@ -180,12 +212,19 @@ export function createModel3dAdapter(service: Model3dService): DomainAdapter {
 				request.origin.kind === "conversation" || request.origin.kind === "task"
 					? request.origin.conversationId
 					: "main";
+			// An attached image is the domain's shared-image source; the model only ever names its URI.
+			const sharedImageId = sharedImageOf(input.sourceImageRef);
+			const commandInput = (
+				sharedImageId
+					? { ...input, sourceImageRef: undefined, sharedImageId }
+					: request.input
+			) as Parameters<Model3dService["commandInTransaction"]>[4];
 			const saved = service.commandInTransaction(
 				db,
 				OWNER,
 				conversationId,
 				op,
-				request.input as Parameters<Model3dService["commandInTransaction"]>[4],
+				commandInput,
 				request.requestId,
 				request.origin.kind === "task"
 					? { deadline: request.origin.execution.deadline }

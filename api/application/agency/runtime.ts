@@ -40,6 +40,13 @@ export function createHostRuntime(input: {
 		interestFormation: true,
 		hostTopics: true,
 		hostTodos: true,
+		// A live selection uses ~13k tokens: discovery and delegation share one activity.
+		// Keep Agency's three-operation / 30-minute bounds and account for the full input.
+		activityLimits: {
+			toolCalls: 3,
+			tokens: 60_000,
+			elapsedMs: 30 * 60_000,
+		},
 		...(agency.emotion ? { utteranceEmotion: true } : {}),
 		systemContext: {
 			update: (data) => ({

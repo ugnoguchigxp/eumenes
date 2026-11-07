@@ -12,6 +12,14 @@ import type { ChildExecution, Source, ToolRuntime } from "../../tool-runtime";
  */
 export const RESOURCE_READ_TOOL = "resource.read";
 export const RESOURCE_READS_MAX = 8;
+/** The sub-agent tool that writes a shared file (spec/server-scratch-cache-design-2026-11-07.md §9.1). */
+export const SCRATCH_WRITE_TOOL = "scratch.write";
+export const SCRATCH_WRITES_MAX = 8;
+/** The tools the host binds and answers itself: they never reach the tool runtime and use none of its budget. */
+export const HOST_TOOLS: ReadonlySet<string> = new Set([
+	RESOURCE_READ_TOOL,
+	SCRATCH_WRITE_TOOL,
+]);
 export const RESOURCE_LINKS_MAX = 8;
 /** A read is shortened by its owner; this only bounds what a task keeps. */
 const READ_TEXT_MAX = 4000;
@@ -25,11 +33,32 @@ export type ResourceReadOutcome =
 
 /** What the host provides to read a resource by URI (the registry's `read`); the runtime never opens a store. */
 export interface ResourceReadPort {
-	read(uri: string, signal: AbortSignal): Promise<ResourceReadOutcome>;
+	read(
+		uri: string,
+		signal: AbortSignal,
+		options?: { offset?: number },
+	): Promise<ResourceReadOutcome>;
 }
 
-export type StoredRead = { uri: string } & ResourceReadOutcome;
-type StoredResources = { reads: StoredRead[]; links: string[] };
+export type SharedWriteOutcome =
+	| { ok: true; uri: string; bytes: number }
+	| { ok: false; code: string };
+/** What the host provides to write a shared file for `scratch.write`; without it the tool is not offered. */
+export interface SharedWritePort {
+	write(
+		input: { name: string; mime: string; text: string },
+		context: { conversationId: string; maker: string },
+		signal: AbortSignal,
+	): Promise<SharedWriteOutcome>;
+}
+
+export type StoredRead = { uri: string; offset?: number } & ResourceReadOutcome;
+export type StoredWrite = { name: string } & SharedWriteOutcome;
+type StoredResources = {
+	reads: StoredRead[];
+	links: string[];
+	writes: StoredWrite[];
+};
 
 /** The optional `links` of every `finish` action. */
 export const finishLinks = z
@@ -45,7 +74,11 @@ export function parseResources(
 	json: string | null | undefined,
 ): StoredResources {
 	const stored = (json ? JSON.parse(json) : {}) as Partial<StoredResources>;
-	return { reads: stored.reads ?? [], links: stored.links ?? [] };
+	return {
+		reads: stored.reads ?? [],
+		links: stored.links ?? [],
+		writes: stored.writes ?? [],
+	};
 }
 export function loadResources(db: Database, taskId: string): StoredResources {
 	const row = db
@@ -113,10 +146,13 @@ export function allowedUris(
 		for (const source of sources)
 			if (!external(source)) collectUris(source, allowed);
 	}
-	for (const read of loadResources(db, taskId).reads) {
+	const stored = loadResources(db, taskId);
+	for (const read of stored.reads) {
 		allowed.add(read.uri);
 		if (read.ok) collectUris(read.text, allowed);
 	}
+	// A file this task wrote is one of its tools' results: it may be named in `finish.links`.
+	for (const write of stored.writes) if (write.ok) allowed.add(write.uri);
 	return allowed;
 }
 

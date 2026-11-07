@@ -8,6 +8,7 @@ import {
 	model3dTitle,
 	type Model3dCompletion,
 	type Model3dLarm,
+	type Model3dSharedImages,
 	type Model3dSource,
 } from "../contracts";
 import {
@@ -51,6 +52,8 @@ export function createModel3d(deps: {
 	pollMs?: number;
 	/** How long a generation is followed before the screen offers a recheck. */
 	followMs?: number;
+	/** Shared images the user attached, which a generation may start from (absent: none is found). */
+	sharedImages?: Model3dSharedImages;
 }) {
 	const { store, queue } = deps;
 	function enqueue(
@@ -150,6 +153,7 @@ export function createModel3d(deps: {
 		pollMs: deps.pollMs ?? 3000,
 		waitMs: (deps.pollMs ?? 3000) * 3,
 		followMs: deps.followMs ?? FOLLOW_MS,
+		...(deps.sharedImages ? { sharedImages: deps.sharedImages } : {}),
 	});
 
 	function createInTransaction(
@@ -183,6 +187,11 @@ export function createModel3d(deps: {
 		if (activeGenerationCount(db, input.owner) >= ACTIVE_LIMIT)
 			throw new Error("model3d_capacity");
 		const id = crypto.randomUUID();
+		// The shared file stays until the submit has saved it to the LARM library.
+		if (input.source.type === "shared-image") {
+			if (!deps.sharedImages) throw new Error("model3d_image_not_found");
+			deps.sharedImages.hold(input.source.id, id);
+		}
 		const now = Date.now();
 		db.query(
 			`INSERT INTO model3d_generations(id,owner,conversation_id,origin,request_id,idempotency_key,title,tags_json,

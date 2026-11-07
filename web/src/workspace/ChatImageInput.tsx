@@ -3,6 +3,7 @@ import { DropdownMenu, ImagePicker } from "@eumenes/design-system";
 import { attachmentLimits } from "../../../api/domains/conversation/contracts";
 import { Button, Modal } from "../design-system";
 import type { WorkspaceState } from "./useWorkspace";
+import { CHAT_FILE_ACCEPT, fileSizeText } from "./useChatFiles";
 
 /** A short hint that the image carries detections (sent to the model as reference data). */
 function annotationLabel(data: Record<string, unknown>) {
@@ -45,6 +46,8 @@ function MenuIcon({ children }: { children: ReactNode }) {
 
 export function ChatImageInput({ state }: { state: WorkspaceState }) {
 	const picker = useRef<HTMLInputElement>(null);
+	const filePicker = useRef<HTMLInputElement>(null);
+	const files = state.files;
 	const [libraryOpen, setLibraryOpen] = useState(false);
 	const images = state.attachments;
 	const library = images.library;
@@ -76,6 +79,18 @@ export function ChatImageInput({ state }: { state: WorkspaceState }) {
 					e.target.value = "";
 				}}
 			/>
+			<input
+				ref={filePicker}
+				type="file"
+				accept={CHAT_FILE_ACCEPT}
+				multiple
+				hidden
+				aria-label="添付ファイルを選択"
+				onChange={(e) => {
+					files.add(Array.from(e.target.files ?? []));
+					e.target.value = "";
+				}}
+			/>
 			<DropdownMenu
 				side="top"
 				items={[
@@ -103,6 +118,16 @@ export function ChatImageInput({ state }: { state: WorkspaceState }) {
 							setLibraryOpen(true);
 						},
 					},
+					{
+						label: "ファイルを選ぶ…（Markdown・PDFなど）",
+						icon: (
+							<MenuIcon>
+								<path d="M6 3h9l4 4v14H6z" />
+								<path d="M14 3v5h5" />
+							</MenuIcon>
+						),
+						onClick: () => filePicker.current?.click(),
+					},
 				]}
 				trigger={
 					<Button
@@ -110,8 +135,8 @@ export function ChatImageInput({ state }: { state: WorkspaceState }) {
 						variant="secondary"
 						size="icon"
 						aria-label="ファイルを添付"
-						title="ファイルを添付（端末のJPG・PNG・BMP画像、または画像一覧から）"
-						disabled={images.busy || state.submit.isPending}
+						title="ファイルを添付（端末のJPG・PNG・BMP画像、画像一覧、またはMarkdown・PDFなどのファイル）"
+						disabled={images.busy || files.busy || state.submit.isPending}
 					>
 						<svg
 							width="20"
@@ -260,6 +285,48 @@ export function ChatImagePreviews({ state }: { state: WorkspaceState }) {
 			{images.error && (
 				<p className="chat-error" role="alert">
 					{images.error}
+				</p>
+			)}
+		</div>
+	);
+}
+
+/** The files besides images the next message carries: shared with the agents on send, never shown to the model. */
+export function ChatFilePreviews({ state }: { state: WorkspaceState }) {
+	const files = state.files;
+	if (!files.items.length && !files.error) return null;
+	return (
+		<div className="chat-image-input">
+			{files.items.length > 0 && (
+				<ul className="draft-files" aria-label="送信する添付ファイル">
+					{files.items.map((item) => (
+						<li key={item.id} className="draft-file">
+							<span className="draft-file-name">{item.name}</span>
+							<small>{fileSizeText(item.size)}</small>
+							<Button
+								type="button"
+								size="sm"
+								variant="ghost"
+								aria-label={`${item.name}の添付を外す`}
+								disabled={files.busy || state.submit.isPending}
+								onClick={() => files.remove(item.id)}
+							>
+								×
+							</Button>
+						</li>
+					))}
+				</ul>
+			)}
+			{files.items.length > 0 && (
+				<small>
+					{files.busy
+						? "ファイルを送信準備中"
+						: "ファイルは会話の一時ファイルとして担当に渡せます（サーバーの再起動で消えます）。"}
+				</small>
+			)}
+			{files.error && (
+				<p className="chat-error" role="alert">
+					{files.error}
 				</p>
 			)}
 		</div>

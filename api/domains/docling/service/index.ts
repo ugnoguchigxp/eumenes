@@ -2,6 +2,8 @@ import { readBounded } from "../../../infrastructure/bounded-read";
 import { checkRefusal, isCapacityBusy } from "../../larm";
 import { doclingPrepared, type DoclingConnection } from "../contracts";
 import { createDoclingWiki } from "./wiki";
+import { createDoclingDocuments } from "./documents";
+import type { DocumentFileConnection } from "../contracts/documents";
 
 export type DoclingFetch = (url: URL, init: RequestInit) => Promise<Response>;
 
@@ -13,11 +15,16 @@ export function createDocling(deps: {
 		publicOrigin: string | null;
 	};
 	fetch?: DoclingFetch;
+	fileConnection?: () => DocumentFileConnection | null;
 	timeoutMs?: number;
 }) {
 	let opening = false;
 	const fetcher = deps.fetch ?? fetch;
 	const service = {
+		documents: createDoclingDocuments({
+			connection: () => deps.fileConnection?.() ?? null,
+			fetch: deps.fetch,
+		}),
 		wiki: createDoclingWiki(deps),
 		status: deps.status,
 		/** The conversation tool only returns the artifact; its Web adapter requests startup. */

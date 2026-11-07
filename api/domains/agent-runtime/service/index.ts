@@ -11,7 +11,7 @@ import { createMaintenance } from "./maintenance";
 import { createQueries } from "./queries";
 import { createReconcile } from "./reconcile";
 import { createRuntimeState, type SearchReportHook } from "./runtime-context";
-import type { ResourceReadPort } from "./resource-access";
+import type { ResourceReadPort, SharedWritePort } from "./resource-access";
 import { createStartTask } from "./start-task";
 import { createStepHandler } from "./step-handler";
 import { createTaskOps } from "./task-ops";
@@ -29,6 +29,7 @@ export function createAgentRuntime({
 	timers = { setTimeout, clearTimeout },
 	onSearchReport,
 	resources,
+	sharedWrite,
 	autonomousResearch,
 }: {
 	store: SqliteStore;
@@ -47,6 +48,8 @@ export function createAgentRuntime({
 	onSearchReport?: SearchReportHook;
 	/** Reads a resource by URI for the sub-agent tool `resource.read` (the registry's `read`). */
 	resources?: ResourceReadPort;
+	/** Writes a shared file for the sub-agent tool `scratch.write`. */
+	sharedWrite?: SharedWritePort;
 	autonomousResearch?: (
 		db: import("bun:sqlite").Database,
 		rootId: string,
@@ -66,6 +69,7 @@ export function createAgentRuntime({
 			log: getLogger("agent-runtime"),
 			onSearchReport,
 			resources,
+			...(sharedWrite ? { sharedWrite } : {}),
 			autonomousResearch,
 		},
 	};

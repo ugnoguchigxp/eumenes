@@ -25,6 +25,7 @@ export {
 	CONVERSATION_SOURCE_REPRESENTATION,
 } from "./contracts";
 export type { ConversationService } from "./service";
+export type { AttachmentStored } from "./service/attachments";
 export { createConversationService } from "./service";
 export { migrations } from "./repository";
 

@@ -4,6 +4,7 @@ import { createLiveBridge } from "./media/live-bridge";
 import { createLateResources } from "./resources/late";
 import { buildResources } from "./resources/wiring";
 import { buildMarkdown } from "./markdown/markdown-composition";
+import { sharedFiles, sharedWrites } from "./scratch/scratch-composition";
 import { buildDocling } from "./docling/docling-composition";
 import { createDotsMessages } from "./work/dots-messages";
 import { createDotsWork } from "./work/dots-work";
@@ -122,7 +123,7 @@ export async function buildServices(
 		memoryJournalPath,
 		worldResourceId: () => settings.get().world.curationResourceId,
 	});
-	const docling = buildDocling(settings);
+	const docling = buildDocling(settings, config.larmToken);
 	const markdown = buildMarkdown(store, queue, docling, () =>
 		changes.publish(),
 	);
@@ -155,6 +156,8 @@ export async function buildServices(
 	const lateResources = createLateResources(store);
 	const { toolchain, links } = await createHostToolchain({
 		resources: lateResources,
+		sharedWrite: sharedWrites(core.scratch),
+		scratch: core.scratch,
 		docling,
 		dotsWork: createDotsWork({
 			tasks: delegated.tasks,
@@ -210,6 +213,7 @@ export async function buildServices(
 		events: continuity.events,
 		webResearch,
 		shell: toolchain.shell,
+		scratch: core.scratch,
 	});
 	const toolchains = enabled
 		? createToolchainRouting(
@@ -248,6 +252,7 @@ export async function buildServices(
 			producesInTransaction: (db, toolchainId) =>
 				toolchain.capabilities.producesInTransaction(db, toolchainId),
 		},
+		sharedFiles: sharedFiles(core.scratch),
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
 		logFile: () => config.logFile,
@@ -372,6 +377,7 @@ export async function buildServices(
 		image: media.image,
 		uiCompositions,
 		markdown,
+		scratch: core.scratch,
 		objectRecognition: media.objectRecognition,
 		ocr,
 		model3d,

@@ -7,7 +7,20 @@ import { normalizeImage } from "./normalize-image";
 const digest = (bytes: Uint8Array) =>
 	createHash("sha256").update(bytes).digest("hex");
 
-export function createAttachments(store: SqliteStore, principal: string) {
+/**
+ * Told after an upload is stored, with the image as the user sent it and as the model reads it (the application
+ * shares it, §3 of the scratch spec).
+ */
+export type AttachmentStored = (
+	attachment: Attachment,
+	files: { original: Uint8Array; normalized: Uint8Array },
+) => Promise<void>;
+
+export function createAttachments(
+	store: SqliteStore,
+	principal: string,
+	stored?: AttachmentStored,
+) {
 	return {
 		async uploadAttachment(
 			conversationId: string,
@@ -26,7 +39,7 @@ export function createAttachments(store: SqliteStore, principal: string) {
 			const original = new Uint8Array(await file.arrayBuffer());
 			const originalDigest = digest(original);
 			const normalized = await normalizeImage(original, file.type);
-			return store.write((db) => {
+			const meta = await store.write((db): Attachment => {
 				const existing = db
 					.query("SELECT id FROM conversation_attachments WHERE id=?")
 					.get(id);
@@ -80,6 +93,8 @@ export function createAttachments(store: SqliteStore, principal: string) {
 				);
 				return meta;
 			});
+			await stored?.(meta, { original, normalized: normalized.bytes });
+			return meta;
 		},
 		attachmentsByIdsInTransaction(
 			db: Database,

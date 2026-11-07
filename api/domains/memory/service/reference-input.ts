@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { AccessContext } from "eumenes-memory";
+import type { AccessContext, RecordOrigin } from "eumenes-memory";
 import { CONTRACT_VERSIONS } from "eumenes-memory";
 import {
 	getForgetReceipt,
@@ -238,6 +238,28 @@ export function createReferenceInputs(deps: {
 			return result.status === "available" && result.record.status === "active"
 				? result
 				: null;
+		},
+		/** A confirmed tombstone, distinct from missing, denied or temporarily unavailable data. */
+		isRecordForgottenInTransaction(db: Database, recordId: string): boolean {
+			if (!deps.healthy()) throw new Error("memory_unavailable");
+			return readRecord(db, { ...header(db), recordId }).status === "forgotten";
+		},
+		/** Records' public identity contract: canonical JSON of this string array, then SHA-256. */
+		isRecordOriginForgottenInTransaction(
+			db: Database,
+			origin: RecordOrigin,
+		): boolean {
+			const h = header(db);
+			const id = `rec:${sha256Hex(
+				JSON.stringify([
+					h.access.principal,
+					h.scopeKey,
+					origin.namespace,
+					origin.kind,
+					origin.id,
+				]),
+			)}`;
+			return api.isRecordForgottenInTransaction(db, id);
 		},
 		changesInTransaction(db: Database, afterSeq: number) {
 			if (!deps.healthy()) throw new Error("memory_unavailable");

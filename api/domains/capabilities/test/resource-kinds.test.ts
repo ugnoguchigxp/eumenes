@@ -69,7 +69,7 @@ const definition = (
 	...patch,
 });
 
-test("the 12 builtin kinds load with their actions, default and owner", async () => {
+test("the 13 builtin kinds load with their actions, default and owner", async () => {
 	await withCapabilities(async (caps, store) => {
 		await caps.seed();
 		const kinds = store.read((db) => caps.resourceKindsInTransaction(db));
@@ -92,10 +92,11 @@ test("the 12 builtin kinds load with their actions, default and owner", async ()
 			document: ["読み取った文書", "ocr", "open+read", "open"],
 			"code.task": ["コード作業", "codex-tasks", "open+read", "read"],
 			event: ["会話の出来事", "continuity", "read", "read"],
+			scratch: ["一時ファイル", "scratch", "open+read", "open"],
 		});
 		expect(
 			resourceKindBuiltins.filter((d) => d.kind === "resource-kind"),
-		).toHaveLength(12);
+		).toHaveLength(13);
 	});
 });
 

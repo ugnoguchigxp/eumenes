@@ -19,6 +19,7 @@ import {
 import {
 	confirmationRefsMigration,
 	resourcesMigration,
+	resourceAttachedMigration,
 	runViewingResourceMigration,
 	workLinksMigration,
 } from "./resources";
@@ -470,6 +471,11 @@ export const migrations: readonly Migration[] = [
 		id: "dialogue/0037-agency-actions",
 		after: ["dialogue/0036-agency-observations"],
 		sql: agencyActionsMigration,
+	},
+	{
+		id: "dialogue/0038-resource-attached",
+		after: ["dialogue/0037-agency-actions"],
+		sql: resourceAttachedMigration,
 	},
 ];
 

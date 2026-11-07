@@ -4,6 +4,7 @@ import {
 	type createRouterExport,
 } from "./toolchain/router-export";
 import { registerMarkdown, type MarkdownService } from "../domains/markdown";
+import { registerScratch, type ScratchStore } from "../domains/scratch";
 import { registerDocling, type DoclingService } from "../domains/docling";
 import { registerSearchCheck } from "./toolchain/toolchain-search-check";
 import {
@@ -138,6 +139,8 @@ export type AppServices = {
 	image?: ImageService;
 	docling?: DoclingService;
 	markdown?: MarkdownService;
+	/** Server-lifetime shared files (absent: the routes do not exist). */
+	scratch?: ScratchStore;
 	excalidraw?: ExcalidrawService;
 	drawingOperations?: { list: (conversationId: string) => unknown };
 	objectRecognition?: ObjectRecognitionService;
@@ -187,6 +190,7 @@ export function appModules(services: AppServices): AppModule[] {
 		},
 		s.docling && { mount: (app) => registerDocling(app, s.docling!) },
 		s.markdown && { mount: (app) => registerMarkdown(app, s.markdown!) },
+		s.scratch && { mount: (app) => registerScratch(app, s.scratch!) },
 		s.changes && {
 			mount: (app) =>
 				app.get("/api/events", (c) =>

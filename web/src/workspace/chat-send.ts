@@ -1,5 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import type { useChatAttachments } from "./useChatAttachments";
+import type { ChatFiles } from "./useChatFiles";
 import type {
 	Addressee,
 	RunViewing,
@@ -12,6 +13,7 @@ export function chatSend(
 	input: ChatDraft,
 	setInput: Dispatch<SetStateAction<ChatDraft>>,
 	images: ReturnType<typeof useChatAttachments>,
+	files: ChatFiles,
 	submit: ReturnType<typeof useSubmit>,
 	automaticInput: boolean,
 	watchRun: (id: string) => void,
@@ -23,29 +25,33 @@ export function chatSend(
 	return (event: FormEvent) => {
 		event.preventDefault();
 		const text = input.text.trim();
+		const carried = images.items.length + files.items.length;
 		if (
-			(!text && !images.items.length) ||
-			(automaticInput && !images.items.length) ||
+			(!text && !carried) ||
+			(automaticInput && !carried) ||
 			submit.isPending ||
-			images.busy
+			images.busy ||
+			files.busy
 		)
 			return;
 		const snapshot = [...images.items];
+		const fileSnapshot = [...files.items];
 		// What is on screen now is what the message refers to, not what is shown after the upload.
 		const shown = viewing();
 		const sentTo = addressee();
-		void images
-			.upload(snapshot)
-			.then((attachmentIds) =>
+		void Promise.all([images.upload(snapshot), files.upload(fileSnapshot)])
+			.then(([attachmentIds, fileIds]) =>
 				submit.mutateAsync({
 					text,
 					attachmentIds,
+					...(fileIds.length ? { fileIds } : {}),
 					...(shown ? { viewing: shown } : {}),
 					...(sentTo ? { addressee: sentTo } : {}),
 				}),
 			)
 			.then((run) => {
 				images.clear(snapshot);
+				files.clear(fileSnapshot);
 				if (run?.id) watchRun(run.id);
 				setInput((current) =>
 					current === input ? { text: "", dictated: false } : current,

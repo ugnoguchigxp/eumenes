@@ -1,0 +1,110 @@
+{
+  "date": "2026-11-07",
+  "baseCommit": "fab11cdc08d23a57ced604717221c9d3d599acb5",
+  "incident": {
+    "event": "server.startup_failed",
+    "reason": "agency_archive_unavailable",
+    "time": "2026-11-07T14:37:24.914+09:00",
+    "bootId": "084405c2-0d41-45c8-99ce-2784372619e6",
+    "priorLiveForgetFailureAt": "2026-11-07T14:33:54.195+09:00",
+    "priorLiveSaveFailure": "memory_record_blocked",
+    "productionDatabaseOpened": false
+  },
+  "baseline": {
+    "ordinaryMessageForget": "passed",
+    "recordOnlyForget": "failed: unreadable checkpoint and agency_archive_conflict on save/close",
+    "persistedDanglingCheckpoint": "agency_archive_unavailable reproduced before recover in fixed tests"
+  },
+  "fix": {
+    "mechanism": "Existing Memory Record tombstones and version checks, native prepareForgetting, existing cancellation and single writer",
+    "liveAndPersistedStateAlignedByRecordAndConversationScope": true,
+    "tombstonedReferencesRemovedBeforeDependencyRegistration": true,
+    "startupReconcilesBeforeArchiveHydration": true,
+    "unknownMissingRecordsStillFail": true,
+    "originalConversationBodiesNotReloadedToReviveForgottenData": true,
+    "newSemanticRules": false,
+    "newRuntimeOrPlanner": false,
+    "databaseResetOrManualRepair": false
+  },
+  "verification": {
+    "focused": {
+      "passed": 17,
+      "failed": 0,
+      "assertions": 84,
+      "files": 3
+    },
+    "related": {
+      "passed": 288,
+      "failed": 0,
+      "assertions": 1691,
+      "files": 45,
+      "seconds": 28.21,
+      "log": "startup-recovery-backend.txt",
+      "fileList": "startup-recovery-test-files.json",
+      "archiveRecoveryTestDigestAtRun": "2569ce10657574fd36e96087285ba93b8e3ce85337d206818026deddc6af0a2e"
+    },
+    "withoutServerStartup": {
+      "passed": 3,
+      "failed": 0,
+      "filteredOutActualServerTests": 4,
+      "assertions": 12,
+      "file": "api/application/server.test.ts"
+    },
+    "typecheck": "pass: 3061 files",
+    "ownedLint": "pass",
+    "ownedFormat": "pass: 8 files",
+    "ownedSize": "pass: 4 production files",
+    "sqlBoundaries": "pass: 396 tables, 1 existing allowed cross-domain access",
+    "domainDocs": "pass",
+    "newTestSelectedForDialogueVerification": true,
+    "gitDiffCheck": "pass",
+    "codeEditedWhileVerificationWasRunning": false,
+    "additionalForgetCompletionAssertion": {
+      "reason": "also require the Record forget receipt to confirm all external deletions",
+      "file": "api/application/agency/archive-recovery.test.ts",
+      "passed": 2,
+      "failed": 0,
+      "assertions": 7,
+      "changeAfterBroadRun": "test assertion only; production sources unchanged"
+    }
+  },
+  "globalGates": {
+    "domainVerify": {
+      "status": "failed at inventory",
+      "runId": "2026-11-07T05-48-01-907Z-0762ce11-f24b-42a7-8f9a-c21e228dde6f",
+      "cause": "existing artifacts/pursuit-integration-20261106 copies scanned as unowned tests"
+    },
+    "boundaries": {
+      "status": "failed outside owned files",
+      "cause": "api/application/markdown/markdown-registration.test.ts imports capabilities/bundles/markdown.bundle.json instead of public entry",
+      "fileHasNoWorkingDiff": true
+    },
+    "rulesOrExpectedResultsWeakened": false
+  },
+  "live": {
+    "serverStartedStoppedOrRestartedByAgent": false,
+    "actualUserRestartAfterFix": false,
+    "realGenerationAndWebAcceptance": "pending user startup; not validated by fixture success"
+  },
+  "contextStill": {
+    "contextCompileCalls": 4,
+    "compileEvalCalls": 4
+  },
+  "unrelatedChangesPreserved": [
+    "spec/README.md",
+    "spec/server-scratch-cache-design-2026-11-07.md"
+  ],
+  "sourceDigests": {
+    "api/application/agency/host.ts": "46f04365fdd92c73bf3618a1b56f720200ae1e29126576d40f38b9250c61954e",
+    "api/application/agency/archive-recovery.test.ts": "9556a879f5ea014b0eb267e1427c74835588cb479c006af4fe896136e2438013",
+    "api/application/agency/memory-integration.test.ts": "70b10dbd6cdacd7e125d4ddfa9fb2b13c5f96534089845b8676012aa09aead61",
+    "api/domains/dialogue/service/agency-forgetting.ts": "f71b2e94da956b75623f206ede06a120c61f850198e22e5c157b09d0402bc8d4",
+    "api/domains/dialogue/service/agency-state.ts": "dd3631bf41b8ea5a8561555c222c8e32877cedb8a04ddb521e0f6a2f171e8e71",
+    "api/domains/memory/service/reference-input.ts": "97154be6598c16fe2da9aa99820a2f38f44f862a236b9a024bb500927852b899",
+    "api/domains/memory/test/reference-input.test.ts": "fd20b9259ee9c6a1d64d33a91ba3704d83dfd485c32c81bced561e26e00f3aa6",
+    "scripts/domains.ts": "e21a4f7877edab63ac40bafc3003f5a3b9f91509e66543d9a89996c335d9aa8b",
+    "api/application/agency/runtime.ts": "b3edb0b075fb28a9926c1bf27f20d6c193502c0b3fdc2669ea4e381db358d8a7",
+    "api/application/agency/action-host.fixture.ts": "a71eaed3b4ecd6e92c041be7090ea6b9f18efd5528ee47c373e44a13b1ae2752",
+    "api/application/agency/actions.test.ts": "ac9365cb028b71e8397f0a6c84159f945e71b2edd107f1002b25782524b327e7"
+  }
+}

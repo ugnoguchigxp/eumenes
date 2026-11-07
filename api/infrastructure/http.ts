@@ -88,4 +88,5 @@ export type HttpErrorStatus =
 	| 429
 	| 501
 	| 502
-	| 503;
+	| 503
+	| 507;

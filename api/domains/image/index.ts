@@ -6,3 +6,4 @@ export {
 export { registerImage } from "./controller";
 export { migrations } from "./repository";
 export { createImageResourceAdapter } from "./service/resource-adapter";
+export { prepareImageUpload } from "./service/prepare-upload";

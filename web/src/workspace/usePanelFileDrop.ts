@@ -1,18 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import type { WorkspaceState } from "./useWorkspace";
 
-/** Images pasted into the page or dropped on the panel are attached to the input; `dragging` is true while a file is over the panel. */
+const isImage = (file: File) =>
+	file.type.startsWith("image/") || /\.(jpe?g|png|bmp)$/i.test(file.name);
+
+/**
+ * Files pasted into the page or dropped on the panel are attached to the input: images as images, other files as
+ * shared files; `dragging` is true while a file is over the panel.
+ */
 export function usePanelFileDrop(state: WorkspaceState) {
 	const panel = useRef<HTMLElement>(null);
 	const depth = useRef(0);
 	const [dragging, setDragging] = useState(false);
+	const route = (files: File[]) => {
+		const images = files.filter(isImage);
+		const others = files.filter((file) => !isImage(file));
+		if (images.length) state.attachments.add(images);
+		if (others.length) state.files.add(others);
+	};
 	// The listeners below attach once; they read the latest callbacks through this ref.
-	const latest = useRef({
-		add: state.attachments.add,
-		edit: state.editInput,
-	});
+	const latest = useRef({ add: route, edit: state.editInput });
 	useEffect(() => {
-		latest.current = { add: state.attachments.add, edit: state.editInput };
+		latest.current = { add: route, edit: state.editInput };
 	});
 	useEffect(() => {
 		function paste(event: ClipboardEvent) {

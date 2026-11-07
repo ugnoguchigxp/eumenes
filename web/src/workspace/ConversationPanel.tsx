@@ -10,6 +10,7 @@ import { ConversationHistory } from "./ConversationHistory";
 import { ConversationStatusBar } from "./ConversationStatusBar";
 import { usePanelFileDrop } from "./usePanelFileDrop";
 import { usePanelResources } from "./usePanelResources";
+import { ScratchViewer } from "./ScratchViewer";
 import type { WorkspaceState } from "./useWorkspace";
 
 export function ConversationPanel({
@@ -56,7 +57,7 @@ export function ConversationPanel({
 		>
 			{dragging && (
 				<div className="chat-drop-target" aria-live="polite">
-					画像を追加
+					ファイルを追加
 				</div>
 			)}
 			<ConversationBackground
@@ -92,6 +93,11 @@ export function ConversationPanel({
 				</button>
 			)}
 			<ConversationComposer state={state} store={store} />
+			<ScratchViewer
+				client={client}
+				id={resources.scratch.id}
+				onClose={resources.scratch.close}
+			/>
 			{subtitles?.enabled && subtitleText && (
 				<Subtitle
 					text={subtitleText}

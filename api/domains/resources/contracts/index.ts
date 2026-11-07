@@ -80,7 +80,12 @@ export type ResourceView = ResourceRef & {
 	actions: ResourceAction[];
 	/** A short preview (thumbnail URL for images, one line otherwise). */
 	preview?: string;
+	/** One line the conversation reads after the label: who made it and what it is (「利用者が添付、画像 1600×1200」). */
+	note?: string;
 };
+
+/** Where a read starts: a kind whose text is long pages through it by characters; other kinds ignore it. */
+export type ResourceReadOptions = { offset?: number };
 
 export type ResourceSearch = {
 	text: string;
@@ -113,7 +118,11 @@ export interface ResourceAdapter {
 	/** The owner's own list, newest first; never copied elsewhere. */
 	search(query: ResourceSearch, signal: AbortSignal): Promise<ResourceRef[]>;
 	/** At most 600 estimated tokens, shortened by the owner (the host never truncates). */
-	read(id: string, signal: AbortSignal): Promise<{ text: string }>;
+	read(
+		id: string,
+		signal: AbortSignal,
+		options?: ResourceReadOptions,
+	): Promise<{ text: string }>;
 }
 
 /** A registered resource kind (capabilities `resource-kind` item, resolved to plain data). */
@@ -160,6 +169,7 @@ export interface ResourceRegistry {
 		db: Database,
 		uri: string,
 		signal: AbortSignal,
+		options?: ResourceReadOptions,
 	): Promise<
 		{ ok: true; text: string } | { ok: false; code: ResourceErrorCode }
 	>;

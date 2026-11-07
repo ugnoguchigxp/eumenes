@@ -12,8 +12,10 @@ import {
 import type { HandlerDefinition, QueueService } from "../../queue";
 import {
 	isLarmRefusal,
+	SOURCE_IMPORT_STAGE,
 	type Model3dAsset,
 	type Model3dLarm,
+	type Model3dSharedImages,
 	type Model3dSource,
 } from "../contracts";
 import {
@@ -56,6 +58,8 @@ export type Deps = {
 	waitMs: number;
 	/** How long a generation is followed once LARM accepts it. */
 	followMs: number;
+	/** Shared images the user attached (absent: such a source is not found). */
+	sharedImages?: Model3dSharedImages;
 };
 type Body = Parameters<Model3dLarm["submit"]>[1];
 
@@ -140,6 +144,32 @@ function registerSubmit(deps: Deps) {
 		tags: string[];
 		seed: number;
 	};
+	/**
+	 * A shared image becomes a LARM library image first (§11.1 of the scratch spec): saved once under the generation's
+	 * id, then sent as any library image. The file is let go once LARM has it or the save failed.
+	 */
+	async function librarySource(
+		input: Input,
+		signal: AbortSignal,
+	): Promise<Exclude<Model3dSource, { type: "shared-image" }>> {
+		const { source } = input;
+		if (source.type !== "shared-image") return source;
+		const shared = deps.sharedImages;
+		if (!shared) throw new Error("model3d_image_not_found");
+		await deps.store.write((db) => {
+			const r = generationRow(db, input.id);
+			if (r?.state === "submitting" && r.stage !== SOURCE_IMPORT_STAGE)
+				patchGeneration(db, r.id, { stage: SOURCE_IMPORT_STAGE });
+		});
+		try {
+			return {
+				type: "image-artifact",
+				id: await shared.artifact(source.id, input.id, bounded(signal)),
+			};
+		} finally {
+			shared.release(input.id);
+		}
+	}
 	/** Fixes the body once, then sends it; the lost-response rule sends the same key once more. */
 	async function send(input: Input, signal: AbortSignal) {
 		const larm = larmOf(deps);
@@ -149,16 +179,17 @@ function registerSubmit(deps: Deps) {
 			if (!found.mesh) throw new Error("model3d_service_unavailable");
 			if (input.source.type === "prompt" && !found.image)
 				throw new Error("model3d_image_service_unavailable");
+			const source = await librarySource(input, signal);
 			const built: Body = {
 				model: found.mesh.model,
 				source:
-					input.source.type === "prompt"
+					source.type === "prompt"
 						? {
 								type: "prompt",
-								prompt: input.source.prompt,
+								prompt: source.prompt,
 								imageModel: found.image!.model,
 							}
-						: input.source,
+						: source,
 				title: input.title,
 				tags: input.tags,
 				resolution: 512,
@@ -175,6 +206,8 @@ function registerSubmit(deps: Deps) {
 				patchGeneration(db, r.id, {
 					request_json: JSON.stringify(built),
 					service_path: found.mesh!.path,
+					// The saved source image is LARM's now: the screen shows the send again.
+					...(r.stage === SOURCE_IMPORT_STAGE ? { stage: null } : {}),
 				});
 				return { body: built, path: found.mesh!.path };
 			});

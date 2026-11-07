@@ -44,6 +44,7 @@ export function createAgencyStatePort(
 	},
 ) {
 	const actions = createAgencyActions(deps);
+	const forgetting = agencyForgetting(deps);
 	const revoke = (db: Database, id: string) => {
 		for (const w of agencyWorks(db, id, true)) {
 			if (w.execution_id) eraseAgencyActionWork(db, w.execution_id, deps.now());
@@ -78,6 +79,72 @@ export function createAgencyStatePort(
 						: [];
 				});
 	return {
+		recoverForgottenInTransaction(db: Database) {
+			if (!deps.memory) return;
+			// Remove tombstoned Record references before re-registering any retained dependencies.
+			const recordIds = agencyObservations(db)
+				.filter((row) =>
+					deps.memory!.referenceInputs.isRecordForgottenInTransaction(
+						db,
+						row.ref.id,
+					),
+				)
+				.map((row) => row.ref.id);
+			if (recordIds.length)
+				forgetting.forgetInTransaction(db, {
+					messageIds: [],
+					itemIds: [],
+					derived: { "memory.records": recordIds },
+				});
+			for (const record of agencyRecords(db)) {
+				const snap =
+					record.snapshot as import("eumenes-agency").AgencySnapshot & {
+						memoryObservations?: boolean;
+					};
+				if (snap.memoryObservations) {
+					const archived = new Set(
+						agencyObservations(db, record.conversationId)
+							.filter((row) => row.scope === record.scope)
+							.map((row) => row.observationId),
+					);
+					const forgotten = snap.observations
+						.filter(
+							(o) =>
+								!archived.has(o.id) &&
+								!snap.forgottenRefs?.includes(o.id) &&
+								deps.memory!.referenceInputs.isRecordOriginForgottenInTransaction(
+									db,
+									{
+										namespace: "agency",
+										kind: "observation",
+										id: `${record.scope}:${o.id}`,
+									},
+								),
+						)
+						.map((o) => o.id);
+					if (forgotten.length)
+						forgetting.forgetInTransaction(db, {
+							messageIds: [],
+							itemIds: [],
+							sourceRefs: forgotten,
+							target: {
+								conversationId: record.conversationId,
+								scope: record.scope,
+							},
+						});
+				}
+				const stale = deps.memory.referenceInputs.staleInTransaction(
+					db,
+					record.sourceRefs,
+				);
+				if (stale.length)
+					forgetting.forgetInTransaction(db, {
+						messageIds: [],
+						itemIds: [],
+						sourceRefs: stale,
+					});
+			}
+		},
 		quarantineLegacyInTransaction(db: Database) {
 			for (const record of agencyRecords(db))
 				if (
@@ -255,7 +322,7 @@ export function createAgencyStatePort(
 			revokeAgencyWork(db, id);
 		},
 		revokeInTransaction: revoke,
-		...agencyForgetting(deps),
+		...forgetting,
 	};
 }
 export type AgencyStatePort = ReturnType<typeof createAgencyStatePort>;

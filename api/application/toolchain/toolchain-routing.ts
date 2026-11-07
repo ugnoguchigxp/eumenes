@@ -20,6 +20,38 @@ import type { AdapterRegistry } from "../../domains/tool-runtime";
 import type { SchemaProvider } from "./toolchain-adapters";
 import { createInstantRouting } from "./toolchain-instant";
 
+/** Changes when the connection's data changes: its own writes and other connections' commits. */
+function dataVersion(db: Database) {
+	const changes = db
+		.query<{ n: number }, []>("SELECT total_changes() AS n")
+		.get()!.n;
+	const version = db
+		.query<{ data_version: number }, []>("PRAGMA data_version")
+		.get()!.data_version;
+	return `${changes}:${version}`;
+}
+
+/**
+ * A value computed once per synchronous pass over a connection. The catalog, the cards and the adapters'
+ * availability are asked for many times in one pass (each agency conversation, each autonomy check), and each
+ * answer walks every capability. The value is dropped when the connection's data changes and after the current
+ * task, so state outside the database (a service that came up) is read again next time.
+ */
+function perPass<T>(compute: (db: Database) => T) {
+	const cache = new WeakMap<Database, { version: string; value: T }>();
+	return (db: Database): T => {
+		const version = dataVersion(db);
+		const hit = cache.get(db);
+		if (hit?.version === version) return hit.value;
+		const value = compute(db);
+		cache.set(db, { version, value });
+		queueMicrotask(() => {
+			if (cache.get(db)?.value === value) cache.delete(db);
+		});
+		return value;
+	};
+}
+
 /**
  * Dialogue's view of the toolchain registry and selection history. Retrieval uses
  * the current request embedding; past selections are reference data.
@@ -38,6 +70,17 @@ export function createToolchainRouting(
 	/** The router package's embedding of what it routes (spec router-package-integration 2026-11-04 §1 #5). */
 	embedRouter?: ToolchainRoutingPort["embedRouter"],
 ): ToolchainRoutingPort {
+	/** An adapter's availability does not depend on the toolchain bound to it: asked once per adapter in a pass. */
+	const adapterAvailability = perPass(() => new Map<string, boolean>());
+	const toolchains = perPass((db) => capabilities.toolchainsInTransaction(db));
+	/** Every active toolchain as a card, in search order: what `cardInTransaction` picks one revision from. */
+	const allCards = perPass((db) =>
+		capabilities.toolchainCandidatesInTransaction(db, {
+			text: "",
+			// Preserve redirect identities; only the exact revision asked for is returned and enriched.
+			available: () => true,
+		}),
+	);
 	function runtimeInTransaction(
 		db: Database,
 		d: FixedDefinition,
@@ -49,19 +92,33 @@ export function createToolchainRouting(
 				? undefined
 				: runtime;
 		}
-		const adapter = registry.get(bound.binding.document.adapterRef);
+		const adapterRef = bound.binding.document.adapterRef;
+		const adapter = registry.get(adapterRef);
+		let available = false;
+		if (adapter) {
+			const known = adapterAvailability(db);
+			const cached = known.get(adapterRef);
+			available = cached ?? adapter.availableInTransaction(db);
+			if (cached === undefined) known.set(adapterRef, available);
+		}
 		return {
 			execution: bound.binding.document.execution,
 			binding: {
 				bindingRevisionId: bound.binding.revisionId,
-				adapterRef: bound.binding.document.adapterRef,
+				adapterRef,
 				...(bound.artifact
 					? { artifactRevisionId: bound.artifact.revisionId }
 					: {}),
-				available: !!adapter && adapter.availableInTransaction(db),
+				available,
 			},
 		};
 	}
+	const catalog = perPass((db) =>
+		toolchains(db).flatMap((d) => {
+			const runtime = runtimeInTransaction(db, d);
+			return runtime ? [{ id: d.id, revisionId: d.revisionId, runtime }] : [];
+		}),
+	);
 	function adapterOf(db: Database, bindingRevisionId: string) {
 		const doc = capabilities.documentInTransaction(db, bindingRevisionId);
 		const ref =
@@ -136,20 +193,12 @@ export function createToolchainRouting(
 		taskInTransaction: (db, revisionId) =>
 			registeredTask(capabilities, registry, db, revisionId),
 		cardInTransaction(db, revisionId) {
-			const d = capabilities
-				.toolchainsInTransaction(db)
-				.find((d) => d.revisionId === revisionId);
+			const d = toolchains(db).find((d) => d.revisionId === revisionId);
 			if (!d) return undefined;
 			const runtime = runtimeInTransaction(db, d);
 			if (!runtime || (runtime.binding && !runtime.binding.available))
 				return undefined;
-			const card = capabilities
-				.toolchainCandidatesInTransaction(db, {
-					text: "",
-					// Preserve redirect identities; only this exact revision is returned and enriched.
-					available: () => true,
-				})
-				.find((c) => c.revisionId === revisionId);
+			const card = allCards(db).find((c) => c.revisionId === revisionId);
 			return card ? enrich(db, card)[0] : undefined;
 		},
 		routeInTransaction(db, input) {
@@ -209,12 +258,7 @@ export function createToolchainRouting(
 								: "none",
 			};
 		},
-		catalogInTransaction(db) {
-			return capabilities.toolchainsInTransaction(db).flatMap((d) => {
-				const runtime = runtimeInTransaction(db, d);
-				return runtime ? [{ id: d.id, revisionId: d.revisionId, runtime }] : [];
-			});
-		},
+		catalogInTransaction: (db) => [...catalog(db)],
 		resolveInTransaction(db, revisionId) {
 			const resolved = capabilities.resolveToolchainInTransaction(
 				db,

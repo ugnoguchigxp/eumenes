@@ -358,6 +358,8 @@ export type SetupOptions = {
 	agents?: unknown;
 	/** The resource registry and the kinds each toolchain makes; absent: the conversation has no resources. */
 	resources?: ResourceAccess;
+	/** The input's shared files and the conversation's recent ones; absent: none. */
+	sharedFiles?: import("../contracts/resources").SharedFilesPort;
 	/**
 	 * The saved settings the run captures its routes from (the snapshot a LARM lease would be taken on). Absent: the
 	 * run has a LARM request from the start and no settings.
@@ -722,6 +724,7 @@ export async function setup(options: SetupOptions = {}) {
 		...(options.worldContext ? { worldContext: options.worldContext } : {}),
 		...(options.agents ? { agents: options.agents as never } : {}),
 		...(options.resources ? { resources: options.resources } : {}),
+		...(options.sharedFiles ? { sharedFiles: options.sharedFiles } : {}),
 		...(options.keeper ? { keeper: options.keeper } : {}),
 	});
 	if (options.autoStart !== false) queue.start();

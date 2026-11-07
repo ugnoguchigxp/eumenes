@@ -43,6 +43,7 @@ import {
 	addressedSession,
 	sessionRunMs,
 } from "./specialist-intake";
+import { enterSharedInTransaction, sharedInputUris } from "./shared-files";
 type ExistingInput = {
 	requestId: string;
 	conversationId: string;
@@ -296,6 +297,14 @@ export function createIntake(deps: DialogueDeps) {
 			setRunViewingResource(db, runId, input.viewing.resource);
 		else if (input.viewing) setRunViewing(db, runId, input.viewing);
 		recordInputInTransaction(deps, db, input, messageId, now, !!addressee);
+		if (input.sharedUris?.length)
+			enterSharedInTransaction(
+				deps,
+				db,
+				input.conversationId,
+				messageId,
+				input.sharedUris,
+			);
 		// A scheduled prompt is stored as a user message but is the host's: it is never learned from.
 		if (isSystemPrompt(input.sourceKind))
 			memory?.blockMessagesInTransaction(db, {
@@ -336,9 +345,11 @@ export function createIntake(deps: DialogueDeps) {
 			link: (db: Tx, run: Run) => void,
 		): Promise<Run> {
 			if (!larm.bindInTransaction) throw new Error("invalid_voice_inference");
+			const sharedUris = await sharedInputUris(deps, input);
 			const accepted = await store.write((db) => {
 				const result = acceptInTransaction(db, {
 					...input,
+					...(sharedUris ? { sharedUris } : {}),
 					voiceSubject,
 					transcriptionRequestIds,
 					sourceKind: "voice",
@@ -393,9 +404,11 @@ export function createIntake(deps: DialogueDeps) {
 			return accepted.run;
 		},
 		async submit(input: Submit): Promise<Run> {
+			const sharedUris = await sharedInputUris(deps, input);
 			const accepted = await store.write((db) =>
 				acceptInTransaction(db, {
 					...input,
+					...(sharedUris ? { sharedUris } : {}),
 					sourceKind: input.utteranceId ? "voice" : "manual",
 				}),
 			);

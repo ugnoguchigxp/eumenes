@@ -160,6 +160,10 @@ export async function createHostToolchain(
 		embed?: Embed;
 		/** The registry, ledger and screen commands, reached once the dialogue exists. */
 		resources?: LateResources;
+		/** The sub-agents' `scratch.write` (absent: it is not offered). */
+		sharedWrite?: import("../../domains/agent-runtime").SharedWritePort;
+		/** The conversation's shared files (3D generation's attached images). */
+		scratch?: import("../../domains/scratch").ScratchStore;
 		/** This server's loopback URL for Claude Code hooks, and the change publisher. */
 		terminalHooks?: { baseUrl: string; publish: () => void };
 	},
@@ -215,6 +219,8 @@ export async function createHostToolchain(
 			stock: {},
 			embed: s.embed,
 			...(s.resources ? { resources: s.resources } : {}),
+			...(s.sharedWrite ? { sharedWrite: s.sharedWrite } : {}),
+			...(s.scratch ? { scratch: s.scratch } : {}),
 		},
 	);
 	loadedCapabilities = toolchain.capabilities;

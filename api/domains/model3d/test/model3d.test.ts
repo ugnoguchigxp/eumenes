@@ -7,7 +7,11 @@ import { waitFor as until } from "../../../infrastructure/wait-for";
 import { createQueue, migrations as queueMigrations } from "../../queue";
 import { LarmCapacityBusy } from "../../larm";
 import { createModel3d, migrations } from "..";
-import type { Model3dCompletion, Model3dLarm } from "../contracts";
+import type {
+	Model3dCompletion,
+	Model3dLarm,
+	Model3dSharedImages,
+} from "../contracts";
 
 type Job = Awaited<ReturnType<Model3dLarm["job"]>>;
 class Refusal extends Error {
@@ -99,7 +103,7 @@ afterEach(async () => {
 function boot(
 	dir: string,
 	fake: ReturnType<typeof fakeLarm>,
-	options: { followMs?: number } = {},
+	options: { followMs?: number; sharedImages?: Model3dSharedImages } = {},
 ) {
 	const store = openStore(join(dir, "db"), [...queueMigrations, ...migrations]);
 	const queue = createQueue(store, {
@@ -126,7 +130,9 @@ function boot(
 	cleanup.push(stop);
 	return { service, store, notices, stop };
 }
-function setup(options: { followMs?: number } = {}) {
+function setup(
+	options: { followMs?: number; sharedImages?: Model3dSharedImages } = {},
+) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-model3d-"));
 	const fake = fakeLarm();
 	const booted = boot(dir, fake, options);
@@ -216,6 +222,91 @@ test("an existing LARM image is sent without imageModel", async () => {
 		source: { type: "image-artifact", id: "img-1" },
 	});
 	expect(JSON.stringify(body)).not.toContain("imageModel");
+});
+
+/** Shared images the way the application keeps them: held per generation, saved once into the library. */
+function fakeShared(files: string[]) {
+	const calls: string[] = [];
+	let gate: () => void = () => {};
+	const opened = new Promise<void>((resolve) => {
+		gate = resolve;
+	});
+	const shared: Model3dSharedImages = {
+		hold(id, key) {
+			if (!files.includes(id)) throw new Error("model3d_image_not_found");
+			calls.push(`hold:${id}:${key}`);
+		},
+		async artifact(id, key) {
+			calls.push(`artifact:${id}:${key}`);
+			await opened;
+			if (id.endsWith("bad")) throw new Error("model3d_source_import_failed");
+			return `lib-${id.slice(0, 4)}`;
+		},
+		release(key) {
+			calls.push(`release:${key}`);
+		},
+	};
+	return { shared, calls, open: () => gate() };
+}
+const sharedId = "5b0c6f1e-0000-4000-8000-000000000001";
+
+test("an attached image is saved to the library first, then sent as that library image", async () => {
+	const files = fakeShared([sharedId]);
+	const { service, calls, state: larm } = setup({ sharedImages: files.shared });
+	larm.jobs.push({ status: "completed", assetId: "asset-new" });
+	larm.assets.set("asset-new", asset("asset-new"));
+	const g = await service.create("owner", "main", {
+		requestId: crypto.randomUUID(),
+		title: "添付から",
+		tags: [],
+		source: { type: "shared-image", id: sharedId },
+	});
+	expect(files.calls).toEqual([`hold:${sharedId}:${g.id}`]);
+	await until(() => state(service, g.id).stageLabel === "元画像を保存中", {
+		timeout: 3000,
+	});
+	expect(calls.some((c) => c.op === "submit")).toBe(false);
+	files.open();
+	await until(() => state(service, g.id).state === "completed", {
+		timeout: 3000,
+	});
+	expect(calls.find((c) => c.op === "submit")!.args[1]).toMatchObject({
+		source: { type: "image-artifact", id: "lib-5b0c" },
+	});
+	expect(files.calls).toEqual([
+		`hold:${sharedId}:${g.id}`,
+		`artifact:${sharedId}:${g.id}`,
+		`release:${g.id}`,
+	]);
+	expect(state(service, g.id).source).toEqual({
+		type: "shared-image",
+		id: sharedId,
+	});
+});
+
+test("a shared image that is gone refuses the generation; one LARM cannot save fails it unsent", async () => {
+	const bad = "5b0c6f1e-0000-4000-8000-000000000bad";
+	const files = fakeShared([bad]);
+	const { service, calls } = setup({ sharedImages: files.shared });
+	await expect(
+		service.create("owner", "main", {
+			requestId: crypto.randomUUID(),
+			title: "消えた画像",
+			tags: [],
+			source: { type: "shared-image", id: sharedId },
+		}),
+	).rejects.toThrow("model3d_image_not_found");
+	files.open();
+	const g = await service.create("owner", "main", {
+		requestId: crypto.randomUUID(),
+		title: "保存できない画像",
+		tags: [],
+		source: { type: "shared-image", id: bad },
+	});
+	await until(() => state(service, g.id).state === "failed", { timeout: 3000 });
+	expect(state(service, g.id).errorCode).toBe("model3d_source_import_failed");
+	expect(calls.some((c) => c.op === "submit")).toBe(false);
+	expect(files.calls.at(-1)).toBe(`release:${g.id}`);
 });
 
 test("without the 3D service nothing is sent and the model is never guessed", async () => {

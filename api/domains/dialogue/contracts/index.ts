@@ -13,6 +13,12 @@ const submitFields = z.object({
 		.max(8)
 		.refine((ids) => new Set(ids).size === ids.length)
 		.optional(),
+	/** The user's other files (shared files uploaded to `/api/conversations/:id/scratch`); never the model's input. */
+	fileIds: z
+		.array(z.uuid())
+		.max(8)
+		.refine((ids) => new Set(ids).size === ids.length)
+		.optional(),
 	utteranceId: z.string().min(1).max(120).optional(),
 	/** The saved item on screen, as a host source issued it; re-checked against the issued choices. */
 	viewing: runViewingSchema.optional(),
@@ -24,18 +30,23 @@ const submitFields = z.object({
 		.regex(/^[a-z0-9][a-z0-9.-]{0,63}$/)
 		.optional(),
 });
-const hasInput = (v: { text: string; attachmentIds?: string[] }) =>
-	!!(v.text || v.attachmentIds?.length);
+const hasInput = (v: {
+	text: string;
+	attachmentIds?: string[];
+	fileIds?: string[];
+}) => !!(v.text || v.attachmentIds?.length || v.fileIds?.length);
 /** A pinned toolchain is a screen's form submit: only an artifact presentation carries one. */
 const pinnedOnScreen = (v: {
 	toolchainId?: string;
 	presentation?: string;
 	attachmentIds?: string[];
+	fileIds?: string[];
 	utteranceId?: string;
 }) =>
 	!v.toolchainId ||
 	(v.presentation === "artifact" &&
 		!v.attachmentIds?.length &&
+		!v.fileIds?.length &&
 		v.utteranceId === undefined);
 export const submitSchema = submitFields
 	.refine(hasInput, "input_required")

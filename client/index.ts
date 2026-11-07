@@ -15,6 +15,7 @@ import { requirementsClient } from "./requirements";
 import { agentRuntimeClient } from "./agent-runtime";
 import { attitudeDatasetClient } from "./attitude-dataset";
 import { conversationClient } from "./conversation";
+import { scratchClient } from "./scratch";
 import { dialogueClient } from "./dialogue";
 import { eventsClient } from "./events";
 import { larmClient } from "./larm";
@@ -56,6 +57,7 @@ export function createClient(
 		...attitudeDatasetClient(transport),
 		...eventsClient(transport),
 		...conversationClient(transport),
+		...scratchClient(transport),
 		...dialogueClient(transport),
 		...larmClient(transport),
 		...googleAccountsClient(transport),

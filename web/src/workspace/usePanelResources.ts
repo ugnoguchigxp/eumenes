@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { SCRATCH_ADAPTER_REF } from "../../../api/domains/scratch/contracts";
 import type { EumenesClient } from "../../../client";
 import {
 	MUSIC_PLAYLIST_ADAPTER_REF,
@@ -20,11 +21,16 @@ import { toolchainWebAdapters } from "./toolchain-adapters";
 import type { WorkspaceState } from "./useWorkspace";
 
 const CONVERSATION_ID = "main";
+const NO_VIEWER = () => {};
 
-/** How a resource reaches a screen: the registered artifact of its adapter, or the playlist or drawing tab. */
+/**
+ * How a resource reaches a screen: the registered artifact of its adapter, the playlist or drawing tab, or the
+ * shared-file viewer.
+ */
 export function useWorkspaceLauncher(
 	client: EumenesClient,
 	state: Pick<WorkspaceState, "toolchain" | "openPlaylist" | "openDrawing">,
+	openScratch: (id: string) => void = NO_VIEWER,
 ): ResourceLauncher {
 	const cache = useQueryClient();
 	const { openByAdapter } = state.toolchain;
@@ -32,6 +38,10 @@ export function useWorkspaceLauncher(
 	return useMemo<ResourceLauncher>(
 		() => ({
 			open: async (adapterRef, targetRef) => {
+				if (adapterRef === SCRATCH_ADAPTER_REF) {
+					openScratch(targetRef);
+					return true;
+				}
 				if (adapterRef === MUSIC_PLAYLIST_ADAPTER_REF) {
 					openPlaylist(targetRef);
 					return true;
@@ -55,7 +65,7 @@ export function useWorkspaceLauncher(
 						? drawingScreen
 						: toolchainWebAdapters.get(adapterRef),
 		}),
-		[cache, client, openByAdapter, openPlaylist, openDrawing],
+		[cache, client, openByAdapter, openPlaylist, openDrawing, openScratch],
 	);
 }
 
@@ -64,7 +74,8 @@ export function usePanelResources(
 	client: EumenesClient,
 	state: WorkspaceState,
 ) {
-	const launcher = useWorkspaceLauncher(client, state);
+	const [scratchId, setScratchId] = useState<string | null>(null);
+	const launcher = useWorkspaceLauncher(client, state, setScratchId);
 	const notice = useResourceNotice();
 	const openResource = useResourceOpener({
 		client,
@@ -72,5 +83,11 @@ export function usePanelResources(
 		notify: notice.show,
 	});
 	const resources = useConversationResources(client, CONVERSATION_ID);
-	return { resources, openResource, notice };
+	return {
+		resources,
+		openResource,
+		notice,
+		/** The shared file open in the viewer, if any. */
+		scratch: { id: scratchId, close: () => setScratchId(null) },
+	};
 }

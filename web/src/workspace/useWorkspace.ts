@@ -2,6 +2,7 @@ import { useNotificationAudio } from "./useNotificationAudio";
 import { useScreenSound } from "./useScreenSound";
 import { chatSend } from "./chat-send";
 import { useChatAttachments } from "./useChatAttachments";
+import { useChatFiles } from "./useChatFiles";
 import { useDrawingArtifacts } from "../domains/excalidraw/useDrawingArtifacts";
 import { useOpenDrawing, useOpenPlaylist } from "./open-artifacts";
 import { useRecognitionArtifacts } from "../domains/object-recognition";
@@ -54,6 +55,7 @@ export function useWorkspace({
 	const [input, setInput] = useState({ text: "", dictated: false });
 	const draft = input.text;
 	const attachments = useChatAttachments(client, "main");
+	const files = useChatFiles(client, "main");
 	const editedRecognition = useRef<string | null>(null);
 	const artifacts = useArtifactWorkspace();
 	// Music generation and playback each own a stable screen, independent of record IDs.
@@ -279,6 +281,7 @@ export function useWorkspace({
 		input,
 		setInput,
 		attachments,
+		files,
 		submit,
 		automaticInput,
 		watchTimerRun,
@@ -300,6 +303,7 @@ export function useWorkspace({
 	}, [voice.turn?.runId, watchTimerRun]);
 	return {
 		attachments,
+		files,
 		live,
 		playbackScreen: sound.playbackScreen,
 		openLiveSettings: () => void openById("settings.live"),

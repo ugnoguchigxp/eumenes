@@ -87,7 +87,7 @@ import { publicUrl } from "./public-url";
 import { toolchainRequest } from "./toolchains";
 import { stockQuote } from "./stock";
 import { musicPlaybackPlanV2 } from "./music-playback-v2";
-import { resourceRead } from "./resource-read";
+import { resourceRead, scratchWrite } from "./resource-read";
 import { weatherPlace } from "./weather";
 import {
 	model3dFind,
@@ -130,7 +130,7 @@ import {
 } from "./browser-interact";
 export { stockQuote } from "./stock";
 export * from "./read-tools";
-export { musicPlaybackPlanV2, resourceRead };
+export { musicPlaybackPlanV2, resourceRead, scratchWrite };
 export { weatherPlace } from "./weather";
 export { publicUrl };
 export const researchInput = z
@@ -324,6 +324,7 @@ export const validators = {
 	weatherPlace,
 	musicPlaybackPlanV2,
 	resourceRead,
+	scratchWrite,
 	stockQuote,
 	model3dGenerate,
 	model3dFind,

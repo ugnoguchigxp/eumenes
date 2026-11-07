@@ -9,6 +9,8 @@ import type { Task } from "../contracts";
 import {
 	RESOURCE_READ_TOOL,
 	RESOURCE_READS_MAX,
+	SCRATCH_WRITE_TOOL,
+	SCRATCH_WRITES_MAX,
 	loadResources,
 } from "./resource-access";
 import {
@@ -24,6 +26,7 @@ export function createToolSelection({
 	prepared,
 	now,
 	resources,
+	sharedWrite = false,
 }: {
 	tools: ToolRuntime;
 	bindings: Map<string, ReturnType<ToolRuntime["bind"]>>;
@@ -31,6 +34,8 @@ export function createToolSelection({
 	now: () => number;
 	/** The host provided a resource port: `resource.read` can be offered. */
 	resources: boolean;
+	/** The host provided a shared-file port: `scratch.write` can be offered. */
+	sharedWrite?: boolean;
 }) {
 	function toolLimit(t: Task, meta: ToolRuntimeMeta | undefined) {
 		const limits = operationLimits(prepared.get(t.id));
@@ -62,6 +67,11 @@ export function createToolSelection({
 			if (b.tool.id === RESOURCE_READ_TOOL)
 				return resources &&
 					loadResources(db, t.id).reads.length < RESOURCE_READS_MAX
+					? [{ ...b, replayOnly: false }]
+					: [];
+			if (b.tool.id === SCRATCH_WRITE_TOOL)
+				return sharedWrite &&
+					loadResources(db, t.id).writes.length < SCRATCH_WRITES_MAX
 					? [{ ...b, replayOnly: false }]
 					: [];
 			const meta = toolRuntimeOf(b.tool.revisionId);
