@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { Attachment } from "../contracts/attachments";
+import type { ImageReference } from "../contracts/history";
 
 export const attachmentsMigration: Migration = {
 	id: "conversation/0006-attachments",
@@ -23,6 +24,40 @@ function attachmentsReady(db: Database) {
 	return !!db
 		.query("SELECT 1 FROM sqlite_master WHERE name='conversation_attachments'")
 		.get();
+}
+/** Metadata only, scoped to the target's conversation and the newest image input of its exchange. */
+export function imageInputReferences(
+	db: Database,
+	messageId: string,
+): ImageReference[] {
+	if (!attachmentsReady(db)) return [];
+	const rows = db
+		.query(
+			`
+SELECT input.id AS message_id, a.attachment_id
+FROM messages target JOIN messages input ON input.conversation_id=target.conversation_id
+ AND ((target.role='user' AND input.id=target.id)
+ OR (target.role='assistant' AND input.rowid=(
+ SELECT MAX(candidate.rowid) FROM messages candidate
+ WHERE candidate.conversation_id=target.conversation_id AND candidate.role='user' AND candidate.run_id=target.run_id
+ AND EXISTS(SELECT 1 FROM message_attachments linked WHERE linked.message_id=candidate.id))))
+JOIN message_attachments a ON a.message_id=input.id
+WHERE target.id=? AND target.retracted_at IS NULL AND input.retracted_at IS NULL
+ORDER BY input.rowid DESC, a.ordinal
+`,
+		)
+		.all(messageId) as Array<{ message_id: string; attachment_id: string }>;
+	const first = rows[0];
+	return first
+		? [
+				{
+					messageId: first.message_id,
+					attachmentIds: rows
+						.filter((r) => r.message_id === first.message_id)
+						.map((r) => r.attachment_id),
+				},
+			]
+		: [];
 }
 export function messageAttachments(db: Database, id: string): Attachment[] {
 	if (!attachmentsReady(db)) return [];

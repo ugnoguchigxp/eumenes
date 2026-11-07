@@ -134,7 +134,7 @@ export function executionStep(
 					sourceRefs: {
 						conversationId: source.conversationId,
 						messageIds: [
-							source.messageId,
+							...(source.messageId ? [source.messageId] : []),
 							...(source.amendments ?? []).map((update) => update.messageId),
 							...(source.responses ?? []).map((update) => update.messageId),
 							...state.refs

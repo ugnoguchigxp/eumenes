@@ -150,7 +150,7 @@ export function executionCommands(
 			return executionView(executionRow(db, row.id)!);
 		}
 		// A pipeline's steps are fixed: a changed request is a new request, not an amendment of this run.
-		if (input.action === "amend" && state.pipeline)
+		if (input.action === "amend" && (state.pipeline || state.single))
 			throw new Error("pipeline_amend_unsupported");
 		if (input.action === "cancel")
 			ops.fail(db, row, state, "cancel_requested", "cancelled");

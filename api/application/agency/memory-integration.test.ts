@@ -149,6 +149,48 @@ async function fixture(onSelect?: () => Promise<void>) {
 	};
 }
 
+test("an untraceable reply after forgetting does not block independent autonomous decisions", async () => {
+	const h = await fixture();
+	let host = h.start();
+	await h.exchange("forget-seed", "seed", "忘却する会話材料");
+	expect(
+		(
+			await h.memory.forget({
+				conversationId: "seed",
+				messageIds: ["forget-seed"],
+				itemIds: [],
+			})
+		).completed,
+	).toBe(true);
+	await h.conversation.append({
+		id: "untraceable-reply",
+		conversationId: "B",
+		role: "assistant",
+		text: "出所を追跡できない古い応答",
+		runId: "unrecorded-run",
+		createdAt: new Date(h.now()).toISOString(),
+	});
+	await h.exchange("independent-input", "B", "新しい独立した関心です", false);
+	await settle();
+	expect(
+		host.inspect("B")!.snapshot.observations.map((o) => o.id),
+	).not.toContain("untraceable-reply");
+	expect(
+		h.calls.some(
+			(r) =>
+				r.purpose === "select" &&
+				JSON.parse(r.prompt).conversationEvidenceRefs.includes(
+					"independent-input",
+				),
+		),
+	).toBe(true);
+	expect(h.calls.at(-1)?.input?.complete).toBe(true);
+	await host.close();
+	host = h.start();
+	await h.exchange("after-restart", "B", "再開後も関心を続けます");
+	expect(JSON.stringify(h.calls)).not.toContain("出所を追跡できない古い応答");
+});
+
 test("candidate-free speech reaches the real host writer and Memory-backed checkpoint", async () => {
 	const h = await fixture();
 	const host = h.start();

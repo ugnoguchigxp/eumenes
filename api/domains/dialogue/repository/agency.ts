@@ -20,6 +20,12 @@ ALTER TABLE dialogue_agency_state ADD COLUMN last_dispatch_at INTEGER;
 UPDATE dialogue_agency_state SET last_dispatch_at=CAST(unixepoch('subsec')*1000 AS INTEGER)
  WHERE json_extract(snapshot_json,'$.state.lastOutboundAt') IS NOT NULL;`;
 
+export const agencyActionsMigration = `
+ALTER TABLE dialogue_agency_work ADD COLUMN execution_id TEXT;
+ALTER TABLE dialogue_agency_work ADD COLUMN authority_json TEXT;
+ALTER TABLE dialogue_agency_work ADD COLUMN created_at INTEGER;
+`;
+
 export function claimAgencyDispatch(
 	db: Database,
 	conversationId: string,
@@ -132,6 +138,9 @@ export type AgencyWorkRow = {
 	deadline: number;
 	source_refs_json: string;
 	task_id: string | null;
+	execution_id?: string | null;
+	authority_json?: string | null;
+	created_at?: number | null;
 	returned: number;
 	revoked: number;
 };
@@ -247,4 +256,20 @@ export function revokeAgencyWork(db: Database, id: string) {
 	db.query(
 		"UPDATE dialogue_agency_work SET revoked=1,question='',source_refs_json='[]' WHERE root_id=?",
 	).run(id);
+}
+
+/** A separate grant for general actions; old read-only research rows never acquire it. */
+export function autonomousActionSource(db: Database, root: string, now: number): import("../../tool-runtime").ExecutionSource | null {
+ const work = agencyWork(db, root);
+ if (!work || work.revoked || !work.authority_json || (!work.returned && (work.deadline <= now || !currentAgencyWork(db, work)))) return null;
+ const record = db.query("SELECT epoch,settings_digest FROM dialogue_agency_state WHERE conversation_id=?").get(work.conversation_id) as {epoch:number;settings_digest:string}|null;
+ const authority = JSON.parse(work.authority_json) as {version:number;settingsDigest:string;policyDigest:string};
+ if (authority.version !== 1 || record?.epoch !== work.epoch || record.settings_digest !== authority.settingsDigest) return null;
+ return { origin:"autonomous", messageId:null, conversationId:work.conversation_id, runId:root, request:work.question, digest: authority.policyDigest, agency:{epoch:work.epoch,ticketId:work.ticket_id,capabilityRevisionId:work.toolchain_revision_id,policyDigest:authority.policyDigest} };
+}
+export function authorizeAgencyAction(db: Database, root: string, authority: {settingsDigest:string;policyDigest:string}, now: number) {
+ db.query("UPDATE dialogue_agency_work SET authority_json=?,created_at=? WHERE root_id=? AND authority_json IS NULL").run(JSON.stringify({version:1,...authority}),now,root);
+}
+export function linkAgencyExecution(db: Database, root: string, id: string) {
+ db.query("UPDATE dialogue_agency_work SET execution_id=? WHERE root_id=?").run(id,root);
 }

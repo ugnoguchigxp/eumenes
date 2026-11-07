@@ -402,7 +402,9 @@ export const settingsSchema = z
 			.default({ enabled: false, curationResourceId: null }),
 		agency: z
 			.object({
-				/** Seconds of silence before an AI-initiated turn; 0 turns the silence-triggered turns off (turn_end still runs). */
+				/** Optional for older callers; absence uses the approved initial action limits. */
+                actions: z.object({ enabled: z.boolean(), maxConcurrent: z.number().int().min(1).max(8), dailyLimit: z.number().int().min(1).max(100) }).strict().optional(),
+                /** Seconds of silence before an AI-initiated turn; 0 turns the silence-triggered turns off (turn_end still runs). */
 				idleSec: z.number().int().min(0).max(86400).default(20),
 				/** AI-initiated utterances allowed in a row without a user reply. */
 				maxUnanswered: z.number().int().min(1).max(10).default(1),

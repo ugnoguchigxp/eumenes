@@ -21,6 +21,19 @@ export function conversationClient(transport: Transport) {
 				{ method: "POST", body },
 			);
 		},
+		/** A saved library image as a pending attachment; `requestId` becomes its id. */
+		attachLibraryImage: async (
+			id: string,
+			requestId: string,
+			imageId: string,
+			signal?: AbortSignal,
+		) =>
+			callJson(
+				transport,
+				attachmentSchema,
+				`/api/conversations/${encodeURIComponent(id)}/attachments/library`,
+				{ ...json({ requestId, imageId }), signal },
+			),
 		attachmentPreview: async (
 			id: string,
 			attachmentId: string,

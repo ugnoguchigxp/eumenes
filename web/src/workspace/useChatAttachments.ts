@@ -1,22 +1,30 @@
 import { useSettings } from "../domains/settings";
 import type { ImageInputStatus } from "../../../api/domains/inference/contracts";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import {
 	attachmentLimits,
 	type Attachment,
 } from "../../../api/domains/conversation/contracts";
 import { describeError } from "../errorMessages";
+import {
+	imageContentUrl,
+	libraryLoadError,
+	libraryPickerItems,
+	useImageLibrary,
+} from "../media/use-image-library";
 
 const acceptsImages = (status: ImageInputStatus | undefined) =>
 	status?.primary.status === "supported" ||
 	(status?.primary.status === "failed" &&
 		status.fallback?.status === "supported");
 
+/** A device file is uploaded on send; a library image is converted to an attachment on send. */
 export type DraftImage = {
 	id: string;
-	file: File;
+	name: string;
 	url: string;
+	source: { kind: "file"; file: File } | { kind: "library"; imageId: string };
 	saved?: Attachment;
 };
 export function useChatAttachments(
@@ -32,6 +40,13 @@ export function useChatAttachments(
 	const [error, setError] = useState<string>();
 	const [busy, setBusy] = useState(false);
 	const urls = useRef(new Set<string>());
+	// The saved images are read only once the library picker has been opened.
+	const [libraryWanted, setLibraryWanted] = useState(false);
+	const libraryQuery = useImageLibrary(client, false, libraryWanted);
+	const libraryImages = useMemo(
+		() => libraryPickerItems(libraryQuery.data),
+		[libraryQuery.data],
+	);
 	useEffect(
 		() => () => {
 			check.current?.abort();
@@ -93,10 +108,15 @@ export function useChatAttachments(
 			setError("JPG・PNG・BMPの画像を選んでください。");
 			return;
 		}
-		const appended = files.map((file) => {
+		const appended = files.map((file): DraftImage => {
 			const url = URL.createObjectURL(file);
 			urls.current.add(url);
-			return { id: crypto.randomUUID(), file, url };
+			return {
+				id: crypto.randomUUID(),
+				name: file.name,
+				url,
+				source: { kind: "file", file },
+			};
 		});
 		current.current = [...current.current, ...appended];
 		setItems(current.current);
@@ -112,18 +132,47 @@ export function useChatAttachments(
 			setError("添付は8枚までです。画像を減らしてください。");
 			return;
 		}
-		const appended = fresh.map(({ attachment, file }) => {
+		const appended = fresh.map(({ attachment, file }): DraftImage => {
 			const url = URL.createObjectURL(file);
 			urls.current.add(url);
-			return { id: attachment.id, file, url, saved: attachment };
+			return {
+				id: attachment.id,
+				name: file.name,
+				url,
+				source: { kind: "file", file },
+				saved: attachment,
+			};
 		});
+		current.current = [...current.current, ...appended];
+		setItems(current.current);
+		checkConnection();
+	}
+	/** Saved library images, shown from the library and converted to attachments on send. */
+	function addLibrary(images: { id: string; title: string }[]) {
+		setError(undefined);
+		const fresh = images.filter(
+			(image) =>
+				!current.current.some(
+					(i) => i.source.kind === "library" && i.source.imageId === image.id,
+				),
+		);
+		if (current.current.length + fresh.length > attachmentLimits.maxImages) {
+			setError("添付は8枚までです。画像を減らしてください。");
+			return;
+		}
+		const appended = fresh.map((image): DraftImage => ({
+			id: crypto.randomUUID(),
+			name: image.title,
+			url: imageContentUrl(image.id),
+			source: { kind: "library", imageId: image.id },
+		}));
 		current.current = [...current.current, ...appended];
 		setItems(current.current);
 		checkConnection();
 	}
 	function remove(id: string) {
 		const item = current.current.find((i) => i.id === id);
-		if (item) {
+		if (item && urls.current.has(item.url)) {
 			URL.revokeObjectURL(item.url);
 			urls.current.delete(item.url);
 		}
@@ -145,7 +194,17 @@ export function useChatAttachments(
 			for (const item of snapshot) {
 				const saved =
 					item.saved ??
-					(await client.uploadAttachment(conversationId, item.id, item.file));
+					(item.source.kind === "file"
+						? await client.uploadAttachment(
+								conversationId,
+								item.id,
+								item.source.file,
+							)
+						: await client.attachLibraryImage(
+								conversationId,
+								item.id,
+								item.source.imageId,
+							));
 				item.saved = saved;
 				ids.push(saved.id);
 			}
@@ -165,6 +224,18 @@ export function useChatAttachments(
 		capability,
 		add,
 		addSaved,
+		addLibrary,
+		library: {
+			images: libraryImages,
+			loading: libraryWanted && libraryQuery.isPending,
+			error: libraryQuery.error ? libraryLoadError : undefined,
+			/** Reads the list on first open, then refreshes it on each later open. */
+			open: () => {
+				if (libraryWanted) void libraryQuery.refetch();
+				else setLibraryWanted(true);
+			},
+			refresh: () => void libraryQuery.refetch(),
+		},
 		remove,
 		upload,
 		clear,

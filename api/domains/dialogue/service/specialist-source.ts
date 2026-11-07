@@ -12,7 +12,7 @@ export function specialistExecutionSource(
 	runId: string,
 	expectedSession?: string,
 	expectedEpoch?: number,
-): ExecutionSource | null {
+): (ExecutionSource & { messageId: string }) | null {
 	const run = byId(db, runId);
 	if (
 		!run?.specialistSessionId ||

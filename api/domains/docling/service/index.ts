@@ -1,6 +1,7 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
 import { checkRefusal, isCapacityBusy } from "../../larm";
 import { doclingPrepared, type DoclingConnection } from "../contracts";
+import { createDoclingWiki } from "./wiki";
 
 export type DoclingFetch = (url: URL, init: RequestInit) => Promise<Response>;
 
@@ -17,6 +18,7 @@ export function createDocling(deps: {
 	let opening = false;
 	const fetcher = deps.fetch ?? fetch;
 	const service = {
+		wiki: createDoclingWiki(deps),
 		status: deps.status,
 		/** The conversation tool only returns the artifact; its Web adapter requests startup. */
 		prepare: () =>

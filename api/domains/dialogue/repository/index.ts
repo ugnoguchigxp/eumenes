@@ -1,4 +1,4 @@
-import { agencyMigration, dispatchClockMigration } from "./agency";
+import { agencyMigration, dispatchClockMigration, agencyActionsMigration } from "./agency";
 import { specialistObservationsMigration } from "./specialist-observations";
 import { agencyObservationsMigration } from "./agency-observations";
 import { intentAnswerRouteMigration, intentJudgmentsMigration } from "./intent";
@@ -462,6 +462,7 @@ export const migrations: readonly Migration[] = [
 		after: ["dialogue/0035-specialist-observations"],
 		sql: agencyObservationsMigration,
 	},
+	{ id: "dialogue/0037-agency-actions", after: ["dialogue/0036-agency-observations"], sql: agencyActionsMigration },
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

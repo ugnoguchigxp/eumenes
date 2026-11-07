@@ -18,6 +18,7 @@ import {
 import { createObjectRecognition } from "../../domains/object-recognition";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
 import { createImage } from "../../domains/image";
+import { createMarkdown } from "../../domains/markdown";
 import { createUiCompositions } from "../../domains/ui-compositions";
 import { createMusic } from "../../domains/music";
 import {
@@ -588,6 +589,9 @@ export async function harness(options: HarnessOptions = {}) {
 		conversation,
 		ttsDictionary: createTtsDictionary(store),
 	});
+	const markdown = options.markdown
+		? createMarkdown({ store, queue, archive: options.markdown })
+		: undefined;
 	const uiCompositions = options.uiCompositions
 		? createUiCompositions()
 		: undefined;
@@ -632,6 +636,7 @@ export async function harness(options: HarnessOptions = {}) {
 		music: !!options.musicGateway,
 		image: !!options.imageGateway,
 		uiCompositions,
+		markdown,
 		excalidraw: !!options.drawingConnection,
 		objectRecognition: !!options.recognitionFetcher,
 		ocr,
@@ -809,6 +814,7 @@ export async function harness(options: HarnessOptions = {}) {
 		}),
 	});
 	toolchainLinks.attachDialogue(dialogue);
+	let executionPort: ReturnType<typeof configureTaskExecution> | undefined;
 	if (options.everyday || options.pipelines || options.pursuit) {
 		// The everyday task agent is suspended: its bundle is never seeded, so the fixtures of that
 		// implementation register it explicitly. Pipelines need only the parent execution's port.
@@ -822,7 +828,7 @@ export async function harness(options: HarnessOptions = {}) {
 				)
 			: { issues: [] };
 		if (registered.issues.length) throw new Error("dormant_bundle_rejected");
-		configureTaskExecution({
+		executionPort = configureTaskExecution({
 			pursuit: toolchain.pursuit,
 			collaboration: toolchain.collaboration,
 			interact: browser?.interact,
@@ -850,6 +856,7 @@ export async function harness(options: HarnessOptions = {}) {
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
 		modules: appModules({
+			markdown,
 			docling: options.docling,
 			changes,
 			excalidraw,
@@ -890,6 +897,7 @@ export async function harness(options: HarnessOptions = {}) {
 			body: body ? JSON.stringify(body) : undefined,
 		});
 	return {
+		executionPort,
 		dir,
 		memory,
 		dotsWork,
@@ -901,6 +909,7 @@ export async function harness(options: HarnessOptions = {}) {
 		drawingOperations,
 		image,
 		uiCompositions,
+		markdown,
 		objectRecognition,
 		ocr,
 		compute,

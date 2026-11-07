@@ -43,6 +43,7 @@ export function agencyBackgroundSystem(
 	const own = conversationPersona(persona);
 	return [
 		systemContext("dialogue.contexts.agency.background", own),
+		systemContext("dialogue.contexts.system.image-history", {}),
 		purpose === "update"
 			? systemContext("dialogue.contexts.agency.update", {})
 			: systemContext("dialogue.contexts.agency.select", {

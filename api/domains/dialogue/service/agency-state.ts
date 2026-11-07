@@ -1,3 +1,4 @@
+import { createAgencyActions, type AgencyActionDeps } from "./agency-actions";
 import { agencyForgetting } from "./agency-forgetting";
 import { refreshAgencyDependencies } from "./agency-memory";
 import { staleAgencySources } from "./agency-sources";
@@ -30,25 +31,31 @@ import {
 	replaceAgencyDependents,
 } from "../repository/agency-observations";
 
-export function createAgencyStatePort(deps: {
+export function createAgencyStatePort(deps: AgencyActionDeps & {
 	agents?: AgentRuntime;
 	toolchains?: ToolchainRoutingPort | undefined;
 	now: () => number;
 	memory?: Pick<MemoryService, "referenceInputs">;
 }) {
+	const actions = createAgencyActions(deps);
 	const revoke = (db: Database, id: string) => {
-		for (const w of agencyWorks(db, id, true))
+		for (const w of agencyWorks(db, id, true)) {
+			if (w.execution_id) deps.agents?.executions.forgetInTransaction(db,w.execution_id);
 			deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
+		}
 		revokeAgency(db, id);
 	};
 	const catalog = (db: Database) =>
-		(deps.toolchains?.catalogInTransaction(db) ?? []).flatMap((entry) => {
-			const card = deps.toolchains!.cardInTransaction(db, entry.revisionId);
+		actions.available() ? actions.catalog(db) : (deps.toolchains?.catalogInTransaction(db) ?? []).flatMap((entry) => {
 			// Runtime routes are execution contracts, not semantic topic judgments.
-			return card &&
-				(card.minImpact === undefined || card.minImpact === "none") &&
-				!entry.runtime.binding &&
-				(entry.runtime.route === "web" || entry.runtime.route === "history")
+			// They are checked first: a card reads the whole toolchain set, and this runs per agency checkpoint.
+			if (
+				entry.runtime.binding ||
+				(entry.runtime.route !== "web" && entry.runtime.route !== "history")
+			)
+				return [];
+			const card = deps.toolchains!.cardInTransaction(db, entry.revisionId);
+			return card && (card.minImpact === undefined || card.minImpact === "none")
 				? [
 						{
 							revisionId: card.revisionId,
@@ -140,6 +147,9 @@ export function createAgencyStatePort(deps: {
 		saveInTransaction: saveAgency,
 		saveFeedInTransaction: saveAgencyFeed,
 		catalogInTransaction: catalog,
+		findCapabilities: actions.find,
+		generalActionsAvailable: actions.available,
+		linkFindingsInTransaction(db: Database, conversationId: string, messageId: string, ticketIds: readonly string[]) { actions.link(db,conversationId,messageId,agencyWorks(db,conversationId,true).filter((w)=>ticketIds.includes(w.ticket_id)).flatMap((w)=>w.execution_id ? [w.execution_id] : [])); },
 		startInTransaction(
 			db: Database,
 			input: {
@@ -154,8 +164,10 @@ export function createAgencyStatePort(deps: {
 				deadline: number;
 				outboundIntervalMs: number;
 				sourceRefs: readonly string[];
+				arguments?: Record<string, unknown>;
 			},
 		) {
+			if (actions.available()) return actions.start(db,input);
 			if (!deps.agents || !deps.toolchains)
 				throw new Error("agency_research_unavailable");
 			if (
@@ -225,6 +237,11 @@ export function createAgencyStatePort(deps: {
 							cancel: true,
 						},
 					];
+                if (w.execution_id) {
+                  const view = actions.result(db,w.root_id);
+                  if (!view?.result) return [];
+                  return [{cancel:false,rootId:w.root_id,conversationId:w.conversation_id,epoch:w.epoch,ticketId:w.ticket_id,status:view.status === "completed" || view.status === "partial" ? "succeeded" as const : view.status === "cancelled" || view.status === "interrupted" ? "interrupted" as const : "failed" as const,workStatus:view.status === "completed" ? "succeeded" as const : view.status === "partial" ? "partial" as const : view.status === "cancelled" || view.status === "interrupted" ? "interrupted" as const : "failed" as const,summary:JSON.stringify(view.result)}];
+                }
 				const task = w.task_id
 					? deps.agents?.getInTransaction(db, w.task_id)
 					: null;
@@ -296,6 +313,14 @@ export function createAgencyStatePort(deps: {
 		returnedInTransaction(db: Database, rootId: string) {
 			const w = agencyWork(db, rootId);
 			let adopted = true;
+            if (w?.execution_id) {
+              if (!currentAgencyWork(db,w)) { returnAgencyWork(db,rootId); return false; }
+              const view = actions.result(db,rootId);
+              if (!view?.result) return false;
+              actions.synchronize(db,view);
+              returnAgencyWork(db,rootId);
+              return true;
+            }
 			if (
 				w?.task_id &&
 				deps.agents?.getInTransaction(db, w.task_id)?.status ===
@@ -317,6 +342,7 @@ export function createAgencyStatePort(deps: {
 			return adopted;
 		},
 		cancelInTransaction(db: Database, id: string) {
+			actions.cancel(db,id);
 			deps.agents?.deleteTaskDataInTransaction(db, id);
 			revokeAgencyWork(db, id);
 		},

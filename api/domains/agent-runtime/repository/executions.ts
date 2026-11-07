@@ -33,6 +33,8 @@ CREATE TABLE agent_execution_events (id TEXT PRIMARY KEY, execution_id TEXT NOT 
 `;
 export type ParentState = {
 	version: 1;
+	/** A host-selected capability; its result ends this execution without a planning loop. */
+	single?: { chainRevisionId: string };
 	bindingRevisionId: string;
 	instructions: string;
 	calls: number;

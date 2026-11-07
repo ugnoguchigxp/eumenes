@@ -1,6 +1,23 @@
 import { z } from "zod";
 import { attributionSchema } from "./attribution";
 const ref = z.string().uuid();
+const imageAnswerEvidenceSchema = z.object({
+	requestId: z.string().min(1),
+	attemptId: z.string().min(1),
+	adoptedAt: z.string().datetime({ offset: true }),
+});
+const imageReferenceSchema = z.object({
+	messageId: z.string(),
+	attachmentIds: z.array(z.uuid()).max(8),
+	/** Host evidence of a completed image-bearing call and adopted answer, not a correctness judgement. */
+	answerEvidence: imageAnswerEvidenceSchema.optional(),
+});
+export type ImageReference = z.infer<typeof imageReferenceSchema>;
+export type ImageAnswerTrace = {
+	requestId: string;
+	attemptId: string;
+	inputs: Array<Pick<ImageReference, "messageId" | "attachmentIds">>;
+};
 export const historySearchInput = z
 	.object({
 		query: z.string().trim().max(200).default(""),
@@ -38,6 +55,8 @@ const historyViewSchema = z.object({
 	start: z.number().int().nonnegative(),
 	end: z.number().int().nonnegative(),
 	text: z.string(),
+	/** Transcript links, not image content or a claim of successful recognition. */
+	imageReferences: z.array(imageReferenceSchema).optional(),
 	truncated: z.boolean(),
 	nextCursor: ref.nullable(),
 });

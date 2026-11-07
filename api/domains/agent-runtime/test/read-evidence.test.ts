@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { verifyReport, parentProjection } from "../service/verify-report";
 import type { Source } from "../../tool-runtime";
+import { EvidenceCatalog } from "../service/evidence-catalog";
 const source = (body: string): Source => ({
 	sourceId: "same-source",
 	viewId: crypto.randomUUID(),
@@ -24,6 +25,27 @@ const raw = (s: Source) => ({
 	],
 	limitations: [],
 	exploration: ["合成資料"],
+});
+
+test("image exchange links survive the evidence projection alongside the original analysis text", () => {
+	const reading: Source = {
+		...source("赤い円が3個、文字はR7K4です。"),
+		kind: "conversation_source",
+		basis: "conversation",
+		speaker: "assistant",
+		imageReferences: [
+			{
+				messageId: "image-input",
+				attachmentIds: ["c37b270f-910b-409c-b6b8-d313ee92362a"],
+			},
+		],
+	};
+	const observations = new EvidenceCatalog().observe([reading]);
+	expect(observations[0]).toMatchObject({
+		imageReferences: reading.imageReferences,
+	});
+	expect(JSON.stringify(observations)).toContain("赤い円が3個");
+	expect(JSON.stringify(observations)).not.toMatch(/base64|data:image/);
 });
 test("R7: equal e0 identifiers in different views never redirect an old quotation; unpresented and forged views fail", () => {
 	const old = source("旧版の値は10。"),

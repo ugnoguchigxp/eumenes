@@ -1,0 +1,269 @@
+{
+  "summary": {
+    "total": 27,
+    "byteEqual": 8,
+    "astEqual": 16,
+    "exactEditor": 27,
+    "exactOriginal": 27,
+    "coreFailures": [
+      "loose-list",
+      "gfm-table-align",
+      "code-fence",
+      "inline-links",
+      "reference-links",
+      "soft-break",
+      "soft-break-after-link",
+      "soft-break-after-mark",
+      "soft-break-after-code"
+    ],
+    "extendedFailures": [
+      "frontmatter",
+      "html-details"
+    ]
+  },
+  "results": [
+    {
+      "id": "headings-paragraphs",
+      "group": "core",
+      "byteEqual": true,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "# 見出し\n\n本文です。\n\n## 次の節\n\n続きです。\n"
+    },
+    {
+      "id": "inline-marks",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "**太字**&#x3068;_&#x659C;体_、~~取消~~、`code`。\n"
+    },
+    {
+      "id": "nested-lists",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "* 親\n  * 子\n    * 孫\n* 次\n"
+    },
+    {
+      "id": "ordered-start",
+      "group": "core",
+      "byteEqual": true,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "3. 三番目\n4. 四番目\n"
+    },
+    {
+      "id": "loose-list",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "* 一つ目\n\n二つ目の段落\n\n* 次の項目\n"
+    },
+    {
+      "id": "task-list",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "* [ ] 未着手\n* [x] 完了\n"
+    },
+    {
+      "id": "nested-quote",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "> 引用\n>\n> * 引用内の箇条書き\n>\n> > 入れ子\n"
+    },
+    {
+      "id": "gfm-table-align",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "| 左      | 中央  | 右 |\n| ------ | --- | - |\n| **強調** | `x` | 値 |\n"
+    },
+    {
+      "id": "code-fence",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "```ts\nconst x = `a`;\n\nconsole.log(x);\n```\n"
+    },
+    {
+      "id": "inline-links",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "[公式](https://example.com/a)と\n\n![代替](https://example.com/a.png \"画像\")\n"
+    },
+    {
+      "id": "reference-links",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "[参照](https://example.com) と&#x20;\n\n![画像](https://example.com/i.png \"画像\")\n"
+    },
+    {
+      "id": "autolink",
+      "group": "core",
+      "byteEqual": true,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "https://example.com と <user@example.com>\n"
+    },
+    {
+      "id": "soft-break",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "一行目\\\n二行目\n"
+    },
+    {
+      "id": "soft-break-after-link",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "[link](https://example.com)next\n"
+    },
+    {
+      "id": "soft-break-after-mark",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "**太字**次の行\n"
+    },
+    {
+      "id": "soft-break-after-code",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "`code`next\n"
+    },
+    {
+      "id": "hard-break",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "一行目\\\n二行目\n"
+    },
+    {
+      "id": "crlf-code",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "```ts\nconst x = 1;\n```\n"
+    },
+    {
+      "id": "escaped-and-unicode",
+      "group": "core",
+      "byteEqual": true,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "\\*記号\\*と日本語、👩‍💻、é、絵文字🙂。\n"
+    },
+    {
+      "id": "thematic-break",
+      "group": "core",
+      "byteEqual": false,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "前\n\n***\n\n後\n"
+    },
+    {
+      "id": "frontmatter",
+      "group": "extended",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "***\n\ntitle: \"企画\"\ntags: \\[a, b]\n-------------\n\n# 本文\n"
+    },
+    {
+      "id": "html-comment",
+      "group": "extended",
+      "byteEqual": true,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "本文\n\n<!-- 管理用コメント -->\n\n次\n"
+    },
+    {
+      "id": "html-details",
+      "group": "extended",
+      "byteEqual": false,
+      "astEqual": false,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "<details>\n\n<summary>詳細</summary>\n\n**内容**\n\n</details>\n"
+    },
+    {
+      "id": "footnotes",
+      "group": "extended",
+      "byteEqual": true,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "本文[^note]。\n\n[^note]: 脚注の内容。\n"
+    },
+    {
+      "id": "math",
+      "group": "extended",
+      "byteEqual": true,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "$x^2$ と数式。\n\n$$\nx^2+y^2=z^2\n$$\n"
+    },
+    {
+      "id": "mermaid-fence",
+      "group": "extended",
+      "byteEqual": true,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "```mermaid\nflowchart LR\n  A --> B\n```\n"
+    },
+    {
+      "id": "blank-lines",
+      "group": "extended",
+      "byteEqual": false,
+      "astEqual": true,
+      "exactEditor": true,
+      "exactOriginal": true,
+      "output": "前\n\n後\n"
+    }
+  ]
+}

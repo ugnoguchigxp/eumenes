@@ -129,7 +129,7 @@ export function executionCompose(
 					sourceRefs: {
 						conversationId: source.conversationId,
 						messageIds: [
-							source.messageId,
+							...(source.messageId ? [source.messageId] : []),
 							...(source.responses ?? []).map((r) => r.messageId),
 							...state.refs
 								.filter((r) => r.kind === "message")

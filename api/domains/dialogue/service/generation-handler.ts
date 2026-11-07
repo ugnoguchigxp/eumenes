@@ -141,6 +141,9 @@ export function createGenerationHandler(
 						log.info("dialogue.generation_completed");
 						return {
 							text: reportedLinks(deps, input, generated.text),
+							...(generated.imageAnswer
+								? { imageAnswer: generated.imageAnswer }
+								: {}),
 							exchange: generated.exchange,
 							...(generated.receipt ? { receipt: generated.receipt } : {}),
 							...(generated.emotion ? { emotion: generated.emotion } : {}),

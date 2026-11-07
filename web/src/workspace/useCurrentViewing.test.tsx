@@ -107,3 +107,41 @@ test("the specialist's saved work still wins the message's viewing, then the rec
 		targetRef: "still-1",
 	});
 });
+
+test("a document adapter exposes its current target to collaborator handover, while other resources keep their URI", () => {
+	const cache = new QueryClient();
+	cache.setQueryData(
+		[queryRoots.toolchainArtifacts, "id", "list"],
+		[
+			{
+				artifactRevisionId: "artifact:test.screen@1",
+				adapterRef: adapter.adapterRef,
+			},
+		],
+	);
+	const target = {
+		artifactRevisionId: "artifact:test.screen@1",
+		targetRef: "document-1",
+	};
+	adapter.viewingTarget = () => target;
+	const view = renderHook(
+		() =>
+			useCurrentViewing(
+				() => undefined,
+				toolchainTab("artifact:test.screen@1"),
+				adapters,
+			),
+		{
+			wrapper: ({ children }: PropsWithChildren) => (
+				<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+			),
+		},
+	);
+	expect(view.result.current()).toEqual(target);
+	delete adapter.viewingTarget;
+	shown.mockReturnValue("eumenes://image/image-1");
+	expect(view.result.current()).toEqual({
+		resource: "eumenes://image/image-1",
+	});
+	cache.clear();
+});

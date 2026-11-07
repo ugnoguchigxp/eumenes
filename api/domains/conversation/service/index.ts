@@ -55,6 +55,8 @@ import {
 	writeCut,
 } from "../repository/input";
 import { createHistory } from "./history";
+import { imageReferences } from "./image-context";
+import { recordImageAnswer } from "../repository/image-answers";
 import type { HistoryOwner } from "../contracts/history";
 
 /** Upper bound of messages returned by `get` (newest kept). */
@@ -123,6 +125,8 @@ export function createConversationService(
 		);
 	};
 	return {
+		imageReferencesInTransaction: imageReferences,
+		recordImageAnswerInTransaction: recordImageAnswer,
 		...createAttachments(store, outbox.principal),
 		/**
 		 * What the conversation's input is built from (the conversation input specification, sections 6.3, 6.1.1 and

@@ -5,6 +5,13 @@
  * allow-list in `depends`; raising a dependency means raising `tier` here.
  */
 export const domains = {
+	markdown: {
+		tier: 1,
+		backend: "api/domains/markdown",
+		web: "web/src/domains/markdown",
+		components: "packages/design-system/src/components/MarkdownWorkspace",
+		depends: { api: ["queue", "resources"], web: ["resources"], test: [] },
+	},
 	collaboration: {
 		tier: 3,
 		backend: "api/domains/collaboration",

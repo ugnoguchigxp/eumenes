@@ -150,6 +150,15 @@ export const viewRegistry = {
 			body: z.string().max(1000),
 		}),
 	},
+	"markdown-workspace": {
+		name: "MarkdownWorkspace",
+		label: "文書の共同編集",
+		schema: z.strictObject({
+			view: z.literal("markdown-workspace"),
+			source,
+			title,
+		}),
+	},
 	"ui-studio": {
 		name: "UiStudio",
 		label: "UI制作",

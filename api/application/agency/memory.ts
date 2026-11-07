@@ -45,16 +45,30 @@ export function archiveOf(deps: AgencyHostDeps, c: Conv) {
 	};
 }
 
+/**
+ * Archives the observations of the records saved in one write. The input check is one pass over all their
+ * sources: staleness is decided per source, and a checkpoint carries every conversation of the host.
+ */
 export function persistMemory(
 	deps: AgencyHostDeps,
 	db: Database,
-	record: AgencyRecord,
-): AgencyRecord {
+	records: readonly AgencyRecord[],
+): AgencyRecord[] {
 	const memory = deps.memory.referenceInputs;
 	const state = deps.state;
-	if (!memory || !state) return record;
-	if (staleInputSources(deps, db, record.sourceRefs).length)
+	if (!memory || !state) return [...records];
+	const sources = [...new Set(records.flatMap((r) => r.sourceRefs))];
+	if (staleInputSources(deps, db, sources).length)
 		throw new Error("agency_input_stale");
+	return records.map((record) => archiveRecord(memory, state, db, record));
+}
+
+function archiveRecord(
+	memory: NonNullable<AgencyHostDeps["memory"]["referenceInputs"]>,
+	state: NonNullable<AgencyHostDeps["state"]>,
+	db: Database,
+	record: AgencyRecord,
+): AgencyRecord {
 	const snapshot = record.snapshot as AgencySnapshot;
 	const inputs = new Map(snapshot.provenance?.entries);
 	const existing = new Map(

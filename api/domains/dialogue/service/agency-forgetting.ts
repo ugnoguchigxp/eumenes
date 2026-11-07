@@ -68,8 +68,10 @@ export function agencyForgetting(deps: {
 					!Array.isArray(snapshot.state?.candidates)
 				) {
 					if (!record.sourceRefs.some((ref) => refs.has(ref))) continue;
-					for (const work of agencyWorks(db, record.conversationId, true))
+					for (const work of agencyWorks(db, record.conversationId, true)) {
+						if (work.execution_id) deps.agents?.executions.forgetInTransaction(db,work.execution_id);
 						deps.agents?.deleteTaskDataInTransaction(db, work.root_id);
+					}
 					revokeAgency(db, record.conversationId);
 					changed.push(record.conversationId);
 					continue;
@@ -84,6 +86,7 @@ export function agencyForgetting(deps: {
 								refs.has(ref),
 							))
 					) {
+						if (work.execution_id) deps.agents?.executions.forgetInTransaction(db,work.execution_id);
 						deps.agents?.deleteTaskDataInTransaction(db, work.root_id);
 						revokeAgencyWork(db, work.root_id);
 					}

@@ -41,6 +41,61 @@ it("separates selection, embedded preview and confirmation; cancel emits no sele
 	expect(onCancel).toHaveBeenCalledTimes(1);
 });
 
+it("multiple selection toggles up to the limit and confirms in the order chosen", () => {
+	const onConfirm = vi.fn();
+	render(
+		<ImagePicker
+			savedOnly
+			multiple
+			maxSelected={2}
+			images={[
+				...images,
+				{ id: "c", title: "山", thumbnailUrl: "/mountain.png" },
+			]}
+			onConfirm={onConfirm}
+			onCancel={vi.fn()}
+		/>,
+	);
+	const use = screen.getByRole("button", { name: "選んだ画像を使う" });
+	expect(use).toBeDisabled();
+	expect(screen.getByText("画像を選んでください（最大2枚）")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "海を選ぶ" }));
+	fireEvent.click(screen.getByRole("button", { name: "森を選ぶ" }));
+	// A full picker keeps its choices instead of replacing one.
+	fireEvent.click(screen.getByRole("button", { name: "山を選ぶ" }));
+	expect(screen.getByRole("button", { name: "山を選ぶ" })).toHaveAttribute(
+		"aria-pressed",
+		"false",
+	);
+	expect(screen.getByText("2枚選択中（最大2枚）")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "海を選ぶ" }));
+	fireEvent.click(screen.getByRole("button", { name: "山を選ぶ" }));
+	fireEvent.click(use);
+	expect(onConfirm).toHaveBeenCalledExactlyOnceWith(["a", "c"]);
+});
+
+it("choices refreshed out of the list no longer count toward the limit", () => {
+	const onConfirm = vi.fn();
+	const props = {
+		savedOnly: true,
+		multiple: true as const,
+		maxSelected: 2,
+		onConfirm,
+		onCancel: vi.fn(),
+	};
+	const mountain = { id: "c", title: "山", thumbnailUrl: "/mountain.png" };
+	const view = render(
+		<ImagePicker {...props} images={[...images, mountain]} />,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "森を選ぶ" }));
+	fireEvent.click(screen.getByRole("button", { name: "海を選ぶ" }));
+	view.rerender(<ImagePicker {...props} images={[images[1]!, mountain]} />);
+	expect(screen.getByText("1枚選択中（最大2枚）")).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: "山を選ぶ" }));
+	fireEvent.click(screen.getByRole("button", { name: "選んだ画像を使う" }));
+	expect(onConfirm).toHaveBeenCalledExactlyOnceWith(["b", "c"]);
+});
+
 it("keeps the loaded images and selection when returning from a preview", () => {
 	const manyImages = Array.from({ length: 25 }, (_, index) => ({
 		id: String(index),

@@ -1,0 +1,222 @@
+{
+  "results": [
+    {
+      "name": "artifact-only-full-toolbar",
+      "ok": true,
+      "detail": {
+        "buttons": 35
+      }
+    },
+    {
+      "name": "unchanged-ai-document-saves-without-local-normalization",
+      "ok": true,
+      "detail": {
+        "sourceId": "fixture-desk"
+      }
+    },
+    {
+      "name": "japanese-composition-cancel-confirm-undo",
+      "ok": true,
+      "detail": {
+        "osIme": false
+      }
+    },
+    {
+      "name": "toolbar-formatting-and-table-reach-editor-data",
+      "ok": true,
+      "detail": {
+        "bold": true,
+        "table": true
+      }
+    },
+    {
+      "name": "apply-then-save-uses-small-staged-event",
+      "ok": true,
+      "detail": {
+        "actions": [
+          "markdown-apply",
+          "markdown-archive"
+        ]
+      }
+    },
+    {
+      "name": "save-waits-for-apply-receipt-even-if-source-arrives-first",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "remote-update-does-not-overwrite-local-draft-and-reload-keeps-base",
+      "ok": true,
+      "detail": {
+        "base": 1
+      }
+    },
+    {
+      "name": "typing-during-apply-retains-newer-draft",
+      "ok": true,
+      "detail": {
+        "base": 2
+      }
+    },
+    {
+      "name": "format-save-bold",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "format-save-italic",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "format-save-underline",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "format-save-strikethrough",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "format-save-code",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "format-save-subscript",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "format-save-superscript",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-blockquote",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-hr",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-callout",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-toggle",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-toc",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-column_group",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-code_block",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-footnoteDefinition",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "table-row-and-column-controls",
+      "ok": true,
+      "detail": {
+        "rows": 3,
+        "columns": 3
+      }
+    },
+    {
+      "name": "font-colors-alignment-heading-save",
+      "ok": false,
+      "error": "TimeoutError: evaluate: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[data-node-type=\"p\"]').last()\u001b[22m\n"
+    },
+    {
+      "name": "lists-indent-checkbox-save",
+      "ok": false,
+      "error": "TimeoutError: waitForFunction: Timeout 3000ms exceeded."
+    },
+    {
+      "name": "insert-save-a",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-img",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "insert-save-equation",
+      "ok": true,
+      "detail": {
+        "saved": true
+      }
+    },
+    {
+      "name": "emoji-clear-format-undo-redo",
+      "ok": false,
+      "error": "Error: undo format"
+    },
+    {
+      "name": "narrow-artifact-layout",
+      "ok": true,
+      "detail": {
+        "width": 480,
+        "scroll": 480
+      }
+    }
+  ],
+  "errors": []
+}

@@ -1,3 +1,8 @@
+import {
+	MARKDOWN_ADAPTER_REF,
+	describeMarkdownAdapter,
+	markdownDomainSchemas,
+} from "../markdown/markdown-adapter";
 import { describePursuitAdapter } from "../pursuit/pursuit-adapter";
 import {
 	DOCLING_ADAPTER_REF,
@@ -154,6 +159,7 @@ import {
 const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...dotsWorkDomainSchemas,
 	...doclingDomainSchemas,
+	...markdownDomainSchemas,
 	...timerDomainSchemas,
 	"domain:ocr.receipt@1": z.union([
 		ocrRecord,
@@ -239,6 +245,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: MUSIC_SCREEN_ADAPTER_REF, describe: describeMusicScreenAdapter },
 	{ ref: IMAGE_SCREEN_ADAPTER_REF, describe: describeImageScreenAdapter },
 	{ ref: UI_COMPOSITIONS_ADAPTER_REF, describe: describeUiCompositionsAdapter },
+	{ ref: MARKDOWN_ADAPTER_REF, describe: describeMarkdownAdapter },
 	{
 		ref: OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,
 		describe: describeObjectRecognitionScreenAdapter,
@@ -327,7 +334,7 @@ export function createRegistryActions(
 			const source = execution
 				? { ...execution.source, taskId: request.owner.taskId }
 				: readActionOriginInTransaction(db, runId!);
-			if (!source || source.taskId !== request.owner.taskId)
+			if (!source || (!execution && !source.messageId) || source.taskId !== request.owner.taskId)
 				throw new Error("origin_invalid");
 			const adapter = adapterOf(request.adapterRef);
 			if (!adapter.describe().operations.has(request.operationName))
@@ -337,15 +344,7 @@ export function createRegistryActions(
 				input: request.arguments,
 				requestId: request.requestId,
 				issuedAt: request.issuedAt,
-				origin: {
-					...(execution
-						? { kind: "task" as const, execution }
-						: { kind: "conversation" as const }),
-					owner: request.owner,
-					runId: request.owner.rootRunId,
-					conversationId: source.conversationId,
-					messageId: source.messageId,
-				},
+				origin: execution ? {kind:"task",execution,owner:request.owner,runId:request.owner.rootRunId,conversationId:source.conversationId,messageId:source.messageId} : {kind:"conversation",owner:request.owner,runId:request.owner.rootRunId,conversationId:source.conversationId,messageId: source.messageId!},
 			});
 			return {
 				kind: "local_action",

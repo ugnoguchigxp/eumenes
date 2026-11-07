@@ -8,6 +8,7 @@ import {
 } from "../../../infrastructure/context-budget";
 import { sha256Hex } from "../../../infrastructure/digest";
 import type { ConversationCut, Utterance } from "../../conversation";
+import { imageReferenceText } from "../../conversation";
 import { keepOrder, type ProfileItem, type WindowSnapshot } from "../../memory";
 import { latestConversationId } from "../repository";
 import type { ChatMessage, DialogueDeps } from "./context";
@@ -125,11 +126,17 @@ export function recentUtterances(
  */
 export function recentMessages(
 	utterances: readonly Utterance[],
+	imageNotes: ReadonlyMap<string, string> = new Map(),
 ): ChatMessage[] {
 	const messages: ChatMessage[] = [];
 	for (const u of utterances) {
 		const role = u.speaker === "user" ? "user" : "assistant";
-		const text = dataText(headWithin(u.text, RECENT.utteranceTokens).text);
+		const note = u.messageId ? imageNotes.get(u.messageId) : null;
+		const text = dataText(
+			[headWithin(u.text, RECENT.utteranceTokens).text, note]
+				.filter(Boolean)
+				.join("\n"),
+		);
 		const last = messages.at(-1);
 		if (last && last.role === role) last.content += `\n${text}`;
 		else messages.push({ role, content: text });
@@ -395,7 +402,18 @@ export function conversationPrefixFrom(
 		INPUT_HEADINGS.memory,
 		lines.length ? lines : ["- なし"],
 	);
-	const conversation = recentMessages(recent);
+	const imageNotes = new Map<string, string>();
+	for (const utterance of recent) {
+		if (!utterance.messageId) continue;
+		const references = deps.conversation
+			.imageReferencesInTransaction(tx, utterance.messageId)
+			.filter(
+				(ref) => !deps.memory?.isSourceRevokedInTransaction(tx, ref.messageId),
+			);
+		if (references.length)
+			imageNotes.set(utterance.messageId, imageReferenceText(references));
+	}
+	const conversation = recentMessages(recent, imageNotes);
 	const messages: ChatMessage[] = [{ role: "system", content: input.system }];
 	if (memory && conversation.length)
 		messages.push({ role: "user", content: memory });

@@ -3,6 +3,7 @@ import {
 	registerRouterExport,
 	type createRouterExport,
 } from "./toolchain/router-export";
+import { registerMarkdown, type MarkdownService } from "../domains/markdown";
 import { registerDocling, type DoclingService } from "../domains/docling";
 import { registerSearchCheck } from "./toolchain/toolchain-search-check";
 import {
@@ -25,6 +26,7 @@ import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contract
 import { recognitionSharing } from "./media/recognition-sharing";
 import { registerImage, type ImageService } from "../domains/image";
 import { registerGooglePhotoImport } from "./media/google-photo-import";
+import { registerLibraryAttachment } from "./media/library-attachment";
 import { registerMusic, type MusicService } from "../domains/music";
 import {
 	registerCapabilities,
@@ -135,6 +137,7 @@ export type AppServices = {
 	music?: MusicService;
 	image?: ImageService;
 	docling?: DoclingService;
+	markdown?: MarkdownService;
 	excalidraw?: ExcalidrawService;
 	drawingOperations?: { list: (conversationId: string) => unknown };
 	objectRecognition?: ObjectRecognitionService;
@@ -183,6 +186,7 @@ export function appModules(services: AppServices): AppModule[] {
 				}),
 		},
 		s.docling && { mount: (app) => registerDocling(app, s.docling!) },
+		s.markdown && { mount: (app) => registerMarkdown(app, s.markdown!) },
 		s.changes && {
 			mount: (app) =>
 				app.get("/api/events", (c) =>
@@ -240,6 +244,7 @@ export function appModules(services: AppServices): AppModule[] {
 		s.image && {
 			mount: (app) => {
 				registerImage(app, s.image!);
+				registerLibraryAttachment(app, s.image!, s.conversation);
 				if (s.googleAccounts)
 					registerGooglePhotoImport(app, s.image!, s.googleAccounts);
 			},

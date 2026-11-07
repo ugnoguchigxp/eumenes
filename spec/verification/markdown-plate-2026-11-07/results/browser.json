@@ -1,0 +1,158 @@
+{
+  "results": [
+    {
+      "name": "open-does-not-normalize-or-save-original",
+      "ok": true,
+      "detail": {
+        "revision": 1,
+        "byteExact": true
+      }
+    },
+    {
+      "name": "chromium-native-ime-conversion-confirm-and-undo",
+      "ok": true,
+      "detail": {
+        "confirmed": "前文日本語\n",
+        "undone": "前文\n",
+        "events": [
+          {
+            "type": "compositionstart",
+            "data": ""
+          },
+          {
+            "type": "compositionupdate",
+            "data": "にほんご"
+          },
+          {
+            "type": "beforeinput",
+            "data": "にほんご",
+            "inputType": "insertCompositionText",
+            "isComposing": true
+          },
+          {
+            "type": "input",
+            "data": "にほんご",
+            "inputType": "insertCompositionText",
+            "isComposing": true
+          },
+          {
+            "type": "compositionupdate",
+            "data": "日本語"
+          },
+          {
+            "type": "beforeinput",
+            "data": "日本語",
+            "inputType": "insertCompositionText",
+            "isComposing": true
+          },
+          {
+            "type": "input",
+            "data": "日本語",
+            "inputType": "insertCompositionText",
+            "isComposing": true
+          },
+          {
+            "type": "compositionupdate",
+            "data": "日本語"
+          },
+          {
+            "type": "beforeinput",
+            "data": "日本語",
+            "inputType": "insertCompositionText",
+            "isComposing": true
+          },
+          {
+            "type": "input",
+            "data": "日本語",
+            "inputType": "insertCompositionText",
+            "isComposing": true
+          },
+          {
+            "type": "compositionend",
+            "data": "日本語"
+          }
+        ],
+        "osIme": false
+      }
+    },
+    {
+      "name": "chromium-native-ime-cancel",
+      "ok": true,
+      "detail": {
+        "text": "元の本文",
+        "composing": false
+      }
+    },
+    {
+      "name": "imported-trailing-space-survives-following-ime-edit",
+      "ok": false,
+      "error": "imported separator lost on edit: \"前文日本語\\n\""
+    },
+    {
+      "name": "remote-ai-result-during-ime-does-not-replace-composition",
+      "ok": true,
+      "detail": {
+        "remote": "blocked",
+        "text": "前文入力\n"
+      }
+    },
+    {
+      "name": "remote-ai-result-preserves-unsaved-user-input",
+      "ok": true,
+      "detail": {
+        "remote": "blocked",
+        "text": "原文手入力\n"
+      }
+    },
+    {
+      "name": "remote-clean-document-and-stale-response",
+      "ok": true,
+      "detail": {
+        "text": "新しい本文"
+      }
+    },
+    {
+      "name": "backend-save-reload-and-unsaved-draft-recovery",
+      "ok": true,
+      "detail": {
+        "savedRevision": 2,
+        "draftRecovered": true
+      }
+    },
+    {
+      "name": "failed-save-retains-draft-and-saved-revision",
+      "ok": true,
+      "detail": {
+        "dirty": true,
+        "savedRevision": 1
+      }
+    },
+    {
+      "name": "typing-during-save-ack-retains-newer-draft",
+      "ok": true,
+      "detail": {
+        "savedRevision": 2,
+        "newerDraftRetained": true
+      }
+    },
+    {
+      "name": "server-ai-commit-and-reload-cannot-rebase-old-user-draft-silently",
+      "ok": true,
+      "detail": {
+        "savedRevision": 2,
+        "draftRecovered": true,
+        "conflictRetainedAfterReload": true
+      }
+    },
+    {
+      "name": "full-toolbar-markdown-format-retention",
+      "ok": false,
+      "error": "color/fontSize/alignment not retained: **<u><span style=\"color: #ff0000;\"><span style=\"font-size: 24px;\">文字装飾</span></span></u>**\n"
+    }
+  ],
+  "pageErrors": [],
+  "chromium": "149.0.7827.55",
+  "transport": "Playwright exposed test port; no HTTP server",
+  "ai": "fixed results using common document tools",
+  "osIme": "not tested"
+}

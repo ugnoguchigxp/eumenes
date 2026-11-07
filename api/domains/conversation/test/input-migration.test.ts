@@ -44,6 +44,8 @@ const LATER = [
 	"conversation/0014-drop-utterance-tool-exchange",
 	"conversation/0015-utterance-tool-exchange",
 	"conversation/0016-utterance-notice",
+	"conversation/0017-image-answers",
+	"conversation/0018-image-answer-sequences",
 ];
 
 test("a deployed input database upgrades without losing cuts, utterances, state or migration history", async () => {
@@ -95,6 +97,16 @@ test("a deployed input database upgrades without losing cuts, utterances, state 
 		await store.close();
 		store = openStore(path, migrations);
 		expect(snapshot()).toEqual(before);
+		expect(
+			store.read(
+				(db) =>
+					(
+						db
+							.query("SELECT COUNT(*) AS n FROM conversation_image_answers")
+							.get() as { n: number }
+					).n,
+			),
+		).toBe(0);
 		for (const id of ["c1", "c2", "c3"])
 			expect(store.read((db) => readCut(db, id))).toMatchObject({
 				seq: 12,
@@ -152,7 +164,9 @@ test("0013 keeps the checksum it ran with, and a database that went through 0014
 		migrations.filter(
 			(m) =>
 				m.id !== "conversation/0015-utterance-tool-exchange" &&
-				m.id !== "conversation/0016-utterance-notice",
+				m.id !== "conversation/0016-utterance-notice" &&
+				m.id !== "conversation/0017-image-answers" &&
+				m.id !== "conversation/0018-image-answer-sequences",
 		),
 	);
 	try {

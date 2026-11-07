@@ -12,6 +12,10 @@ import {
 	writeAttribution,
 } from "./attribution";
 import { messageAttachments, attachmentsMigration } from "./attachments";
+import {
+	imageAnswersMigration,
+	imageAnswerSequencesMigration,
+} from "./image-answers";
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { createHash } from "node:crypto";
@@ -727,4 +731,6 @@ export const migrations: readonly Migration[] = [
 	dropToolExchangeMigration,
 	restoreToolExchangeMigration,
 	utteranceNoticeMigration,
+	imageAnswersMigration,
+	imageAnswerSequencesMigration,
 ];

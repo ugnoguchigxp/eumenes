@@ -125,6 +125,9 @@ export class EvidenceCatalog {
 						}
 					: {}),
 				speaker: source.speaker,
+				...(source.imageReferences?.length
+					? { imageReferences: source.imageReferences }
+					: {}),
 				createdAt: source.createdAt,
 				origin: source.origin,
 				truncated: source.truncated,

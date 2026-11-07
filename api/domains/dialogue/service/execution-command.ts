@@ -1,3 +1,4 @@
+import { autonomousActionSource } from "../repository/agency";
 import { liveSession } from "../repository/specialist";
 import type { Database } from "bun:sqlite";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
@@ -18,7 +19,9 @@ import { specialistExecutionSource } from "./specialist-source";
 /** The existing command translator, with a real source turn and a separate child-call identity. */
 export function executionCommands(deps: DialogueDeps) {
 	const sourceOf = (db: Database, child: ChildExecution) =>
-		child.source.specialistSessionId !== undefined
+		child.source.origin === "autonomous"
+			? autonomousActionSource(db, child.source.runId, Date.now())
+			: child.source.specialistSessionId !== undefined
 			? specialistExecutionSource(
 					deps,
 					db,
@@ -27,24 +30,29 @@ export function executionCommands(deps: DialogueDeps) {
 					child.source.specialistEpoch,
 				)
 			: executionSourceInTransaction(deps, db, child.source.runId);
-	function prepareInTransaction(db: Database, child: ChildExecution) {
+	function prepareInTransaction(db: Database, child: ChildExecution, allowedOperations?: readonly string[]) {
 		const run = byId(db, child.source.runId);
 		const source = sourceOf(db, child);
 		if (
-			!run ||
+			(!run && child.source.origin !== "autonomous") ||
 			source?.digest !== child.source.digest ||
 			!deps.toolchains?.bound ||
 			!deps.larm.captureUserControlInTransaction
 		)
 			throw new Error("execution_source_invalid");
-		const set = deps.toolchains.commandSetInTransaction(
+		let set = deps.toolchains.commandSetInTransaction(
 			db,
 			child.chainRevisionId,
 		);
+		if (child.source.origin === "autonomous") {
+ if (!set.binding || !allowedOperations?.length) throw new Error("agency_approval_required");
+ const tools = set.binding.tools.filter((tool) => allowedOperations.includes(tool.operationName));
+ set = { ...set, binding: { ...set.binding, tools } };
+ }
 		const loaded = commandSource(
 			deps,
 			db,
-			run,
+			run ?? { id: child.source.runId, conversationId: child.source.conversationId },
 			set,
 			{ toolchainRevisionId: child.chainRevisionId },
 			child,

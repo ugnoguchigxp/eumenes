@@ -1,3 +1,4 @@
+import { autonomousActionSource } from "../../domains/dialogue";
 import { hash } from "../../domains/capabilities";
 import type { ToolchainExecutionPort } from "../../domains/tool-runtime";
 import type { TaskChildContext } from "./task-execution-catalog";
@@ -19,7 +20,9 @@ export function taskExecutionSources(
 	const port: ReturnType<typeof taskExecutionSources> = {
 		validSourceInTransaction(db, source) {
 			const current =
-				source.specialistSessionId !== undefined
+				source.origin === "autonomous"
+					? autonomousActionSource(db, source.runId, Date.now())
+					: source.specialistSessionId !== undefined
 					? dialogue.specialistExecutionSourceInTransaction(
 							db,
 							source.runId,

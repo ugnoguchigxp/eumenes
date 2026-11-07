@@ -118,7 +118,11 @@ const CalculatorView = lazyView(() =>
 	dataViews().then((m) => m.CalculatorView),
 );
 
+const MarkdownWorkspaceView = lazyView(() =>
+	import("./markdown-components").then((m) => m.MarkdownWorkspaceView),
+);
 const renderers = {
+	"markdown-workspace": MarkdownWorkspaceView,
 	"external-app-launcher": ExternalAppLauncherView,
 	"dots-messaging": DotsMessagingView,
 	"work-menu": WorkMenuView,

@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-07",
+  "scope": "existing agency feed input validation fix; general action design only, not implemented",
+  "baseCommit": "bdc68978389c8338f3726f584586a8e17cdd17a1",
+  "currentWorkspaceAgencyTests": {
+    "passed": 105,
+    "failed": 0
+  },
+  "isolatedDomainTests": {
+    "backendPassed": 867,
+    "webPassed": 32,
+    "failed": 0
+  },
+  "typecheck": "passed, 3012 files",
+  "lint": "passed",
+  "domainVerify": "stopped at pre-existing formatting issues in unmodified HEAD files",
+  "preexistingFormatting": [
+    "api/domains/capabilities/bundles/browser-interact.bundle.json",
+    "tests/browser/chat-image-attachments.spec.ts"
+  ],
+  "live": "not run; standard API connection refused; no production server operations",
+  "context_compile": 1,
+  "compile_eval": 1,
+  "sourceHashes": {
+    "api/application/agency/feed.ts": "d54a4977e5956c8a3d528db068c8031cfa85016b97c772bf9125dfda3281f970",
+    "api/application/agency/memory-integration.test.ts": "35989e8b32e957feaa6f2c3c803de57231546f932d25855504f65487e1119388"
+  }
+}

@@ -572,6 +572,8 @@ export function createInference(
 		},
 		/** The router's reranker on its own port (spec router-package-integration 2026-11-04 §1 #4). */
 		...judges.ports,
+		/** After the HTTP server listens: the saved router's connection is made ahead of the first utterance. */
+		startRouter: () => judges.start(),
 		async close() {
 			screen.close();
 			unsubscribeCollection();

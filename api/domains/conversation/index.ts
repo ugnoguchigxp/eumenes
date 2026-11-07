@@ -1,4 +1,6 @@
 export { routingExportUtterance } from "./service/routing-export";
+export { imageReferenceText } from "./service/image-context";
+export type { ImageAnswerTrace } from "./contracts/history";
 export { registerConversation } from "./controller";
 export {
 	/** @public */ migration,

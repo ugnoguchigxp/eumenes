@@ -45,6 +45,16 @@ export type Source = {
 	conversationId?: string;
 	speaker?: "user" | "assistant";
 	attribution?: { namespace: string; sourceId: string; displayName: string };
+	/** Text history can identify an image exchange without carrying image content. */
+	imageReferences?: Array<{
+		messageId: string;
+		attachmentIds: string[];
+		answerEvidence?: {
+			requestId: string;
+			attemptId: string;
+			adoptedAt: string;
+		};
+	}>;
 	createdAt?: string;
 	revision?: string;
 	digest?: string;

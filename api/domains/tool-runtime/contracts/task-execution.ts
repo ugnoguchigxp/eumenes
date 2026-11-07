@@ -84,7 +84,10 @@ export type ExecutionView = {
 };
 export type ExecutionSource = {
 	conversationId: string;
-	messageId: string;
+	messageId: string | null;
+	/** A persisted Agency work owns autonomous execution; never a user-message identity. */
+	origin?: "autonomous";
+	agency?: { epoch: number; ticketId: string; capabilityRevisionId: string; policyDigest: string };
 	runId: string;
 	request: string;
 	digest: string;
@@ -168,6 +171,7 @@ export type ChildResult = {
 export interface ToolchainExecutionPort {
 	/** Shared domain-task lifecycle, also callable by research invocation owners. */
 	childOperations?: import("./child-operation").ChildOperationPort;
+	autonomyInTransaction?(db: Database, revisionId: string): { automatic: boolean; reason: string; operations: string[] };
 	validSourceInTransaction(db: Database, source: ExecutionSource): boolean;
 	controlSourceInTransaction(
 		db: Database,
@@ -286,7 +290,7 @@ export function executionCallSession(child: ChildExecution) {
 		refs: {
 			conversationId: child.source.conversationId,
 			messageIds: [
-				child.source.messageId,
+				...(child.source.messageId ? [child.source.messageId] : []),
 				...(child.source.amendments ?? []).map((update) => update.messageId),
 				...(child.source.responses ?? []).map((update) => update.messageId),
 				...(child.resume ? [child.resume.answerMessageId] : []),

@@ -7,6 +7,33 @@ const settings = vi.hoisted(() => ({ revision: 1 }));
 vi.mock("../domains/settings", () => ({
 	useSettings: () => ({ data: settings }),
 }));
+const library = vi.hoisted(() => ({
+	enabled: [] as boolean[],
+	refetch: () => Promise.resolve(),
+}));
+vi.mock("../media/use-image-library", async (original) => ({
+	...(await original<typeof import("../media/use-image-library")>()),
+	useImageLibrary: (_client: unknown, _interval: unknown, enabled: boolean) => {
+		library.enabled.push(enabled);
+		return {
+			data: enabled
+				? {
+						images: [
+							{
+								id: "img-1",
+								createdAt: "2026-11-07T01:00:00.000Z",
+								width: 1024,
+								height: 768,
+							},
+						],
+					}
+				: undefined,
+			isPending: !enabled,
+			error: null,
+			refetch: library.refetch,
+		};
+	},
+}));
 afterEach(cleanup);
 function client() {
 	return {
@@ -136,5 +163,60 @@ test("unknown image support prevents upload and preserves the draft; text-only s
 	});
 	expect(c.uploadAttachment).not.toHaveBeenCalled();
 	expect(hook.result.current.items).toHaveLength(1);
+	vi.unstubAllGlobals();
+});
+
+test("library images wait in the draft and become attachments only on send", async () => {
+	const revoke = vi.fn();
+	vi.stubGlobal("URL", {
+		createObjectURL: () => "blob:fixture",
+		revokeObjectURL: revoke,
+	});
+	const c = {
+		...client(),
+		uploadAttachment: vi.fn(),
+		attachLibraryImage: vi.fn(
+			async (_conversation: string, id: string, _imageId: string) => ({ id }),
+		),
+	};
+	const hook = renderHook(() =>
+		useChatAttachments(c as unknown as EumenesClient, "main"),
+	);
+	expect(hook.result.current.library.loading).toBe(false);
+	expect(library.enabled.at(-1)).toBe(false);
+	act(() => hook.result.current.library.open());
+	expect(library.enabled.at(-1)).toBe(true);
+	const [image] = hook.result.current.library.images;
+	expect(image).toEqual({
+		id: "img-1",
+		title: "画像 2026-11-07（1024×768）",
+		thumbnailUrl: "/api/images/img-1/content",
+	});
+	act(() => hook.result.current.addLibrary([image!]));
+	// The same saved image is attached once.
+	act(() => hook.result.current.addLibrary([image!]));
+	await waitFor(() => expect(hook.result.current.busy).toBe(false));
+	const items = hook.result.current.items;
+	expect(items).toHaveLength(1);
+	expect(items[0]).toMatchObject({
+		name: "画像 2026-11-07（1024×768）",
+		url: "/api/images/img-1/content",
+		source: { kind: "library", imageId: "img-1" },
+	});
+	expect(c.attachLibraryImage).not.toHaveBeenCalled();
+	let ids: string[] = [];
+	await act(async () => {
+		ids = await hook.result.current.upload(items);
+	});
+	expect(ids).toEqual([items[0]!.id]);
+	expect(c.attachLibraryImage).toHaveBeenCalledExactlyOnceWith(
+		"main",
+		items[0]!.id,
+		"img-1",
+	);
+	expect(c.uploadAttachment).not.toHaveBeenCalled();
+	act(() => hook.result.current.remove(items[0]!.id));
+	expect(hook.result.current.items).toHaveLength(0);
+	expect(revoke).not.toHaveBeenCalled();
 	vi.unstubAllGlobals();
 });

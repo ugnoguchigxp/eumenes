@@ -23,6 +23,7 @@ import { model3dArtifactSource, parseSourceData, revisionOf } from "./source";
 import {
 	imageContentUrl,
 	imageLibraryKey,
+	libraryLoadError,
 	useImageLibrary,
 } from "../../media/use-image-library";
 import { uploadImage } from "../../media/upload-image";
@@ -213,9 +214,7 @@ export function useModel3dRuntime({
 					: undefined,
 		})),
 		sourceImagesLoading: images.isPending,
-		sourceImagesError: images.error
-			? "保存画像を取得できませんでした。一覧を更新してください。"
-			: undefined,
+		sourceImagesError: images.error ? libraryLoadError : undefined,
 		assets: items.map(toAsset),
 		total: last?.total,
 		hasMore: !!last?.nextCursor,

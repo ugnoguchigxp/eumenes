@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { createReadPorts } from "./research-history-ports";
+import type { Source } from "../../domains/tool-runtime";
 
 /** The research history port with fakes: only the blocked-message handling is under test. */
 const runRow = {
@@ -26,6 +27,12 @@ const message = (messageId: string) => ({
 	end: 3,
 	nextCursor: null,
 	text: `text-${messageId}`,
+	imageReferences: [
+		{
+			messageId: "image-input",
+			attachmentIds: ["c37b270f-910b-409c-b6b8-d313ee92362a"],
+		},
+	],
 	truncated: false,
 });
 const scope = { scopeRef: "scope-1" };
@@ -82,6 +89,22 @@ test("without blocked messages every result is passed on", () => {
 		arguments: {},
 	} as never);
 	expect(ids(search)).toEqual(["kept", "forgotten"]);
+});
+
+test("delegated history preserves image links in model observations and removes blocked origins", () => {
+	const read = (blockedIds: string[]) =>
+		ports(blockedIds).localInTransaction!(db, {
+			owner,
+			tool: { id: "history.read" },
+			arguments: {},
+		} as never) as { result: { readings: Source[] } };
+	const sources = read([]).result.readings;
+	expect(JSON.stringify(sources)).toContain(
+		"c37b270f-910b-409c-b6b8-d313ee92362a",
+	);
+	expect(JSON.stringify(sources)).not.toMatch(/base64|data:image/);
+	const hidden = read(["image-input"]).result.readings;
+	expect(hidden.every((source) => !source.imageReferences?.length)).toBe(true);
 });
 
 test("a report that stands on a message forgotten during the research is not adopted", () => {

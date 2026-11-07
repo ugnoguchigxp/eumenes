@@ -17,6 +17,7 @@ import { openStore } from "../api/infrastructure/sqlite";
 
 const BACKENDS = [
 	"docling",
+	"markdown",
 	"task-execution",
 	"pursuit",
 	"web",

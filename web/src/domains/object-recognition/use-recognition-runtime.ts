@@ -17,7 +17,8 @@ import { useRecognitionHandoffs } from "./use-recognition-handoffs";
 import { queryRoots } from "../../queryKeys";
 import { useCaptureSave } from "./use-capture-save";
 import {
-	imageContentUrl,
+	libraryLoadError,
+	libraryPickerItems,
 	useImageLibrary,
 } from "../../media/use-image-library";
 const origins = new Set(["camera", "screen", "file"]);
@@ -342,18 +343,9 @@ function libraryResource(
 	failed: boolean,
 ) {
 	return {
-		libraryImages: (data?.images ?? [])
-			.slice()
-			.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-			.map((image) => ({
-				id: image.id,
-				title: `画像 ${image.createdAt.slice(0, 10)}（${image.width}×${image.height}）`,
-				thumbnailUrl: imageContentUrl(image.id),
-			})),
+		libraryImages: libraryPickerItems(data),
 		libraryLoading: loading,
-		libraryError: failed
-			? "保存画像を取得できませんでした。一覧を更新してください。"
-			: undefined,
+		libraryError: failed ? libraryLoadError : undefined,
 	};
 }
 
@@ -401,7 +393,7 @@ async function handleLibrary(
 			}),
 		);
 	} catch {
-		deps.setError("保存画像を取得できませんでした。一覧を更新してください。");
+		deps.setError(libraryLoadError);
 		return { status: "rejected", message: "保存画像を取得できませんでした。" };
 	} finally {
 		deps.setBusy(false);

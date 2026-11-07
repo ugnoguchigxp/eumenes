@@ -9,7 +9,7 @@ export function executionSourceInTransaction(
 	deps: DialogueDeps,
 	db: Database,
 	runId: string,
-): ExecutionSource | null {
+): (ExecutionSource & { messageId: string }) | null {
 	const run = byId(db, runId);
 	if (!run || !["manual", "voice"].includes(run.sourceKind)) return null;
 	const found = deps.conversation.messageInTransaction(db, run.inputMessageId);

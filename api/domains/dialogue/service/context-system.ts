@@ -88,7 +88,10 @@ export function systemText(
 		],
 		Emotion: [agent.emotionRules],
 		Input: [systemContext("dialogue.contexts.system.input", {})],
-		Facts: [systemContext("dialogue.contexts.system.talk-facts", {})],
+		Facts: [
+			systemContext("dialogue.contexts.system.talk-facts", {}),
+			systemContext("dialogue.contexts.system.image-history", {}),
+		],
 	};
 	return TALK_SECTIONS.flatMap((name) => {
 		const parts = sections[name].filter((part): part is string => !!part);

@@ -1,3 +1,4 @@
+import { createMarkdownResourceAdapter } from "../../domains/markdown";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import {
@@ -111,6 +112,7 @@ export function buildResources(deps: {
 			createModel3dResourceAdapter({ store, owner }),
 			createDrawingResourceAdapter({ store, conversationId: CONVERSATIONS[0] }),
 			createUiCompositionResourceAdapter({ store }),
+			createMarkdownResourceAdapter(store),
 			reports,
 			createComputeResourceAdapter({ store, owner }),
 			createBrowserResourceAdapter({ store, owner, includeInteract: true }),

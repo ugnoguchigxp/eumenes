@@ -1,4 +1,6 @@
-import { useRef } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { DropdownMenu, ImagePicker } from "@eumenes/design-system";
+import { attachmentLimits } from "../../../api/domains/conversation/contracts";
 import { Button, Modal } from "../design-system";
 import type { WorkspaceState } from "./useWorkspace";
 
@@ -22,9 +24,44 @@ function annotationLabel(data: Record<string, unknown>) {
 		: "検出: なし";
 }
 
+/** Menu glyphs share the composer's line-icon style (folder: device files, stacked frames: library). */
+function MenuIcon({ children }: { children: ReactNode }) {
+	return (
+		<svg
+			width="16"
+			height="16"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="1.8"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			aria-hidden="true"
+		>
+			{children}
+		</svg>
+	);
+}
+
 export function ChatImageInput({ state }: { state: WorkspaceState }) {
 	const picker = useRef<HTMLInputElement>(null);
+	const [libraryOpen, setLibraryOpen] = useState(false);
 	const images = state.attachments;
+	const library = images.library;
+	const remaining = attachmentLimits.maxImages - images.items.length;
+	// A saved image already in the draft is shown but cannot be chosen again.
+	const attached = new Set(
+		images.items.flatMap((item) =>
+			item.source.kind === "library" ? [item.source.imageId] : [],
+		),
+	);
+	const choices = libraryOpen
+		? library.images.map((image) =>
+				attached.has(image.id)
+					? { ...image, disabledReason: "添付済み" }
+					: image,
+			)
+		: [];
 	return (
 		<>
 			<input
@@ -39,29 +76,93 @@ export function ChatImageInput({ state }: { state: WorkspaceState }) {
 					e.target.value = "";
 				}}
 			/>
-			<Button
-				type="button"
-				variant="secondary"
-				size="icon"
-				aria-label="ファイルを添付"
-				title="ファイルを添付（現在はJPG・PNG・BMP画像に対応）"
-				onClick={() => picker.current?.click()}
-				disabled={images.busy || state.submit.isPending}
+			<DropdownMenu
+				side="top"
+				items={[
+					{
+						label: "端末の画像を選ぶ…",
+						icon: (
+							<MenuIcon>
+								<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
+							</MenuIcon>
+						),
+						onClick: () => picker.current?.click(),
+					},
+					{
+						label: "画像一覧から選ぶ…",
+						icon: (
+							<MenuIcon>
+								<path d="M18 22H4a2 2 0 0 1-2-2V6" />
+								<path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18" />
+								<circle cx="12" cy="8" r="2" />
+								<rect width="16" height="16" x="6" y="2" rx="2" />
+							</MenuIcon>
+						),
+						onClick: () => {
+							library.open();
+							setLibraryOpen(true);
+						},
+					},
+				]}
+				trigger={
+					<Button
+						type="button"
+						variant="secondary"
+						size="icon"
+						aria-label="ファイルを添付"
+						title="ファイルを添付（端末のJPG・PNG・BMP画像、または画像一覧から）"
+						disabled={images.busy || state.submit.isPending}
+					>
+						<svg
+							width="20"
+							height="20"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="1.8"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M12 16V4m-4 4 4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+						</svg>
+					</Button>
+				}
+			/>
+			<Modal
+				open={libraryOpen}
+				onOpenChange={setLibraryOpen}
+				title="画像一覧から添付"
+				description="保存した画像を選んで、送信前の添付に加えます。"
+				draggable={false}
 			>
-				<svg
-					width="20"
-					height="20"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="1.8"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					aria-hidden="true"
-				>
-					<path d="M12 16V4m-4 4 4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
-				</svg>
-			</Button>
+				{libraryOpen && remaining <= 0 && (
+					<output>
+						添付は{attachmentLimits.maxImages}
+						枚までです。添付を外してから選んでください。
+					</output>
+				)}
+				{libraryOpen && remaining > 0 && (
+					<ImagePicker
+						savedOnly
+						multiple
+						maxSelected={remaining}
+						images={choices}
+						loading={library.loading}
+						error={library.error}
+						onRefresh={library.refresh}
+						onCancel={() => setLibraryOpen(false)}
+						onConfirm={(ids) => {
+							setLibraryOpen(false);
+							images.addLibrary(
+								ids.flatMap(
+									(id) => library.images.find((image) => image.id === id) ?? [],
+								),
+							);
+						}}
+					/>
+				)}
+			</Modal>
 		</>
 	);
 }
@@ -81,30 +182,30 @@ export function ChatImagePreviews({ state }: { state: WorkspaceState }) {
 					{images.items.map((item) => (
 						<div key={item.id} className="draft-image">
 							<Modal
-								title={item.file.name || "添付画像"}
+								title={item.name || "添付画像"}
 								description="送信前の画像"
 								draggable={false}
 								trigger={
 									<Button
 										type="button"
 										variant="ghost"
-										aria-label={`${item.file.name}を確認`}
+										aria-label={`${item.name}を確認`}
 									>
-										<img src={item.url} alt={item.file.name} />
+										<img src={item.url} alt={item.name} />
 									</Button>
 								}
 							>
 								<img
 									className="attachment-expanded"
 									src={item.url}
-									alt={item.file.name}
+									alt={item.name}
 								/>
 							</Modal>
 							<Button
 								type="button"
 								size="sm"
 								variant="ghost"
-								aria-label={`${item.file.name}の添付を外す`}
+								aria-label={`${item.name}の添付を外す`}
 								disabled={images.busy || state.submit.isPending}
 								onClick={() => images.remove(item.id)}
 							>

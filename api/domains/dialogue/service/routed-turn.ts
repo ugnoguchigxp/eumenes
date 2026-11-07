@@ -12,6 +12,7 @@ import type {
 } from "../contracts";
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
 import { conversationOutput } from "./conversation-output";
+import { imageAnswerTrace } from "./attachment-context";
 import { availableReadTools, readToolDefinitions } from "./executor-read";
 import type {
 	GenerationOutcome,
@@ -77,6 +78,25 @@ const callFailed = (code: string) =>
 		code,
 	);
 
+/** Convert only a completed talk reply; structured choices and tool preambles attest no image answer. */
+function completedTalk(
+	answered: Receipt,
+	messages: ChatMessage[],
+	output: ReturnType<typeof conversationOutput>,
+) {
+	const text = output.finish(String(answered.value ?? ""));
+	return {
+		text,
+		imageAnswer:
+			text.trim() && !answered.toolCalls?.length
+				? imageAnswerTrace(answered, messages)
+				: undefined,
+		toolCalls: (answered.toolCalls ?? []).map(
+			({ id, name, arguments: args }) => ({ id, name, arguments: args }),
+		),
+	};
+}
+
 /**
  * One turn of the local harness (the local harness rebuild plan, section 4): the eumenes_router package decides every
  * utterance turn, the conversation among the toolchains, the work and the open confirmations and questions (spec
@@ -118,11 +138,12 @@ export async function runRoutedTurn(
 	}
 	log.info("dialogue.turn_routed", { kind, count: turn.calls() });
 	options.signal.throwIfAborted();
-	const { receipt, emotion } = turn.result();
+	const { receipt, emotion, imageAnswer } = turn.result();
 	return {
 		text: turn.said().trim(),
 		...(receipt ? { receipt } : {}),
 		...(emotion ? { emotion } : {}),
+		...(imageAnswer ? { imageAnswer } : {}),
 		executed: turn.executed,
 		exchange: turn.exchange,
 		ended: turn.executed.some(({ outcome }) => outcome.end === true),
@@ -141,6 +162,7 @@ function createTurn(
 	const executed: GenerationOutcome["executed"] = [];
 	const exchange: ExchangeStep[] = [];
 	let receipt: Receipt | undefined;
+	let imageAnswer: GenerationOutcome["imageAnswer"];
 	let said = "";
 	let emotion: GenerationOutcome["emotion"];
 	let calls = 0;
@@ -249,7 +271,7 @@ function createTurn(
 		calls: () => calls,
 		said: () => said,
 		published: () => published,
-		result: () => ({ receipt, emotion }),
+		result: () => ({ receipt, emotion, imageAnswer }),
 
 		/** The host's own words: spoken as they are, and part of the answer. */
 		speak(text: string) {
@@ -265,6 +287,7 @@ function createTurn(
 		 * once the run's answer is accepted (speech while the run is running stands on a model call of it).
 		 */
 		answer(text: string) {
+			imageAnswer = undefined;
 			said = text.trim();
 		},
 
@@ -319,6 +342,7 @@ function createTurn(
 		 * 2026-10-31 §2); `tools: false` when the host has read for it already.
 		 */
 		async talk(notice?: string, { tools = true }: { tools?: boolean } = {}) {
+			let talkImageAnswer: GenerationOutcome["imageAnswer"];
 			const messages = notice
 				? withNotice(input.messages, notice)
 				: input.messages;
@@ -375,14 +399,13 @@ function createTurn(
 								);
 								chatSignal.throwIfAborted();
 								receipt = answered;
-								return {
-									text: output.finish(String(answered.value ?? "")),
-									toolCalls: (answered.toolCalls ?? []).map((toolCall) => ({
-										id: toolCall.id,
-										name: toolCall.name,
-										arguments: toolCall.arguments,
-									})),
-								};
+								const { imageAnswer: trace, ...reply } = completedTalk(
+									answered,
+									request.messages as ChatMessage[],
+									output,
+								);
+								talkImageAnswer = trace;
+								return reply;
 							} catch (error) {
 								// A call that ended cleanly with nothing to say: the reply says nothing, as the system allows. So
 								// does the answer after a read that calls a tool again, when none is offered any more.
@@ -424,6 +447,7 @@ function createTurn(
 			)
 				throw new Error("chat_output_empty");
 			emotion = reply.emotion;
+			imageAnswer = talkImageAnswer;
 			said = [said, reply.text].filter(Boolean).join("\n");
 		},
 	};

@@ -1,7 +1,8 @@
 import type { Database } from "bun:sqlite";
 import type { AgencyRuntime, Opportunity, InputContext } from "eumenes-agency";
-import { combineInput, observationInput } from "./input";
+import { combineInput, currentInput, observationInput } from "./input";
 import type { OutboxEvent } from "../../domains/conversation";
+import { imageReferenceText } from "../../domains/conversation";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { getLogger } from "../../infrastructure/logger";
 import type { createConversationLifecycle } from "./conversation-lifecycle";
@@ -86,6 +87,9 @@ export function createAgencyFeed(input: {
 		context: InputContext,
 	) {
 		try {
+			// Reject an unusable source before it can poison every later update's input.
+			if (!store.read((db) => currentInput(deps, db, context)))
+				throw new Error("agency_input_stale");
 			c.runtime.observe(input, context);
 			log.info("agency.observation_received", {
 				subjectId: c.id,
@@ -130,6 +134,11 @@ export function createAgencyFeed(input: {
 		const occurredAt = Date.parse(event.occurredAt);
 		const at = Number.isFinite(occurredAt) ? occurredAt : nowMs();
 		const speaker = event.speaker;
+		const imageRefs = conversation
+			.imageReferencesInTransaction(db, message.id)
+			.filter(
+				(ref) => !deps.memory.isBlockedInTransaction?.(db, ref.messageId),
+			);
 		if (event.kind === "added" && speaker === "user") {
 			invalidate(c, "input.changed");
 			c.planner.userTurn(nowMs());
@@ -137,7 +146,10 @@ export function createAgencyFeed(input: {
 			c.scheduler.rearm();
 			pending.set(c.id, { turnEnd: false });
 		}
-		if (message.presentation !== "artifact" && message.text.trim() !== "")
+		if (
+			message.presentation !== "artifact" &&
+			(message.text.trim() !== "" || imageRefs.length > 0)
+		)
 			observe(
 				c,
 				{
@@ -148,10 +160,13 @@ export function createAgencyFeed(input: {
 					kind: event.kind === "added" ? "exchange.adopted" : "correction",
 					actor: speaker === "user" ? "user" : "agent",
 					occurredAt: at,
-					text: message.text,
+					text: [message.text, imageReferenceText(imageRefs)]
+						.filter(Boolean)
+						.join("\n"),
 				},
 				combineInput(
 					observationInput(deps, db, message.id),
+					...imageRefs.map((ref) => observationInput(deps, db, ref.messageId)),
 					speaker === "assistant" &&
 						message.runId &&
 						deps.memory.referenceInputs

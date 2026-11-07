@@ -145,6 +145,7 @@ export async function createHostToolchain(
 		dbPath?: string;
 		queue: QueueService;
 		uiCompositions?: UiCompositionsService;
+		markdown?: import("../../domains/markdown").MarkdownService;
 		ocr?: import("../../domains/ocr").OcrService;
 		docling?: import("../../domains/docling").DoclingService;
 		compute?: import("../../domains/compute").ComputeService;
@@ -192,6 +193,7 @@ export async function createHostToolchain(
 		{
 			timers: s.timers,
 			uiCompositions: s.uiCompositions,
+			markdown: s.markdown,
 			ocr: s.ocr,
 			docling: s.docling,
 			model3d: s.model3d,

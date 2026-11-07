@@ -361,6 +361,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		c.id === activeId && c.planner.checkpoint().unanswered < cfg.maxUnanswered;
 
 	const { deliver } = createAgencyDelivery({
+		onToolResult: (c) => { c.toolResultReady = true; },
 		deps,
 		nowMs,
 		save,
@@ -527,6 +528,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		}
 		if (on() && convs.get(c.id) === c && c.planner === cy.planner)
 			c.scheduler.rearm();
+		if (c.toolResultReady && on() && convs.get(c.id) === c) { c.toolResultReady = false; launch(c,"result_received"); }
 		return outcome;
 	}
 

@@ -1,3 +1,5 @@
+import type { MarkdownResource } from "./markdown-components";
+export type { MarkdownResource } from "./markdown-components";
 import type { DotsMessagingResource } from "./dots-messaging-components";
 import type { WorkMenuResource, WorkResultResource } from "./work-components";
 export type { WorkMenuResource, WorkResultResource } from "./work-components";
@@ -310,6 +312,7 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| MarkdownResource
 	| UsageDashboardResource
 	| {
 			kind: "external-app-launcher";

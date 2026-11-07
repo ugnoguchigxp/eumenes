@@ -48,14 +48,13 @@ export function createCheckpoint(input: {
 					)
 				)
 					return false;
-				for (const x of captures)
-					if (
-						!deps.state!.saveInTransaction(
-							db,
-							persistMemory(deps, db, x.record),
-							input.nowMs(),
-						)
-					)
+				const records = persistMemory(
+					deps,
+					db,
+					captures.map((x) => x.record),
+				);
+				for (const record of records)
+					if (!deps.state!.saveInTransaction(db, record, input.nowMs()))
 						throw new Error("agency_checkpoint_stale");
 				deps.state!.saveFeedInTransaction(db, feed.cursor, feed.activeId);
 				return true;

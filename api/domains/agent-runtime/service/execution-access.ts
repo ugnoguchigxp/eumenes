@@ -45,6 +45,7 @@ export function executionAccess(
 		eraseExecutionBodies(db, row, now());
 	}
 	return {
+		forgetInTransaction(db: Database, id: string) { const row = executionRow(db,id); if (!row) return; if (isExecutionActive(row)) ops.fail(db,row,executionState(row),"execution_source_forgotten","cancelled"); purge(db,executionRow(db,id)!); },
 		stopRequestedInTransaction(
 			db: Database,
 			child: Pick<
@@ -109,7 +110,7 @@ export function executionAccess(
 					state = executionState(row);
 				const dependent =
 					[
-						source.messageId,
+						...(source.messageId ? [source.messageId] : []),
 						...(source.amendments ?? []).map((update) => update.messageId),
 						...(source.responses ?? []).map((update) => update.messageId),
 					].some((id) => input.messageIds.includes(id)) ||

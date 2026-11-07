@@ -2,6 +2,7 @@ import { buildAnalysisFactory } from "./media/visual-perception";
 import { createLiveBridge } from "./media/live-bridge";
 import { createLateResources } from "./resources/late";
 import { buildResources } from "./resources/wiring";
+import { buildMarkdown } from "./markdown/markdown-composition";
 import { buildDocling } from "./docling/docling-composition";
 import { createDotsMessages } from "./work/dots-messages";
 import { createDotsWork } from "./work/dots-work";
@@ -121,6 +122,9 @@ export async function buildServices(
 		worldResourceId: () => settings.get().world.curationResourceId,
 	});
 	const docling = buildDocling(settings);
+	const markdown = buildMarkdown(store, queue, docling, () =>
+		changes.publish(),
+	);
 	const uiCompositions = createUiCompositions();
 	let ocrCapabilities: Capabilities | null = null;
 	const ocr = createOcr({
@@ -163,6 +167,7 @@ export async function buildServices(
 		store,
 		queue,
 		uiCompositions,
+		markdown,
 		ocr,
 		model3d,
 		compute,
@@ -217,13 +222,14 @@ export async function buildServices(
 			)
 		: undefined;
 	const liveBridge = createLiveBridge();
+	let agencyExecution: import("../domains/tool-runtime").ToolchainExecutionPort | undefined;
 	const agencyDeps = {
 		store,
 		conversation,
 		inference,
 		settings,
 		memory,
-		research: { agents: toolchain.agents, toolchains },
+		research: { agents: toolchain.agents, toolchains, store, settings, resources: resources.access.registry, execution: () => agencyExecution },
 	};
 	const agency = assembleAgency(
 		{ ...agencyDeps, ...liveBridge.agency },
@@ -274,7 +280,7 @@ export async function buildServices(
 	);
 	links.attachDialogue(dialogue);
 	if (enabled && toolchains)
-		configureTaskExecution({
+		agencyExecution = configureTaskExecution({
 			pursuit: toolchain.pursuit,
 			collaboration: toolchain.collaboration,
 			interact: browser.interact,
@@ -358,6 +364,7 @@ export async function buildServices(
 		drawingOperations: media.drawingOperations,
 		image: media.image,
 		uiCompositions,
+		markdown,
 		objectRecognition: media.objectRecognition,
 		ocr,
 		model3d,

@@ -275,6 +275,13 @@ function createScope({
 		caller?: AbortSignal,
 		force = false,
 	): Promise<Lease> {
+		// TEMP(connect-trace): remove once the startup system-one callers are identified.
+		if (required.includes("system-one"))
+			log.warn(
+				"larm.connect_trace",
+				{ kind: "system-one", reason: force ? "force" : "plain" },
+				new Error("connect_trace"),
+			);
 		caller?.throwIfAborted();
 		if (closed) throw new Error("larm_closed");
 		if (!base) throw new Error("larm_base_url_unconfigured");

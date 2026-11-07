@@ -13,6 +13,7 @@ export function createAgencyDelivery(config: {
 	nowMs: () => number;
 	save(c: Conv): Promise<boolean>;
 	isCurrent(cy: Cycle, db: Database, ticket: ActionTicket): boolean;
+	onToolResult?(c: Conv): void;
 }) {
 	const { deps, nowMs, save } = config;
 	const { store } = deps;
@@ -24,6 +25,23 @@ export function createAgencyDelivery(config: {
 		evidenceRefs: readonly string[],
 	): Promise<CycleOutcome> {
 		const { c, trigger } = cy;
+        if (ticket.action === "tool" && ticket.toolName === "find_toolchain" && deps.state) {
+          try {
+            if (!(await save(c))) return "aborted";
+            const raw = JSON.parse(ticket.toolInput ?? "{}");
+            if (typeof raw.query !== "string" || !raw.query.trim() || raw.query.length > 2000) throw new Error("agency_catalog_input_invalid");
+            const cards = await deps.state.findCapabilities(raw.query,cy.controller.signal);
+            if (!store.read(db=>config.isCurrent(cy,db,ticket))) return "aborted";
+            receipt(cy,ticket,{status:"succeeded",resultText:JSON.stringify(cards)}, {sources:cards.map(card=>`capability:${card.revisionId}`),complete:true});
+            await save(c);
+            config.onToolResult?.(c);
+            return "aborted";
+          } catch (error) {
+            receipt(cy,ticket,{status:cy.controller.signal.aborted ? "interrupted" : "failed",resultText:toErrorCode(error,"agency_catalog_failed")});
+            await save(c);
+            return "failed";
+          }
+        }
 		if (ticket.action === "tool" && deps.state) {
 			try {
 				if (!(await save(c))) return "aborted";
@@ -143,6 +161,7 @@ export function createAgencyDelivery(config: {
 		cy: Cycle,
 		ticket: ActionTicket,
 		result: Omit<ActionReceipt, "ticketId" | "at">,
+		context?: import("eumenes-agency").InputContext,
 	) {
 		const { c } = cy;
 		const { status } = result;
@@ -157,7 +176,7 @@ export function createAgencyDelivery(config: {
 			return;
 		}
 		try {
-			let input = resultInput(cy.c, ticket.id);
+			let input = combineInput(resultInput(cy.c, ticket.id),context ?? {sources:[],complete:true});
 			if (
 				ticket.action === "speak" &&
 				result.status === "succeeded" &&

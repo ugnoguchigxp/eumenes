@@ -130,6 +130,8 @@ export type AdapterState = {
 export type WebArtifactAdapter = {
 	/** `adapter:<owner>@<n>`; matches the artifact's source bindings. */
 	adapterRef: string;
+	/** The displayed document for session handover; the backend validates it against registered target choices. */
+	viewingTarget?(): { artifactRevisionId: string; targetRef: string } | null;
 	/** A hook: the host renders one component per adapter, so the call order is stable. */
 	useArtifact(context: AdapterHostContext): AdapterState;
 	/**

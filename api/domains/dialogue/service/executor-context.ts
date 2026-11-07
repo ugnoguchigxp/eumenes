@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { ExchangeStep } from "./tool-exchange";
 import type { ToolchainCard } from "../../capabilities";
 import type { Receipt } from "../../inference";
+import type { ImageAnswerTrace } from "../../conversation";
 import type { DeliveryEmotion } from "../../delivery";
 import type { ParsedCall } from "./generation-tools";
 import { adoptMemoryWindow } from "./memory-window";
@@ -38,6 +39,7 @@ export type ToolExecutor = (
 ) => Promise<ToolOutcome>;
 
 export type GenerationOutcome = {
+	imageAnswer?: ImageAnswerTrace;
 	/** The speech the generation ends with ("" when it said nothing). */
 	text: string;
 	receipt?: Receipt;

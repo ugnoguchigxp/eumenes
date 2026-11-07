@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { recordUtteranceInTransaction } from "./utterances";
 import type { HandlerDefinition } from "../../queue";
 import type { Receipt } from "../../inference";
+import type { ImageAnswerTrace } from "../../conversation";
 import { hostDelivery, type DeliveryEmotion } from "../../delivery";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import { getLogger } from "../../../infrastructure/logger";
@@ -26,6 +27,7 @@ import { carriedToolCalls, type ExchangeStep } from "./tool-exchange";
 const log = getLogger("dialogue");
 
 export type GenerationResult = {
+	imageAnswer?: ImageAnswerTrace;
 	/** The speech the generation ends with ("" for silence or a handover). */
 	text: string;
 	receipt?: Receipt;
@@ -217,6 +219,19 @@ export function createGenerationSettlement(
 					runId: run.id,
 				});
 				if (!result.handover) {
+					if (result.imageAnswer) {
+						if (
+							result.imageAnswer.requestId !== result.receipt?.requestId ||
+							result.imageAnswer.attemptId !== result.receipt.attemptId
+						)
+							throw new Error("image_answer_receipt_mismatch");
+						conversation.recordImageAnswerInTransaction(
+							tx,
+							messageId,
+							result.imageAnswer,
+							clock(),
+						);
+					}
 					said(deps, tx, run, messageId, text, result, input.notice);
 					linkAnswerResources(deps, tx, run, input, messageId);
 				}

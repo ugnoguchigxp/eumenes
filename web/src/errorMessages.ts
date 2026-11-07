@@ -120,6 +120,8 @@ const messages: Record<string, string> = {
 	chat_input_contract_unavailable:
 		"画像入力の接続仕様を確認できなかったため送信を止めました。接続を再確認してください。",
 	attachment_not_found: "添付画像が見つかりません。もう一度追加してください。",
+	image_content_unavailable:
+		"保存画像を取得できませんでした。画像一覧を更新して選び直してください。",
 	attachment_source_unavailable:
 		"会話の画像を取得できません。画像を除いた要求は送信していません。",
 	attachment_capacity:

@@ -1,5 +1,6 @@
 import { readAttribution } from "../repository/attribution";
 import { historyFingerprint } from "./history-fingerprint";
+import { imageReferences } from "./image-context";
 import { scanHistory, type HistoryPosition } from "./history-scan";
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
@@ -35,6 +36,16 @@ type Session = {
 	scope: HistoryScope;
 };
 type Position = HistoryPosition;
+type HistoryEvidenceView = {
+	session: string;
+	messageId: string;
+	revision: string;
+	digest: string;
+	viewDigest: string;
+	imagesDigest: string;
+	start: number;
+	end: number;
+};
 /** Only identities and positions are retained. All excerpts come from the current conversation source. */
 export function createHistory(now: () => number, outbox: OutboxOptions) {
 	const sessions = new Map<string, Session>();
@@ -43,18 +54,7 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 		string,
 		{ session: string; messageId: string; offset: number }
 	>();
-	const views = new Map<
-		string,
-		{
-			session: string;
-			messageId: string;
-			revision: string;
-			digest: string;
-			viewDigest: string;
-			start: number;
-			end: number;
-		}
-	>();
+	const views = new Map<string, HistoryEvidenceView>();
 	function prune() {
 		for (const [id, s] of sessions) if (s.expires <= now()) sessions.delete(id);
 		for (const map of [cursors, messages, views])
@@ -89,6 +89,7 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 	): HistoryView {
 		const s = sessions.get(sessionId)!;
 		const text = historyChunk(db, s.owner.conversationId, row.id, start, count);
+		const images = imageReferences(db, row.id);
 		const identity = historyIdentity(db, row.id);
 		const end = start + Array.from(text).length;
 		if (views.size >= 4096 || messages.size >= 4096)
@@ -105,6 +106,7 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 			messageId: row.id,
 			...identity,
 			viewDigest: sha(text),
+			imagesDigest: sha(images),
 			start,
 			end,
 		};
@@ -123,6 +125,7 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 			start,
 			end,
 			text,
+			...(images.length ? { imageReferences: images } : {}),
 			truncated: start > 0 || end < row.size,
 			nextCursor:
 				end < row.size
@@ -304,7 +307,8 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 							v.start,
 							v.end - v.start,
 						),
-					) === v.viewDigest
+					) === v.viewDigest &&
+					sha(imageReferences(db, e.messageId)) === v.imagesDigest
 				);
 			});
 		} catch {

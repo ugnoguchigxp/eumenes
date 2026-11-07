@@ -9,6 +9,7 @@ import {
 	isExecutionActive,
 	type ExecutionRow,
 } from "../repository/executions";
+import { singleExecution } from "./execution-single";
 import { executionAccess } from "./execution-access";
 import { executionChild } from "./execution-child";
 import { executionCommands } from "./execution-commands";
@@ -252,6 +253,7 @@ export function createTaskExecutions(deps: Omit<ExecutionContext, "port">) {
 			return pipeline.startPipelineInTransaction(db, input);
 		},
 		...executionCommands(ctx, ops, available),
+		...singleExecution(ctx, ops),
 		...executionAccess(ctx, ops, table, () => !!port),
 		reconcile,
 		async recover() {

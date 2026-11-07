@@ -8,6 +8,7 @@ import {
 	type Harness,
 } from "./generation.fixture";
 import { saveItem } from "./memory-seed";
+import sharp from "sharp";
 
 /**
  * The conversation's read tools (spec conversation-read-tools-design 2026-10-31): the talk turn may call one, and a
@@ -40,6 +41,53 @@ const READ_HISTORY: ToolchainCard = {
 	redirects: [],
 	score: { rank: 1, ftsRank: null, similarity: null, fromHistory: false },
 };
+
+test("a history read after the recent window closes recovers image analysis as text and its exchange references", async () => {
+	h = await setup();
+	const image = await h.conversation.uploadAttachment(
+		"main",
+		crypto.randomUUID(),
+		new File(
+			[
+				await sharp({
+					create: { width: 2, height: 2, channels: 3, background: "red" },
+				})
+					.png()
+					.toBuffer(),
+			],
+			"history.png",
+			{ type: "image/png" },
+		),
+	);
+	await h.conversation.append({
+		id: "old-image",
+		role: "user",
+		conversationId: "main",
+		text: "図形を読んで",
+		attachments: [image],
+		runId: "old-vision",
+		createdAt: "2026-11-07T00:00:00Z",
+	});
+	await h.conversation.append({
+		id: "old-analysis",
+		role: "assistant",
+		conversationId: "main",
+		text: "赤い円が3個、青い四角が2個、文字はR7K4です。",
+		runId: "old-vision",
+		createdAt: "2026-11-07T00:00:01Z",
+	});
+	h.state.steps.push(
+		choice({ choice: "none" }),
+		{ calls: [{ name: "read_history", args: { query: "R7K4" } }] },
+		{ text: "記録では赤い円が3個でした。" },
+	);
+	await h.say("前に画像で何を読み取りましたか");
+	const result = toolResult(h.state.calls.at(-1)!)!;
+	expect(result).toContain("赤い円が3個");
+	expect(result).toContain(image.id);
+	expect(result).toContain("old-image");
+	expect(result).not.toMatch(/base64|data:image/);
+});
 
 test("the talk turn reads memory with its tool, and a second call with no tool tells what was read", async () => {
 	h = await setup({ memory: true });

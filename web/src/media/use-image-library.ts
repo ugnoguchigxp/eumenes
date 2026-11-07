@@ -24,6 +24,23 @@ export function useImageLibrary(
 export const imageContentUrl = (id: string) =>
 	`/api/images/${encodeURIComponent(id)}/content`;
 
+type Library = Awaited<ReturnType<EumenesClient["imageLibrary"]>>;
+
+/** Shown wherever the saved image list could not be read. */
+export const libraryLoadError =
+	"保存画像を取得できませんでした。一覧を更新してください。";
+
+/** Newest first, as picker cards; the library has no titles, so date and size name them. */
+export const libraryPickerItems = (data: Library | undefined) =>
+	(data?.images ?? [])
+		.slice()
+		.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+		.map((image) => ({
+			id: image.id,
+			title: `画像 ${image.createdAt.slice(0, 10)}（${image.width}×${image.height}）`,
+			thumbnailUrl: imageContentUrl(image.id),
+		}));
+
 /** Reconcile a confirmed deletion with the authenticated library shared by all screens. */
 export async function deleteLibraryImage(
 	cache: QueryClient,
@@ -31,7 +48,6 @@ export async function deleteLibraryImage(
 	id: string,
 ) {
 	const key = imageLibraryKey(client);
-	type Library = Awaited<ReturnType<EumenesClient["imageLibrary"]>>;
 	if (
 		!cache.getQueryData<Library>(key)?.images.some((image) => image.id === id)
 	)

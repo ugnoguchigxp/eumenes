@@ -16,7 +16,7 @@ const derive = (purpose: string) =>
  * router is on, made again when the profile or the LARM origin changes, closed at the end; never the intent judge's
  * port.
  */
-function harness(router: Partial<Settings["router"]>) {
+function harness(router: Partial<Settings["router"]>, started = true) {
 	let saved = defaults({});
 	saved.larm.baseUrl = "http://127.0.0.1:9810";
 	saved.router = { ...saved.router, ...router };
@@ -54,6 +54,8 @@ function harness(router: Partial<Settings["router"]>) {
 			},
 		},
 	});
+	// The server starts the router once it listens.
+	if (started) judge.start();
 	const change = (next: (s: Settings) => void) => {
 		saved = structuredClone(saved);
 		next(saved);
@@ -82,6 +84,17 @@ test("a router with a saved profile is connected ahead of the first call, once, 
 	await h.judge.close();
 	expect(h.made[0]!.closed).toBe(true);
 	await expect(h.judge.route(input, signal())).rejects.toThrow("router_closed");
+});
+
+test("before the server listens no LARM connection is made; start makes it", async () => {
+	const h = harness({ profile: "router-a" }, false);
+	h.change((s) => {
+		s.router.accept = 0.7;
+	});
+	expect(h.made).toEqual([]);
+	h.judge.start();
+	expect(h.made).toEqual([{ profile: "router-a", closed: false }]);
+	await h.judge.close();
 });
 
 test("without a profile no port is made and the caller falls back", async () => {

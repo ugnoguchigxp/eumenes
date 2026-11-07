@@ -1,3 +1,4 @@
+import { taskAutonomy } from "./task-autonomy";
 import type { ToolchainRoutingPort } from "../../domains/dialogue";
 import type { DialogueService } from "../../domains/dialogue";
 import type {
@@ -35,7 +36,7 @@ export function taskExecutionDispatch(
 			if (kind === "command")
 				return {
 					kind,
-					input: dialogue.executionCommands.prepareInTransaction(db, child),
+					input: dialogue.executionCommands.prepareInTransaction(db, child, child.source.origin === "autonomous" ? host.registry && host.routing && taskAutonomy(host, context)(db, child.chainRevisionId).operations : undefined),
 				} as const;
 			if (kind === "instant")
 				return {
@@ -170,6 +171,10 @@ export function taskExecutionDispatch(
 					);
 				}
 				const command = translated.invocation;
+				if (child.source.origin === "autonomous") {
+					const policy = host.registry.get(command.adapterRef)?.describe().operations.get(command.operationName);
+					if (policy?.effect !== "read" && policy?.autonomy !== "create") throw new Error("agency_approval_required");
+				}
 				const actionCapability = capabilities.prepareBoundInTransaction(
 					db,
 					{

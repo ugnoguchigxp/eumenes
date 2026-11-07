@@ -75,15 +75,17 @@ export function createResultCollector(input: {
 					if (
 						!deps.state!.saveInTransaction(
 							db,
-							persistMemory(deps, db, {
-								conversationId: c.id,
-								epoch: c.epoch,
-								scope: c.scope,
-								snapshot: c.runtime.snapshot(),
-								idle: c.planner.checkpoint(),
-								settingsDigest: digest(),
-								sourceRefs: snapshotRefs(c.runtime),
-							}),
+							persistMemory(deps, db, [
+								{
+									conversationId: c.id,
+									epoch: c.epoch,
+									scope: c.scope,
+									snapshot: c.runtime.snapshot(),
+									idle: c.planner.checkpoint(),
+									settingsDigest: digest(),
+									sourceRefs: snapshotRefs(c.runtime),
+								},
+							])[0]!,
 							nowMs(),
 						)
 					)

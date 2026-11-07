@@ -16,7 +16,7 @@ export type AdapterOrigin =
 			owner: Owner;
 			runId: string;
 			conversationId: string;
-			messageId: string;
+			messageId: string | null;
 			execution: import("./task-execution").ChildExecution;
 	  }
 	| {
@@ -236,7 +236,7 @@ export interface DomainAdapter {
 		/** Operation name → its input schema ref and whether it changes state. */
 		operations: ReadonlyMap<
 			string,
-			{ inputSchemaRef: string; effect: "read" | "write" }
+			{ inputSchemaRef: string; effect: "read" | "write"; /** Independent new output only; never modify, publish or send. */ autonomy?: "create" }
 		>;
 		/** Registered read queries (`query:timers.current@1`) for OpenUI sources. */
 		queries: ReadonlySet<string>;

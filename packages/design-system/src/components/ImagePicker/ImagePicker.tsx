@@ -6,7 +6,7 @@ import { Modal } from "../Modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../Tabs";
 import { ImageGrid, type ImageGridItem } from "./ImageGrid";
 
-export type ImagePickerProps = {
+type ImagePickerBaseProps = {
 	images: readonly ImageGridItem[];
 	/** Only browse saved images; omit upload and external providers. */
 	savedOnly?: boolean;
@@ -15,7 +15,6 @@ export type ImagePickerProps = {
 	error?: string;
 	pending?: boolean;
 	onRefresh?: () => void;
-	onConfirm: (id: string) => void;
 	onCancel: () => void;
 	onDelete?: (id: string) => Promise<boolean>;
 	renderGooglePhotos?: (onSelect: (image: ImageGridItem) => void) => ReactNode;
@@ -25,27 +24,56 @@ export type ImagePickerProps = {
 		signal: AbortSignal,
 	) => Promise<ImagePickerUploadResult>;
 };
+export type ImagePickerProps = ImagePickerBaseProps &
+	(
+		| { multiple?: false; onConfirm: (id: string) => void }
+		| {
+				/** Toggle up to `maxSelected` images; confirm returns them in the order chosen. */
+				multiple: true;
+				maxSelected: number;
+				onConfirm: (ids: string[]) => void;
+		  }
+	);
 export type ImagePickerUploadResult =
 	| { status: "succeeded"; image: ImageGridItem }
 	| { status: "pending"; message: string }
 	| { status: "failed"; message: string; canRetry?: boolean };
 
 /** Draft selection stays here until confirmed; browsing never starts generation. */
-export function ImagePicker({
-	images,
-	selectedId,
-	loading,
-	error,
-	pending,
-	onRefresh,
-	onConfirm,
-	onCancel,
-	onDelete,
-	onUpload,
-	savedOnly = false,
-	renderGooglePhotos,
-}: ImagePickerProps) {
-	const [draftId, setDraftId] = useState(selectedId);
+export function ImagePicker(props: ImagePickerProps) {
+	const {
+		images,
+		selectedId,
+		loading,
+		error,
+		pending,
+		onRefresh,
+		onCancel,
+		onDelete,
+		onUpload,
+		savedOnly = false,
+		renderGooglePhotos,
+	} = props;
+	const max = props.multiple ? props.maxSelected : 1;
+	const [draftIds, setDraftIds] = useState<string[]>(
+		selectedId ? [selectedId] : [],
+	);
+	/**
+	 * Adds a choice; a single picker replaces it, a full multiple picker keeps its choices.
+	 * Choices no longer offered (refreshed away or disabled) do not count toward the limit.
+	 */
+	const pick = (id: string, deselect = false) =>
+		setDraftIds((ids) => {
+			if (!props.multiple) return [id];
+			// Decided on the latest choices, so quick repeated clicks toggle correctly.
+			if (deselect && ids.includes(id))
+				return ids.filter((value) => value !== id);
+			const kept = ids.filter((value) =>
+				candidates.some((image) => image.id === value && !image.disabledReason),
+			);
+			return kept.includes(id) || kept.length >= max ? kept : [...kept, id];
+		});
+	const toggle = (id: string) => pick(id, true);
 	const [previewId, setPreviewId] = useState<string>();
 	const [deleteId, setDeleteId] = useState<string>();
 	const [deleting, setDeleting] = useState(false);
@@ -78,8 +106,10 @@ export function ImagePicker({
 		uploaded && !images.some((i) => i.id === uploaded.id)
 			? [uploaded, ...images]
 			: images;
-	const selected = candidates.find(
-		(image) => image.id === draftId && !image.disabledReason,
+	const selected = draftIds.flatMap(
+		(id) =>
+			candidates.find((image) => image.id === id && !image.disabledReason) ??
+			[],
 	);
 	const preview = images.find((image) => image.id === previewId);
 	const deleteTarget = candidates.find((image) => image.id === deleteId);
@@ -98,7 +128,7 @@ export function ImagePicker({
 			setUploadResult(result);
 			if (result.status === "succeeded") {
 				setUploaded(result.image);
-				setDraftId(result.image.id);
+				pick(result.image.id);
 				setFile(undefined);
 				onRefresh?.();
 			}
@@ -171,7 +201,7 @@ export function ImagePicker({
 										value: picked,
 										requestId: crypto.randomUUID(),
 									});
-									setDraftId(undefined);
+									setDraftIds([]);
 								}}
 							/>
 						</div>
@@ -272,12 +302,12 @@ export function ImagePicker({
 							mode="select"
 							key={gridRevision}
 							images={candidates}
-							selectedId={selected?.id}
+							selectedIds={selected.map((image) => image.id)}
 							disabled={pending}
 							onSelect={(id) => {
 								cancelUpload();
 								setUploadResult(undefined);
-								setDraftId(id);
+								toggle(id);
 								setFile(undefined);
 							}}
 							onPreview={setPreviewId}
@@ -321,7 +351,7 @@ export function ImagePicker({
 									setFile(undefined);
 									setUploadResult(undefined);
 									setUploaded(image);
-									setDraftId(image.id);
+									pick(image.id);
 									setProvider("larm");
 									onRefresh?.();
 								}}
@@ -336,19 +366,26 @@ export function ImagePicker({
 			</div>
 			<footer className="image-picker-footer">
 				<span aria-live="polite">
-					{selected ? "1枚選択中" : "画像を選んでください"}
+					{selected.length
+						? `${selected.length}枚選択中`
+						: "画像を選んでください"}
+					{props.multiple && `（最大${max}枚）`}
 				</span>
 				<Button type="button" variant="outline" onClick={leave}>
 					キャンセル
 				</Button>
 				<Button
 					type="button"
-					disabled={!selected || uploading || pending || loading || !!error}
+					disabled={
+						!selected.length || uploading || pending || loading || !!error
+					}
 					onClick={() => {
-						if (selected) onConfirm(selected.id);
+						if (props.multiple)
+							props.onConfirm(selected.map((image) => image.id));
+						else if (selected[0]) props.onConfirm(selected[0].id);
 					}}
 				>
-					この画像を使う
+					{props.multiple ? "選んだ画像を使う" : "この画像を使う"}
 				</Button>
 			</footer>
 			<Modal
@@ -380,9 +417,7 @@ export function ImagePicker({
 							setDeleting(true);
 							try {
 								if (await onDelete(id)) {
-									setDraftId((currentId) =>
-										currentId === id ? undefined : currentId,
-									);
+									setDraftIds((ids) => ids.filter((value) => value !== id));
 									setUploaded((currentImage) =>
 										currentImage?.id === id ? undefined : currentImage,
 									);

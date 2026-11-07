@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-07",
+  "decision": "hold-production-adoption",
+  "configuration": "official flat list plus MarkdownKit remark plugins; no custom conversion rules",
+  "markdown": {
+    "total": 27,
+    "byteEqual": 7,
+    "astEqual": 15,
+    "coreFailures": [
+      "loose-list",
+      "gfm-table-align",
+      "code-fence",
+      "inline-links",
+      "reference-links",
+      "soft-break",
+      "soft-break-after-link",
+      "soft-break-after-mark",
+      "soft-break-after-code"
+    ]
+  },
+  "browser": {
+    "pass": 10,
+    "fail": [
+      "imported-trailing-space-survives-following-ime-edit",
+      "full-toolbar-markdown-format-retention"
+    ],
+    "pageErrors": 0,
+    "version": "149.0.7827.55"
+  },
+  "sharedAndStoreTests": {
+    "pass": 19,
+    "fail": 0,
+    "assertions": 93
+  },
+  "typecheck": {
+    "engine": "bun check",
+    "files": 257,
+    "errors": 0
+  },
+  "limitations": [
+    "OS IME not tested",
+    "real LLM collaborator handoff not tested",
+    "product OpenUI/API/auth integration not implemented"
+  ],
+  "hashes": {
+    "lab.tsx": "dbbed88fa92e8abe1a798b0de1978212c51f12d3c1945f8e0842bec27aa1f8df",
+    "fixtures.ts": "8956b6985d0f3d0b1afc13aea4b1d3cb8ccde9492e34547e75ee46759888a126",
+    "store.test.ts": "de8c84cd41ab5e30209ca9988284f0214bd27fbe36c0e2d0333ae96fb3d4db70",
+    "browser.ts": "6ff380e7f9290c43315a0b4d55d058cce8e93dd9b0f4ab73d840188b50b5a3ce",
+    "preservation.ts": "d9cf323e7a17fad7960d5a6cc4f75bae87a66237ddee67876d8cfec6a4bff2b8",
+    "package-lock.json": "26054fb18214f01117787ee3882a3c9aa7dffca6dac2cfd9c5ecfc6132fe3cd0",
+    "package.json": "1ac0e2676a2fd689d8fa4adfbf89a09b1b43d85db25e4f66e0a77b74c4a43b66",
+    "tsconfig.json": "28331611a925fb506914e1037efb01ab9e5aea1b23fb81e1e620950a83c90b9d",
+    "plate.ts": "84aae8f99b68c7db3fae25052d2a1ad65daba9e2b91c7b89b7ccf7ee866e6bd6",
+    "store.ts": "5d86797134a7d1d00a32f806961f30e89a80ed882b6bfb5b5a730e1193d518d9"
+  }
+}

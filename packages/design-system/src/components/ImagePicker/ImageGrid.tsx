@@ -17,6 +17,7 @@ export function ImageGrid<T extends ImageGridItem>({
 	images,
 	mode = "select",
 	selectedId,
+	selectedIds,
 	disabled,
 	onSelect,
 	onPreview,
@@ -28,6 +29,8 @@ export function ImageGrid<T extends ImageGridItem>({
 	images: readonly T[];
 	mode?: "view" | "select";
 	selectedId?: string;
+	/** Several chosen images; takes the place of `selectedId` for multi-selection. */
+	selectedIds?: readonly string[];
 	disabled?: boolean;
 	onSelect: (id: string) => void;
 	onPreview?: (id: string) => void;
@@ -38,10 +41,13 @@ export function ImageGrid<T extends ImageGridItem>({
 	classNames?: Partial<Record<"grid" | "card" | "select" | "caption", string>>;
 }) {
 	const [failed, setFailed] = useState<Record<string, string>>({});
+	const chosen = selectedIds ?? (selectedId ? [selectedId] : []);
+	const isSelected = (id: string) => chosen.includes(id);
 	// Reaches the furthest selected image so it is never hidden behind "load more".
-	const selectedEnd = selectedId
-		? images.findIndex((image) => image.id === selectedId) + 1
-		: 0;
+	const selectedEnd = images.reduce(
+		(end, image, index) => (isSelected(image.id) ? index + 1 : end),
+		0,
+	);
 	const firstPage = Math.max(1, Math.ceil(selectedEnd / pageSize)) * pageSize;
 	const [paging, setPaging] = useState({
 		total: images.length,
@@ -85,7 +91,7 @@ export function ImageGrid<T extends ImageGridItem>({
 						className={cn("image-grid-card", classNames?.card)}
 						key={image.id}
 						data-mode={mode}
-						data-selected={mode === "select" && image.id === selectedId}
+						data-selected={mode === "select" && isSelected(image.id)}
 						title={
 							image.disabledReason
 								? `${image.title}：${image.disabledReason}`
@@ -107,7 +113,7 @@ export function ImageGrid<T extends ImageGridItem>({
 								}
 								aria-pressed={
 									mode === "select" && !onPreview
-										? image.id === selectedId
+										? isSelected(image.id)
 										: undefined
 								}
 								onClick={() =>
@@ -139,9 +145,9 @@ export function ImageGrid<T extends ImageGridItem>({
 								<button
 									type="button"
 									className="image-grid-check"
-									data-selected={image.id === selectedId}
+									data-selected={isSelected(image.id)}
 									aria-label={selectLabel(image)}
-									aria-pressed={image.id === selectedId}
+									aria-pressed={isSelected(image.id)}
 									disabled={
 										disabled ||
 										!!image.disabledReason ||
@@ -150,16 +156,16 @@ export function ImageGrid<T extends ImageGridItem>({
 									}
 									onClick={() => onSelect(image.id)}
 								>
-									{image.id === selectedId ? "✓" : ""}
+									{isSelected(image.id) ? "✓" : ""}
 								</button>
 							)}
 							{mode === "select" && !onPreview && (
 								<span
 									className="image-grid-check"
-									data-selected={image.id === selectedId}
+									data-selected={isSelected(image.id)}
 									aria-hidden="true"
 								>
-									{image.id === selectedId ? "✓" : ""}
+									{isSelected(image.id) ? "✓" : ""}
 								</span>
 							)}
 						</div>

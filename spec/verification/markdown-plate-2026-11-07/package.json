@@ -1,0 +1,26 @@
+{
+  "name": "eumenes-plate-adoption-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "platejs": "53.5.2",
+    "@platejs/markdown": "53.3.18",
+    "@platejs/basic-nodes": "53.0.0",
+    "@platejs/list-classic": "53.0.0",
+    "@platejs/list": "53.3.13",
+    "@platejs/indent": "53.0.0",
+    "@platejs/link": "53.3.5",
+    "@platejs/code-block": "53.0.0",
+    "@platejs/table": "53.0.9",
+    "@platejs/media": "53.1.4",
+    "@platejs/footnote": "53.0.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "remark-stringify": "11.0.0",
+    "remark-frontmatter": "5.0.0",
+    "remark-math": "6.0.0",
+    "unified": "11.0.5"
+  }
+}

@@ -248,7 +248,9 @@ export function createExecutionStore(ctx: ExecutionContext) {
 						? "interactive_handoff"
 						: "operation_indeterminate"),
 			);
-		if (state.pipeline && advance) advance(db, row, state, result);
+		if (state.single)
+			finish(db, row, state, result.state === "completed" ? "completed" : result.state === "cancelled" ? "cancelled" : result.state === "failed" ? "failed" : "partial", { summary: result.summary, fulfilled: result.state === "completed" ? [row.request] : [], missing: result.state === "completed" ? [] : [result.code ?? result.state], refs: [reference.ref], ...(result.code ? { code: result.code } : {}) });
+		else if (state.pipeline && advance) advance(db, row, state, result);
 		else enqueue(db, row, state);
 	}
 	function startChild(
@@ -312,6 +314,7 @@ function followsControl(
 	db: Database,
 	state: ParentState,
 ) {
+	if (state.single) return !!ctx.port().cardInTransaction(db, state.single.chainRevisionId);
 	return state.pipeline
 		? state.pipeline.contractVersion === "p0-3" &&
 				ctx

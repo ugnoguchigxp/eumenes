@@ -20,6 +20,29 @@ export type BlockedMessages = Pick<
 type HistoryMessage = ReturnType<
 	ConversationService["historyReadInTransaction"]
 >["messages"][number];
+/** A forgotten message and its image links never reach the researcher. */
+function visibleHistoryMessages(
+	db: Database,
+	messages: HistoryMessage[],
+	blocked?: BlockedMessages,
+): HistoryMessage[] {
+	const hidden =
+		blocked?.blockedMessageIdsInTransaction(
+			db,
+			messages.flatMap((m) => [
+				m.messageId,
+				...(m.imageReferences ?? []).map((ref) => ref.messageId),
+			]),
+		) ?? new Set<string>();
+	return messages
+		.filter((m) => !hidden.has(m.messageId))
+		.map((m) => ({
+			...m,
+			imageReferences: m.imageReferences?.filter(
+				(ref) => !hidden.has(ref.messageId),
+			),
+		}));
+}
 /** A stored conversation message as the evidence source a research report may cite. */
 function conversationSource(m: HistoryMessage, scopeRef: string): Source {
 	return {
@@ -29,6 +52,9 @@ function conversationSource(m: HistoryMessage, scopeRef: string): Source {
 		messageId: m.messageId,
 		conversationId: m.conversationId,
 		speaker: m.speaker,
+		...(m.imageReferences?.length
+			? { imageReferences: m.imageReferences }
+			: {}),
 		...(m.attribution ? { attribution: m.attribution } : {}),
 		createdAt: m.createdAt,
 		revision: m.revision,
@@ -177,12 +203,7 @@ export function createReadPorts(
 			// A forgotten message stays in the conversation but never reaches the researcher.
 			const found =
 				"candidates" in result ? result.candidates : result.messages;
-			const hidden =
-				blocked?.blockedMessageIdsInTransaction(
-					db,
-					found.map((m) => m.messageId),
-				) ?? new Set<string>();
-			const messages = found.filter((m) => !hidden.has(m.messageId));
+			const messages = visibleHistoryMessages(db, found, blocked);
 			const readings = messages.map((m) =>
 				conversationSource(m, result.scope.scopeRef),
 			);
@@ -295,7 +316,10 @@ export function createReadPorts(
 					history.length &&
 					blocked?.blockedMessageIdsInTransaction(
 						db,
-						history.map((s) => s.messageId!),
+						history.flatMap((s) => [
+							s.messageId!,
+							...(s.imageReferences ?? []).map((ref) => ref.messageId),
+						]),
 					).size
 				)
 					return false;

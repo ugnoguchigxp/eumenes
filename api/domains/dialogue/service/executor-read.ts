@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { imageReferenceText } from "../../conversation";
 import type { z } from "zod";
 import {
 	isReadToolName,
@@ -204,9 +205,8 @@ function historyFound(
 			);
 		const lines = candidates
 			.filter((view) => !blocked.has(view.messageId))
-			.map(
-				(view) =>
-					`- ${when(view.createdAt)} ${view.speaker === "user" ? "利用者" : "Eumenes"}: ${clip(view.text, LIMITS.textChars)}`,
+			.map((view) =>
+				`- ${when(view.createdAt)} ${view.speaker === "user" ? "利用者" : "Eumenes"}: ${clip(view.text, LIMITS.textChars)} ${imageReferenceText((view.imageReferences ?? []).filter((ref) => !blocked.has(ref.messageId)))}`.trimEnd(),
 			);
 		return {
 			lines: lines.slice(0, LIMITS.history),

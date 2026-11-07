@@ -69,11 +69,15 @@ export function createRouterJudge(deps: {
 		}
 		return held.port;
 	}
-	/** A configured router's connection is made ahead of the first utterance, so it does not spend that turn's bound. */
+	/**
+	 * A configured router's connection is made ahead of the first utterance, so it does not spend that turn's bound.
+	 * It waits for `start` (after the HTTP server listens): the server's startup never waits behind LARM.
+	 */
+	let started = false;
 	function warm() {
 		const s = deps.settings.get();
 		const key = keyOf(s);
-		if (key && !closed)
+		if (key && started && !closed)
 			void port(s, key)
 				.connect()
 				.catch(() => {});
@@ -82,7 +86,6 @@ export function createRouterJudge(deps: {
 		if (held && keyOf(deps.settings.get()) !== held.key) drop();
 		warm();
 	});
-	warm();
 	/** The held port of the saved settings. */
 	function ready() {
 		if (closed) throw new Error("router_closed");
@@ -93,6 +96,11 @@ export function createRouterJudge(deps: {
 		return port(s, key);
 	}
 	return {
+		/** Called once the HTTP server listens: the saved router's connection is made now and again on changes. */
+		start() {
+			started = true;
+			warm();
+		},
 		/** One routing with the saved settings; an unconfigured router is an error the caller falls back from. */
 		async route(input: RouteInput, signal: AbortSignal): Promise<RouteAnswer> {
 			const route = ready().route;

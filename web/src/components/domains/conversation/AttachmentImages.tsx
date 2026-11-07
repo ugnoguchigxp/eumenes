@@ -41,6 +41,7 @@ function AttachmentImage({
 				<Button
 					type="button"
 					variant="ghost"
+					className="message-image-trigger"
 					aria-label={`${attachment.name || "添付画像"}を拡大`}
 				>
 					<img src={url} alt={attachment.name || "添付画像"} />

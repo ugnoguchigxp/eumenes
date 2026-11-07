@@ -110,7 +110,7 @@ export function model(ctx: Context, id: string, epoch: number): ResearchModel {
 						outputSchema: control.outputSchema,
 						refs: {
 							messageIds: [
-								state.source.messageId,
+								...(state.source.messageId ? [state.source.messageId] : []),
 								...(state.source.amendments ?? []).map((x) => x.messageId),
 								...(state.source.responses ?? []).map((x) => x.messageId),
 								...state.references

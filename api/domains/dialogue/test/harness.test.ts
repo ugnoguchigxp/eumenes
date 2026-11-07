@@ -86,6 +86,7 @@ test("the copy filter leaves out an agent's utterance that copies the system par
 	});
 	const deps = {
 		conversation: {
+			imageReferencesInTransaction: () => [],
 			input: {
 				cutInTransaction: () => null,
 				utterancesAfterInTransaction: () => [

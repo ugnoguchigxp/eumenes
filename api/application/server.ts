@@ -104,6 +104,8 @@ async function main() {
 		});
 		if (stopping || !server) return;
 		log.info("server.listening", { port: (server as { port: number }).port });
+		// LARM connections begin only once the server listens; startup never waits behind them.
+		services.inference.startRouter();
 		// Probe once so the UI reports a real result before the first message.
 		void services.inference.connect().then(
 			() =>

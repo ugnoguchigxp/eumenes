@@ -941,9 +941,19 @@ select:focus-visible {
 	color: var(--muted-foreground);
 	overflow-wrap: anywhere;
 }
+.message-image-trigger {
+	flex-shrink: 0;
+	align-self: flex-start;
+	height: auto;
+	min-height: 0;
+	padding: 0;
+}
 .message-images img {
-	width: 120px;
-	height: 120px;
+	display: block;
+	width: auto;
+	height: auto;
+	max-width: 120px;
+	max-height: 120px;
 	object-fit: contain;
 	background: white;
 	border-radius: 8px;

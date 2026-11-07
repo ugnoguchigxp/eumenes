@@ -1,0 +1,3090 @@
+[
+  {
+    "id": "headings-paragraphs",
+    "group": "core",
+    "byteEqual": true,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "# 見出し\n\n本文です。\n\n## 次の節\n\n続きです。\n",
+    "output": "# 見出し\n\n本文です。\n\n## 次の節\n\n続きです。\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "見出し"
+            }
+          ],
+          "depth": 1,
+          "type": "heading"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "本文です。"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "次の節"
+            }
+          ],
+          "depth": 2,
+          "type": "heading"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "続きです。"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "見出し"
+            }
+          ],
+          "depth": 1,
+          "type": "heading"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "本文です。"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "次の節"
+            }
+          ],
+          "depth": 2,
+          "type": "heading"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "続きです。"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "見出し"
+          }
+        ],
+        "type": "h1",
+        "id": "-pmPnEMfrp"
+      },
+      {
+        "children": [
+          {
+            "text": "本文です。"
+          }
+        ],
+        "type": "p",
+        "id": "92rsZu-ZDw"
+      },
+      {
+        "children": [
+          {
+            "text": "次の節"
+          }
+        ],
+        "type": "h2",
+        "id": "pNBDzDJjRq"
+      },
+      {
+        "children": [
+          {
+            "text": "続きです。"
+          }
+        ],
+        "type": "p",
+        "id": "ajDS-ymzqh"
+      }
+    ]
+  },
+  {
+    "id": "inline-marks",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "**太字**と*斜体*、~~取消~~、`code`。\n",
+    "output": "**太字**&#x3068;_&#x659C;体_、~~取消~~、`code`。\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "太字"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "type": "text",
+              "value": "と"
+            },
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "斜体"
+                }
+              ],
+              "type": "emphasis"
+            },
+            {
+              "type": "text",
+              "value": "、"
+            },
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "取消"
+                }
+              ],
+              "type": "delete"
+            },
+            {
+              "type": "text",
+              "value": "、"
+            },
+            {
+              "type": "inlineCode",
+              "value": "code"
+            },
+            {
+              "type": "text",
+              "value": "。"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "太字"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "type": "text",
+              "value": "と"
+            },
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "斜体"
+                }
+              ],
+              "type": "emphasis"
+            },
+            {
+              "type": "text",
+              "value": "、"
+            },
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "取消"
+                }
+              ],
+              "type": "delete"
+            },
+            {
+              "type": "text",
+              "value": "、"
+            },
+            {
+              "type": "inlineCode",
+              "value": "code"
+            },
+            {
+              "type": "text",
+              "value": "。"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "bold": true,
+            "text": "太字"
+          },
+          {
+            "text": "と"
+          },
+          {
+            "italic": true,
+            "text": "斜体"
+          },
+          {
+            "text": "、"
+          },
+          {
+            "strikethrough": true,
+            "text": "取消"
+          },
+          {
+            "text": "、"
+          },
+          {
+            "code": true,
+            "text": "code"
+          },
+          {
+            "text": "。"
+          }
+        ],
+        "type": "p",
+        "id": "NEaoYAX9DK"
+      }
+    ]
+  },
+  {
+    "id": "nested-lists",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "- 親\n  - 子\n    - 孫\n- 次\n",
+    "output": "* 親\n  * 子\n    * 孫\n* 次\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "親"
+                    }
+                  ],
+                  "type": "paragraph"
+                },
+                {
+                  "children": [
+                    {
+                      "checked": null,
+                      "children": [
+                        {
+                          "children": [
+                            {
+                              "type": "text",
+                              "value": "子"
+                            }
+                          ],
+                          "type": "paragraph"
+                        },
+                        {
+                          "children": [
+                            {
+                              "checked": null,
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "value": "孫"
+                                    }
+                                  ],
+                                  "type": "paragraph"
+                                }
+                              ],
+                              "spread": false,
+                              "type": "listItem"
+                            }
+                          ],
+                          "ordered": false,
+                          "spread": false,
+                          "start": null,
+                          "type": "list"
+                        }
+                      ],
+                      "spread": false,
+                      "type": "listItem"
+                    }
+                  ],
+                  "ordered": false,
+                  "spread": false,
+                  "start": null,
+                  "type": "list"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            },
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "次"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            }
+          ],
+          "ordered": false,
+          "spread": false,
+          "start": null,
+          "type": "list"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "親"
+                    }
+                  ],
+                  "type": "paragraph"
+                },
+                {
+                  "children": [
+                    {
+                      "checked": null,
+                      "children": [
+                        {
+                          "children": [
+                            {
+                              "type": "text",
+                              "value": "子"
+                            }
+                          ],
+                          "type": "paragraph"
+                        },
+                        {
+                          "children": [
+                            {
+                              "checked": null,
+                              "children": [
+                                {
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "value": "孫"
+                                    }
+                                  ],
+                                  "type": "paragraph"
+                                }
+                              ],
+                              "spread": false,
+                              "type": "listItem"
+                            }
+                          ],
+                          "ordered": false,
+                          "spread": false,
+                          "start": null,
+                          "type": "list"
+                        }
+                      ],
+                      "spread": false,
+                      "type": "listItem"
+                    }
+                  ],
+                  "ordered": false,
+                  "spread": false,
+                  "start": null,
+                  "type": "list"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            },
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "次"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            }
+          ],
+          "ordered": false,
+          "spread": false,
+          "start": null,
+          "type": "list"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "親"
+                  }
+                ],
+                "type": "lic",
+                "id": "YcL0X3K2c9"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "text": "子"
+                          }
+                        ],
+                        "type": "lic",
+                        "id": "GpQFUlc2ZR"
+                      },
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "text": "孫"
+                                  }
+                                ],
+                                "type": "lic",
+                                "id": "JHC-xpJd3s"
+                              }
+                            ],
+                            "type": "li",
+                            "id": "wyxZ0UydoK"
+                          }
+                        ],
+                        "type": "ul",
+                        "id": "29aU2s3H-W"
+                      }
+                    ],
+                    "type": "li",
+                    "id": "OxsHeNNkf4"
+                  }
+                ],
+                "type": "ul",
+                "id": "bn3QJKOmfP"
+              }
+            ],
+            "type": "li",
+            "id": "bEBMAc5sQA"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "次"
+                  }
+                ],
+                "type": "lic",
+                "id": "pin7QY39xc"
+              }
+            ],
+            "type": "li",
+            "id": "v6FnR9iH1A"
+          }
+        ],
+        "type": "ul",
+        "id": "ovp5hPFRGc"
+      }
+    ]
+  },
+  {
+    "id": "ordered-start",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "3. 三番目\n4. 四番目\n",
+    "output": "1. 三番目\n2. 四番目\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "三番目"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            },
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "四番目"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            }
+          ],
+          "ordered": true,
+          "spread": false,
+          "start": 3,
+          "type": "list"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "三番目"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            },
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "四番目"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            }
+          ],
+          "ordered": true,
+          "spread": false,
+          "start": 1,
+          "type": "list"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "三番目"
+                  }
+                ],
+                "type": "lic",
+                "id": "g3J0tIU_GI"
+              }
+            ],
+            "type": "li",
+            "id": "db-GWnnhsl"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "四番目"
+                  }
+                ],
+                "type": "lic",
+                "id": "vlRqIANteV"
+              }
+            ],
+            "type": "li",
+            "id": "uF1Z2-Gzrz"
+          }
+        ],
+        "type": "ol",
+        "id": "DNFkbkNKym"
+      }
+    ]
+  },
+  {
+    "id": "loose-list",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "- 一つ目\n\n  二つ目の段落\n\n- 次の項目\n",
+    "output": "* 一つ目\n\n  二つ目の段落\n* 次の項目\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "一つ目"
+                    }
+                  ],
+                  "type": "paragraph"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "二つ目の段落"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": true,
+              "type": "listItem"
+            },
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "次の項目"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            }
+          ],
+          "ordered": false,
+          "spread": true,
+          "start": null,
+          "type": "list"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "一つ目"
+                    }
+                  ],
+                  "type": "paragraph"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "二つ目の段落"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": true,
+              "type": "listItem"
+            },
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "次の項目"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            }
+          ],
+          "ordered": false,
+          "spread": false,
+          "start": null,
+          "type": "list"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "一つ目"
+                  }
+                ],
+                "type": "lic",
+                "id": "dVLJrgVcO9"
+              },
+              {
+                "children": [
+                  {
+                    "text": "二つ目の段落"
+                  }
+                ],
+                "type": "lic",
+                "id": "CG7hmmC2be"
+              }
+            ],
+            "type": "li",
+            "id": "g4RYgTcGc4"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "次の項目"
+                  }
+                ],
+                "type": "lic",
+                "id": "Ps4nBA1izU"
+              }
+            ],
+            "type": "li",
+            "id": "zk8oT2_hR2"
+          }
+        ],
+        "type": "ul",
+        "id": "hCXeaV71_h"
+      }
+    ]
+  },
+  {
+    "id": "task-list",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "- [ ] 未着手\n- [x] 完了\n",
+    "output": "* 未着手\n* 完了\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "checked": false,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "未着手"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            },
+            {
+              "checked": true,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "完了"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            }
+          ],
+          "ordered": false,
+          "spread": false,
+          "start": null,
+          "type": "list"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "未着手"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            },
+            {
+              "checked": null,
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "完了"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "spread": false,
+              "type": "listItem"
+            }
+          ],
+          "ordered": false,
+          "spread": false,
+          "start": null,
+          "type": "list"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "未着手"
+                  }
+                ],
+                "type": "lic",
+                "id": "ARCK2wsKxW"
+              }
+            ],
+            "type": "li",
+            "id": "-TLfTIxOLA"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "完了"
+                  }
+                ],
+                "type": "lic",
+                "id": "4SbfxmaTup"
+              }
+            ],
+            "type": "li",
+            "id": "c7oa9iITjf"
+          }
+        ],
+        "type": "ul",
+        "id": "oP_t3mRke7"
+      }
+    ]
+  },
+  {
+    "id": "nested-quote",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "> 引用\n>\n> - 引用内の箇条書き\n>\n> > 入れ子\n",
+    "output": "> 引用\n>\n> * 引用内の箇条書き\n>\n> > 入れ子\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "引用"
+                }
+              ],
+              "type": "paragraph"
+            },
+            {
+              "children": [
+                {
+                  "checked": null,
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "引用内の箇条書き"
+                        }
+                      ],
+                      "type": "paragraph"
+                    }
+                  ],
+                  "spread": false,
+                  "type": "listItem"
+                }
+              ],
+              "ordered": false,
+              "spread": true,
+              "start": null,
+              "type": "list"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "入れ子"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "type": "blockquote"
+            }
+          ],
+          "type": "blockquote"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "引用"
+                }
+              ],
+              "type": "paragraph"
+            },
+            {
+              "children": [
+                {
+                  "checked": null,
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "引用内の箇条書き"
+                        }
+                      ],
+                      "type": "paragraph"
+                    }
+                  ],
+                  "spread": false,
+                  "type": "listItem"
+                }
+              ],
+              "ordered": false,
+              "spread": true,
+              "start": null,
+              "type": "list"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "入れ子"
+                    }
+                  ],
+                  "type": "paragraph"
+                }
+              ],
+              "type": "blockquote"
+            }
+          ],
+          "type": "blockquote"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "text": "引用"
+              }
+            ],
+            "type": "p",
+            "id": "cfvSseE_WC"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "引用内の箇条書き"
+                      }
+                    ],
+                    "type": "lic",
+                    "id": "9j1-r6BtGo"
+                  }
+                ],
+                "type": "li",
+                "id": "ISYbXFO769"
+              }
+            ],
+            "type": "ul",
+            "id": "YAjoB5E-rZ"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "text": "入れ子"
+                  }
+                ],
+                "type": "p",
+                "id": "NT4h4lf7S3"
+              }
+            ],
+            "type": "blockquote",
+            "id": "egF-pYHP5v"
+          }
+        ],
+        "type": "blockquote",
+        "id": "HL8K2CqvGy"
+      }
+    ]
+  },
+  {
+    "id": "gfm-table-align",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "| 左 | 中央 | 右 |\n| :--- | :---: | ---: |\n| **強調** | `x` | 値 |\n",
+    "output": "| 左      | 中央  | 右 |\n| ------ | --- | - |\n| **強調** | `x` | 値 |\n",
+    "before": {
+      "children": [
+        {
+          "align": [
+            "left",
+            "center",
+            "right"
+          ],
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "左"
+                    }
+                  ],
+                  "type": "tableCell"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "中央"
+                    }
+                  ],
+                  "type": "tableCell"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "右"
+                    }
+                  ],
+                  "type": "tableCell"
+                }
+              ],
+              "type": "tableRow"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "強調"
+                        }
+                      ],
+                      "type": "strong"
+                    }
+                  ],
+                  "type": "tableCell"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "inlineCode",
+                      "value": "x"
+                    }
+                  ],
+                  "type": "tableCell"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "値"
+                    }
+                  ],
+                  "type": "tableCell"
+                }
+              ],
+              "type": "tableRow"
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "align": [
+            null,
+            null,
+            null
+          ],
+          "children": [
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "左"
+                    }
+                  ],
+                  "type": "tableCell"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "中央"
+                    }
+                  ],
+                  "type": "tableCell"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "右"
+                    }
+                  ],
+                  "type": "tableCell"
+                }
+              ],
+              "type": "tableRow"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "type": "text",
+                          "value": "強調"
+                        }
+                      ],
+                      "type": "strong"
+                    }
+                  ],
+                  "type": "tableCell"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "inlineCode",
+                      "value": "x"
+                    }
+                  ],
+                  "type": "tableCell"
+                },
+                {
+                  "children": [
+                    {
+                      "type": "text",
+                      "value": "値"
+                    }
+                  ],
+                  "type": "tableCell"
+                }
+              ],
+              "type": "tableRow"
+            }
+          ],
+          "type": "table"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "左"
+                      }
+                    ],
+                    "type": "p",
+                    "id": "LbiJG3jrTK"
+                  }
+                ],
+                "type": "th",
+                "id": "xroCbk5ql0"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "中央"
+                      }
+                    ],
+                    "type": "p",
+                    "id": "rDnddMBwln"
+                  }
+                ],
+                "type": "th",
+                "id": "qoBjt1icw_"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "右"
+                      }
+                    ],
+                    "type": "p",
+                    "id": "RmReDP7FTV"
+                  }
+                ],
+                "type": "th",
+                "id": "yiHSUQvBWK"
+              }
+            ],
+            "type": "tr",
+            "id": "TfxsG9b2qD"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "bold": true,
+                        "text": "強調"
+                      }
+                    ],
+                    "type": "p",
+                    "id": "tcyuOaTUAA"
+                  }
+                ],
+                "type": "td",
+                "id": "TefHt2YNoF"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "code": true,
+                        "text": "x"
+                      }
+                    ],
+                    "type": "p",
+                    "id": "zIQFaupwrb"
+                  }
+                ],
+                "type": "td",
+                "id": "SBeBw8E34k"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "text": "値"
+                      }
+                    ],
+                    "type": "p",
+                    "id": "E7eLcbI6xt"
+                  }
+                ],
+                "type": "td",
+                "id": "ROE_GW7usP"
+              }
+            ],
+            "type": "tr",
+            "id": "YFEuWHLkxp"
+          }
+        ],
+        "type": "table",
+        "id": "6qm8-1AWRe"
+      }
+    ]
+  },
+  {
+    "id": "code-fence",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "```ts title=demo.ts\nconst x = `a`;\n\nconsole.log(x);\n```\n",
+    "output": "```ts\nconst x = `a`;\n\nconsole.log(x);\n```\n",
+    "before": {
+      "children": [
+        {
+          "lang": "ts",
+          "meta": "title=demo.ts",
+          "type": "code",
+          "value": "const x = `a`;\n\nconsole.log(x);"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "lang": "ts",
+          "meta": null,
+          "type": "code",
+          "value": "const x = `a`;\n\nconsole.log(x);"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "text": "const x = `a`;"
+              }
+            ],
+            "type": "code_line",
+            "id": "f-g5IDkljw"
+          },
+          {
+            "children": [
+              {
+                "text": ""
+              }
+            ],
+            "type": "code_line",
+            "id": "7qRr8_qMuz"
+          },
+          {
+            "children": [
+              {
+                "text": "console.log(x);"
+              }
+            ],
+            "type": "code_line",
+            "id": "Rpw9DjCeUU"
+          }
+        ],
+        "lang": "ts",
+        "type": "code_block",
+        "id": "8LP58D0VkV"
+      }
+    ]
+  },
+  {
+    "id": "inline-links",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "[公式](https://example.com/a \"説明\")と![代替](https://example.com/a.png \"画像\")\n",
+    "output": "[公式](https://example.com/a)と\n\n![代替](https://example.com/a.png \"画像\")\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "公式"
+                }
+              ],
+              "title": "説明",
+              "type": "link",
+              "url": "https://example.com/a"
+            },
+            {
+              "type": "text",
+              "value": "と"
+            },
+            {
+              "alt": "代替",
+              "title": "画像",
+              "type": "image",
+              "url": "https://example.com/a.png"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "公式"
+                }
+              ],
+              "title": null,
+              "type": "link",
+              "url": "https://example.com/a"
+            },
+            {
+              "type": "text",
+              "value": "と"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "alt": "代替",
+              "title": "画像",
+              "type": "image",
+              "url": "https://example.com/a.png"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": ""
+          },
+          {
+            "children": [
+              {
+                "text": "公式"
+              }
+            ],
+            "type": "a",
+            "url": "https://example.com/a",
+            "id": "zSfyK981iZ"
+          },
+          {
+            "text": "と"
+          }
+        ],
+        "type": "p",
+        "id": "8c87WJRFwO"
+      },
+      {
+        "caption": [
+          {
+            "text": "代替"
+          }
+        ],
+        "children": [
+          {
+            "text": ""
+          }
+        ],
+        "title": "画像",
+        "type": "img",
+        "url": "https://example.com/a.png",
+        "id": "e8Kiipp7Po"
+      }
+    ]
+  },
+  {
+    "id": "reference-links",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "[参照][ref] と ![画像][img]\n\n[ref]: https://example.com \"説明\"\n[img]: https://example.com/i.png \"画像\"\n",
+    "output": "[参照](https://example.com) と&#x20;\n\n![画像](https://example.com/i.png \"画像\")\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "参照"
+                }
+              ],
+              "title": "説明",
+              "type": "link",
+              "url": "https://example.com"
+            },
+            {
+              "type": "text",
+              "value": " と "
+            },
+            {
+              "alt": "画像",
+              "title": "画像",
+              "type": "image",
+              "url": "https://example.com/i.png"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "参照"
+                }
+              ],
+              "title": null,
+              "type": "link",
+              "url": "https://example.com"
+            },
+            {
+              "type": "text",
+              "value": " と "
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "alt": "画像",
+              "title": "画像",
+              "type": "image",
+              "url": "https://example.com/i.png"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": ""
+          },
+          {
+            "children": [
+              {
+                "text": "参照"
+              }
+            ],
+            "type": "a",
+            "url": "https://example.com",
+            "id": "7cyki7bp_d"
+          },
+          {
+            "text": " と "
+          }
+        ],
+        "type": "p",
+        "id": "ionpOn9cyy"
+      },
+      {
+        "caption": [
+          {
+            "text": "画像"
+          }
+        ],
+        "children": [
+          {
+            "text": ""
+          }
+        ],
+        "title": "画像",
+        "type": "img",
+        "url": "https://example.com/i.png",
+        "id": "oQaLQYzP1Y"
+      }
+    ]
+  },
+  {
+    "id": "autolink",
+    "group": "core",
+    "byteEqual": true,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "https://example.com と <user@example.com>\n",
+    "output": "https://example.com と <user@example.com>\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "https://example.com"
+                }
+              ],
+              "title": null,
+              "type": "link",
+              "url": "https://example.com"
+            },
+            {
+              "type": "text",
+              "value": " と "
+            },
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "user@example.com"
+                }
+              ],
+              "title": null,
+              "type": "link",
+              "url": "mailto:user@example.com"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "https://example.com"
+                }
+              ],
+              "title": null,
+              "type": "link",
+              "url": "https://example.com"
+            },
+            {
+              "type": "text",
+              "value": " と "
+            },
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "user@example.com"
+                }
+              ],
+              "title": null,
+              "type": "link",
+              "url": "mailto:user@example.com"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": ""
+          },
+          {
+            "children": [
+              {
+                "text": "https://example.com"
+              }
+            ],
+            "type": "a",
+            "url": "https://example.com",
+            "id": "WtF5i7lg6j"
+          },
+          {
+            "text": " と "
+          },
+          {
+            "children": [
+              {
+                "text": "user@example.com"
+              }
+            ],
+            "type": "a",
+            "url": "mailto:user@example.com",
+            "id": "BBzD1yIxsg"
+          },
+          {
+            "text": ""
+          }
+        ],
+        "type": "p",
+        "id": "NAGLzDbFiI"
+      }
+    ]
+  },
+  {
+    "id": "soft-break",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "一行目\n二行目\n",
+    "output": "一行目\\\n二行目\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "一行目\n二行目"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "一行目"
+            },
+            {
+              "type": "break"
+            },
+            {
+              "type": "text",
+              "value": "二行目"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "一行目\n二行目"
+          }
+        ],
+        "type": "p",
+        "id": "PE-Q8iwcmH"
+      }
+    ]
+  },
+  {
+    "id": "soft-break-after-link",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "[link](https://example.com)\nnext\n",
+    "output": "[link](https://example.com)next\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "link"
+                }
+              ],
+              "title": null,
+              "type": "link",
+              "url": "https://example.com"
+            },
+            {
+              "type": "text",
+              "value": "\nnext"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "link"
+                }
+              ],
+              "title": null,
+              "type": "link",
+              "url": "https://example.com"
+            },
+            {
+              "type": "text",
+              "value": "next"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": ""
+          },
+          {
+            "children": [
+              {
+                "text": "link"
+              }
+            ],
+            "type": "a",
+            "url": "https://example.com",
+            "id": "re95N5IWI-"
+          },
+          {
+            "text": "next"
+          }
+        ],
+        "type": "p",
+        "id": "tyaQ9xWjm2"
+      }
+    ]
+  },
+  {
+    "id": "soft-break-after-mark",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "**太字**\n次の行\n",
+    "output": "**太字**次の行\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "太字"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "type": "text",
+              "value": "\n次の行"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "太字"
+                }
+              ],
+              "type": "strong"
+            },
+            {
+              "type": "text",
+              "value": "次の行"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "bold": true,
+            "text": "太字"
+          },
+          {
+            "text": "次の行"
+          }
+        ],
+        "type": "p",
+        "id": "sv03cONkwF"
+      }
+    ]
+  },
+  {
+    "id": "soft-break-after-code",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "`code`\nnext\n",
+    "output": "`code`next\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "inlineCode",
+              "value": "code"
+            },
+            {
+              "type": "text",
+              "value": "\nnext"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "inlineCode",
+              "value": "code"
+            },
+            {
+              "type": "text",
+              "value": "next"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "code": true,
+            "text": "code"
+          },
+          {
+            "text": "next"
+          }
+        ],
+        "type": "p",
+        "id": "36VD5C5wDH"
+      }
+    ]
+  },
+  {
+    "id": "hard-break",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "一行目  \n二行目\n",
+    "output": "一行目\\\n二行目\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "一行目"
+            },
+            {
+              "type": "break"
+            },
+            {
+              "type": "text",
+              "value": "二行目"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "一行目"
+            },
+            {
+              "type": "break"
+            },
+            {
+              "type": "text",
+              "value": "二行目"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "一行目\n二行目"
+          }
+        ],
+        "type": "p",
+        "id": "VqJuYAY6JV"
+      }
+    ]
+  },
+  {
+    "id": "crlf-code",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "```ts\r\nconst x = 1;\r\n```\r\n",
+    "output": "```ts\nconst x = 1;\n```\n",
+    "before": {
+      "children": [
+        {
+          "lang": "ts",
+          "meta": null,
+          "type": "code",
+          "value": "const x = 1;"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "lang": "ts",
+          "meta": null,
+          "type": "code",
+          "value": "const x = 1;"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "text": "const x = 1;"
+              }
+            ],
+            "type": "code_line",
+            "id": "FspY30i2ny"
+          }
+        ],
+        "lang": "ts",
+        "type": "code_block",
+        "id": "_SSLYrAh7u"
+      }
+    ]
+  },
+  {
+    "id": "escaped-and-unicode",
+    "group": "core",
+    "byteEqual": true,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "\\*記号\\*と日本語、👩‍💻、é、絵文字🙂。\n",
+    "output": "\\*記号\\*と日本語、👩‍💻、é、絵文字🙂。\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "*記号*と日本語、👩‍💻、é、絵文字🙂。"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "*記号*と日本語、👩‍💻、é、絵文字🙂。"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "*記号*と日本語、👩‍💻、é、絵文字🙂。"
+          }
+        ],
+        "type": "p",
+        "id": "UuAM6Hxc1q"
+      }
+    ]
+  },
+  {
+    "id": "thematic-break",
+    "group": "core",
+    "byteEqual": false,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "前\n\n---\n\n後\n",
+    "output": "前\n\n***\n\n後\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "前"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "type": "thematicBreak"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "後"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "前"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "type": "thematicBreak"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "後"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "前"
+          }
+        ],
+        "type": "p",
+        "id": "8HjEit9cct"
+      },
+      {
+        "children": [
+          {
+            "text": ""
+          }
+        ],
+        "type": "hr",
+        "id": "1J9bXOdLns"
+      },
+      {
+        "children": [
+          {
+            "text": "後"
+          }
+        ],
+        "type": "p",
+        "id": "cgaOXqRo5c"
+      }
+    ]
+  },
+  {
+    "id": "frontmatter",
+    "group": "extended",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "---\ntitle: \"企画\"\ntags: [a, b]\n---\n\n# 本文\n",
+    "output": "***\n\ntitle: \"企画\"\ntags: \\[a, b]\n-------------\n\n# 本文\n",
+    "before": {
+      "children": [
+        {
+          "type": "yaml",
+          "value": "title: \"企画\"\ntags: [a, b]"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "本文"
+            }
+          ],
+          "depth": 1,
+          "type": "heading"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "type": "thematicBreak"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "title: \"企画\"\ntags: [a, b]"
+            }
+          ],
+          "depth": 2,
+          "type": "heading"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "本文"
+            }
+          ],
+          "depth": 1,
+          "type": "heading"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": ""
+          }
+        ],
+        "type": "hr",
+        "id": "qtv_-81Zmc"
+      },
+      {
+        "children": [
+          {
+            "text": "title: \"企画\"\ntags: [a, b]"
+          }
+        ],
+        "type": "h2",
+        "id": "GBAWbEuHe7"
+      },
+      {
+        "children": [
+          {
+            "text": "本文"
+          }
+        ],
+        "type": "h1",
+        "id": "_1BkkQ-pX3"
+      }
+    ]
+  },
+  {
+    "id": "html-comment",
+    "group": "extended",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "本文\n\n<!-- 管理用コメント -->\n\n次\n",
+    "output": "本文\n\n{/\\* 管理用コメント \\*/}\n\n次\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "本文"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "type": "html",
+          "value": "<!-- 管理用コメント -->"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "次"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "本文"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "{/* 管理用コメント */}"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "次"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "本文"
+          }
+        ],
+        "type": "p",
+        "id": "C7zMH7Puoa"
+      },
+      {
+        "children": [
+          {
+            "text": "{/* 管理用コメント */}"
+          }
+        ],
+        "type": "p",
+        "id": "Y_fNcZMeyX"
+      },
+      {
+        "children": [
+          {
+            "text": "次"
+          }
+        ],
+        "type": "p",
+        "id": "zetIaie1o7"
+      }
+    ]
+  },
+  {
+    "id": "html-details",
+    "group": "extended",
+    "byteEqual": true,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "<details>\n<summary>詳細</summary>\n\n**内容**\n\n</details>\n",
+    "output": "<details>\n<summary>詳細</summary>\n\n**内容**\n\n</details>\n",
+    "before": {
+      "children": [
+        {
+          "type": "html",
+          "value": "<details>\n<summary>詳細</summary>"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "内容"
+                }
+              ],
+              "type": "strong"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "type": "html",
+          "value": "</details>"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "type": "html",
+          "value": "<details>\n<summary>詳細</summary>"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "内容"
+                }
+              ],
+              "type": "strong"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "type": "html",
+          "value": "</details>"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "rawHtml": true,
+            "text": "<details>\n<summary>詳細</summary>"
+          }
+        ],
+        "type": "p",
+        "id": "AqOEAIVUdO"
+      },
+      {
+        "children": [
+          {
+            "bold": true,
+            "text": "内容"
+          }
+        ],
+        "type": "p",
+        "id": "MDRhWX7OPj"
+      },
+      {
+        "children": [
+          {
+            "rawHtml": true,
+            "text": "</details>"
+          }
+        ],
+        "type": "p",
+        "id": "DFIiI0qifT"
+      }
+    ]
+  },
+  {
+    "id": "footnotes",
+    "group": "extended",
+    "byteEqual": true,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "本文[^note]。\n\n[^note]: 脚注の内容。\n",
+    "output": "本文[^note]。\n\n[^note]: 脚注の内容。\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "本文"
+            },
+            {
+              "identifier": "note",
+              "label": "note",
+              "type": "footnoteReference"
+            },
+            {
+              "type": "text",
+              "value": "。"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "脚注の内容。"
+                }
+              ],
+              "type": "paragraph"
+            }
+          ],
+          "identifier": "note",
+          "label": "note",
+          "type": "footnoteDefinition"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "本文"
+            },
+            {
+              "identifier": "note",
+              "label": "note",
+              "type": "footnoteReference"
+            },
+            {
+              "type": "text",
+              "value": "。"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "type": "text",
+                  "value": "脚注の内容。"
+                }
+              ],
+              "type": "paragraph"
+            }
+          ],
+          "identifier": "note",
+          "label": "note",
+          "type": "footnoteDefinition"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "本文"
+          },
+          {
+            "children": [
+              {
+                "text": ""
+              }
+            ],
+            "identifier": "note",
+            "type": "footnoteReference",
+            "id": "Rn3ug2gG79"
+          },
+          {
+            "text": "。"
+          }
+        ],
+        "type": "p",
+        "id": "P9NAFG199f"
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "text": "脚注の内容。"
+              }
+            ],
+            "type": "p",
+            "id": "uPWGgQP0pT"
+          }
+        ],
+        "identifier": "note",
+        "type": "footnoteDefinition",
+        "id": "feW7InkCqr"
+      }
+    ]
+  },
+  {
+    "id": "math",
+    "group": "extended",
+    "byteEqual": false,
+    "astEqual": false,
+    "stableSecondRound": true,
+    "input": "$x^2$ と数式。\n\n$$\nx^2+y^2=z^2\n$$\n",
+    "output": "$x^2$ と数式。\n\n$$\\\nx^2+y^2=z^2\\\n$$\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "data": {
+                "hChildren": [
+                  {
+                    "type": "text",
+                    "value": "x^2"
+                  }
+                ],
+                "hName": "code",
+                "hProperties": {
+                  "className": [
+                    "language-math",
+                    "math-inline"
+                  ]
+                }
+              },
+              "type": "inlineMath",
+              "value": "x^2"
+            },
+            {
+              "type": "text",
+              "value": " と数式。"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "data": {
+            "hChildren": [
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "x^2+y^2=z^2"
+                  }
+                ],
+                "properties": {
+                  "className": [
+                    "language-math",
+                    "math-display"
+                  ]
+                },
+                "tagName": "code",
+                "type": "element"
+              }
+            ],
+            "hName": "pre"
+          },
+          "meta": null,
+          "type": "math",
+          "value": "x^2+y^2=z^2"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "data": {
+                "hChildren": [
+                  {
+                    "type": "text",
+                    "value": "x^2"
+                  }
+                ],
+                "hName": "code",
+                "hProperties": {
+                  "className": [
+                    "language-math",
+                    "math-inline"
+                  ]
+                }
+              },
+              "type": "inlineMath",
+              "value": "x^2"
+            },
+            {
+              "type": "text",
+              "value": " と数式。"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "data": {
+            "hChildren": [
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "x^2+y^2=z^2\\"
+                  }
+                ],
+                "properties": {
+                  "className": [
+                    "language-math",
+                    "math-display"
+                  ]
+                },
+                "tagName": "code",
+                "type": "element"
+              }
+            ],
+            "hName": "pre"
+          },
+          "meta": "\\",
+          "type": "math",
+          "value": "x^2+y^2=z^2\\"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "$x^2$ と数式。"
+          }
+        ],
+        "type": "p",
+        "id": "xZoDM9N3W9"
+      },
+      {
+        "children": [
+          {
+            "text": "$$\nx^2+y^2=z^2\n$$"
+          }
+        ],
+        "type": "p",
+        "id": "n6fL1iIYr6"
+      }
+    ]
+  },
+  {
+    "id": "mermaid-fence",
+    "group": "extended",
+    "byteEqual": true,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "```mermaid\nflowchart LR\n  A --> B\n```\n",
+    "output": "```mermaid\nflowchart LR\n  A --> B\n```\n",
+    "before": {
+      "children": [
+        {
+          "lang": "mermaid",
+          "meta": null,
+          "type": "code",
+          "value": "flowchart LR\n  A --> B"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "lang": "mermaid",
+          "meta": null,
+          "type": "code",
+          "value": "flowchart LR\n  A --> B"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "text": "flowchart LR"
+              }
+            ],
+            "type": "code_line",
+            "id": "Fpedpw5vKT"
+          },
+          {
+            "children": [
+              {
+                "text": "  A --> B"
+              }
+            ],
+            "type": "code_line",
+            "id": "PpTG37Pq9H"
+          }
+        ],
+        "lang": "mermaid",
+        "type": "code_block",
+        "id": "yx55bmiMao"
+      }
+    ]
+  },
+  {
+    "id": "blank-lines",
+    "group": "extended",
+    "byteEqual": false,
+    "astEqual": true,
+    "stableSecondRound": true,
+    "input": "前\n\n\n\n後\n\n",
+    "output": "前\n\n後\n",
+    "before": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "前"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "後"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "after": {
+      "children": [
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "前"
+            }
+          ],
+          "type": "paragraph"
+        },
+        {
+          "children": [
+            {
+              "type": "text",
+              "value": "後"
+            }
+          ],
+          "type": "paragraph"
+        }
+      ],
+      "type": "root"
+    },
+    "value": [
+      {
+        "children": [
+          {
+            "text": "前"
+          }
+        ],
+        "type": "p",
+        "id": "P1fXlPl2Ew"
+      },
+      {
+        "children": [
+          {
+            "text": "後"
+          }
+        ],
+        "type": "p",
+        "id": "aKG_st1B6c"
+      }
+    ]
+  }
+]

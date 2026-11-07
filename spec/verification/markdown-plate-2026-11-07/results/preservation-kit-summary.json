@@ -1,0 +1,20 @@
+{
+  "total": 27,
+  "core": 20,
+  "coreFailures": [
+    "loose-list",
+    "gfm-table-align",
+    "code-fence",
+    "inline-links",
+    "reference-links",
+    "soft-break",
+    "soft-break-after-link",
+    "soft-break-after-mark",
+    "soft-break-after-code"
+  ],
+  "extendedFailures": [
+    "frontmatter",
+    "html-details",
+    "math"
+  ]
+}

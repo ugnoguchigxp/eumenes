@@ -6,6 +6,7 @@ export function createJudges(deps: Parameters<typeof createRouterJudge>[0]) {
 	return {
 		/** The inference port's method: the router's reranker. */
 		ports: { route: router.route },
+		start: () => router.start(),
 		close: () => router.close(),
 	};
 }

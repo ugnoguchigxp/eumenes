@@ -1,3 +1,4 @@
+import { markdownWebAdapter } from "../domains/markdown/toolchain-adapter";
 import { doclingWebAdapter } from "../domains/docling/toolchain-adapter";
 import { collaborationWebAdapters } from "../domains/collaboration/toolchain-adapter";
 import { pursuitWebAdapter } from "../domains/pursuit/toolchain-adapter";
@@ -32,6 +33,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	pursuitWebAdapter,
 	usageWebAdapter,
 	doclingWebAdapter,
+	markdownWebAdapter,
 	dotsMessagingWebAdapter,
 	dotsWorkWebAdapter,
 	todosWebAdapter,

@@ -6,6 +6,17 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
+		| "markdown-reconcile"
+		| "markdown-new"
+		| "markdown-apply"
+		| "markdown-archive"
+		| "markdown-select"
+		| "markdown-open"
+		| "markdown-library"
+		| "markdown-return"
+		| "markdown-resume"
+		| "markdown-refresh"
+		| "markdown-stop"
 		| "usage-query"
 		| "usage-refresh"
 		| "usage-rate-save"

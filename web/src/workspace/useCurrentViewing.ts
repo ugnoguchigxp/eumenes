@@ -85,6 +85,7 @@ export function useCurrentViewing(
 	active: ActiveTab,
 	adapters: WebAdapterRegistry = toolchainWebAdapters,
 ): () => RunViewing | undefined {
+	const cache = useQueryClient();
 	const tab = useRef(active);
 	useEffect(() => {
 		tab.current = active;
@@ -93,7 +94,15 @@ export function useCurrentViewing(
 	return useCallback(() => {
 		const viewing = specialistViewing() ?? recognitionViewing(tab.current);
 		if (viewing) return viewing;
+		const current = tab.current;
+		if (current?.kind === "toolchain") {
+			const entry = catalogEntries(cache).find(
+				(e) => e.artifactRevisionId === current.artifactRevisionId,
+			);
+			const target = entry && adapters.get(entry.adapterRef)?.viewingTarget?.();
+			if (target) return target;
+		}
 		const uri = viewingUri();
 		return uri ? { resource: uri } : undefined;
-	}, [specialistViewing, viewingUri]);
+	}, [specialistViewing, viewingUri, cache, adapters]);
 }

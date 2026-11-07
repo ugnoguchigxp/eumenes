@@ -10,6 +10,7 @@ import type { ImageCreationOptions } from "@eumenes/design-system";
 import {
 	imageContentUrl,
 	deleteLibraryImage,
+	libraryLoadError,
 	useImageLibrary,
 } from "../../media/use-image-library";
 export const imageStudioSource = "image-studio";
@@ -94,9 +95,7 @@ export function useImageRuntime(
 		statusDescription: creation.creation.description,
 		canCancel: creation.creation.canCancel,
 		loading: library.isPending,
-		error: library.error
-			? "保存画像を取得できませんでした。一覧を更新してください。"
-			: undefined,
+		error: library.error ? libraryLoadError : undefined,
 	};
 	const snapshot = { [imageStudioSource]: resource };
 	async function dispatch(event: ArtifactEvent): Promise<Receipt> {

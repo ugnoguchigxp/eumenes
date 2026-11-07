@@ -1,3 +1,5 @@
+import { autonomousActionSource } from "../../domains/dialogue";
+import { taskAutonomy } from "./task-autonomy";
 import { pipelineComponents } from "../pipelines/component-catalog";
 import type { CollaborationInteract } from "../collaboration/collaboration-backends";
 import { configureCollaboration } from "../collaboration/collaboration-wiring";
@@ -72,7 +74,7 @@ export function sendExecutionNotice(
 		!dialogue.executionSourceInTransaction(
 			db,
 			agents.executions.sourceRunInTransaction(db, view.id) ?? "",
-		)
+		) && !autonomousActionSource(db, agents.executions.sourceRunInTransaction(db,view.id) ?? "", Date.now())
 	)
 		return false;
 	dialogue.notifyInTransaction(db, {
@@ -139,6 +141,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 	const { available, resolve, bound, research } = context;
 	const port: ToolchainExecutionPort = {
 		childOperations: host.childOperations,
+		autonomyInTransaction: taskAutonomy(host, context),
 		childDeadlineInTransaction(db, revisionId, deadline) {
 			const binding = capabilities.toolchainBindingInTransaction(db, revisionId)
 				?.binding.document;
@@ -191,6 +194,11 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		},
 		adoptInTransaction(db, child, outcome) {
 			resolve(db, child);
+            if (outcome.state === "completed" && host.resources) {
+              const card = routing.cardInTransaction(db, child.chainRevisionId);
+              const links = card ? capabilities.producesInTransaction(db,card.id).flatMap((kind) => host.resources!.adapter(kind)?.fromResultInTransaction(db, outcome.output, {conversationId:child.source.conversationId,runId:child.source.runId}) ?? []).map((resource) => resource.uri) : [];
+              outcome.links = [...new Set([...(outcome.links ?? []), ...links])];
+            }
 			const ref = reference.parse(outcome.ref);
 			if (ref.kind === "research" && outcome.state !== "running")
 				return (
@@ -289,7 +297,12 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		revokeDeliveryInTransaction: dialogue.revokeExecutionNoticeInTransaction,
 		deliveryStateInTransaction: dialogue.noticeDeliveryInTransaction,
 		deliverInTransaction(db, view, eventId) {
-			// The durable collaboration watcher delivers to the owning specialist session.
+			const root = agents.executions.sourceRunInTransaction(db,view.id);
+            if (root && autonomousActionSource(db,root,Date.now())) {
+              if (view.question) { sendExecutionNotice(host,db,view,eventId); return false; }
+              return true;
+            }
+            // The durable collaboration watcher delivers to the owning specialist session.
 			if (host.collaboration?.works.ownsChild(db, view.id, view.conversationId))
 				return true;
 			if (

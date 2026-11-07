@@ -2,11 +2,12 @@ import type { Database } from "bun:sqlite";
 import { createPursuit, type PursuitService } from "../../domains/pursuit";
 import { createPursuitAdapter } from "../pursuit/pursuit-adapter";
 import { createPursuitWebPort } from "../pursuit/web-port";
+import { createMarkdownAdapter } from "../markdown/markdown-adapter";
 import { createDoclingAdapter } from "../docling/docling-adapter";
 import { createDotsMessagingAdapter } from "../work/dots-messaging-adapter";
 import { createDotsDelegationAdapter } from "../work/dots-delegation-adapter";
 import {
-	autonomousResearchSource,
+	autonomousResearchSource, autonomousActionSource,
 	readActionOriginInTransaction,
 } from "../../domains/dialogue";
 import { createChildOperations } from "./child-operations";
@@ -103,6 +104,7 @@ type ToolchainOptions = {
 	kanbanSdk?: ReturnType<typeof createKanbanSdkHost>;
 	music?: boolean;
 	image?: boolean;
+	markdown?: import("../../domains/markdown").MarkdownService;
 	uiCompositions?: import("../../domains/ui-compositions").UiCompositionsService;
 	/** Whether a specialist session still owns its work (UI undo/redo/save guard). */
 	specialistSessionLive?: (
@@ -186,11 +188,16 @@ function researchSourceResolver(
 		const origin =
 			agents().executionOriginInTransaction(db, owner)?.source ??
 			readActionOriginInTransaction(db, owner.rootRunId);
+        if (origin && "origin" in origin && origin.origin === "autonomous") {
+          const current = autonomousActionSource(db,origin.runId,Date.now());
+          if (!current) throw new Error("source_ref_invalid");
+          return current;
+        }
 		const request =
-			origin &&
+			origin?.messageId &&
 			options.browser?.requests.userMessageInTransaction(db, origin.messageId);
 		if (
-			!origin ||
+			!origin?.messageId ||
 			!request ||
 			options.blockedMessages?.blockedMessageIdsInTransaction(db, [
 				origin.messageId,
@@ -222,6 +229,7 @@ const createResearchRuntime = (
 function enabledBackends(options: ToolchainOptions) {
 	return new Set([
 		...(options.docling ? ["docling"] : []),
+		...(options.markdown ? ["markdown"] : []),
 		"task-execution",
 		...(options.webResearch !== false ? ["pursuit"] : []),
 		...(options.webResearch !== false ? ["web"] : []),
@@ -275,6 +283,7 @@ export async function createToolchain(
 	const collaboration = createCollaborationHost(queue);
 	const registry = createAdapterRegistry([
 		...collaboration.adapters,
+		...(options.markdown ? [createMarkdownAdapter(options.markdown)] : []),
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
 		createPursuitAdapter(() => pursuitRuntime, options.webResearch !== false),

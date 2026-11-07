@@ -1,6 +1,32 @@
 import type { Tx } from "../../queue";
 import type { Attachment } from "../../conversation/contracts";
 import type { DialogueDeps, GenerateInput } from "./context";
+import type { ChatMessage } from "./context";
+import type { Receipt } from "../../inference";
+import type { ImageAnswerTrace } from "../../conversation";
+
+/** The actual successful talk call's image inputs. Attachment presence alone is not a receipt. */
+export function imageAnswerTrace(
+	receipt: Receipt,
+	messages: readonly ChatMessage[],
+): ImageAnswerTrace | undefined {
+	const pictured = messages.filter((m) => m.images?.length);
+	if (
+		!pictured.length ||
+		pictured.some(
+			(m) => !m.sourceMessageId || m.images!.length !== m.attachments?.length,
+		)
+	)
+		return undefined;
+	return {
+		requestId: receipt.requestId,
+		attemptId: receipt.attemptId,
+		inputs: pictured.map((m) => ({
+			messageId: m.sourceMessageId!,
+			attachmentIds: m.attachments!.map((a) => a.id),
+		})),
+	};
+}
 
 /** The user's text with the host-made reference data of its images (detections etc.), in image order. */
 export function withAttachmentNotes(text: string, attachments?: Attachment[]) {

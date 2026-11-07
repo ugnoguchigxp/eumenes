@@ -35,7 +35,7 @@ export type CommandSource = {
 export function commandSource(
 	deps: DialogueDeps,
 	tx: Database,
-	run: Run,
+	run: Pick<Run, "id" | "conversationId"> & Partial<Pick<Run, "inputMessageId">>,
 	set: ReturnType<ToolchainRoutingPort["commandSetInTransaction"]>,
 	payload: { toolchainRevisionId: string; interactionId?: string },
 	execution?: import("../../tool-runtime").ChildExecution,
@@ -85,7 +85,7 @@ export function commandSource(
 		original = context.originalRequest ?? undefined;
 	} else {
 		request = toolchains.requestOfRunInTransaction(tx, run.id);
-		const input = conversation.messageInTransaction(tx, run.inputMessageId);
+		const input = run.inputMessageId ? conversation.messageInTransaction(tx, run.inputMessageId) : null;
 		original =
 			input?.message.conversationId === run.conversationId
 				? input.message.text
