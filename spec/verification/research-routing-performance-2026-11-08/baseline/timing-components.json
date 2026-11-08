@@ -1,0 +1,216 @@
+[
+  {
+    "name": "case-a",
+    "pursuitId": "297cc0d4-4b18-4768-802e-04fe3240bbd5",
+    "owned": {
+      "calls": 53,
+      "inputTokens": 1095082,
+      "outputTokens": 44261,
+      "unknownUsage": 0
+    },
+    "relatedAgency": {
+      "calls": 2,
+      "inputTokens": 25530,
+      "outputTokens": 1540,
+      "unknownUsage": 0
+    },
+    "wallMs": 1435402,
+    "inferenceMs": 1049091,
+    "queueWaitMs": 404178,
+    "queueWaitUnknown": 0,
+    "webJobs": [
+      {
+        "id": "cce4c169-ac7d-4ff4-8cd4-5260215ecaa4",
+        "parentJobId": "08872567-e40b-4bc2-9af4-2d0acfcd00b9",
+        "subjectRef": "852b1951-7be0-4b75-94c0-3815ba74f310",
+        "state": "completed"
+      },
+      {
+        "id": "acc3628e-6779-483d-b5bd-ccf18bb89527",
+        "parentJobId": "5d8336d0-3d02-4065-89ff-039245b7aeb8",
+        "subjectRef": "1f0b5fef-bdb7-4c94-a9f4-447ad211e583",
+        "state": "completed"
+      },
+      {
+        "id": "6cb5a9d3-ae8d-497c-a7df-ddd037585290",
+        "parentJobId": "dda65639-cde2-4eba-8df3-158a7f436d34",
+        "subjectRef": "8b5cc5ad-a80f-4c9f-8a0d-4310a2c921f0",
+        "state": "completed"
+      },
+      {
+        "id": "c89fd62b-06cd-4b45-afb1-0b782ed1c6e6",
+        "parentJobId": "e0f6c32f-3946-4592-b177-41ac19bd7d0f",
+        "subjectRef": "79127725-4bfc-440b-9783-35378628771f",
+        "state": "completed"
+      }
+    ],
+    "ownAttemptIds": [
+      "d931f064-9188-4afc-8fa6-43f4081bb3cc",
+      "7d87271a-a56e-459e-bd46-2cfb2ba9c01e",
+      "8c3afb6f-9f36-473b-907e-37dd6fd011ab",
+      "7ac17acc-d47d-4a05-8bb7-70cb3bda7aed",
+      "1aef63f6-2c2f-4812-97fe-7121acf87410",
+      "67bc88cb-3ae0-43e2-9167-6d8ef0348415",
+      "aa94b69e-67dd-4981-bc78-4f49e4e772f3",
+      "a683910a-5c74-4bd3-886e-77bdab5f945c",
+      "e1e54a45-0bce-49cf-ab0c-2c2a3b95561d",
+      "92341f0b-d877-4da1-a48a-43c9925f7966",
+      "b34afad6-48a7-40b6-8a6e-b04c6ba8208d",
+      "bf184891-cfe3-4e82-93e1-90f985b167d1",
+      "0fe06fab-72ac-49b6-b8da-e7c4a28d9bd4",
+      "c599896c-8ba2-4b19-8a84-6b5c9ec1a299",
+      "5275fdc4-cbd4-4620-8e46-9d95bd9efbe0",
+      "aba21573-50f6-4af6-bada-84fab6ca88e0",
+      "56ebb1bb-d9b0-4efe-9672-0d5e478715b6",
+      "cf203d04-cbf5-4628-96b8-2b21bbf50995",
+      "b7dc943e-cf69-4e3a-93f2-66523a8b08e2",
+      "5ca070ae-6f2b-49bc-9d48-3d565879d8f7",
+      "606da6e3-1934-4adb-9976-cddf75c70b1b",
+      "039d63d0-eefc-491f-9e9b-e30611cd5f17",
+      "9a6ef466-3239-4a97-bd9c-8e8577c7e79b",
+      "aca4e3cf-7ba2-42a0-94b9-40c519c85655",
+      "a0fb29f4-697b-41d3-817a-ebc3ae7174f7",
+      "0f5141e9-279d-4520-8fcd-56e38e43a261",
+      "236cfc99-0db5-4714-be66-19a016bc67ea",
+      "01517abb-d9ec-4251-aa15-e7aa5355385e",
+      "990e4608-67be-49a5-93fe-b62cbb993dd7",
+      "5846cf6d-58bd-451a-b940-c024899dc98a",
+      "9b7ed960-329f-49dc-b03a-396ccf26de7c",
+      "c354176a-8eb6-44f8-870f-6efff2e5f82b",
+      "2bd9b6df-30ba-4f60-b5c1-4264d4fe9d9c",
+      "3d05d182-263b-4eab-a466-7f9ac3c210c3",
+      "f03ceb5b-ae9c-4bc0-9f81-e9c3a83e994b",
+      "299b86cf-5b64-4a3a-976e-113ad587bdab",
+      "51da4a33-7848-4b78-913b-347e8faef6fa",
+      "1891270e-8649-4b77-af67-6024de8f8309",
+      "cc0038ec-5d35-44b7-9398-f1571af31264",
+      "04b1e88c-7c11-4098-a0e6-386075d11611",
+      "817fd8dd-6183-4c47-8137-6fa37ded0f7b",
+      "c7a49f2b-35a1-43d6-b31f-14cd0ea32d66",
+      "a3c2a4fc-cc9a-4914-8a54-26d9e0ed3a6e",
+      "4aeaba72-2c26-453f-8387-4d15c8cd38ce",
+      "aa7d3fa8-a054-4f8f-9830-822c2a2639b1",
+      "a8f1aa5d-fd06-4098-80dd-364903342111",
+      "d8e0c25b-65ee-4fbd-8468-ba841a91d1ed",
+      "1696469c-3977-47c5-94cb-e56d527d2aa1",
+      "b4ead46d-43c3-437f-ab46-ab54322ccd22",
+      "493f0866-500f-4df8-87e3-9fbab97b814d",
+      "ccc7345b-e491-4dcf-a514-9802a83ba089",
+      "42f2c059-222c-45e0-a8a7-11e8ff2142c4",
+      "dbed47d3-f91b-48ad-a282-5a536e7d1de1"
+    ]
+  },
+  {
+    "name": "case-b3",
+    "pursuitId": "649b2872-3c35-44a4-8f58-ec9a63e4513e",
+    "owned": {
+      "calls": 29,
+      "inputTokens": 568124,
+      "outputTokens": 21033,
+      "unknownUsage": 0
+    },
+    "relatedAgency": {
+      "calls": 2,
+      "inputTokens": 25357,
+      "outputTokens": 1155,
+      "unknownUsage": 0
+    },
+    "wallMs": 1171072,
+    "inferenceMs": 515132,
+    "queueWaitMs": 658486,
+    "queueWaitUnknown": 0,
+    "webJobs": [
+      {
+        "id": "2872a24d-543f-4cd0-ac0c-53c50c7d2bf8",
+        "parentJobId": "e4212c4c-3071-41c5-b4f3-3ea84476de60",
+        "subjectRef": "b302b971-f6d7-4958-bbcd-b0a6773a1386",
+        "state": "completed"
+      },
+      {
+        "id": "8a96668b-3e49-4855-973f-7139f43371c6",
+        "parentJobId": "3239e05b-7e6f-4648-bea0-4b437595a077",
+        "subjectRef": "99c644c2-bb67-43cf-b1a4-1f2cce914ffc",
+        "state": "completed"
+      },
+      {
+        "id": "523c68f9-e469-4b25-8aec-eabfa15b174e",
+        "parentJobId": "0b5573cf-f882-4fe0-8a72-c9fe370907eb",
+        "subjectRef": "cb361ec6-df22-4ce5-9e1c-44c9d128ebde",
+        "state": "completed"
+      },
+      {
+        "id": "1af8319f-e4ad-4548-8a1c-febdfc63c031",
+        "parentJobId": "98afdaf2-cb62-4661-aeaa-ca5a895e1f7a",
+        "subjectRef": "518a878b-c6b4-4f69-a0cf-e4253cbec221",
+        "state": "completed"
+      },
+      {
+        "id": "387c1a0b-8120-45b9-a229-93af70b753dd",
+        "parentJobId": "6f117571-b24f-4ad8-baa1-211ea84b4bf2",
+        "subjectRef": "3f448f10-769e-4159-80da-c66bde097ca2",
+        "state": "completed"
+      },
+      {
+        "id": "0f8684d7-2757-4b26-849b-da5d99b508c2",
+        "parentJobId": "0eba28a5-1c6a-41f9-a039-be67c719185e",
+        "subjectRef": "59dca22b-991d-4213-ab78-7ea4a555a0ab",
+        "state": "completed"
+      },
+      {
+        "id": "404e0170-1c39-471c-b2c8-d4d18334e720",
+        "parentJobId": "b0ac1428-0e52-4333-ab03-ac13eb4284ec",
+        "subjectRef": "f15bd3f4-6a48-428e-b43f-479032c3f322",
+        "state": "completed"
+      },
+      {
+        "id": "881aee37-97c4-4254-982c-66a0dcb9c31a",
+        "parentJobId": "eac4f4e0-c935-446b-8370-58326e735425",
+        "subjectRef": "f35299c9-fe73-4261-a907-f0c4c4f8ef7b",
+        "state": "failed"
+      },
+      {
+        "id": "86d17f50-07d8-4878-ac07-dfb0e1c38683",
+        "parentJobId": "442c7005-8608-487c-9b94-d9d38ca8cd73",
+        "subjectRef": "d675c132-3cf9-46fc-80c8-9535d3a74b43",
+        "state": "completed"
+      },
+      {
+        "id": "d77151af-77b5-44da-9169-a21609bb9d24",
+        "parentJobId": "8c4d508a-a288-4566-aff4-b4ca3542c281",
+        "subjectRef": "282e7474-3da9-46fa-83fd-2f8de853e01c",
+        "state": "completed"
+      }
+    ],
+    "ownAttemptIds": [
+      "f18c49f3-441e-46dc-a34c-c611a5819c34",
+      "5ecf5585-c6dc-41a3-bf84-4ed756ccfc0b",
+      "3e02c3ed-899b-4992-a68a-2cad7d870084",
+      "809748cb-4dff-484d-9cce-3279ac0a6219",
+      "714095db-2c77-4c5a-aa0e-5607bf573db3",
+      "3114f2c4-052c-4ccd-8de8-7bbeb170ee19",
+      "6f798c7e-ec08-4030-bc8b-a7fa58aa1577",
+      "e0abffb3-b8f1-40ab-87f0-a2eba6711123",
+      "cb84f4ad-eafb-4481-acbf-c7837a061781",
+      "1742c25c-67be-4333-a8c7-b2e107b956c8",
+      "92b0d661-4eef-40d2-b45c-6c4eae5faab9",
+      "b39627a5-1a1d-4a32-a01e-52055cdf152b",
+      "5a0574e5-7f54-4e43-9fa2-2b2ca1ef84ec",
+      "f8a05b97-49a5-48ee-8506-0af848a8cb40",
+      "4f527a3e-959d-43b1-a888-6925ea0f20a7",
+      "ec15e2d0-b31b-468c-9242-51483f435aae",
+      "849516a2-c3fc-470a-9f78-10c0b0f193f5",
+      "cc04a6fe-3da9-4dfd-b45b-56f5f081fad1",
+      "3aec3f25-e216-410f-8270-3b417232dd9e",
+      "17984d8b-1225-41ab-b5ae-fa3321876180",
+      "2d72c027-88ea-4656-9e67-49d3c61c469a",
+      "e164688c-8153-4366-a917-ea72ec08930b",
+      "d63b2543-e8c2-47a7-b237-15c947944025",
+      "2d5e8cac-e11d-40bd-be00-fffac71a8a47",
+      "4cf79fed-bcef-4d87-87ae-fd73f5c6ce6d",
+      "2dba2b0e-07ba-4982-8c31-cefca867ecfb",
+      "fcdf6d43-679e-4f06-97a1-2d17187ac3a1",
+      "d5ff07eb-3df8-4f71-8c4b-b5f708545a58",
+      "941f16cd-42ca-43cf-9bcc-08b4e108212a"
+    ]
+  }
+]
