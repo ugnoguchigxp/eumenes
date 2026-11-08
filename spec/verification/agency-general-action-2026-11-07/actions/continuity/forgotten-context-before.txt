@@ -1,0 +1,24 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/forgotten-context.test.ts:
+60 | 		layer = host.dialoguePort;
+61 | 		host.start();
+62 | 		await settle();
+63 | 		const prefix = h.store.read((db) => h.dialogue.conversationTaskInTransaction(db, "main", "", { requireProvenance: true }))!;
+64 | 		expect(prefix.messages.map((m) => m.content).join("\n")).not.toContain("古い観測だけに属する話題");
+65 | 		expect(prefix.input?.sources).not.toContain(row.observationId);
+                                         ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "066dfee0-c75b-4852-92fb-a1d77bc32866"
+Received: [ "066dfee0-c75b-4852-92fb-a1d77bc32866", "memory-input:{\"kind\":\"message\",\"id\":\"066dfee0-c75b-4852-92fb-a1d77bc32866\",\"revision\":\"sha256:bbf639475ac4d518a38c4a914c68c88793f9b9f82d4e0292cc2fa4e1988f9416\",\"digest\":\"bbf639475ac4d518a38c4a914c68c88793f9b9f82d4e0292cc2fa4e1988f9416\",\"principal\":\"local:owner\",\"scope\":\"profile:owner\",\"policy\":\"1\"}",
+  "2b5e1fbb-c89c-452f-aad3-f68f78fe94e6", "memory-input:{\"kind\":\"message\",\"id\":\"2b5e1fbb-c89c-452f-aad3-f68f78fe94e6\",\"revision\":\"sha256:e7b119007c4296f8117404bb2c9076ec0a8d4129f3808f33e480a4998730c441\",\"digest\":\"e7b119007c4296f8117404bb2c9076ec0a8d4129f3808f33e480a4998730c441\",\"principal\":\"local:owner\",\"scope\":\"profile:owner\",\"policy\":\"1\"}"
+]
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/forgotten-context.test.ts:65:37)
+(fail) a forgotten archived observation cannot re-enter shared context or block fresh exchanges [122.34ms]
+
+ 0 pass
+ 1 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [439.00ms]

@@ -8,8 +8,17 @@ export const documentCapabilities = z.object({
 	basePath: z.literal("/v1/docling/documents"),
 	requiresDocling: z.literal(false),
 	methods: z
-		.array(z.enum(["GET", "PUT"]))
+		.array(z.string())
 		.refine((v) => v.includes("GET") && v.includes("PUT")),
+	delete: z.unknown().optional(),
+	libraryPath: z.unknown().optional(),
+	foldersPath: z.unknown().optional(),
+	operationsPath: z.unknown().optional(),
+	libraryOperations: z.unknown().optional(),
+	maxBatchItems: z.unknown().optional(),
+	maxAffectedItems: z.unknown().optional(),
+	maxCopyBytes: z.unknown().optional(),
+	folderCopyIds: z.unknown().optional(),
 	maxRequestBytes: z.number().int().positive().safe(),
 	maxMarkdownBytes: z.number().int().positive().safe(),
 	maxRecoveryBytes: z.number().int().positive().safe(),

@@ -6,6 +6,9 @@ export type ArtifactEvent = {
 	source: string;
 	revision: number;
 	action:
+		| "markdown-files"
+		| "markdown-manage"
+		| "markdown-check"
 		| "markdown-reconcile"
 		| "markdown-more"
 		| "markdown-resolve"

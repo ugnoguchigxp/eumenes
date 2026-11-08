@@ -45,3 +45,9 @@
 意味判断を固定分岐へ移す変更はない。フォルダはAPIの構造、検索は表示上の部分一致、保存状態は既存状態に基づく。今回以外のScratch・Agency・画像添付等の差分も存在し、削除・巻戻し・commitしていない。
 
 画像生成は組込みimage_genを使用。[画像案](design.png)と[生成条件](image-generation.md)を保存した。ContextStillはこのチャット累計context_compile 7回 / compile_eval 7回（今回useful）。
+
+## ヘッダーの追加表示調整
+
+利用者の追加指定により「新規文書」「Markdownを読み込む」も既存CreateButton/ActionButtonのiconOnlyへ変更した。操作名はaria-labelとtitleに残し、クリック処理とpendingによる無効化は維持した。既存MarkdownWorkspace画面試験5件、対象lint/format、DesignSystemのbuild用型検査とDesignSystem/Web buildは成功。表示だけの調整のため、新しい試験やAPI変更は追加していない。
+
+対象domainのverifyは従来と同じ保管コピー内の試験一覧で停止した。[今回のreport](../../../verification-reports/runs/2026-11-07T11-42-49-333Z-1189a389-c931-432d-8a6f-93607bc16245/report.json)。差分点検では今回の表示調整と説明追記以外の変更を維持した。稼働画面は再起動待ちであり、この調整後の実画面確認は未実施。ContextStill累計context_compile 10回 / compile_eval 10回（今回partial）。

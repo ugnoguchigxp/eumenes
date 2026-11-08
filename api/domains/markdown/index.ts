@@ -10,3 +10,9 @@ export {
 } from "./contracts";
 
 export { createMarkdownResourceAdapter } from "./service/resource-adapter";
+
+export type {
+	GeneratedHost,
+	GeneratedInput,
+	GeneratedReceipt,
+} from "./contracts/generated";

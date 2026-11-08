@@ -1,3 +1,4 @@
+import { assertLibraryIdle } from "../repository/library-operations";
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { HandlerDefinition, QueueService } from "../../queue";
@@ -87,6 +88,50 @@ export async function confirmSave(
 		state: conflict ? "conflict" : "unknown",
 	};
 }
+/** One conditional PUT, followed only by bounded GET confirmation. Shared by editors and generated documents. */
+export async function executeArchiveSave(
+	archive: ArchivePort,
+	frozen: ArchiveSave,
+	signal: AbortSignal,
+): Promise<SaveOutcome> {
+	const deadline = AbortSignal.any([signal, AbortSignal.timeout(190000)]);
+	try {
+		const entry = await archive.save(frozen, deadline);
+		if (matchesSave(entry, frozen)) return { ok: true, entry };
+		return confirmSave(
+			archive,
+			frozen,
+			AbortSignal.any([signal, AbortSignal.timeout(30000)]),
+		);
+	} catch (error) {
+		if (signal.aborted || archive.binding() !== frozen.binding)
+			return {
+				ok: false,
+				code: "markdown_archive_unknown",
+				state: "unknown",
+			};
+		if (error instanceof ArchiveFailure && error.outcome === "failed")
+			return { ok: false, code: error.code, state: "unsaved" };
+		const result = await confirmSave(
+			archive,
+			frozen,
+			AbortSignal.any([signal, AbortSignal.timeout(30000)]),
+			error instanceof ArchiveFailure && error.outcome === "conflict",
+		);
+		if (
+			!result.ok &&
+			result.state === "unknown" &&
+			error instanceof ArchiveFailure &&
+			error.outcome === "conflict"
+		)
+			return {
+				ok: false,
+				code: "markdown_archive_conflict",
+				state: "conflict",
+			};
+		return result;
+	}
+}
 export function adoptSave(
 	db: Database,
 	input: PendingSave,
@@ -147,46 +192,8 @@ export function createArchiveSave(
 				? { status: "ready", input }
 				: { status: "stale", reason: "markdown_save_changed" };
 		},
-		async execute(input, { signal }) {
-			const frozen = frozenSave(input);
-			const deadline = AbortSignal.any([signal, AbortSignal.timeout(190000)]);
-			try {
-				const entry = await archive.save(frozen, deadline);
-				if (matchesSave(entry, frozen)) return { ok: true, entry };
-				return confirmSave(
-					archive,
-					frozen,
-					AbortSignal.any([signal, AbortSignal.timeout(30000)]),
-				);
-			} catch (error) {
-				if (signal.aborted || archive.binding() !== frozen.binding)
-					return {
-						ok: false,
-						code: "markdown_archive_unknown",
-						state: "unknown",
-					};
-				if (error instanceof ArchiveFailure && error.outcome === "failed")
-					return { ok: false, code: error.code, state: "unsaved" };
-				const result = await confirmSave(
-					archive,
-					frozen,
-					AbortSignal.any([signal, AbortSignal.timeout(30000)]),
-					error instanceof ArchiveFailure && error.outcome === "conflict",
-				);
-				if (
-					!result.ok &&
-					result.state === "unknown" &&
-					error instanceof ArchiveFailure &&
-					error.outcome === "conflict"
-				)
-					return {
-						ok: false,
-						code: "markdown_archive_conflict",
-						state: "conflict",
-					};
-				return result;
-			}
-		},
+		execute: (input, { signal }) =>
+			executeArchiveSave(archive, frozenSave(input), signal),
 		classify: () => "fail",
 		settleInTransaction(db, claim, input, result) {
 			input ??= db
@@ -238,6 +245,7 @@ export function createArchiveSave(
 				(document.remote_binding && document.remote_binding !== binding)
 			)
 				throw new Error("markdown_archive_unavailable");
+			assertLibraryIdle(db, binding, document.remote_namespace ?? "eumenes");
 			const sourceId =
 				document.source_id ?? `wiki-${crypto.randomUUID().replaceAll("-", "")}`;
 			const namespace = document.remote_namespace ?? "eumenes",

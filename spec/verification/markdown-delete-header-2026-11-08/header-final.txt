@@ -1,0 +1,25 @@
+$ vitest run --project unit src/components/MarkdownWorkspace/header-delete.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/MarkdownWorkspace/header-delete.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/header-delete.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/MarkdownWorkspace/header-delete.test.tsx (10 tests) 1131ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  11:51:14
+   Duration  2.28s (transform 218ms, setup 91ms, import 652ms, tests 1.13s, environment 331ms)
+

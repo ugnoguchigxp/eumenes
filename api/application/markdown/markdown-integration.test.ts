@@ -113,7 +113,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 		await say("見出しと最後の段落を直して");
 		expect(prompts).toHaveLength(2);
 		const sourcePath =
-			"/api/toolchain-artifacts/artifact:markdown.workspace@3/sources/markdown-workspace?params=" +
+			"/api/toolchain-artifacts/artifact:markdown.workspace@4/sources/markdown-workspace?params=" +
 			encodeURIComponent(JSON.stringify({ workRef: owner.workRef }));
 		const source = await (await h.request(sourcePath)).json();
 		expect(source.data.current.title).toBe("企画");
@@ -128,7 +128,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 		expect(staged.status).toBe(201);
 		const { id: stageId } = await staged.json();
 		const artifact = await (
-			await h.request("/api/toolchain-artifacts/artifact:markdown.workspace@3")
+			await h.request("/api/toolchain-artifacts/artifact:markdown.workspace@4")
 		).json();
 		const event = {
 			version: 1,
@@ -136,7 +136,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 			eventCreatedAt: new Date().toISOString(),
 			eventExpiresAt: new Date(Date.now() + 60000).toISOString(),
 			artifactId: "fixture-tab",
-			artifactRevisionId: "artifact:markdown.workspace@3",
+			artifactRevisionId: "artifact:markdown.workspace@4",
 			source: "markdown-workspace",
 			sourceRevision: source.revision,
 			actionId: "archive",
@@ -213,4 +213,96 @@ test("the authenticated upload route accepts documents above the shared 1 MiB ca
 	} finally {
 		await h.close();
 	}
+});
+
+test("the public capability projection exposes limits and feature flags without opaque upstream extension values", async () => {
+	const { createDocling } = await import("../../domains/docling"),
+		{ markdownArchive } = await import("./markdown-composition");
+	const service = createDocling({
+		connection: () => null,
+		status: () => ({ revision: 0, configured: false, publicOrigin: null }),
+		fileConnection: () => ({
+			baseUrl: "https://larm.test",
+			credential: "fixture-backend-only",
+		}),
+		fetch: async () =>
+			Response.json({
+				contractVersion: "larm.docling-files.v1",
+				basePath: "/v1/docling/documents",
+				requiresDocling: false,
+				methods: ["GET", "PUT", "DELETE", "FUTURE"],
+				delete: { opaque: "upstream-extension-value" },
+				maxRequestBytes: 20971520,
+				maxMarkdownBytes: 8388608,
+				maxRecoveryBytes: 8388608,
+				maxPageSize: 100,
+				contentDigest: "sha256(ascii(markdownSha256 + LF + recoverySha256))",
+			}),
+	});
+	const caps = await markdownArchive(service).capabilities(
+		AbortSignal.timeout(5000),
+	);
+	expect(caps.maxMarkdownBytes).toBe(8388608);
+	expect(caps.features?.delete).toBe(false);
+	expect(JSON.stringify(caps)).not.toContain("upstream-extension-value");
+	expect(JSON.stringify(caps)).not.toContain("fixture-backend-only");
+});
+
+test("management metadata excludes document bodies while retaining validated identity and digests", async () => {
+	const { createDocling, documentDigests } =
+			await import("../../domains/docling"),
+		{ markdownArchive } = await import("./markdown-composition");
+	const id = `wiki-${"a".repeat(32)}`,
+		etag = `"${"b".repeat(64)}"`,
+		markdown = "\uFEFF# 本文\r\n末尾  \r\n",
+		recovery = '{"style":"太字"}',
+		digests = documentDigests(markdown, recovery);
+	const service = createDocling({
+		connection: () => null,
+		status: () => ({ revision: 0, configured: false, publicOrigin: null }),
+		fileConnection: () => ({
+			baseUrl: "https://larm.test",
+			credential: "fixture",
+		}),
+		fetch: async (url) =>
+			url.pathname.endsWith("capabilities")
+				? Response.json({
+						contractVersion: "larm.docling-files.v1",
+						basePath: "/v1/docling/documents",
+						requiresDocling: false,
+						methods: ["GET", "PUT"],
+						maxRequestBytes: 20971520,
+						maxMarkdownBytes: 8388608,
+						maxRecoveryBytes: 8388608,
+						maxPageSize: 100,
+						contentDigest:
+							"sha256(ascii(markdownSha256 + LF + recoverySha256))",
+					})
+				: Response.json(
+						{
+							id,
+							etag,
+							namespace: "eumenes",
+							path: "元.md",
+							title: "原題",
+							markdown,
+							recovery,
+							...digests,
+						},
+						{ headers: { ETag: etag } },
+					),
+	});
+	const metadata = await markdownArchive(service).management!.getEntry(
+		"document",
+		id,
+		AbortSignal.timeout(5000),
+	);
+	expect(metadata).toMatchObject({
+		kind: "document",
+		id,
+		etag,
+		contentDigest: digests.contentDigest,
+	});
+	expect(metadata).not.toHaveProperty("markdown");
+	expect(metadata).not.toHaveProperty("recovery");
 });

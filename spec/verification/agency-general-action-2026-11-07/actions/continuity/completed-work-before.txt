@@ -1,0 +1,25 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/forgotten-context.test.ts:
+(pass) a forgotten input cannot re-enter shared context with completed work=false [147.39ms]
+196 | 				}),
+197 | 			)!;
+198 | 			expect(prefix.messages.map((m) => m.content).join("\n")).not.toContain(
+199 | 				"古い観測だけに属する話題",
+200 | 			);
+201 | 			expect(prefix.input?.sources).not.toContain(row.observationId);
+                                           ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "d40abf0c-08eb-46e8-8205-69d01ff579d7"
+Received: [ "d40abf0c-08eb-46e8-8205-69d01ff579d7", "memory-input:{\"kind\":\"message\",\"id\":\"d40abf0c-08eb-46e8-8205-69d01ff579d7\",\"revision\":\"sha256:df79ba0079de8ffaa0e983d7a7f7dcb27a972126875e180703a7e54eefc0482f\",\"digest\":\"df79ba0079de8ffaa0e983d7a7f7dcb27a972126875e180703a7e54eefc0482f\",\"principal\":\"local:owner\",\"scope\":\"profile:owner\",\"policy\":\"1\"}",
+  "host-work:[\"ba8fd714-383a-409d-a7f5-2aef887e9718\",2]"
+]
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/forgotten-context.test.ts:201:38)
+(fail) a forgotten input cannot re-enter shared context with completed work=true [1111.60ms]
+
+ 1 pass
+ 1 fail
+ 25 expect() calls
+Ran 2 tests across 1 file. [1.56s]

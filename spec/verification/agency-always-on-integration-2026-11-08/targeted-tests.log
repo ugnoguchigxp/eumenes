@@ -1,0 +1,70 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/always-on.test.ts:
+(pass) always-on owns one heartbeat, stores canonical bodies in Memory and restores actual speech [731.61ms]
+(pass) new user words invalidate the action while an independent think continues [634.57ms]
+(pass) a Live handoff is not counted as delivered or replayed after restart [629.66ms]
+(pass) preparation uses the registered image owner and returns a real result once [754.03ms]
+(pass) corrected versions replace old derived state and remain usable after restart [648.37ms]
+(pass) screen typing blocks new ticks and a saved heartbeat preserves its backoff [590.16ms]
+(pass) forgetting one conversation leaves another independent think running [646.27ms]
+(pass) forgetting a canonical observation Record survives recovery [603.57ms]
+(pass) a confirmed normal reply shares preparation through existing State and stock operations [723.11ms]
+
+api/application/agency/always-on-activity.test.ts:
+(pass) activity leases respect revisions, hidden playback, independent screens and expiration [0.15ms]
+
+api/application/agency/always-on-authority.test.ts:
+(pass) an invented always-on ticket cannot authorize a registered capability [577.69ms]
+(pass) preparation result rollback is retried once through the existing ledger without duplicate execution [696.68ms]
+
+api/application/agency/always-on-checkpoint.test.ts:
+(pass) a queued checkpoint rejects a changed capture and saves all latest scopes with the feed [558.04ms]
+(pass) recovery isolates unknown-version while another conversation remains available [625.63ms]
+(pass) recovery isolates missing-record while another conversation remains available [613.92ms]
+(pass) incomplete host input cannot reach the think provider even before any forgetting [543.70ms]
+
+api/application/agency/always-on-switch.test.ts:
+(pass) switching drains old think before starting F and can return to one always-on owner [615.71ms]
+
+api/application/agency/continuity-actions.test.ts:
+(pass) native recall starts creation after the speech cap and returns a real resource once [841.84ms]
+
+api/application/agency/action-safety.test.ts:
+(pass) an autonomous command cannot translate into an unapproved write, even if it claims user approval [613.28ms]
+(pass) settings stops an accepted autonomous operation and rejects its late response [606.29ms]
+(pass) forget stops an accepted autonomous operation and rejects its late response [589.24ms]
+(pass) cancel stops an accepted autonomous operation and rejects its late response [817.02ms]
+(pass) capability stops an accepted autonomous operation and rejects its late response [709.64ms]
+(pass) the concurrent action limit is transactional and a replay consumes no second slot [610.87ms]
+(pass) the daily action limit is transactional and a replay consumes no second slot [765.61ms]
+(pass) an accepted action survives host restart without a second operation or a second execution [629.04ms]
+
+api/application/agency/llm-port.test.ts:
+(pass) agency LLM port > captures a structured background control on the conversation route and returns usage and latency [0.75ms]
+(pass) agency LLM port > never asks for more than the background output limit [0.26ms]
+(pass) agency LLM port > a schema violation is an output error and rejects the control receipt [0.14ms]
+(pass) agency LLM port > unparseable output is an output error [0.10ms]
+(pass) agency LLM port > an already aborted signal calls nothing [0.03ms]
+(pass) agency LLM port > an abort during the call propagates and reaches inference through the signal [0.09ms]
+(pass) agency LLM port > a result that arrives after cancellation is not adopted [0.05ms]
+(pass) agency LLM port > inference failures become call errors; connection-class codes are retryable [0.15ms]
+(pass) agency LLM port > a call that yielded to the foreground is not tried again at once [0.04ms]
+(pass) agency LLM port > a capture refusal of inference is a non-retryable call error [0.06ms]
+(pass) agency LLM port > a receipt inference no longer accepts is not adopted [0.04ms]
+(pass) agency LLM port > an invalid decision id is refused before capture [0.04ms]
+(pass) agency LLM port on the conversation's prompt > the purpose system replaces the conversation system; only data goes into Task [0.12ms]
+(pass) missing host system never captures or calls inference [0.06ms]
+
+api/application/vendor.test.ts:
+(pass) the vendored memory package matches its manifest, package.json, the lockfile and the installed copy [1.22ms]
+(pass) the memory distribution identifies its source and verifies the installed published files [40.68ms]
+(pass) the vendored world-model package matches its manifest, package.json, the lockfile and the installed copy [1.21ms]
+(pass) the vendored agency package matches its manifest, package.json, the lockfile and the installed copy [1.01ms]
+(pass) the vendored router package matches its manifest, package.json, the lockfile and the installed copy [0.86ms]
+(pass) the installed memory host matches its vendored artifact and the adopted core runtime [52.45ms]
+
+ 46 pass
+ 0 fail
+ 605 expect() calls
+Ran 46 tests across 9 files. [16.99s]

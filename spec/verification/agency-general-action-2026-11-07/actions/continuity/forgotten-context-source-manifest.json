@@ -1,0 +1,7 @@
+{
+  "api/application/agency/host.ts": "55574923a9c477eae956fd0063ddaa77ef98ad4fa7fa51c29022198b304e5d8b",
+  "api/application/agency/forgotten-context.test.ts": "d0cfc938f91b02f0ef2195307b0443490e9f4f14757aa76c06498e61d6797286",
+  "api/domains/dialogue/contracts/index.ts": "6e5eb2b7effa98d0da7d64af413d5c9e571ca61bc00614ba0d0469a810afd1d3",
+  "api/domains/dialogue/service/conversation-input.ts": "f6bc78e9067e4bbabed3e462ceb9e304de06c2d14c26c3e7e69fc3d27f48ed71",
+  "scripts/domains.ts": "ec10eb641388964851c5cc0747e64d78ecc94fcb98f936e03406246a98d0ea15"
+}

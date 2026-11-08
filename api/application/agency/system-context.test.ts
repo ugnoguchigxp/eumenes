@@ -23,7 +23,7 @@ test("both runtime purposes send the complete Eumenes system; observations stay 
 	await h.say("a1", "assistant", "HISTORY_SENTINEL", "r1");
 	await waitFor(() => h.calls.select === 1);
 	for (const request of h.requests) {
-		if (request.purpose === "respond")
+		if (request.purpose === "respond" || request.purpose === "think")
 			throw new Error("unexpected normal reply in background port");
 		const data = JSON.parse(request.prompt);
 		expect(data.observations).toContainEqual(

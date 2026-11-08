@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+export { agencyStatusSchema } from "./agency-status";
 import { z } from "zod";
 import type { DeliveryEmotion } from "../../delivery";
 import { addresseeSchema, runViewingSchema } from "./specialist";
@@ -198,6 +199,8 @@ export interface AgencyLayerPort {
 	isCurrentInputInTransaction?(
 		db: Database,
 		input: { sources: readonly string[]; complete: boolean },
+		/** Also respect this conversation's native forgotten references when rendering its context. */
+		conversationId?: string,
 	): boolean;
 	inputForMessageInTransaction?(
 		db: Database,
@@ -311,3 +314,9 @@ export const errorStatus = {
 	interaction_capacity: 429,
 	toolchain_unavailable: 503,
 } as const satisfies Record<string, HttpErrorStatus>;
+export {
+	isAlwaysOnSnapshot,
+	alwaysOnSources,
+	alwaysOnTicketInput,
+	type AlwaysOnHostSnapshot,
+} from "./agency-always-on";

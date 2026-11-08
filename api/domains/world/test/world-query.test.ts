@@ -556,7 +556,7 @@ test("A16 Goal: an adopted Goal of the scope is accepted; a withdrawn one blocks
 		// A Gap is something to confirm, not something to run.
 		expect(withGoal.executionPermission).toBe("none");
 		expect(withGoal.referenceOnly).toBe(true);
-		for (const gap of withGoal.result.gaps.gaps)
+		for (const gap of withGoal.result.gaps.gaps) {
 			expect(Object.keys(gap).sort()).toEqual(
 				[
 					"blocksGoal",
@@ -564,11 +564,14 @@ test("A16 Goal: an adopted Goal of the scope is accepted; a withdrawn one blocks
 					"confirmationCost",
 					"deadlineAt",
 					"edgeId",
+					"freshness",
 					"gapKey",
 					"kind",
 					"subjectId",
 				].sort(),
 			);
+			expect(gap.freshness).toBe("unknown");
+		}
 		await goals.withdraw(access, goal.id, { expectedRevision: 1, source: src });
 		expect(
 			ok(await q.query(ctx, { mode: "gaps", goalId: goal.id })).status,

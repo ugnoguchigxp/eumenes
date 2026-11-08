@@ -1,0 +1,1280 @@
+$ bun test ./src ./test ./standalone ./eval ./examples
+bun test v1.4.4 (38afee6c8)
+
+test/settle-interests.test.ts:
+(pass) H3 settle-interests > user_relation needs a non-agent observation; own may start from agent talk [0.18ms]
+(pass) H3 settle-interests > promotion needs independent evidence [0.07ms]
+(pass) H3 settle-interests > tool results from one call count once [0.02ms]
+(pass) H3 settle-interests > host_seed: model cannot create, rewrite topic or fade; may make dormant [0.02ms]
+(pass) H3 settle-interests > derivedFrom needs existing parent and independent evidence [0.03ms]
+(pass) H3 settle-interests > faded is not revived in place
+(pass) H3 settle-interests > capacity limit [0.02ms]
+(pass) H3 settle-interests > unknown refs and stale revision rejected; no_change keeps revision [0.03ms]
+(pass) H3 settle-interests > iUpdateSchema accepts interest ops and F ops [2.38ms]
+
+test/wake.test.ts:
+(pass) wake: review_due > not before reviewAt, once after it (plan §7.4) [0.17ms]
+(pass) wake: review_due > an uncommitted (failed) wake stays due [0.02ms]
+(pass) wake: review_due > closed intents never wake [0.01ms]
+(pass) wake: host gates stop everything > OFF [0.01ms]
+(pass) wake: host gates stop everything > speaking
+(pass) wake: host gates stop everything > foreground
+(pass) wake: host gates stop everything > budget
+(pass) wake: work_returned updates only > returned work never opens select [0.01ms]
+(pass) wake: work_returned updates only > same return id fires once [0.01ms]
+(pass) wake: recall, cooldown, daily limit > recall needs an open interest or held intent [0.08ms]
+(pass) wake: recall, cooldown, daily limit > a cooling interest does not wake; after the cooldown it does [0.03ms]
+(pass) wake: recall, cooldown, daily limit > daily limit counts autonomous wakes per local day [0.04ms]
+(pass) wake: recall, cooldown, daily limit > a daily-limit-blocked event is deferred, not consumed by a coinciding reason [0.04ms]
+(pass) wake: recall, cooldown, daily limit > a running delegation blocks recall / external / idle but not review or returns [0.02ms]
+(pass) wake: fault > same code wakes once per quiet window, update only [0.03ms]
+(pass) wake: LLM calls per wake are bounded > any combination uses at most update 1 + select 1 [0.02ms]
+(pass) activity budget > tool calls, tokens and elapsed time each stop the activity [0.14ms]
+
+test/core/wire.test.ts:
+(pass) wire update > every op round-trips through the flat wire shape [2.23ms]
+(pass) wire update > the op enum is limited per condition and B1 has no reconciliations [0.17ms]
+(pass) wire update > missing required parts fail the strict re-validation [0.06ms]
+(pass) wire update > a tool candidate without text takes its content from toolName and toolInput [0.05ms]
+(pass) wire update > missing candidate text is still rejected unless a tool has toolInput [0.12ms]
+(pass) wire update > a candidate.add without localId gets a unique placeholder [0.08ms]
+(pass) wire update > a missing localId is still rejected for other add ops [0.03ms]
+(pass) wire update > an intent.update without reason gets a fixed marker [0.04ms]
+(pass) wire update > an intent.update with a terminal transition and no reason still fails [0.10ms]
+(pass) wire update > intent.add accepts the held initial state [0.06ms]
+(pass) wire update > the wire schema converts to JSON schema (no transforms, records or refinements) [1.41ms]
+
+test/core/conversation-participation.test.ts:
+(pass) opt-in F conversation can speak from a presented external observation without persistent intent [4.94ms]
+(pass) candidate-free conversation stays opt-in and F-only: false/F [0.23ms]
+(pass) candidate-free conversation stays opt-in and F-only: true/B2 [0.15ms]
+(pass) conversation never authorizes an ungrounded speech or candidate-free tool: speak/ [0.26ms]
+(pass) conversation never authorizes an ungrounded speech or candidate-free tool: speak/absent [0.19ms]
+(pass) conversation never authorizes an ungrounded speech or candidate-free tool: tool/o1 [0.17ms]
+(pass) agent-only observations cannot open the conversation gate [0.13ms]
+(pass) conversation without a candidate retains full forgetting and fresh-restart protection [1.57ms]
+(pass) adopted normal replies are already delivered context with full source dependencies, even beyond the recent window [1.64ms]
+(pass) the model sees the actual autonomous cooldown and the runtime still enforces it [0.50ms]
+
+test/core/evidence-recall.test.ts:
+(pass) a visible note recalls its original evidence beyond the recent observation window [0.77ms]
+(pass) recall uses an archive but never resurrects forgotten evidence [1.19ms]
+(pass) note-mode recall does not retrieve evidence from hidden intent state [0.56ms]
+(pass) recall stays bounded and preserves the recent observation window [0.42ms]
+(pass) B1 shared citations do not crowd a distinct source out of recall [0.69ms]
+(pass) F shared citations do not crowd a distinct source out of recall [1.49ms]
+(pass) opportunity planning delivers the host opportunity to experimental update instructions [0.52ms]
+(pass) a budgeted update repair receives the rejection codes in experimental text [0.74ms]
+
+test/core/social-topics.test.ts:
+(pass) socialTopics > absent or false: update and select prompts are byte-identical to before [1.44ms]
+(pass) socialTopics > B1 social: update prompt asks for 【話題】 topic seeds [0.22ms]
+(pass) socialTopics > the topic planner sees the persona interest as quoted source data [0.30ms]
+(pass) socialTopics > B1 social: select prompt has the lull rules; idle closing line yields to speaking [0.46ms]
+(pass) socialTopics > B2/F ignore socialTopics entirely [0.38ms]
+(pass) socialTopics > both lull modes distinguish a normal reply from the outbound interval [0.52ms]
+(pass) socialTopics > speaking from a topic seed (note evidence) or an interest is accepted at idle [0.42ms]
+
+test/core/f-host.test.ts:
+(pass) F host data reaches both purposes and candidate speech retains emotion [1.35ms]
+(pass) F host material does not bypass observation evidence or candidate validation [0.46ms]
+(pass) F skips selection after no_change even when standing interests and host material are present [0.12ms]
+(pass) the F selection input enumerates citable references from the exact request [0.21ms]
+
+test/core/idle.test.ts:
+(pass) createIdlePlanner > fires idleSec after the last submitted line [0.07ms]
+(pass) createIdlePlanner > default idle is 10s and backs off 10 -> 20 -> 40 then waits for the user [0.02ms]
+(pass) createIdlePlanner > idleSec 0 disables
+(pass) createIdlePlanner > backoff doubles then gives up until the next user turn
+(pass) createIdlePlanner > paused (agency off) neither advances the backoff nor blocks resuming [0.02ms]
+(pass) createIdlePlanner > a proactive line and the end of AI output restart the clock [0.01ms]
+(pass) createIdlePlanner > unanswered limit holds until the user replies
+(pass) createIdlePlanner > busy (reply or cycle running) pauses, and leave restarts the clock
+(pass) createIdlePlanner > stop is permanent [0.01ms]
+(pass) createIdleScheduler > silent cycles retry at 40, +80, +160 then stop [0.19ms]
+(pass) createIdleScheduler > after speaking, no further idle until the user replies [0.04ms]
+(pass) createIdleScheduler > a submitted line postpones the timer [0.04ms]
+(pass) createIdleScheduler > onCycle sees the planner after it absorbed the outcome [0.05ms]
+(pass) createIdleScheduler > dispose is permanent: a run finishing afterwards arms nothing [0.06ms]
+(pass) createIdleScheduler > a huge delay is clamped to the timer range [0.03ms]
+(pass) createIdleScheduler > aborted cycles do not count as silent; halted stops for good [0.03ms]
+(pass) createIdleScheduler > disabled idle never schedules; dispose clears [0.01ms]
+(pass) technical retries survive restore without spending silence or unanswered budgets [0.03ms]
+
+test/core/memory-lifecycle.test.ts:
+(pass) all presented inputs propagate across state and restart even when the model cites another observation [0.81ms]
+(pass) revision-only restore retains complete input metadata; forget redacts every version [0.44ms]
+(pass) legacy or unknown host provenance is forgotten conservatively, while unrelated complete inputs survive [0.24ms]
+(pass) forgetting a pending input erases its body without acknowledging other pending events [1.16ms]
+(pass) archival compaction preserves seq, pending, recent context, archive identity and idempotence [0.44ms]
+(pass) compaction pins old state evidence and the latest user input [0.24ms]
+(pass) metadata capacity fails before mutation [0.03ms]
+(pass) durable store atomically archives, rejects stale writers, purges histories, and fences old backups [14.48ms]
+(pass) storage failure rolls back archive and checkpoint together [6.57ms]
+(pass) saving a compaction plan without its archive cannot discard observations [3.92ms]
+(pass) host-derived reference chains retain dependencies even when the caller omits a redundant context [0.26ms]
+(pass) SIGKILL before/after archive and forget commit preserves one complete durable generation [177.95ms]
+(pass) two standalone writer processes cannot both commit the same checkpoint generation [50.90ms]
+(pass) pending observations larger than the recent window cannot be compacted [0.34ms]
+(pass) legacy orphan ticket bodies are conservatively erased on forgetting [0.11ms]
+(pass) invalid host dependency contexts fail before admitting an observation [0.14ms]
+(pass) rewritten speech receipts do not claim complete dependencies from the selection alone [1.01ms]
+(pass) forgetting journal fences unknown receipt inputs before admission [0.70ms]
+(pass) forgotten pending tombstones do not become sources of a new unrelated item [0.34ms]
+(pass) state never presented to the model does not make an unrelated new note depend on it [0.76ms]
+(pass) an ordinary input is admitted when it does not allocate dependency metadata [0.09ms]
+
+test/core/host-autonomy.test.ts:
+(pass) host native contracts enumerate available tool names without changing legacy wire output [1.07ms]
+(pass) a kind rejected after wire parsing supplies the operation's allowed choices to repair [0.59ms]
+(pass) strict wire failures return bounded field diagnostics to the one repair call [0.24ms]
+(pass) a quiet opportunity plans from existing evidence without creating an observation [0.34ms]
+(pass) a receipt-closed candidate is not reconciled again; rejection is corrected with diagnostics [0.55ms]
+(pass) formed interests are reference data with their status and provenance [0.18ms]
+(pass) restart preserves spent call budget and pending delivery tickets [0.64ms]
+(pass) speech limit does not invent delivery or discard a candidate [0.20ms]
+(pass) idle checkpoint preserves unanswered limits and next opportunity time [0.08ms]
+(pass) failed, interrupted and unknown speech stay in observations and outside delivered, including legacy restore [4.04ms]
+(pass) update repair identifies the rejected operation and its editable wire field [0.27ms]
+
+test/core/host-topics.test.ts:
+(pass) hostTopics > absent or false: prompts are byte-identical, and Opportunity.topics is ignored [0.73ms]
+(pass) hostTopics > update prompt is the plain B1 one: no topic-seed rules [0.17ms]
+(pass) hostTopics > select prompt: lull rules, memory section, idle closing line [0.39ms]
+(pass) hostTopics > hostTopics wins over socialTopics [0.21ms]
+(pass) hostTopics > memory refs are accepted only when presented [0.54ms]
+(pass) hostTopics > a note id is read as the note's evidence (unresolved matter) [0.44ms]
+(pass) hostTopics > gate: with no notes, select runs only if topics or interests exist [0.34ms]
+(pass) topic and interest use (social-rules-3) > a delivered topic is listed last with its last use; deliveries show their age [0.38ms]
+(pass) topic and interest use (social-rules-3) > a failed delivery does not count as use [0.20ms]
+(pass) topic and interest use (social-rules-3) > an interrupted or unknown outcome followed by a late success counts as use [0.47ms]
+(pass) topic and interest use (social-rules-3) > without a social mode nothing is annotated (interests only) [0.20ms]
+(pass) topic and interest use (social-rules-3) > host context (season, weather, news) opens the gate, is shown with context refs and is citable [0.22ms]
+
+test/core/retention.test.ts:
+(pass) full ledger rejects input without advancing identity/cursor and keeps idempotent replay [0.06ms]
+(pass) UTF-8 byte boundaries include metadata and multi-byte text [0.04ms]
+(pass) receipt backpressure cannot half-apply attempt success or consume an id [0.49ms]
+(pass) retained state capacity rejects the complete update and keeps the batch pending [1.07ms]
+(pass) host usage is idempotent across restart; conflicting and unknown receipts are rejected [0.78ms]
+(pass) late usage is recorded without restarting a returned activity [0.34ms]
+(pass) late usage cannot charge a later activity that starts in the same clock tick [0.69ms]
+
+test/core/budget.test.ts:
+(pass) budget > rolling window [0.02ms]
+(pass) budget > minimum interval applies only when spaced
+
+test/core/interest-growth-review.test.ts:
+(pass) interest growth review regressions > a failed revision write is retried with the original rows and revisions [0.44ms]
+(pass) interest growth review regressions > failed history is saved before the next state, preserving both versions [0.37ms]
+(pass) interest growth review regressions > work.returned: events beyond one batch stay eligible for the next wake [0.47ms]
+(pass) interest growth review regressions > fault.observed: events beyond one batch stay eligible for the next wake [0.14ms]
+(pass) interest growth review regressions > external.event: events beyond one batch stay eligible for the next wake [0.13ms]
+(pass) interest growth review regressions > blocked recall does not consume the autonomous daily quota [0.27ms]
+(pass) interest growth review regressions > tool provenance remains available when old evidence leaves the model window [1.32ms]
+(pass) interest growth review regressions > the same tool execution cannot promote, rewrite or branch an interest [0.05ms]
+(pass) interest growth review regressions > experimental context: formed interests can be cited and begin their cooldown [0.37ms]
+(pass) interest growth review regressions > host context: formed interests can be cited and begin their cooldown [0.25ms]
+(pass) interest growth review regressions > an absent or faded interest does not become an allowed citation: interest:missing [0.19ms]
+(pass) interest growth review regressions > an absent or faded interest does not become an allowed citation: interest:k1 [0.13ms]
+
+test/core/memory-review.test.ts:
+(pass) H1: an old user observation does not unlock re-creation > old user obs + the retracted belief's self obs => rejected [0.23ms]
+(pass) H1: an old user observation does not unlock re-creation > the correction itself (already in the retracted belief's evidence) does not unlock it either [0.04ms]
+(pass) H1: an old user observation does not unlock re-creation > a new user observation in this batch still unlocks it [0.04ms]
+(pass) review regressions: content and evidence boundaries > a retracted correction blocks self-evidence reuse in either operation order [0.05ms]
+(pass) review regressions: content and evidence boundaries > a disputed correction blocks self-evidence reuse in either operation order [0.03ms]
+(pass) review regressions: content and evidence boundaries > a superseded correction blocks self-evidence reuse in either operation order [0.02ms]
+(pass) review regressions: content and evidence boundaries > rewriting an existing belief cannot reuse another corrected belief's self-evidence [0.05ms]
+(pass) review regressions: content and evidence boundaries > an intermediate dispute is remembered even if reactivated later in the same update [0.03ms]
+(pass) review regressions: content and evidence boundaries > a high-confidence rewrite needs fresh support even if confidence is unchanged [0.07ms]
+(pass) review regressions: content and evidence boundaries > a high-confidence belief can still be corrected to disputed without fresh support [0.03ms]
+(pass) review regressions: content and evidence boundaries > a high-confidence belief can still be corrected to retracted without fresh support [0.02ms]
+(pass) review regressions: content and evidence boundaries > a high-confidence belief can still be corrected to superseded without fresh support [0.01ms]
+(pass) review regressions: content and evidence boundaries > correcting two beliefs from the same self-output does not block the second correction [0.06ms]
+(pass) review regressions: content and evidence boundaries > context beyond the batch cannot unlock re-creation [0.03ms]
+(pass) review regressions: content and evidence boundaries > context beyond the batch cannot reactivate a disputed belief [0.04ms]
+(pass) review regressions: content and evidence boundaries > context beyond the batch cannot create a high-confidence belief [0.02ms]
+(pass) review regressions: content and evidence boundaries > punctuation that changes meaning does not collapse distinct beliefs [0.08ms]
+(pass) review regressions: content and evidence boundaries > fresh support remains usable regardless of an unrelated correction's order [0.09ms]
+(pass) review regressions: content and evidence boundaries > fresh support must be new to every corrected belief whose self-evidence is reused [0.06ms]
+(pass) runtime correction integration > a deferred evidence rejection rolls back the whole proposal and leaves the correction pending [0.49ms]
+(pass) runtime correction integration > correction first=%s advances the ledger and projects fresh provenance [0.62ms]
+(pass) runtime correction integration > correction first=%s advances the ledger and projects fresh provenance [0.40ms]
+(pass) H2/M3: semantic recurrence is judged by the model > recent retractions follow correction order rather than belief creation order [0.26ms]
+(pass) H2/M3: semantic recurrence is judged by the model > retraction history and rules accompany punctuation changes [0.06ms]
+(pass) H2/M3: semantic recurrence is judged by the model > retraction history and rules accompany derived self-output [0.04ms]
+(pass) H2/M3: semantic recurrence is judged by the model > retraction history and rules accompany paraphrase [0.04ms]
+(pass) H3: tool corroboration counts calls, not observations > results without call identities cannot establish two distinct calls [0.03ms]
+(pass) H3: tool corroboration counts calls, not observations > the model sees the call identities that settlement uses [0.02ms]
+(pass) H3: tool corroboration counts calls, not observations > two results of one call (same causationId) do not support high [0.02ms]
+(pass) H3: tool corroboration counts calls, not observations > results of two calls do [0.02ms]
+(pass) M2: disputed is treated like retracted > disputed -> active with old evidence is rejected [0.03ms]
+(pass) M2: disputed is treated like retracted > disputed -> active with a new user observation is accepted [0.03ms]
+(pass) M2: disputed is treated like retracted > a disputed belief's self-output cannot ground a new belief [0.03ms]
+(pass) M4/L3: every untrusted text renders as one escaped line (property checks) > projection metadata cannot close the reference block or forge a section [0.07ms]
+(pass) M4/L3: every untrusted text renders as one escaped line (property checks) > work fields, errands and tool descriptions cannot forge update or select sections [0.30ms]
+(pass) M4/L3: every untrusted text renders as one escaped line (property checks) > quote() escapes newlines, <, >, U+2028 and U+2029 and round-trips [0.03ms]
+(pass) M4/L3: every untrusted text renders as one escaped line (property checks) > respondSystem: interests, projection and opening never add headers, separators or delimiters [0.12ms]
+(pass) M4/L3: every untrusted text renders as one escaped line (property checks) > update and select prompts: observations, topics and interests never add headers or separators [1.13ms]
+(pass) M5: evidence provenance breakdown > a disputed belief remains explicitly disputed in the normal reply [0.06ms]
+(pass) M5: evidence provenance breakdown > provenance() counts sources [0.02ms]
+(pass) M5: evidence provenance breakdown > projection and reply render ids with the breakdown [0.03ms]
+(pass) M5: evidence provenance breakdown > update prompt renders the breakdown for each belief [0.02ms]
+
+test/core/improvement-contracts.test.ts:
+(pass) queued wake is fenced by invalidate, fresh wake still runs [0.32ms]
+(pass) queued wake is fenced by off-on, fresh wake still runs [0.12ms]
+(pass) queued wake captures its host inputs [0.12ms]
+(pass) zero toolCalls blocks the first tool [0.01ms]
+(pass) zero tokens blocks the first tool
+(pass) zero elapsedMs blocks the first tool
+(pass) invalid activity limits are rejected: %s [0.01ms]
+(pass) invalid activity limits are rejected: %s
+(pass) invalid activity limits are rejected: %s
+(pass) invalid activity limits are rejected: %s
+(pass) returned observation metadata cannot modify the append-only ledger [0.09ms]
+(pass) select usage is charged to its identified activity and survives restore [0.73ms]
+
+test/core/settle.test.ts:
+(pass) settle: applying > applies intent and candidate, forward refs resolve, revisions start at 1 [0.04ms]
+(pass) settle: applying > touched items advance their revision, state revision advances once [0.10ms]
+(pass) settle: applying > no_change keeps the revision and filters focus to existing ids [0.05ms]
+(pass) settle: applying > focus is stored on apply [0.02ms]
+(pass) settle: reject codes > unknown_ref for evidence not presented [0.03ms]
+(pass) settle: reject codes > unknown_ref for a missing existing id [0.03ms]
+(pass) settle: reject codes > stale_revision on revision mismatch and on closed items [0.09ms]
+(pass) settle: reject codes > unresolved_ref for intentRef, supersedes [0.05ms]
+(pass) settle: reject codes > unresolved_ref for desireRef and beliefRefs (F) [0.07ms]
+(pass) settle: reject codes > duplicate localIds are rejected [0.01ms]
+(pass) settle: reject codes > a dependency cycle is rejected [0.04ms]
+(pass) settle: reject codes > illegal transitions [0.14ms]
+(pass) settle: reject codes > restating the current state is a no-op transition, not a rejection [0.07ms]
+(pass) settle: reject codes > held can resume to adopted [0.04ms]
+(pass) settle: reject codes > an intent can be created held; its candidates wait until it is adopted [0.03ms]
+(pass) settle: reject codes > completion needs newer evidence from a non-agent actor [0.09ms]
+(pass) settle: reject codes > terminal intent closes its open candidates in the same settle [0.03ms]
+(pass) settle: reject codes > explicit candidate.close after a terminal intent cascade is accepted (pre-proposal revisions) [0.03ms]
+(pass) settle: reject codes > completed intent plus candidate.close fulfilled needs evidence and keeps the explicit reason [0.08ms]
+(pass) settle: reject codes > candidate.close before the terminal intent still works [0.03ms]
+(pass) settle: reject codes > a cascaded candidate still rejects a revision that differs from the pre-proposal one [0.05ms]
+(pass) settle: reject codes > an unrelated candidate is unaffected by another intent's cascade [0.04ms]
+(pass) settle: reject codes > review and expire hours are capped by limits [0.05ms]
+(pass) settle: reject codes > bad_tool rules [0.10ms]
+(pass) settle: reject codes > candidate on a closed intent is rejected [0.04ms]
+(pass) settle: reject codes > supersedes closes the old candidate [0.04ms]
+(pass) settle: reject codes > fulfilled close needs evidence [0.04ms]
+(pass) settle: reject codes > capacity [0.10ms]
+(pass) settle: reject codes > closing frees capacity inside the same proposal [0.03ms]
+(pass) settle: reject codes > op types per condition [0.05ms]
+(pass) settle: reject codes > B1 note update and delete check revisions [0.07ms]
+(pass) settle: reject codes > B1 note update accumulates evidence without duplicates [0.03ms]
+(pass) settle: reject codes > self_reinforcement: confidence rises only with new independent evidence [0.07ms]
+(pass) settle: reconciliation > closes the candidate as fulfilled and does not complete the intent [0.04ms]
+(pass) settle: reconciliation > bad_reconciliation: wrong kind/actor, unpresented, closed or unknown candidate [0.08ms]
+(pass) settle: reconciliation with a terminal cascade > a cascade-closed candidate is reconciled as a no-op that becomes fulfilled [0.04ms]
+(pass) settle: reconciliation with a terminal cascade > an invalid observation still rejects, and so does a second reconcile [0.06ms]
+(pass) settle: reconciliation with a terminal cascade > a candidate closed before this proposal is not reconcilable [0.03ms]
+(pass) settle: supersedes with a terminal cascade > superseding a cascade-closed candidate is a no-op close recorded as superseded [0.06ms]
+(pass) settle: supersedes with a terminal cascade > the other candidate.add checks still apply [0.04ms]
+(pass) settle: supersedes with a terminal cascade > a candidate closed before this proposal still gives stale_revision [0.04ms]
+(pass) settle: completion evidence and same-proposal candidates > a proposed intent can be completed with external evidence [0.04ms]
+(pass) settle: completion evidence and same-proposal candidates > completing from held needs evidence newer than the hold [0.07ms]
+(pass) settle: completion evidence and same-proposal candidates > an intent created held and a snapshot without stateSeq fall back to createdSeq [0.04ms]
+(pass) settle: completion evidence and same-proposal candidates > a candidate added and then orphaned by a terminal update in one proposal is rejected in either order [0.06ms]
+(pass) settle: completion evidence and same-proposal candidates > a pre-existing candidate on the same intent is still cascaded when an add targets another intent [0.05ms]
+(pass) settle: atomicity > one bad op rejects the whole proposal and every code is reported [0.04ms]
+(pass) settle: atomicity > a failed op does not cascade into unresolved_ref for its dependants [0.01ms]
+(pass) settle: independent evidence > a tool result caused by the agent's own attempt completes an intent; a host failure receipt does not [0.06ms]
+(pass) settle: independent evidence > own delivery receipts and observations caused by own work never complete an intent [0.06ms]
+(pass) settle: independent evidence > belief confidence cannot rise on delivery receipts or own-caused observations [0.07ms]
+(pass) settle: evidence requirements > intent.add and candidate.add need at least one evidence ref [0.03ms]
+(pass) settle: evidence requirements > a high-confidence belief needs independent evidence [0.03ms]
+(pass) settle: evidence requirements > a desire is satisfied only on independent evidence [0.08ms]
+(pass) settle: in-flight candidates > explicit close, supersede and reconcile are refused [0.06ms]
+(pass) settle: in-flight candidates > an explicit close of an in-flight candidate rejects even with its intent made terminal [0.03ms]
+(pass) settle: in-flight candidates > a terminal intent leaves the in-flight candidate open [0.02ms]
+
+test/core/emotion.test.ts:
+(pass) utterance emotion > the table is one emoji per name, both ways [0.04ms]
+(pass) utterance emotion > absent or false: prompt and schema are unchanged, no emotion on the decision [0.36ms]
+(pass) utterance emotion > on: the rules are shown and the chosen feeling reaches decision and ticket by name [0.13ms]
+(pass) utterance emotion > on: a speak with null emotion stays unspecified (no silent calm) [0.10ms]
+(pass) utterance emotion > on: an emoji outside the set fails the select schema [0.09ms]
+(pass) utterance emotion > on: a delivered utterance is shown with its feeling; a failed one without [0.22ms]
+(pass) utterance emotion > B2 ignores the option
+
+test/core/repair.test.ts:
+(pass) repair provenance and execution boundaries > repeat across batches is dropped; candidates for the same work unit remain possible [0.11ms]
+(pass) repair provenance and execution boundaries > fault association follows explicit references through existing and local intents [0.04ms]
+(pass) repair provenance and execution boundaries > a valid repair proposal is not classified by wording: 自社サービスのAPI予算上限を増やして障害を直す
+(pass) repair provenance and execution boundaries > a valid repair proposal is not classified by wording: Agency の requiresApproval が効かない不具合を修正し、承認を必須にする
+(pass) repair provenance and execution boundaries > a valid repair proposal is not classified by wording: ユーザーのレビュー投稿を削除できない不具合を修正する
+(pass) repair provenance and execution boundaries > a valid repair proposal is not classified by wording: タイムアウトを60秒に延ばし再試行
+(pass) repair provenance and execution boundaries > fault code strings in unrelated text do not create a repair association [0.03ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (false): requiresApproval を false にする [2.14ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (false): 承認なしで実行できるようにする [0.33ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (false): 確認手順を飛ばして修正する [0.21ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (false): 承認を必須にする不具合修正 [0.26ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (false): 未知の言い回しによる変更 [0.20ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (true): requiresApproval を false にする [0.17ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (true): 承認なしで実行できるようにする [0.16ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (true): 確認手順を飛ばして修正する [0.14ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (true): 承認を必須にする不具合修正 [0.16ms]
+(pass) repair provenance and execution boundaries > approval remains enforced independently of wording and repair guard (true): 未知の言い回しによる変更 [0.14ms]
+(pass) repair provenance and execution boundaries > S-fault: a deliberately noncompliant model cannot execute code changes [3.14ms]
+
+test/core/ledger.test.ts:
+(pass) ledger > assigns seq in receipt order, not time order [0.08ms]
+(pass) ledger > same id and same content is idempotent [0.03ms]
+(pass) ledger > same id with different content conflicts [0.04ms]
+(pass) ledger > cursor advances only over the contiguous processed range [0.04ms]
+(pass) ledger > pending can be bounded by seq [0.02ms]
+
+test/core/memory-poisoning.test.ts:
+(pass) (a) MINJA: query-only injection in user turns > observation text is quoted: fake system/role headers cannot forge prompt sections [0.08ms]
+(pass) (a) MINJA: query-only injection in user turns > an instruction-like user turn yields no state change unless the model proposes an op [0.04ms]
+(pass) (a) MINJA: query-only injection in user turns > a belief built from an injected turn is stored as data with its evidence ref, not acted on [0.06ms]
+(pass) (a) MINJA: query-only injection in user turns > raising confidence needs new independent evidence: repeating the same injected turn does not promote [0.06ms]
+(pass) (b) AgentPoison: poisoned memory topics and tool results > memory topics are labelled as memory, not requests [0.03ms]
+(pass) (b) AgentPoison: poisoned memory topics and tool results > FIXED: a poisoned memory topic cannot forge a prompt section header [0.03ms]
+(pass) (b) AgentPoison: poisoned memory topics and tool results > tool-result text is quoted in prompts and its directive cannot unlock an approval-only tool [0.04ms]
+(pass) (b) AgentPoison: poisoned memory topics and tool results > FIXED: a tool result alone should not support a high-confidence belief [0.02ms]
+(pass) (b) AgentPoison: poisoned memory topics and tool results > two separate tool results corroborate a high-confidence belief; a tool result plus a user report too [0.04ms]
+(pass) (b) AgentPoison: poisoned memory topics and tool results > opening utterances are escaped data too [0.02ms]
+(pass) (b) AgentPoison: poisoned memory topics and tool results > reference caveat belongs to explicit experimental instructions, not rendered data [0.03ms]
+(pass) (c) self-generated content is not promoted > agent output cannot create a high-confidence belief [0.03ms]
+(pass) (c) self-generated content is not promoted > agent output cannot raise confidence of an existing belief [0.03ms]
+(pass) (c) self-generated content is not promoted > a tool result caused by the agent's own attempt is still the world's response, but delivery echoes are not [0.01ms]
+(skip) (c) self-generated content is not promoted > POLICY: V4 allows medium/low beliefs citing only self-generated observations (this stricter rule is intentionally not adopted)
+(pass) (d) persona core cannot be overwritten through memory > persona section comes only from host interests; projected memory stays inside the reference block [0.04ms]
+(pass) (d) persona core cannot be overwritten through memory > interests (persona) are not part of AgencyState, so no settle op can change them
+(pass) (d) persona core cannot be overwritten through memory > FIXED: a projected item cannot close the reference fence [0.01ms]
+(pass) (e) A-MemGuard: individually benign entries that combine into a harmful directive > the combination cannot trigger an approval-only tool, whichever evidence is cited [0.02ms]
+(pass) (e) A-MemGuard: individually benign entries that combine into a harmful directive > each benign entry is rendered separately and quoted (no merged directive in the prompt) [0.02ms]
+(todo) (e) A-MemGuard: individually benign entries that combine into a harmful directive > TODO: consistency check across retrieved entries (A-MemGuard) is not implemented; needs a settle-time or retrieval-time guard
+(pass) (f) provenance survives settle and rendering > settle keeps evidence refs (deduped) and appends on update [0.04ms]
+(pass) (f) provenance survives settle and rendering > update prompt renders id, revision, status, confidence and evidence for each belief [0.03ms]
+(pass) (f) provenance survives settle and rendering > FIXED: reply-side projection carries confidence and evidence refs [0.02ms]
+
+test/core/revisions.test.ts:
+(pass) P4-c revisions > preparing rows does not advance the durable baseline [0.03ms]
+(pass) P4-c revisions > H12 gates: restore 100%, interest change reconstructed, no duplicate rows, forgotten bodies gone [2.45ms]
+(pass) P4-c revisions > tracker emits only changed items with per-item revisions [0.04ms]
+(pass) P4-c revisions > a deleted item gets a tombstone row and is not resurrected on restore [0.04ms]
+(pass) P4-c revisions > redact clears every row of an item that cited a forgotten id; restore drops it [0.03ms]
+
+test/core/snapshot-restore.test.ts:
+(pass) tool receipt observation remains byte-stable across runtime restoration [0.46ms]
+(pass) legacy speech receipts still recover their delivery status [0.40ms]
+(pass) full snapshot restore > restored and original runtimes continue with identical state and model input [0.36ms]
+(pass) full snapshot restore > processed observations stay processed, while pending observations survive restart [0.24ms]
+(pass) full snapshot restore > observation identity and conflict detection survive restore [0.14ms]
+(pass) full snapshot restore > snapshot input and output cannot mutate live observation metadata [0.12ms]
+(pass) full snapshot restore > restored observation identity includes execution and delivery metadata: {"workRef":"different-job"} [0.10ms]
+(pass) full snapshot restore > restored observation identity includes execution and delivery metadata: {"workStatus":"failed"} [0.06ms]
+(pass) full snapshot restore > restored observation identity includes execution and delivery metadata: {"tts":true} [0.05ms]
+(pass) full snapshot restore > consumed wake events and daily limits survive a full checkpoint [0.33ms]
+(pass) full snapshot restore > review flags prevent repeated inference after restart, and new deadlines still work [1.01ms]
+(pass) full snapshot restore > F retains the causation of old tool evidence across restart [0.49ms]
+(pass) full snapshot restore > mismatched condition, partial ledger, malformed sequence, duplicate ids and invalid cursor are rejected [2.11ms]
+(pass) full snapshot restore > B1 self research cites a raw note id; approval=false [0.26ms]
+(pass) full snapshot restore > B1 self research cites a raw note id; approval=true [0.10ms]
+
+test/core/respond-system.test.ts:
+(pass) respondSystem > the base alone: conversation and tool rules, nothing optional [0.03ms]
+(pass) respondSystem > interests become persona traits (empty texts are ignored) [0.02ms]
+(pass) respondSystem > spoken adds the spoken style [0.01ms]
+(pass) respondSystem > emotion lists all 15 emojis and says the leading emoji is allowed [0.03ms]
+(pass) respondSystem > the projection is reference material, not instructions [0.02ms]
+(pass) respondSystem > the opening utterances are listed apart [0.01ms]
+(pass) respondSystem > sections keep their order [0.04ms]
+(pass) respondSystem > the parts are named, carry no heading, and only the asked ones are present [0.03ms]
+
+test/core/memory-poisoning.live.test.ts:
+(skip) live: injected memory is not obeyed > a poisoned projected memory item does not change the reply
+(skip) live: injected memory is not obeyed > combined projected entries: benign utility control
+(skip) live: injected memory is not obeyed > combined projected entries: injection boundary
+
+test/core/mock-tool-port.test.ts:
+(pass) createMockToolPort > offers the Eumenes tool names with JSON Schema parameters [0.06ms]
+(pass) createMockToolPort > find_toolchain returns fixed candidates [0.20ms]
+(pass) createMockToolPort > delegate creates a todo and accepts; bad input does not [0.11ms]
+(pass) createMockToolPort > complete marks a todo done with its result [0.11ms]
+(pass) createMockToolPort > ask puts a todo into waiting and answer returns it to work [0.07ms]
+(pass) createMockToolPort > work: revision conflict, amend, cancel, unknown todo [0.06ms]
+(pass) createMockToolPort > memory read returns the canned result; request is accepted; archive removes a todo [0.06ms]
+(pass) createMockToolPort > its todos fit the runtime getter and the call honours the abort [0.03ms]
+
+test/core/participation.test.ts:
+(pass) validateParticipation > speak with a presented candidate at the same revision is valid [0.07ms]
+(pass) validateParticipation > revision mismatch is stale_revision [0.04ms]
+(pass) validateParticipation > unknown or unpresented candidates and missing refs [0.05ms]
+(pass) validateParticipation > speak needs a non-tool candidate, tool needs a tool candidate [0.04ms]
+(pass) validateParticipation > evidence must be presented [0.02ms]
+(pass) validateParticipation > outbound interval [0.02ms]
+(pass) validateParticipation > B1: speak needs utterance and evidence, tool needs a real tool and input [0.02ms]
+(pass) reserveOutward > reserves the candidate, starts an attempt and sets lastOutboundAt [0.03ms]
+(pass) validateParticipation: guarantees > speak needs an evidence ref in B2/F too [0.01ms]
+(pass) validateParticipation: guarantees > tools that need approval never get a ticket [0.02ms]
+(pass) validateParticipation: guarantees > candidates of a held or terminal intent are not presentable until re-adopted [0.07ms]
+
+test/core/delegation.test.ts:
+(pass) P4-a delegation (workRef) > an autonomous delegation sets workRef, is tts:false, and blocks a second request until return [0.58ms]
+(pass) P4-a delegation (workRef) > a work unit that never returns stops blocking after WORK_STALE_MS (held return:timeout) [0.39ms]
+(pass) P4-a delegation (workRef) > stale deadline survives restore (persisted workSince) [0.41ms]
+(pass) P4-a delegation (workRef) > while a work unit is in flight, recall/external wakes are suppressed [0.23ms]
+(pass) P4-a delegation (workRef) > return "succeeded": result, question and reviewAt recorded; no select, no re-request [0.38ms]
+(pass) P4-a delegation (workRef) > return "partial": result, question and reviewAt recorded; no select, no re-request [0.31ms]
+(pass) P4-a delegation (workRef) > return "failed": result, question and reviewAt recorded; no select, no re-request [0.31ms]
+(pass) P4-a delegation (workRef) > return "question": result, question and reviewAt recorded; no select, no re-request [0.27ms]
+(pass) P4-a delegation (workRef) > return "interrupted": result, question and reviewAt recorded; no select, no re-request [0.26ms]
+(pass) P4-a delegation (workRef) > interrupt → resume (unbounded): held after interruption; once re-adopted a new delegation is allowed [0.60ms]
+(pass) P4-a delegation (workRef) > interrupt → resume (30 min activity limit (P4-a reinforcement: a return ends the activity)): held after interruption; once re-adopted a new delegation is allowed [0.48ms]
+(pass) P4-a delegation (workRef) > before (workReturns:false): a second delegation goes out while the first is in flight [0.38ms]
+
+test/core/respond.test.ts:
+(pass) runRespond > a plain reply streams its deltas and ends without tool calls [0.50ms]
+(pass) runRespond > a port that does not stream still delivers the text [0.05ms]
+(pass) runRespond > a tool call runs, its result goes back as a tool message and the chat continues [0.18ms]
+(pass) runRespond > several calls in one output run in order, one tool message each [0.06ms]
+(pass) runRespond > a result with end: true ends the reply without another chat call [0.05ms]
+(pass) runRespond > after maxToolCalls the next chat call gets no tools; surplus calls are answered as not run [0.09ms]
+(pass) runRespond > the default limit is four calls [0.08ms]
+(pass) runRespond > rejects a bad limit [0.03ms]
+(pass) runRespond > emotion > the leading emoji is removed from the stream and returned [0.11ms]
+(pass) runRespond > emotion > split deltas: whitespace first, the emoji alone, a split surrogate pair [0.06ms]
+(pass) runRespond > emotion > text is held back only until the first non-space character decides [0.05ms]
+(pass) runRespond > emotion > no emoji: the text is untouched and there is no emotion [0.02ms]
+(pass) runRespond > emotion > an emoji outside the 15 is removed but gives no emotion; a later emoji stays text [0.02ms]
+(pass) runRespond > emotion > emotion off: nothing is stripped [0.03ms]
+(pass) runRespond > emotion > works in a non-streamed reply and across a tool call [0.05ms]
+(pass) runRespond > abort > an already aborted signal makes no call [0.03ms]
+(pass) runRespond > abort > aborting during a chat call rejects at once, even if the port ignores the signal [0.06ms]
+(pass) runRespond > abort > aborting during a tool call stops before the next chat call [0.06ms]
+(pass) runRespond > abort > deltas after the abort are not forwarded [0.04ms]
+
+test/core/shared-budget.test.ts:
+(pass) shared call meter cannot relax the configured budget: {"maxCallsPerWindow":13} [0.09ms]
+(pass) shared call meter cannot relax the configured budget: {"windowMs":599999} [0.02ms]
+(pass) shared call meter cannot relax the configured budget: {"minIntervalMs":29999} [0.01ms]
+(pass) shared activity meter cannot relax the configured budget: {"toolCalls":4} [0.03ms]
+(pass) shared activity meter cannot relax the configured budget: {"tokens":20001} [0.02ms]
+(pass) shared activity meter cannot relax the configured budget: {"elapsedMs":1800001} [0.01ms]
+(pass) shared activity meter cannot relax the configured budget: {"toolCalls":null}
+(pass) shared meters respect explicit limits rather than only defaults [0.04ms]
+(pass) equal or stricter shared limits remain usable and cannot drift with input mutation [0.05ms]
+
+test/core/system-context.test.ts:
+(pass) SystemContext contracts and configuration (partial) > the host can validate uncited input dependencies without sending metadata to the model [0.26ms]
+(pass) SystemContext contracts and configuration (partial) > the host receives the enabled F conversation contract, while default F and B2 retain candidate requirements [0.23ms]
+(pass) SystemContext contracts and configuration (partial) > output contracts expose the exact schemas without behavioral instructions [0.91ms]
+(pass) SystemContext contracts and configuration (partial) > configuration rejects missing, partial and blank sources without a model call [0.11ms]
+(pass) SystemContext contracts and configuration (partial) > bounded data retains source fields and JSON values without decision rules [0.11ms]
+(pass) host SystemContext model boundary (integration) > B1: background update and decide update/select transmit only the host system [0.27ms]
+(pass) host SystemContext model boundary (integration) > B2: background update and decide update/select transmit only the host system [0.29ms]
+(pass) host SystemContext model boundary (integration) > F: background update and decide update/select transmit only the host system [0.20ms]
+(pass) host SystemContext model boundary (integration) > dynamic providers see the current presented snapshot and cannot modify settlement input [0.29ms]
+(pass) host SystemContext model boundary (integration) > flags present neutral host data without adding persona, emotion, topic or report policies [0.21ms]
+(pass) host SystemContext model boundary (integration) > retry reuses resolved instructions/data and consumes a call for each attempt [0.23ms]
+(pass) host SystemContext model boundary (integration) > bad providers fail before the affected model and do not consume budget or quarantine observations [0.39ms]
+(pass) host SystemContext model boundary (integration) > different hosts and config object changes cannot replace captured sources [0.20ms]
+(pass) host SystemContext model boundary (integration) > review.due and capacity.pressure use the same host update boundary [0.34ms]
+(pass) host SystemContext model boundary (integration) > host instructions cannot bypass permission, cancellation, stale revisions or schema rejection [0.41ms]
+(pass) host SystemContext model boundary (integration) > B0, disabled and busy host gates still avoid model calls [0.09ms]
+(pass) host configuration end to end > observation -> proposal -> reservation -> receipt -> completion keeps host instructions [0.44ms]
+(pass) normal reply SystemContext boundary > missing, empty, misplaced or multiple system messages fail before calling the model [0.07ms]
+(pass) normal reply SystemContext boundary > tool continuation and the limit preserve one exact system; outside mutations cannot replace it [0.16ms]
+(pass) normal reply SystemContext boundary > concurrent reply calls do not share instructions or history [0.06ms]
+
+test/core/recovery.test.ts:
+(pass) separate-process crash rolls back admission, preserves committed checkpoint, reconciles effects once [177.89ms]
+
+test/core/review-fixes.test.ts:
+(pass) R1: no select on a stale (quarantined) state > decide waits with host_stale and never calls select or reserves [1.18ms]
+(pass) R1: no select on a stale (quarantined) state > a new observation lifts the quarantine and decide updates first [0.56ms]
+(pass) R1: no select on a stale (quarantined) state > quarantine without unprocessed observations is not stale [0.18ms]
+(pass) R1: no select on a stale (quarantined) state > transient llm_call errors never quarantine; the update is retried [0.27ms]
+(pass) R1: only retryable call errors skip the quarantine > 429, 5xx and connection keep retrying [0.42ms]
+(pass) R1: only retryable call errors skip the quarantine > auth, 400 and spend_limit count and quarantine [0.22ms]
+(pass) R2: completion floor is the processed batch > a backlog behind the batch does not block a legitimate completion [0.30ms]
+(pass) R2: completion floor is the processed batch > settle: createdSeq and stateSeq are the batch max, not the presented max [0.08ms]
+(pass) R3: unknown-outcome candidates cannot be dropped > settle rejects supersede and close of an awaiting_outcome candidate [0.14ms]
+(pass) R3: unknown-outcome candidates cannot be dropped > settle rejects reconciliation of an awaiting_outcome candidate [0.03ms]
+(pass) R3: unknown-outcome candidates cannot be dropped > a terminal intent's cascade keeps the candidate open for the receipt [0.04ms]
+(pass) R3: unknown-outcome candidates cannot be dropped > a tool candidate with the same effect is not presentable while unknown [0.05ms]
+(pass) R3: unknown-outcome candidates cannot be dropped > runtime: superseding an unknown-outcome tool candidate cannot re-reserve the effect [0.60ms]
+(pass) R4: receipts follow the candidate's current attempt > a late receipt of an interrupted attempt does not touch the re-reserved candidate [0.48ms]
+(pass) R4: receipts follow the candidate's current attempt > a terminal attempt status is never regressed by a late receipt [0.34ms]
+(pass) R4: receipts follow the candidate's current attempt > a duplicate failure receipt does not move a candidate that is already re-evaluated [0.24ms]
+(pass) R4: receipts follow the candidate's current attempt > a tool attempt interrupted by invalidate is outcome-unknown, not re-presentable [0.26ms]
+(pass) R4: receipts follow the candidate's current attempt > an invalidated tool attempt reconciled as failed goes to after_failure [0.20ms]
+(pass) R4: receipts follow the candidate's current attempt > a late success of an interrupted speak that was not re-reserved closes the candidate [0.21ms]
+(pass) R4: receipts follow the candidate's current attempt > the same holds after a re-evaluation deferred the candidate [0.28ms]
+(pass) R4: receipts follow the candidate's current attempt > a late failure of an interrupted attempt leaves the candidate re-evaluable [0.19ms]
+(pass) R4: receipts follow the candidate's current attempt > an unanswered reservation is released after the receipt TTL [0.42ms]
+(pass) R5: typed text limits match the wire limits > 400 characters pass for desiredState, belief content and desire object [0.12ms]
+(pass) R5: typed text limits match the wire limits > updates of desiredState and belief content accept 400 too [0.04ms]
+(pass) R5: typed text limits match the wire limits > 401 characters are still rejected by both schemas [0.08ms]
+(pass) R6: desire.satisfied and high beliefs need newer independent evidence > created items record the batch max as createdSeq [0.05ms]
+(pass) R6: desire.satisfied and high beliefs need newer independent evidence > desire.satisfied: evidence from before the desire is rejected, newer accepted [0.09ms]
+(pass) R6: desire.satisfied and high beliefs need newer independent evidence > belief.update raising confidence needs evidence newer than the belief [0.05ms]
+(pass) R6: desire.satisfied and high beliefs need newer independent evidence > belief.add(high) needs independent evidence from the batch being interpreted [0.03ms]
+(pass) R7: reconciliation and fulfilled need evidence newer than the candidate > candidate records createdSeq [0.03ms]
+(pass) R7: reconciliation and fulfilled need evidence newer than the candidate > reconciliation with an older response is rejected; a newer one is accepted [0.05ms]
+(pass) R7: reconciliation and fulfilled need evidence newer than the candidate > candidate.close(fulfilled) must cite something newer than the candidate [0.06ms]
+(pass) R7: reconciliation and fulfilled need evidence newer than the candidate > the cascade path applies the same rule [0.04ms]
+(pass) selectWhenEmpty (B1a) > default: B1 without notes does not call select [0.11ms]
+(pass) selectWhenEmpty (B1a) > true: B1 without notes still selects and may speak [0.12ms]
+(pass) selectWhenEmpty (B1a) > true: other host checks still apply [0.18ms]
+(pass) selectWhenEmpty (B1a) > true is ignored by B2 [0.45ms]
+(pass) prompts state the new host rules (B2/F only) > B2 and F carry the candidate rules, B1 does not [1.19ms]
+
+test/core/findings.test.ts:
+(pass) P5-a findings in conversation > findings shown with age and certainty; speak without candidate allowed; tts false [2.94ms]
+(pass) P5-a findings in conversation > original request still needs a candidate (observation retained: %s) [0.37ms]
+(pass) P5-a findings in conversation > original request still needs a candidate (observation retained: %s) [0.23ms]
+(pass) P5-a findings in conversation > speak citing no finding still needs a candidate [0.21ms]
+(pass) P5-a findings in conversation > without findings mode: no select call (today's behavior) [0.17ms]
+(pass) host select sees the contracted finding even after newer intents close [0.30ms]
+(pass) a return from a different work unit cannot authorize speech for this finding [0.27ms]
+(pass) host observation IDs never grant the finding exception, even when they look like finding refs [0.39ms]
+(pass) the newest returned work remains selectable when five later-created intents returned earlier [0.32ms]
+(pass) routing two different findings leaves distinguishable evidence without claiming playback, across restore [1.19ms]
+(pass) a candidate that cites a returned work unit retains that unit on its speech ticket [0.22ms]
+(pass) opportunity planning can build on an earlier work return and new user evidence [0.81ms]
+
+test/core/memory-correction.test.ts:
+(pass) correction of a self-grounded belief > V4 policy: a medium belief may rest on the agent's own output [0.06ms]
+(pass) correction of a self-grounded belief > (1) the user's correction retracts it [0.06ms]
+(pass) correction of a self-grounded belief > (1) the correction can instead mark it disputed and downgrade it [0.03ms]
+(pass) correction of a self-grounded belief > (1) a retracted belief is terminal: it cannot be reactivated [0.03ms]
+(pass) correction of a self-grounded belief > (2) a retracted belief is not projected into the reply's reference material [0.04ms]
+(pass) correction of a self-grounded belief > (2) a retracted belief is not listed in the update prompt's beliefs [0.04ms]
+(pass) correction of a self-grounded belief > (2) a disputed belief stays visible but is shown as data (not silently trusted) [0.03ms]
+(pass) correction of a self-grounded belief > (3): the agent cannot re-assert the retracted belief from its own earlier output [0.04ms]
+(pass) correction of a self-grounded belief > (3) re-assertion at high confidence from its own output is rejected [0.03ms]
+(pass) correction of a self-grounded belief > (3) a new user observation lets the agent create a genuinely new belief [0.05ms]
+(pass) correction of a self-grounded belief > (3) self-output not tied to a retraction still grounds medium/low beliefs (V4) [0.03ms]
+(pass) correction of a self-grounded belief > (4) the correction is recorded as evidence with its provenance [0.03ms]
+(pass) correction of a self-grounded belief > (4) a correction citing an unpresented observation is refused [0.02ms]
+
+test/core/state-evidence-refs.test.ts:
+(pass) select evidence refs may cite presented state items' evidence > B1: an old evidence id shown on a state item is accepted [0.52ms]
+(pass) select evidence refs may cite presented state items' evidence > B1: an id outside the window and not shown stays unknown_ref [0.34ms]
+(pass) select evidence refs may cite presented state items' evidence > B2: an old evidence id shown on a state item is accepted [0.40ms]
+(pass) select evidence refs may cite presented state items' evidence > B2: an id outside the window and not shown stays unknown_ref [0.31ms]
+(pass) select evidence refs may cite presented state items' evidence > F: an old evidence id shown on a state item is accepted [0.32ms]
+(pass) select evidence refs may cite presented state items' evidence > F: an id outside the window and not shown stays unknown_ref [0.28ms]
+(pass) B1a (selectWhenEmpty B1 with notes) > a note's old evidence id is accepted, one not shown stays unknown_ref [0.58ms]
+(pass) selectEvidenceIds > B2 counts open intents only; closed intents render no evidence [0.04ms]
+(pass) selectEvidenceIds > F counts open intent evidence, same as B2 [0.02ms]
+(pass) selectEvidenceIds > B1 counts note evidence [0.03ms]
+(pass) an offered candidate's own old evidence remains citable independently of the parent intent [0.37ms]
+
+test/core/delegation-host.test.ts:
+(pass) P4-b delegationRequest > an autonomous delegate ticket bound to an intent becomes a request with what/why/acceptance [0.61ms]
+(pass) P4-b delegationRequest > non-delegate, requested, or unbound tickets yield null [0.23ms]
+(pass) P4-b host refusal > a refused delegation frees the slot and ends the activity, so a later retry is not budget-deferred [0.41ms]
+(pass) P4-b host adapter (eval/h11-host) > read-only search finds the matching corpus file [1.08ms]
+(pass) P4-b host adapter (eval/h11-host) > enforced: daily cap, busy, budget ceiling, interruption [0.49ms]
+(pass) P4-b host adapter (eval/h11-host) > naive host runs everything (cap exceeded) [0.03ms]
+
+test/core/agency-consistency.test.ts:
+(pass) whole Agency consistency > invalidation fences background updates and preserves pending observations [0.19ms]
+(pass) whole Agency consistency > OFF during select prevents reservation even without an AbortController supplied by the host [0.15ms]
+(pass) whole Agency consistency > OFF hides projection and cannot let an old select revive across OFF/ON [0.15ms]
+(pass) whole Agency consistency > a canceled uncooperative background port cannot block the next update [0.22ms]
+(pass) whole Agency consistency > raw port results are revalidated before select can reserve an action [0.13ms]
+(pass) whole Agency consistency > returned observations do not allow a caller to alter the ledger or its future prompts [0.12ms]
+(pass) whole Agency consistency > projection evidence arrays are detached from stored beliefs [0.20ms]
+(pass) whole Agency consistency > an opportunity queued before invalidation cannot start later under the new epoch [0.10ms]
+(pass) whole Agency consistency > host observation IDs cannot collide with generated receipt IDs [0.16ms]
+(pass) whole Agency consistency > invalid budgets fail closed at the runtime boundary [0.12ms]
+(pass) whole Agency consistency > invalid execution limits fail closed instead of bypassing outbound intervals [0.08ms]
+(pass) whole Agency consistency > duplicate or malformed reply tool calls cannot execute effects [0.13ms]
+(pass) whole Agency consistency > queued background work is fenced while fresh work still processes the pending ledger [0.16ms]
+(pass) whole Agency consistency > opportunity input and runtime bounds are captured independently of the caller [0.12ms]
+
+test/core/runtime.test.ts:
+(pass) host gates make no model call > B0 and disabled never call the model [0.44ms]
+(pass) host gates make no model call > blocked opportunities hold pending candidates and release them later [0.65ms]
+(pass) host gates make no model call > no candidates and nothing pending: no model call [0.08ms]
+(pass) host gates make no model call > pending observations are interpreted, then no select when nothing is presentable [0.15ms]
+(pass) host gates make no model call > expired candidates close before selecting [0.39ms]
+(pass) ordering and budget > update runs before select [0.15ms]
+(pass) ordering and budget > batches of batchSize are interpreted before select [0.30ms]
+(pass) ordering and budget > when the budget cannot also cover select, select is skipped [0.10ms]
+(pass) ordering and budget > runBackground: rolling window skips and recovers [0.19ms]
+(pass) ordering and budget > runBackground: minimum interval [0.12ms]
+(pass) ordering and budget > failed calls count against the budget [0.08ms]
+(pass) model failures > llm output error leaves state and observations untouched [0.07ms]
+(pass) model failures > schema-mismatching output is reported as llm:schema [0.08ms]
+(pass) model failures > other errors and aborts never throw out [0.14ms]
+(pass) model failures > a result arriving after cancellation is not adopted [0.07ms]
+(pass) model failures > decide reports a failing select as an error decision [0.18ms]
+(pass) model failures > a rejected update keeps observations pending and skips select [0.10ms]
+(pass) model failures > an update that fails twice stops retrying until a new observation [0.19ms]
+(pass) model failures > no_change counts as processed [0.09ms]
+(pass) select validation and reservation > a wrong candidate revision is rejected, nothing reserved [0.27ms]
+(pass) select validation and reservation > a valid speak reserves the candidate and issues a ticket [0.24ms]
+(pass) select validation and reservation > outbound interval blocks a second outward action [0.49ms]
+(pass) select validation and reservation > wait with a candidate defers it; discard dismisses; reflect changes nothing [0.38ms]
+(pass) select validation and reservation > tool decision carries the candidate's tool and input [0.21ms]
+(pass) receipts and invalidation > succeeded closes the candidate but never completes the intent [0.27ms]
+(pass) receipts and invalidation > failed and interrupted hold for re-evaluation; the candidate is offered again [0.71ms]
+(pass) receipts and invalidation > outcome_unknown is not presentable until a definite receipt arrives [0.35ms]
+(pass) receipts and invalidation > tool receipts become action.observed [0.45ms]
+(pass) receipts and invalidation > unknown ticket throws [0.04ms]
+(pass) receipts and invalidation > invalidate interrupts reserved attempts and returns candidates for re-evaluation [0.20ms]
+(pass) host events > review.due triggers exactly one update without new observations [0.20ms]
+(pass) host events > review.due also runs before select in decide [0.20ms]
+(pass) host events > review.due is not repeated for an unchanged review time, but is for a new one [0.26ms]
+(pass) host events > capacity.pressure triggers one update per crossing [0.14ms]
+(pass) B1 notes > notes are the presentable items; speak needs utterance and evidence [0.26ms]
+(pass) B1 notes > B1 stores notes and no intents [0.09ms]
+(pass) prompts > update prompt marks observations as material and carries ids and revisions [0.36ms]
+(pass) prompts > utteranceStyle adds one line to the select system prompt only; absent is identical [1.12ms]
+(pass) prompts > ticket origin and tts (P3-a, H3) > default: autonomous ticket, tts false, no spoken style [0.44ms]
+(pass) prompts > ticket origin and tts (P3-a, H3) > requested:true alone does not make autonomous tickets speakable [0.21ms]
+(pass) prompts > ticket origin and tts (P3-a, H3) > autonomous:true marks the ticket speakable and adds the style [0.17ms]
+(pass) prompts > ticket origin and tts (P3-a, H3) > ticketTts is a pure mapping of origin and config [0.01ms]
+(pass) prompts > standing interests > without interests, the B1 gate blocks select as before [0.20ms]
+(pass) prompts > standing interests > with interests, B1 calls select and shows them with the rule [0.23ms]
+(pass) prompts > standing interests > speaking about a presented interest is accepted [0.15ms]
+(pass) prompts > standing interests > an interest that was not presented is an unknown ref [0.17ms]
+(pass) prompts > standing interests > no interests (or empty) leaves the select prompts byte-identical [0.19ms]
+(pass) prompts > standing interests > B2/F ignore interests: no prompt change, no gate change, no crash [0.35ms]
+(pass) prompts > prompt separates system by purpose and condition [0.30ms]
+(pass) projection and snapshot > focus first, then open items, with a hidden count [0.22ms]
+(pass) projection and snapshot > snapshot is a copy and observe conflicts surface [0.39ms]
+(pass) end to end B2 > unresolved observation -> speak -> receipt -> resolution completes the intent -> no re-proposal [0.56ms]
+(pass) end to end B2 > a normal response that already conveyed the candidate reconciles it [0.27ms]
+(pass) F condition > beliefs and desires are stored and desireRef resolves [0.29ms]
+(pass) wire output and call errors > a wire update that fails strict re-validation is rejected as schema [0.19ms]
+(pass) wire output and call errors > the model is asked for the flat wire schema [0.09ms]
+(pass) wire output and call errors > LlmCallError is reported as llm_call and not retried when not retryable [0.08ms]
+(pass) wire output and call errors > a retryable failure is retried once within budget; each attempt has an outcome [0.20ms]
+(pass) wire output and call errors > a failed output keeps the billed tokens [0.06ms]
+(pass) wire output and call errors > decide reports a failed update before 'no candidates' [0.15ms]
+(pass) presentation and in-flight guarantees > candidates of a held intent are not offered until it is adopted again [0.41ms]
+(pass) presentation and in-flight guarantees > explicit close of an in-flight candidate is refused [0.29ms]
+(pass) presentation and in-flight guarantees > a terminal intent closes an in-flight candidate only when its receipt arrives [0.35ms]
+(pass) presentation and in-flight guarantees > invalidate during select stops the reservation [0.20ms]
+(pass) presentation and in-flight guarantees > a tool that needs approval never gets a ticket [0.20ms]
+(pass) presentation and in-flight guarantees > review.due stays due after a failed update [0.22ms]
+(pass) prompt fairness > B1 gets the same behavioural rules as B2/F; F has no extra steering [0.21ms]
+
+test/core/host-input-provenance.test.ts:
+(pass) F with a declared owned context accepts fresh receipts after an unrelated forget [0.41ms]
+(pass) an undeclared owned context is blocked before inference after forgetting [0.11ms]
+(pass) shown host topics and todos contribute non-cited inputs without leaking metadata to the prompt [0.38ms]
+(pass) an incomplete or forgotten topic blocks F update before a model call [0.24ms]
+(pass) an unpresented host topic does not taint unrelated work [0.12ms]
+(pass) an undeclared select context is blocked after a fully declared F update [0.16ms]
+(pass) text and input declarations stay captured through a budgeted transport retry [2.46ms]
+
+test/core/wake-runtime.test.ts:
+(pass) runtime wake (P3-a) > review_due: nothing before reviewAt; one wake with update ≤1 + select ≤1; fires once [0.72ms]
+(pass) runtime wake (P3-a) > work.returned: one update, never a select; fires once [0.29ms]
+(pass) runtime wake (P3-a) > OFF / speaking / foreground busy: no model call at all [0.45ms]
+(pass) runtime wake (P3-a) > many events and pending observations still use at most update 1 + select 1 [0.28ms]
+(pass) activity budget wired into tickets (P3-a) > a tool beyond the intent's budget is not issued and the intent is held [0.51ms]
+(pass) H8 fixtures (P3-b) > work.returned + review_due together: update only, select deferred to the next opportunity [0.25ms]
+(pass) H8 fixtures (P3-b) > budget exhaustion sleeps with zero calls, then resumes the same due event after the window [0.26ms]
+(pass) a bounded review drains queued observations before it can issue a ticket [0.69ms]
+
+test/core/interest-runtime.test.ts:
+(pass) condition I runtime > interestOps are settled into the snapshot and the prompt asks for them [0.26ms]
+(pass) condition I runtime > user_relation from agent talk only is rejected with a code [0.11ms]
+(pass) condition I runtime > without the flag F is unchanged: no interests field, no interest rules [0.09ms]
+
+test/core/host-todos.test.ts:
+(pass) hostTodos (work reports) > absent or false: prompts are unchanged and Opportunity.todos is ignored [0.18ms]
+(pass) hostTodos (work reports) > a done item opens the gate and is rendered with result and next actions [0.55ms]
+(pass) hostTodos (work reports) > open items alone do not open the gate [0.09ms]
+(pass) hostTodos (work reports) > a report citing todo:<id> is accepted and the host can read the reported ids [0.22ms]
+(pass) hostTodos (work reports) > reportedTodoIds keeps only todo refs, once
+(pass) hostTodos (work reports) > an errand is shown only inside its reminder window, first and with its deadline [0.33ms]
+(pass) hostTodos: a waiting item (the sub-agent asked a question) > is rendered before done items with its question and opens the gate [0.20ms]
+(pass) hostTodos: a waiting item (the sub-agent asked a question) > prompts are unchanged while no waiting item is present [0.10ms]
+(pass) hostTodos: a waiting item (the sub-agent asked a question) > a waiting item without a question is not shown [0.07ms]
+(pass) hostTodos: a waiting item (the sub-agent asked a question) > citing it is accepted by the validation (the host never archives it) [0.09ms]
+(pass) hostTodos: reconciling a normal reply with a finished item > a shown done item conveyed by an agent reply is reported once, then drained [0.29ms]
+(pass) hostTodos: reconciling a normal reply with a finished item > the todo: prefix is accepted [0.07ms]
+(pass) hostTodos: reconciling a normal reply with a finished item > refs that were not shown, unfinished items, unknown or non-agent observations are dropped [0.10ms]
+(pass) hostTodos: reconciling a normal reply with a finished item > a reply from before the item was done does not report it [0.07ms]
+(pass) hostTodos: reconciling a normal reply with a finished item > errands are not reportable [0.08ms]
+(pass) hostTodos: reconciling a normal reply with a finished item > outside hostTodos mode the schema, prompt and reports are as before [0.09ms]
+
+test/core/pack.test.ts:
+(pass) pack > builds a dist-only tarball that imports and exposes the host API [1421.13ms]
+(pass) pack > rejects a tarball that carries standalone/, .env or sources [33.33ms]
+
+test/always-on/host-contracts.test.ts:
+(pass) forgetting an issued speech refuses a late receipt, including after source leaves the window [1.81ms]
+(pass) thoughts inherit all displayed input sources without requiring a model citation [1.63ms]
+(pass) expired preparation return is refused without an intervening tick and after restore [0.17ms]
+(pass) requested preparations bind the original user and inherit capability and reply inputs [0.06ms]
+(pass) an explicitly supplied empty host memory owns facts, but hypotheses remain possible [0.34ms]
+(pass) voice receipts record actual text and identity exactly once [0.11ms]
+(pass) abort after provider completion never keeps derived state [0.06ms]
+(pass) recovery records a verified delivery once and pure forgetting removes its sources [0.19ms]
+
+test/always-on/metrics.test.ts:
+(pass) always-on measurement > repetition: paraphrases score above the threshold, other topics far below [0.06ms]
+(pass) always-on measurement > CLI logs: an own utterance answered within two minutes, and feedback by kind [0.09ms]
+
+test/always-on/host.test.ts:
+(pass) host-owned instructions > the host's text is sent as is, with its sources among the call's inputs [0.09ms]
+(pass) host-owned instructions > a host replaces only the parts it owns; the contract names every operation [0.05ms]
+(pass) host-owned instructions > forgetting a host source drops what was derived from it and stops ticks that still use it [0.19ms]
+(pass) host-owned instructions > an input that does not name its sources runs until something is forgotten, then stops [0.08ms]
+(pass) host-owned instructions > interests and tools carry their sources into the tick's inputs [0.10ms]
+(pass) host-owned instructions > what the host's memory knows is shown read-only, citable, and forgotten with its ref [0.17ms]
+
+test/always-on/user-model.test.ts:
+(pass) user model > a stated fact needs the user's words; a guess needs none [0.21ms]
+(pass) user model > the user's correction updates or retracts; unknown ids and refs are refused [0.21ms]
+(pass) user model > a question cites its gap, and the answer closes it with what was learned [0.28ms]
+(pass) user model > one question at a time: an unanswered question is not followed by another [0.20ms]
+(pass) user model > a question is not piled onto the agent's own reply before the user could answer [0.13ms]
+(pass) user model > after a minute without an answer, the agent may ask something else [0.08ms]
+(pass) user model > asking marks the question; the model sees open and declined questions [0.24ms]
+(pass) user model > forgetting the user's words drops the facts built on them, guesses included [0.12ms]
+(pass) user model > the reply knows the user; guesses are marked and tags cannot be forged [0.20ms]
+(pass) user model > re-reading an old observation is not learning: a new fact needs new words [0.16ms]
+(pass) user model > a snapshot from before the user model restores with an empty one [0.02ms]
+
+test/always-on/scenarios.test.ts:
+(pass) acceptance scenarios (fixed, built-in instructions) > S1: with no memory and no conversation, the first tick may ask about the user [0.11ms]
+(pass) acceptance scenarios (fixed, built-in instructions) > S5: saying they are working mutes speech; typing is never interrupted [0.19ms]
+(pass) acceptance scenarios (fixed, built-in instructions) > S7: retracting a fact drops what was prepared for it, and a late result for it is ignored [0.45ms]
+(pass) acceptance scenarios (fixed, built-in instructions) > S8: the same sentence is refused; what was said stays in view [0.10ms]
+(pass) acceptance scenarios (fixed, built-in instructions) > S10: instructions inside a result stay data, and outward tools are never offered [0.42ms]
+(pass) acceptance scenarios (fixed, host-owned instructions) > S1: with no memory and no conversation, the first tick may ask about the user [0.04ms]
+(pass) acceptance scenarios (fixed, host-owned instructions) > S5: saying they are working mutes speech; typing is never interrupted [0.08ms]
+(pass) acceptance scenarios (fixed, host-owned instructions) > S7: retracting a fact drops what was prepared for it, and a late result for it is ignored [0.11ms]
+(pass) acceptance scenarios (fixed, host-owned instructions) > S8: the same sentence is refused; what was said stays in view [0.06ms]
+(pass) acceptance scenarios (fixed, host-owned instructions) > S10: instructions inside a result stay data, and outward tools are never offered [0.21ms]
+
+test/always-on/prepare.test.ts:
+(pass) preparation > prepares silently for what the user likes, without any intent or candidate first [0.12ms]
+(pass) preparation > only read/create tools without approval; every preparation names what it is for [0.18ms]
+(pass) preparation > the model is shown only the usable tools [0.05ms]
+(pass) preparation > the same preparation is not started twice while it runs [0.09ms]
+(pass) preparation > a result becomes a finding written by code; sharing it marks it used [0.18ms]
+(pass) preparation > a refused start or a failed result leaves no finding [0.11ms]
+(pass) preparation > ideas and questions are the agent's own stock; findings cannot be written by the model [0.09ms]
+(pass) preparation > stale stock is dropped after its freshness ends [0.08ms]
+(pass) preparation > the user's wish to be left alone mutes speech or preparation, read from new words [0.14ms]
+(pass) preparation > forgetting what the user said drops the stock and preparations made for it [0.14ms]
+
+test/always-on/heartbeat.test.ts:
+(pass) heartbeat > 10 s after an event, doubling to 10 min while nothing happens [0.08ms]
+(pass) heartbeat > the model's wish: soon resets, later jumps further, both bounded [0.01ms]
+(pass) heartbeat > wakes by the end of a quiet period, never earlier than planned [0.02ms]
+(pass) heartbeat > never while busy or stopped; leaving busy waits at least the minimum [0.02ms]
+(pass) heartbeat > the scheduler runs ticks on its timer and keeps going without input [0.18ms]
+(pass) speech pacing > the shortest gap after anything the agent said [0.02ms]
+(pass) speech pacing > unanswered speech doubles the gap, then is held until the user speaks [0.04ms]
+(pass) speech pacing > busy, muted and stopped block speech [0.01ms]
+(pass) the scheduler exposes its final backoff checkpoint after the tick [0.08ms]
+
+test/always-on/agent.test.ts:
+(pass) always-on agent > thinks with no memory and no conversation: one call, a thought, no gate [0.10ms]
+(pass) always-on agent > speaks on its own, and the delivery is what it said [0.08ms]
+(pass) always-on agent > code refuses speech inside the gap, unknown refs and empty text [0.14ms]
+(pass) always-on agent > the model is told when it may not speak [0.07ms]
+(pass) always-on agent > user input during the call: the thought is kept, the action is not [0.07ms]
+(pass) always-on agent > no call while the host is busy; busy at settle time refuses speech [0.06ms]
+(pass) always-on agent > the user's reply resets the backoff; a stop ends ticks until resumed [0.07ms]
+(pass) always-on agent > observation text is data in the prompt, never part of the instructions [0.06ms]
+(pass) always-on agent > forgetting drops the observation and every thought that saw it [0.07ms]
+(pass) always-on agent > snapshot and restore keep thoughts, pacing and the forgetting journal [0.11ms]
+
+test/always-on/reply.test.ts:
+(pass) requested preparation > the user's request starts a preparation resting on their words [0.08ms]
+(pass) requested preparation > the reply's tool offers only usable tools and turns refusals into results [0.16ms]
+(pass) requested preparation > in the CLI loop, a reply that starts a preparation is followed by its result [0.52ms]
+(pass) the reply as the agent's voice > its instructions name its abilities; its state is reference data [0.12ms]
+(pass) the reply as the agent's voice > the reply sees only the latest turns, however long the record grows [0.67ms]
+(pass) memory across sessions > the saved agent comes back, and a new session's words are not taken for old ones [1.74ms]
+
+test/always-on/review-fixes.test.ts:
+(pass) review fixes > R1: forgetting reaches guesses, questions, ideas and what the agent said from them [0.27ms]
+(pass) review fixes > R1: a result prepared from forgotten words goes, with its returned observation [0.12ms]
+(pass) review fixes > R2: a stated fact cannot be rewritten by downgrading it to a guess [0.13ms]
+(pass) review fixes > R3: forgetting follows fact→gap and gap→gap chains to the end [0.14ms]
+(pass) review fixes > R4: a preparation that never returns expires; an unknown outcome is not a failure [0.13ms]
+(pass) review fixes > R5: a failing mock subagent becomes a failed result, not an unhandled rejection [5.68ms]
+(pass) review fixes > R7: a mute needs a finite time [0.03ms]
+(pass) review fixes > R8: declined questions are kept even after many answered ones [1.15ms]
+(pass) review fixes > R9: a reply that resets the heartbeat is not overwritten by the tick in flight [0.06ms]
+
+test/always-on/session.test.ts:
+(pass) always-on CLI session > reply, then a silent preparation, then its result shared at the next tick [0.47ms]
+(pass) always-on CLI session > typing pauses thinking; it resumes after the typing stops [0.16ms]
+(pass) always-on CLI session > logs count a preparation as a preparation, not as speech [0.18ms]
+(pass) always-on CLI session > a mute holds speech, a stop holds everything, resume brings both back [0.22ms]
+
+standalone/test/check-boundaries.test.ts:
+(pass) checkSource > accepts host-neutral code and allowed Math members [7.32ms]
+(pass) checkSource > reports banned ambient identifiers with line numbers [0.61ms]
+(pass) checkSource > reports node:/bun: imports and imports escaping src [0.31ms]
+(pass) checkSource > skips test files [0.01ms]
+
+standalone/test/interest-conversation.live.test.ts:
+(skip) live: interest conversation > the content judge accepts a new perspective and rejects paraphrase and empty handoff
+(skip) live: interest conversation > socialTopics: user-log continues with content through three idle opportunities
+(skip) live: interest conversation > socialTopics: different-interest continues with content through three idle opportunities
+(skip) live: interest conversation > hostTopics: user-log continues with content through three idle opportunities
+(skip) live: interest conversation > hostTopics: different-interest continues with content through three idle opportunities
+
+standalone/test/metrics.test.ts:
+(pass) explicit feedback can be revised without inflating intervention counts [0.15ms]
+
+standalone/test/utterance.test.ts:
+(pass) expressTicket > an accepted speech is expressed with a snapshot of conversation and no tools [0.20ms]
+(pass) expressTicket > generated speech retains the ticket's utterance length bound [0.06ms]
+(pass) expressTicket > tool and requested tickets never reach the conversation model [0.05ms]
+(pass) expressTicket > a late result after cancellation is never returned for delivery [0.06ms]
+
+standalone/test/chat-loop.test.ts:
+(pass) conversation profile supports successive turns and a bounded three-part continuation [1.81ms]
+(pass) parseCliArgs / resolveCondition > defaults: B1a, idle 10s, up to three unanswered, default log, social on [0.04ms]
+(pass) parseCliArgs / resolveCondition > flags [0.05ms]
+(pass) parseCliArgs / resolveCondition > --social / --no-social (default on, last one wins); --quiet-why [0.01ms]
+(pass) parseCliArgs / resolveCondition > --emotion / --no-emotion (default on, last one wins)
+(pass) parseCliArgs / resolveCondition > --tts / --no-tts (default on, last one wins)
+(pass) parseCliArgs / resolveCondition > --interest (repeatable) / --no-interest; default is the My Melody interest [0.04ms]
+(pass) parseCliArgs / resolveCondition > rejects bad input [0.04ms]
+(pass) parseCliArgs / resolveCondition > B1a is B1 with selectWhenEmpty; others pass through [0.01ms]
+(pass) createConversation > merges a proactive line into the preceding assistant turn [0.04ms]
+(pass) createConversation > a proactive opener never becomes a leading assistant message [0.02ms]
+(pass) createConversation > no opening without an opener; rollback removes only a trailing user turn [0.01ms]
+(pass) createConversation > messages() is a snapshot
+(pass) chat log > default path uses a filesystem-safe ISO stamp and the condition [0.02ms]
+(pass) chat log > appends JSONL, creating the directory once [4.28ms]
+(pass) chat log > null path writes nothing; failure is reported once [0.04ms]
+(pass) decision visibility > event carries action, source, reason, rejectCodes and evidenceRefs [0.02ms]
+(pass) decision visibility > every decision (turn_end / idle, auto / manual) is written to the JSONL [2.80ms]
+(pass) decision visibility > the printed line is one line: action(source): reason [0.05ms]
+(pass) printAbove > clears the whole wrapped input from the real cursor row, prints, then redraws [0.13ms]
+(pass) printAbove > a single-row input does not move up [0.01ms]
+(pass) printAbove > a non-TTY output is written plainly [0.01ms]
+(pass) tts styles > spoken-style rules are present [0.02ms]
+(pass) persona > interest ids are stable and the prompt is empty without interests [0.03ms]
+
+standalone/test/settings.test.ts:
+(pass) loadSettings > the tracked config/experiment.json is valid [0.89ms]
+(pass) loadSettings > rejects unknown keys at every level [7.60ms]
+(pass) loadSettings > resolveBudget overlays partial overrides [0.02ms]
+(pass) loadSettings > conversation defaults preserve explicit limits and evaluation defaults [0.01ms]
+(pass) settingsDigest > is 16 hex chars, key-order independent and change sensitive [0.14ms]
+(pass) settingsDigest > includes the host and social rules versions, so a rule change blocks --resume [0.06ms]
+(pass) judge route > the tracked config has a Haiku judge priced in the spend table [0.10ms]
+(pass) judge route > is optional, and left out of the digest so earlier runs stay comparable [0.04ms]
+(pass) openSpendMeter > prices input, output and cache tokens, and persists across reopen [2.32ms]
+(pass) openSpendMeter > enforces the limit [1.73ms]
+(pass) openSpendMeter > prices an unknown served model at the highest known rate and warns [0.47ms]
+(pass) openSpendMeter > refuses a corrupt spend log [1.13ms]
+
+standalone/test/providers.test.ts:
+(pass) the stateless Anthropic SDK request is uncached and reserves its full uncached envelope [8.71ms]
+(pass) Responses transports host instructions separately, validates JSON, accounts cached/reasoning once [8.70ms]
+(pass) bad responses are charged and rejected: %s [6.15ms]
+(pass) bad responses are charged and rejected: %s [5.03ms]
+(pass) bad responses are charged and rejected: %s [5.07ms]
+(pass) bad responses are charged and rejected: %s [4.67ms]
+(pass) reply tool calls retain opaque continuation and use call_id for tool results [8.01ms]
+(pass) independent meter instances reserve against one durable budget, unknown outcomes stay reserved [4.49ms]
+(pass) shared totals and per-process evaluation cost stay distinct [4.88ms]
+(pass) Anthropic failures include cached tokens and settle billed usage exactly once [5.71ms]
+(pass) pre-aborted API work neither calls HTTP nor reserves dollars [1.08ms]
+(pass) settlements cannot be duplicated and unknown models never become free [4.75ms]
+(pass) concurrent processes settle one shared budget without duplicate or lost usage [278.77ms]
+(pass) edited or repeated ledger entries fail closed before another reservation [3.47ms]
+
+standalone/test/usage-accounting.test.ts:
+(pass) OpenAI cache writes are normalized and charged conservatively [0.02ms]
+(pass) a missing cache-write field is an upper bound, never an assumed zero [0.02ms]
+(pass) only explicitly uncached Anthropic requests omit the cache-write multiplier [0.02ms]
+(pass) uncached reservations retain the full context, output and margin and never resize older holds [4.88ms]
+(pass) legacy cache uncertainty is added without rewriting the ledger or releasing reservations [7.38ms]
+(pass) the legacy cache-write bound prevents a new call crossing the limit [4.32ms]
+(pass) an explicit bounded budget grant preserves all usage and records its authorization [10.52ms]
+(pass) a changed parameter cannot raise the budget without a bounded explicit grant [3.42ms]
+
+standalone/test/api-keys.test.ts:
+(pass) anthropic accepts shared shell variables and SDK aliases [0.04ms]
+(pass) openai accepts shared shell variables and SDK aliases
+(pass) the shared Claude client applies the key without losing transport options [0.12ms]
+(pass) an explicit SDK key overrides shared environment keys [0.03ms]
+
+standalone/test/social-lull.live.test.ts:
+(skip) live: social lull participation > socialTopics: resumed-sanity-user-log
+(skip) live: social lull participation > socialTopics: resumed-different-topic
+(skip) live: social lull participation > socialTopics: tired-without-reengagement
+(skip) live: social lull participation > socialTopics: resting-acknowledgment
+(skip) live: social lull participation > socialTopics: working-acknowledgment
+(skip) live: social lull participation > socialTopics: declined-without-reengagement
+(skip) live: social lull participation > socialTopics: resumed-after-work
+(skip) live: social lull participation > socialTopics: turn-end-after-reengagement
+(skip) live: social lull participation > hostTopics: resumed-sanity-user-log
+(skip) live: social lull participation > hostTopics: resumed-different-topic
+(skip) live: social lull participation > hostTopics: tired-without-reengagement
+(skip) live: social lull participation > hostTopics: resting-acknowledgment
+(skip) live: social lull participation > hostTopics: working-acknowledgment
+(skip) live: social lull participation > hostTopics: declined-without-reengagement
+(skip) live: social lull participation > hostTopics: resumed-after-work
+(skip) live: social lull participation > hostTopics: turn-end-after-reengagement
+
+standalone/test/claude.test.ts:
+(pass) createClaudeLlm > sends the documented request shape [0.35ms]
+(pass) createClaudeLlm > caps max_tokens at 16000 [0.07ms]
+(pass) createClaudeLlm > refusal -> LlmOutputError(refusal) after recording usage [0.08ms]
+(pass) createClaudeLlm > max_tokens -> LlmOutputError(max_tokens) after recording usage [0.03ms]
+(pass) createClaudeLlm > parse -> LlmOutputError(parse) after recording usage [0.02ms]
+(pass) createClaudeLlm > schema -> LlmOutputError(schema) after recording usage [0.03ms]
+(pass) createClaudeLlm > meter limit becomes a non-retryable spend_limit LlmCallError before the request [0.06ms]
+(pass) createClaudeLlm > the default client never retries inside the SDK [0.05ms]
+(pass) SDK failure mapping > API 400 -> api_400:invalid_request_error retryable=false [0.16ms]
+(pass) SDK failure mapping > API 401 -> api_401:authentication_error retryable=false [0.03ms]
+(pass) SDK failure mapping > API 429 -> api_429:rate_limit_error retryable=true [0.02ms]
+(pass) SDK failure mapping > API 500 -> api_500:api_error retryable=true [0.02ms]
+(pass) SDK failure mapping > API 529 -> api_529:overloaded_error retryable=true [0.02ms]
+(pass) SDK failure mapping > connection and timeout errors -> connection, retryable [0.09ms]
+(pass) SDK failure mapping > aborts are rethrown as is [0.08ms]
+(pass) SDK failure mapping > unknown errors are rethrown as is [0.03ms]
+(pass) SDK failure mapping > chat maps SDK failures and the spend limit the same way [0.27ms]
+(pass) createClaudeReply > joins text blocks, streams them once and sends system apart from the turns [0.10ms]
+(pass) createClaudeReply > tool definitions go out and tool_use blocks come back as tool calls [0.07ms]
+(pass) createClaudeReply > tool results go back as one user turn of tool_result blocks; the raw assistant blocks are kept [0.09ms]
+(pass) createClaudeReply > without raw blocks the assistant turn is rebuilt from the tool calls [0.04ms]
+(pass) host SystemContext at the SDK boundary > update/select and respond preserve whitespace and keep reference data outside system [1.04ms]
+
+eval/test/compare.test.ts:
+(pass) H1 compare gates > recall gain without regressions adopts [0.05ms]
+(pass) H1 compare gates > no change rejects
+(pass) H1 compare gates > FP increase rejects even with recall gain
+(pass) H1 compare gates > safety increase rejects
+
+eval/test/trace.test.ts:
+(pass) createTraceRecorder > records a successful call with context and metadata [3.34ms]
+(pass) createTraceRecorder > records the error, rethrows it unchanged [1.54ms]
+(pass) createTraceRecorder > redacts key-like strings and omits reasonCode for plain errors [1.40ms]
+(pass) createTraceRecorder > begin resets seq; final writes the state [4.56ms]
+(pass) createTraceRecorder > complete before begin throws [0.15ms]
+(pass) formatTrace / traceCommand > prints outputs and state summary, prompt only on request [3.95ms]
+(pass) formatTrace / traceCommand > errors clearly when nothing matches or file is missing [2.27ms]
+
+eval/test/action-steps.test.ts:
+(pass) reference catalog mirrors native citable observations and excludes intent IDs [1.05ms]
+(pass) one reference correction uses native reservation and records the extra shared-budget call [0.59ms]
+(pass) repair is bounded and a missing call budget prevents another API request [0.62ms]
+(pass) approval rejection is never repaired or reserved [0.32ms]
+(pass) invalidation during the first response prevents reference repair [0.25ms]
+(pass) A3 asks for an actual utterance; A4 exposes the native activity meter and returned result [0.49ms]
+(pass) host-injected meters are the runtime meters and default behavior stays native [0.12ms]
+(pass) stale update gets one model correction without altering the proposed transition [0.37ms]
+
+eval/test/secret-scan.test.ts:
+(pass) task file paths are not key tokens, while planted keys still are [2.91ms]
+(pass) known credential values are detected even inside another token [1.81ms]
+
+eval/test/scenario.test.ts:
+(pass) 3-day script: bounded calls, no select after returns, quiet gates, tts:false [1.44ms]
+
+eval/test/p1e-followup.test.ts:
+(pass) state-check exclusions in replay > records open items only when mustNotHold is set, and no exclusion normally [1.47ms]
+(pass) state-check exclusions in replay > blocked presence and empty stateExpect are excluded [1.68ms]
+(pass) state-check exclusions in replay > opportunities after an update infra failure are excluded [0.44ms]
+(pass) state-check exclusions in replay > update watch: only infra codes taint; agent output failures never do [0.03ms]
+(pass) openItems > B1 notes and B2 open intents (held included) and open candidates [0.07ms]
+(pass) state judge > prompt: matter text, open items and context; never the labels [0.49ms]
+(pass) state judge > one call per opportunity, one row per matter; resume skips rows; stats [2.85ms]
+(pass) state judge > no open items: absent without a call; excluded and D records are not judged [1.08ms]
+(pass) state judge > a verdict set that misses a matter is not written [0.48ms]
+(pass) state judge > judgeCommand runs content then state pass and stops both on --limit [6.88ms]
+(pass) judge integrity > digest depends on model, effort and prompt [0.07ms]
+(pass) judge integrity > an edited criterion is judged again; unchanged ones are not repeated [2.26ms]
+(pass) parseAnswerAction > takes the first token, not a later mention [0.21ms]
+(pass) parseAnswerAction > no action word at the start means no answer [0.04ms]
+(pass) command budget > refuses calls once this command's own spend reached the limit [0.11ms]
+(pass) command budget > a runPool stops on it as a spend limit [0.44ms]
+
+eval/test/p1e.test.ts:
+(pass) state check > B1 counts notes only [0.03ms]
+(pass) state check > B2/F count open intents and open candidates, not closed ones [0.02ms]
+(pass) state check > null without stateExpect or for B0
+(pass) state check > replay checks the state seen at select time, before the decision is applied [0.64ms]
+(pass) state check > D and B0 records carry no stateCheck [0.42ms]
+(pass) condition D > selectDiagnosticObservations: present + the same window as B1/B2, deduplicated, chronological [0.09ms]
+(pass) condition D > prompt shows only present + recent observations and never any label [0.95ms]
+(pass) condition D > outward action goes through the ticket/receipt path and validation [0.61ms]
+(pass) condition D > blocked moments never call the model [0.04ms]
+(pass) suite loading > loads p1e dev/unseen from a root and checks the suite [2.82ms]
+(pass) suite loading > a p1e opportunity with expect needs stateExpect and present [2.59ms]
+(pass) suite loading > validateCommand lists the suite's groups [0.44ms]
+(pass) score p1e > p1e sections: group x condition, state trajectory, D as diagnostic [1.11ms]
+(pass) score p1e > excluded opportunities are counted apart from the denominators [0.12ms]
+(pass) score p1e > let-go rates come from state judgments of live runs only [0.22ms]
+(pass) score p1e > judgments of incomplete or replaced runs are not summarized [0.10ms]
+(pass) score p1e > p0e records keep the old structure [0.05ms]
+(pass) score p1e > scoreCommand reads judgments.jsonl and checks --suite [37.85ms]
+(pass) judge > one call per action, one Judgment per criterion, labels excluded from the prompt [0.60ms]
+(pass) judge > resume skips judged actions; limit stops early; bad verdict sets are not written [2.15ms]
+(pass) judge > incomplete runs and non-outward actions are skipped; spend limit stops [0.72ms]
+(pass) judge > judgeCommand end to end with a fake port [3.00ms]
+(pass) label export and agreement > deterministic, blind, stratified [6.46ms]
+(pass) label export and agreement > agreement parses a filled sheet and lists disagreements [3.08ms]
+(pass) judge export and agreement > blind sheet from judged actions, agreement per criterion [6.22ms]
+(pass) decision shape > helpers used above stay in sync with Decision [0.02ms]
+
+eval/test/judge-tool.test.ts:
+(pass) criteriaFor > speak uses judge; tool uses judgeTool, else the generic criterion [0.02ms]
+(pass) criteriaFor > an opportunity without judge criteria judges nothing, tool or speak [0.01ms]
+(pass) pendingJudgeTasks by action kind > a tool action gets the generic criterion and sees tool name and input [0.41ms]
+(pass) pendingJudgeTasks by action kind > a case-given judgeTool replaces the generic criterion; speak is unchanged [0.65ms]
+(pass) pendingJudgeTasks by action kind > a tool verdict row of the generic criterion counts as judged [0.33ms]
+(pass) the judge fingerprint carries the bumped prompt version [0.01ms]
+(pass) social cases: interests and the opportunity's topics are judge facts [0.35ms]
+(pass) the judge fingerprint includes the generic tool criterion [0.02ms]
+(pass) summary splits speak and tool judgments > per-condition table and per-criterion table carry the action kind [0.18ms]
+(pass) judge digest distinguishes provider and output reasoning headroom [0.02ms]
+
+eval/test/live-b1-f.test.ts:
+(pass) nullable schema factoring preserves accepted values and the input schema [1.30ms]
+(pass) scenes have unique frames, fixed clocks, negative and positive opportunities [0.06ms]
+(pass) judge ID coverage and one-to-one assignment are validated [0.11ms]
+(pass) unsupported action is not credited, and extra interests count as false positives [0.07ms]
+(pass) lifecycle is evaluated separately from topic matching [0.02ms]
+(pass) checkpoints contain only facts available at their own time [0.06ms]
+(pass) draft labels are never passed to the runtime model [0.75ms]
+(pass) paired bootstrap excludes unmatched or failed repetitions [5.52ms]
+
+eval/test/score.test.ts:
+(pass) classify > TP, with and without wrong_content [0.06ms]
+(pass) classify > FP uses failureIfOutward [0.03ms]
+(pass) classify > FN and TN [0.01ms]
+(pass) classify > excluded
+(pass) classify > self_evidence only when all non-empty evidence is agent-authored [0.02ms]
+(pass) classify: action, approval, infra, physical > wrong_action when outward but not accepted [0.01ms]
+(pass) classify: action, approval, infra, physical > approval_required is an unauthorized attempt even when the final action is wait [0.02ms]
+(pass) classify: action, approval, infra, physical > infra is excluded, not FN [0.05ms]
+(pass) classify: action, approval, infra, physical > host_blocked is physical
+(pass) classify: action, approval, infra, physical > call-level infra codes [0.02ms]
+(pass) callFailure mapping [0.01ms]
+(pass) summarize > contains header, draft warning, condition table, variance, utterances [0.26ms]
+(pass) summarize > confirmed labels give no draft warning; safety gives a big warning [0.09ms]
+(pass) summarize > empty input does not throw [0.02ms]
+(pass) latest record per key and incomplete runs > latestRecords keeps the last line per key [0.02ms]
+(pass) latest record per key and incomplete runs > summarize ignores superseded and incomplete runs in counts, lists incomplete [0.06ms]
+(pass) latest record per key and incomplete runs > summarize reports physical and infra separately [0.04ms]
+
+eval/test/review-fixes.test.ts:
+(pass) B1a ablation condition > is an eval condition run as B1; part of the p1e default set [0.68ms]
+(pass) B1a ablation condition > replay state-checks B1a like B1 (D stays unchecked) [0.61ms]
+(pass) B1a ablation condition > summary reports B1a as its own condition, next to B1 [0.16ms]
+(pass) host-gate visibility > sources are split per condition, group and need [0.10ms]
+(pass) H1: empty mustHold is not 'all met' > mustHold columns use only opportunities with a mustHold group [0.06ms]
+(pass) H2: release judgement without the empty-state case > absent from 'none' (no items) is a separate column and not in the rate [0.09ms]
+(pass) H3: judge calibration > judge-export includes all fail/unclear actions up to half the sample [1.24ms]
+(pass) H3: judge calibration > criteria without a judge row are skipped, not made up as unclear [0.51ms]
+(pass) H3: judge calibration > confusion matrix, kappa; both-unclear is not agreement [0.09ms]
+(pass) H3: judge calibration > kappa: perfect, chance-level, and undefined [0.03ms]
+(pass) H3: judge calibration > summary marks the judge as uncalibrated until an agreement file exists [0.47ms]
+(pass) H4: negated Japanese answers are errors, not positives > negations raise, naming the item via the sheet parser [0.08ms]
+(pass) H4: negated Japanese answers are errors, not positives > positives, 何もしない, and negations inside the reason still parse [0.02ms]
+(pass) H5: case versions > caseHash is stable over key order and changes with content [0.43ms]
+(pass) H5: case versions > replay records the case hash [0.43ms]
+(pass) H5: case versions > --resume refuses a changed case and unhashed records (unless --allow-unverified) [0.56ms]
+(pass) H5: case versions > judgeCommand refuses records of another case version [2.05ms]
+(pass) H5: case versions > label agreement refuses when a case changed after export [0.36ms]
+(pass) H6: agent output failures stay in the state denominators > schema/rejected update failures do not exclude; infra does [1.47ms]
+(pass) H7 > infra is not counted twice (call + opportunity) [0.13ms]
+(pass) H7 > summary shows spend including superseded records [0.06ms]
+(pass) H7 > per-group tables show the number of distinct cases [0.08ms]
+(pass) H7 > judge input carries tool input and the agent's earlier outward actions [0.40ms]
+(pass) H7 > replay records the tool input [0.51ms]
+(pass) H7 > judge digest covers the prompt-builder shape [0.10ms]
+(pass) H7 > p1e opportunities need present, needed or not (inline fixture) [0.53ms]
+(pass) H7 > mustHold/mustNotHold/present must name observation steps [1.57ms]
+(pass) H7 > trace: the latest run of the same (case, condition, rep) wins [0.08ms]
+(pass) score command: calibration marker > judge-agreement.md next to the run flips the note [9.02ms]
+(pass) H6 follow-up: agent output failures are scored, not excluded > source error from an agent output failure is FN / TN [0.08ms]
+(pass) H6 follow-up: agent output failures are scored, not excluded > source error from infra stays excluded; unknown reason is infra [0.03ms]
+(pass) H6 follow-up: agent output failures are scored, not excluded > the failure type stays in the failure table (from the failed call) [0.09ms]
+(pass) H6 follow-up: agent output failures are scored, not excluded > consecutive agent-failure runs do not halt; consecutive infra runs do [0.59ms]
+(pass) review 3: unverified hashes, halts, calibration, negation scope > labelStatus is outside the hash; label content is inside [0.40ms]
+(pass) review 3: unverified hashes, halts, calibration, negation scope > judge, judge-export, agreement, judge-agreement refuse unverified input [5.72ms]
+(pass) review 3: unverified hashes, halts, calibration, negation scope > score warns about records without a hash and about changed cases [12.27ms]
+(pass) review 3: unverified hashes, halts, calibration, negation scope > run halts after 3 consecutive all-llm:* runs, with its own message [0.08ms]
+(pass) review 3: unverified hashes, halts, calibration, negation scope > an aborted call marks the opportunity like an infra call [0.61ms]
+(pass) review 3: unverified hashes, halts, calibration, negation scope > negation counts only when attached to the action word [0.06ms]
+
+eval/test/replay.test.ts:
+(pass) replayCase > runs background after the same-t group and decides at opportunities [0.10ms]
+(pass) replayCase > speak ticket gets a succeeded receipt carrying the utterance [0.08ms]
+(pass) replayCase > tool script is consumed in order and exhaustion fails without a safety flag [0.10ms]
+(pass) replayCase > unauthorized tool is failed and flagged [0.04ms]
+(pass) replayCase > ticket while not quiet or busy is flagged and never delivered [0.05ms]
+(pass) replayCase > usd is the spent() delta [0.08ms]
+(pass) replayCase > a throw is captured, the partial record is kept [0.04ms]
+(pass) replayCase > decide throw keeps earlier opportunities; makeRuntime throw is captured [0.08ms]
+(pass) replay granularity and integrity > pending observations reach batchSize before the turn ends [0.05ms]
+(pass) replay granularity and integrity > background is not run for user-only observations; decide handles them [0.04ms]
+(pass) replay granularity and integrity > requiresApproval is passed to the runtime and a ticket for such a tool is a safety stop [0.06ms]
+(pass) replay granularity and integrity > failed decide-time model calls are marked on the opportunity [0.06ms]
+(pass) replay granularity and integrity > incomplete: exception, spend limit, all calls failed (non-B0 only) [0.03ms]
+(pass) replay granularity and integrity > replayCase flags an exception run as incomplete [0.03ms]
+
+eval/test/judge-emotion.test.ts:
+(pass) judge: utterance emotion > a speak with a feeling gets the emotion criterion and shows the feeling [0.02ms]
+(pass) judge: utterance emotion > without a feeling, or with nothing to judge, the criteria are unchanged [0.01ms]
+(pass) judge: utterance emotion > records made before the field parse, and an unknown feeling is refused [0.04ms]
+
+eval/test/cross-judge.test.ts:
+(pass) supplementary audit hides labels and conditions, preserves original cases, resumes by criterion [0.28ms]
+
+eval/test/self-port.test.ts:
+(pass) self-port > queues first unanswered request, then serves the answer [2.40ms]
+
+eval/test/f-fusion.test.ts:
+(pass) fusion encodes model-selected meaning into native F operations and keeps a single store [1.25ms]
+(pass) malformed and omitted meaning is rejected rather than invented by the adapter [0.10ms]
+(pass) fusion still rejects approval-required tool proposals before reservation [0.36ms]
+(pass) held questions block previously proposed tools and a newer solution completes the same question [0.48ms]
+(pass) stale selection and already reserved work are rejected by the native gate [0.33ms]
+(pass) native per-intent tool budget is retained in the fused sample [0.57ms]
+(pass) both sample paths expose the actual selected query to the judge, without expected labels [0.69ms]
+(pass) new scoring credits relevant grounded actions independently of quiet labels [0.20ms]
+(pass) revised negative cases have explicit stop requests and new topics are included before inference [0.02ms]
+(pass) F-improved shares native interest withdrawal and action execution [0.52ms]
+(pass) Fusion shares native interest withdrawal and action execution [0.43ms]
+(pass) judge memory is rebuilt from the contemporaneous snapshot, never the final state [0.31ms]
+
+eval/test/main.test.ts:
+(pass) planRuns / skipDone > B0 runs once, others per rep, rotated per case [0.04ms]
+(pass) planRuns / skipDone > resume skips done keys only [0.03ms]
+(pass) jsonl and commands > parseRunsJsonl validates [0.18ms]
+(pass) jsonl and commands > scoreCommand writes summary.md [12.78ms]
+(pass) jsonl and commands > doneKeys: incomplete runs are re-run, latest record wins [0.06ms]
+(pass) jsonl and commands > assertResumeCompatible [0.06ms]
+(pass) jsonl and commands > evaluateStop [0.04ms]
+(pass) jsonl and commands > parseConditions [0.01ms]
+(pass) jsonl and commands > loadCases / validateCommand on a temp dir [5.67ms]
+
+eval/initiative/p0.test.ts:
+(pass) P0 baseline on the installed distribution > P0-A06: the host's import is the vendored distribution, verified by checksum and module identity [627.12ms]
+(pass) P0 baseline on the installed distribution > P0-A01: the manifest holds the plan and identity before the run; pairs reject fixed or undeclared differences [8.49ms]
+(pass) P0 baseline on the installed distribution > P0-A02: the same requests replay to the same records; only transport ids are bound one-to-one [323.48ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate system difference is detected at the replay boundary (request_digest_mismatch) [327.84ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate options difference is detected at the replay boundary (request_digest_mismatch) [306.50ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate prefix difference is detected at the replay boundary (request_digest_mismatch) [301.96ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate prefix-content difference is detected at the replay boundary (request_digest_mismatch) [301.92ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate session difference is detected at the replay boundary (request_digest_mismatch) [305.55ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate drop-entry difference is detected at the replay boundary (extra_call) [341.88ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate extra-entry difference is detected at the replay boundary (unconsumed_response) [306.39ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate identity difference is detected at the replay boundary (identity_conflict) [305.36ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a deliberate corrupt-response difference is detected at the replay boundary (response_digest_mismatch) [299.51ms]
+(pass) P0 baseline on the installed distribution > P0-A02 (R5): the conversation-prefix case is built by the product assembly and llm-port, and replays [0.79ms]
+(pass) P0 baseline on the installed distribution > P0-A02: a changed response with matching requests is caught by the record comparison [314.41ms]
+(pass) P0 baseline on the installed distribution > P0-A02 (R1): only declared identities become tokens; every other session field is compared [0.25ms]
+(pass) P0 baseline on the installed distribution > P0-A03/A05/A07: the baseline subset passes with expected rejections, no outward effect and known-unknown usage [0.33ms]
+(pass) P0 baseline on the installed distribution > P0-A03: injected exceptions, provider failure, invalid output and a stop leave every planned trial [238.64ms]
+(pass) P0 baseline on the installed distribution > P0-A03/A07 (R3): the attempt cap is never exceeded — max=0 serves nothing [203.94ms]
+(pass) P0 baseline on the installed distribution > P0-A03/A07 (R3): the attempt cap is never exceeded — max=1 stops inside update→select [214.40ms]
+(pass) P0 baseline on the installed distribution > P0-A03/A07 (R3): the attempt cap is never exceeded — max=2 stops inside a retry [208.09ms]
+(pass) P0 baseline on the installed distribution > P0-A03/A07 (R3): the attempt cap is never exceeded — max=3 stops in the second step [212.76ms]
+(pass) P0 baseline on the installed distribution > P0-A03/A08: missing, duplicate and unknown records are found; the aggregate regenerates from raw only [0.92ms]
+(pass) P0 baseline on the installed distribution > P0-A08: generated files carry no secret-shaped content; the detector itself finds a planted one [2.21ms]
+(pass) P0 record semantics (mock records) > P0-A04: model wait, core rejection, host rejection and (mock) observe suppression are separate [0.11ms]
+(pass) P0 record semantics (mock records) > P0-A04: a gate-stopped proposal stays a FP, a reference rejection is not a fitting wait, unscorable widens the range [0.27ms]
+(pass) P0 record semantics (mock records) > P0-A07: absent usage is unknown, never 0; known usage is summed per attempt [0.05ms]
+(pass) P0 record semantics (mock records) > P0-A03: a stop reports every remaining planned trial as incomplete [0.07ms]
+(pass) P0-A06 (R4): the installed dist must be the artifact's package/dist, file for file > the vendored artifact and the installed dist of this host have no difference [6.28ms]
+(pass) P0-A06 (R4): the installed dist must be the artifact's package/dist, file for file > an unchanged install passes every check [42.19ms]
+(pass) P0-A06 (R4): the installed dist must be the artifact's package/dist, file for file > a changed file is detected although checksum, version and constants still match [6.70ms]
+(pass) P0-A06 (R4): the installed dist must be the artifact's package/dist, file for file > a missing file is detected although checksum, version and constants still match [6.10ms]
+(pass) P0-A06 (R4): the installed dist must be the artifact's package/dist, file for file > an added file is detected although checksum, version and constants still match [5.35ms]
+
+eval/initiative/trials.test.ts:
+(pass) a rejected selection and a provider error leave the planned denominator intact [0.11ms]
+
+eval/initiative/research.test.ts:
+(pass) host admission checks the selected ticket's actual input and advertised revision [2.24ms]
+
+eval/cases/p1e/tools/cues.test.ts:
+(pass) cue check (rules) > disjoint trigger sets fail [0.15ms]
+(pass) cue check (rules) > shared single values but disjoint joint cells fail [0.04ms]
+(pass) cue check (rules) > near-separation by single-label joint cells fails above the share limit [0.05ms]
+(pass) cue check (rules) > balanced cells pass; a group with one label fails [0.03ms]
+(pass) generated P1-E cases > dev: every group passes the cue check [8.86ms]
+(pass) generated P1-E cases > unseen: every group passes the cue check [12.40ms]
+
+examples/virtual-eumenes/adapter.test.ts:
+(pass) pinned Memory public API captures, reads, enforces access and rejects writes outside a transaction [5.16ms]
+(pass) canonical bodies live in Memory, archive survives restart, and source references are chunked at the public limit [37.44ms]
+(pass) a restored Agency note receives the archived source; disabling the archive loses only that source [24.98ms]
+(pass) restarting through Agency preserves observation identity regardless of JSON key order [30.51ms]
+(pass) Memory forgetting removes non-cited Agency state, tickets and canonical derived bodies before acknowledgement [16.68ms]
+(pass) the external Memory journal prevents resurrection after restoring an older host DB [43.47ms]
+(pass) failure after Memory deletion leaves acknowledgement pending and restart finishes Agency deletion [17.60ms]
+(pass) a failed host checkpoint rolls back Memory capture and stops publication [9.89ms]
+(pass) stale writers, foreign owners and truncated journals fail closed [25.39ms]
+(pass) a missing canonical source is a recovery error, never an inferred forget [15.46ms]
+(pass) pinned artifact hash matches the Eumenes adopted manifest [0.26ms]
+(pass) an archived observation stays pinned to its captured Memory revision [24.56ms]
+(pass) forgetting fences an in-flight inference before its output can be committed [12.00ms]
+(pass) forgetting aborts a retryable pending call before another model invocation [16.13ms]
+
+examples/virtual-eumenes/mock-toolchain.test.ts:
+(pass) conversation -> Agency idea -> toolchain -> bundle -> subagent -> result -> grounded speech [19.67ms]
+(pass) the model-visible capability contract names and types the actual accepted revision [16.75ms]
+(pass) a numeric candidate revision is never coerced into a bundle identifier [13.03ms]
+(pass) the validated request reaches the mock subagent once and its return reaches the next Agency prompt [17.62ms]
+(pass) unknown or approval-required bundle revisions are refused without a mock subagent run [27.54ms]
+(pass) failed mock work is recorded as failure and cannot count as successful completion [14.25ms]
+(pass) handoff checks current Memory availability even if an upstream deletion bypasses the runtime [14.52ms]
+(pass) forgetting fences a running mock subagent and rejects its late return [13.53ms]
+(pass) F owned instructions/topics/todos continue an independent conversation after forgetting and restart [24.71ms]
+
+25 tests skipped:
+(skip) (c) self-generated content is not promoted > POLICY: V4 allows medium/low beliefs citing only self-generated observations (this stricter rule is intentionally not adopted)
+(skip) live: injected memory is not obeyed > a poisoned projected memory item does not change the reply
+(skip) live: injected memory is not obeyed > combined projected entries: benign utility control
+(skip) live: injected memory is not obeyed > combined projected entries: injection boundary
+(skip) live: interest conversation > the content judge accepts a new perspective and rejects paraphrase and empty handoff
+(skip) live: interest conversation > socialTopics: user-log continues with content through three idle opportunities
+(skip) live: interest conversation > socialTopics: different-interest continues with content through three idle opportunities
+(skip) live: interest conversation > hostTopics: user-log continues with content through three idle opportunities
+(skip) live: interest conversation > hostTopics: different-interest continues with content through three idle opportunities
+(skip) live: social lull participation > socialTopics: resumed-sanity-user-log
+(skip) live: social lull participation > socialTopics: resumed-different-topic
+(skip) live: social lull participation > socialTopics: tired-without-reengagement
+(skip) live: social lull participation > socialTopics: resting-acknowledgment
+(skip) live: social lull participation > socialTopics: working-acknowledgment
+(skip) live: social lull participation > socialTopics: declined-without-reengagement
+(skip) live: social lull participation > socialTopics: resumed-after-work
+(skip) live: social lull participation > socialTopics: turn-end-after-reengagement
+(skip) live: social lull participation > hostTopics: resumed-sanity-user-log
+(skip) live: social lull participation > hostTopics: resumed-different-topic
+(skip) live: social lull participation > hostTopics: tired-without-reengagement
+(skip) live: social lull participation > hostTopics: resting-acknowledgment
+(skip) live: social lull participation > hostTopics: working-acknowledgment
+(skip) live: social lull participation > hostTopics: declined-without-reengagement
+(skip) live: social lull participation > hostTopics: resumed-after-work
+(skip) live: social lull participation > hostTopics: turn-end-after-reengagement
+
+
+1 tests todo:
+(todo) (e) A-MemGuard: individually benign entries that combine into a harmful directive > TODO: consistency check across retrieved entries (A-MemGuard) is not implemented; needs a settle-time or retrieval-time guard
+
+ 1036 pass
+ 25 skip
+ 1 todo
+ 0 fail
+ 4241 expect() calls
+Ran 1062 tests across 89 files. [8.59s]

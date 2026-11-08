@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { hash } from "../../capabilities";
+import { isAlwaysOnSnapshot } from "../contracts/agency-always-on";
 
 export const agencyMigration = `
 CREATE TABLE dialogue_agency_state (
@@ -215,6 +216,12 @@ export function currentAgencyWork(db: Database, r: AgencyWorkRow): boolean {
 		)
 		.get(r.conversation_id, r.epoch) as { snapshot_json: string | null } | null;
 	if (!row?.snapshot_json) return false;
+	const value: unknown = JSON.parse(row.snapshot_json);
+	if (isAlwaysOnSnapshot(value))
+		return (
+			value.agent.state.preparing.some((p) => p.ticketId === r.ticket_id) &&
+			value.tickets.some((t) => t.id === r.ticket_id && t.action === "prepare")
+		);
 	const snapshot = JSON.parse(row.snapshot_json) as {
 		state: {
 			intents: Array<{ id: string; state: string; workRef?: string | null }>;

@@ -12,3 +12,5 @@ export {
 	type DoclingDocuments,
 } from "./service/documents";
 export * from "./contracts/documents";
+
+export * from "./contracts/library";

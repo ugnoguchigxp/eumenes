@@ -39,6 +39,17 @@ export type ExecutionStatus =
 	| "failed"
 	| "cancelled"
 	| "interrupted";
+export type ExecutionDocument = {
+	id: string;
+	title: string;
+	path: string;
+	local: { state: "saved" | "failed" | "expired"; uri?: string; code?: string };
+	archive: {
+		state: "saved" | "unsaved" | "unknown" | "conflict";
+		sourceId?: string;
+		code?: string;
+	};
+};
 export type ExecutionResult = {
 	status: ExecutionStatus;
 	summary: string;
@@ -48,6 +59,7 @@ export type ExecutionResult = {
 	code?: string;
 	/** Resource URIs the execution's children made (resource-uri plan §6.3). */
 	links?: string[];
+	document?: ExecutionDocument;
 	/** A research owner's bounded report; source IDs are issued only after reading a guarded body. */
 	answer?: string;
 	sources?: Array<{
@@ -180,7 +192,12 @@ export interface ToolchainExecutionPort {
 	autonomyInTransaction?(
 		db: Database,
 		revisionId: string,
-	): { automatic: boolean; reason: string; operations: string[] };
+	): {
+		automatic: boolean;
+		reason: string;
+		operations: string[];
+		effect?: "read" | "create";
+	};
 	validSourceInTransaction(db: Database, source: ExecutionSource): boolean;
 	controlSourceInTransaction(
 		db: Database,

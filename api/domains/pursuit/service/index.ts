@@ -6,6 +6,7 @@ import { current, type Context, type PursuitDeps } from "./context";
 import { active, rowOf, save, stateOf, type RunRow } from "../repository";
 import { controls } from "./control";
 import { registerJobs } from "./jobs";
+import { collectDocuments, publishDocument } from "./documents";
 import { end, forget, notice, reconcile } from "./lifecycle";
 import { collectWeb } from "./web";
 import { reportInTransaction, viewInTransaction } from "./view";
@@ -43,7 +44,10 @@ export function createPursuit(deps: PursuitDeps) {
 			row.job_id = job.job.id;
 		},
 		forget: (db, id) => forget(ctx, db, id),
-		notice: (db, row) => notice(ctx, db, row),
+		notice: (db, row) => {
+			const latest = rowOf(db, row.id)!;
+			if (!publishDocument(ctx, db, latest)) notice(ctx, db, latest);
+		},
 	};
 	registerJobs(ctx);
 	function flush() {
@@ -52,6 +56,7 @@ export function createPursuit(deps: PursuitDeps) {
 		deps.inference.flushCancelledRequests?.([...ctx.abortRequests]);
 		ctx.abortRequests.clear();
 		deps.web.flush();
+		deps.documents?.flush?.();
 		deps.queue.wake();
 	}
 	async function maintain(recovering = false) {
@@ -60,6 +65,7 @@ export function createPursuit(deps: PursuitDeps) {
 		pending = deps.store
 			.write((db) => {
 				reconcile(ctx, db, recovering);
+				collectDocuments(ctx, db);
 				collectWeb(ctx, db);
 			})
 			.then(flush)
@@ -92,7 +98,7 @@ export function createPursuit(deps: PursuitDeps) {
 			if (
 				set.binding?.revisionId !== input.bindingRevisionId ||
 				binding?.execution !== "task" ||
-				binding.adapterRef !== "adapter:pursuit@1"
+				!["adapter:pursuit@1", "adapter:pursuit@2"].includes(binding.adapterRef)
 			)
 				throw new Error("pursuit_binding_invalid");
 			const request = input.request.trim();
@@ -123,6 +129,7 @@ export function createPursuit(deps: PursuitDeps) {
 				draft: null,
 				snapshots: {},
 				result: null,
+				saveDocument: binding.adapterRef === "adapter:pursuit@2",
 			};
 			const row: RunRow = {
 				id,
@@ -172,6 +179,24 @@ export function createPursuit(deps: PursuitDeps) {
 	return {
 		task,
 		reportInTransaction,
+		documentSourceInTransaction(
+			db: Database,
+			documentId: string,
+			id: string,
+			epoch: number,
+		) {
+			try {
+				const r = current(ctx, db, id, epoch, true),
+					state = stateOf(r);
+				return (
+					r.state === "waiting_child" &&
+					state.saveDocument === true &&
+					state.publication?.id === documentId
+				);
+			} catch {
+				return false;
+			}
+		},
 		configure(port: SourcePort) {
 			source = port;
 		},

@@ -142,6 +142,20 @@ export function createMarkdownAdapter(service: MarkdownService): DomainAdapter {
 			const parsed = z
 				.strictObject({ workRef: z.string().optional() })
 				.parse(params ?? {});
+			if (targetRef?.startsWith("generated-")) {
+				const saved = service.generated.currentInTransaction(
+					db,
+					targetRef.slice("generated-".length),
+				);
+				if (saved?.archive.state !== "saved") return null;
+				return {
+					revision: 1,
+					data: {
+						...service.currentInTransaction(db),
+						openSourceId: saved.archive.sourceId,
+					},
+				};
+			}
 			const data = service.currentInTransaction(
 				db,
 				targetRef ?? undefined,

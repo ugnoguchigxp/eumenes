@@ -59,15 +59,15 @@ test("seeding upgrades the published editor without rewriting v1, and repeated s
 				.read((db) => capabilities.artifactsInTransaction(db))
 				.filter((a) => a.artifactId === "markdown.workspace")
 				.map((a) => a.artifactRevisionId),
-		).toEqual(["artifact:markdown.workspace@3"]);
+		).toEqual(["artifact:markdown.workspace@4"]);
 		expect(
 			store
 				.read((db) => capabilities.toolchainsInTransaction(db))
 				.find((t) => t.id === "markdown.collaborate"),
 		).toMatchObject({
-			revisionId: "toolchain:markdown.collaborate@3",
-			bindingRevisionId: "binding:markdown.collaborate@3",
-			artifactRevisionId: "artifact:markdown.workspace@3",
+			revisionId: "toolchain:markdown.collaborate@4",
+			bindingRevisionId: "binding:markdown.collaborate@4",
+			artifactRevisionId: "artifact:markdown.workspace@4",
 		});
 	} finally {
 		await store.close();

@@ -1,3 +1,4 @@
+import { registerLibraryManagement } from "./library-management";
 import type { Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { parseJsonBody } from "../../../infrastructure/http";
@@ -32,6 +33,7 @@ const signal = (c: Context) =>
 	AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(30000)]);
 const headers = { "Cache-Control": "no-store" };
 export function registerMarkdown(app: Hono, service: MarkdownService) {
+	registerLibraryManagement(app, service);
 	app.use(
 		"/api/markdown/*",
 		bodyLimit({
@@ -74,6 +76,19 @@ export function registerMarkdown(app: Hono, service: MarkdownService) {
 		try {
 			return c.json(
 				await service.preview(parsed.data.sourceId, signal(c)),
+				200,
+				headers,
+			);
+		} catch (e) {
+			return failure(c, e);
+		}
+	});
+	app.post("/api/markdown/generated/:id/check", async (c) => {
+		const parsed = id.safeParse(c.req.param("id"));
+		if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
+		try {
+			return c.json(
+				await service.generated.reconcile(parsed.data, signal(c)),
 				200,
 				headers,
 			);

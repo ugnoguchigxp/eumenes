@@ -167,3 +167,53 @@ test("the vendored router package matches its manifest, package.json, the lockfi
 	);
 	expect(lock).toContain(integrity);
 });
+
+test("the installed memory host matches its vendored artifact and the adopted core runtime", () => {
+	const manifest = JSON.parse(
+		read("vendor/eumenes-memory-host/manifest.json").toString(),
+	);
+	const artifact = read(`vendor/eumenes-memory-host/${manifest.artifact}`);
+	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
+		manifest.sha256,
+	);
+	expect(
+		read(`vendor/eumenes-memory-host/${manifest.artifact}.sha256`)
+			.toString()
+			.split(/\s+/)[0],
+	).toBe(manifest.sha256);
+	expect(
+		JSON.parse(read("package.json").toString()).dependencies[manifest.package],
+	).toBe(`file:vendor/eumenes-memory-host/${manifest.artifact}`);
+	const lock = read("bun.lock").toString();
+	expect(lock).toContain(
+		`${manifest.package}@vendor/eumenes-memory-host/${manifest.artifact}`,
+	);
+	expect(lock).toContain(
+		`sha512-${createHash("sha512").update(artifact).digest("base64")}`,
+	);
+	const hostUrl = new URL("../", import.meta.resolve("eumenes-memory-host"));
+	const installed = JSON.parse(
+		readFileSync(new URL("package.json", hostUrl), "utf8"),
+	);
+	expect(installed.version).toBe(manifest.version);
+	const release = JSON.parse(
+		readFileSync(new URL("dist/release-manifest.json", hostUrl), "utf8"),
+	);
+	expect(release.sourceHash).toBe(manifest.sourceHash);
+	const coreUrl = import.meta.resolve("eumenes-memory/package.json");
+	const coreRelease = JSON.parse(
+		readFileSync(new URL("./dist/release-manifest.json", coreUrl), "utf8"),
+	);
+	expect(release.sourceHash).toBe(coreRelease.sourceHash);
+	expect(coreRelease.baseCommit).toBe(manifest.sourceGitCommit);
+	for (const [path, sha] of Object.entries(release.files)) {
+		if (typeof path !== "string" || typeof sha !== "string")
+			throw new Error("Invalid host release checksum");
+		const bytes = readFileSync(new URL(path, hostUrl));
+		expect(createHash("sha256").update(bytes).digest("hex")).toBe(sha);
+		if (path.startsWith("dist/core/") && path.endsWith(".js"))
+			expect(bytes).toEqual(
+				readFileSync(new URL(path.replace("dist/core/", "./dist/"), coreUrl)),
+			);
+	}
+});

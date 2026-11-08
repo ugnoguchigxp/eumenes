@@ -4,13 +4,27 @@ import type { AdapterState } from "../toolchain-artifacts/registry";
 
 /** Uses the existing upload contracts: staged editor input, or an ordinary SSD scratch file. */
 export function markdownUploads(
-	client: Pick<EumenesClient, "uploadScratchFile" | "markdownStage">,
+	client: Pick<
+		EumenesClient,
+		"uploadScratchFile" | "markdownStage" | "markdownStageManagement"
+	>,
 	conversationId: string | undefined,
 	maxRequestBytes?: number,
 ): NonNullable<AdapterState["uploadFile"]> {
 	return async (_source, file, context) => {
 		const cache = context?.purpose === "markdown-cache";
 		try {
+			if (context?.purpose === "markdown-management") {
+				if (
+					file.size >
+					Math.min(20 * 1024 * 1024, maxRequestBytes ?? 20 * 1024 * 1024)
+				)
+					throw new Error("too_large");
+				const value = await client.markdownStageManagement(
+					JSON.parse(await file.text()),
+				);
+				return { status: "accepted", message: "", value: value.id };
+			}
 			if (cache) {
 				if (!conversationId || !z.uuid().safeParse(context.requestId).success)
 					throw new Error("cache_unavailable");

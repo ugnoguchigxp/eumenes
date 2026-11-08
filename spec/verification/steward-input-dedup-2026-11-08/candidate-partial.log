@@ -1,0 +1,36 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/steward-input.test.ts:
+(pass) an independent steward call receives the entire output contract once through Inference [0.18ms]
+(pass) a shared-conversation call keeps its records and presents the contract only in the first system [0.14ms]
+
+api/domains/steward/test/steps.test.ts:
+(pass) the events of a run go through curate-memory and are handled [49.13ms]
+(pass) events that carry nothing to learn from are handled without a model [33.61ms]
+(pass) a failed summary-like answer is run again without saving the memory twice [37.21ms]
+(pass) three unusable answers over events give them up and the pipeline goes on [35.69ms]
+(pass) an event that is already handled is not offered again [39.35ms]
+(pass) long-term writers share one concurrency key across conversations [36.88ms]
+(pass) elements that cannot be saved are dropped one by one [35.63ms]
+(pass) a mismatched quote and the agent's words cannot become evidence of a saved memory [34.76ms]
+(pass) a failed attempt reaches curate-memory as the user's event alone [33.25ms]
+(pass) long messages are cut to 6 KB for the steward, and one event always fits [34.72ms]
+(pass) at most eight events and 16 KB go into one step; the rest waits [40.49ms]
+(pass) a step on its own prompt runs on a connection of its own and yields to the user's calls [33.60ms]
+(pass) a step reading the conversation runs on the conversation's prompt with its own task last, on the conversation's connection [36.97ms]
+
+api/domains/steward/test/requests.test.ts:
+(pass) a request alone starts a unit, is settled by the request's state, and its words are cleared [39.27ms]
+(pass) several requests are settled by one call, and one the model leaves out is counted [38.18ms]
+(pass) an explicit remember of what is already stored makes a new confirmed version [40.03ms]
+(pass) a remember request the model answers with none but points at the stored item is still reconfirmed [39.10ms]
+(pass) a remember request answered with none and a wrong ref is reconfirmed through its key [38.80ms]
+(pass) a request the model never answers is given up after three tries [37.24ms]
+(pass) a correct request updates an item and is shown to the user once as a notice [36.79ms]
+(pass) a withdraw request takes back a request that was not applied yet: the forget is not carried out [36.57ms]
+(pass) a withdraw request can not undo an applied forget: it finds nothing to take back and the forget stays [47.03ms]
+
+ 24 pass
+ 0 fail
+ 92 expect() calls
+Ran 24 tests across 3 files. [971.00ms]

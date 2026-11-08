@@ -8,6 +8,10 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [Pursuit調査結果のMarkdown保存](web-research-markdown-design-2026-11-08.md) | 2026-11-08、合意済み・実装・固定検証済み。担当を切り替えずタイトル付きMarkdownを既存scratchと利用可能なDoclingの `eumenes/research/` へ保存。関連1,558件と最終シナリオ37件、型・buildが成功。一括verifyの既存inventory問題と実接続受入は残る。[検証記録](verification/web-research-markdown-2026-11-08/README.md) |
+| [always-onのEumenes取り込み実装計画](agency-always-on-integration-plan-2026-11-08.md) | 2026-11-08、実装・固定検証を実施。独立推論、保存票・原観測、準備・通常応答、busy、排他的切替を接続。[実装・検証記録](verification/agency-always-on-integration-2026-11-08/README.md)。Live実配送の対応、全体検証の阻害、実モデル・利用者受入を区別して残す |
+| [LARM文書ライブラリ拡張への対応](markdown-library-api-design-2026-11-07.md) | 実装・固定試験・接続仕様更新済み。旧GET/PUT互換、文書/空フォルダー管理、複数選択・配下操作、固定要求の永続化とGET照合。再起動後の公開API・Artifact @4・既存一覧/編集/cache表示を確認済み。拡張配備後の実機受入は未実施。[検証記録](verification/markdown-library-api-2026-11-07/README.md) |
+| [Markdown文書の削除](markdown-document-delete-design-2026-11-07.md) | 後続の利用者提示仕様により、上記ライブラリ拡張へ統合。単件削除案の事前調査を保持。[調査記録](verification/markdown-document-delete-2026-11-07/README.md) |
 | [一時ファイル（scratch）の設計](server-scratch-cache-design-2026-11-07.md) | 2026-11-07、合意済み（利用者回答「実装してください」）・P1〜P5 実装済み・fixture 検証済み。live（実 LARM での添付→3D、書出し→別担当の読取り）・サーバー反映・実機器は未実施。会話の前後で引用ID（台帳 `a<n>`）を付けてエージェント間で共有する、サーバー稼働中だけの置き場 `scratch` domain（`eumenes://scratch/<uuid>`、`<dataDir>/scratch/<bootId>/`、索引はメモリー、合計2 GiB・空き5 GiB未満でLRUにより1.5 GiBまで掃除）。前: 添付・2,000字超の貼り付け・画像以外のファイル（`fileIds`）を `attached` で台帳へ。中・後: 全担当にホストが付ける `scratch.write` と `resource.read@3` の `offset`（UTF-8 のバイト位置）、`finish.links`、adapter の結果に入れた一時ファイルの URI。State に「共有中」（6件）。添付画像はLARM画像ライブラリへ取り込んでから3D化。Web はファイル添付・チップ・閲覧ダイアログ。調整は §15、漏れの確認と文書（`docs/scratch.md`）は §15.7 |
 | [Markdown文書の一覧・編集ビューとSSD一時保存](markdown-file-browser-ui-design-2026-11-07.md) | 画像案作成後に実装。フォルダ・パンくず・検索付き一覧と編集切替、SaveIconButton、既存scratchルールによるcache自動保存。固定試験・既存SSD APIの読戻し・再起動後の実画面を確認。一括verifyの保管コピー問題は残る。[検証記録](verification/markdown-file-browser-2026-11-07/README.md) |
 | [MarkdownとLARM常駐文書APIの接続](markdown-larm-documents-integration-2026-11-07.md) | 実装・固定試験・実LARM・実画面の保存と再読込みを確認。実画面の競合確認ダイアログの完了観測と一括verifyの保管コピー問題は未確認。[検証記録](verification/markdown-larm-documents-2026-11-07/README.md) |

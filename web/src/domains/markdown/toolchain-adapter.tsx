@@ -11,6 +11,7 @@ import {
 	createLiveScreen,
 	type WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
+import { useLibraryManagement } from "./library-management";
 import { markdownUploads } from "./uploads";
 import { useSpecialistBridge } from "../toolchain-artifacts/specialist-bridge";
 
@@ -20,6 +21,7 @@ const sourceSchema = z.object({
 	current: markdownCurrentSchema.nullable(),
 	documents: z.array(z.object({ id: z.string(), title: z.string() })),
 	archiveAvailable: z.boolean(),
+	openSourceId: z.string().optional(),
 });
 const live = createLiveScreen<{
 	id: string | undefined;
@@ -79,6 +81,52 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 		const parsed = sourceSchema.safeParse(query.data?.data);
 		const data = parsed.success ? parsed.data : null;
 		const selected = data?.current?.id;
+		useEffect(() => {
+			if (
+				!visible ||
+				!data?.openSourceId ||
+				!targetRef?.startsWith("generated-")
+			)
+				return;
+			const controller = new AbortController();
+			void (async () => {
+				const signal = controller.signal;
+				const remote = await client.markdownPreview(data.openSourceId!, signal);
+				let stageId: string | undefined;
+				if (remote.document === null) {
+					const { importMarkdown } =
+						await import("@eumenes/design-system/markdown");
+					stageId = (
+						await client.markdownStage(
+							{
+								document: importMarkdown(remote.markdown),
+								markdown: remote.markdown,
+							},
+							signal,
+						)
+					).id;
+				}
+				const document = await client.markdownOpen(data.openSourceId!, signal, {
+					stageId,
+					expectedEtag: remote.entry.revision,
+				});
+				if (!signal.aborted) setTargetRef(document.id);
+			})().catch(() => {
+				if (!controller.signal.aborted)
+					notify("Doclingの調査文書を開けませんでした。");
+			});
+			return () => controller.abort();
+		}, [visible, data?.openSourceId, targetRef, client, setTargetRef, notify]);
+
+		const management = useLibraryManagement({
+			client,
+			features: capabilities.data?.features,
+			namespaces,
+			visible,
+			selected,
+			refresh,
+			setTargetRef,
+		});
 		const latest = useRef({
 			id: selected,
 			visible,
@@ -104,6 +152,11 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 						revision: query.data!.revision,
 						library,
 						libraryStatus,
+						files: management.files,
+						knownFolders: management.knownFolders,
+						filesLoading: management.filesLoading,
+						filesError: management.filesError,
+						operations: management.operations,
 						cacheAvailable: !!conversationId,
 						namespaces,
 						libraryHasMore: nextCursor !== null,
@@ -148,6 +201,12 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 				capabilities.data?.maxRequestBytes,
 			),
 			async local(binding, event) {
+				if (
+					["markdown-files", "markdown-manage", "markdown-check"].includes(
+						binding.eventAction,
+					)
+				)
+					return management.local(event);
 				switch (binding.eventAction) {
 					case "markdown-select":
 						return select(String(event.values.id));
@@ -240,6 +299,7 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 							setNamespaces(page.namespaces);
 							setNextCursor(page.nextCursor);
 							setLibraryStatus("ready");
+							if (!more) await management.reload();
 							return { status: "accepted", message: "" };
 						} catch {
 							setLibraryStatus("error");

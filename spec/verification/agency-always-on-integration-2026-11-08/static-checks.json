@@ -1,0 +1,73 @@
+{
+  "standardVerify": "blocked at inventory; this diagnostic does not replace a standard pass",
+  "selected": [
+    "dialogue",
+    "inference",
+    "larm",
+    "settings",
+    "tool-runtime",
+    "capabilities",
+    "memory",
+    "conversation",
+    "delivery",
+    "live-voice"
+  ],
+  "results": [
+    {
+      "name": "boundaries",
+      "status": "pass",
+      "result": {
+        "warnings": [
+          "client/agency.ts: client import ../api/domains/dialogue/contracts/agency-status must use api/domains/<domain>/contracts"
+        ]
+      }
+    },
+    {
+      "name": "system-context",
+      "status": "pass",
+      "result": {
+        "warnings": []
+      }
+    },
+    {
+      "name": "size-budget",
+      "status": "pass",
+      "result": {
+        "warnings": [
+          "size-budget: packages/design-system/src/components/ImagePicker/ImagePicker.tsx#ImagePicker grew 376 -> 402 (limit 300)",
+          "size-budget: new function over 300 lines: web/src/workspace/useWorkspace.ts#useWorkspace (309)"
+        ]
+      }
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "pass",
+      "result": {
+        "warnings": []
+      }
+    },
+    {
+      "name": "domain-docs",
+      "status": "pass",
+      "result": {
+        "warnings": []
+      }
+    },
+    {
+      "name": "format",
+      "status": "fail",
+      "error": "Error: not formatted: api/domains/capabilities/bundles/browser-interact.bundle.json\nnot formatted: api/domains/capabilities/bundles/markdown.bundle.json\nnot formatted: api/domains/capabilities/bundles/pursuit-research.bundle.json"
+    },
+    {
+      "name": "lint",
+      "status": "pass",
+      "result": {
+        "warnings": [
+          "api/application/memory-host.test.ts:87:10: Variable 'h' is declared but never used. Unused variables should start with a '_'. [Error/eslint(no-unused-vars)]",
+          "api/domains/pursuit/service/documents.ts:10:32: Unexpected control characters [Error/eslint(no-control-regex)]",
+          "spec/verification/markdown-full-bundle-2026-11-07/fixture.tsx:11:55: Cannot reassign variables declared outside of the component/hook [Error/react(globals)]"
+        ]
+      }
+    }
+  ]
+}

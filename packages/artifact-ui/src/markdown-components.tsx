@@ -5,6 +5,7 @@ import {
 	type MarkdownCurrent,
 	type MarkdownDraft,
 	type MarkdownLibraryEntry,
+	type MarkdownWorkspaceProps,
 } from "@eumenes/design-system/markdown";
 import { useArtifactRuntime } from "./runtime";
 import { useAction, Feedback } from "./action";
@@ -19,11 +20,12 @@ export type MarkdownResource = {
 	libraryStatus?: "idle" | "loading" | "ready" | "error";
 	libraryHasMore?: boolean;
 	namespaces?: string[];
-	capabilities?: {
-		maxMarkdownBytes: number;
-		maxRecoveryBytes: number;
-		maxRequestBytes: number;
-	};
+	capabilities?: MarkdownWorkspaceProps["capabilities"];
+	files?: MarkdownWorkspaceProps["files"];
+	knownFolders?: MarkdownWorkspaceProps["knownFolders"];
+	filesLoading?: boolean;
+	filesError?: string;
+	operations?: MarkdownWorkspaceProps["operations"];
 	archiveAvailable: boolean;
 	archiveError?: string;
 	cacheAvailable?: boolean;
@@ -121,7 +123,7 @@ export function MarkdownWorkspaceView({
 				pending={action.pending}
 				message={
 					storageError
-						? "ブラウザーに下書きを保管できません。画面を閉じる前に下書きへ反映してください。"
+						? "ブラウザーに下書きを保管できません。画面を閉じる前にDoclingへの保存を確認するか、Markdownを書き出してください。"
 						: action.message
 				}
 				onDraft={(draft) => {
@@ -171,6 +173,31 @@ export function MarkdownWorkspaceView({
 					});
 					return receipt?.status === "accepted";
 				}}
+				onFiles={(namespace, path, cursor) =>
+					void action.send("markdown-files", {
+						namespace,
+						path,
+						...(cursor ? { cursor } : {}),
+					})
+				}
+				onManage={async (command, requestId) => {
+					const receipt = await runtime.uploadFile?.(
+						action.source,
+						new File(
+							[JSON.stringify({ command, requestId })],
+							"operation.json",
+							{ type: "application/json" },
+						),
+						{ purpose: "markdown-management" },
+					);
+					return (
+						receipt?.status === "accepted" &&
+						!!receipt.value &&
+						action.send("markdown-manage", { stageId: receipt.value })
+					);
+				}}
+
+				onCheck={(id) => void action.send("markdown-check", { id })}
 				onSelect={(id) => local("markdown-select", id)}
 				onOpen={(id) => local("markdown-open", id)}
 				onReconcile={(id) => void action.send("markdown-reconcile", { id })}

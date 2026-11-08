@@ -1,5 +1,5 @@
 # Source: api/domains/dialogue/service/routed-route.ts
-text = '''「[[title]]」の仕事を取りやめる。'''
+text = '''現在進行中の依頼「[[title]]」を中止し、この仕事の実行と今後の結果の保存を取りやめる。利用者がこの依頼をもう進める必要がないと伝えたときの操作。'''
 
 [variables.title]
 type = "string"

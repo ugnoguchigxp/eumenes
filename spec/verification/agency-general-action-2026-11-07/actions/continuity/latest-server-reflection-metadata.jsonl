@@ -1,0 +1,3 @@
+{"level": "info", "time": "2026-11-07T20:33:11.888+09:00", "service": "eumenes", "pid": 56107, "bootId": "7acc5c24-3a94-4f61-a0ac-7ae39ca0a739", "schemaVersion": 1, "component": "server", "event": "server.shutdown_started"}
+{"level": "info", "time": "2026-11-07T20:33:13.709+09:00", "service": "eumenes", "pid": 56107, "bootId": "7acc5c24-3a94-4f61-a0ac-7ae39ca0a739", "schemaVersion": 1, "reason": "ok", "component": "server", "event": "server.shutdown_completed"}
+{"level": "info", "time": "2026-11-07T20:33:16.503+09:00", "service": "eumenes", "pid": 59123, "bootId": "8e11444f-86e1-4a24-a066-cd9b19b69e7c", "schemaVersion": 1, "component": "server", "event": "server.ready"}

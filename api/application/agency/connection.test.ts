@@ -264,10 +264,11 @@ for (const target of ["larm", "cloud"] as const) {
 				expect.objectContaining({ text: "OBSERVATION_SENTINEL" }),
 			);
 		}
+		const inspected = host.inspect("connected")?.snapshot;
 		expect(
-			host
-				.inspect("connected")
-				?.snapshot.provenance?.entries.some(
+			inspected &&
+				"provenance" in inspected &&
+				inspected.provenance?.entries.some(
 					([, input]) =>
 						input.sources.includes("fixture-memory") &&
 						input.sources.includes("fixture-history"),

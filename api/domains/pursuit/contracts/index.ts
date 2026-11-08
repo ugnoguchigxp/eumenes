@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { Prepared } from "../../capabilities";
 import type {
+	ExecutionDocument,
 	ExecutionReference,
 	ExecutionSource,
 	ExecutionView,
@@ -24,7 +25,32 @@ export const researchDraft = z.strictObject({
 	limitations: z.array(z.string().min(1).max(600)).max(16),
 	stopReason: z.string().min(1).max(1000),
 });
-export type ResearchDraft = z.infer<typeof researchDraft>;
+export const researchDocumentDraft = researchDraft.extend({
+	title: z.string().trim().min(1).max(200),
+});
+export type ResearchDraft = z.infer<typeof researchDraft> & { title?: string };
+export interface ResearchDocumentPort {
+	flush?(): void;
+	startInTransaction(
+		db: Database,
+		input: {
+			id: string;
+			ownerRef: string;
+			sourceRunId: string;
+			conversationId: string;
+			title: string;
+			markdown: string;
+			namespace: string;
+			path: string;
+		},
+	): void;
+	currentInTransaction(
+		db: Database,
+		id: string,
+	):
+		(ExecutionDocument & { state: "pending" | "settled" | "cancelled" }) | null;
+	cancelInTransaction(db: Database, id: string, forget?: boolean): void;
+}
 export type ResearchLimits = {
 	parentCalls: number;
 	childCalls: number;
@@ -49,6 +75,13 @@ export type HostState = {
 	snapshots: Record<string, ResearchDraft | null>;
 	command?: { kind: "answer"; consultationId: string; text: string };
 	result: ExecutionView["result"];
+	saveDocument?: boolean;
+	documentIds?: string[];
+	publication?: {
+		id: string;
+		outcome: "completed" | "partial";
+		result: NonNullable<ExecutionView["result"]>;
+	};
 };
 export type SourcePort = Pick<
 	ToolchainExecutionPort,

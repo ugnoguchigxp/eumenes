@@ -45,6 +45,62 @@ test("a collaborative draft is edited, confirmed and executed exactly once witho
 		},
 		specialist: (messages) => {
 			const prompt = messages.map((m) => m.content).join("\n");
+			const lines = messages[1]!.content.split("\n");
+			const savedLine = lines.find((line) =>
+				line.startsWith("COLLABORATION_STATE="),
+			);
+			const saved = savedLine
+				? JSON.parse(savedLine.slice("COLLABORATION_STATE=".length))
+				: null;
+			const registryLine = lines.find((line) =>
+				line.startsWith("SOURCE_REGISTRY="),
+			);
+			const registry = registryLine
+				? JSON.parse(registryLine.slice("SOURCE_REGISTRY=".length))
+				: null;
+			const host = registry?.host;
+			const sourceRef = host?.sources
+				.filter((s: { active: boolean }) => s.active)
+				.at(-1)?.ref;
+			const stateUpdate = saved && {
+				coreContractVersion: 1,
+				sessionId: saved.sessionId,
+				epoch: host.epoch,
+				expectedRevision: saved.revision,
+				sourceRevision: host.sourceRevision,
+				work: host.work,
+				removals: [],
+				upserts:
+					stage === 0
+						? [
+								{
+									id: "first-duration",
+									kind: "condition",
+									status: "confirmed",
+									value: 20,
+									sourceRefs: [sourceRef],
+									supersedes: [],
+								},
+								{
+									id: "second-duration",
+									kind: "condition",
+									status: "confirmed",
+									value: 30,
+									sourceRefs: [sourceRef],
+									supersedes: [],
+								},
+							]
+						: [
+								{
+									id: "corrected-duration",
+									kind: "condition",
+									status: "confirmed",
+									value: 45,
+									sourceRefs: [sourceRef],
+									supersedes: ["second-duration"],
+								},
+							],
+			};
 			traces.push(prompt);
 			const revision = Number(
 				/CURRENT_DOCUMENT path=pipeline\.json revision=(\d+)/.exec(prompt)?.[1],
@@ -52,6 +108,7 @@ test("a collaborative draft is edited, confirmed and executed exactly once witho
 			if (stage === 0) {
 				stage++;
 				return {
+					stateUpdate,
 					action: "invoke",
 					tool: "doc.write",
 					arguments: {
@@ -65,6 +122,7 @@ test("a collaborative draft is edited, confirmed and executed exactly once witho
 			if (stage === 1) {
 				stage++;
 				return {
+					stateUpdate,
 					action: "invoke",
 					tool: "doc.edit",
 					arguments: {
@@ -156,6 +214,21 @@ test("a collaborative draft is edited, confirmed and executed exactly once witho
 		expect(draft.data.work.summary).toContain("45秒のタイマー");
 		expect(draft.data.work.summary).toContain("20秒のタイマー");
 		expect(draft.data.work.request).toBe(request);
+		const conditionResponse = await h.request(
+			`/api/specialist-sessions/${owner.id}/collaboration-state`,
+		);
+		expect(conditionResponse.status).toBe(200);
+		const { state: conditions } = await conditionResponse.json();
+		expect(conditions.facts.map((f: any) => [f.id, f.status, f.value])).toEqual(
+			[
+				["first-duration", "confirmed", 20],
+				["second-duration", "retracted", 30],
+				["corrected-duration", "confirmed", 45],
+			],
+		);
+		expect(conditions.facts[0].sourceRefs).not.toEqual(
+			conditions.facts[2].sourceRefs,
+		);
 		expect(h.toolchain.agents.executions.list("main")).toHaveLength(0);
 		await say("この内容で実行してください");
 		await waitFor(

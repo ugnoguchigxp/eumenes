@@ -1,0 +1,43 @@
+import { Database } from "bun:sqlite";
+import { createHash } from "node:crypto";
+
+// Metadata only. No conversation, settings, prompts, Record contents or provider responses are selected.
+if (!process.argv.includes("--read-main-reference-metadata")) process.exit(2);
+const db = new Database("/Users/y.noguchi/Code/eumenes/data/eumenes.sqlite3", { readonly: true, strict: true });
+db.exec("PRAGMA query_only=ON");
+const hash = (s: string) => createHash("sha256").update(s).digest("hex");
+function ref(s: string) {
+	if (s.startsWith("capability:")) return { type: "capability", revisionId: s.slice("capability:".length), refHash: hash(s) };
+	if (s.startsWith("memory-input:")) {
+		const x = JSON.parse(s.slice("memory-input:".length));
+		return { type: "memory-input", id: x.id, kind: x.kind, revision: x.revision, digest: x.digest, refHash: hash(s) };
+	}
+	return { type: s.includes(":") ? s.slice(0, s.indexOf(":")) : "message-id", refHash: hash(s) };
+}
+try {
+	const inspect = db.transaction(() => {
+		const row = db.query("SELECT epoch,scope,json_extract(snapshot_json,'$.cursor') AS cursor,json_extract(snapshot_json,'$.state.revision') AS revision,json_extract(snapshot_json,'$.forgottenRefs') AS forgotten,json_extract(snapshot_json,'$.provenance.entries') AS provenance,source_refs_json AS sources FROM dialogue_agency_state WHERE conversation_id='main'").get() as any;
+		if (!row) throw new Error("main_checkpoint_missing");
+		const forgotten = new Set<string>(JSON.parse(row.forgotten ?? "[]"));
+		const capabilityVersions = [...forgotten].filter(s => s.startsWith("capability:")).map(s => db.query("SELECT r.id AS referencedRevision,i.active_revision_id AS activeRevision,i.enabled,i.generation FROM capability_revisions r JOIN capability_items i ON i.key=r.item_key WHERE r.id=?").get(s.slice("capability:".length)));
+		const intersections = (input: { sources?: string[]; complete?: boolean }) => ({ complete: input.complete, sourceCount: input.sources?.length ?? 0, collisions: (input.sources ?? []).filter(s => forgotten.has(s)).map(ref) });
+		const entries = JSON.parse(row.provenance ?? "[]") as Array<[string, {sources: string[];complete: boolean}]>;
+		const observations = db.query("SELECT json_extract(o.value,'$.id') AS id,json_extract(o.value,'$.seq') AS seq,json_extract(o.value,'$.kind') AS kind,json_extract(o.value,'$.actor') AS actor,json_extract(o.value,'$.deliveryStatus') AS deliveryStatus FROM dialogue_agency_state s,json_each(s.snapshot_json,'$.observations') o WHERE s.conversation_id='main'").all();
+		const archive = db.query("SELECT observation_id,json_extract(record_ref,'$.id') AS recordId,json_extract(record_ref,'$.revision') AS revision,input_json FROM dialogue_agency_observations WHERE conversation_id='main'").all() as any[];
+		const work = db.query("SELECT id,run_id,source_ref,status,outcome,revision,archived_at,message_ids_json FROM dialogue_work WHERE conversation_id='main'").all() as any[];
+		const runIds = new Set<string>([...work.map(w => w.run_id), "41381540-9fd9-40b0-9a48-0f75f3a57282", "e81d3914-5239-4c74-a2e9-fca5f84f3f1f", "b4ffc21a-a679-4988-8969-ce1b6e947714", "c6c8afcd-bcee-41c0-bd22-fac4e96a3c98", "c3f52f9c-d36a-4e70-b9db-bf20755040c3"]);
+		const runs = [...runIds].map(id => {
+			const r = db.query("SELECT input_json FROM memory_host_run_inputs WHERE run_id=?").get(id) as {input_json:string}|null;
+			return { id, present: !!r, ...(r ? intersections(JSON.parse(r.input_json)) : {}) };
+		});
+		return { queryOnly: db.query("PRAGMA query_only").get(), conversationId: "main", epoch: row.epoch, scope: row.scope, cursor: row.cursor, revision: row.revision, forgottenCount: forgotten.size, forgottenCapabilities: [...forgotten].filter(s => s.startsWith("capability:")).map(ref), capabilityVersions,
+			checkpointSources: intersections({ sources: JSON.parse(row.sources), complete: true }),
+			provenance: entries.map(([key,input]) => ({key,...intersections(input)})).filter(x => x.collisions.length || !x.complete),
+			observations: observations.map((o: any) => ({...o, forgotten: forgotten.has(o.id)})),
+			archiveCollisions: archive.map(a => ({observationId:a.observation_id,recordId:a.recordId,revision:a.revision,...intersections(JSON.parse(a.input_json))})).filter(x => x.collisions.length || !x.complete),
+			work: work.map(w => ({id:w.id,runId:w.run_id,sourceRef:w.source_ref,status:w.status,outcome:w.outcome,revision:w.revision,archivedAt:w.archived_at,...intersections({sources:JSON.parse(w.message_ids_json),complete:true})})),
+			runInputs: runs,
+		};
+	});
+	console.log(JSON.stringify(inspect(), null, 2));
+} finally { db.close(); }

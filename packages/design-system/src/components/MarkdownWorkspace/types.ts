@@ -45,6 +45,14 @@ export type MarkdownLibraryEntry = {
 	path: string;
 };
 export type MarkdownWorkspaceProps = {
+	files?: import("./library-types").LibraryFiles;
+	knownFolders?: import("./library-types").LibraryItem[];
+	filesLoading?: boolean;
+	filesError?: string;
+	operations?: import("./library-types").LibraryOperation[];
+	onFiles?(namespace: string, path: string, cursor?: string): void;
+	onManage?(command: unknown, requestId: string): Promise<boolean>;
+	onCheck?(id: string): void;
 	current: MarkdownCurrent | null;
 	documents: { id: string; title: string }[];
 	library: MarkdownLibraryEntry[];
@@ -55,6 +63,7 @@ export type MarkdownWorkspaceProps = {
 		maxMarkdownBytes: number;
 		maxRecoveryBytes: number;
 		maxRequestBytes: number;
+		features?: import("./library-types").LibraryFeatures;
 	};
 	archiveAvailable: boolean;
 	archiveError?: string;

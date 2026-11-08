@@ -12,6 +12,8 @@ import { view, create, apply, replay, sessionAdapter } from "./workspace";
 import { createArchiveSave } from "./archive-save";
 import { createArchiveRecovery } from "./archive-recovery";
 import { createArchiveLibrary } from "./archive-library";
+import { createLibraryManagement } from "./library-management";
+import { createGeneratedDocuments } from "./generated";
 import { staged, stageDocument } from "./inputs";
 
 export function createMarkdown(deps: {
@@ -24,6 +26,8 @@ export function createMarkdown(deps: {
 	const saves = createArchiveSave(archive, queue, deps.publish);
 	queue.registerHandler(saves.handler);
 	return {
+		generated: createGeneratedDocuments(store, queue, archive, deps.publish),
+		...createLibraryManagement(store, archive, deps.publish),
 		available: archive.available,
 		stage: stageDocument(store),
 		listInTransaction: list,

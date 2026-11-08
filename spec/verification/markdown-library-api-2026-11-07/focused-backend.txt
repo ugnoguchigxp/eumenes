@@ -1,0 +1,89 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/markdown/markdown-integration.test.ts:
+(pass) conversation switches to collaborator, edits arbitrary document ranges and reaches registered save through the ledger [687.55ms]
+(pass) the authenticated upload route accepts documents above the shared 1 MiB cap and keeps its own 20 MiB bound [630.12ms]
+(pass) the public capability projection exposes limits and feature flags without opaque upstream extension values [5.39ms]
+(pass) management metadata excludes document bodies while retaining validated identity and digests [0.64ms]
+
+api/application/markdown/markdown-server-wiring.test.ts:
+(pass) production app assembly mounts resident Markdown routes even when Desk has no connection [979.45ms]
+
+api/application/markdown/markdown-registration.test.ts:
+(pass) seeding upgrades the published editor without rewriting v1, and repeated seeding is stable [726.86ms]
+
+api/domains/markdown/test/library-management.test.ts:
+(pass) document metadata changes adopt the same workspace without changing opaque content; copy keeps its source [11.63ms]
+(pass) empty folder creation, recursive move/copy and batch deletion preserve exact request conditions [9.89ms]
+(pass) unconfirmed changes are not resent, fence saves and apply, and GET-only confirmation is distinct [10.62ms]
+(pass) dirty work, changing library ETags and unsupported descendants reject before mutation [9.53ms]
+(pass) 412 keeps the local document and does not silently adopt a new ETag [7.24ms]
+(pass) public staged management endpoint uses fixed input and returns the recorded result on duplicates [8.59ms]
+(pass) a lost success response is confirmed with GETs without resending the mutation [9.23ms]
+(pass) workspace adopts exactly the metadata checked against the expected content [9.50ms]
+(pass) batch move and copy adopt stable identities and leave opaque content untouched [9.97ms]
+(pass) staging accepts 100 long Unicode destinations without packing them into an Artifact event [13.15ms]
+(pass) overlapping moves and a manifest that changes while reading never dispatch [12.48ms]
+(pass) saving and collaborator ownership fence management before any external change [18.86ms]
+(pass) a late mutation after cancellation is retained as unknown and only a later GET check adopts it [10.18ms]
+(pass) a fresh service reads the persisted unknown request and can only confirm it without another mutation [21.32ms]
+
+api/domains/markdown/test/document-files.test.ts:
+(pass) reopening maps a stable remote ID and preserves opaque recovery and exact Markdown on title-only update [9.13ms]
+(pass) only an empty recovery accepts a completed Plate import at the same ETag [7.72ms]
+(pass) ID and frozen input persist before dispatch, definite rejection reuses the ID and writes stay serialized [9.11ms]
+(pass) 412 preserves local content, GETs latest and requires explicit resolution before using its ETag [8.96ms]
+(pass) a lost PUT response is confirmed by exact digest, title, namespace and path without a resend [6.34ms]
+(pass) 412 remains a conflict even when latest content matches the attempted save [8.02ms]
+
+api/domains/markdown/test/workspace.test.ts:
+(pass) archive v2 preserves frontmatter and rejects changes; legacy v1 remains readable [0.26ms]
+(pass) Plate decorations and exact imported original survive native recovery and reopen [7.83ms]
+(pass) stale user or collaborator edit cannot overwrite the current document [6.29ms]
+(pass) save freezes its snapshot and leaves newer typing dirty after completion [7.90ms]
+(pass) unconfirmed failure never becomes saved or retries [609.77ms]
+(pass) unconfirmed configuration never becomes saved or retries [8.61ms]
+(pass) unconfirmed cancel never becomes saved or retries [7.00ms]
+(pass) unconfirmed interrupt never becomes saved or retries [7.40ms]
+(pass) staged input keeps the ledger small, is single-use and rejects malformed editor trees [12.24ms]
+(pass) startup recovery settles a persisted running save with no prepared in-memory input [6.65ms]
+(pass) explicit GET reconciliation confirms the frozen snapshot and preserves later edits [6.47ms]
+(pass) repeated 404s remain unknown without another PUT; different content becomes conflict [1312.75ms]
+(pass) database reopen retains pending work and last Desk baseline without a version history [28.13ms]
+(pass) native UTF8 limits reject oversized staging without submitting a save [24.39ms]
+
+api/domains/docling/test/document-library.test.ts:
+(pass) old and future capabilities preserve GET/PUT; extensions appear after cache expiry without probing mutations [0.39ms]
+(pass) malformed extension metadata disables only affected features [0.11ms]
+(pass) hierarchy uses server folder ids, library ETag and an opaque cursor [1.47ms]
+(pass) patch document sends exact conditions and never reserializes content [0.43ms]
+(pass) copy document sends exact conditions and never reserializes content [0.12ms]
+(pass) delete document sends exact conditions and never reserializes content [0.17ms]
+(pass) create-folder batch/folder sends exact conditions and never reserializes content [0.08ms]
+(pass) patch folder sends exact conditions and never reserializes content [0.06ms]
+(pass) copy folder sends exact conditions and never reserializes content [0.04ms]
+(pass) delete folder sends exact conditions and never reserializes content [0.08ms]
+(pass) batch batch/folder sends exact conditions and never reserializes content [0.47ms]
+(pass) batch batch/folder sends exact conditions and never reserializes content [0.19ms]
+(pass) batch batch/folder sends exact conditions and never reserializes content [0.12ms]
+(pass) mutations are single-attempt for disconnect [0.10ms]
+(pass) mutations are single-attempt for five [0.06ms]
+(pass) mutations are single-attempt for conflict [0.05ms]
+(pass) invalid paths, ETags and unsupported operations never send a mutation [0.15ms]
+
+api/domains/docling/test/documents.test.ts:
+(pass) resident listing discovers capabilities and preserves encoded cursors without leases [0.51ms]
+(pass) create and update preserve exact strings and the quoted ETag, with only permitted fields [0.62ms]
+(pass) PUT disconnect is classified without any automatic resend [0.15ms]
+(pass) PUT 503 is classified without any automatic resend [0.09ms]
+(pass) PUT 412 is classified without any automatic resend [0.08ms]
+(pass) PUT wrong-digest is classified without any automatic resend [0.09ms]
+(pass) PUT wrong-etag is classified without any automatic resend [0.09ms]
+(pass) contract mismatch and byte limits stop a write before dispatch [0.24ms]
+(pass) unsafe conditions and update routing fields are refused [0.34ms]
+(pass) a changed connection fences a late response [0.11ms]
+
+ 67 pass
+ 0 fail
+ 323 expect() calls
+Ran 67 tests across 8 files. [6.84s]

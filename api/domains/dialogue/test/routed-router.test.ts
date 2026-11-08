@@ -277,6 +277,24 @@ test("a memory request is filled by the one-candidate call and taken by the host
 	]);
 });
 
+test("a cancellation carries the running request's identifying detail beyond its opening words", async () => {
+	const r = await start();
+	const marker = "対象は海辺の灯台の案内図",
+		request = `${"これは描画の確認用です。".repeat(4)}${marker}です。`;
+	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));
+	await h!.say(request, "queued");
+	r.scripts.push(weigh({ "t1.cancel": 0.95 }));
+	await h!.say("先ほどの案内図を作る仕事を中止してください");
+	const candidate = r.routes
+		.at(-1)!
+		.criteria.find((c) => c.name === "t1.cancel");
+	expect(candidate?.description).toContain(marker);
+	expect(candidate?.description).toContain("現在進行中の依頼");
+	expect(h!.todos()).toHaveLength(0);
+	expect(h!.archived()).toHaveLength(1);
+	expect(h!.archived()[0]).toMatchObject({ outcome: "cancelled" });
+});
+
 test("a work is checked, corrected or cancelled by the package's decision: the host's operation, the host's words", async () => {
 	const r = await start();
 	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));

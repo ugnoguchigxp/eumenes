@@ -65,6 +65,7 @@ export function controls(
 				state.draft = null;
 				state.snapshots = {};
 				state.result = null;
+				delete state.publication;
 				delete state.command;
 				state.source.amendments = [...(state.source.amendments ?? []), control];
 			}

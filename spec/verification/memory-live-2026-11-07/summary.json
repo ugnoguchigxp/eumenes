@@ -1,0 +1,206 @@
+{
+  "status": "passed",
+  "finding": "Installed package had no application-owned MemoryHost startup binding; normal startup wiring repaired.",
+  "implementation": {
+    "singleWriter": true,
+    "sameMemoryService": true,
+    "normalServerStartupMcp": true,
+    "newDatabase": false,
+    "semanticBranchesAdded": false,
+    "reusesInstalledHost": true
+  },
+  "packages": {
+    "eumenes-memory": {
+      "package": "eumenes-memory",
+      "version": "0.0.4",
+      "artifact": "eumenes-memory-0.0.4-30721f30aa19.tgz",
+      "sha256": "30721f30aa19d1eb3c64b92a604a499afd53f53038ad071c747adf07e5f34f01",
+      "sourceGitCommit": "13f6f47f02203cd392c1c9fbc994e068ea81343d",
+      "sourceHash": "0b0f9e5557b7d3ce2fb6fd2acce87dab0186dfd2988808f32d80f986dfffd95f",
+      "sourceTreeState": "clean committed source",
+      "verifiedWith": "source verify and distribution gates; installed Eumenes acceptance recorded in spec/verification/memory-package-adoption-2026-11-07/summary.json",
+      "contractVersions": {
+        "records": 1,
+        "state": 1,
+        "lifecycle": 2,
+        "external": 1
+      },
+      "dbSchemaVersion": 8
+    },
+    "eumenes-memory-host": {
+      "package": "eumenes-memory-host",
+      "version": "0.1.0",
+      "artifact": "eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
+      "sha256": "3b6091d1b1ea8c47911430748bb367301e4dc156c70efc7e1af5178ba3366ee1",
+      "sourceGitCommit": "13f6f47f02203cd392c1c9fbc994e068ea81343d",
+      "sourceHash": "0b0f9e5557b7d3ce2fb6fd2acce87dab0186dfd2988808f32d80f986dfffd95f",
+      "sourceTreeState": "clean committed source",
+      "verifiedWith": "source verify and distribution gates; installed Eumenes acceptance recorded in spec/verification/memory-package-adoption-2026-11-07/summary.json",
+      "mcpSdk": "2.4.0",
+      "corePackage": "eumenes-memory@0.0.4",
+      "coreSchemaVersion": 8
+    }
+  },
+  "fixture": {
+    "targetedPass": 30,
+    "targetedFail": 0,
+    "typecheckedFiles": 3129,
+    "typeErrors": 0,
+    "brokenConfigAppPurgeRegression": "reproduced before fix; passed after fix",
+    "normalServerMcp": "passed"
+  },
+  "standard": {
+    "result": "pass",
+    "selectedDomains": [
+      "memory",
+      "steward",
+      "dialogue",
+      "world"
+    ],
+    "bunPassed": 1028,
+    "webPassed": 15,
+    "failed": 0,
+    "revision": "8936a072c377ba921778db805b3dcc3bfc5c3260fc667dbe1c44dc715dc48a16",
+    "finalRevision": "8936a072c377ba921778db805b3dcc3bfc5c3260fc667dbe1c44dc715dc48a16",
+    "integrityErrors": [],
+    "environment": "Frozen copy of current source; existing generated artifact copies excluded; formatting normalized in three temporary files only. See ignored report."
+  },
+  "testedFiles": [
+    {
+      "path": "api/application/memory-host.ts",
+      "sha256": "43b4462a17d26f86e30c2af7ffbddfeb237d45138671614bf1b9908517e89162",
+      "matchesTestedSnapshot": true
+    },
+    {
+      "path": "api/application/memory-host.test.ts",
+      "sha256": "c692b82934627a709c9953d3a6bda2f045fdd798bb61132e01b41c97f426545a",
+      "matchesTestedSnapshot": true
+    },
+    {
+      "path": "api/application/server-services.ts",
+      "sha256": "8db3d4f6640d7db86c56c67c406a98d61e12caa3a8a7eb581f7f464d25d92eb5",
+      "matchesTestedSnapshot": true
+    },
+    {
+      "path": "api/application/server-lifecycles.ts",
+      "sha256": "85694ce6bd468a2864f66006cc957e2afa11ab9dd5819fef0aa4b41427d56dc6",
+      "matchesTestedSnapshot": true
+    },
+    {
+      "path": "api/application/server.test.ts",
+      "sha256": "d55a29abfee8589e1a1d5507edacb60d74fecd40ab0d4cf4249fa7e3aecc80c2",
+      "matchesTestedSnapshot": true
+    },
+    {
+      "path": "api/application/memory-host-integration.test.ts",
+      "sha256": "f2c72e5e05075ba8786c06e70c7452b99b424700b1c6dba4e5f880d2e6486fe4",
+      "matchesTestedSnapshot": true
+    },
+    {
+      "path": "scripts/domains.ts",
+      "sha256": "c59a51c8fbf4b2ef48c8fdf4123a69587f4c5bc6f73e4bddd00d2a040a4a06cf",
+      "matchesTestedSnapshot": true
+    },
+    {
+      "path": "docs/memory.md",
+      "sha256": "3c745dca102284c4ad03208841a84451a478d498061d7eff371f3a698ab5b9c1",
+      "matchesTestedSnapshot": true
+    }
+  ],
+  "live": {
+    "result": "pass",
+    "api": {
+      "phase": "ready",
+      "larmState": "ready"
+    },
+    "memory": {
+      "enabled": true,
+      "healthy": true
+    },
+    "web": {
+      "httpStatus": 200,
+      "applicationEntryPresent": true
+    },
+    "restart": {
+      "authorizedBy": "User selected restart and continue",
+      "stoppedSupervisorPid": 68351,
+      "previousProcessesExited": true,
+      "portsReleased": [
+        8787,
+        5173
+      ],
+      "stoppedAt": "2026-11-07T20:58:35+0900",
+      "startedAt": "2026-11-07T20:58:42.723+09:00",
+      "readyAt": "2026-11-07T20:58:43.719+09:00",
+      "bootId": "84da6ba6-1cf8-498f-af42-20900cfa29e1",
+      "newOwnerEpoch": true,
+      "configurationPreserved": true,
+      "activeMemoryPreserved": true,
+      "supervisorPid": 69051,
+      "apiPid": 69052,
+      "webPid": 69059
+    },
+    "host": {
+      "status": "ready",
+      "epoch": "7ca11045-8ba7-4e62-b0fb-6cd3b4247dd7"
+    },
+    "configuration": {
+      "modes": [
+        "700",
+        "600",
+        "600"
+      ],
+      "socket": true
+    },
+    "views": {
+      "count": 0,
+      "hashes": {
+        "apiBefore": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "apiAfter": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "nativeCli": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "memoryCli": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mcpA": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "mcpB": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "pages": {
+        "cli": 1,
+        "a": 1,
+        "b": 1
+      }
+    },
+    "snapshotRead": {
+      "status": "found",
+      "current": true
+    },
+    "evidenceRead": {
+      "status": "no_current_item"
+    },
+    "mcp": {
+      "tools": [
+        "memory_apply",
+        "memory_context",
+        "memory_operation",
+        "memory_plan",
+        "memory_read",
+        "memory_source",
+        "memory_status"
+      ],
+      "clients": 2,
+      "reconnect": "pass",
+      "survivingClient": "ready"
+    },
+    "memoryWarnings": 0,
+    "personalMemoryWritten": false,
+    "productionDatabaseOpenedDirectly": false,
+    "agentConfigurationChanged": false,
+    "scope": "Read-only API/CLI/MCP checks. Active memory was empty before and after restart; reading actual item evidence therefore had no target. Non-empty save/correct/forget/source evidence is covered by disposable integration tests."
+  },
+  "evidence": "verification-reports/memory-live-2026-11-07/",
+  "completedAt": "2026-11-07T12:00:39.564938+00:00",
+  "finalInspection": {
+    "testedRuntimeSourcesUnchanged": true,
+    "gitDiffCheck": "passed",
+    "semanticBranchesAdded": false,
+    "unrelatedWorkPreserved": true
+  }
+}

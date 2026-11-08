@@ -1,0 +1,3 @@
+web/src/domains/markdown/library-management.ts: web import ../../../../api/domains/markdown/contracts/library must use api/domains/<domain>/contracts
+client/markdown.ts: client import ../api/domains/markdown/contracts/library must use api/domains/<domain>/contracts
+client/markdown-library.ts: client import ../api/domains/markdown/contracts/library must use api/domains/<domain>/contracts

@@ -1,3 +1,4 @@
+import { createMemoryHostConnection } from "./memory-host";
 import type { ToolchainExecutionPort } from "../domains/tool-runtime";
 import { buildAnalysisFactory } from "./media/visual-perception";
 import { createLiveBridge } from "./media/live-bridge";
@@ -385,6 +386,7 @@ export async function buildServices(
 		dotsMessages,
 		continuity,
 		memory,
+		memoryHost: createMemoryHostConnection(memory, dirname(resolve(dbPath))),
 		steward,
 		settings,
 		world,

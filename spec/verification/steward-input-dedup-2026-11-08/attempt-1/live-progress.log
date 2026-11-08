@@ -1,0 +1,11 @@
+581 | 								.get() as { t: number | null }
+582 | 						).t,
+583 | 				);
+584 | 				if (next !== null && next > time.ms) time.ms = next;
+585 | 			}
+586 | 			throw new Error("steward_not_idle");
+                   ^
+error: steward_not_idle
+      at drain (/Users/y.noguchi/Code/eumenes/api/domains/steward/test/steward.fixture.ts:586:14)
+
+Bun v1.4.4 (macOS arm64)

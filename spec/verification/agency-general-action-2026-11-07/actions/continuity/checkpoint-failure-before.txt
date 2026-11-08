@@ -1,0 +1,22 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/continuity.test.ts:
+116 | 	const h = await continuityHost(() => updated(), { maxUnanswered: 1 });
+117 | 	const save = h.state.saveInTransaction;
+118 | 	try {
+119 | 		await h.exchange();
+120 | 		await waitFor(() => !h.host.status("c1").busy);
+121 | 		h.state.saveInTransaction = () => { throw new Error("fixture_checkpoint_failed"); };
+                                                      ^
+error: fixture_checkpoint_failed
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/continuity.test.ts:121:49)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/checkpoint.ts:57:23)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:278:20)
+      at transaction (bun:sqlite:447:27)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:284:6)
+(fail) a checkpoint failure stays a bounded failed idle cycle rather than an unhandled rejection [92.36ms]
+
+ 0 pass
+ 5 filtered out
+ 1 fail
+Ran 1 test across 1 file. [349.00ms]

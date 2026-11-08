@@ -1,0 +1,145 @@
+{
+  "status": "passed",
+  "sourceGitCommit": "13f6f47f02203cd392c1c9fbc994e068ea81343d",
+  "sourceHash": "0b0f9e5557b7d3ce2fb6fd2acce87dab0186dfd2988808f32d80f986dfffd95f",
+  "packages": {
+    "eumenes-memory": {
+      "package": "eumenes-memory",
+      "version": "0.0.4",
+      "artifact": "eumenes-memory-0.0.4-30721f30aa19.tgz",
+      "sha256": "30721f30aa19d1eb3c64b92a604a499afd53f53038ad071c747adf07e5f34f01",
+      "sourceGitCommit": "13f6f47f02203cd392c1c9fbc994e068ea81343d",
+      "sourceHash": "0b0f9e5557b7d3ce2fb6fd2acce87dab0186dfd2988808f32d80f986dfffd95f",
+      "sourceTreeState": "clean committed source",
+      "verifiedWith": "source verify and distribution gates; installed Eumenes acceptance recorded in spec/verification/memory-package-adoption-2026-11-07/summary.json",
+      "contractVersions": {
+        "records": 1,
+        "state": 1,
+        "lifecycle": 2,
+        "external": 1
+      },
+      "dbSchemaVersion": 8
+    },
+    "eumenes-memory-host": {
+      "package": "eumenes-memory-host",
+      "version": "0.1.0",
+      "artifact": "eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
+      "sha256": "3b6091d1b1ea8c47911430748bb367301e4dc156c70efc7e1af5178ba3366ee1",
+      "sourceGitCommit": "13f6f47f02203cd392c1c9fbc994e068ea81343d",
+      "sourceHash": "0b0f9e5557b7d3ce2fb6fd2acce87dab0186dfd2988808f32d80f986dfffd95f",
+      "sourceTreeState": "clean committed source",
+      "verifiedWith": "source verify and distribution gates; installed Eumenes acceptance recorded in spec/verification/memory-package-adoption-2026-11-07/summary.json",
+      "mcpSdk": "2.4.0",
+      "corePackage": "eumenes-memory@0.0.4",
+      "coreSchemaVersion": 8
+    }
+  },
+  "installation": {
+    "actualEumenesWorkspace": true,
+    "packageJsonAndLockUpdated": true,
+    "postinstallBuild": "passed",
+    "frozenReinstall": "passed; no changes",
+    "cliBinary": "node_modules/.bin/eumenes-memory"
+  },
+  "verification": {
+    "baseline": {
+      "vendorPassed": 2,
+      "memoryAndCurationPassed": 145
+    },
+    "installedWorkspace": {
+      "memoryCurationVendorAndCliMcpPassed": 152,
+      "failed": 0,
+      "finalVendorAndInteropPassed": 7,
+      "typecheckedFiles": 3125,
+      "typeErrors": 0,
+      "existingMcpRegressionPassed": 4
+    },
+    "standard": {
+      "result": "pass",
+      "selectedDomains": [
+        "memory",
+        "steward",
+        "dialogue",
+        "world"
+      ],
+      "bunPassed": 1013,
+      "webPassed": 15,
+      "failed": 0,
+      "revision": "ac38347d3b5486ec87a8b49193f4c417a95308b272fc4fe272d1851617cfe186",
+      "finalRevision": "ac38347d3b5486ec87a8b49193f4c417a95308b272fc4fe272d1851617cfe186",
+      "integrityErrors": [],
+      "environment": "Isolated frozen copy of current source with installed pinned dependencies; generated artifacts excluded."
+    },
+    "migrationRuntime": {
+      "migrationRuntimeFileCount": 9,
+      "identical": true,
+      "changed": []
+    }
+  },
+  "integrationCoverage": [
+    "Installed artifact file hashes, source identities and bundled core equality",
+    "Packaged CLI binary and Eumenes CLI memory status/list",
+    "MCP discovery and invalid tool handling",
+    "App curation visible to packaged CLI and two independent MCP processes",
+    "CLI source/plan/apply visible to app and MCP",
+    "Correction with shared operation-ID retry and one committed revision",
+    "One MCP disconnect/reconnect without stopping owner or peer",
+    "Forget all fact versions, invalidate old producing plans and advance app forget fence",
+    "Conversation-source correction invalidates prior snapshot and yields stale evidence",
+    "App-side forget blocks source and removes MCP-visible memory",
+    "Owner reconstruction with shared journal preserves deletion and durable operation outcome"
+  ],
+  "standardEnvironmentNotes": {
+    "preexistingRootBlocker": "Actual workspace standard verify initially includes historical test copies under artifacts/pursuit-integration-20261106. Existing artifacts were not moved or modified.",
+    "staticSourceFile": "The tracked api/domains/delivery/data/speech-delivery.v1.json is included; product data directory excluded.",
+    "temporaryFormattingOnly": {
+      "api/domains/capabilities/bundles/browser-interact.bundle.json": {
+        "before": "89731708ea58c0bb87239f8be6c30dba5d4ba80a6f6de4db2a554b2dbf06ca06",
+        "after": "a11fa79fff5ffcc0fddf466a02ac22b844a487a7489795c678f4938c6be3df6c",
+        "actualWorkspaceModified": false
+      },
+      "api/domains/capabilities/bundles/markdown.bundle.json": {
+        "before": "97889961cbf71d6f4eb57606675ece46256e31647c5f4636cd59deabf9a2fc75",
+        "after": "52a58ba2b87bcfabf10c68966130bd67efcaa14569b18fd3e78c399c59f15057",
+        "actualWorkspaceModified": false
+      },
+      "tests/browser/chat-image-attachments.spec.ts": {
+        "before": "e85087d6ad1af35b2abbe99097c1eaef7d6700697ef4c7b54b27f96d1153121a",
+        "after": "7d6c99dc3e70e084a0cb6cca0a51bc60545f06d143c68cc7dfdb3b5fa1c22539",
+        "actualWorkspaceModified": false
+      }
+    },
+    "concurrentFailure": "The initial frozen agency forgotten-context test failed with both old and new core. Current application source had already fixed it and passed with stronger assertions; three current source files were refreshed in the frozen copy before the final standard pass.",
+    "refreshedSource": {
+      "api/application/agency/host.ts": {
+        "before": "4b869ed5cc5cc518fe5eadcf478ab111623419a52a5c169127f33d07f13ff9a0",
+        "after": "8326cd60fe64c57d1e3c186c24a98be99bc3def25e3d26f3d5f6b807cb87dc60",
+        "origin": "concurrent application work, copied from current workspace, not edited by this task"
+      },
+      "api/domains/dialogue/service/conversation-input.ts": {
+        "before": "f6bc78e9067e4bbabed3e462ceb9e304de06c2d14c26c3e7e69fc3d27f48ed71",
+        "after": "be32b6dfc770fdf50ebaf7bdf6f80125e58fc73dd7779a3ed4810d915ae6fa88",
+        "origin": "concurrent application work, copied from current workspace, not edited by this task"
+      },
+      "api/application/agency/forgotten-context.test.ts": {
+        "before": "6f9ae3cf28275c3af48071497d881d3b805be40f61305014165c7813d1f54669",
+        "after": "4175111d7813aae36a500220283d3a5a7ee77f91e9859f01412599700a4eb82b",
+        "origin": "concurrent application work, copied from current workspace, not edited by this task"
+      }
+    },
+    "unrelatedDiagnostics": "Standard verifier retains findings outside selected domains in standard-report.json; no expectations or checks were weakened."
+  },
+  "liveBoundary": {
+    "productionDbOrSecretsCopied": false,
+    "acceptanceDatabase": "Disposable real Eumenes MemoryService fixture, not a copy of personal data",
+    "existingAgentConfigurationChanged": false,
+    "productionHotReloadClaimed": false,
+    "productionApiOrWebStartedStoppedOrRestarted": false
+  },
+  "preservation": "Existing application changes were retained; package.json changes were limited to core/host and the MCP test client. Concurrency drift recorded without reverting others.",
+  "contextToolsThisTurn": {
+    "context_compile": 1,
+    "compile_eval": 1
+  },
+  "evidence": "verification-reports/memory-package-adoption-2026-11-07/"
+}

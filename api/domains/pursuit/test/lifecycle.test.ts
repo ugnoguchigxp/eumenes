@@ -258,7 +258,7 @@ test("deep source reads persist the body and supply confirmed later passages to 
 		expect(
 			f.modelPackets.some(
 				(packet) =>
-					packet.sources.some(
+					packet.sources?.some(
 						(source: { evidence: string; totalCharacters: number }) =>
 							source.evidence === "e1" &&
 							source.totalCharacters === body.length,
@@ -266,10 +266,24 @@ test("deep source reads persist the body and supply confirmed later passages to 
 			),
 		).toBe(true);
 		expect(
-			f.modelPackets.every((packet) =>
-				packet.sources.every((source: object) => !("text" in source)),
-			),
+			f.modelPackets
+				.filter((packet) => packet.sources)
+				.every((packet) =>
+					packet.sources.every((source: object) => !("text" in source)),
+				),
 		).toBe(true);
+		const evaluation = f.modelPackets.find((packet) =>
+			packet.state?.startsWith('{"originalRequest"'),
+		);
+		expect(evaluation).toBeDefined();
+		expect(Object.keys(evaluation!)).toEqual(["state"]);
+		const content = JSON.parse(evaluation!.state);
+		expect(content.report.answer).toContain("本文で確認した結論");
+		expect(content.originalRequest).toContain("複数の資料を比較");
+		expect(JSON.stringify(content.evidence)).toContain(marker);
+		expect(f.gradeInstructions).toHaveLength(1);
+		expect(f.gradeInstructions[0]).toContain("独立した最終検証担当");
+		expect(f.gradeInstructions[0]).not.toContain("report_draft");
 		expect(
 			f
 				.store()

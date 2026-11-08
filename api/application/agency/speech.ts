@@ -33,7 +33,7 @@ export function persistSpeech(
 		messageId: string;
 		text: string;
 		at: number;
-		ticket: ActionTicket;
+		ticket: Pick<ActionTicket, "emotion" | "findingWorkRefs">;
 		evidenceRefs: readonly string[];
 		input: InputContext;
 	},

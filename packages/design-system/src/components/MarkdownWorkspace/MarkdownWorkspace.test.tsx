@@ -12,6 +12,7 @@ import type { MarkdownWorkspaceProps, MarkdownCurrent } from "./types";
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
 const current = (): MarkdownCurrent => ({
 	id: "local",
@@ -69,6 +70,86 @@ const conflict = () => {
 	};
 	return c;
 };
+test("header download exports the current unsaved title and body as Markdown without saving", async () => {
+	const createObjectURL = vi.fn((_blob: Blob) => "blob:markdown-download"),
+		revokeObjectURL = vi.fn();
+	vi.stubGlobal(
+		"URL",
+		class extends URL {
+			static createObjectURL = createObjectURL;
+			static revokeObjectURL = revokeObjectURL;
+		},
+	);
+	const click = vi
+		.spyOn(HTMLAnchorElement.prototype, "click")
+		.mockImplementation(() => {});
+	const p = props();
+	render(
+		<MarkdownWorkspace
+			{...p}
+			recovery={{
+				documentId: "local",
+				baseRevision: 1,
+				title: "復元した下書き",
+				document: {
+					formatVersion: 1,
+					nodes: [{ type: "p", children: [{ text: "未保存の本文" }] }],
+					originalMarkdown: "別の取込原文",
+				},
+			}}
+		/>,
+	);
+	fireEvent.change(screen.getByRole("textbox", { name: "文書名" }), {
+		target: { value: "変更後の題名" },
+	});
+	fireEvent.click(screen.getByRole("tab", { name: "ファイル一覧" }));
+	const button = screen.getByRole("button", {
+		name: "Markdownをダウンロード",
+	});
+	expect(button.textContent).toBe("");
+	expect(button.parentElement).toBe(
+		screen.getByRole("button", { name: "Markdownを読み込む" }).parentElement,
+	);
+	fireEvent.click(button);
+	expect(click).toHaveBeenCalledOnce();
+	expect(click.mock.instances[0]).toHaveAttribute(
+		"download",
+		"変更後の題名.md",
+	);
+	const blob = createObjectURL.mock.calls[0]![0] as Blob;
+	expect(blob.type).toBe("text/markdown;charset=utf-8");
+	const text = await new Promise<string>((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(String(reader.result));
+		reader.onerror = reject;
+		reader.readAsText(blob);
+	});
+	expect(text.trim()).toBe("未保存の本文");
+	expect(p.onApply).not.toHaveBeenCalled();
+	expect(p.onSave).not.toHaveBeenCalled();
+	await waitFor(
+		() =>
+			expect(revokeObjectURL).toHaveBeenCalledWith("blob:markdown-download"),
+		{ timeout: 1500 },
+	);
+});
+
+test("Markdown download is disabled without an open document and the footer is removed", () => {
+	const p = props();
+	const view = render(<MarkdownWorkspace {...p} />);
+	expect(screen.queryByRole("button", { name: "Markdownを確認" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "Markdownを書出" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "取込原文" })).toBeNull();
+	expect(
+		screen.queryByText("文書のどの部分でも会話から編集を依頼できます"),
+	).toBeNull();
+	expect(screen.queryByText(/Markdownの読込み・書出しでは/)).toBeNull();
+	view.rerender(<MarkdownWorkspace {...p} current={null} />);
+	expect(
+		screen.getByRole("button", { name: "Markdownをダウンロード" }),
+	).toBeDisabled();
+});
+
 test("untouched Markdown stays exact and title whitespace survives an apply-and-save", async () => {
 	const p = props(),
 		view = render(<MarkdownWorkspace {...p} />);

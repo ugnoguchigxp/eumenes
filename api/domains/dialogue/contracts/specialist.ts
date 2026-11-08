@@ -159,6 +159,8 @@ export type SpecialistSet = {
 	 * take the host defaults (`agentPolicy`). `document` is the work document the adapter declares for it.
 	 */
 	agent: {
+		/** Opt-in source-backed state, extracted in the same control call. Frozen in a new binding revision. */
+		collaborationState?: true;
 		document: {
 			ref: string;
 			path: string;

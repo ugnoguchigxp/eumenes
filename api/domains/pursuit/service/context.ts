@@ -3,7 +3,11 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { Capabilities } from "../../capabilities";
 import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
-import type { ResearchWebPort, SourcePort } from "../contracts";
+import type {
+	ResearchDocumentPort,
+	ResearchWebPort,
+	SourcePort,
+} from "../contracts";
 import { active, rowOf, stateOf, type RunRow } from "../repository";
 
 export type PursuitDeps = {
@@ -12,6 +16,7 @@ export type PursuitDeps = {
 	capabilities: Capabilities;
 	inference: InferencePort;
 	web: ResearchWebPort;
+	documents?: ResearchDocumentPort;
 	now?: () => number;
 	id?: () => string;
 };

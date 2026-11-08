@@ -353,3 +353,53 @@
 		flex: 1;
 	}
 }
+.ds-markdown-management-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 12px;
+}
+.ds-markdown-management-toolbar button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+}
+.ds-markdown-file-table tr[data-selected] {
+	background: color-mix(in srgb, #38b6a1 12%, transparent);
+}
+.ds-markdown-operation-form {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 12px;
+}
+.ds-markdown-operation-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+.ds-markdown-operation-form input:not([type="checkbox"]) {
+	border: 1px solid var(--border);
+	padding: 8px;
+	border-radius: 5px;
+	background: var(--background);
+	color: var(--foreground);
+}
+.ds-markdown-header .ds-tabs-item {
+	flex: 0 0 auto;
+}
+.ds-markdown-header .ds-tabs-label {
+	max-width: none;
+}
+.ds-markdown-managed-table th:first-child {
+	width: 36px;
+	min-width: 36px;
+}
+.ds-markdown-managed-table th:nth-child(2) {
+	width: 60%;
+}
+.ds-markdown-file-tools > input[type="search"] {
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	padding: 8px 10px;
+}

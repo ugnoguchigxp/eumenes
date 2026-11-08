@@ -82,6 +82,9 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 	app.get("/api/conversations/:id/specialist", (c) =>
 		c.json({ session: service.specialistSession(c.req.param("id")) }),
 	);
+	app.get("/api/specialist-sessions/:id/collaboration-state", (c) =>
+		c.json({ state: service.specialistCollaborationState(c.req.param("id")) }),
+	);
 	for (const kind of specialistCommandKinds)
 		app.post(`/api/specialist-sessions/:id/${kind}`, async (c) => {
 			const parsed = await parseJsonBody(c, specialistCommandSchema);

@@ -1,137 +1,152 @@
 {
-	"implementation": "implemented; repeated startup failure diagnosed from authorized read-only metadata; 61 missing archived references confirmed forgotten and covered by corrected recovery; 292 related tests pass; actual startup and live creation pending",
-	"baselineHead": "e4a84f05b8fffb0eb0cf910733d1d9d5900ecb53",
-	"isolation": "detached HEAD plus listed action source overlay; concurrent Markdown/startup changes excluded",
-	"final": {
-		"backend": {
-			"passed": 140,
-			"failed": 0,
-			"files": 27,
-			"expects": 788
-		},
-		"typecheck": "pass (3,056 files)",
-		"ownedLint": "pass",
-		"ownedFormat": "pass",
-		"ownedSize": "pass",
-		"sourceMatchesWorkspace": true,
-		"documentationOnlyUpdatesAfterCodeValidation": [
-			"docs/toolchain-extension.md",
-			"spec/agency-general-action-design-2026-11-07.md"
-		]
-	},
-	"widerBeforeFinalRevocationAndLifecycleGuards": {
-		"passed": 1514,
-		"failed": 1,
-		"files": 263,
-		"expects": 10445,
-		"seconds": 233.91,
-		"failure": "fresh initialization: fixture backend list omits markdown; toolchain:markdown.collaborate@1 unavailable",
-		"rawLogRetained": false,
-		"evidence": "aggregate observed in tool execution output; later scoped run reused the original raw-log path; source manifest retained"
-	},
-	"web": {
-		"testsPassed": 67,
-		"testFilesPassed": 14,
-		"testFilesFailedBeforeTests": 10,
-		"cause": "ERR_UNKNOWN_FILE_EXTENSION for katex.min.css through unchanged DesignSystem Markdown export",
-		"status": "incomplete; not a passing web gate"
-	},
-	"domainVerify": {
-		"selected": [
-			"dialogue",
-			"agent-runtime",
-			"tool-runtime",
-			"capabilities",
-			"memory",
-			"resources",
-			"image",
-			"music",
-			"pursuit",
-			"settings",
-			"queue"
-		],
-		"passedGates": [
-			"inventory",
-			"boundaries",
-			"system-context",
-			"size-budget",
-			"sql-boundaries",
-			"domain-docs"
-		],
-		"stoppedAt": "format",
-		"baselineFormatFailures": [
-			"api/domains/capabilities/bundles/browser-interact.bundle.json",
-			"tests/browser/chat-image-attachments.spec.ts"
-		],
-		"status": "failed; later gates executed separately"
-	},
-	"repositoryLint": {
-		"status": "failed",
-		"baselineFailure": "spec/verification/markdown-full-bundle-2026-11-07/fixture.tsx"
-	},
-	"designSystem": {
-		"typecheck": "pass",
-		"build": "pass",
-		"sourceUnchangedByThisTask": true
-	},
-	"regressions": [
-		"image/music with real Memory provenance and public forgetting",
-		"research/instant/command/pipeline/registered task through shared execution",
-		"question to TODO and continuation from real user answer",
-		"speech cap and busy-host timer pacing; search and restart continuation",
-		"settings/capability revocation, cancellation, forgetting and late-response rejection",
-		"concurrent/daily limits and immutable replay",
-		"task cancellation and erasure lifecycle required for automatic registration",
-		"old autonomous research cannot acquire action authority"
-	],
-	"live": {
-		"status": "partial; capability discovery succeeded, generation blocked by activity token budget",
-		"report": "live-after-restart.json",
-		"serverStartedStoppedOrRestarted": false,
-		"realModelCalls": true,
-		"realGenerationCalls": false,
-		"browserAcceptance": "existing user Web gallery inspected; generated artifact unavailable"
-	},
-	"contextStill": {
-		"contextCompileCalls": 5,
-		"compileEvalCalls": 5
-	},
-	"remaining": [
-		"live model chooses useful actions or waiting from interests without explicit creation requests",
-		"saved generation services; delivery/opening on user Web screen; stop and late result acceptance",
-		"baseline global format/lint/Markdown fixture and CSS import failures owned by other work"
-	],
-	"diffReview": {
-		"topicOrKeywordRulesAdded": false,
-		"fabricatedUserRunsAdded": false,
-		"secondPlannerForSelectedSingleCapability": false,
-		"unrelatedWorkspaceChangesPreserved": true
-	},
-	"documentationLinks": {
-		"newDesignAndVerificationLinks": "valid",
-		"preexistingBrokenLink": "../api/domains/agent-runtime/service/timer-operation.ts",
-		"presentInHead": true,
-		"unchangedByThisTask": true
-	},
-	"liveBudgetAdjustment": {
-		"report": "live-after-restart.json",
-		"relatedTestsPassed": 117,
-		"relatedTestsFailed": 0,
-		"runningServerHasAdjustment": false
-	},
-	"startupArchiveRecovery": {
-		"report": "startup-archive-recovery.json",
-		"relatedTestsPassed": 288,
-		"relatedTestsFailed": 0,
-		"nonServerStartupTestsPassed": 3,
-		"actualStartupPending": true
-	},
-	"missingReferenceRecovery": {
-		"report": "startup-missing-reference-recovery.json",
-		"explicitReadOnlyDiagnosisAuthorized": true,
-		"actualMissingReferencesConfirmedForgotten": 61,
-		"relatedTestsPassed": 292,
-		"relatedTestsFailed": 0,
-		"actualStartupPending": true
-	}
+  "implementation": "core Agency action integration implemented; metadata-backed input fixes reflected; main normal processing and three idle LLM decisions recovered live. Autonomous image/music and completion notice proved in earlier live phase. Full acceptance remains incomplete for research report and historical revoked links.",
+  "baselineHead": "e4a84f05b8fffb0eb0cf910733d1d9d5900ecb53",
+  "isolation": "detached HEAD plus listed action source overlay; concurrent Markdown/startup changes excluded",
+  "final": {
+    "backend": {
+      "passed": 140,
+      "failed": 0,
+      "files": 27,
+      "expects": 788
+    },
+    "typecheck": "pass (3,056 files)",
+    "ownedLint": "pass",
+    "ownedFormat": "pass",
+    "ownedSize": "pass",
+    "sourceMatchesWorkspace": true,
+    "documentationOnlyUpdatesAfterCodeValidation": [
+      "docs/toolchain-extension.md",
+      "spec/agency-general-action-design-2026-11-07.md"
+    ]
+  },
+  "widerBeforeFinalRevocationAndLifecycleGuards": {
+    "passed": 1514,
+    "failed": 1,
+    "files": 263,
+    "expects": 10445,
+    "seconds": 233.91,
+    "failure": "fresh initialization: fixture backend list omits markdown; toolchain:markdown.collaborate@1 unavailable",
+    "rawLogRetained": false,
+    "evidence": "aggregate observed in tool execution output; later scoped run reused the original raw-log path; source manifest retained"
+  },
+  "web": {
+    "testsPassed": 67,
+    "testFilesPassed": 14,
+    "testFilesFailedBeforeTests": 10,
+    "cause": "ERR_UNKNOWN_FILE_EXTENSION for katex.min.css through unchanged DesignSystem Markdown export",
+    "status": "incomplete; not a passing web gate"
+  },
+  "domainVerify": {
+    "selected": [
+      "dialogue",
+      "agent-runtime",
+      "tool-runtime",
+      "capabilities",
+      "memory",
+      "resources",
+      "image",
+      "music",
+      "pursuit",
+      "settings",
+      "queue"
+    ],
+    "passedGates": [
+      "inventory",
+      "boundaries",
+      "system-context",
+      "size-budget",
+      "sql-boundaries",
+      "domain-docs"
+    ],
+    "stoppedAt": "format",
+    "baselineFormatFailures": [
+      "api/domains/capabilities/bundles/browser-interact.bundle.json",
+      "tests/browser/chat-image-attachments.spec.ts"
+    ],
+    "status": "failed; later gates executed separately"
+  },
+  "repositoryLint": {
+    "status": "failed",
+    "baselineFailure": "spec/verification/markdown-full-bundle-2026-11-07/fixture.tsx"
+  },
+  "designSystem": {
+    "typecheck": "pass",
+    "build": "pass",
+    "sourceUnchangedByThisTask": true
+  },
+  "regressions": [
+    "image/music with real Memory provenance and public forgetting",
+    "research/instant/command/pipeline/registered task through shared execution",
+    "question to TODO and continuation from real user answer",
+    "speech cap and busy-host timer pacing; search and restart continuation",
+    "settings/capability revocation, cancellation, forgetting and late-response rejection",
+    "concurrent/daily limits and immutable replay",
+    "task cancellation and erasure lifecycle required for automatic registration",
+    "old autonomous research cannot acquire action authority"
+  ],
+  "live": {
+    "status": "partial; capability discovery succeeded, generation blocked by activity token budget",
+    "report": "live-after-restart.json",
+    "serverStartedStoppedOrRestarted": false,
+    "realModelCalls": true,
+    "realGenerationCalls": false,
+    "browserAcceptance": "existing user Web gallery inspected; generated artifact unavailable"
+  },
+  "contextStill": {
+    "contextCompileCalls": 8,
+    "compileEvalCalls": 8
+  },
+  "remaining": [
+    "research completed report delivery not accepted live",
+    "historical revoked conversation Resource links not restored; new generated-output persistence not reaccepted after latest correction",
+    "full live late-result race and listening quality not assessed"
+  ],
+  "diffReview": {
+    "topicOrKeywordRulesAdded": false,
+    "fabricatedUserRunsAdded": false,
+    "secondPlannerForSelectedSingleCapability": false,
+    "unrelatedWorkspaceChangesPreserved": true
+  },
+  "documentationLinks": {
+    "newDesignAndVerificationLinks": "valid",
+    "preexistingBrokenLink": "../api/domains/agent-runtime/service/timer-operation.ts",
+    "presentInHead": true,
+    "unchangedByThisTask": true
+  },
+  "liveBudgetAdjustment": {
+    "report": "live-after-restart.json",
+    "relatedTestsPassed": 117,
+    "relatedTestsFailed": 0,
+    "runningServerHasAdjustment": false
+  },
+  "startupArchiveRecovery": {
+    "report": "startup-archive-recovery.json",
+    "relatedTestsPassed": 288,
+    "relatedTestsFailed": 0,
+    "nonServerStartupTestsPassed": 3,
+    "actualStartupPending": true
+  },
+  "missingReferenceRecovery": {
+    "report": "startup-missing-reference-recovery.json",
+    "explicitReadOnlyDiagnosisAuthorized": true,
+    "actualMissingReferencesConfirmedForgotten": 61,
+    "relatedTestsPassed": 292,
+    "relatedTestsFailed": 0,
+    "actualStartupPending": true
+  },
+  "latestAcceptance": {
+    "report": "continuity/summary.json",
+    "liveImage": true,
+    "liveMusic": true,
+    "positiveSpontaneousSpeech": true,
+    "currentApiReachable": true,
+    "latestIntegrationPassed": 625,
+    "sharedContextCorrectionReflected": true,
+    "scopedMemoryTopicsCorrectionReflected": true,
+    "fullAcceptance": false,
+    "metadataBackedCorrectionsReflected": true,
+    "measuredMainProcessingRecovered": true,
+    "mainIdleDecisionsPassed": 3,
+    "mainObservationEnd": "2026-11-07T20:41:20.753+09:00"
+  }
 }

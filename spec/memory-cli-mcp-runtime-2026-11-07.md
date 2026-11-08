@@ -1,0 +1,24 @@
+# 稼働EumenesのMemory CLI/MCP接続
+
+## 確認した不足と方針
+
+再起動後のAPIはready、Memoryはenabled/healthyだったが、MemoryHostの生成とUnix socket受付は検証用コードにしかなく、通常のserver起動には接続されていなかった。導入済みパッケージと既存MemoryService.sharedHostをそのまま使い、アプリの所有するWriter・journalへ接続する起動処理を追加する。意味の指示、推論方式、Memoryの公開API/schemaは変更しない。
+
+## 起動と終了
+
+- 構築時は接続オブジェクトと忘却hookだけを登録し、ファイル・DB・listenerへ触れない。
+- Memory回復の直後にホスト側のjournalと派生物を回復する。既存Memoryがunhealthyなら受付を開かない。
+- 全serviceの回復後にUnix socketを準備し、startの最後まで通常要求を拒否する。終了時はHTTPと同じ入口の段階で受付を止め、受理済み操作をsettleしてから既存Storeを閉じる。
+- アプリ所有DBを別プロセスで開かず、新たなMemory DBも作らない。接続失敗は本文・設定値なしの固定コードで記録し、他のAPIの可用性を維持する。
+
+## ローカル設定
+
+DBのあるディレクトリの`memory-host/owner.json`を権限の正本、`memory-host/profile.json`をCLI/MCPの接続先とする。socketは同じDBディレクトリの`memory.sock`。起動時に未作成なら0700の設定ディレクトリと0600の設定ファイルを作る。既存設定は検証して再利用し、不正な設定や通常ファイルを上書きしない。profileのsecretをログやモデルへ渡さない。
+
+初期grantは既存ホストの標準と同じく、本人profileのread/writeとforgetAllを持ち、confirmedWritesはfalse。提出する出典はagent_inferredであり、本人確認済みの事実へ権限やoriginを自動昇格させない。アプリのAPI tokenは流用しない。利用者の既存コーディングエージェント設定は自動変更しない。
+
+## 完了条件
+
+設定の作成・再利用・不正値拒否、start前の拒否、同じWriterでの相互参照と忘却、終了と再接続、通常のserver起動からMCPが使えることを使い捨て環境で検証する。その後、本人の再起動許可を得て稼働中のAPI/Webへ反映する。liveではCLI/API/MCPの参照結果をhashで照合し、既存事実の本文をログへ出さず、まずread-onlyで確認する。許可のないサーバー再起動や個人DBの直接操作はしない。
+
+設定破損の回帰試験で、MCPの設定読込み失敗がアプリ自身の忘却hookまで妨げることを再現した。アプリ所有の同期purge中だけ、最後に検証した同じprincipal/scopesの設定を使ってmetadataを消去する。外部の要求は常に現在の設定を読み、破損時に拒否する。この限定された回復用設定は外部への権限のフォールバックには使わない。

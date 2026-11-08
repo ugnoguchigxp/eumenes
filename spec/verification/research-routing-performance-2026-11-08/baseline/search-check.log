@@ -1,0 +1,50 @@
+checked 209, offered 171 (82%), toolchain unavailable 20, no index 0
+rank of the chosen toolchain by similarity:
+    1: 100 (48%)
+    2: 39 (19%)
+    3: 15 (7%)
+    4: 7 (3%)
+    5: 3 (1%)
+    6: 5 (2%)
+    7: 2 (1%)
+    8: 3 (1%)
+   9+: 35 (17%)
+not offered by the slots:
+  2026-10-12T21:50 web.search rank 9+
+  2026-10-14T09:12 music.create rank 9+
+  2026-10-14T09:48 web.search rank 2
+  2026-10-14T10:01 web.search rank 2
+  2026-10-14T13:23 history.research rank 9+
+  2026-10-14T13:26 history.research rank 9+
+  2026-10-14T13:36 web.search rank 9+
+  2026-10-14T13:38 web.search rank 9+
+  2026-10-14T13:40 web.search rank 8
+  2026-10-14T16:24 history.research rank 7
+  2026-10-14T16:31 history.research rank 9+
+  2026-10-14T16:58 history.research rank 9+
+  2026-10-14T17:00 history.research rank 6
+  2026-10-14T17:10 history.research rank 7
+  2026-10-14T17:12 history.research rank 9+
+  2026-10-14T23:51 history.research rank 6
+  2026-10-15T00:25 history.research rank 9+
+  2026-10-15T14:36 web.search rank 9+
+  2026-10-15T14:36 web.search rank 3
+  2026-10-15T14:46 web.search rank 9+
+  2026-10-16T14:00 web.search rank 9+
+  2026-10-16T14:12 web.search rank 5
+  2026-10-16T23:40 ui.compose rank 4
+  2026-10-16T23:42 ui.compose rank 4
+  2026-10-17T00:23 ui.compose rank 6
+  2026-10-17T12:19 web.search rank 9+
+  2026-10-17T13:24 web.search rank 9+
+  2026-10-17T13:31 web.search rank 9+
+  2026-10-17T21:27 web.search rank 4
+  2026-10-17T21:32 web.search rank 9+
+  2026-10-17T23:53 weather.forecast rank 9+
+  2026-10-20T21:32 web.search rank 9+
+  2026-10-29T02:01 claude-code.request rank 9+
+  2026-10-30T23:34 image.create rank 4
+  2026-10-31T12:26 image.create rank 9+
+  2026-10-31T13:12 image.create rank 4
+  2026-11-06T11:15 pipeline.execute rank 9+
+  2026-11-06T11:15 pipeline.execute rank 9+

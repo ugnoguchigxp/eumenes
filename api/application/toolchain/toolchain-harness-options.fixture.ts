@@ -56,6 +56,7 @@ export type HarnessOptions = {
 	musicGateway?: () => LarmPlayground;
 	imageGateway?: () => LarmPlayground;
 	uiCompositions?: boolean;
+	scratch?: import("../../domains/scratch").ScratchStore;
 	markdown?: import("../../domains/markdown").ArchivePort;
 	routeTool?: string;
 	docling?: import("../../domains/docling").DoclingService;

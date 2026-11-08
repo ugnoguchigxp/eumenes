@@ -29,7 +29,7 @@ const entry = {
 	namespace: "eumenes",
 	contentDigest: "c".repeat(64),
 };
-function mount(empty = false) {
+function mount(empty = false, generated = false) {
 	const markdown = "\uFEFF# 日本語\r\n末尾  \r\n",
 		document = importer(markdown);
 	importer.mockClear();
@@ -43,6 +43,7 @@ function mount(empty = false) {
 				current: null,
 				documents: [],
 				archiveAvailable: true,
+				...(generated ? { openSourceId: remoteId } : {}),
 			},
 		})),
 		markdownCapabilities: vi.fn(async () => ({
@@ -77,6 +78,9 @@ function mount(empty = false) {
 			markdownWebAdapter.useArtifact({
 				client,
 				visible: true,
+				...(generated
+					? { targetRef: "generated-research-document", notify: vi.fn() }
+					: {}),
 				artifactRevisionId: "artifact:markdown.workspace@3",
 				setTargetRef,
 			} as unknown as AdapterHostContext),
@@ -141,4 +145,16 @@ test("more follows the returned cursor, retains namespaces and appends the page"
 		libraryHasMore: false,
 	});
 	h.cache.clear();
+});
+
+test("opening a generated research document imports its Markdown without switching the conversation specialist", async () => {
+	const h = mount(true, true);
+	await waitFor(() => expect(h.setTargetRef).toHaveBeenCalledWith(localId));
+	expect(importer).toHaveBeenCalledWith(h.markdown);
+	expect(h.client.markdownOpen).toHaveBeenCalledTimes(1);
+	expect(h.client.markdownOpen).toHaveBeenCalledWith(
+		remoteId,
+		expect.any(AbortSignal),
+		{ stageId: "import-stage", expectedEtag: entry.revision },
+	);
 });

@@ -53,7 +53,6 @@ export function useWorkspace({
 	store: AudioStore;
 }) {
 	const [input, setInput] = useState({ text: "", dictated: false });
-	useAgencyAttention(client, "main");
 	const draft = input.text;
 	const attachments = useChatAttachments(client, "main");
 	const editedRecognition = useRef<string | null>(null);
@@ -155,6 +154,14 @@ export function useWorkspace({
 		output: screenOutput,
 	});
 	const live = useWorkspaceLive(client, settings.data, voice, replay);
+	const speaking = useSyncExternalStore(
+		screenOutput.subscribe,
+		screenOutput.speaking,
+	);
+	useAgencyAttention(client, "main", {
+		typing: input.text.length > 0,
+		playing: speaking || live.playing,
+	});
 	const mute = useVoiceMute(client);
 	const automaticInput = input.dictated && voice.active;
 	const recognitionId = voice.recognitionId;

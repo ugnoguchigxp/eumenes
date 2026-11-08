@@ -7,6 +7,7 @@ import type { RequestRow } from "../repository";
 
 /** A call's resolved session lifetime (LLM calls only). */
 export type CallSessionRole = {
+	independent?: true;
 	agentSession?: CallSession["agentSession"];
 	sessionRole: "main" | "subagent" | "auxiliary";
 	taskId?: string;
@@ -33,6 +34,7 @@ export type CallSessionRole = {
 export const sessionCallOptions = (session?: CallSessionRole) =>
 	session
 		? {
+				...(session.independent ? { independent: true as const } : {}),
 				agentSession: session.agentSession,
 				sessionRole: session.sessionRole,
 				...(session.taskId ? { taskId: session.taskId } : {}),
@@ -74,6 +76,7 @@ export function resolveSession(
 		throw new Error("invalid_failure_scope");
 	if (row.purpose !== "llm") {
 		if (
+			given?.independent ||
 			given?.agentSession ||
 			given?.sessionRole ||
 			given?.taskId ||
@@ -101,9 +104,16 @@ export function resolveSession(
 	}
 	if (
 		(given?.onConversation && sessionRole !== "auxiliary") ||
+		(given?.independent &&
+			(sessionRole !== "auxiliary" ||
+				row.mode !== "control" ||
+				given.onConversation ||
+				given.yields)) ||
 		(given?.yields && sessionRole !== "auxiliary") ||
 		(given?.readAhead && !given.onConversation) ||
-		(given?.reasoning !== undefined && sessionRole !== "main") ||
+		(given?.reasoning !== undefined &&
+			sessionRole !== "main" &&
+			!given.independent) ||
 		(given?.outputSchema !== undefined &&
 			sessionRole !== "main" &&
 			!(sessionRole === "auxiliary" && row.mode === "control")) ||
@@ -136,6 +146,7 @@ export function resolveSession(
 		throw new Error("invalid_session_context");
 	return {
 		sessionRole,
+		...(given?.independent ? { independent: true as const } : {}),
 		...(given?.agentSession ? { agentSession: { ...given.agentSession } } : {}),
 		...(given?.taskId ? { taskId: given.taskId } : {}),
 		...(given?.onConversation ? { onConversation: true as const } : {}),

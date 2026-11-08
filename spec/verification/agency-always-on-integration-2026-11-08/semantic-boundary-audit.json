@@ -1,0 +1,38 @@
+{
+  "result": "checked",
+  "rules": "No user-phrase classifier or scenario-specific production branches added; prefix/membership checks are structural contracts. Model and profile names are not fixed.",
+  "structuralMembershipChanges": [
+    {
+      "file": "api/application/agency/always-on-checkpoint.ts",
+      "line": "].some((ref) => refs.includes(ref))"
+    },
+    {
+      "file": "api/application/agency/always-on-flow.ts",
+      "line": "if (m.id.startsWith(`agency:${c.scope}:`)) return;"
+    },
+    {
+      "file": "api/application/agency/always-on-flow.ts",
+      "line": ".filter((s) => refs.includes(`stock:${s.id}`))"
+    },
+    {
+      "file": "api/application/toolchain/task-autonomy.ts",
+      "line": "[\"task\", \"pipeline\"].includes(registered.runtime.execution) &&"
+    },
+    {
+      "file": "api/domains/dialogue/service/agency-state-memory.ts",
+      "line": "if (snap.forgottenRefs?.includes(observation.id)) return observation;"
+    },
+    {
+      "file": "api/domains/dialogue/service/agency-state.ts",
+      "line": "!(alwaysOn?.agent.forgotten ?? snap.forgottenRefs)?.includes("
+    },
+    {
+      "file": "web/src/workspace/useWorkspace.ts",
+      "line": "[\"responding\", \"synthesizing\", \"ready\"].includes(voice.turn.status),"
+    }
+  ],
+  "whitespaceCheck": {
+    "sourceAndDocs": "pass",
+    "patch": "Unified-diff context prefixes are not source indentation; patch application and reconstructed source hashes verified separately."
+  }
+}

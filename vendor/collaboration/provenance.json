@@ -1,12 +1,14 @@
 {
 	"package": "eumenes-collaboration",
-	"version": "0.2.0",
-	"archive": "eumenes-collaboration-0.2.0-b407ecd8372b.tgz",
-	"archiveSha256": "52a7041f47cfafa148db132144d82a0f436c19bb9de4aedca6761b1e846fabbd",
+	"version": "0.4.0",
+	"archive": "eumenes-collaboration-0.4.0-ce0d56eedc6a.tgz",
+	"archiveSha256": "ce0d56eedc6ada0e67e8aff39daba2ae29caddb4e328c1041620135d2a12450c",
 	"sourceRepository": "eumenes_collaboration",
-	"sourceCommit": "b407ecd8372b2718f05c23a2340e0483833a0296",
-	"sourceTreeDigest": "59e7a1d0cbd7aa3230ee62d6002e86b131bcdd3e183c75429e739e9dc89da308",
+	"sourceCommit": null,
+	"sourceBaseCommit": "b03426226ef5ef6ead47c216a309bb48c2a420df",
+	"sourceTreeDirty": true,
+	"sourceTreeDigest": "5240d54d9a68246cda2cf1fbd4edf08d9d00e95aadc858072b341e84eaf4a56c",
 	"coreContractVersion": 1,
 	"supportedStateSchemaVersions": [1],
-	"integration": "Existing session runtime consumes the public action contract, shared instructions and message builder. State proposals, planning helpers, example stores and external ports are not installed as a second host runtime."
+	"integration": "Versioned opt-in bindings use same-call state proposals and dialogue writer state/receipt/revocation transactions. Real model, UI, DB-backed APIs, correction, restart preservation and condition forgetting accepted 2026-11-07. Formal state approval review UI is not connected. CI not run. Final repack changes README and manifest only; runtime/instructions match live-accepted archive."
 }

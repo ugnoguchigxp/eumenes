@@ -1,0 +1,36 @@
+[
+  {
+    "id": "durable",
+    "variant": "before",
+    "shared": false,
+    "status": "pending",
+    "input": {
+      "today": "2026-10-14",
+      "events": [
+        {
+          "id": "e1",
+          "at": "2026-10-14T12:00:00.000Z",
+          "by": "user",
+          "text": "私は緑茶が好きです。"
+        },
+        {
+          "id": "e2",
+          "at": "2026-10-14T12:00:00.000Z",
+          "by": "agent",
+          "origin": "reply",
+          "text": "わかりました。"
+        }
+      ],
+      "requests": [],
+      "longTerm": [],
+      "longTermCoverage": {
+        "stateTotal": 0,
+        "stateShown": 0,
+        "tendenciesTotal": 0,
+        "tendenciesShown": 0
+      },
+      "shortTerm": []
+    },
+    "inputHash": "7f2d8ca385a06625438b6d453a068b2c954a437fd7e52808aa86eeb206af3432"
+  }
+]

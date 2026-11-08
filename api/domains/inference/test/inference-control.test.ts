@@ -394,3 +394,68 @@ test("an attempt's own time replaces the LARM and cloud defaults, within the req
 	expect(short).toBeLessThanOrEqual(30_000);
 	expect(short).toBeGreaterThan(29_000);
 });
+
+test("independent structured controls preserve ownership and reasoning without yielding", async () => {
+	let observed: unknown;
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			observed = options;
+			return "{}";
+		},
+	});
+	const id = await h.store.write((db) =>
+		h.inference.captureBackgroundControlInTransaction!(db, {
+			taskId: "agency",
+			decisionId: "independent-fixture",
+			authorityEpoch: 1,
+			executionGeneration: 1,
+			deadline: Date.now() + 20_000,
+			taskDeadline: Date.now() + 30_000,
+			maxOutputTokens: 512,
+			structuredOutput: true,
+			route: "conversation",
+		}),
+	);
+	await h.inference.executeControl(
+		id,
+		messages,
+		new AbortController().signal,
+		undefined,
+		{
+			sessionRole: "auxiliary",
+			independent: true,
+			agentSession: { conversationId: "a", agentId: "think-a" },
+			reasoning: { larm: "high", cloud: "high" },
+			outputSchema: {
+				type: "object",
+				properties: {},
+				additionalProperties: false,
+			},
+		},
+	);
+	expect(observed).toMatchObject({
+		independent: true,
+		agentSession: { conversationId: "a", agentId: "think-a" },
+	});
+	expect(observed).not.toHaveProperty("yields");
+	expect(observed).not.toHaveProperty("onConversation");
+});
+
+test("an unavailable explicit background resource is rejected before any fallback call", async () => {
+	const h = await setup();
+	await expect(
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction!(db, {
+				taskId: "agency",
+				decisionId: "strict-fixture",
+				authorityEpoch: 1,
+				executionGeneration: 1,
+				deadline: Date.now() + 20_000,
+				taskDeadline: Date.now() + 30_000,
+				maxOutputTokens: 512,
+				route: { resourceId: crypto.randomUUID(), strict: true },
+			}),
+		),
+	).rejects.toThrow("background_resource_unavailable");
+	expect(h.calls).toHaveLength(0);
+});

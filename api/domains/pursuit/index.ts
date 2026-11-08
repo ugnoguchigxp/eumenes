@@ -5,3 +5,5 @@ export {
 	createPursuitReportResourceAdapter,
 	PURSUIT_REPORT_RESOURCE_PREFIX,
 } from "./service/report-resource";
+
+export { documentName } from "./service/documents";

@@ -1,0 +1,56 @@
+{
+  "kind": "scripted-contract-investigation",
+  "upstreamVersion": "always-on-25",
+  "sourceFiles": {
+    "src/always-on/agent.ts": "e717531b95a695e94ee8041d50ce972a9dc39c964b46bb08fa389279d6b3ba21",
+    "src/always-on/contracts.ts": "e53862b544392fbb9e44b1034d4ae2334b4c3778ed0a9c51c466860799c079db",
+    "src/always-on/forgetting.ts": "584cd4161523b22b999d7a7ae85e2424b63cc7f8c02f3cf0266cb7300bac8535",
+    "src/always-on/prompt.ts": "c99cb1a6829be24419c54a00c2742de0762a4a230422478b77cc1548106f0b1a",
+    "src/always-on/stock.ts": "5145f36311206b8deafbdc2f190cf8a6ad0c13b1bf90006ab871ae4eb3c2fc1a"
+  },
+  "providerCalls": 0,
+  "productDatabaseAccess": false,
+  "serverOperations": false,
+  "meaningQualityEvaluated": false,
+  "note": "4件の契約不足の再現であり、製品受入の合格ではない",
+  "results": [
+    {
+      "id": "AO-N1",
+      "expectedAfterFix": "忘却した出典に依存する遅延receiptは観測・発話回数を増やさない",
+      "observed": {
+        "receiptAccepted": true,
+        "observations": 1,
+        "unanswered": 1
+      },
+      "contractGapReproduced": true
+    },
+    {
+      "id": "AO-N2",
+      "expectedAfterFix": "提示した過去の考えの依存元を次の出力へ継承し、忘却を連鎖させる",
+      "observed": {
+        "inheritedSourceMissing": true,
+        "dependentThoughtRetainedAfterForget": true
+      },
+      "contractGapReproduced": true
+    },
+    {
+      "id": "AO-N3",
+      "expectedAfterFix": "tickの有無に関係なく6時間を超えた返却を採用しない",
+      "observed": {
+        "expiredReturnAccepted": true,
+        "findings": 1
+      },
+      "contractGapReproduced": true
+    },
+    {
+      "id": "AO-N4",
+      "expectedAfterFix": "通常応答のrun・入力版と能力等の依存元を明示し、古いrunからの受付を拒否する",
+      "observed": {
+        "boundToLatestUser": "request-B",
+        "toolSourceMissing": true,
+        "apiAcceptsExpectedRunOrMessage": false
+      },
+      "contractGapReproduced": true
+    }
+  ]
+}

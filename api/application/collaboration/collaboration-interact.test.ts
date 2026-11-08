@@ -9,7 +9,8 @@ import {
 import {
 	InteractFakeDriver,
 	done,
-	part,
+	capturePrepare,
+	captureSave,
 } from "../../domains/browser/test/interact.fixture";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -62,8 +63,10 @@ test("interact pilot stays unavailable by default; an enabled fixture returns ca
 								explanation: "capture confirmed",
 							})
 						: ++step === 1
-							? part("page.capture", { range: "viewport", item: null })
-							: done(input),
+							? capturePrepare
+							: step === 2
+								? captureSave(input)
+								: done(input),
 			});
 			return {
 				service: legacy,
@@ -85,7 +88,12 @@ test("interact pilot stays unavailable by default; an enabled fixture returns ca
 			})(messages),
 		specialist: (messages) => {
 			traces.push(messages.map((m) => m.content).join("\n"));
-			const ref = JSON.parse(messages[1]!.content.split("REFERENCE=")[1]!);
+			const ref = JSON.parse(
+				messages[1]!.content
+					.split("\n")
+					.find((line) => line.startsWith("REFERENCE="))!
+					.slice("REFERENCE=".length),
+			);
 			if (ref.currentWork.hostEvent) {
 				observations.push(ref.currentWork.hostEvent);
 				return {
@@ -150,6 +158,10 @@ test("interact pilot stays unavailable by default; an enabled fixture returns ca
 		);
 		const owner = h.dialogue.specialistSession("main")!;
 		await waitFor(() => observations.length === 1, { timeout: 6000 });
+		expect(
+			observations[0].question,
+			JSON.stringify(observations[0]),
+		).toBeTruthy();
 		expect(observations[0].question.approval).toBe(true);
 		expect(driver.calls).not.toContain("screenshot");
 		const childId = observations[0].id;

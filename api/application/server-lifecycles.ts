@@ -154,6 +154,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				feedResyncRequired = recovery.feedResyncRequired === true;
 			},
 		},
+		{ name: "memory_host_recovery", recover: () => s.memoryHost.recover() },
 		{
 			name: "agency_recovery",
 			recover: () => s.agency.recover(),
@@ -270,6 +271,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "kanban_maintenance_start",
 			start: () => kanbanMaintenance.start?.(),
 		},
+		{ name: "memory_host_start", start: () => s.memoryHost.start() },
 		// Bring-up order of the resources; closed in reverse.
 		{ name: "store", close: () => s.store.close() },
 		{ name: "dataset_store", close: () => s.datasetStore.close() },
@@ -335,9 +337,11 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				vectorRefresh.stop();
 			},
 		},
+		{ name: "memory_host", close: () => s.memoryHost.close() },
 		http,
 		{ name: "changes", close: () => s.changes.close() },
 		{ name: "status", close: () => s.unsubscribeStatus() },
 		{ name: "commits", close: () => s.unsubscribeCommits() },
+		{ name: "memory_host_listener", recover: () => s.memoryHost.listen() },
 	];
 }

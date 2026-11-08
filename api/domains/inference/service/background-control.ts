@@ -125,6 +125,17 @@ export function captureBackgroundControl(
 		return old.id;
 	}
 	const snapshot = deps.snapshot();
+	const selectedRoute = input.route;
+	if (typeof selectedRoute === "object" && selectedRoute.strict) {
+		const resource = snapshot.resources.find(
+			(r) => r.id === selectedRoute.resourceId && r.purpose === "llm",
+		);
+		const connection = snapshot.connections.find(
+			(c) => c.id === resource?.connectionId,
+		);
+		if (!resource || !connection?.enabled || !snapshot.routes.llm.cloudAllowed)
+			throw new Error("background_resource_unavailable");
+	}
 	if (input.route === undefined) {
 		snapshot.routes.llm.mode = "larm-only";
 		snapshot.routes.llm.cloudAllowed = false;

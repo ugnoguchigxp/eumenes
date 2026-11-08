@@ -22,8 +22,7 @@
 	cursor: default;
 }
 .ds-markdown-header,
-.ds-markdown-documentbar,
-.ds-markdown-footer {
+.ds-markdown-documentbar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -167,26 +166,10 @@
 	padding: 12px;
 	background: var(--muted, #f5f7fa);
 }
-.ds-markdown-footer {
-	font-size: 11px;
-	border-top: 1px solid var(--border, #dce1e8);
-	border-bottom: 0;
-}
-.ds-markdown-warning {
-	display: block;
-	color: var(--muted-foreground, #68788c);
-	font-size: 11px;
-	padding: 6px 16px 14px;
-}
 .ds-markdown-empty {
 	padding: 60px 30px;
 	color: var(--muted-foreground, #68788c);
 	text-align: center;
-}
-.ds-markdown-source {
-	margin: 10px 16px;
-	min-height: 240px;
-	font-family: monospace;
 }
 .ds-markdown-notice {
 	margin: 8px 16px;

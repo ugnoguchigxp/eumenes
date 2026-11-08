@@ -1,0 +1,20 @@
+[
+  {
+    "pid": "297cc0d4-4b18-4768-802e-04fe3240bbd5",
+    "calls": 51,
+    "inputTokens": 1069552,
+    "outputTokens": 42721,
+    "totalTokens": 1112273,
+    "unknownUsage": 0,
+    "inferenceMs": 1006069
+  },
+  {
+    "pid": "649b2872-3c35-44a4-8f58-ec9a63e4513e",
+    "calls": 27,
+    "inputTokens": 542767,
+    "outputTokens": 19878,
+    "totalTokens": 562645,
+    "unknownUsage": 0,
+    "inferenceMs": 482719
+  }
+]

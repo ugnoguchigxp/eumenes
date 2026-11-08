@@ -100,7 +100,7 @@ export type RoutedInput = {
 	 * The work the choice may name: the open work, which it may check, correct or cancel, and the finished work
 	 * `## State` shows, which it may only check.
 	 */
-	todos: Array<{ ref: number; title: string; open: boolean }>;
+	todos: Array<{ ref: number; title: string; request?: string; open: boolean }>;
 	/** The resources `## State` names (`a<n>`): the only ones a choice may hand over with its request. */
 	resources: string[];
 	/**

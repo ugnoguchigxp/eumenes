@@ -5478,6 +5478,198 @@
 				"label": "設定",
 				"order": 100
 			}
+		},
+		{
+			"kind": "artifact",
+			"id": "settings.conversation",
+			"revision": 9,
+			"title": "会話の設定",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "settings-section",
+						"source": "settings-conversation",
+						"title": "会話"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "settings-conversation",
+					"adapterRef": "adapter:settings@1",
+					"query": "query:settings.document@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "edit",
+					"eventAction": "settings-edit",
+					"source": "settings-conversation",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "draft",
+					"draftAction": "edit",
+					"draftDocument": "document:settings@1"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "settings-apply",
+					"source": "settings-conversation",
+					"inputSchemaRef": "schema:settings-apply@4",
+					"effect": "write",
+					"operationId": "settings.apply-v4",
+					"draftDocument": "document:settings@1",
+					"confidentialFields": ["keys"]
+				},
+				{
+					"actionId": "review",
+					"eventAction": "settings-review",
+					"source": "settings-conversation",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "navigate",
+					"navigateTo": {
+						"artifactId": "settings.changes"
+					}
+				}
+			],
+			"launcher": {
+				"icon": "conversation",
+				"label": "会話",
+				"group": "使い方を変える",
+				"order": 10,
+				"description": "AIの名前 あなたの名前 口調 ワールドモデル"
+			},
+			"fields": [
+				{
+					"fieldId": "conversation.agent-name",
+					"document": "document:settings@1",
+					"path": "$.general.agentName",
+					"label": "AIの名前",
+					"control": "text",
+					"help": "空欄の場合は名前を設定しません。",
+					"maxLength": 40
+				},
+				{
+					"fieldId": "conversation.user-name",
+					"document": "document:settings@1",
+					"path": "$.general.userName",
+					"label": "あなたの名前",
+					"control": "text",
+					"help": "空欄の場合は名前で呼びません。",
+					"maxLength": 40
+				},
+				{
+					"fieldId": "conversation.persona",
+					"document": "document:settings@1",
+					"path": "$.general.persona",
+					"label": "口調",
+					"control": "select",
+					"help": "次の返答から反映されます。",
+					"options": [
+						{
+							"value": "butler",
+							"label": "執事"
+						},
+						{
+							"value": "maid",
+							"label": "メイド"
+						},
+						{
+							"value": "strategist",
+							"label": "参謀"
+						},
+						{
+							"value": "sage",
+							"label": "老師"
+						}
+					]
+				},
+				{
+					"fieldId": "world.enabled",
+					"document": "document:settings@1",
+					"path": "$.world.enabled",
+					"label": "ワールドモデル（世界の状態の記録）を使う",
+					"control": "toggle",
+					"help": "変更はbackendの再起動後に反映されます。オフにしても、保存済みの内容が残っている間は、忘却の反映だけが動き続けます。"
+				},
+				{
+					"fieldId": "world.curation-resource",
+					"document": "document:settings@1",
+					"path": "$.world.curationResourceId",
+					"label": "ワールドモデルの記録に使うAI",
+					"control": "select",
+					"unset": "null",
+					"optionsSource": "query:settings.llm-resources@1",
+					"help": "未設定なら会話と同じAIで記録します。クラウドのAIを選ぶと、記録のたびに会話の内容をそのAIへ送ります。次の記録から反映されます。"
+				},
+				{
+					"fieldId": "agency.runtime",
+					"document": "document:settings@1",
+					"path": "$.agency.runtime",
+					"label": "会話の合間の動作",
+					"control": "select",
+					"defaultValue": "F",
+					"options": [
+						{
+							"value": "F",
+							"label": "従来の動作"
+						},
+						{
+							"value": "always-on",
+							"label": "常に考えて準備する"
+						}
+					],
+					"help": "変更すると背景処理を切り替えます。既に実行中の仕事は切替時に停止・照合します。"
+				},
+				{
+					"fieldId": "agency.think-resource",
+					"document": "document:settings@1",
+					"path": "$.agency.thinkResourceId",
+					"label": "背景で考えるAI",
+					"control": "select",
+					"unset": "null",
+					"optionsSource": "query:settings.llm-resources@1",
+					"help": "未設定なら保存済みの会話用AIを別接続で使います。選んだAIが利用不能なときは他の接続へ代替しません。"
+				},
+				{
+					"fieldId": "agency.speech-interval",
+					"document": "document:settings@1",
+					"path": "$.agency.speechIntervalSec",
+					"label": "自分から話しかける最短間隔",
+					"control": "number",
+					"defaultValue": "10",
+					"help": "10、60、600秒のいずれかを指定します。返事がない場合は間隔を延ばし、話しかけを保留します。考えることは続けます。",
+					"min": 10,
+					"max": 600,
+					"step": 10
+				},
+				{
+					"fieldId": "agency.think-reasoning",
+					"document": "document:settings@1",
+					"path": "$.agency.thinkReasoning",
+					"label": "背景で考える深さ",
+					"control": "select",
+					"defaultValue": "high",
+					"options": [
+						{
+							"value": "low",
+							"label": "浅く"
+						},
+						{
+							"value": "medium",
+							"label": "標準"
+						},
+						{
+							"value": "high",
+							"label": "深く"
+						}
+					],
+					"help": "深く考えるほど時間がかかります。"
+				}
+			]
 		}
 	],
 	"schemas": [

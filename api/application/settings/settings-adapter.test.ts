@@ -452,7 +452,7 @@ test("the registered settings bundle applies a draft through the action ledger a
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-1",
-			artifactRevisionId: "artifact:settings.conversation@8",
+			artifactRevisionId: "artifact:settings.conversation@9",
 			source,
 			sourceRevision: revision,
 			actionId: "apply",
@@ -463,6 +463,9 @@ test("the registered settings bundle applies a draft through the action ledger a
 	const revision = rev(h);
 	const accepted = await send(revision, [
 		{ fieldId: "conversation.agent-name", value: "アルフレッド" },
+		{ fieldId: "agency.runtime", value: "always-on" },
+		{ fieldId: "agency.speech-interval", value: "60" },
+		{ fieldId: "agency.think-reasoning", value: "high" },
 		{ fieldId: "conversation.persona", value: "maid" },
 	]);
 	expect(accepted.request.status).toBe("accepted");
@@ -470,6 +473,11 @@ test("the registered settings bundle applies a draft through the action ledger a
 	expect(h.settings.get().general).toMatchObject({
 		agentName: "アルフレッド",
 		persona: "maid",
+	});
+	expect(h.settings.get().agency).toMatchObject({
+		runtime: "always-on",
+		speechIntervalSec: 60,
+		thinkReasoning: "high",
 	});
 	// The same draft against the old revision is a conflict the screen can show.
 	const stale = await send(revision, [

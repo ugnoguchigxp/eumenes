@@ -1,0 +1,61 @@
+{
+  "checkedAt": "2026-11-08T02:32:21.127Z",
+  "serverRunning": true,
+  "results": [
+    {
+      "name": "case-a",
+      "rootRunId": "0d7a1ce9-ff13-46f8-be40-22749edc0898",
+      "pursuitId": "297cc0d4-4b18-4768-802e-04fe3240bbd5",
+      "documentId": "c8600344-ed9a-4ff9-b479-23ac5149a8bd",
+      "checks": {
+        "noSpecialist": true,
+        "localRead": true,
+        "remoteRead": true,
+        "sameMarkdown": true,
+        "hasTitle": true,
+        "hasSources": true,
+        "path": "eumenes/research/2026-11-08_オフラインの個人用メモアプリ：IndexedDBとWeb Storageの選び方_c8600344-ed9a-4ff9-b479-23ac5149a8bd.md",
+        "hasMarkdownHeading": true,
+        "hasComparisonTable": true,
+        "citationCount": 3,
+        "uiObserved": true,
+        "openedFromNotice": true,
+        "afterUiSameMarkdown": true,
+        "scratchBytesMatch": true,
+        "scratchDigestMatches": true,
+        "mainUiNoSpecialist": true,
+        "secondsToNotice": 1435.4,
+        "generatedSaveMs": 332,
+        "reportStatus": "完了"
+      }
+    },
+    {
+      "name": "case-b3",
+      "rootRunId": "6290c55b-c4d1-49c0-8482-aa64e7555b34",
+      "pursuitId": "649b2872-3c35-44a4-8f58-ec9a63e4513e",
+      "documentId": "41163220-3c97-4577-a2ae-a0e635290ef4",
+      "checks": {
+        "noSpecialist": true,
+        "localRead": true,
+        "remoteRead": true,
+        "sameMarkdown": true,
+        "hasTitle": true,
+        "hasSources": true,
+        "path": "eumenes/research/2026-11-08_東京国立博物館・国立科学博物館の常設展示における撮影ルール比較_41163220-3c97-4577-a2ae-a0e635290ef4.md",
+        "hasMarkdownHeading": true,
+        "hasComparisonTable": true,
+        "citationCount": 2,
+        "uiObserved": true,
+        "openedFromNotice": true,
+        "afterUiSameMarkdown": true,
+        "scratchBytesMatch": true,
+        "scratchDigestMatches": true,
+        "mainUiNoSpecialist": true,
+        "secondsToNotice": 1171.1,
+        "generatedSaveMs": 270,
+        "reportStatus": "完了"
+      }
+    }
+  ],
+  "codeChangedDuringLive": false
+}

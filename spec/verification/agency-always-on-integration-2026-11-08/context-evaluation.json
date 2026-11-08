@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"evaluation\": {\n    \"actionability\": 90,\n    \"avg\": 88,\n    \"body\": \"既存のホスト所有SystemContext、Memory Recordsと入力manifest、単一writer、登録済み実行器と配送を再利用する判断に使えた。新旧runtimeを排他的に切り替え、意味判断はLLMに維持した。実装では上流の依存閉包・忘却・期限・known正本化を補い、独立推論、保存票、復旧、busyを接続した。入力packだけではLive提案と実字幕の因果ID不足、数値selectの既存制約、長期復旧での発話票再採用を判断しきれず、ソースと固定試験で確認した。製品設定・稼働サーバー・実モデルの変更はしていない。\",\n    \"clarity\": 90,\n    \"coverage\": 80,\n    \"createdAt\": \"unix-ms:1794098786714\",\n    \"id\": \"00000000-0000-0000-18e5-eb574a149e4e\",\n    \"outcome\": \"useful\",\n    \"relevance\": 93,\n    \"runId\": \"00000000-0000-0000-18e5-e7cf3c00f96e\",\n    \"sessionId\": \"01a1b847-702b-7671-9990-e0088a54ef17\",\n    \"source\": \"mcp\",\n    \"specificity\": 90,\n    \"title\": \"Eumenes always-on取り込みの実装\",\n    \"updatedAt\": \"unix-ms:1794098786714\"\n  },\n  \"resolvedFrom\": \"latest_session_run\"\n}"
+    }
+  ]
+}

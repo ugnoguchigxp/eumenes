@@ -7,7 +7,7 @@ import { estimateTextTokens } from "../../infrastructure/context-budget";
 import { createPursuitReportResourceAdapter } from "../../domains/pursuit";
 
 test("conversation selects the registered research task, uses the existing guarded Web owner, and adopts its full sourced report", async () => {
-	const script = researchScript(),
+	const script = researchScript({ document: true }),
 		answer =
 			"本文で確認した結論です。".repeat(80) +
 			"[資料](https://example.com/source)",
@@ -216,7 +216,10 @@ test("conversation selects the registered research task, uses the existing guard
 }, 20000);
 
 test("disabled research is not offered, while its retained owner still erases prior private work", async () => {
-	const h = await harness({ webResearch: false, pursuit: researchScript() });
+	const h = await harness({
+		webResearch: false,
+		pursuit: researchScript({ document: true }),
+	});
 	try {
 		const adapter = h.toolchain.registry.get("adapter:pursuit@1")!;
 		const id = crypto.randomUUID();

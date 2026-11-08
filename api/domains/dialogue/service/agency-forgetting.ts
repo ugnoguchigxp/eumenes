@@ -3,9 +3,14 @@ import { eraseAgencyActionWork } from "./agency-action-work";
 import type { Database } from "bun:sqlite";
 import {
 	prepareForgetting,
+	prepareAlwaysOnForgetting,
 	type AgencySnapshot,
 	type InputContext,
 } from "eumenes-agency";
+import {
+	isAlwaysOnSnapshot,
+	alwaysOnSources,
+} from "../contracts/agency-always-on";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { MemoryService, ForgetPurge } from "../../memory";
 import {
@@ -120,6 +125,62 @@ export function agencyForgetting(deps: {
 				)
 					continue;
 				const snapshot = record.snapshot as AgencySnapshot;
+				if (isAlwaysOnSnapshot(record.snapshot)) {
+					const original = record.snapshot;
+					const recordRefs = observationReferences(
+						observations,
+						record.conversationId,
+						record.scope,
+						input,
+					);
+					const agent = prepareAlwaysOnForgetting(original.agent, recordRefs);
+					const forgotten = new Set(agent.forgotten);
+					const next = {
+						...original,
+						revision: original.revision + 1,
+						agent,
+						tickets: original.tickets.filter(
+							(t) =>
+								![...t.inputs, ...t.evidenceRefs].some((r) => forgotten.has(r)),
+						),
+					};
+					const retained = new Set(
+						agent.state.preparing.map((p) => p.ticketId),
+					);
+					for (const w of agencyWorks(db, record.conversationId, true))
+						if (
+							!retained.has(w.ticket_id) &&
+							!next.tickets.some((t) => t.id === w.ticket_id)
+						) {
+							if (w.execution_id) {
+								eraseAgencyActionWork(db, w.execution_id, deps.now());
+								stopAgencyExecution(deps, db, w, true);
+							}
+							deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
+							revokeAgencyWork(db, w.root_id);
+						}
+					const sourceRefs = alwaysOnSources(next);
+					if (
+						!saveAgency(
+							db,
+							{ ...record, snapshot: next, sourceRefs },
+							deps.now(),
+						)
+					)
+						throw new Error("agency_checkpoint_stale");
+					if (deps.memory) {
+						oldDependents.push(...agencyDependents(db, record.conversationId));
+						refreshAgencyDependencies(
+							db,
+							deps.memory,
+							record.conversationId,
+							record.scope,
+							sourceRefs,
+						);
+					}
+					changed.push(record.conversationId);
+					continue;
+				}
 				if (
 					!Array.isArray(snapshot.observations) ||
 					!Array.isArray(snapshot.state?.candidates)

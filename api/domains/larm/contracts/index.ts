@@ -39,6 +39,8 @@ import type {
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
 export type LarmCallOptions = {
+	/** Host-owned independent control; separate connection/lane, no cross-agent preemption. */
+	independent?: true;
 	/** Host agent identity, independent of LARM connection ids and Provider credentials. */
 	agentSession?: {
 		conversationId: string | null;

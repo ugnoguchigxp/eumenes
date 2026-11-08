@@ -1,0 +1,114 @@
+{
+  "decision": "not_adopted_quality_not_maintained",
+  "primary": {
+    "candidateFailures": 10,
+    "candidateN": 60,
+    "baselineFailures": 3,
+    "baselineN": 60,
+    "failureRateDifference": 0.11666666666666665,
+    "candidateWorseP": 0.0373993569250397,
+    "twoSidedP": 0.07479871385007938
+  },
+  "quotes": {
+    "candidateFailures": 2,
+    "candidateN": 60,
+    "baselineFailures": 0,
+    "baselineN": 60,
+    "failureRateDifference": 0.03333333333333333,
+    "candidateWorseP": 0.24789915966387785,
+    "twoSidedP": 0.4957983193277557
+  },
+  "grouped": {
+    "before": {
+      "n": 60,
+      "passed": 57,
+      "distinctRawOutputs": 5,
+      "inputHashes": 1,
+      "dataHashes": 1,
+      "failureKinds": {
+        "quoteMismatch": 0,
+        "noUpdate": 3
+      },
+      "successAfterFirst": 56
+    },
+    "after": {
+      "n": 60,
+      "passed": 50,
+      "distinctRawOutputs": 14,
+      "inputHashes": 1,
+      "dataHashes": 1,
+      "failureKinds": {
+        "quoteMismatch": 1,
+        "noUpdate": 9
+      },
+      "successAfterFirst": 50
+    }
+  },
+  "sameData": true,
+  "sameProvider": true,
+  "completed": true,
+  "inputReductionPercent": 48.209366391184574,
+  "totalReductionPercent": 47.22215946956433,
+  "prespecifiedFinalAlpha": 0.025,
+  "primaryAssociationDetected": false,
+  "quotationAssociationDetected": false,
+  "reason": "Both renderers vary within identical input. More failures observed with candidate; no equivalence established. Predeclared primary gate stops the regression stage.",
+  "limitations": [
+    "Repeated single question, not 60 independent questions per variant",
+    "Shared backend cache and external load mean IID trial assumptions are not guaranteed",
+    "No independent human evaluator"
+  ],
+  "orderStrata": {
+    "before": {
+      "first": {
+        "n": 30,
+        "failed": 1,
+        "quoteMismatches": 0
+      },
+      "second": {
+        "n": 30,
+        "failed": 2,
+        "quoteMismatches": 0
+      }
+    },
+    "after": {
+      "first": {
+        "n": 30,
+        "failed": 4,
+        "quoteMismatches": 0
+      },
+      "second": {
+        "n": 30,
+        "failed": 6,
+        "quoteMismatches": 2
+      }
+    }
+  },
+  "invalidQuoteButFinalStateCorrect": [
+    {
+      "variant": "after",
+      "repetition": 34
+    }
+  ],
+  "savedStateSuccessIsNotPerfectProposalQuality": true,
+  "sourceHashesUnchanged": true,
+  "regressionStageRun": false,
+  "productionAdopted": false,
+  "productionRestarted": false,
+  "semanticReview": {
+    "before": {
+      "n": 60,
+      "correct": 50,
+      "polarityReversed": 7,
+      "notApplied": 3
+    },
+    "after": {
+      "n": 60,
+      "correct": 36,
+      "polarityReversed": 14,
+      "notApplied": 10
+    }
+  },
+  "frozenMetricMissedPolarity": true,
+  "causeConclusion": "Within-variant variability is demonstrated. The literal quotation failure is not deterministic. The predeclared primary metric does not establish a renderer effect at alpha0.025; it also does not establish non-inferiority. Separate semantic review finds additional polarity reversals, more frequent with the candidate. No adoption."
+}

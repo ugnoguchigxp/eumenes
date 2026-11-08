@@ -1,3 +1,4 @@
+import { assertLibraryIdle } from "../repository/library-operations";
 import type { Database } from "bun:sqlite";
 import { sha256Hex, canonicalJson } from "../../../infrastructure/digest";
 import {
@@ -65,6 +66,7 @@ export function apply(
 	document: EditorDocument,
 ) {
 	const current = required(db, documentId);
+	assertLibraryIdle(db, current.remote_binding, current.remote_namespace);
 	if (current.revision !== baseRevision) throw new Error("revision_conflict");
 	const checked = editorDocumentSchema.parse(document);
 	const title = name === undefined ? current.title : titleSchema.parse(name);
@@ -137,6 +139,8 @@ export function sessionAdapter() {
 					.get(target.id)
 			)
 				throw new Error("work_busy");
+			const stored = row(db, target.id)!;
+			assertLibraryIdle(db, stored.remote_binding, stored.remote_namespace);
 			const workRef = crypto.randomUUID();
 			db.query(
 				"INSERT INTO markdown_sessions(id,document_id,session_id) VALUES(?,?,?)",

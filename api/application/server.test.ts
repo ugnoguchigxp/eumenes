@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { readProfile, request as memoryRequest } from "eumenes-memory-host";
 import { loadConfig } from "../infrastructure/config";
 
 const dirs: string[] = [];
@@ -78,6 +79,14 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 	const recoveries = items
 		.filter((item) => item.recover)
 		.map((item) => item.name);
+	expect(recoveries.indexOf("memory_host_recovery")).toBeGreaterThan(
+		recoveries.indexOf("memory_recovery"),
+	);
+	expect(recoveries.indexOf("memory_host_recovery")).toBeLessThan(
+		recoveries.indexOf("agency_recovery"),
+	);
+	expect(recoveries.at(-1)).toBe("memory_host_listener");
+
 	expect(recoveries.indexOf("agency_recovery")).toBeGreaterThan(
 		recoveries.indexOf("memory_recovery"),
 	);
@@ -97,6 +106,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"status",
 		"changes",
 		"http",
+		"memory_host",
 		"timers",
 		"kanban_maintenance",
 		"timer_maintenance",
@@ -219,6 +229,10 @@ test("the server listens before recovery, then becomes ready with the real API (
 			service: "eumenes",
 			phase: "ready",
 		});
+		const profile = readProfile(join(dir, "memory-host/profile.json"));
+		expect((await memoryRequest(profile, "status", {})).status).toBe("ready");
+		expect((await memoryRequest(profile, "context", {}))["items"]).toEqual([]);
+
 		// The real API's auth answers again once it is ready.
 		expect((await fetch(`http://127.0.0.1:${port}/api/status`)).status).toBe(
 			401,

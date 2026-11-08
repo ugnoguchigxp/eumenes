@@ -1,3 +1,4 @@
+import { ManagedLibrary } from "./managed-library";
 import { useMemo, useState } from "react";
 import {
 	ChevronRight,
@@ -17,6 +18,7 @@ import {
 } from "./file-tree";
 import { FolderNavigation } from "./folder-navigation";
 import type { MarkdownCurrent, MarkdownWorkspaceProps } from "./types";
+import type { HeaderDeleteSelection } from "./library-types";
 import "./file-browser.css";
 
 function fileState(current: MarkdownCurrent | null, localInput: boolean) {
@@ -28,7 +30,9 @@ function fileState(current: MarkdownCurrent | null, localInput: boolean) {
 }
 export function MarkdownFileBrowser(
 	props: MarkdownWorkspaceProps & {
+		headerDelete?: HeaderDeleteSelection;
 		localInput: boolean;
+		onDiscardCurrent?(): Promise<boolean>;
 		onEditLocal(id: string): void;
 		onEditRemote(id: string): void;
 	},
@@ -75,6 +79,13 @@ export function MarkdownFileBrowser(
 		setSelection(value);
 		setQuery("");
 	}
+	if (props.capabilities?.features?.library)
+		return (
+			<ManagedLibrary
+				key={`${props.files?.namespace}:${props.files?.path}:${props.files?.etag}`}
+				{...props}
+			/>
+		);
 	return (
 		<div className="ds-markdown-file-browser">
 			<FolderNavigation

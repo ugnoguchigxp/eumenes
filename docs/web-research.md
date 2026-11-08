@@ -15,3 +15,13 @@ Web担当の報告は、依頼を満たす必要最小限の情報量にしま�
 会話からの調査経路(担当・予算・報告)は [toolchain.md](toolchain.md)、Web検索の実装目標と未達は [Web検索 実装目標](../spec/.archived/web-search-target-2026-10-11.md)、手順キャッシュと選択の記録は [toolchain.md](toolchain.md) を参照してください。
 
 会話のWeb担当が選んだ複数の取得先は、通常のツール呼出しとQueueで実行し、選択した組の結果をまとめて担当へ戻します。専用の追加取得タイマーや到着数の正本を設けません。再試行の待ち時間はQueueのavailableAtで扱い、取得開始後の通信上限と元のタスク期限は維持します。指定URLの権限照合は日本語パスや国際化ドメインを含む同じURL正規形で行います。
+
+## 詳しい調査のMarkdown文書
+
+`web_research` のPursuitは、調査と文章の執筆を担当したまま、終了時にタイトル付きMarkdown文書を作る。Markdown共同編集担当への会話の切替は行わない。会話には短い結論と文書の参照を返す。
+
+本文は既存scratchの `.md` 一時ファイルへ保存する。保存済みのLARM接続で文書APIを利用できる場合は、Doclingの `eumenes` 領域の `research/` にも同じ本文を新規保存する。ファイル名には日本時間の日付、タイトル、文書固有IDを付け、同名の既存文書を上書きしない。Docling本体を起動する処理はない。
+
+一時保存とDocling保存は別々に結果を報告する。Doclingへ接続できなくても、一時保存した文書を開ける。一時ファイルは容量整理・再起動で消える。部分調査は部分結果のまま文書化し、保存できたことを調査完了の根拠にしない。取消・訂正・忘却後の古い結果を採用せず、忘却では一時ファイルと調査の保存記録を除く。すでにDoclingへ保存した独立文書は文書管理から扱う。
+
+登録は `web.research@6` → `package:pursuit.research@4` / `skill:pursuit.research@4` → `binding:pursuit.research@3` / `adapter:pursuit@2`。旧read版と新規文書を作るcreate版を分ける。接続・固定試験・実環境の確認範囲は[設計と検証記録](../spec/web-research-markdown-design-2026-11-08.md)を参照。

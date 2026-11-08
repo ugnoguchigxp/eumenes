@@ -132,6 +132,36 @@ test("tool output is attributed to files and domains", () => {
 	]);
 });
 
+test("current Bun formatter paths retain domain failures, outside warnings and total-count checks", () => {
+	const findings = formatFindings(
+		[
+			"api/domains/ocr/service/index.ts",
+			"tests/browser/example.spec.ts",
+			"$ bun fmt --check",
+			"2 files need formatting. Run bun fmt to fix them.",
+			'error: script "format:check" exited with code 1',
+		].join("\n"),
+	);
+	expect(findings.map((f) => f.path)).toEqual([
+		"api/domains/ocr/service/index.ts",
+		"tests/browser/example.spec.ts",
+	]);
+	expect(partition(findings, ocr).failing).toHaveLength(1);
+	expect(partition(findings, ocr).outside).toHaveLength(1);
+	expect(partition(findings, { ...ocr, all: true }).failing).toHaveLength(2);
+	expect(
+		formatFindings("a.json\n1 file needs formatting. Run bun fmt to fix it."),
+	).toEqual([{ path: "a.json", text: "not formatted: a.json" }]);
+	const unknown = formatFindings(
+		"a.ts\nb.ts ???\n2 files need formatting. Run bun fmt to fix them.",
+	);
+	expect(unknown).toEqual([
+		{ path: "a.ts", text: "not formatted: a.ts" },
+		{ text: "format: 2 reported, 1 recognized" },
+	]);
+	expect(partition(unknown, ocr).failing).toHaveLength(1);
+});
+
 test("a failure the parsers cannot attribute is kept as a repository finding", () => {
 	const repository = (findings: { path?: string; domain?: string }[]) =>
 		findings.filter((f) => f.path === undefined && f.domain === undefined);

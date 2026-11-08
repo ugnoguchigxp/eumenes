@@ -1,0 +1,36 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/checkpoint-sources.test.ts:
+57 | 	const memory = deps.memory.referenceInputs;
+58 | 	const state = deps.state;
+59 | 	if (!memory || !state) return [...records];
+60 | 	const sources = [...new Set(records.flatMap((r) => r.sourceRefs))];
+61 | 	if (staleInputSources(deps, db, sources).length)
+62 | 		throw new Error("agency_input_stale");
+                 ^
+error: agency_input_stale
+      at persistMemory (/Users/y.noguchi/Code/eumenes/api/application/agency/memory.ts:62:13)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/checkpoint.ts:51:21)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:278:20)
+      at transaction (bun:sqlite:447:27)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:284:6)
+(fail) a changed Memory version in an inactive scope does not block independent scope save [123.11ms]
+57 | 	const memory = deps.memory.referenceInputs;
+58 | 	const state = deps.state;
+59 | 	if (!memory || !state) return [...records];
+60 | 	const sources = [...new Set(records.flatMap((r) => r.sourceRefs))];
+61 | 	if (staleInputSources(deps, db, sources).length)
+62 | 		throw new Error("agency_input_stale");
+                 ^
+error: agency_input_stale
+      at persistMemory (/Users/y.noguchi/Code/eumenes/api/application/agency/memory.ts:62:13)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/checkpoint.ts:51:21)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:278:20)
+      at transaction (bun:sqlite:447:27)
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/infrastructure/sqlite/index.ts:284:6)
+(fail) a changed Memory version in an inactive scope does not block close [88.59ms]
+
+ 0 pass
+ 2 fail
+ 6 expect() calls
+Ran 2 tests across 1 file. [514.00ms]

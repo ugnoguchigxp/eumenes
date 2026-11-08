@@ -1,104 +1,626 @@
-diff --git a/src/application/model-call.ts b/src/application/model-call.ts
-index 0bfe05c..1eb49aa 100644
---- a/src/application/model-call.ts
-+++ b/src/application/model-call.ts
-@@ -55,6 +55,7 @@ export const isApplied = (o: CallOutcome) =>
- const isAbort = (e: unknown) => e instanceof Error && e.name === "AbortError";
+diff --git a/src/always-on/agent.ts b/src/always-on/agent.ts
+index f659a5f..d29205c 100644
+--- a/src/always-on/agent.ts
++++ b/src/always-on/agent.ts
+@@ -6,7 +6,7 @@
+  */
+ import type { Observation } from "../contracts/model.ts";
+ import type { LlmPort } from "../contracts/ports.ts";
+-import type { WithInput } from "../contracts/memory.ts";
++import type { WithInput, InputContext } from "../contracts/memory.ts";
+ import { defaultBudget } from "../contracts/runtime.ts";
+ import type { Budget } from "../application/budget.ts";
+ import { callModel } from "../application/model-call.ts";
+@@ -83,7 +83,7 @@ export interface AlwaysOnView {
+ }
  
- interface CallSpec<T> {
-+	readonly input?: import("../contracts/memory.ts").InputContext;
- 	readonly purpose: LlmPurpose;
- 	readonly at: number;
- 	readonly system: string;
-@@ -89,6 +90,7 @@ const attempt = async <T>(
- 			llm.complete(
- 				{
- 					purpose: spec.purpose,
-+					...(spec.input ? { input: structuredClone(spec.input) } : {}),
- 					system: spec.system,
- 					prompt: spec.prompt,
- 					schema: spec.schema,
-diff --git a/src/application/output-contract.ts b/src/application/output-contract.ts
-index d90925e..f7e9f4a 100644
---- a/src/application/output-contract.ts
-+++ b/src/application/output-contract.ts
-@@ -16,6 +16,8 @@ export interface OutputContractOptions {
- 	readonly condition: Exclude<Condition, "B0">;
- 	readonly hostTodos?: boolean;
- 	readonly findings?: boolean;
-+	/** F opt-in; describes the same candidate-free speech capability enforced by runtime. */
-+	readonly conversationParticipation?: boolean;
- 	readonly utteranceEmotion?: boolean;
- 	/** Condition I (F only): the update also carries interestOps. */
- 	readonly interestFormation?: boolean;
-@@ -102,7 +104,9 @@ export function agencyOutputContract(
- 			"For speak, utterance is the final text addressed to the user: the actual explanation or question, not instructions describing what to say. When null falls back to candidate content, that content must already be suitable as the final utterance.",
- 			condition === "B1"
- 				? "B1 has no candidates. discard is unavailable. speak requires utterance and evidenceRefs. tool requires an available toolName and toolInput. A note ID used as evidence is resolved to that note's evidence."
--				: "By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
-+				: condition === "F" && options.conversationParticipation
-+					? "F conversation participation is enabled. speak may set candidateRef to null when utterance is non-null and evidenceRefs includes an actual external observation ID supplied in conversationEvidenceRefs. A speech using a candidate must reference a current non-tool candidate. tool/discard still require a presented candidateRef with its current revision; tool accepts only tool candidates and uses the candidate's toolName/toolInput. wait may reference a candidate."
-+					: "By default, speak/tool/discard require a presented candidateRef with its current revision; wait may reference a candidate. speak accepts non-tool candidates and requires evidenceRefs; null utterance uses candidate content. tool accepts tool candidates and uses the candidate's toolName/toolInput.",
- 			...(options.findings && condition !== "B1"
- 				? [
- 						"A speak using a presented closed intent with lastReturn may set candidateRef to null. Provide the final utterance and cite the ref supplied for that intent in findingRefs (or the evidence ID of the matching work.returned observation for lastReturn.workRef). The original request alone does not qualify.",
-diff --git a/src/application/runtime.ts b/src/application/runtime.ts
-index 6d27035..645e756 100644
---- a/src/application/runtime.ts
-+++ b/src/application/runtime.ts
-@@ -200,6 +200,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
- 		condition: condition === "B0" ? ("B2" as const) : condition,
- 		hostTodos,
- 		findings: deps.findings === true,
-+		conversationParticipation: conversation,
- 		interestFormation,
- 		utteranceEmotion: emotionMode,
- 		...(deps.constrainToolNames
-@@ -639,6 +640,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
- 			{
- 				purpose: "update",
- 				at,
-+				input: callInput,
- 				system: resolvedSystem.value,
- 				prompt,
- 				schema: updateContract.schema,
-@@ -1119,6 +1121,7 @@ export const createAgencyRuntime = (deps: RuntimeDeps): AgencyRuntime => {
- 			{
- 				purpose: "select",
- 				at: opp.at,
-+				input: selectionInput,
- 				system: resolvedSystem.value,
- 				prompt,
- 				schema: selectContract.schema,
-diff --git a/src/contracts/ports.ts b/src/contracts/ports.ts
-index 73daffd..8080df8 100644
---- a/src/contracts/ports.ts
-+++ b/src/contracts/ports.ts
-@@ -1,8 +1,14 @@
- import { z } from "zod";
+ export interface AlwaysOnAgent {
+-	observe(input: AlwaysOnObservationInput): Observation;
++	observe(input: AlwaysOnObservationInput, context?: InputContext): Observation;
+ 	/** One heartbeat tick: at most one model call. `host` is read again before acting. */
+ 	tick(
+ 		now: number,
+@@ -91,9 +91,23 @@ export interface AlwaysOnAgent {
+ 		signal: AbortSignal,
+ 	): Promise<TickOutcome>;
+ 	/** The host's delivery result for a ticket. Delivered speech becomes an observation. */
+-	recordResult(receipt: AlwaysOnReceipt): Observation | null;
++	recordResult(
++		receipt: AlwaysOnReceipt,
++		deliveredTicket?: AlwaysOnTicket,
++	): Observation | null;
+ 	/** A preparation came back: its result becomes an observation and a finding. */
+ 	workReturned(result: AlwaysOnWorkReturn): Observation | null;
++	/**
++	 * The user asked for a preparation during the normal reply (the reply's tool). It rests on the
++	 * user's latest words; the same tool rules apply. The host runs the ticket as usual.
++	 */
++	requestPrepare(request: {
++		readonly toolName: string;
++		readonly toolInput: string;
++		readonly at: number;
++		readonly observationId?: string;
++		readonly input?: InputContext;
++	}): { readonly ticket: AlwaysOnTicket } | { readonly rejected: string };
+ 	/** New user input or a host change: a tick in flight may still think but not act. */
+ 	invalidate(): void;
+ 	/** User/host controls (not model decisions). */
+@@ -105,6 +119,9 @@ export interface AlwaysOnAgent {
+ 	snapshot(): AlwaysOnSnapshot;
+ }
  
-+/** Serialize with the package's schema implementation; hosts may use a different Zod release. */
-+export const llmOutputJsonSchema = <T>(schema: z.ZodType<T>) =>
-+	z.toJSONSchema(schema);
++/** After the agent spoke, the user gets this long to answer before it asks anything more. */
++const QUESTION_GAP_MS = 60_000;
 +
- export type LlmPurpose = "update" | "select" | "respond";
+ /** Text compared for literal repeats: whitespace and punctuation do not make a sentence new. */
+ const normalize = (text: string) =>
+ 	text.replace(/[\s、。，．,.!?！？…・「」『』（）()〜~ー-]/gu, "");
+@@ -134,6 +151,11 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 	let observations: Observation[] = restore
+ 		? structuredClone([...restore.observations])
+ 		: [];
++	const observationInputs = new Map(restore?.observationInputs ?? []);
++	if (deps.known) {
++		state.facts = state.facts.filter((f) => f.basis === "hypothesis");
++		dropOrphans(state);
++	}
+ 	const forgotten = new Set(restore?.forgotten ?? []);
+ 	let seq = restore?.seq ?? 0;
+ 	let epoch = 0;
+@@ -148,6 +170,9 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 		observations.push(o);
+ 		if (observations.length > OBSERVATIONS_KEPT)
+ 			observations = observations.slice(-OBSERVATIONS_KEPT);
++		const retained = new Set(observations.map((x) => x.id));
++		for (const id of observationInputs.keys())
++			if (!retained.has(id)) observationInputs.delete(id);
+ 	};
  
- export interface LlmRequest<T> {
-+	/** Exact dependencies captured for this call. Host validation only; never add to model messages. */
-+	readonly input?: import("./memory.ts").InputContext;
- 	readonly purpose: LlmPurpose;
- 	readonly system: string;
+ 	const interestRefs = new Set(interests.map((x) => `interest:${x.id}`));
+@@ -214,6 +239,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 				return o?.actor === "user" && o.seq > seenSeq;
+ 			});
+ 		const user = applyUserOps(state, out.userOps, {
++			hostOwnsFacts: deps.known !== undefined,
+ 			at,
+ 			shown: shownObs,
+ 			extraRefs: new Set([...interestRefs, ...memoryRefs]),
+@@ -316,11 +342,21 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 			)
+ 		)
+ 			refuse("repeat");
+-		// One question at a time: an unanswered question is not followed by another.
++		// One question at a time: an unanswered question is not followed by another, and a
++		// question is not piled onto what the agent just said before the user could answer.
++		const lastUserAt = Math.max(
++			-1,
++			...observations
++				.filter((o) => o.actor === "user")
++				.map((o) => o.occurredAt),
++		);
++		const lastAgentAt = state.pacing.lastAgentAt;
+ 		if (
+ 			a.kind === "ask" &&
+-			state.pacing.lastOwnWasAsk &&
+-			state.pacing.unanswered > 0
++			((state.pacing.lastOwnWasAsk && state.pacing.unanswered > 0) ||
++				(lastAgentAt !== null &&
++					at - lastAgentAt < QUESTION_GAP_MS &&
++					lastUserAt <= lastAgentAt))
+ 		)
+ 			refuse("question_pending");
+ 		const gate = speechGate(state.pacing, intervalMs, at, host.busy);
+@@ -353,13 +389,27 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 	};
+ 
+ 	const agent: AlwaysOnAgent = {
+-		observe(input) {
++		observe(input, context) {
+ 			const id = input.id ?? nextId("o");
+ 			if (forgotten.has(id))
+ 				throw new RangeError(`observation ${id} was forgotten`);
+ 			const existing = observations.find((o) => o.id === id);
+ 			if (existing) return existing;
+-			const o: Observation = { ...structuredClone(input), id, seq: ++seq };
++			const refs = [
++				...new Set([...(input.refs ?? []), ...(context?.sources ?? [])]),
++			];
++			if (refs.some((r) => forgotten.has(r)))
++				throw new RangeError("forgotten observation input");
++			const o: Observation = {
++				...structuredClone(input),
++				...(refs.length ? { refs } : {}),
++				id,
++				seq: ++seq,
++			};
++			observationInputs.set(
++				id,
++				structuredClone(context ?? { sources: [id, ...refs], complete: true }),
++			);
+ 			append(o);
+ 			if (o.actor === "user") state.pacing.unanswered = 0;
+ 			if (o.actor === "agent")
+@@ -367,6 +417,19 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 					state.pacing.lastAgentAt ?? 0,
+ 					o.occurredAt,
+ 				);
++			// A host can replay a verified delivery after restore without replaying the proposal.
++			if (
++				o.actor === "agent" &&
++				o.kind === "delivery.observed" &&
++				o.deliveryStatus === "succeeded"
++			) {
++				state.pacing.lastOwnAt = o.occurredAt;
++				state.pacing.unanswered++;
++				for (const g of state.gaps)
++					if (o.refs?.includes(`gap:${g.id}`)) g.askedAt = o.occurredAt;
++				for (const s of state.stock)
++					if (o.refs?.includes(`stock:${s.id}`)) s.usedAt = o.occurredAt;
++			}
+ 			if (o.actor === "user" || o.actor === "tool") epoch++;
+ 			return o;
+ 		},
+@@ -396,7 +459,17 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 			// Host inputs (instructions, interests, tools, memory) are dependencies like observations.
+ 			const system = deps.system
+ 				? deps.system()
+-				: { value: alwaysOnSystem(), input: { sources: [], complete: true } };
++				: {
++						value: alwaysOnSystem(
++							deps.known
++								? {
++										knowing:
++											"利用者についての事実はuser.fromMemoryが正本です。自分ではstated/observedのfactsを記録しません。userOpsは仮説（hypothesis）と、知りたいこと（gap）の作業メモだけに使います。仮説は事実として扱わず、本人の訂正と拒否に従います。",
++									}
++								: {},
++						),
++						input: { sources: [], complete: true },
++					};
+ 			const hostInputs = [
+ 				system.input,
+ 				...interests.map((x) => x.input),
+@@ -414,7 +487,12 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 			for (const [id, t] of issued)
+ 				if (t.at + PREPARING_TTL_MS <= now) issued.delete(id);
+ 			const startEpoch = epoch;
+-			const { prompt, shown } = thinkData({
++			const {
++				prompt,
++				shown,
++				input: visibleInput,
++			} = thinkData({
++				observationInputs,
+ 				now,
+ 				clock: deps.clock ? deps.clock(now) : null,
+ 				state,
+@@ -425,7 +503,11 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 				speech: speechGate(state.pacing, intervalMs, now, before.busy),
+ 				prepare: prepareGate(state.pacing, now),
+ 			});
+-			const inputs = [...shown, ...hostSources];
++			const inputs = [...new Set([...visibleInput.sources, ...hostSources])];
++			if (inputs.some((r) => forgotten.has(r)))
++				return { ...base, skipped: "forgotten_input" };
++			if (forgotten.size > 0 && !visibleInput.complete)
++				return { ...base, skipped: "incomplete_input" };
+ 			const call = await callModel(
+ 				deps.llm,
+ 				unlimited,
+@@ -434,7 +516,8 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 					at: now,
+ 					input: {
+ 						sources: inputs,
+-						complete: hostInputs.every((x) => x.complete),
++						complete:
++							visibleInput.complete && hostInputs.every((x) => x.complete),
+ 					},
+ 					system: system.value,
+ 					prompt,
+@@ -460,7 +543,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 				rejectCodes: [],
+ 			};
+ 			// Forgotten while the call was out: nothing from it is kept.
+-			if (inputs.some((id) => forgotten.has(id)))
++			if (signal.aborted || inputs.some((id) => forgotten.has(id)))
+ 				return { ...base, skipped: "aborted", call: outcome };
+ 			const settled = settle(
+ 				call.value,
+@@ -487,10 +570,25 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 			};
+ 		},
+ 
+-		recordResult(receipt) {
+-			const ticket = issued.get(receipt.ticketId);
++		recordResult(receipt, deliveredTicket) {
++			// After restore the host may reconcile a persisted ticket with a real, identified delivery.
++			const recovered =
++				receipt.status === "succeeded" &&
++				receipt.observationId &&
++				deliveredTicket?.action !== "prepare" &&
++				deliveredTicket?.id === receipt.ticketId
++					? deliveredTicket
++					: undefined;
++			const ticket = issued.get(receipt.ticketId) ?? recovered;
+ 			if (!ticket) return null;
+ 			issued.delete(receipt.ticketId);
++			if (
++				[...ticket.inputs, ...ticket.evidenceRefs].some((r) =>
++					forgotten.has(r),
++				) ||
++				ticket.at + PREPARING_TTL_MS <= receipt.at
++			)
++				return null;
+ 			if (ticket.action === "prepare") {
+ 				// Accepted or unknown: it stays preparing until its result returns or it expires.
+ 				if (receipt.status !== "failed") return null;
+@@ -508,31 +606,88 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 			}
+ 			if (receipt.status !== "succeeded") return null;
+ 			const o = agent.observe({
++				...(receipt.observationId ? { id: receipt.observationId } : {}),
+ 				kind: "delivery.observed",
+ 				actor: "agent",
+ 				occurredAt: receipt.at,
+-				text: ticket.utterance ?? "",
++				text: receipt.text ?? ticket.utterance ?? "",
+ 				causationId: ticket.id,
+ 				deliveryStatus: "succeeded",
+ 				// What it said rests on what it cited and was shown: forgetting follows it here.
+ 				refs: [...ticket.evidenceRefs, ...ticket.inputs],
+ 			});
+-			state.pacing.lastOwnAt = receipt.at;
+-			state.pacing.unanswered++;
+ 			state.pacing.lastOwnWasAsk = ticket.action === "ask";
+-			for (const g of state.gaps)
+-				if (ticket.evidenceRefs.includes(`gap:${g.id}`)) g.askedAt = receipt.at;
+-			for (const s of state.stock)
+-				if (ticket.evidenceRefs.includes(`stock:${s.id}`))
+-					s.usedAt = receipt.at;
+ 			return o;
+ 		},
+ 
++		requestPrepare(request) {
++			if (state.pacing.stopped) return { rejected: "stopped" };
++			const tool = tools.find((t) => t.name === request.toolName);
++			if (!tool) return { rejected: "unknown_tool" };
++			if (!autonomous(tool)) return { rejected: "tool_not_autonomous" };
++			const input = request.toolInput.trim();
++			if (input === "") return { rejected: "empty_input" };
++			const asked = [...observations].reverse().find((o) => o.actor === "user");
++			if (!asked) return { rejected: "needs_user_request" };
++			if (request.observationId && request.observationId !== asked.id)
++				return { rejected: "stale_user_request" };
++			const requestedInput = [
++				observationInputs.get(asked.id) ?? {
++					sources: [asked.id],
++					complete: true,
++				},
++				tool.input ?? { sources: [], complete: true },
++				request.input ?? { sources: [], complete: true },
++			];
++			const sources = [
++				...new Set([asked.id, ...requestedInput.flatMap((x) => x.sources)]),
++			];
++			if (
++				sources.some((r) => forgotten.has(r)) ||
++				(forgotten.size > 0 && requestedInput.some((x) => !x.complete))
++			)
++				return { rejected: "forgotten_input" };
++			if (
++				state.preparing.some(
++					(p) => p.toolName === tool.name && p.toolInput === input,
++				)
++			)
++				return { rejected: "duplicate_prepare" };
++			const ticket: AlwaysOnTicket = {
++				id: nextId("t"),
++				tickId: "reply",
++				action: "prepare",
++				utterance: null,
++				toolName: tool.name,
++				toolInput: input,
++				drive: "care",
++				evidenceRefs: [asked.id],
++				inputs: sources,
++				at: request.at,
++			};
++			issued.set(ticket.id, ticket);
++			state.preparing.push({
++				ticketId: ticket.id,
++				toolName: tool.name,
++				toolInput: input,
++				refs: [asked.id],
++				inputs: sources,
++				at: request.at,
++				requested: true,
++			});
++			return { ticket };
++		},
++
+ 		workReturned(result) {
+ 			const job = state.preparing.find((p) => p.ticketId === result.ticketId);
+ 			if (!job) return null;
+ 			issued.delete(job.ticketId);
+ 			state.preparing = state.preparing.filter((p) => p !== job);
++			if (
++				job.at + PREPARING_TTL_MS <= result.at ||
++				[...job.refs, ...job.inputs].some((r) => forgotten.has(r))
++			)
++				return null;
+ 			const o = agent.observe({
+ 				kind: "work.returned",
+ 				actor: "tool",
+@@ -565,7 +720,18 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 
+ 		forget(refs) {
+ 			for (const r of refs) forgotten.add(r);
+-			observations = forgetDerived(state, observations, refs).observations;
++			const next = forgetDerived(state, observations, refs);
++			observations = next.observations;
++			for (const r of next.gone) forgotten.add(r);
++			for (const [id, ticket] of issued)
++				if (
++					[...ticket.inputs, ...ticket.evidenceRefs].some((r) =>
++						forgotten.has(r),
++					)
++				)
++					issued.delete(id);
++			for (const id of observationInputs.keys())
++				if (forgotten.has(id)) observationInputs.delete(id);
+ 			epoch++;
+ 		},
+ 
+@@ -585,6 +751,7 @@ export function createAlwaysOnAgent(deps: AlwaysOnDeps): AlwaysOnAgent {
+ 			observations: structuredClone(observations),
+ 			forgotten: [...forgotten],
+ 			seq,
++			observationInputs: structuredClone([...observationInputs]),
+ 		}),
+ 	};
+ 	return agent;
+diff --git a/src/always-on/contracts.ts b/src/always-on/contracts.ts
+index 3d46a2c..edc282d 100644
+--- a/src/always-on/contracts.ts
++++ b/src/always-on/contracts.ts
+@@ -8,7 +8,7 @@ import type { DeliveryStatus, ObservationInput } from "../contracts/model.ts";
+ import type { CallOutcome } from "../contracts/runtime.ts";
+ 
+ /** Bump when the built-in instructions or the think contract change. */
+-export const ALWAYS_ON_VERSION = "always-on-22";
++export const ALWAYS_ON_VERSION = "always-on-26";
+ 
+ /** The one user setting: the shortest gap between the agent's own utterances. */
+ export const speechIntervals = [10, 60, 600] as const;
+@@ -134,6 +134,8 @@ export interface Preparing {
+ 	/** Observation ids the tick that asked for it was shown. */
+ 	readonly inputs: readonly string[];
+ 	readonly at: number;
++	/** The user asked for it (through the normal reply), rather than the agent on its own. */
++	readonly requested?: boolean;
+ }
+ 
+ export const STOCK_LIMIT = 16;
+@@ -302,6 +304,9 @@ export interface AlwaysOnReceipt {
+ 	readonly ticketId: string;
+ 	readonly status: DeliveryStatus;
+ 	readonly at: number;
++	/** Actual delivered text/identity when voice output differs from the proposal. */
++	readonly observationId?: string;
++	readonly text?: string;
+ }
+ 
+ /**
+@@ -342,6 +347,11 @@ export interface AlwaysOnSnapshot {
+ 	readonly observations: readonly import("../contracts/model.ts").Observation[];
+ 	readonly forgotten: readonly string[];
+ 	readonly seq: number;
++	/** Raw observation inputs, separate from model citations. */
++	readonly observationInputs?: readonly (readonly [
++		string,
++		import("../contracts/memory.ts").InputContext,
++	])[];
+ }
+ 
+ export type AlwaysOnObservationInput = Omit<ObservationInput, "id"> & {
+diff --git a/src/always-on/forgetting.ts b/src/always-on/forgetting.ts
+index 6f1f35d..e3a24be 100644
+--- a/src/always-on/forgetting.ts
++++ b/src/always-on/forgetting.ts
+@@ -35,9 +35,7 @@ export function forgetDerived(
+ 				mark(`stock:${s.id}`, [s.targets, s.sourceRefs, s.inputs]) || changed;
+ 		for (const p of state.preparing)
+ 			changed = mark(`prepare:${p.ticketId}`, [p.refs, p.inputs]) || changed;
+-		for (const o of observations)
+-			if (o.actor === "agent" || o.actor === "tool" || o.actor === "host")
+-				changed = mark(o.id, [o.refs]) || changed;
++		for (const o of observations) changed = mark(o.id, [o.refs]) || changed;
+ 	}
+ 	state.facts = state.facts.filter((f) => !gone.has(`fact:${f.id}`));
+ 	state.gaps = state.gaps.filter((g) => !gone.has(`gap:${g.id}`));
+diff --git a/src/always-on/heartbeat.ts b/src/always-on/heartbeat.ts
+index 8a744bd..9867fcb 100644
+--- a/src/always-on/heartbeat.ts
++++ b/src/always-on/heartbeat.ts
+@@ -108,6 +108,8 @@ export interface HeartbeatSchedulerDeps {
+ 	 * Runs one tick; returns the model's wish for the next one and when the agent must think
+ 	 * again at the latest (null: nothing was decided).
+ 	 */
++	/** Persist the final scheduler checkpoint after its tick and wake adjustments. */
++	readonly onSettled?: () => void | Promise<void>;
+ 	readonly run: () => Promise<{
+ 		readonly next: NextPace;
+ 		readonly wakeAt: number | null;
+@@ -150,7 +152,11 @@ export function createHeartbeatScheduler(deps: HeartbeatSchedulerDeps) {
+ 				heartbeat.ticked(now(), result?.next ?? "normal");
+ 			if (result?.wakeAt != null) heartbeat.wakeBy(now(), result.wakeAt);
+ 			running = false;
+-			rearm();
++			try {
++				await deps.onSettled?.();
++			} finally {
++				rearm();
++			}
+ 		}
+ 	};
+ 	return {
+diff --git a/src/always-on/index.ts b/src/always-on/index.ts
+index 697708d..fe9144d 100644
+--- a/src/always-on/index.ts
++++ b/src/always-on/index.ts
+@@ -1,4 +1,5 @@
+ export * from "./contracts.ts";
++export { prepareAlwaysOnForgetting } from "./snapshot.ts";
+ export {
+ 	createHeartbeat,
+ 	createHeartbeatScheduler,
+diff --git a/src/always-on/prompt.ts b/src/always-on/prompt.ts
+index 2daaafc..303622b 100644
+--- a/src/always-on/prompt.ts
++++ b/src/always-on/prompt.ts
+@@ -4,6 +4,7 @@
+  * replace the instructions (AlwaysOnDeps.system) and keep the same data and output contract.
+  */
+ import type { Observation } from "../contracts/model.ts";
++import type { InputContext } from "../contracts/memory.ts";
+ import {
+ 	ALWAYS_ON_VERSION,
+ 	OBSERVATIONS_FULL,
+@@ -38,7 +39,7 @@ const thinking = [
+ 
+ const speaking = [
+ 	"【話しかける】話しすぎの調整はホストが行います。speech.allowed が true なら、間を空けすぎる心配はいりません。自分で遠慮して待つ必要はなく、話したいことがあれば話します。speech.allowed が false なら action.kind は wait にします。",
+-	"会話が途切れて静かになったら、こちらから次の一言を持ち出すのが基本です。直前の話の続き、感想、相手への気軽な質問、別の軽い話題、自分の好きなものの話などです。待つのは、相手が作業中・休みたい・静かにしてほしいと言ったときと、自分の問いかけへの返事を少し待ちたいときです。疲れている相手には、短くやわらかい一言にします。",
++	"会話が途切れて静かになったら、こちらから次の一言を持ち出すのが基本です。直前の話への感想や自分の考え、それについて知っていること、準備したことの共有、別の軽い話題、自分の好きなものの話、相手への気軽な質問などです。待つのは、相手が作業中・休みたい・静かにしてほしいと言ったときと、自分の問いかけへの返事を少し待ちたいときです。疲れている相手には、短くやわらかい一言にします。",
+ 	"話すのは1〜2文の自然な日本語で、問いは一つまでです。見出し・箇条書き・URLは使いません。",
+ 	"said は、この会話で自分から話しかけた言葉です。said にある話題・問い・提案は、言い方を変えても繰り返しません（同じ文はホストが受け付けません）。返事がないまま続けて話しかけるときは、said にない話題にします。agent_reply（自分の返事）と同じことも繰り返しません。",
+ 	"直前の自分の発言（agent_reply を含む）が相手への質問で終わっているなら、60秒まではその答えを待ち、別の質問を重ねません。sinceAgentSpokeSec が60を超えたら、返事待ちはもう待つ理由になりません。答えを求めずに、感想や別の軽い話題で話しかけます。",
+@@ -54,7 +55,8 @@ const knowing = [
+ 	"本人が言ったことは fact.add（basis=stated）で、evidenceRefs にその発言の観測 id を入れます。言い換えや訂正、好みの変化は fact.update、間違いだった・もう当てはまらないものは fact.retract にします（どちらも根拠の観測 id を入れる）。",
+ 	"推測は hypothesis として、根拠なしでも記録できます。推測は準備や質問のきっかけに使い、本人に事実として言いません。",
+ 	"知りたいことは gap.add で残します（text=問い、reason=知るとどう役立つか）。答えが分かったら gap.answer と、分かったことの fact.add を同時に行います。答えたくなさそうなら gap.decline にして、もう聞きません。",
+-	"相手のことをまだあまり知らないうちは、気軽な質問で知りに行くのが一番の仕事です。好きなもの、最近の関心、仕事や生活、苦手なものなど、何を聞いてもかまいません。聞くときは action.kind=ask にし、一度に一つだけ聞きます。関係する gap があれば evidenceRefs に gap:<id> を入れます。",
++	"相手のことをまだあまり知らないうちは、知りに行く質問も大事です。好きなもの、最近の関心、仕事や生活、苦手なものなど、何を聞いてもかまいません。ただし質問ばかりにしません。相手が話してくれたことには、まず中身で応えます（感想、それについて知っていること、自分の考え、準備の提案や開始）。質問するのは、答えによって次に話すことや準備が変わるときだけで、一度に一つです。聞くときは action.kind=ask にし、関係する gap があれば evidenceRefs に gap:<id> を入れます。",
++	"相手が自分から挙げたことは、どれも関心がある前提で扱います。どれが好きか選ばせたり、優劣をつけさせたりする質問（「どちらが気になりますか」など）はしません。挙げられたものそれぞれに中身で応えます。相手がすでに答えたことや、自分の返事（agent_reply）で聞いたことを、言い方を変えて聞き直しません。",
+ 	"すでに知っていることを、わざわざもう一度聞きません。知っていることは話題選びに使います（好きなものの話を振る、苦手なものを避ける）。",
+ 	"相手が好みを取り消した・興味を失った話題は、自分から持ち出しません。その話題を区切ると宣言したりせず、黙って別の話題に移ります。",
+ ];
+@@ -170,6 +172,7 @@ const secAgo = (now: number, at: number) =>
+ 	Math.max(0, Math.round((now - at) / 1000));
+ 
+ export interface ThinkDataInput {
++	readonly observationInputs?: ReadonlyMap<string, InputContext>;
+ 	readonly now: number;
+ 	readonly clock: string | null;
+ 	readonly state: AlwaysOnState;
+@@ -187,6 +190,7 @@ export interface ThinkDataInput {
+ export function thinkData(input: ThinkDataInput): {
  	readonly prompt: string;
-diff --git a/src/contracts/runtime.ts b/src/contracts/runtime.ts
-index 36e0a85..3863e03 100644
---- a/src/contracts/runtime.ts
-+++ b/src/contracts/runtime.ts
-@@ -182,7 +182,7 @@ export interface StandingInterest {
- export const RECENT_OBSERVATION_WINDOW = 30;
+ 	readonly shown: readonly string[];
++	readonly input: InputContext;
+ } {
+ 	const { now, state } = input;
+ 	const recent = input.observations.slice(-OBSERVATIONS_SHOWN);
+@@ -232,6 +236,7 @@ export function thinkData(input: ThinkDataInput): {
+ 			input: p.toolInput,
+ 			for: p.refs,
+ 			secAgo: secAgo(now, p.at),
++			...(p.requested ? { requestedByUser: true } : {}),
+ 		})),
+ 		stock: state.stock.map((s) => ({
+ 			id: `stock:${s.id}`,
+@@ -307,5 +312,39 @@ export function thinkData(input: ThinkDataInput): {
+ 			text: t.text,
+ 		})),
+ 	};
+-	return { prompt: JSON.stringify(data), shown: recent.map((o) => o.id) };
++	// Capture every displayed dependency, even after its source left the recent window.
++	const said = input.observations
++		.filter((o) => o.actor === "agent" && o.kind === "delivery.observed")
++		.slice(-SAID_SHOWN);
++	const contexts = [...recent, ...said].map(
++		(o) =>
++			input.observationInputs?.get(o.id) ?? {
++				sources: [o.id, ...(o.refs ?? [])],
++				complete: true,
++			},
++	);
++	const derived = [
++		...state.facts,
++		...state.gaps.filter((g) => g.status !== "answered"),
++		...state.stock,
++		...state.preparing,
++		...state.thoughts.slice(-THOUGHTS_SHOWN),
++	];
++	return {
++		prompt: JSON.stringify(data),
++		shown: recent.map((o) => o.id),
++		input: {
++			sources: [
++				...new Set([
++					...recent.map((o) => o.id),
++					...said.map((o) => o.id),
++					...contexts.flatMap((c) => c.sources),
++					...derived.flatMap((x) => x.inputs ?? []),
++				]),
++			],
++			complete:
++				contexts.every((c) => c.complete) &&
++				derived.every((x) => Array.isArray(x.inputs)),
++		},
++	};
+ }
+diff --git a/src/always-on/user-model.ts b/src/always-on/user-model.ts
+index e31c3c0..c6b2cc9 100644
+--- a/src/always-on/user-model.ts
++++ b/src/always-on/user-model.ts
+@@ -18,6 +18,8 @@ const bare = (id: string, prefix: string) =>
+ 	id.startsWith(`${prefix}:`) ? id.slice(prefix.length + 1) : id;
  
- /** Bumped whenever host validation/settlement rules change; part of the settings digest. */
--export const HOST_RULES_VERSION = "host-rules-25";
-+export const HOST_RULES_VERSION = "host-rules-26";
- 
- /** One background model call (or a host decision not to make one). */
- export interface CallOutcome {
+ export interface UserOpContext {
++	/** Host memory owns facts; this model keeps hypotheses and gaps only. */
++	readonly hostOwnsFacts?: boolean;
+ 	readonly at: number;
+ 	/** Observations shown to this tick, by id. */
+ 	readonly shown: ReadonlyMap<string, Observation>;
+@@ -67,6 +69,16 @@ export function applyUserOps(
+ 			continue;
+ 		}
+ 		const text = op.text?.trim() ?? "";
++		if (
++			ctx.hostOwnsFacts &&
++			((op.op === "fact.add" && op.basis !== "hypothesis") ||
++				(op.op === "fact.update" &&
++					op.basis !== null &&
++					op.basis !== "hypothesis"))
++		) {
++			refuse("host_owned_fact");
++			continue;
++		}
+ 		if (op.op === "fact.add") {
+ 			if (op.aspect === null || op.basis === null || text === "") {
+ 				refuse("missing_field");
+diff --git a/src/always-on/snapshot.ts b/src/always-on/snapshot.ts
+new file mode 100644
+index 0000000..48ce4b6
+--- /dev/null
++++ b/src/always-on/snapshot.ts
+@@ -0,0 +1,19 @@
++import type { AlwaysOnSnapshot } from "./contracts.ts";
++import { forgetDerived } from "./forgetting.ts";
++
++/** Pure persisted-state counterpart of agent.forget; no model or execution dependency. */
++export function prepareAlwaysOnForgetting(
++	snapshot: AlwaysOnSnapshot,
++	refs: readonly string[],
++): AlwaysOnSnapshot {
++	const next = structuredClone(snapshot);
++	const erased = forgetDerived(next.state, next.observations, refs);
++	return {
++		...next,
++		observations: erased.observations,
++		forgotten: [...new Set([...next.forgotten, ...erased.gone])],
++		observationInputs: (next.observationInputs ?? []).filter(
++			([id]) => !erased.gone.has(id),
++		),
++	};
++}

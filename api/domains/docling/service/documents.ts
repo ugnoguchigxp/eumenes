@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createDocumentLibrary } from "./document-library";
 import { sha256Hex } from "../../../infrastructure/digest";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import {
@@ -13,16 +14,8 @@ import {
 	type DocumentWrite,
 } from "../contracts/documents";
 
-/** Only safe protocol codes escape; response text, bodies and credentials never become errors. */
-export class DocumentFileError extends Error {
-	constructor(
-		readonly code: string,
-		readonly status: number | null,
-		readonly uncertain = false,
-	) {
-		super(code);
-	}
-}
+import { DocumentFileError } from "./document-error";
+export { DocumentFileError } from "./document-error";
 const codes = new Set([
 	"etag_mismatch",
 	"path_exists",
@@ -34,6 +27,15 @@ const codes = new Set([
 	"payload_too_large",
 	"unavailable",
 	"wiki_api_retired",
+	"document_not_found",
+	"precondition_required",
+	"storage_unavailable",
+	"delete_outcome_unknown",
+	"operation_outcome_unknown",
+	"overlapping_selection",
+	"invalid_destination",
+	"folder_not_empty",
+	"unsupported_items",
 ]);
 export const documentDigests = (markdown: string, recovery: string) => {
 	const markdownSha256 = sha256Hex(markdown),
@@ -115,7 +117,7 @@ export function createDoclingDocuments(deps: {
 		init: RequestInit = {},
 	) {
 		current(c, signal);
-		const mutation = init.method === "PUT";
+		const mutation = !!init.method && !["GET", "HEAD"].includes(init.method);
 		let response: Response;
 		try {
 			response = await fetcher(new URL(endpoint, c.baseUrl), {
@@ -199,7 +201,7 @@ export function createDoclingDocuments(deps: {
 		);
 		const result = await request(c, endpoint, signal, limit, init);
 		const parsed = savedDocument.safeParse(result.value),
-			mutation = init?.method === "PUT";
+			mutation = !!init?.method && !["GET", "HEAD"].includes(init.method);
 		if (
 			result.response.status !== expectedStatus ||
 			!parsed.success ||
@@ -227,6 +229,7 @@ export function createDoclingDocuments(deps: {
 		return parsed.data;
 	}
 	return {
+		...createDocumentLibrary({ access, capabilities, request, document }),
 		available: () => !!deps.connection(),
 		binding,
 		capabilities,

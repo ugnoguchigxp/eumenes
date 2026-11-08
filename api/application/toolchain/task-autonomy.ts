@@ -52,6 +52,9 @@ export function taskAutonomy(
 			const automatic = (effect === "read" || effect === "create") && lifecycle;
 			return {
 				automatic,
+				...(automatic && (effect === "read" || effect === "create")
+					? { effect }
+					: {}),
 				reason: automatic
 					? "available"
 					: !lifecycle
@@ -82,6 +85,15 @@ export function taskAutonomy(
 				.map((tool) => tool.operationId);
 			return {
 				automatic: operations.length > 0,
+				...(operations.length
+					? {
+							effect: operations.every(
+								(id) => described?.get(id)?.effect === "read",
+							)
+								? ("read" as const)
+								: ("create" as const),
+						}
+					: {}),
 				reason: operations.length ? "available" : "approval_required",
 				operations,
 			};
@@ -95,6 +107,10 @@ export function taskAutonomy(
 			card.minImpact !== "irreversible";
 		return {
 			automatic,
+			...(automatic &&
+			(entry.runtime.autonomy === "read" || entry.runtime.autonomy === "create")
+				? { effect: entry.runtime.autonomy }
+				: {}),
 			reason: automatic ? "available" : "approval_required",
 			operations: [] as string[],
 		};

@@ -1,0 +1,20 @@
+{
+  "sourceRoot": "/Users/y.noguchi/Code/eumenes",
+  "snapshot": "/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-steward-dedup-8tkqmydc",
+  "files": 6795,
+  "excluded": [
+    ".claude",
+    ".codex",
+    ".git",
+    ".serena",
+    "artifacts",
+    "data",
+    "dist",
+    "dist-web",
+    "node_modules",
+    "playwright-report",
+    "test-results",
+    "verification-reports"
+  ],
+  "productDataCopied": false
+}

@@ -1,0 +1,22 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/catalog-input.test.ts:
+72 | 			playerBusy: false,
+73 | 			speechAllowed: false,
+74 | 		},
+75 | 		new AbortController().signal,
+76 | 	);
+77 | 	expect(calls).toBeGreaterThan(0);
+                    ^
+error: expect(received).toBeGreaterThan(expected)
+
+Expected: > 0
+Received: 0
+
+      at <anonymous> (/Users/y.noguchi/Code/eumenes/api/application/agency/catalog-input.test.ts:77:16)
+(fail) an unpresented capability is not an input dependency of the generic delegation tool [8.30ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [278.00ms]

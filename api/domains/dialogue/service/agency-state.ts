@@ -1,4 +1,12 @@
+import {
+	readAgencyRecords,
+	canRestoreAlwaysOnRecord,
+} from "./agency-state-memory";
 import { agencyResults } from "./agency-results";
+import {
+	isAlwaysOnSnapshot,
+	alwaysOnTicketInput,
+} from "../contracts/agency-always-on";
 import { eraseAgencyActionWork } from "./agency-action-work";
 import {
 	createAgencyActions,
@@ -97,11 +105,14 @@ export function createAgencyStatePort(
 					derived: { "memory.records": recordIds },
 				});
 			for (const record of agencyRecords(db)) {
-				const snap =
-					record.snapshot as import("eumenes-agency").AgencySnapshot & {
-						memoryObservations?: boolean;
-					};
-				if (snap.memoryObservations) {
+				const alwaysOn = isAlwaysOnSnapshot(record.snapshot)
+					? record.snapshot
+					: null;
+				const snap = (alwaysOn?.agent ??
+					record.snapshot) as import("eumenes-agency").AgencySnapshot & {
+					memoryObservations?: boolean;
+				};
+				if (alwaysOn?.memoryObservations ?? snap.memoryObservations) {
 					const archived = new Set(
 						agencyObservations(db, record.conversationId)
 							.filter((row) => row.scope === record.scope)
@@ -111,7 +122,9 @@ export function createAgencyStatePort(
 						.filter(
 							(o) =>
 								!archived.has(o.id) &&
-								!snap.forgottenRefs?.includes(o.id) &&
+								!(alwaysOn?.agent.forgotten ?? snap.forgottenRefs)?.includes(
+									o.id,
+								) &&
 								deps.memory!.referenceInputs.isRecordOriginForgottenInTransaction(
 									db,
 									{
@@ -144,12 +157,19 @@ export function createAgencyStatePort(
 						sourceRefs: stale,
 					});
 			}
+			for (const record of agencyRecords(db))
+				if (
+					isAlwaysOnSnapshot(record.snapshot) &&
+					!canRestoreAlwaysOnRecord(db, record, deps.memory)
+				)
+					revoke(db, record.conversationId);
 		},
 		quarantineLegacyInTransaction(db: Database) {
 			for (const record of agencyRecords(db))
 				if (
-					!(record.snapshot as import("eumenes-agency").AgencySnapshot)
-						.provenance
+					!isAlwaysOnSnapshot(record.snapshot) &&
+					!(record.snapshot as import("eumenes-agency").AgencySnapshot | null)
+						?.provenance
 				)
 					revoke(db, record.conversationId);
 		},
@@ -162,6 +182,13 @@ export function createAgencyStatePort(
 		observationsInTransaction: agencyObservations,
 		messageInputInTransaction(db: Database, messageId: string) {
 			for (const record of agencyRecords(db)) {
+				if (isAlwaysOnSnapshot(record.snapshot)) {
+					const ticket = record.snapshot.tickets.find(
+						(t) => messageId === `agency:${record.scope}:${t.id}`,
+					);
+					if (ticket) return alwaysOnTicketInput(record.snapshot, ticket.id);
+					continue;
+				}
 				const snapshot =
 					record.snapshot as import("eumenes-agency").AgencySnapshot;
 				const attempt = snapshot.state.attempts?.find(
@@ -188,38 +215,7 @@ export function createAgencyStatePort(
 		deleteObservationInTransaction: deleteAgencyObservation,
 		dependentsInTransaction: agencyDependents,
 		replaceDependentsInTransaction: replaceAgencyDependents,
-		recordsInTransaction(db: Database) {
-			return agencyRecords(db).map((record) => {
-				const snap =
-					record.snapshot as import("eumenes-agency").AgencySnapshot & {
-						memoryObservations?: boolean;
-					};
-				if (!snap.memoryObservations) return record;
-				if (!deps.memory) throw new Error("agency_memory_unavailable");
-				const rows = agencyObservations(db, record.conversationId).filter(
-					(row) => row.scope === record.scope,
-				);
-				const observations = snap.observations.map((observation) => {
-					if (snap.forgottenRefs?.includes(observation.id)) return observation;
-					const row = rows.find((row) => row.observationId === observation.id);
-					const found =
-						row &&
-						deps.memory!.referenceInputs.readRecordInTransaction(db, {
-							recordId: row.ref.id,
-							revision: row.ref.revision,
-						});
-					if (!found || found.ref.digest !== row!.ref.digest)
-						throw new Error("agency_archive_unavailable");
-					const entry = JSON.parse(
-						found.content,
-					) as import("eumenes-agency").ArchivedObservation;
-					if (entry.observation.id !== observation.id)
-						throw new Error("agency_archive_mismatch");
-					return entry.observation;
-				});
-				return { ...record, snapshot: { ...snap, observations } };
-			});
-		},
+		recordsInTransaction: (db: Database) => readAgencyRecords(db, deps.memory),
 		claimDispatchInTransaction: claimAgencyDispatch,
 		epochInTransaction: agencyEpoch,
 		feedInTransaction: agencyFeed,
@@ -250,8 +246,8 @@ export function createAgencyStatePort(
 				conversationId: string;
 				epoch: number;
 				ticketId: string;
-				intentId: string;
-				candidateId: string;
+				intentId?: string;
+				candidateId?: string;
 				question: string;
 				revisionId: string;
 				deadline: number;
@@ -294,8 +290,8 @@ export function createAgencyStatePort(
 				conversation_id: input.conversationId,
 				epoch: input.epoch,
 				ticket_id: input.ticketId,
-				intent_id: input.intentId,
-				candidate_id: input.candidateId,
+				intent_id: input.intentId ?? "",
+				candidate_id: input.candidateId ?? "",
 				question: input.question,
 				toolchain_revision_id: input.revisionId,
 				deadline: input.deadline,

@@ -69,6 +69,48 @@ function forwardQueuedToMain(
 	}
 }
 
+/** Preserve opted-in durable work; legacy and unavailable sessions retain their close path. */
+function recoverSessions(deps: DialogueDeps, db: Database): Cancelled {
+	const { clock } = deps;
+	const cancelled = none();
+	if (!deps.specialist) return cancelled;
+	for (const record of unfinishedSessions(db)) {
+		let durable = false;
+		try {
+			durable = !!deps.specialist.setInTransaction(
+				db,
+				record.toolchainRevisionId,
+			).agent.collaborationState;
+		} catch {
+			/* Unavailable bindings retain the existing close/recovery path. */
+		}
+		if (
+			durable &&
+			(record.state === "active" || record.state === "suspended") &&
+			!sessionExpired(record, clock()) &&
+			deps.specialist.workStateInTransaction(
+				db,
+				record.adapterRef,
+				record.workRef,
+			)
+		) {
+			absorb(cancelled, cancelSessionRuns(deps, db, record.id));
+			patchSession(
+				db,
+				record.id,
+				{
+					activeRunId: null,
+					pendingSwitch: null,
+					epoch: record.epoch + 1,
+					bump: true,
+				},
+				clock(),
+			);
+		} else absorb(cancelled, endOrMarkClosing(deps, db, record, "restarted"));
+	}
+	return cancelled;
+}
+
 /**
  * The session operations the screen and the application use: reading the conversation's session, the
  * commands (idempotent by requestId, guarded by the revision the screen saw), the periodic sweep and the
@@ -301,14 +343,7 @@ export function createSpecialistOps(deps: DialogueDeps) {
 		return cancelled;
 	}
 
-	/** After a restart every session that was not ended ends: unsaved work does not survive it. */
-	function recoverInTransaction(db: Database): Cancelled {
-		const cancelled = none();
-		if (!deps.specialist) return cancelled;
-		for (const record of unfinishedSessions(db))
-			absorb(cancelled, endOrMarkClosing(deps, db, record, "restarted"));
-		return cancelled;
-	}
+	const recoverInTransaction = (db: Database) => recoverSessions(deps, db);
 
 	return {
 		/**

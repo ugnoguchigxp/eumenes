@@ -1,0 +1,9 @@
+{
+  "newStatusEntries": [
+    "?? scripts/steward-input-eval.ts",
+    "?? spec/steward-input-dedup-2026-11-08.md",
+    "?? spec/verification/agency-always-on-plan-2026-11-08/"
+  ],
+  "removedStatusEntries": [],
+  "retainedRuntimeChanges": []
+}

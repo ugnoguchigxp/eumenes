@@ -1,0 +1,74 @@
+{
+  "mode": "independent-checks-after-blocked-inventory",
+  "canonicalVerify": "blocked",
+  "checkedAt": "2026-11-07T11:06:18.314Z",
+  "steps": [
+    {
+      "name": "inventory",
+      "status": "blocked",
+      "reason": "Canonical verify stopped on unowned copied tests under artifacts/pursuit-integration-20261106; no inventory exclusions changed."
+    },
+    {
+      "name": "boundaries",
+      "status": "failed",
+      "error": "web/src/domains/markdown/library-management.ts: web import ../../../../api/domains/markdown/contracts/library must use api/domains/<domain>/contracts"
+    },
+    {
+      "name": "system-context",
+      "status": "passed",
+      "details": {
+        "warnings": []
+      }
+    },
+    {
+      "name": "size-budget",
+      "status": "passed",
+      "details": {
+        "warnings": [
+          "size-budget: packages/design-system/src/components/ImagePicker/ImagePicker.tsx#ImagePicker grew 376 -> 402 (limit 300)",
+          "size-budget: new function over 300 lines: web/src/workspace/useWorkspace.ts#useWorkspace (302)"
+        ]
+      }
+    },
+    {
+      "name": "sql-boundaries",
+      "status": "passed",
+      "details": {
+        "warnings": []
+      }
+    },
+    {
+      "name": "domain-docs",
+      "status": "passed",
+      "details": {
+        "warnings": []
+      }
+    },
+    {
+      "name": "format",
+      "status": "failed",
+      "error": "run format:check failed (1)\napi/domains/capabilities/bundles/browser-interact.bundle.json\napi/domains/capabilities/bundles/markdown.bundle.json\ntests/browser/chat-image-attachments.spec.ts\n$ bun fmt --check\n3 files need formatting. Run bun fmt to fix them.\nerror: script \"format:check\" exited with code 1"
+    },
+    {
+      "name": "lint",
+      "status": "failed",
+      "error": "packages/design-system/src/components/MarkdownWorkspace/managed-library.tsx:38:3: Existing memoization could not be preserved [Error/react(preserve-manual-memoization)]"
+    },
+    {
+      "name": "bun tests",
+      "status": "failed",
+      "exitCode": 1,
+      "error": "command_failed"
+    },
+    {
+      "name": "web tests",
+      "status": "passed",
+      "exitCode": 0
+    },
+    {
+      "name": "design-system tests",
+      "status": "passed",
+      "exitCode": 0
+    }
+  ]
+}

@@ -30,6 +30,8 @@ export const TRACE_WINDOW_MS = 5 * 60 * 1000;
 
 /** What a description may carry of a record's text, in characters. */
 const TITLE_CHARS = 40;
+/** A cancellation must identify the running request beyond its introductory words. */
+const CONTROL_TITLE_CHARS = 200;
 const SAID_CHARS = 60;
 const QUESTION_CHARS = 80;
 /** A confirmation's description carries three of them (the toolchain, its request, the item it changes). */
@@ -140,7 +142,10 @@ export function dynamicCandidates(input: {
 				operation,
 				title: todo.title,
 				passage: context(WORK[operation], {
-					title: short(todo.title, TITLE_CHARS),
+					title: short(
+						operation === "cancel" ? (todo.request ?? todo.title) : todo.title,
+						operation === "cancel" ? CONTROL_TITLE_CHARS : TITLE_CHARS,
+					),
 				}),
 			})),
 		);

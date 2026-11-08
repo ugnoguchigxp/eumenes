@@ -1,0 +1,552 @@
+{
+  "choices": [
+    {
+      "turnId": "0d7a1ce9-ff13-46f8-be40-22749edc0898",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.6870419031971494
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.2967838646128098
+        },
+        {
+          "id": "web.search",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.037402995772170385
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.014149330547689281
+        },
+        {
+          "id": "web.service-search",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.012118201738540677
+        },
+        {
+          "id": "ui.compose",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.010852878139797581
+        },
+        {
+          "id": "history.research",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.0061338933640211315
+        },
+        {
+          "id": "world.query",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.00476630968683547
+        },
+        {
+          "id": "read_history",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.003452403372503992
+        },
+        {
+          "id": "pipeline.execute",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0034204453781165804
+        },
+        {
+          "id": "read_runs",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.0027812221915975073
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "32c0cd66-f49f-4fc6-b4bf-4b7859572a49",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.48729870153284427
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.3039203011541192
+        },
+        {
+          "id": "web.search",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.09734691945575506
+        },
+        {
+          "id": "browser.operate",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.04091551882932459
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.012539092335522776
+        },
+        {
+          "id": "world.query",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.012354749814775794
+        },
+        {
+          "id": "ocr.manage",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.006028231560579402
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.005509418632375942
+        },
+        {
+          "id": "ui.compose",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.0030607506540384823
+        },
+        {
+          "id": "read_runs",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0029182635390029923
+        },
+        {
+          "id": "compute.python",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.002759561541524594
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "be057369-4a6d-49d8-9879-b3d3d32d3e54",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.4703526252263128
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.13781765102271307
+        },
+        {
+          "id": "t1.redirect:web.search",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.07471410281682889
+        },
+        {
+          "id": "t1.cancel",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.04150989650710947
+        },
+        {
+          "id": "history.research",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.015044008541790955
+        },
+        {
+          "id": "web.search",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.01464298494394016
+        },
+        {
+          "id": "t1.amend",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.010742635527365376
+        },
+        {
+          "id": "t1.check",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.009029119956054276
+        },
+        {
+          "id": "world.query",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.006192965494545347
+        },
+        {
+          "id": "read_history",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.005127759115668497
+        },
+        {
+          "id": "ocr.manage",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.00304313926449675
+        },
+        {
+          "id": "read_agents",
+          "rank": 12,
+          "similarity": null,
+          "probability": 0.0019206104827786741
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 13,
+          "similarity": null,
+          "probability": 0.0016740377617120727
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 14,
+          "similarity": null,
+          "probability": 0.0015450876944740361
+        },
+        {
+          "id": "compute.python",
+          "rank": 15,
+          "similarity": null,
+          "probability": 0.0011016435562508698
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "ab2b8c3c-2826-4e5e-a2c3-8f72c300f6e6",
+      "candidates": [
+        {
+          "id": "web.search",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.5320065869567681
+        },
+        {
+          "id": "web.research",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.33150225070950345
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.13825480781168295
+        },
+        {
+          "id": "web.service-search",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.029601300943948944
+        },
+        {
+          "id": "world.query",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.006647711335648923
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.005988340644409205
+        },
+        {
+          "id": "object-recognition.manage",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.005666482709052374
+        },
+        {
+          "id": "read_agents",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.003113205201123372
+        },
+        {
+          "id": "ui.compose",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.002857583426465656
+        },
+        {
+          "id": "pipeline.execute",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0018664558025760507
+        },
+        {
+          "id": "browser.capture",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.001675731569233763
+        }
+      ],
+      "selectedId": "web.search",
+      "route": "router",
+      "result": "failure",
+      "recordedOutcome": "failed",
+      "routerMode": "on"
+    },
+    {
+      "turnId": "6290c55b-c4d1-49c0-8482-aa64e7555b34",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.3990151628353851
+        },
+        {
+          "id": "web.search",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.3696561023398999
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.10046785132495926
+        },
+        {
+          "id": "web.service-search",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.022352390315569112
+        },
+        {
+          "id": "world.query",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.020314775364225067
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.012342611649037558
+        },
+        {
+          "id": "ui.compose",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.0066295463473654715
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.0051003683542374875
+        },
+        {
+          "id": "pipeline.execute",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.0027817911751344946
+        },
+        {
+          "id": "browser.capture",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0024586703937935495
+        },
+        {
+          "id": "object-recognition.manage",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.0023130964454833743
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    }
+  ],
+  "utterances": [
+    {
+      "conversationId": "research-md-live-20261108-a",
+      "turnId": "0d7a1ce9-ff13-46f8-be40-22749edc0898",
+      "messageId": "3d659f2d-27c3-4dd7-ac34-7f5f83d3b2bc",
+      "timestamp": "2026-11-08T02:03:14.147Z",
+      "text": "MDNの公式資料を実際に読み、オフラインでも使える個人用メモアプリでIndexedDBとWeb Storageを使う場合の違いを調べてください。同期・非同期、保存できるデータ、容量と削除の扱い、向く用途を比較表にし、判断できない点も明記してください。読みやすいタイトルを付けた日本語のMarkdown報告にまとめ、出典リンクを残してください。会話の担当は切り替えず、詳しいWeb調査を使って文書として保存まで進めてください。",
+      "previousUser": null,
+      "previousAgent": null,
+      "activeToolchainId": null,
+      "activeTaskId": null,
+      "resourceKinds": null
+    },
+    {
+      "conversationId": "research-md-live-20261108-c",
+      "turnId": "32c0cd66-f49f-4fc6-b4bf-4b7859572a49",
+      "messageId": "495a5223-fe85-4c74-a2e3-680ef4ce794c",
+      "timestamp": "2026-11-08T02:06:13.972Z",
+      "text": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+      "previousUser": null,
+      "previousAgent": null,
+      "activeToolchainId": null,
+      "activeTaskId": null,
+      "resourceKinds": null
+    },
+    {
+      "conversationId": "research-md-live-20261108-c",
+      "turnId": "be057369-4a6d-49d8-9879-b3d3d32d3e54",
+      "messageId": "2ca86445-e966-4179-abbe-cf2f3cd4a9e6",
+      "timestamp": "2026-11-08T02:06:45.712Z",
+      "text": "いま依頼した自治体オープンデータの詳しいWeb調査を、ここで中止してください。文書の新規保存も行わず、この検証についての追加調査はしないでください。他の会話の調査には触れないでください。",
+      "previousUser": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+      "previousAgent": "「詳しいWeb調査」に頼んでみます。",
+      "activeToolchainId": null,
+      "activeTaskId": null,
+      "resourceKinds": null
+    },
+    {
+      "conversationId": "research-md-live-20261108-b",
+      "turnId": "ab2b8c3c-2826-4e5e-a2c3-8f72c300f6e6",
+      "messageId": "7d2641a2-cf18-4abc-9faf-540fbd475908",
+      "timestamp": "2026-11-08T02:09:43.649Z",
+      "text": "詳しいWeb調査をお願いします。東京国立博物館と国立科学博物館の公式サイトを実際に読み、常設展示での写真撮影、フラッシュ、三脚、自撮り棒の扱いを比較してください。企画展や展示ごとの例外、公式ページで確認できないことは分けて書き、推測で補わないでください。日本語の短いMarkdown報告にタイトル・比較表・出典リンクを付けて保存してください。会話の担当は切り替えずに進めてください。",
+      "previousUser": null,
+      "previousAgent": null,
+      "activeToolchainId": null,
+      "activeTaskId": null,
+      "resourceKinds": null
+    },
+    {
+      "conversationId": "research-md-live-20261108-b3",
+      "turnId": "6290c55b-c4d1-49c0-8482-aa64e7555b34",
+      "messageId": "80c02f43-aaec-40cd-bcc7-fc108814a186",
+      "timestamp": "2026-11-08T02:11:33.747Z",
+      "text": "「詳しいWeb調査」（web_research / Pursuit）に依頼してください。東京国立博物館 https://www.tnm.jp/ と国立科学博物館 https://www.kahaku.go.jp/ の公式資料から、常設展示の写真撮影・フラッシュ・三脚・自撮り棒の扱いを比較してください。展示ごとの例外と、本文で確認できない項目も書いてください。見出しと比較表、出典リンクのある日本語Markdown報告を文書として保存するところまで進めてください。共同編集の担当への切り替えは不要です。短い報告で十分です。",
+      "previousUser": null,
+      "previousAgent": null,
+      "activeToolchainId": null,
+      "activeTaskId": null,
+      "resourceKinds": null
+    }
+  ],
+  "cards": [
+    {
+      "id": "web.research",
+      "kind": "dedicated",
+      "name": "詳しいWeb調査",
+      "description": "複数の公式資料・一次資料をWebで読み比べ、条件や制約、共通点と相違点、矛盾を出典付きで整理する。複数の論点を一つの調査として扱い、仮説と反証を検証しながら考察を深め、不明点を明記した報告を作る。調査結果はタイトル付きMarkdown文書にまとめ、一時ファイルと利用可能なDoclingのEumenes専用領域へ新規保存する",
+      "useWhen": [
+        "複数の資料の本文を照合し、条件・制約・限界を比較して根拠付きでまとめてほしい",
+        "相反する情報や競合する説明を一次資料に当たって検証したい",
+        "複数の問いを関連付け、調査方針や仮説を見直しながら掘り下げたい"
+      ],
+      "avoidWhen": [
+        "定義・人物・指定URLの一項目など短い事実確認",
+        "専用担当で完結する天気・株価・ニュースの取得",
+        "既存文書の変更、公開、他者への送信"
+      ],
+      "examples": [
+        "自治体の防災計画を公式資料で比較し、対象者と発動条件の違いを根拠付きで整理して",
+        "この技術の性能について食い違う主張を一次資料で検証し、成立条件と分からない点をまとめて",
+        "人口減少の原因について競合する説明と反証を調べて"
+      ],
+      "operation": "task",
+      "minImpact": "create",
+      "highImpact": false,
+      "requiresApproval": false,
+      "enabled": true,
+      "version": 6,
+      "revisionId": "toolchain:web.research@6",
+      "updatedAt": null,
+      "embeddingText": "詳しいWeb調査: 複数の公式資料・一次資料をWebで読み比べ、条件や制約、共通点と相違点、矛盾を出典付きで整理する。複数の論点を一つの調査として扱い、仮説と反証を検証しながら考察を深め、不明点を明記した報告を作る。調査結果はタイトル付きMarkdown文書にまとめ、一時ファイルと利用可能なDoclingのEumenes専用領域へ新規保存する\n複数の資料の本文を照合し、条件・制約・限界を比較して根拠付きでまとめてほしい\n相反する情報や競合する説明を一次資料に当たって検証したい\n複数の問いを関連付け、調査方針や仮説を見直しながら掘り下げたい\n自治体の防災計画を公式資料で比較し、対象者と発動条件の違いを根拠付きで整理して\nこの技術の性能について食い違う主張を一次資料で検証し、成立条件と分からない点をまとめて\n人口減少の原因について競合する説明と反証を調べて",
+      "embeddingPassages": [
+        "詳しいWeb調査: 複数の公式資料・一次資料をWebで読み比べ、条件や制約、共通点と相違点、矛盾を出典付きで整理する。複数の論点を一つの調査として扱い、仮説と反証を検証しながら考察を深め、不明点を明記した報告を作る。調査結果はタイトル付きMarkdown文書にまとめ、一時ファイルと利用可能なDoclingのEumenes専用領域へ新規保存する",
+        "複数の資料の本文を照合し、条件・制約・限界を比較して根拠付きでまとめてほしい",
+        "相反する情報や競合する説明を一次資料に当たって検証したい",
+        "複数の問いを関連付け、調査方針や仮説を見直しながら掘り下げたい",
+        "自治体の防災計画を公式資料で比較し、対象者と発動条件の違いを根拠付きで整理して",
+        "この技術の性能について食い違う主張を一次資料で検証し、成立条件と分からない点をまとめて",
+        "人口減少の原因について競合する説明と反証を調べて"
+      ],
+      "routerText": "詳しいWeb調査: 複数の公式資料・一次資料をWebで読み比べ、条件や制約、共通点と相違点、矛盾を出典付きで整理する。複数の論点を一つの調査として扱い、仮説と反証を検証しながら考察を深め、不明点を明記した報告を作る。調査結果はタイトル付きMarkdown文書にまとめ、一時ファイルと利用可能なDoclingのEumenes専用領域へ新規保存する（複数の資料の本文を照合し、条件・制約・限界を比較して根拠付きでまとめてほしい／相反する情報や競合する説明を一次資料に当たって検証したい）"
+    },
+    {
+      "id": "web.search",
+      "kind": "general",
+      "name": "Web検索",
+      "description": "公開Webの情報や公式ページを素早く確認し、短い回答と出典リンクを返す。用語・名称・場所・日付・仕様の一項目や指定ページの内容など、一度の事実確認を担当する",
+      "useWhen": [
+        "公式サイトやWeb資料を確認し、出典付きで簡潔に答えてほしい",
+        "用語の意味・正式名称・所在地・日付などを一つ調べたい",
+        "指定URLの本文から必要な情報を確かめたい"
+      ],
+      "avoidWhen": [
+        "ニュースの整理",
+        "複数資料の比較",
+        "天気予報・株価など、専用の担当がある事柄"
+      ],
+      "examples": [
+        "国立国会図書館の所在地を公式サイトで確認して",
+        "この関数の返り値を公式ドキュメントで調べ、リンクを添えて短く教えて",
+        "このページに載っている受付時間を確認して"
+      ],
+      "operation": "research",
+      "minImpact": null,
+      "highImpact": null,
+      "requiresApproval": null,
+      "enabled": true,
+      "version": 9,
+      "revisionId": "toolchain:web.search@9",
+      "updatedAt": null,
+      "embeddingText": "Web検索: 公開Webの情報や公式ページを素早く確認し、短い回答と出典リンクを返す。用語・名称・場所・日付・仕様の一項目や指定ページの内容など、一度の事実確認を担当する\n公式サイトやWeb資料を確認し、出典付きで簡潔に答えてほしい\n用語の意味・正式名称・所在地・日付などを一つ調べたい\n指定URLの本文から必要な情報を確かめたい\n国立国会図書館の所在地を公式サイトで確認して\nこの関数の返り値を公式ドキュメントで調べ、リンクを添えて短く教えて\nこのページに載っている受付時間を確認して",
+      "embeddingPassages": [
+        "Web検索: 公開Webの情報や公式ページを素早く確認し、短い回答と出典リンクを返す。用語・名称・場所・日付・仕様の一項目や指定ページの内容など、一度の事実確認を担当する",
+        "公式サイトやWeb資料を確認し、出典付きで簡潔に答えてほしい",
+        "用語の意味・正式名称・所在地・日付などを一つ調べたい",
+        "指定URLの本文から必要な情報を確かめたい",
+        "国立国会図書館の所在地を公式サイトで確認して",
+        "この関数の返り値を公式ドキュメントで調べ、リンクを添えて短く教えて",
+        "このページに載っている受付時間を確認して"
+      ],
+      "routerText": "Web検索: 公開Webの情報や公式ページを素早く確認し、短い回答と出典リンクを返す。用語・名称・場所・日付・仕様の一項目や指定ページの内容など、一度の事実確認を担当する（公式サイトやWeb資料を確認し、出典付きで簡潔に答えてほしい／用語の意味・正式名称・所在地・日付などを一つ調べたい）"
+    }
+  ]
+}

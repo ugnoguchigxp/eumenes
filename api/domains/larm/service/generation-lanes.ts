@@ -33,5 +33,9 @@ function lane(limit: number) {
 	};
 }
 
-export const createGenerationLanes = () => ({ main: lane(1), sub: lane(2) });
+export const createGenerationLanes = () => ({
+	main: lane(1),
+	sub: lane(2),
+	independent: lane(1),
+});
 export type GenerationLanes = ReturnType<typeof createGenerationLanes>;

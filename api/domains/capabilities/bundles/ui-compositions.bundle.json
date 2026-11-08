@@ -76,6 +76,38 @@
 			"redirects": [],
 			"bindingRevisionId": "binding:ui.studio@4",
 			"artifactRevisionId": "artifact:ui.studio@4"
+		},
+		{
+			"kind": "toolchain",
+			"id": "ui.compose",
+			"revision": 11,
+			"title": "UI自由制作",
+			"summary": "UI制作の担当と対話して画面を作り、直し、保存する",
+			"aliases": ["UI制作", "フォーム制作"],
+			"tags": [],
+			"useWhen": [
+				"画面、フォーム、アンケート、ランディングページ、案内画面などのUIを新しく作りたい、または保存した作品を修正したい",
+				"ECの商品一覧やカート、割り勘やローンなどの計算・シミュレーション、仕組みの図解、紙芝居やクイズのような動きのある画面を作りたい",
+				"UI制作の担当と続けて画面を作り込みたい"
+			],
+			"avoidWhen": ["既存画面の操作方法や一般的なUI設計の質問"],
+			"examples": [
+				"来場者向けのアンケート画面を作って",
+				"保存した申込みフォームの文言を短くしたい",
+				"さっき作った画面をもう少し暖かい雰囲気に直したい",
+				"キーボードのランディングページを作って",
+				"コーヒー豆のECサイトのトップページとカートを作って",
+				"老後資金のシミュレーターを作って",
+				"飛行機が飛ぶ仕組みを図解して",
+				"三角測量で月までの距離を求める説明ページを作って",
+				"コーヒー豆のクイズと、旅の紙芝居を作って"
+			],
+			"dependencies": ["package:ui.studio@7"],
+			"packageRevisionId": "package:ui.studio@7",
+			"functionName": "ui_create",
+			"redirects": [],
+			"bindingRevisionId": "binding:ui.studio@5",
+			"artifactRevisionId": "artifact:ui.studio@4"
 		}
 	],
 	"bindings": [
@@ -108,6 +140,38 @@
 						"doc.write": 0
 					}
 				}
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "ui.studio",
+			"revision": 5,
+			"execution": "session",
+			"adapterRef": "adapter:ui-compositions@1",
+			"availabilityRef": "availability:ui-compositions@1",
+			"tools": [],
+			"artifactRevisionId": "artifact:ui.studio@4",
+			"session": {
+				"targetSchemaRef": "builtin:uiTargetRef"
+			},
+			"timeLimits": {
+				"runMs": 1200000,
+				"turnMs": 900000,
+				"inferenceMs": 600000
+			},
+			"agent": {
+				"workspace": {
+					"documentRef": "workspace:ui-compositions.definition@1",
+					"inlineBytes": 32768
+				},
+				"turn": {
+					"maxModelCalls": 4,
+					"retries": {
+						"doc.edit": 1,
+						"doc.write": 0
+					}
+				},
+				"collaborationState": true
 			}
 		}
 	],

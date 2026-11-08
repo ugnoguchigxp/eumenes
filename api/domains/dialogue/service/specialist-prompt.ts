@@ -1,5 +1,6 @@
 import {
 	createCollaborationContract,
+	createStatefulCollaborationContract,
 	collaborationInstructions,
 } from "eumenes-collaboration";
 import { systemContext } from "../../../infrastructure/system-context";
@@ -19,14 +20,17 @@ import {
 export type { SpecialistAction } from "eumenes-collaboration";
 
 /** Common collaboration decisions; delivery limits remain the host's contract. */
-const contract = createCollaborationContract({
+const replyPolicy = {
 	maxChars: SPOKEN_REPLY_MAX_CHARS,
 	maxSentences: SPOKEN_REPLY_MAX_SENTENCES,
 	validate: isBriefSpokenReply,
 	measure: spokenReplyMeasure,
 	description:
 		"短い返答。replyでは必須。invokeでは操作が成功したときの返答（任意）。音声で聞かれるため通常一文、補足込みでも二文・300字以内。制作物や実装内容は読み上げない。",
-});
+};
+const contract = createCollaborationContract(replyPolicy);
+export const statefulSpecialistContract =
+	createStatefulCollaborationContract(replyPolicy);
 
 export const parseSpecialistAction = contract.parse;
 export const specialistViolations = contract.violations;
@@ -45,7 +49,10 @@ export function specialistControl(
 	}> = [],
 	replyOnly = false,
 ): ControlContract {
-	const schema = contract.outputSchema;
+	const schema =
+		set.agent.collaborationState && !replyOnly
+			? statefulSpecialistContract.outputSchema
+			: contract.outputSchema;
 	const outputSchema = replyOnly
 		? {
 				...schema,
@@ -63,7 +70,13 @@ export function specialistControl(
 	return agentControl({
 		profile: set.profile,
 		skills: set.skills,
-		rules: RULES,
+		rules:
+			set.agent.collaborationState && !replyOnly
+				? RULES +
+					"\n" +
+					collaborationInstructions.state +
+					"\n同じ出力のstateUpdateでCOLLABORATION_STATEを更新し、既存のactionで次の一手を示します。追加の推論を前提にしません。今回のactionの未観測の実行結果を確定せず、必要な確認は未決として保持します。"
+				: RULES,
 		tools: replyOnly
 			? []
 			: [

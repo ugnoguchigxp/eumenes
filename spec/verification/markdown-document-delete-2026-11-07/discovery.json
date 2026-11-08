@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-11-07T09:27:34.936Z",
+  "mode": "read-only",
+  "capabilities": {
+    "contractVersion": "larm.docling-files.v1",
+    "basePath": "/v1/docling/documents",
+    "requiresDocling": false,
+    "methods": [
+      "GET",
+      "PUT"
+    ],
+    "create": "PUT with If-None-Match: * and a client-generated wiki-<uuid hex> ID",
+    "update": "PUT with the exact If-Match ETag",
+    "recovery": "opaque UTF-8 string",
+    "maxRequestBytes": 20971520,
+    "maxMarkdownBytes": 8388608,
+    "maxRecoveryBytes": 8388608,
+    "maxPageSize": 100,
+    "contentDigest": "sha256(ascii(markdownSha256 + LF + recoverySha256))"
+  },
+  "documentPathMethods": {
+    "/v1/docling/capabilities": [
+      "get"
+    ],
+    "/v1/docling/documents": [
+      "get"
+    ],
+    "/v1/docling/documents/{id}": [
+      "get",
+      "put"
+    ]
+  }
+}

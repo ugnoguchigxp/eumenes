@@ -50,6 +50,16 @@ ALTER TABLE markdown_saves ADD COLUMN content_digest TEXT;
 CREATE UNIQUE INDEX markdown_workspace_remote ON markdown_workspaces(source_id,remote_binding) WHERE source_id IS NOT NULL;
 `,
 	},
+	{
+		id: "markdown/0005-library-operations",
+		after: ["markdown/0004-larm-document-files"],
+		sql: `CREATE TABLE markdown_operations(id TEXT PRIMARY KEY,binding TEXT NOT NULL,namespace TEXT NOT NULL,command_json TEXT NOT NULL,expected_json TEXT NOT NULL,state TEXT NOT NULL,code TEXT,removed_json TEXT NOT NULL DEFAULT '[]',created_at INTEGER NOT NULL); CREATE INDEX markdown_operations_pending ON markdown_operations(binding,namespace,state);`,
+	},
+	{
+		id: "markdown/0006-generated-documents",
+		after: ["markdown/0005-library-operations"],
+		sql: `CREATE TABLE markdown_generated(id TEXT PRIMARY KEY,digest TEXT NOT NULL,input_json TEXT NOT NULL,binding TEXT,source_id TEXT NOT NULL,state TEXT NOT NULL,local_json TEXT NOT NULL,archive_json TEXT NOT NULL,job_id TEXT NOT NULL,created_at INTEGER NOT NULL);`,
+	},
 ];
 export type Workspace = {
 	id: string;

@@ -3,6 +3,7 @@ import type { ConversationState, Utterance } from "../../conversation";
 import type { Run } from "../contracts";
 import { liveSession, markReported, unreportedEnded } from "../repository";
 import type { DialogueDeps } from "./context";
+import { workContextCurrent } from "./work-context-input";
 import type { DocumentRefs, TodoItem } from "./work-items";
 import { INPUT_HEADINGS, gapText, jstNowLine, lineText } from "./input-text";
 import { viewingLineInTransaction } from "./resource-context";
@@ -135,7 +136,11 @@ export function stateLinesInTransaction(
 
 	lines.push(...agencyStateLines(deps, tx, input.conversationId));
 	const ledger = deps.work;
-	const open = ledger?.todosInTransaction(tx, input.conversationId) ?? [];
+	const open = (
+		ledger?.todosInTransaction(tx, input.conversationId) ?? []
+	).filter((todo) =>
+		workContextCurrent(deps, tx, input.conversationId, todo.id),
+	);
 	const work = [
 		...open.map((todo) => todoLine(todo, refs, false)),
 		...(
@@ -161,6 +166,9 @@ export function stateLinesInTransaction(
 						),
 					).toISOString(),
 					room,
+				)
+				.filter((todo) =>
+					workContextCurrent(deps, tx, input.conversationId, todo.id),
 				)
 				.map((todo) => todoLine(todo, refs, true)),
 		);

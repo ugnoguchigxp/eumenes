@@ -1,3 +1,4 @@
+import { collaborationScript } from "./collaboration-script.fixture";
 import { offeredKinds } from "./toolchain-command.fixture";
 import { fixtureResources } from "./toolchain-resources.fixture";
 import { collaborationInstructions } from "eumenes-collaboration";
@@ -290,17 +291,16 @@ export async function harness(options: HarnessOptions = {}) {
 				} catch {
 					/* Not a structured control call. */
 				}
-				if (
-					marker >= 0 &&
-					typeof packet.delegatedRequest === "string" &&
-					typeof packet.state === "string"
-				)
-					return JSON.stringify(
-						options.pursuit(
-							JSON.parse(system.slice(marker + "OUTPUT_SCHEMA=".length)),
-							messages,
-						),
+				if (marker >= 0 && typeof packet.state === "string") {
+					const schema = JSON.parse(
+						system.slice(marker + "OUTPUT_SCHEMA=".length),
 					);
+					if (
+						typeof packet.delegatedRequest === "string" ||
+						schema.properties?.passed
+					)
+						return JSON.stringify(options.pursuit(schema, messages));
+				}
 			}
 			if (messages[0]!.content.includes("転記された発話の主要な言語"))
 				return JSON.stringify({
@@ -313,8 +313,10 @@ export async function harness(options: HarnessOptions = {}) {
 				options.specialist &&
 				system.includes(collaborationInstructions.rules)
 			) {
-				const value = await options.specialist(messages, _signal, callOptions);
-				return typeof value === "string" ? value : JSON.stringify(value);
+				return collaborationScript(
+					await options.specialist(messages, _signal, callOptions),
+					messages,
+				);
 			}
 			// The default fixture declines operations on the prose-only route review.
 			const question = messages
@@ -636,6 +638,7 @@ export async function harness(options: HarnessOptions = {}) {
 		image: !!options.imageGateway,
 		uiCompositions,
 		markdown,
+		scratch: options.scratch,
 		excalidraw: !!options.drawingConnection,
 		objectRecognition: !!options.recognitionFetcher,
 		ocr,
@@ -793,8 +796,10 @@ export async function harness(options: HarnessOptions = {}) {
 			? {
 					resources: {
 						registry: resources.registry,
-						producesInTransaction: (db, toolchainId) =>
-							toolchain.capabilities.producesInTransaction(db, toolchainId),
+						producesInTransaction: (db, toolchainId) => [
+							...toolchain.capabilities.producesInTransaction(db, toolchainId),
+							...(options.scratch ? ["scratch"] : []),
+						],
 					},
 				}
 			: {}),
@@ -853,6 +858,7 @@ export async function harness(options: HarnessOptions = {}) {
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
 		modules: appModules({
+			scratch: options.scratch,
 			markdown,
 			docling: options.docling,
 			changes,

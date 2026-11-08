@@ -299,3 +299,47 @@ test("new port recovers the same client and prompt cache key without using a fix
 		await p.close();
 	}
 });
+
+test("independent thinking runs beside foreground, yielding stewardship and both specialist slots without preemption", async () => {
+	const f = capacityFixture(),
+		p = f.port();
+	const held = Promise.withResolvers<void>();
+	const running: AbortSignal[] = [];
+	f.controls.hold = (_id, abort) => {
+		running.push(abort);
+		return held.promise;
+	};
+	const first = [
+		p.answer(messages, signal(), {
+			...owner("subagent", "a", "steward"),
+			yields: true,
+		}),
+		p.answer(messages, signal(), {
+			...owner("subagent", "a", "think"),
+			independent: true,
+		}),
+	];
+	try {
+		await waitFor(() => f.generations.length === 2);
+		expect(running.every((s) => !s.aborted)).toBe(true);
+		// Foreground preempts the yielding call by its existing contract, never independent thinking.
+		const more = [
+			p.answer(messages, signal(), owner("main")),
+			p.answer(messages, signal(), owner("subagent", "a", "worker")),
+		];
+		await waitFor(() => f.generations.length === 4);
+		expect(running[1]!.aborted).toBe(false);
+		held.resolve();
+		await Promise.allSettled([...first, ...more]);
+		const thinkConnection = f.generations[1]!.id;
+		await p.answer(messages, signal(), {
+			...owner("subagent", "a", "think"),
+			independent: true,
+		});
+		expect(f.generations.at(-1)!.id).toBe(thinkConnection);
+		expect(new Set(f.generations.slice(0, 4).map((g) => g.id)).size).toBe(4);
+	} finally {
+		held.resolve();
+		await p.close();
+	}
+});

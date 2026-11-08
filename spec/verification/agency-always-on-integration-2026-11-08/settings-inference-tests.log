@@ -1,0 +1,39 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/settings/test/always-on-settings.test.ts:
+(pass) old settings retain F implicitly and explicit always-on settings survive reopening [19.67ms]
+
+api/domains/inference/test/inference-control.test.ts:
+(pass) control calls preserve exact context, stay local, skip emotion judgement, and rejected JSON is never adopted [26.28ms]
+(pass) only a structured-output control request sends the output schema to LARM; others stay plain JSON-object [16.06ms]
+(pass) a background control keeps the conversation route only when asked, and a different binding conflicts [12.79ms]
+(pass) a background control on a saved resource goes to that resource only, and falls back to the conversation route when it can not be used [15.67ms]
+(pass) a dedicated resource that can not be used falls back to the conversation route only on the same billing path [14.03ms]
+(pass) a control request may ask for a long output (a large draft), up to 32k tokens [12.31ms]
+(pass) a toolchain's own limits: the run's requests are moved later (never earlier) and an attempt carries its own time [12.91ms]
+(pass) an attempt's own time replaces the LARM and cloud defaults, within the request's deadline [0.06ms]
+(pass) independent structured controls preserve ownership and reasoning without yielding [12.39ms]
+(pass) an unavailable explicit background resource is rejected before any fallback call [11.62ms]
+
+api/application/settings/settings-adapter.test.ts:
+(pass) every field of the settings bundle names an existing, writable settings path and a declared condition [0.52ms]
+(pass) describePath accepts leaves and stable-id array elements and rejects objects, managed values and unknown names [0.12ms]
+(pass) a draft's changes become one saved revision with typed values, and the receipt carries no values [475.95ms]
+(pass) an array element is chosen by its stable id and no other element changes [483.45ms]
+(pass) targets are required for element fields, refused for plain fields and must exist [458.47ms]
+(pass) unset follows the field's registered meaning and is refused elsewhere [457.56ms]
+(pass) rejections are safe codes and save nothing [455.24ms]
+(pass) conversations cannot change settings [455.31ms]
+(pass) a stale draft is reported as revision_conflict, even when its target has since gone [456.77ms]
+(pass) the same request id is a replay and saves once [454.80ms]
+(pass) keys go through to the settings domain and never into the result or an error [459.88ms]
+(pass) sources give the saved document, the TTS models as targets and the ASR languages [461.52ms]
+(pass) fields registered by published artifacts are found through capabilities [666.00ms]
+(pass) the registered settings bundle applies a draft through the action ledger and rejects a stale one [596.24ms]
+(pass) describePath reports kind, bounds, enum values and optional/nullable from the settings schema [0.14ms]
+(pass) a target must be one the field's query lists: another purpose's model is refused [464.89ms]
+
+ 27 pass
+ 0 fail
+ 286 expect() calls
+Ran 27 tests across 3 files. [6.96s]

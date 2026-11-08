@@ -118,6 +118,7 @@ const timeLimitsV1 = z
  * `memory` bounds the earlier turns kept in full. Every field is optional: the host defaults apply.
  */
 const agentV1 = z.strictObject({
+	collaborationState: z.literal(true).optional(),
 	workspace: z
 		.strictObject({
 			documentRef: hostRef("workspace"),

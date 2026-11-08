@@ -1,0 +1,16 @@
+{
+  "filesChecked": 76,
+  "changesAfterBroadRun": [
+    "api/application/markdown/markdown-composition.ts",
+    "api/application/markdown/markdown-integration.test.ts",
+    "packages/design-system/src/components/MarkdownWorkspace/library-action-dialog.tsx",
+    "packages/design-system/src/components/MarkdownWorkspace/managed-library.test.tsx"
+  ],
+  "onlyFocusedFollowupChanges": true,
+  "focusedFollowup": [
+    "backend 67 passed",
+    "document UI 22 passed",
+    "Web 14 passed",
+    "typecheck/build/scoped lint/format/size passed"
+  ]
+}

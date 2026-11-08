@@ -1,0 +1,47 @@
+{
+  "decision": "rejected_restored_baseline",
+  "reason": "New correction failure; candidate quality non-regression condition was not met. No reroll or relaxed expectations.",
+  "pairInputsIdentical": true,
+  "sameProvider": true,
+  "inputReductionPercent": 48.224100569722886,
+  "totalReductionPercent": 46.88295607896604,
+  "uncachedInputTokens": {
+    "before": 54560,
+    "after": 36079
+  },
+  "automaticPassed": {
+    "before": 10,
+    "after": 9,
+    "cases": 12
+  },
+  "newFailures": [
+    "correction"
+  ],
+  "sharedFailures": [
+    "other-owner",
+    "bounded-time"
+  ],
+  "correction": {
+    "before": "Valid source quote, stored morning drink becomes green tea.",
+    "after": "Output quote changes 今は into 前は; quote verification refuses the update; old black-tea item remains.",
+    "safety": "The existing exact-quote guard correctly refused unsupported mutation."
+  },
+  "additionalSemanticConcerns": [
+    "Both variants save a sister’s preference into personal State, against the stated boundary.",
+    "The conditional preference is strengthened into a habit in both variants; invented start periods also appear.",
+    "The bounded-time fixture is routed to a temporary goal instead of the preregistered State target; its fixed failure label is preserved."
+  ],
+  "reviewer": "Same implementing agent, reviewed all 24 outputs and persisted State; not independent human evaluation.",
+  "sampleLimit": "One observation per case and variant; rejects this candidate, does not establish a universal regression probability.",
+  "initialIncompleteAttempt": {
+    "generationDispatches": 1,
+    "receivedResponses": 0,
+    "usageKnown": false,
+    "path": "attempt-1/results.json",
+    "includedInMeasuredComparison": false
+  },
+  "productSourcesRestored": true,
+  "deployed": false,
+  "liveProductMemoryTouched": false,
+  "serverRestarted": false
+}

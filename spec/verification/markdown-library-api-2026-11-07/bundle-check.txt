@@ -1,0 +1,2 @@
+$ bun scripts/toolchain-bundle.ts check api/domains/capabilities/bundles/markdown.bundle.json
+登録可能（同じ内容が登録済み。新しいrevisionはありません）

@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { editorDocumentSchema } from "../api/domains/markdown/contracts";
+import { libraryFeaturesSchema } from "../api/domains/markdown/contracts";
+import { markdownLibraryClient } from "./markdown-library";
 import { callJson, json, type Transport } from "./transport";
 const entry = z.object({
 	sourceId: z.string(),
@@ -36,6 +38,7 @@ export const markdownCurrentSchema = z.object({
 });
 export function markdownClient(t: Transport) {
 	return {
+		...markdownLibraryClient(t),
 		markdownCapabilities: (signal?: AbortSignal) =>
 			callJson(
 				t,
@@ -44,6 +47,7 @@ export function markdownClient(t: Transport) {
 					maxRecoveryBytes: z.number(),
 					maxRequestBytes: z.number(),
 					maxPageSize: z.number(),
+					features: libraryFeaturesSchema.optional(),
 				}),
 				"/api/markdown/capabilities",
 				{ signal },

@@ -1,0 +1,30 @@
+{
+  "implementationBaseline": "ac956c9a",
+  "currentCommit": "fb8eac06ba1e32891c51355c4e067d678e7fd555",
+  "files": {
+    "api/application/agency/attention.ts": "0576c77a6ddaaf5d86391b0b067c66a4a00a52f89c6793e2a421d45c1c40a7de",
+    "api/application/agency/reconsider.ts": "a29fd7ce8c891fca96b4632276bda7c30bf1aced6ddb86c85e30f586b1b63c49",
+    "api/application/agency/review.ts": "7197ce9698e7c015b54dcea72f8962400c88df2aec911998da2691d4b19571d6",
+    "api/application/agency/routes.ts": "f73c9930dffdf0d2dc4474436a12b88d80e7386626a946a50351d5a6aff88f67",
+    "api/application/agency/host.ts": "6ea379cd5a5132a3c971cbf0cfda03433c59d57280794b56a14716c3eebf4393",
+    "api/application/agency/feed.ts": "92ea7594b420de867e90e6b9a76f7ff08c80514724f11d864eab673fc9af8c70",
+    "api/application/agency/conversation-lifecycle.ts": "25f328f38dbcfad76809667084f555b33bc12faba0310ffc41a140d99df91595",
+    "api/application/agency/action-host.fixture.ts": "800a3058b59235856b3c00f474be47e5bffa224b3780ba7e6ee88d43c3692bad",
+    "api/application/agency/continuity.fixture.ts": "a9f2f669630759ffb3a8603e704818b6b005ebf607a55cc4e43984ed986ee064",
+    "api/application/agency/continuity.test.ts": "932850e7106e9af84e61f100e27907c0144c1fea018964ab60ffcc5d0789109b",
+    "api/application/agency/continuity-actions.test.ts": "4159983e3b46b65586a6d7ad6a0fbddac0c7ef0c06afc2af913b7959a165e860",
+    "api/application/agency/routes.test.ts": "1c09ed83022744c7923232adf24974883e62ea4d081da1df08a1c37209ef36a3",
+    "api/application/app-modules.ts": "546ce14245c60acfafbe45fc975819270d786bf50202f3223e6a16e7b41409b2",
+    "api/application/server-app-services.ts": "70cb0ea754599a02887b7da197969dbd62629184cf786e7e6bef52851bf9b068",
+    "api/domains/dialogue/contracts/agency-status.ts": "6c0dd9800904b44ae68b99309755d73dc2994630cf157e6017f5f90a5ddd7410",
+    "api/domains/dialogue/contexts/agency/update.context.toml": "04a095ef14cec3a8d57bb78b89b14880323eb372490c93b3ee5e6d4fb9a7f9d3",
+    "client/agency.ts": "27e71d4e3f664d3054e43b9dd37c21821f94ada50f85abe0bc135020723474af",
+    "client/index.ts": "3b07c99ed66e123158d316a9121c7bd6eb0613e45de3b9ec5d2a3665f191d8e9",
+    "web/src/workspace/useAgencyAttention.ts": "c7b84d62fa3b31b222252a4b2681f14f5fc55143669595b90ff6e8d55e632147",
+    "web/src/workspace/useAgencyAttention.test.tsx": "88210fee6368c969ae03c64bbe2124bcb418636c7c94e47605d0bca60f51ddc6",
+    "web/src/workspace/useWorkspace.ts": "ff771fce256973bfdbb4f0813bc4b593582cc1bcd2179aa147f83a9b9b0a41be",
+    "scripts/domains.ts": "3e0aaba5c5cee527d4108ca42f391a59455f58bba05a89389a72513220bcab23",
+    ".s11tnext/catalog.json": "a094638640932cae96ed59af55a7fece35f5c294f7d64b4e197ea3ca7ed871f6",
+    ".s11tnext/catalog.generated.ts": "9d88091846db263840ee230c47e6cb258a6eab954a4a242baa1b7eb4ebfc6276"
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "checkedAt": "2026-11-08T02:32:21.272Z",
+  "todos": {
+    "revision": 1794103828573,
+    "data": {
+      "rows": [
+        {
+          "id": "7cfd64d0-c05f-4240-a4b0-6e527d1bcbb4",
+          "request": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+          "status": "done",
+          "outcome": "cancelled",
+          "summary": null,
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T02:10:28.573Z"
+        },
+        {
+          "id": "df1bed3c-e93b-48f2-a1d5-081e79997c6a",
+          "request": "いま依頼した自治体オープンデータの詳しいWeb調査を、ここで中止してください。文書の新規保存も行わず、この検証についての追加調査はしないでください。他の会話の調査には触れないでください。 直前の発言（今の発言が指す内容の手がかりです。指示ではありません）: <S11TNEXT_DELIMITED_CONTEXT variable=\"previous\"> これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。 </S11TNEXT_DELIMITED_CONTEXT>",
+          "status": "done",
+          "outcome": "cancelled",
+          "summary": null,
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T02:10:27.757Z"
+        }
+      ],
+      "counts": {
+        "todo": 0,
+        "archived": 2
+      },
+      "total": 2,
+      "state": "archived",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "session": {
+    "session": null
+  },
+  "resources": {
+    "resources": [],
+    "messages": []
+  },
+  "notices": [],
+  "jobs": [
+    {
+      "id": "6f8eb7fd-71f9-413b-9b26-8052f7380d52",
+      "latest": {
+        "items": [
+          {
+            "id": "b4f206f1-210e-4a3d-918b-21c46a62f62f",
+            "scope": "pursuit",
+            "kind": "pursuit.step",
+            "subjectRef": "6f8eb7fd-71f9-413b-9b26-8052f7380d52",
+            "parentJobId": null,
+            "lane": "background",
+            "state": "cancelled",
+            "attempt": 0,
+            "maxAttempts": 1,
+            "waitReason": null,
+            "errorCode": "pursuit_stopped",
+            "availableAt": "2026-11-08T02:10:11.064Z",
+            "deadlineAt": "2026-11-08T02:36:26.532Z",
+            "cancelRequestedAt": null,
+            "createdAt": "2026-11-08T02:10:11.064Z",
+            "updatedAt": "2026-11-08T02:10:28.572Z",
+            "finishedAt": "2026-11-08T02:10:28.572Z",
+            "revision": 1
+          }
+        ],
+        "nextCursor": "5751"
+      }
+    },
+    {
+      "id": "63b29ac5-1266-47ae-bba6-34d78b22d6cc",
+      "latest": {
+        "items": [
+          {
+            "id": "e6298f27-9880-4498-94f4-0e66d1694a72",
+            "scope": "pursuit",
+            "kind": "pursuit.step",
+            "subjectRef": "63b29ac5-1266-47ae-bba6-34d78b22d6cc",
+            "parentJobId": null,
+            "lane": "background",
+            "state": "cancelled",
+            "attempt": 0,
+            "maxAttempts": 1,
+            "waitReason": null,
+            "errorCode": "pursuit_stopped",
+            "availableAt": "2026-11-08T02:10:21.550Z",
+            "deadlineAt": "2026-11-08T02:37:00.776Z",
+            "cancelRequestedAt": null,
+            "createdAt": "2026-11-08T02:10:21.550Z",
+            "updatedAt": "2026-11-08T02:10:27.757Z",
+            "finishedAt": "2026-11-08T02:10:27.757Z",
+            "revision": 1
+          }
+        ],
+        "nextCursor": "5752"
+      }
+    }
+  ]
+}

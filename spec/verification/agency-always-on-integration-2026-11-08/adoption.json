@@ -1,0 +1,13 @@
+{
+  "reconstructedFromCommitAndPatch": true,
+  "adoptedFilesMatchCurrentSources": true,
+  "adoptedSourceFiles": 59,
+  "unadoptedNewFiles": [
+    "src/agenda/prompt.ts",
+    "src/agenda/contracts.ts",
+    "src/agenda/agent.ts",
+    "src/agenda/index.ts"
+  ],
+  "artifact": "eumenes-agency-0.1.5-c632b5632390-b8b87f7c1f33.tgz",
+  "artifactSha256": "b8b87f7c1f3369e524b48a2a1decd4c1bc4601a03f58b5311434235e655f84b7"
+}

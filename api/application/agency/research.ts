@@ -22,7 +22,9 @@ export const agencyResearchRequest = z.strictObject({
 });
 export function researchTools(
 	store: Pick<SqliteStore, "read">,
-	state: AgencyStatePort | undefined,
+	state:
+		| Pick<AgencyStatePort, "catalogInTransaction" | "generalActionsAvailable">
+		| undefined,
 ): readonly ToolCapability[] {
 	const catalog = state
 		? store.read((db) => state.catalogInTransaction(db))
@@ -39,10 +41,8 @@ export function researchTools(
 			{
 				name: "delegate",
 				requiresApproval: false,
-				input: {
-					sources: catalog.map((c) => `capability:${c.revisionId}`),
-					complete: true,
-				},
+				// Only the generic contract is shown here. Discovered cards carry their own provenance.
+				input: { sources: [], complete: true },
 				description:
 					'発見済みの担当へ自発的な調査・制作・読み取り操作を依頼します。toolInputはJSON文字列 {"revisionId":"検索結果のrevisionId","question":"目的と完了条件","arguments":{}}。argumentsは担当がargumentsSchemaを返した場合の実引数です。requiresApproval=trueの担当は実行せず、必要なら利用者へ具体案を確認します。受付と完了を区別し、結果は後でwork.returnedとして届きます。',
 			},

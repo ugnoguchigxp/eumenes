@@ -13,6 +13,7 @@ import { researchScript } from "./model.fixture";
 
 export async function fixture(
 	options: {
+		documents?: import("../contracts").ResearchDocumentPort;
 		consult?: boolean;
 		sourceStart?: number;
 		body?: string;
@@ -32,8 +33,9 @@ export async function fixture(
 		erased = new Set<string>(),
 		notices: unknown[] = [];
 	const gradePrompts: string[] = [];
+	const gradeInstructions: string[] = [];
 	const modelPackets: Array<Record<string, any>> = [];
-	const script = researchScript(options),
+	const script = researchScript({ ...options, document: !!options.documents }),
 		receiptIds = new Set<string>();
 	const inference: InferencePort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
@@ -54,8 +56,10 @@ export async function fixture(
 			if (
 				(control?.outputSchema as { properties?: { passed?: unknown } })
 					?.properties?.passed
-			)
+			) {
 				gradePrompts.push(JSON.stringify(_messages));
+				gradeInstructions.push(control?.instructions ?? "");
+			}
 			if (options.holdModel) await options.holdModel;
 			const value = JSON.stringify(
 				script(control!.outputSchema as Record<string, unknown>),
@@ -138,12 +142,28 @@ export async function fixture(
 			bundleHost: offlineBundleHost,
 		});
 		await capabilities.seed();
+		if (!options.documents)
+			await store.write((db) => {
+				// Recreate the previously published package and skill for legacy lifecycle/recovery fixtures.
+				db.query(
+					"UPDATE capability_items SET active_revision_id=? WHERE key=?",
+				).run("package:pursuit.research@3", "package:pursuit.research");
+				db.query(
+					"UPDATE capability_items SET active_revision_id=? WHERE key=?",
+				).run("skill:pursuit.research@3", "skill:pursuit.research");
+				capabilities.publishToolchainRevisionInTransaction(
+					db,
+					"web.research",
+					"toolchain:web.research@5",
+				);
+			});
 		const service = createPursuit({
 			store,
 			queue,
 			capabilities,
 			inference,
 			web,
+			documents: options.documents,
 			now: () => now,
 		});
 		service.configure(source);
@@ -166,8 +186,12 @@ export async function fixture(
 			},
 			request,
 			references: [],
-			toolchainRevisionId: "toolchain:web.research@5",
-			bindingRevisionId: "binding:pursuit.research@2",
+			toolchainRevisionId: options.documents
+				? "toolchain:web.research@7"
+				: "toolchain:web.research@5",
+			bindingRevisionId: options.documents
+				? "binding:pursuit.research@3"
+				: "binding:pursuit.research@2",
 		}),
 	);
 	function start() {
@@ -177,6 +201,7 @@ export async function fixture(
 	return {
 		dir,
 		gradePrompts,
+		gradeInstructions,
 		modelPackets,
 		id: execution.id,
 		notices,

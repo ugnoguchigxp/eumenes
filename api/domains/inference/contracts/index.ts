@@ -87,7 +87,7 @@ export interface BackgroundControl {
 	 * `conversation` keeps the saved conversation route; `{ resourceId }` sends the request to that saved
 	 * cloud LLM resource (the conversation route when it can not be used); absent means LARM only.
 	 */
-	route?: "conversation" | { resourceId: string };
+	route?: "conversation" | { resourceId: string; strict?: true };
 	/** Enforce the control output schema as a strict provider schema; absent keeps plain JSON-object output. */
 	structuredOutput?: boolean;
 }
@@ -97,6 +97,8 @@ export interface BackgroundControl {
  * `auxiliary` (default): a one-shot call.
  */
 export type CallSession = {
+	/** Host control on its own connection and admission lane; neither yields nor preempts other agents. */
+	independent?: true;
 	/** Logical owner of the LARM session. A new history branch has a different branchId. */
 	agentSession?: {
 		conversationId: string | null;

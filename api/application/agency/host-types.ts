@@ -35,7 +35,7 @@ export type AgencyHostDeps = {
 		| "appendInTransaction"
 	>;
 	/** `foregroundBusy()` serves the user right now (conversation answers, ASR, TTS); background calls never count. */
-	inference: { foregroundBusy(): boolean };
+	inference: { foregroundBusy(): boolean; onActivity?(listener: () => void): () => void };
 	settings: {
 		get(): { agency: AgencySettings; general: HostPersona };
 		/** The committed settings as the transaction sees them (the delivery fence reads this, not the cache). */

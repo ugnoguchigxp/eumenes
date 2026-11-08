@@ -1,0 +1,141 @@
+{
+  "note": "担当起動なし。2静的候補と有限の取消候補だけを比較する意味境界の切り分け。全体のrouter成功とは扱わない。",
+  "rows": [
+    {
+      "id": "cancel-original",
+      "variant": "baseline",
+      "elapsedMs": 71,
+      "expected": "t1.cancel",
+      "choice": "t1.cancel",
+      "scores": {
+        "web.research": 0.6720363145787224,
+        "web.search": 0.13998388167224343,
+        "t1.cancel": 0.6989392418115126
+      },
+      "probabilities": {
+        "web.research": 0.45199715106759597,
+        "web.search": 0.03590377844358121,
+        "t1.cancel": 0.5120990704888229
+      },
+      "pass": true
+    },
+    {
+      "id": "cancel-original",
+      "variant": "revised",
+      "elapsedMs": 62,
+      "expected": "t1.cancel",
+      "choice": "t1.cancel",
+      "scores": {
+        "web.research": 0.04079430818855044,
+        "web.search": 0.07095469712303232,
+        "t1.cancel": 0.9685990697794403
+      },
+      "probabilities": {
+        "web.research": 0.0013734581529744854,
+        "web.search": 0.0024664474393034683,
+        "t1.cancel": 0.996160094407722
+      },
+      "pass": true
+    },
+    {
+      "id": "cancel-short",
+      "variant": "baseline",
+      "elapsedMs": 67,
+      "expected": "t1.cancel",
+      "choice": "t1.cancel",
+      "scores": {
+        "web.research": 0.16301688829486663,
+        "web.search": 0.14786169252884,
+        "t1.cancel": 0.21690117727716413
+      },
+      "probabilities": {
+        "web.research": 0.3018413062217419,
+        "web.search": 0.2689108661816064,
+        "t1.cancel": 0.42924782759665175
+      },
+      "pass": true
+    },
+    {
+      "id": "cancel-short",
+      "variant": "revised",
+      "elapsedMs": 61,
+      "expected": "t1.cancel",
+      "choice": "t1.cancel",
+      "scores": {
+        "web.research": 0.04195327682466563,
+        "web.search": 0.06313499692761232,
+        "t1.cancel": 0.8069689643449288
+      },
+      "probabilities": {
+        "web.research": 0.010203529694652743,
+        "web.search": 0.015702340202483244,
+        "t1.cancel": 0.9740941301028639
+      },
+      "pass": true
+    },
+    {
+      "id": "comparison-original",
+      "variant": "baseline",
+      "elapsedMs": 71,
+      "expected": "web.research",
+      "choice": "web.research",
+      "scores": {
+        "web.research": 0.9624013819174533,
+        "web.search": 0.7683729810785062
+      },
+      "probabilities": {
+        "web.research": 0.885270639439891,
+        "web.search": 0.114729360560109
+      },
+      "pass": true
+    },
+    {
+      "id": "comparison-original",
+      "variant": "revised",
+      "elapsedMs": 59,
+      "expected": "web.research",
+      "choice": "web.research",
+      "scores": {
+        "web.research": 0.6440871150557885,
+        "web.search": 0.3890037621904986
+      },
+      "probabilities": {
+        "web.research": 0.7397461873192421,
+        "web.search": 0.2602538126807578
+      },
+      "pass": true
+    },
+    {
+      "id": "single-fact",
+      "variant": "baseline",
+      "elapsedMs": 57,
+      "expected": "web.search",
+      "choice": "web.search",
+      "scores": {
+        "web.research": 0.13050973215299203,
+        "web.search": 0.9783733397739444
+      },
+      "probabilities": {
+        "web.research": 0.0033069258784587247,
+        "web.search": 0.9966930741215413
+      },
+      "pass": true
+    },
+    {
+      "id": "single-fact",
+      "variant": "revised",
+      "elapsedMs": 53,
+      "expected": "web.search",
+      "choice": "web.search",
+      "scores": {
+        "web.research": 0.14420396834224977,
+        "web.search": 0.9235699699309156
+      },
+      "probabilities": {
+        "web.research": 0.01375266966000514,
+        "web.search": 0.9862473303399949
+      },
+      "pass": true
+    }
+  ]
+}

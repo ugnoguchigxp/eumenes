@@ -286,6 +286,7 @@ function routedInputInTransaction(
 			...todos.map((todo) => ({
 				ref: todo.ref,
 				title: todo.title,
+				request: deps.work?.workInTransaction(tx, todo.id)?.request,
 				open: true,
 			})),
 			...finished,

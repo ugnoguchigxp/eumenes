@@ -33,6 +33,7 @@ import {
 	specialistControl,
 	specialistViolations,
 	violationNames,
+	statefulSpecialistContract,
 	type SpecialistAction,
 } from "./specialist-prompt";
 import { viewedSpecialistTarget } from "./specialist-context";
@@ -47,6 +48,11 @@ import {
 	runDocTool,
 } from "./specialist-agent";
 import { settleSpecialistTurn } from "./specialist-settle";
+import {
+	collaborationSnapshot,
+	collaborationReference,
+	adoptCollaborationState,
+} from "./collaboration-state";
 
 const log = getLogger("dialogue");
 
@@ -153,6 +159,92 @@ function observedWork(
 				context: { work: work.context, hostEvent },
 			}
 		: work;
+}
+
+function updatedTurn(
+	deps: DialogueDeps,
+	input: TurnInput,
+	receipts: Receipt[],
+): TurnOutput {
+	const work = deps.store.read((tx) =>
+		deps.specialist!.workStateInTransaction(
+			tx,
+			input.adapterRef,
+			input.workRef,
+		),
+	);
+	return {
+		receipts,
+		action: {
+			kind: "reply",
+			text: updatedReply(work?.label ?? input.set.title),
+		},
+	};
+}
+
+function assertTurnCurrent(deps: DialogueDeps, tx: Database, input: TurnInput) {
+	const run = byId(tx, input.runId);
+	const refusal =
+		run?.status === "running"
+			? turnRefusal(
+					sessionById(tx, input.sessionId),
+					input.runId,
+					input.epoch,
+					deps.clock(),
+				)
+			: "specialist_session_changed";
+	if (refusal) throw new StaleTurn(refusal);
+}
+
+/** State adoption shares the turn's live-run, cancellation and receipt boundary. */
+async function statefulAction(
+	deps: DialogueDeps,
+	input: TurnInput,
+	signal: AbortSignal,
+	stillMine: (tx: Database) => void,
+	output: { value: unknown; receipt: Receipt; call: number },
+) {
+	const checked = statefulSpecialistContract.check(output.value);
+	if (!checked.ok) return checked;
+	const adopted = await deps.store.write((tx) => {
+		stillMine(tx);
+		signal.throwIfAborted();
+		if (!deps.larm.validateReceiptInTransaction?.(tx, output.receipt))
+			throw new StaleTurn("permission_revoked");
+		return adoptCollaborationState(
+			deps,
+			tx,
+			{
+				sessionId: input.sessionId,
+				epoch: input.epoch,
+				runId: input.runId,
+				operationId: `${input.runId}:${output.call}`,
+			},
+			checked.proposal,
+		);
+	});
+	return adopted.ok ? { ok: true as const, action: checked.action } : adopted;
+}
+
+function stateReference(
+	deps: DialogueDeps,
+	tx: Database,
+	input: TurnInput,
+	reference: string,
+) {
+	if (!input.set.agent.collaborationState || input.observation)
+		return reference;
+	return (
+		reference +
+		collaborationReference(
+			collaborationSnapshot(
+				deps,
+				tx,
+				sessionById(tx, input.sessionId)!,
+				input.runId,
+			),
+		)
+	);
 }
 
 /** The specialist turn: the user's utterance goes to the toolchain's specialist, never to the main model. */
@@ -304,6 +396,7 @@ export function createSpecialistTurnHandler(
 		signal: AbortSignal,
 	): Promise<TurnOutput> {
 		const messages = [...input.messages];
+		const reference = messages[1]?.content ?? "";
 		const receipts: Receipt[] = [];
 		const policy = agentPolicy(input.set);
 		const max = policy.maxModelCalls;
@@ -313,44 +406,21 @@ export function createSpecialistTurnHandler(
 		let applied = false;
 		/** Refusals per tool in this turn, against the tool's retries (spec §7.4). */
 		const refusals = new Map<string, number>();
-		const updated = (): TurnOutput => {
-			const work = deps.store.read((tx) =>
-				deps.specialist!.workStateInTransaction(
-					tx,
-					input.adapterRef,
-					input.workRef,
-				),
-			);
-			return {
-				receipts,
-				action: {
-					kind: "reply",
-					text: updatedReply(work?.label ?? input.set.title),
-				},
-			};
-		};
+		const updated = () => updatedTurn(deps, input, receipts);
 		const hostReply = (text: string): TurnOutput => ({
 			receipts,
 			action: { kind: "reply", text },
 		});
 		/** The session still addresses this turn; checked in the same transaction as each capture/operation. */
-		const stillMine = (tx: Database) => {
-			const run = byId(tx, input.runId);
-			const refusal =
-				run?.status === "running"
-					? turnRefusal(
-							sessionById(tx, input.sessionId),
-							input.runId,
-							input.epoch,
-							deps.clock(),
-						)
-					: "specialist_session_changed";
-			if (refusal) throw new StaleTurn(refusal);
-		};
+		const stillMine = (tx: Database) => assertTurnCurrent(deps, tx, input);
 		for (let call = 1; call <= max; call++) {
 			signal.throwIfAborted();
 			const requestId = await store.write((tx) => {
 				stillMine(tx);
+				messages[1] = {
+					...messages[1]!,
+					content: stateReference(deps, tx, input, reference),
+				};
 				return larm.captureControlInTransaction!(tx, {
 					subject: `specialist:${input.runId}:${call}`,
 					policySubject: input.runId,
@@ -380,16 +450,33 @@ export function createSpecialistTurnHandler(
 			const raw = String(receipt.value);
 			let value: unknown;
 			let action: SpecialistAction | null = null;
+			let stateRefusal: string | null = null;
 			try {
 				value = parseLlmJson(raw);
-				action = parseSpecialistAction(value);
-			} catch {
+				if (input.set.agent.collaborationState && !input.observation) {
+					const checked = await statefulAction(deps, input, signal, stillMine, {
+						value,
+						receipt,
+						call,
+					});
+					if (checked.ok) action = checked.action;
+					else stateRefusal = checked.reason;
+				} else action = parseSpecialistAction(value);
+			} catch (error) {
+				if (
+					error instanceof StaleTurn ||
+					signal.aborted ||
+					(input.set.agent.collaborationState && value !== undefined)
+				)
+					throw error;
 				action = null;
 			}
 			if (!action || (input.observation && action.kind !== "reply")) {
 				const violations = action
 					? [{ path: "action", code: "host_event_reply_only" }]
-					: specialistViolations(value);
+					: stateRefusal
+						? [{ path: "stateUpdate", code: stateRefusal }]
+						: specialistViolations(value);
 				log.warn("dialogue.specialist_output_rejected", {
 					reason: "invalid_contract",
 					repairAttempt: repaired ? 1 : 0,

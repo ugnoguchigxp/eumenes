@@ -1,0 +1,13 @@
+{
+	"package": "eumenes-memory-host",
+	"version": "0.1.0",
+	"artifact": "eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
+	"sha256": "3b6091d1b1ea8c47911430748bb367301e4dc156c70efc7e1af5178ba3366ee1",
+	"sourceGitCommit": "13f6f47f02203cd392c1c9fbc994e068ea81343d",
+	"sourceHash": "0b0f9e5557b7d3ce2fb6fd2acce87dab0186dfd2988808f32d80f986dfffd95f",
+	"sourceTreeState": "clean committed source",
+	"verifiedWith": "source verify and distribution gates; installed Eumenes acceptance recorded in spec/verification/memory-package-adoption-2026-11-07/summary.json",
+	"mcpSdk": "2.4.0",
+	"corePackage": "eumenes-memory@0.0.4",
+	"coreSchemaVersion": 8
+}

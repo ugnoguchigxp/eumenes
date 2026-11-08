@@ -3,7 +3,7 @@ import type { DomainAdapter } from "../../domains/tool-runtime";
 
 export const PURSUIT_REPORT_QUERY = "query:pursuit.report@1";
 
-export function describePursuitAdapter() {
+export function describePursuitAdapter(version: 1 | 2 = 1) {
 	return {
 		owner: "pursuit",
 		operations: new Map(),
@@ -12,13 +12,14 @@ export function describePursuitAdapter() {
 		projections: new Set<string>(),
 		availability: "availability:pursuit@1",
 		task: true,
-		autonomy: "read" as const,
+		autonomy: version === 2 ? ("create" as const) : ("read" as const),
 	};
 }
 /** Registered lifecycle; the dialogue's common task path selects this owner. */
 export function createPursuitAdapter(
 	service: () => PursuitService | undefined,
 	enabled = true,
+	version: 1 | 2 = 1,
 ): DomainAdapter {
 	const required = () => {
 		const value = service();
@@ -26,8 +27,8 @@ export function createPursuitAdapter(
 		return value;
 	};
 	return {
-		ref: "adapter:pursuit@1",
-		describe: describePursuitAdapter,
+		ref: `adapter:pursuit@${version}`,
+		describe: () => describePursuitAdapter(version),
 		availableInTransaction: () =>
 			enabled && (service()?.availableInTransaction() ?? false),
 		artifactAvailableInTransaction: () => service() !== undefined,
@@ -80,11 +81,22 @@ export function createPursuitAdapter(
 					revision: view.revision,
 					targetRef: view.id,
 					work: {
-						title: "調査報告",
+						title: result.document?.title ?? "調査報告",
 						status: view.status === "completed" ? "完了" : "一部のみ",
 						request: view.request,
 						summary: result.answer ?? result.summary,
 						sections: [
+							...(result.document
+								? [
+										{
+											title: "文書の保存",
+											items: [
+												`${{ saved: "一時保存済み", failed: "一時保存できませんでした", expired: "一時ファイルの期限切れ" }[result.document.local.state]}`,
+												`${{ saved: "Docling保存済み", unsaved: "Docling未保存", unknown: "Docling保存結果不明", conflict: "Doclingの文書と競合" }[result.document.archive.state]} (${result.document.path})`,
+											],
+										},
+									]
+								: []),
 							{
 								title: "出典",
 								items: (result.sources ?? []).map(
@@ -103,4 +115,13 @@ export function createPursuitAdapter(
 		targetInput: () => ({}),
 		afterCommit: () => service()?.flush(),
 	};
+}
+
+export function createPursuitAdapters(
+	service: () => PursuitService | undefined,
+	enabled: boolean,
+) {
+	return ([1, 2] as const).map((version) =>
+		createPursuitAdapter(service, enabled, version),
+	);
 }

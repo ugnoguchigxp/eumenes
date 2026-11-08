@@ -6,6 +6,7 @@ import {
 } from "../../domains/markdown";
 import {
 	DocumentFileError,
+	libraryFeatures,
 	type DocumentSummary,
 	type DoclingService,
 } from "../../domains/docling";
@@ -40,9 +41,52 @@ export function markdownArchive(docling: DoclingService): ArchivePort {
 	return {
 		available: files.available,
 		binding: files.binding,
+		management: {
+			async listLibrary(input, signal) {
+				try {
+					return await files.listLibrary(input, signal);
+				} catch (e) {
+					return failure(e);
+				}
+			},
+			async manage(input, signal, binding) {
+				try {
+					return await files.manage(input, signal, binding);
+				} catch (e) {
+					return failure(e);
+				}
+			},
+			async getEntry(kind, id, signal) {
+				try {
+					if (kind === "folder")
+						return { ...(await files.getFolder(id, signal)), kind };
+					const d = await files.read(id, signal);
+					return {
+						kind,
+						id: d.id,
+						namespace: d.namespace,
+						path: d.path,
+						title: d.title,
+						etag: d.etag,
+						markdownSha256: d.markdownSha256,
+						recoverySha256: d.recoverySha256,
+						contentDigest: d.contentDigest,
+					};
+				} catch (e) {
+					return failure(e);
+				}
+			},
+		},
 		async capabilities(signal) {
 			try {
-				return await files.capabilities(signal);
+				const c = await files.capabilities(signal);
+				return {
+					maxMarkdownBytes: c.maxMarkdownBytes,
+					maxRecoveryBytes: c.maxRecoveryBytes,
+					maxRequestBytes: c.maxRequestBytes,
+					maxPageSize: c.maxPageSize,
+					features: libraryFeatures(c),
+				};
 			} catch (e) {
 				return failure(e);
 			}

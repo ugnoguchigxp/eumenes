@@ -1,3 +1,5 @@
+import { createMarkdownResourceAdapter } from "../../domains/markdown";
+import { createScratchResourceAdapter } from "../../domains/scratch";
 import type { HarnessOptions } from "./toolchain-harness-options.fixture";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { Capabilities } from "../../domains/capabilities";
@@ -23,6 +25,10 @@ export function fixtureResources(
 						) as ResourceKind[],
 					adapters: [
 						createPursuitReportResourceAdapter(store),
+						...(options.markdown ? [createMarkdownResourceAdapter(store)] : []),
+						...(options.scratch
+							? [createScratchResourceAdapter(options.scratch)]
+							: []),
 						...(image ? [createImageResourceAdapter({ store })] : []),
 						...(music
 							? createMusicResourceAdapters({

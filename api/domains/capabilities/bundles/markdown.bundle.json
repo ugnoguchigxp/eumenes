@@ -109,6 +109,51 @@
 			"artifactRevisionId": "artifact:markdown.workspace@3",
 			"functionName": "markdown_edit",
 			"redirects": []
+		},
+		{
+			"aliases": ["Markdown", "文書編集"],
+			"tags": [],
+			"useWhen": [
+				"Markdown文書や装飾文書を新しく作成、読み込み、編集する",
+				"文書の任意の部分を利用者と共同で修正する"
+			],
+			"avoidWhen": [],
+			"dependencies": ["package:markdown.collaborate@1"],
+			"kind": "toolchain",
+			"id": "markdown.collaborate",
+			"revision": 4,
+			"title": "文書の共同編集",
+			"summary": "Markdown文書を共同編集し、LARMのDocling文書APIへ保存する",
+			"examples": [
+				"会議の議事録をMarkdownで作りたい",
+				"この文書の導入と表を整理して",
+				"保存した文書を開いて見出しを直したい"
+			],
+			"packageRevisionId": "package:markdown.collaborate@1",
+			"bindingRevisionId": "binding:markdown.collaborate@4",
+			"artifactRevisionId": "artifact:markdown.workspace@4",
+			"functionName": "markdown_edit",
+			"redirects": []
+		},
+		{
+			"kind": "resource-kind",
+			"id": "resource.markdown.document",
+			"title": "文書",
+			"summary": "共同編集文書と調査から生成した文書",
+			"resourceKindData": {
+				"version": 1,
+				"label": "文書",
+				"owner": "markdown",
+				"actions": ["open", "read"],
+				"defaultAction": "open",
+				"producedBy": ["markdown.collaborate", "web.research"]
+			},
+			"revision": 2,
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": []
 		}
 	],
 	"bindings": [
@@ -152,6 +197,37 @@
 			"availabilityRef": "availability:markdown@1",
 			"tools": [],
 			"artifactRevisionId": "artifact:markdown.workspace@3",
+			"session": {
+				"targetSchemaRef": "schema:markdown-target@1"
+			},
+			"timeLimits": {
+				"runMs": 1200000,
+				"turnMs": 900000,
+				"inferenceMs": 600000
+			},
+			"agent": {
+				"workspace": {
+					"documentRef": "workspace:markdown.document@1",
+					"inlineBytes": 32768
+				},
+				"turn": {
+					"maxModelCalls": 4,
+					"retries": {
+						"doc.edit": 1,
+						"doc.write": 0
+					}
+				}
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "markdown.collaborate",
+			"revision": 4,
+			"execution": "session",
+			"adapterRef": "adapter:markdown@1",
+			"availabilityRef": "availability:markdown@1",
+			"tools": [],
+			"artifactRevisionId": "artifact:markdown.workspace@4",
 			"session": {
 				"targetSchemaRef": "schema:markdown-target@1"
 			},
@@ -428,6 +504,164 @@
 				"label": "Markdown",
 				"order": 41
 			}
+		},
+		{
+			"kind": "artifact",
+			"id": "markdown.workspace",
+			"revision": 4,
+			"title": "Markdown",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "markdown-workspace",
+						"source": "markdown-workspace",
+						"title": "Markdown"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "markdown-workspace",
+					"adapterRef": "adapter:markdown@1",
+					"query": "query:markdown.workspace@1",
+					"target": "optional",
+					"paramsSchemaRef": "schema:markdown-query@1"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "new",
+					"eventAction": "markdown-new",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-new@3",
+					"operationId": "markdown.new.v2",
+					"inputAdapterRef": "input:markdown.new@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "apply",
+					"eventAction": "markdown-apply",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-apply@3",
+					"operationId": "markdown.apply.v2",
+					"inputAdapterRef": "input:markdown.apply@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "archive",
+					"eventAction": "markdown-archive",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-archive@2",
+					"operationId": "markdown.archive",
+					"inputAdapterRef": "input:markdown.archive@1",
+					"effect": "write"
+				},
+				{
+					"actionId": "select",
+					"eventAction": "markdown-select",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-select@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "open",
+					"eventAction": "markdown-open",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-select@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "library",
+					"eventAction": "markdown-library",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "return",
+					"eventAction": "markdown-return",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "resume",
+					"eventAction": "markdown-resume",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "markdown-refresh",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "stop",
+					"eventAction": "markdown-stop",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "reconcile",
+					"eventAction": "markdown-reconcile",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-select@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "resolve",
+					"eventAction": "markdown-resolve",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-resolve@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "reload",
+					"eventAction": "markdown-reload",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-reload@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "more",
+					"eventAction": "markdown-more",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "files",
+					"eventAction": "markdown-files",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-files@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "manage",
+					"eventAction": "markdown-manage",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-management@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "check",
+					"eventAction": "markdown-check",
+					"source": "markdown-workspace",
+					"inputSchemaRef": "schema:markdown-select@1",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "Markdown",
+				"order": 41
+			}
 		}
 	],
 	"schemas": [
@@ -664,6 +898,50 @@
 					}
 				},
 				"required": ["id", "revision"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "markdown-files",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"namespace": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 2048
+					},
+					"path": {
+						"type": "string",
+						"minLength": 0,
+						"maxLength": 2048
+					},
+					"cursor": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 4096
+					}
+				},
+				"required": ["namespace", "path"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "markdown-management",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"stageId": {
+						"type": "string",
+						"minLength": 36,
+						"maxLength": 36
+					}
+				},
+				"required": ["stageId"]
 			}
 		}
 	]

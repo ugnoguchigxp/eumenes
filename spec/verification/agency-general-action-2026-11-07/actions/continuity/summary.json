@@ -1,0 +1,502 @@
+{
+  "status": "main input processing recovered on user-reflected version: normal reply, turn-end and three idle decisions all succeed; earlier autonomous image/music/notice live proofs retained; research report and historical revoked conversation links remain unaccepted",
+  "design": "../../../../agency-general-action-design-2026-11-07.md#14-通常会話の継続と関心の再検討実装前の追加設計",
+  "baselineCommit": "ac956c9a",
+  "currentCommit": "fb8eac06ba1e32891c51355c4e067d678e7fd555",
+  "changes": [
+    "native recall/wake wired to retained interest and changed Memory topics",
+    "visible Web attention lease: 15s renewal and 45s TTL; no fabricated user turn or limit reset",
+    "one screen-view observation per conversation ordinal on entry, including empty/exhausted scope",
+    "other scopes may update and silently act without taking the displayed speech destination",
+    "read-only status metadata and strict client schema",
+    "native restore legacy status migration restricted to speech receipts; immutable tool observations retained",
+    "common cycle boundary reports checkpoint exceptions as failed; existing idle technical retry limit retained",
+    "shared conversation prefix validates direct and inherited references against the same conversation native forgottenRefs, keeping original stored conversation and independent scopes intact",
+    "all captured scopes pass existing source-version reconciliation before atomic checkpoint",
+    "same-scope input check also filters rendered Memory items, native host topics/todos, opportunities and reconsideration",
+    "shared work context uses the same scope source check for rendered body and background manifest; stored work/assets remain unchanged",
+    "generic delegate contract no longer claims dependencies on catalog entries it does not present; discovered card provenance and selected-capability enforcement remain intact"
+  ],
+  "fixed": {
+    "agencyAndVendor": {
+      "passed": 140,
+      "failed": 0,
+      "files": 24,
+      "assertions": 869,
+      "seconds": 18.22
+    },
+    "nativeCore": {
+      "passed": 591,
+      "skipped": 1,
+      "todo": 1,
+      "failed": 0,
+      "files": 41,
+      "assertions": 2328
+    },
+    "webAttention": {
+      "passed": 2,
+      "failed": 0
+    },
+    "typecheck": "pass 3127 files",
+    "boundaries": "pass 2905 files",
+    "sqlBoundaries": "pass 398 tables / 1 existing allowed",
+    "size": "pass 24 agency files",
+    "context": "generated outputs current; 117 contexts lint passed",
+    "ownedFormat": "pass",
+    "gitDiffCheck": "pass",
+    "nativeTypecheckLintBoundary": "pass",
+    "ownedLint": "pass, including checkpoint error-boundary change",
+    "latestAgencyAndDialogue": {
+      "passed": 625,
+      "failed": 0,
+      "files": 98,
+      "assertions": 3498,
+      "seconds": 78.82,
+      "log": "reference-root-fix-integration.txt",
+      "afterRun": "one assertion strengthened to require native decision.source=llm; focused test 4 assertions passed"
+    },
+    "scopeContextRegression": {
+      "passed": 1,
+      "assertions": 15,
+      "sourceOriginalRemainsAvailable": true,
+      "originalRole": "user",
+      "dependentAnswerRemoved": true,
+      "otherScopeRemainsValid": true,
+      "freshExchangeSelectsAfterRestart": true,
+      "activeMemoryTopicIncludedInReproduction": true,
+      "topicBodyAndSourceExcludedOnlyInRevokedScope": true,
+      "originalMemoryItemStillActive": true
+    },
+    "checkpointSourcesRegression": {
+      "passed": 2,
+      "assertions": 11,
+      "beforeFix": "both independent-scope save and close threw agency_input_stale",
+      "afterFix": "both pass; unrelated scope preserved; writer checks retained"
+    },
+    "completedWorkAndCatalogRegressions": {
+      "passed": 3,
+      "assertions": 37,
+      "workRecordRetained": true,
+      "memoryItemRetained": true,
+      "freshNativeDecisionFromLlm": true,
+      "beforeFixLogs": [
+        "completed-work-before.txt",
+        "catalog-input-before.txt"
+      ]
+    }
+  },
+  "domainVerify": {
+    "status": "blocked at inventory by existing copied test trees under artifacts/pursuit-integration-20261106",
+    "runId": "2026-11-07T09-21-50-583Z-1acc7a55-3dee-4d42-a3a8-c50129f5cf78",
+    "rulesOrExpectationsWeakened": false
+  },
+  "baselineReproductions": {
+    "retainedInterest": {
+      "host": "HEAD before changes, absolute imports rewritten only for isolated load",
+      "realMemory": true,
+      "expectedSelections": 2,
+      "actualSelections": 1,
+      "log": "baseline-retained-interest.txt"
+    },
+    "archiveReceipt": {
+      "beforeFix": "restored original scope became untracked; a successful save response for another scope alone was insufficient proof",
+      "nativeBeforeFix": "restoration added deliveryStatus=succeeded to action.observed",
+      "afterFix": "original scope retained, both scopes checkpoint; legacy speech status still restored"
+    },
+    "checkpointFailure": {
+      "beforeFix": "injected save exception escaped idle cycle",
+      "afterFix": "failed result reaches existing retry_limit, no idle level advancement",
+      "log": "checkpoint-failure-before.txt"
+    },
+    "forgottenContext": {
+      "beforeFix": "background prefix inherited a forgotten archived observation reference while original conversation remained available",
+      "afterFix": "direct and inherited references excluded from content and provenance; fresh exchange reaches selection after restore",
+      "log": "forgotten-context-before.txt"
+    },
+    "scopedTopic": {
+      "beforeFix": "active Memory item sourced from forgotten observation blocked new select; wait_for_timeout",
+      "afterFix": "fresh exchange selects; invalid topic body and input refs absent; original item remains active",
+      "log": "forgotten-topic-before.txt"
+    }
+  },
+  "live": {
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "readyAt": "2026-11-07T18:33:21.632+09:00",
+    "main": {
+      "returnedToDisplayedConversation": true,
+      "memoryItems": 0,
+      "retainedInterests": 0,
+      "idleState": "exhausted",
+      "updateAt": "2026-11-07T18:34:36.200+09:00",
+      "selectAt": "2026-11-07T18:34:46.570+09:00",
+      "decision": "wait",
+      "newUserMessageNeeded": false
+    },
+    "image": {
+      "conversationId": "agency-live-image-20261107-1834",
+      "explicitCreationRequest": false,
+      "firstInterestOnlyDecision": "wait",
+      "unmetNeedDiscoveredAndDelegated": true,
+      "generationId": "2d1e1d3e-e9dc-481b-98cc-63126c9f2162",
+      "autonomousRunId": "agency:e956dd98-22:a6",
+      "artifactId": "image_25cb519346e44fec9e028a14e9b05159",
+      "state": "completed",
+      "width": 512,
+      "height": 1024,
+      "resourceUri": "eumenes://image/image_25cb519346e44fec9e028a14e9b05159",
+      "resourceConfirmed": true,
+      "archivedTodoOutcome": "succeeded",
+      "browserGalleryAutoUpdated": true,
+      "browserImageOpened": true,
+      "screenshot": "autonomous-image.jpg",
+      "quality": "partial: blue-purple wet street / portrait image / no people observed; illuminated signs contain small lettering despite requested no text; execution acceptance does not imply full content-quality acceptance",
+      "stopRequestedAt": "2026-11-07T18:42:25.844+09:00",
+      "stopAcknowledged": true,
+      "postStopNativeInputStaleObserved": true,
+      "activeWorkAfterStop": 0,
+      "imageRetainedAsRequested": true
+    },
+    "musicBeforeReceiptFix": {
+      "conversationId": "agency-live-music-20261107-1843",
+      "explicitCreationRequest": false,
+      "initialDecision": "wait",
+      "fault": "agency_archive_conflict",
+      "accepted": false,
+      "cliClosed": true
+    },
+    "liveSourceUnchangedUntilImageAndInitialMusicEvidence": true,
+    "currentAvailability": {
+      "api": "reachable",
+      "bootId": "8e11444f-86e1-4a24-a066-cd9b19b69e7c",
+      "readyAt": "2026-11-07T20:33:16.503+09:00",
+      "metadataBackedCorrectionsLoaded": true,
+      "mainProcessingRecovered": true,
+      "unrelatedHttpError": "/api/markdown/capabilities returned 503 at 20:38:16.171; not an Agency processing failure"
+    },
+    "postReceiptFix": {
+      "bootId": "48abd990-1ffe-4686-bcd2-a3cd35be05ee",
+      "readyAt": "2026-11-07T19:20:10.706+09:00",
+      "imageScopeRestored": true,
+      "musicScopeRestored": true,
+      "mainDisplayed": true,
+      "archiveConflictObserved": false,
+      "mainUserAt": "2026-11-07T19:21:06.190+09:00",
+      "mainUserId": "834e6410-78b9-4a71-a328-863c5081edb0",
+      "manualRunId": "c3f52f9c-d36a-4e70-b9db-bf20755040c3",
+      "explicitCreationRequest": false,
+      "mainNativeFailure": "rejected:input_dependency forgotten_input",
+      "screenshot": "music-blocked-before-context-fix.jpg"
+    },
+    "postContextFix": {
+      "initialUserReplayNeeded": false,
+      "updateAt": "2026-11-07T19:33:02.375+09:00",
+      "selectionAt": "2026-11-07T19:33:15.279+09:00",
+      "selection": "tool",
+      "searchReceipt": "a9 succeeded",
+      "followupUserAt": "2026-11-07T19:33:18.224+09:00",
+      "followupUserId": "50dd2220-414d-43f8-aac5-4edd59542ff2",
+      "followupManualRunId": "c6c8afcd-bcee-41c0-bd22-fac4e96a3c98",
+      "interference": "additional test input interrupted native continuation three seconds after autonomous discovery; ordinary route also generated a separate song; cross-route duplicate suppression not accepted"
+    },
+    "music": {
+      "conversationId": "main",
+      "explicitCreationRequest": false,
+      "nativeDelegateAt": "2026-11-07T19:34:30.255+09:00",
+      "generationId": "6a0c33ee-a76b-48c1-a3cd-6ceb7e33cfdc",
+      "autonomousRunId": "agency:8c0b8718-44:a12",
+      "title": "読書用の柔らかなソロピアノ",
+      "state": "completed",
+      "durationSeconds": 30,
+      "resourceUri": "eumenes://music.track/music_00a06513-d30e-4c72-946e-8df1548a3a82",
+      "resourceRef": "a37",
+      "resourceConfirmed": true,
+      "todoId": "939fb63b-cc6c-44e6-91bb-e020e82c96e8",
+      "archivedTodoOutcome": "succeeded",
+      "todoCompletedAt": "2026-11-07T19:34:54.983+09:00",
+      "browserHistoryAndDetailConfirmed": true,
+      "screenshot": "autonomous-music.jpg",
+      "quality": "generation, metadata and display accepted; listening-based content quality not assessed",
+      "playbackObservation": "browser showed an older song playing; agent paused it. Ordinary generated song then auto-played and advanced to old song; paused again. No OS or CLI audio playback used. Do not attribute old/manual music to autonomous generation.",
+      "postRestart": {
+        "generationRetained": true,
+        "manualGenerationAlsoRetained": true,
+        "originalA37ConversationResourceAbsentAt2002": true,
+        "originalNoticeMessageBindingAbsentAt2002": true,
+        "cause": "old native run and completed manual work inherited unrelated catalog capability revisions; those false dependencies invalidated conversation bindings after capability revision changes; records/files remain; old bindings not reconstructed"
+      }
+    },
+    "spontaneousSpeech": {
+      "messageId": "agency:8c0b8718-44:a14",
+      "runId": null,
+      "at": "2026-11-07T19:36:35.310+09:00",
+      "afterLastUserMs": 197086,
+      "text": "ご希望に沿って、穏やかなテンポで静かに終わる約30秒のソロピアノ音源ができました。",
+      "resourceBinding": "a37",
+      "browserTextAndResourceActionsConfirmed": true,
+      "screenshot": "spontaneous-music-notice.jpg",
+      "unansweredLimitPreserved": true
+    },
+    "musicStop": {
+      "userId": "84413f1d-9494-4ec4-9407-7fad44151a0f",
+      "at": "2026-11-07T19:37:44.910+09:00",
+      "acknowledged": true,
+      "nativeTurnEndDecision": "wait at 19:38:35.128+09:00",
+      "nativeIdleDecision": "wait at 19:39:18.462+09:00",
+      "openIntents": 0,
+      "inFlight": 0,
+      "generatedTracksRetained": 2,
+      "screenshot": "stopped-music-scene.jpg",
+      "lateResultRace": "fixture coverage only, not stressed live"
+    },
+    "research": {
+      "conversationId": "agency-live-research-20261107-1940",
+      "firstUserAt": "2026-11-07T19:38:24.491+09:00",
+      "firstUserId": "af8a8c89-d4aa-4528-b9c2-ca9d1bff103d",
+      "manualRunId": "8bde76d3-3035-41ea-97f0-03033bd4beb0",
+      "explicitResearchRequest": false,
+      "additionalUserInputBeforeExecution": false,
+      "nativeDiscoveryAt": "2026-11-07T19:39:14.751+09:00",
+      "nativeDelegationAt": "2026-11-07T19:41:01.896+09:00",
+      "todoId": "2b2f842f-41f8-4c7c-930d-fbb149adb548",
+      "state": "not accepted: no report Resource; work archived as cancelled after intervening server transition",
+      "mainDisplayedThroughout": true,
+      "archivedOutcome": "cancelled",
+      "archivedAt": "2026-11-07T19:52:05.521+09:00",
+      "nearbyWorkerFailure": "pursuit step failed at tools.ts:106, existing pursuit_web_budget_exceeded guard; earlier web_bot_challenge logged",
+      "reportRegistered": false,
+      "stopUserId": "5114899a-7eca-42ff-a4c1-c8659d12ae7e",
+      "stopAt": "2026-11-07T19:54:00.089+09:00",
+      "stopAcknowledged": true,
+      "stopDecision": "wait 19:54:35.558+09:00",
+      "cliClosed": true
+    },
+    "laterBoots": [
+      {
+        "readyAt": "2026-11-07T19:52:05.499+09:00",
+        "bootId": "f77dffc1-580d-424a-aa8e-6a5b5d13861d",
+        "initiatedByAgent": false,
+        "initiatorNotEstablished": true
+      },
+      {
+        "readyAt": "2026-11-07T20:00:12.166+09:00",
+        "bootId": "d38770b9-77ea-407f-ba1e-8719fd6bfc28",
+        "userConfirmed": true,
+        "checkpointFixLoaded": true,
+        "normalReplyPassed": true,
+        "nativeForgottenInputRecurred": true
+      },
+      {
+        "readyAt": "2026-11-07T20:11:05.118+09:00",
+        "bootId": "94e32087-6b5b-4e07-b57f-0f82253291eb",
+        "userConfirmed": true,
+        "scopedTopicFixLoaded": true,
+        "previousShutdown": "second_signal forced; graceful close not accepted live"
+      },
+      {
+        "readyAt": "2026-11-07T20:25:49.584+09:00",
+        "bootId": "7acc5c24-3a94-4f61-a0ac-7ae39ca0a739",
+        "initiatedByAgent": false,
+        "phase": "intermediate completed-work fix; before final frozen checks",
+        "mainReview": "update/select succeed without new input at 20:27:03/20:27:11; cursor100 to103"
+      },
+      {
+        "readyAt": "2026-11-07T20:33:16.503+09:00",
+        "bootId": "8e11444f-86e1-4a24-a066-cd9b19b69e7c",
+        "userConfirmed": true,
+        "metadataBackedCorrectionsLoaded": true,
+        "previousShutdown": "graceful completion at 20:33:13.709, reason ok"
+      }
+    ],
+    "mainRecovery": {
+      "bootId": "8e11444f-86e1-4a24-a066-cd9b19b69e7c",
+      "readyAt": "2026-11-07T20:33:16.503+09:00",
+      "pid": 59123,
+      "normalUserId": "2cdc9088-4624-4f3d-91ef-b56706d067ed",
+      "normalRunId": "41381540-9fd9-40b0-9a48-0f75f3a57282",
+      "normalAssistantId": "8d13788e-b4b1-4329-a7e0-6ade13b4c588",
+      "normalReplyAt": "2026-11-07T20:37:49.371+09:00",
+      "turnEndDecision": {
+        "at": "2026-11-07T20:38:09.018+09:00",
+        "decision": "wait",
+        "source": "llm"
+      },
+      "idleDecisions": [
+        {
+          "at": "2026-11-07T20:38:48.878+09:00",
+          "decision": "wait",
+          "source": "llm"
+        },
+        {
+          "at": "2026-11-07T20:39:46.181+09:00",
+          "decision": "wait",
+          "source": "llm"
+        },
+        {
+          "at": "2026-11-07T20:41:20.490+09:00",
+          "decision": "wait",
+          "source": "llm"
+        }
+      ],
+      "finalIdleState": "exhausted after three normal silent decisions; existing limit preserved",
+      "forgottenInputRecurrenceObserved": false,
+      "observationEnd": "2026-11-07T20:41:20.753+09:00",
+      "forgottenCount": 82,
+      "cursor": 105,
+      "checkpointSourceCount": 28,
+      "checkpointCollisions": 0,
+      "retainedProvenanceCollisions": 0,
+      "freshRunInput": {
+        "complete": true,
+        "sourceCount": 2,
+        "collisions": 0
+      },
+      "metadataLog": "main-recovered-metadata.jsonl",
+      "webReplyObservedInAccessibilityTree": true,
+      "screenshot": "recovered-main-after-reference-fix.jpg",
+      "screenshotLimitation": "saved viewport remains above newest messages; screenshot alone does not show final reply; accessibility observation and run/log IDs carry final evidence",
+      "newCreationAfterLatestCorrection": false
+    }
+  },
+  "nativeDistribution": {
+    "package": "eumenes-agency",
+    "version": "0.1.5",
+    "artifact": "eumenes-agency-0.1.5-03cde67996b0-6777b50e4335.tgz",
+    "sha256": "6777b50e4335b4426c9f77e2b820210cdffcefbf1e7a6efac53dc91260c815ca",
+    "size": 129411,
+    "INSTRUCTION_VERSION": "p0e-instructions-29",
+    "HOST_RULES_VERSION": "host-rules-26",
+    "gitSha": "03cde67996b0c7f9250760fec8a29fa70f38c5e5",
+    "dirty": true,
+    "builtAt": "2026-11-07T09:55:12.586Z",
+    "adoptionSource": {
+      "baseCommit": "03cde67996b0c7f9250760fec8a29fa70f38c5e5",
+      "patchFile": "adoption-source.patch",
+      "patchSha256": "41044679b6f0da9ac51afc99653cb3ae4449f264a34400b63b6f21524fb80dc8",
+      "sourceHash": "5c844e87649590fda88a8dfd4639f0e3e343479bbfb5f33a8ac53606e87e7168",
+      "sourceFiles": {
+        "src/application/abort.ts": "cc93de77b61375fcea0e8f3e0ce004afee4b6675313833df58af69bd207c90c5",
+        "src/application/activity-budget.ts": "02947aa600772111821a51809f85cd779c95f6be4787889b184c3cde6eda25ec",
+        "src/application/budget.ts": "44b19efa6f7cd52f9c7cce372e17129e06f5fc60c5253ce33e2ce53278481d4d",
+        "src/application/delegation.ts": "7dd35a9eb7f343b0f25e5cedf7b026b18c4b2fa8389981398eb11fe8ffa1a245",
+        "src/application/findings.ts": "754b38e1d8245bbbf24a902f9a8c2ac1218032399b38439db2a3549567bd37ac",
+        "src/application/idle.ts": "05a3041edb591ea77078afd7378e80ce80f6ff0de6107c96621c81808832a9d5",
+        "src/application/memory.ts": "7c30897259d0565cddcf1cac4b3e6162a80f81ab3ce5a3dec70a0131cdb3b836",
+        "src/application/mock-tool-port.ts": "7ed0d399abddf2af89560d01c14b116d1668b541feeb257eb46ab8074d570cc4",
+        "src/application/model-call.ts": "c5da87f34c744d98ec894063f791f2428748bac89f8d064cb8d1b3fd31b22905",
+        "src/application/model-data.ts": "76421a3e874088fd70d22d2856a6ff812ab44e20affe1eb5d89c5e0394590654",
+        "src/application/output-contract.ts": "026a3f1cb156871eefdb508419433f044ba3b321f45edefd0a0a17bf4ed3f249",
+        "src/application/projection.ts": "e2fc2eea24b6c6a071070599634fc7e4c71d4c5a3d23a1a06959cdbc94db0ca6",
+        "src/application/prompts.ts": "684cf181daa9fae13c1a4479dec197043f523627be86112cb87d2dcd41d33216",
+        "src/application/provenance.ts": "1cc54dcc7a564b47c288f805b2fbaf1242f6b1a270778f0f33c320dad07b4306",
+        "src/application/quote.ts": "598882f4d5e14cba067a6cf139b6aa37860fe954057fc0488f54ad8b07cc3073",
+        "src/application/respond-system.ts": "a239906196e23c7e064aec9414ad9cbab5d52c372a02397fded610cdd83507f7",
+        "src/application/respond.ts": "6ca516f39746d309b80f04afe177db5537a483e3738dac9e99a6ca7e45ed0c90",
+        "src/application/revisions.ts": "86e698a9099099914db15ffc4aa6df124f4bf8978c4d073c627929ff4ba8369b",
+        "src/application/runtime.ts": "8cc0d0465d151a677db041092bb23212662f2c146ddd29d33735cc5f8d9ee78e",
+        "src/application/snapshot.ts": "fbf486f15bb5b5c0b015e54b5eccb5ac03033142ce3c48229e6dde760f588cb4",
+        "src/application/styles.ts": "a43b95b3050431d0d61b63f578ac43e8544ddaa9faafa0ac1ac2a458ed12ffde",
+        "src/application/system-context.ts": "c7f107af041e7356c0b4e2816cabbba55d9206f5404ca6a6075a29aa2726974a",
+        "src/application/todos.ts": "a67c53a934e7d15b2f58a6bdd9638ba8adf4813761a61d622f4c75053a7bf791",
+        "src/contracts/delegation.ts": "71de0dd296a573a3521aeb70222886e710c4c63b4b87d7d2e44e1166ccd07bad",
+        "src/contracts/emotion.ts": "bc65dd8d4d7586f95e22cdb4fa1853dbd61e67c0277dd271f5dd8370f2e3d662",
+        "src/contracts/errors.ts": "5ab60f5375ccc59b947a074220fa7870e26ab8803f191fe2ee8fa461235ca3cf",
+        "src/contracts/index.ts": "ee2932d7dea6bafe47bd777ff458b7080a09516bf33094191e9f07312b76e642",
+        "src/contracts/interest.ts": "088f1d5cb77b4052667cad151846df9fecb85d03177a1d8c31b93709b5a76d44",
+        "src/contracts/memory.ts": "5d6eb92c65abbee9a9b612fb7fb80a85ec747ea2d92e0226636c52ab55e1efab",
+        "src/contracts/model.ts": "aa4c35759deb00ef8efe1de44db24cf632d005d8c0726de8be2d720ba32e3141",
+        "src/contracts/ports.ts": "01768454295ebba6a62005c7883bdd0efdd1ba37789d47117bae224933462a99",
+        "src/contracts/proposals.ts": "bfe5ef161185f523b93f8dd8484c8e519123c8ef7e2635de05fe85384381a9fa",
+        "src/contracts/revisions.ts": "2e4f46014b8361783c8a332e7a32058ad6297ce66f7c3d095c960aaee9faec19",
+        "src/contracts/runtime.ts": "c04990df6f4776ff826451d0bf2996e414aa99b6464ef89f569dfee75cb687f4",
+        "src/contracts/system-context.ts": "8c57a66ac72c54767cf6c47f6bcf2dd638d11813f877dd8f579afbf2ee56b583",
+        "src/domains/agency/due.ts": "094a6d0791eb4828034d152a6a9e1164f85f4910444f0c22688736e14c63fdf1",
+        "src/domains/agency/ids.ts": "c99d194a7162d260cc09b5e1b50200a6aec32943f0d0be7ea464d50b631e5f3c",
+        "src/domains/agency/lifecycle.ts": "8b0059f04007d7d6fc954f312d753cb27fdaf60cd65c1eb0fb6d49d9d1ea1057",
+        "src/domains/agency/participation.ts": "01f458d97501cc54683dabbaa04146c9725499ee0077c0b729823378201071a1",
+        "src/domains/agency/results.ts": "353cf8353c49e7c2c25a8458b8f812ccab889cfd6df0b13454d70f154fcefc06",
+        "src/domains/agency/settle-beliefs.ts": "e435a4fd7fe110cc68725be52b2254c98c8d4037d05f6afd6451f26201e00caa",
+        "src/domains/agency/settle-context.ts": "b6e0ba30fe5d8351358163569f310e2841372ba7bbd94b4c395f65c50e848927",
+        "src/domains/agency/settle-intents.ts": "f4865508b4ea367a91ba537055db2c3288ce67988c57182266c23205b3b91959",
+        "src/domains/agency/settle-interests.ts": "f1ca13c3d18f04e94116bc16d251c4522ce670ce4dd8f3ec8b76829bb51c7bba",
+        "src/domains/agency/settle-notes.ts": "8551d22fc6ed5a51a379fc4e9ed16813f63d56ec2253f540a9dfaa7e9593e3c7",
+        "src/domains/agency/settle.ts": "483d2b83169438da39b2b6c30b63d795ab29daf99d88a4025fa52799243af4d2",
+        "src/domains/agency/wake.ts": "d10ec1c1662288af8680ea5784e7b8126b1c1731620f7814395873d6caa5f01d",
+        "src/domains/experience/ledger.ts": "12daaa6c019190cfef8a3bd22c823b913877db803eccf69112857c66e41e203c",
+        "src/index.ts": "ec7cab31465df6ea9c5dd9d370038e93e623d2f55b7d887ffee3307bff05fa11"
+      },
+      "patchFormat": "git-diff-unified-0 (apply with git apply --unidiff-zero)"
+    }
+  },
+  "serverOperations": {
+    "productionStartedStoppedOrRestartedByAgent": false,
+    "userRestartedForReflection": true,
+    "isolatedServerTestsAccidentallyRun": true,
+    "reportedToUser": true,
+    "furtherServerStartingTestsExcluded": true
+  },
+  "scopeAudit": {
+    "topicKeywordDispatchAdded": false,
+    "fakeManualRunUsedForAutonomousSource": false,
+    "secondPlannerAdded": false,
+    "budgetOrPermissionExpansionInThisPhase": false,
+    "productionDatabaseDirectlyOpened": true,
+    "unrelatedConcurrentChangesPreserved": true,
+    "productionDatabaseAccess": "user-authorized main-only reference metadata, readonly/query_only; no content/settings/secrets or mutations"
+  },
+  "remaining": [
+    "research completed report Resource and delivery have not passed live acceptance",
+    "historically revoked main Resource a37/message binding has not been restored; no new generated-output persistence acceptance after latest correction"
+  ],
+  "limitations": [
+    "research report did not complete; no live success claimed",
+    "ordinary-route and native creation both ran after additional test input; cross-route duplicate suppression not accepted",
+    "image visual constraints partial (small sign lettering)",
+    "listening-based audio quality and live late-result race not assessed",
+    "historical music generation records/files retained, but original conversation Resource a37/message binding had been invalidated under false catalog-wide provenance; old links not automatically restored",
+    "current live recovery verifies processing and waiting, not a fresh generation or indefinite stability"
+  ],
+  "contextStill": {
+    "compileCalls": 8,
+    "evaluationSaves": 8,
+    "note": "literal totals; latest pack evaluated twice; not a claimed one-to-one mapping"
+  },
+  "diagnosticRequest": {
+    "conversationId": "main",
+    "access": "readonly SQLite + query_only, read transaction",
+    "fields": "observation IDs, provenance reference identifiers/hashes, versions, forgetting flags, related work/run input metadata",
+    "excluded": "conversation/Record/prompt bodies, settings, credentials, provider responses, mutations, server operations",
+    "script": "/tmp/eumenes-agency-live-20261107/main-reference-diagnostic.ts",
+    "executed": true,
+    "permission": "explicitly granted by user: メタデータだけ読み取りを許可する",
+    "transactions": 6,
+    "queryOnly": 1,
+    "selectedBodiesOrSettingsOrSecrets": false,
+    "mutatedData": false,
+    "record": "authorized-main-reference-metadata.json",
+    "scriptCopy": "authorized-main-reference-diagnostic.ts.txt",
+    "diagnosticTransactions": 3,
+    "postReflectionTransactions": 3,
+    "afterRecord": "authorized-main-reference-after.json"
+  },
+  "diagnosis": {
+    "checkpointSources": 24,
+    "checkpointSourceCollisions": 0,
+    "retainedProvenanceCollisions": 0,
+    "archiveRowsWithCollision": 11,
+    "confirmedReentry": "recently archived work row and its original run input brought old capability revision into State/backgroundInput",
+    "oldReferencedRevision": "toolchain:markdown.collaborate@3",
+    "currentRevision": "toolchain:markdown.collaborate@4",
+    "additionalGenericToolFault": "generic delegate declares no catalog values but depended on every catalog capability; one tombstoned capability remains active, so a fresh runtime was also rejected",
+    "replicas": "temporary data only, real Memory and completed image work; no live data copied into fixtures"
+  },
+  "sourceAudit": {
+    "manifest": "final-source-manifest.json",
+    "matchedFiles": 39,
+    "totalFiles": 40,
+    "registrationFileChanged": "scripts/domains.ts",
+    "registrationChange": "shared registration file includes concurrent memory-host/server test registrations; all added Agency test registrations remain; explicit 625-test invocation does not depend on domain registry",
+    "productionSourceAfterValidationChanged": false,
+    "unrelatedChanges": "Markdown, memory package/server composition and document-library changes preserved; not claimed as validated by this task",
+    "diffWhitespace": "pass"
+  }
+}

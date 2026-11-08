@@ -1,0 +1,38 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/steward/test/steps.test.ts:
+(pass) the events of a run go through curate-memory and are handled [47.19ms]
+(pass) events that carry nothing to learn from are handled without a model [31.30ms]
+(pass) a failed summary-like answer is run again without saving the memory twice [36.22ms]
+(pass) three unusable answers over events give them up and the pipeline goes on [36.13ms]
+(pass) an event that is already handled is not offered again [38.32ms]
+(pass) long-term writers share one concurrency key across conversations [36.12ms]
+(pass) elements that cannot be saved are dropped one by one [36.49ms]
+(pass) a mismatched quote and the agent's words cannot become evidence of a saved memory [36.15ms]
+(pass) a failed attempt reaches curate-memory as the user's event alone [34.17ms]
+(pass) long messages are cut to 6 KB for the steward, and one event always fits [34.97ms]
+(pass) at most eight events and 16 KB go into one step; the rest waits [40.59ms]
+(pass) a step on its own prompt runs on a connection of its own and yields to the user's calls [36.20ms]
+(pass) a step reading the conversation runs on the conversation's prompt with its own task last, on the conversation's connection [35.62ms]
+
+api/domains/inference/test/control-schema.test.ts:
+(pass) OpenAI-compatible cloud sends the schema as response_format and leaves ordinary turns alone [3.23ms]
+(pass) Codex and Claude agent connections receive the schema in the call [0.26ms]
+(pass) schema-constrained operation choices suppress native tools on every cloud route [0.18ms]
+(pass) Claude Agent SDK gets outputFormat and its structured output becomes the text [3.40ms]
+(pass) Codex SDK isolates inherited MCP servers and passes the schema even without tools [439.67ms]
+
+api/domains/inference/test/inference-control.test.ts:
+(pass) control calls preserve exact context, stay local, skip emotion judgement, and rejected JSON is never adopted [25.64ms]
+(pass) only a structured-output control request sends the output schema to LARM; others stay plain JSON-object [13.36ms]
+(pass) a background control keeps the conversation route only when asked, and a different binding conflicts [10.07ms]
+(pass) a background control on a saved resource goes to that resource only, and falls back to the conversation route when it can not be used [12.10ms]
+(pass) a dedicated resource that can not be used falls back to the conversation route only on the same billing path [10.22ms]
+(pass) a control request may ask for a long output (a large draft), up to 32k tokens [10.16ms]
+(pass) a toolchain's own limits: the run's requests are moved later (never earlier) and an attempt carries its own time [10.91ms]
+(pass) an attempt's own time replaces the LARM and cloud defaults, within the request's deadline [0.10ms]
+
+ 26 pass
+ 0 fail
+ 106 expect() calls
+Ran 26 tests across 3 files. [1230.00ms]

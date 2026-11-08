@@ -1,3 +1,4 @@
+import { collaborationState } from "../repository/collaboration-state";
 import type { Database } from "bun:sqlite";
 import type { DialogueDeps } from "./context";
 import { specialistExecutionSource } from "./specialist-source";
@@ -11,6 +12,11 @@ import { forgetSessionObservations } from "../repository/specialist-observations
 /** Public host integration for session-scoped sources and child observations. */
 export function createSpecialistHost(deps: DialogueDeps) {
 	return {
+		specialistCollaborationState: (sessionId: string): unknown =>
+			deps.store.read((db) => {
+				const row = collaborationState(db, sessionId);
+				return row ? JSON.parse(row.body) : null;
+			}),
 		forgetSpecialistObservationsInTransaction: forgetSessionObservations,
 		specialistResultTextInTransaction: (
 			db: Database,

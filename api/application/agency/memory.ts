@@ -17,7 +17,7 @@ export function dependsOn(input: InputContext, refs: ReadonlySet<string>) {
 }
 
 /** Bodies live in Memory Records. The dialogue owner keeps only identity and dependency metadata. */
-export function archiveOf(deps: AgencyHostDeps, c: Conv) {
+export function archiveOf(deps: AgencyHostDeps, c: Pick<Conv, "id" | "scope">) {
 	return {
 		get(id: string): ArchivedObservation | undefined {
 			if (!deps.state || !deps.memory.referenceInputs) return undefined;

@@ -1,0 +1,119 @@
+{
+  "date": "2026-11-08",
+  "implementation": "complete",
+  "fixture": "passed",
+  "live": "document_save_passed_with_findings",
+  "server_operations": "started_with_explicit_user_authorization; left_running",
+  "versions": {
+    "toolchain": "web.research@6",
+    "package": "pursuit.research@4",
+    "skill": "pursuit.research@4",
+    "binding": "pursuit.research@3",
+    "adapter": "pursuit@2"
+  },
+  "baseline": {
+    "tests": 26,
+    "failed": 0
+  },
+  "regression": {
+    "bun": {
+      "passed": 1385,
+      "failed": 0,
+      "files": 201
+    },
+    "web": {
+      "passed": 148,
+      "failed": 0,
+      "files": 24
+    },
+    "design_system": {
+      "passed": 25,
+      "failed": 0,
+      "files": 5
+    }
+  },
+  "final_scenarios": {
+    "passed": 37,
+    "failed": 0,
+    "files": 6
+  },
+  "typecheck": {
+    "files": 3172,
+    "errors": 0
+  },
+  "build": "passed",
+  "bundle_checks": "passed",
+  "old_revisions_unchanged": {
+    "pursuit": 19,
+    "markdown": 24
+  },
+  "scenarios": [
+    {
+      "name": "normal_online",
+      "result": "passed"
+    },
+    {
+      "name": "docling_unavailable",
+      "result": "passed"
+    },
+    {
+      "name": "local_capacity_failure",
+      "result": "passed"
+    },
+    {
+      "name": "partial_research",
+      "result": "passed"
+    },
+    {
+      "name": "awaiting_document_restart",
+      "result": "passed"
+    },
+    {
+      "name": "lost_put_response_confirmed",
+      "result": "passed"
+    },
+    {
+      "name": "lost_put_response_unknown_no_retry",
+      "result": "passed"
+    },
+    {
+      "name": "cancel_or_forget_late_write",
+      "result": "passed"
+    },
+    {
+      "name": "forget_superseded_epochs",
+      "result": "passed"
+    },
+    {
+      "name": "connection_changed",
+      "result": "passed"
+    },
+    {
+      "name": "remote_conflict",
+      "result": "passed"
+    },
+    {
+      "name": "get_only_reconciliation",
+      "result": "passed"
+    },
+    {
+      "name": "fresh_and_existing_registry",
+      "result": "passed"
+    },
+    {
+      "name": "web_import_without_specialist_switch",
+      "result": "passed"
+    }
+  ],
+  "limitations": [
+    "Canonical verify stops at the existing archived-copy test inventory issue.",
+    "Existing boundary violation: client/agency.ts deep-imports dialogue/contracts/agency-status.",
+    "Repository-wide whitespace check flags existing vendor/agency/adoption-source.patch; changed feature files pass.",
+    "Live natural-language cancellation started another research task; explicit TODO archive cancelled both without late documents.",
+    "A live compound request selected web.search and expired; a later request naming Pursuit selected web.research and completed.",
+    "Research-to-notice durations were about 24 and 20 minutes; generated-save jobs took 332 and 270 milliseconds.",
+    "Fault injection and Playwright E2E suite were not run against live services; fixed failure scenarios and real browser operations are recorded separately."
+  ],
+  "live_report": "live/README.md",
+  "live_summary": "live/summary.json"
+}

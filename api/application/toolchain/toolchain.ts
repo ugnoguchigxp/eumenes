@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createPursuit, type PursuitService } from "../../domains/pursuit";
-import { createPursuitAdapter } from "../pursuit/pursuit-adapter";
+import { createPursuitAdapters } from "../pursuit/pursuit-adapter";
+import { createResearchDocuments } from "../pursuit/document-port";
 import { createPursuitWebPort } from "../pursuit/web-port";
 import { createMarkdownAdapter } from "../markdown/markdown-adapter";
 import { createDoclingAdapter } from "../docling/docling-adapter";
@@ -291,7 +292,10 @@ export async function createToolchain(
 		...(options.markdown ? [createMarkdownAdapter(options.markdown)] : []),
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
-		createPursuitAdapter(() => pursuitRuntime, options.webResearch !== false),
+		...createPursuitAdapters(
+			() => pursuitRuntime,
+			options.webResearch !== false,
+		),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk
 			? [
@@ -410,6 +414,7 @@ export async function createToolchain(
 		inference,
 		capabilities,
 		web: createPursuitWebPort(web, queue),
+		documents: createResearchDocuments(options, () => pursuitRuntime),
 	});
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(

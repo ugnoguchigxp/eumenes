@@ -7,7 +7,7 @@ import { researchScript } from "../../domains/pursuit/test/model.fixture";
 for (const kind of ["research", "instant", "pipeline", "task"] as const) {
 	test(`Agency uses the registered ${kind} execution contract without a manufactured user run`, async () => {
 		const weather = weatherFetch();
-		const script = researchScript();
+		const script = researchScript({ document: true });
 		const h = await harness({
 			everyday: true,
 			resources: true,
@@ -100,7 +100,7 @@ for (const kind of ["research", "instant", "pipeline", "task"] as const) {
 }
 
 test("an autonomous owner's question reaches its TODO and resumes only from a real user answer", async () => {
-	const script = researchScript({ consult: true });
+	const script = researchScript({ consult: true, document: true });
 	const h = await harness({
 		pursuit: (schema) => script(schema),
 		firstRound: () => ({ text: "対象期間を受け取りました。" }),

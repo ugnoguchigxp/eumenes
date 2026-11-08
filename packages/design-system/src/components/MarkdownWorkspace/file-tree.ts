@@ -14,12 +14,14 @@ const compare = (a: string, b: string) =>
 export function documentFolders(
 	entries: MarkdownLibraryEntry[],
 	namespaces: string[],
+	folderPaths: FolderLocation[] = [],
 ): DocumentFolder[] {
 	const nodes = new Map<string, DocumentFolder>();
 	const roots: DocumentFolder[] = [];
 	for (const namespace of new Set([
 		...namespaces,
 		...entries.map((e) => e.namespace),
+		...folderPaths.map((e) => e.namespace),
 	])) {
 		const root = {
 			namespace,
@@ -31,11 +33,20 @@ export function documentFolders(
 		nodes.set(root.key, root);
 		roots.push(root);
 	}
-	for (const entry of entries) {
+	for (const entry of [
+		...entries.map((e) => ({
+			namespace: e.namespace,
+			parts: e.path.split("/").slice(0, -1),
+		})),
+		...folderPaths.map((e) => ({
+			namespace: e.namespace,
+			parts: e.path.split("/"),
+		})),
+	]) {
 		let parent = nodes.get(
 			folderKey({ namespace: entry.namespace, path: "" }),
 		)!;
-		for (const part of entry.path.split("/").slice(0, -1)) {
+		for (const part of entry.parts) {
 			const path = parent.path ? parent.path + "/" + part : part,
 				key = folderKey({ namespace: entry.namespace, path });
 			let node = nodes.get(key);

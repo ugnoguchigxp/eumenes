@@ -1,6 +1,7 @@
 import { createAgencyStatePort } from "../../domains/dialogue";
 import type { DialogueService } from "../../domains/dialogue";
-import { createAgencyHost, type AgencyHostDeps } from "./host";
+import type { AgencyHostDeps } from "./host";
+import { createSwitchingAgencyHost } from "./switching-host";
 import { createAgencyLlmPort } from "./llm-port";
 
 /**
@@ -49,7 +50,7 @@ export function assembleAgency(
 					now: Date.now,
 				})
 			: undefined);
-	return createAgencyHost({
+	return createSwitchingAgencyHost({
 		...deps,
 		...(state ? { state } : {}),
 		captureContext: (conversationId) =>

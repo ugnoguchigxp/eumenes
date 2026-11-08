@@ -83,14 +83,21 @@ export function lintFindings(output: string): Finding[] {
 }
 
 /**
- * `bun fmt --check`: one `path (Nms)` line per unformatted file; a parse error is an `error:` line
- * followed by `    at path:line:col`.
+ * `bun fmt --check`: timed paths in older releases, bare paths with a counted summary in 1.4.
+ * A parse error is an `error:` line followed by `    at path:line:col`.
  */
 export function formatFindings(output: string): Finding[] {
 	const unformatted: Finding[] = [];
 	const unparsed: Finding[] = [];
+	const plainSummary =
+		/^([\d,]+) files? needs? formatting\. Run bun fmt to fix (?:it|them)\.$/m;
+	const plainPaths = plainSummary.test(output);
 	for (const line of output.split("\n")) {
-		const file = /^(\S.*) \(\d+(?:\.\d+)?m?s\)$/.exec(line);
+		const file =
+			/^(\S.*) \(\d+(?:\.\d+)?m?s\)$/.exec(line) ??
+			(plainPaths
+				? /^((?:[^\s:/]+\/)*[^\s:/]+\.[a-zA-Z0-9_-]+)$/.exec(line)
+				: null);
 		if (file)
 			unformatted.push({ text: `not formatted: ${file[1]}`, path: file[1] });
 		const parse = /^\s+at (.+?):\d+:\d+$/.exec(line);
@@ -100,7 +107,7 @@ export function formatFindings(output: string): Finding[] {
 	return reconcile(
 		[...unformatted, ...unparsed],
 		output,
-		/Format issues found in above ([\d,]+) files?/,
+		plainPaths ? plainSummary : /Format issues found in above ([\d,]+) files?/,
 		"format",
 		unformatted.length,
 	);

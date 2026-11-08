@@ -1,0 +1,836 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/agency/continuity.test.ts:
+(pass) retained interest gets one native wake when the speech planner cannot run [204.97ms]
+(pass) a visible conversation keeps attention when another CLI conversation receives a message [95.97ms]
+(pass) forgetting the interest's real inputs prevents recall on a later review [109.17ms]
+(pass) a newly published Memory topic wakes once without re-enabling idle speech [134.84ms]
+(pass) displaying an exhausted conversation with no interests admits its context only once [100.47ms]
+(pass) a checkpoint failure stays a bounded failed idle cycle rather than an unhandled rejection [81.91ms]
+
+api/application/agency/schema.test.ts:
+(pass) transport factoring preserves the F schema when shared references are expanded [1.28ms]
+(pass) factoring preserves literals and existing definition names [0.06ms]
+
+api/application/agency/image-history.test.ts:
+(pass) image-only input and its analysis reach autonomous selection as one identifiable exchange [13.30ms]
+(pass) a host-recorded image answer reaches autonomous selection as execution evidence [12.03ms]
+
+api/application/agency/host.test.ts:
+(pass) start and settings > the feed starts at its end: what was said before start is never read [12.62ms]
+(pass) start and settings > agency settings immediately replace pending inference while retaining grounded state [17.70ms]
+(pass) start and settings > settings that are not the agency's change nothing [10.35ms]
+(pass) start and settings > switching the settings while a decision is pending appends nothing [11.58ms]
+(pass) opportunities > one reply makes one turn-end decision and the user message alone calls no model [10.12ms]
+(pass) opportunities > a runless assistant message (a timer's) is observed but opens no opportunity [7.93ms]
+(pass) opportunities > the user's active State items reach the decision as topics, bounded and stable [10.28ms]
+(pass) opportunities > two events of one commit are both observed, in order, and open one cycle [10.53ms]
+(pass) opportunities > a corrected message becomes a correction observation [11.87ms]
+(pass) opportunities > a retraction removes dependent data and new grounded input continues [14.80ms]
+(pass) delivery > accepted Live speech keeps the offered text separate from playback evidence [12.19ms]
+(pass) delivery > a spoken ticket becomes one runless assistant message with one terminal receipt [10.10ms]
+(pass) delivery > with emotion on, the utterance's feeling is stored as its host delivery; without one, none [31.82ms]
+(pass) delivery > with emotion off, the select is asked without the feeling rules [9.94ms]
+(pass) delivery > S5: a user message arriving during the decision appends nothing [11.41ms]
+(pass) delivery > S5: something said after the opportunity (without new input) interrupts the ticket [12.27ms]
+(pass) delivery > S5: a run still queued or running at the delivery time interrupts the ticket [12.32ms]
+(pass) delivery > the user speaking or being answered at the delivery time interrupts the ticket [11.66ms]
+(pass) delivery > a foreground request in progress blocks the opportunity without a model choice [6.23ms]
+(pass) delivery > S6: the same text at another opportunity is another ticket and another message [10.72ms]
+(pass) idle > a review with no work leaves the original idle deadline in place [71.29ms]
+(pass) idle > an exhausted call window defers idle without consuming a speech opportunity [29.28ms]
+(pass) idle > periodic review leaves a running idle update intact [76.92ms]
+(pass) idle > silence is retried at 20s, 40s, 80s and then given up [14.24ms]
+(pass) idle > one unanswered spoken remark ends automatic idle until the user speaks again [15.49ms]
+(pass) idle > pending speech is interrupted if the user switches conversations before delivery [15.32ms]
+(pass) idle > only the conversation the user spoke in last gets idle cycles [15.41ms]
+(pass) idle > a busy moment defers the cycle without spending the backoff [10.95ms]
+(pass) idle > a cycle whose call yielded to the foreground does not spend the backoff [12.54ms]
+(pass) idle > a new user message cancels the pending idle and restarts the silence [12.03ms]
+(pass) review fixes > decision ids stay unique when runtimes are recreated by settings changes and retractions [19.59ms]
+(pass) review fixes > close cancels an idle cycle without waiting for an uncooperative provider and rejects its late result [14.82ms]
+(pass) review fixes > a retraction gives the conversation a new idle planner [13.46ms]
+(pass) review fixes > the delivery fence reads the committed setting, not the cached one [12.99ms]
+(pass) review fixes > a replaced runtime neither delivers nor receives a receipt [10.86ms]
+(pass) review fixes > topics are cached for 30 seconds and re-read after a memory forget [12.16ms]
+(pass) review fixes > idle conversations are forgotten and the tracked set is bounded [12.79ms]
+
+api/application/agency/initiative-limits.test.ts:
+(pass) three invalid idle selections consume only their bounded technical retries [17.42ms]
+(pass) slow selection respects the actual delivery interval (durable=false) [16.55ms]
+(pass) slow selection respects the actual delivery interval (durable=true) [80.74ms]
+
+api/application/agency/action-safety.test.ts:
+(pass) an autonomous command cannot translate into an unapproved write, even if it claims user approval [749.15ms]
+(pass) settings stops an accepted autonomous operation and rejects its late response [772.78ms]
+(pass) forget stops an accepted autonomous operation and rejects its late response [695.06ms]
+(pass) cancel stops an accepted autonomous operation and rejects its late response [596.55ms]
+(pass) capability stops an accepted autonomous operation and rejects its late response [602.85ms]
+(pass) the concurrent action limit is transactional and a replay consumes no second slot [607.76ms]
+(pass) the daily action limit is transactional and a replay consumes no second slot [622.83ms]
+(pass) an accepted action survives host restart without a second operation or a second execution [619.77ms]
+
+api/application/agency/archive-receipt.test.ts:
+(pass) restoring an archived tool receipt permits another scope to checkpoint [712.21ms]
+
+api/application/agency/backlog.test.ts:
+(pass) a burst within the presented observation window reaches selection in the same opportunity [10.53ms]
+
+api/application/agency/routes.test.ts:
+(pass) attention and read-only status expose no conversation or memory contents [70.31ms]
+
+api/application/agency/connection.test.ts:
+(pass) assembled host reaches larm with one exact purpose system, including a retry [79.67ms]
+(pass) assembled host reaches cloud with one exact purpose system, including a retry [78.40ms]
+
+api/application/agency/catalog-input.test.ts:
+(pass) an unpresented capability is not an input dependency of the generic delegation tool [1.32ms]
+
+api/application/agency/continuity-actions.test.ts:
+(pass) native recall starts creation after the speech cap and returns a real resource once [810.67ms]
+
+api/application/agency/action-kinds.test.ts:
+(pass) Agency uses the registered research execution contract without a manufactured user run [660.48ms]
+(pass) Agency uses the registered instant execution contract without a manufactured user run [636.91ms]
+(pass) Agency uses the registered pipeline execution contract without a manufactured user run [643.16ms]
+(pass) Agency uses the registered task execution contract without a manufactured user run [960.14ms]
+(pass) an autonomous owner's question reaches its TODO and resumes only from a real user answer [1011.67ms]
+
+api/application/agency/llm-port.test.ts:
+(pass) agency LLM port > captures a structured background control on the conversation route and returns usage and latency [1.43ms]
+(pass) agency LLM port > never asks for more than the background output limit [0.71ms]
+(pass) agency LLM port > a schema violation is an output error and rejects the control receipt [0.50ms]
+(pass) agency LLM port > unparseable output is an output error [0.27ms]
+(pass) agency LLM port > an already aborted signal calls nothing [0.09ms]
+(pass) agency LLM port > an abort during the call propagates and reaches inference through the signal [0.23ms]
+(pass) agency LLM port > a result that arrives after cancellation is not adopted [0.14ms]
+(pass) agency LLM port > inference failures become call errors; connection-class codes are retryable [0.28ms]
+(pass) agency LLM port > a call that yielded to the foreground is not tried again at once [0.10ms]
+(pass) agency LLM port > a capture refusal of inference is a non-retryable call error [0.14ms]
+(pass) agency LLM port > a receipt inference no longer accepts is not adopted [0.13ms]
+(pass) agency LLM port > an invalid decision id is refused before capture [0.14ms]
+(pass) agency LLM port on the conversation's prompt > the purpose system replaces the conversation system; only data goes into Task [0.30ms]
+(pass) missing host system never captures or calls inference [0.16ms]
+
+api/application/agency/forgotten-context.test.ts:
+(pass) a forgotten input cannot re-enter shared context with completed work=false [103.67ms]
+(pass) a forgotten input cannot re-enter shared context with completed work=true [1144.33ms]
+
+api/application/agency/interest-growth.test.ts:
+(pass) the actual host forms, promotes and withdraws F interests from new user evidence [20.18ms]
+
+api/application/agency/memory-integration.test.ts:
+(pass) an untraceable reply after forgetting does not block independent autonomous decisions [108.23ms]
+(pass) candidate-free speech reaches the real host writer and Memory-backed checkpoint [77.23ms]
+(pass) forget removes A bodies and preserves independent B through result persistence and restart [106.10ms]
+(pass) uncited Memory topics invalidate their outputs, then unrelated conversation can speak again [86.73ms]
+(pass) legacy checkpoints are quarantined before new work, and shutdown confirms that quarantine [88.30ms]
+(pass) compacted observations remain in Memory, restore with bounded live state, and accept new conversation [252.35ms]
+(pass) Memory expiry during selection rejects the old output and new conversation recovers [92.78ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-message [106.53ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-message-with-record-ref [106.87ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-record [102.92ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-record-without-ref-or-provenance [102.73ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for forgotten-receipt-without-ref-or-provenance [109.13ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for unknown-missing [89.40ms]
+(pass) startup reconciles confirmed forgetting but preserves failures for unknown-missing-without-ref-or-provenance [91.59ms]
+
+api/application/agency/actions.test.ts:
+(pass) Agency delegates image creation through shared execution and returns a resource without a user request [677.77ms]
+(pass) Agency delegates music creation through shared execution and returns a resource without a user request [672.16ms]
+(pass) catalog result drives a further action after restart even when the speech cap is reached [730.51ms]
+(pass) discovery and delegation retain a shared activity token ceiling [657.39ms]
+
+api/application/agency/work.test.ts:
+(pass) an open TODO is offered to the agency as todo, dated when it was requested [0.06ms]
+(pass) a TODO that waits for the user is offered as waiting, with the question the sub-agent asked [0.04ms]
+(pass) finished work is never offered to the agency: its notice on screen tells it
+(pass) the agency reads the TODOs of the conversation from the dialogue ledger: open and asking ones only [0.10ms]
+(pass) the title names the toolchain the work went to, within the title length [0.03ms]
+
+api/application/agency/archive-recovery.test.ts:
+(pass) forgetting after capability discovery leaves readable checkpoints on restart [630.09ms]
+(pass) forgetting an archived Memory Record also invalidates its Agency checkpoint [627.18ms]
+
+api/application/agency/system-context.test.ts:
+(pass) both runtime purposes send the complete Eumenes system; observations stay in JSON data [12.34ms]
+(pass) hosts and calls keep their own persona, interests and emotion settings [22.26ms]
+(pass) a persona change rejects old pending speech (announced=true) [11.24ms]
+(pass) a persona change rejects old pending speech (announced=false) [11.26ms]
+(pass) the real dialogue composes Eumenes-owned reply parts and keeps user text outside system [77.20ms]
+
+api/application/agency/recovery.test.ts:
+(pass) restart preserves provenance for an independent pending speech (persisted) after unrelated forgetting [8.29ms]
+(pass) restart preserves provenance for an independent pending speech (unknown delivery) after unrelated forgetting [8.45ms]
+
+api/application/agency/autonomy.test.ts:
+(pass) autonomous intent dispatches real research, receives a result, survives restart and is revoked on forget [568.31ms]
+
+api/application/agency/host-work.test.ts:
+(pass) TODOs offered to the agency > open and asking TODOs reach the decision and the update, with the question; finished ones never do [11.65ms]
+(pass) TODOs offered to the agency > a failing ledger read offers no TODOs and does not stop the cycle [9.90ms]
+(pass) asking what work asks > an utterance that cites an asking TODO is stored with its todoRefs [11.11ms]
+(pass) asking what work asks > an utterance that cites no TODO carries no todoRefs [10.92ms]
+(pass) work that changed > a waiting work question cannot bypass the unanswered speech limit [13.91ms]
+(pass) work that changed > a question opens a result_received opportunity after the commit, in the conversation the user is in [14.52ms]
+(pass) work that changed > finished work opens no opportunity: its notice on screen tells it [10.17ms]
+(pass) work that changed > a change told in a transaction that rolled back opens nothing [13.47ms]
+(pass) work that changed > in a conversation the user is not in, it waits for the next turn there [16.33ms]
+(pass) work that changed > the question the opportunity asks is delivered as a runless message citing it [14.89ms]
+(pass) the conversation agent > the system parts are fixed by the settings: the interests and the spoken style, and the feeling rule only when the feeling is on [14.12ms]
+(pass) the conversation agent > a reply is one model call that answers in plain text [6.26ms]
+(pass) the conversation agent > the leading feeling emoji becomes the delivery emotion and is not spoken; calm is none [6.87ms]
+(pass) the conversation agent > with the feeling off the reply is left as it is and carries no emotion [6.57ms]
+(pass) the conversation agent > a tool call runs through the host's tools and the reply goes on with its result [6.85ms]
+(pass) the conversation agent > a tool that hands the work over ends the reply [6.41ms]
+
+api/application/agency/topics.test.ts:
+(pass) takes affirmed, active, currently valid preferences, habits and facts with their memory ids [0.09ms]
+(pass) is bounded, short, deduplicated and stable across input order [0.08ms]
+
+api/application/agency/checkpoint-sources.test.ts:
+(pass) a changed Memory version in an inactive scope does not block independent scope save [94.33ms]
+(pass) a changed Memory version in an inactive scope does not block close [85.11ms]
+
+api/application/vendor.test.ts:
+(pass) the vendored memory package matches its manifest, package.json, the lockfile and the installed copy [0.52ms]
+(pass) the memory distribution identifies its source and verifies the installed published files [31.29ms]
+(pass) the vendored world-model package matches its manifest, package.json, the lockfile and the installed copy [1.45ms]
+(pass) the vendored agency package matches its manifest, package.json, the lockfile and the installed copy [0.61ms]
+(pass) the vendored router package matches its manifest, package.json, the lockfile and the installed copy [1.07ms]
+(pass) the installed memory host matches its vendored artifact and the adopted core runtime [53.71ms]
+
+api/domains/dialogue/test/attachment-notes.test.ts:
+(pass) images without host annotations leave the text unchanged [0.05ms]
+(pass) annotations follow the text in image order as reference data, including an empty meta [0.04ms]
+
+api/domains/dialogue/test/specialist-notices.test.ts:
+(pass) the screen reuses only an adopted terminal explanation of the same session and child, and forget removes it [83.63ms]
+(pass) a persisted observation resumes the same specialist without adding a user message or granting a tool [77.96ms]
+(pass) an observation cannot discard or invoke even when the model ignores its reply-only schema [75.07ms]
+
+api/domains/dialogue/test/pursuit-result.test.ts:
+(pass) a research result keeps the answer, source identity, uncertainty and partial outcome visible [0.32ms]
+
+api/domains/dialogue/test/context-system.test.ts:
+(pass) the five sections stand in order, each part in its own, and no input heading is among them [0.25ms]
+(pass) a section without a part is left out (the feeling rule while the setting is off) [0.10ms]
+(pass) every persona's role and style sentences are in the text, as the sources write them, without examples [3.55ms]
+(pass) the names are stated as given, omitted when empty, and never substituted [0.30ms]
+(pass) no host rule carries an example, and the same input gives the same bytes [1.70ms]
+
+api/domains/dialogue/test/routed-work-integration.test.ts:
+(pass) a multi-score turn can ask about its whole work instead of starting the automatic pipeline [75.77ms]
+
+api/domains/dialogue/test/progress.test.ts:
+(pass) publishing an unwatched run still delivers its current status to a later subscriber [68.39ms]
+
+api/domains/dialogue/test/generation-work.test.ts:
+(pass) check reads a TODO's state and result into the talk turn's notice, and logs only the check [1092.16ms]
+(pass) an approval is refused when the confirmation statement was not heard at all [97.53ms]
+(pass) an irreversible confirmation heard only in part is not enough to approve [81.34ms]
+(pass) a partial playback records what was heard of the reply [81.13ms]
+(pass) finished work is archived as it finishes, with an unread notice the screen reads and marks read [1086.89ms]
+(pass) clearing notification history keeps TODO results, archives every page, and leaves future completion notices visible [3139.05ms]
+(pass) the TODO screen's archive stops the run an open TODO waits on and archives it as cancelled, with no notice [94.62ms]
+(pass) an agency utterance is recorded as a spontaneous said event, and the next input carries it as the agent's [74.74ms]
+(pass) a memory read returns the long-term items that match, tells them to the talk call and logs the read [80.59ms]
+(pass) a memory not yet published is read with its text and not marked as shown [77.53ms]
+(pass) cancel of a waiting TODO from a later utterance ends the run it waits on, and the TODO is done as cancelled [74.15ms]
+(pass) the TODO screen's page shows the whole request, the newest finished first, in the archive [2095.07ms]
+(pass) a finished TODO can still be checked: its result is read again, with room for what the notice left out [1126.05ms]
+(pass) a spoken reply takes its place when adopted and keeps only what was heard; one not heard at all leaves the input [105.11ms]
+(pass) an image waiting for LARM memory extends its open run, never shortens it, and not after it ends [1078.26ms]
+
+api/domains/dialogue/test/todo-screen.test.ts:
+(pass) the archive read returns only the latest 20 by archive time and leaves them out of the active page [74.72ms]
+
+api/domains/dialogue/test/error-report.test.ts:
+(pass) token counting refusal includes the connection and upstream correlation without raw provider text [70.39ms]
+(pass) records written in UTC before the JST format and JST records mix in one correct timeline [75.04ms]
+(pass) a worker's control failure is reported in the fixed form with the first failure and its reference [70.61ms]
+(pass) repeated rejections of an operation fold into one row; a contract violation names the run's reason [70.28ms]
+(pass) a research failure answered by the fixed reply is reported with the tool failure of the Web run [70.38ms]
+(pass) a cancellation and the failure it causes are reported with the cancellation first [72.94ms]
+(pass) an inference failure shows where it happened (without the checkout's path) [70.78ms]
+(pass) a repaired violation of the first round is a row of the table, not the failure the worker ended with [69.38ms]
+(pass) a warning the run went on from is not the failure; the record with the run's failure code is [68.88ms]
+(pass) records from the rotated generations and the other IDs of the run are read [72.89ms]
+(pass) a missing log still gives the overview from the run's own state [68.33ms]
+(pass) an interrupted run, which ended without an answer, is reported like a failure [66.75ms]
+(pass) only fixed fields and identifier-like values are printed; text, settings and unknown fields never are [72.12ms]
+(pass) a long run stays within the limit: the oldest normal rows go first and the omission is stated [78.46ms]
+(pass) the route returns the report, 404 for an unknown run and 409 for a run that did not fail [284.47ms]
+
+api/domains/dialogue/test/specialist-lifecycle.test.ts:
+(pass) expiry is the session's only one: polling never extends it, an accepted utterance does [81.87ms]
+(pass) an expired session is not extended by a new utterance: it ends and the utterance goes the ordinary way [78.09ms]
+(pass) a turn that outlives the session's expiry is not adopted [88.51ms]
+(pass) the sweep ends expired sessions; a refusing domain leaves them closing and the next sweep retries the same end [79.61ms]
+(pass) a suspended work that was saved meanwhile is ended by the sweep, an unsaved one is kept [78.50ms]
+(pass) recovery ends every session that was not ended as restarted [77.30ms]
+(pass) a pinned form submit is the main conversation's: an active session does not take it [78.78ms]
+(pass) commands: revision guard, idempotent by requestId, return suspends or ends, resume advances the epoch [78.25ms]
+(pass) closing a clean work ends it; returning a clean one ends it too [80.65ms]
+(pass) return cancels the turn in flight; the work is free and a late result is not adopted [132.17ms]
+(pass) an utterance while a turn holds the work is queued behind it, in order, and takes the work when its turn starts [80.25ms]
+(pass) the work is never free between two queued turns; a return command withdraws the turn in flight and hands the queued utterances to the conversation agent in order [89.75ms]
+(pass) when the specialist leaves, utterances queued behind it go to the conversation agent instead of being lost [84.39ms]
+(pass) an expired session with a turn in flight is withdrawn when the next utterance ends it [138.42ms]
+(pass) the live check holds only for an active or suspended session that has not expired [80.75ms]
+(pass) after the specialist leaves, the conversation's own exchanges are not blocked from memory and are learned from [84.04ms]
+
+api/domains/dialogue/test/command-interactions-work.test.ts:
+(pass) the pending choice's answer is accepted once and the same run resumes the interaction [79.13ms]
+(pass) a second answer to the same question is refused: the TODO no longer waits and is not offered [84.58ms]
+(pass) an answer to a question whose chain has since been replaced is refused and leaves the question open [82.84ms]
+(pass) an answer the UI gave completes the operation into the TODO that asked the question [76.60ms]
+(pass) a question asked again after a UI answer replaces the TODO's question [81.19ms]
+
+api/domains/dialogue/test/specialist-turn.test.ts:
+(pass) a malformed output is repaired once with the rejected output as data; a second one fails the run [171.29ms]
+(pass) a rejected output is logged with where it broke the contract, never with what it said [94.17ms]
+(pass) a repair call says where the output broke the contract: schema path and kind, or the reply's measured length, never an internal code name [86.77ms]
+(pass) a turn is bounded by its model calls; the last one must carry its reply, and work changed before the limit is reported by the host [76.21ms]
+(pass) refusals beyond the tool's retries end the turn with the host's words [75.58ms]
+(pass) a refused or invalid operation is data for the next call, never a crash [85.23ms]
+(pass) the specialist is not given memory, World, the main prompt or the conversation's persona [74.31ms]
+(pass) a toolchain's own time limits: the run lasts its run time from the hand-over, each call gets its turn and inference time, and an utterance addressed to it gets the run time too [76.56ms]
+(pass) the specialist turn never calls the conversation model, and a failed turn does not either [81.65ms]
+(pass) HTTP: the session, its commands and their errors [80.48ms]
+(pass) HTTP: an utterance while a turn holds the work is accepted and queued [82.88ms]
+(pass) the addressee the screen showed must still listen: otherwise nothing is stored (409 addressee_changed) [87.33ms]
+(pass) a saved item older than the recent choices is offered, accepted and shown when it is on screen [155.13ms]
+(pass) a refusal's short repair hint reaches the specialist, truncated [76.99ms]
+
+api/domains/dialogue/test/command-interactions-lifecycle.test.ts:
+(pass) an answer whose request id already belongs to another run is a conflict, not a link [78.93ms]
+(pass) a failed operation ends the interaction without a receipt [75.61ms]
+(pass) answers are refused for a stale question or revision, an invalid value, or a changed version [72.30ms]
+(pass) an answer past the question's time is expired, not resumed [78.48ms]
+(pass) maintenance expires open questions and ends interactions whose run is gone [74.39ms]
+(pass) an answer and its new run commit together: a refused job leaves the question open [73.39ms]
+(pass) at most three questions are asked; the fourth stops the operation [82.48ms]
+(pass) interactions are bounded: open and total capacity refuse a new one, and ending keeps the body for 30 days [84.40ms]
+(pass) ended interactions lose their bodies after 30 days and their rows after 30 more [72.44ms]
+(pass) an interaction whose run ended without finishing it is closed [181.37ms]
+
+api/domains/dialogue/test/specialist-memory.test.ts:
+(pass) 2026-10-18: a draft whose reply broke the contract, an utterance cut off by the next one, and the follow-up all reach the specialist [87.87ms]
+(pass) a failed turn stays in the course with its refused operations and its code [82.52ms]
+(pass) an operation that changes nothing ends the turn with the host's question, without another call [78.77ms]
+
+api/domains/dialogue/test/routed-choice.test.ts:
+(pass) the resources State names are its references, not the words of their labels [0.04ms]
+(pass) a hand-over's refs are the named resources; with none named the branch has no refs [0.06ms]
+(pass) the work State lists is read by its lines' heads: a title that holds a number is not work [0.01ms]
+(pass) a toolchain with saved items always names its target: new first, then the items; the system says when each [0.11ms]
+(pass) a cloud provider gets the fill in strict form: one object, every field required and nullable, no ranges; the host reads it back [0.18ms]
+
+api/domains/dialogue/test/generation-tools.test.ts:
+(pass) the argument schemas leave each mode's required fields to the host's check [0.45ms]
+(pass) a delegate call without impact or the request is taken (the host fills or checks it); approve may carry it [0.04ms]
+
+api/domains/dialogue/test/media-deadline.test.ts:
+(pass) image: default deadline survives on-demand startup without overriding caller limits [0.23ms]
+(pass) image: explicit deadline survives on-demand startup without overriding caller limits [0.07ms]
+(pass) image: longer deadline survives on-demand startup without overriding caller limits [0.07ms]
+(pass) music-create: default deadline survives on-demand startup without overriding caller limits [0.07ms]
+(pass) music-create: explicit deadline survives on-demand startup without overriding caller limits [0.05ms]
+(pass) music-create: longer deadline survives on-demand startup without overriding caller limits [0.05ms]
+
+api/domains/dialogue/test/routed-router.test.ts:
+(pass) the package decides with no model call: a sure toolchain is offered by the host, handed the words and announced in the host's words (row 2) [71.94ms]
+(pass) the conversation leads when no tool scores: the turn talks, with one call and no choice [70.13ms]
+(pass) a toolchain best-v2 is not sure of is asked to try, in the host's words (row 3) [71.17ms]
+(pass) an unsure toolchain that changes what exists is confirmed first (row 4), and a yes above the approval line approves it (row 5) [74.98ms]
+(pass) a yes below the approval line asks the host's question again and leaves the confirmation open; a sure no closes it [76.69ms]
+(pass) route(): row 9 never dispatches only the first job when no planner is available [70.47ms]
+(pass) a router that fails, is slow, has no memory or no embedding leaves the turn to the talk turn; the trace says why (row 10) [407.01ms]
+(pass) a toolchain with inputs is filled by the one-candidate call, the only model call, held to that candidate [73.59ms]
+(pass) a fill that finds nothing to ask for leaves the turn to the talk turn; one that asks back keeps the request it asked about [77.03ms]
+(pass) a hand-over the host refuses, or an instant toolchain that cannot answer, is said in the host's failure words, with no call to try again [77.41ms]
+(pass) a memory request is filled by the one-candidate call and taken by the host's operation [73.42ms]
+(pass) a work is checked, corrected or cancelled by the package's decision: the host's operation, the host's words [77.04ms]
+(pass) a doubted hand-over is redone elsewhere: the work is cancelled, the same words go to the other toolchain, and the correction is kept [78.30ms]
+(pass) the turns before go to the reranker's port, and the user's utterance before the words goes to the toolchain with them [73.90ms]
+(pass) a correction near the utterance moves the decision, never to a sure one; disagreeing ones apply none and are put out of use; weight 0 turns them off [148.97ms]
+(pass) with no profile saved there is no router: the turn talks, and nothing is offered or embedded [74.60ms]
+(pass) with the router on the user-intent judge is not asked: the package sees the tools and the open confirmations together [77.65ms]
+(pass) the resources State presents go with a hand-over the router decided, for the agent to pick from [1086.80ms]
+(pass) routeStructured: one request with a reference routes the masked utterance; the structure model is the saved resource, at low effort [74.06ms]
+(pass) routeStructured: no request is the conversation, with nothing scored; requests of two tools never dispatch a partial first job when the pipeline is unavailable [80.17ms]
+(pass) routeStructured: a failed structure model leaves the entire request unperformed without direct fallback [71.33ms]
+(pass) routeStructured: a mixed multi-job request never falls back to running only its first tool [70.34ms]
+
+api/domains/dialogue/test/queue.test.ts:
+(pass) a run handles the utterances pending at its claim; a later input waits for its own run [75.16ms]
+(pass) utterances pending together are one generation; a run with nothing left to handle ends as handled [75.44ms]
+(pass) full queue rejects the submit and stores neither message nor run [69.89ms]
+(pass) restart: queued runs continue, a running run is interrupted, a late result from the old owner is rejected [76.46ms]
+(pass) runs from before the queue existed are interrupted, not given a new job [69.02ms]
+(pass) a scheduled prompt creates exactly one background run per occurrence; an interactive input is claimed first [82.15ms]
+(pass) waitForTerminal honours its own timeout and an abort, and never cancels the run [108.54ms]
+(pass) a rejected answer adoption fails both the run and its queue job, and adds no message [79.48ms]
+(pass) only an adopted, confident motion labels an answer; a judgment of a cancelled run is rejected [78.71ms]
+(pass) the emotion context holds the earlier turns and the complete answer, never a later input [73.34ms]
+
+api/domains/dialogue/test/generation.test.ts:
+(pass) an utterance is answered with plain text: the said events, a full delivery and the answer trace [75.90ms]
+(pass) a model call that fails fails the run; its utterance joins the log unanswered and the next generation answers only its own [77.75ms]
+(pass) choices the host cannot carry out twice leave the host's words and a rejected selection; nothing is handed over [73.00ms]
+(pass) an instant toolchain's answer is the host's answer, and makes no TODO [71.51ms]
+(pass) a delegation is announced, opens a TODO and hands the run over; the finished work ends the run without a generation and is archived with its notice [1080.05ms]
+(pass) a finished TODO with no agency port ends its run without a generation too [1092.45ms]
+(pass) an answer delivery uses the emotion of the reply, never judged again [98.33ms]
+(pass) a change needs a confirmation first; the approval executes the saved request [81.89ms]
+(pass) a memory request goes to the steward with the user's message as its source [73.39ms]
+(pass) a spoken answer cut short records what was heard, without the announcement [75.82ms]
+
+api/domains/dialogue/test/routed-work-choice.test.ts:
+(pass) multiple candidates may describe one interactive work: offer whole-work owners, not a partial first job [0.28ms]
+(pass) a genuine execution keeps the entire original request even if the model writes a first-job summary [0.08ms]
+(pass) no interactive owner leaves the existing multi-job path intact without an extra model call [0.03ms]
+(pass) an unavailable or partial candidate never becomes a handover; none and malformed choices also fall back [0.26ms]
+(pass) an unresolved whole-work choice asks once without starting any owner [0.07ms]
+
+api/domains/dialogue/test/run-end.test.ts:
+(pass) a completed run tells the steward once, with its conversation and the completed state [70.92ms]
+(pass) a failed run tells the steward its failure [69.54ms]
+(pass) a cancelled run tells the steward it was cancelled, and its waiting TODO ends with it [72.64ms]
+(pass) stopping the reply of a run that handed its work over keeps the run and its TODO [73.24ms]
+(pass) stopping the reply of a run that handed nothing over cancels it [67.43ms]
+(pass) a run that already completed is not ended or told twice by a later cancel [69.25ms]
+(pass) a run left without a job when the backend restarts is interrupted and the steward is told [68.31ms]
+
+api/domains/dialogue/test/brief-reply.test.ts:
+(pass) specialist reply length is bounded without limiting production arguments [0.29ms]
+(pass) brief speech is at most two sentences, keeping decimal values and links intact [0.05ms]
+(pass) a display artifact's body is not held to the speech contract [72.43ms]
+(pass) a long conversation answer is adopted as it is: the host neither repairs nor rejects it [72.02ms]
+
+api/domains/dialogue/test/controller.test.ts:
+(pass) the dialogue controller validates requests and delegates one run per request ID [66.91ms]
+(pass) the public runs API rejects utteranceId, unknown keys and a pinned toolchain outside a form submit; it accepts the shape web and CLI send [69.49ms]
+(pass) the resubmit route answers the new run, 400 for an empty text, 404 for an unknown message and 409 when refused [73.23ms]
+
+api/domains/dialogue/test/resources.test.ts:
+(pass) a resource keeps its number; the most recently used comes first; a forgotten one is hidden and returns under its number [63.40ms]
+(pass) a message links resources in order, once each [65.14ms]
+(pass) an image result becomes the TODO's link, which the state names by its number [69.04ms]
+(pass) delegate refs: a number in the ledger becomes a reference with the owner's text; an unknown or forgotten one is refused [66.84ms]
+(pass) a finished image TODO links its image, its notice and a message citing it show it, and the next prompt shows its number [1097.85ms]
+(pass) the resource on screen is shown in the state by its number and joins the ledger as viewed [94.69ms]
+(pass) the candidates tell what a toolchain makes, in the kinds' display names [75.99ms]
+(pass) forgetting the messages a TODO came from empties its links and hides the resources it made [1086.93ms]
+(pass) the resources a confirmation was issued with are kept with it [65.89ms]
+
+api/domains/dialogue/test/generation-prepare.test.ts:
+(pass) the recent conversation is native messages from the agent's first utterance; the last message is State, then the user's words [76.77ms]
+(pass) the talk system part is its sections in order, and the same in every talk call [77.22ms]
+(pass) a read stays in its own turn: the next input has the reply only, and what was read was text [93.58ms]
+(pass) a notice is the host notice of the last message, its fields as items; no user section [70.98ms]
+(pass) a plain notice text is the host notice as it is [71.30ms]
+(pass) the user's words can not forge a heading or a role [73.23ms]
+(pass) after half an hour nothing said before stays in the recent conversation, and the gap is said in the 今 line [82.30ms]
+(pass) clearing the recent conversation leaves the earlier words out of the next input, and what follows is kept [77.15ms]
+(pass) the recent conversation is not cleared while a run of the conversation is waiting or running [81.86ms]
+(pass) a window too small for the planned sections fails the run with window_too_small, with no model call [75.32ms]
+
+api/domains/dialogue/test/dialogue.test.ts:
+(pass) a request ID is idempotent, a different body under it conflicts, and the answer is adopted atomically [84.00ms]
+(pass) a pinned toolchain is stored on the run and is part of the request's identity [72.58ms]
+(pass) a failed input persistence prevents any provider request [0.25ms]
+(pass) a cancelled inference cannot append its answer [72.93ms]
+
+api/domains/dialogue/test/command-interactions.test.ts:
+(pass) the offer comes from the catalog: bound chains by adapter availability, the rest by host capability [145.32ms]
+(pass) a delegation to a command toolchain opens a command TODO and hands the run to the command job [78.05ms]
+(pass) a delegation ends the generation: the model is not called again after the work was handed over [75.44ms]
+(pass) a command chain without a binding or with an unknown backend is refused before any execution [222.65ms]
+(pass) a bound chain runs through the generic action route with the binding's adapter and operation [73.92ms]
+(pass) arguments that the binding's schema rejects never reach the agent runtime [69.54ms]
+(pass) an operation without an interaction carries no frozen stamp [79.16ms]
+(pass) the command sub-agent runs as a sub-agent of its run, as one call [71.84ms]
+
+api/domains/dialogue/test/tool-exchange.test.ts:
+(pass) a hand-over's search and delegation are kept with its announcement, the next local turn draws the words alone, and the background calls read the same prefix [1086.91ms]
+(pass) a confirmation's number and a refused call are kept; the read is not [92.47ms]
+(pass) a result keeps only the candidates' names and the host's numbers, never an instant answer's text [0.15ms]
+(pass) a replayed call's arguments are always a JSON object, each text within its bound [0.10ms]
+(pass) a report keeps the notice of the work it told; the next local turn draws the words alone [1088.59ms]
+
+api/domains/dialogue/test/agency-sources.test.ts:
+(pass) TODO revision changes and withdrawn capabilities invalidate only their own source versions [79.56ms]
+
+api/domains/dialogue/test/pinned-operation.test.ts:
+(pass) a run pinned to image.create hands its submit body to the toolchain: a TODO, no model call, no answer text [73.21ms]
+(pass) a run pinned to music.create hands over the same way when the music port is offered [70.00ms]
+(pass) a run pinned to a command toolchain (the CLI's --toolchain) hands its body to the command sub-agent [73.22ms]
+(pass) a toolchain that is not offered on this host (no music port) fails the pinned run with toolchain_unavailable and no fallback [72.24ms]
+(pass) a toolchain with no active revision (not in the catalog) fails the pinned run with toolchain_unavailable and no fallback [69.33ms]
+(pass) a toolchain whose card cannot be rebuilt fails the pinned run with toolchain_unavailable and no fallback [67.46ms]
+(pass) a research toolchain fails the pinned run with toolchain_unavailable and no fallback [73.22ms]
+(pass) a music playback toolchain fails the pinned run with toolchain_unavailable and no fallback [73.84ms]
+
+api/domains/dialogue/test/conversation-input.test.ts:
+(pass) the recent conversation starts with the agent, leaves out what waits for an answer, and joins a side's run [0.12ms]
+(pass) an utterance is cut at its bound, and its data can not open a heading [2.67ms]
+(pass) a fixed-rule cut keeps the newest few from an agent's utterance [0.07ms]
+(pass) `## Memory` holds the leanings only, with source and date, within its bound [3.75ms]
+(pass) the last message joins a trailing user message and carries `## Memory` when nothing comes before it [0.05ms]
+(pass) a research result is what was and was not confirmed, with links to its own sources, within its bound [0.37ms]
+(pass) a result names its resources by number, hides identifiers, and says failure plainly [0.09ms]
+(pass) tool results are text: the search lists its candidates with how to call them, never JSON [0.05ms]
+(pass) lines past a bound name how many were left out and of what [0.10ms]
+(pass) the keeper's operations apply by the numbers shown; a rule broken anywhere refuses the whole output [0.22ms]
+(pass) after a gap nothing said before stays, even when the memory or the system part changed meanwhile [0.13ms]
+
+api/domains/dialogue/test/harness-voice.test.ts:
+(pass) the route of a voice run is found from its bound llm request by the run id [71.72ms]
+
+api/domains/dialogue/test/execution-notices.test.ts:
+(pass) revoking a queued notice run cancels it and its job, and the steward is told it was cancelled [69.90ms]
+(pass) revoking a notice that already completed changes nothing [71.76ms]
+(pass) revoking an unknown source is a no-op [66.61ms]
+
+api/domains/dialogue/test/memory-integration.test.ts:
+(pass) a remembered fact is in the profile of the next prompt [77.28ms]
+(pass) memory switched off injects nothing: the profile is empty [90.30ms]
+(pass) a forgotten fact leaves the next prompt, and the messages it came from stay in the conversation [85.75ms]
+(pass) a forget of a fact shown while the answer is generated makes that answer stale: nothing is adopted [82.61ms]
+(pass) an addition or a republish during generation does not expire the answer [84.09ms]
+(pass) a fact whose period has not started yet, or has ended, is not current understanding [89.28ms]
+(pass) a remembered text with newlines stays on its own line, so it cannot forge a heading or a line [75.60ms]
+(pass) the context policy of a memory-enabled run is exact: the server neither trims nor reorders the prompt [73.54ms]
+(pass) a long multibyte conversation id keeps its runs and its messages apart from others [79.58ms]
+
+api/domains/dialogue/test/structured-continuation.test.ts:
+(pass) a structured answer resumes the same question and work once, without a new routing score [81.21ms]
+(pass) a mixed reply asks about the whole unperformed scope and leaves the existing question open [80.12ms]
+(pass) an invented question reference fails before answering or starting a replacement job [78.32ms]
+(pass) structured cancellation reaches the same command and rejects a later answer to its closed question [78.79ms]
+(pass) a model's partial answer or cancellation cannot omit the rest of the utterance [77.34ms]
+
+api/domains/dialogue/test/resubmit.test.ts:
+(pass) an edit while the answer is generated stops the run, corrects the utterance and answers it again [78.31ms]
+(pass) the same text sends the utterance again without a correction [73.69ms]
+(pass) an utterance stopped by the user can be edited and answered [73.93ms]
+(pass) an answered utterance is not edited, and nothing changes [72.32ms]
+(pass) an utterance whose delegation was committed is refused and its run keeps waiting [74.95ms]
+(pass) an utterance followed by another is not the latest [68.36ms]
+(pass) a screen's submit, an empty text and another conversation's message are refused [67.03ms]
+(pass) a repeated requestId is one edit and one run [75.00ms]
+(pass) finding a toolchain commits nothing: the utterance is still edited, and its exchange moves to the new run [83.85ms]
+(pass) a repeated requestId with another text is a conflict [72.19ms]
+
+api/domains/dialogue/test/routed-route.test.ts:
+(pass) the host's candidates: the work, the open confirmations and questions, in the order the records give [0.28ms]
+(pass) a work doubted offers a redirect to each other toolchain of the earlier prediction set, at most two [0.29ms]
+(pass) a redirect is offered only from a decision the host can still name: the toolchain the work went to is active [0.14ms]
+(pass) a description that carries the user's words stays within the router's bound, whatever they are [0.16ms]
+(pass) a delimiter inside the user's words cannot close the context it sits in [0.06ms]
+(pass) a hand-over waiting for the word on unsaved work offers one candidate, last, that lets it go [0.04ms]
+(pass) only the newest six work are offered [0.07ms]
+(pass) the trace keeps the package's ranking, the prediction set, the row, the entry and best-v2's gate [0.06ms]
+
+api/domains/dialogue/test/agency-state.test.ts:
+(pass) forget fences late checkpoints and removes their saved bodies [0.51ms]
+(pass) only an actual current autonomous work authorizes research and expiry revokes it [0.34ms]
+(pass) a worker failure at ready_for_answer returns failure instead of waiting for a nonexistent report [0.31ms]
+(pass) evidence invalidated before adoption is rejected and the pending answer ends [0.29ms]
+(pass) actual dispatch time is atomic with the effect and survives subsequent checkpoints [0.25ms]
+
+api/domains/dialogue/test/context-keeper.test.ts:
+(pass) the keeper reads the shared prefix with its own sections under a strict schema, and what it writes of the state is held [101.35ms]
+(pass) with no cut point to offer, the keeper is not called while its state is held [182.84ms]
+(pass) the keeper's provider schema keeps each op's shape and types, and leaves the bounds to the host [0.44ms]
+(pass) the keeper offers the World names it reads inside one read transaction [95.75ms]
+(pass) a held state op that breaks a rule is only counted: the cut it chose is taken [96.73ms]
+(pass) a cut at a point it was not offered refuses the whole output [90.08ms]
+(pass) the keeper's cut moves the recent conversation, and the new prefix is read ahead [102.94ms]
+(pass) a user utterance stops the keeper of that conversation: the answer comes first [288.52ms]
+
+api/domains/dialogue/test/shared-files.test.ts:
+(pass) an input's shared file is numbered, linked to its message and presented; the next turn lists it as shared [80.89ms]
+(pass) a shared file that is gone is neither presented nor listed [75.96ms]
+(pass) a store that cannot take the input leaves the input accepted without numbers [78.33ms]
+
+api/domains/dialogue/test/routed-router-switch.test.ts:
+(pass) the word that lets unsaved work go hands the waiting request over again, to the same item; below the approval line the host asks and does nothing [97.73ms]
+
+api/domains/dialogue/test/harness.test.ts:
+(pass) the harness: the last two utterances with local low and cloud high within 4,096 tokens [0.06ms]
+(pass) the llm route is LARM only unless the saved route picks a usable cloud model [0.10ms]
+(pass) a usable saved cloud model is the llm route; speech routes are left as saved [0.04ms]
+(pass) the copy filter leaves out an agent's utterance that copies the system part, and only when the flag is on [0.13ms]
+(pass) an answer that copies the system part fails only while the harness's gate is on [0.25ms]
+(pass) a run is the routed turn: its calls carry the harness's limit and reasoning [77.49ms]
+(pass) a run takes the saved cloud model's route and runs the same routed turn: the same limit and the same talk system [162.68ms]
+(pass) a saved cloud model that can not be used falls back to LARM [73.67ms]
+(pass) a run accepted keeps the saved route as it is: a LARM-preferred one stays so [77.08ms]
+(pass) a run captured at prepare pins speech to LARM and routes the llm as the saved route picks [77.04ms]
+(pass) a resubmitted utterance is captured with the saved route as it is [77.90ms]
+
+api/domains/dialogue/test/specialist.test.ts:
+(pass) a session starts from the conversation's delegate, then talks directly: no conversation model call for the utterances after it [96.45ms]
+(pass) a hand-over to a session toolchain ends the generation: the model is called for the one choice only (the host searches itself) [77.81ms]
+(pass) an utterance handed to the specialist is logged as said by the user, to the specialist, and is not pending for the conversation agent [81.34ms]
+(pass) the specialist's reply is logged as said by the specialist, with the toolchain's id (6.8) [76.42ms]
+(pass) specialist dialogue is blocked from memory, and the specialist's turns tell the steward nothing [82.11ms]
+(pass) returning: unsaved work is suspended and the conversation agent takes over with a short record of it [86.87ms]
+(pass) returning a clean work ends the session once and tells the conversation agent once [81.56ms]
+(pass) a request outside the specialist's scope is forwarded to the conversation agent once, as its own utterance [164.34ms]
+(pass) a discard ends the session, drops the work and returns the conversation [97.23ms]
+(pass) a hand-over to another toolchain while unsaved work stands waits for the user's decision, and the conversation agent asks [99.76ms]
+(pass) the same target resumes the suspended work instead of starting another [91.53ms]
+(pass) a target the host did not issue is refused before anything starts [77.86ms]
+(pass) a saved item starts the session from it; the fill offers exactly the issued items, and the screen's viewing is shown when issued [82.92ms]
+(pass) an item on screen the host did not issue is not shown [76.42ms]
+(pass) a change of a saved item is confirmed naming the item, and the approval opens that same item [82.48ms]
+(pass) a request to make something new is handed to the specialist at once, on a new work [77.88ms]
+(pass) a confirmation keeps its target: the same request on two items stays two confirmations, and the approved one opens its item [83.83ms]
+(pass) an item that is gone is refused when confirmed, and a confirmation whose item went since is closed before anything is announced [80.41ms]
+(pass) forgetting the words a confirmation came from clears its target with its request [71.86ms]
+
+api/domains/dialogue/test/specialist-document.test.ts:
+(pass) the work document is read as its canonical text, and the host offers its document tools [80.50ms]
+(pass) a partial edit with its reply makes a revision in one call and is kept in the session's course [80.49ms]
+(pass) an edit whose text is missing or not unique applies nothing and says which edit, for one retry [76.75ms]
+(pass) an edit that changes nothing ends the turn with the host's question [82.86ms]
+(pass) argument refusals name unexpected fields so the same bounded turn can repair the envelope [84.51ms]
+(pass) an edit on an old revision is refused with the current one [85.67ms]
+(pass) a whole write that fails its check is kept as the rejected draft and ends the turn at once; the next turn reads it [85.67ms]
+(pass) a write the domain had to trim says so after the reply [83.85ms]
+(pass) a document larger than the inline budget is an outline, and doc.view reads its lines [77.62ms]
+(pass) a domain refusal of the commit is data for the next call, and a later screen change is flagged [88.65ms]
+(pass) a later change that adds nothing after one that changed the work is reported as the change [79.74ms]
+(pass) an edit not found says why and gives the document's own lines to copy on the retry [79.96ms]
+
+api/domains/dialogue/test/read-tools.test.ts:
+(pass) a history read after the recent window closes recovers image analysis as text and its exchange references [74.12ms]
+(pass) the talk turn reads memory with its tool, and a second call with no tool tells what was read [84.08ms]
+(pass) a conversation submits a memory request through the existing steward inbox without writing State itself [74.91ms]
+(pass) a conversation without a steward cannot offer or submit a memory mutation [88.77ms]
+(pass) the conversation log is read from before the current words, the recent runs with how each was handled [114.06ms]
+(pass) a tool the talk turn was not offered is refused and never run; its next call answers [80.11ms]
+(pass) a read tool the search offered is chosen with its inputs: the talk turn tells what was read, with no tool [97.79ms]
+(pass) the sub-agents' work and World's records are told as records; nothing found says so [88.61ms]
+(pass) a forgotten message is read by none of the read tools: not in the log, nor as a run, nor as work [90.28ms]
+(pass) a read that cannot be made says so and the run goes on; a failed answer after a read gets the host's words [76.33ms]
+
+api/domains/dialogue/test/command-interactions-http.test.ts:
+(pass) the HTTP routes answer and list interactions with the documented statuses [79.44ms]
+(pass) the HTTP answer to an expired question is 410 [74.32ms]
+
+api/domains/dialogue/test/answer-streams.test.ts:
+(pass) a late subscriber receives only the current generation and superseded producers cannot publish [0.14ms]
+(pass) abort clears buffered text immediately and late subscribers cannot replay it [0.03ms]
+(pass) adoption releases the buffer without revoking audio already synthesized [0.02ms]
+(pass) disposing an old subscription twice cannot remove a later subscriber [0.03ms]
+(pass) a subscriber whose initial replay throws is removed instead of leaking without a disposal handle [0.03ms]
+
+api/domains/dialogue/test/state-text.test.ts:
+(pass) finished work is shown from the start of the recent conversation, within its usual window [0.09ms]
+(pass) the context keeper's fields show only while it runs [0.04ms]
+
+api/domains/dialogue/test/routed-router-turns.test.ts:
+(pass) a confirmation quotes the user's words only, not the utterance before them nor any marker; so do the criteria of its answers [77.26ms]
+(pass) a doubted work is not cancelled before the new hand-over is certain: a fill that asks back leaves it running [74.24ms]
+(pass) a doubted work stays running when the new toolchain needs the user's yes: the confirmation says so [76.58ms]
+(pass) a hand-over that fails after the old work was cancelled says both, with no model call to try again [77.09ms]
+(pass) a cancellation asked about once more is done on a plain yes: the user was asked, so the lower line holds [76.11ms]
+(pass) without the question before it, the same probability is asked about again [76.83ms]
+(pass) a redirect asked about is worded as doing it again, and its yes redirects the same work to the same toolchain [83.44ms]
+(pass) a redirect that was carried out is what its trace decided, so the next redirect names the toolchain the work went to [77.58ms]
+(pass) a read of the router's own that fails is a router failure: the turn talks [74.44ms]
+(pass) the router reads the head of a long utterance: 2000 characters embedded and searched, 400 for the reranker [72.13ms]
+
+api/domains/dialogue/test/routed-cut.test.ts:
+(pass) a fill cut at the output limit passes to talk and keeps its log, with none of the words [71.94ms]
+
+api/domains/dialogue/test/collaboration-control.test.ts:
+(pass) the same collaboration control takes a binding's tools without inventing extra operations [0.08ms]
+(pass) the host passes the current request separately and the package encloses the current document [0.08ms]
+(pass) a three-sentence operation reply is rejected and its repair repeats the host delivery limits [0.12ms]
+
+api/domains/dialogue/test/reconcile-agents.test.ts:
+(pass) a throwing event is logged, never rejected, and close() still completes [69.30ms]
+(pass) transient store errors back off but never fail the run [72.21ms]
+(pass) a poison event fails the run after five failures [70.48ms]
+(pass) a failing run synchronisation write does not reject [70.18ms]
+
+api/domains/dialogue/test/copy-gate.test.ts:
+(pass) a reply copying the rules is not kept and the host answers in its words: the next turn does not see it [72.18ms]
+(pass) a copying utterance kept before the gate (or the agency's) is not drawn into the recent conversation [79.62ms]
+
+api/domains/dialogue/test/routed-turn.test.ts:
+(pass) an instant toolchain the router decided answers from the inputs of the one fill call: the host says its answer [71.20ms]
+(pass) a talk cut before a word gets the host's words [70.72ms]
+(pass) a talk that tells the user who spoke nothing gets the host's words; each call of the turn ends only itself [72.06ms]
+(pass) a pipeline uses the request branch and has no legacy template input contract [75.73ms]
+(pass) no candidate fits: the talk turn answers with only the read tools, on a system that names no toolchain and the time alone of the state [69.42ms]
+(pass) a no on the pending turn closes the confirmation: the next turn has nothing pending [74.14ms]
+(pass) the talk turn's recent conversation is the last two of the user's utterances and the reply before them [83.52ms]
+(pass) finished work State still lists may be checked, never corrected: the check's record is what the talk turn tells [1085.75ms]
+(pass) the fill reads the user's earlier words of the talk window: its fields carry the condition they point to [78.36ms]
+(pass) the fill reads `## Memory` as the talk turn shows it [78.52ms]
+(pass) a fill the provider failed (a cloud error) leaves the turn to the talk turn; the cloud got the fill's strict form [73.11ms]
+
+api/domains/dialogue/test/command-interactions-questions.test.ts:
+(pass) a clarifying question is saved with the delegation's TODO and reaches the conversation, then is answered once by the UI [81.83ms]
+(pass) the resumed command run gets the question and the answer as data and completes the interaction with the receipt [77.95ms]
+(pass) a target question carries the host's choices and accepts only one of them [82.79ms]
+(pass) a binding without questions allows only free text, and the model is offered no other schema [74.28ms]
+(pass) free text is always allowed: a binding without questions asks builtin:answerText [81.46ms]
+(pass) a binding with questions offers exactly those schemas to the model [74.33ms]
+(pass) the choice field is the binding's: a schema with another field is validated the same way [80.95ms]
+(pass) a schema without a choice field carries no choices even if the host has some [76.08ms]
+(pass) a target question without host choices is asked as free text [73.46ms]
+
+api/domains/dialogue/test/active-run.test.ts:
+(pass) a conversation has an active run from acceptance until the run ends, and only that conversation [74.91ms]
+
+api/domains/dialogue/test/routed-package.test.ts:
+(pass) pipeline mapping preserves the requirement that every part can be executed by the host [0.09ms]
+
+api/domains/dialogue/test/conversation-output.test.ts:
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 1 [0.16ms]
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 3 [0.03ms]
+(pass) control text is never published, including split delimiters: delegate{mode:<|"| / 63
+(pass) control text is never published, including split delimiters: 元気の出る曲、再生しますね。
+
+＜p / 1 [0.06ms]
+(pass) control text is never published, including split delimiters: 元気の出る曲、再生しますね。
+
+＜p / 3 [0.02ms]
+(pass) control text is never published, including split delimiters: 元気の出る曲、再生しますね。
+
+＜p / 58 [0.01ms]
+(pass) control text is never published, including split delimiters: ＜tool_call＞
+＜funct / 1 [0.02ms]
+(pass) control text is never published, including split delimiters: ＜tool_call＞
+＜funct / 3
+(pass) control text is never published, including split delimiters: ＜tool_call＞
+＜funct / 52
+(pass) an ASCII run attached to control syntax goes with it, even when it streamed first [0.09ms]
+(pass) a name written like a call, with no provider delimiter, is ordinary text, and is published [0.05ms]
+(pass) angle brackets in ordinary prose are published [0.06ms]
+(pass) ordinary prose, JSON and code retain their text and stream before completion [0.07ms]
+(pass) an unfinished delimiter is held until its ordinary continuation is known [0.02ms]
+(pass) a natural prefix does not let later control syntax into the published text [0.04ms]
+(pass) control text in a nonstream response is never published; the text before it is the answer [0.04ms]
+(pass) held whitespace and discarded output still obey the total capacity limit [0.12ms]
+(pass) an answer that copies a line of the system part fails as it streams, and an ordinary answer passes [0.06ms]
+
+api/domains/dialogue/test/specialist-flush.test.ts:
+(pass) a deferred flush does not cancel a run the database still has running [68.71ms]
+
+api/domains/dialogue/test/context-eval/pipeline.test.ts:
+(pass) prepare freezes once; changing a holdout case afterwards is refused by prepare and by run [1721.72ms]
+(pass) prepare refuses a case whose messages break an invariant or cannot be prepared, before anything is frozen [381.29ms]
+(pass) holdout cases are not run before the freeze [11.23ms]
+(pass) fixture lane: run, score and analyze produce reports labelled fixture, each in a new directory [1004.35ms]
+
+api/domains/dialogue/test/context-eval/checks-judge.test.ts:
+(pass) tool checks look at the fixed tool names [0.07ms]
+(pass) delegation checks read the delegate call's mode and toolchain [0.09ms]
+(pass) speaks and silent read the text [0.01ms]
+(pass) the brief spoken reply contract is the delivery domain's isBriefSpokenReply [0.05ms]
+(pass) forbidden identifiers are exact substrings of the answer text [0.02ms]
+(pass) the request is blind: facts, input, answer and axes only, with the auxiliary exact JSON options [0.14ms]
+(pass) a generation without an utterance gives the judge its trigger; the events are the seed's, without keys [0.13ms]
+(pass) the judge sees the functions the answer called, with their arguments escaped, so "call or announce" is decidable [0.10ms]
+(pass) a valid reply (object or JSON text) gives a 0/1 per axis with its reason, in rubric order [0.15ms]
+(pass) the judge fails closed: call failure, bad JSON, schema violation and axis mismatch all need adjudication [0.46ms]
+(pass) without rubric axes the judge is not called [0.05ms]
+(pass) the judge prompt lives in a system-context toml, not in TypeScript [0.39ms]
+
+api/domains/dialogue/test/context-eval/scoring.test.ts:
+(pass) a trial passes only when every check and every axis passes [0.21ms]
+(pass) transport errors are counted apart; a contract failure is a failed trial; a repair is a violation [0.07ms]
+(pass) an unusable judge reply leaves the trial needing adjudication, and adjudication.json settles exactly that axis [0.19ms]
+(pass) a case passes on the majority of trials and is incomplete when a trial is unresolved, failed to run or missing [0.07ms]
+(pass) a failed deterministic check is a definite fail even when the judge is unresolved [0.07ms]
+(pass) duplicate or out-of-range trial rows never add votes and make the case incomplete [0.04ms]
+(pass) the scores.jsonl schema refuses malformed rows and knows the new check kinds [0.17ms]
+
+api/domains/dialogue/test/context-eval/trajectory.test.ts:
+(pass) the default trajectory is twelve generations that keep the message invariants [128.35ms]
+(pass) the system part stays the same and the recent conversation is a window of the user's last two utterances [61.11ms]
+(pass) the recent conversation is cut where the host's rules say: a long silence resumes the conversation [61.60ms]
+(pass) a memory saved after the profile was drawn waits until a cut draws `## Memory` again [61.92ms]
+(pass) the delegation's TODO is a line of the state, and a notice is the host notice of its generation [60.42ms]
+(pass) long exchanges pass the hard limit and the host cuts the recent conversation to the newest few [71.98ms]
+
+api/domains/dialogue/test/context-eval/integrity.test.ts:
+(pass) the freeze covers every harness source and the judge prompt, and nothing of the deleted arms [578.96ms]
+(pass) run.json records the settings snapshot and score.json the judge rules digest [369.00ms]
+(pass) the catalog text of the judge rules is byte-identical to the frozen toml source (live lane check) [0.40ms]
+(pass) score refuses raw rows that do not belong to the run: duplicates, unknown case, trial out of range, lane [321.87ms]
+(pass) score refuses a holdout run whose freeze changed; a dev run records a manifest mismatch [1258.15ms]
+(pass) analyze refuses scores whose raw rows changed, malformed score rows, an invalid prefix measurement, and a baseline of another lane [380.01ms]
+(pass) rerun condition: a line that is empty, missing or still says 要合意 is not filled in [0.11ms]
+(pass) transport re-run: refused until preregistered; then a NEW run dir holds the original rows with only the failed calls replaced, with provenance [1797.76ms]
+
+api/domains/dialogue/test/context-eval/analysis.test.ts:
+(pass) adoption: all seven criteria met adopts [1.81ms]
+(pass) adoption criterion 1: a transport error or an unresolved axis makes the decision incomplete [0.89ms]
+(pass) adoption criterion 2: one regression in a safety family rejects, even with a large net gain [1.10ms]
+(pass) adoption criterion 3: a net of zero adopts; a net below the configured minimum rejects [0.94ms]
+(pass) adoption criterion 4: a family with a net loss rejects even when the total gain is positive [0.23ms]
+(pass) adoption criterion 5: more F9 contract violations than baseline rejects [0.47ms]
+(pass) adoption criterion 6: prefix stability must be higher than baseline; unmeasured is incomplete, never adopted [0.52ms]
+(pass) adoption criterion 7: a median response time above the baseline's rejects [0.66ms]
+(pass) fixture and dev analyses are never binding; a safety regression rejects even when criterion 1 is also unmet [0.37ms]
+(pass) a run without a baseline is summarized per family, with its safety failures and no comparison [0.11ms]
+(pass) the report names the lane and says when a result cannot decide [0.47ms]
+
+api/domains/dialogue/test/context-eval/run.test.ts:
+(pass) every case is prepared once by the production code and its trials share the messages [163.41ms]
+(pass) planJobs closes every store it opens, including when a case cannot be prepared [118.23ms]
+(pass) a run records one row per call; a thrown error is a transport error with its class only, a contract failure is its own status [82.69ms]
+(pass) the fixture model answers through the production loop: with no router in the lane the turn talks, and the row is scored [41.10ms]
+(pass) the trajectory measurement is a valid report; ordinary calls share nearly all of the previous prompt, cut ones less [143.18ms]
+(pass) prefix stability counts the shared bytes of consecutive calls [0.07ms]
+(pass) the example experiment's cases all prepare within the message invariants [4788.89ms]
+
+api/domains/dialogue/test/context-eval/materialize.test.ts:
+(pass) a case becomes the production messages: the system part, the recent conversation, then State and the user's words [168.26ms]
+(pass) `## Memory` is the published leanings: a waiting memory, the notes, goals and World are not in the input [109.47ms]
+(pass) the recent conversation is what reached the user: a partial delivery as heard, nothing being spoken, no notice or tool line [73.24ms]
+(pass) TODOs and confirmations come from the work ledger as lines of `## State` [50.14ms]
+(pass) a generation without an utterance answers a host notice, with the TODO in `## State` [45.32ms]
+(pass) the input is deterministic, and outside text keeps its characters but can not open a heading [125.22ms]
+(pass) a window the plan cannot use stops the case, and the store is closed [38.14ms]
+(pass) a seed that fails to write closes the store before the error propagates [37.19ms]
+(pass) the generation time is just after the newest thing the seed records [0.09ms]
+(pass) a generation after a long silence keeps nothing said before it, and says why and how long [41.07ms]
+
+api/domains/dialogue/test/context-eval/case-schema.test.ts:
+(pass) a valid case parses; unknown fields and bad ids are rejected [0.30ms]
+(pass) id, family and split must agree; axes are unique; families that need an axis carry it [0.10ms]
+(pass) a generation without an utterance needs a trigger, and an utterance has none [0.07ms]
+(pass) references must name a seeded key, keys are unique, delivery fields agree with how much was heard [0.19ms]
+(pass) episode parts, TODOs, tendencies and forbidden identifiers are checked against the seed [0.16ms]
+(pass) the loader reports invalid json, schema errors, file-name mismatch and duplicate ids together [0.15ms]
+(pass) skeleton normalization keeps grammar and collapses content runs [0.02ms]
+(pass) dev/holdout leakage: the same skeleton or heavy n-gram overlap is refused; a different sentence passes [0.07ms]
+(pass) the example experiment's cases validate and cover every family in both splits [20.10ms]
+
+api/domains/dialogue/test/context-eval/freeze.test.ts:
+(pass) the manifest holds a sha256 per file and a holdout digest [0.13ms]
+(pass) freezing twice with the same content is a no-op; changed holdout content is refused [2.95ms]
+(pass) any frozen file (judge prompt, harness source) changing is refused, as are added and removed files [2.67ms]
+(pass) verifyFrozen fails closed when nothing was frozen [0.40ms]
+(pass) a report directory is new every time and a report file is never overwritten [3.49ms]
+
+api/domains/dialogue/test/context-eval/generation-runner.test.ts:
+(pass) a generation without an utterance only talks, and may stay silent [40.29ms]
+(pass) an answer that copies the system part is not heard: the host says its fixed words instead [39.98ms]
+(pass) the offline search ranks the catalog by shared character pairs, best first, at most four [0.26ms]
+
+ 625 pass
+ 0 fail
+ 3498 expect() calls
+Ran 625 tests across 98 files. [78.82s]

@@ -1,3 +1,4 @@
+import { assertLibraryIdle } from "../repository/library-operations";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ArchivePort, ArchivedDocument } from "../contracts";
 import type { Workspace, PendingSave } from "../repository";
@@ -33,6 +34,7 @@ export function createArchiveLibrary(store: SqliteStore, archive: ArchivePort) {
 				signal.throwIfAborted();
 				if (!binding || archive.binding() !== binding)
 					throw new Error("markdown_archive_unavailable");
+				assertLibraryIdle(db, binding, remote.entry.namespace);
 				const imported = input.stageId ? staged(db, input.stageId) : null;
 				if (input.expectedEtag && input.expectedEtag !== remote.entry.revision)
 					throw new Error("revision_conflict");

@@ -13,19 +13,23 @@ const hash = (body: Uint8Array) =>
 test("the installed collaboration entry and all shipped resources match the reviewed archive", async () => {
 	const archive = join(
 		root,
-		"vendor/collaboration/eumenes-collaboration-0.2.0-b407ecd8372b.tgz",
+		"vendor/collaboration/eumenes-collaboration-0.4.0-ce0d56eedc6a.tgz",
 	);
 	expect(hash(new Uint8Array(await Bun.file(archive).arrayBuffer()))).toBe(
-		"52a7041f47cfafa148db132144d82a0f436c19bb9de4aedca6761b1e846fabbd",
+		"ce0d56eedc6ada0e67e8aff39daba2ae29caddb4e328c1041620135d2a12450c",
 	);
 	const entry = Bun.resolveSync("eumenes-collaboration", root);
 	expect(entry.startsWith(join(root, "node_modules") + "/")).toBe(true);
 	const installed = dirname(dirname(entry));
 	const manifest = await Bun.file(join(installed, "manifest.json")).json();
-	expect(manifest.sourceCommit).toBe(
-		"b407ecd8372b2718f05c23a2340e0483833a0296",
+	expect(manifest.sourceCommit).toBeNull();
+	expect(manifest.sourceBaseCommit).toBe(
+		"b03426226ef5ef6ead47c216a309bb48c2a420df",
 	);
-	expect(manifest.sourceTreeDirty).toBe(false);
+	expect(manifest.sourceTreeDirty).toBe(true);
+	expect(manifest.sourceTreeDigest).toBe(
+		"5240d54d9a68246cda2cf1fbd4edf08d9d00e95aadc858072b341e84eaf4a56c",
+	);
 	expect(coreContractVersion).toBe(1);
 	expect(supportedStateSchemaVersions).toContain(1);
 	for (const [path, expected] of Object.entries(manifest.files)) {

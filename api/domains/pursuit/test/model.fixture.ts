@@ -1,6 +1,11 @@
 /** Fixed control model for lifecycle tests. Semantic choice is verified separately with a real model. */
 export function researchScript(
-	options: { consult?: boolean; sourceStart?: number; grader?: boolean } = {},
+	options: {
+		consult?: boolean;
+		sourceStart?: number;
+		grader?: boolean;
+		document?: boolean;
+	} = {},
 ) {
 	let proposals = 0,
 		asked = false;
@@ -69,6 +74,7 @@ export function researchScript(
 				"report_draft",
 				{
 					completion: "complete",
+					...(options.document ? { title: "一次資料の比較調査" } : {}),
 					answer: "本文で確認した結論です。[資料](https://example.com/source)",
 					summary: "本文に基づく結論",
 					claims: [

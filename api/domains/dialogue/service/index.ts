@@ -49,6 +49,7 @@ import { createErrorReport } from "./error-report";
 import { executionSourceInTransaction } from "./execution-source";
 import { createSpecialistHost } from "./specialist-host";
 import { forgetObservations } from "../repository/specialist-observations";
+import { forgetCollaborationState } from "./collaboration-state";
 import { executionCommands } from "./execution-command";
 import {
 	clearRecentInTransaction,
@@ -124,6 +125,7 @@ function registerChangeHooks(
  */
 function registerForgetHook(deps: DialogueDeps) {
 	deps.memory?.registerForgetPurge?.((db, purge) => {
+		forgetCollaborationState(db, purge.messageIds);
 		forgetObservations(db, purge.messageIds);
 		const changed = new Set(
 			deps.conversation.input.retractUtterancesInTransaction(

@@ -192,6 +192,7 @@ export class ArchiveFailure extends Error {
 	}
 }
 export type ArchivePort = {
+	management?: import("./library").ManagementPort;
 	available(): boolean;
 	binding(): string | null;
 	capabilities(signal: AbortSignal): Promise<{
@@ -199,6 +200,7 @@ export type ArchivePort = {
 		maxRecoveryBytes: number;
 		maxRequestBytes: number;
 		maxPageSize: number;
+		features?: import("./library").LibraryFeatures;
 	}>;
 	list(
 		signal: AbortSignal,
@@ -213,6 +215,14 @@ export type ArchivePort = {
 };
 export const errorStatus = {
 	markdown_document_too_large: 422,
+	overlapping_selection: 400,
+	unsupported_items: 409,
+	folder_not_empty: 409,
+	markdown_management_pending: 409,
+	markdown_unsaved_changes: 409,
+	markdown_library_unsupported: 409,
+	invalid_request: 400,
+	request_conflict: 409,
 	markdown_not_found: 404,
 	markdown_document_invalid: 422,
 	markdown_apply_invalid: 422,
@@ -234,3 +244,5 @@ export const stageInput = z.strictObject({
 		.refine((v) => new TextEncoder().encode(v).length <= 8 * 1024 * 1024)
 		.optional(),
 });
+
+export * from "./library";

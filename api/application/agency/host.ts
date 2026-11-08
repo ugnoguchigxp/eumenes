@@ -1,4 +1,4 @@
-import { archiveOf, resultInput } from "./memory";
+import { archiveOf, dependsOn, resultInput } from "./memory";
 import { currentInput, staleInputSources } from "./input";
 import type { Database } from "bun:sqlite";
 import type { AgencySnapshot, IdleCheckpoint } from "eumenes-agency";
@@ -122,6 +122,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		convs,
 		nowMs,
 		digest,
+		refreshSources,
 		feed: () => ({ cursor, activeId }),
 	});
 	const save = checkpoint.save;
@@ -207,6 +208,31 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 
 	// ---- runtime / conversation state --------------------------------------
 
+	function currentScopeInput(
+		db: Database,
+		input: import("eumenes-agency").InputContext,
+		id?: string,
+	) {
+		return (
+			currentInput(deps, db, input) &&
+			!dependsOn(
+				input,
+				new Set(id ? convs.get(id)?.runtime?.snapshot().forgottenRefs : []),
+			)
+		);
+	}
+	function topicsFor(c: Conv) {
+		const topics = topicsNow();
+		return store.read((db) =>
+			topics.filter((topic) =>
+				currentScopeInput(
+					db,
+					topic.input ?? { sources: [], complete: false },
+					c.id,
+				),
+			),
+		);
+	}
 	function topicsNow() {
 		const now = nowMs();
 		if (
@@ -243,7 +269,17 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	function todosNow(c: Conv) {
 		if (!work) return [];
 		try {
-			return store.read((db) => work!.todosInTransaction(db, c.id));
+			return store.read((db) =>
+				work!
+					.todosInTransaction(db, c.id)
+					.filter((todo) =>
+						currentScopeInput(
+							db,
+							todo.input ?? { sources: [], complete: false },
+							c.id,
+						),
+					),
+			);
 		} catch (error) {
 			log.warn("agency.todos_failed", {
 				subjectId: c.id,
@@ -323,7 +359,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			...(restore ? { restore } : {}),
 			tools: researchTools(store, deps.state),
 			todos: () => todosNow(c),
-			topics: topicsNow,
+			topics: () => topicsFor(c),
 			llm: wrapLlm(c, newScope()),
 			input: () => captureHostInput(deps, c, { agency: cfg, persona }),
 			archive: archiveOf(deps, c),
@@ -402,8 +438,8 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			offerReconsideration(
 				c,
 				nowMs(),
-				c.id === activeId ? topicsNow() : [],
-				(input) => store.read((db) => currentInput(deps, db, input)),
+				c.id === activeId ? topicsFor(c) : [],
+				(input) => store.read((db) => currentScopeInput(db, input, c.id)),
 			);
 		const opportunity: Opportunity = {
 			id: `o${++c.opportunities}`,
@@ -413,7 +449,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 			foregroundBusy: hostBusy(c),
 			playerBusy: false,
 			speechAllowed: speechAllowed(c),
-			topics: topicsNow(),
+			topics: topicsFor(c),
 			todos: todosNow(c),
 		};
 		const result =
@@ -553,7 +589,14 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 		c: Conv,
 		trigger: Opportunity["trigger"],
 	): Promise<CycleOutcome> {
-		const task = cycle(c, trigger);
+		const task = cycle(c, trigger).catch((error): CycleOutcome => {
+			log.warn("agency.cycle_failed", {
+				subjectId: c.id,
+				kind: trigger,
+				reason: toErrorCode(error, "cycle_failed"),
+			});
+			return "failed";
+		});
 		inflight.add(task);
 		const done = () => inflight.delete(task);
 		task.then(done, done);
@@ -654,7 +697,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	// ---- public ---------------------------------------------------------------
 
 	const dialoguePort: AgencyLayerPort = {
-		isCurrentInputInTransaction: (db, input) => currentInput(deps, db, input),
+		isCurrentInputInTransaction: currentScopeInput,
 		inputForMessageInTransaction: (db, id) =>
 			deps.state?.messageInputInTransaction(db, id) ?? null,
 		inputForContextInTransaction: (db, id) =>

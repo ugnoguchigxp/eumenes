@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-11-08T02:44:59.972Z",
+  "status": {
+    "status": 200,
+    "phase": "ready"
+  },
+  "caps": {
+    "status": 200,
+    "data": {
+      "maxMarkdownBytes": 8388608,
+      "maxRecoveryBytes": 8388608,
+      "maxRequestBytes": 20971520,
+      "maxPageSize": 100,
+      "features": {
+        "library": false,
+        "folders": false,
+        "patch": false,
+        "copy": false,
+        "delete": false,
+        "createFolder": false,
+        "recursiveDelete": false,
+        "folderCopy": false,
+        "batch": false,
+        "maxBatchItems": 0,
+        "maxAffectedItems": 0,
+        "maxCopyBytes": 0
+      }
+    }
+  },
+  "libraryStatus": 200,
+  "libraryCount": 7,
+  "operationsStatus": 200,
+  "operationStates": [],
+  "artifactStatus": 200,
+  "artifactActions": [
+    "markdown-new",
+    "markdown-apply",
+    "markdown-archive",
+    "markdown-select",
+    "markdown-open",
+    "markdown-library",
+    "markdown-return",
+    "markdown-resume",
+    "markdown-refresh",
+    "markdown-stop",
+    "markdown-reconcile",
+    "markdown-resolve",
+    "markdown-reload",
+    "markdown-more",
+    "markdown-files",
+    "markdown-manage",
+    "markdown-check"
+  ]
+}

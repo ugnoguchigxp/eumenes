@@ -1,8 +1,24 @@
-import { useCallback, useEffect, useRef, useState, useReducer } from "react";
+import {
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useRef,
+	useState,
+	useReducer,
+	type Ref,
+} from "react";
 import { Plate, PlateContent } from "platejs/react";
-import { FileText, FolderOpen, PencilLine, Plus, Upload } from "lucide-react";
+import {
+	Download,
+	FileText,
+	FolderOpen,
+	PencilLine,
+	Upload,
+} from "lucide-react";
+import { ActionButton, CreateButton } from "../ActionButton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../Tabs";
 import { MarkdownFileBrowser } from "./file-browser";
+import { MarkdownHeaderDelete } from "./header-delete";
 import { useCacheAutosave } from "./use-cache-autosave";
 import {
 	createMarkdownEditor,
@@ -11,7 +27,7 @@ import {
 } from "./editor";
 import { MarkdownToolbar } from "./toolbar";
 import { MarkdownSaveNotice } from "./save-notice";
-import { MarkdownDocumentFooter } from "./document-footer";
+import { downloadMarkdown } from "./download";
 import { MarkdownDocumentBar } from "./document-bar";
 import type { MarkdownCurrent, MarkdownWorkspaceProps } from "./types";
 import "./markdown-workspace.css";
@@ -20,11 +36,37 @@ const signature = (title: string, document: unknown) =>
 	JSON.stringify({ title, document });
 export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 	const input = useRef<HTMLInputElement>(null);
+	const downloadRef = useRef<(() => void) | null>(null);
+	const [editorEpoch, setEditorEpoch] = useState(0);
 	const { onLibrary } = props;
 	const [view, setView] = useState(props.current ? "editor" : "files");
 	const [localDraftId, setLocalDraftId] = useState(
 		props.recovery?.documentId ?? null,
 	);
+	const selectionScope = JSON.stringify([
+		props.files?.namespace,
+		props.files?.path,
+		props.files?.etag,
+	]);
+	const [fileSelection, setFileSelection] = useState({
+		scope: selectionScope,
+		ids: [] as string[],
+	});
+	const selection =
+		fileSelection.scope === selectionScope ? fileSelection.ids : [];
+	if (fileSelection.scope !== selectionScope)
+		setFileSelection({ scope: selectionScope, ids: [] });
+	const headerDelete = {
+		selection,
+		setSelection: (update: import("react").SetStateAction<string[]>) =>
+			setFileSelection((previous) => ({
+				scope: selectionScope,
+				ids:
+					typeof update === "function"
+						? update(previous.scope === selectionScope ? previous.ids : [])
+						: update,
+			})),
+	};
 	const libraryRequested = useRef(false);
 	const previousId = useRef(props.current?.id);
 	useEffect(() => {
@@ -44,6 +86,17 @@ export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 			libraryRequested.current = true;
 			onLibrary();
 		}
+	}
+	async function discardCurrent() {
+		const c = props.current;
+		if (!c?.sourceId) return false;
+		const ok = await props.onReload?.(c.sourceId, c.revision);
+		if (ok) {
+			props.onDraft(null);
+			setLocalDraftId(null);
+			setEditorEpoch((n) => n + 1);
+		}
+		return !!ok;
 	}
 	return (
 		<section className="ds-markdown-workspace" aria-label="Markdown文書">
@@ -70,7 +123,11 @@ export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 						</TabsTrigger>
 					</TabsList>
 					<div className="ds-markdown-header-actions">
-						<button
+						<CreateButton
+							iconOnly
+							variant="outline"
+							label="新規文書"
+							title="新規文書"
 							disabled={props.pending}
 							onClick={() =>
 								void props.onNew("無題", {
@@ -79,17 +136,36 @@ export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 									originalMarkdown: null,
 								})
 							}
-						>
-							<Plus size={16} />
-							新規文書
-						</button>
-						<button
+						/>
+						<ActionButton
+							iconOnly
+							variant="outline"
+							icon={Upload}
+							label="Markdownを読み込む"
+							title="Markdownを読み込む"
 							disabled={props.pending}
 							onClick={() => input.current?.click()}
-						>
-							<Upload size={16} />
-							Markdownを読み込む
-						</button>
+						/>
+						<ActionButton
+							iconOnly
+							variant="outline"
+							icon={Download}
+							label="Markdownをダウンロード"
+							title="Markdownをダウンロード"
+							disabled={!props.current}
+							onClick={() => downloadRef.current?.()}
+						/>
+						<MarkdownHeaderDelete
+							{...props}
+							view={view}
+							selected={
+								props.files?.entries.filter((e) => selection.includes(e.id)) ??
+								[]
+							}
+							localInput={localDraftId === props.current?.id}
+							onEditCurrent={() => setView("editor")}
+							onDiscardCurrent={discardCurrent}
+						/>
 						{props.sessionState === "active" && (
 							<button onClick={props.onReturn}>通常の会話へ</button>
 						)}
@@ -138,7 +214,9 @@ export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 				>
 					<MarkdownFileBrowser
 						{...props}
+						headerDelete={headerDelete}
 						localInput={localDraftId === props.current?.id}
+						onDiscardCurrent={discardCurrent}
 						onEditLocal={async (id) => {
 							if ((await props.onSelect(id)) !== false) setView("editor");
 						}}
@@ -155,9 +233,10 @@ export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 				>
 					{props.current ? (
 						<DocumentEditor
-							key={props.current.id}
+							key={`${props.current.id}:${editorEpoch}`}
 							{...props}
 							current={props.current}
+							downloadRef={downloadRef}
 							onDraft={(draft) => {
 								setLocalDraftId(draft?.documentId ?? null);
 								props.onDraft(draft);
@@ -178,7 +257,10 @@ export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 	);
 }
 function DocumentEditor(
-	props: MarkdownWorkspaceProps & { current: MarkdownCurrent },
+	props: MarkdownWorkspaceProps & {
+		current: MarkdownCurrent;
+		downloadRef: Ref<() => void>;
+	},
 ) {
 	const recovery =
 		props.recovery?.documentId === props.current.id ? props.recovery : null;
@@ -195,8 +277,11 @@ function DocumentEditor(
 	const [composing, setComposing] = useState(false),
 		composingRef = useRef(false);
 	const original = useRef(initial.originalMarkdown);
-	const [originalMarkdown, setOriginalMarkdown] = useState(
-		initial.originalMarkdown,
+	useImperativeHandle(
+		props.downloadRef,
+		() => () =>
+			downloadMarkdown(serializeMarkdown(editor), `${title || "無題"}.md`),
+		[editor, title],
 	);
 	const [initialRendered] = useState(() => JSON.stringify(editor.children));
 	const shown = useRef(initialRendered);
@@ -307,7 +392,6 @@ function DocumentEditor(
 		}
 		base.current = remote.revision;
 		original.current = remote.document.originalMarkdown;
-		setOriginalMarkdown(original.current);
 		editor.tf.setValue(structuredClone(remote.document.nodes));
 		shown.current = JSON.stringify(editor.children);
 		rendered.current = shown.current;
@@ -386,7 +470,6 @@ function DocumentEditor(
 							const r = latest.current.current!;
 							base.current = r.revision;
 							original.current = r.document.originalMarkdown;
-							setOriginalMarkdown(original.current);
 							editor.tf.setValue(structuredClone(r.document.nodes));
 							shown.current = JSON.stringify(editor.children);
 							rendered.current = shown.current;
@@ -455,12 +538,6 @@ function DocumentEditor(
 					}}
 				/>
 			</Plate>
-			<MarkdownDocumentFooter
-				editor={editor}
-				title={title}
-				originalMarkdown={originalMarkdown}
-				busy={props.busy}
-			/>
 		</>
 	);
 }

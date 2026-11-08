@@ -1,0 +1,180 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/steward-input.test.ts:
+(pass) an independent steward call receives the entire output contract once through Inference [0.12ms]
+(pass) a shared-conversation call keeps its records and presents the contract only in the first system [0.10ms]
+
+api/domains/steward/test/world-integration.test.ts:
+(pass) only the World curation runs on the resource chosen for World; every other step keeps the conversation route [83.92ms]
+(pass) a statement reaches World through the steward, and a forget request removes the claim, its evidence and the source [90.05ms]
+
+api/domains/steward/test/requests.test.ts:
+(pass) a request alone starts a unit, is settled by the request's state, and its words are cleared [43.13ms]
+(pass) several requests are settled by one call, and one the model leaves out is counted [38.44ms]
+(pass) an explicit remember of what is already stored makes a new confirmed version [39.41ms]
+(pass) a remember request the model answers with none but points at the stored item is still reconfirmed [40.04ms]
+(pass) a remember request answered with none and a wrong ref is reconfirmed through its key [38.96ms]
+(pass) a request the model never answers is given up after three tries [37.97ms]
+(pass) a correct request updates an item and is shown to the user once as a notice [39.25ms]
+(pass) a withdraw request takes back a request that was not applied yet: the forget is not carried out [37.99ms]
+(pass) a withdraw request can not undo an applied forget: it finds nothing to take back and the forget stays [47.60ms]
+
+api/domains/steward/test/maintenance.test.ts:
+(pass) upkeep does not run while the revision has not moved [34.41ms]
+(pass) a step that changed nothing stays quiet until the revision moves [44.72ms]
+(pass) a merge keeps the sources' evidence, stops the sources and asks for the profile to be published anew [41.87ms]
+(pass) upkeep waits while an answer is generated: 30 s, then 2 min, then 10 min [43.99ms]
+(pass) after the quiet spell, the pending limit starts a consolidation without waiting for the foreground [44.82ms]
+(pass) an upkeep step that failed three times at a revision is given up for it [41.15ms]
+
+api/domains/steward/test/goals.test.ts:
+(pass) a stated goal is adopted and an inferred one is proposed, both standing on the user's message; the chain goes on [37.05ms]
+(pass) goals:false skips the goal step; a missing judgment counts as true; time alone never withdraws a goal [40.07ms]
+(pass) a goal request is answered by the goal step, not by curate-memory [42.88ms]
+(pass) a goal request is ended at once when the application keeps no goals [32.71ms]
+(pass) a goal step that fails three times drops its events' reflection and the chain goes on [39.23ms]
+(pass) an op the host can not trust is dropped: unknown evidence, unknown ref, adopted goal withdrawn as a proposal [37.93ms]
+(pass) the goal upkeep withdraws duplicate proposals and never an adopted goal [37.62ms]
+(pass) near the proposal cap the model is told how full it is [46.50ms]
+
+api/domains/steward/test/runs.test.ts:
+(pass) completed: the run's events are in the log and every request is pending [33.05ms]
+(pass) failed and interrupted: only the user's event is in the log and requests go on [33.16ms]
+(pass) cancelled: no event, and every request goes on (a stopped generation does not take back what it asked) [32.77ms]
+(pass) stale: the requests that were committed stay too, and nothing else is registered [34.91ms]
+(pass) a request is pending at once, and the steward does not read it before the run ends [33.34ms]
+(pass) asking the same tool call again is a replay; bad input and foreign sources are refused [33.77ms]
+(pass) a request the steward has not applied survives a restart: the startup kick makes its unit [34.16ms]
+
+api/domains/steward/test/forget-relevance.test.ts:
+(pass) the live case: two memories unrelated to the request are not forgotten, and the request ends with a plain notice [54.34ms]
+(pass) a correct forget still works, and a related and an unrelated ref in one answer forget only the related one [52.70ms]
+(pass) an earlier exchange the request has nothing to do with is not blocked by alsoIn [55.94ms]
+(pass) a request is answered only by its own label: the kind is never a fallback [47.72ms]
+(pass) the strict schema of curate-memory allows only the request labels of the unit [48.52ms]
+(pass) a World entity named in the request is forgotten [39.58ms]
+(pass) relevance is by name or by shared content, case-insensitive [0.16ms]
+
+api/domains/steward/test/activity.test.ts:
+(pass) a slot is lit only while its open unit's job runs [32.70ms]
+(pass) a slot fails while its last closed unit failed for a reason other than a LARM yield [32.61ms]
+(pass) a later success without a unit (World events routed with nothing to record) clears the failure [30.59ms]
+(pass) the error report names the failing step with IDs, codes and the job's log, and nothing else [35.95ms]
+(pass) activity and the error report are read over HTTP [31.69ms]
+
+api/domains/steward/test/controller.test.ts:
+(pass) the decisions are read over HTTP [34.87ms]
+
+api/domains/steward/test/migration.test.ts:
+(pass) steward/0003 carries the units, requests and decisions over to the event flow [23.71ms]
+(pass) steward/0005 drops the episode units, decisions and quiet ranges and the window version of the units [23.60ms]
+
+api/domains/steward/test/steps.test.ts:
+(pass) the events of a run go through curate-memory and are handled [36.24ms]
+(pass) events that carry nothing to learn from are handled without a model [33.82ms]
+(pass) a failed summary-like answer is run again without saving the memory twice [41.20ms]
+(pass) three unusable answers over events give them up and the pipeline goes on [36.97ms]
+(pass) an event that is already handled is not offered again [39.54ms]
+(pass) long-term writers share one concurrency key across conversations [36.81ms]
+(pass) elements that cannot be saved are dropped one by one [36.18ms]
+(pass) a mismatched quote and the agent's words cannot become evidence of a saved memory [36.73ms]
+(pass) a failed attempt reaches curate-memory as the user's event alone [34.96ms]
+(pass) long messages are cut to 6 KB for the steward, and one event always fits [33.74ms]
+(pass) at most eight events and 16 KB go into one step; the rest waits [40.19ms]
+(pass) a step on its own prompt runs on a connection of its own and yields to the user's calls [33.38ms]
+(pass) a step reading the conversation runs on the conversation's prompt with its own task last, on the conversation's connection [33.45ms]
+
+api/domains/steward/test/activity-indexes.test.ts:
+(pass) activity indexes upgrade retained history and avoid sorting the history for each closed unit [1287.18ms]
+
+api/domains/steward/test/review-fixes.test.ts:
+(pass) a forget runs first: what the same unit would save from the forgotten exchange is dropped [46.22ms]
+(pass) a request that shares the forgotten message with a forget is ended by the purge without a failure notice [43.69ms]
+(pass) a ref the model was not shown ends the whole forget, and so does a list longer than five [56.79ms]
+(pass) five items can be forgotten at once [53.94ms]
+(pass) a forget the memory refuses as too large ends the request without forgetting, and the rest of the unit goes on [52.27ms]
+(pass) a deferred upkeep waits in the timer and never delays another conversation; a reflecting unit waits for the run to report [45.66ms]
+(pass) the startup kick makes the upkeep that is due and waits for the one that is not [44.82ms]
+(pass) every step asks for the conversation's own route and a strict output schema [35.30ms]
+(pass) a request given up after real failures is shown to the user as a notice [36.87ms]
+(pass) a request the model never answers is also announced [38.99ms]
+(pass) a note is based on the messages of every event the unit read, and an update adds them [38.19ms]
+(pass) a note that repeats a live note is not added twice [38.04ms]
+(pass) an expired or interrupted job is not counted against its targets, and a new unit follows at once [34.20ms]
+(pass) a real failure is counted, and the target waits before the next try [34.23ms]
+(pass) when the inference request cannot be taken, the step is tried again later: 30 s, then 60 s [36.59ms]
+
+api/domains/steward/test/world-view.test.ts:
+(pass) an entity named in the request is offered whatever its letter case, and the others are not matched by chance [51.68ms]
+
+api/domains/steward/test/units.test.ts:
+(pass) a transient failure is retried by the queue on the same job and unit [35.95ms]
+(pass) after the queue ended a job, the kick makes a new unit with a new id that really runs [35.94ms]
+(pass) a conversation holds one open reflecting unit however often it is kicked [32.71ms]
+(pass) the startup kick (no conversation named) reaches a conversation that has only waiting events [32.20ms]
+(pass) a unit cancelled in the queue is closed and its request is released [33.58ms]
+(pass) a step whose inference is not available is neither counted nor retried at once [36.47ms]
+(pass) the startup kick makes the units every conversation with work still needs [36.76ms]
+(pass) events whose messages were retracted are handled without asking the model [34.25ms]
+
+api/domains/steward/test/memory-adoption.test.ts:
+(pass) curation receives key, origin and coverage; update output preserves both polarities through the queue [43.12ms]
+(pass) explicit remember with omitted wording retains the existing negative value when reconfirmed [39.05ms]
+(pass) explicit correction carries the model's negated output to State [38.57ms]
+
+api/domains/steward/test/forget.test.ts:
+(pass) a forget request can identify and erase an inactive memory [47.54ms]
+(pass) a fact with more than five versions uses one forget reference and erases every version [60.69ms]
+(pass) a forget request erases the memory and blocks the exchanges, and nothing else of the steward keeps the words [47.12ms]
+(pass) an answer that stood on ground a forget removed is not adopted, and leaves no body [40.12ms]
+(pass) the purge is idempotent: running it again changes nothing [34.97ms]
+
+api/domains/steward/test/forget-world.test.ts:
+(pass) naming a world entity and claim forgets them, their evidence, the goals tied to the entity, and nothing else of the same message [67.16ms]
+(pass) claims about a chosen entity and the goals tied to it are not counted again, and an unrelated goal is left alone [65.25ms]
+(pass) a goal named in a request is forgotten with its message; the goal layer epoch moves [66.91ms]
+(pass) one request names at most five things in all, across memory, world and goals; over the limit nothing is forgotten [63.69ms]
+(pass) when World can not be read the forget is refused whole, and the request says so [63.42ms]
+(pass) when the evidence of the claims can be read only in part the forget is refused whole, and the user is told to ask again [59.62ms]
+(pass) a memory forget also takes the blocked messages out of World as sources [55.96ms]
+
+api/domains/steward/test/goals-restore.test.ts:
+(pass) a database restored from before a goal forget loses the goal again at startup [52.12ms]
+
+api/domains/steward/test/world-events.test.ts:
+(pass) the events of one exchange become one world_events unit; settle, unit and decision are one result [36.58ms]
+(pass) World is edited only while the user leaves the conversation: between turns only the memory is curated [36.76ms]
+(pass) an event that arrives before curate-memory judged its exchange waits; no unit is made and no model is asked [37.98ms]
+(pass) an exchange judged world:false is settled empty without a model, and the decision says so [35.55ms]
+(pass) a corrected version of a judged message is not routed by the old judgment [38.32ms]
+(pass) an exchange the steward never judged (cancelled run) and an exchange without a judgment both count as needing the world [41.35ms]
+(pass) prepare that is not ready closes the unit and the timer tries again; events World finalized are done [38.11ms]
+(pass) a window held three times is given up and the events after it go on [41.64ms]
+(pass) a World forget since prepare voids the answer; a memory forget does too (stale, nothing applied) [37.46ms]
+(pass) a settle that fails half way leaves nothing: events stay pending, the unit fails, the dependents are released [38.98ms]
+(pass) an unusable answer counts against the events; after a restart the startup kick makes units for pending events [38.74ms]
+(pass) the judgment is kept per message with the version the model read, and a forget of the message removes it [35.41ms]
+(pass) a world_events unit cancelled in the queue gives back what World registered for it [34.63ms]
+(pass) a retried world_events unit gives back its registration before the next try [37.75ms]
+
+api/domains/inference/test/inference-control.test.ts:
+(pass) control calls preserve exact context, stay local, skip emotion judgement, and rejected JSON is never adopted [25.81ms]
+(pass) only a structured-output control request sends the output schema to LARM; others stay plain JSON-object [12.95ms]
+(pass) a background control keeps the conversation route only when asked, and a different binding conflicts [10.60ms]
+(pass) a background control on a saved resource goes to that resource only, and falls back to the conversation route when it can not be used [10.87ms]
+(pass) a dedicated resource that can not be used falls back to the conversation route only on the same billing path [11.54ms]
+(pass) a control request may ask for a long output (a large draft), up to 32k tokens [12.10ms]
+(pass) a toolchain's own limits: the run's requests are moved later (never earlier) and an attempt carries its own time [12.39ms]
+(pass) an attempt's own time replaces the LARM and cloud defaults, within the request's deadline [0.05ms]
+
+api/domains/inference/test/control-schema.test.ts:
+(pass) OpenAI-compatible cloud sends the schema as response_format and leaves ordinary turns alone [2.43ms]
+(pass) Codex and Claude agent connections receive the schema in the call [0.24ms]
+(pass) schema-constrained operation choices suppress native tools on every cloud route [0.16ms]
+(pass) Claude Agent SDK gets outputFormat and its structured output becomes the text [3.05ms]
+(pass) Codex SDK isolates inherited MCP servers and passes the schema even without tools [526.20ms]
+
+ 130 pass
+ 0 fail
+ 605 expect() calls
+Ran 130 tests across 22 files. [7.09s]

@@ -1,0 +1,858 @@
+bun test v1.4.4 (38afee6c8)
+
+api/application/browser/browser-adapter.test.ts:
+(pass) the adapter registers the operations of the capture toolchain and the screen [0.40ms]
+(pass) the screen stays reachable while the browser is not connected [21.59ms]
+(pass) connect refuses without a saved path, then starts once and is idempotent [63.05ms]
+(pass) the snapshot shows tabs the conversation may name, without queries or fragments [15.72ms]
+(pass) a conversation may capture only a tab its snapshot showed; the screen may name any open tab [15.86ms]
+(pass) a capture started from the conversation runs, is announced, and its receipt reads back [21.95ms]
+(pass) a capture of an unknown tab is refused even from the screen [12.40ms]
+(pass) cancelling a capture ends it and aborts the stage in flight after the commit [79.78ms]
+(pass) screen tab operations queue the browser call and refuse tabs that are not listed [37.90ms]
+(pass) a tab cannot be opened while the browser is not connected [10.63ms]
+(pass) disconnect stops the connection; opening the workspace changes nothing [19.36ms]
+(pass) a replay of the same request repeats its receipt and queues no second effect [22.56ms]
+(pass) an effect that waited past its age expires unrun instead of running late [92.85ms]
+(pass) the workspace source reads the domain's data and nothing else [12.43ms]
+(pass) a task keeps the user's own words as its request and the command step's paraphrase beside it [16.38ms]
+(pass) a task that stopped for the user's approval is shown with what it waits for, and its approval reaches the task that continues it [32.63ms]
+(pass) without a saved user message the paraphrase is the request; the screen's own words are used as given [16.45ms]
+(pass) a task needs a connection, a tab its snapshot showed, and room [26.92ms]
+(pass) status reads a task the snapshot showed, cancel ends it and aborts the running step after the commit [29.36ms]
+(pass) each binding of the bundle names only operations, schemas and queries this adapter registers [0.50ms]
+(pass) the screen's history events pass the action path as sent: action schema, input adapter, operation schema [2.07ms]
+(pass) the tool schemas the model sees are flat objects [0.49ms]
+(pass) the scripted task entry accepts a new disconnected request only with saved connection authorization [23.01ms]
+(pass) deleting a history is the screen's: it needs the revision the screen showed, and the conversation cannot do it [11.18ms]
+(pass) the delete event's string revision becomes a number; anything else reports every field [0.16ms]
+
+api/application/browser/browser-replay.test.ts:
+(pass) replaying is the screen's: it starts one replay, reads back by its id and the screen can stop it [30.43ms]
+(pass) the replay event's strings become the number and the values map; anything else reports its field [0.33ms]
+(pass) the page operator's tools never reach the code runner: replays are the screen's alone [0.16ms]
+
+api/application/browser/browser-toolchain.test.ts:
+(pass) the shipped adapter description is the one the bundle was checked against [0.29ms]
+(pass) the capture toolchain is a command toolchain whose adapter is available before any connection [806.90ms]
+(pass) capture and operate share one browser screen, so the launcher shows it once [689.64ms]
+(pass) the command specialist gets the capture tools with flat schemas and the tabs it may name [755.02ms]
+(pass) a validated invocation reaches the adapter and starts a capture of that tab [762.81ms]
+(pass) the operate toolchain is a command toolchain that starts a single-shot task with the binding's policy [684.82ms]
+(pass) the acceptance package, with the operator package it runs, still fits the context budget [709.00ms]
+(pass) every tool the operator package offers has a flat schema the host also checks [984.53ms]
+(pass) upgrading the old browser bundle preserves its definitions and is idempotent [1000.70ms]
+
+api/application/docling/docling-e2e.test.ts:
+(pass) disconnecting a real HTTP client aborts the gateway request and frees the open guard [5.38ms]
+(pass) Bun applies the route's timeout while waiting beyond the server default [1502.93ms]
+(pass) authenticated ticket API keeps secrets out of status, applies a per-request timeout and rejects foreign Origin [0.68ms]
+
+api/application/docling/docling-ready.test.ts:
+(pass) startup API enforces authentication and Origin, waits once, and returns no ticket [0.46ms]
+
+api/application/docling/docling-toolchain.test.ts:
+(pass) registered Docling chain runs its profile/Skill/tool and returns one launcher without connecting upstream [804.84ms]
+
+api/application/markdown/markdown-integration.test.ts:
+(pass) conversation switches to collaborator, edits arbitrary document ranges and reaches registered save through the ledger [670.74ms]
+(pass) the authenticated upload route accepts documents above the shared 1 MiB cap and keeps its own 20 MiB bound [645.70ms]
+
+api/application/markdown/markdown-registration.test.ts:
+(pass) seeding upgrades the published editor without rewriting v1, and repeated seeding is stable [741.22ms]
+
+api/application/media/image-screen-adapter.test.ts:
+(pass) image screen bundle seeds one registered screen and reads the image domain source [811.75ms]
+
+api/application/media/music-routing.test.ts:
+(pass) the current music request reaches generation after unrelated Web and image history [740.71ms]
+
+api/application/media/music-screen-adapter.test.ts:
+(pass) music screen bundle seeds one registered screen and reads the music domain source [1069.92ms]
+
+api/application/media/object-recognition-screen-adapter.test.ts:
+(pass) recognition screen seeds once and exposes its owner-scoped source [1089.62ms]
+(pass) the published recognition screen binds every action the screen sends [5.33ms]
+
+api/application/media/ui-compositions-actions.test.ts:
+(pass) seeding an upgraded database leaves only the studio as a launcher [700.58ms]
+(pass) the screen's string values reach undo, redo and save as the operations' integers, with or without a viewed target [654.32ms]
+(pass) the screen deletes the viewed saved work once no work is built on it [666.32ms]
+
+api/application/media/ui-compositions-adapter.test.ts:
+(pass) the work document: canonical text, a check that fixes and says where, commits only by the holding turn [22.52ms]
+(pass) the screen applies its own source edit as a drafted receipt [13.35ms]
+(pass) operations accept only their origins and typed input [9.46ms]
+(pass) the sources show the work, the saved form and the definition, and choices offer saved items only [12.49ms]
+(pass) the session adapter ends a work by mode and starts from a saved item [11.88ms]
+(pass) the bundle connects only operations, queries and schemas this adapter registers [0.54ms]
+(pass) choices are cut at the limit while hasTarget knows every saved item [27.62ms]
+(pass) screen actions on the work of a session that is no longer live are refused [11.35ms]
+
+api/application/media/visual-analysis-registration.test.ts:
+(pass) existing OCR and recognition artifacts upgrade without replacing published revisions or adding a toolchain identity [606.57ms]
+
+api/application/settings/service-tests-adapter.test.ts:
+(pass) the service-tests bundle passes a dry-run import against this host, and needs the adapter [626.38ms]
+(pass) the catalog source labels targets, the status shows an outdated list until it is refreshed [712.71ms]
+(pass) a row starts a test once, the run is listed with its result, and a resend starts no second run [720.09ms]
+(pass) the free-form start passes only the entered values to the service [720.25ms]
+(pass) start is refused for an unsupported target, a stale view and while another test runs [643.73ms]
+(pass) diagnosis records a run and its Health rows, and does not generate anything [553.98ms]
+(pass) a fetch that failed after generation can be retried from the run's row without generating again [547.84ms]
+(pass) a write whose transaction does not commit starts nothing [531.74ms]
+(pass) operations are for screens only and validate their input [669.91ms]
+(pass) the screen re-reads only while something runs: the bundle names the field and the rows carry it [561.82ms]
+(pass) a cancel still aborts the run when a progress save rewrote its phase before the abort ran [560.74ms]
+(pass) the free-form start carries no revision of its own: only the catalog's stale check guards it [554.15ms]
+(pass) a run with a preview carries its path and type for the media column [581.44ms]
+
+api/application/settings/settings-adapter.test.ts:
+(pass) every field of the settings bundle names an existing, writable settings path and a declared condition [0.20ms]
+(pass) describePath accepts leaves and stable-id array elements and rejects objects, managed values and unknown names [0.17ms]
+(pass) a draft's changes become one saved revision with typed values, and the receipt carries no values [533.89ms]
+(pass) an array element is chosen by its stable id and no other element changes [528.16ms]
+(pass) targets are required for element fields, refused for plain fields and must exist [521.54ms]
+(pass) unset follows the field's registered meaning and is refused elsewhere [508.95ms]
+(pass) rejections are safe codes and save nothing [544.51ms]
+(pass) conversations cannot change settings [556.76ms]
+(pass) a stale draft is reported as revision_conflict, even when its target has since gone [551.26ms]
+(pass) the same request id is a replay and saves once [565.74ms]
+(pass) keys go through to the settings domain and never into the result or an error [585.66ms]
+(pass) sources give the saved document, the TTS models as targets and the ASR languages [548.41ms]
+(pass) fields registered by published artifacts are found through capabilities [632.59ms]
+(pass) the registered settings bundle applies a draft through the action ledger and rejects a stale one [616.90ms]
+(pass) describePath reports kind, bounds, enum values and optional/nullable from the settings schema [0.25ms]
+(pass) a target must be one the field's query lists: another purpose's model is refused [535.94ms]
+
+api/application/settings/settings-bundle.test.ts:
+(pass) connection fields use the connection query's targets, and the API key never travels in changes [540.18ms]
+(pass) sources list connections without credentials, models per purpose and the routes [537.14ms]
+(pass) the AI and external-work artifacts apply through the action ledger with structure and keys [671.44ms]
+(pass) a key alone is an apply, and a key inside a structure's input is refused [561.84ms]
+(pass) the AI screen's collections name registered actions with rows built by fixed paths [0.14ms]
+(pass) the connection form registers a connection alone or with its first model in one apply [543.04ms]
+(pass) the probe row is offered for enabled targets and a clean draft, and the key field can be unset [0.17ms]
+
+api/application/settings/settings-live-upgrade.test.ts:
+(pass) Live settings upgrade publishes the new selects and persistent save layout without changing the existing revision [582.13ms]
+
+api/application/settings/tts-dictionary-adapter.test.ts:
+(pass) describe offers the entries query and the three writes, and the bundle imports with no issue [680.95ms]
+(pass) save adds and never replaces; update changes the reading behind the expected reading [607.38ms]
+(pass) invalid entries and inputs are rejected with safe codes and save nothing [591.55ms]
+(pass) delete is guarded by the reading the row showed [593.82ms]
+(pass) conversation origin and unknown operations are unavailable [620.45ms]
+(pass) the source pages, sorts and searches, and its revision follows the entries [494.42ms]
+(pass) the registered bundle saves and deletes through the action ledger [584.93ms]
+
+api/application/toolchain/capability-seed.test.ts:
+(pass) fresh initialization installs every repository seed and bundle without runtime or personal data [908.69ms]
+(pass) reopening and seeding preserves disabled toolchains and explicitly published revisions [819.11ms]
+(pass) normal server assembly seeds toolchains and launchers without a separate import [913.96ms]
+
+api/application/toolchain/capability-upgrade.test.ts:
+(pass) seed upgrades the deployed board and terminal schemas without replacing archived definitions [716.02ms]
+
+api/application/toolchain/conversation-output.test.ts:
+(pass) voice does not display, persist or speak text-only control output: a reply of nothing else gets the host's words [651.72ms]
+
+api/application/toolchain/read-tools-search.test.ts:
+(pass) the read tools are indexed with the toolchains but are no toolchain of the catalog [8.59ms]
+(pass) a read tool's card carries execution read and the JSON Schema of its arguments [3.61ms]
+(pass) a read tool that is not available now is not offered [1.93ms]
+(pass) 「直近の会話ログをチェックしてくれる？」 puts read_history first in the search [1.73ms]
+(pass) 「前に私が何て言ったか確認して」 puts read_history first in the search [1.64ms]
+(pass) 「メモリーに何が残ってるかチェックして」 puts read_memory first in the search [1.95ms]
+(pass) 「私について記憶していることを教えて」 puts read_memory first in the search [1.69ms]
+(pass) 「さっきの依頼はどうして失敗したの？」 puts read_runs first in the search [1.79ms]
+(pass) 「実行ログを見せて」 puts read_runs first in the search [1.85ms]
+(pass) 「サブエージェントは何をしたの？」 puts read_agents first in the search [1.81ms]
+(pass) 「さっきの調べものでどのページを見た？」 puts read_agents first in the search [1.56ms]
+(pass) 「World だと Eumenes について何が記録されてる？」 puts read_world first in the search [1.48ms]
+(pass) 「半年前の会話で決めたことを履歴から調べて」 puts history.research first in the search [1.53ms]
+(pass) 「これまでの会話全体から旅行の話の経緯を洗い出して」 puts history.research first in the search [1.68ms]
+
+api/application/toolchain/router-export.test.ts:
+(pass) fixture snapshot preserves cards, context, both routing paths, corrections and matching passage vectors without writes [772.08ms]
+(pass) authenticated API, typed client and JSONL/gzip writer work together; Git destinations and overwrites are refused [707.48ms]
+(pass) security filtering removes environment values, credentials and signed/authenticated URLs while retaining names [0.20ms]
+(pass) CLI parser and command dispatch write a fixture without printing prose, and reject invalid dates [1186.57ms]
+(pass) a retracted input is not resurrected from trace text; an orphaned run uses only an exact retained message link [625.10ms]
+
+api/application/toolchain/toolchain-history.test.ts:
+(pass) every builtin and bundled toolchain registers as a complete set with flat tool schemas [707.21ms]
+(pass) a toolchain is offered only where its whole package is registered [550.35ms]
+(pass) an incomplete set or a reused function name is refused at registration [558.25ms]
+(pass) without vectors every available toolchain is offered; with vectors the top ones by similarity [559.04ms]
+(pass) a selection is traced from offer to outcome and later offered as reference data [559.31ms]
+(pass) a saved procedure is found by its signature and suspended after three failed reads [571.95ms]
+(pass) a proposed procedure is kept only when the answer cites the page it read [634.36ms]
+
+api/application/toolchain/toolchain-routing.test.ts:
+(pass) a session toolchain's runtime says session and its set carries the binding's contract [664.92ms]
+(pass) the command set refuses a session toolchain and the session set refuses command and unavailable ones [1432.30ms]
+(pass) a command binding's agent turn reaches the command set; a binding without one carries none [679.91ms]
+(pass) rehydrating an exact revision preserves its redirect conditions without expanding the offered context [583.79ms]
+(pass) the catalog is computed once per pass, and a write on the connection is seen at once [543.04ms]
+
+api/application/toolchain/toolchain-search-check.test.ts:
+(pass) a past choice is ranked again from its stored vector; one the slots would not offer is listed by its toolchain only [595.74ms]
+
+api/application/usage/usage.test.ts:
+(pass) settings navigation and authenticated usage are available without a model call [583.93ms]
+(pass) registered artifact reads owner records across pages and stores reviewed rates through its public operation [541.92ms]
+
+api/application/work/dots-audit.test.ts:
+(pass) the audit Skill is frozen in commands and survives reseeding [508.50ms]
+(pass) an unregistered callback never receives task notifications [510.73ms]
+
+api/application/work/dots-delegation-registration.test.ts:
+(pass) stored first document revisions survive upgrade and do not block the current bundle [706.08ms]
+(pass) fresh seed registers one launcher and immutable revisions; reseed keeps disabled publication [710.10ms]
+(pass) an old seeded revision retains its hash while publication migrates to the new binding [753.56ms]
+
+api/application/work/dots-messaging-registration.test.ts:
+(pass) startup seed registers the messaging launcher and its local actions with the production adapter descriptions [220.72ms]
+
+api/application/work/terminals-adapter.test.ts:
+(pass) Claude Code screen is registered as a launcher and reads the live session list [634.65ms]
+(pass) a Claude Code request is saved once per request id and read back from the table [577.61ms]
+
+api/application/world/memory-adapter.test.ts:
+(pass) describe offers the memory queries and the one write (the connection switch), for the UI only [580.41ms]
+(pass) the shipped memory bundle registers against this adapter plus the existing ones with no issue [536.27ms]
+(pass) status shows the connection and the switch needs a healthy memory to turn on [593.03ms]
+(pass) items page, search and sort; memory content cannot be changed by hand [549.19ms]
+(pass) tendencies, short-term notes and the context are read [552.39ms]
+(pass) the steward timeline shows decisions with their proposal, result and window change, and the event log [618.05ms]
+(pass) the memory bundle runs through the action ledger: only the connection switch is offered [503.28ms]
+
+api/application/world/world-adapter.test.ts:
+(pass) describe offers the World queries and no operation; the shipped bundle registers with no issue and has no action [504.12ms]
+(pass) World OFF has no ports: the adapter is unavailable and shows nothing [556.88ms]
+(pass) status, claims and forgets are plain rows with the words the screen shows [499.93ms]
+(pass) the World bundle runs through the action ledger as a view: sources read, no change is accepted [533.34ms]
+(pass) World table revision upgrades the catalog without changing the prior view and imports idempotently [568.95ms]
+(pass) an unavailable or partial list says why in the status row instead of passing for empty [574.32ms]
+(pass) the forgets list marks the forgets still moving, and the bundle re-reads it only while one is [591.03ms]
+(pass) paged claims fetch grounds for the selected page beyond row 50; compact status avoids reading lists [613.15ms]
+
+api/application/world/world-bundle-upgrade.test.ts:
+(pass) World document tool has the same public and owner contract [0.14ms]
+(pass) World bundle upgrades an existing catalog without modifying old definitions and reseeds idempotently [715.04ms]
+
+api/domains/capabilities/test/browser-interact-bundle.test.ts:
+(pass) pilot bundle registers immutably, with shared components and no unsupported host contracts [15.01ms]
+
+api/domains/capabilities/test/bundles.test.ts:
+(pass) the shipped bundle's pin is the stored digest and its toolchain is data-driven [77.83ms]
+(pass) a bundle the host cannot run is skipped whole, and without a host nothing is added [94.56ms]
+(pass) old revisions keep their JSON and hash, and publication moves back and forth [83.20ms]
+(pass) rolling the pointer back to the unbound revision removes the chain from the offer until a bound revision is published [54.31ms]
+(pass) the dry run lists every problem and writes nothing [26.54ms]
+(pass) each kind of reference problem is refused [106.74ms]
+(pass) a failing toolchain rolls back its documents and keeps the published revision [19.05ms]
+(pass) documents are immutable: the same id with other content is a conflict, the same content a no-op [27.38ms]
+(pass) binding fields belong to toolchains only and need a matching binding [18.59ms]
+(pass) a bound tool is prepared with its own schema and only from an active package [44.21ms]
+(pass) a timer start without a duration is defined as the 3 minute default, not as a question [41.59ms]
+(pass) stored schemas are served as validators; unknown and domain references are not [14.73ms]
+(pass) a bound toolchain is shown by its artifact registration: artifact is optional there, and unbound ones still need one [50.23ms]
+(pass) question schemas must be readable validators and the choice field one of their fields [61.29ms]
+(pass) an install already at revision 5 is upgraded to the latest, and revision 5 stays a valid rollback target [61.98ms]
+(pass) toolchain publication over HTTP is compare-and-set and can roll back [49.91ms]
+
+api/domains/capabilities/test/capabilities.test.ts:
+(pass) 5000 capability catalogue: bounded discovery, exact aliases, immutable revisions and owner isolation [5959.33ms]
+(pass) builtin SKILL is mandatory; disabling survives seed and dependency failure hides package [22.85ms]
+(pass) revoking a dependency permanently invalidates already issued candidates, even after re-enabling [13.60ms]
+(pass) seed still rejects a changed newest builtin revision [7.50ms]
+(pass) history and timer catalogue selection can be enabled independently [24.36ms]
+
+api/domains/capabilities/test/command-agent-binding.test.ts:
+(pass) a command binding takes agent.turn as the policy of its single-shot task, and stays valid without it [5.57ms]
+(pass) the bundle check accepts the existing command binding with or without agent.turn [108.10ms]
+(pass) the bundle check refuses retries that name a tool the binding does not have [99.44ms]
+
+api/domains/capabilities/test/docling-bundle.test.ts:
+(pass) Docling menu revision seeds once and preserves earlier revisions (existing=%s) [12.43ms]
+(pass) Docling menu revision seeds once and preserves earlier revisions (existing=%s) [13.39ms]
+
+api/domains/capabilities/test/dots-messaging-revision.test.ts:
+(pass) messaging v2 seeds without re-registering or replacing an installation's archived v1 [20.30ms]
+
+api/domains/capabilities/test/image.test.ts:
+(pass) image seed is additive, repeatable and published with one flat request schema [24.84ms]
+(pass) image model-selection bundle upgrades legacy definitions without rewriting their revisions [89.95ms]
+
+api/domains/capabilities/test/instant-binding.test.ts:
+(pass) the shipped weather bundle is seeded: an instant toolchain with a binding and no artifact [48.10ms]
+(pass) an instant binding has no field filled from the host's values: its arguments are the model's [49.48ms]
+(pass) an adapter that does not answer instant bindings is refused [46.25ms]
+(pass) an instant toolchain that also names an artifact is refused [43.22ms]
+(pass) an instant binding takes exactly one tool [46.18ms]
+(pass) the shipped stock bundle is an instant toolchain [41.98ms]
+
+api/domains/capabilities/test/json-schema-subset.test.ts:
+(pass) the finite subset becomes a strict validator with the stated bounds [0.93ms]
+(pass) anything outside the subset is refused with its path, never dropped [0.19ms]
+
+api/domains/capabilities/test/music-versions.test.ts:
+(pass) V3 describes music/vocals/SFX without changing historical schemas [0.45ms]
+
+api/domains/capabilities/test/pipeline-bundle.test.ts:
+(pass) seed installs p0-3 idempotently, preserves an old binding body, and refuses its execution contract [78.07ms]
+(pass) planner instruction upgrade preserves old revisions and selects the new skill once [12.05ms]
+
+api/domains/capabilities/test/requirement-controller.test.ts:
+(pass) profile validity compares instants with mixed fractional-second precision [0.72ms]
+(pass) R02/R03/R06 immutable profile revisions, CAS, independent catalogs and invalidation [13.81ms]
+(pass) management API validates bodies, exposes CAS state and keeps requirement profiles out of executable catalog [7.31ms]
+
+api/domains/capabilities/test/requirement-schema.test.ts:
+(pass) enum values must also satisfy bounds and formats at every nested node [1.09ms]
+(pass) R04 unsupported keywords, incompatible keywords and resource limits reject before conversion [0.10ms]
+(pass) R05 standard schema conversion is strict and does not coerce, default or ignore fields [0.54ms]
+(pass) optional string bounds preserve explicit constraints and the overall value capacity [0.12ms]
+(pass) a rejected value schema reports where and why, never its keys or values [0.04ms]
+
+api/domains/capabilities/test/requirements.test.ts:
+
+api/domains/capabilities/test/resource-kinds.test.ts:
+(pass) the 13 builtin kinds load with their actions, default and owner [95.36ms]
+(pass) action labels fall back to the global action words and a kind can override them [103.11ms]
+(pass) produces lists the kinds a toolchain creates and the candidate card carries it [96.37ms]
+(pass) an invalid registration is rejected and stores nothing [11.07ms]
+(pass) a bundle can register a kind and refuses an invalid one [9.37ms]
+(pass) revisions are versioned: seeding again changes nothing, a changed revision conflicts, a new one supersedes [215.07ms]
+
+api/domains/capabilities/test/session-binding.test.ts:
+(pass) a session binding passes the check and registers as a toolchain with the session execution [57.98ms]
+(pass) a session binding's references are all checked [84.75ms]
+(pass) a session binding with command-only fields or an unknown execution is refused [58.05ms]
+(pass) the registry refuses a session binding whose tool schema differs from the package tool's [47.22ms]
+(pass) a session binding may carry its own time limits: each 10 s to 60 min, inference <= turn <= run [4.43ms]
+
+api/domains/capabilities/test/settings-google.test.ts:
+(pass) Google settings bundle exposes no AI definitions or bindings [0.01ms]
+
+api/domains/capabilities/test/standalone-artifacts-forms.test.ts:
+(pass) structure actions must be registered by the document's adapter with its input schema [9.40ms]
+(pass) collection sources, paging and row actions are checked against this artifact's bindings [11.12ms]
+(pass) row input keys must be top-level properties of the action's input, on write and structure actions only [7.43ms]
+(pass) the create form must match the action input and keep secrets declared [8.78ms]
+(pass) form options come from fixed values or a registered query of the source's adapter [7.68ms]
+(pass) a row edit form adds fields to the row-built input without overlapping it [8.80ms]
+(pass) form defaults fit their control, and refresh-while keeps to an existing source [8.93ms]
+(pass) structure actions can be row actions and create actions, and ids may be generated [8.62ms]
+(pass) a clean-draft requirement names a registered document that the artifact uses [10.27ms]
+
+api/domains/capabilities/test/standalone-artifacts.test.ts:
+(pass) launcher artifacts are published without a toolchain, with the final entry shape [9.19ms]
+(pass) a newer revision switches the published pointer, an old one is a rollback, and re-import keeps the choice [7.97ms]
+(pass) fields are checked against the adapter that owns the document [8.05ms]
+(pass) a field id is unique across the whole published catalog, but a revision may keep its own [10.17ms]
+(pass) draft documents, navigation targets and apply operations must be registered [8.82ms]
+(pass) a refused bundle publishes nothing [7.22ms]
+(pass) a navigate-by-value map is checked for every target, and a default value stays display-only [6.80ms]
+(pass) a field must agree with what the document schema says about its path [8.17ms]
+(pass) confidential values travel only in declared input properties of every write that applies the document [9.10ms]
+(pass) source params schemas must resolve [9.13ms]
+(pass) revisions of one artifact id inside a bundle may carry the same fields [7.83ms]
+(pass) artifact publication over HTTP is compare-and-set [10.15ms]
+
+api/domains/capabilities/test/steward-request-retire.test.ts:
+(pass) the steward.request items lose their active entry, search and embedding; their revisions stay as history [20.76ms]
+
+api/domains/capabilities/test/task-binding.test.ts:
+(pass) task binding is bounded, has no artifact and rejects unknown execution kinds [0.65ms]
+(pass) the dormant task bundle is never seeded, registers explicitly without a dummy artifact, and survives reseeding [205.84ms]
+(pass) a host with the earlier task result schema upgrades by new revisions and preserves its old binding [16.23ms]
+
+api/domains/capabilities/test/timer-compatibility.test.ts:
+(pass) timer UI pausing keeps the deployed version 1 input schemas and accepts paused result state [0.51ms]
+(pass) the bound-command inputs accept exactly the shapes the UI and the questions send [0.37ms]
+
+api/domains/capabilities/test/toolchain-candidates.test.ts:
+(pass) the current request embedding selects music.create despite past choices and unrelated text matches [106.96ms]
+(pass) the current request embedding selects image.create despite past choices and unrelated text matches [98.48ms]
+(pass) the current request embedding selects excalidraw.edit despite past choices and unrelated text matches [102.95ms]
+(pass) strict discovery has no all-catalog fallback and returns the top four [97.50ms]
+(pass) the search fills each kind's slots: the three closest dedicated toolchains, and general ones near the closest candidate [51.94ms]
+(pass) the router's offer is exactly the ids given, in their order, read tools among them; the router's cards are valid [49.28ms]
+(pass) a router passage is the name, the summary and the first two use cases, at most the criterion's length [0.04ms]
+
+api/domains/capabilities/test/web-guided.test.ts:
+(pass) the Web bundle seeds the current revisions and reseeding changes nothing [83.85ms]
+
+api/domains/docling/test/docling.test.ts:
+(pass) startup waits for gateway readiness, discards the ticket, and shares the open guard [0.27ms]
+(pass) startup rejects late readiness after cancel [0.08ms]
+(pass) startup rejects late readiness after change [0.04ms]
+(pass) one gateway POST wakes the app and returns only a browser URL; status and prepare never connect [0.11ms]
+(pass) concurrent open is refused, with no second POST or shared ticket [0.06ms]
+(pass) untrusted response URLs, expired tickets and oversized bodies are refused [0.17ms]
+(pass) upstream auth, redirect and network failures never expose body, URL or credential and never retry [0.32ms]
+(pass) cancellation and configuration change discard late responses [0.09ms]
+(pass) deadline aborts one request; next explicit attempt is possible [21.85ms]
+(pass) startup rechecks cancel after ticket completion [0.23ms]
+(pass) startup rechecks change after ticket completion [0.02ms]
+(pass) a LARM capacity refusal on ready is HTTP 503 with the wait to apply, one gateway POST, no body leaked [0.31ms]
+(pass) a LARM capacity refusal on ui-tickets is HTTP 503 with the wait to apply, one gateway POST, no body leaked [0.12ms]
+(pass) a refusal that is not the capacity refusal keeps its upstream failure [0.07ms]
+
+api/domains/docling/test/document-library.test.ts:
+(pass) old and future capabilities preserve GET/PUT; extensions appear after cache expiry without probing mutations [1.14ms]
+(pass) malformed extension metadata disables only affected features [0.12ms]
+(pass) hierarchy uses server folder ids, library ETag and an opaque cursor [0.76ms]
+(pass) patch document sends exact conditions and never reserializes content [0.56ms]
+(pass) copy document sends exact conditions and never reserializes content [0.17ms]
+(pass) delete document sends exact conditions and never reserializes content [0.20ms]
+(pass) create-folder batch/folder sends exact conditions and never reserializes content [0.12ms]
+(pass) patch folder sends exact conditions and never reserializes content [0.05ms]
+(pass) copy folder sends exact conditions and never reserializes content [0.04ms]
+(pass) delete folder sends exact conditions and never reserializes content [0.05ms]
+(pass) batch batch/folder sends exact conditions and never reserializes content [0.45ms]
+(pass) batch batch/folder sends exact conditions and never reserializes content [0.14ms]
+(pass) batch batch/folder sends exact conditions and never reserializes content [0.08ms]
+(pass) mutations are single-attempt for disconnect [0.10ms]
+(pass) mutations are single-attempt for five [0.04ms]
+(pass) mutations are single-attempt for conflict [0.04ms]
+(pass) invalid paths, ETags and unsupported operations never send a mutation [0.12ms]
+
+api/domains/docling/test/documents.test.ts:
+(pass) resident listing discovers capabilities and preserves encoded cursors without leases [0.62ms]
+(pass) create and update preserve exact strings and the quoted ETag, with only permitted fields [0.55ms]
+(pass) PUT disconnect is classified without any automatic resend [0.12ms]
+(pass) PUT 503 is classified without any automatic resend [0.07ms]
+(pass) PUT 412 is classified without any automatic resend [0.06ms]
+(pass) PUT wrong-digest is classified without any automatic resend [0.06ms]
+(pass) PUT wrong-etag is classified without any automatic resend [0.06ms]
+(pass) contract mismatch and byte limits stop a write before dispatch [0.19ms]
+(pass) unsafe conditions and update routing fields are refused [0.26ms]
+(pass) a changed connection fences a late response [0.09ms]
+
+api/domains/markdown/test/document-files.test.ts:
+(pass) reopening maps a stable remote ID and preserves opaque recovery and exact Markdown on title-only update [10.77ms]
+(pass) only an empty recovery accepts a completed Plate import at the same ETag [11.05ms]
+(pass) ID and frozen input persist before dispatch, definite rejection reuses the ID and writes stay serialized [11.08ms]
+(pass) 412 preserves local content, GETs latest and requires explicit resolution before using its ETag [10.61ms]
+(pass) a lost PUT response is confirmed by exact digest, title, namespace and path without a resend [7.87ms]
+(pass) 412 remains a conflict even when latest content matches the attempted save [8.50ms]
+
+api/domains/markdown/test/library-management.test.ts:
+(pass) document metadata changes adopt the same workspace without changing opaque content; copy keeps its source [7.20ms]
+(pass) empty folder creation, recursive move/copy and batch deletion preserve exact request conditions [6.57ms]
+(pass) unconfirmed changes are not resent, fence saves and apply, and GET-only confirmation is distinct [6.44ms]
+(pass) dirty work, changing library ETags and unsupported descendants reject before mutation [7.96ms]
+(pass) 412 keeps the local document and does not silently adopt a new ETag [5.35ms]
+(pass) public staged management endpoint uses fixed input and returns the recorded result on duplicates [5.84ms]
+(pass) a lost success response is confirmed with GETs without resending the mutation [5.35ms]
+(pass) workspace adopts exactly the metadata checked against the expected content [6.38ms]
+(pass) batch move and copy adopt stable identities and leave opaque content untouched [6.24ms]
+(pass) staging accepts 100 long Unicode destinations without packing them into an Artifact event [10.69ms]
+(pass) overlapping moves and a manifest that changes while reading never dispatch [4.96ms]
+(pass) saving and collaborator ownership fence management before any external change [12.52ms]
+(pass) a late mutation after cancellation is retained as unknown and only a later GET check adopts it [7.04ms]
+(pass) a fresh service reads the persisted unknown request and can only confirm it without another mutation [25.49ms]
+
+api/domains/markdown/test/workspace.test.ts:
+(pass) archive v2 preserves frontmatter and rejects changes; legacy v1 remains readable [1.35ms]
+(pass) Plate decorations and exact imported original survive native recovery and reopen [39.89ms]
+(pass) stale user or collaborator edit cannot overwrite the current document [31.76ms]
+(pass) save freezes its snapshot and leaves newer typing dirty after completion [9.85ms]
+(pass) unconfirmed failure never becomes saved or retries [612.41ms]
+(pass) unconfirmed configuration never becomes saved or retries [10.66ms]
+(pass) unconfirmed cancel never becomes saved or retries [8.86ms]
+(pass) unconfirmed interrupt never becomes saved or retries [8.36ms]
+(pass) staged input keeps the ledger small, is single-use and rejects malformed editor trees [13.58ms]
+(pass) startup recovery settles a persisted running save with no prepared in-memory input [7.04ms]
+(pass) explicit GET reconciliation confirms the frozen snapshot and preserves later edits [6.15ms]
+(pass) repeated 404s remain unknown without another PUT; different content becomes conflict [1311.40ms]
+(pass) database reopen retains pending work and last Desk baseline without a version history [16.99ms]
+(pass) native UTF8 limits reject oversized staging without submitting a save [15.06ms]
+
+packages/artifact-ui/src/composition-content-components.test.tsx:
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+(pass) typing in a number input recomputes the stat [14.53ms]
+(pass) an empty or unparsable text writes nothing and blur shows the state again [2.89ms]
+(pass) a number input clamps to its own min and max, then to the state's [2.56ms]
+(pass) a number input takes min, max and step from the state when the view has none [1.11ms]
+(pass) the slider moves the state and formats its value [2.90ms]
+(pass) a slider without a range anywhere is 0 to 100 [1.04ms]
+(pass) choice sets a text state, as buttons and as cards [4.36ms]
+(pass) toggle flips a boolean state [3.76ms]
+(pass) stat shows a literal value as is and — for an expression that fails [1.28ms]
+(pass) views of other kinds render nothing [0.40ms]
+(pass) without a model the input views render disabled and the stat shows — [3.96ms]
+(pass) an input bound to a state of another type or a missing state is disabled [2.12ms]
+(pass) choice is disabled without a model and for a state that is not text [1.59ms]
+(pass) pricing-card, comparison-table, faq and timeline render their content [23.62ms]
+
+packages/artifact-ui/src/composition-data-components.test.tsx:
+(pass) a chart draws the series of the model and the static points [51.91ms]
+(pass) a chart of an unknown or non-series name has no data [0.96ms]
+(pass) a data-table evaluates each column per point of a series [2.07ms]
+(pass) a data-table shows 200 rows of a series and reports the rest [8.50ms]
+(pass) a data-table shows static rows, formatted by column [0.95ms]
+(pass) a data-table of a series without a model is empty [0.33ms]
+(pass) a formula shows its value after the typeset formula [4.78ms]
+(pass) a formula whose expression has no value shows the empty mark [1.25ms]
+(pass) the calculator's result goes to resultBind and the formula follows [6.12ms]
+(pass) the calculator evaluates with the host expression language [2.33ms]
+(pass) the calculator shows an error for what the language cannot work out [1.51ms]
+(pass) without a model the views draw and the calculator works [24.56ms]
+(pass) the calculator accepts pi after a number through the host language [3.40ms]
+(pass) float noise is trimmed from the result and from resultBind [2.49ms]
+(pass) a changed preset or mode starts the calculator over [3.66ms]
+(pass) a view of another kind renders nothing [0.36ms]
+
+packages/artifact-ui/src/composition-diagram-components.test.tsx:
+(pass) the stepper moves the shared step and the diagram shows its elements [6.62ms]
+(pass) a state set from outside moves the expression coordinates [1.82ms]
+(pass) without stepBind every element is shown and highlightAt is ignored [0.77ms]
+(pass) a stepper without bind keeps its own step [1.50ms]
+(pass) a stepper bound to an unknown state keeps its own step instead of freezing [0.88ms]
+(pass) both parts render without a model [1.10ms]
+(pass) other parts render nothing [0.24ms]
+
+packages/artifact-ui/src/composition-expressions.test.ts:
+(pass) literals and operators > numbers, strings, booleans and constants [0.08ms]
+(pass) literals and operators > precedence and associativity [0.12ms]
+(pass) literals and operators > comparison and equality across types [0.02ms]
+(pass) literals and operators > the conditional is right-associative and short-circuits [0.04ms]
+(pass) literals and operators > plus joins strings and numbers [0.04ms]
+(pass) literals and operators > names come from the scope [0.04ms]
+(pass) functions > basic math [0.21ms]
+(pass) functions > round goes half away from zero and takes digits [0.06ms]
+(pass) functions > trigonometry works in degrees [0.09ms]
+(pass) functions > pmt follows the spreadsheet sign convention [0.04ms]
+(pass) functions > fv follows the spreadsheet sign convention [0.07ms]
+(pass) functions > series functions [0.15ms]
+(pass) functions > text and format [0.20ms]
+(pass) functions > a null argument gives null [0.01ms]
+(pass) failures give null and never throw > 1 / 0
+(pass) failures give null and never throw > 5 % 0
+(pass) failures give null and never throw > sqrt(-1)
+(pass) failures give null and never throw > log(0)
+(pass) failures give null and never throw > log(-1)
+(pass) failures give null and never throw > log(8, 1)
+(pass) failures give null and never throw > pow(0, -1)
+(pass) failures give null and never throw > (-8) ^ 0.5
+(pass) failures give null and never throw > 10 ^ 400
+(pass) failures give null and never throw > clamp(1, 5, 0)
+(pass) failures give null and never throw > 1 + true
+(pass) failures give null and never throw > !1
+(pass) failures give null and never throw > -"a"
+(pass) failures give null and never throw > 1 && 2
+(pass) failures give null and never throw > unknown + 1
+(pass) failures give null and never throw > a very large intermediate value is null, not Infinity
+(pass) limits > length [0.04ms]
+(pass) limits > depth [0.19ms]
+(pass) limits > string literals stop at 120 characters [0.03ms]
+(pass) limits > min and max over a series spend the step budget too [0.36ms]
+(pass) limits > sum spends the step budget [0.15ms]
+(pass) parse results > names and functions are listed once, constants excluded [0.02ms]
+(pass) parse results > 1 + is rejected as unexpected_token [0.01ms]
+(pass) parse results > (1 is rejected as unexpected_token
+(pass) parse results > 1 2 is rejected as unexpected_token
+(pass) parse results > a = 1 is rejected as unexpected_character
+(pass) parse results > a & b is rejected as unexpected_character
+(pass) parse results > a ? 1 is rejected as unexpected_token
+(pass) parse results > 1,2 is rejected as unexpected_token
+(pass) parse results > foo(1) is rejected as unknown_function
+(pass) parse results > max() is rejected as bad_arity
+(pass) parse results > sqrt(1, 2) is rejected as bad_arity
+(pass) parse results > pmt(1, 2) is rejected as bad_arity
+(pass) parse results > a.b is rejected as unexpected_character
+(pass) parse results > a[0] is rejected as unexpected_character
+(pass) parse results > x ** 2 is rejected as unexpected_token
+(pass) parse results > 1e999 is rejected as bad_number
+(pass) parse results > 日本 is rejected as unexpected_character [0.02ms]
+(pass) parse results > `a` is rejected as unexpected_character
+(pass) prototype names > constructor is just an unknown name [0.03ms]
+(pass) prototype names > __proto__ is just an unknown name
+(pass) prototype names > toString is just an unknown name
+(pass) prototype names > hasOwnProperty is just an unknown name
+(pass) prototype names > valueOf is just an unknown name
+(pass) prototype names > prototype is just an unknown name
+(pass) prototype names > function names are only called, never read from the prototype [0.02ms]
+(pass) prototype names > object prototypes stay untouched [0.01ms]
+(pass) cyclicNames > finds names on a cycle, not those that only lead into one [0.02ms]
+
+packages/artifact-ui/src/composition-fixer.test.ts:
+(pass) identity on valid definitions > there are fixtures
+(pass) identity on valid definitions > fixture u1-landing-page.json comes back unchanged [3.71ms]
+(pass) identity on valid definitions > fixture u2-ec-cart.json comes back unchanged [3.70ms]
+(pass) identity on valid definitions > fixture u3-split-bill.json comes back unchanged [1.47ms]
+(pass) identity on valid definitions > fixture u4-retirement.json comes back unchanged [2.41ms]
+(pass) identity on valid definitions > fixture u5a-airplane-diagram.json comes back unchanged [1.59ms]
+(pass) identity on valid definitions > fixture u5b-triangulation.json comes back unchanged [1.49ms]
+(pass) identity on valid definitions > fixture u6-quiz.json comes back unchanged [2.06ms]
+(pass) identity on valid definitions > fixture u7-content-showcase.json comes back unchanged [1.93ms]
+(pass) identity on valid definitions > fixture u8-survey.json comes back unchanged [1.06ms]
+(pass) identity on valid definitions > the SKILL has examples [0.02ms]
+(pass) identity on valid definitions > every SKILL example comes back unchanged [2.32ms]
+(pass) identity on valid definitions > a valid definition is not mutated and the result is a copy [0.26ms]
+(pass) outer shape > an array of parts is wrapped in a stack layout [0.21ms]
+(pass) outer shape > a single non-layout part is wrapped [0.13ms]
+(pass) outer shape > a double wrap is unwrapped [0.14ms]
+(pass) outer shape > an unwrapped array is wrapped too [0.12ms]
+(pass) outer shape > an aliased root layout is not wrapped [0.12ms]
+(pass) keys > source and settings-only layout keys are removed [0.15ms]
+(pass) keys > unknown keys of a part are dropped [0.31ms]
+(pass) keys > unknown keys inside nested objects are dropped [0.14ms]
+(pass) keys > an unknown key of a layout is dropped [0.17ms]
+(pass) view names > aliases are mapped [0.27ms]
+(pass) view names > img becomes image [0.14ms]
+(pass) view names > a text alias moves its text into the missing title [0.14ms]
+(pass) view names > content and label move too, but a present title stays [0.24ms]
+(pass) view names > unaliased and unknown views are dropped [0.14ms]
+(pass) generic repairs from the schema issues > a long string is cut to max - 1 characters plus an ellipsis [0.16ms]
+(pass) generic repairs from the schema issues > a cut never splits a surrogate pair [0.12ms]
+(pass) generic repairs from the schema issues > a long array is cut to its maximum [0.23ms]
+(pass) generic repairs from the schema issues > more than 48 children are cut [2.90ms]
+(pass) generic repairs from the schema issues > an invalid optional enum is dropped [0.20ms]
+(pass) generic repairs from the schema issues > a differently cased enum value is corrected [0.16ms]
+(pass) generic repairs from the schema issues > an invalid layout direction becomes stack [0.27ms]
+(pass) generic repairs from the schema issues > an invalid required enum takes the first value [0.38ms]
+(pass) generic repairs from the schema issues > a wrong step is rounded to the nearest valid one [0.14ms]
+(pass) generic repairs from the schema issues > a non-integer where an integer is needed is rounded [0.24ms]
+(pass) generic repairs from the schema issues > a number over its maximum is clamped [0.11ms]
+(pass) generic repairs from the schema issues > a missing required key drops the part [0.21ms]
+(pass) generic repairs from the schema issues > an unfixable optional value is dropped, a required one drops the part [0.30ms]
+(pass) generic repairs from the schema issues > a nested union is followed to its own issue [0.33ms]
+(pass) generic repairs from the schema issues > an element with an unknown type drops the whole part [0.16ms]
+(pass) generic repairs from the schema issues > exactly-one rules: both given keeps the first [0.13ms]
+(pass) generic repairs from the schema issues > a variant that needs an image loses the variant [0.08ms]
+(pass) generic repairs from the schema issues > a table with ragged rows is dropped [0.17ms]
+(pass) images > a URL becomes a placeholder [0.09ms]
+(pass) images > an unknown provider keeps a valid alt [0.07ms]
+(pass) images > an unknown picsum theme or a bad seed becomes a placeholder [0.19ms]
+(pass) images > a too long alt is not kept [0.08ms]
+(pass) images > a valid picture is left alone, a long alt is cut [0.16ms]
+(pass) images > an avatar is handled the same way [0.08ms]
+(pass) images > a required picture that is missing drops the part [0.13ms]
+(pass) state > a model of a nested layout moves to the outermost layout [0.51ms]
+(pass) state > nested models merge with the root's when no name collides [0.31ms]
+(pass) state > a colliding nested model is dropped [0.27ms]
+(pass) state > an unbound number input gets a state, using its min and max [0.29ms]
+(pass) state > an unbound number input without a range starts at 0 [0.13ms]
+(pass) state > an unbound choice gets a text state and a toggle a boolean [0.33ms]
+(pass) state > a bind of the wrong type or a computed value drops the part [0.21ms]
+(pass) state > a chart over an unknown series is dropped [0.18ms]
+(pass) state > an input range reaching outside its state loses the key [0.14ms]
+(pass) state > an invalid state is dropped and an input gets a default state instead [0.27ms]
+(pass) state > more than 32 states are cut [0.33ms]
+(pass) expressions > computed entries with broken or unknown expressions are dropped [0.28ms]
+(pass) expressions > a part using a dropped value goes with it [0.40ms]
+(pass) expressions > a part with a broken expression is dropped [0.16ms]
+(pass) expressions > a computed value reading another in a circle is dropped [0.21ms]
+(pass) expressions > a layout with a broken `when` keeps its children and loses the key [0.61ms]
+(pass) limits > forms after the first are dropped [0.35ms]
+(pass) limits > layouts deeper than 6 give their children to the parent [1.47ms]
+(pass) limits > a depth-6 chain of layouts is valid and left alone [0.46ms]
+(pass) limits > parts over 240 are dropped from the end [14.99ms]
+(pass) limits > over 96 KiB drops parts from the end [3.98ms]
+(pass) nothing displayable > non-objects [0.06ms]
+(pass) nothing displayable > an empty layout [0.01ms]
+(pass) nothing displayable > every part dropped [0.01ms]
+(pass) nothing displayable > only empty layouts remain
+(pass) nothing displayable > a single unknown part
+(pass) determinism and robustness > the same input gives the same output [0.72ms]
+(pass) determinism and robustness > a messy definition ends valid [0.22ms]
+(pass) determinism and robustness > fixing the output again changes nothing [0.45ms]
+(pass) determinism and robustness > the input is not mutated [0.22ms]
+
+packages/artifact-ui/src/composition-fixtures-render.test.tsx:
+(pass) there are fixtures to render
+(pass) u1-landing-page.json renders without an error [16.25ms]
+(pass) u2-ec-cart.json renders without an error [44.94ms]
+(pass) u3-split-bill.json renders without an error [9.17ms]
+The width(0) and height(0) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+(pass) u4-retirement.json renders without an error [15.45ms]
+(pass) u5a-airplane-diagram.json renders without an error [7.35ms]
+(pass) u5b-triangulation.json renders without an error [9.22ms]
+(pass) u6-quiz.json renders without an error [8.86ms]
+(pass) u7-content-showcase.json renders without an error [23.68ms]
+(pass) u8-survey.json renders without an error [11.21ms]
+
+packages/artifact-ui/src/composition-format.test.ts:
+(pass) numbers use ja-JP grouping and at most two decimals by default [0.16ms]
+(pass) yen carries the sign and thousands separators [0.10ms]
+(pass) percent shows the value as it is [0.04ms]
+(pass) a value that rounds to zero loses its minus sign [0.05ms]
+(pass) the unit follows the value, with a space before a Latin unit [0.05ms]
+(pass) invalid values show a dash [0.02ms]
+(pass) text and booleans are shown as they read
+
+packages/artifact-ui/src/composition-images.test.ts:
+(pass) resolveCompositionImage > the same spec always gives the same url [0.08ms]
+(pass) resolveCompositionImage > the id comes from the catalog of the theme [0.12ms]
+(pass) resolveCompositionImage > an omitted seed is the seed 1, and other seeds reach other pictures [0.11ms]
+(pass) resolveCompositionImage > filters go into the query; a blur of 0 adds nothing [0.04ms]
+(pass) resolveCompositionImage > srcSet holds the 1x and 2x pictures, filters included [0.01ms]
+(pass) resolveCompositionImage > sizes are rounded to integers and limited to 1..2400 [0.04ms]
+(pass) resolveCompositionImage > the 2x size keeps the ratio when a side reaches the limit [0.02ms]
+(pass) resolveCompositionImage > a placeholder spec resolves to its tone, neutral by default [0.01ms]
+(pass) aspectSize > gives the ratio of each aspect, landscape by default [0.02ms]
+(pass) aspectSize > rounds to integers within 1..2400 [0.01ms]
+(pass) picsum catalog > nature has at least 6 distinct positive integer ids [0.02ms]
+(pass) picsum catalog > mountain has at least 6 distinct positive integer ids
+(pass) picsum catalog > forest has at least 6 distinct positive integer ids
+(pass) picsum catalog > sea has at least 6 distinct positive integer ids
+(pass) picsum catalog > beach has at least 6 distinct positive integer ids
+(pass) picsum catalog > sky has at least 6 distinct positive integer ids
+(pass) picsum catalog > flower has at least 6 distinct positive integer ids
+(pass) picsum catalog > city has at least 6 distinct positive integer ids
+(pass) picsum catalog > architecture has at least 6 distinct positive integer ids
+(pass) picsum catalog > interior has at least 6 distinct positive integer ids
+(pass) picsum catalog > night has at least 6 distinct positive integer ids
+(pass) picsum catalog > food has at least 6 distinct positive integer ids
+(pass) picsum catalog > coffee has at least 6 distinct positive integer ids
+(pass) picsum catalog > people has at least 6 distinct positive integer ids
+(pass) picsum catalog > animal has at least 6 distinct positive integer ids
+(pass) picsum catalog > workspace has at least 6 distinct positive integer ids
+(pass) picsum catalog > tech has at least 6 distinct positive integer ids
+(pass) picsum catalog > books has at least 6 distinct positive integer ids
+(pass) picsum catalog > travel has at least 6 distinct positive integer ids
+(pass) picsum catalog > road has at least 6 distinct positive integer ids
+(pass) picsum catalog > winter has at least 6 distinct positive integer ids
+(pass) picsum catalog > autumn has at least 6 distinct positive integer ids
+(pass) picsum catalog > texture has at least 6 distinct positive integer ids
+(pass) picsum catalog > minimal has at least 6 distinct positive integer ids
+
+packages/artifact-ui/src/composition-marketing-components.test.tsx:
+(pass) hero draws the text, display-only labels and a catalog photo [1.91ms]
+(pass) hero background asks for a wider picture and keeps overlay options [0.49ms]
+(pass) hero without an image draws only the text [0.26ms]
+(pass) image view uses the aspect for the frame and the picture size [0.56ms]
+(pass) image view draws a placeholder without any network picture [0.46ms]
+(pass) media card draws its text and a catalog photo [0.39ms]
+(pass) product card shows price, badge and rating with an optional photo [1.61ms]
+(pass) product card without an image still draws [0.34ms]
+(pass) feature card draws its icon, title and body [0.36ms]
+(pass) the design system's icon names are exactly the contract's featureIcons [0.02ms]
+(pass) testimonial draws the quote, person and catalog avatar [0.51ms]
+(pass) testimonial without an avatar shows the initial [4.60ms]
+(pass) cta banner draws labels, and the image variant a catalog backdrop [0.96ms]
+(pass) cta banner accent has no picture; a placeholder image becomes a gradient frame [0.71ms]
+(pass) each view renders nothing for another view's request [0.70ms]
+
+packages/artifact-ui/src/composition-model.test.tsx:
+(pass) computed values follow the state in dependency order [0.11ms]
+(pass) a series makes {x: i, y} points from the first to the last index [0.10ms]
+(pass) series bounds are rounded and an empty range gives an empty series [0.03ms]
+(pass) circular references, bad expressions and unknown names give null [0.08ms]
+(pass) series limits: 1,200 points each and a shared step budget [0.76ms]
+(pass) a series whose point fails is null as a whole [0.04ms]
+(pass) names of Object.prototype read as nothing [0.05ms]
+(pass) the Provider starts at the initial values and recomputes on set [1.05ms]
+(pass) set rounds into min and max and ignores unknown names, computed values and wrong types [0.37ms]
+(pass) an initial value outside min and max is rounded in too [0.13ms]
+(pass) evaluate uses the current values and the locals, and never throws [0.14ms]
+(pass) state returns the definition for input defaults [0.15ms]
+(pass) without a model the hook gives null [0.08ms]
+(pass) a changed definition starts over from its initial values [0.25ms]
+
+packages/artifact-ui/src/composition-validate.test.ts:
+(pass) accepted compositions > a full composition [0.27ms]
+(pass) accepted compositions > definitions without a model or expressions [0.03ms]
+(pass) model position > a nested layout may not hold a model [0.06ms]
+(pass) layout features > {"direction":"form-preview"} [0.04ms]
+(pass) layout features > {"tabs":[{"label":"a","children":[0]}]} [0.03ms]
+(pass) layout features > {"headerChildren":[0]} [0.02ms]
+(pass) layout features > {"draftSource":"x"} [0.02ms]
+(pass) layout features > {"headerLayout":"inline"} [0.01ms]
+(pass) layout features > the allowed directions pass [0.03ms]
+(pass) expressions > syntax errors and unknown functions name the position and a rule [0.12ms]
+(pass) expressions > unknown names are refused in every expression place [0.19ms]
+(pass) expressions > locals only exist where they are defined [0.07ms]
+(pass) expressions > names of Object.prototype are unknown, not inherited [0.05ms]
+(pass) expressions > a model without those names still validates its own references
+(pass) model definition > circular computed values are refused [0.05ms]
+(pass) model definition > reserved and duplicate names are refused [0.04ms]
+(pass) binds > {"view":"number-input","bind":"plan","label":"l"} [0.02ms]
+(pass) binds > {"view":"slider","bind":"pro","label":"l"} [0.02ms]
+(pass) binds > {"view":"choice","bind":"age","options":["a","b"]} [0.02ms]
+(pass) binds > {"view":"toggle","bind":"age","label":"l"} [0.02ms]
+(pass) binds > {"view":"calculator","resultBind":"plan"} [0.02ms]
+(pass) binds > {"view":"stepper","bind":"pro","steps":[]} [0.01ms]
+(pass) binds > {"view":"diagram","stepBind":"plan","elements":[]} [0.01ms]
+(pass) binds > {"view":"number-input","bind":"ghost","label":"l"} [0.01ms]
+(pass) binds > {"view":"calculator","resultBind":"ghost"} [0.02ms]
+(pass) binds > {"view":"number-input","bind":"atRetire","label":"l"} [0.01ms]
+(pass) binds > {"view":"diagram","stepBind":"balance","elements":[]} [0.01ms]
+(pass) binds > {"view":"chart","kind":"line","series":[{"name":"n","from":"ghost"}]} [0.02ms]
+(pass) binds > {"view":"chart","kind":"line","series":[{"name":"a","points":[]},{"name":"n","from":"atRetire"}]} [0.01ms]
+(pass) binds > {"view":"data-table","columns":[],"series":"atRetire"} [0.02ms]
+(pass) binds > {"view":"data-table","columns":[],"series":"ghost"} [0.01ms]
+(pass) binds > a bind without any model is refused
+(pass) binds > paths of nested layouts are joined [0.03ms]
+(pass) binds > the result never carries a value of the definition [0.03ms]
+(pass) tex > \href{x}{y} is refused [0.03ms]
+(pass) tex > \url{x} is refused [0.02ms]
+(pass) tex > \includegraphics{x} is refused [0.02ms]
+(pass) tex > \htmlClass{a}{b} is refused [0.01ms]
+(pass) tex > \htmlStyle{a}{b} is refused [0.01ms]
+(pass) tex > \def\a{1} is refused [0.01ms]
+(pass) tex > \gdef\a{1} is refused [0.01ms]
+(pass) tex > \edef\a{1} is refused
+(pass) tex > \xdef\a{1} is refused [0.01ms]
+(pass) tex > \let\a=b is refused
+(pass) tex > \newcommand{\a}{1} is refused
+(pass) tex > \renewcommand{\a}{1} is refused
+(pass) tex > \providecommand{\a}{1} is refused [0.01ms]
+(pass) tex > \DeclareMathOperator{\a}{a} is refused [0.01ms]
+(pass) tex > x = \frac{a}{b} \href{u}{v} is refused
+(pass) tex > ordinary commands, similar names and line breaks pass [0.07ms]
+(pass) input ranges and choices > an input may not reach outside its state's range [0.06ms]
+(pass) input ranges and choices > a state whose min is above its max is refused
+(pass) input ranges and choices > a choice starts at an option, or at nothing [0.03ms]
+(pass) data-table columns > rows with an expr column are refused; series needs it [0.04ms]
+(pass) series budget > a literal series over 1,200 points is refused [0.04ms]
+(pass) series budget > all series together stay within 10,000 points [0.08ms]
+(pass) series budget > bounds that read states are tried at the initial value and the ends of the range [0.04ms]
+(pass) series budget > a boolean in a bound is tried both ways [0.02ms]
+(pass) series budget > a bound that reads another computed value is not estimated [0.01ms]
+
+packages/artifact-ui/src/compute-components.test.tsx:
+(pass) registered computation view composes with text and rejects a wrong resource kind [2.19ms]
+
+packages/artifact-ui/src/dots-messaging.test.ts:
+(pass) dots messaging composes with registered views and requires its own source [2.86ms]
+
+packages/artifact-ui/src/external-app-components.test.tsx:
+(pass) a stale source conflict is displayed and the user can explicitly try again [2.45ms]
+(pass) a late open rejection does not leak into the launcher after its connection changes [1.08ms]
+
+packages/artifact-ui/src/markdown-cache.test.ts:
+(pass) scratch cache contains exact Markdown, Plate styling and imported original as one ordinary JSON file [0.15ms]
+
+packages/artifact-ui/src/markdown-composition.test.ts:
+(pass) the editor composes with other registered views through ordinary Artifact JSON [2.40ms]
+
+packages/artifact-ui/src/ui-studio-source.test.tsx:
+(pass) the source view shows the canonical text as given, not a re-serialization [11.29ms]
+(pass) the lines changed from the previous revision are marked and removed lines are indicated [8.38ms]
+(pass) nothing is marked when there is no earlier revision or nothing changed [12.33ms]
+(pass) editing the text and applying sends the work, the revision and the text [24.31ms]
+(pass) applying is unavailable while a turn runs, for blank text, and the editor cannot open for a saved work [35.47ms]
+(pass) a work that moved after editing began cannot be overwritten by the old text [14.82ms]
+(pass) a refusal is shown beside the editor and the typed text is kept [7.93ms]
+(pass) the rejected draft is read-only with its issues, can be loaded into the editor, and never reaches the preview [9.34ms]
+(pass) a first draft that failed the check still offers its text, with no preview [4.25ms]
+(pass) the toolbar keeps its own actions with the source editor open [12.14ms]
+
+packages/artifact-ui/src/work-components.test.tsx:
+(pass) work menu/result compose with an existing activity view and reject wrong source kinds [2.58ms]
+
+ 678 pass
+ 0 fail
+ 7108 expect() calls
+Ran 678 tests across 84 files. [86.89s]

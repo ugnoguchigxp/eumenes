@@ -1,0 +1,55 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/markdown/test/generated.test.ts:
+(pass) generated Markdown is saved without a session, retains exact text, and replays the same receipt [17.45ms]
+(pass) local capacity failure does not prevent an independent Docling save [12.23ms]
+(pass) unavailable Docling preserves the local file; rejected namespace never sends a PUT [24.99ms]
+(pass) lost PUT response is confirmed by GET without resending or changing its ID [27.03ms]
+(pass) an unconfirmed PUT stays unknown and repeated requests do not retry it [618.64ms]
+(pass) cancelled or forgotten output cannot be saved or adopted after a delayed local write [23.21ms]
+(pass) connection change during PUT never adopts a result from the previous binding [18.67ms]
+(pass) the status check confirms a previously unknown save using GET only [618.88ms]
+(pass) a changed remote document is a conflict and is never overwritten [15.70ms]
+
+api/domains/markdown/test/workspace.test.ts:
+(pass) archive v2 preserves frontmatter and rejects changes; legacy v1 remains readable [1.65ms]
+(pass) Plate decorations and exact imported original survive native recovery and reopen [13.08ms]
+(pass) stale user or collaborator edit cannot overwrite the current document [8.76ms]
+(pass) save freezes its snapshot and leaves newer typing dirty after completion [8.87ms]
+(pass) unconfirmed failure never becomes saved or retries [612.03ms]
+(pass) unconfirmed configuration never becomes saved or retries [15.71ms]
+(pass) unconfirmed cancel never becomes saved or retries [13.74ms]
+(pass) unconfirmed interrupt never becomes saved or retries [12.44ms]
+(pass) staged input keeps the ledger small, is single-use and rejects malformed editor trees [20.77ms]
+(pass) startup recovery settles a persisted running save with no prepared in-memory input [9.88ms]
+(pass) explicit GET reconciliation confirms the frozen snapshot and preserves later edits [10.25ms]
+(pass) repeated 404s remain unknown without another PUT; different content becomes conflict [1319.16ms]
+(pass) database reopen retains pending work and last Desk baseline without a version history [35.10ms]
+(pass) native UTF8 limits reject oversized staging without submitting a save [33.95ms]
+
+api/domains/pursuit/test/documents.test.ts:
+(pass) new research waits for the document receipt, then returns its title and file references without another model call [631.44ms]
+(pass) cancellation while saving revokes the document operation and never adopts the late receipt [585.49ms]
+(pass) only filesystem separators and filename length are normalized, without changing the document title [0.08ms]
+(pass) a partial research report remains partial after its document is saved [812.24ms]
+(pass) restarting while awaiting the same document receipt does not repeat research or create another document [1712.59ms]
+(pass) forgetting after an amendment removes document outputs from every superseded epoch [604.54ms]
+
+api/application/pursuit/document-integration.test.ts:
+(pass) public research produces an exact Markdown file and a truthful Docling receipt (online=true) [1586.28ms]
+(pass) public research produces an exact Markdown file and a truthful Docling receipt (online=false) [1565.46ms]
+
+api/application/pursuit/document-registration.test.ts:
+(pass) old research revisions remain intact while fresh and previously seeded databases publish document-capable research [1279.24ms]
+
+api/application/agency/action-kinds.test.ts:
+(pass) Agency uses the registered research execution contract without a manufactured user run [672.54ms]
+(pass) Agency uses the registered instant execution contract without a manufactured user run [613.16ms]
+(pass) Agency uses the registered pipeline execution contract without a manufactured user run [641.38ms]
+(pass) Agency uses the registered task execution contract without a manufactured user run [986.06ms]
+(pass) an autonomous owner's question reaches its TODO and resumes only from a real user answer [989.66ms]
+
+ 37 pass
+ 0 fail
+ 177 expect() calls
+Ran 37 tests across 6 files. [16.67s]

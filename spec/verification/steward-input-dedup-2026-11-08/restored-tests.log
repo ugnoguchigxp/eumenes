@@ -1,0 +1,32 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/steward/test/steps.test.ts:
+(pass) the events of a run go through curate-memory and are handled [50.94ms]
+(pass) events that carry nothing to learn from are handled without a model [33.02ms]
+(pass) a failed summary-like answer is run again without saving the memory twice [37.84ms]
+(pass) three unusable answers over events give them up and the pipeline goes on [36.96ms]
+(pass) an event that is already handled is not offered again [40.72ms]
+(pass) long-term writers share one concurrency key across conversations [37.99ms]
+(pass) elements that cannot be saved are dropped one by one [43.34ms]
+(pass) a mismatched quote and the agent's words cannot become evidence of a saved memory [35.24ms]
+(pass) a failed attempt reaches curate-memory as the user's event alone [42.03ms]
+(pass) long messages are cut to 6 KB for the steward, and one event always fits [36.37ms]
+(pass) at most eight events and 16 KB go into one step; the rest waits [41.94ms]
+(pass) a step on its own prompt runs on a connection of its own and yields to the user's calls [33.90ms]
+(pass) a step reading the conversation runs on the conversation's prompt with its own task last, on the conversation's connection [33.79ms]
+
+api/domains/steward/test/requests.test.ts:
+(pass) a request alone starts a unit, is settled by the request's state, and its words are cleared [36.03ms]
+(pass) several requests are settled by one call, and one the model leaves out is counted [36.40ms]
+(pass) an explicit remember of what is already stored makes a new confirmed version [40.75ms]
+(pass) a remember request the model answers with none but points at the stored item is still reconfirmed [37.82ms]
+(pass) a remember request answered with none and a wrong ref is reconfirmed through its key [39.13ms]
+(pass) a request the model never answers is given up after three tries [37.50ms]
+(pass) a correct request updates an item and is shown to the user once as a notice [41.16ms]
+(pass) a withdraw request takes back a request that was not applied yet: the forget is not carried out [42.00ms]
+(pass) a withdraw request can not undo an applied forget: it finds nothing to take back and the forget stays [51.28ms]
+
+ 22 pass
+ 0 fail
+ 86 expect() calls
+Ran 22 tests across 2 files. [1021.00ms]

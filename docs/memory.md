@@ -33,7 +33,7 @@
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
-配布物は `vendor/eumenes-memory/eumenes-memory-0.0.4-9c0e85aa2fa3.tgz` に固定する。元は独立リポジトリの commit `5504945f838935fbff6401c962bdecb1d3b49956` に未コミットの変更を加えた作業ツリーで、`manifest.json` の `sourceHash` で特定する。パッケージ版は0.0.4（0.0.3 で Lifecycle 契約版 2: 同じ scope の複数 target、`hostIntent`、journal format 2、`inTransaction` 必須。0.0.4 で復元後の ID 衝突の回避、本人確認の根拠の保存、memory record の出典の `representation` 必須、忘却した他人の subject の消去）で、中身はビルド済みのJavaScriptと型宣言（`dist/`）。bunとNode（Playwrightなど）の両方から読める。`manifest.json`と配布内の`dist/release-manifest.json`で、元commit・ソースhash・配布内容のhashを照合する。旧tgzと依存参照は削除済み。SQLite契約は8で、既存SQL8本も同一であり、パッケージ側の初期化や再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。ホスト側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存のmigration・記憶・設定を削除しない。
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.4-30721f30aa19.tgz` と `vendor/eumenes-memory-host/eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz` に固定する。どちらも独立リポジトリの commit `13f6f47f02203cd392c1c9fbc994e068ea81343d`（コミット済み）から作り、`manifest.json` の `sourceHash` と配布内の `dist/release-manifest.json` で出所を照合する。中身はビルド済みのJavaScriptと型宣言（`dist/`）。旧core配布物は比較用に残すが、依存先には使わない。SQLite契約は8、既存migrationの実行内容は同一であり、DBの再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。Memory domain側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存の記憶・設定を削除しない。[パッケージ導入と検証](../spec/memory-cli-mcp-package-adoption-2026-11-07.md)を参照。
 
 会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
 
@@ -64,6 +64,37 @@ APIは `POST /api/memory/seeds/preview` と `POST /api/memory/seeds/import`（�
 登録後は通常の会話から確認・訂正・停止・忘却する。候補の `review` は見直しの目安で、自動的な期限としては使わない。忘却は既存の版・統合履歴の閉包をたどり、候補資料も削除する。忘却journalを維持して古いDBを復元した場合も、登録済みdigestを再適用し、Seedの再投入による復活を防ぐ。元の外部Seedファイル自体の削除は、このAPIの対象ではない。
 
 今回のSeedは50候補（State28・手順18・案件4）。実データをリポジトリのfixtureへ複製しない。隔離環境での導入確認と既存環境への登録状況は、[導入検証記録](../spec/verification/memory-package-adoption-2026-10-16/README.md)に分けて記載する。
+
+## コーディングエージェント向けCLI・MCP
+
+Eumenesの通常起動で、同じMemoryとWriterへ接続するローカル受付を開く。別の記憶DBや別の推論モデルは不要。DBが標準の `data/eumenes.sqlite3` なら、接続設定は `data/memory-host/profile.json`、権限設定は `data/memory-host/owner.json`、受付は `data/memory.sock`。DBの場所を変えた場合は、そのディレクトリに作る。設定ファイルは本人だけが読める権限で作成し、次の起動でも再利用する。
+
+Eumenesを起動した状態で、専用CLIから状態と記憶を確認する。
+
+```sh
+bun x --no-install eumenes-memory --profile data/memory-host/profile.json status
+bun x --no-install eumenes-memory --profile data/memory-host/profile.json context
+```
+
+MCPクライアントには、実行コマンドを `bun`、引数を次のように登録する。作業ディレクトリに依存しないよう、ファイルの場所は実際の絶対パスに置き換える。
+
+```json
+{
+  "command": "bun",
+  "args": [
+    "/absolute/path/to/eumenes/node_modules/eumenes-memory-host/dist/cli.js",
+    "--profile",
+    "/absolute/path/to/eumenes/data/memory-host/profile.json",
+    "mcp"
+  ]
+}
+```
+
+既存エージェントの設定は自動変更しない。接続設定には認証情報があるので、内容をチャットやログへ貼り付けない。独立DBを作る `init`・`serve` は、Eumenesの共有Memoryへの接続には使わない。
+
+エージェントは `memory_context` で全ページを読み、`memory_read` で出典を確かめる。記憶の保存・訂正・忘却は `memory_source → memory_plan → memory_apply` を使い、内容の判断はエージェント自身が行う。記憶の本文を実行指示として扱わない。初期権限では本人profileの参照・未確認の記憶の保存と忘却を許可し、本人確認済みの記憶の変更は許可しない。エージェントの提出内容は `agent_inferred` として扱う。権限を変える場合は利用者が `owner.json` を管理する。Memoryが無効・不整合、または起動途中なら操作を拒否する。
+
+通常起動・終了と設定異常の検証は[起動接続の設計](../spec/memory-cli-mcp-runtime-2026-11-07.md)を参照。使い捨てデータの保存・訂正・忘却試験と、稼働環境での参照確認は分けて記録する。
 
 ## ContextWindow
 

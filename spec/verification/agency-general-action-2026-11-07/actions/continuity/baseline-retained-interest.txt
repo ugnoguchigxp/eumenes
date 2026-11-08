@@ -1,0 +1,23 @@
+bun test v1.4.4 (38afee6c8)
+
+../../../../private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-agency-continuity-baseline-_c64l6vm/continuity.test.ts:
+12 | 		await waitFor(() => h.calls.select === 1);
+13 | 		await settle();
+14 | 		expect(h.host.inspect("c1")?.idle.blockedBy).toBe("disabled");
+15 | 		await h.advance(61_000);
+16 | 		await settle();
+17 | 		expect(h.calls.select).toBe(2);
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 1
+
+      at <anonymous> (/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-agency-continuity-baseline-_c64l6vm/continuity.test.ts:17:26)
+(fail) retained interest gets one native wake when the speech planner cannot run [94.68ms]
+
+ 0 pass
+ 3 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [376.00ms]

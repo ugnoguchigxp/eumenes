@@ -11,6 +11,16 @@ export function stopChildren(
 	row: RunRow,
 	forget = false,
 ) {
+	const state = stateOf(row),
+		publication = state.publication;
+	const documents = forget
+		? new Set([
+				...(state.documentIds ?? []),
+				...(publication ? [publication.id] : []),
+			])
+		: new Set(publication ? [publication.id] : []);
+	for (const id of documents)
+		ctx.documents?.cancelInTransaction(db, id, forget);
 	if (row.job_id) {
 		ctx.queue.cancelInTransaction(db, row.job_id, "pursuit_stopped");
 		ctx.abortJobs.add(row.job_id);
@@ -98,7 +108,7 @@ export function reconcile(ctx: Context, db: Database, recovering = false) {
 			ctx.forget(db, candidate.id);
 			continue;
 		}
-		if (!active(row)) continue;
+		if (!active(row) || stateOf(row).publication) continue;
 		if (row.deadline <= ctx.now()) {
 			end(
 				ctx,

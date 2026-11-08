@@ -1,0 +1,121 @@
+diff --git a/api/domains/steward/service/messages.ts b/api/domains/steward/service/messages.ts
+index acaba5f9..ba01d8c1 100644
+--- a/api/domains/steward/service/messages.ts
++++ b/api/domains/steward/service/messages.ts
+@@ -1,29 +1,13 @@
+ import type { ChatMessage } from "../contracts";
+-import type { PreparedUnit, StepDefinition } from "./types";
+-
+-/** The system message carries the instructions and the schema the answer must follow, the way control requests do. */
+-function systemMessage(step: StepDefinition, prepared: PreparedUnit): string {
+-	return `${step.instructions}\nOUTPUT_SCHEMA=${JSON.stringify(step.outputSchema(prepared))}`;
+-}
+-export function buildMessages(
+-	step: StepDefinition,
+-	prepared: PreparedUnit,
+-	data: unknown,
+-): ChatMessage[] {
+-	return [
+-		{ role: "system", content: systemMessage(step, prepared) },
+-		{ role: "user", content: JSON.stringify(data) },
+-	];
++/** executeControl supplies instructions and schema once, through Inference's shared output contract. */
++export function buildMessages(data: unknown): ChatMessage[] {
++	return [{ role: "user", content: JSON.stringify(data) }];
+ }
+ 
+ /**
+  * A step's own `## Task` after the conversation's prefix (the conversation input specification, section 10): the
+- * task's instructions, the schema its answer follows, and its input.
++ * input only. executeControl adds the step's instructions and schema to the first system message.
+  */
+-export function taskText(
+-	step: StepDefinition,
+-	prepared: PreparedUnit,
+-	data: unknown,
+-): string {
+-	return `${systemMessage(step, prepared)}\n入力:\n${JSON.stringify(data)}`;
++export function taskText(data: unknown): string {
++	return `入力:\n${JSON.stringify(data)}`;
+ }
+diff --git a/api/domains/steward/service/unit-prepare.ts b/api/domains/steward/service/unit-prepare.ts
+index 5d125832..ab1478b6 100644
+--- a/api/domains/steward/service/unit-prepare.ts
++++ b/api/domains/steward/service/unit-prepare.ts
+@@ -177,7 +177,7 @@ export function createPrepare(
+ 				step,
+ 				requestId,
+ 				prepared: preparedUnit,
+-				messages: buildMessages(step, preparedUnit, prepared.data),
++				messages: buildMessages(prepared.data),
+ 				startedAt: deps.nowMs(),
+ 			},
+ 		};
+diff --git a/api/domains/steward/service/units.ts b/api/domains/steward/service/units.ts
+index f0f5cef8..81b10d4b 100644
+--- a/api/domains/steward/service/units.ts
++++ b/api/domains/steward/service/units.ts
+@@ -60,15 +60,13 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
+ 			? deps.conversationTask?.()
+ 			: undefined;
+ 		const prefix = read
+-			? deps.store.read((db) =>
+-					read(db, input.conversationId, taskText(step, prepared, data)),
+-				)
++			? deps.store.read((db) => read(db, input.conversationId, taskText(data)))
+ 			: null;
+ 		const messages = prefix
+ 			? prefix.messages
+ 			: before?.data === undefined
+ 				? input.messages
+-				: buildMessages(step, prepared, before.data);
++				: buildMessages(before.data);
+ 		const receipt = await inference.executeControl(
+ 			input.requestId,
+ 			messages,
+diff --git a/api/domains/steward/test/steps.test.ts b/api/domains/steward/test/steps.test.ts
+index 3c58ee9a..9d565765 100644
+--- a/api/domains/steward/test/steps.test.ts
++++ b/api/domains/steward/test/steps.test.ts
+@@ -363,7 +363,8 @@ test("a step reading the conversation runs on the conversation's prompt with its
+ 	const [call] = h.inference.callsOf("curate-memory");
+ 	expect(call!.messages.slice(0, 2)).toEqual(prefix.messages);
+ 	expect(call!.messages[2]!.content).toStartWith("## Task\n");
+-	expect(call!.messages[2]!.content).toContain("OUTPUT_SCHEMA=");
++	expect(call!.messages[2]!.content).not.toContain("OUTPUT_SCHEMA=");
++	expect(call!.schema).toBeDefined();
+ 	expect(call!.session).toEqual({
+ 		sessionRole: "auxiliary",
+ 		onConversation: true,
+diff --git a/api/domains/steward/test/steward.fixture.ts b/api/domains/steward/test/steward.fixture.ts
+index 6edfd9d4..fe4bbfb6 100644
+--- a/api/domains/steward/test/steward.fixture.ts
++++ b/api/domains/steward/test/steward.fixture.ts
+@@ -106,15 +106,16 @@ export function createFakeInference() {
+ 		return value;
+ 	};
+ 	/** A step's own prompt starts with its instructions; on the conversation's prompt, its task is the last message. */
+-	const stepOf = (messages: ChatMessage[]) =>
++	const stepOf = (messages: ChatMessage[], instructions?: string) =>
+ 		Object.values(steps).find(
+ 			(step) =>
++				instructions === step.instructions ||
+ 				messages[0]?.content.startsWith(step.instructions) ||
+ 				messages.at(-1)?.content.includes(step.instructions),
+ 		)?.id ?? "unknown";
+ 	const dataOf = (messages: ChatMessage[]) => {
+ 		const task = /\n入力:\n([\s\S]*)$/.exec(messages.at(-1)?.content ?? "");
+-		return JSON.parse(task ? task[1]! : messages[1]!.content) as Record<
++		return JSON.parse(task ? task[1]! : messages.at(-1)!.content) as Record<
+ 			string,
+ 			unknown
+ 		>;
+@@ -135,7 +136,7 @@ export function createFakeInference() {
+ 			control,
+ 			session,
+ 		): Promise<ControlReceipt> {
+-			const step = stepOf(messages);
++			const step = stepOf(messages, control?.instructions);
+ 			const data = dataOf(messages);
+ 			calls.push({
+ 				step,

@@ -98,11 +98,14 @@ export function createAgentLarm(
 			conversationId: null,
 			agentId: options.taskId ?? crypto.randomUUID(),
 		};
+		if (options.independent && (role === "main" || options.yields))
+			throw new Error("larm_independent_session_conflict");
 		const key = JSON.stringify([
 			role,
 			owner.conversationId,
 			owner.agentId,
 			owner.branchId ?? null,
+			...(options.independent ? ["independent"] : []),
 		]);
 		let entry = connections.get(key);
 		if (entry?.retiring) {
@@ -123,7 +126,7 @@ export function createAgentLarm(
 		if (role === "main") selected = entry.port;
 		const yields =
 			options.onConversation || options.yields ? yielding.enter() : undefined;
-		if (!yields) yielding.preempt();
+		if (!yields && !options.independent) yielding.preempt();
 		const scoped = AbortSignal.any([
 			signal,
 			lifetime.signal,
@@ -133,16 +136,22 @@ export function createAgentLarm(
 		// The child already has its capacity. Its local main queue serializes this agent only.
 		const call = { ...options, sessionRole: "main" as const };
 		try {
-			return await lanes[role](scoped, () =>
-				onDelta && target.answerStream
-					? target.answerStream(messages, scoped, onDelta, call)
-					: target.answer(messages, scoped, call),
+			return await lanes[options.independent ? "independent" : role](
+				scoped,
+				() =>
+					onDelta && target.answerStream
+						? target.answerStream(messages, scoped, onDelta, call)
+						: target.answer(messages, scoped, call),
 			);
 		} finally {
 			yields?.leave();
 			entry.calls--;
 			if (!entry.calls) entry.drained?.resolve();
-			if (role === "sub" && options.sessionRole !== "subagent")
+			if (
+				role === "sub" &&
+				options.sessionRole !== "subagent" &&
+				!options.independent
+			)
 				await retire(key, entry);
 		}
 	}

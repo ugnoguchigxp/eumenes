@@ -238,6 +238,8 @@ export function harness(
 			((next) => ({
 				async complete<T>(request: LlmRequest<T>) {
 					identities.push(next(request as LlmRequest<unknown>));
+					if (request.purpose === "think")
+						throw new Error("unexpected always-on call in F fixture");
 					calls[request.purpose]++;
 					requests.push(request as LlmRequest<unknown>);
 					const reply =

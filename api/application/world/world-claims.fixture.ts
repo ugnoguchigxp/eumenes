@@ -114,14 +114,18 @@ export async function worldHarness(options: WorldFixtureOptions = {}) {
 		feedResyncRequired: recovery.feedResyncRequired === true,
 	});
 
-	const apply = (key: string, operation: unknown) =>
-		world.service.apply({
+	const apply = async (key: string, operation: unknown) => {
+		const result = await world.service.apply({
 			access: manualAccess(),
 			scope: SCOPE,
 			operationKey: key,
 			clock: NOW,
 			operation: operation as never,
 		});
+		if (result.status !== "applied" && result.status !== "no_op")
+			throw new Error(`world seed ${key}: ${JSON.stringify(result)}`);
+		return result;
+	};
 	const ref = (id: string) => {
 		const state = store.read((db) => conversation.sourceInTransaction(db, id));
 		if (state.state !== "available") throw new Error(`no source ${id}`);
@@ -216,6 +220,7 @@ export async function worldHarness(options: WorldFixtureOptions = {}) {
 		const m1 = ref("m1");
 		const measured = claim("claim-measured", m1, {
 			origin: "runtime_observation",
+			observedAt: NOW,
 			predicate: "latency",
 			payload: {
 				kind: "value",

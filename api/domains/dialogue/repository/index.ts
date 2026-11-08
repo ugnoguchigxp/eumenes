@@ -4,6 +4,7 @@ import {
 	agencyActionsMigration,
 } from "./agency";
 import { specialistObservationsMigration } from "./specialist-observations";
+import { collaborationStateMigration } from "./collaboration-state";
 import { agencyObservationsMigration } from "./agency-observations";
 import { intentAnswerRouteMigration, intentJudgmentsMigration } from "./intent";
 import type { Database } from "bun:sqlite";
@@ -477,6 +478,7 @@ export const migrations: readonly Migration[] = [
 		after: ["dialogue/0037-agency-actions"],
 		sql: resourceAttachedMigration,
 	},
+	collaborationStateMigration,
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

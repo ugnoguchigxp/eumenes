@@ -1,0 +1,12 @@
+$ bun scripts/verify.ts
+$ oxfmt --check
+Checking formatting...
+
+examples/virtual-eumenes/agenda/docs.ts (0ms)
+examples/virtual-eumenes/agenda/memory.ts (0ms)
+examples/virtual-eumenes/agenda/research.ts (0ms)
+
+Format issues found in above 3 files. Run without `--check` to fix.
+Finished in 36ms on 676 files using 10 threads.
+error: script "format:check" exited with code 1
+error: script "verify" exited with code 1

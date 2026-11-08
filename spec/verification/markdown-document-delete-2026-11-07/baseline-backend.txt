@@ -1,0 +1,42 @@
+bun test v1.4.4 (38afee6c8)
+
+api/domains/markdown/test/document-files.test.ts:
+(pass) reopening maps a stable remote ID and preserves opaque recovery and exact Markdown on title-only update [16.88ms]
+(pass) only an empty recovery accepts a completed Plate import at the same ETag [10.56ms]
+(pass) ID and frozen input persist before dispatch, definite rejection reuses the ID and writes stay serialized [10.09ms]
+(pass) 412 preserves local content, GETs latest and requires explicit resolution before using its ETag [10.30ms]
+(pass) a lost PUT response is confirmed by exact digest, title, namespace and path without a resend [7.55ms]
+(pass) 412 remains a conflict even when latest content matches the attempted save [8.41ms]
+
+api/domains/markdown/test/workspace.test.ts:
+(pass) archive v2 preserves frontmatter and rejects changes; legacy v1 remains readable [0.38ms]
+(pass) Plate decorations and exact imported original survive native recovery and reopen [7.16ms]
+(pass) stale user or collaborator edit cannot overwrite the current document [5.56ms]
+(pass) save freezes its snapshot and leaves newer typing dirty after completion [5.70ms]
+(pass) unconfirmed failure never becomes saved or retries [607.45ms]
+(pass) unconfirmed configuration never becomes saved or retries [6.61ms]
+(pass) unconfirmed cancel never becomes saved or retries [8.71ms]
+(pass) unconfirmed interrupt never becomes saved or retries [8.57ms]
+(pass) staged input keeps the ledger small, is single-use and rejects malformed editor trees [11.48ms]
+(pass) startup recovery settles a persisted running save with no prepared in-memory input [5.47ms]
+(pass) explicit GET reconciliation confirms the frozen snapshot and preserves later edits [8.01ms]
+(pass) repeated 404s remain unknown without another PUT; different content becomes conflict [1311.96ms]
+(pass) database reopen retains pending work and last Desk baseline without a version history [16.08ms]
+(pass) native UTF8 limits reject oversized staging without submitting a save [19.39ms]
+
+api/domains/docling/test/documents.test.ts:
+(pass) resident listing discovers capabilities and preserves encoded cursors without leases [1.48ms]
+(pass) create and update preserve exact strings and the quoted ETag, with only permitted fields [1.04ms]
+(pass) PUT disconnect is classified without any automatic resend [0.20ms]
+(pass) PUT 503 is classified without any automatic resend [0.10ms]
+(pass) PUT 412 is classified without any automatic resend [0.10ms]
+(pass) PUT wrong-digest is classified without any automatic resend [0.11ms]
+(pass) PUT wrong-etag is classified without any automatic resend [0.09ms]
+(pass) contract mismatch and byte limits stop a write before dispatch [0.43ms]
+(pass) unsafe conditions and update routing fields are refused [0.50ms]
+(pass) a changed connection fences a late response [0.14ms]
+
+ 30 pass
+ 0 fail
+ 136 expect() calls
+Ran 30 tests across 3 files. [3.22s]

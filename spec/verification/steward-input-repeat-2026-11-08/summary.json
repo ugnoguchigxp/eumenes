@@ -1,0 +1,45 @@
+{
+  "status": "completed",
+  "stoppingReason": "primary_quality_not_maintained",
+  "sums": {
+    "before": {
+      "calls": 60,
+      "passed": 57,
+      "inputTokens": 348480,
+      "outputTokens": 5644,
+      "totalTokens": 354124,
+      "cacheReadTokens": 342436,
+      "durationMs": 222954.4486309999
+    },
+    "after": {
+      "calls": 60,
+      "passed": 50,
+      "inputTokens": 180480,
+      "outputTokens": 6419,
+      "totalTokens": 186899,
+      "cacheReadTokens": 177236,
+      "durationMs": 229958.4767469999
+    }
+  },
+  "sourceHashes": {
+    "scripts/steward-input-repeat.ts": "8cc4943a7b8ab5707998cdf40d229c7e03ab286420f05018768e4f866019cc3b",
+    "scripts/steward-input-repeat-stats.ts": "29e7cb74e5aa47323c0fe2ea68eff81e7a12db4ff55ee4284edeaf80e9122e60",
+    "api/domains/steward/service/messages.ts": "d2556ae3b2f752ef10e055359d70fd017fb29a7aca65d121641b4658c51a2535",
+    "api/domains/steward/service/units.ts": "94e274d02f19232eb50f746dff08ddc098a4332f1bb80ca77a8f022bbe374218",
+    "api/domains/steward/service/unit-prepare.ts": "e624c088398a7834bf7bf559654a40fe958aa5e4986dc6ddb890491d1f5bef52",
+    "api/domains/steward/service/steps/curate-memory.ts": "a79a2db57ee901c8c5f2bee64c6c0f0d52f3543bdb1676482e508cff0713a7f6",
+    "api/domains/steward/service/steps/curate-apply.ts": "fb243b4f591429cc687c4a43ef79971f3d7975a0852bd91770625224c1e3316f",
+    "api/domains/steward/service/steps/curate-types.ts": "6039188c3b991b64327f32c2952e892b083745ce9eb42d475d062c40b24f466a",
+    "api/domains/steward/service/schemas.ts": "9d3858fd333bb0d7ce5b5aba0442c2c84f6462abb9c6ec0ab389cef25d65f06b",
+    "api/domains/steward/test/steward.fixture.ts": "8c66db811b16257ba149cc99b67422d04ab971ad42866254a4604f809c858ad7",
+    "api/domains/inference/contracts/operation-output.ts": "17a2f31d20053cf4a6f6ea5a48331730b822cb75bc9910e7e19e1281b0e5ae39",
+    "api/domains/steward/contexts/curate-memory/instructions-text.context.toml": "f1c0b28404abb55b47a6e8fda30b8148c2dc7eaefbeb8ae7c4562c076860f60a",
+    "api/domains/steward/contexts/common/preface.context.toml": "a140837a3107947170b5c58fb287c4a1a40838c70b2fb961940f3492b98b43e6"
+  },
+  "settingsUnchanged": true,
+  "limitations": [
+    "Synthetic cases only; same configured LARM; no claim for cloud or production latency",
+    "All planned repetitions retained; repeated cases are not independent new questions; no selection of best output",
+    "Quality checker plus implementing-agent review, not independent human judging"
+  ]
+}

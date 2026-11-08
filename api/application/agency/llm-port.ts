@@ -33,6 +33,9 @@ export type AgencyAttemptUsage = {
 
 /** The host names each call: the id must be unique per call (inference binds it to the request). */
 export type AgencyCallIdentity = {
+	independent?: true;
+	resourceId?: string;
+	reasoning?: "off" | "low" | "medium" | "high";
 	decisionId: string;
 	/** The host's execution generation (positive); bumped when input invalidates background work. */
 	generation: number;
@@ -121,7 +124,10 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 						taskDeadline: deadline,
 						maxOutputTokens,
 						structuredOutput: true,
-						route: "conversation",
+						route:
+							identity.independent && identity.resourceId
+								? { resourceId: identity.resourceId, strict: true }
+								: "conversation",
 					}),
 				);
 			} catch (error) {
@@ -154,14 +160,28 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 					]),
 					undefined, // Use the native schema channel; ControlContract would append instructions to the system.
 					// Either way the agency yields: a call made for the user aborts it (`larm_preempted`).
-					prefix && conversationId
+					identity.independent
 						? {
 								sessionRole: "auxiliary",
+								independent: true,
 								outputSchema,
-								onConversation: true,
-								agentSession: { conversationId, agentId: conversationId },
+								agentSession: {
+									conversationId: conversationId ?? null,
+									agentId: `agency:${conversationId ?? identity.decisionId}`,
+								},
+								reasoning: {
+									larm: identity.reasoning ?? "high",
+									cloud: identity.reasoning ?? "high",
+								},
 							}
-						: { sessionRole: "auxiliary", yields: true, outputSchema },
+						: prefix && conversationId
+							? {
+									sessionRole: "auxiliary",
+									outputSchema,
+									onConversation: true,
+									agentSession: { conversationId, agentId: conversationId },
+								}
+							: { sessionRole: "auxiliary", yields: true, outputSchema },
 				);
 			} catch (error) {
 				return callError(error, signal);

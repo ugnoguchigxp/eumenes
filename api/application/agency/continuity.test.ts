@@ -111,3 +111,21 @@ test("displaying an exhausted conversation with no interests admits its context 
 		await h.close();
 	}
 });
+
+test("a checkpoint failure stays a bounded failed idle cycle rather than an unhandled rejection", async () => {
+	const h = await continuityHost(() => updated(), { maxUnanswered: 1 });
+	const save = h.state.saveInTransaction;
+	try {
+		await h.exchange();
+		await waitFor(() => !h.host.status("c1").busy);
+		h.state.saveInTransaction = () => {
+			throw new Error("fixture_checkpoint_failed");
+		};
+		for (const ms of [20_000, 40_000, 80_000]) await h.advance(ms);
+		expect(h.host.inspect("c1")?.idle.blockedBy).toBe("retry_limit");
+		expect(h.host.inspect("c1")?.idle.level).toBe(0);
+	} finally {
+		h.state.saveInTransaction = save;
+		await h.close();
+	}
+});

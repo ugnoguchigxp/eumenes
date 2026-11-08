@@ -1,0 +1,54 @@
+$ vitest run --project unit src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx src/components/MarkdownWorkspace/file-browser.test.tsx src/components/MarkdownWorkspace/managed-library.test.tsx src/components/MarkdownWorkspace/use-cache-autosave.test.tsx
+│ ┌────────────────────────────────────────────────────────────────────────────┐
+│ │  Info: Found a setup file with "setProjectAnnotations".                    │
+│ │  Skipping automatic provisioning of preview annotations to avoid           │
+│ │  conflicts. Since Storybook 10.3, "@storybook/addon-vitest" applies these  │
+│ │   automatically.                                                           │
+│ │  You can safely remove the "setProjectAnnotations" call from your setup    │
+│ │  file, or remove the file entirely if you don't have custom code there.    │
+│ └────────────────────────────────────────────────────────────────────────────┘
+
+ RUN  v4.0.16 /Users/y.noguchi/Code/eumenes/packages/design-system
+
+stdout | src/components/MarkdownWorkspace/managed-library.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/file-browser.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/use-cache-autosave.test.tsx
+Test setup running...
+
+stdout | src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/managed-library.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/file-browser.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/use-cache-autosave.test.tsx
+Test setup running...
+
+stdout | src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx
+Test setup running...
+
+stdout | src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx
+Test setup running...
+
+ ✓ |unit| src/components/MarkdownWorkspace/use-cache-autosave.test.tsx (4 tests) 28ms
+ ✓ |unit| src/components/ExternalAppLauncher/ExternalAppLauncher.test.tsx (3 tests) 133ms
+ ✓ |unit| src/components/MarkdownWorkspace/managed-library.test.tsx (6 tests) 741ms
+ ✓ |unit| src/components/MarkdownWorkspace/MarkdownWorkspace.test.tsx (5 tests) 640ms
+ ✓ |unit| src/components/MarkdownWorkspace/file-browser.test.tsx (5 tests) 1702ms
+   ✓ idle typing reaches the temporary cache without applying or saving to Docling  1061ms
+
+ Test Files  5 passed (5)
+      Tests  23 passed (23)
+   Start at  20:06:14
+   Duration  3.50s (transform 754ms, setup 726ms, import 2.57s, tests 3.24s, environment 2.65s)
+

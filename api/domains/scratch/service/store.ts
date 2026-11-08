@@ -233,6 +233,12 @@ export function createScratchStore(options: ScratchStoreOptions) {
 		get(id: string): ScratchItem | null {
 			return items.get(id) ?? null;
 		},
+		/** Revoke a host-created output, including its existing access paths. Attachments are never removed here. */
+		forgetWritten(id: string, conversationId: string) {
+			const item = items.get(id);
+			if (item?.origin === "written" && item.conversationId === conversationId)
+				remove(item);
+		},
 		/** Marks the item as used now (read, handed to an agent). */
 		touch(id: string) {
 			const item = items.get(id);

@@ -101,6 +101,7 @@ async function seed(life: Life) {
 	// a measured claim, adopted
 	const measured = claim("claim-measured", [ref1], {
 		origin: "runtime_observation",
+		observedAt: NOW,
 		predicate: "latency",
 		payload: {
 			kind: "value",
@@ -111,13 +112,19 @@ async function seed(life: Life) {
 		...e,
 		kind: "runtime_measurement",
 	}));
-	await life.world.apply(registerClaim("r-3", measured));
-	await life.world.apply(
-		request("a-3", {
-			kind: "assertion.transition",
-			plan: adoptPlan("claim-measured", 1),
-		}),
+	expect((await life.world.apply(registerClaim("r-3", measured))).status).toBe(
+		"applied",
 	);
+	expect(
+		(
+			await life.world.apply(
+				request("a-3", {
+					kind: "assertion.transition",
+					plan: adoptPlan("claim-measured", 1),
+				}),
+			)
+		).status,
+	).toBe("applied");
 	// an unadopted candidate of the person
 	await life.world.apply(
 		registerClaim(
@@ -179,6 +186,7 @@ test("the list shows target, claim, adoption, evidence kind and freshness as sep
 		expect(byId["claim-measured"]).toMatchObject({
 			origin: "runtime_observation",
 			evidenceKinds: ["runtime_measurement"],
+			freshness: "fresh",
 			tone: "measured",
 		});
 		expect(byId["claim-cand"]).toMatchObject({

@@ -56,3 +56,34 @@ test("an invalid cache request never writes", async () => {
 	).toMatchObject({ status: "rejected" });
 	expect(h.client.uploadScratchFile).not.toHaveBeenCalled();
 });
+test("management requests are staged intact and only their handle is returned to the Artifact event", async () => {
+	const h = fixture(),
+		stage = vi.fn(async () => ({ id: crypto.randomUUID() }));
+	Object.assign(h.client, { markdownStageManagement: stage });
+	const upload = markdownUploads(h.client as unknown as EumenesClient, "main"),
+		input = {
+			requestId: crypto.randomUUID(),
+			command: {
+				op: "batch",
+				items: [
+					{
+						kind: "folder",
+						id: "source",
+						path: "😀".repeat(508) + "0000",
+						newId: "fixed-copy",
+					},
+				],
+			},
+		};
+	const receipt = await upload(
+		"markdown-workspace",
+		new File([JSON.stringify(input)], "operation.json", {
+			type: "application/json",
+		}),
+		{ purpose: "markdown-management" },
+	);
+	expect(receipt.status).toBe("accepted");
+	expect(stage).toHaveBeenCalledWith(input);
+	expect(h.client.uploadScratchFile).not.toHaveBeenCalled();
+	expect(h.client.markdownStage).not.toHaveBeenCalled();
+});

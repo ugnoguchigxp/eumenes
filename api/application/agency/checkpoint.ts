@@ -11,12 +11,17 @@ export function createCheckpoint(input: {
 	convs: Map<string, Conv>;
 	nowMs: () => number;
 	digest: () => string;
+	refreshSources(c: Conv): Promise<void>;
 	feed: () => { cursor: number; activeId: string | null };
 }) {
 	const { deps, convs } = input;
 	const api = {
-		save(c: Conv) {
+		async save(c: Conv) {
 			if (!deps.state) return Promise.resolve(true);
+			// The atomic checkpoint contains every scope, including ones whose idle planner is paused.
+			const scopes = [...convs.values()];
+			for (const conv of scopes)
+				if (convs.get(conv.id) === conv) await input.refreshSources(conv);
 			const captures = [...convs.values()].map((conv) => ({
 				conv,
 				generation: conv.generation,

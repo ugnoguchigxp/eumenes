@@ -257,6 +257,62 @@
 			"artifactRevisionId": "artifact:collaboration.interact@1",
 			"minImpact": "create",
 			"general": true
+		},
+		{
+			"kind": "toolchain",
+			"id": "collaboration.pipeline",
+			"revision": 2,
+			"title": "手順の共同編集",
+			"summary": "今回の短い手順を対話で共同編集し、内容の確認後に実行へ渡す",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"今回の手順を利用者と相談して作成し、内容を見てから実行へ進めたい",
+				"手順の下書きを見ながら部分的に直して具体化したい"
+			],
+			"avoidWhen": [
+				"相談や下書きが不要で、今その依頼を実行してほしい",
+				"再利用ひな形を公開する依頼"
+			],
+			"dependencies": ["package:collaboration.pipeline@1"],
+			"packageRevisionId": "package:collaboration.pipeline@1",
+			"functionName": "collaborate_pipeline",
+			"examples": [
+				"複数の担当を使う今回の手順を、一緒に作ってから実行したい",
+				"手順の二つ目だけ変えて、確認してから実行したい",
+				"この依頼の進め方を下書きにして相談しながら直そう"
+			],
+			"redirects": [],
+			"bindingRevisionId": "binding:collaboration.pipeline@2",
+			"artifactRevisionId": "artifact:collaboration.pipeline@1",
+			"minImpact": "create"
+		},
+		{
+			"kind": "toolchain",
+			"id": "collaboration.interact",
+			"revision": 2,
+			"title": "ブラウザの共同作業",
+			"summary": "利用者と相談しながらinteractのブラウザ作業・質問・回答・結果確認を進める",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"利用者と確認しながらブラウザ上の作業を進めたい",
+				"ブラウザ作業の質問に答え、経過を見ながら続けたい"
+			],
+			"avoidWhen": ["ブラウザでなく、資料の調査だけを頼んでいる"],
+			"dependencies": ["package:collaboration.interact@1"],
+			"packageRevisionId": "package:collaboration.interact@1",
+			"functionName": "collaborate_interact",
+			"examples": [
+				"このサイトで行う作業を相談しながら進めたい",
+				"ブラウザの操作で質問されたら答えながら一緒に進めよう",
+				"サイトへの入力内容を一緒に確認してから操作したい"
+			],
+			"redirects": [],
+			"bindingRevisionId": "binding:collaboration.interact@2",
+			"artifactRevisionId": "artifact:collaboration.interact@1",
+			"minImpact": "create",
+			"general": true
 		}
 	],
 	"bindings": [
@@ -353,6 +409,108 @@
 					}
 				},
 				"sharedTools": []
+			},
+			"timeLimits": {
+				"runMs": 1200000,
+				"turnMs": 900000,
+				"inferenceMs": 600000
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "collaboration.pipeline",
+			"revision": 2,
+			"execution": "session",
+			"adapterRef": "adapter:collaboration.pipeline@1",
+			"availabilityRef": "availability:collaboration.pipeline@1",
+			"artifactRevisionId": "artifact:collaboration.pipeline@1",
+			"session": {},
+			"tools": [
+				{
+					"toolRevisionId": "tool:collaboration.pipeline.start@1",
+					"operationId": "collaboration.pipeline.start",
+					"inputSchemaRef": "builtin:collaborationPipelineStart"
+				},
+				{
+					"toolRevisionId": "tool:collaboration.pipeline.answer@1",
+					"operationId": "collaboration.pipeline.answer",
+					"inputSchemaRef": "builtin:collaborationAnswer"
+				},
+				{
+					"toolRevisionId": "tool:collaboration.pipeline.status@1",
+					"operationId": "collaboration.pipeline.status",
+					"inputSchemaRef": "builtin:emptyInput"
+				},
+				{
+					"toolRevisionId": "tool:collaboration.pipeline.cancel@1",
+					"operationId": "collaboration.pipeline.cancel",
+					"inputSchemaRef": "builtin:emptyInput"
+				}
+			],
+			"agent": {
+				"workspace": {
+					"documentRef": "workspace:collaboration.pipeline@1",
+					"inlineBytes": 32768
+				},
+				"turn": {
+					"maxModelCalls": 4,
+					"retries": {
+						"default": 1,
+						"doc.edit": 1,
+						"doc.write": 1
+					}
+				},
+				"sharedTools": [],
+				"collaborationState": true
+			},
+			"timeLimits": {
+				"runMs": 1200000,
+				"turnMs": 900000,
+				"inferenceMs": 600000
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "collaboration.interact",
+			"revision": 2,
+			"execution": "session",
+			"adapterRef": "adapter:collaboration.interact@1",
+			"availabilityRef": "availability:collaboration.interact@1",
+			"artifactRevisionId": "artifact:collaboration.interact@1",
+			"session": {},
+			"tools": [
+				{
+					"toolRevisionId": "tool:collaboration.interact.start@1",
+					"operationId": "collaboration.interact.start",
+					"inputSchemaRef": "builtin:collaborationInteractStart"
+				},
+				{
+					"toolRevisionId": "tool:collaboration.interact.answer@1",
+					"operationId": "collaboration.interact.answer",
+					"inputSchemaRef": "builtin:collaborationAnswer"
+				},
+				{
+					"toolRevisionId": "tool:collaboration.interact.status@1",
+					"operationId": "collaboration.interact.status",
+					"inputSchemaRef": "builtin:emptyInput"
+				},
+				{
+					"toolRevisionId": "tool:collaboration.interact.cancel@1",
+					"operationId": "collaboration.interact.cancel",
+					"inputSchemaRef": "builtin:emptyInput"
+				}
+			],
+			"agent": {
+				"turn": {
+					"maxModelCalls": 4,
+					"retries": {
+						"default": 1,
+						"doc.edit": 1,
+						"doc.write": 0
+					}
+				},
+				"sharedTools": [],
+				"collaborationState": true
 			},
 			"timeLimits": {
 				"runMs": 1200000,

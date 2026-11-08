@@ -422,7 +422,12 @@ export const domains = {
 		backend: "api/domains/memory",
 		web: null,
 		components: null,
-		integrationTests: ["api/application/backup-restore.test.ts"],
+		integrationTests: [
+			"api/application/backup-restore.test.ts",
+			"api/application/memory-host-integration.test.ts",
+			"api/application/memory-host.test.ts",
+			"api/application/server.test.ts",
+		],
 		depends: {
 			api: ["continuity", "conversation", "tool-runtime"],
 			web: [],
@@ -477,6 +482,11 @@ export const domains = {
 	},
 	pursuit: {
 		tier: 3,
+		integrationTests: [
+			"api/application/pursuit/document-integration.test.ts",
+			"api/application/pursuit/document-registration.test.ts",
+			"api/application/pursuit/pursuit-integration.test.ts",
+		],
 		backend: "api/domains/pursuit",
 		web: "web/src/domains/pursuit",
 		components: null,
@@ -493,9 +503,18 @@ export const domains = {
 		components: null,
 		integrationTests: [
 			"api/application/agency/archive-recovery.test.ts",
+			"api/application/agency/archive-receipt.test.ts",
+			"api/application/agency/checkpoint-sources.test.ts",
+			"api/application/agency/catalog-input.test.ts",
+			"api/application/agency/forgotten-context.test.ts",
 			"api/application/agency/continuity.test.ts",
 			"api/application/agency/continuity-actions.test.ts",
 			"api/application/agency/routes.test.ts",
+			"api/application/agency/always-on.test.ts",
+			"api/application/agency/always-on-activity.test.ts",
+			"api/application/agency/always-on-switch.test.ts",
+			"api/application/agency/always-on-authority.test.ts",
+			"api/application/agency/always-on-checkpoint.test.ts",
 		],
 		depends: {
 			api: [

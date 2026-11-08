@@ -1,0 +1,19 @@
+$ bun scripts/verify.ts --domain steward --domain memory --domain dialogue --domain inference
+[verify] selected=steward,memory,dialogue,inference dependencyClosure=continuity,delivery,conversation,goals,capabilities,queue,tool-runtime,memory,world,steward,attitude-dataset,larm,settings,inference,pipelines,resources,agent-runtime,scheduler,toolchain-history,dialogue,avatar,audio
+[verify] Shared DesignSystem dist: do not overlap dev, browser tests or other builds; endpoint hashes cannot detect change-and-restore.
+[verify] inventory
+[verify] boundaries
+[verify] boundaries: 1 finding(s) outside the selection (not failing; all in report.json)
+  api/application/steward-input.test.ts: application must use steward public entry (../domains/steward/service/messages)
+[verify] system-context
+[verify] size-budget
+[verify] size-budget: 2 finding(s) outside the selection (not failing; all in report.json)
+  size-budget: packages/design-system/src/components/ImagePicker/ImagePicker.tsx#ImagePicker grew 376 -> 402 (limit 300)
+  size-budget: new function over 300 lines: web/src/workspace/useWorkspace.ts#useWorkspace (302)
+[verify] sql-boundaries
+[verify] fail: 4270 ms; /private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-steward-dedup-8tkqmydc/verification-reports/runs/2026-11-07T23-20-35-689Z-9cc95d56-91fd-4ba9-879d-608f9181a133/report.json
+Error: scripts/sql-boundaries.ts failed (1)
+error: Cannot find package 'standardwebhooks' from '/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-steward-dedup-8tkqmydc/packages/dots-mcp/src/index.ts'
+
+Bun v1.4.4 (macOS arm64)
+error: script "verify" exited with code 1

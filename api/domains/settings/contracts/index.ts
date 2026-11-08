@@ -402,6 +402,17 @@ export const settingsSchema = z
 			.default({ enabled: false, curationResourceId: null }),
 		agency: z
 			.object({
+				/** Absent in existing installations: keep the adopted F host until explicitly switched. */
+				runtime: z.enum(["F", "always-on"]).optional(),
+				thinkResourceId: z.string().min(1).nullable().optional(),
+				speechIntervalSec: z
+					.number()
+					.int()
+					.min(10)
+					.max(600)
+					.refine((n) => n === 10 || n === 60 || n === 600)
+					.optional(),
+				thinkReasoning: z.enum(["off", "low", "medium", "high"]).optional(),
 				/** Optional for older callers; absence uses the approved initial action limits. */
 				actions: z
 					.object({

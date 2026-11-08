@@ -1,0 +1,16 @@
+{
+  "oldCounts": {
+    "definitions": 5,
+    "bindings": 2,
+    "artifacts": 2,
+    "schemas": 10
+  },
+  "unchanged": true,
+  "newRevisions": [
+    "toolchain:markdown.collaborate@4",
+    "binding:markdown.collaborate@4",
+    "artifact:markdown.workspace@4",
+    "schema:markdown-files@1",
+    "schema:markdown-management@1"
+  ]
+}

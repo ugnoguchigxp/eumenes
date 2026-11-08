@@ -1,0 +1,538 @@
+[
+  {
+    "time": "2026-11-07T18:34:28.214+09:00",
+    "level": "info",
+    "event": "agency.invalidated",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "reason": "input.changed"
+  },
+  {
+    "time": "2026-11-07T18:34:28.220+09:00",
+    "level": "info",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "source": "user"
+  },
+  {
+    "time": "2026-11-07T18:34:35.856+09:00",
+    "level": "info",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "source": "agent"
+  },
+  {
+    "time": "2026-11-07T18:34:36.200+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 13216,
+    "completionTokens": 205,
+    "durationMs": 14916
+  },
+  {
+    "time": "2026-11-07T18:34:44.690+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 12614,
+    "completionTokens": 139,
+    "durationMs": 8787
+  },
+  {
+    "time": "2026-11-07T18:34:46.570+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "ok",
+    "promptTokens": 12707,
+    "completionTokens": 179,
+    "durationMs": 10318
+  },
+  {
+    "time": "2026-11-07T18:34:46.572+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "llm",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:34:54.484+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "ok",
+    "promptTokens": 11915,
+    "completionTokens": 302,
+    "durationMs": 9758
+  },
+  {
+    "time": "2026-11-07T18:34:54.485+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "llm",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:35:14.169+09:00",
+    "level": "info",
+    "event": "agency.invalidated",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "reason": "input.changed"
+  },
+  {
+    "time": "2026-11-07T18:35:14.203+09:00",
+    "level": "info",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "source": "user"
+  },
+  {
+    "time": "2026-11-07T18:35:24.450+09:00",
+    "level": "info",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "source": "agent"
+  },
+  {
+    "time": "2026-11-07T18:35:46.523+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 12959,
+    "completionTokens": 962,
+    "durationMs": 22024
+  },
+  {
+    "time": "2026-11-07T18:36:13.057+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 12999,
+    "completionTokens": 1229,
+    "durationMs": 26479
+  },
+  {
+    "time": "2026-11-07T18:36:23.544+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "ok",
+    "promptTokens": 12802,
+    "completionTokens": 359,
+    "durationMs": 10426
+  },
+  {
+    "time": "2026-11-07T18:36:23.547+09:00",
+    "level": "info",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "rejected:schema",
+    "validationCode": "schema,schema:ops.0.resumeCondition:invalid_type,schema_op:ops.0:intent.add,schema_expected:ops.0.resumeCondition:string"
+  },
+  {
+    "time": "2026-11-07T18:36:23.547+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "llm",
+    "decision": "tool",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:36:23.724+09:00",
+    "level": "info",
+    "event": "agency.receipt",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "attemptId": "a3"
+  },
+  {
+    "time": "2026-11-07T18:37:13.992+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 13428,
+    "completionTokens": 1206,
+    "durationMs": 27213
+  },
+  {
+    "time": "2026-11-07T18:37:40.238+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 13438,
+    "completionTokens": 1209,
+    "durationMs": 26153
+  },
+  {
+    "time": "2026-11-07T18:37:40.245+09:00",
+    "level": "info",
+    "event": "agency.background_call",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "rejected:unknown_ref",
+    "validationCode": "unknown_ref"
+  },
+  {
+    "time": "2026-11-07T18:37:40.245+09:00",
+    "level": "info",
+    "event": "agency.background_call",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "rejected:unknown_ref",
+    "validationCode": "unknown_ref"
+  },
+  {
+    "time": "2026-11-07T18:37:40.245+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "rejected",
+    "decision": "wait",
+    "validationCode": "unknown_ref"
+  },
+  {
+    "time": "2026-11-07T18:37:46.257+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 14083,
+    "completionTokens": 743,
+    "durationMs": 17953
+  },
+  {
+    "time": "2026-11-07T18:37:57.841+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "ok",
+    "promptTokens": 13551,
+    "completionTokens": 314,
+    "durationMs": 11534
+  },
+  {
+    "time": "2026-11-07T18:37:57.843+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "llm",
+    "decision": "tool",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:37:57.916+09:00",
+    "level": "info",
+    "event": "agency.research_started",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "attemptId": "a6"
+  },
+  {
+    "time": "2026-11-07T18:38:40.340+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "host_stale",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:39:13.495+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 16441,
+    "completionTokens": 608,
+    "durationMs": 15406
+  },
+  {
+    "time": "2026-11-07T18:39:24.974+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "ok",
+    "promptTokens": 15372,
+    "completionTokens": 364,
+    "durationMs": 11408
+  },
+  {
+    "time": "2026-11-07T18:39:24.976+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "llm",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:39:40.439+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "host_stale",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:40:40.533+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "host_stale",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:41:40.630+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "host_stale",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:42:25.851+09:00",
+    "level": "info",
+    "event": "agency.invalidated",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "reason": "input.changed"
+  },
+  {
+    "time": "2026-11-07T18:42:25.882+09:00",
+    "level": "info",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "source": "user"
+  },
+  {
+    "time": "2026-11-07T18:42:35.182+09:00",
+    "level": "info",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "source": "agent"
+  },
+  {
+    "time": "2026-11-07T18:42:40.732+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "host_stale",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:42:46.251+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 16771,
+    "completionTokens": 157,
+    "durationMs": 10992
+  },
+  {
+    "time": "2026-11-07T18:42:55.236+09:00",
+    "level": "warn",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "failed",
+    "reason": "agency_input_stale"
+  },
+  {
+    "time": "2026-11-07T18:42:55.238+09:00",
+    "level": "info",
+    "event": "agency.background_call",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "aborted",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:42:55.238+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "superseded",
+    "source": "error",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:42:55.299+09:00",
+    "level": "warn",
+    "event": "agency.cycle_failed",
+    "subjectId": "agency-live-image-20261107-1834",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "reason": "agency_input_stale"
+  },
+  {
+    "time": "2026-11-07T18:43:27.304+09:00",
+    "level": "info",
+    "event": "agency.invalidated",
+    "subjectId": "agency-live-music-20261107-1843",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "reason": "input.changed"
+  },
+  {
+    "time": "2026-11-07T18:43:27.308+09:00",
+    "level": "info",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-music-20261107-1843",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "source": "user"
+  },
+  {
+    "time": "2026-11-07T18:43:35.177+09:00",
+    "level": "info",
+    "event": "agency.observation_received",
+    "subjectId": "agency-live-music-20261107-1843",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "source": "agent"
+  },
+  {
+    "time": "2026-11-07T18:43:44.799+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-music-20261107-1843",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "update",
+    "outcome": "ok",
+    "promptTokens": 12638,
+    "completionTokens": 221,
+    "durationMs": 9543
+  },
+  {
+    "time": "2026-11-07T18:43:48.390+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "ok",
+    "promptTokens": 12707,
+    "completionTokens": 179,
+    "durationMs": 7476
+  },
+  {
+    "time": "2026-11-07T18:43:48.392+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "main",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "llm",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:43:57.419+09:00",
+    "level": "info",
+    "event": "agency.llm_call",
+    "subjectId": "agency-live-music-20261107-1843",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "purpose": "select",
+    "outcome": "ok",
+    "promptTokens": 11941,
+    "completionTokens": 396,
+    "durationMs": 12560
+  },
+  {
+    "time": "2026-11-07T18:43:57.421+09:00",
+    "level": "info",
+    "event": "agency.decision",
+    "subjectId": "agency-live-music-20261107-1843",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "outcome": "current",
+    "source": "llm",
+    "decision": "wait",
+    "validationCode": ""
+  },
+  {
+    "time": "2026-11-07T18:43:57.456+09:00",
+    "level": "warn",
+    "event": "agency.cycle_failed",
+    "subjectId": "agency-live-music-20261107-1843",
+    "bootId": "c6555d00-be2f-4f05-9e74-767e8e7e63c6",
+    "reason": "agency_archive_conflict"
+  }
+]

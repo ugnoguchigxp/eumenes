@@ -7,7 +7,11 @@ import type {
 	WorkspacePort,
 } from "eumenes-pursuit";
 import { hash } from "../../capabilities";
-import { researchDraft, type ResearchDraft } from "../contracts";
+import {
+	researchDraft,
+	researchDocumentDraft,
+	type ResearchDraft,
+} from "../contracts";
 import { documents, save, stateOf } from "../repository";
 import { current, type Context } from "./context";
 
@@ -81,7 +85,17 @@ export function researchTools(
 							description: descriptions[name],
 							inputSchema: z
 								.record(z.string(), z.json())
-								.parse(z.toJSONSchema(inputs[name])),
+								.parse(
+									z.toJSONSchema(
+										name === "report_draft" &&
+											ctx.store.readSnapshot(
+												(db) =>
+													stateOf(current(ctx, db, id, epoch)).saveDocument,
+											)
+											? researchDocumentDraft
+											: inputs[name],
+									),
+								),
 							permission: "research",
 							sideEffect: name === "report_draft" ? "workspace" : "none",
 							readsWorkspace: name === "report_read",
@@ -136,7 +150,9 @@ export function researchTools(
 					let output: unknown;
 					switch (call.tool) {
 						case "report_draft": {
-							const draft = researchDraft.parse(call.input);
+							const draft = (
+								state.saveDocument ? researchDocumentDraft : researchDraft
+							).parse(call.input);
 							if (
 								!citationIntegrity(
 									draft,

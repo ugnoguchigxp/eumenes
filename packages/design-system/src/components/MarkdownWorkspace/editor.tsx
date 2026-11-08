@@ -294,5 +294,3 @@ export function importMarkdown(text: string): MarkdownDocument {
 		originalMarkdown: text,
 	};
 }
-export const exportWarning =
-	"Markdownの読込み・書出しでは、一部の改行、リンクの補足情報、表の配置、先頭のメタ情報などが変わる場合があります。色や段組みなどはMarkdownに書き出せません。Doclingには編集データと取込原文を保存します。";

@@ -14,7 +14,12 @@ export function agencyReplyParts(
 	settings: Settings["agency"],
 ): ConversationAgentSystem {
 	return {
-		base: systemContext("dialogue.contexts.agency.reply", {}),
+		base: [
+			systemContext("dialogue.contexts.agency.reply", {}),
+			...(settings.runtime === "always-on"
+				? [systemContext("dialogue.contexts.agency.always-on-reply", {})]
+				: []),
+		].join("\n\n"),
 		...(settings.interests.length
 			? {
 					persona: systemContext("dialogue.contexts.agency.interests", {

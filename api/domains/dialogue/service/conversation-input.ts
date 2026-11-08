@@ -372,6 +372,16 @@ export function conversationPrefixFrom(
 				deps.memory?.isSourceRevokedInTransaction(tx, u.messageId)
 			)
 				return false;
+			if (
+				u.messageId &&
+				deps.agency?.isCurrentInputInTransaction &&
+				!deps.agency.isCurrentInputInTransaction(
+					tx,
+					{ sources: [u.messageId], complete: true },
+					conversationId,
+				)
+			)
+				return false;
 			if (!requireProvenance || u.speaker === "user") return true;
 			if (!u.messageId) return false;
 			const source = deps.conversation.sourceInTransaction(tx, u.messageId);
@@ -388,7 +398,13 @@ export function conversationPrefixFrom(
 			return (
 				!!inherited?.complete &&
 				(!deps.memory ||
-					deps.memory.referenceInputs.isCurrentInTransaction(tx, inherited))
+					deps.memory.referenceInputs.isCurrentInTransaction(tx, inherited)) &&
+				(!deps.agency?.isCurrentInputInTransaction ||
+					deps.agency.isCurrentInputInTransaction(
+						tx,
+						inherited,
+						conversationId,
+					))
 			);
 		});
 	const recent = recentUtterances(after, input.pending, history.users);
@@ -396,7 +412,20 @@ export function conversationPrefixFrom(
 		(u) =>
 			u.speaker === "user" && !(u.messageId && input.pending.has(u.messageId)),
 	);
-	const { lines, ids } = memoryLines(input.window?.profile.items ?? []);
+	const { lines, ids } = memoryLines(
+		(input.window?.profile.items ?? []).filter((item) => {
+			if (!deps.agency?.isCurrentInputInTransaction) return true;
+			const source = deps.memory?.referenceInputs.captureInTransaction(tx, {
+				itemIds: [item.id],
+				itemRevisions: { [item.id]: item.revision },
+			}) ?? { sources: [`memory:${item.id}`], complete: false };
+			return deps.agency.isCurrentInputInTransaction(
+				tx,
+				source,
+				conversationId,
+			);
+		}),
+	);
 	// Always there before a recent conversation, so the conversation never opens with the agent's message.
 	const memory = section(
 		INPUT_HEADINGS.memory,

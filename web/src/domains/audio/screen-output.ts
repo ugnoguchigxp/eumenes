@@ -28,8 +28,10 @@ export function createScreenOutput(
 	let serving = 0;
 	const abandoned = new Set<number>();
 	const waiters = new Set<() => void>();
+	const listeners = new Set<() => void>();
 	const changed = () => {
 		for (const waiter of waiters) waiter();
+		for (const listener of listeners) listener();
 	};
 	const speaking = () => utterances > 0 || speechElsewhere();
 	function until(ready: () => boolean, signal?: AbortSignal) {
@@ -99,6 +101,12 @@ export function createScreenOutput(
 		/** Re-evaluates the lanes after `speechElsewhere` may have changed. */
 		changed,
 		speaking,
+		subscribe(listener: () => void) {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
 		/** A reading holds the speech lane until the returned release; notices wait for it. */
 		beginSpeech() {
 			utterances++;

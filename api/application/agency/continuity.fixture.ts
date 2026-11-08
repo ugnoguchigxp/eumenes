@@ -36,6 +36,8 @@ export async function continuityHost(
 	const requests: LlmRequest<unknown>[] = [];
 	const llm: LlmPort = {
 		async complete(request) {
+			if (request.purpose === "think")
+				throw new Error("unexpected always-on call in F fixture");
 			calls[request.purpose]++;
 			requests.push(request);
 			return {
@@ -54,11 +56,12 @@ export async function continuityHost(
 		agency: { ...baseSettings, maxUnanswered: options.maxUnanswered ?? 0 },
 		general: { agentName: "Eumenes", userName: "", persona: "butler" as const },
 	};
+	const state = createAgencyStatePort({ memory, now: () => now });
 	const host = createAgencyHost({
 		store,
 		conversation,
 		memory,
-		state: createAgencyStatePort({ memory, now: () => now }),
+		state,
 		settings: {
 			get: () => settings,
 			inTransaction: () => settings,
@@ -84,6 +87,7 @@ export async function continuityHost(
 	host.start();
 	return {
 		host,
+		state,
 		calls,
 		requests,
 		memory,

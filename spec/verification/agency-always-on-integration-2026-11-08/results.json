@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-08",
+  "status": "implemented and fixture-verified within scope; Live causal delivery, repository-wide gates and live acceptance remain open",
+  "runtimeDefault": "F",
+  "alwaysOnVersion": "always-on-26",
+  "externalProviderCalls": 0,
+  "productionDatabaseAccesses": 0,
+  "productionServerOperations": 0,
+  "checks": {
+    "targeted": {
+      "passed": 46,
+      "failed": 0,
+      "files": 9,
+      "newAlwaysOnTests": 17
+    },
+    "settingsInference": {
+      "passed": 27,
+      "failed": 0
+    },
+    "web": {
+      "passed": 69,
+      "failed": 0,
+      "files": 14
+    },
+    "upstreamTests": {
+      "passed": 1036,
+      "skipped": 25,
+      "todo": 1,
+      "failed": 0,
+      "files": 89
+    },
+    "broadDomains": {
+      "passed": 2010,
+      "failed": 12,
+      "files": 332,
+      "failures": [
+        "(fail) ui_create opens the work and the same run continues as the specialist's turn, which drafts and replies",
+        "(fail) later utterances go to the specialist without the main model; an explanation does not grow the undo history",
+        "(fail) undo and redo take the screen's string values; they are refused while a turn holds the work",
+        "(fail) only the screen saves: the saved work shows in the history and the specialist has no save tool",
+        "(fail) return with unsaved work suspends the session, the main agent answers, and ui_create resumes the same work",
+        "(fail) forward:true hands the same run to the main agent exactly once",
+        "(fail) a discard command during a running turn cancels the run and removes the work, leaving saved works alone",
+        "(fail) closing: unsaved work is refused with work_unsaved; clean work ends",
+        "(fail) choosing a saved work in the history makes it the session's work; unsaved work goes only when the user chose to drop it",
+        "(fail) the specialist's prompt holds no conversation, World or memory material; what was said during the switch is not in the main agent's input",
+        "(fail) a whole draft with nothing it can show is refused at once, kept for the source view, and neither the draft nor the undo history changes",
+        "(fail) a spoken request switches to the specialist; its reply is spoken, and so is the reply to the next spoken request"
+      ]
+    },
+    "standardVerify": {
+      "result": "blocked",
+      "stage": "inventory",
+      "reason": "Archived code copies under artifacts/pursuit-integration-20261106 are detected as unregistered tests",
+      "report": "verification-reports/runs/2026-11-08T00-18-25-177Z-ac06f19a-47d1-47f7-9394-1cc4408ce9b9/report.json"
+    },
+    "ownedFormat": {
+      "result": "pass",
+      "files": 58
+    },
+    "ownedLint": {
+      "result": "pass"
+    },
+    "typecheck": {
+      "result": "pass",
+      "files": 3170
+    },
+    "isolatedWebBuild": {
+      "result": "pass",
+      "outDir": "/tmp/eumenes-always-on-web-build"
+    }
+  },
+  "unverified": [
+    "Live proposal-to-actual-transcript causal acknowledgment",
+    "Real model quality, timing, cache and cost",
+    "Real LARM concurrent capacity",
+    "User Web acceptance and three round trips on actual audio devices"
+  ],
+  "contextTools": {
+    "context_compile": 1,
+    "compile_eval": 1,
+    "cumulativeEach": 3,
+    "runId": "00000000-0000-0000-18e5-e7cf3c00f96e"
+  },
+  "logs": {
+    "targeted-tests.log": "f290f7fc7739499bfecf02085b5564ba136cae40fb658b06df3f6a1155453a53",
+    "settings-inference-tests.log": "93255369406362fb7dc6ce42c7abf615e9eac831ff7f76dce2e108f0d36fe0e7",
+    "web-tests.log": "0e0cd16a195fc682fa5070a6cabb7dfa73b7bf43ffa2124d12e36056da58f6c7",
+    "upstream-tests.log": "afc457b57360c5280423b4676189498da1b62aa4fb9b0875e5768085a25ba4e9",
+    "broad-domain-tests.log": "5303820353ac4dc5e57c9377836f74c208278bd989271d4d7926d96320e19652",
+    "types.log": "f83f73534df276c3c768efe65b8263fce47b3f066147bb027abb480d614d1c82",
+    "owned-format.log": "297c4de13b9ccea6f56e32979c2f9fc1f4c8633a20546f049314a40778dc3c18",
+    "owned-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "web-build.log": "cab15f73f824ca8823d1768dd5b1cba44eeb79c7f0d547fb94f615b8b48c6233",
+    "upstream-verify.log": "1e29da6c1cae2384b8970831fa6d12b4b6eb690558c8eebf51dd291b95d9f631",
+    "context-check.log": "92ef96a4c7c474fe3792cb11f9198f19493e2eba7754c988dc46dc014521840a",
+    "static-checks.json": "4ca89eaacbfc6a72b85ca76752a3e2297b8a8c8036b15430bb78348e99bcff62",
+    "adoption.json": "5ace88f8bf1291dcce94a6439075a32f7072b68ba588b59f87ec5e0e87381fac"
+  }
+}

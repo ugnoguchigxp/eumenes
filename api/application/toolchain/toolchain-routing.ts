@@ -404,6 +404,7 @@ function agentOf(
 							: {}),
 					}
 				: null,
+		...(agent?.collaborationState ? { collaborationState: true as const } : {}),
 		...(agent?.turn?.maxModelCalls !== undefined
 			? { maxModelCalls: agent.turn.maxModelCalls }
 			: {}),
