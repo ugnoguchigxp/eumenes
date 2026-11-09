@@ -46,6 +46,7 @@ import {
 import { DEFAULT_TIMER_SCOPE } from "../../domains/timers";
 import { createAgentRuntime } from "../../domains/agent-runtime";
 import { createTimerAdapter } from "../timers/timer-adapter";
+import type { SchedulerAdapterPorts } from "../scheduler/scheduler-adapter";
 import {
 	createSettingsAdapter,
 	publishedSettingsFields,
@@ -133,6 +134,7 @@ type ToolchainOptions = {
 	webResearch?: boolean;
 	conversation?: import("../../domains/conversation").ConversationService;
 	timers?: import("../../domains/timers").TimersService;
+	schedules?: SchedulerAdapterPorts;
 	/** Tests that observe a pass immediately after a commit set 0. */
 	reconcileThrottleMs?: number;
 	/** Settings service for the data-driven settings screens (absent: no settings adapter). */
@@ -288,7 +290,7 @@ export async function createToolchain(
 	const weather = options.weather && createWeatherAdapter(options.weather);
 	const stock = options.stock && createStockAdapter(options.stock);
 	// Typed domain adapters this host offers; bundles naming any other adapter are not registered.
-	const collaboration = createCollaborationHost(queue);
+	const collaboration = createCollaborationHost(queue, options.schedules);
 	const registry = createAdapterRegistry([
 		...collaboration.adapters,
 		...(options.markdown ? [createMarkdownAdapter(options.markdown)] : []),

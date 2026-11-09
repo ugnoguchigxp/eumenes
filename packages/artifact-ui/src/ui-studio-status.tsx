@@ -84,6 +84,11 @@ export function HistoryMenu({
 								}}
 							>
 								{item.title || "名称未設定"}
+								{item.storageState === "deleting"
+									? "（削除待ち）"
+									: item.storageState === "initializing"
+										? "（保存先の準備中）"
+										: ""}
 							</button>
 						))
 					) : (

@@ -73,6 +73,51 @@ function cursorOf(value: string | null): number | null {
 	return n;
 }
 
+function schedulePage(
+	db: Tx,
+	state: string | undefined,
+	cursor: string | null,
+	limit: number,
+) {
+	const size = Math.min(100, Math.max(1, limit));
+	const rows = listSchedules(db, state, cursorOf(cursor), size + 1);
+	const page = rows.slice(0, size);
+	return {
+		items: page.map(toDto),
+		nextCursor: rows.length > size ? String(page.at(-1)?.createdSeq) : null,
+	};
+}
+
+function occurrencePage(
+	store: SqliteStore,
+	queue: QueueService,
+	id: string,
+	cursor: string | null,
+	limit: number,
+) {
+	const size = Math.min(100, Math.max(1, limit));
+	const rows = store.read((db) =>
+		listOccurrences(db, id, cursorOf(cursor), size + 1),
+	);
+	const page = rows.slice(0, size);
+	const items: OccurrenceDto[] = page.map((o) => ({
+		id: o.id,
+		scheduleId: o.scheduleId,
+		scheduleRevision: o.scheduleRevision,
+		scheduledAt: iso(o.scheduledAtMs),
+		state: o.state,
+		jobId: o.jobId,
+		subjectRef: o.subjectRef,
+		jobState: o.jobId ? (queue.get(o.jobId)?.state ?? null) : null,
+		reason: o.reason,
+		createdAt: iso(o.createdAtMs),
+	}));
+	return {
+		items,
+		nextCursor: rows.length > size ? String(page.at(-1)?.seq) : null,
+	};
+}
+
 type FireResult = "none" | "dispatched" | "skipped" | "deferred";
 function defaultSleep(ms: number, signal?: AbortSignal) {
 	return new Promise<void>((resolve) => {
@@ -441,6 +486,13 @@ export function createScheduler(
 		getInTransaction(db: Tx, id: string): ScheduleDto | null {
 			return dtoOrNull(getSchedule(db, id));
 		},
+		getByRequestInTransaction: (db: Tx, requestId: string) =>
+			dtoOrNull(getByRequest(db, requestId)),
+		pendingInTransaction: (db: Tx) =>
+			[
+				...listSchedules(db, "active", null, maxSchedules),
+				...listSchedules(db, "paused", null, maxSchedules),
+			].map(toDto),
 		cancelInTransaction(db: Tx, id: string, expectedRevision: number) {
 			const s = getSchedule(db, id);
 			if (!s) throw new Error("invalid_schedule_id");
@@ -466,38 +518,10 @@ export function createScheduler(
 			return s ? toDto(s) : null;
 		},
 		list(state?: string, cursor: string | null = null, limit = 50) {
-			const size = Math.min(100, Math.max(1, limit));
-			const rows = store.read((db) =>
-				listSchedules(db, state, cursorOf(cursor), size + 1),
-			);
-			const page = rows.slice(0, size);
-			return {
-				items: page.map(toDto),
-				nextCursor: rows.length > size ? String(page.at(-1)?.createdSeq) : null,
-			};
+			return store.read((db) => schedulePage(db, state, cursor, limit));
 		},
 		listOccurrences(id: string, cursor: string | null = null, limit = 50) {
-			const size = Math.min(100, Math.max(1, limit));
-			const rows = store.read((db) =>
-				listOccurrences(db, id, cursorOf(cursor), size + 1),
-			);
-			const page = rows.slice(0, size);
-			const items: OccurrenceDto[] = page.map((o) => ({
-				id: o.id,
-				scheduleId: o.scheduleId,
-				scheduleRevision: o.scheduleRevision,
-				scheduledAt: iso(o.scheduledAtMs),
-				state: o.state,
-				jobId: o.jobId,
-				subjectRef: o.subjectRef,
-				jobState: o.jobId ? (queue.get(o.jobId)?.state ?? null) : null,
-				reason: o.reason,
-				createdAt: iso(o.createdAtMs),
-			}));
-			return {
-				items,
-				nextCursor: rows.length > size ? String(page.at(-1)?.seq) : null,
-			};
+			return occurrencePage(store, queue, id, cursor, limit);
 		},
 		pause: (id: string, expectedRevision: number) =>
 			transitionOp(id, expectedRevision, ["active"], "paused", () => null),

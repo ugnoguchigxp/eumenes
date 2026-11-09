@@ -312,6 +312,11 @@ export const validators = {
 	timerTargetAnswer,
 	timerHms,
 	emptyInput,
+	schedulePrompt: z.strictObject({
+		text: z.string().trim().min(1).max(8000),
+		at: z.iso.datetime({ offset: true }),
+		intervalMs: z.number().int().min(60_000).max(31_536_000_000).optional(),
+	}),
 	ocrTarget: z.strictObject({ id: z.uuid() }),
 	ocrCorrectionRequest: z.strictObject({
 		sourceId: z.uuid(),

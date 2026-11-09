@@ -139,6 +139,8 @@ export async function buildServices(
 		web: webResearch,
 		inference,
 		git: createGitObservation(resolve(dirname(dbPath), "workflow-git")),
+		storageRoot: resolve(dirname(dbPath), "app-storage"),
+		storageChanged: () => changes.publish(),
 		destination: () =>
 			docling.documents.available()
 				? {
@@ -207,6 +209,10 @@ export async function buildServices(
 		goals: goals.goals,
 		serviceTests,
 		timers,
+		schedules: {
+			scheduler,
+			workflowTitle: (db, id) => workflow.apps.app(db, id)?.title,
+		},
 		log,
 		history: config.historyToolsEnabled,
 		webResearchEnabled: config.webResearchToolsEnabled,

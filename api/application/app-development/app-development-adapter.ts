@@ -1,9 +1,12 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import {
+	AppStorageDefinitionError,
 	appDigest,
 	appDraft,
 	checkAppDraft,
+	recordRequest,
+	type PendingSave,
 	type AppDevelopment,
 	type AppDraft,
 } from "../../domains/app-development";
@@ -13,18 +16,24 @@ import {
 } from "../../domains/pipelines";
 import type { DomainAdapter } from "../../domains/tool-runtime";
 import {
+	fieldsOfDefinition,
 	prepareWorkflowScreen,
 	saveWorkflowScreenInTransaction,
 	UiCompositionError,
-	workflowScreenInTransaction,
 } from "../../domains/ui-compositions";
 import type {
 	createWorkflowAuthoring,
 	WorkflowAuthoringSource,
 } from "../pipelines/workflow-authoring";
 
+import {
+	storageForSave,
+	type createAppStorageRuntime,
+} from "./storage-runtime";
+import { workflowRefs } from "./workflow-operations";
+import { createStudioSource, studio, records } from "./app-development-source";
+
 export const APP_ADAPTER = "adapter:app-development@1";
-const studio = "query:app-development.studio@1";
 const workspace = "workspace:app-development.definition@1";
 const schemaRef = (key: string) => `domain:app-development.${key}@1`;
 const inputRef = (key: string) => `input:app-development.${key}@1`;
@@ -37,6 +46,8 @@ const number = z
 			.transform(Number),
 	])
 	.pipe(z.number().int().nonnegative());
+const digestInput = z.string().regex(/^[0-9a-f]{64}$/);
+const appInput = z.object({ appId: z.uuid(), revision: number });
 const workInput = z.object({ workRef: z.uuid(), expectedRevision: number });
 const inputs = {
 	save: workInput.extend({
@@ -56,7 +67,12 @@ const inputs = {
 	}),
 	cancel: z.object({ appId: z.uuid(), revision: number, runId: z.uuid() }),
 	reconcile: z.object({ appId: z.uuid(), revision: number, runId: z.uuid() }),
-	stop: z.object({ appId: z.uuid(), revision: number }),
+	stop: appInput,
+	delete: appInput.extend({ digest: digestInput }),
+	record: appInput.extend({
+		collection: z.string().regex(/^[a-z][a-z0-9_]{0,31}$/),
+		record: z.string().min(2).max(12000),
+	}),
 };
 export const appDevelopmentDomainSchemas = {
 	...Object.fromEntries(
@@ -82,7 +98,7 @@ export const describeAppDevelopmentAdapter = () => ({
 			{ inputSchemaRef: schemaRef(key), effect: "write" as const },
 		]),
 	),
-	queries: new Set([studio]),
+	queries: new Set([studio, records]),
 	inputAdapters: new Map(
 		Object.entries(inputs).map(([key, validator]) => [
 			inputRef(key),
@@ -125,6 +141,7 @@ export type AppWorkflowControls = {
 	cancel(db: Database, app: App, runId: string): Record<string, unknown>;
 	reconcile(db: Database, app: App, runId: string): Record<string, unknown>;
 	stop(db: Database, app: App): Record<string, unknown>;
+	stopForDeletion(db: Database, app: App): void;
 	view(db: Database, app: App): { status: unknown; data: unknown };
 	wake(): void;
 };
@@ -132,6 +149,7 @@ export type AppWorkflowControls = {
 type AdapterDependencies = {
 	authoring(): ReturnType<typeof createWorkflowAuthoring>;
 	workflow(): AppWorkflowControls;
+	storage(): ReturnType<typeof createAppStorageRuntime>;
 	turn(
 		db: Database,
 		runId: string,
@@ -145,13 +163,61 @@ type AdapterDependencies = {
 export function createAppDevelopmentAdapter(
 	service: AppDevelopment,
 	deps: AdapterDependencies,
-): DomainAdapter {
+): DomainAdapter & {
+	finishSave(db: Database, operationId: string, save: PendingSave): App;
+} {
 	const preview = createAppPreview(service, deps.authoring, deps.grantDigest);
-	function requiredApp(db: Database, appId: string, revision: number) {
+	function requiredApp(
+		db: Database,
+		appId: string,
+		revision: number,
+		workflow = true,
+	) {
 		const app = service.app(db, appId);
-		if (!app || app.revision !== revision || !app.workflowRevision)
+		if (
+			!app ||
+			app.revision !== revision ||
+			(workflow && !app.workflowRevision)
+		)
 			throw new Error("app_revision_conflict");
 		return app;
+	}
+	function finishSave(
+		db: Database,
+		requestId: string,
+		data: Omit<PendingSave, "plan">,
+	) {
+		const work = service.draft(db, data.workRef);
+		const checked = preview(db, work);
+		if (checked.digest !== data.digest)
+			throw new Error("workflow_confirmation_changed");
+		const saved = checked.args
+			? deps
+					.authoring()
+					.confirmInTransaction(
+						db,
+						checked.args.source,
+						checked.args.input,
+						requestId,
+						checked.workflowDigest!,
+					)
+			: null;
+		const screen = checked.screen
+			? saveWorkflowScreenInTransaction(
+					db,
+					{ scope: service.scope, workflowId: work.appId },
+					checked.screen,
+				)
+			: null;
+		return service.publish(db, {
+			workRef: data.workRef,
+			draftRevision: data.expectedRevision,
+			expectedSavedRevision: data.expectedSavedRevision,
+			digest: checked.digest,
+			workflowRevision: saved?.revision ?? null,
+			screenRevision:
+				screen?.revision ?? saved?.value.artifact?.revision ?? null,
+		});
 	}
 	const state = (db: Database, workRef: string) => {
 		const value = service.state(db, workRef);
@@ -159,6 +225,7 @@ export function createAppDevelopmentAdapter(
 	};
 	return {
 		ref: APP_ADAPTER,
+		finishSave,
 		describe: describeAppDevelopmentAdapter,
 		availableInTransaction: () => true,
 		snapshotInTransaction: (db) => ({ items: service.list(db) }),
@@ -177,6 +244,30 @@ export function createAppDevelopmentAdapter(
 				throw new Error("origin_not_allowed");
 			const { requestId, operationName, input } = request;
 			const digest = appDigest([operationName, input]);
+			if (operationName === "app-development.record") {
+				const data = inputs.record.parse(input);
+				let decoded: unknown;
+				try {
+					decoded = JSON.parse(data.record);
+				} catch {
+					throw new Error("app_storage_record_invalid");
+				}
+				const checked = recordRequest.safeParse(decoded);
+				if (!checked.success) throw new Error("app_storage_record_invalid");
+				const operation = checked.data;
+				if (operation.operation === "list" || operation.operation === "get")
+					throw new Error("app_storage_write_required");
+				deps
+					.storage()
+					.records(
+						db,
+						requiredApp(db, data.appId, data.revision, false),
+						data.collection,
+						operation,
+						requestId,
+					);
+				return receipt({ state: "record_saved" }, requestId, false);
+			}
 			const prior = service.receipt(db, requestId);
 			if (prior) {
 				if (prior.digest !== digest) throw new Error("request_conflict");
@@ -214,38 +305,28 @@ export function createAppDevelopmentAdapter(
 					const checked = preview(db, work);
 					if (checked.digest !== data.digest)
 						throw new Error("workflow_confirmation_changed");
-					const saved = checked.args
-						? deps
-								.authoring()
-								.confirmInTransaction(
-									db,
-									checked.args.source,
-									checked.args.input,
-									requestId,
-									checked.workflowDigest!,
-								)
-						: null;
-					const screen = checked.screen
-						? saveWorkflowScreenInTransaction(
-								db,
-								{ scope: service.scope, workflowId: work.appId },
-								checked.screen,
-							)
-						: null;
-					const app = service.publish(db, {
-						workRef: data.workRef,
-						draftRevision: data.expectedRevision,
-						expectedSavedRevision: data.expectedSavedRevision,
-						digest: checked.digest,
-						workflowRevision: saved?.revision ?? null,
-						screenRevision:
-							screen?.revision ?? saved?.value.artifact?.revision ?? null,
-					});
-					value = {
-						state: "saved",
-						projectId: app.appId,
-						revision: app.revision,
-					};
+					if (!service.storage.available(db, work.appId))
+						throw new Error("app_operation_pending");
+					if (checked.storage) {
+						value = deps.storage().save(db, work.appId, requestId, {
+							...data,
+							plan: checked.storage,
+						});
+					} else {
+						const app = finishSave(db, requestId, data);
+						value = {
+							state: "saved",
+							projectId: app.appId,
+							revision: app.revision,
+						};
+					}
+					break;
+				}
+				case "app-development.delete": {
+					const data = inputs.delete.parse(input);
+					value = deps
+						.storage()
+						.delete(db, data.appId, data.revision, data.digest, requestId);
 					break;
 				}
 				case "app-development.run": {
@@ -307,74 +388,7 @@ export function createAppDevelopmentAdapter(
 			const saved = service.receipt(db, operationId);
 			return saved ? receipt(saved.value, operationId, true) : null;
 		},
-		sourceInTransaction(db, query, targetRef) {
-			if (query !== studio) return null;
-			const work = service.current(db);
-			const viewing = targetRef ? service.app(db, targetRef) : null;
-			const screen = viewing?.screenRevision
-				? workflowScreenInTransaction(
-						db,
-						{ scope: service.scope, workflowId: viewing.appId },
-						viewing.workflowRevision
-							? `${viewing.appId}.workflow`
-							: viewing.appId,
-						viewing.screenRevision,
-					)?.value
-				: null;
-			let confirmation = null,
-				issue: string | null = null;
-			if (work?.draft && !work.busy && work.dirty) {
-				try {
-					const checked = preview(db, work);
-					confirmation = { digest: checked.digest, summary: checked.summary };
-				} catch (error) {
-					issue = draftIssue(error);
-				}
-			}
-			const live = viewing?.workflowRevision
-				? deps.workflow().view(db, viewing)
-				: null;
-			const data = {
-				kind: "ui-studio",
-				work: work
-					? {
-							workRef: work.id,
-							sessionId: work.sessionId,
-							title: work.draft?.title ?? "",
-							definition: work.draft?.screen?.definition ?? null,
-							revision: work.revision,
-							source: work.draft ? JSON.stringify(work.draft, null, 2) : "",
-							previousSource: "",
-							rejected: work.rejected,
-							savedRef: work.savedRevision ? work.appId : null,
-							savedRevision: work.savedRevision,
-							busy: work.busy,
-							dirty: work.dirty,
-							canUndo: false,
-							canRedo: false,
-							confirmation,
-							issue,
-						}
-					: null,
-				viewing: viewing
-					? {
-							id: viewing.appId,
-							title: viewing.title,
-							definition: screen?.definition ?? null,
-							storedDefinition: viewing.draft,
-							savedRevision: viewing.revision,
-							bindings: screen?.bindings ?? null,
-							workflow: viewing.draft.workflow ?? null,
-							...live,
-						}
-					: null,
-				history: service.list(db),
-			};
-			return {
-				revision: Math.max(1, work?.revision ?? 0, viewing?.revision ?? 0),
-				data,
-			};
-		},
+		sourceInTransaction: createStudioSource(service, deps, preview, draftIssue),
 		targetInput: () => ({}),
 		afterCommit: () => deps.workflow().wake(),
 		session: {
@@ -430,7 +444,8 @@ function createAppDocument(
 			} catch (error) {
 				const code = draftIssue(error);
 				const issues =
-					error instanceof WorkflowPipelineError
+					error instanceof WorkflowPipelineError ||
+					error instanceof AppStorageDefinitionError
 						? error.issues
 						: error instanceof z.ZodError
 							? error.issues.slice(0, 8).map((issue) => ({
@@ -528,6 +543,11 @@ function createAppPreview(
 	return function preview(db: Database, work: Work) {
 		const draft = work.draft;
 		if (!draft) throw new Error("app_draft_unavailable");
+		const storage = storageForSave(db, service, work.appId, draft);
+		checkStorageScreen(draft, storage);
+		const storageSummary = storage?.collections.map(
+			({ id, operations, columns }) => ({ id, operations, columns }),
+		);
 		if (draft.workflow) {
 			const args = draftArguments(db, work, draft);
 			const checked = authoring().previewInTransaction(
@@ -535,11 +555,27 @@ function createAppPreview(
 				args.source,
 				args.input,
 			);
+			if (checked.definition.input.schemaRef === workflowRefs.storageInput) {
+				const { collection, operation } = checked.definition.input.fixed;
+				const owned = storage?.collections.find(({ id }) => id === collection);
+				if (
+					!owned ||
+					typeof operation !== "string" ||
+					!owned.operations.some((value) => value === operation)
+				)
+					throw new Error("app_storage_operation_forbidden");
+			}
 			return {
-				digest: appDigest([work.revision, draft.title, checked.digest]),
+				digest: appDigest([
+					work.revision,
+					draft.title,
+					checked.digest,
+					...(storage ? [storage] : []),
+				]),
+				storage,
 				args,
 				workflowDigest: checked.digest,
-				summary: checked.definition,
+				summary: { ...checked.definition, storage: storageSummary },
 			};
 		}
 		const screen = {
@@ -556,11 +592,80 @@ function createAppPreview(
 		)
 			throw new Error("app_bindings_require_workflow");
 		return {
-			digest: appDigest([work.revision, draft.title, checked.digest]),
+			digest: appDigest([
+				work.revision,
+				draft.title,
+				checked.digest,
+				...(storage ? [storage] : []),
+			]),
+			storage,
 			screen,
-			summary: null,
+			summary: storageSummary ? { storage: storageSummary } : null,
 		};
 	};
+}
+
+function checkStorageScreen(
+	draft: AppDraft,
+	plan: ReturnType<typeof storageForSave>,
+) {
+	const binding = draft.screen?.storage;
+	if (!binding) {
+		if (plan && !draft.workflow)
+			throw new AppStorageDefinitionError(
+				"app_storage_screen_required",
+				"screen.storage",
+				"screen.storage に {collection, inputs} を置いてください。collection は storage.collections[].id、inputs はフォームの各項目IDからスキーマの列名への対応です。",
+			);
+		return;
+	}
+	const collection = plan?.collections.find(
+		({ id }) => id === binding.collection,
+	);
+	if (!collection)
+		throw new AppStorageDefinitionError(
+			"app_storage_collection_not_found",
+			"screen.storage.collection",
+			"storage.collections の id で定義した保存先を指定してください。",
+		);
+	const screen = draft.screen!;
+	const fields =
+		fieldsOfDefinition(screen.definition as Record<string, unknown>) ?? [];
+	const mapping = Object.entries(binding.inputs);
+	const writable = collection.operations.some(
+		(op) => op === "create" || op === "update",
+	);
+	if (
+		new Set(Object.values(binding.inputs)).size !== mapping.length ||
+		(writable &&
+			(!fields.length ||
+				fields.some(({ id }) => !Object.hasOwn(binding.inputs, id)) ||
+				collection.columns.some(
+					({ name, required }) =>
+						required && !Object.values(binding.inputs).includes(name),
+				))) ||
+		(!writable && fields.length) ||
+		mapping.some(([field, name]) => {
+			const input = fields.find(({ id }) => id === field);
+			const column = collection.columns.find(({ name: key }) => key === name);
+			if (!input || !column) return true;
+			if (input.type === "number")
+				return column.type !== "number" && column.type !== "integer";
+			if (input.type === "boolean") return column.type !== "boolean";
+			return input.type === "checkbox"
+				? column.type !== "array"
+				: column.type !== "string";
+		}) ||
+		Object.keys(
+			(screen.bindings as { inputs?: Record<string, string> } | undefined)
+				?.inputs ?? {},
+		).length
+	)
+		throw new AppStorageDefinitionError(
+			"app_storage_screen_invalid",
+			"screen.storage.inputs",
+			"フォームの項目IDと列名を重複なく対応させ、必須の列を全て割り当ててください。フォームの型を列の型に合わせ、同じフォームを bindings.inputs にも割り当てないでください。",
+		);
 }
 
 function receipt(

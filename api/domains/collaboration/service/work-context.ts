@@ -53,7 +53,7 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 	function state(db: Database, row: WorkRow) {
 		const source = row.source_json ? current(db, row) : null;
 		const child =
-			source && row.child_id
+			source && row.child_id && row.kind !== "schedule"
 				? host().view(db, row.kind, source, row.child_id)
 				: null;
 		if (child && !withinJsonLimits(child))
@@ -69,7 +69,11 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 			revision: row.revision,
 			label:
 				row.title ||
-				(row.kind === "pipeline" ? "手順の共同編集" : "ブラウザの共同作業"),
+				{
+					pipeline: "手順の共同編集",
+					interact: "ブラウザの共同作業",
+					schedule: "実行予約",
+				}[row.kind],
 			current: {
 				kind: row.kind,
 				revision: row.revision,
@@ -80,7 +84,10 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 				? {
 						originalRequest: source.request,
 						child,
-						available: host().context(db, row.kind, source),
+						available:
+							row.kind === "schedule"
+								? null
+								: host().context(db, row.kind, source),
 					}
 				: {},
 		};
@@ -140,7 +147,7 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 	function purge(db: Database, row: WorkRow, erase = false) {
 		const ref = sourceRef(row),
 			source = ref && host().source(db, ref.runId);
-		if (ref && row.child_id)
+		if (ref && row.child_id && row.kind !== "schedule")
 			host().cancel(
 				db,
 				row.kind,

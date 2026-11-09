@@ -84,6 +84,10 @@ import type {
 	DomainAdapter,
 } from "../../domains/tool-runtime";
 import type { AgentRuntime } from "../../domains/agent-runtime";
+import {
+	describeSchedulerAdapter,
+	SCHEDULER_ADAPTER_REF,
+} from "../scheduler/scheduler-adapter";
 import { readActionOriginInTransaction } from "../../domains/dialogue";
 import {
 	describeTimerAdapter,
@@ -241,6 +245,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: "adapter:pursuit@2", describe: () => describePursuitAdapter(2) },
 	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
+	{ ref: SCHEDULER_ADAPTER_REF, describe: describeSchedulerAdapter },
 	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },
 	{ ref: MODEL3D_ADAPTER_REF, describe: describeModel3dAdapter },
 	{ ref: COMPUTE_ADAPTER_REF, describe: describeComputeAdapter },

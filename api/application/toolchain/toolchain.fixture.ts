@@ -111,6 +111,7 @@ export function workerPacket(
 	return data;
 }
 export async function harness(options: HarnessOptions = {}) {
+	const fixtureActionKey = crypto.getRandomValues(new Uint8Array(32));
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-toolchain-"));
 	// The terminals request table is registered by the host; added here until it is.
 	const store = openStore(join(dir, "db"), [
@@ -611,6 +612,7 @@ export async function harness(options: HarnessOptions = {}) {
 					inference,
 					scratch: options.scratch,
 					git: options.appDevelopment.git,
+					storageRoot: join(dir, "app-storage"),
 					destination:
 						options.appDevelopment.destination ??
 						(() => ({ namespace: "eumenes", path: "journal" })),
@@ -654,12 +656,14 @@ export async function harness(options: HarnessOptions = {}) {
 		dotsConfiguration: dotsWork?.dots.config,
 		embed: options.embed,
 		timers,
+		schedules: options.schedules ? { scheduler } : undefined,
 		conversation: options.history ? conversation : undefined,
 		reconcileThrottleMs: 0,
 		music: !!options.musicGateway,
 		image: !!options.imageGateway,
 		uiCompositions,
 		appDevelopmentAdapter: appRuntime?.adapter,
+		...(appRuntime ? { secretKey: () => fixtureActionKey } : {}),
 		markdown,
 		scratch: options.scratch,
 		excalidraw: !!options.drawingConnection,
@@ -815,7 +819,13 @@ export async function harness(options: HarnessOptions = {}) {
 		agents: toolchain.agents.executions,
 	});
 	let executionPort: ReturnType<typeof configureTaskExecution> | undefined;
-	if (options.everyday || options.pipelines || options.pursuit || appRuntime) {
+	if (
+		options.everyday ||
+		options.pipelines ||
+		options.pursuit ||
+		appRuntime ||
+		options.schedules
+	) {
 		// The everyday task agent is suspended: its bundle is never seeded, so the fixtures of that
 		// implementation register it explicitly. Pipelines need only the parent execution's port.
 		const registered = options.everyday
@@ -852,6 +862,7 @@ export async function harness(options: HarnessOptions = {}) {
 			legacy: taskLegacyPorts(dialogue),
 		});
 	}
+	if (options.schedules) scheduler.registerTarget(dialogue.promptTarget);
 	const voice = createVoiceDialogue(store, dialogue, inference);
 	if (terminals) reportFinishedTasks(terminals, dialogue);
 	if (shell) reportShellRuns(shell, dialogue);

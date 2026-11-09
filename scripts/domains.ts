@@ -174,6 +174,8 @@ export const domains = {
 		backend: "api/domains/app-development",
 		integrationTests: [
 			"api/application/app-development/app-development.test.ts",
+			"api/application/app-development/storage-recovery.test.ts",
+			"api/application/app-development/app-storage.test.ts",
 		],
 		web: null,
 		components: null,
@@ -487,9 +489,10 @@ export const domains = {
 	scheduler: {
 		tier: 1,
 		backend: "api/domains/scheduler",
-		web: null,
+		web: "web/src/domains/scheduler",
 		components: null,
 		depends: { api: ["queue"], web: [], test: [] },
+		integrationTests: ["api/application/scheduler/scheduler-toolchain.test.ts"],
 	},
 	timers: {
 		tier: 2,

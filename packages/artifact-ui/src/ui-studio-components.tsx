@@ -10,158 +10,22 @@ import {
 	Trash2,
 	Undo2,
 } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useId, useState } from "react";
 import { Feedback, useAction } from "./action";
-import { listRefreshSource } from "./composition-contracts";
 import {
 	type ArtifactEvent,
 	type ArtifactRequest,
-	type Snapshot,
 	type UiStudioResource,
 } from "./contracts";
-import { ArtifactRenderer } from "./index";
-import { type ArtifactRuntime, useArtifactRuntime } from "./runtime";
-import {
-	hasForm,
-	savedFormSource,
-	savedPreview,
-	trialFormSource,
-	trialPreview,
-} from "./ui-studio-preview";
+import { hasForm } from "./ui-studio-preview";
+import { StudioPreview } from "./ui-studio-render-preview";
 import { StudioSource, type StudioWork } from "./ui-studio-source";
 import { HistoryMenu, StudioNotices } from "./ui-studio-status";
-import { displayWorkflowOutput } from "./ui-studio-workflow-output";
 import "./ui-studio.css";
 
 type Device = "desktop" | "mobile";
 type StudioMode = "preview" | "source";
 type AppViewing = NonNullable<UiStudioResource["viewing"]>;
-
-const trialMessage = "試用です。回答は保存されません。";
-
-/** The draft or a saved work, rendered as a composition (a draft's form is a trial). */
-function StudioPreview({
-	definition,
-	saved,
-	device,
-	app,
-}: {
-	definition: unknown;
-	saved: boolean;
-	device: Device;
-	app?: AppViewing;
-}) {
-	const runtime = useArtifactRuntime();
-	const savedForm = runtime.snapshot[savedFormSource];
-	const workflow = app?.workflow;
-	const bindings = app?.bindings;
-	const appIdentity = app && `${app.id}:${app.savedRevision}`;
-	const formId = useId();
-	const listRefresh =
-		workflow?.publish?.schemaRef === "schema:showtimes.rows@1" &&
-		!!(bindings?.sections ?? bindings?.table) &&
-		Object.keys(bindings.inputs).length > 0;
-	const updating = ["accepted", "running", "publishing"].includes(
-		app?.status?.state ?? "",
-	);
-	const prepared = useMemo(() => {
-		const preview = app ? displayWorkflowOutput(app, listRefresh) : definition;
-		return saved
-			? { definition: savedPreview(preview), form: null }
-			: trialPreview(preview);
-	}, [app, definition, listRefresh, saved]);
-	const snapshot = useMemo<Snapshot>(
-		() => ({
-			...(prepared.form
-				? {
-						[trialFormSource]: workflow
-							? {
-									...prepared.form,
-									identity: appIdentity,
-									submitLabel: "更新",
-									...(listRefresh ? { externalSubmitId: formId } : {}),
-								}
-							: prepared.form,
-					}
-				: {}),
-			...(listRefresh && prepared.form
-				? {
-						[listRefreshSource]: {
-							kind: "form",
-							revision: 0,
-							submitLabel: "作品リストを更新",
-							submitForm: formId,
-							disabled: updating,
-							fields: [],
-							defaults: {},
-						},
-					}
-				: {}),
-			...(saved && savedForm ? { [savedFormSource]: savedForm } : {}),
-		}),
-		[
-			prepared.form,
-			saved,
-			savedForm,
-			workflow,
-			appIdentity,
-			formId,
-			listRefresh,
-			updating,
-		],
-	);
-	const previewRuntime = useMemo<ArtifactRuntime>(
-		() => ({
-			...runtime,
-			snapshot,
-			dispatch: (event) =>
-				event.source === trialFormSource && app?.workflow && app.bindings
-					? runtime.dispatch({
-							...event,
-							revision:
-								runtime.snapshot["ui-studio"]?.revision ?? event.revision,
-							source: "ui-studio",
-							action: "ui-workflow-run",
-							values: {
-								appId: app.id,
-								revision: String(app.savedRevision),
-								values: JSON.stringify(
-									Object.fromEntries(
-										Object.entries(event.values).flatMap(([field, value]) =>
-											Object.hasOwn(app.bindings!.inputs, field)
-												? [[app.bindings!.inputs[field], value]]
-												: [],
-										),
-									),
-								),
-							},
-						})
-					: event.source === trialFormSource
-						? Promise.resolve({ status: "accepted", message: trialMessage })
-						: runtime.dispatch(event),
-		}),
-		[runtime, snapshot, app],
-	);
-	const text = useMemo(
-		() => JSON.stringify(prepared.definition),
-		[prepared.definition],
-	);
-	const waitingForm =
-		saved && hasForm(definition) && !savedForm
-			? "回答フォームを読み込んでいます"
-			: null;
-	return (
-		<div className={`aui-ui-preview-canvas aui-ui-preview-${device}`}>
-			{waitingForm ? (
-				<div className="aui-ui-preview-empty">
-					<output>{waitingForm}</output>
-				</div>
-			) : (
-				<ArtifactRenderer definition={text} runtime={previewRuntime} />
-			)}
-		</div>
-	);
-}
 
 export function UiStudioView({ request }: { request: ArtifactRequest }) {
 	const action = useAction(request);
@@ -290,6 +154,7 @@ function StudioMain({
 					{!empty && (
 						<div className="aui-ui-preview-stage" hidden={mode !== "preview"}>
 							<StudioPreview
+								key={app?.id}
 								definition={shown.definition}
 								saved={viewing && !app}
 								device={device}
@@ -366,6 +231,9 @@ function Studio({
 	} | null>(null);
 	const suspended = session?.state === "suspended";
 	const busy = !!work?.busy;
+	const storagePending =
+		work?.storageState === "initializing" || work?.storageState === "deleting";
+	const deletingApp = viewing?.storageState === "deleting";
 	// The draft is what the controls act on; a viewed saved work hides it from the preview.
 	const editing = !!work && !viewing;
 	const shown = viewing
@@ -464,16 +332,24 @@ function Studio({
 							>
 								{draftAction}
 							</Button>
-							{!appDevelopment && (
+							{(!appDevelopment || viewing.deleteDigest) && (
 								<Button
 									type="button"
 									variant="outline-destructive"
 									size="sm"
-									disabled={action.pending}
+									disabled={
+										action.pending ||
+										(deletingApp && !viewing.storageError) ||
+										viewing.storageState === "initializing"
+									}
 									onClick={() => setDeleting(true)}
 								>
 									<Trash2 size={14} aria-hidden="true" />
-									削除
+									{appDevelopment
+										? deletingApp
+											? "削除を再試行"
+											: "アプリを削除"
+										: "削除"}
 								</Button>
 							)}
 						</>
@@ -506,6 +382,7 @@ function Studio({
 									!editing ||
 									busy ||
 									!work?.dirty ||
+									storagePending ||
 									action.pending ||
 									(appDevelopment && !work.confirmation)
 								}
@@ -553,6 +430,14 @@ function Studio({
 			{editing && (
 				<StudioNotices data={data} pending={action.pending} send={send} />
 			)}
+			{appDevelopment && (
+				<StorageProgress
+					viewing={viewing}
+					work={work}
+					pending={storagePending}
+				/>
+			)}
+
 			{appDevelopment && editing && work?.issue && (
 				<Feedback message={`確認が必要です（${work.issue}）。`} />
 			)}
@@ -567,23 +452,25 @@ function Studio({
 					send={send}
 				/>
 			)}
-			<StudioMain
-				heading={heading}
-				shown={shown}
-				work={viewing ? null : work}
-				viewing={!!viewing}
-				app={appDevelopment ? (viewing ?? undefined) : undefined}
-				editing={editing}
-				device={device}
-				onDevice={onDevice}
-				mode={mode}
-				onMode={onMode}
-				onRefresh={() => send("ui-refresh")}
-				pending={action.pending}
-				busy={editing && busy}
-				result={{ status: action.status, message: action.message }}
-				onApply={applySource}
-			/>
+			{!deletingApp && viewing?.storageState !== "initializing" && (
+				<StudioMain
+					heading={heading}
+					shown={shown}
+					work={viewing ? null : work}
+					viewing={!!viewing}
+					app={appDevelopment ? (viewing ?? undefined) : undefined}
+					editing={editing}
+					device={device}
+					onDevice={onDevice}
+					mode={mode}
+					onMode={onMode}
+					onRefresh={() => send("ui-refresh")}
+					pending={action.pending}
+					busy={editing && busy}
+					result={{ status: action.status, message: action.message }}
+					onApply={applySource}
+				/>
+			)}
 			<Feedback message={action.message} />
 			<ConfirmModal
 				open={!!switching}
@@ -601,32 +488,97 @@ function Studio({
 				}}
 				onCancel={() => setSwitching(null)}
 			/>
-			{viewing && !appDevelopment && (
-				<ConfirmModal
-					open={deleting}
+			{viewing && (!appDevelopment || viewing.deleteDigest) && (
+				<AppDeletion
+					viewing={viewing}
+					appDevelopment={appDevelopment}
+					deleting={deleting}
 					onOpenChange={setDeleting}
-					title="作品を削除しますか"
-					description={`「${viewing.title || "名称未設定"}」を作品履歴から削除します。元に戻せません。`}
-					confirmText="削除する"
-					cancelText="やめる"
-					variant="destructive"
-					onConfirm={() => {
-						setDeleting(false);
-						send("ui-delete", {
-							projectId: viewing.id,
-							expectedSavedRevision: String(viewing.savedRevision),
-						});
-					}}
-					onCancel={() => setDeleting(false)}
+					send={send}
 				/>
 			)}
 		</div>
 	);
 }
 
+function StorageProgress({
+	viewing,
+	work,
+	pending,
+}: Pick<UiStudioResource, "viewing" | "work"> & { pending: boolean }) {
+	if (!viewing && pending)
+		return (
+			<output className="aui-ui-notice">
+				{work?.storageError
+					? `保存先を準備できませんでした（${work.storageError}）。`
+					: "アプリの保存先を準備しています。"}
+			</output>
+		);
+	if (
+		viewing?.storageState !== "deleting" &&
+		viewing?.storageState !== "initializing"
+	)
+		return null;
+	return (
+		<output className="aui-ui-notice">
+			{viewing.storageState === "deleting"
+				? "アプリの削除待ち"
+				: "アプリの保存先を準備しています。"}
+			{viewing.storageError ? `（${viewing.storageError}）` : ""}
+		</output>
+	);
+}
+
+function AppDeletion({
+	viewing,
+	appDevelopment,
+	deleting,
+	onOpenChange,
+	send,
+}: {
+	viewing: AppViewing;
+	appDevelopment?: boolean;
+	deleting: boolean;
+	onOpenChange(open: boolean): void;
+	send: Send;
+}) {
+	return (
+		<ConfirmModal
+			open={deleting}
+			onOpenChange={onOpenChange}
+			title={appDevelopment ? "アプリを削除しますか" : "作品を削除しますか"}
+			description={`「${viewing.title || "名称未設定"}」を作品履歴から削除します。${viewing.hasStorage ? "このアプリに保存した記録も削除されます。" : ""}元に戻せません。`}
+			confirmText="削除する"
+			cancelText="やめる"
+			variant="destructive"
+			onConfirm={() => {
+				onOpenChange(false);
+				if (appDevelopment && viewing.deleteDigest) {
+					send("ui-app-delete", {
+						appId: viewing.id,
+						revision: String(viewing.savedRevision),
+						digest: viewing.deleteDigest,
+					});
+				} else {
+					send("ui-delete", {
+						projectId: viewing.id,
+						expectedSavedRevision: String(viewing.savedRevision),
+					});
+				}
+			}}
+			onCancel={() => onOpenChange(false)}
+		/>
+	);
+}
+
 function AppConfirmation({ summary }: { summary: unknown }) {
 	const data = summary as {
 		trigger?: string;
+		storage?: Array<{
+			id: string;
+			operations: string[];
+			columns: Array<{ name: string; type: string }>;
+		}>;
 		input?: { fixed?: Record<string, unknown> };
 		publish?: { destinationRef?: string };
 		pipeline?: { steps?: Array<{ bundle: string; task: string }> };
@@ -634,7 +586,27 @@ function AppConfirmation({ summary }: { summary: unknown }) {
 	return (
 		<details open className="aui-ui-notice">
 			<summary>実行内容を確認</summary>
-			<p>起動 {data.trigger === "schedule" ? "予約" : "手動"}</p>
+			{data.trigger && (
+				<p>起動 {data.trigger === "schedule" ? "予約" : "手動"}</p>
+			)}
+			{data.storage && (
+				<div>
+					<p>
+						このアプリに記録を保存します。アプリを削除すると記録も削除されます。
+					</p>
+					<ul>
+						{data.storage.map(({ id, operations, columns }) => (
+							<li key={id}>
+								{id}　
+								{columns
+									.map(({ name, type }) => `${name}（${type}）`)
+									.join("、")}
+								　{operations.join("、")}
+							</li>
+						))}
+					</ul>
+				</div>
+			)}
 			{data.input?.fixed && Object.keys(data.input.fixed).length > 0 && (
 				<p>
 					固定入力{" "}

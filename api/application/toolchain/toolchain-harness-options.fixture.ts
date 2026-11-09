@@ -20,6 +20,7 @@ export type HarnessOptions = {
 	everyday?: boolean;
 	/** Task pipelines run on the parent execution, without the suspended task bundle. */
 	pipelines?: boolean;
+	schedules?: boolean;
 	workflowRuntime?: (
 		agents: import("../../domains/agent-runtime").AgentRuntime,
 	) => Pick<

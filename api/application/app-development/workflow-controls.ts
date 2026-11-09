@@ -168,7 +168,7 @@ export function createAppWorkflowControls(deps: WorkflowDependencies) {
 		schema: scheduleTarget,
 		deferReasonInTransaction(db, occurrence) {
 			const app = apps.app(db, occurrence.payload.definitionId);
-			if (!app) return null;
+			if (!app) return "workflow_unavailable";
 			return activeCheckpointWorkflowInTransaction(db, scope, app.appId)
 				? "workflow_busy"
 				: null;
@@ -181,7 +181,10 @@ export function createAppWorkflowControls(deps: WorkflowDependencies) {
 				definitionId,
 				occurrence.scheduleId,
 			);
-			if (binding?.definition_revision !== revision)
+			if (
+				!apps.app(db, definitionId) ||
+				binding?.definition_revision !== revision
+			)
 				throw new Error("workflow_schedule_forbidden");
 			const result = admit(
 				db,
@@ -234,7 +237,8 @@ export function createAppWorkflowControls(deps: WorkflowDependencies) {
 			if (
 				!revision ||
 				revision.value.definition.trigger !== "schedule" ||
-				!deps.destination()
+				(revision.value.definition.publish.kind === "markdown" &&
+					!deps.destination())
 			)
 				throw new Error("workflow_schedule_forbidden");
 			stop(db, app);
@@ -300,6 +304,14 @@ export function createAppWorkflowControls(deps: WorkflowDependencies) {
 			)
 				throw new Error("workflow_state_changed");
 			return { projectId: app.appId, state: "reconciling", runId };
+		},
+		stopForDeletion(db, app) {
+			stop(db, app);
+			for (const item of activeWorkflowRunsInTransaction(db)) {
+				if (item.scope !== scope) continue;
+				const run = load(db, item.id);
+				if (run?.workflowId === app.appId) controls.cancel(db, app, run.runId);
+			}
 		},
 		view: createWorkflowView(scope, scheduler),
 		wake() {

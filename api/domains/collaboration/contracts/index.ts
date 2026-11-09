@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 
 export type CollaborationKind = "pipeline" | "interact";
+export type WorkKind = CollaborationKind | "schedule";
 /** Resolved from a real dialogue input, never from a model's claimed approval. */
 export type Source = {
 	conversationId: string;
@@ -88,12 +89,7 @@ export type Ports = {
 		input: unknown,
 		history: Source[],
 	): ChildView;
-	forget(
-		db: Database,
-		kind: CollaborationKind,
-		source: Source,
-		workRef: string,
-	): void;
+	forget(db: Database, kind: WorkKind, source: Source, workRef: string): void;
 	cancel(
 		db: Database,
 		kind: CollaborationKind,

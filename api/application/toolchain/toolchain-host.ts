@@ -157,6 +157,7 @@ export async function createHostToolchain(
 			Parameters<typeof createToolchainHostLinks>[0]["inference"];
 		webResearch: WebResearchService;
 		timers?: TimersService;
+		schedules?: import("../scheduler/scheduler-adapter").SchedulerAdapterPorts;
 		history?: boolean;
 		webResearchEnabled?: boolean;
 		embed?: Embed;
@@ -196,6 +197,7 @@ export async function createHostToolchain(
 		s.webResearch,
 		{
 			timers: s.timers,
+			schedules: s.schedules,
 			appDevelopmentAdapter: s.appDevelopmentAdapter,
 			uiCompositions: s.uiCompositions,
 			markdown: s.markdown,

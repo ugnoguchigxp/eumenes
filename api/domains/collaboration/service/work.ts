@@ -6,6 +6,7 @@ import type {
 	CollaborationKind,
 	Ports,
 	RejectedDraft,
+	WorkKind,
 } from "../contracts";
 import {
 	forSession,
@@ -32,7 +33,7 @@ export function createCollaborationWorks(now: () => number = Date.now) {
 			ports?.available(db, kind) ?? false,
 		open(
 			db: Database,
-			kind: CollaborationKind,
+			kind: WorkKind,
 			sessionId: string,
 			targetRef: string | null,
 		) {
@@ -59,6 +60,18 @@ export function createCollaborationWorks(now: () => number = Date.now) {
 		state: (db: Database, id: string) => {
 			const row = work(db, id);
 			return row && !row.ended ? state(db, row) : null;
+		},
+		sourceOfTurn(
+			db: Database,
+			kind: WorkKind,
+			id: string,
+			sessionId: string,
+			runId: string,
+		) {
+			const row = held(db, id, sessionId, runId);
+			if (row.kind !== kind) fail("work_not_found");
+			authority(db, row);
+			return response(db, row, runId);
 		},
 		begin(db: Database, id: string, runId: string) {
 			const row = live(db, id);
@@ -137,6 +150,7 @@ export function createCollaborationWorks(now: () => number = Date.now) {
 			},
 		) {
 			const row = held(db, input.workRef, input.sessionId, input.runId);
+			if (row.kind === "schedule") fail("work_not_found");
 			if (row.revision !== input.baseRevision) fail("revision_conflict");
 			if (row.child_id) {
 				const child = host().view(db, row.kind, current(db, row), row.child_id);
@@ -178,6 +192,7 @@ export function createCollaborationWorks(now: () => number = Date.now) {
 			input: { workRef: string; sessionId: string; runId: string },
 		) {
 			const row = held(db, input.workRef, input.sessionId, input.runId);
+			if (row.kind === "schedule") fail("work_not_found");
 			authority(db, row);
 			response(db, row, input.runId);
 			if (row.child_id)

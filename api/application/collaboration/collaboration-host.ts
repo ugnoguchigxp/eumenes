@@ -5,17 +5,28 @@ import {
 } from "../../domains/collaboration";
 import { createCollaborationAdapter } from "./collaboration-adapter";
 import { registerCollaborationFollowup } from "./collaboration-followup";
+import {
+	createSchedulerAdapter,
+	type SchedulerAdapterPorts,
+} from "../scheduler/scheduler-adapter";
+import type { DomainAdapter } from "../../domains/tool-runtime";
 
-export function createCollaborationHost(queue: QueueService) {
+export function createCollaborationHost(
+	queue: QueueService,
+	schedules?: SchedulerAdapterPorts,
+) {
 	const works = createCollaborationWorks();
 	let afterCommit = () => {};
 	const watch = registerCollaborationFollowup(queue, works, () =>
 		afterCommit(),
 	);
-	const adapters = (["pipeline", "interact"] as const).map((kind) => ({
-		...createCollaborationAdapter(kind, works, watch),
-		afterCommit: () => afterCommit(),
-	}));
+	const adapters: DomainAdapter[] = (["pipeline", "interact"] as const).map(
+		(kind) => ({
+			...createCollaborationAdapter(kind, works, watch),
+			afterCommit: () => afterCommit(),
+		}),
+	);
+	if (schedules) adapters.push(createSchedulerAdapter(schedules, works));
 	return {
 		works,
 		adapters,

@@ -1,5 +1,6 @@
 export { routingExportCards } from "./service/export";
 export { createCapabilities, zSchema, type Capabilities } from "./service";
+export { compileJsonSchemaSubset } from "./service/json-schema-subset";
 export { prepareWorkflowSchema } from "./service/workflow-schemas";
 export {
 	dot,

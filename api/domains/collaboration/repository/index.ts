@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
-import type { CollaborationKind, SourceRef } from "../contracts";
+import type { WorkKind, SourceRef } from "../contracts";
 
 export const migrations: readonly Migration[] = [
 	{
@@ -33,7 +33,7 @@ CREATE TABLE collaboration_receipts (
 export type WorkRow = {
 	id: string;
 	session_id: string;
-	kind: CollaborationKind;
+	kind: WorkKind;
 	revision: number;
 	title: string;
 	document_json: string | null;

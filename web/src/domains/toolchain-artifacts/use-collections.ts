@@ -23,6 +23,17 @@ const REFRESH_MS = 3000;
 /** Consecutive read errors after which the watched polling stops. */
 const MAX_FAILURES = 3;
 
+export const collectionQueryKey = (
+	identity: string,
+	artifactRevisionId: string,
+) =>
+	[
+		queryRoots.toolchainArtifacts,
+		identity,
+		"collection",
+		artifactRevisionId,
+	] as const;
+
 /**
  * The registered collections of an artifact: each source is read (with the table query as
  * `params` when it pages), and its resource is built from the registration and the data.
@@ -44,10 +55,7 @@ export function useCollections(
 	const reads = useQueries({
 		queries: collections.map((collection) => ({
 			queryKey: [
-				queryRoots.toolchainArtifacts,
-				client.identity,
-				"collection",
-				artifactRevisionId,
+				...collectionQueryKey(client.identity, artifactRevisionId),
 				collection.source,
 				collection.paging ? queryOf(collection.source) : null,
 			],
@@ -170,12 +178,7 @@ export function useCollections(
 	const reload = useCallback(() => {
 		failures.current.clear();
 		return cache.invalidateQueries({
-			queryKey: [
-				queryRoots.toolchainArtifacts,
-				client.identity,
-				"collection",
-				artifactRevisionId,
-			],
+			queryKey: collectionQueryKey(client.identity, artifactRevisionId),
 		});
 	}, [cache, client.identity, artifactRevisionId]);
 	return {

@@ -5,7 +5,7 @@ import type {
 } from "@eumenes/artifact-ui/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatResourceUri } from "../../../../api/domains/resources/contracts";
 import { focusWhenDrawn } from "../../components/domains/resource-focus";
 import { queryRoots } from "../../queryKeys";
@@ -32,7 +32,39 @@ type StudioScreen = {
 };
 const live = createLiveScreen<{ read(): StudioScreen }>();
 
+const lifecycle = {
+	storageState: z.string().nullish(),
+	storageError: z.string().nullish(),
+};
+const storageView = z.object({
+	collection: z.string(),
+	inputs: z.record(z.string(), z.string()),
+	operations: z.array(z.string()),
+	columns: z.array(
+		z.object({ name: z.string(), type: z.string(), label: z.string() }),
+	),
+	rows: z.array(
+		z.object({
+			id: z.string(),
+			revision: z.number().int(),
+			createdAt: z.number(),
+			updatedAt: z.number(),
+			values: z.record(z.string(), z.unknown()),
+		}),
+	),
+	page: z.number().int(),
+	hasMore: z.boolean(),
+	error: z.string().optional(),
+});
+const storagePending = (
+	value?: { storageState?: string | null; storageError?: string | null } | null,
+) =>
+	!value?.storageError &&
+	(value?.storageState === "initializing" ||
+		value?.storageState === "deleting");
+
 const workSchema = z.object({
+	...lifecycle,
 	workRef: z.string(),
 	sessionId: z.string(),
 	title: z.string(),
@@ -65,8 +97,12 @@ const studioSchema = z.object({
 	work: workSchema.nullable(),
 	viewing: z
 		.object({
+			...lifecycle,
 			id: z.string(),
 			title: z.string(),
+			hasStorage: z.boolean().optional(),
+			deleteDigest: z.string().optional(),
+			storage: storageView.nullish(),
 			definition: z.unknown(),
 			storedDefinition: z.unknown().optional(),
 			savedRevision: z.number().int(),
@@ -124,6 +160,7 @@ const studioSchema = z.object({
 		.nullable(),
 	history: z.array(
 		z.object({
+			...lifecycle,
 			id: z.string(),
 			title: z.string(),
 			updatedAt: z.union([z.string(), z.number()]),
@@ -137,6 +174,15 @@ const rejected = (message: string) => ({
 /** Wording for a refused source apply; the detail ("path: rule") follows when the server names one. */
 const sourceRefusals: Record<string, string> = {
 	ui_definition_invalid: "定義の検査を通りませんでした",
+	app_storage_record_invalid: "入力した記録の項目を確認してください",
+	app_storage_record_conflict:
+		"記録が更新されています。一覧を開き直してください",
+	app_storage_operation_forbidden:
+		"この操作は保存済みのアプリで許可されていません",
+	app_storage_file_missing: "アプリの保存先が見つかりません",
+	app_operation_pending: "アプリの保存先を処理しています",
+	app_revision_conflict:
+		"アプリの版が変わりました。作品履歴から開き直してください",
 	document_parse_failed: "JSONとして読み取れませんでした",
 	generation_in_progress: "制作中のため、今は反映できません",
 };
@@ -144,6 +190,27 @@ const receiptOf = (result: BridgeResult, message: string) =>
 	result.ok
 		? { status: "accepted" as const, message }
 		: rejected(result.message);
+
+function studioPollInterval(
+	raw: unknown,
+	busy: boolean,
+	appDevelopment: boolean,
+) {
+	const data = raw as Partial<z.infer<typeof studioSchema>> | undefined;
+	const { work, viewing } = data ?? {};
+	return work?.busy ||
+		busy ||
+		storagePending(work) ||
+		storagePending(viewing) ||
+		(appDevelopment &&
+			viewing?.status &&
+			(["accepted", "running", "publishing"].includes(
+				viewing.status.state ?? "",
+			) ||
+				viewing.status.schedule?.state === "active"))
+		? 1000
+		: false;
+}
 
 function createStudioAdapter(appDevelopment: boolean): WebArtifactAdapter {
 	const domain = appDevelopment ? "app-development" : "ui-compositions";
@@ -162,40 +229,37 @@ function createStudioAdapter(appDevelopment: boolean): WebArtifactAdapter {
 			const bridge = useSpecialistBridge();
 			const session = bridge?.session ?? null;
 			const root = [queryRoots.toolchainArtifacts, client.identity, domain];
+			const [storagePage, setStoragePage] = useState<{
+				appId: string;
+				page: number;
+			} | null>(null);
+			const page =
+				storagePage && storagePage.appId === targetRef ? storagePage.page : 0;
 
 			const studio = useQuery({
-				queryKey: [...root, "studio", artifactRevisionId, targetRef ?? null],
+				queryKey: [
+					...root,
+					"studio",
+					artifactRevisionId,
+					targetRef ?? null,
+					page,
+				],
 				queryFn: ({ signal }) =>
 					client.toolchainArtifactSource(
 						artifactRevisionId,
 						"ui-studio",
 						targetRef,
 						signal,
+						page ? { page } : undefined,
 					),
 				enabled: visible,
 				// While a turn is running the draft changes under the screen.
-				refetchInterval: (query) => {
-					const work = (
-						query.state.data?.data as { work?: { busy?: boolean } | null }
-					)?.work;
-					const viewing = (
-						query.state.data?.data as {
-							viewing?: {
-								status?: { state?: string; schedule?: { state?: string } };
-							};
-						}
-					)?.viewing;
-					return work?.busy ||
-						session?.busy ||
-						(appDevelopment &&
-							viewing?.status &&
-							(["accepted", "running", "publishing"].includes(
-								viewing.status.state ?? "",
-							) ||
-								viewing.status.schedule?.state === "active"))
-						? 1000
-						: false;
-				},
+				refetchInterval: (query) =>
+					studioPollInterval(
+						query.state.data?.data,
+						!!session?.busy,
+						appDevelopment,
+					),
 			});
 			// A spoken return/discard or expiry can finish an idle work without a local action.
 			// Session transitions must refresh the source even when the busy poll is stopped.
@@ -282,6 +346,20 @@ function createStudioAdapter(appDevelopment: boolean): WebArtifactAdapter {
 					source === "composition-form" ? targetRef : undefined,
 				local: async (binding, event) => {
 					switch (binding.eventAction) {
+						case "ui-storage-page": {
+							const requested = Number(event.values.page);
+							if (
+								!appDevelopment ||
+								!targetRef ||
+								!viewing?.storage ||
+								!Number.isInteger(requested) ||
+								requested < 0 ||
+								requested > 399
+							)
+								return rejected("記録一覧を開けません。");
+							setStoragePage({ appId: targetRef, page: requested });
+							return { status: "accepted", message: "" };
+						}
 						case "ui-select":
 						case "ui-retarget": {
 							const id = event.values.id;
@@ -298,6 +376,7 @@ function createStudioAdapter(appDevelopment: boolean): WebArtifactAdapter {
 								session?.state === "active" &&
 								session.artifactRevisionId === artifactRevisionId;
 							if (!id || !editing) {
+								setStoragePage(null);
 								setTargetRef(id || undefined);
 								return { status: "accepted", message: "" };
 							}

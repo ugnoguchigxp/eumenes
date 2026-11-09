@@ -59,7 +59,7 @@
 | `larm` | 0 | `api/domains/larm/index.ts` | なし | なし | なし | なし | なし |
 | `audio` | 0 | なし | `web/src/domains/audio/index.ts` | なし | なし | なし | なし |
 | `queue` | 0 | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
-| `scheduler` | 1 | `api/domains/scheduler/index.ts` | なし | なし | `queue` | なし | なし |
+| `scheduler` | 1 | `api/domains/scheduler/index.ts` | `web/src/domains/scheduler/` | なし | `queue` | なし | なし |
 | `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | `resources` | なし |
 | `pursuit` | 3 | `api/domains/pursuit/index.ts` | なし | なし | `capabilities`、`inference`、`queue`、`resources`、`tool-runtime` | なし | なし |
 | `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`continuity`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`resources`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `goals` |
@@ -91,7 +91,7 @@
 | larm | `api/domains/larm/index.ts` | なし | `api/domains/larm/test/` |
 | audio | なし | `web/src/domains/audio/index.ts` | `web/src/domains/audio/test/` |
 | queue | `api/domains/queue/index.ts` | なし | `api/domains/queue/test/` |
-| scheduler | `api/domains/scheduler/index.ts` | なし | `api/domains/scheduler/test/` |
+| scheduler | `api/domains/scheduler/index.ts` | `web/src/domains/scheduler/`（アーティファクト「実行予約」） | `api/domains/scheduler/test/`、`api/application/scheduler/scheduler-toolchain.test.ts`、`web/src/workspace/scheduler-artifact.test.tsx` |
 | ocr | `api/domains/ocr/index.ts` | `web/src/domains/ocr/`（アーティファクト「文字を読み取る」、`docs/ocr.md`） | `api/domains/ocr/test/`、`api/application/media/ocr-e2e.test.ts`、`api/application/media/ocr-adapter.test.ts`、`tests/browser/ocr.spec.ts` |
 | terminals | `api/domains/terminals/index.ts` | `web/src/domains/terminals/index.ts`（アーティファクト「ターミナル」、`docs/terminals.md`） | `api/domains/terminals/test/`、`api/application/work/terminals-adapter.test.ts`、`web/src/domains/terminals/connection.test.ts` |
 | timers | `api/domains/timers/index.ts` | `web/src/domains/timers/` と `web/src/components/domains/timers/` | `api/domains/timers/test/` |

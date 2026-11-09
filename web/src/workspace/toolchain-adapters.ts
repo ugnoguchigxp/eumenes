@@ -15,6 +15,7 @@ import {
 	settingsWebAdapter,
 } from "../domains/settings-data";
 import { timerWebAdapter } from "../domains/timers/toolchain-adapter";
+import { schedulerWebAdapter } from "../domains/scheduler/toolchain-adapter";
 import { musicScreenWebAdapter } from "../domains/music/toolchain-adapter";
 import { imageScreenWebAdapter } from "../domains/image/toolchain-adapter";
 import { model3dWebAdapter } from "../domains/model3d/toolchain-adapter";
@@ -37,6 +38,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	todosWebAdapter,
 	googleAccountsWebAdapter,
 	timerWebAdapter,
+	schedulerWebAdapter,
 	musicScreenWebAdapter,
 	imageScreenWebAdapter,
 	model3dWebAdapter,

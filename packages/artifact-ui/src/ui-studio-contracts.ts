@@ -14,7 +14,28 @@ export type AppWorkflowStatus = {
 	result?: { code?: string; path?: string; kind?: string } | null;
 	schedule?: { id: string; state: string; nextDueAt: string | null } | null;
 };
-type UiStudioWork = {
+export type AppStorageRecord = {
+	id: string;
+	revision: number;
+	createdAt: number;
+	updatedAt: number;
+	values: Record<string, unknown>;
+};
+export type AppStorageView = {
+	collection: string;
+	inputs: Record<string, string>;
+	operations: string[];
+	columns: Array<{ name: string; type: string; label: string }>;
+	rows: AppStorageRecord[];
+	page: number;
+	hasMore: boolean;
+	error?: string;
+};
+type StorageLifecycle = {
+	storageState?: string | null;
+	storageError?: string | null;
+};
+type UiStudioWork = StorageLifecycle & {
 	workRef: string;
 	sessionId: string;
 	title: string;
@@ -40,7 +61,7 @@ type UiStudioWork = {
 	issue?: string | null;
 };
 
-type UiStudioViewing = {
+type UiStudioViewing = StorageLifecycle & {
 	id: string;
 	title: string;
 	/** What the preview renders (the answer form is bound to the host's form source). */
@@ -62,6 +83,9 @@ type UiStudioViewing = {
 	workflow?: { trigger?: string; publish?: { schemaRef?: string } } | null;
 	status?: AppWorkflowStatus;
 	data?: unknown;
+	hasStorage?: boolean;
+	storage?: AppStorageView | null;
+	deleteDigest?: string;
 };
 
 export type UiStudioResource = {
@@ -71,7 +95,9 @@ export type UiStudioResource = {
 	work: UiStudioWork | null;
 	/** A saved work the user looks at; shown instead of the draft while set. */
 	viewing: UiStudioViewing | null;
-	history: Array<{ id: string; title: string; updatedAt: string | number }>;
+	history: Array<
+		StorageLifecycle & { id: string; title: string; updatedAt: string | number }
+	>;
 	/** The dialogue session of this work, when the host knows one. */
 	session: { state: "active" | "suspended"; expiresAt: string } | null;
 	/** True when a turn of the session can be cancelled (stop). */

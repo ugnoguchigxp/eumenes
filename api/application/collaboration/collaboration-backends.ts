@@ -272,7 +272,7 @@ export function collaborationBackends(deps: {
 				);
 			if (kind === "interact")
 				browser().purgeExecutionInTransaction(db, workRef);
-			else
+			else if (kind === "pipeline")
 				agents.executions.purgeSourcesInTransaction(db, {
 					messageIds: [source.messageId],
 					itemIds: [],

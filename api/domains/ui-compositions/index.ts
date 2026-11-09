@@ -5,6 +5,7 @@ export {
 } from "./service";
 export {
 	checkDefinitionText as checkUiDefinitionText,
+	fieldsOfDefinition,
 	UiCompositionError,
 	limits as uiCompositionLimits,
 } from "./contracts";

@@ -3,6 +3,20 @@ import { z } from "zod";
 import { canonicalJson, sha256Hex } from "../../infrastructure/digest";
 import { decodeLlmJson } from "../../infrastructure/llm-json";
 import type { Migration } from "../../infrastructure/sqlite";
+import { appStorage, storageScreenBinding } from "./storage-contract";
+import { createStorageLifecycle, storageMigration } from "./storage-lifecycle";
+
+export {
+	AppStorageDefinitionError,
+	checkStorageUpgrade,
+	prepareAppStorage,
+	recordRequest,
+	type RecordRequest,
+	type StoragePlan,
+	type StoragePage,
+} from "./storage-contract";
+export { createAppStorageFiles } from "./storage-files";
+export { eraseAppInTransaction, type PendingSave } from "./storage-lifecycle";
 
 export {
 	forgetWorkflowWebRoute,
@@ -45,6 +59,7 @@ CREATE TABLE app_development_web_routes (
  PRIMARY KEY(scope, workflow_id, revision, step_id, target_key)
 );`,
 	},
+	storageMigration,
 ];
 
 export const appDraft = z
@@ -55,9 +70,11 @@ export const appDraft = z
 			.strictObject({
 				definition: z.json(),
 				bindings: z.json().optional(),
+				storage: storageScreenBinding.optional(),
 			})
 			.optional(),
 		workflow: z.record(z.string(), z.json()).optional(),
+		storage: appStorage.optional(),
 		schemas: z
 			.array(
 				z.strictObject({
@@ -73,8 +90,8 @@ export const appDraft = z
 		"screen or workflow required",
 	)
 	.refine(
-		(draft) => draft.workflow || draft.schemas.length === 0,
-		"schemas require workflow",
+		(draft) => draft.workflow || draft.storage || draft.schemas.length === 0,
+		"schemas require workflow or storage",
 	);
 
 export type AppDraft = z.infer<typeof appDraft>;
@@ -141,7 +158,8 @@ const parsed = <T>(value: string | null) =>
 	value === null ? null : (JSON.parse(value) as T);
 
 export function createAppDevelopment(scope: string, now = Date.now) {
-	function app(db: Database, id: string, revision?: number) {
+	const storage = createStorageLifecycle(scope);
+	function storedApp(db: Database, id: string, revision?: number) {
 		const row = db
 			.query<{ value_json: string }, [string, string, number | null]>(
 				"SELECT value_json FROM app_development_versions WHERE scope=? AND app_id=? AND revision=COALESCE(?,revision) ORDER BY revision DESC LIMIT 1",
@@ -149,10 +167,16 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 			.get(scope, id, revision ?? null);
 		return row ? parsed<Version>(row.value_json) : null;
 	}
+	function app(db: Database, id: string, revision?: number) {
+		return storage.available(db, id) ? storedApp(db, id, revision) : null;
+	}
+	function ensureAvailable(db: Database, id: string) {
+		if (!storage.available(db, id)) throw new Error("app_operation_pending");
+	}
 	function draftOf(db: Database, row: WorkRow) {
 		const draft = parsed<AppDraft>(row.draft_json);
 		const saved = row.saved_revision
-			? app(db, row.app_id, row.saved_revision)
+			? storedApp(db, row.app_id, row.saved_revision)
 			: null;
 		return {
 			id: row.id,
@@ -188,10 +212,21 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 	return {
 		scope,
 		app,
+		storedApp,
+		storage,
 		list(db: Database) {
 			return db
-				.query<{ id: string; title: string; updatedAt: number }, [string]>(
-					"SELECT v.app_id AS id,v.title,v.created_at AS updatedAt FROM app_development_versions v WHERE v.scope=? AND v.revision=(SELECT MAX(n.revision) FROM app_development_versions n WHERE n.scope=v.scope AND n.app_id=v.app_id) ORDER BY v.created_at DESC,v.app_id LIMIT 50",
+				.query<
+					{
+						id: string;
+						title: string;
+						updatedAt: number;
+						storageState: string | null;
+						storageError: string | null;
+					},
+					[string]
+				>(
+					"SELECT v.app_id AS id,v.title,v.created_at AS updatedAt,s.state AS storageState,s.error_code AS storageError FROM app_development_versions v LEFT JOIN app_development_storage s ON s.scope=v.scope AND s.app_id=v.app_id WHERE v.scope=? AND (s.state IS NULL OR s.state<>'deleted') AND v.revision=(SELECT MAX(n.revision) FROM app_development_versions n WHERE n.scope=v.scope AND n.app_id=v.app_id) ORDER BY v.created_at DESC,v.app_id LIMIT 50",
 				)
 				.all(scope);
 		},
@@ -212,7 +247,10 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 					"SELECT * FROM app_development_works WHERE scope=? AND session_id=?",
 				)
 				.get(scope, input.sessionId);
-			if (prior) return state(db, prior);
+			if (prior) {
+				ensureAvailable(db, prior.app_id);
+				return state(db, prior);
+			}
 			const saved = input.targetRef ? app(db, input.targetRef) : null;
 			if (input.targetRef && !saved) throw new Error("target_not_found");
 			const id = crypto.randomUUID();
@@ -238,6 +276,7 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 		},
 		begin(db: Database, id: string, runId: string) {
 			const row = load(db, id);
+			ensureAvailable(db, row.app_id);
 			if (row.busy_run_id && row.busy_run_id !== runId)
 				throw new Error("work_busy");
 			db.run(
@@ -253,7 +292,7 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 		},
 		end(db: Database, id: string, mode: "discard" | "close") {
 			const row = work(db, scope, id);
-			if (!row) return;
+			if (!row || !storage.available(db, row.app_id)) return;
 			if (mode === "close" && draftOf(db, row).dirty)
 				throw new Error("work_unsaved");
 			db.run("DELETE FROM app_development_works WHERE scope=? AND id=?", [
@@ -276,6 +315,7 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 			},
 		) {
 			const row = load(db, id);
+			ensureAvailable(db, row.app_id);
 			if (
 				input.turn
 					? row.session_id !== input.turn.sessionId ||
@@ -336,7 +376,8 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 			if (
 				row.revision !== input.draftRevision ||
 				row.saved_revision !== input.expectedSavedRevision ||
-				(app(db, row.app_id)?.revision ?? 0) !== input.expectedSavedRevision
+				(storedApp(db, row.app_id)?.revision ?? 0) !==
+					input.expectedSavedRevision
 			)
 				throw new Error("revision_conflict");
 			const value: Version = {

@@ -29,6 +29,7 @@ export function createChildOperations(context: WorkContext) {
 	) {
 		const row = held(db, input.workRef, input.sessionId, input.runId),
 			owner = authority(db, row);
+		if (row.kind === "schedule") fail("work_not_found");
 		const replay = prior(db, row, input.requestId, input);
 		if (replay) return replay;
 		if (row.revision !== input.expectedRevision) fail("revision_conflict");
@@ -97,6 +98,7 @@ export function createChildOperations(context: WorkContext) {
 		if (!withinJsonLimits(input.value)) fail("collaboration_answer_capacity");
 		const row = held(db, input.workRef, input.sessionId, input.runId),
 			owner = authority(db, row);
+		if (row.kind === "schedule") fail("work_not_found");
 		if (row.child_epoch !== owner.epoch || !row.child_id)
 			fail("collaboration_child_changed");
 		const replay = prior(db, row, input.requestId, input);
@@ -137,6 +139,7 @@ export function createChildOperations(context: WorkContext) {
 		for (const row of pending(db).filter(
 			(row) => workRef === undefined || row.id === workRef,
 		)) {
+			if (row.kind === "schedule") continue;
 			let source: Source;
 			try {
 				source = current(db, row);

@@ -1,3 +1,6 @@
+import type { Database } from "bun:sqlite";
+import type { PendingSave } from "../../domains/app-development";
+import { createAppStorageRuntime } from "./storage-runtime";
 import type { AgentRuntime } from "../../domains/agent-runtime";
 import {
 	appDigest,
@@ -40,6 +43,8 @@ export function createAppDevelopmentRuntime(deps: {
 		path: string;
 		binding?: string | null;
 	} | null;
+	storageRoot: string;
+	storageChanged?(): void;
 	now?: () => number;
 }) {
 	const {
@@ -80,9 +85,24 @@ export function createAppDevelopmentRuntime(deps: {
 			);
 		},
 	});
+	const publishStorage = (
+		db: Database,
+		operationId: string,
+		save: PendingSave,
+	) => adapter.finishSave(db, operationId, save);
+	const storage = createAppStorageRuntime({
+		store,
+		queue,
+		apps,
+		root: deps.storageRoot,
+		workflow: () => workflow,
+		publish: publishStorage,
+		changed: deps.storageChanged,
+	});
 	const adapter = createAppDevelopmentAdapter(apps, {
 		authoring: () => authoring,
 		workflow: () => workflow,
+		storage: () => storage,
 		turn: (db, runId, sessionId) =>
 			dialogue?.specialistExecutionSourceInTransaction(db, runId, sessionId) ??
 			null,
@@ -117,6 +137,38 @@ export function createAppDevelopmentRuntime(deps: {
 						}),
 				},
 				journalAvailable: () => !!destination(),
+				storage: (child, signal, collection, request) =>
+					store.write((db) => {
+						signal.throwIfAborted();
+						const resolved = authority.runInTransaction(db, child.source);
+						const app = resolved && apps.app(db, resolved.run.workflowId);
+						if (
+							!app ||
+							!resolved ||
+							app.workflowRevision !== resolved.run.revision ||
+							!agents.authorizeChildInTransaction(db, child)
+						)
+							throw new Error("execution_source_invalid");
+						const result = storage.records(
+							db,
+							app,
+							collection,
+							request,
+							child.id,
+						);
+						const refs = (records: Array<{ id: string; revision?: number }>) =>
+							records.map(({ id, revision }) => ({
+								id,
+								...(revision === undefined ? {} : { revision }),
+							}));
+						return "rows" in result
+							? {
+									collection,
+									records: refs(result.rows),
+									hasMore: result.hasMore,
+								}
+							: { collection, records: refs([result]) };
+					}),
 			});
 			authoring = createWorkflowAuthoring({
 				store,
@@ -154,7 +206,7 @@ export function createAppDevelopmentRuntime(deps: {
 						mime: "text/markdown",
 						data: new TextEncoder().encode(input.markdown),
 						origin: "written",
-						maker: "Eumenesアプリ開発",
+						maker: "Webアプリ開発",
 						internal: true,
 					});
 					return scratchUri(item.id);
@@ -183,6 +235,9 @@ export function createAppDevelopmentRuntime(deps: {
 		attachDialogue(value: typeof dialogue) {
 			dialogue = value;
 		},
-		recover: () => workflow.recover(),
+		recover: async () => {
+			await storage.recover();
+			await workflow.recover();
+		},
 	};
 }
