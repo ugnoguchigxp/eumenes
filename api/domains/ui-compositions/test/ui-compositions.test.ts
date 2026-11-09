@@ -623,6 +623,35 @@ test("saved answers keep the submit contract against the saved revision and form
 	expect((await submit(values, id(), 2)).replay).toBe(false);
 });
 
+test("saved date fields reject impossible calendar dates", async () => {
+	const s = setup();
+	const work = await open(s);
+	await turn(s, work.workRef, "日付", {
+		view: "form",
+		fields: [
+			{
+				id: "date",
+				label: "日付",
+				type: "date",
+				defaultDate: "today",
+				required: true,
+			},
+		],
+	});
+	const projectId = (await save(s, work.workRef, 1, 0)).receipt.projectId;
+	const submit = (date: string) =>
+		s.store.write((db) =>
+			s.service.submitInTransaction(
+				db,
+				ui,
+				{ projectId, expectedGeneration: 1, values: { date } },
+				id(),
+			),
+		);
+	await expect(submit("2026-02-29")).rejects.toThrow("ui_response_invalid");
+	await expect(submit("2026-11-09")).resolves.toMatchObject({ replay: false });
+});
+
 test("studio source with no work and no target is a clean blank state", async () => {
 	const s = setup();
 	expect(

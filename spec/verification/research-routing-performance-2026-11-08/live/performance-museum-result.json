@@ -1,0 +1,85 @@
+{
+  "checkedAt": "2026-11-08T09:21:58.833Z",
+  "id": "aa7a93ad-3142-491a-9042-21bf1389f84d",
+  "conversationId": "research-routing-live-20261108-museum",
+  "notice": {
+    "id": "45a70196-7e5b-470d-b0b0-f174370117da",
+    "conversationId": "research-routing-live-20261108-museum",
+    "title": "「詳しいWeb調査」（web_research / Pursuit）に依頼してください。東京国立博物館 https:/…",
+    "toolchainTitle": "詳しいWeb調査",
+    "outcome": "partial",
+    "summary": "# 東京国立博物館・国立科学博物館の常設展示における撮影ルール比較 ## 比較表 | 館 | 常設展示の写真撮影 | フラッシュ | 三脚 | 自撮り棒 | 展示ごとの例外・確認できない項目 | |---|---|---|---|---|---| | 東京国立博物館 | 未確認 | 未確認 | 未確認 | 未確認 | 公式資料の本文を確認後に記載します。 | | 国立科学博物館 | 未確認 | …",
+    "links": [
+      {
+        "uri": "eumenes://markdown.document/generated-1d02c27b-68d2-43ff-a190-9b31c9637945",
+        "label": "東京国立博物館・国立科学博物館の常設展示における撮影ルール比較",
+        "kind": "markdown.document"
+      },
+      {
+        "uri": "eumenes://report/pursuit%3Aaa7a93ad-3142-491a-9042-21bf1389f84d",
+        "label": "両館の常設展示における撮影ルールの比較報告を準備中です。公式本文の確認後に表・例外・不明点を埋めます。",
+        "kind": "report"
+      },
+      {
+        "uri": "eumenes://scratch/1d02c27b-68d2-43ff-a190-9b31c9637945",
+        "label": "東京国立博物館・国立科学博物館の常設展示における撮影ルール比較.md",
+        "kind": "scratch"
+      }
+    ],
+    "read": false,
+    "createdAt": "2026-11-08T09:21:57.346Z"
+  },
+  "checks": {
+    "noSpecialist": true,
+    "localRead": true,
+    "remoteRead": true,
+    "sameMarkdown": true,
+    "hasTitle": true,
+    "hasSources": false,
+    "path": "eumenes/research/2026-11-08_東京国立博物館・国立科学博物館の常設展示における撮影ルール比較_1d02c27b-68d2-43ff-a190-9b31c9637945.md"
+  },
+  "report": {
+    "revision": 162,
+    "data": {
+      "kind": "work-result",
+      "revision": 162,
+      "targetRef": "aa7a93ad-3142-491a-9042-21bf1389f84d",
+      "work": {
+        "title": "東京国立博物館・国立科学博物館の常設展示における撮影ルール比較",
+        "status": "一部のみ",
+        "request": "「詳しいWeb調査」（web_research / Pursuit）に依頼してください。東京国立博物館 https://www.tnm.jp/ と国立科学博物館 https://www.kahaku.go.jp/ の公式資料から、常設展示の写真撮影・フラッシュ・三脚・自撮り棒の扱いを比較してください。展示ごとの例外と、本文で確認できない項目も書いてください。見出しと比較表、出典リンクのある日本語Markdown報告を文書として保存するところまで進めてください。共同編集の担当への切り替えは不要です。短い報告で十分です。",
+        "summary": "# 東京国立博物館・国立科学博物館の常設展示における撮影ルール比較\n\n## 比較表\n\n| 館 | 常設展示の写真撮影 | フラッシュ | 三脚 | 自撮り棒 | 展示ごとの例外・確認できない項目 |\n|---|---|---|---|---|---|\n| 東京国立博物館 | 未確認 | 未確認 | 未確認 | 未確認 | 公式資料の本文を確認後に記載します。 |\n| 国立科学博物館 | 未確認 | 未確認 | 未確認 | 未確認 | 公式資料の本文を確認後に記載します。 |\n\n## 調査結果\n公式資料の本文取得後、常設展示に適用される規則と展示ごとの例外を区別して記載します。本文で確認できない項目は「確認できない」と明記し、推測で補いません。\n\n## 出典\n本文を取得・確認した公式ページへのリンクを記載します。\n\n## 不明点・限界\n現時点では両館の公式資料本文を未確認のため、各規則・例外は未確定です。",
+        "sections": [
+          {
+            "title": "文書の保存",
+            "items": [
+              "一時保存済み",
+              "Docling保存済み (research/2026-11-08_東京国立博物館・国立科学博物館の常設展示における撮影ルール比較_1d02c27b-68d2-43ff-a190-9b31c9637945.md)"
+            ]
+          },
+          {
+            "title": "出典",
+            "items": []
+          },
+          {
+            "title": "確認できない点",
+            "items": [
+              "公式資料の本文をまだ取得していないため、規則や展示ごとの例外を確認できていません。"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "remote": {
+    "entry": {
+      "sourceId": "wiki-1d02c27b68d243ffa1909b31c9637945",
+      "title": "東京国立博物館・国立科学博物館の常設展示における撮影ルール比較",
+      "revision": "\"ec0dc806069a67b03810e4899c8674f4a0edcc800841fa2de118dad0b053bfa2\"",
+      "path": "research/2026-11-08_東京国立博物館・国立科学博物館の常設展示における撮影ルール比較_1d02c27b-68d2-43ff-a190-9b31c9637945.md",
+      "namespace": "eumenes",
+      "contentDigest": "ada49a779b01b46c4d8eeedd3ee26941ad4d6b379eb6ecdea808a31c75203f2d"
+    },
+    "recovery": ""
+  }
+}

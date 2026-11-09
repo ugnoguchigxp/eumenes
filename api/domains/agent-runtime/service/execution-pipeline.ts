@@ -1,11 +1,16 @@
 import type { Database } from "bun:sqlite";
-import type { AuthoringOutcome } from "eumenes-pipeline";
+import {
+	MAX_STEPS,
+	type AuthoringOutcome,
+	type ComponentRecord,
+} from "eumenes-pipeline";
 import { hash } from "../../capabilities";
 import { checkPipelineDefinition, CONTRACT_VERSION } from "../../pipelines";
 import type {
 	ChildResult,
 	ExecutionSource,
 	ExecutionReference,
+	RoutedPipelineStep,
 } from "../../tool-runtime";
 import {
 	executionRow,
@@ -16,6 +21,69 @@ import {
 } from "../repository/executions";
 import type { ExecutionContext } from "./execution-context";
 import type { ExecutionOps } from "./execution-store";
+
+function routedStepsAvailable(
+	catalog: ComponentRecord[],
+	steps: readonly RoutedPipelineStep[],
+): boolean {
+	return (
+		steps.length >= 2 &&
+		steps.length <= MAX_STEPS &&
+		steps.every(
+			(step, index) =>
+				step.after.every((i) => Number.isInteger(i) && i >= 0 && i < index) &&
+				catalog.some(
+					(record) =>
+						record.card.entry === step.entry &&
+						record.evidence.toolchainRevisionId === step.revisionId &&
+						record.enabled &&
+						record.support !== "excluded" &&
+						record.execution !== "unbound",
+				),
+		)
+	);
+}
+
+function initialPipelineState(
+	control: { bindingRevisionId: string; instructions: string },
+	toolchainRevisionId: string,
+	refs: ExecutionReference[],
+	catalog: ComponentRecord[],
+	steps: readonly RoutedPipelineStep[] | undefined,
+): ParentState {
+	return {
+		version: 1,
+		bindingRevisionId: control.bindingRevisionId,
+		instructions: control.instructions,
+		calls: 0,
+		consumed: 0,
+		searches: 0,
+		children: 0,
+		ordinal: 0,
+		questions: 0,
+		selecting: false,
+		offered: [],
+		retained: [],
+		refs: [...refs],
+		notes: [],
+		pending: null,
+		question: null,
+		limits: { parentCalls: 5, childCalls: 8, searches: 0, modelCalls: 101 },
+		pipeline: {
+			contractVersion: CONTRACT_VERSION,
+			toolchainRevisionId,
+			catalog,
+			...(steps ? { routedSteps: steps } : {}),
+			initialRefs: refs.map((r) => r.ref),
+			definition: null,
+			executionPlan: null,
+			cursor: 0,
+			children: {},
+			results: {},
+			repaired: false,
+		},
+	};
+}
 
 /** Adapt the imported plan to the existing parent/child lifecycle, without another execution loop. */
 export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
@@ -68,9 +136,10 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 				links: [...new Set(outputs.flatMap((r) => r.links ?? []))],
 			});
 		}
+		const source = executionSource(row);
 		const current = ctx
 			.port()
-			.stepToolchainInTransaction?.(db, step.entry, executionSource(row));
+			.stepToolchainInTransaction?.(db, step.entry, source);
 		if (current !== step.revisionId)
 			return stop(db, row, state, "pipeline_component_changed");
 		const refs: ExecutionReference[] = [];
@@ -85,7 +154,13 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 				return stop(db, row, state, "pipeline_reference_missing");
 			const note = state.notes.find((n) => n.id === child);
 			if (!note) return stop(db, row, state, "pipeline_reference_missing");
-			refs.push(...state.refs.filter((r) => note.refs.includes(r.ref)));
+			refs.push(
+				...state.refs.filter((r) =>
+					source.origin === "workflow"
+						? r.ref === `result:${child}`
+						: note.refs.includes(r.ref),
+				),
+			);
 		}
 		const id = crypto.randomUUID();
 		p.children[step.stepId] = id;
@@ -96,6 +171,9 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 				state,
 				{
 					chainRevisionId: step.revisionId,
+					...(source.origin === "workflow"
+						? { pipelineStepId: step.stepId }
+						: {}),
 					request: `${step.task}\n期待する結果: ${step.expectedResult}`,
 					...(step.arguments !== undefined
 						? { arguments: step.arguments }
@@ -170,6 +248,7 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 			toolchainRevisionId: string;
 			deadline?: number;
 			references?: ExecutionReference[];
+			routedSteps?: readonly RoutedPipelineStep[];
 			/** A collaborative draft already reviewed by the user. Revalidated against the current catalog. */
 			definition?: unknown;
 			requestId?: string;
@@ -193,13 +272,25 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 			)
 		)
 			throw new Error("execution_reference_invalid");
+		const workflow =
+			input.source.origin === "workflow"
+				? ctx.port().workflowPlanInTransaction?.(db, input.source)
+				: null;
+		if (
+			input.source.origin === "workflow" &&
+			(!workflow ||
+				input.definition !== undefined ||
+				input.requestId !== input.source.runId)
+		)
+			throw new Error("pipeline_workflow_source_required");
 		if (
 			input.definition !== undefined &&
 			(!input.requestId || !input.source.specialistSessionId)
 		)
 			throw new Error("pipeline_authored_source_required");
-		const key =
-				input.definition !== undefined
+		const key = workflow
+				? `pipeline-workflow:${input.source.runId}`
+				: input.definition !== undefined
 					? `pipeline-authored:${input.source.specialistSessionId}:${input.requestId}`
 					: `pipeline:${input.source.messageId}:${input.source.digest}`,
 			digest = hash(input);
@@ -224,47 +315,39 @@ export function executionPipeline(ctx: ExecutionContext, ops: ExecutionOps) {
 			throw new Error("execution_capacity");
 		const catalog = ctx.port().pipelineCatalogInTransaction?.(db, input.source);
 		if (!catalog) throw new Error("pipeline_unavailable");
+		const steps = input.routedSteps;
+		if (steps && !routedStepsAvailable(catalog, steps))
+			throw new Error("pipeline_component_unavailable");
 		if (new TextEncoder().encode(JSON.stringify(catalog)).length > 128000)
 			throw new Error("pipeline_catalog_capacity");
 		const id = crypto.randomUUID();
-		const state: ParentState = {
-			version: 1,
-			bindingRevisionId: control.bindingRevisionId,
-			instructions: control.instructions,
-			calls: 0,
-			consumed: 0,
-			searches: 0,
-			children: 0,
-			ordinal: 0,
-			questions: 0,
-			selecting: false,
-			offered: [],
-			retained: [],
-			refs: [...refs],
-			notes: [],
-			pending: null,
-			question: null,
-			limits: { parentCalls: 5, childCalls: 8, searches: 0, modelCalls: 101 },
-			pipeline: {
-				contractVersion: CONTRACT_VERSION,
-				toolchainRevisionId: input.toolchainRevisionId,
-				catalog,
-				initialRefs: refs.map((r) => r.ref),
-				definition: null,
-				executionPlan: null,
-				cursor: 0,
-				children: {},
-				results: {},
-				repaired: false,
-			},
-		};
-		if (input.definition !== undefined) {
+		const state = initialPipelineState(
+			control,
+			input.toolchainRevisionId,
+			refs,
+			catalog,
+			steps,
+		);
+		const definition = workflow ? workflow.definition : input.definition;
+		if (definition !== undefined) {
 			const checked = checkPipelineDefinition(
-				input.definition,
+				definition,
 				catalog,
 				input.source.request,
 			);
 			if (!checked.ok) throw new Error("pipeline_definition_invalid");
+			if (
+				workflow &&
+				(workflow.steps.length !== checked.plan.steps.length ||
+					workflow.steps.some((pin, index) => {
+						const step = checked.plan.steps[index];
+						return (
+							pin.stepId !== step?.stepId ||
+							pin.toolchainRevisionId !== step.revisionId
+						);
+					}))
+			)
+				throw new Error("pipeline_component_changed");
 			state.pipeline!.definition = checked.definition;
 			state.pipeline!.executionPlan = checked.plan;
 		}

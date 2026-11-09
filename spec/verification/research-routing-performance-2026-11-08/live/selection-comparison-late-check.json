@@ -1,0 +1,52 @@
+{
+  "checkedAt": "2026-11-08T09:12:21.838Z",
+  "caseId": "selection-comparison",
+  "label": "late-check",
+  "active": {
+    "revision": 0,
+    "data": {
+      "rows": [],
+      "counts": {
+        "todo": 0,
+        "archived": 1
+      },
+      "total": 0,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "archived": {
+    "revision": 1794128474231,
+    "data": {
+      "rows": [
+        {
+          "id": "a7e2f93f-a7a4-4994-8f9e-1482b1b17f5c",
+          "request": "詳しいWeb調査をお願いします。東京国立博物館と国立科学博物館の公式サイトを実際に読み、常設展示での写真撮影、フラッシュ、三脚、自撮り棒の扱いを比較してください。企画展や展示ごとの例外、公式ページで確認できないことは分けて書き、推測で補わないでください。日本語の短いMarkdown報告にタイトル・比較表・出典リンクを付けて保存してください。会話の担当は切り替えずに進めてください。",
+          "status": "done",
+          "outcome": "cancelled",
+          "summary": null,
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T09:01:14.231Z"
+        }
+      ],
+      "counts": {
+        "todo": 0,
+        "archived": 1
+      },
+      "total": 1,
+      "state": "archived",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "notices": [],
+  "resources": {
+    "resources": [],
+    "messages": []
+  },
+  "specialist": {
+    "session": null
+  }
+}

@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { EDIT, ROUTER, startRouter, traceOf, weigh } from "./router.fixture";
 import {
+	DIRECT_ROUTER_MODEL,
 	IMAGE,
 	INSTANT,
 	MUSIC,
@@ -26,7 +27,10 @@ async function start(
 	router: Partial<typeof ROUTER> = {},
 	options: SetupOptions = {},
 ) {
-	const started = await startRouter(router, options);
+	const started = await startRouter(router, {
+		routerModel: DIRECT_ROUTER_MODEL,
+		...options,
+	});
 	h = started.h;
 	return started;
 }

@@ -16,6 +16,7 @@ import {
 } from "../../../infrastructure/sqlite";
 import {
 	resultSchema,
+	WEB_ACQUISITION_PROVIDER,
 	type CacheStatus,
 	type ResearchRequest,
 	type ResearchResult,
@@ -59,7 +60,7 @@ export function cacheKey(request: ResearchRequest) {
 	return createHash("sha256")
 		.update(
 			JSON.stringify([
-				"llm-fetch@0.1.4",
+				WEB_ACQUISITION_PROVIDER,
 				"guard-v3",
 				"result-v1",
 				scope,

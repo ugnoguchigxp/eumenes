@@ -20,6 +20,7 @@ const page = {
 			documentCount: 0,
 			folderCount: 0,
 			hasUnsupportedEntries: false,
+			updatedAt: "2026-11-09T00:00:00+09:00",
 		},
 	],
 	nextCursor: null,

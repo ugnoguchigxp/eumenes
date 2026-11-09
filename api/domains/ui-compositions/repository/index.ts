@@ -63,6 +63,14 @@ CREATE TABLE ui_composition_revisions (
 		after: ["ui-compositions/0002-draft-works"],
 		sql: `ALTER TABLE ui_composition_works ADD COLUMN rejected_json TEXT;`,
 	},
+	{
+		id: "ui-compositions/0004-workflow-screens",
+		after: ["ui-compositions/0003-rejected-draft"],
+		sql: `CREATE TABLE ui_workflow_screens (
+ scope TEXT NOT NULL, workflow_id TEXT NOT NULL, id TEXT NOT NULL, revision INTEGER NOT NULL,
+ digest TEXT NOT NULL, value_json TEXT NOT NULL, PRIMARY KEY (scope, workflow_id, id, revision)
+);`,
+	},
 ];
 
 /** A saved composition (`ready`); other states are rows of the removed one-shot generation. */

@@ -1,0 +1,40 @@
+{
+  "scope": "既存構造解析だけ。製品設定・仕事の状態は変更しない。保存済み8秒、会話経路、既存prompt/schemaを使用。通し検証の成功とは扱わない。",
+  "rows": [
+    {
+      "id": "cancel-original",
+      "expected": "control:t1.cancel",
+      "pass": false,
+      "elapsedMs": 8005,
+      "error": "deadline_exceeded"
+    },
+    {
+      "id": "quoted-control",
+      "expected": "conversation",
+      "valid": false,
+      "pass": false,
+      "elapsedMs": 5691
+    },
+    {
+      "id": "cancel-museum",
+      "expected": "control:t1.cancel",
+      "valid": false,
+      "pass": false,
+      "elapsedMs": 6406
+    },
+    {
+      "id": "ambiguous",
+      "expected": "clarify",
+      "valid": false,
+      "pass": false,
+      "elapsedMs": 4655
+    },
+    {
+      "id": "selective",
+      "expected": "control:t2.cancel",
+      "pass": false,
+      "elapsedMs": 8005,
+      "error": "deadline_exceeded"
+    }
+  ]
+}

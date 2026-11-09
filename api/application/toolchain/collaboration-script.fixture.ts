@@ -19,6 +19,8 @@ export function collaborationScript(
 			line.startsWith("SOURCE_REGISTRY="),
 		);
 		if (savedLine && registryLine) {
+			if (!lines.some((line) => line.startsWith("STATE_UPDATE_BASE=")))
+				return JSON.stringify(value);
 			const saved = JSON.parse(savedLine.slice("COLLABORATION_STATE=".length));
 			const { host } = JSON.parse(
 				registryLine.slice("SOURCE_REGISTRY=".length),

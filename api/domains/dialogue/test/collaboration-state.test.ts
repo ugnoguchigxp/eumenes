@@ -19,8 +19,11 @@ type Input = {
 	};
 };
 
-async function harness(upserts: (input: Input) => CollaborationFact[]) {
-	const h = await setup({ agent: { ...NO_AGENT, collaborationState: true } });
+async function harness(
+	upserts: (input: Input) => CollaborationFact[],
+	mode: true | "host-bound" = true,
+) {
+	const h = await setup({ agent: { ...NO_AGENT, collaborationState: mode } });
 	open.push(h);
 	const original = h.larm.executeControl!;
 	h.larm.executeControl = async (...args) => {
@@ -40,12 +43,16 @@ async function harness(upserts: (input: Input) => CollaborationFact[]) {
 			value: JSON.stringify({
 				...JSON.parse(String(receipt.value)),
 				stateUpdate: {
-					coreContractVersion: 1,
-					sessionId: state.sessionId,
-					epoch: host.epoch,
-					expectedRevision: state.revision,
-					sourceRevision: host.sourceRevision,
-					work: host.work,
+					...(mode === true
+						? {
+								coreContractVersion: 1,
+								sessionId: state.sessionId,
+								epoch: host.epoch,
+								expectedRevision: state.revision,
+								sourceRevision: host.sourceRevision,
+								work: host.work,
+							}
+						: {}),
 					upserts: upserts({ state, host }),
 					removals: [],
 				},
@@ -68,6 +75,32 @@ const fact = (
 	supersedes,
 });
 const reply = { action: "reply", text: "条件を確認しました。" };
+
+test("the host supplies the state version and rejects a work change after inference starts", async () => {
+	const h = await harness(
+		({ host }) => [fact("late", true, host.sources.at(-1)!.ref)],
+		"host-bound",
+	);
+	h.handOver({ request: "条件を保持" });
+	h.state.specialist.push(reply);
+	const first = await h.ask("条件を保持");
+	expect(first.status).toBe("completed");
+	const session = (await h.session())!;
+	const adopted = h.dialogue.specialistCollaborationState(
+		session.id,
+	) as CollaborationState;
+	expect(adopted?.facts).toHaveLength(1);
+	const execute = h.larm.executeControl!;
+	h.larm.executeControl = async (...args) => {
+		const receipt = await execute(...args);
+		h.work()[0]!.revision++;
+		return receipt;
+	};
+	h.state.specialist.push(reply, reply);
+	const stale = await h.ask("条件を更新");
+	expect(stale.status).toBe("failed");
+	expect(h.dialogue.specialistCollaborationState(session.id)).toEqual(adopted);
+});
 
 test("the same control call adopts source-backed state, corrects only one condition and survives recovery", async () => {
 	let turn = 0;

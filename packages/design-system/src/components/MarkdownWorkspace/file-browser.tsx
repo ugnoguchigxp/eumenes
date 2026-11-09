@@ -17,35 +17,80 @@ import {
 	type FolderLocation,
 } from "./file-tree";
 import { FolderNavigation } from "./folder-navigation";
-import type { MarkdownCurrent, MarkdownWorkspaceProps } from "./types";
+import type { MarkdownWorkspaceProps } from "./types";
 import type { HeaderDeleteSelection } from "./library-types";
+import {
+	useLibraryReveal,
+	type RevealRequest,
+	type RevealedDocument,
+} from "./library-reveal";
+import {
+	FileSortColumn,
+	FileUpdatedDate,
+	useFileSort,
+} from "./file-list-columns";
 import "./file-browser.css";
 
-function fileState(current: MarkdownCurrent | null, localInput: boolean) {
-	if (!current) return "作業用";
-	if (current.saveState === "saving") return "保存中";
-	if (current.saveState === "unknown") return "保存結果不明";
-	if (current.saveState === "conflict") return "競合あり";
-	return current.dirty || localInput ? "未保存の変更あり" : "保存済み";
-}
+type FileBrowserProps = MarkdownWorkspaceProps & {
+	headerDelete?: HeaderDeleteSelection;
+	localInput: boolean;
+	onDiscardCurrent?(): Promise<boolean>;
+	onEditLocal(id: string): void;
+	onEditRemote(id: string): void;
+};
 export function MarkdownFileBrowser(
-	props: MarkdownWorkspaceProps & {
-		headerDelete?: HeaderDeleteSelection;
-		localInput: boolean;
-		onDiscardCurrent?(): Promise<boolean>;
-		onEditLocal(id: string): void;
-		onEditRemote(id: string): void;
-	},
+	props: FileBrowserProps & { reveal?: RevealRequest },
 ) {
+	const [ignored, setIgnored] = useState<RevealRequest>();
+	const reveal = useLibraryReveal(
+		props,
+		ignored === props.reveal ? undefined : props.reveal,
+	);
+	const onBrowse = () => setIgnored(props.reveal);
+	if (props.capabilities?.features?.library) {
+		const files = props.files;
+		const folder =
+			typeof reveal?.location === "object" ? reveal.location : undefined;
+		const matches =
+			!folder ||
+			(files?.namespace === folder.namespace && files.path === folder.path);
+		return (
+			<ManagedLibrary
+				key={JSON.stringify([files?.namespace, files?.path, files?.etag])}
+				{...props}
+				files={matches ? files : undefined}
+				reveal={reveal}
+				onBrowse={onBrowse}
+			/>
+		);
+	}
+	return <LegacyLibrary {...props} reveal={reveal} onBrowse={onBrowse} />;
+}
+
+function LegacyLibrary(
+	props: FileBrowserProps & { reveal?: RevealedDocument; onBrowse(): void },
+) {
+	const { reveal } = props;
+	const revealFolder =
+		typeof reveal?.location === "object" ? reveal.location : undefined;
 	const folders = useMemo(
-		() => documentFolders(props.library, props.namespaces ?? []),
-		[props.library, props.namespaces],
+		() =>
+			documentFolders(
+				props.library,
+				props.namespaces ?? [],
+				revealFolder?.path ? [revealFolder] : [],
+			),
+		[props.library, props.namespaces, revealFolder],
 	);
 	const [selection, setSelection] = useState<
 		FolderLocation | "work" | "root" | null
 	>(null);
-	const [query, setQuery] = useState("");
-	const selected = selection ?? (folders.length === 1 ? folders[0]! : "root");
+	const [search, setQuery] = useState("");
+	const query = reveal ? "" : search;
+	const selected =
+		reveal?.location ??
+		selection ??
+		(folders.length === 1 ? folders[0]! : "root");
 	const location = typeof selected === "object" ? selected : null;
 	const currentFolder = location ? findFolder(folders, location) : null;
 	const work = selected === "work",
@@ -76,16 +121,50 @@ export function MarkdownFileBrowser(
 				location.namespace)
 			: "Docling";
 	function navigate(value: FolderLocation | "work" | "root") {
+		props.onBrowse();
 		setSelection(value);
 		setQuery("");
 	}
-	if (props.capabilities?.features?.library)
-		return (
-			<ManagedLibrary
-				key={`${props.files?.namespace}:${props.files?.path}:${props.files?.etag}`}
-				{...props}
-			/>
-		);
+	const sort = useFileSort();
+	const rows: {
+		id: string;
+		name: string;
+		kind: "md" | "フォルダー";
+		Icon: typeof FileText;
+		current?: boolean;
+		updatedAt?: string | number;
+		detail?: string;
+		open(): void;
+	}[] = [
+		...visibleFolders.map((folder) => ({
+			id: folder.key,
+			name: folder.name,
+			kind: "フォルダー" as const,
+			Icon: Folder,
+			open: () => navigate(folder),
+		})),
+		...files.map((file) => ({
+			id: file.sourceId,
+			name: file.title,
+			kind: "md" as const,
+			Icon: FileText,
+			current: props.current?.sourceId === file.sourceId,
+			updatedAt: file.updatedAt,
+			detail: searching
+				? [file.namespace, parentPath(file.path)].filter(Boolean).join("/")
+				: undefined,
+			open: () => props.onEditRemote(file.sourceId),
+		})),
+		...documents.map((doc) => ({
+			id: doc.id,
+			name: doc.title,
+			kind: "md" as const,
+			Icon: PencilLine,
+			current: props.current?.id === doc.id,
+			updatedAt: doc.updated_at,
+			open: () => props.onEditLocal(doc.id),
+		})),
+	];
 	return (
 		<div className="ds-markdown-file-browser">
 			<FolderNavigation
@@ -95,7 +174,14 @@ export function MarkdownFileBrowser(
 			/>
 			<section className="ds-markdown-file-main" aria-label="ファイル一覧">
 				<nav className="ds-markdown-breadcrumb" aria-label="現在のフォルダ">
-					<button onClick={() => navigate("root")}>Docling</button>
+					{location ? (
+						<button onClick={() => navigate("root")}>Docling</button>
+					) : (
+						<>
+							<span>Docling</span>
+							<button onClick={() => navigate("root")}>ルート</button>
+						</>
+					)}
 					{work ? (
 						<>
 							<ChevronRight size={14} />
@@ -105,12 +191,13 @@ export function MarkdownFileBrowser(
 						location && (
 							<>
 								<ChevronRight size={14} />
+								<span>{location.namespace}</span>
 								<button
 									onClick={() =>
 										navigate({ namespace: location.namespace, path: "" })
 									}
 								>
-									{location.namespace}
+									ルート
 								</button>
 								{location.path
 									.split("/")
@@ -149,14 +236,20 @@ export function MarkdownFileBrowser(
 								aria-label="文書名・パスで検索"
 								placeholder="文書名・パスで検索"
 								value={query}
-								onChange={(e) => setQuery(e.target.value)}
+								onChange={(e) => {
+									if (reveal) navigate(selected);
+									setQuery(e.target.value);
+								}}
 							/>
 						</label>
 						<button
 							aria-label="ファイル一覧を更新"
 							title="ファイル一覧を更新"
 							disabled={props.pending || loading}
-							onClick={props.onLibrary}
+							onClick={() => {
+								if (reveal) navigate(selected);
+								props.onLibrary();
+							}}
 						>
 							<RefreshCw size={17} />
 						</button>
@@ -175,86 +268,42 @@ export function MarkdownFileBrowser(
 					>
 						<thead>
 							<tr>
-								<th scope="col">名前</th>
-								<th scope="col">種類</th>
-								<th scope="col">保存状態</th>
+								<FileSortColumn column="name" sort={sort} />
+								<FileSortColumn column="kind" sort={sort} />
+								<FileSortColumn column="updatedAt" sort={sort} />
 							</tr>
 						</thead>
 						<tbody>
-							{visibleFolders.map((folder) => (
-								<tr key={folder.key}>
-									<td>
-										<button
-											className="ds-markdown-file-name"
-											onClick={() => navigate(folder)}
-										>
-											<Folder size={20} className="ds-markdown-folder-icon" />
-											<span>{folder.name}</span>
-										</button>
-									</td>
-									<td>フォルダ</td>
-									<td>—</td>
-								</tr>
-							))}
-							{files.map((file) => (
-								<tr key={file.sourceId}>
-									<td>
-										<button
-											className="ds-markdown-file-name"
-											disabled={props.pending}
-											onClick={() => props.onEditRemote(file.sourceId)}
-										>
-											<FileText size={20} />
-											<span>{file.title}</span>
-										</button>
-										{searching && (
-											<small>
-												{file.namespace}
-												{parentPath(file.path)
-													? "/" + parentPath(file.path)
-													: ""}
-											</small>
-										)}
-									</td>
-									<td>Markdown</td>
-									<td>
-										<span
-											className="ds-markdown-file-state"
-											data-saved={
-												props.current?.sourceId !== file.sourceId ||
-												(!props.current.dirty &&
-													!props.localInput &&
-													props.current.saveState === "saved")
-											}
-										>
-											<i />
-											{props.current?.sourceId === file.sourceId
-												? fileState(props.current, props.localInput)
-												: "保存済み"}
-										</span>
-									</td>
-								</tr>
-							))}
-							{documents.map((doc) => (
-								<tr key={doc.id}>
-									<td>
-										<button
-											className="ds-markdown-file-name"
-											disabled={props.pending}
-											onClick={() => props.onEditLocal(doc.id)}
-										>
-											<PencilLine size={19} />
-											<span>{doc.title}</span>
-										</button>
-									</td>
-									<td>作業用文書</td>
-									<td>
-										{props.current?.id === doc.id
-											? fileState(props.current, props.localInput)
-											: "作業用"}
-									</td>
-								</tr>
-							))}
+							{sort
+								.rows(rows, (row) => row)
+								.map((row) => (
+									<tr key={row.id} data-current={row.current || undefined}>
+										<td>
+											<button
+												className="ds-markdown-file-name"
+												aria-current={row.current || undefined}
+												ref={reveal?.id === row.id ? reveal.button : undefined}
+												disabled={props.pending && row.kind === "md"}
+												onClick={row.open}
+											>
+												<row.Icon
+													size={20}
+													className={
+														row.kind === "フォルダー"
+															? "ds-markdown-folder-icon"
+															: undefined
+													}
+												/>
+												<span>{row.name}</span>
+											</button>
+											{row.detail && <small>{row.detail}</small>}
+										</td>
+										<td>{row.kind}</td>
+										<td className="ds-markdown-file-date">
+											<FileUpdatedDate value={row.updatedAt} />
+										</td>
+									</tr>
+								))}
 						</tbody>
 					</table>
 				</div>
@@ -276,7 +325,10 @@ export function MarkdownFileBrowser(
 							<span>読み込み済みの文書とフォルダを表示しています。</span>
 							<button
 								disabled={props.pending || loading}
-								onClick={props.onMore}
+								onClick={() => {
+									if (reveal) navigate(selected);
+									props.onMore?.();
+								}}
 							>
 								続きを読み込む
 							</button>

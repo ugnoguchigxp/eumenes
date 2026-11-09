@@ -3,27 +3,6 @@ import { loadPursuit } from "eumenes-pursuit/sqlite";
 import type { ExecutionResult, ExecutionView } from "../../tool-runtime";
 import { documents, rowOf, stateOf, type RunRow } from "../repository";
 
-export function reportInTransaction(
-	db: Database,
-	id?: string,
-): ExecutionView | null {
-	const target =
-		id === undefined
-			? (
-					db
-						.query(
-							"SELECT id FROM pursuit_runs WHERE state IN ('completed','partial') AND data_json IS NOT NULL AND json_extract(data_json,'$.result') IS NOT NULL ORDER BY updated_at DESC,id DESC LIMIT 1",
-						)
-						.get() as { id: string } | null
-				)?.id
-			: id;
-	if (!target) return null;
-	const view = viewInTransaction(db, target);
-	return view?.result && ["completed", "partial"].includes(view.status)
-		? view
-		: null;
-}
-
 export function viewInTransaction(
 	db: Database,
 	id: string,

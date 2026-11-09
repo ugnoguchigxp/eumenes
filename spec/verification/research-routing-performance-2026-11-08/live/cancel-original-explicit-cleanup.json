@@ -1,0 +1,91 @@
+{
+  "at": "2026-11-08T09:05:30.169Z",
+  "results": [
+    {
+      "todoId": "33689646-db99-4fb7-a02d-3ba1fa1f1ae2",
+      "result": {
+        "httpStatus": 200,
+        "view": {
+          "eventId": "3fdb4d51-71c5-45ce-8996-0766d27408bb",
+          "status": "accepted",
+          "result": {
+            "version": 1,
+            "executionId": "3fdb4d51-71c5-45ce-8996-0766d27408bb",
+            "artifactRevisionId": "artifact:agency.todos@4",
+            "outcome": "completed",
+            "receiptRef": {
+              "owner": "dialogue",
+              "operationId": "3fdb4d51-71c5-45ce-8996-0766d27408bb",
+              "digest": "4b6878bd39092bb25f57b03ffcf9823ce35a4a00731481f29890fadd081a9926"
+            },
+            "resultRefs": [
+              {
+                "owner": "dialogue",
+                "id": "33689646-db99-4fb7-a02d-3ba1fa1f1ae2",
+                "kind": "todo",
+                "schemaRef": "domain:dialogue.todo@1",
+                "revision": 2
+              }
+            ],
+            "artifactRefs": [
+              {
+                "artifactRevisionId": "artifact:agency.todos@4",
+                "sourceRefs": [
+                  {
+                    "source": "agency-todos",
+                    "targetRef": "33689646-db99-4fb7-a02d-3ba1fa1f1ae2"
+                  }
+                ]
+              }
+            ]
+          },
+          "createdAt": "2026-11-08T09:05:29.538Z",
+          "settledAt": "2026-11-08T09:05:29.538Z"
+        }
+      }
+    },
+    {
+      "todoId": "d1b9985b-7336-4818-a400-d63852c93a33",
+      "result": {
+        "httpStatus": 200,
+        "view": {
+          "eventId": "4070e38a-9105-46fd-948b-28b9ce6097ea",
+          "status": "accepted",
+          "result": {
+            "version": 1,
+            "executionId": "4070e38a-9105-46fd-948b-28b9ce6097ea",
+            "artifactRevisionId": "artifact:agency.todos@4",
+            "outcome": "completed",
+            "receiptRef": {
+              "owner": "dialogue",
+              "operationId": "4070e38a-9105-46fd-948b-28b9ce6097ea",
+              "digest": "77575ca346ba52a07531fe136ab7ee685cc7eec1e3a2f520a045cef87e804835"
+            },
+            "resultRefs": [
+              {
+                "owner": "dialogue",
+                "id": "d1b9985b-7336-4818-a400-d63852c93a33",
+                "kind": "todo",
+                "schemaRef": "domain:dialogue.todo@1",
+                "revision": 2
+              }
+            ],
+            "artifactRefs": [
+              {
+                "artifactRevisionId": "artifact:agency.todos@4",
+                "sourceRefs": [
+                  {
+                    "source": "agency-todos",
+                    "targetRef": "d1b9985b-7336-4818-a400-d63852c93a33"
+                  }
+                ]
+              }
+            ]
+          },
+          "createdAt": "2026-11-08T09:05:30.047Z",
+          "settledAt": "2026-11-08T09:05:30.047Z"
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { Database } from "bun:sqlite";
+import { stateProposalSchema } from "eumenes-collaboration";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import {
@@ -52,6 +53,7 @@ import {
 	collaborationSnapshot,
 	collaborationReference,
 	adoptCollaborationState,
+	stateUpdateBase,
 } from "./collaboration-state";
 
 const log = getLogger("dialogue");
@@ -197,14 +199,41 @@ function assertTurnCurrent(deps: DialogueDeps, tx: Database, input: TurnInput) {
 }
 
 /** State adoption shares the turn's live-run, cancellation and receipt boundary. */
+const stateChanges = z.looseObject({
+	stateUpdate: stateProposalSchema
+		.pick({ upserts: true, removals: true })
+		.nullish(),
+});
 async function statefulAction(
 	deps: DialogueDeps,
 	input: TurnInput,
 	signal: AbortSignal,
 	stillMine: (tx: Database) => void,
-	output: { value: unknown; receipt: Receipt; call: number },
+	output: {
+		value: unknown;
+		receipt: Receipt;
+		call: number;
+		baseline?: ReturnType<typeof stateUpdateBase>;
+	},
 ) {
-	const checked = statefulSpecialistContract.check(output.value);
+	let value = output.value;
+	if (output.baseline) {
+		const proposal = stateChanges.safeParse(value);
+		if (!proposal.success)
+			return {
+				ok: false as const,
+				reason: "proposal_invalid",
+				issues: proposal.error.issues.slice(0, 8).map(({ path, code }) => ({
+					path: path.join(".") || "stateUpdate",
+					code,
+				})),
+			};
+		value = {
+			...proposal.data,
+			stateUpdate: { ...output.baseline, ...proposal.data.stateUpdate },
+		};
+	}
+	const checked = statefulSpecialistContract.check(value);
 	if (!checked.ok) return checked;
 	const adopted = await deps.store.write((tx) => {
 		stillMine(tx);
@@ -233,18 +262,18 @@ function stateReference(
 	reference: string,
 ) {
 	if (!input.set.agent.collaborationState || input.observation)
-		return reference;
-	return (
-		reference +
-		collaborationReference(
-			collaborationSnapshot(
-				deps,
-				tx,
-				sessionById(tx, input.sessionId)!,
-				input.runId,
-			),
-		)
+		return { content: reference };
+	const hostBound = input.set.agent.collaborationState === "host-bound";
+	const snapshot = collaborationSnapshot(
+		deps,
+		tx,
+		sessionById(tx, input.sessionId)!,
+		input.runId,
 	);
+	return {
+		content: reference + collaborationReference(snapshot, hostBound),
+		baseline: hostBound ? stateUpdateBase(snapshot) : undefined,
+	};
 }
 
 /** The specialist turn: the user's utterance goes to the toolchain's specialist, never to the main model. */
@@ -415,21 +444,23 @@ export function createSpecialistTurnHandler(
 		const stillMine = (tx: Database) => assertTurnCurrent(deps, tx, input);
 		for (let call = 1; call <= max; call++) {
 			signal.throwIfAborted();
-			const requestId = await store.write((tx) => {
+			const { requestId, baseline } = await store.write((tx) => {
 				stillMine(tx);
+				const state = stateReference(deps, tx, input, reference);
 				messages[1] = {
 					...messages[1]!,
-					content: stateReference(deps, tx, input, reference),
+					content: state.content,
 				};
-				return larm.captureControlInTransaction!(tx, {
+				const requestId = larm.captureControlInTransaction!(tx, {
 					subject: `specialist:${input.runId}:${call}`,
 					policySubject: input.runId,
 					deadline: input.deadline,
-					maxOutputTokens: MAX_OUTPUT_TOKENS,
+					maxOutputTokens: input.set.agent.maxOutputTokens ?? MAX_OUTPUT_TOKENS,
 					...(input.set.timeLimits
 						? { attemptMs: input.set.timeLimits.inferenceMs }
 						: {}),
 				});
+				return { requestId, baseline: state.baseline };
 			});
 			// The provider session lives as long as the specialist session; it is released when that ends.
 			const receipt = await larm.executeControl!(
@@ -451,6 +482,7 @@ export function createSpecialistTurnHandler(
 			let value: unknown;
 			let action: SpecialistAction | null = null;
 			let stateRefusal: string | null = null;
+			let stateIssues: ReturnType<typeof specialistViolations> | undefined;
 			try {
 				value = parseLlmJson(raw);
 				if (input.set.agent.collaborationState && !input.observation) {
@@ -458,9 +490,14 @@ export function createSpecialistTurnHandler(
 						value,
 						receipt,
 						call,
+						baseline,
 					});
 					if (checked.ok) action = checked.action;
-					else stateRefusal = checked.reason;
+					else {
+						stateRefusal = checked.reason;
+						if ("issues" in checked && checked.issues)
+							stateIssues = [...checked.issues];
+					}
 				} else action = parseSpecialistAction(value);
 			} catch (error) {
 				if (
@@ -475,7 +512,7 @@ export function createSpecialistTurnHandler(
 				const violations = action
 					? [{ path: "action", code: "host_event_reply_only" }]
 					: stateRefusal
-						? [{ path: "stateUpdate", code: stateRefusal }]
+						? (stateIssues ?? [{ path: "stateUpdate", code: stateRefusal }])
 						: specialistViolations(value);
 				log.warn("dialogue.specialist_output_rejected", {
 					reason: "invalid_contract",

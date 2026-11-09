@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { startRouter, VECTOR, weigh, traceOf } from "./router.fixture";
-import { IMAGE, choice } from "./generation.fixture";
+import { DIRECT_ROUTER_MODEL, IMAGE, choice } from "./generation.fixture";
 
 test("a multi-score turn can ask about its whole work instead of starting the automatic pipeline", async () => {
 	const planner = {
@@ -19,7 +19,10 @@ test("a multi-score turn can ask about its whole work instead of starting the au
 		title: "共同編集",
 		execution: "session" as const,
 	};
-	const r = await startRouter({}, { cards: [IMAGE, editor, planner] });
+	const r = await startRouter(
+		{},
+		{ cards: [IMAGE, editor, planner], routerModel: DIRECT_ROUTER_MODEL },
+	);
 	try {
 		r.h.state.vector = VECTOR;
 		r.scripts.push(weigh({ [IMAGE.id]: 0.9, [editor.id]: 0.95 }));

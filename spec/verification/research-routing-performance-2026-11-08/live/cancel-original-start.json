@@ -1,0 +1,185 @@
+{
+  "caseId": "cancel-original",
+  "part": "start",
+  "startedAt": "2026-11-08T09:01:40.626Z",
+  "finishedAt": "2026-11-08T09:01:42.445Z",
+  "exitCode": 0,
+  "conversationId": "research-routing-live-20261108-cancel",
+  "run": {
+    "id": "88b9076b-dc84-4dcb-8658-b112de04eac5",
+    "agentTaskId": null,
+    "requestId": "3947411a-bf41-4059-b523-bd281e289e94",
+    "conversationId": "research-routing-live-20261108-cancel",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 2,
+    "inputMessageId": "15229a68-2e5c-4dc7-82f8-e09c92ea23e5",
+    "answerMessageId": "47b9b066-b4d8-45ed-8540-13d65a526d51",
+    "announcement": "「詳しいWeb調査」に頼みます。",
+    "error": null,
+    "jobId": "24e10802-488f-4202-b08c-0b2bab6743ff",
+    "deadlineAt": "2026-11-08T09:04:40.718Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-08T09:01:40.718Z",
+    "updatedAt": "2026-11-08T09:01:41.804Z"
+  },
+  "newPursuitIds": [
+    "b132d599-01ad-469c-92a9-8870bb59d8b8"
+  ],
+  "selections": {
+    "items": [
+      {
+        "id": "cb453958-d5a9-4d45-a85d-52faba9de36f",
+        "runId": "88b9076b-dc84-4dcb-8658-b112de04eac5",
+        "conversationId": "research-routing-live-20261108-cancel",
+        "utteranceId": null,
+        "requestId": "3947411a-bf41-4059-b523-bd281e289e94",
+        "retrieval": "hybrid",
+        "candidates": [
+          {
+            "toolchainId": "web.research",
+            "revisionId": "toolchain:web.research@7",
+            "functionName": "web_research",
+            "rank": 1,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.search",
+            "revisionId": "toolchain:web.search@10",
+            "functionName": "web_search",
+            "rank": 2,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "browser.operate",
+            "revisionId": "toolchain:browser.operate@8",
+            "functionName": "browser_operate",
+            "rank": 3,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "markdown.collaborate",
+            "revisionId": "toolchain:markdown.collaborate@4",
+            "functionName": "markdown_edit",
+            "rank": 4,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "world.query",
+            "revisionId": "toolchain:world.query@8",
+            "functionName": "world_query",
+            "rank": 5,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ocr.manage",
+            "revisionId": "toolchain:ocr.manage@6",
+            "functionName": "ocr",
+            "rank": 6,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "collaboration.pipeline",
+            "revisionId": "toolchain:collaboration.pipeline@2",
+            "functionName": "collaborate_pipeline",
+            "rank": 7,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ui.compose",
+            "revisionId": "toolchain:ui.compose@11",
+            "functionName": "ui_create",
+            "rank": 8,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_runs",
+            "revisionId": "host:read_runs@1",
+            "functionName": "read_runs",
+            "rank": 9,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "compute.python",
+            "revisionId": "toolchain:compute.python@1",
+            "functionName": "compute_python",
+            "rank": 10,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          }
+        ],
+        "historyRefs": [],
+        "decision": "toolchain",
+        "toolchainId": "web.research",
+        "toolchainRevisionId": "toolchain:web.research@7",
+        "functionName": "web_research",
+        "request": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+        "taskId": null,
+        "outcome": null,
+        "outcomeCode": null,
+        "recipe": null,
+        "durationMs": null,
+        "createdAt": 1794128501800,
+        "settledAt": null
+      }
+    ],
+    "nextCursor": null
+  },
+  "todos": {
+    "revision": 1794128501799,
+    "data": {
+      "rows": [
+        {
+          "id": "d1b9985b-7336-4818-a400-d63852c93a33",
+          "request": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T09:01:41.799Z"
+        }
+      ],
+      "counts": {
+        "todo": 1,
+        "archived": 0
+      },
+      "total": 1,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "latestAssistant": {
+    "id": "47b9b066-b4d8-45ed-8540-13d65a526d51",
+    "conversationId": "research-routing-live-20261108-cancel",
+    "role": "assistant",
+    "text": "「詳しいWeb調査」に頼みます。",
+    "createdAt": "2026-11-08T09:01:41.804Z",
+    "runId": "88b9076b-dc84-4dcb-8658-b112de04eac5"
+  }
+}

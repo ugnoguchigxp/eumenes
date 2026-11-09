@@ -161,8 +161,25 @@ export function collaborationSnapshot(
 	};
 }
 
+export function stateUpdateBase(
+	snapshot: ReturnType<typeof collaborationSnapshot>,
+) {
+	const { state, host } = snapshot;
+	return {
+		coreContractVersion: state.coreContractVersion,
+		sessionId: host.sessionId,
+		epoch: host.epoch,
+		expectedRevision: state.revision,
+		sourceRevision: host.sourceRevision,
+		work: host.work,
+		upserts: [],
+		removals: [],
+	};
+}
+
 export function collaborationReference(
 	snapshot: ReturnType<typeof collaborationSnapshot>,
+	hostBound: boolean,
 ) {
 	const { state, host, sourceText, reconfirm } = snapshot;
 	const text =
@@ -171,7 +188,10 @@ export function collaborationReference(
 		"\nSOURCE_REGISTRY=" +
 		JSON.stringify({ host, sourceText }) +
 		"\nRECONFIRM=" +
-		JSON.stringify(reconfirm);
+		JSON.stringify(reconfirm) +
+		(hostBound
+			? ""
+			: "\nSTATE_UPDATE_BASE=" + JSON.stringify(stateUpdateBase(snapshot)));
 	if (!withinJsonLimits({ state, host, sourceText, reconfirm }))
 		fail("json_resource_limit");
 	return text;

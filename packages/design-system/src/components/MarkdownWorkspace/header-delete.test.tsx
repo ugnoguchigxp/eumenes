@@ -150,6 +150,12 @@ test("list deletion uses the checked items and library ETag instead of the open 
 		"true",
 	);
 	expect(deleteButton()).toBeDisabled();
+	await userEvent.click(
+		within(screen.getByRole("navigation", { name: "フォルダ" })).getByRole(
+			"button",
+			{ name: "eumenes" },
+		),
+	);
 	fireEvent.click(screen.getByRole("checkbox", { name: "表示中をすべて選択" }));
 	fireEvent.click(deleteButton());
 	const dialog = screen.getByRole("dialog");

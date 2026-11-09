@@ -56,15 +56,11 @@ function expiryLabel(expiresAt: string) {
 
 export function HistoryMenu({
 	history,
-	hasDraft,
 	viewingId,
-	send,
 	onPick,
 }: {
 	history: UiStudioResource["history"];
-	hasDraft: boolean;
 	viewingId: string | undefined;
-	send: Send;
 	/** Choosing a saved work (the studio asks first when that would drop unsaved work). */
 	onPick: (item: UiStudioResource["history"][number]) => void;
 }) {
@@ -75,19 +71,6 @@ export function HistoryMenu({
 		>
 			{(close) => (
 				<fieldset className="aui-ui-menu" aria-label="保存した作品">
-					{hasDraft && (
-						<button
-							type="button"
-							className="aui-ui-menu-item"
-							aria-current={!viewingId ? "true" : undefined}
-							onClick={() => {
-								send("ui-select", { id: "" });
-								close();
-							}}
-						>
-							編集中の案
-						</button>
-					)}
 					{history.length ? (
 						history.map((item) => (
 							<button
@@ -112,7 +95,7 @@ export function HistoryMenu({
 	);
 }
 
-/** Progress of a running turn, and the unsaved/suspended/viewing notices. */
+/** Progress and notices for the draft currently shown. */
 export function StudioNotices({
 	data,
 	pending,
@@ -122,7 +105,7 @@ export function StudioNotices({
 	pending: boolean;
 	send: Send;
 }) {
-	const { work, viewing, session } = data;
+	const { work, session } = data;
 	const suspended = session?.state === "suspended";
 	const expiry = session ? expiryLabel(session.expiresAt) : "";
 	return (
@@ -169,23 +152,6 @@ export function StudioNotices({
 							編集を再開
 						</Button>
 					)}
-				</p>
-			)}
-			{viewing && (
-				<p className="aui-ui-notice">
-					<span>
-						{work
-							? "保存した作品を表示しています。編集中の案は残っています。"
-							: "保存した作品を表示しています。"}
-					</span>
-					<Button
-						type="button"
-						variant="outline"
-						size="sm"
-						onClick={() => send("ui-select", { id: "" })}
-					>
-						{work ? "編集中の案に戻る" : "新規作成"}
-					</Button>
 				</p>
 			)}
 		</>

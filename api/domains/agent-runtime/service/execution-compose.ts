@@ -1,8 +1,11 @@
 import type {
 	AuthoringOutcome,
 	ComponentRecord,
+	ExecutionPlan,
 	InferencePort as ComposerPort,
 } from "eumenes-pipeline";
+import { systemContext } from "../../../infrastructure/system-context";
+import type { RoutedPipelineStep } from "../../tool-runtime";
 import { estimateMessageTokens, type Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import {
@@ -21,6 +24,7 @@ type Input = {
 	requestId: string;
 	request: string;
 	catalog: ComponentRecord[];
+	routedSteps?: readonly RoutedPipelineStep[];
 	messages: Array<{ role: "system" | "user"; content: string }>;
 	sourceRefs: {
 		conversationId: string;
@@ -36,6 +40,25 @@ type Output = {
 };
 /** Bounds the recorded copy so a long paraphrase cannot push the parent state past its capacity. */
 const ECHO_CHARS = 500;
+
+function matchesRoutedSteps(
+	plan: ExecutionPlan,
+	steps: readonly RoutedPipelineStep[],
+) {
+	return (
+		plan.steps.length === steps.length &&
+		steps.every((step, i) => {
+			const planned = plan.steps[i]!;
+			return (
+				planned.revisionId === step.revisionId &&
+				planned.entry === step.entry &&
+				step.after.every((index) =>
+					planned.from.includes(plan.steps[index]!.stepId),
+				)
+			);
+		})
+	);
+}
 /** LARM is the imported inference port's transport; its receipt stays under the existing revocation contract. */
 export function executionCompose(
 	ctx: ExecutionContext,
@@ -76,7 +99,12 @@ export function executionCompose(
 				return { status: "stale", reason: "execution_budget_exceeded" };
 			}
 			const messages: Input["messages"] = [
-				{ role: "system", content: state.instructions },
+				{
+					role: "system",
+					content: p.routedSteps
+						? `${state.instructions}\n${systemContext("agent-runtime.contexts.pipeline.routed-steps", {})}`
+						: state.instructions,
+				},
 				{
 					role: "user",
 					content: JSON.stringify({
@@ -91,6 +119,15 @@ export function executionCompose(
 							})),
 						answers: source.responses ?? [],
 						cards: p.catalog.map((r) => r.card),
+						...(p.routedSteps
+							? {
+									routedSteps: p.routedSteps.map(({ text, entry, after }) => ({
+										text,
+										entry,
+										after,
+									})),
+								}
+							: {}),
 						...(p.correction
 							? { contractErrors: p.correction, previousOutput: p.draft }
 							: {}),
@@ -125,6 +162,7 @@ export function executionCompose(
 					requestId,
 					request: source.request,
 					catalog: p.catalog,
+					...(p.routedSteps ? { routedSteps: p.routedSteps } : {}),
 					messages,
 					sourceRefs: {
 						conversationId: source.conversationId,
@@ -236,6 +274,17 @@ export function executionCompose(
 								.map((i) => `${i.path}:${i.code}`)
 								.join("\n")
 								.slice(0, 4000),
+						},
+					};
+				if (
+					input.routedSteps &&
+					!matchesRoutedSteps(check.plan, input.routedSteps)
+				)
+					return {
+						receipt,
+						invalid: {
+							output: result.text,
+							issues: "steps:routed_steps_mismatch",
 						},
 					};
 				return {

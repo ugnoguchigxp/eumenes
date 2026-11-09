@@ -22,6 +22,7 @@ function turn(answer: unknown) {
 		said,
 		value: {
 			exchange: [],
+			signal: new AbortController().signal,
 			utterance: "相談したい",
 			deps: {
 				store: { read: (fn: (db: unknown) => unknown) => fn({}) },

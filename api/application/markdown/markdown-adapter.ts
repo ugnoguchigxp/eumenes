@@ -143,16 +143,20 @@ export function createMarkdownAdapter(service: MarkdownService): DomainAdapter {
 				.strictObject({ workRef: z.string().optional() })
 				.parse(params ?? {});
 			if (targetRef?.startsWith("generated-")) {
-				const saved = service.generated.currentInTransaction(
-					db,
-					targetRef.slice("generated-".length),
-				);
-				if (saved?.archive.state !== "saved") return null;
+				const id = targetRef.slice("generated-".length),
+					saved = service.generated.currentInTransaction(db, id);
+				if (saved?.state !== "settled") return null;
+				const openSourceId =
+					saved.archive.state === "saved" ? saved.archive.sourceId : undefined;
+				const preview = openSourceId
+					? undefined
+					: service.generated.localPreviewInTransaction(db, id);
+				if (!openSourceId && !preview) return null;
 				return {
 					revision: 1,
 					data: {
 						...service.currentInTransaction(db),
-						openSourceId: saved.archive.sourceId,
+						...(openSourceId ? { openSourceId } : { preview }),
 					},
 				};
 			}

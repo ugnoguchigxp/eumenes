@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { RoutedPipelineStep } from "../../tool-runtime";
 import { isSystemPrompt } from "../contracts";
 import { saveAnnouncement } from "../repository";
 import {
@@ -131,6 +132,7 @@ export async function handOver(
 	let committed: { handed: boolean; workId: string | null };
 	try {
 		committed = await store.write((tx) => {
+			signal.throwIfAborted();
 			const run = current(tx);
 			adoptHere(x, tx, run);
 			if (
@@ -148,6 +150,7 @@ export async function handOver(
 					? { resolveUnsaved: chosen.resolveUnsaved }
 					: {}),
 				...(chosen.inputs ? { inputs: chosen.inputs } : {}),
+				...(chosen.routedSteps ? { routedSteps: chosen.routedSteps } : {}),
 				references: chosen.references ?? [],
 			});
 			// A refused dispatch rolls everything of this step back; the model is told why.
@@ -311,6 +314,7 @@ export async function delegate(
 	call: ParsedCall,
 	args: DelegateArgs,
 	signal: AbortSignal,
+	routedSteps?: readonly RoutedPipelineStep[],
 ): Promise<ToolOutcome> {
 	const { deps, offered } = x;
 	const { store, toolchains } = deps;
@@ -384,6 +388,7 @@ export async function delegate(
 	const chosen = {
 		card,
 		request,
+		...(routedSteps ? { routedSteps } : {}),
 		...(uris.length ? { references, refUris: uris } : {}),
 		...(inputs ? { inputs } : {}),
 		...(args.target ? { target: args.target } : {}),

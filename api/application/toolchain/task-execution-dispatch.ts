@@ -22,6 +22,8 @@ export function taskExecutionDispatch(
 		readReferenceInTransaction: readReference,
 		prepareInTransaction(db, child) {
 			live(db, child);
+			if (child.source.origin === "workflow")
+				return host.workflowSteps!.prepare(db, child);
 			child = {
 				...child,
 				referenceData: child.refs.map((ref) => ({
@@ -102,6 +104,11 @@ export function taskExecutionDispatch(
 			} as const;
 		},
 		async execute(raw, child, signal) {
+			if (child.source.origin === "workflow") {
+				store.read((db) => live(db, child));
+				signal.throwIfAborted();
+				return host.workflowSteps!.execute(raw, signal);
+			}
 			const prepared = raw as ReturnType<typeof port.prepareInTransaction> &
 				(
 					| {

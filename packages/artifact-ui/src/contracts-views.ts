@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { browserViews } from "./browser-contracts";
-import { compositionViewRegistry } from "./composition-contracts";
+import { compositionViewRegistry, listRefresh } from "./composition-contracts";
 import { computeViewRegistry } from "./compute-contracts";
 
 export const title = z.string().max(480).optional();
@@ -14,16 +14,24 @@ export const field = z
 			"text",
 			"textarea",
 			"number",
+			"date",
 			"select",
 			"radio",
 			"checkbox",
 			"boolean",
 		]),
 		required: z.boolean().optional(),
+		defaultDate: z.literal("today").optional(),
 		options: z.array(z.string().min(1).max(120)).min(1).max(128).optional(),
 		optionLabels: z.record(z.string(), z.string().min(1).max(200)).optional(),
 	})
 	.superRefine((f, ctx) => {
+		if (f.defaultDate && f.type !== "date")
+			ctx.addIssue({
+				code: "custom",
+				path: ["defaultDate"],
+				message: "日付欄に設定してください",
+			});
 		if (["select", "radio", "checkbox"].includes(f.type) && !f.options)
 			ctx.addIssue({ code: "custom", message: "選択肢が必要です" });
 	});
@@ -145,7 +153,7 @@ export const viewRegistry = {
 		label: "情報カード",
 		schema: z.strictObject({
 			view: z.literal("info-card"),
-			source: z.never().optional(),
+			source: listRefresh,
 			title: z.string().min(1).max(120),
 			body: z.string().max(1000),
 		}),

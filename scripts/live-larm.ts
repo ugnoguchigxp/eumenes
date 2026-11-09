@@ -1,5 +1,5 @@
 import { readStoredLarm } from "../api/domains/settings";
-import { createLarm } from "../api/domains/larm";
+import { createAgentLarm, createLarm } from "../api/domains/larm";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";
 
 /** Backend-only live runners use the same saved connection as normal inference. */
@@ -8,13 +8,18 @@ export function liveLarmSettings(env = process.env) {
 }
 export function createLiveLarm(
 	env = process.env,
-	options: { fetch?: typeof fetch; keepAlive?: boolean } = {},
+	options: {
+		fetch?: typeof fetch;
+		keepAlive?: boolean;
+		agentSessions?: boolean;
+	} = {},
 ) {
 	const saved = liveLarmSettings(env);
 	if (!saved.baseUrl) throw new Error("saved_larm_connection_unconfigured");
 	if (!resolveLarmToken(env)) throw new Error("larm_credential_unconfigured");
-	return createLarm({
-		...options,
+	const { agentSessions, ...connection } = options;
+	return (agentSessions ? createAgentLarm : createLarm)({
+		...connection,
 		...saved,
 		baseUrl: saved.baseUrl,
 		voice: saved.voice || undefined,

@@ -25,7 +25,14 @@ export function fixtureResources(
 						) as ResourceKind[],
 					adapters: [
 						createPursuitReportResourceAdapter(store),
-						...(options.markdown ? [createMarkdownResourceAdapter(store)] : []),
+						...(options.markdown
+							? [
+									createMarkdownResourceAdapter(
+										store,
+										(id) => !!options.scratch?.get(id),
+									),
+								]
+							: []),
 						...(options.scratch
 							? [createScratchResourceAdapter(options.scratch)]
 							: []),

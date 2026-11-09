@@ -179,7 +179,7 @@ export function executionAccess(
 			return (
 				db
 					.query(
-						"SELECT r.reference_json FROM agent_execution_refs r JOIN agent_executions e ON e.id=r.execution_id WHERE e.conversation_id=? AND json_extract(r.reference_json,'$.owner')='agent-runtime' ORDER BY e.updated_at DESC LIMIT 8",
+						"SELECT r.reference_json FROM agent_execution_refs r JOIN agent_executions e ON e.id=r.execution_id WHERE e.conversation_id=? AND json_extract(r.reference_json,'$.owner')='agent-runtime' AND COALESCE(json_extract(e.source_json,'$.origin'),'')!='workflow' ORDER BY e.updated_at DESC LIMIT 8",
 					)
 					.all(conversationId) as { reference_json: string }[]
 			).map((r) => executionReference.parse(JSON.parse(r.reference_json)));
@@ -217,6 +217,48 @@ export function executionAccess(
 		viewInTransaction: (db: Database, id: string) => {
 			const row = table(db) ? executionRow(db, id) : null;
 			return row ? executionView(row) : null;
+		},
+		cancelWorkflowInTransaction(
+			db: Database,
+			id: string,
+			source: import("../../tool-runtime").ExecutionSource,
+		) {
+			const row = executionRow(db, id);
+			if (
+				!row?.source_json ||
+				!isExecutionActive(row) ||
+				source.origin !== "workflow" ||
+				hash(executionSource(row)) !== hash(source)
+			)
+				return false;
+			ops.fail(db, row, executionState(row), "workflow_cancelled", "cancelled");
+			return true;
+		},
+		workflowOutputsInTransaction(
+			db: Database,
+			id: string,
+			source: import("../../tool-runtime").ExecutionSource,
+		) {
+			const row = executionRow(db, id);
+			if (
+				!row?.source_json ||
+				row.state !== "completed" ||
+				source.origin !== "workflow" ||
+				hash(executionSource(row)) !== hash(source) ||
+				!ctx.port().validSourceInTransaction(db, source)
+			)
+				return null;
+			const pipeline = executionState(row).pipeline;
+			if (!pipeline?.executionPlan) return null;
+			const outputs: Record<string, unknown> = Object.create(null);
+			for (const stepId of pipeline.executionPlan.output.from) {
+				if (stepId === "request") continue;
+				const result = pipeline.results[stepId];
+				if (result?.state !== "completed" || result.output === undefined)
+					return null;
+				outputs[stepId] = result.output;
+			}
+			return outputs;
 		},
 		listInTransaction: (db: Database, conversationId: string) =>
 			table(db)

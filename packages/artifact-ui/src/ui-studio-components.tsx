@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { Feedback, useAction } from "./action";
+import { listRefreshSource } from "./composition-contracts";
 import {
 	type ArtifactEvent,
 	type ArtifactRequest,
@@ -29,10 +30,13 @@ import {
 } from "./ui-studio-preview";
 import { StudioSource, type StudioWork } from "./ui-studio-source";
 import { HistoryMenu, StudioNotices } from "./ui-studio-status";
+import { displayWorkflowOutput } from "./ui-studio-workflow-output";
 import "./ui-studio.css";
 
 type Device = "desktop" | "mobile";
 type StudioMode = "preview" | "source";
+type AppViewing = NonNullable<UiStudioResource["viewing"]>;
+
 const trialMessage = "試用です。回答は保存されません。";
 
 /** The draft or a saved work, rendered as a composition (a draft's form is a trial). */
@@ -40,37 +44,103 @@ function StudioPreview({
 	definition,
 	saved,
 	device,
+	app,
 }: {
 	definition: unknown;
 	saved: boolean;
 	device: Device;
+	app?: AppViewing;
 }) {
 	const runtime = useArtifactRuntime();
 	const savedForm = runtime.snapshot[savedFormSource];
-	const prepared = useMemo(
-		() =>
-			saved
-				? { definition: savedPreview(definition), form: null }
-				: trialPreview(definition),
-		[definition, saved],
+	const workflow = app?.workflow;
+	const bindings = app?.bindings;
+	const appIdentity = app && `${app.id}:${app.savedRevision}`;
+	const formId = useId();
+	const listRefresh =
+		workflow?.publish?.schemaRef === "schema:showtimes.rows@1" &&
+		!!(bindings?.sections ?? bindings?.table) &&
+		Object.keys(bindings.inputs).length > 0;
+	const updating = ["accepted", "running", "publishing"].includes(
+		app?.status?.state ?? "",
 	);
+	const prepared = useMemo(() => {
+		const preview = app ? displayWorkflowOutput(app, listRefresh) : definition;
+		return saved
+			? { definition: savedPreview(preview), form: null }
+			: trialPreview(preview);
+	}, [app, definition, listRefresh, saved]);
 	const snapshot = useMemo<Snapshot>(
 		() => ({
-			...(prepared.form ? { [trialFormSource]: prepared.form } : {}),
+			...(prepared.form
+				? {
+						[trialFormSource]: workflow
+							? {
+									...prepared.form,
+									identity: appIdentity,
+									submitLabel: "更新",
+									...(listRefresh ? { externalSubmitId: formId } : {}),
+								}
+							: prepared.form,
+					}
+				: {}),
+			...(listRefresh && prepared.form
+				? {
+						[listRefreshSource]: {
+							kind: "form",
+							revision: 0,
+							submitLabel: "作品リストを更新",
+							submitForm: formId,
+							disabled: updating,
+							fields: [],
+							defaults: {},
+						},
+					}
+				: {}),
 			...(saved && savedForm ? { [savedFormSource]: savedForm } : {}),
 		}),
-		[prepared.form, saved, savedForm],
+		[
+			prepared.form,
+			saved,
+			savedForm,
+			workflow,
+			appIdentity,
+			formId,
+			listRefresh,
+			updating,
+		],
 	);
 	const previewRuntime = useMemo<ArtifactRuntime>(
 		() => ({
 			...runtime,
 			snapshot,
 			dispatch: (event) =>
-				event.source === trialFormSource
-					? Promise.resolve({ status: "accepted", message: trialMessage })
-					: runtime.dispatch(event),
+				event.source === trialFormSource && app?.workflow && app.bindings
+					? runtime.dispatch({
+							...event,
+							revision:
+								runtime.snapshot["ui-studio"]?.revision ?? event.revision,
+							source: "ui-studio",
+							action: "ui-workflow-run",
+							values: {
+								appId: app.id,
+								revision: String(app.savedRevision),
+								values: JSON.stringify(
+									Object.fromEntries(
+										Object.entries(event.values).flatMap(([field, value]) =>
+											Object.hasOwn(app.bindings!.inputs, field)
+												? [[app.bindings!.inputs[field], value]]
+												: [],
+										),
+									),
+								),
+							},
+						})
+					: event.source === trialFormSource
+						? Promise.resolve({ status: "accepted", message: trialMessage })
+						: runtime.dispatch(event),
 		}),
-		[runtime, snapshot],
+		[runtime, snapshot, app],
 	);
 	const text = useMemo(
 		() => JSON.stringify(prepared.definition),
@@ -124,6 +194,7 @@ function StudioMain({
 	shown,
 	work,
 	viewing,
+	app,
 	editing,
 	device,
 	onDevice,
@@ -146,6 +217,7 @@ function StudioMain({
 	/** The draft the source can be edited into; null while a saved work is viewed. */
 	work: StudioWork | null;
 	viewing: boolean;
+	app?: AppViewing;
 	editing: boolean;
 	device: Device;
 	onDevice: (device: Device) => void;
@@ -162,7 +234,8 @@ function StudioMain({
 	// Nothing to show yet: no work, or a work whose first draft was never accepted.
 	const empty = !shown || shown.definition == null;
 	// A first draft that failed the check has no preview, but its text is still worth fixing.
-	const rejectedOnly = empty && mode === "source" && !!work?.rejected;
+	const rejectedOnly =
+		empty && mode === "source" && (!!work?.rejected || !!shown?.text);
 	// Both stay mounted: switching is display state and keeps trial input.
 	return (
 		<section className="aui-ui-preview-panel" aria-labelledby={heading}>
@@ -218,8 +291,9 @@ function StudioMain({
 						<div className="aui-ui-preview-stage" hidden={mode !== "preview"}>
 							<StudioPreview
 								definition={shown.definition}
-								saved={viewing}
+								saved={viewing && !app}
 								device={device}
+								app={app}
 							/>
 						</div>
 					)}
@@ -283,7 +357,7 @@ function Studio({
 	mode: StudioMode;
 	onMode: (mode: StudioMode) => void;
 }) {
-	const { work, viewing, history, session } = data;
+	const { work, viewing, history, session, appDevelopment } = data;
 	const heading = useId();
 	const [deleting, setDeleting] = useState(false);
 	const [switching, setSwitching] = useState<{
@@ -338,6 +412,11 @@ function Studio({
 				: work
 					? "編集中"
 					: "";
+	const draftAction = !work
+		? "新規作成"
+		: work.dirty || work.rejected || busy
+			? "編集中の案に戻る"
+			: "編集に戻る";
 	return (
 		<div className="aui-ui-studio" data-busy={busy ? "true" : undefined}>
 			<header className="aui-ui-studio-bar">
@@ -348,7 +427,7 @@ function Studio({
 					{state && (
 						<span
 							className="aui-ui-state"
-							data-state={suspended ? "suspended" : undefined}
+							data-state={editing && suspended ? "suspended" : undefined}
 						>
 							{state}
 						</span>
@@ -361,9 +440,7 @@ function Studio({
 				>
 					<HistoryMenu
 						history={history}
-						hasDraft={!!work}
 						viewingId={viewing?.id}
-						send={send}
 						onPick={(item) => {
 							// The active specialist would edit the chosen work instead: unsaved work is not dropped silently.
 							if (
@@ -376,18 +453,30 @@ function Studio({
 							else send("ui-select", { id: item.id });
 						}}
 					/>
-					{/* A viewed saved work is not edited here: deleting it is its only action. */}
 					{viewing ? (
-						<Button
-							type="button"
-							variant="outline-destructive"
-							size="sm"
-							disabled={action.pending}
-							onClick={() => setDeleting(true)}
-						>
-							<Trash2 size={14} aria-hidden="true" />
-							削除
-						</Button>
+						<>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={action.pending}
+								onClick={() => send("ui-select", { id: "" })}
+							>
+								{draftAction}
+							</Button>
+							{!appDevelopment && (
+								<Button
+									type="button"
+									variant="outline-destructive"
+									size="sm"
+									disabled={action.pending}
+									onClick={() => setDeleting(true)}
+								>
+									<Trash2 size={14} aria-hidden="true" />
+									削除
+								</Button>
+							)}
+						</>
 					) : (
 						<>
 							<Button
@@ -413,18 +502,27 @@ function Studio({
 							<Button
 								type="button"
 								size="sm"
-								disabled={!editing || busy || !work?.dirty || action.pending}
+								disabled={
+									!editing ||
+									busy ||
+									!work?.dirty ||
+									action.pending ||
+									(appDevelopment && !work.confirmation)
+								}
 								onClick={() =>
 									work &&
 									send("ui-save", {
 										workRef: work.workRef,
 										expectedRevision: String(work.revision),
 										expectedSavedRevision: String(work.savedRevision ?? 0),
+										...(work.confirmation
+											? { digest: work.confirmation.digest }
+											: {}),
 									})
 								}
 							>
 								<Save size={14} aria-hidden="true" />
-								保存
+								{appDevelopment ? "確認して保存" : "保存"}
 							</Button>
 							<Button
 								type="button"
@@ -452,12 +550,29 @@ function Studio({
 					)}
 				</div>
 			</header>
-			<StudioNotices data={data} pending={action.pending} send={send} />
+			{editing && (
+				<StudioNotices data={data} pending={action.pending} send={send} />
+			)}
+			{appDevelopment && editing && work?.issue && (
+				<Feedback message={`確認が必要です（${work.issue}）。`} />
+			)}
+			{appDevelopment && editing && work?.confirmation?.summary != null && (
+				<AppConfirmation summary={work.confirmation.summary} />
+			)}
+			{appDevelopment && viewing?.workflow && (
+				<AppWorkflowPanel
+					key={viewing.id}
+					viewing={viewing}
+					pending={action.pending}
+					send={send}
+				/>
+			)}
 			<StudioMain
 				heading={heading}
 				shown={shown}
 				work={viewing ? null : work}
 				viewing={!!viewing}
+				app={appDevelopment ? (viewing ?? undefined) : undefined}
 				editing={editing}
 				device={device}
 				onDevice={onDevice}
@@ -465,7 +580,7 @@ function Studio({
 				onMode={onMode}
 				onRefresh={() => send("ui-refresh")}
 				pending={action.pending}
-				busy={busy}
+				busy={editing && busy}
 				result={{ status: action.status, message: action.message }}
 				onApply={applySource}
 			/>
@@ -486,7 +601,7 @@ function Studio({
 				}}
 				onCancel={() => setSwitching(null)}
 			/>
-			{viewing && (
+			{viewing && !appDevelopment && (
 				<ConfirmModal
 					open={deleting}
 					onOpenChange={setDeleting}
@@ -506,5 +621,159 @@ function Studio({
 				/>
 			)}
 		</div>
+	);
+}
+
+function AppConfirmation({ summary }: { summary: unknown }) {
+	const data = summary as {
+		trigger?: string;
+		input?: { fixed?: Record<string, unknown> };
+		publish?: { destinationRef?: string };
+		pipeline?: { steps?: Array<{ bundle: string; task: string }> };
+	};
+	return (
+		<details open className="aui-ui-notice">
+			<summary>実行内容を確認</summary>
+			<p>起動 {data.trigger === "schedule" ? "予約" : "手動"}</p>
+			{data.input?.fixed && Object.keys(data.input.fixed).length > 0 && (
+				<p>
+					固定入力{" "}
+					{Object.entries(data.input.fixed)
+						.map(([key, value]) => `${key}＝${String(value)}`)
+						.join("、")}
+				</p>
+			)}
+			{data.publish?.destinationRef && (
+				<p>保存先 {data.publish.destinationRef}</p>
+			)}
+			{data.pipeline?.steps && (
+				<ol>
+					{data.pipeline.steps.map((step, index) => (
+						<li key={index}>{step.task}</li>
+					))}
+				</ol>
+			)}
+		</details>
+	);
+}
+
+function AppWorkflowPanel({
+	viewing,
+	pending,
+	send,
+}: {
+	viewing: AppViewing;
+	pending: boolean;
+	send: Send;
+}) {
+	const [anchor, setAnchor] = useState("");
+	const status = viewing.status;
+	const state = status?.state === "completed" ? undefined : status?.state;
+	const busy = ["accepted", "running", "publishing"].includes(state ?? "");
+	const canRunDirectly = !Object.keys(viewing.bindings?.inputs ?? {}).length;
+	const scheduled = viewing.workflow?.trigger === "schedule";
+	const partial =
+		(viewing.data as { coverage?: string } | null)?.coverage === "partial";
+	if (
+		!state &&
+		!status?.result?.code &&
+		!status?.result?.path &&
+		!partial &&
+		!canRunDirectly &&
+		!scheduled
+	)
+		return null;
+	const base = { appId: viewing.id, revision: String(viewing.savedRevision) };
+	const states: Record<string, string> = {
+		accepted: "受付済み",
+		running: "実行中",
+		publishing: "保存を確認中",
+		failed: "失敗",
+		cancelled: "取消済み",
+		expired: "期限切れ",
+	};
+	return (
+		<section className="aui-ui-notice" aria-label="アプリの実行状況">
+			{state && <output aria-live="polite">{states[state] ?? state}</output>}
+			{status?.result?.code && <p>{status.result.code}</p>}
+			{status?.result?.code === "workflow_markdown_needs_confirmation" &&
+				status.runId && (
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={pending}
+						onClick={() =>
+							send("ui-workflow-reconcile", { ...base, runId: status.runId! })
+						}
+					>
+						保存を再確認する
+					</Button>
+				)}
+			{status?.result?.path && <p>保存先 {status.result.path}</p>}
+			{partial && <p>確認できた範囲のみ表示しています。</p>}
+			{canRunDirectly && (
+				<Button
+					size="sm"
+					disabled={pending || busy}
+					onClick={() => send("ui-workflow-run", { ...base, values: "{}" })}
+				>
+					今すぐ実行
+				</Button>
+			)}
+			{busy && status?.runId && (
+				<Button
+					size="sm"
+					variant="outline"
+					disabled={pending}
+					onClick={() =>
+						send("ui-workflow-cancel", { ...base, runId: status.runId! })
+					}
+				>
+					実行を取り消す
+				</Button>
+			)}
+			{scheduled && (
+				<div>
+					<label>
+						初回の日時（日本時間）{" "}
+						<input
+							type="datetime-local"
+							value={anchor}
+							onChange={(event) => setAnchor(event.currentTarget.value)}
+						/>
+					</label>
+					<Button
+						size="sm"
+						disabled={pending || !anchor}
+						onClick={() =>
+							send("ui-workflow-schedule", {
+								...base,
+								anchor: `${anchor}:00+09:00`,
+							})
+						}
+					>
+						毎日の予約を有効にする
+					</Button>
+					{status?.schedule?.state === "active" && (
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={pending}
+							onClick={() => send("ui-workflow-stop", base)}
+						>
+							予約を停止する
+						</Button>
+					)}
+					{status?.schedule?.nextDueAt && (
+						<p>
+							次回{" "}
+							{new Date(status.schedule.nextDueAt).toLocaleString("ja-JP", {
+								timeZone: "Asia/Tokyo",
+							})}
+						</p>
+					)}
+				</div>
+			)}
+		</section>
 	);
 }

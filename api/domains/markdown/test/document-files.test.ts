@@ -123,12 +123,23 @@ test("ID and frozen input persist before dispatch, definite rejection reuses the
 	await h.queue.tick();
 	await flush();
 	expect(h.view(made.documentId).saveState).toBe("unsaved");
-	await h.saveDoc(made.documentId, 1);
+	expect(requests[0]?.path).toBe("日本語の文書.md");
+	const { id: stageId } = await h.service.stage({
+		document: h.view(made.documentId).document,
+	});
+	await h.invoke("markdown.apply.v2", {
+		documentId: made.documentId,
+		expectedRevision: 1,
+		title: "別の題名",
+		stageId,
+	});
+	await h.saveDoc(made.documentId, 2);
 	await h.queue.tick();
 	await flush();
-	await expect(h.saveDoc(made.documentId, 1)).rejects.toThrow(
+	await expect(h.saveDoc(made.documentId, 2)).rejects.toThrow(
 		"markdown_save_in_progress",
 	);
+	expect(requests[1]?.path).toBe("別の題名.md");
 	expect(requests[0]?.sourceId).toBe(requests[1]?.sourceId);
 	expect(requests[0]?.remoteRevision).toBeNull();
 	expect(requests[1]?.remoteRevision).toBeNull();

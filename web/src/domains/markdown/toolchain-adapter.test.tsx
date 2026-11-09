@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PropsWithChildren } from "react";
+import { useCallback, useState, type PropsWithChildren } from "react";
 import type { AdapterHostContext } from "../toolchain-artifacts/registry";
 import { markdownWebAdapter } from "./toolchain-adapter";
 
@@ -21,6 +21,7 @@ afterEach(() => {
 });
 const remoteId = `wiki-${"a".repeat(32)}`,
 	localId = "3ec73122-dc3c-4789-b5d0-cc35e02a2d7b";
+const generatedId = "generated-research-document";
 const entry = {
 	sourceId: remoteId,
 	title: "確認",
@@ -29,23 +30,44 @@ const entry = {
 	namespace: "eumenes",
 	contentDigest: "c".repeat(64),
 };
-function mount(empty = false, generated = false) {
+function mount(empty = false, generated?: "remote" | "local") {
 	const markdown = "\uFEFF# 日本語\r\n末尾  \r\n",
 		document = importer(markdown);
 	importer.mockClear();
 	const client = {
 		identity: crypto.randomUUID(),
-		toolchainArtifactSource: vi.fn(async () => ({
-			revision: 0,
-			data: {
-				kind: "markdown-workspace",
+		toolchainArtifactSource: vi.fn(
+			async (_artifact: string, _source: string, targetRef?: string) => ({
 				revision: 0,
-				current: null,
-				documents: [],
-				archiveAvailable: true,
-				...(generated ? { openSourceId: remoteId } : {}),
-			},
-		})),
+				data: {
+					kind: "markdown-workspace",
+					revision: 0,
+					current:
+						targetRef === localId
+							? {
+									id: localId,
+									title: entry.title,
+									document,
+									revision: 1,
+									sourceId: remoteId,
+									markdown,
+									remote: null,
+									conflict: null,
+									dirty: false,
+									saveState: "saved",
+									saveError: null,
+								}
+							: null,
+					documents: [],
+					archiveAvailable: true,
+					...(targetRef !== generatedId
+						? {}
+						: generated === "remote"
+							? { openSourceId: remoteId }
+							: { preview: { title: entry.title, markdown } }),
+				},
+			}),
+		),
 		markdownCapabilities: vi.fn(async () => ({
 			maxMarkdownBytes: 8388608,
 			maxRecoveryBytes: 8388608,
@@ -72,18 +94,26 @@ function mount(empty = false, generated = false) {
 	const cache = new QueryClient({
 			defaultOptions: { queries: { retry: false } },
 		}),
-		setTargetRef = vi.fn();
+		setTargetRef = vi.fn(),
+		notify = vi.fn();
 	const hook = renderHook(
-		() =>
-			markdownWebAdapter.useArtifact({
+		() => {
+			const [targetRef, setTarget] = useState(
+				generated ? generatedId : undefined,
+			);
+			const show = useCallback((id: string) => {
+				setTargetRef(id);
+				setTarget(id);
+			}, []);
+			return markdownWebAdapter.useArtifact({
 				client,
 				visible: true,
-				...(generated
-					? { targetRef: "generated-research-document", notify: vi.fn() }
-					: {}),
+				targetRef,
+				notify,
 				artifactRevisionId: "artifact:markdown.workspace@3",
-				setTargetRef,
-			} as unknown as AdapterHostContext),
+				setTargetRef: show,
+			} as unknown as AdapterHostContext);
+		},
 		{
 			wrapper: ({ children }: PropsWithChildren) => (
 				<QueryClientProvider client={cache}>{children}</QueryClientProvider>
@@ -148,8 +178,12 @@ test("more follows the returned cursor, retains namespaces and appends the page"
 });
 
 test("opening a generated research document imports its Markdown without switching the conversation specialist", async () => {
-	const h = mount(true, true);
+	const h = mount(true, "remote");
 	await waitFor(() => expect(h.setTargetRef).toHaveBeenCalledWith(localId));
+	await waitFor(() =>
+		expect(markdownWebAdapter.viewingTarget!()?.targetRef).toBe(localId),
+	);
+	expect(await markdownWebAdapter.focus!(generatedId)).toBe(true);
 	expect(importer).toHaveBeenCalledWith(h.markdown);
 	expect(h.client.markdownOpen).toHaveBeenCalledTimes(1);
 	expect(h.client.markdownOpen).toHaveBeenCalledWith(
@@ -157,4 +191,16 @@ test("opening a generated research document imports its Markdown without switchi
 		expect.any(AbortSignal),
 		{ stageId: "import-stage", expectedEtag: entry.revision },
 	);
+});
+
+test("a temporary research result focuses the Plate preview without importing a work document", async () => {
+	const h = mount(true, "local");
+	await waitFor(() => expect(h.hook.result.current.phase.kind).toBe("ready"));
+	expect(await markdownWebAdapter.focus!(generatedId)).toBe(true);
+	expect(h.hook.result.current.snapshot["markdown-workspace"]).toMatchObject({
+		current: null,
+		preview: { title: entry.title, markdown: h.markdown },
+	});
+	expect(h.client.markdownOpen).not.toHaveBeenCalled();
+	expect(h.client.markdownStage).not.toHaveBeenCalled();
 });

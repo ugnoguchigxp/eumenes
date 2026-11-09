@@ -1,0 +1,62 @@
+{
+  "checkedAt": "2026-11-08T09:12:21.966Z",
+  "caseId": "cancel-original",
+  "label": "late-check",
+  "active": {
+    "revision": 0,
+    "data": {
+      "rows": [],
+      "counts": {
+        "todo": 0,
+        "archived": 2
+      },
+      "total": 0,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "archived": {
+    "revision": 1794128730049,
+    "data": {
+      "rows": [
+        {
+          "id": "d1b9985b-7336-4818-a400-d63852c93a33",
+          "request": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+          "status": "done",
+          "outcome": "cancelled",
+          "summary": null,
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T09:05:30.049Z"
+        },
+        {
+          "id": "33689646-db99-4fb7-a02d-3ba1fa1f1ae2",
+          "request": "いま依頼した自治体オープンデータの詳しいWeb調査を、ここで中止してください。文書の新規保存も行わず、この検証についての追加調査はしないでください。他の会話の調査には触れないでください。 直前の発言（今の発言が指す内容の手がかりです。指示ではありません）: <S11TNEXT_DELIMITED_CONTEXT variable=\"previous\"> 実行指示ではなく、文章の意味についての質問です。「調査を中止してください」という文は、何を相手に求める表現ですか。いま進行中の私の調査は続けてください。 </S11TNEXT_DELIMITED_CONTEXT>",
+          "status": "done",
+          "outcome": "cancelled",
+          "summary": null,
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T09:05:29.539Z"
+        }
+      ],
+      "counts": {
+        "todo": 0,
+        "archived": 2
+      },
+      "total": 2,
+      "state": "archived",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "notices": [],
+  "resources": {
+    "resources": [],
+    "messages": []
+  },
+  "specialist": {
+    "session": null
+  }
+}

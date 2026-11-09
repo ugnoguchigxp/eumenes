@@ -68,6 +68,7 @@ export type StructureCall = {
 	messages: Array<{ role: string; content: string }>;
 	options: unknown;
 	session: unknown;
+	signal: AbortSignal;
 };
 
 /**
@@ -87,7 +88,7 @@ export async function startRouter(
 	});
 	const routes: RouteInput[] = [];
 	const scripts: Script[] = [];
-	const structures: Array<string | Error> = [];
+	const structures: Array<string | Error | (() => Promise<string>)> = [];
 	const structureCalls: StructureCall[] = [];
 	const controls = new Map<string, Record<string, unknown>>();
 	Object.assign(h.larm, {
@@ -108,7 +109,7 @@ export async function startRouter(
 		executeControl: async (
 			requestId: string,
 			messages: Array<{ role: string; content: string }>,
-			_signal: AbortSignal,
+			signal: AbortSignal,
 			options: unknown,
 			session: unknown,
 		) => {
@@ -117,13 +118,14 @@ export async function startRouter(
 				messages,
 				options,
 				session,
+				signal,
 			});
 			const next = structures.shift();
 			if (next === undefined) throw new Error("fixture_structure_missing");
 			if (next instanceof Error) throw next;
-			let value = next;
+			let value = typeof next === "function" ? await next() : next;
 			try {
-				value = JSON.stringify({ decision: JSON.parse(next) });
+				value = JSON.stringify({ decision: JSON.parse(value) });
 			} catch {
 				/* Deliberately malformed fixture. */
 			}

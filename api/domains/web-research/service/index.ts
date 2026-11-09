@@ -7,6 +7,7 @@ import type { HandlerDefinition, QueueService } from "../../queue";
 import { getLogger } from "../../../infrastructure/logger";
 import {
 	submitResearchSchema,
+	WEB_ACQUISITION_PROVIDER,
 	type ResearchRequest,
 	type ResearchRun,
 } from "../contracts";
@@ -49,7 +50,7 @@ function typedReadFailure(
 		hit: null,
 		bodies: [],
 		result: {
-			provider: "llm-fetch@0.1.4",
+			provider: WEB_ACQUISITION_PROVIDER,
 			observedAt: new Date(now).toISOString(),
 			cache: "bypass",
 			hits: [],

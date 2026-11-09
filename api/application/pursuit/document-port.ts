@@ -33,11 +33,12 @@ export function createResearchDocuments(
 			const item = await scratch.put({
 				id: input.id,
 				conversationId: input.conversationId,
-				name: `${documentName(input.title)}.md`,
+				name: `${documentName(input.title) || "調査報告"}.md`,
 				mime: "text/markdown",
 				data: new TextEncoder().encode(input.markdown),
 				origin: "written",
 				maker: "詳しいWeb調査",
+				internal: true,
 			});
 			return scratchUri(item.id);
 		},

@@ -1,3 +1,4 @@
+import { toErrorCode } from "../../../infrastructure/error-code";
 import type { HandlerDefinition } from "../../queue";
 import type { ChildExecution, ChildResult } from "../../tool-runtime";
 import { CHILD_STEP, type ExecutionContext } from "./execution-context";
@@ -28,10 +29,20 @@ export function executionChild(
 			if (!active?.state.pending || active.row.state !== "waiting_child")
 				return { status: "stale", reason: "execution_changed" };
 			const child = active.state.pending.child;
-			return {
-				status: "ready",
-				input: { child, prepared: ctx.port().prepareInTransaction(db, child) },
-			};
+			try {
+				return {
+					status: "ready",
+					input: {
+						child,
+						prepared: ctx.port().prepareInTransaction(db, child),
+					},
+				};
+			} catch (error) {
+				if (child.source.origin !== "workflow") throw error;
+				const reason = toErrorCode(error, "workflow_step_prepare_failed");
+				ops.fail(db, active.row, active.state, reason);
+				return { status: "stale", reason };
+			}
 		},
 		execute: (input, { signal }) =>
 			ctx.port().execute(input.prepared, input.child, signal),

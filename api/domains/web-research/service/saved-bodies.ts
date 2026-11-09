@@ -18,6 +18,7 @@ export type AcquiredBody = {
 	acquisitionTruncated: boolean;
 	source?: { provider: string; query: string; rank: number; snippet?: string };
 	security?: { decision: string; reasonCodes: string[] };
+	links?: readonly { url: string; label: string }[];
 };
 export type SavedView = {
 	kind: "web_source";
@@ -350,6 +351,8 @@ export function createSavedBodies(
 		stage,
 		deliveryText,
 		issue,
+		links: (owner: BodyOwner, sourceRef: string) =>
+			lookup(owner, sourceRef).b.links ?? [],
 		read,
 		find,
 		validate,

@@ -1,7 +1,11 @@
 import { expect, test } from "bun:test";
 import { createBuiltinContextGuard } from "llm-fetch";
 import { createWebAcquisition } from "..";
-import { resultSchema, submitResearchSchema } from "../contracts";
+import {
+	resultSchema,
+	submitResearchSchema,
+	WEB_ACQUISITION_PROVIDER,
+} from "../contracts";
 import { LlmFetchError } from "llm-fetch";
 import { readFailure } from "../adapters/llm-fetch";
 
@@ -17,6 +21,9 @@ test("read provenance survives extraction and typed errors retain retry policy",
 		const value = await port.execute(
 			{ ...request(), source },
 			AbortSignal.timeout(2000),
+		);
+		expect(resultSchema.parse(value.result).provider).toBe(
+			WEB_ACQUISITION_PROVIDER,
 		);
 		expect(value.result.documents[0]!.source).toEqual(source);
 		expect(value.bodies![0]!.source).toEqual(source);
@@ -71,6 +78,33 @@ function acquisition(
 		}),
 	});
 }
+test("guarded reads preserve same-origin navigation independently from the body preview", async () => {
+	const port = createWebAcquisition({
+		fetcher: async (url) => ({
+			requestedUrl: url,
+			finalUrl: "https://example.com/calendar/",
+			status: 200,
+			contentType: "text/html",
+			headers: { "content-type": "text/html; charset=utf-8" },
+			body: new TextEncoder().encode(`<article><h1>Calendar</h1>
+				<p>${"Public source material for readers. ".repeat(4)}</p>
+				<ul><li><a href="./tuesday?day=2&amp;site=1#listing"><span>Tuesday</span> schedule</a></li>
+				<li><a href="https://unrelated.example/tuesday">Other calendar</a></li></ul></article>`),
+		}),
+	});
+	try {
+		const value = await port.execute(request(), AbortSignal.timeout(2000));
+		expect(value.bodies![0]!.links).toEqual([
+			{
+				url: "https://example.com/calendar/tuesday?day=2&site=1",
+				label: "Tuesday schedule",
+			},
+		]);
+		expect(value.result.documents[0]).not.toHaveProperty("links");
+	} finally {
+		await port.close();
+	}
+});
 test("reviewed hidden-body acquisition inspects titles and preserves output bounds", async () => {
 	for (const attack of [false, true]) {
 		const title = attack

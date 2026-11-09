@@ -59,6 +59,7 @@ const CONVERSATIONS = ["main"] as const;
  * The resource registry with every owner's adapter (spec resource-uri-implementation-plan-2026-10-25.md §3). A kind with several owners is combined by id prefix.
  */
 export function buildResources(deps: {
+	retireUiCompositions?: boolean;
 	store: SqliteStore;
 	capabilities: Pick<
 		Capabilities,
@@ -121,8 +122,10 @@ export function buildResources(deps: {
 			playlist,
 			createModel3dResourceAdapter({ store, owner }),
 			createDrawingResourceAdapter({ store, conversationId: CONVERSATIONS[0] }),
-			createUiCompositionResourceAdapter({ store }),
-			createMarkdownResourceAdapter(store),
+			...(deps.retireUiCompositions
+				? []
+				: [createUiCompositionResourceAdapter({ store })]),
+			createMarkdownResourceAdapter(store, (id) => !!deps.scratch?.get(id)),
 			...(deps.scratch ? [createScratchResourceAdapter(deps.scratch)] : []),
 			reports,
 			createComputeResourceAdapter({ store, owner }),

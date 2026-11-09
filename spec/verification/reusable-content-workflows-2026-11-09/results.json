@@ -1,0 +1,170 @@
+{
+  "gate": "failed",
+  "completedSamples": 3,
+  "plannedSamples": 12,
+  "stoppedPending": "cinecitta-2026-11-10",
+  "measurements": [
+    {
+      "case": "shonan-2026-11-09",
+      "rep": 1,
+      "expectedRows": 57,
+      "timings": {
+        "readMs": 6489,
+        "reviewMs": 0,
+        "reviewCalls": 0,
+        "inferenceMs": 53514
+      },
+      "waitMeasurement": "no_eumenes_queue_in_backend_probe",
+      "cache": "bypass",
+      "body": {
+        "url": "https://109cinemas.net/shonan/schedules/20261109.html?theater_code=R1",
+        "length": 2417,
+        "hash": "b2b09f3f57615a9a00cb27a42f5cbc36bdaecd977adda29771403f216d19bb94",
+        "truncated": false,
+        "publicPreviewTruncated": false,
+        "guardDecision": "allow"
+      },
+      "passed": false,
+      "error": "overall_deadline",
+      "stage": "inference",
+      "totalMs": 60002,
+      "providerReadinessWaitMs": 51888
+    },
+    {
+      "case": "shonan-2026-11-10",
+      "rep": 1,
+      "expectedRows": 57,
+      "timings": {
+        "readMs": 219,
+        "reviewMs": 0,
+        "reviewCalls": 0,
+        "inferenceMs": 59782
+      },
+      "waitMeasurement": "no_eumenes_queue_in_backend_probe",
+      "cache": "bypass",
+      "body": {
+        "url": "https://109cinemas.net/shonan/schedules/20261110.html?theater_code=R1",
+        "length": 2405,
+        "hash": "45d9985e1d95dfcfefc4b2c21839bc716489a0249f3c104eae440871e90afd03",
+        "truncated": false,
+        "publicPreviewTruncated": false,
+        "guardDecision": "allow"
+      },
+      "passed": false,
+      "error": "overall_deadline",
+      "stage": "inference",
+      "totalMs": 60001,
+      "providerReadinessWaitMs": 59781
+    },
+    {
+      "case": "cinecitta-2026-11-09",
+      "rep": 1,
+      "expectedRows": 69,
+      "timings": {
+        "readMs": 288,
+        "reviewMs": 0,
+        "reviewCalls": 0,
+        "inferenceMs": 59714
+      },
+      "waitMeasurement": "no_eumenes_queue_in_backend_probe",
+      "cache": "bypass",
+      "body": {
+        "url": "https://cinecitta.co.jp/schedule?d=20261109",
+        "length": 32108,
+        "hash": "2f5f01cc1640fb400b9b185c4d43cc6c193b1e54f5ee6a2a3426e75a85325ebe",
+        "truncated": false,
+        "publicPreviewTruncated": true,
+        "guardDecision": "allow"
+      },
+      "passed": false,
+      "error": "overall_deadline",
+      "stage": "inference",
+      "totalMs": 60002,
+      "providerReadinessWaitMs": 59714
+    }
+  ],
+  "readDiagnostics": [
+    {
+      "case": "shonan-2026-11-09",
+      "durationMs": 556,
+      "cache": "bypass",
+      "url": "https://109cinemas.net/shonan/schedules/20261109.html?theater_code=R1",
+      "bodyHash": "df69f7ec45b998c326c94ca435390a9601260cee17d75194df64b71e886b2c59",
+      "truncated": false,
+      "characters": 2417,
+      "foundTimeTokens": 115,
+      "missingDistinctTimes": [],
+      "missingExactTitles": 27,
+      "exactTitleMatchCaution": "label can be split or normalized by the protected text conversion"
+    },
+    {
+      "case": "shonan-2026-11-10",
+      "durationMs": 581,
+      "cache": "bypass",
+      "url": "https://109cinemas.net/shonan/schedules/20261110.html?theater_code=R1",
+      "bodyHash": "4ef5775170041353b086e105b634cb9e73d4a13abedd3b605d8b035d7eb43b08",
+      "truncated": false,
+      "characters": 2405,
+      "foundTimeTokens": 115,
+      "missingDistinctTimes": [],
+      "missingExactTitles": 27,
+      "exactTitleMatchCaution": "label can be split or normalized by the protected text conversion"
+    },
+    {
+      "case": "cinecitta-2026-11-09",
+      "durationMs": 756,
+      "cache": "bypass",
+      "url": "https://cinecitta.co.jp/schedule?d=20261109",
+      "bodyHash": "2f5f01cc1640fb400b9b185c4d43cc6c193b1e54f5ee6a2a3426e75a85325ebe",
+      "truncated": false,
+      "characters": 32108,
+      "foundTimeTokens": 598,
+      "missingDistinctTimes": [],
+      "missingExactTitles": 0,
+      "exactTitleMatchCaution": "label can be split or normalized by the protected text conversion"
+    },
+    {
+      "case": "cinecitta-2026-11-10",
+      "durationMs": 859,
+      "cache": "bypass",
+      "url": "https://cinecitta.co.jp/schedule?d=20261110",
+      "bodyHash": "2f5f01cc1640fb400b9b185c4d43cc6c193b1e54f5ee6a2a3426e75a85325ebe",
+      "truncated": false,
+      "characters": 32108,
+      "foundTimeTokens": 598,
+      "missingDistinctTimes": [],
+      "missingExactTitles": 0,
+      "exactTitleMatchCaution": "label can be split or normalized by the protected text conversion"
+    }
+  ],
+  "runtimeRead": {
+    "runId": "75dcfb10-6a88-4dcc-95b7-ba69e2247843",
+    "jobId": "09b11c2a-16c5-4c70-a993-e4b1fcaf637f",
+    "status": "completed",
+    "cache": "bypass",
+    "errorCode": null,
+    "length": 2417,
+    "bodyHash": "df69f7ec45b998c326c94ca435390a9601260cee17d75194df64b71e886b2c59",
+    "exactTitlesPresent": 0,
+    "timeTokenCount": 115,
+    "guardDecision": "allow"
+  },
+  "headerControl": [
+    {
+      "wrapper": "header",
+      "titlePresent": false,
+      "timePresent": true,
+      "guard": "allow"
+    },
+    {
+      "wrapper": "div",
+      "titlePresent": true,
+      "timePresent": true,
+      "guard": "allow"
+    }
+  ],
+  "alternativeOfficialUrl": {
+    "url": "https://cinema.109cinemas.net/cgi-bin/pc/site/det.cgi?tsc=1168&ymd=2026-11-09",
+    "error": "UNSUPPORTED_CONTENT_ENCODING"
+  }
+}

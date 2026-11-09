@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { z } from "zod";
 import { fail, formFields, submitInput } from "../contracts";
 import { get, saveReceipt } from "../repository";
 import {
@@ -9,6 +10,8 @@ import {
 	type Caller,
 	type Outcome,
 } from "./shared";
+
+const isoDate = z.iso.date();
 
 // --- answers to a saved composition's form ---
 export function submitInTransaction(
@@ -59,6 +62,9 @@ export function submitInTransaction(
 					? typeof value !== "boolean"
 					: typeof value !== "string" ||
 						value.length > 2000 ||
+						(field.type === "date" &&
+							value !== "" &&
+							!isoDate.safeParse(value).success) ||
 						(["select", "radio"].includes(field.type) &&
 							!field.options?.includes(value))
 		)

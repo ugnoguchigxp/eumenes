@@ -33,7 +33,7 @@ export const limits = {
 const formSource = "composition-form";
 
 /** A refusal carrying only a safe, lowercase code; `detail` is a short note for repair, never data. */
-class UiCompositionError extends Error {
+export class UiCompositionError extends Error {
 	constructor(
 		readonly code: string,
 		readonly detail?: string,
@@ -52,22 +52,29 @@ export const submitInput = z.record(
 /** The saved form's fields (the inline `fields` of the definition's one form). */
 export const formFields = z
 	.array(
-		z.strictObject({
-			id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
-			label: z.string().min(1).max(120),
-			type: z.enum([
-				"text",
-				"textarea",
-				"number",
-				"select",
-				"radio",
-				"checkbox",
-				"boolean",
-			]),
-			required: z.boolean().optional(),
-			options: z.array(z.string().min(1).max(120)).min(1).max(128).optional(),
-			optionLabels: z.record(z.string(), z.string()).optional(),
-		}),
+		z
+			.strictObject({
+				id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+				label: z.string().min(1).max(120),
+				type: z.enum([
+					"text",
+					"textarea",
+					"number",
+					"date",
+					"select",
+					"radio",
+					"checkbox",
+					"boolean",
+				]),
+				required: z.boolean().optional(),
+				defaultDate: z.literal("today").optional(),
+				options: z.array(z.string().min(1).max(120)).min(1).max(128).optional(),
+				optionLabels: z.record(z.string(), z.string()).optional(),
+			})
+			.refine((field) => !field.defaultDate || field.type === "date", {
+				path: ["defaultDate"],
+				message: "日付欄に設定してください",
+			}),
 	)
 	.max(8);
 export type FormFields = z.infer<typeof formFields>;

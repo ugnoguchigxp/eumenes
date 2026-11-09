@@ -129,7 +129,7 @@ test("folder rows, breadcrumb and file table replace the document selector and b
 	expect(within(table).queryByText("別領域の企画書")).not.toBeInTheDocument();
 	expect(
 		screen.getByRole("navigation", { name: "現在のフォルダ" }),
-	).toHaveTextContent("Doclingeumenes仕事企画");
+	).toHaveTextContent("Doclingeumenesルート仕事企画");
 	expect(
 		screen.queryByRole("combobox", { name: "作業中の文書" }),
 	).not.toBeInTheDocument();
@@ -153,6 +153,15 @@ test("switching to files and back retains unapplied typing and the icon save has
 	expect(save).toHaveTextContent("");
 	expect(save.querySelector("svg")).not.toBeNull();
 	await userEvent.click(screen.getByRole("tab", { name: "ファイル一覧" }));
+	const opened = screen.getByRole("button", { name: "企画書" });
+	await waitFor(() => expect(opened).toHaveFocus());
+	expect(opened).toHaveAttribute("aria-current", "true");
+	expect(
+		screen.getByRole("navigation", { name: "現在のフォルダ" }),
+	).toHaveTextContent("Doclingeumenesルート仕事企画");
+	expect(
+		screen.queryByRole("button", { name: "別領域の企画書" }),
+	).not.toBeInTheDocument();
 	expect(
 		screen.queryByRole("textbox", { name: "文書名" }),
 	).not.toBeInTheDocument();
@@ -162,7 +171,194 @@ test("switching to files and back retains unapplied typing and the icon save has
 	);
 	expect(p.onApply).not.toHaveBeenCalled();
 	expect(p.onSave).not.toHaveBeenCalled();
+	await userEvent.click(screen.getByRole("tab", { name: "ファイル一覧" }));
+	await userEvent.click(
+		within(
+			screen.getByRole("navigation", { name: "現在のフォルダ" }),
+		).getByRole("button", { name: "ルート" }),
+	);
+	expect(
+		within(screen.getByRole("table")).getByRole("button", {
+			name: "仕事",
+		}),
+	).toBeInTheDocument();
+	expect(
+		screen.queryByRole("button", { name: "企画書" }),
+	).not.toBeInTheDocument();
 });
+
+test("the legacy list follows its cursor until the opened document is present and focuses once", async () => {
+	const item = {
+		...current(),
+		remote: {
+			id: "one",
+			namespace: "eumenes",
+			path: "仕事/企画/案.md",
+			etag: null,
+		},
+	};
+	const p = { ...props(item), library: [], libraryStatus: "idle" as const };
+	const view = render(<MarkdownWorkspace {...p} />);
+	await userEvent.click(screen.getByRole("tab", { name: "ファイル一覧" }));
+	expect(p.onLibrary).toHaveBeenCalledTimes(1);
+	const page = {
+		...p,
+		library: entries.slice(1, 2),
+		libraryStatus: "ready" as const,
+		libraryNextCursor: "next",
+	};
+	view.rerender(<MarkdownWorkspace {...page} />);
+	expect(p.onMore).toHaveBeenCalledTimes(1);
+	view.rerender(<MarkdownWorkspace {...page} message="取得中" />);
+	expect(p.onMore).toHaveBeenCalledTimes(1);
+	view.rerender(
+		<MarkdownWorkspace {...page} library={entries} libraryNextCursor={null} />,
+	);
+	await waitFor(() =>
+		expect(screen.getByRole("button", { name: "企画書" })).toHaveFocus(),
+	);
+	const search = screen.getByRole("searchbox", { name: "文書名・パスで検索" });
+	await userEvent.click(search);
+	view.rerender(
+		<MarkdownWorkspace
+			{...page}
+			library={[...entries]}
+			libraryNextCursor={null}
+		/>,
+	);
+	expect(search).toHaveFocus();
+});
+
+const managedCapabilities: MarkdownWorkspaceProps["capabilities"] = {
+	maxMarkdownBytes: 8e6,
+	maxRecoveryBytes: 8e6,
+	maxRequestBytes: 20e6,
+	features: {
+		library: true,
+		folders: true,
+		patch: true,
+		copy: true,
+		delete: true,
+		createFolder: true,
+		recursiveDelete: true,
+		batch: true,
+		maxBatchItems: 100,
+		maxAffectedItems: 500,
+		maxCopyBytes: 20e6,
+	},
+};
+function managedProps() {
+	const item = {
+		...current(),
+		sourceId: "four",
+		remote: {
+			id: "four",
+			namespace: "other",
+			path: "仕事/企画/案.md",
+			etag: '"doc"',
+		},
+	};
+	return {
+		...props(item),
+		capabilities: managedCapabilities,
+		onFiles: vi.fn(),
+		onManage: vi.fn(async () => true),
+		files: {
+			namespace: "eumenes",
+			path: "",
+			etag: '"root"',
+			entries: [],
+			nextCursor: null,
+		},
+	};
+}
+
+test("the managed list requests the document's parent and focuses its later page without checking it for deletion", async () => {
+	const p = managedProps();
+	const view = render(<MarkdownWorkspace {...p} />);
+	await userEvent.click(screen.getByRole("tab", { name: "ファイル一覧" }));
+	expect(p.onFiles).toHaveBeenCalledExactlyOnceWith("other", "仕事/企画");
+	expect(p.onLibrary).not.toHaveBeenCalled();
+	const page = {
+		namespace: "other",
+		path: "仕事/企画",
+		etag: '"folder"',
+		entries: [],
+		nextCursor: "next",
+	};
+	view.rerender(<MarkdownWorkspace {...p} files={page} />);
+	expect(p.onFiles).toHaveBeenNthCalledWith(2, "other", "仕事/企画", "next");
+	view.rerender(
+		<MarkdownWorkspace
+			{...p}
+			files={{
+				...page,
+				nextCursor: null,
+				entries: [
+					{
+						kind: "document",
+						id: "four",
+						namespace: "other",
+						path: "仕事/企画/案.md",
+						etag: '"doc"',
+					},
+				],
+			}}
+		/>,
+	);
+	await waitFor(() =>
+		expect(screen.getByRole("button", { name: "案.md" })).toHaveFocus(),
+	);
+	expect(
+		screen.getByRole("checkbox", { name: "仕事/企画/案.mdを選択" }),
+	).not.toBeChecked();
+	expect(screen.getByRole("button", { name: "削除" })).toBeDisabled();
+	expect(p.onFiles).toHaveBeenCalledTimes(2);
+});
+
+test("manual folder navigation cancels a pending reveal", async () => {
+	const p = managedProps();
+	const view = render(<MarkdownWorkspace {...p} />);
+	await userEvent.click(screen.getByRole("tab", { name: "ファイル一覧" }));
+	const tree = within(screen.getByRole("navigation", { name: "フォルダ" }));
+	const root = tree.getByRole("button", { name: "eumenes" });
+	await userEvent.click(root);
+	expect(p.onFiles).toHaveBeenNthCalledWith(2, "eumenes", "");
+	view.rerender(
+		<MarkdownWorkspace
+			{...p}
+			files={{
+				...p.files,
+				namespace: "other",
+				path: "仕事/企画",
+				nextCursor: "later",
+			}}
+		/>,
+	);
+	expect(p.onFiles).toHaveBeenCalledTimes(2);
+	expect(p.onManage).not.toHaveBeenCalled();
+});
+
+test.each([undefined, managedCapabilities])(
+	"an unsaved document opens the work list and receives focus (%s)",
+	async (capabilities) => {
+		const p = {
+			...props({ ...current(), sourceId: null }),
+			capabilities,
+			onFiles: vi.fn(),
+		};
+		render(<MarkdownWorkspace {...p} />);
+		await userEvent.click(screen.getByRole("tab", { name: "ファイル一覧" }));
+		const work = screen.getByRole("table", { name: "作業用文書の一覧" });
+		await waitFor(() =>
+			expect(
+				within(work).getByRole("button", { name: "保存した文書" }),
+			).toHaveFocus(),
+		);
+		expect(p.onLibrary).not.toHaveBeenCalled();
+		expect(p.onFiles).not.toHaveBeenCalled();
+	},
+);
 test("idle typing reaches the temporary cache without applying or saving to Docling", async () => {
 	const raw = "\uFEFF# 原文\r\n末尾  \r\n",
 		item = current();

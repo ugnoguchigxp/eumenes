@@ -1,8 +1,9 @@
 import {
-	route,
 	routeStructured,
+	routeWithFallback,
+	type BeginStructured,
+	type FallbackDecision,
 	type RouteCandidate as PackageCandidate,
-	type RouteDecision as PackageDecision,
 	type RoutePorts,
 	type Analyze,
 	type RouteResult,
@@ -97,14 +98,17 @@ export function portsOf(
 	router: ActiveRouter,
 	model: RoutePorts["model"],
 	embedded: Map<string, QueryVector>,
+	rerankTimeoutMs: number | null = router.settings.timeoutMs,
 ): RoutePorts {
 	const { store, port, signal } = env;
 	const { settings } = router;
 	return {
 		async embed(texts) {
+			signal.throwIfAborted();
 			const missing = texts.filter((text) => !embedded.has(text));
 			if (missing.length) {
 				const r = await port.embedRouter!(missing, signal);
+				signal.throwIfAborted();
 				missing.forEach((text, i) =>
 					embedded.set(text, { space: r.space, vector: r.vectors[i]! }),
 				);
@@ -116,9 +120,16 @@ export function portsOf(
 			};
 		},
 		async rerank(input) {
-			const timeout = AbortSignal.timeout(settings.timeoutMs);
+			const timeout =
+				rerankTimeoutMs === null
+					? undefined
+					: AbortSignal.timeout(rerankTimeoutMs);
+			const scoring = timeout ? AbortSignal.any([signal, timeout]) : signal;
 			try {
-				return await router.route(input, AbortSignal.any([signal, timeout]));
+				scoring.throwIfAborted();
+				const answer = await router.route(input, scoring);
+				scoring.throwIfAborted();
+				return answer;
 			} catch (cause) {
 				if (signal.aborted) throw cause;
 				throw new Error(reasonOf(cause, timeout));
@@ -180,17 +191,18 @@ async function analyzeOf(
 	turn: Turn,
 	router: ActiveRouter,
 	prompt: Parameters<Analyze>[0],
+	scope: { deadline: number; timeout: AbortSignal; signal: AbortSignal },
 ): Promise<string> {
 	const { deps, input } = turn;
 	const { larm } = deps;
 	const { settings } = router;
-	const timeout = AbortSignal.timeout(settings.structureTimeoutMs);
+	const { deadline, timeout, signal } = scope;
 	try {
 		if (!larm.captureBackgroundControlInTransaction || !larm.executeControl)
 			throw new Error("structure_unavailable");
-		const deadline = Date.parse(deps.clock()) + settings.structureTimeoutMs;
-		const requestId = await deps.store.write((tx) =>
-			larm.captureBackgroundControlInTransaction!(tx, {
+		const requestId = await deps.store.write((tx) => {
+			signal.throwIfAborted();
+			return larm.captureBackgroundControlInTransaction!(tx, {
 				taskId: "router-structure",
 				decisionId: input.runId,
 				authorityEpoch: 1,
@@ -202,15 +214,16 @@ async function analyzeOf(
 				route: settings.structureResourceId
 					? { resourceId: settings.structureResourceId }
 					: "conversation",
-			}),
-		);
+			});
+		});
+		signal.throwIfAborted();
 		const receipt = await larm.executeControl(
 			requestId,
 			[
 				{ role: "system", content: prompt.system },
 				{ role: "user", content: prompt.user },
 			],
-			AbortSignal.any([turn.signal, timeout]),
+			signal,
 			{
 				instructions: "",
 				outputSchema: prompt.outputSchema,
@@ -218,6 +231,7 @@ async function analyzeOf(
 			},
 			{ sessionRole: "auxiliary" },
 		);
+		signal.throwIfAborted();
 		return typeof receipt.value === "string"
 			? receipt.value
 			: new TextDecoder().decode(receipt.value);
@@ -233,8 +247,9 @@ async function analyzeOf(
 /** The routing of one turn by the package's entry, as one shape: the parts it routed and the decision. */
 export type Routed = {
 	parts: ReadonlyArray<{ text: string; result: RouteResult }>;
-	decision: PackageDecision;
+	decision: FallbackDecision;
 	structure: StructuredResult["structure"] | null;
+	structuredAttempted: boolean;
 };
 
 /** The package's evidence part; a multi-job pipeline keeps the full original request. */
@@ -247,30 +262,13 @@ export function decidedPart(routed: Routed) {
 
 /** Honor the router's multi-job decision through the registered planner, without a first-job fallback. */
 export function hostDecision(
-	decision: PackageDecision,
+	decision: FallbackDecision,
 	hostOf: (c: PackageCandidate) => RouteCandidate | null,
 	pipelineCandidate?: RouteCandidate,
 ): RouteDecision | null {
-	// A planner can only execute registered tools. Do not lose a pending/control
-	// decision, or an unavailable part, by replacing the full step set with a plan.
-	if (
-		decision.to === "pipeline" &&
-		decision.steps.some(
-			(step) =>
-				step.decision.to !== "run" ||
-				(step.candidate.kind !== "toolchain" &&
-					step.candidate.kind !== "read") ||
-				!hostOf(step.candidate),
-		)
-	)
-		return null;
-	// The pinned router exposes row 9 as `run/partial` in route(), and `pipeline` in routeStructured().
-	if (isPipelineDecision(decision))
-		return pipelineCandidate
-			? { row: 9, to: "run", candidate: pipelineCandidate, announce: "fixed" }
-			: null;
 	switch (decision.to) {
 		case "clarify":
+		case "unresolved":
 			return decision;
 		case "conversation":
 			return decision;
@@ -279,20 +277,45 @@ export function hostDecision(
 			const second = hostOf(decision.options[1]);
 			return first && second
 				? { row: 8, to: "ask", options: [first, second] }
-				: { row: 8, to: "conversation" };
+				: null;
 		}
 		case "run": {
 			const candidate = hostOf(decision.candidate);
+			if (decision.row === 9)
+				return candidate && pipelineCandidate
+					? {
+							row: 9,
+							to: "run",
+							candidate: pipelineCandidate,
+							announce: "fixed",
+						}
+					: null;
 			return candidate ? { ...decision, candidate } : null;
 		}
 		case "again": {
 			const candidate = hostOf(decision.candidate);
 			return candidate ? { ...decision, candidate } : null;
 		}
-		case "pipeline":
-			return pipelineCandidate
-				? { row: 9, to: "run", candidate: pipelineCandidate, announce: "fixed" }
-				: null;
+		case "pipeline": {
+			if (pipelineCandidate?.kind !== "toolchain") return null;
+			const steps = [];
+			for (const { text, after, candidate, decision: part } of decision.steps) {
+				const host = hostOf(candidate);
+				if (
+					part.to !== "run" ||
+					(candidate.kind !== "toolchain" && candidate.kind !== "read") ||
+					(host?.kind !== "toolchain" && host?.kind !== "read")
+				)
+					return null;
+				steps.push({
+					text,
+					after,
+					entry: host.id,
+					revisionId: host.card.revisionId,
+				});
+			}
+			return { row: 9, to: "pipeline", candidate: pipelineCandidate, steps };
+		}
 	}
 }
 
@@ -386,7 +409,7 @@ export async function offer(
 	return { candidates: [...tools.values(), ...dynamic], hostOf };
 }
 
-/** The turn routed by the saved entry: the whole utterance (`route`), or the structure model first (`routeStructured`). */
+/** Use the saved entry. The usual entry only starts the structured scope when the package requests it. */
 export async function routeByEntry(
 	turn: Turn,
 	router: ActiveRouter,
@@ -394,37 +417,60 @@ export async function routeByEntry(
 	model: RoutePorts["model"],
 	embedded: Map<string, QueryVector>,
 ): Promise<Routed> {
-	const ports = portsOf(
-		{
-			store: turn.deps.store,
-			port: turn.deps.toolchains!,
-			signal: turn.signal,
-		},
-		router,
-		model,
-		embedded,
-	);
+	const env = {
+		store: turn.deps.store,
+		port: turn.deps.toolchains!,
+		signal: turn.signal,
+	};
+	let structuredAttempted = false;
+	const beginStructured: BeginStructured = () => {
+		structuredAttempted = true;
+		const ms = router.settings.structureTimeoutMs;
+		const timeout = AbortSignal.timeout(ms);
+		const deadline = Date.parse(turn.deps.clock()) + ms;
+		const signal = AbortSignal.any([turn.signal, timeout]);
+		return {
+			deadline: timeout,
+			ports: {
+				...portsOf({ ...env, signal }, router, model, embedded, null),
+				analyze: (prompt) =>
+					analyzeOf(turn, router, prompt, { deadline, timeout, signal }),
+			},
+			turn: {
+				...routeTurn,
+				state: { ...routeTurn.state, text: turn.utterance },
+			},
+		};
+	};
 	if (router.settings.entry === "routeStructured") {
-		const structured = await routeStructured(
-			{ ...ports, analyze: (prompt) => analyzeOf(turn, router, prompt) },
-			routeTurn,
-		);
+		const scope = beginStructured();
+		const structured = await routeStructured(scope.ports, scope.turn!);
+		scope.deadline.throwIfAborted();
 		return {
 			parts: structured.parts,
 			decision: structured.decision,
 			structure: structured.structure,
+			structuredAttempted,
 		};
 	}
-	const whole = await route(ports, routeTurn);
+	const { decision, direct, structured } = await routeWithFallback(
+		portsOf(env, router, model, embedded),
+		routeTurn,
+		beginStructured,
+		turn.signal,
+	);
 	return {
-		parts: [{ text: routeTurn.state.text, result: whole }],
-		decision: whole.decision,
-		structure: null,
+		parts: structured?.parts ?? [
+			{ text: routeTurn.state.text, result: direct },
+		],
+		decision,
+		structure: structured?.structure ?? null,
+		structuredAttempted,
 	};
 }
 
 /** Translate both published multi-job variants of the pinned router contract. */
-function isPipelineDecision(decision: PackageDecision) {
+function isPipelineDecision(decision: FallbackDecision) {
 	return (
 		decision.to === "pipeline" || (decision.to === "run" && decision.row === 9)
 	);

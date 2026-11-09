@@ -20,6 +20,12 @@ export type HarnessOptions = {
 	everyday?: boolean;
 	/** Task pipelines run on the parent execution, without the suspended task bundle. */
 	pipelines?: boolean;
+	workflowRuntime?: (
+		agents: import("../../domains/agent-runtime").AgentRuntime,
+	) => Pick<
+		import("./task-execution-port").TaskExecutionHost,
+		"workflowAuthority" | "workflowSteps"
+	>;
 	/** A pipeline composer response, scripted independently from the child operations. */
 	compose?: (
 		messages: import("../../domains/inference/contracts").Messages,
@@ -42,6 +48,8 @@ export type HarnessOptions = {
 		messages: import("../../domains/inference/contracts").Messages,
 	) => { name: string; arguments: Record<string, unknown> };
 	model?: LarmPort;
+	/** Keep the host's real tool lookup and conversation decision for a live acceptance run. */
+	liveRouting?: boolean;
 	/** Cloud transport seams for end-to-end attachment verification, with no external calls. */
 	inferenceOptions?: Parameters<
 		typeof import("../../domains/inference").createInference
@@ -55,6 +63,17 @@ export type HarnessOptions = {
 	embed?: import("./toolchain-vectors").Embed;
 	musicGateway?: () => LarmPlayground;
 	imageGateway?: () => LarmPlayground;
+	appDevelopment?: {
+		git: ReturnType<
+			typeof import("../../domains/git-observation").createGitObservation
+		>;
+		destination?: () => { namespace: string; path: string } | null;
+		control?: (
+			messages: import("../../domains/inference/contracts").Messages,
+			signal: AbortSignal,
+			options: Parameters<LarmPort["answer"]>[2],
+		) => string | Promise<string>;
+	};
 	uiCompositions?: boolean;
 	scratch?: import("../../domains/scratch").ScratchStore;
 	markdown?: import("../../domains/markdown").ArchivePort;

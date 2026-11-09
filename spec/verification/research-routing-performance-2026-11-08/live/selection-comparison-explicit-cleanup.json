@@ -1,0 +1,48 @@
+{
+  "at": "2026-11-08T09:01:14.351Z",
+  "results": [
+    {
+      "todoId": "a7e2f93f-a7a4-4994-8f9e-1482b1b17f5c",
+      "result": {
+        "httpStatus": 200,
+        "view": {
+          "eventId": "642ff42b-a696-4d72-b800-eacda402e57e",
+          "status": "accepted",
+          "result": {
+            "version": 1,
+            "executionId": "642ff42b-a696-4d72-b800-eacda402e57e",
+            "artifactRevisionId": "artifact:agency.todos@4",
+            "outcome": "completed",
+            "receiptRef": {
+              "owner": "dialogue",
+              "operationId": "642ff42b-a696-4d72-b800-eacda402e57e",
+              "digest": "c63c90fe79964916947757decf38138b7de03df8b594800cd4abab16a334e895"
+            },
+            "resultRefs": [
+              {
+                "owner": "dialogue",
+                "id": "a7e2f93f-a7a4-4994-8f9e-1482b1b17f5c",
+                "kind": "todo",
+                "schemaRef": "domain:dialogue.todo@1",
+                "revision": 2
+              }
+            ],
+            "artifactRefs": [
+              {
+                "artifactRevisionId": "artifact:agency.todos@4",
+                "sourceRefs": [
+                  {
+                    "source": "agency-todos",
+                    "targetRef": "a7e2f93f-a7a4-4994-8f9e-1482b1b17f5c"
+                  }
+                ]
+              }
+            ]
+          },
+          "createdAt": "2026-11-08T09:01:14.219Z",
+          "settledAt": "2026-11-08T09:01:14.219Z"
+        }
+      }
+    }
+  ]
+}

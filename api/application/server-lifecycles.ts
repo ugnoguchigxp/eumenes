@@ -193,6 +193,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "web_research_recovery", recover: () => s.webResearch.recover() },
 		{ name: "compute_discovery", recover: () => s.compute.refresh() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
+		{ name: "workflow_recovery", recover: () => s.workflow.recover() },
 		{
 			name: "pursuit_recovery",
 			recover: async () => {

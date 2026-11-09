@@ -22,6 +22,7 @@ import {
 	SettingsDraftBarView,
 } from "./settings-components";
 import { z } from "zod";
+import { hasListRefresh, listRefreshSource } from "./composition-contracts";
 import { type ComponentType, lazy, Suspense, useState } from "react";
 import {
 	Slides,
@@ -66,7 +67,11 @@ import { CollectionWorkspaceView } from "./collection-components";
 import { RecordsWorkspaceView } from "./records-components";
 import { TodoWorkspaceView } from "./todo-components";
 import { ServiceTestWorkspaceView } from "./service-test-components";
-import { TextBlockView, InfoCardView } from "./ui-composition-components";
+import {
+	GroupedListView,
+	TextBlockView,
+	InfoCardView,
+} from "./ui-composition-components";
 import { UiStudioView } from "./ui-studio-components";
 import {
 	CompositionModelProvider,
@@ -131,6 +136,7 @@ const renderers = {
 	"ui-studio": UiStudioView,
 	"text-block": TextBlockView,
 	"info-card": InfoCardView,
+	"grouped-list": GroupedListView,
 	hero: HeroView,
 	image: ContentImageView,
 	"media-card": MediaCardView,
@@ -196,6 +202,20 @@ function RegisteredView({ request }: { request: Node }) {
 	if (request.view === "layout")
 		return <CompositionView request={request} nested />;
 	const Component = renderers[request.view];
+	if (hasListRefresh(request))
+		return (
+			<section
+				className="aui-composition"
+				data-gap="compact"
+				aria-label="上映作品"
+			>
+				<h3 className="aui-composition-section-title">上映作品</h3>
+				<SmallForm
+					request={{ view: "form", source: listRefreshSource, title: "" }}
+				/>
+				<Component request={request} />
+			</section>
+		);
 	return <Component request={request} />;
 }
 /** The settings form-preview arrangements are validated to hold plain views. */

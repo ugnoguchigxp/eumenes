@@ -17,8 +17,14 @@ interface TargetOccurrence<P> {
 export interface TargetDefinition<P> {
 	kind: string;
 	version: number;
+	publicCreate?: false;
 	schema: z.ZodType<P>;
 	validateInTransaction?(tx: Tx, payload: P): void;
+	/** A safe reason code keeps this occurrence due until the target can accept it. */
+	deferReasonInTransaction?(
+		tx: Tx,
+		occurrence: Omit<TargetOccurrence<P>, "occurrenceId">,
+	): string | null;
 	materializeInTransaction(
 		tx: Tx,
 		occurrence: TargetOccurrence<P>,

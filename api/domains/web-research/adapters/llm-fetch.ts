@@ -15,8 +15,9 @@ import type {
 } from "../contracts";
 
 import { getLogger } from "../../../infrastructure/logger";
-import { isPublicHttpUrl } from "../contracts";
+import { isPublicHttpUrl, WEB_ACQUISITION_PROVIDER } from "../contracts";
 import type { AcquiredBody } from "../service/saved-bodies";
+import { sameOriginPageLinks } from "./page-links";
 export interface Acquisition {
 	bodies?: AcquiredBody[];
 	result: ResearchResult;
@@ -196,7 +197,7 @@ export function createWebAcquisition(
 			options.fetcher ??
 			createSafeHttpFetcher({
 				timeoutMs: 30000,
-				userAgent: "Eumenes/0.1 (llm-fetch/0.1.4)",
+				userAgent: `Eumenes/0.1 (${WEB_ACQUISITION_PROVIDER.replace("@", "/")})`,
 				allowedContentTypes: [
 					"text/html",
 					"text/plain",
@@ -209,6 +210,7 @@ export function createWebAcquisition(
 			});
 		let headers: Readonly<Record<string, string>> = {};
 		let status = 200;
+		let fetched: Awaited<ReturnType<SafeHttpFetcher>> | undefined;
 		let timing = { requestedAtMs: now(), receivedAtMs: now() };
 		const client = createLlmFetch({
 			cache: { enabled: false },
@@ -223,6 +225,7 @@ export function createWebAcquisition(
 			fetcher: async (target, input) => {
 				const requestedAtMs = now();
 				const response = await transport(target, input);
+				fetched = response;
 				timing = { requestedAtMs, receivedAtMs: now() };
 				headers = response.headers;
 				status = response.status;
@@ -262,11 +265,22 @@ export function createWebAcquisition(
 				final = new URL(doc.finalUrl);
 			requested.hash = final.hash = "";
 			const text = doc.text.replaceAll("\r\n", "\n");
+			const links = fetched
+				? await sameOriginPageLinks(
+						{
+							body: fetched.body,
+							contentType:
+								fetched.headers["content-type"] ?? fetched.contentType,
+						},
+						new URL(fetched.finalUrl),
+					)
+				: [];
 			return {
 				body: {
 					url: doc.finalUrl,
 					title: limited(doc.title, 500),
 					text,
+					...(links.length ? { links } : {}),
 					fetchedAt: doc.fetchedAt,
 					acquisitionTruncated: doc.truncated || status === 206,
 					source: doc.source,
@@ -302,7 +316,7 @@ export function createWebAcquisition(
 		async execute(request, signal) {
 			const bodies: AcquiredBody[] = [];
 			const result: ResearchResult = {
-				provider: "llm-fetch@0.1.4",
+				provider: WEB_ACQUISITION_PROVIDER,
 				observedAt: new Date(now()).toISOString(),
 				cache: "bypass",
 				hits: [],

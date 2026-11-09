@@ -178,15 +178,21 @@ const ROUTER_PARAMS: BestV2Params = {
 	extra: { tools: 4 },
 	knn: { neighbors: 1, dimension: 2 },
 };
-export const ROUTER_MODEL = loadBestV2(ROUTER_PARAMS, {
-	format: BEST_V2_MEMORY_FORMAT,
-	source: "fixture",
-	dimension: 2,
-	labels: ["conversation.respond"],
-	vectors: btoa(
-		String.fromCharCode(...new Uint8Array(new Float32Array([1, 0]).buffer)),
-	),
-});
+const routerModel = (deferBelow: number) =>
+	loadBestV2(
+		{ ...ROUTER_PARAMS, gate: { deferBelow } },
+		{
+			format: BEST_V2_MEMORY_FORMAT,
+			source: "fixture",
+			dimension: 2,
+			labels: ["conversation.respond"],
+			vectors: btoa(
+				String.fromCharCode(...new Uint8Array(new Float32Array([1, 0]).buffer)),
+			),
+		},
+	);
+export const ROUTER_MODEL = routerModel(ROUTER_PARAMS.gate.deferBelow);
+export const DIRECT_ROUTER_MODEL = routerModel(0);
 /** The router as the fixtures save it: a profile, the package's `route` entry and the product's lines. */
 export const FIXTURE_ROUTER = {
 	profile: "router-fixture-profile",
@@ -336,6 +342,11 @@ export type SetupOptions = {
 	extraMigrations?: import("../../../infrastructure/sqlite").Migration[];
 	/** Cards the catalog lists (default: image and instant). */
 	cards?: ToolchainCard[];
+	routerModel?: typeof ROUTER_MODEL;
+	beforeRouterEmbed?: (
+		texts: readonly string[],
+		signal: AbortSignal,
+	) => Promise<void>;
 	/** Offer the music port (the music toolchain is then available). */
 	music?: boolean;
 	/** Real memory service (its journal in the test directory). */
@@ -534,14 +545,16 @@ export async function setup(options: SetupOptions = {}) {
 				retrieval: "fts",
 			};
 		},
-		embedRouter: async (texts: readonly string[]) => {
+		embedRouter: async (texts: readonly string[], signal: AbortSignal) => {
 			state.routerEmbeds.push(...texts);
+			await options.beforeRouterEmbed?.(texts, signal);
 			if (state.routerEmbedFails) throw new Error(state.routerEmbedFails);
 			return { space: ROUTER_SPACE, vectors: texts.map(() => [1, 0]) };
 		},
 		routerCardsInTransaction: () => routerCards(cards),
 		routerLexicalInTransaction: () => new Map(),
-		routerModelInTransaction: () => (state.routerMemory ? ROUTER_MODEL : null),
+		routerModelInTransaction: () =>
+			state.routerMemory ? (options.routerModel ?? ROUTER_MODEL) : null,
 		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
 			new Map(
 				cards.filter((c) => ids.includes(c.id)).map((c) => [c.id, c.title]),

@@ -211,6 +211,7 @@ export function createScratchStore(options: ScratchStoreOptions) {
 					digest,
 					origin: input.origin,
 					maker: input.maker,
+					...(input.internal ? { internal: true } : {}),
 					...(input.width ? { width: input.width } : {}),
 					...(input.height ? { height: input.height } : {}),
 					...(input.annotation ? { annotation: input.annotation } : {}),

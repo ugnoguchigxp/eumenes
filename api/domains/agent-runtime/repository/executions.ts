@@ -7,6 +7,7 @@ import type {
 	ExecutionSource,
 	ExecutionStatus,
 	ExecutionView,
+	RoutedPipelineStep,
 } from "../../tool-runtime";
 import type {
 	PipelineDefinition,
@@ -83,6 +84,7 @@ export type ParentState = {
 		contractVersion: "p0-3";
 		toolchainRevisionId: string;
 		catalog: ComponentRecord[];
+		routedSteps?: readonly RoutedPipelineStep[];
 		initialRefs: string[];
 		definition: PipelineDefinition | null;
 		executionPlan: ExecutionPlan | null;

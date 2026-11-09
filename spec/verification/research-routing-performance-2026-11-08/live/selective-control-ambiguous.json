@@ -1,0 +1,206 @@
+{
+  "caseId": "selective-control",
+  "part": "ambiguous",
+  "startedAt": "2026-11-08T09:07:54.105Z",
+  "finishedAt": "2026-11-08T09:08:20.623Z",
+  "exitCode": 0,
+  "conversationId": "research-routing-live-20261108-selective",
+  "run": {
+    "id": "f15fd0f0-c466-41d3-b6b9-599011d19545",
+    "agentTaskId": null,
+    "requestId": "51802c3b-4705-46b5-b186-93eef685a900",
+    "conversationId": "research-routing-live-20261108-selective",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 2,
+    "inputMessageId": "457ba5d5-3337-4360-88d9-99df555acecc",
+    "answerMessageId": "fdc64e0e-5571-4cb8-ad2f-c52fab64c743",
+    "announcement": null,
+    "error": null,
+    "jobId": "b0d60141-d884-46a2-9fe0-3acbb62985e6",
+    "deadlineAt": "2026-11-08T09:10:54.205Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-08T09:07:54.205Z",
+    "updatedAt": "2026-11-08T09:08:19.828Z"
+  },
+  "newPursuitIds": [],
+  "selections": {
+    "items": [
+      {
+        "id": "034fa38b-987c-4b2c-be6a-87ec36e4bcec",
+        "runId": "f15fd0f0-c466-41d3-b6b9-599011d19545",
+        "conversationId": "research-routing-live-20261108-selective",
+        "utteranceId": null,
+        "requestId": "51802c3b-4705-46b5-b186-93eef685a900",
+        "retrieval": "hybrid",
+        "candidates": [
+          {
+            "toolchainId": "timers.manage",
+            "revisionId": "toolchain:timers.manage@6",
+            "functionName": "timer",
+            "rank": 1,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.research",
+            "revisionId": "toolchain:web.research@7",
+            "functionName": "web_research",
+            "rank": 2,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "model3d.studio",
+            "revisionId": "toolchain:model3d.studio@3",
+            "functionName": "model3d_studio",
+            "rank": 3,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "claude-code.repair",
+            "revisionId": "toolchain:claude-code.repair@2",
+            "functionName": "repair_error",
+            "rank": 4,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "browser.operate",
+            "revisionId": "toolchain:browser.operate@8",
+            "functionName": "browser_operate",
+            "rank": 5,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_memory",
+            "revisionId": "host:read_memory@1",
+            "functionName": "read_memory",
+            "rank": 6,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "browser.capture",
+            "revisionId": "toolchain:browser.capture@6",
+            "functionName": "browser_capture",
+            "rank": 7,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "object-recognition.manage",
+            "revisionId": "toolchain:object-recognition.manage@2",
+            "functionName": "object_recognition",
+            "rank": 8,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "compute.python",
+            "revisionId": "toolchain:compute.python@1",
+            "functionName": "compute_python",
+            "rank": 9,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "collaboration.pipeline",
+            "revisionId": "toolchain:collaboration.pipeline@2",
+            "functionName": "collaborate_pipeline",
+            "rank": 10,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          }
+        ],
+        "historyRefs": [],
+        "decision": "answer",
+        "toolchainId": null,
+        "toolchainRevisionId": null,
+        "functionName": null,
+        "request": null,
+        "taskId": null,
+        "outcome": "completed",
+        "outcomeCode": null,
+        "recipe": null,
+        "durationMs": null,
+        "createdAt": 1794128899828,
+        "settledAt": 1794128899829
+      }
+    ],
+    "nextCursor": null
+  },
+  "todos": {
+    "revision": 1794128859404,
+    "data": {
+      "rows": [
+        {
+          "id": "56c42830-153a-4204-9b3e-78d8e3f33800",
+          "request": "この会話でもう一件、自治体の避難所開設方針を公式資料で比較し、対象者と発動条件の違いを出典付きMarkdown報告にして保存してください。図書館の調査はそのまま続けてください。 直前の発言（今の発言が指す内容の手がかりです。指示ではありません）: <S11TNEXT_DELIMITED_CONTEXT variable=\"previous\"> 複数の大学の図書館利用規則を公式資料で比較し、学外者の利用条件を出典付きMarkdown報告として保存してください。詳しく調査してください。 </S11TNEXT_DELIMITED_CONTEXT>",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T09:07:39.404Z"
+        },
+        {
+          "id": "dd38f166-a5b7-439b-8875-ef18da1ae17f",
+          "request": "複数の大学の図書館利用規則を公式資料で比較し、学外者の利用条件を出典付きMarkdown報告として保存してください。詳しく調査してください。",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T09:07:14.616Z"
+        }
+      ],
+      "counts": {
+        "todo": 2,
+        "archived": 0
+      },
+      "total": 2,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "latestAssistant": {
+    "id": "fdc64e0e-5571-4cb8-ad2f-c52fab64c743",
+    "conversationId": "research-routing-live-20261108-selective",
+    "role": "assistant",
+    "text": "自治体の避難所開設方針の調査は止めます。図書館の調査はそのまま続けます。",
+    "createdAt": "2026-11-08T09:08:19.828Z",
+    "runId": "f15fd0f0-c466-41d3-b6b9-599011d19545",
+    "delivery": {
+      "id": "f658d8e2-f3bc-412e-a5fa-da32d1da1b3d",
+      "version": 2,
+      "emotion": "none",
+      "emotionConfidence": 1,
+      "motion": "neutral",
+      "tone": "natural",
+      "source": "host",
+      "confidence": 1,
+      "motionConfidence": 1,
+      "toneConfidence": 1,
+      "latencyMs": 0
+    }
+  }
+}

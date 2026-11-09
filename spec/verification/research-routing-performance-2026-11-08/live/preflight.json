@@ -1,0 +1,94 @@
+{
+  "checkedAt": "2026-11-08T08:59:24.086Z",
+  "status": {
+    "service": "eumenes",
+    "phase": "ready",
+    "larm": {
+      "state": "ready",
+      "capabilities": [
+        "llm"
+      ],
+      "chatInput": {
+        "contractVersion": "larm-chat-input.v1",
+        "maxRequestBytes": 4194304,
+        "images": {
+          "mimeTypes": [
+            "image/jpeg",
+            "image/png",
+            "image/bmp"
+          ],
+          "maxImages": 8,
+          "maxBytes": 3145728,
+          "maxWidth": 8192,
+          "maxHeight": 8192,
+          "maxPixels": 16777216,
+          "maxAspectRatio": 100,
+          "referenceTypes": [
+            "data-url"
+          ],
+          "roles": [
+            "user"
+          ],
+          "detail": "auto-only",
+          "orientation": "encoded-pixels",
+          "alpha": "discard"
+        },
+        "tokenCounting": {
+          "protocol": "llama-chat-token-count.v1",
+          "endpoint": "/v1/chat/completions/input-tokens"
+        },
+        "retention": {
+          "inferenceAudit": "full-required",
+          "requestPayloadStored": true,
+          "maxRetentionSeconds": 604800,
+          "encrypted": true,
+          "tokenCountPayloadStored": false,
+          "providerImageStore": false,
+          "historyResendRequired": true
+        }
+      }
+    }
+  },
+  "router": {
+    "entry": "route",
+    "accept": 0.6,
+    "low": 0.3,
+    "margin": 0.15,
+    "approve": 0.85,
+    "multi": 0.5
+  },
+  "cards": [
+    {
+      "id": "web.research",
+      "version": 7,
+      "revisionId": "toolchain:web.research@7",
+      "description": "複数資料の本文を読み比べ、条件・制約・例外・共通点・相違点・不明点を検証する調査を担当する。複数の項目を比較表に整理し、出典リンク付きの調査報告を作る。結果をタイトル付きMarkdown文書として一時ファイルと利用可能なDoclingのEumenes専用領域へ保存するところまで、この担当が一つの調査として行う"
+    },
+    {
+      "id": "web.search",
+      "version": 10,
+      "revisionId": "toolchain:web.search@10",
+      "description": "公開Webの一つの事実・一つのページの内容を確認して、その場で短い回答と出典リンクを返す。用語の意味、名称、所在地、日付、受付時間、仕様の一項目を調べる単発の確認を担当する"
+    }
+  ],
+  "markdown": {
+    "maxMarkdownBytes": 8388608,
+    "maxRecoveryBytes": 8388608,
+    "maxRequestBytes": 20971520,
+    "maxPageSize": 100,
+    "features": {
+      "library": false,
+      "folders": false,
+      "folderCopy": false,
+      "patch": false,
+      "copy": false,
+      "delete": false,
+      "createFolder": false,
+      "recursiveDelete": false,
+      "batch": false,
+      "maxBatchItems": 0,
+      "maxAffectedItems": 0,
+      "maxCopyBytes": 0
+    }
+  }
+}

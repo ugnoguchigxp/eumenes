@@ -19,6 +19,11 @@ export function taskExecutionSources(
 	const checkingReferences = new Set<string>();
 	const port: ReturnType<typeof taskExecutionSources> = {
 		validSourceInTransaction(db, source) {
+			if (source.origin === "workflow")
+				return (
+					!!host.workflowSteps &&
+					!!host.workflowAuthority?.planInTransaction(db, source)
+				);
 			if (
 				source.origin === "autonomous" &&
 				(!source.agency ||
@@ -86,6 +91,8 @@ export function taskExecutionSources(
 				: null;
 		},
 		validReferenceInTransaction(db, source, ref) {
+			if (source.origin === "workflow" && ref.owner !== "agent-runtime")
+				return false;
 			if (checkingReferences.has(ref.ref) || checkingReferences.size >= 32)
 				return false;
 			checkingReferences.add(ref.ref);
@@ -126,6 +133,11 @@ export function taskExecutionSources(
 				);
 				if (!stored) return false;
 				if (
+					source.origin === "workflow" &&
+					stored.child.source.runId !== source.runId
+				)
+					return false;
+				if (
 					!port.validSourceInTransaction(db, stored.child.source) ||
 					stored.child.refs.some(
 						(ancestor) =>
@@ -138,6 +150,12 @@ export function taskExecutionSources(
 				)
 					return false;
 				try {
+					if (stored.child.source.origin === "workflow")
+						return (
+							source.origin === "workflow" &&
+							stored.result.state === "completed" &&
+							!!host.workflowSteps?.verify(db, stored.child, stored.result)
+						);
 					resolve(db, stored.child);
 					const r = reference.parse(stored.result.ref);
 					if (r.kind === "research" && r.reportDigest)

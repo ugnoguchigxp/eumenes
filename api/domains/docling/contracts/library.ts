@@ -3,6 +3,7 @@ import {
 	documentId,
 	documentEtag,
 	documentSummary,
+	documentUpdatedAt,
 	type DocumentCapabilities,
 } from "./documents";
 export const folderId = z.string().regex(/^folder-[a-f0-9]{32}$/);
@@ -29,6 +30,7 @@ export const folder = z.object({
 	documentCount: z.number().int().nonnegative(),
 	folderCount: z.number().int().nonnegative(),
 	hasUnsupportedEntries: z.boolean(),
+	updatedAt: documentUpdatedAt,
 });
 export const libraryEntry = z.discriminatedUnion("kind", [
 	documentSummary.extend({ kind: z.literal("document") }),

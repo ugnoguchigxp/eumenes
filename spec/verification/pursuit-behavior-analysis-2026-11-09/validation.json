@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "cases": 4,
+  "timelineRows": 317,
+  "webRows": 29,
+  "modelRows": 131,
+  "checks": [
+    "exact attempt counts and input/output equal retained all-page metrics",
+    "cache input/output equal the same attempt IDs",
+    "all known queue waits equal earlier measurements",
+    "no duplicate model attempt IDs",
+    "all time intervals nonnegative",
+    "public data and retained logs only; no product database reads"
+  ],
+  "limitations": [
+    "local action names/arguments and exact search queries are not available from current public APIs",
+    "baseline model purposes were not logged in that server version"
+  ],
+  "inputHashes": {
+    "/Users/y.noguchi/Code/eumenes/spec/verification/pursuit-behavior-analysis-2026-11-09/source-events.jsonl": "5047e74c3b217543698d92113d3e813822390dfa8b8e08177b2e0a2975fb27ba",
+    "/Users/y.noguchi/Code/eumenes/spec/verification/pursuit-behavior-analysis-2026-11-09/api-snapshot.json": "a5f2d8d23ffc630835d8b3e522d8c41fd6f24186bb3b96a066fa8bb01863989e",
+    "/Users/y.noguchi/Code/eumenes/spec/verification/pursuit-behavior-analysis-2026-11-09/web-api-snapshot.json": "ba32df972bd1bbb01664a713aa85ff0512456b8ae5b8c7f5a8197fff67b7c1cf",
+    "/Users/y.noguchi/Code/eumenes/spec/verification/research-routing-performance-2026-11-08/live/measurements.json": "7443f53814cc6b1bcff6c40e5708e79f673cd976ef159f1066e64e45929944a3",
+    "/Users/y.noguchi/Code/eumenes/spec/verification/research-routing-performance-2026-11-08/live/web-acquisitions.json": "93d96f79e87e27abc22de8ae39a0e90c767d15fee6cd5c779c617386bb31f327"
+  },
+  "unchangedProductFilesChecked": 15,
+  "productSourceChanges": [],
+  "contextMcpCumulative": {
+    "context_compile": 6,
+    "compile_eval": 6
+  },
+  "documentationCorrection": "One manually transcribed gap differed by 4 ms; corrected against the original public job timestamps. Dataset and acceptance expectations unchanged."
+}

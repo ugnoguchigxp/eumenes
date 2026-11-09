@@ -1,4 +1,23 @@
-import type { LibraryItem } from "./library-types";
+import type { LibraryFeatures, LibraryItem } from "./library-types";
+export const pathInFolder = (path: string, folder: string) =>
+	[folder, path.split("/").at(-1)].filter(Boolean).join("/");
+
+export function canMoveLibraryItems(
+	items: LibraryItem[],
+	features: LibraryFeatures,
+) {
+	return (
+		features.patch &&
+		items.length > 0 &&
+		(items.length === 1 ||
+			(features.batch && items.length <= features.maxBatchItems)) &&
+		items.every(
+			(item) =>
+				!item.hasUnsupportedEntries &&
+				(item.kind === "document" || features.folders),
+		)
+	);
+}
 export const newLibraryId = (kind: "document" | "folder") =>
 	`${kind === "document" ? "wiki" : "folder"}-${crypto.randomUUID().replaceAll("-", "").toLowerCase()}`;
 export function selectedRoots(items: LibraryItem[]) {
@@ -78,7 +97,7 @@ export function makeLibraryCommand(input: {
 			...(action === "delete"
 				? {}
 				: {
-						path: [path, e.path.split("/").at(-1)].filter(Boolean).join("/"),
+						path: pathInFolder(e.path, path),
 						...(action === "copy" ? { newId: ids[e.id] } : {}),
 					}),
 		})),

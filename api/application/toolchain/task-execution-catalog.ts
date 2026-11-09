@@ -52,7 +52,8 @@ export function taskChildContext(host: TaskExecutionHost) {
 	function live(db: Database, child: ChildExecution) {
 		if (!agents.executions.authorizeChildInTransaction(db, child))
 			throw new Error("execution_changed");
-		resolve(db, child);
+		if (child.source.origin !== "workflow" || !host.workflowCatalog)
+			resolve(db, child);
 	}
 	function research(
 		db: Database,

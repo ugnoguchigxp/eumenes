@@ -2,6 +2,7 @@ import {
 	useCallback,
 	useEffect,
 	useImperativeHandle,
+	useMemo,
 	useRef,
 	useState,
 	useReducer,
@@ -19,6 +20,7 @@ import { ActionButton, CreateButton } from "../ActionButton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../Tabs";
 import { MarkdownFileBrowser } from "./file-browser";
 import { MarkdownHeaderDelete } from "./header-delete";
+import type { RevealRequest } from "./library-reveal";
 import { useCacheAutosave } from "./use-cache-autosave";
 import {
 	createMarkdownEditor,
@@ -35,11 +37,44 @@ import "./markdown-workspace.css";
 const signature = (title: string, document: unknown) =>
 	JSON.stringify({ title, document });
 export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
+	return props.preview ? (
+		<ReadOnlyDocument {...props.preview} />
+	) : (
+		<EditableWorkspace {...props} />
+	);
+}
+
+function ReadOnlyDocument({
+	title,
+	markdown,
+}: {
+	title: string;
+	markdown: string;
+}) {
+	const editor = useMemo(
+		() => createMarkdownEditor(importMarkdown(markdown)),
+		[markdown],
+	);
+	return (
+		<section className="ds-markdown-workspace" aria-label="Markdown文書">
+			<header className="ds-markdown-documentbar">
+				<strong>{title}</strong>
+				<span>一時保存 · 閲覧のみ</span>
+			</header>
+			<Plate editor={editor} readOnly>
+				<PlateContent aria-label="文書本文" className="ds-markdown-content" />
+			</Plate>
+		</section>
+	);
+}
+
+function EditableWorkspace(props: MarkdownWorkspaceProps) {
 	const input = useRef<HTMLInputElement>(null);
 	const downloadRef = useRef<(() => void) | null>(null);
 	const [editorEpoch, setEditorEpoch] = useState(0);
 	const { onLibrary } = props;
 	const [view, setView] = useState(props.current ? "editor" : "files");
+	const [reveal, setReveal] = useState<RevealRequest>();
 	const [localDraftId, setLocalDraftId] = useState(
 		props.recovery?.documentId ?? null,
 	);
@@ -84,7 +119,9 @@ export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 		setView(value);
 		if (value === "files") {
 			libraryRequested.current = true;
-			onLibrary();
+			setReveal(props.current ? { documentId: props.current.id } : undefined);
+			setFileSelection({ scope: selectionScope, ids: [] });
+			if (!props.current) onLibrary();
 		}
 	}
 	async function discardCurrent() {
@@ -215,6 +252,7 @@ export function MarkdownWorkspace(props: MarkdownWorkspaceProps) {
 					<MarkdownFileBrowser
 						{...props}
 						headerDelete={headerDelete}
+						reveal={view === "files" ? reveal : undefined}
 						localInput={localDraftId === props.current?.id}
 						onDiscardCurrent={discardCurrent}
 						onEditLocal={async (id) => {

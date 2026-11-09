@@ -98,7 +98,33 @@
       "ccc7345b-e491-4dcf-a514-9802a83ba089",
       "42f2c059-222c-45e0-a8a7-11e8ff2142c4",
       "dbed47d3-f91b-48ad-a282-5a536e7d1de1"
-    ]
+    ],
+    "pursuit": {
+      "calls": 51,
+      "inputTokens": 1069552,
+      "outputTokens": 42721,
+      "totalReportedTokens": 1112273,
+      "unknownUsageCalls": 0,
+      "inferenceMs": 1006069
+    },
+    "associatedRecordedInference": {
+      "calls": 2,
+      "inputTokens": 25530,
+      "outputTokens": 1540,
+      "totalReportedTokens": 27070,
+      "unknownUsageCalls": 0,
+      "inferenceMs": 43022
+    },
+    "totalRecordedInference": {
+      "calls": 53,
+      "inputTokens": 1095082,
+      "outputTokens": 44261,
+      "totalReportedTokens": 1139343,
+      "unknownUsageCalls": 0,
+      "inferenceMs": 1049091
+    },
+    "routerTokens": "not reported by the decision.context classifier",
+    "timingNote": "Pursuit inference sum and per-owner queue wait are cumulative durations. Ancillary calls can overlap these intervals; do not add all durations as wall time."
   },
   {
     "name": "case-b3",
@@ -211,6 +237,32 @@
       "fcdf6d43-679e-4f06-97a1-2d17187ac3a1",
       "d5ff07eb-3df8-4f71-8c4b-b5f708545a58",
       "941f16cd-42ca-43cf-9bcc-08b4e108212a"
-    ]
+    ],
+    "pursuit": {
+      "calls": 27,
+      "inputTokens": 542767,
+      "outputTokens": 19878,
+      "totalReportedTokens": 562645,
+      "unknownUsageCalls": 0,
+      "inferenceMs": 482719
+    },
+    "associatedRecordedInference": {
+      "calls": 2,
+      "inputTokens": 25357,
+      "outputTokens": 1155,
+      "totalReportedTokens": 26512,
+      "unknownUsageCalls": 0,
+      "inferenceMs": 32413
+    },
+    "totalRecordedInference": {
+      "calls": 29,
+      "inputTokens": 568124,
+      "outputTokens": 21033,
+      "totalReportedTokens": 589157,
+      "unknownUsageCalls": 0,
+      "inferenceMs": 515132
+    },
+    "routerTokens": "not reported by the decision.context classifier",
+    "timingNote": "Pursuit inference sum and per-owner queue wait are cumulative durations. Ancillary calls can overlap these intervals; do not add all durations as wall time."
   }
 ]

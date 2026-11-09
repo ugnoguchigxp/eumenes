@@ -1,0 +1,166 @@
+{
+  "caseId": "single-fact",
+  "part": "start",
+  "startedAt": "2026-11-08T09:05:35.993Z",
+  "finishedAt": "2026-11-08T09:06:15.616Z",
+  "exitCode": 0,
+  "conversationId": "research-routing-live-20261108-short",
+  "run": {
+    "id": "58740120-b460-4aae-904f-1ad91a73d036",
+    "agentTaskId": "1c10c55e-d859-4c51-9d6c-d530c6408798",
+    "requestId": "61656a1f-60f5-4257-b7ca-27354d677adc",
+    "conversationId": "research-routing-live-20261108-short",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 4,
+    "inputMessageId": "cfd5f56b-627b-4c3b-81c9-541c272bf2fc",
+    "answerMessageId": null,
+    "announcement": "「Web検索」に頼みます。",
+    "error": null,
+    "jobId": "d11f8116-f3e7-4999-a1c4-db6f6e50e177",
+    "deadlineAt": "2026-11-08T09:08:36.084Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-08T09:05:36.084Z",
+    "updatedAt": "2026-11-08T09:06:15.572Z"
+  },
+  "newPursuitIds": [
+    "180ee6a7-19d9-436d-bfea-54d4200616fa"
+  ],
+  "selections": {
+    "items": [
+      {
+        "id": "93491eaa-859f-45e1-8ee1-c353a412a5a1",
+        "runId": "58740120-b460-4aae-904f-1ad91a73d036",
+        "conversationId": "research-routing-live-20261108-short",
+        "utteranceId": null,
+        "requestId": "61656a1f-60f5-4257-b7ca-27354d677adc",
+        "retrieval": "hybrid",
+        "candidates": [
+          {
+            "toolchainId": "web.search",
+            "revisionId": "toolchain:web.search@10",
+            "functionName": "web_search",
+            "rank": 1,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.research",
+            "revisionId": "toolchain:web.research@7",
+            "functionName": "web_research",
+            "rank": 2,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "browser.operate",
+            "revisionId": "toolchain:browser.operate@8",
+            "functionName": "browser_operate",
+            "rank": 3,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "docling.desk",
+            "revisionId": "toolchain:docling.desk@2",
+            "functionName": "docling_desk",
+            "rank": 4,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "codex-tasks.manage",
+            "revisionId": "toolchain:codex-tasks.manage@2",
+            "functionName": "codex_tasks",
+            "rank": 5,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "markdown.collaborate",
+            "revisionId": "toolchain:markdown.collaborate@4",
+            "functionName": "markdown_edit",
+            "rank": 6,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_runs",
+            "revisionId": "host:read_runs@1",
+            "functionName": "read_runs",
+            "rank": 7,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ocr.manage",
+            "revisionId": "toolchain:ocr.manage@6",
+            "functionName": "ocr",
+            "rank": 8,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "world.query",
+            "revisionId": "toolchain:world.query@8",
+            "functionName": "world_query",
+            "rank": 9,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "kanban.manage",
+            "revisionId": "toolchain:kanban.manage@4",
+            "functionName": "kanban",
+            "rank": 10,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          }
+        ],
+        "historyRefs": [],
+        "decision": "toolchain",
+        "toolchainId": "web.search",
+        "toolchainRevisionId": "toolchain:web.search@10",
+        "functionName": "web_search",
+        "request": "MDNの https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API を読み、IndexedDBのAPIは同期か非同期かを、出典リンク付きで短く教えてください。",
+        "taskId": null,
+        "outcome": "completed",
+        "outcomeCode": null,
+        "recipe": null,
+        "durationMs": null,
+        "createdAt": 1794128737198,
+        "settledAt": 1794128775566
+      }
+    ],
+    "nextCursor": null
+  },
+  "todos": {
+    "revision": 0,
+    "data": {
+      "rows": [],
+      "counts": {
+        "todo": 0,
+        "archived": 1
+      },
+      "total": 0,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  }
+}

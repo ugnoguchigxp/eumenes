@@ -70,6 +70,27 @@ const conflict = () => {
 	};
 	return c;
 };
+test("a temporary document renders Markdown through Plate in read-only mode", () => {
+	const p = props();
+	render(
+		<MarkdownWorkspace
+			{...p}
+			current={null}
+			preview={{
+				title: "比較調査",
+				markdown: "## 結論\n\n[出典](https://example.com/source)",
+			}}
+		/>,
+	);
+	expect(screen.getByRole("heading", { name: "結論" })).toBeTruthy();
+	expect(screen.getByRole("link", { name: "出典" }).getAttribute("href")).toBe(
+		"https://example.com/source",
+	);
+	expect(
+		screen.getByLabelText("文書本文").getAttribute("contenteditable"),
+	).toBe("false");
+	expect(p.onDraft).not.toHaveBeenCalled();
+});
 test("header download exports the current unsaved title and body as Markdown without saving", async () => {
 	const createObjectURL = vi.fn((_blob: Blob) => "blob:markdown-download"),
 		revokeObjectURL = vi.fn();

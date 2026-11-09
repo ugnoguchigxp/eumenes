@@ -43,8 +43,10 @@ export type MarkdownLibraryEntry = {
 	title: string;
 	namespace: string;
 	path: string;
+	updatedAt?: string;
 };
 export type MarkdownWorkspaceProps = {
+	preview?: { title: string; markdown: string };
 	files?: import("./library-types").LibraryFiles;
 	knownFolders?: import("./library-types").LibraryItem[];
 	filesLoading?: boolean;
@@ -54,10 +56,11 @@ export type MarkdownWorkspaceProps = {
 	onManage?(command: unknown, requestId: string): Promise<boolean>;
 	onCheck?(id: string): void;
 	current: MarkdownCurrent | null;
-	documents: { id: string; title: string }[];
+	documents: { id: string; title: string; updated_at?: number }[];
 	library: MarkdownLibraryEntry[];
 	libraryStatus?: "idle" | "loading" | "ready" | "error";
 	libraryHasMore?: boolean;
+	libraryNextCursor?: string | null;
 	namespaces?: string[];
 	capabilities?: {
 		maxMarkdownBytes: number;

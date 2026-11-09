@@ -1,0 +1,84 @@
+{
+  "checkedAt": "2026-11-08T09:06:54.618Z",
+  "caseId": "single-fact",
+  "label": "final",
+  "active": {
+    "revision": 0,
+    "data": {
+      "rows": [],
+      "counts": {
+        "todo": 0,
+        "archived": 1
+      },
+      "total": 0,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "archived": {
+    "revision": 1794128775565,
+    "data": {
+      "rows": [
+        {
+          "id": "94ed8c09-5699-40c4-8c14-a244673317fd",
+          "request": "MDNの https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API を読み、IndexedDBのAPIは同期か非同期かを、出典リンク付きで短く教えてください。",
+          "status": "done",
+          "outcome": "succeeded",
+          "summary": "IndexedDBの操作は非同期です。",
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T09:06:15.565Z"
+        }
+      ],
+      "counts": {
+        "todo": 0,
+        "archived": 1
+      },
+      "total": 1,
+      "state": "archived",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "notices": [
+    {
+      "id": "94ed8c09-5699-40c4-8c14-a244673317fd",
+      "conversationId": "research-routing-live-20261108-short",
+      "title": "MDNの https://developer.mozilla.org/en-US/docs/Web/API/Index…",
+      "toolchainTitle": "Web検索",
+      "outcome": "succeeded",
+      "summary": "IndexedDBのAPI操作は非同期で行われます。[MDN: IndexedDB API](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)",
+      "links": [
+        {
+          "uri": "eumenes://report/agent%3A3172c543-1ad3-44dc-b826-d61199e94c7e",
+          "label": "IndexedDBの操作は非同期です。",
+          "kind": "report"
+        }
+      ],
+      "read": false,
+      "createdAt": "2026-11-08T09:06:15.565Z"
+    }
+  ],
+  "resources": {
+    "resources": [
+      {
+        "ref": "a1",
+        "uri": "eumenes://report/agent%3A3172c543-1ad3-44dc-b826-d61199e94c7e",
+        "kind": "report",
+        "kindLabel": "調査報告",
+        "label": "IndexedDBの操作は非同期です。",
+        "actions": [
+          "read",
+          "open"
+        ],
+        "preview": "MDNの https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API を読み、IndexedD",
+        "forgotten": false
+      }
+    ],
+    "messages": []
+  },
+  "specialist": {
+    "session": null
+  }
+}

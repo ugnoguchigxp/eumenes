@@ -11,6 +11,7 @@ import {
 } from "../contracts";
 import { getDocument, type StoredDocument } from "../repository";
 import { compileJsonSchemaSubset } from "./json-schema-subset";
+import { isWorkflowSchema } from "./workflow-schemas";
 
 function typed<T>(
 	stored: StoredDocument | null,
@@ -56,7 +57,9 @@ export function schemaInTransaction(
 			: null;
 	}
 	if (!ref.startsWith("schema:")) return null;
-	const stored = typed(getDocument(db, ref), "schema", bundleSchemaV1);
+	const document = getDocument(db, ref);
+	if (isWorkflowSchema(document)) return null;
+	const stored = typed(document, "schema", bundleSchemaV1);
 	if (!stored) return null;
 	try {
 		return compileJsonSchemaSubset(stored.document.schema);

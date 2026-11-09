@@ -1,5 +1,6 @@
 import type { CallSession, Receipt } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
+import type { RoutedPipelineStep } from "../../tool-runtime";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
@@ -153,6 +154,29 @@ export async function runRoutedTurn(
 /** What the steps of one routed turn share: its words, its model calls and its host operations. */
 export type Turn = ReturnType<typeof createTurn>;
 
+function callSession(
+	input: GenerateInput,
+	options: RoutedTurnOptions,
+): CallSession {
+	return {
+		sessionRole: "main",
+		agentSession: {
+			conversationId: input.conversationId,
+			agentId: input.conversationId,
+		},
+		// The turn settles its request itself (a model answer, or the host's words): a failed call ends only that call,
+		// so a choice can be made again, the talk turn follow it, or the host answer.
+		retainRequest: true,
+		outputLimit: input.harness.call.outputLimit,
+		reasoning: {
+			larm: input.harness.call.reasoning,
+			cloud: input.harness.call.cloudReasoning,
+		},
+		...(options.session?.context ? { context: options.session.context } : {}),
+		...(options.session?.refs ? { refs: options.session.refs } : {}),
+	};
+}
+
 function createTurn(
 	deps: DialogueDeps,
 	input: GenerateInput,
@@ -170,26 +194,11 @@ function createTurn(
 	let published = false;
 	/** Every word for the user goes out here: the run is marked as having said something once a word went. */
 	const delta = (text: string) => {
+		if (signal.aborted) return;
 		if (text) published = true;
 		options.delta(text);
 	};
-	const session: CallSession = {
-		sessionRole: "main",
-		agentSession: {
-			conversationId: input.conversationId,
-			agentId: input.conversationId,
-		},
-		// The turn settles its request itself (a model answer, or the host's words): a failed call ends only that call,
-		// so a choice can be made again, the talk turn follow it, or the host answer.
-		retainRequest: true,
-		outputLimit: input.harness.call.outputLimit,
-		reasoning: {
-			larm: input.harness.call.reasoning,
-			cloud: input.harness.call.cloudReasoning,
-		},
-		...(options.session?.context ? { context: options.session.context } : {}),
-		...(options.session?.refs ? { refs: options.session.refs } : {}),
-	};
+	const session = callSession(input, options);
 
 	/** One model call on the run's request: a streamed reply (`onDelta`) or a silent choice (`outputSchema`). */
 	const call = (
@@ -198,6 +207,7 @@ function createTurn(
 		extra: Pick<CallSession, "outputSchema" | "cloudOutputSchema">,
 		tools?: NativeTool[],
 	) => {
+		signal.throwIfAborted();
 		const stream = deps.larm.executeStream;
 		if (!input.requestId || !stream) throw new Error("routed_turn_unavailable");
 		calls++;
@@ -219,7 +229,9 @@ function createTurn(
 	async function operate(
 		name: string,
 		args: Record<string, unknown>,
+		routedSteps?: readonly RoutedPipelineStep[],
 	): Promise<{ outcome: ToolOutcome } | { refused: ValidationFailure }> {
+		signal.throwIfAborted();
 		const raw = {
 			id: `routed-${++seq}`,
 			name,
@@ -230,6 +242,7 @@ function createTurn(
 			const outcome = await options.execute(parsed, {
 				signal,
 				...(receipt ? { receipt } : {}),
+				...(routedSteps ? { routedSteps } : {}),
 				exchange,
 			});
 			executed.push({ call: parsed, outcome });
@@ -275,6 +288,7 @@ function createTurn(
 
 		/** The host's own words: spoken as they are, and part of the answer. */
 		speak(text: string) {
+			signal.throwIfAborted();
 			const words = text.trim();
 			if (!words) return;
 			const piece = said ? `\n${words}` : words;
@@ -327,7 +341,7 @@ function createTurn(
 		},
 
 		/** One host operation through the generation's executor: its outcome, or the refusal of its arguments. */
-		act: (name: string, args: Record<string, unknown>) => operate(name, args),
+		act: operate,
 
 		/** Why the host refused an operation, as the retry reads it. */
 		reasonOf(error: ValidationFailure) {
@@ -342,6 +356,7 @@ function createTurn(
 		 * 2026-10-31 §2); `tools: false` when the host has read for it already.
 		 */
 		async talk(notice?: string, { tools = true }: { tools?: boolean } = {}) {
+			signal.throwIfAborted();
 			let talkImageAnswer: GenerationOutcome["imageAnswer"];
 			const messages = notice
 				? withNotice(input.messages, notice)

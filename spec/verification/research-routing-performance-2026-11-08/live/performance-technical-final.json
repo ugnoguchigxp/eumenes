@@ -1,0 +1,120 @@
+{
+  "checkedAt": "2026-11-08T09:27:36.241Z",
+  "caseId": "performance-technical",
+  "label": "final",
+  "active": {
+    "revision": 0,
+    "data": {
+      "rows": [],
+      "counts": {
+        "todo": 0,
+        "archived": 1
+      },
+      "total": 0,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "archived": {
+    "revision": 1794129619443,
+    "data": {
+      "rows": [
+        {
+          "id": "7c697f8e-c456-427d-b12b-009488b7019a",
+          "request": "MDNの公式資料を実際に読み、オフラインでも使える個人用メモアプリでIndexedDBとWeb Storageを使う場合の違いを調べてください。同期・非同期、保存できるデータ、容量と削除の扱い、向く用途を比較表にし、判断できない点も明記してください。読みやすいタイトルを付けた日本語のMarkdown報告にまとめ、出典リンクを残してください。会話の担当は切り替えず、詳しいWeb調査を使って文書として保存まで進めてください。",
+          "status": "done",
+          "outcome": "partial",
+          "summary": "MDN公式本文に基づき、IndexedDBは非同期・構造化データ向け、Web Storageは同期・少量用途向けと比較。容量の具体値や環境依存の削除条件、アプリ全体のオフライン化は資料だけでは確定できないと明記した。",
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T09:20:19.443Z"
+        }
+      ],
+      "counts": {
+        "todo": 0,
+        "archived": 1
+      },
+      "total": 1,
+      "state": "archived",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "notices": [
+    {
+      "id": "7c697f8e-c456-427d-b12b-009488b7019a",
+      "conversationId": "research-routing-live-20261108-technical",
+      "title": "MDNの公式資料を実際に読み、オフラインでも使える個人用メモアプリでIndexedDBとWeb Storageを使う場…",
+      "toolchainTitle": "詳しいWeb調査",
+      "outcome": "partial",
+      "summary": "# オフライン対応の個人用メモアプリ：IndexedDBとWeb Storageの比較 ## 結論 メモ本文や添付ファイルなど、構造化されたデータを複数件保存・検索する中心領域にはIndexedDBが適しています。IndexedDBは非同期で、構造化クローン可能なオブジェクト（ファイル／Blobを含む）を扱い、トランザクションやインデックスを備えるためです。一方、少量の単純な設定値などにはWeb…",
+      "links": [
+        {
+          "uri": "eumenes://markdown.document/generated-20cb5d16-45bd-4768-8cb2-bc4d14b6b208",
+          "label": "オフライン対応の個人用メモアプリ：IndexedDBとWeb Storageの比較",
+          "kind": "markdown.document"
+        },
+        {
+          "uri": "eumenes://report/pursuit%3A180ee6a7-19d9-436d-bfea-54d4200616fa",
+          "label": "MDN公式本文に基づき、IndexedDBは非同期・構造化データ向け、Web Storageは同期・少量用途向けと比較。容量の具体値や環境依存の削除条件、アプリ全体のオフライン化は資料だけでは確定できないと明記した。",
+          "kind": "report"
+        },
+        {
+          "uri": "eumenes://scratch/20cb5d16-45bd-4768-8cb2-bc4d14b6b208",
+          "label": "オフライン対応の個人用メモアプリ：IndexedDBとWeb Storageの比較.md",
+          "kind": "scratch"
+        }
+      ],
+      "read": false,
+      "createdAt": "2026-11-08T09:20:19.443Z"
+    }
+  ],
+  "resources": {
+    "resources": [
+      {
+        "ref": "a1",
+        "uri": "eumenes://markdown.document/generated-20cb5d16-45bd-4768-8cb2-bc4d14b6b208",
+        "kind": "markdown.document",
+        "kindLabel": "文書",
+        "label": "オフライン対応の個人用メモアプリ：IndexedDBとWeb Storageの比較",
+        "actions": [
+          "open",
+          "read"
+        ],
+        "preview": "Doclingの調査文書",
+        "forgotten": false
+      },
+      {
+        "ref": "a2",
+        "uri": "eumenes://report/pursuit%3A180ee6a7-19d9-436d-bfea-54d4200616fa",
+        "kind": "report",
+        "kindLabel": "調査報告",
+        "label": "MDN公式本文に基づき、IndexedDBは非同期・構造化データ向け、Web Storageは同期・少量用途向けと比較。容量の具体値や環境依存の削除条件、アプリ全体のオフライン化は資料だけでは確定できないと明記した。",
+        "actions": [
+          "read",
+          "open"
+        ],
+        "preview": "MDNの公式資料を実際に読み、オフラインでも使える個人用メモアプリでIndexedDBとWeb Storageを使う場合の違いを調べてください。同期・非同期、保存できるデータ、容量と削除の扱い、向く用途を比較表にし、判断できない点も明記して",
+        "forgotten": false
+      },
+      {
+        "ref": "a3",
+        "uri": "eumenes://scratch/20cb5d16-45bd-4768-8cb2-bc4d14b6b208",
+        "kind": "scratch",
+        "kindLabel": "一時ファイル",
+        "label": "オフライン対応の個人用メモアプリ：IndexedDBとWeb Storageの比較.md",
+        "actions": [
+          "open",
+          "read"
+        ],
+        "preview": "詳しいWeb調査が作成、Markdown 4KB",
+        "forgotten": false
+      }
+    ],
+    "messages": []
+  },
+  "specialist": {
+    "session": null
+  }
+}

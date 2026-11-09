@@ -13,6 +13,7 @@ import {
 export function LibraryActionDialog(
 	props: Omit<MarkdownWorkspaceProps, "files"> & {
 		action: LibraryAction;
+		initialPath?: string;
 		items: LibraryItem[];
 		files: LibraryActionScope;
 		localInput: boolean;
@@ -23,11 +24,12 @@ export function LibraryActionDialog(
 ) {
 	const one = props.items[0];
 	const [path, setPath] = useState(
-			props.action === "create-folder"
-				? [props.files.path, "新しいフォルダー"].filter(Boolean).join("/")
-				: props.items.length === 1
-					? one!.path
-					: props.files.path,
+			props.initialPath ??
+				(props.action === "create-folder"
+					? [props.files.path, "新しいフォルダー"].filter(Boolean).join("/")
+					: props.items.length === 1
+						? one!.path
+						: props.files.path),
 		),
 		[title, setTitle] = useState(one?.title ?? ""),
 		[recursive, setRecursive] = useState(false),
@@ -158,6 +160,10 @@ export function LibraryActionDialog(
 								<input
 									aria-label="保存場所"
 									value={path}
+									placeholder={
+										props.initialPath === "" ? "保存領域のルート" : undefined
+									}
+									readOnly={props.initialPath !== undefined}
 									onChange={(e) => {
 										setPath(e.target.value);
 										change();

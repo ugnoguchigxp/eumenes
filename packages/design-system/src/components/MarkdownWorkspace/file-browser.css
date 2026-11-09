@@ -103,6 +103,14 @@
 .ds-markdown-folder-row:hover {
 	background: color-mix(in srgb, var(--foreground, #283445) 5%, transparent);
 }
+.ds-markdown-workspace .ds-markdown-file-name[draggable="true"] {
+	cursor: grab;
+}
+.ds-markdown-file-browser [data-move-target="true"] {
+	outline: 2px solid #38b6a1;
+	outline-offset: -2px;
+	background: color-mix(in srgb, #38b6a1 18%, transparent);
+}
 .ds-markdown-folder-row[data-active],
 .ds-markdown-folder-nav button[aria-current="page"] {
 	color: var(--foreground, #283445);
@@ -244,6 +252,26 @@
 .ds-markdown-file-table th:last-child {
 	min-width: 125px;
 }
+.ds-markdown-file-table .ds-markdown-sort-column {
+	padding: 0;
+}
+.ds-markdown-file-table .ds-markdown-file-sort {
+	border: 0;
+	background: transparent;
+	padding: 11px 12px;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font: inherit;
+}
+.ds-markdown-file-table .ds-markdown-file-sort:hover {
+	color: var(--foreground, #243641);
+}
+.ds-markdown-file-date {
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
 .ds-markdown-file-table tr:hover {
 	background: color-mix(in srgb, #38b6a1 8%, transparent);
 }
@@ -272,21 +300,6 @@
 	color: var(--muted-foreground, #67788c);
 	margin: 3px 0 0 32px;
 	overflow-wrap: anywhere;
-}
-.ds-markdown-file-state {
-	display: inline-flex;
-	align-items: center;
-	gap: 7px;
-	white-space: nowrap;
-}
-.ds-markdown-file-state i {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: #d5ad4d;
-}
-.ds-markdown-file-state[data-saved="true"] i {
-	background: #38b6a1;
 }
 .ds-markdown-files-empty {
 	display: flex;
@@ -363,6 +376,9 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 5px;
+}
+.ds-markdown-file-table tr[data-current] {
+	background: color-mix(in srgb, #38b6a1 10%, transparent);
 }
 .ds-markdown-file-table tr[data-selected] {
 	background: color-mix(in srgb, #38b6a1 12%, transparent);

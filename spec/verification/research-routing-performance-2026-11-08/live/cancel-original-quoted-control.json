@@ -1,0 +1,196 @@
+{
+  "caseId": "cancel-original",
+  "part": "quoted-control",
+  "startedAt": "2026-11-08T09:02:41.607Z",
+  "finishedAt": "2026-11-08T09:02:55.308Z",
+  "exitCode": 0,
+  "conversationId": "research-routing-live-20261108-cancel",
+  "run": {
+    "id": "48f49166-5605-4ff2-9ad8-ef571fafe816",
+    "agentTaskId": null,
+    "requestId": "f9e8ebd3-3f2d-46f6-98ca-ebb1446b08f5",
+    "conversationId": "research-routing-live-20261108-cancel",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 2,
+    "inputMessageId": "0b2e2503-8d3d-4826-9def-9a6bad46d0b6",
+    "answerMessageId": "9e00c28d-1689-4aec-8b76-d4ae6a766bc1",
+    "announcement": null,
+    "error": null,
+    "jobId": "34db882f-e975-48c4-bc7c-8790774db9f0",
+    "deadlineAt": "2026-11-08T09:05:41.701Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-08T09:02:41.701Z",
+    "updatedAt": "2026-11-08T09:02:54.621Z"
+  },
+  "newPursuitIds": [],
+  "selections": {
+    "items": [
+      {
+        "id": "0dd27201-bebd-4e7a-ae63-9fab35f2f355",
+        "runId": "48f49166-5605-4ff2-9ad8-ef571fafe816",
+        "conversationId": "research-routing-live-20261108-cancel",
+        "utteranceId": null,
+        "requestId": "f9e8ebd3-3f2d-46f6-98ca-ebb1446b08f5",
+        "retrieval": "hybrid",
+        "candidates": [
+          {
+            "toolchainId": "world.query",
+            "revisionId": "toolchain:world.query@8",
+            "functionName": "world_query",
+            "rank": 1,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ui.compose",
+            "revisionId": "toolchain:ui.compose@11",
+            "functionName": "ui_create",
+            "rank": 2,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ocr.manage",
+            "revisionId": "toolchain:ocr.manage@6",
+            "functionName": "ocr",
+            "rank": 3,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_memory",
+            "revisionId": "host:read_memory@1",
+            "functionName": "read_memory",
+            "rank": 4,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "history.research",
+            "revisionId": "toolchain:history.research@2",
+            "functionName": "conversation_history",
+            "rank": 5,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.research",
+            "revisionId": "toolchain:web.research@7",
+            "functionName": "web_research",
+            "rank": 6,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_history",
+            "revisionId": "host:read_history@1",
+            "functionName": "read_history",
+            "rank": 7,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_runs",
+            "revisionId": "host:read_runs@1",
+            "functionName": "read_runs",
+            "rank": 8,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.search",
+            "revisionId": "toolchain:web.search@10",
+            "functionName": "web_search",
+            "rank": 9,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_agents",
+            "revisionId": "host:read_agents@1",
+            "functionName": "read_agents",
+            "rank": 10,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          }
+        ],
+        "historyRefs": [],
+        "decision": "answer",
+        "toolchainId": null,
+        "toolchainRevisionId": null,
+        "functionName": null,
+        "request": null,
+        "taskId": null,
+        "outcome": "completed",
+        "outcomeCode": null,
+        "recipe": null,
+        "durationMs": null,
+        "createdAt": 1794128574621,
+        "settledAt": 1794128574622
+      }
+    ],
+    "nextCursor": null
+  },
+  "todos": {
+    "revision": 1794128501799,
+    "data": {
+      "rows": [
+        {
+          "id": "d1b9985b-7336-4818-a400-d63852c93a33",
+          "request": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T09:01:41.799Z"
+        }
+      ],
+      "counts": {
+        "todo": 1,
+        "archived": 0
+      },
+      "total": 1,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "latestAssistant": {
+    "id": "9e00c28d-1689-4aec-8b76-d4ae6a766bc1",
+    "conversationId": "research-routing-live-20261108-cancel",
+    "role": "assistant",
+    "text": "「調査を中止してください」は、相手に調査をやめるよう求める表現です。今回はその文の意味についての質問なので、中止の指示としては扱いません。",
+    "createdAt": "2026-11-08T09:02:54.619Z",
+    "runId": "48f49166-5605-4ff2-9ad8-ef571fafe816",
+    "delivery": {
+      "id": "754f8c9f-ba20-4134-9230-3f52bd2830fc",
+      "version": 2,
+      "emotion": "none",
+      "emotionConfidence": 1,
+      "motion": "neutral",
+      "tone": "natural",
+      "source": "host",
+      "confidence": 1,
+      "motionConfidence": 1,
+      "toneConfidence": 1,
+      "latencyMs": 0
+    }
+  }
+}

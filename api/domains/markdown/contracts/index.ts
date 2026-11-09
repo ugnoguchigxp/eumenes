@@ -164,6 +164,7 @@ export type ArchiveEntry = {
 	path: string;
 	namespace: string;
 	contentDigest: string;
+	updatedAt?: string;
 };
 export type ArchivedDocument = {
 	entry: ArchiveEntry;

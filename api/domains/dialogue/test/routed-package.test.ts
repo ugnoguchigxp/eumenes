@@ -29,8 +29,16 @@ test("pipeline mapping preserves the requirement that every part can be executed
 		],
 	};
 	expect(hostDecision(decision, () => tool, pipeline)).toMatchObject({
-		to: "run",
+		to: "pipeline",
 		candidate: pipeline,
+		steps: [
+			{
+				text: "画像を作って",
+				entry: IMAGE.id,
+				revisionId: IMAGE.revisionId,
+				after: [],
+			},
+		],
 	});
 	expect(hostDecision(decision, () => null, pipeline)).toBeNull();
 	const pending: PackageCandidate = {

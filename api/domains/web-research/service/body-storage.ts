@@ -46,12 +46,14 @@ export function createBodyStorage(
 				bounded += c;
 				size += n;
 			}
+			size += doc.links ? Buffer.byteLength(JSON.stringify(doc.links)) : 0;
 			const id = sha(
 				JSON.stringify([
 					doc.url,
 					doc.fetchedAt,
 					bounded,
 					doc.acquisitionTruncated,
+					...(doc.links ? [doc.links] : []),
 					...(doc.source || doc.security ? [doc.source, doc.security] : []),
 				]),
 			);

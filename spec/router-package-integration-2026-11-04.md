@@ -1,6 +1,6 @@
 # 担当の振り分けを eumenes_router パッケージにする（2026-11-04）
 
-2026-11-06の変更と利用者合意は[全体課題の第1段階](project-issues-first-batch-2026-11-06.md)と[取消先の構造選択](router-cancellation-structure-design-2026-11-06.md)を正本とする。現在はroute契約7 / structure契約5、指示 `turn-structure-v8`。下表は導入時の契約2の履歴である。現在の構造経路は全文、有効な保留質問、取消可能な仕事の有限参照を受ける。packageが生成するschemaを `structuredOutput:true` とともに既存background controlへ渡し、`decision` 内の回答・新規作業・会話・確認・取消を検査する。回答・取消は全文一致を要求する。解析失敗時の全文振り分けfallbackは行わない。保存設定の切替・実モデル受入は同実施記録で区別する。
+2026-11-06の変更と利用者合意は[全体課題の第1段階](project-issues-first-batch-2026-11-06.md)と[取消先の構造選択](router-cancellation-structure-design-2026-11-06.md)を正本とする。2026-11-09採用版はroute契約8、structure契約6、指示 `turn-structure-v8`、DB schema 1。下表は導入時の契約2の履歴である。現在の構造経路は全文、有効な保留質問、取消可能な仕事の有限参照を受ける。packageが生成するschemaを `structuredOutput:true` とともに既存background controlへ渡し、`decision` 内の回答・新規作業・会話・確認・取消を検査する。回答・取消は全文一致を要求する。解析失敗時の全文振り分けfallbackは行わない。保存設定の切替・実モデル受入は同実施記録で区別する。
 
 利用者の指示（2026-11-04）:「commit、pushしていいです。eumenesへの移植していいです。現在eumenesのroutingをしている箇所の実装は削除して構いません。このtarballが使われて、然るべき動きになっているか確認してください」
 
@@ -44,7 +44,7 @@
 | `router.profile` | `decision.context` を持つ LARM の Agent Profile | なし（Router は回らない） |
 | `router.entry` | `route`・`routeStructured` | `route` |
 | `router.structureResourceId` | 構造の判断に使う保存済みのクラウド LLM 資源 | null（会話の経路） |
-| `router.structureTimeoutMs` | 構造の判断を待つ上限 | 8000 |
+| `router.structureTimeoutMs` | 構造経路の判断・埋め込み・採点に共通の上限 | 8000 |
 | `router.timeoutMs`・`accept`・`low`・`margin`・`approve`・`multi`・`feedbackNear`・`feedbackWeight` | 今と同じ | 今と同じ |
 
 ```sh
@@ -59,3 +59,24 @@ bun run cli -- router set entry routeStructured   # B を試すとき
 | --- | --- |
 | fixture | 偽の embedding・reranker・構造のモデルで、A・B の決定から引き渡し・会話・聞き返し・パイプライン（1段目）までを通す。記憶なし・LARM の失敗・構造の失敗は会話の回 |
 | live（利用者の再起動の後） | 記憶の取込み → `router status` → `chat --json` で、会話・単一の依頼・参照付きの依頼（「この音楽に合う画像を作って」）・複数の依頼を順に送り、`router_traces` の入口・行・決定とログを確かめる |
+
+## 2026-11-09 条件付き構造判断
+
+採用元は `eumenes_router` の `4b5e83db6e1e7497fd6e5967008b7faa3ed0ecbb`。通常の `route` は、Aの採点で判定が保留されたときだけ `routeWithFallback` 内でBを開始する。Bの開始時に共通期限を設定し、ターン取消とともに構造判断・埋め込み・採点へ渡す。聞き返しへの返答では、Aが元依頼と返答を合わせて読み、Bは現在の発言原文で回答・取消の対象を照合する。
+
+最上位の判断を既存の実行経路へ渡す。Bが複数依頼を確定した場合は、各担当の版が実行時のプランナーの候補に揃っていることを確認する。元発言と別に順序・担当・依存関係を渡し、プランナーの出力がそれを保持していることを実行前に検査する。未確定の場合は、会話担当がツールを持たずに案内または聞き返しを行う。質問したときは従来の質問記録を使う。
+
+配布物・ルーティング結合試験は57件成功。固定の埋め込み・採点・モデル応答を使い、ウォームアップ後に会話応答へ進むターンを各40回計測した。Aは埋め込み1回・採点1回・構造判断0回、Bは埋め込み1回・採点1回・構造判断1回で、会話モデルはどちらも1回だった。受付から会話の完了までのp95はAが6.77 ms、Bが7.24 ms。実環境の計測は下記に記録した。
+
+作業ツリー全体の検証は、既存差分の `executionAccess` と `createWorkLedger` がサイズ上限を超えて停止した。今回の差分を分離したコピーでは dialogue、pipelines、agent-runtime、tool-runtime、voice-dialogue、toolchain-history、inference、settings の検証が通り、Bun 1,392件とWeb 113件が成功した。capabilities の単独検査は既存のブラウザー用bundleの整形違反で停止した。検証前後の入力ハッシュは一致した。
+
+### 実環境の計測
+
+2026-11-09 18:53〜19:22 JST。保存済みの通常入口 `route` と構造経路の上限8秒を使った。会話用の検証文2種を独立した会話に1件ずつ送信し、`dialogue.router_decided.phase` で経路を分類した。受付ログの時刻から実行記録が完了した時刻までを実行IDで照合し、最近順位法でp95を求めた。
+
+| 経路 | 完了件数 | 構造モデル／件 | 振り分けのp95 | 受付から完了までのp95 |
+| --- | ---: | ---: | ---: | ---: |
+| 通常A | 16 | 0 | 1.530秒 | 59.771秒 |
+| B | 15 | 1 | 9.961秒 | 68.572秒 |
+
+完了した全ターンの会話モデルは各1回。Bの12件は構造段の時間切れ後に案内または聞き返しで完了したため、Bの集計に含めた。計測中にサーバーが再起動し、32件目のBは `interrupted`（`shutdown`）で終了した。目標は各20件で、今回のp95は各群の観測最大値に当たる。集計と実行IDごとの記録は `verification-reports/router-live-20261109-185321/` に保存した。

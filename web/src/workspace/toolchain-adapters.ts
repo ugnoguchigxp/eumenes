@@ -1,7 +1,6 @@
 import { markdownWebAdapter } from "../domains/markdown/toolchain-adapter";
 import { doclingWebAdapter } from "../domains/docling/toolchain-adapter";
 import { collaborationWebAdapters } from "../domains/collaboration/toolchain-adapter";
-import { pursuitWebAdapter } from "../domains/pursuit/toolchain-adapter";
 import { dotsMessagingWebAdapter } from "../domains/dots/toolchain-adapter";
 import { dotsWorkWebAdapter } from "../domains/dots/work-adapter";
 import { shellWebAdapter } from "../domains/shell/toolchain-adapter";
@@ -21,7 +20,7 @@ import { imageScreenWebAdapter } from "../domains/image/toolchain-adapter";
 import { model3dWebAdapter } from "../domains/model3d/toolchain-adapter";
 import { browserWebAdapter } from "../domains/browser/toolchain-adapter";
 import { browserInteractWebAdapter } from "../domains/browser/interact/toolchain-adapter";
-import { uiCompositionsWebAdapter } from "../domains/ui-compositions/toolchain-adapter";
+import { appDevelopmentWebAdapter } from "../domains/ui-compositions/toolchain-adapter";
 import { objectRecognitionScreenWebAdapter } from "../domains/object-recognition/toolchain-adapter";
 import { serviceTestsWebAdapter } from "../domains/service-tests/toolchain-adapter";
 import { terminalsWebAdapter } from "../domains/terminals";
@@ -30,7 +29,6 @@ import { kanbanWebAdapter, sharedKanbanWebAdapter } from "../domains/kanban";
 /** Every domain adapter the common artifact host can render. Adding a domain adds one line. */
 export const toolchainWebAdapters = createWebAdapterRegistry([
 	...collaborationWebAdapters,
-	pursuitWebAdapter,
 	usageWebAdapter,
 	doclingWebAdapter,
 	markdownWebAdapter,
@@ -45,7 +43,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	computeWebAdapter,
 	browserWebAdapter,
 	browserInteractWebAdapter,
-	uiCompositionsWebAdapter,
+	appDevelopmentWebAdapter,
 	objectRecognitionScreenWebAdapter,
 	ocrWebAdapter,
 	settingsWebAdapter,

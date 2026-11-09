@@ -1,0 +1,820 @@
+{
+  "readAt": "2026-11-08T15:11:38.608Z",
+  "rows": [
+    {
+      "job": {
+        "id": "a2e8ac1a-5159-4651-ad0e-d664d5b0d80b",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "6e0ca652-f810-461e-86b3-b5b8df7a2152",
+        "parentJobId": "5db4af0e-dba2-4f91-a7bc-b9fcf26c2862",
+        "lane": "background",
+        "state": "failed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": "web_bot_challenge",
+        "availableAt": "2026-11-08T09:21:09.844Z",
+        "deadlineAt": "2026-11-08T09:23:09.843Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:21:09.844Z",
+        "updatedAt": "2026-11-08T09:21:11.234Z",
+        "finishedAt": "2026-11-08T09:21:11.234Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "6e0ca652-f810-461e-86b3-b5b8df7a2152",
+        "operation": "lookup",
+        "status": "failed",
+        "errorCode": "web_bot_challenge",
+        "createdAt": "2026-11-08T09:21:09.844Z",
+        "finishedAt": "2026-11-08T09:21:11.235Z",
+        "resultExpired": false
+      }
+    },
+    {
+      "job": {
+        "id": "36e9ad56-b337-4159-92af-e5806e85fbb7",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "b00feb93-3295-4008-b059-da496bce8363",
+        "parentJobId": "49632b40-6fec-4b9a-b6c0-6589a0f18d6d",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:19:34.741Z",
+        "deadlineAt": "2026-11-08T09:21:34.741Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:19:34.741Z",
+        "updatedAt": "2026-11-08T09:19:42.392Z",
+        "finishedAt": "2026-11-08T09:19:42.392Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "b00feb93-3295-4008-b059-da496bce8363",
+        "operation": "lookup",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:19:34.741Z",
+        "finishedAt": "2026-11-08T09:19:42.392Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "71ca5b2b-25ed-49c7-aa43-8f64b2206ecf",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "16e0ac79-195f-48e2-81ab-f32fdc359eb8",
+        "parentJobId": "8b024816-ddf0-45db-a987-87ef3ab69dee",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:18:14.036Z",
+        "deadlineAt": "2026-11-08T09:20:14.036Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:18:14.036Z",
+        "updatedAt": "2026-11-08T09:18:16.599Z",
+        "finishedAt": "2026-11-08T09:18:16.599Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "16e0ac79-195f-48e2-81ab-f32fdc359eb8",
+        "operation": "lookup",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:18:14.036Z",
+        "finishedAt": "2026-11-08T09:18:16.599Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "4405d754-5ee9-4588-a745-b3115c5cdf1e",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "24e49c36-2e64-4c4f-a9a0-b4e23d5dc864",
+        "parentJobId": "4f433680-4714-4400-ad0d-c9ee4451651a",
+        "lane": "background",
+        "state": "failed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": "web_bot_challenge",
+        "availableAt": "2026-11-08T09:17:09.313Z",
+        "deadlineAt": "2026-11-08T09:19:09.313Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:17:09.313Z",
+        "updatedAt": "2026-11-08T09:17:09.320Z",
+        "finishedAt": "2026-11-08T09:17:09.320Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "24e49c36-2e64-4c4f-a9a0-b4e23d5dc864",
+        "operation": "lookup",
+        "status": "failed",
+        "errorCode": "web_bot_challenge",
+        "createdAt": "2026-11-08T09:17:09.313Z",
+        "finishedAt": "2026-11-08T09:17:09.320Z",
+        "resultExpired": false
+      }
+    },
+    {
+      "job": {
+        "id": "97341db4-a75f-4776-8a68-50055b59b28b",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "9f6a33ac-11f7-43c4-b195-2216d9675159",
+        "parentJobId": "20c5415e-c66a-48be-b8b9-63052276140d",
+        "lane": "background",
+        "state": "failed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": "web_bot_challenge",
+        "availableAt": "2026-11-08T09:16:52.259Z",
+        "deadlineAt": "2026-11-08T09:18:52.259Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:16:52.259Z",
+        "updatedAt": "2026-11-08T09:16:52.273Z",
+        "finishedAt": "2026-11-08T09:16:52.273Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "9f6a33ac-11f7-43c4-b195-2216d9675159",
+        "operation": "lookup",
+        "status": "failed",
+        "errorCode": "web_bot_challenge",
+        "createdAt": "2026-11-08T09:16:52.259Z",
+        "finishedAt": "2026-11-08T09:16:52.274Z",
+        "resultExpired": false
+      }
+    },
+    {
+      "job": {
+        "id": "9ce6c929-dab5-4c40-8236-432c4302abc8",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "30d1edae-d3c8-4797-9cd6-40d7c110c7d4",
+        "parentJobId": "c9b5b1a0-abb5-4a7a-be2c-ef0e4db81937",
+        "lane": "background",
+        "state": "failed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": "web_bot_challenge",
+        "availableAt": "2026-11-08T09:16:09.566Z",
+        "deadlineAt": "2026-11-08T09:18:09.566Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:16:09.566Z",
+        "updatedAt": "2026-11-08T09:16:11.807Z",
+        "finishedAt": "2026-11-08T09:16:11.807Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "30d1edae-d3c8-4797-9cd6-40d7c110c7d4",
+        "operation": "lookup",
+        "status": "failed",
+        "errorCode": "web_bot_challenge",
+        "createdAt": "2026-11-08T09:16:09.566Z",
+        "finishedAt": "2026-11-08T09:16:11.807Z",
+        "resultExpired": false
+      }
+    },
+    {
+      "job": {
+        "id": "0563ddd0-6298-49d8-ab35-e6f50b963f42",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "689a2d41-6b13-42d7-8903-813c6557f9eb",
+        "parentJobId": "c5b3105d-5354-444e-b7c9-59f57d524125",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:15:34.106Z",
+        "deadlineAt": "2026-11-08T09:17:34.106Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:15:34.106Z",
+        "updatedAt": "2026-11-08T09:15:36.879Z",
+        "finishedAt": "2026-11-08T09:15:36.879Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "689a2d41-6b13-42d7-8903-813c6557f9eb",
+        "operation": "lookup",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:15:34.106Z",
+        "finishedAt": "2026-11-08T09:15:36.879Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "99984c08-89b9-452a-ba5f-47bceb7675e8",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "aee36343-2da5-4f93-97bc-35459bbd8618",
+        "parentJobId": "9f2b556b-974b-4e67-a11b-7e46ea8673f5",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:13:10.359Z",
+        "deadlineAt": "2026-11-08T09:15:10.359Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:13:10.359Z",
+        "updatedAt": "2026-11-08T09:13:10.659Z",
+        "finishedAt": "2026-11-08T09:13:10.659Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "aee36343-2da5-4f93-97bc-35459bbd8618",
+        "operation": "read",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:13:10.359Z",
+        "finishedAt": "2026-11-08T09:13:10.659Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "cd5ed929-9654-40c3-811a-84c09026cc2d",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "f500145c-b43a-4172-9922-106f72f51f55",
+        "parentJobId": "db8543b6-7fd5-41b1-94a0-e365b86b5759",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:12:32.423Z",
+        "deadlineAt": "2026-11-08T09:14:32.422Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:12:32.423Z",
+        "updatedAt": "2026-11-08T09:12:40.310Z",
+        "finishedAt": "2026-11-08T09:12:40.310Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "f500145c-b43a-4172-9922-106f72f51f55",
+        "operation": "lookup",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:12:32.423Z",
+        "finishedAt": "2026-11-08T09:12:40.310Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "92e2a05f-06cc-43a3-a6cb-9fe0671aca4a",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "f1577dec-1c17-4d83-a515-31c291f25a44",
+        "parentJobId": "a1b0946f-d7e8-4083-ae76-904cc597ce24",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:11:47.682Z",
+        "deadlineAt": "2026-11-08T09:13:47.682Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:11:47.682Z",
+        "updatedAt": "2026-11-08T09:11:47.797Z",
+        "finishedAt": "2026-11-08T09:11:47.797Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "f1577dec-1c17-4d83-a515-31c291f25a44",
+        "operation": "read",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:11:47.682Z",
+        "finishedAt": "2026-11-08T09:11:47.797Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "e491f837-6726-4f29-bd61-c4d558895f74",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "03d6c249-b32f-4087-bd1e-dcbca9bc977f",
+        "parentJobId": "92337e22-0cfb-4b4d-bfaa-6bb8f64d969d",
+        "lane": "background",
+        "state": "failed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": "web_bot_challenge",
+        "availableAt": "2026-11-08T09:11:14.386Z",
+        "deadlineAt": "2026-11-08T09:13:14.386Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:11:14.386Z",
+        "updatedAt": "2026-11-08T09:11:17.499Z",
+        "finishedAt": "2026-11-08T09:11:17.499Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "03d6c249-b32f-4087-bd1e-dcbca9bc977f",
+        "operation": "lookup",
+        "status": "failed",
+        "errorCode": "web_bot_challenge",
+        "createdAt": "2026-11-08T09:11:14.386Z",
+        "finishedAt": "2026-11-08T09:11:17.499Z",
+        "resultExpired": false
+      }
+    },
+    {
+      "job": {
+        "id": "08ade50a-aace-4349-b343-88f3efec6032",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "678c386e-fcf5-47b5-8656-45a9bf9ff6b0",
+        "parentJobId": "0db68487-3b4b-412c-8402-dd650032ee4a",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:11:03.109Z",
+        "deadlineAt": "2026-11-08T09:13:03.109Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:11:03.109Z",
+        "updatedAt": "2026-11-08T09:11:03.370Z",
+        "finishedAt": "2026-11-08T09:11:03.370Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "678c386e-fcf5-47b5-8656-45a9bf9ff6b0",
+        "operation": "read",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:11:03.109Z",
+        "finishedAt": "2026-11-08T09:11:03.370Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "72863c3b-4785-4e91-ae85-062a41e2913e",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "34e89072-49e1-4192-8ccf-9b5d5deadc22",
+        "parentJobId": "9b543dec-84b6-4889-ba2a-43926af0be77",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:10:49.459Z",
+        "deadlineAt": "2026-11-08T09:12:49.459Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:10:49.459Z",
+        "updatedAt": "2026-11-08T09:10:49.599Z",
+        "finishedAt": "2026-11-08T09:10:49.599Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "34e89072-49e1-4192-8ccf-9b5d5deadc22",
+        "operation": "read",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:10:49.459Z",
+        "finishedAt": "2026-11-08T09:10:49.599Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "bb02c3bc-d208-4202-ae26-f39ebbb224f2",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "9940fea1-c84b-4a1e-87f8-68c79b800932",
+        "parentJobId": "d05f04f5-725e-4a80-ac4c-25750b6fdeb7",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T09:10:38.986Z",
+        "deadlineAt": "2026-11-08T09:12:38.986Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:10:38.986Z",
+        "updatedAt": "2026-11-08T09:10:39.142Z",
+        "finishedAt": "2026-11-08T09:10:39.142Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "9940fea1-c84b-4a1e-87f8-68c79b800932",
+        "operation": "read",
+        "status": "completed",
+        "errorCode": null,
+        "createdAt": "2026-11-08T09:10:38.986Z",
+        "finishedAt": "2026-11-08T09:10:39.142Z",
+        "resultExpired": true
+      }
+    },
+    {
+      "job": {
+        "id": "6c300b26-cd0b-420e-a774-e13bd7fae857",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "19edcf20-0292-4b62-b6b2-42f0f8408374",
+        "parentJobId": "deb0e578-106c-4887-b107-cad0bc4311a7",
+        "lane": "background",
+        "state": "failed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": "web_bot_challenge",
+        "availableAt": "2026-11-08T09:08:52.409Z",
+        "deadlineAt": "2026-11-08T09:10:52.409Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T09:08:52.409Z",
+        "updatedAt": "2026-11-08T09:08:56.917Z",
+        "finishedAt": "2026-11-08T09:08:56.917Z",
+        "revision": 2
+      },
+      "run": {
+        "id": "19edcf20-0292-4b62-b6b2-42f0f8408374",
+        "operation": "lookup",
+        "status": "failed",
+        "errorCode": "web_bot_challenge",
+        "createdAt": "2026-11-08T09:08:52.409Z",
+        "finishedAt": "2026-11-08T09:08:56.917Z",
+        "resultExpired": false
+      }
+    },
+    {
+      "job": {
+        "id": "2872a24d-543f-4cd0-ac0c-53c50c7d2bf8",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "b302b971-f6d7-4958-bbcd-b0a6773a1386",
+        "parentJobId": "e4212c4c-3071-41c5-b4f3-3ea84476de60",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:27:30.087Z",
+        "deadlineAt": "2026-11-08T02:29:30.087Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:27:30.087Z",
+        "updatedAt": "2026-11-08T02:27:30.268Z",
+        "finishedAt": "2026-11-08T02:27:30.268Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "8a96668b-3e49-4855-973f-7139f43371c6",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "99c644c2-bb67-43cf-b1a4-1f2cce914ffc",
+        "parentJobId": "3239e05b-7e6f-4648-bea0-4b437595a077",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:27:09.538Z",
+        "deadlineAt": "2026-11-08T02:29:09.538Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:27:09.538Z",
+        "updatedAt": "2026-11-08T02:27:17.251Z",
+        "finishedAt": "2026-11-08T02:27:17.251Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "523c68f9-e469-4b25-8aec-eabfa15b174e",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "cb361ec6-df22-4ce5-9e1c-44c9d128ebde",
+        "parentJobId": "0b5573cf-f882-4fe0-8a72-c9fe370907eb",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:25:59.447Z",
+        "deadlineAt": "2026-11-08T02:27:59.447Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:25:59.447Z",
+        "updatedAt": "2026-11-08T02:25:59.585Z",
+        "finishedAt": "2026-11-08T02:25:59.585Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "1af8319f-e4ad-4548-8a1c-febdfc63c031",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "518a878b-c6b4-4f69-a0cf-e4253cbec221",
+        "parentJobId": "98afdaf2-cb62-4661-aeaa-ca5a895e1f7a",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:24:42.360Z",
+        "deadlineAt": "2026-11-08T02:26:42.360Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:24:42.360Z",
+        "updatedAt": "2026-11-08T02:24:44.857Z",
+        "finishedAt": "2026-11-08T02:24:44.857Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "387c1a0b-8120-45b9-a229-93af70b753dd",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "3f448f10-769e-4159-80da-c66bde097ca2",
+        "parentJobId": "6f117571-b24f-4ad8-baa1-211ea84b4bf2",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:22:46.622Z",
+        "deadlineAt": "2026-11-08T02:24:46.622Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:22:46.622Z",
+        "updatedAt": "2026-11-08T02:22:46.691Z",
+        "finishedAt": "2026-11-08T02:22:46.691Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "0f8684d7-2757-4b26-849b-da5d99b508c2",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "59dca22b-991d-4213-ab78-7ea4a555a0ab",
+        "parentJobId": "0eba28a5-1c6a-41f9-a039-be67c719185e",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:21:33.635Z",
+        "deadlineAt": "2026-11-08T02:23:33.635Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:21:33.635Z",
+        "updatedAt": "2026-11-08T02:21:41.261Z",
+        "finishedAt": "2026-11-08T02:21:41.261Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "404e0170-1c39-471c-b2c8-d4d18334e720",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "f15bd3f4-6a48-428e-b43f-479032c3f322",
+        "parentJobId": "b0ac1428-0e52-4333-ab03-ac13eb4284ec",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:18:55.795Z",
+        "deadlineAt": "2026-11-08T02:20:55.795Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:18:55.795Z",
+        "updatedAt": "2026-11-08T02:18:55.921Z",
+        "finishedAt": "2026-11-08T02:18:55.921Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "881aee37-97c4-4254-982c-66a0dcb9c31a",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "f35299c9-fe73-4261-a907-f0c4c4f8ef7b",
+        "parentJobId": "eac4f4e0-c935-446b-8370-58326e735425",
+        "lane": "background",
+        "state": "failed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": "web_bot_challenge",
+        "availableAt": "2026-11-08T02:16:59.054Z",
+        "deadlineAt": "2026-11-08T02:18:59.054Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:16:59.054Z",
+        "updatedAt": "2026-11-08T02:17:03.702Z",
+        "finishedAt": "2026-11-08T02:17:03.702Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "86d17f50-07d8-4878-ac07-dfb0e1c38683",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "d675c132-3cf9-46fc-80c8-9535d3a74b43",
+        "parentJobId": "442c7005-8608-487c-9b94-d9d38ca8cd73",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:14:50.745Z",
+        "deadlineAt": "2026-11-08T02:16:50.745Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:14:50.745Z",
+        "updatedAt": "2026-11-08T02:14:51.047Z",
+        "finishedAt": "2026-11-08T02:14:51.047Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "d77151af-77b5-44da-9169-a21609bb9d24",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "282e7474-3da9-46fa-83fd-2f8de853e01c",
+        "parentJobId": "8c4d508a-a288-4566-aff4-b4ca3542c281",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:14:11.428Z",
+        "deadlineAt": "2026-11-08T02:16:11.428Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:14:11.428Z",
+        "updatedAt": "2026-11-08T02:14:13.878Z",
+        "finishedAt": "2026-11-08T02:14:13.878Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "cce4c169-ac7d-4ff4-8cd4-5260215ecaa4",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "852b1951-7be0-4b75-94c0-3815ba74f310",
+        "parentJobId": "08872567-e40b-4bc2-9af4-2d0acfcd00b9",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:05:30.828Z",
+        "deadlineAt": "2026-11-08T02:07:30.828Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:05:30.828Z",
+        "updatedAt": "2026-11-08T02:05:31.005Z",
+        "finishedAt": "2026-11-08T02:05:31.005Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "acc3628e-6779-483d-b5bd-ccf18bb89527",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "1f0b5fef-bdb7-4c94-a9f4-447ad211e583",
+        "parentJobId": "5d8336d0-3d02-4065-89ff-039245b7aeb8",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:05:13.931Z",
+        "deadlineAt": "2026-11-08T02:07:13.931Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:05:13.931Z",
+        "updatedAt": "2026-11-08T02:05:14.037Z",
+        "finishedAt": "2026-11-08T02:05:14.037Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "6cb5a9d3-ae8d-497c-a7df-ddd037585290",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "8b5cc5ad-a80f-4c9f-8a0d-4310a2c921f0",
+        "parentJobId": "dda65639-cde2-4eba-8df3-158a7f436d34",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:04:45.272Z",
+        "deadlineAt": "2026-11-08T02:06:45.272Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:04:45.272Z",
+        "updatedAt": "2026-11-08T02:04:45.416Z",
+        "finishedAt": "2026-11-08T02:04:45.416Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    },
+    {
+      "job": {
+        "id": "c89fd62b-06cd-4b45-afb1-0b782ed1c6e6",
+        "scope": "web:owner",
+        "kind": "web-research.acquire",
+        "subjectRef": "79127725-4bfc-440b-9783-35378628771f",
+        "parentJobId": "e0f6c32f-3946-4592-b177-41ac19bd7d0f",
+        "lane": "background",
+        "state": "completed",
+        "attempt": 1,
+        "maxAttempts": 1,
+        "waitReason": null,
+        "errorCode": null,
+        "availableAt": "2026-11-08T02:04:30.449Z",
+        "deadlineAt": "2026-11-08T02:06:30.448Z",
+        "cancelRequestedAt": null,
+        "createdAt": "2026-11-08T02:04:30.449Z",
+        "updatedAt": "2026-11-08T02:04:35.081Z",
+        "finishedAt": "2026-11-08T02:04:35.081Z",
+        "revision": 2
+      },
+      "run": {
+        "error": "not_found"
+      }
+    }
+  ]
+}

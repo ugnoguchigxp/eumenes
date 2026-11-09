@@ -8,6 +8,17 @@ import { z } from "zod";
 import { picsumThemeNames } from "./picsum-themes";
 
 const noSource = z.never().optional();
+/** Studio-only source bound by the host to a saved workflow's output view. */
+export const listRefreshSource = "workflow-list-refresh";
+export const listRefresh = z.literal(listRefreshSource).optional();
+export function hasListRefresh(request: { view: string; source?: string }) {
+	return (
+		request.source === listRefreshSource &&
+		(request.view === "grouped-list" ||
+			request.view === "data-table" ||
+			request.view === "info-card")
+	);
+}
 /** Views without a heading still name `title` (absent), as every registered view does. */
 const noTitle = z.never().optional();
 const text = (max: number) => z.string().min(1).max(max);
@@ -546,13 +557,34 @@ export const compositionViewRegistry = {
 			note: z.string().max(800).optional(),
 		}),
 	},
+	"grouped-list": {
+		name: "GroupedList",
+		label: "見出し付き一覧",
+		schema: z.strictObject({
+			view: z.literal("grouped-list"),
+			source: listRefresh,
+			title: text(480).optional(),
+			scheduleDate: z.iso.date().optional(),
+			groups: z
+				.array(
+					z.strictObject({
+						title: text(480),
+						items: z
+							.array(z.array(z.string().max(480)).min(1).max(12))
+							.min(1)
+							.max(200),
+					}),
+				)
+				.max(200),
+		}),
+	},
 	"data-table": {
 		name: "DataTable",
 		label: "表",
 		schema: z
 			.strictObject({
 				view: z.literal("data-table"),
-				source: noSource,
+				source: listRefresh,
 				title: text(480).optional(),
 				/** With `series`, each column's `expr` is evaluated per point with `x` and `y`. */
 				columns: z

@@ -44,6 +44,14 @@ export type TaskExecutionHost = {
 	agents: AgentRuntime;
 	routing: ToolchainRoutingPort;
 	registry: AdapterRegistry;
+	workflowCatalog?: Pick<
+		ReturnType<
+			typeof import("../app-development/workflow-operations").createWorkflowOperations
+		>,
+		"catalog" | "revisionOf"
+	>;
+	workflowAuthority?: import("../pipelines/workflow-execution-source").WorkflowExecutionAuthority;
+	workflowSteps?: import("../pipelines/workflow-step-execution").WorkflowStepExecution;
 	dialogue: DialogueService;
 	conversation: ConversationService;
 	memory?: MemoryService;
@@ -193,6 +201,8 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			port.readReferenceInTransaction(db, source, ref, start, limit),
 		),
 		currentInTransaction(db, child, raw) {
+			if (child.source.origin === "workflow")
+				return host.workflowSteps!.current(db, child, raw);
 			if (raw === null)
 				return result(
 					"cancelled",
@@ -215,6 +225,8 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			);
 		},
 		adoptInTransaction(db, child, outcome) {
+			if (child.source.origin === "workflow")
+				return host.workflowSteps!.adopt(db, child, outcome);
 			resolve(db, child);
 			adoptTaskResources(host, db, child, outcome);
 			const ref = reference.parse(outcome.ref);
@@ -226,6 +238,8 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			return true;
 		},
 		cancelInTransaction(db, child, raw) {
+			if (child.source.origin === "workflow")
+				return host.workflowSteps?.cancel(db, child, raw);
 			const dispatched = agents.executionChildReceiptInTransaction(
 				db,
 				child.dispatchId ?? child.id,
@@ -269,6 +283,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 				host.legacy?.cancelInTransaction(db, child, raw);
 		},
 		validateAnswerInTransaction(db, child, outcome, input) {
+			if (child.source.origin === "workflow") return false;
 			const ref = reference.parse(outcome.ref);
 			if (ref.kind === "bound" && ref.operationId && ref.adapterRef)
 				return (
@@ -341,10 +356,15 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		pipelineInTransaction: (db, revisionId) =>
 			pipelineContract(host, db, revisionId),
 		pipelineCatalogInTransaction: (db, source) =>
-			pipelineComponents(host, context, db, source),
+			source.origin === "workflow" && host.workflowCatalog
+				? host.workflowCatalog.catalog()
+				: pipelineComponents(host, context, db, source),
+		workflowPlanInTransaction: host.workflowAuthority?.planInTransaction,
 		stepToolchainInTransaction: (db, toolchainId, source) =>
-			available(db, source.runId).find((e) => e.id === toolchainId)
-				?.revisionId ?? null,
+			source.origin === "workflow" && host.workflowCatalog
+				? host.workflowCatalog.revisionOf(toolchainId)
+				: (available(db, source.runId).find((e) => e.id === toolchainId)
+						?.revisionId ?? null),
 		controlInTransaction(db) {
 			const sets = capabilities.toolchainsInTransaction(db).flatMap((d) => {
 				const bound = capabilities.toolchainBindingInTransaction(

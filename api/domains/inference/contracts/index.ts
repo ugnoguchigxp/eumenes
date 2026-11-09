@@ -13,6 +13,8 @@ export type ControlContract = {
 	instructions: string;
 	outputSchema: unknown;
 	reasoningEffort?: "low";
+	/** For a bounded transcription control on a LARM provider that accepts thinking disabled. */
+	larmReasoning?: "off";
 };
 export function controlInstructions(control: ControlContract) {
 	const examples = (control.outputSchema as { examples?: unknown[] } | null)

@@ -1,3 +1,4 @@
+import { migrations as appDevelopmentMigrations } from "../domains/app-development";
 import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
 import { migrations as pursuitCoreMigrations } from "eumenes-pursuit/sqlite";
 import { migrations as pursuitMigrations } from "../domains/pursuit";
@@ -204,6 +205,7 @@ const catalog: readonly Migration[] = [
 	...uiCompositionsMigrations,
 	...markdownMigrations,
 	...pipelinesMigrations,
+	...appDevelopmentMigrations,
 	...collaborationMigrations,
 	...excalidrawMigrations,
 	...objectRecognitionMigrations,

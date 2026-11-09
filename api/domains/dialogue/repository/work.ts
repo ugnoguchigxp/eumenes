@@ -450,8 +450,8 @@ export function archiveWork(db: Database, id: string, at: string): boolean {
  * A finished TODO's notice: one that ended with a result to tell (not cancelled) and was not forgotten (a forgotten
  * TODO loses its title).
  */
-const NOTICE =
-	"archived_at IS NOT NULL AND status = 'done' AND outcome IN ('succeeded','partial','failed','interrupted') AND title != ''";
+export const WEB_RESEARCH_WORK = "web.research";
+const NOTICE = `archived_at IS NOT NULL AND status = 'done' AND outcome IN ('succeeded','partial','failed','interrupted') AND title != '' AND toolchain_id != '${WEB_RESEARCH_WORK}'`;
 
 /** The completion notices of every conversation, newest first, at most `limit`, and how many are unread in all. */
 export function workNotices(

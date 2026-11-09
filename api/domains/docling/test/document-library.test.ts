@@ -124,7 +124,7 @@ function fixture() {
 					etag: libraryTag,
 					entries: [
 						{ kind: "folder", ...dir() },
-						{ kind: "document", ...saved() },
+						{ kind: "document", ...saved(), updatedAt: "2026-11-08T15:00:00Z" },
 					],
 					nextCursor: "次/+=",
 				});
@@ -180,6 +180,8 @@ test("hierarchy uses server folder ids, library ETag and an opaque cursor", asyn
 		);
 	expect(r.etag).toBe(libraryTag);
 	expect(r.entries[0]?.id).toBe(folder);
+	expect(r.entries[0]?.updatedAt).toBeUndefined();
+	expect(r.entries[1]?.updatedAt).toBe("2026-11-08T15:00:00Z");
 	expect(h.calls.at(-1)?.url.searchParams.get("cursor")).toBe("次/+= ");
 	expect((await h.port.getFolder(folder, signal())).etag).toBe(etag);
 });

@@ -80,9 +80,7 @@ test("conversation selects the registered research task, uses the existing guard
 	});
 	try {
 		const reportBase = `/api/toolchain-artifacts/${encodeURIComponent("artifact:pursuit.report@1")}/sources/pursuit-report`;
-		expect(await (await h.request(reportBase)).json()).toMatchObject({
-			data: { work: { status: "未作成" } },
-		});
+		expect((await h.request(reportBase)).status).toBe(503);
 		const source = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
@@ -115,31 +113,23 @@ test("conversation selects the registered research task, uses the existing guard
 		expect(attempts.every((a) => a.attempt_ms === 120000)).toBe(true);
 		const uri = `eumenes://report/${encodeURIComponent(`pursuit:${runs[0]!.id}`)}`;
 		const notices = await (await h.request("/api/todo-notices")).json();
-		expect(notices.notices).toContainEqual(
-			expect.objectContaining({
-				outcome: "succeeded",
-				links: [expect.objectContaining({ uri, kind: "report" })],
-			}),
-		);
+		expect(notices).toEqual({ notices: [], unread: 0 });
 		const resolved = await (
 			await h.request(`/api/resources/resolve?uri=${encodeURIComponent(uri)}`)
 		).json();
 		expect(resolved).toMatchObject({
 			ok: true,
-			resource: { adapterRef: "adapter:pursuit@1", targetRef: runs[0]!.id },
+			resource: {
+				adapterRef: "adapter:pursuit@1",
+				targetRef: runs[0]!.id,
+				actions: ["read"],
+			},
 		});
 		const reportSource = `/api/toolchain-artifacts/${encodeURIComponent("artifact:pursuit.report@1")}/sources/pursuit-report?target=${encodeURIComponent(runs[0]!.id)}`;
-		const response = await h.request(reportSource);
-		expect(await response.json()).toMatchObject({
-			data: { kind: "work-result", work: { summary: answer } },
-		});
-		expect(response.status).toBe(200);
-		expect(await (await h.request(reportBase)).json()).toMatchObject({
-			data: { targetRef: runs[0]!.id, work: { summary: answer } },
-		});
+		expect((await h.request(reportSource)).status).toBe(503);
 		expect(
-			(await h.request(`${reportBase}?target=missing-report`)).status,
-		).not.toBe(200);
+			await (await h.request("/api/toolchain-artifacts")).text(),
+		).not.toContain("artifact:pursuit.report@1");
 		const reports = createPursuitReportResourceAdapter(h.store);
 		expect(
 			h.store.read((db) =>
@@ -186,10 +176,6 @@ test("conversation selects the registered research task, uses the existing guard
 			(await h.request(`/api/resources/resolve?uri=${encodeURIComponent(uri)}`))
 				.status,
 		).toBe(404);
-		expect((await h.request(reportSource)).status).not.toBe(200);
-		expect(await (await h.request(reportBase)).json()).toMatchObject({
-			data: { work: { status: "未作成" } },
-		});
 		await expect(
 			reports.read(`pursuit:${runs[0]!.id}`, new AbortController().signal),
 		).rejects.toThrow("item_not_found");

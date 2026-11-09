@@ -1,26 +1,43 @@
 import { expect, test } from "bun:test";
 import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
+import type { RouteInput } from "../../domains/larm";
+import { weigh } from "../../domains/dialogue/test/router.fixture";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 
 // Real seed, dialogue, package, scheduler, queue, child adoption, TODO and notices; model outputs alone are scripted.
-test("conversation selects the imported planner and two actual timer commands complete under one pipeline TODO", async () => {
-	const request = "一つ目の結果を確認してから二つ目のタイマーを作って";
+test("B sends ordered steps to the imported planner and two actual commands complete under one pipeline TODO", async () => {
+	const first = "一つ目のタイマーを作って";
+	const second = "二つ目のタイマーを作って";
+	const request = `${first}、終わったら${second}`;
 	let translations = 0,
-		plans = 0;
+		plans = 0,
+		structures = 0;
 	const h = await harness({
 		pipelines: true,
 		timers: true,
 		discoveryTarget: () => "execute_pipeline",
-		firstRound: (_tools, _question, messages) =>
-			searchThenDelegate((c) => c.id === "pipeline.execute", request, {
-				announcement: "順に進めます。",
-				impact: "create",
-			})(messages),
+		structure: (messages) => {
+			structures++;
+			expect(JSON.parse(messages.at(-1)!.content).text).toBe(request);
+			return {
+				requests: [
+					{ text: first, target: "一つ目のタイマー", inputs: [], after: [] },
+					{ text: second, target: "二つ目のタイマー", inputs: [], after: [0] },
+				],
+			};
+		},
 		compose: (messages) => {
 			plans++;
 			const packet = JSON.parse(messages.at(-1)!.content);
 			expect(packet.request).toBe(request);
+			expect(packet.routedSteps).toEqual([
+				{ text: first, entry: "timers.manage", after: [] },
+				{ text: second, entry: "timers.manage", after: [0] },
+			]);
+			expect(translations).toBe(0);
+			if (plans === 2)
+				expect(packet.contractErrors).toContain("routed_steps_mismatch");
 			expect(
 				packet.cards.some((c: any) => c.entry === "pipeline.execute"),
 			).toBe(false);
@@ -46,7 +63,7 @@ test("conversation selects the imported planner and two actual timer commands co
 							id: "second",
 							bundle: "timers.manage",
 							task: "二つ目のタイマー",
-							from: ["first"],
+							from: plans === 1 ? ["request"] : ["first"],
 							result: "保存済みタイマー",
 						},
 					],
@@ -65,6 +82,13 @@ test("conversation selects the imported planner and two actual timer commands co
 			}),
 	});
 	try {
+		Object.assign(h.inference, {
+			route: (input: RouteInput, signal: AbortSignal) =>
+				weigh({ "timers.manage": input.text === request ? 0.45 : 0.95 })(
+					input,
+					signal,
+				),
+		});
 		const source = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
@@ -81,7 +105,8 @@ test("conversation selects the imported planner and two actual timer commands co
 				h.toolchain.agents.executions.list("main")[0]?.status === "completed",
 			{ timeout: 5000 },
 		);
-		expect(plans).toBe(1);
+		expect(structures).toBe(1);
+		expect(plans).toBe(2);
 		expect(translations).toBe(2);
 		const timers = await (await h.request("/api/timers")).json();
 		expect(timers.items.map((t: any) => t.label).sort()).toEqual([
@@ -103,16 +128,18 @@ test("conversation selects the imported planner and two actual timer commands co
 });
 
 for (const operation of ["answer", "cancel"] as const) {
-	test(`conversation ${operation} reaches the waiting pipeline owner without creating replacement work`, async () => {
+	test(`B ${operation} reaches the waiting pipeline owner without creating replacement work`, async () => {
 		const request = "必要な時間を聞いてからタイマーを作って";
 		const reply = operation === "answer" ? "15秒です" : "その作業を取り消して";
 		let plans = 0,
-			commands = 0;
+			commands = 0,
+			structures = 0;
 		const h = await harness({
 			pipelines: true,
 			timers: true,
 			discoveryTarget: () => "execute_pipeline",
 			structure: (messages) => {
+				structures++;
 				const packet = JSON.parse(messages.at(-1)!.content);
 				expect(packet.text).toBe(reply);
 				expect(packet.pending).toEqual([
@@ -191,7 +218,7 @@ for (const operation of ["answer", "cancel"] as const) {
 				execution: "pipeline",
 				status: "waiting",
 			});
-			await h.settings.configureRouter({ entry: "routeStructured" });
+			Object.assign(h.inference, { route: weigh({ "timers.manage": 0.45 }) });
 			const answered = await h.dialogue.submit({
 				requestId: crypto.randomUUID(),
 				conversationId: "main",
@@ -211,6 +238,7 @@ for (const operation of ["answer", "cancel"] as const) {
 			expect(
 				[...page("active"), ...page("archived")].map((row) => row.id),
 			).toEqual([before.id]);
+			expect(structures).toBe(1);
 			expect(commands).toBe(operation === "answer" ? 1 : 0);
 			expect(plans).toBe(operation === "answer" ? 2 : 1);
 		} finally {

@@ -1,0 +1,87 @@
+{
+  "method": "isolated-backend-probe-and-protected-body-comparison",
+  "provider": {
+    "version": "0.1.4-eumenes.1",
+    "sha256": "78fe62ed33ab76b601a9bd1f12b4285ea38b047ce837adbfba80edb2810ef0e2",
+    "sourceCommit": "fd180e89c8f97b30422831d48eb4e5984aa996a7"
+  },
+  "rows": [
+    {
+      "case": "shonan-2026-11-09",
+      "expectedRows": 57,
+      "actualRows": 57,
+      "missing": 0,
+      "extra": 0,
+      "matched": true,
+      "protectedBodySha256": "33bebc50c01985784ffe0e36e9b858c1d335553549ef4387b642f1f4c5a45ef3",
+      "acquisitionDiagnostic": {
+        "protectedBodySha256": "115a34c68b971b2fa078e071a313b29cdebff13307b5ff448590ea4b9b64d73c",
+        "cache": "bypass",
+        "characters": 3762,
+        "durationMs": 376,
+        "truncated": false
+      }
+    },
+    {
+      "case": "shonan-2026-11-10",
+      "expectedRows": 57,
+      "actualRows": 57,
+      "missing": 0,
+      "extra": 0,
+      "matched": true,
+      "protectedBodySha256": "0a9215f8c30dece829090fb8dc48f5d7e6d7376be3d4a4d42c17229824418a07",
+      "acquisitionDiagnostic": {
+        "protectedBodySha256": "900c07287a4ee368b9600ea0a9163b08c2876534d58a48406f889cb590c7a8d5",
+        "cache": "bypass",
+        "characters": 3750,
+        "durationMs": 1833,
+        "truncated": false
+      }
+    },
+    {
+      "case": "cinecitta-2026-11-09",
+      "expectedRows": 69,
+      "actualRows": 69,
+      "missing": 0,
+      "extra": 0,
+      "matched": true,
+      "protectedBodySha256": "2f5f01cc1640fb400b9b185c4d43cc6c193b1e54f5ee6a2a3426e75a85325ebe",
+      "acquisitionDiagnostic": {
+        "protectedBodySha256": "2f5f01cc1640fb400b9b185c4d43cc6c193b1e54f5ee6a2a3426e75a85325ebe",
+        "cache": "bypass",
+        "characters": 32108,
+        "durationMs": 542,
+        "truncated": false
+      }
+    },
+    {
+      "case": "cinecitta-2026-11-10",
+      "expectedRows": 69,
+      "actualRows": 69,
+      "missing": 0,
+      "extra": 0,
+      "matched": true,
+      "protectedBodySha256": "2f5f01cc1640fb400b9b185c4d43cc6c193b1e54f5ee6a2a3426e75a85325ebe",
+      "acquisitionDiagnostic": {
+        "protectedBodySha256": "2f5f01cc1640fb400b9b185c4d43cc6c193b1e54f5ee6a2a3426e75a85325ebe",
+        "cache": "bypass",
+        "characters": 32108,
+        "durationMs": 652,
+        "truncated": false
+      }
+    }
+  ],
+  "readiness": {
+    "startedAt": "2026-11-09T01:13:34.671Z",
+    "ready": false,
+    "durationMs": 60001,
+    "outcome": "deadline",
+    "role": "aux",
+    "initialConnectionReadyMs": 1404,
+    "auxConnectionWaitMs": 58595,
+    "queueWaitMs": null,
+    "modelProcessingMs": null
+  },
+  "fullExtractionTrials": 0,
+  "runningApplicationRestarted": false
+}

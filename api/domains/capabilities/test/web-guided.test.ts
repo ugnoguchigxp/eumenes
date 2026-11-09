@@ -32,7 +32,7 @@ test("the Web bundle seeds the current revisions and reseeding changes nothing",
 			store.read((db) =>
 				db
 					.query(
-						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('profile:web.guided@1','skill:web.guided@5','package:web.recipe@6','package:web.search@6','package:web.quick@7','toolchain:web.search@8','toolchain:web.search@9') ORDER BY id",
+						"SELECT id,definition_hash FROM capability_revisions WHERE id IN ('profile:web.guided@1','skill:web.guided@5','package:web.recipe@6','package:web.search@6','package:web.quick@7','toolchain:web.search@8','toolchain:web.search@9','toolchain:web.search@10') ORDER BY id",
 					)
 					.all(),
 			);
@@ -40,17 +40,17 @@ test("the Web bundle seeds the current revisions and reseeding changes nothing",
 			{ key: "package:web.quick", active_revision_id: "package:web.quick@7" },
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@9",
+				active_revision_id: "toolchain:web.search@10",
 			},
 		]);
 		const registered = stored();
-		expect(registered).toHaveLength(7);
+		expect(registered).toHaveLength(8);
 		await caps.seed();
 		expect(active()).toEqual([
 			{ key: "package:web.quick", active_revision_id: "package:web.quick@7" },
 			{
 				key: "toolchain:web.search",
-				active_revision_id: "toolchain:web.search@9",
+				active_revision_id: "toolchain:web.search@10",
 			},
 		]);
 		expect(stored()).toEqual(registered);

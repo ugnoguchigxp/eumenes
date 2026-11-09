@@ -107,6 +107,7 @@ type ToolchainOptions = {
 	music?: boolean;
 	image?: boolean;
 	markdown?: import("../../domains/markdown").MarkdownService;
+	appDevelopmentAdapter?: import("../../domains/tool-runtime").DomainAdapter;
 	uiCompositions?: import("../../domains/ui-compositions").UiCompositionsService;
 	/** Whether a specialist session still owns its work (UI undo/redo/save guard). */
 	specialistSessionLive?: (
@@ -243,6 +244,7 @@ function enabledBackends(options: ToolchainOptions) {
 		...(options.dots ? ["dots"] : []),
 		...(options.music ? ["music"] : []),
 		...(options.image ? ["image"] : []),
+		...(options.appDevelopmentAdapter ? ["app-development"] : []),
 		...(options.uiCompositions ? ["ui-compositions"] : []),
 		...(options.objectRecognition ? ["object-recognition"] : []),
 		...(options.shell ? ["shell"] : []),
@@ -330,6 +332,7 @@ export async function createToolchain(
 			: []),
 		...(options.music ? [createMusicScreenAdapter()] : []),
 		...(options.image ? [createImageScreenAdapter()] : []),
+		...(options.appDevelopmentAdapter ? [options.appDevelopmentAdapter] : []),
 		...(options.uiCompositions
 			? [
 					createUiCompositionsAdapter(options.uiCompositions, {

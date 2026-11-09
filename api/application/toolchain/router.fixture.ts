@@ -1,4 +1,8 @@
 import type { Database } from "bun:sqlite";
+import { fixtureDiscovery } from "./discovery.fixture";
+import { createToolchainRouting } from "./toolchain-routing";
+import type { HarnessOptions } from "./toolchain-harness-options.fixture";
+import type { createToolchain } from "./toolchain";
 import { READ_TOOLS, type Capabilities } from "../../domains/capabilities";
 import {
 	INPUT_HEADINGS,
@@ -210,3 +214,54 @@ export const askModel =
 	(model: Pick<import("../../domains/larm").LarmPort, "answer">): AskChoice =>
 	(messages, _round, signal) =>
 		model.answer(messages, signal, { jsonSchema: { type: "object" } } as never);
+
+/** Bind the same capability catalog to the fixture's scripted or live decision provider. */
+export async function fixtureRouting(input: {
+	options: HarnessOptions;
+	toolchain: Awaited<ReturnType<typeof createToolchain>>;
+	store: SqliteStore;
+	settings: Awaited<ReturnType<typeof createSettings>>;
+	inference: InferencePort;
+	ask: AskChoice;
+}) {
+	const { options, toolchain, store, settings, inference, ask } = input;
+	const discovery = (query: string) =>
+		options.discoveryTarget?.(query) ??
+		(options.history
+			? "conversation_history"
+			: (options.routeTool ??
+				(options.uiCompositions
+					? "ui_create"
+					: options.weather && /天気/.test(query)
+						? "weather_forecast"
+						: options.stock && /株価/.test(query)
+							? "stock_quote"
+							: options.timers && /タイマー/.test(query)
+								? "timer"
+								: "web_search")));
+	const routing = createToolchainRouting(
+		toolchain.capabilities,
+		toolchain.history,
+		options.embed || options.liveRouting
+			? toolchain.embedQuery
+			: fixtureDiscovery(store, toolchain.capabilities, discovery),
+		toolchain.registry,
+		toolchain.schemas,
+		undefined,
+		options.liveRouting ? toolchain.embedRouter : undefined,
+	);
+	if (options.liveRouting) {
+		if (options.embed) await toolchain.refreshVectors();
+	} else {
+		await attachFixtureRouter({
+			store,
+			inference,
+			routing,
+			settings,
+			capabilities: toolchain.capabilities,
+			...(options.embed ? {} : { discovery }),
+			ask: options.model ? askModel(options.model) : ask,
+		});
+	}
+	return routing;
+}

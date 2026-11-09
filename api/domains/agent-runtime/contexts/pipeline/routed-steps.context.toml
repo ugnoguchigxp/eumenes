@@ -1,0 +1,2 @@
+# Source: api/domains/agent-runtime/service/execution-compose.ts
+text = '''入力に routedSteps がある場合は、各要素を配列順に一つずつ手順にし、entry の担当を使ってください。after は依存する先行要素の0始まりの位置で、対応する手順IDを from に含めます。text は計画対象の資料です。request は入力の request をそのまま保持してください。'''

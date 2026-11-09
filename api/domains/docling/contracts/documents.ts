@@ -3,6 +3,10 @@ import { z } from "zod";
 export const documentId = z.string().regex(/^wiki-[a-f0-9]{32}$/);
 export const documentEtag = z.string().regex(/^"[a-f0-9]{64}"$/);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
+export const documentUpdatedAt = z.iso
+	.datetime({ offset: true })
+	.optional()
+	.catch(undefined);
 export const documentCapabilities = z.object({
 	contractVersion: z.literal("larm.docling-files.v1"),
 	basePath: z.literal("/v1/docling/documents"),
@@ -36,6 +40,7 @@ export const documentSummary = z.object({
 	markdownSha256: digest,
 	recoverySha256: digest,
 	contentDigest: digest,
+	updatedAt: documentUpdatedAt,
 });
 export const savedDocument = documentSummary.extend({
 	markdown: z.string(),

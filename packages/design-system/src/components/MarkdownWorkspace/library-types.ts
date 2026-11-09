@@ -17,6 +17,7 @@ export type LibraryItem = {
 	title?: string;
 	name?: string;
 	contentDigest?: string;
+	updatedAt?: string;
 	documentCount?: number;
 	folderCount?: number;
 	hasUnsupportedEntries?: boolean;

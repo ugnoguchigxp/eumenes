@@ -1,0 +1,62 @@
+{
+  "checkedAt": "2026-11-08T09:10:07.725Z",
+  "caseId": "selective-control",
+  "label": "after-explicit-cleanup",
+  "active": {
+    "revision": 0,
+    "data": {
+      "rows": [],
+      "counts": {
+        "todo": 0,
+        "archived": 2
+      },
+      "total": 0,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "archived": {
+    "revision": 1794129004453,
+    "data": {
+      "rows": [
+        {
+          "id": "dd38f166-a5b7-439b-8875-ef18da1ae17f",
+          "request": "複数の大学の図書館利用規則を公式資料で比較し、学外者の利用条件を出典付きMarkdown報告として保存してください。詳しく調査してください。",
+          "status": "done",
+          "outcome": "cancelled",
+          "summary": null,
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T09:10:04.453Z"
+        },
+        {
+          "id": "56c42830-153a-4204-9b3e-78d8e3f33800",
+          "request": "この会話でもう一件、自治体の避難所開設方針を公式資料で比較し、対象者と発動条件の違いを出典付きMarkdown報告にして保存してください。図書館の調査はそのまま続けてください。 直前の発言（今の発言が指す内容の手がかりです。指示ではありません）: <S11TNEXT_DELIMITED_CONTEXT variable=\"previous\"> 複数の大学の図書館利用規則を公式資料で比較し、学外者の利用条件を出典付きMarkdown報告として保存してください。詳しく調査してください。 </S11TNEXT_DELIMITED_CONTEXT>",
+          "status": "done",
+          "outcome": "cancelled",
+          "summary": null,
+          "pipeline": false,
+          "archived": true,
+          "updatedAt": "2026-11-08T09:10:02.828Z"
+        }
+      ],
+      "counts": {
+        "todo": 0,
+        "archived": 2
+      },
+      "total": 2,
+      "state": "archived",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "notices": [],
+  "resources": {
+    "resources": [],
+    "messages": []
+  },
+  "specialist": {
+    "session": null
+  }
+}

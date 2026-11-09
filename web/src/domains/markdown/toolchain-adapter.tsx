@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type {
@@ -19,12 +19,21 @@ const sourceSchema = z.object({
 	kind: z.literal("markdown-workspace"),
 	revision: z.number(),
 	current: markdownCurrentSchema.nullable(),
-	documents: z.array(z.object({ id: z.string(), title: z.string() })),
+	documents: z.array(
+		z.object({
+			id: z.string(),
+			title: z.string(),
+			updated_at: z.number().optional(),
+		}),
+	),
 	archiveAvailable: z.boolean(),
 	openSourceId: z.string().optional(),
+	preview: z.object({ title: z.string(), markdown: z.string() }).optional(),
 });
 const live = createLiveScreen<{
 	id: string | undefined;
+	targetRef: string | undefined;
+	generatedId: string | undefined;
 	visible: boolean;
 	artifactRevisionId: string;
 	show(id: string): void;
@@ -51,6 +60,10 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 			useState<MarkdownResource["libraryStatus"]>("idle");
 		const [nextCursor, setNextCursor] = useState<string | null>(null);
 		const [namespaces, setNamespaces] = useState<string[]>([]);
+		const [openedGenerated, setOpenedGenerated] = useState<{
+			targetRef: string;
+			documentId: string;
+		}>();
 		const root = useMemo(
 			() => ["markdown-workspace", client.identity, artifactRevisionId],
 			[client.identity, artifactRevisionId],
@@ -81,6 +94,11 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 		const parsed = sourceSchema.safeParse(query.data?.data);
 		const data = parsed.success ? parsed.data : null;
 		const selected = data?.current?.id;
+		const displayedId = data?.preview ? targetRef : selected;
+		const generatedId =
+			openedGenerated?.documentId === selected
+				? openedGenerated?.targetRef
+				: undefined;
 		useEffect(() => {
 			if (
 				!visible ||
@@ -110,7 +128,10 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 					stageId,
 					expectedEtag: remote.entry.revision,
 				});
-				if (!signal.aborted) setTargetRef(document.id);
+				if (!signal.aborted) {
+					setOpenedGenerated({ targetRef, documentId: document.id });
+					setTargetRef(document.id);
+				}
 			})().catch(() => {
 				if (!controller.signal.aborted)
 					notify("Doclingの調査文書を開けませんでした。");
@@ -127,23 +148,24 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 			refresh,
 			setTargetRef,
 		});
-		const latest = useRef({
-			id: selected,
-			visible,
-			artifactRevisionId,
-			show: setTargetRef,
-		});
-		useEffect(() => {
-			latest.current = {
-				id: selected,
+		useEffect(
+			() =>
+				live.attach({
+					id: displayedId,
+					targetRef,
+					generatedId,
+					visible,
+					artifactRevisionId,
+					show: setTargetRef,
+				}),
+			[
+				displayedId,
+				targetRef,
+				generatedId,
 				visible,
 				artifactRevisionId,
-				show: setTargetRef,
-			};
-		}, [selected, visible, artifactRevisionId, setTargetRef]);
-		useEffect(
-			() => live.attach(latest.current),
-			[selected, visible, artifactRevisionId, setTargetRef],
+				setTargetRef,
+			],
 		);
 		const snapshot: Snapshot = data
 			? {
@@ -160,6 +182,7 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 						cacheAvailable: !!conversationId,
 						namespaces,
 						libraryHasMore: nextCursor !== null,
+						libraryNextCursor: nextCursor,
 						capabilities: capabilities.data,
 						archiveAvailable:
 							data.archiveAvailable &&
@@ -363,8 +386,13 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 	async focus(id) {
 		const screen = await live.waitFor((h) => h);
 		if (!screen) return false;
-		screen.show(id);
-		return !!(await live.waitFor((h) => h.id === id));
+		if (
+			screen.id !== id &&
+			screen.generatedId !== id &&
+			screen.targetRef !== id
+		)
+			screen.show(id);
+		return !!(await live.waitFor((h) => h.id === id || h.generatedId === id));
 	},
 	viewingTarget() {
 		const screen = live.current();

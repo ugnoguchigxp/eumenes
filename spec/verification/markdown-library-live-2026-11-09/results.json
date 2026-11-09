@@ -1,0 +1,204 @@
+{
+  "checkedAt": "2026-11-09T01:10:47.845Z",
+  "nativeMethods": [
+    "GET",
+    "PUT",
+    "PATCH",
+    "POST",
+    "DELETE"
+  ],
+  "eumenesFeatures": {
+    "library": true,
+    "folders": true,
+    "patch": true,
+    "copy": true,
+    "delete": true,
+    "createFolder": true,
+    "recursiveDelete": true,
+    "folderCopy": true,
+    "batch": true,
+    "maxBatchItems": 100,
+    "maxAffectedItems": 500,
+    "maxCopyBytes": 20971520
+  },
+  "initialDocumentCount": 9,
+  "doclingPreflight": "stopped",
+  "apiChecks": [
+    {
+      "step": "create empty acceptance folder",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "213eabaa-25db-44b7-9af8-7f3bad8b5bc2",
+        "httpRequestId": "046537f8-eb41-4780-b0cf-3ea5bef1f8bd"
+      }
+    },
+    {
+      "step": "create empty destination folder",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "850e2af1-8f12-4fe9-b99f-ae9452da3d11",
+        "httpRequestId": "3e246788-33a6-4c88-b330-6f37a36462bd"
+      }
+    },
+    {
+      "step": "move and retitle document",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "482e86d1-6976-414d-9e46-2da74f641678",
+        "httpRequestId": "d04405e9-c9f2-48b8-b2e7-2c2beee8dd00"
+      }
+    },
+    {
+      "step": "stale ETag rejected before mutation; exact content retained",
+      "details": {
+        "status": 409,
+        "code": "revision_conflict"
+      }
+    },
+    {
+      "step": "copy document",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "de3da241-6485-4cd3-896b-75349d41d708",
+        "httpRequestId": "0895b766-69aa-4284-979a-91ad4f914659"
+      }
+    },
+    {
+      "step": "batch move",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "05c20461-2c5b-45eb-afad-0cd28496aa64",
+        "httpRequestId": "da63421c-4e67-4959-9532-f07e18fe92ea"
+      }
+    },
+    {
+      "step": "batch copy",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "bf99be83-5cd7-4e66-b50c-72e305aec978",
+        "httpRequestId": "ca52bc6b-aeae-4a8d-951a-72fa556e7901"
+      }
+    },
+    {
+      "step": "batch delete",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "8201d6fe-f0d3-449d-b507-650b99c83027",
+        "httpRequestId": "f00d840b-83e5-48dc-9d2b-3d8b99d3233c"
+      }
+    },
+    {
+      "step": "delete single document",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "06643e7c-156d-4b63-94db-00663a5795b0",
+        "httpRequestId": "2aeace81-2735-4ed9-838d-fffc5ec60527"
+      }
+    },
+    {
+      "step": "move folder with its documents",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "89e6f265-630b-4400-b45d-e15f0a0c458d",
+        "httpRequestId": "c9bfb522-ede8-46ef-98cc-448d82d07a6d"
+      }
+    },
+    {
+      "step": "copy folder with its documents",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "e82377fb-6c41-4688-8350-c3f40f366287",
+        "httpRequestId": "4b83e336-c555-4bf3-9888-4382f7fc4f0b"
+      }
+    },
+    {
+      "step": "delete copied subtree",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "1d5ac403-2eea-4c12-b5ff-3c117585e8de",
+        "httpRequestId": "6c08caa7-ec9b-4a68-910c-0a802ec26e07"
+      }
+    },
+    {
+      "step": "fixture ready for UI",
+      "details": {
+        "folder": "_eumenes-acceptance-176dd94866eb",
+        "subfolder": "整頓",
+        "originalCount": 9
+      }
+    },
+    {
+      "step": "remove acceptance subtree",
+      "details": {
+        "state": "applied",
+        "code": null,
+        "requestId": "1194eff4-4e01-43ad-9525-cf9e173ec9a1",
+        "httpRequestId": "cd5abbac-c80b-428e-9854-6c7d761e94f3"
+      }
+    },
+    {
+      "step": "cleanup verified",
+      "details": {
+        "documentCount": 9,
+        "docling": "stopped"
+      }
+    }
+  ],
+  "browser": {
+    "artifactRevision": 4,
+    "openedFixture": true,
+    "deleteConfirmation": true,
+    "deleteConfirmationCancelled": true,
+    "toolbarMoveReadback": true,
+    "currentDocumentFocus": false,
+    "draggable": false,
+    "latestUiPendingRestart": false,
+    "moveContentReadbackMatched": true
+  },
+  "existingDocumentsUnchanged": true,
+  "cleanup": "verified",
+  "finalDocumentCount": 9,
+  "doclingAfter": "stopped",
+  "afterRestart": {
+    "dragDestination": "_eumenes-acceptance-e27c8b52d770/移動先/文書A.md",
+    "openedFromWorkList": true,
+    "restoredFromParentFolder": true,
+    "breadcrumb": "Docling\neumenes\n/ _eumenes-acceptance-e27c8b52d770\n/ 移動先",
+    "checked": 0,
+    "current": "true",
+    "focused": true,
+    "dragApplied": true,
+    "exactContentReadback": true,
+    "existingDocumentsUnchanged": true,
+    "cleanup": [
+      {
+        "step": "remove acceptance subtree",
+        "details": {
+          "state": "applied",
+          "code": null,
+          "requestId": "c4d6815f-063a-4e8b-863d-6e095195603a",
+          "httpRequestId": "0eba4f09-beeb-405f-b369-2bab19b1160b"
+        }
+      },
+      {
+        "step": "cleanup verified",
+        "details": {
+          "documentCount": 9,
+          "docling": "stopped"
+        }
+      }
+    ],
+    "proof": "focus-after-restart.jpg"
+  }
+}

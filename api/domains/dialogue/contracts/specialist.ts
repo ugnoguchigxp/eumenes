@@ -160,7 +160,8 @@ export type SpecialistSet = {
 	 */
 	agent: {
 		/** Opt-in source-backed state, extracted in the same control call. Frozen in a new binding revision. */
-		collaborationState?: true;
+		collaborationState?: true | "host-bound";
+		larmReasoning?: "off";
 		document: {
 			ref: string;
 			path: string;
@@ -168,6 +169,7 @@ export type SpecialistSet = {
 			inlineBytes?: number;
 		} | null;
 		maxModelCalls?: number;
+		maxOutputTokens?: number;
 		retries?: Readonly<Record<string, number>>;
 		recentTurns?: number;
 		recentBytes?: number;

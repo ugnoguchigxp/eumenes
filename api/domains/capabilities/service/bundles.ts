@@ -24,6 +24,7 @@ import {
 	schemaProperties,
 } from "./bundle-fields";
 import { bundleFiles } from "./bundle-files";
+import { isWorkflowSchema } from "./workflow-schemas";
 import {
 	compileJsonSchemaSubset,
 	UnsupportedSchema,
@@ -171,8 +172,12 @@ function createCheck(
 	}
 	const storedRevision = (id: string) =>
 		!!db.query("SELECT 1 FROM capability_revisions WHERE id=?").get(id);
-	const hasDocument = (id: string, kind: DocumentKind) =>
-		(bundleDocs.get(id)?.kind ?? getDocument(db, id)?.kind) === kind;
+	const hasDocument = (id: string, kind: DocumentKind) => {
+		const local = bundleDocs.get(id);
+		if (local) return local.kind === kind;
+		const stored = getDocument(db, id);
+		return stored?.kind === kind && !isWorkflowSchema(stored);
+	};
 	const schemaResolves = (ref: string) => {
 		if (ref.startsWith("builtin:"))
 			return Object.hasOwn(validators, ref.slice("builtin:".length));
@@ -235,7 +240,10 @@ function checkPins({ db, bundle, issue }: Check) {
 function checkDocuments({ db, bundle, docs, issue }: Check) {
 	for (const doc of docs) {
 		const stored = getDocument(db, doc.revisionId);
-		if (stored && stored.digest !== hash(doc.document))
+		if (
+			doc.revisionId.startsWith("schema:workflow.") ||
+			(stored && stored.digest !== hash(doc.document))
+		)
 			issue("revision_conflict", doc.path, doc.revisionId);
 	}
 	bundle.schemas.forEach((s, i) => {

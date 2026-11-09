@@ -53,6 +53,9 @@ export function specialistControl(
 		set.agent.collaborationState && !replyOnly
 			? statefulSpecialistContract.outputSchema
 			: contract.outputSchema;
+	const hostBound = set.agent.collaborationState === "host-bound" && !replyOnly;
+	const stateFields = statefulSpecialistContract.outputSchema.properties
+		.stateUpdate.properties as Record<string, unknown>;
 	const outputSchema = replyOnly
 		? {
 				...schema,
@@ -66,8 +69,25 @@ export function specialistControl(
 					},
 				},
 			}
-		: schema;
-	return agentControl({
+		: hostBound
+			? {
+					...schema,
+					required: schema.required?.filter((field) => field !== "stateUpdate"),
+					properties: {
+						...schema.properties,
+						stateUpdate: {
+							type: "object",
+							properties: {
+								upserts: stateFields.upserts,
+								removals: stateFields.removals,
+							},
+							required: ["upserts", "removals"],
+							additionalProperties: false,
+						},
+					},
+				}
+			: schema;
+	const control = agentControl({
 		profile: set.profile,
 		skills: set.skills,
 		rules:
@@ -75,7 +95,10 @@ export function specialistControl(
 				? RULES +
 					"\n" +
 					collaborationInstructions.state +
-					"\n同じ出力のstateUpdateでCOLLABORATION_STATEを更新し、既存のactionで次の一手を示します。追加の推論を前提にしません。今回のactionの未観測の実行結果を確定せず、必要な確認は未決として保持します。"
+					(hostBound
+						? "\n今回記録すべき状態の変更がある場合だけ、stateUpdateにupsertsとremovalsを返します。ホストが版と作業参照を結び付けます。"
+						: "\nstateUpdateには今回のSTATE_UPDATE_BASEをそのまま使い、意味のある変更があればupsertsとremovalsだけを編集します。expectedRevisionは更新前の値なので増やしません。workは操作前の版を保持します。") +
+					"同じ出力のactionで次の一手を示し、未観測の結果は確定しません。"
 				: RULES,
 		tools: replyOnly
 			? []
@@ -89,6 +112,7 @@ export function specialistControl(
 				],
 		outputSchema,
 	});
+	return { ...control, larmReasoning: set.agent.larmReasoning };
 }
 
 /** Rejected output remains reference data, followed by the shared repair instruction. */

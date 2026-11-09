@@ -15,7 +15,16 @@ import { row, list, type Workspace } from "../repository";
 
 export function createMarkdownResourceAdapter(
 	store: SqliteStore,
+	hasLocal?: (id: string) => boolean,
 ): ResourceAdapter {
+	const available = (value: NonNullable<ReturnType<typeof generatedRow>>) => {
+		const { archive, local } = generatedReceipt(value);
+		return (
+			value.state === "settled" &&
+			(archive.state === "saved" ||
+				(local.state === "saved" && hasLocal?.(value.id) === true))
+		);
+	};
 	const ref = (value: Workspace): ResourceRef => ({
 		uri: formatResourceUri("markdown.document", value.id),
 		kind: "markdown.document",
@@ -24,12 +33,7 @@ export function createMarkdownResourceAdapter(
 	});
 	const generatedRef = (db: import("bun:sqlite").Database, id: string) => {
 		const value = generatedRow(db, id);
-		if (
-			!value ||
-			value.state !== "settled" ||
-			generatedReceipt(value).archive.state !== "saved"
-		)
-			return null;
+		if (!value || !available(value)) return null;
 		return {
 			uri: formatResourceUri("markdown.document", `generated-${id}`),
 			kind: "markdown.document",
@@ -51,6 +55,7 @@ export function createMarkdownResourceAdapter(
 							state: z.string(),
 							sourceId: z.string().optional(),
 						}),
+						local: z.object({ state: z.string() }).optional(),
 					}),
 				})
 				.safeParse(result);
@@ -65,8 +70,12 @@ export function createMarkdownResourceAdapter(
 					input.sourceRunId === context.runId &&
 					output.document.title === input.title &&
 					output.document.path === input.path &&
-					output.document.archive.state === "saved" &&
-					output.document.archive.sourceId === saved.archive.sourceId
+					((output.document.archive.state === "saved" &&
+						saved.archive.state === "saved" &&
+						output.document.archive.sourceId === saved.archive.sourceId) ||
+						(output.document.local?.state === "saved" &&
+							saved.local.state === "saved" &&
+							hasLocal?.(r.id) === true))
 					? [ref]
 					: [];
 			}
@@ -83,7 +92,7 @@ export function createMarkdownResourceAdapter(
 							adapterRef: "adapter:markdown@1",
 							targetRef: id,
 							actions: ["open", "read"],
-							preview: "Doclingの調査文書",
+							preview: "調査文書",
 						}
 					: null;
 			}
@@ -117,12 +126,7 @@ export function createMarkdownResourceAdapter(
 				const r = store.read((db) =>
 					generatedRow(db, id.slice("generated-".length)),
 				);
-				if (
-					!r ||
-					r.state !== "settled" ||
-					generatedReceipt(r).archive.state !== "saved"
-				)
-					throw new Error("item_not_found");
+				if (!r || !available(r)) throw new Error("item_not_found");
 				return {
 					text: headWithin(
 						generatedValue(r).markdown,

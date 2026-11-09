@@ -135,13 +135,10 @@ const routerManifest = JSON.parse(
 test("the vendored router package matches its manifest, package.json, the lockfile and the installed copy", () => {
 	const artifact = read(`vendor/router/${routerManifest.artifact}`);
 	expect(routerManifest.package).toBe("eumenes_router");
-	expect(routerManifest.source.dirty).toBe(true);
-	expect(routerManifest.source.patch.file).toBe("adoption-source.patch");
-	expect(
-		createHash("sha256")
-			.update(read(`vendor/router/${routerManifest.source.patch.file}`))
-			.digest("hex"),
-	).toBe(routerManifest.source.patch.sha256);
+	expect(routerManifest.source.dirty).toBe(false);
+	expect(routerManifest.source.commit).toBe(
+		"4b5e83db6e1e7497fd6e5967008b7faa3ed0ecbb",
+	);
 	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
 		routerManifest.sha256,
 	);
@@ -159,6 +156,9 @@ test("the vendored router package matches its manifest, package.json, the lockfi
 	expect(routerSql.length).toBe(routerManifest.dbSchemaVersion);
 	expect(TURN_STRUCTURE_PROMPT.version).toBe(
 		routerManifest.entries.routeStructured.structurePrompt,
+	);
+	expect(TURN_STRUCTURE_PROMPT.version).toBe(
+		routerManifest.entries.routeWithFallback.structurePrompt,
 	);
 	const lock = read("bun.lock").toString();
 	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;

@@ -20,6 +20,7 @@ const entry = (d: DocumentSummary): ArchiveEntry => ({
 	namespace: d.namespace,
 	path: d.path,
 	contentDigest: d.contentDigest,
+	...(d.updatedAt ? { updatedAt: d.updatedAt } : {}),
 });
 function failure(error: unknown): never {
 	if (error instanceof DocumentFileError) {
@@ -71,6 +72,7 @@ export function markdownArchive(docling: DoclingService): ArchivePort {
 						markdownSha256: d.markdownSha256,
 						recoverySha256: d.recoverySha256,
 						contentDigest: d.contentDigest,
+						...(d.updatedAt ? { updatedAt: d.updatedAt } : {}),
 					};
 				} catch (e) {
 					return failure(e);

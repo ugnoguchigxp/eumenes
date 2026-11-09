@@ -1,0 +1,335 @@
+{
+  "id": "180ee6a7-19d9-436d-bfea-54d4200616fa",
+  "conversationId": "research-routing-live-20261108-technical",
+  "observations": [
+    {
+      "at": "2026-11-08T09:06:31.519Z",
+      "jobId": "ce45e34f-fa3d-4911-b07e-81bb22183d8f",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:06:36.551Z",
+      "jobId": "0083f9a0-e535-4d16-8751-abd6b93d79da",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:06:56.681Z",
+      "jobId": "d482d133-cca5-428b-887f-b67649fae012",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:07:17.710Z",
+      "jobId": "d482d133-cca5-428b-887f-b67649fae012",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:07:43.147Z",
+      "jobId": "deb0e578-106c-4887-b107-cad0bc4311a7",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:08:43.833Z",
+      "jobId": "deb0e578-106c-4887-b107-cad0bc4311a7",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:08:53.900Z",
+      "jobId": "deb0e578-106c-4887-b107-cad0bc4311a7",
+      "state": "completed",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:08:58.935Z",
+      "jobId": "d55debfd-def6-4350-9046-45f26b1f86ca",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:10:07.390Z",
+      "jobId": "d05f04f5-725e-4a80-ac4c-25750b6fdeb7",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:10:27.512Z",
+      "jobId": "d05f04f5-725e-4a80-ac4c-25750b6fdeb7",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:10:42.613Z",
+      "jobId": "21f82e3e-a493-4108-943f-eb8a2d258858",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:10:52.680Z",
+      "jobId": "0db68487-3b4b-412c-8402-dd650032ee4a",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:11:08.175Z",
+      "jobId": "d358df87-7a47-4e54-8e7f-7243b6138337",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:11:18.249Z",
+      "jobId": "34d2929f-1513-486a-bfa9-bd004b5cc38d",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:11:28.309Z",
+      "jobId": "94d9564b-b2b5-4b32-a88e-3e7048eb905b",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:11:38.384Z",
+      "jobId": "5ae64268-610e-40ed-87d2-f2c31fc7ad01",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:11:48.434Z",
+      "jobId": "5ae64268-610e-40ed-87d2-f2c31fc7ad01",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:12:03.541Z",
+      "jobId": "49c62cdb-4f9f-41f1-aa7e-0daaed920d86",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:12:23.663Z",
+      "jobId": "84868a8d-988c-449a-96fb-d06535020260",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:12:33.723Z",
+      "jobId": "84868a8d-988c-449a-96fb-d06535020260",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:12:48.806Z",
+      "jobId": "5302d710-9cf4-40cc-9619-b9d612146b72",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:12:58.875Z",
+      "jobId": "edfe9ff7-25d7-49c2-8979-9ed81bc61285",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:13:13.929Z",
+      "jobId": "edfe9ff7-25d7-49c2-8979-9ed81bc61285",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:13:23.968Z",
+      "jobId": "3f9b041a-9cf5-4566-b096-e5e29c787483",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:13:34.031Z",
+      "jobId": "1f00fc5e-c0ea-4fe6-9e27-a4e6c18ae010",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:13:49.135Z",
+      "jobId": "1f00fc5e-c0ea-4fe6-9e27-a4e6c18ae010",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:13:59.205Z",
+      "jobId": "6700a2f7-15b9-4cf8-b654-afc1d7411952",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:14:14.290Z",
+      "jobId": "6700a2f7-15b9-4cf8-b654-afc1d7411952",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:14:24.359Z",
+      "jobId": "4b94d9c2-7dc3-4fd8-9b0b-c9c84321d07a",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:14:39.462Z",
+      "jobId": "4b94d9c2-7dc3-4fd8-9b0b-c9c84321d07a",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:15:25.000Z",
+      "jobId": "693d9b69-d227-41ba-9ec2-5e56bbc3a4f9",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:15:35.146Z",
+      "jobId": "693d9b69-d227-41ba-9ec2-5e56bbc3a4f9",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:15:45.179Z",
+      "jobId": "b344d61d-3337-4ec1-88ae-3309ad6b0449",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:16:00.426Z",
+      "jobId": "f3b6871b-e6a9-4105-a7ae-b989536bf0d2",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:16:11.007Z",
+      "jobId": "f3b6871b-e6a9-4105-a7ae-b989536bf0d2",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:16:26.157Z",
+      "jobId": "06d94de0-cbad-4463-8cc9-cd52797dc459",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:16:41.245Z",
+      "jobId": "4f433680-4714-4400-ad0d-c9ee4451651a",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:16:56.350Z",
+      "jobId": "4f433680-4714-4400-ad0d-c9ee4451651a",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:17:11.594Z",
+      "jobId": "4e8379ff-2698-4fa8-9b02-26d5cc0c07ff",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:17:31.727Z",
+      "jobId": "4e8379ff-2698-4fa8-9b02-26d5cc0c07ff",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:18:01.915Z",
+      "jobId": "c0c06377-e25b-46ba-ab83-61f55f6435f1",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:18:16.995Z",
+      "jobId": "c0c06377-e25b-46ba-ab83-61f55f6435f1",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:18:47.194Z",
+      "jobId": "90f662cf-afb9-438e-85bd-ff3419afd059",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:19:22.408Z",
+      "jobId": "b29a73e5-6542-4409-a030-0f3e09f0f88f",
+      "state": "queued",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:19:37.516Z",
+      "jobId": "b29a73e5-6542-4409-a030-0f3e09f0f88f",
+      "state": "running",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:20:12.744Z",
+      "jobId": "b29a73e5-6542-4409-a030-0f3e09f0f88f",
+      "state": "completed",
+      "errorCode": null,
+      "notices": 0
+    },
+    {
+      "at": "2026-11-08T09:20:22.796Z",
+      "jobId": "b29a73e5-6542-4409-a030-0f3e09f0f88f",
+      "state": "completed",
+      "errorCode": null,
+      "notices": 1
+    }
+  ]
+}

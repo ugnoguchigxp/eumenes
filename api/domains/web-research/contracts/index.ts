@@ -73,9 +73,14 @@ const documentSchema = z.object({
 	guardReasonCodes: z.array(z.string().max(80)).max(16),
 });
 export type ResearchDocument = z.infer<typeof documentSchema>;
+export const WEB_ACQUISITION_PROVIDER = "llm-fetch@0.1.4-eumenes.1";
 export const resultSchema = z.object({
-	// Keep retained results from the previous release readable.
-	provider: z.enum(["llm-fetch@0.1.3", "llm-fetch@0.1.4"]),
+	// Keep previously retained results readable.
+	provider: z.enum([
+		"llm-fetch@0.1.3",
+		"llm-fetch@0.1.4",
+		WEB_ACQUISITION_PROVIDER,
+	]),
 	observedAt: z.string().datetime(),
 	cache: z.enum(["miss", "hit", "bypass"]),
 	hits: z

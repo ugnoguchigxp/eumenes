@@ -150,6 +150,7 @@ export type StoredDocument = {
 	kind: DocumentKind;
 	digest: string;
 	document: unknown;
+	bundleId: string;
 };
 export function getDocument(
 	db: Database,
@@ -157,13 +158,14 @@ export function getDocument(
 ): StoredDocument | null {
 	const row = db
 		.query(
-			"SELECT id,kind,digest,document_json FROM capability_documents WHERE id=?",
+			"SELECT id,kind,digest,document_json,bundle_id FROM capability_documents WHERE id=?",
 		)
 		.get(revisionId) as {
 		id: string;
 		kind: DocumentKind;
 		digest: string;
 		document_json: string;
+		bundle_id: string;
 	} | null;
 	return row
 		? {
@@ -171,6 +173,7 @@ export function getDocument(
 				kind: row.kind,
 				digest: row.digest,
 				document: JSON.parse(row.document_json),
+				bundleId: row.bundle_id,
 			}
 		: null;
 }

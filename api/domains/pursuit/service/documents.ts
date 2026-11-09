@@ -1,22 +1,12 @@
 import type { Database } from "bun:sqlite";
-import { jstDay } from "../../../infrastructure/jst-time";
+import { documentName } from "../../../infrastructure/markdown-filename";
 import { sha256Hex } from "../../../infrastructure/digest";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { rowOf, save, stateOf, type RunRow } from "../repository";
 import { current, type Context } from "./context";
 import { notice } from "./lifecycle";
 
-/** Filename constraints only: title and document structure are chosen by the model. */
-export function documentName(title: string) {
-	return [...title]
-		.map((c) => {
-			const code = c.codePointAt(0)!;
-			return code < 32 || code === 127 || c === "/" || c === "\\" ? "_" : c;
-		})
-		.slice(0, 80)
-		.join("")
-		.trim();
-}
+export { documentName };
 export function publishDocument(
 	ctx: Context,
 	db: Database,
@@ -40,7 +30,7 @@ export function publishDocument(
 		title: state.draft.title,
 		markdown: state.draft.answer,
 		namespace: "eumenes",
-		path: `research/${jstDay(ctx.now())}_${documentName(state.draft.title)}_${id}.md`,
+		path: `research/${documentName(state.draft.title) || "調査報告"}.md`,
 	};
 	if (!ctx.documents) {
 		state.result.document = {
@@ -121,14 +111,11 @@ export function collectDocuments(ctx: Context, db: Database) {
 			...(document
 				? {
 						document,
-						links: [
-							...(document.local.uri ? [document.local.uri] : []),
-							...(document.archive.state === "saved"
-								? [
-										`eumenes://markdown.document/${encodeURIComponent(`generated-${document.id}`)}`,
-									]
-								: []),
-						],
+						links:
+							document.archive.state === "saved" ||
+							document.local.state === "saved"
+								? [`eumenes://markdown.document/generated-${document.id}`]
+								: [],
 					}
 				: { code: "markdown_document_missing" }),
 		};

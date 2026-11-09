@@ -285,6 +285,7 @@ test("management metadata excludes document bodies while retaining validated ide
 							namespace: "eumenes",
 							path: "元.md",
 							title: "原題",
+							updatedAt: "2026-11-08T15:00:00Z",
 							markdown,
 							recovery,
 							...digests,
@@ -302,6 +303,7 @@ test("management metadata excludes document bodies while retaining validated ide
 		id,
 		etag,
 		contentDigest: digests.contentDigest,
+		updatedAt: "2026-11-08T15:00:00Z",
 	});
 	expect(metadata).not.toHaveProperty("markdown");
 	expect(metadata).not.toHaveProperty("recovery");

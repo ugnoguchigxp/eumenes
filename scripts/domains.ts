@@ -169,6 +169,23 @@ export const domains = {
 			test: [],
 		},
 	},
+	"app-development": {
+		tier: 3,
+		backend: "api/domains/app-development",
+		integrationTests: [
+			"api/application/app-development/app-development.test.ts",
+		],
+		web: null,
+		components: null,
+		depends: { api: [], web: [], test: [] },
+	},
+	"git-observation": {
+		tier: 0,
+		backend: "api/domains/git-observation",
+		web: null,
+		components: null,
+		depends: { api: [], web: [], test: [] },
+	},
 	"ui-compositions": {
 		tier: 3,
 		backend: "api/domains/ui-compositions",
@@ -248,11 +265,12 @@ export const domains = {
 		integrationTests: [
 			"api/application/pipelines/pipeline-execution.test.ts",
 			"api/application/pipelines/vendor.test.ts",
+			"api/application/pipelines/workflow-authoring.test.ts",
 		],
 		depends: {
 			api: [],
 			web: [],
-			test: [],
+			test: ["queue"],
 		},
 	},
 	"tool-runtime": {
@@ -488,7 +506,7 @@ export const domains = {
 			"api/application/pursuit/pursuit-integration.test.ts",
 		],
 		backend: "api/domains/pursuit",
-		web: "web/src/domains/pursuit",
+		web: null,
 		components: null,
 		depends: {
 			api: ["capabilities", "inference", "queue", "resources", "tool-runtime"],

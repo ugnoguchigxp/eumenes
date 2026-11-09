@@ -51,7 +51,7 @@ async function research(f: Awaited<ReturnType<typeof fixture>>) {
 	await f.finishWeb();
 }
 
-test("new research waits for the document receipt, then returns its title and file references without another model call", async () => {
+test("new research waits for the document receipt, then publishes one editor link without another model call", async () => {
 	const documents = documentPort(),
 		f = await fixture({ documents: documents.port });
 	try {
@@ -65,19 +65,26 @@ test("new research waits for the document receipt, then returns its title and fi
 			markdown: "本文で確認した結論です。[資料](https://example.com/source)",
 			namespace: "eumenes",
 		});
-		expect(documents.input()!.path).toMatch(
-			/^research\/\d{4}-\d{2}-\d{2}_一次資料の比較調査_.*\.md$/,
-		);
+		expect(documents.input()!.path).toBe("research/一次資料の比較調査.md");
 		documents.complete();
 		await f.service().maintain();
 		expect(f.calls()).toBe(calls);
 		expect(f.view()).toMatchObject({
 			status: "completed",
 			result: {
-				document: { title: "一次資料の比較調査", archive: { state: "saved" } },
+				document: {
+					title: "一次資料の比較調査",
+					local: {
+						state: "saved",
+						uri: `eumenes://scratch/${documents.input()!.id}`,
+					},
+					archive: { state: "saved" },
+				},
+				links: [
+					`eumenes://markdown.document/generated-${documents.input()!.id}`,
+				],
 			},
 		});
-		expect(f.view()?.result?.links).toHaveLength(2);
 		await f.service().maintain();
 		expect(f.notices).toHaveLength(1);
 		await f

@@ -1,7 +1,10 @@
 import type { Database } from "bun:sqlite";
 import { RESEARCH_BUDGET } from "../../agent-runtime";
 import { packageRuntimeOf, type ToolchainCard } from "../../capabilities";
-import type { ExecutionReference } from "../../tool-runtime";
+import type {
+	ExecutionReference,
+	RoutedPipelineStep,
+} from "../../tool-runtime";
 import type { Run } from "../contracts";
 import { extendRunDeadline, linkAnswer, transition } from "../repository";
 import { COMMAND_KIND, type DialogueDeps } from "./context";
@@ -41,6 +44,7 @@ export function dispatchInTransaction(
 		run: Run;
 		card: ToolchainCard;
 		request: string;
+		routedSteps?: readonly RoutedPipelineStep[];
 		target?: string;
 		resolveUnsaved?: "discard";
 		inputs?: Record<string, unknown>;
@@ -158,12 +162,22 @@ export function dispatchInTransaction(
 			const source = executionSourceInTransaction(deps, tx, run.id);
 			if (!agents || !source)
 				return { ok: false, code: "execution_source_invalid" };
-			const view = agents.executions.startPipelineInTransaction(tx, {
-				source,
-				toolchainRevisionId: card.revisionId,
-				references: input.references,
-			});
-			return { ok: true, handed: false, sourceRef: view.id };
+			try {
+				const view = agents.executions.startPipelineInTransaction(tx, {
+					source,
+					toolchainRevisionId: card.revisionId,
+					references: input.references,
+					...(input.routedSteps ? { routedSteps: input.routedSteps } : {}),
+				});
+				return { ok: true, handed: false, sourceRef: view.id };
+			} catch (error) {
+				if (
+					error instanceof Error &&
+					error.message === "pipeline_component_unavailable"
+				)
+					return { ok: false, code: error.message };
+				throw error;
+			}
 		}
 		default: {
 			if (!agents || !runtime.route)

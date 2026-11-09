@@ -5,6 +5,7 @@ import {
 	type UiStudioResource,
 } from "@eumenes/artifact-ui";
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -203,6 +204,236 @@ test("the device switch is display state: the input and the draft survive it and
 	fireEvent.click(button(/デスクトップ/));
 	expect(container.querySelector(".aui-ui-preview-desktop")).toBeTruthy();
 	expect(dispatch).not.toHaveBeenCalled();
+});
+
+test("a workflow shows each movie as a heading with its own screenings", () => {
+	mount(
+		studio({
+			appDevelopment: true,
+			work: null,
+			viewing: {
+				id: "movies",
+				title: "上映一覧",
+				savedRevision: 2,
+				definition: { view: "grouped-list", groups: [] },
+				bindings: {
+					inputs: {},
+					sections: {
+						path: [],
+						rowsKey: "rows",
+						groupBy: "title",
+						itemKeys: ["startTime", "format"],
+						labels: { format: { "2D": "通常" } },
+					},
+				},
+				data: {
+					rows: [
+						{
+							title: "第一の映画",
+							startTime: "09:00",
+							format: "2D",
+						},
+						{
+							title: "第一の映画",
+							startTime: "11:00",
+						},
+						{
+							title: "第一の映画[IMAX]",
+							startTime: "14:30",
+							format: "IMAX",
+						},
+					],
+				},
+			},
+		}),
+	);
+	const first = screen
+		.getByRole("heading", { name: "第一の映画" })
+		.closest("section")!;
+	const second = screen
+		.getByRole("heading", { name: "第一の映画[IMAX]" })
+		.closest("section")!;
+	const screenings = (section: HTMLElement) =>
+		within(section)
+			.getAllByRole("listitem")
+			.map((item) => item.textContent);
+	expect(screenings(first)).toEqual(["09:00通常", "11:00"]);
+	expect(screenings(second)).toEqual(["14:30IMAX"]);
+	expect(screen.queryByRole("table")).toBeNull();
+});
+
+test("a screening list shows shared formats once and moves the next screening at its start time", () => {
+	vi.useFakeTimers();
+	try {
+		vi.setSystemTime(new Date("2026-11-09T14:57:00+09:00"));
+		const title = "ゴジラ [IMAXレーザー]";
+		const viewing = {
+			id: "screenings",
+			title: "上映一覧",
+			savedRevision: 2,
+			definition: { view: "grouped-list", groups: [] },
+			bindings: {
+				inputs: {},
+				sections: {
+					path: [],
+					rowsKey: "rows",
+					groupBy: "title",
+					itemKeys: ["startTime", "format"],
+					labels: { format: { "2D": "通常" } },
+				},
+			},
+			workflow: { publish: { schemaRef: "schema:showtimes.rows@1" } },
+			data: {
+				date: "2026-11-09",
+				rows: [
+					...["14:45", "17:40", "20:35"].map((startTime) => ({
+						title,
+						startTime,
+						format: "IMAXレーザー",
+					})),
+					...["09:00", "15:30"].map((startTime) => ({
+						title: "別の作品",
+						startTime,
+						format: "2D",
+					})),
+				],
+			},
+		};
+		const snapshot = (date: string) =>
+			studio({
+				appDevelopment: true,
+				work: null,
+				viewing: { ...viewing, data: { ...viewing.data, date } },
+			});
+		const { update } = mount(snapshot("2026-11-09"));
+		const section = (title: string) =>
+			screen.getByRole("heading", { name: title }).closest("section")!;
+		const imax = section(title);
+		const normal = section("別の作品");
+		expect(
+			within(imax).queryByText("IMAXレーザー", { exact: true }),
+		).toBeNull();
+		expect(within(normal).getAllByText("通常", { exact: true })).toHaveLength(
+			1,
+		);
+		expect(imax.querySelector("[data-next] strong")?.textContent).toBe("17:40");
+		expect(normal.querySelector("[data-next] strong")?.textContent).toBe(
+			"15:30",
+		);
+		act(() => vi.advanceTimersByTime(163 * 60_000));
+		expect(imax.querySelector("[data-next] strong")?.textContent).toBe("20:35");
+		expect(normal.querySelector("[data-next]")).toBeNull();
+		update(snapshot("2026-11-10"));
+		expect(screen.queryByText("次回")).toBeNull();
+	} finally {
+		cleanup();
+		vi.useRealTimers();
+	}
+});
+
+test("the movie list refresh submits the date from outside the date form", async () => {
+	vi.useFakeTimers({ toFake: ["Date"] });
+	try {
+		vi.setSystemTime(new Date(2026, 10, 9, 0, 5));
+		let output: unknown = { view: "grouped-list", groups: [] };
+		for (let depth = 0; depth < 4; depth++)
+			output = { view: "layout", children: [output] };
+		const viewing = {
+			id: "screenings",
+			title: "上映一覧",
+			savedRevision: 2,
+			definition: {
+				view: "layout",
+				children: [
+					{
+						view: "form",
+						fields: [
+							{
+								id: "date",
+								label: "上映日",
+								type: "date",
+								required: true,
+								defaultDate: "today",
+							},
+						],
+					},
+					output,
+				],
+			},
+			bindings: {
+				inputs: { date: "date" },
+				sections: {
+					path: [1, 0, 0, 0, 0],
+					rowsKey: "rows",
+					groupBy: "title",
+					itemKeys: ["startTime"],
+				},
+			},
+			workflow: {
+				trigger: "manual",
+				publish: { schemaRef: "schema:showtimes.rows@1" },
+			},
+		};
+		const snapshot = (
+			data?: unknown,
+			status?: NonNullable<UiStudioResource["viewing"]>["status"],
+		) =>
+			studio({
+				appDevelopment: true,
+				work: null,
+				viewing: { ...viewing, data, status },
+			});
+		const { dispatch, update } = mount(snapshot());
+		const date = () => screen.getByLabelText(/上映日/) as HTMLInputElement;
+		const list = () => screen.getByRole("region", { name: "上映作品" });
+		const refreshLabel = "作品リストを更新";
+		const refresh = () =>
+			within(list()).getByRole("button", {
+				name: refreshLabel,
+			}) as HTMLButtonElement;
+		expect(date().type).toBe("date");
+		expect(date().value).toBe("2026-11-09");
+		expect(list().contains(date())).toBe(false);
+		expect(refresh().closest("form")).toBeNull();
+		expect(refresh().form).toBe(date().form);
+		expect(
+			within(date().form!).queryByRole("button", { name: "更新" }),
+		).toBeNull();
+		fireEvent.change(date(), { target: { value: "2026-11-10" } });
+		expect(dispatch).not.toHaveBeenCalled();
+		await click(refreshLabel, dispatch, 1);
+		expect(dispatch.mock.calls[0]?.[0]).toMatchObject({
+			action: "ui-workflow-run",
+			values: { values: '{"date":"2026-11-10"}' },
+		});
+		const data = { rows: [{ title: "作品", startTime: "12:00" }] };
+		update(snapshot(data, { state: "completed" }));
+		expect(
+			screen.queryByRole("region", { name: "アプリの実行状況" }),
+		).toBeNull();
+		expect(date().value).toBe("2026-11-10");
+		expect(within(list()).getByRole("heading", { name: "作品" })).toBeTruthy();
+		await click(refreshLabel, dispatch, 2);
+		expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
+			action: "ui-workflow-run",
+			values: { values: '{"date":"2026-11-10"}' },
+		});
+		update(snapshot(data, { state: "running", runId: "running-1" }));
+		expect(screen.getByText("実行中")).toBeTruthy();
+		expect(button("実行を取り消す")).toBeTruthy();
+		update(snapshot(data, { state: "failed" }));
+		expect(screen.getByText("失敗")).toBeTruthy();
+		update(snapshot({ ...data, coverage: "partial" }, { state: "completed" }));
+		expect(screen.getByText("確認できた範囲のみ表示しています。")).toBeTruthy();
+		expect(screen.queryByText("完了", { exact: true })).toBeNull();
+		vi.setSystemTime(new Date(2026, 10, 10, 0, 5));
+		fireEvent.change(date(), { target: { value: "2026-11-11" } });
+		fireEvent.click(button("入力をリセット"));
+		expect(date().value).toBe("2026-11-10");
+	} finally {
+		cleanup();
+		vi.useRealTimers();
+	}
 });
 
 test("history selects a saved work; a viewed saved work uses the answer form and disables edit controls", async () => {
@@ -426,7 +657,7 @@ test("the source of a saved work is the stored definition with inline fields whe
 	).toBe(JSON.stringify(survey, null, 2));
 });
 
-test("a viewed saved work offers a way back: new creation without a draft, the draft with one", async () => {
+test("the saved app toolbar returns to editing and its history lists only saved works", async () => {
 	const saved = {
 		id: "c1",
 		title: "保存済みの案内",
@@ -434,24 +665,52 @@ test("a viewed saved work offers a way back: new creation without a draft, the d
 		savedRevision: 8,
 	};
 	const { dispatch, update } = mount(
-		studio({ work: null, session: null, viewing: saved }),
+		studio({ appDevelopment: true, work: null, session: null, viewing: saved }),
 	);
-	fireEvent.click(button("新規作成"));
+	const toolbar = within(screen.getByRole("toolbar", { name: "UI制作の操作" }));
+	fireEvent.click(toolbar.getByRole("button", { name: "新規作成" }));
 	await vi.waitFor(() =>
 		expect(dispatch.mock.calls[0]?.[0]).toMatchObject({
 			action: "ui-select",
 			values: { id: "" },
 		}),
 	);
-	update(studio({ viewing: saved }));
-	expect(screen.queryByRole("button", { name: "新規作成" })).toBeNull();
-	await vi.waitFor(() =>
-		expect((button("編集中の案に戻る") as HTMLButtonElement).disabled).toBe(
-			false,
-		),
+	update(
+		studio({
+			appDevelopment: true,
+			viewing: saved,
+			work: work({ dirty: false }),
+		}),
 	);
-	fireEvent.click(button("編集中の案に戻る"));
-	await vi.waitFor(() => expect(dispatch).toHaveBeenCalledTimes(2));
+	expect(toolbar.getByRole("button", { name: "編集に戻る" })).toBeTruthy();
+	update(studio({ appDevelopment: true, viewing: saved }));
+	expect(screen.queryByRole("button", { name: "新規作成" })).toBeNull();
+	expect(screen.queryByText(/編集中の案は残っています/)).toBeNull();
+	expect(
+		screen.queryByText(/保存ボタンを押すまで作品には保存されません/),
+	).toBeNull();
+	fireEvent.click(toolbar.getByRole("button", { name: "作品履歴" }));
+	const history = screen.getByRole("dialog", { name: "作品履歴" });
+	expect(
+		within(history)
+			.getAllByRole("button")
+			.map((item) => item.textContent),
+	).toEqual(["保存済みの案内"]);
+	fireEvent.keyDown(history, { key: "Escape" });
+	await vi.waitFor(() =>
+		expect(screen.queryByRole("dialog", { name: "作品履歴" })).toBeNull(),
+	);
+	fireEvent.click(toolbar.getByRole("button", { name: "編集中の案に戻る" }));
+	await vi.waitFor(() =>
+		expect(dispatch.mock.calls[1]?.[0]).toMatchObject({
+			action: "ui-select",
+			values: { id: "" },
+		}),
+	);
+	update(studio({ appDevelopment: true }));
+	expect(
+		screen.getByText(/保存ボタンを押すまで作品には保存されません/),
+	).toBeTruthy();
 	update(studio({ work: null, session: null }));
 	expect(
 		screen.getByText(

@@ -1,4 +1,9 @@
 import {
+	APP_ADAPTER,
+	appDevelopmentDomainSchemas,
+	describeAppDevelopmentAdapter,
+} from "../app-development/app-development-adapter";
+import {
 	MARKDOWN_ADAPTER_REF,
 	describeMarkdownAdapter,
 	markdownDomainSchemas,
@@ -169,6 +174,7 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 		}),
 	]),
 	...uiCompositionsDomainSchemas,
+	...appDevelopmentDomainSchemas,
 	...model3dDomainSchemas,
 	...computeDomainSchemas,
 	...browserDomainSchemas,
@@ -246,6 +252,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: MUSIC_SCREEN_ADAPTER_REF, describe: describeMusicScreenAdapter },
 	{ ref: IMAGE_SCREEN_ADAPTER_REF, describe: describeImageScreenAdapter },
 	{ ref: UI_COMPOSITIONS_ADAPTER_REF, describe: describeUiCompositionsAdapter },
+	{ ref: APP_ADAPTER, describe: describeAppDevelopmentAdapter },
 	{ ref: MARKDOWN_ADAPTER_REF, describe: describeMarkdownAdapter },
 	{
 		ref: OBJECT_RECOGNITION_SCREEN_ADAPTER_REF,

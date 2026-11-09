@@ -94,11 +94,21 @@ export type ExecutionView = {
 	/** A task pipeline's run: its fixed steps answer for the request as one step of it. */
 	pipeline?: true;
 };
+/** One ordered request handed from the router to the pipeline planner. */
+export type RoutedPipelineStep = {
+	text: string;
+	entry: string;
+	revisionId: string;
+	after: readonly number[];
+};
+
 export type ExecutionSource = {
 	conversationId: string;
 	messageId: string | null;
 	/** A persisted Agency work owns autonomous execution; never a user-message identity. */
-	origin?: "autonomous";
+	origin?: "autonomous" | "workflow";
+	/** Host-issued reference to an accepted, scoped workflow run. */
+	workflow?: { scope: string; definitionId: string; revision: number };
 	agency?: {
 		epoch: number;
 		ticketId: string;
@@ -144,6 +154,7 @@ export type ChildExecution = {
 	executionId: string;
 	revision: number;
 	step: number;
+	pipelineStepId?: string;
 	chainRevisionId: string;
 	request: string;
 	arguments?: Record<string, unknown>;
@@ -280,6 +291,13 @@ export interface ToolchainExecutionPort {
 		db: Database,
 		source: ExecutionSource,
 	): import("eumenes-pipeline").ComponentRecord[];
+	workflowPlanInTransaction?(
+		db: Database,
+		source: ExecutionSource,
+	): {
+		definition: unknown;
+		steps: readonly { stepId: string; toolchainRevisionId: string }[];
+	} | null;
 	/** The revision of the toolchain a pipeline step names that a child may run now; null when none may. */
 	stepToolchainInTransaction?(
 		db: Database,

@@ -2,6 +2,7 @@ import { assertLibraryIdle } from "../repository/library-operations";
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { HandlerDefinition, QueueService } from "../../queue";
+import { documentName } from "../../../infrastructure/markdown-filename";
 import {
 	ArchiveFailure,
 	type ArchivePort,
@@ -248,8 +249,13 @@ export function createArchiveSave(
 			assertLibraryIdle(db, binding, document.remote_namespace ?? "eumenes");
 			const sourceId =
 				document.source_id ?? `wiki-${crypto.randomUUID().replaceAll("-", "")}`;
-			const namespace = document.remote_namespace ?? "eumenes",
-				path = document.remote_path ?? `${document.id}.md`;
+			const namespace = document.remote_namespace ?? "eumenes";
+			const newPath = `${documentName(document.title) || "無題"}.md`;
+			const path =
+				!document.remote_revision &&
+				document.save_error === "markdown_path_exists"
+					? newPath
+					: (document.remote_path ?? newPath);
 			const unchanged = document.content_json === document.saved_content_json;
 			const markdown =
 				unchanged && document.saved_markdown !== null

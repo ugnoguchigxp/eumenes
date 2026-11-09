@@ -1,0 +1,185 @@
+{
+  "caseId": "selection-comparison",
+  "part": "start",
+  "startedAt": "2026-11-08T08:59:45.281Z",
+  "finishedAt": "2026-11-08T08:59:47.128Z",
+  "exitCode": 0,
+  "conversationId": "research-routing-live-20261108-selection",
+  "run": {
+    "id": "c539de5b-9be7-417f-a2a6-71b6bbf468ce",
+    "agentTaskId": null,
+    "requestId": "2d6b5c98-44e7-48d0-bb97-2f6ffd6b2998",
+    "conversationId": "research-routing-live-20261108-selection",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 2,
+    "inputMessageId": "37cf4c64-d645-4fef-a443-fde8d1844998",
+    "answerMessageId": "b8482b34-d544-4e93-a8e4-563d29727b75",
+    "announcement": "「詳しいWeb調査」に頼みます。",
+    "error": null,
+    "jobId": "5e2dfbc4-16b3-414d-8c5b-cbef11da9e3c",
+    "deadlineAt": "2026-11-08T09:02:45.375Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-08T08:59:45.375Z",
+    "updatedAt": "2026-11-08T08:59:46.482Z"
+  },
+  "newPursuitIds": [
+    "cec8e874-17eb-4148-ab1a-cd8d83601527"
+  ],
+  "selections": {
+    "items": [
+      {
+        "id": "aa8cb837-a247-4ed0-a986-e712a36f9fa7",
+        "runId": "c539de5b-9be7-417f-a2a6-71b6bbf468ce",
+        "conversationId": "research-routing-live-20261108-selection",
+        "utteranceId": null,
+        "requestId": "2d6b5c98-44e7-48d0-bb97-2f6ffd6b2998",
+        "retrieval": "hybrid",
+        "candidates": [
+          {
+            "toolchainId": "web.research",
+            "revisionId": "toolchain:web.research@7",
+            "functionName": "web_research",
+            "rank": 1,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.search",
+            "revisionId": "toolchain:web.search@10",
+            "functionName": "web_search",
+            "rank": 2,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.service-search",
+            "revisionId": "toolchain:web.service-search@5",
+            "functionName": "service_search",
+            "rank": 3,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "world.query",
+            "revisionId": "toolchain:world.query@8",
+            "functionName": "world_query",
+            "rank": 4,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "object-recognition.manage",
+            "revisionId": "toolchain:object-recognition.manage@2",
+            "functionName": "object_recognition",
+            "rank": 5,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "markdown.collaborate",
+            "revisionId": "toolchain:markdown.collaborate@4",
+            "functionName": "markdown_edit",
+            "rank": 6,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_agents",
+            "revisionId": "host:read_agents@1",
+            "functionName": "read_agents",
+            "rank": 7,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ui.compose",
+            "revisionId": "toolchain:ui.compose@11",
+            "functionName": "ui_create",
+            "rank": 8,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "collaboration.pipeline",
+            "revisionId": "toolchain:collaboration.pipeline@2",
+            "functionName": "collaborate_pipeline",
+            "rank": 9,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "browser.capture",
+            "revisionId": "toolchain:browser.capture@6",
+            "functionName": "browser_capture",
+            "rank": 10,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          }
+        ],
+        "historyRefs": [],
+        "decision": "toolchain",
+        "toolchainId": "web.research",
+        "toolchainRevisionId": "toolchain:web.research@7",
+        "functionName": "web_research",
+        "request": "詳しいWeb調査をお願いします。東京国立博物館と国立科学博物館の公式サイトを実際に読み、常設展示での写真撮影、フラッシュ、三脚、自撮り棒の扱いを比較してください。企画展や展示ごとの例外、公式ページで確認できないことは分けて書き、推測で補わないでください。日本語の短いMarkdown報告にタイトル・比較表・出典リンクを付けて保存してください。会話の担当は切り替えずに進めてください。",
+        "taskId": null,
+        "outcome": null,
+        "outcomeCode": null,
+        "recipe": null,
+        "durationMs": null,
+        "createdAt": 1794128386475,
+        "settledAt": null
+      }
+    ],
+    "nextCursor": null
+  },
+  "todos": {
+    "revision": 1794128386474,
+    "data": {
+      "rows": [
+        {
+          "id": "a7e2f93f-a7a4-4994-8f9e-1482b1b17f5c",
+          "request": "詳しいWeb調査をお願いします。東京国立博物館と国立科学博物館の公式サイトを実際に読み、常設展示での写真撮影、フラッシュ、三脚、自撮り棒の扱いを比較してください。企画展や展示ごとの例外、公式ページで確認できないことは分けて書き、推測で補わないでください。日本語の短いMarkdown報告にタイトル・比較表・出典リンクを付けて保存してください。会話の担当は切り替えずに進めてください。",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T08:59:46.474Z"
+        }
+      ],
+      "counts": {
+        "todo": 1,
+        "archived": 0
+      },
+      "total": 1,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "latestAssistant": {
+    "id": "b8482b34-d544-4e93-a8e4-563d29727b75",
+    "conversationId": "research-routing-live-20261108-selection",
+    "role": "assistant",
+    "text": "「詳しいWeb調査」に頼みます。",
+    "createdAt": "2026-11-08T08:59:46.482Z",
+    "runId": "c539de5b-9be7-417f-a2a6-71b6bbf468ce"
+  }
+}

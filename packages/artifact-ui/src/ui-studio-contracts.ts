@@ -8,6 +8,12 @@ type UiStudioRejected = {
 	createdAt: string;
 };
 
+export type AppWorkflowStatus = {
+	runId?: string;
+	state?: string;
+	result?: { code?: string; path?: string; kind?: string } | null;
+	schedule?: { id: string; state: string; nextDueAt: string | null } | null;
+};
 type UiStudioWork = {
 	workRef: string;
 	sessionId: string;
@@ -30,6 +36,8 @@ type UiStudioWork = {
 	busy: boolean;
 	canUndo: boolean;
 	canRedo: boolean;
+	confirmation?: { digest: string; summary: unknown } | null;
+	issue?: string | null;
 };
 
 type UiStudioViewing = {
@@ -40,10 +48,25 @@ type UiStudioViewing = {
 	/** The definition as stored, with its form fields inline; shown as the source. */
 	storedDefinition?: unknown;
 	savedRevision: number;
+	bindings?: {
+		inputs: Record<string, string>;
+		table?: { path: number[]; rowsKey: string; columns: string[] };
+		sections?: {
+			path: number[];
+			rowsKey: string;
+			groupBy: string;
+			itemKeys: string[];
+			labels?: Record<string, Record<string, string>>;
+		};
+	} | null;
+	workflow?: { trigger?: string; publish?: { schemaRef?: string } } | null;
+	status?: AppWorkflowStatus;
+	data?: unknown;
 };
 
 export type UiStudioResource = {
 	kind: "ui-studio";
+	appDevelopment?: boolean;
 	revision: number;
 	work: UiStudioWork | null;
 	/** A saved work the user looks at; shown instead of the draft while set. */

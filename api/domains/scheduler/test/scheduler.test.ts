@@ -22,6 +22,7 @@ function setup(
 		maxSchedules?: number;
 		queueLimit?: number;
 		sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+		deferral?: boolean;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-scheduler-"));
@@ -51,7 +52,11 @@ function setup(
 		settleInTransaction: () => "applied",
 		cancelInTransaction: () => {},
 	});
-	const control = { fail: false, materialized: [] as string[] };
+	const control = {
+		fail: false,
+		materialized: [] as string[],
+		deferReason: null as string | null,
+	};
 	const target: TargetDefinition<{ label: string }> = {
 		kind: "test.target",
 		version: 1,
@@ -70,6 +75,8 @@ function setup(
 			return { jobId: job.id, subjectRef: occurrence.occurrenceId };
 		},
 	};
+	if (options.deferral)
+		target.deferReasonInTransaction = () => control.deferReason;
 	const scheduler = createScheduler(store, queue, {
 		now: () => clock.t,
 		sleep: options.sleep ?? (() => new Promise(() => {})),
@@ -232,6 +239,47 @@ test("overlap: previous open job makes the next occurrence skipped without touch
 	await h.scheduler.tick();
 	expect(jobs(h)).toHaveLength(2);
 });
+
+test.each([false, true])(
+	"target deferral leaves a due occurrence available for coalescing (previous job finished: %s)",
+	async (previousJobFinished) => {
+		const h = setup({ deferral: true });
+		const schedule = await create(h, {
+			type: "interval",
+			anchor: iso(T0),
+			intervalMs: MIN,
+		});
+		await h.scheduler.tick();
+		if (previousJobFinished) await finishJobs(h);
+
+		h.control.deferReason = "target_busy";
+		h.clock.t += MIN;
+		await h.scheduler.tick();
+		expect(h.scheduler.get(schedule.id)).toMatchObject({
+			nextDueAt: iso(T0 + MIN),
+			deferReason: "target_busy",
+		});
+		expect(h.scheduler.listOccurrences(schedule.id).items).toHaveLength(1);
+		expect(jobs(h)).toHaveLength(1);
+
+		await finishJobs(h);
+		h.control.deferReason = null;
+		h.clock.t += 2 * MIN;
+		await h.scheduler.tick();
+		const [latest, original] = h.scheduler.listOccurrences(schedule.id).items;
+		expect(latest).toMatchObject({
+			scheduledAt: iso(T0 + 3 * MIN),
+			state: "dispatched",
+			reason: "coalesced (+2 earlier)",
+		});
+		expect(original?.scheduledAt).toBe(iso(T0));
+		expect(jobs(h)).toHaveLength(2);
+		expect(h.scheduler.get(schedule.id)).toMatchObject({
+			nextDueAt: iso(T0 + 4 * MIN),
+			deferReason: null,
+		});
+	},
+);
 
 test("pause/resume/cancel with revisions; resume skips stopped periods; cancelled never revives", async () => {
 	const h = setup();

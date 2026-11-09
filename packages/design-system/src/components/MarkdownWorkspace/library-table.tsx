@@ -2,6 +2,13 @@ import type { Dispatch, SetStateAction } from "react";
 import { Folder, FileText } from "lucide-react";
 import type { MarkdownWorkspaceProps } from "./types";
 import type { LibraryItem } from "./library-types";
+import type { LibraryMoveDrag } from "./library-move-drag";
+import type { RevealedDocument } from "./library-reveal";
+import {
+	FileSortColumn,
+	FileUpdatedDate,
+	useFileSort,
+} from "./file-list-columns";
 export function ManagedLibraryTable(
 	props: MarkdownWorkspaceProps & {
 		work: boolean;
@@ -10,8 +17,9 @@ export function ManagedLibraryTable(
 		selection: string[];
 		setSelection: Dispatch<SetStateAction<string[]>>;
 		pending?: boolean;
+		moveDrag?: LibraryMoveDrag;
+		reveal?: RevealedDocument;
 		limit: number;
-		localInput: boolean;
 		changeFolder(namespace: string, path: string): void;
 		onEditLocal(id: string): void;
 		onEditRemote(id: string): void;
@@ -27,32 +35,53 @@ export function ManagedLibraryTable(
 		limit,
 		changeFolder,
 	} = props;
+	const sort = useFileSort();
+	const items = sort.rows(visible, (e) => ({
+		name: e.path.split("/").at(-1) ?? e.path,
+		kind: e.kind === "folder" ? "フォルダー" : "md",
+		updatedAt: e.updatedAt,
+	}));
+	const documents = sort.rows(
+		props.documents.filter((d) => d.title.includes(query)),
+		(d) => ({ name: d.title, kind: "md", updatedAt: d.updated_at }),
+	);
 	return (
 		<>
 			{work ? (
 				<table className="ds-markdown-file-table" aria-label="作業用文書の一覧">
 					<thead>
 						<tr>
-							<th>名前</th>
-							<th>種類</th>
+							<FileSortColumn column="name" sort={sort} />
+							<FileSortColumn column="kind" sort={sort} />
+							<FileSortColumn column="updatedAt" sort={sort} />
 						</tr>
 					</thead>
 					<tbody>
-						{props.documents
-							.filter((d) => d.title.includes(query))
-							.map((d) => (
-								<tr key={d.id}>
-									<td>
-										<button
-											className="ds-markdown-file-name"
-											onClick={() => props.onEditLocal(d.id)}
-										>
-											{d.title}
-										</button>
-									</td>
-									<td>作業用文書</td>
-								</tr>
-							))}
+						{documents.map((d) => (
+							<tr
+								key={d.id}
+								data-current={props.current?.id === d.id || undefined}
+							>
+								<td>
+									<button
+										className="ds-markdown-file-name"
+										aria-current={props.current?.id === d.id || undefined}
+										ref={
+											props.reveal?.id === d.id
+												? props.reveal.button
+												: undefined
+										}
+										onClick={() => props.onEditLocal(d.id)}
+									>
+										{d.title}
+									</button>
+								</td>
+								<td>md</td>
+								<td className="ds-markdown-file-date">
+									<FileUpdatedDate value={d.updated_at} />
+								</td>
+							</tr>
+						))}
 					</tbody>
 				</table>
 			) : (
@@ -79,16 +108,18 @@ export function ManagedLibraryTable(
 										}
 									/>
 								</th>
-								<th scope="col">名前 / タイトル</th>
-								<th scope="col">種類</th>
-								<th scope="col">内容</th>
+								<FileSortColumn column="name" sort={sort} />
+								<FileSortColumn column="kind" sort={sort} />
+								<FileSortColumn column="updatedAt" sort={sort} />
 							</tr>
 						</thead>
 						<tbody>
-							{visible.map((e) => (
+							{items.map((e) => (
 								<tr
 									key={e.id}
+									{...(e.kind === "folder" && props.moveDrag?.target(e))}
 									data-selected={selection.includes(e.id) || undefined}
+									data-current={props.current?.sourceId === e.id || undefined}
 								>
 									<td>
 										<input
@@ -111,6 +142,15 @@ export function ManagedLibraryTable(
 									<td>
 										<button
 											className="ds-markdown-file-name"
+											{...props.moveDrag?.source(e)}
+											aria-current={
+												props.current?.sourceId === e.id || undefined
+											}
+											ref={
+												props.reveal?.id === e.id
+													? props.reveal.button
+													: undefined
+											}
 											disabled={pending}
 											onClick={() =>
 												e.kind === "folder"
@@ -128,17 +168,17 @@ export function ManagedLibraryTable(
 										{e.kind === "document" && e.title && (
 											<small>{e.title}</small>
 										)}
+										{e.kind === "folder" && (
+											<small>
+												{e.hasUnsupportedEntries
+													? "操作対象外の項目を含む"
+													: `${e.documentCount}文書・${e.folderCount}フォルダー`}
+											</small>
+										)}
 									</td>
-									<td>{e.kind === "folder" ? "フォルダー" : "Markdown"}</td>
-									<td>
-										{e.kind === "folder"
-											? e.hasUnsupportedEntries
-												? "操作対象外の項目を含む"
-												: `${e.documentCount}文書・${e.folderCount}フォルダー`
-											: props.current?.sourceId === e.id &&
-												  (props.localInput || props.current.dirty)
-												? "未保存の変更あり"
-												: "保存済み"}
+									<td>{e.kind === "folder" ? "フォルダー" : "md"}</td>
+									<td className="ds-markdown-file-date">
+										<FileUpdatedDate value={e.updatedAt} />
 									</td>
 								</tr>
 							))}

@@ -76,7 +76,10 @@ export function createGenerationExecutor(
 	ctx: Parameters<typeof createExecutorContext>[1],
 ) {
 	const x = createExecutorContext(deps, ctx);
-	const execute: ToolExecutor = async (call, { signal, receipt, exchange }) => {
+	const execute: ToolExecutor = async (
+		call,
+		{ signal, receipt, exchange, routedSteps },
+	) => {
 		x.state.receipt = receipt;
 		x.state.exchange = exchange;
 		switch (call.name) {
@@ -85,7 +88,7 @@ export function createGenerationExecutor(
 			case "find_toolchain":
 				return find(x, call, call.args.query, signal, call.args.ids);
 			case "delegate":
-				return delegate(x, call, call.args, signal);
+				return delegate(x, call, call.args, signal, routedSteps);
 			case "work":
 				return work(x, call, call.args);
 			default:

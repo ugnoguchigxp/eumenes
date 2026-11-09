@@ -122,7 +122,7 @@ function FieldInput({
 			) : (
 				<Input
 					id={id}
-					type={field.type === "number" ? "number" : "text"}
+					type={field.type}
 					value={String(value)}
 					onChange={(e) => onChange(e.target.value)}
 					disabled={disabled}
@@ -134,11 +134,29 @@ function FieldInput({
 	);
 }
 
+function resolveDefaults({ defaults, fields }: FormResource) {
+	const dateFields = fields.filter(
+		(field) =>
+			field.type === "date" &&
+			field.defaultDate === "today" &&
+			!Object.hasOwn(defaults, field.id),
+	);
+	if (!dateFields.length) return defaults;
+	const now = new Date();
+	const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+		.map((part) => String(part).padStart(2, "0"))
+		.join("-");
+	return {
+		...defaults,
+		...Object.fromEntries(dateFields.map((field) => [field.id, today])),
+	};
+}
+
 export function SmallForm({ request }: { request: ArtifactRequest }) {
 	const action = useAction(request);
 	const data = action.resource as FormResource;
 	const disabled = action.pending || data.disabled === true;
-	const [values, setValues] = useState(data.defaults);
+	const [values, setValues] = useState(() => resolveDefaults(data));
 	const [dirty, setDirty] = useState(false);
 	const defaults = useRef(data.defaults);
 	const identity = useRef(data.identity);
@@ -148,7 +166,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 		if (identity.current !== data.identity) {
 			identity.current = data.identity;
 			defaults.current = data.defaults;
-			setValues(data.defaults);
+			setValues(resolveDefaults(data));
 			setDirty(false);
 			setSent(false);
 			setValidationMessage("");
@@ -158,10 +176,18 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 		// An edited form retains its original precondition so external edits still conflict.
 		if (!dirty && defaults.current !== data.defaults) {
 			defaults.current = data.defaults;
-			setValues(data.defaults);
+			setValues(resolveDefaults(data));
 		}
-	}, [data.defaults, data.identity, dirty]);
+	}, [data, dirty]);
 	const prefix = useId();
+	if (data.submitForm)
+		return (
+			<div className="aui-row">
+				<Button type="submit" form={data.submitForm} disabled={disabled}>
+					{data.submitLabel ?? "フォームを送信"}
+				</Button>
+			</div>
+		);
 	return (
 		<Card>
 			{request.title !== "" && (
@@ -171,6 +197,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 			)}
 			<CardContent>
 				<form
+					id={data.externalSubmitId}
 					className="aui-stack"
 					onSubmit={(e) => {
 						e.preventDefault();
@@ -216,11 +243,13 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 						/>
 					))}
 					<div className="aui-row">
-						<Button type="submit" disabled={disabled}>
-							{action.pending
-								? "送信中"
-								: (data.submitLabel ?? "フォームを送信")}
-						</Button>
+						{!data.externalSubmitId && (
+							<Button type="submit" disabled={disabled}>
+								{action.pending
+									? "送信中"
+									: (data.submitLabel ?? "フォームを送信")}
+							</Button>
+						)}
 						{request.title !== "" && (
 							<Button
 								type="button"
@@ -228,7 +257,7 @@ export function SmallForm({ request }: { request: ArtifactRequest }) {
 								disabled={disabled}
 								onClick={() => {
 									setDirty(false);
-									setValues(data.defaults);
+									setValues(resolveDefaults(data));
 									setSent(false);
 									setValidationMessage("");
 								}}

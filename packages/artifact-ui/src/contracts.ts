@@ -295,6 +295,9 @@ export type FormResource = {
 	/** A host-owned form that is unavailable in the current saved lifecycle state. */
 	disabled?: boolean;
 	submitLabel?: string;
+	/** Host-owned DOM association for submitting from outside the form. */
+	externalSubmitId?: string;
+	submitForm?: string;
 	fields: Field[];
 	defaults: Record<string, string | boolean>;
 	submitted?: Record<string, string | boolean>;

@@ -1,4 +1,5 @@
 import { systemContext } from "../../../infrastructure/system-context";
+import type { RoutedPipelineStep } from "../../tool-runtime";
 import { IMPACT_ORDER } from "./executor-context";
 import { TOOL_NAMES } from "./generation-tools";
 import { lineText } from "./input-text";
@@ -8,6 +9,7 @@ import {
 	answerSchema,
 	type ChoiceCandidate,
 } from "./routed-choice";
+import type { RouteDecision } from "./routed-route";
 import type { Turn } from "./routed-turn";
 import { ARGUMENT_CHARS, ASK_STEP } from "./tool-exchange";
 
@@ -57,6 +59,12 @@ export function askedRequest(before: string | undefined, utterance: string) {
 /** A question back: spoken, and kept as the step the next turn takes the user's answer with. */
 export function askBack(turn: Turn, say: string): Step {
 	turn.speak(say);
+	recordQuestion(turn);
+	return "done";
+}
+
+function recordQuestion(turn: Turn): void {
+	turn.signal.throwIfAborted();
 	turn.exchange.push({
 		name: ASK_STEP,
 		arguments: JSON.stringify({
@@ -64,6 +72,53 @@ export function askBack(turn: Turn, say: string): Step {
 		}),
 		result: {},
 	});
+}
+
+/** The package has no executable decision. The conversation may explain or clarify with no tools. */
+export async function replyToUnresolved(
+	turn: Turn,
+	decision: Extract<RouteDecision, { to: "unresolved" }>,
+): Promise<Step> {
+	const requests = decision.requests.map(({ text, options }) => ({
+		text,
+		options: options.map((c) =>
+			"card" in c ? c.card.title : "title" in c ? c.title : c.id,
+		),
+	}));
+	await turn.talk(
+		systemContext("dialogue.contexts.local.router-unresolved", {
+			requests: JSON.stringify(requests),
+		}),
+		{ tools: false },
+	);
+	if (requests.some(({ options }) => options.length > 0)) recordQuestion(turn);
+	return "done";
+}
+
+export function askRouterClarification(
+	turn: Turn,
+	decision: Extract<RouteDecision, { to: "clarify" }>,
+): Step {
+	return askBack(
+		turn,
+		[
+			decision.question,
+			systemContext("dialogue.contexts.local.router-clarify", {}),
+			...decision.unhandled,
+		].join("\n"),
+	);
+}
+
+export async function routerUnperformed(
+	turn: Turn,
+	structuredEntry: boolean,
+): Promise<Step> {
+	const notice = systemContext(
+		"dialogue.contexts.local.router-unperformed",
+		{},
+	);
+	if (structuredEntry) turn.speak(notice);
+	else await turn.talk(notice, { tools: false });
 	return "done";
 }
 
@@ -176,6 +231,7 @@ export async function handWith(
 	fields: Fields,
 	announcement: string,
 	words: string,
+	routedSteps?: readonly RoutedPipelineStep[],
 ): Promise<Step> {
 	const request = {
 		toolchain: candidate.id,
@@ -198,12 +254,13 @@ export async function handWith(
 		// The user's own words, when the request carries more than they said: the TODO's title and the statement's quote.
 		...(typeof fields.words === "string" ? { words: fields.words } : {}),
 	};
-	const handed = await turn.act(TOOL_NAMES.delegate, {
-		mode: "execute",
-		...request,
-	});
+	const handed = await turn.act(
+		TOOL_NAMES.delegate,
+		{ mode: "execute", ...request },
+		routedSteps,
+	);
 	if ("refused" in handed) {
-		if (handed.refused.message !== "confirmation_required")
+		if (handed.refused.message !== "confirmation_required" || routedSteps)
 			return { retry: turn.reasonOf(handed.refused) };
 		// A change of something that exists, or one that cannot be undone, is confirmed first (section 6.7).
 		const issued = await turn.act(TOOL_NAMES.delegate, {

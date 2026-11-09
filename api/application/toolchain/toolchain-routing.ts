@@ -404,9 +404,15 @@ function agentOf(
 							: {}),
 					}
 				: null,
-		...(agent?.collaborationState ? { collaborationState: true as const } : {}),
+		...(agent?.collaborationState
+			? { collaborationState: agent.collaborationState }
+			: {}),
+		...(agent?.larmReasoning ? { larmReasoning: agent.larmReasoning } : {}),
 		...(agent?.turn?.maxModelCalls !== undefined
 			? { maxModelCalls: agent.turn.maxModelCalls }
+			: {}),
+		...(agent?.turn?.maxOutputTokens !== undefined
+			? { maxOutputTokens: agent.turn.maxOutputTokens }
 			: {}),
 		...(agent?.turn?.retries ? { retries: agent.turn.retries } : {}),
 		...(agent?.memory?.recentTurns !== undefined

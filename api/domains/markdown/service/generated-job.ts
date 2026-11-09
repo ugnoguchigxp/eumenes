@@ -37,12 +37,16 @@ export function registerGeneratedJob(
 	store: SqliteStore,
 	queue: QueueService,
 	archive: ArchivePort,
-	host: () => GeneratedHost | undefined,
+	host: (ownerRef: string) => GeneratedHost | undefined,
 	publish?: () => void,
 ) {
 	const valid = (db: Database, r: GeneratedRow) =>
 		r.state === "pending" &&
-		!!host()?.validInTransaction(db, r.id, generatedValue(r).ownerRef);
+		!!host(generatedValue(r).ownerRef)?.validInTransaction(
+			db,
+			r.id,
+			generatedValue(r).ownerRef,
+		);
 
 	function localState(
 		db: Database,
@@ -82,8 +86,8 @@ export function registerGeneratedJob(
 			};
 			assertCurrent();
 			try {
-				if (!host()) throw new Error("scratch_unavailable");
-				const uri = await host()!.writeLocal(input, signal);
+				if (!host(input.ownerRef)) throw new Error("scratch_unavailable");
+				const uri = await host(input.ownerRef)!.writeLocal(input, signal);
 				assertCurrent();
 				await store.write((db) =>
 					localState(db, r.id, { state: "saved", uri }),
@@ -96,7 +100,7 @@ export function registerGeneratedJob(
 						return current && valid(db, current);
 					})
 				)
-					host()?.forgetLocal(r.id);
+					host(input.ownerRef)?.forgetLocal(r.id);
 				await store.write((db) =>
 					localState(db, r.id, {
 						state: "failed",

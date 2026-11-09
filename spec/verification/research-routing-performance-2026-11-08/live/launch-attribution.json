@@ -1,0 +1,109 @@
+{
+  "note": "起動のraw差分は全会話のPursuit一覧である。single-fact待機中に後続の技術比較を開始したため、技術比較のIDがraw差分に入った。Web検索の操作・TODO・通知を照合し、当該IDをsingle-factへ帰属させない。researchの開始は互いに重ねず順に実行した。",
+  "launches": [
+    {
+      "file": "selective-control-start.json",
+      "caseId": "selective-control",
+      "runId": "8c96a823-93cf-4ca4-9adc-c34fd65009ba",
+      "conversationId": "research-routing-live-20261108-selective",
+      "toolchainIds": [
+        "web.research"
+      ],
+      "pursuitIds": [
+        "f257910a-889f-451a-975b-8a8770dcb4f7"
+      ],
+      "excludedGlobalDeltas": []
+    },
+    {
+      "file": "selective-control-additional.json",
+      "caseId": "selective-control",
+      "runId": "76ff9bd9-ae8d-4871-8a81-e02e60bd361b",
+      "conversationId": "research-routing-live-20261108-selective",
+      "toolchainIds": [
+        "web.research"
+      ],
+      "pursuitIds": [
+        "19682510-7df3-4cd2-aab4-73924b06a507"
+      ],
+      "excludedGlobalDeltas": []
+    },
+    {
+      "file": "cancel-original-start.json",
+      "caseId": "cancel-original",
+      "runId": "88b9076b-dc84-4dcb-8658-b112de04eac5",
+      "conversationId": "research-routing-live-20261108-cancel",
+      "toolchainIds": [
+        "web.research"
+      ],
+      "pursuitIds": [
+        "b132d599-01ad-469c-92a9-8870bb59d8b8"
+      ],
+      "excludedGlobalDeltas": []
+    },
+    {
+      "file": "performance-museum-start.json",
+      "caseId": "performance-museum",
+      "runId": "3dcb4412-b9d5-41c4-b431-f6a630a4e205",
+      "conversationId": "research-routing-live-20261108-museum",
+      "toolchainIds": [
+        "web.research"
+      ],
+      "pursuitIds": [
+        "aa7a93ad-3142-491a-9042-21bf1389f84d"
+      ],
+      "excludedGlobalDeltas": []
+    },
+    {
+      "file": "cancel-original-cancel.json",
+      "caseId": "cancel-original",
+      "runId": "cdaee265-1a64-40af-8b79-50ff17bb0e10",
+      "conversationId": "research-routing-live-20261108-cancel",
+      "toolchainIds": [
+        "web.research"
+      ],
+      "pursuitIds": [
+        "636debdd-71f3-485e-b4ce-4ed4580c0eea"
+      ],
+      "excludedGlobalDeltas": []
+    },
+    {
+      "file": "single-fact-start.json",
+      "caseId": "single-fact",
+      "runId": "58740120-b460-4aae-904f-1ad91a73d036",
+      "conversationId": "research-routing-live-20261108-short",
+      "toolchainIds": [
+        "web.search"
+      ],
+      "pursuitIds": [],
+      "excludedGlobalDeltas": [
+        "180ee6a7-19d9-436d-bfea-54d4200616fa"
+      ]
+    },
+    {
+      "file": "performance-technical-start.json",
+      "caseId": "performance-technical",
+      "runId": "aa4d74f0-4b59-45cb-b747-7a5e4294e2d8",
+      "conversationId": "research-routing-live-20261108-technical",
+      "toolchainIds": [
+        "web.research"
+      ],
+      "pursuitIds": [
+        "180ee6a7-19d9-436d-bfea-54d4200616fa"
+      ],
+      "excludedGlobalDeltas": []
+    },
+    {
+      "file": "selection-comparison-start.json",
+      "caseId": "selection-comparison",
+      "runId": "c539de5b-9be7-417f-a2a6-71b6bbf468ce",
+      "conversationId": "research-routing-live-20261108-selection",
+      "toolchainIds": [
+        "web.research"
+      ],
+      "pursuitIds": [
+        "cec8e874-17eb-4148-ab1a-cd8d83601527"
+      ],
+      "excludedGlobalDeltas": []
+    }
+  ]
+}

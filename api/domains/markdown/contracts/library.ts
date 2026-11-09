@@ -1,4 +1,8 @@
 import { z } from "zod";
+export const libraryUpdatedAt = z.iso
+	.datetime({ offset: true })
+	.optional()
+	.catch(undefined);
 const documentId = z.string().regex(/^wiki-[a-f0-9]{32}$/),
 	documentEtag = z.string().regex(/^"[a-f0-9]{64}"$/);
 const documentSummary = z.object({
@@ -10,6 +14,7 @@ const documentSummary = z.object({
 	markdownSha256: z.string(),
 	recoverySha256: z.string(),
 	contentDigest: z.string(),
+	updatedAt: libraryUpdatedAt,
 });
 export const folderId = z.string().regex(/^folder-[a-f0-9]{32}$/);
 export const libraryPath = z
@@ -35,6 +40,7 @@ export const folder = z.object({
 	documentCount: z.number().int().nonnegative(),
 	folderCount: z.number().int().nonnegative(),
 	hasUnsupportedEntries: z.boolean(),
+	updatedAt: libraryUpdatedAt,
 });
 export const libraryEntry = z.discriminatedUnion("kind", [
 	documentSummary.extend({ kind: z.literal("document") }),

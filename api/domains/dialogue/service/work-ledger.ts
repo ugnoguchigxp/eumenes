@@ -35,6 +35,7 @@ import {
 	workNotices,
 	workPage,
 	workRefs,
+	WEB_RESEARCH_WORK,
 	type ConfirmationRow,
 	type WorkOutcome,
 	type WorkRow,
@@ -460,7 +461,16 @@ export function createWorkLedger(
 			if (report.status === "done") archiveWork(db, workId, clock());
 			const next = workById(db, workId)!;
 			logResult(db, next);
-			reportExternalWork(deps, db, next);
+			if (next.status === "done" && next.toolchainId === WEB_RESEARCH_WORK) {
+				const messageId = next.messageIds[0];
+				if (messageId)
+					deps.resourceLedger?.linkMessageToWorkInTransaction(
+						db,
+						next.conversationId,
+						messageId,
+						[next.id],
+					);
+			} else reportExternalWork(deps, db, next);
 			return next;
 		},
 		/** The agent's check: the TODO as it is now (its result is the check's answer). */

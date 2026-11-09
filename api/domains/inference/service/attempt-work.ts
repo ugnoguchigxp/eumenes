@@ -67,9 +67,16 @@ export function callOptionsFor(
 	source: Source,
 ): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
+	const controlReasoning =
+		source === "larm" && r.row.mode === "control"
+			? r.control?.larmReasoning
+			: undefined;
 	// Only the conversation's own call names its level, and its limit already counts the thinking.
 	const thinksByDefault =
-		!r.session?.reasoning && source === "larm" && r.row.purpose === "llm";
+		!r.session?.reasoning &&
+		!controlReasoning &&
+		source === "larm" &&
+		r.row.purpose === "llm";
 	return {
 		...(r.voiceOverride ? { speechOverride: r.voiceOverride } : {}),
 		// A decision call names its choices in the output schema: no native tools field, no tool calls back.
@@ -136,14 +143,16 @@ export function callOptionsFor(
 		// 400; left out, LARM's default would think at medium).
 		...(r.session?.reasoning
 			? { reasoning: r.session.reasoning[source] }
-			: thinksByDefault
-				? {
-						reasoning:
-							(r.session?.onConversation &&
-								r.env.options.conversationReasoning) ||
-							"low",
-					}
-				: {}),
+			: controlReasoning
+				? { reasoning: controlReasoning }
+				: thinksByDefault
+					? {
+							reasoning:
+								(r.session?.onConversation &&
+									r.env.options.conversationReasoning) ||
+								"low",
+						}
+					: {}),
 		// A read-ahead only reads the prompt and stops at its own bound (one token): it gets no room for thinking.
 		...(r.row.outputLimit || r.outputLimit
 			? {

@@ -1,3 +1,4 @@
+import { createAppDevelopmentRuntime } from "../app-development/runtime";
 import { collaborationScript } from "./collaboration-script.fixture";
 import { offeredKinds } from "./toolchain-command.fixture";
 import { fixtureResources } from "./toolchain-resources.fixture";
@@ -12,7 +13,6 @@ import { dormantBundleFile } from "../../domains/capabilities";
 import { bundleHostOf } from "./toolchain-adapters";
 import { computeAnnouncements } from "../compute/compute-composition";
 import { createCompute } from "../../domains/compute";
-import { fixtureDiscovery } from "./discovery.fixture";
 import { createOcr } from "../../domains/ocr";
 import {
 	createExcalidraw,
@@ -54,7 +54,6 @@ import { createToolchain } from "./toolchain";
 import { createToolchainHostLinks } from "./toolchain-host";
 import { createTimers } from "../../domains/timers";
 import { createSpecialistPort } from "./specialist-port";
-import { createToolchainRouting } from "./toolchain-routing";
 import { configureTaskExecution } from "./task-execution-port";
 import { taskMediaPorts } from "./task-media-execution";
 import { taskLegacyPorts } from "./task-legacy-execution";
@@ -62,7 +61,7 @@ import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
 import { appModules } from "../app-modules";
 import type { LarmPort } from "../../domains/larm";
-import { askModel, attachFixtureRouter } from "./router.fixture";
+import { fixtureRouting } from "./router.fixture";
 import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { researchAcquisition } from "./research-acquisition.fixture";
 export { forbidden } from "./research-acquisition.fixture";
@@ -309,6 +308,14 @@ export async function harness(options: HarnessOptions = {}) {
 					confidence: 0.99,
 				});
 			const system = messages[0]!.content;
+			if (
+				options.appDevelopment?.control &&
+				/OUTPUT_SCHEMA=.*"(?:follow|markdown|query|hitNumbers|dateLinkNumber)"/s.test(
+					system,
+				) &&
+				!system.includes(collaborationInstructions.rules)
+			)
+				return options.appDevelopment.control(messages, _signal, callOptions);
 			if (
 				options.specialist &&
 				system.includes(collaborationInstructions.rules)
@@ -593,9 +600,24 @@ export async function harness(options: HarnessOptions = {}) {
 	const markdown = options.markdown
 		? createMarkdown({ store, queue, archive: options.markdown })
 		: undefined;
-	const uiCompositions = options.uiCompositions
-		? createUiCompositions()
-		: undefined;
+	const appRuntime =
+		options.appDevelopment && markdown
+			? createAppDevelopmentRuntime({
+					store,
+					queue,
+					scheduler,
+					markdown,
+					web,
+					inference,
+					scratch: options.scratch,
+					git: options.appDevelopment.git,
+					destination:
+						options.appDevelopment.destination ??
+						(() => ({ namespace: "eumenes", path: "journal" })),
+				})
+			: undefined;
+	const uiCompositions =
+		options.uiCompositions && !appRuntime ? createUiCompositions() : undefined;
 	const ocr = options.ocrFetcher
 		? createOcr({
 				store,
@@ -637,6 +659,7 @@ export async function harness(options: HarnessOptions = {}) {
 		music: !!options.musicGateway,
 		image: !!options.imageGateway,
 		uiCompositions,
+		appDevelopmentAdapter: appRuntime?.adapter,
 		markdown,
 		scratch: options.scratch,
 		excalidraw: !!options.drawingConnection,
@@ -723,50 +746,21 @@ export async function harness(options: HarnessOptions = {}) {
 					: undefined,
 			})
 		: undefined;
-	// The function a search for `query` finds first: the test's fixed embedding stands in for the model's.
-	const discovery = (query: string) =>
-		options.discoveryTarget?.(query) ??
-		(options.history
-			? "conversation_history"
-			: (options.routeTool ??
-				(options.uiCompositions
-					? "ui_create"
-					: options.weather && /天気/.test(query)
-						? "weather_forecast"
-						: options.stock && /株価/.test(query)
-							? "stock_quote"
-							: options.timers && /タイマー/.test(query)
-								? "timer"
-								: "web_search")));
-	const routing = createToolchainRouting(
-		toolchain.capabilities,
-		toolchain.history,
-		options.embed
-			? toolchain.embedQuery
-			: fixtureDiscovery(store, toolchain.capabilities, discovery),
-		toolchain.registry,
-		toolchain.schemas,
-	);
-	// The router decides every utterance turn: its context judgment is the conversation's script (the test's own model
-	// when it has one), asked as the old choice call asked it.
-	await attachFixtureRouter({
+	const routing = await fixtureRouting({
+		options,
+		toolchain,
 		store,
-		inference,
-		routing,
 		settings,
-		capabilities: toolchain.capabilities,
-		...(options.embed ? {} : { discovery }),
-		ask: options.model
-			? askModel(options.model)
-			: (messages, round) =>
-					choiceByScript(messages as never, round, (loop) =>
-						utteranceStep(
-							loop as never,
-							utteranceOf(messages as never),
-							CONVERSATION_TOOLS,
-							true,
-						),
-					),
+		inference,
+		ask: (messages, round) =>
+			choiceByScript(messages as never, round, (loop) =>
+				utteranceStep(
+					loop as never,
+					utteranceOf(messages as never),
+					CONVERSATION_TOOLS,
+					true,
+				),
+			),
 	});
 	const continuity = createContinuityService();
 	const memory = options.memory
@@ -815,8 +809,13 @@ export async function harness(options: HarnessOptions = {}) {
 		}),
 	});
 	toolchainLinks.attachDialogue(dialogue);
+	appRuntime?.attachDialogue(dialogue);
+	const appWorkflowPorts = appRuntime?.attach({
+		capabilities: toolchain.capabilities,
+		agents: toolchain.agents.executions,
+	});
 	let executionPort: ReturnType<typeof configureTaskExecution> | undefined;
-	if (options.everyday || options.pipelines || options.pursuit) {
+	if (options.everyday || options.pipelines || options.pursuit || appRuntime) {
 		// The everyday task agent is suspended: its bundle is never seeded, so the fixtures of that
 		// implementation register it explicitly. Pipelines need only the parent execution's port.
 		const registered = options.everyday
@@ -830,6 +829,8 @@ export async function harness(options: HarnessOptions = {}) {
 			: { issues: [] };
 		if (registered.issues.length) throw new Error("dormant_bundle_rejected");
 		executionPort = configureTaskExecution({
+			...options.workflowRuntime?.(toolchain.agents),
+			...appWorkflowPorts,
 			settings,
 			pursuit: toolchain.pursuit,
 			collaboration: toolchain.collaboration,
@@ -901,6 +902,7 @@ export async function harness(options: HarnessOptions = {}) {
 		});
 	return {
 		executionPort,
+		appRuntime,
 		resources: resources?.registry,
 		dir,
 		memory,

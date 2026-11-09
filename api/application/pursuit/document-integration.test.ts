@@ -136,6 +136,35 @@ for (const online of [true, false]) {
 			expect(scratch.get(result.document.id)?.name).toBe(
 				"一次資料の比較調査.md",
 			);
+			const uri = `eumenes://markdown.document/generated-${result.document.id}`;
+			const sourceUrl = `/api/toolchain-artifacts/${encodeURIComponent("artifact:markdown.workspace@4")}/sources/markdown-workspace?target=generated-${result.document.id}`;
+			expect(result.links).toEqual([uri]);
+			expect(await (await h.request("/api/todo-notices")).json()).toEqual({
+				notices: [],
+				unread: 0,
+			});
+			const resources = await (
+				await h.request("/api/conversations/main/resources")
+			).json();
+			expect(resources.resources).toEqual([
+				expect.objectContaining({ uri, kind: "markdown.document" }),
+			]);
+			expect(resources.messages).toEqual([
+				{ messageId: run.inputMessageId, uris: [uri] },
+			]);
+			const resolve = (ref: string) =>
+				h.request(`/api/resources/resolve?uri=${encodeURIComponent(ref)}`);
+			expect(
+				(await resolve(`eumenes://scratch/${result.document.id}`)).status,
+			).toBe(404);
+			expect(await (await resolve(uri)).json()).toMatchObject({
+				ok: true,
+				resource: {
+					adapterRef: "adapter:markdown@1",
+					targetRef: `generated-${result.document.id}`,
+				},
+			});
+			const source = await (await h.request(sourceUrl)).json();
 			expect(
 				h.store.read((db) =>
 					db
@@ -148,27 +177,7 @@ for (const online of [true, false]) {
 				const remote = saved.get(result.document.archive.sourceId)!;
 				expect(remote.markdown).toBe(result.answer);
 				expect(remote.recovery).toBe("");
-				expect(remote.entry.path).toMatch(
-					/^research\/.*一次資料の比較調査.*\.md$/,
-				);
-				const uri = `eumenes://markdown.document/${encodeURIComponent(`generated-${result.document.id}`)}`;
-				const resource = await (
-					await h.request(
-						`/api/resources/resolve?uri=${encodeURIComponent(uri)}`,
-					)
-				).json();
-				expect(resource).toMatchObject({
-					ok: true,
-					resource: {
-						adapterRef: "adapter:markdown@1",
-						targetRef: `generated-${result.document.id}`,
-					},
-				});
-				const source = await (
-					await h.request(
-						`/api/toolchain-artifacts/${encodeURIComponent("artifact:markdown.workspace@4")}/sources/markdown-workspace?target=${encodeURIComponent(`generated-${result.document.id}`)}`,
-					)
-				).json();
+				expect(remote.entry.path).toBe("research/一次資料の比較調査.md");
 				expect(source).toMatchObject({
 					data: { openSourceId: remote.entry.sourceId, current: null },
 				});
@@ -179,7 +188,15 @@ for (const online of [true, false]) {
 					markdown: result.answer,
 					document: null,
 				});
-			} else expect(puts).toBe(0);
+			} else {
+				expect(puts).toBe(0);
+				expect(source).toMatchObject({
+					data: {
+						current: null,
+						preview: { title: result.document.title, markdown: result.answer },
+					},
+				});
+			}
 			const task = h.store.read((db) =>
 				db.query("SELECT id FROM pursuit_runs").get(),
 			) as { id: string };
@@ -187,6 +204,7 @@ for (const online of [true, false]) {
 				h.toolchain.pursuit!.task.forgetInTransaction!(db, task.id),
 			);
 			expect(scratch.get(result.document.id)).toBeNull();
+			expect((await resolve(uri)).status).toBe(404);
 			expect(online ? saved.size : 0).toBe(online ? 1 : 0);
 		} finally {
 			await h.close();

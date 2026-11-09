@@ -1,0 +1,159 @@
+{
+  "date": "2026-11-09",
+  "fixed": {
+    "passed": 58,
+    "failed": 0,
+    "liveSkipped": 2,
+    "legacySpecialistBaselineFailures": 11,
+    "chromium": {
+      "inputDispatch": "ui-workflow-run",
+      "displayedTitle": true,
+      "displayedStartTime": true
+    },
+    "compactInstructionsWorkflowTrialsPassed": 2
+  },
+  "liveReadiness": {
+    "auxiliary": {
+      "startedAt": "2026-11-09T02:58:07.165Z",
+      "ready": true,
+      "durationMs": 4585,
+      "outcome": "structured_json_verified"
+    },
+    "subagent": {
+      "startedAt": "2026-11-09T03:32:29.400Z",
+      "ready": true,
+      "durationMs": 4083,
+      "outcome": "structured_json_verified"
+    }
+  },
+  "liveAuthoring": [
+    {
+      "workflow": "showtimes",
+      "state": "still_running",
+      "deadlineMs": 180000,
+      "draftSaved": false
+    },
+    {
+      "workflow": "journal",
+      "state": "still_running",
+      "deadlineMs": 180000,
+      "draftSaved": false
+    },
+    {
+      "workflow": "showtimes",
+      "variant": "compact-authoring-instructions",
+      "state": "still_running",
+      "deadlineMs": 90000,
+      "draftSaved": false
+    }
+  ],
+  "liveShowtimesWithFixedAuthoring": {
+    "case": "shonan-2026-11-09",
+    "expectedRows": 57,
+    "originalRangeLimitError": "invalid_read_size",
+    "afterRangeFix": [
+      "workflow_deadline_exceeded",
+      "workflow_deadline_exceeded"
+    ],
+    "runDeadlineMs": 60000,
+    "fullCoverageTrialsPassed": 0
+  },
+  "liveJournalWithFixedAuthoringAndContent": {
+    "checkpointCount": 10,
+    "documentId": "wiki-f77153300a464d338ef78a92319f66c7",
+    "savedPath": "検証/Eumenesアプリ開発-3488edeb-6a21-4f99-b7d2-6b9137046bed/2026-11-09-f7715330-0a46-4d33-8ef7-8a92319f66c7.md",
+    "bytes": 480,
+    "actualGitHub": true,
+    "verifiedChanged": 1,
+    "secondDocumentId": "wiki-61fd2709faa748e7ad2f4fbe00a14759",
+    "modelAuthoredContent": false,
+    "archiveReadback": true,
+    "procedure": "Initial reference save; selected one actually fetched previous commit in the isolated checkpoint store; advanced the scheduler clock by one day; observed the actual remote diff and read the next document from Docling.",
+    "durationMs": 28047
+  },
+  "activeApplicationRestarted": true,
+  "liveWithoutFixedResponses": {
+    "toolchainRevision": 3,
+    "isolatedSchedulerClock": true,
+    "showtimes": {
+      "durationMs": 57812,
+      "expected": 57,
+      "actual": 57,
+      "coverage": "complete",
+      "matches": true,
+      "sources": [
+        "https://109cinemas.net/shonan/schedules/20261109.html?theater_code=R1"
+      ],
+      "authoringResponseMs": 21711,
+      "browser": {
+        "browser": "chromium",
+        "inputDispatch": "ui-workflow-run",
+        "rows": 57,
+        "matches": true
+      }
+    },
+    "journal": {
+      "checkpointCount": 10,
+      "documentId": "wiki-e44f15efa9c24c0db71390c065fda039",
+      "savedPath": "検証/Eumenesアプリ開発-4bc1d0f5-46d0-4abe-827e-d9daa5b0906a/2026-11-09-e44f15ef-a9c2-4c0d-b713-90c065fda039.md",
+      "bytes": 2989,
+      "actualGitHub": true,
+      "verifiedChanged": 1,
+      "secondDocumentId": "wiki-6985ef5e256445a18e52c87ccf6ad508",
+      "modelAuthoredContent": true,
+      "archiveReadback": true,
+      "authoringResponseMs": 19963,
+      "writingResponsesMs": [
+        41685,
+        43020
+      ],
+      "procedure": "Two daily ticks in an isolated scheduler. One checkpoint was set to a fetched predecessor to exercise an actual GitHub diff. Both documents were read back from the configured Docling archive."
+    }
+  },
+  "activeRegistration": {
+    "toolchainRevision": 3,
+    "apps": [
+      {
+        "id": "5f9f36b9-b453-48e4-9d09-dc2ad410705a",
+        "title": "109シネマズ湘南 上映一覧",
+        "revision": 1,
+        "trigger": "manual"
+      },
+      {
+        "id": "91f4650c-8fe4-4f8e-aa06-d6d88b2ecb36",
+        "title": "Eumenes 開発日誌",
+        "revision": 1,
+        "trigger": "schedule"
+      }
+    ],
+    "verifiedInBrowserHistory": true,
+    "journalScheduleActive": false,
+    "showtimes": {
+      "runId": "54844e7c-1fe8-4c77-be8f-a8b80dcb6b78",
+      "state": "completed",
+      "rows": 57,
+      "coverage": "complete",
+      "sources": [
+        "https://109cinemas.net/shonan/schedules/20261109.html?theater_code=R1"
+      ],
+      "matches": true,
+      "visibleRows": 57
+    }
+  },
+  "activeShowtimesLayoutUpdate": {
+    "toolchainRevision": 4,
+    "historyEntryPreserved": true,
+    "id": "5f9f36b9-b453-48e4-9d09-dc2ad410705a",
+    "revision": 2,
+    "date": "2026-11-09",
+    "runId": "37d66d78-ca17-482b-bea2-88c94c7c17b5",
+    "coverage": "complete",
+    "sections": 27,
+    "rows": 57,
+    "normal": 47,
+    "imaxSection": true,
+    "table": 0,
+    "matches": true,
+    "rawMatches": true
+  }
+}

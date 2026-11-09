@@ -8,7 +8,10 @@ import type { ParsedCall } from "./generation-tools";
 import { adoptMemoryWindow } from "./memory-window";
 import { jstSeconds } from "../../../infrastructure/jst-time";
 import type { Run } from "../contracts";
-import type { ExecutionReference } from "../../tool-runtime";
+import type {
+	ExecutionReference,
+	RoutedPipelineStep,
+} from "../../tool-runtime";
 import type { QueryVector, ToolchainRoute } from "../contracts/toolchains";
 import { byId } from "../repository";
 import type { DialogueDeps, GenerateInput } from "./context";
@@ -33,6 +36,7 @@ export type ToolExecutor = (
 	context: {
 		signal: AbortSignal;
 		receipt?: Receipt;
+		routedSteps?: readonly RoutedPipelineStep[];
 		/** The searches and hand-overs this generation made before this call. */
 		exchange: readonly ExchangeStep[];
 	},
@@ -79,6 +83,7 @@ export type Request = {
 	resolveUnsaved?: "discard";
 	announcement: string;
 	confirmationId?: string;
+	routedSteps?: readonly RoutedPipelineStep[];
 	/** The resources handed over with the request: the references the toolchain reads, and their URIs. */
 	references?: ExecutionReference[];
 	refUris?: string[];

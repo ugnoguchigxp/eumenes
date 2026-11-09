@@ -8,9 +8,16 @@ import {
 	parseDocument,
 } from "./contracts";
 import { artifactLibrary } from "./library";
+import { hasListRefresh, listRefreshSource } from "./composition-contracts";
 
 function checkSource(definition: ArtifactDefinition, snapshot: Snapshot) {
 	for (const request of definitionRequests(definition)) {
+		if (hasListRefresh(request)) {
+			const form = snapshot[listRefreshSource];
+			if (form?.kind !== "form" || !form.submitForm)
+				throw new Error("一覧を更新するフォームがありません");
+			continue;
+		}
 		if (request.view === "service-test-workspace") {
 			for (const source of [
 				request.statusSource,

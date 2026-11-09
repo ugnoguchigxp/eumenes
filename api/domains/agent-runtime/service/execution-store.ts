@@ -355,15 +355,15 @@ function childLauncher(
 		state: ParentState,
 		input: Pick<
 			import("../../tool-runtime").ChildExecution,
-			"chainRevisionId" | "request" | "arguments" | "refs"
+			"chainRevisionId" | "request" | "arguments" | "refs" | "pipelineStepId"
 		>,
 		id: string,
 		started?: () => void,
 	) {
-		if (
-			state.children >= state.limits.childCalls ||
-			now() >= row.deadline - 45_000
-		)
+		const childDeadline = input.pipelineStepId
+			? row.deadline
+			: row.deadline - 45_000;
+		if (state.children >= state.limits.childCalls || now() >= childDeadline)
 			return fail(db, row, state, "execution_budget_exceeded");
 		const allocation = Math.min(
 			12,
@@ -379,14 +379,14 @@ function childLauncher(
 			step: state.ordinal,
 			source: executionSource(row),
 			deadline: Math.min(
-				row.deadline - 45_000,
+				childDeadline,
 				ctx
 					.port()
 					.childDeadlineInTransaction?.(
 						db,
 						input.chainRevisionId,
-						row.deadline - 45_000,
-					) ?? row.deadline - 45_000,
+						childDeadline,
+					) ?? childDeadline,
 			),
 			modelCalls: allocation,
 		};

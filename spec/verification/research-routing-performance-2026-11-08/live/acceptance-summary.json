@@ -1,0 +1,119 @@
+{
+  "fullResearch": [
+    {
+      "caseId": "performance-technical",
+      "outcome": "partial",
+      "contentAcceptance": "failed",
+      "saveAcceptance": true,
+      "checks": {
+        "noSpecialist": true,
+        "localRead": true,
+        "remoteRead": true,
+        "sameMarkdown": true,
+        "hasTitle": true,
+        "hasSources": true,
+        "path": "eumenes/research/2026-11-08_オフライン対応の個人用メモアプリ：IndexedDBとWeb Storageの比較_20cb5d16-45bd-4768-8cb2-bc4d14b6b208.md"
+      },
+      "measurement": {
+        "wallMs": 855826,
+        "recordedTotal": {
+          "calls": 35,
+          "inputTokens": 621245,
+          "outputTokens": 20763,
+          "totalReportedTokens": 642008,
+          "unknownUsageCalls": 0,
+          "inferenceMs": 553390,
+          "unfinishedCalls": 0
+        },
+        "pursuit": {
+          "calls": 28,
+          "inputTokens": 535528,
+          "outputTokens": 17556,
+          "totalReportedTokens": 553084,
+          "unknownUsageCalls": 0,
+          "inferenceMs": 460350,
+          "unfinishedCalls": 0
+        },
+        "associated": {
+          "calls": 7,
+          "inputTokens": 85717,
+          "outputTokens": 3207,
+          "totalReportedTokens": 88924,
+          "unknownUsageCalls": 0,
+          "inferenceMs": 93040,
+          "unfinishedCalls": 0
+        },
+        "memoryUntilNotice": {
+          "calls": 4,
+          "inputTokens": 47470,
+          "outputTokens": 1051,
+          "totalReportedTokens": 48521,
+          "unknownUsageCalls": 0,
+          "inferenceMs": 38848,
+          "unfinishedCalls": 0
+        }
+      }
+    },
+    {
+      "caseId": "performance-museum",
+      "outcome": "partial",
+      "contentAcceptance": "failed",
+      "saveAcceptance": true,
+      "checks": {
+        "noSpecialist": true,
+        "localRead": true,
+        "remoteRead": true,
+        "sameMarkdown": true,
+        "hasTitle": true,
+        "hasSources": false,
+        "path": "eumenes/research/2026-11-08_東京国立博物館・国立科学博物館の常設展示における撮影ルール比較_1d02c27b-68d2-43ff-a190-9b31c9637945.md"
+      },
+      "measurement": {
+        "wallMs": 924614,
+        "recordedTotal": {
+          "calls": 31,
+          "inputTokens": 519382,
+          "outputTokens": 16135,
+          "totalReportedTokens": 535517,
+          "unknownUsageCalls": 0,
+          "inferenceMs": 456160,
+          "unfinishedCalls": 0
+        },
+        "pursuit": {
+          "calls": 25,
+          "inputTokens": 446289,
+          "outputTokens": 13646,
+          "totalReportedTokens": 459935,
+          "unknownUsageCalls": 0,
+          "inferenceMs": 378332,
+          "unfinishedCalls": 0
+        },
+        "associated": {
+          "calls": 6,
+          "inputTokens": 73093,
+          "outputTokens": 2489,
+          "totalReportedTokens": 75582,
+          "unknownUsageCalls": 0,
+          "inferenceMs": 77828,
+          "unfinishedCalls": 0
+        },
+        "memoryUntilNotice": {
+          "calls": 4,
+          "inputTokens": 47698,
+          "outputTokens": 1280,
+          "totalReportedTokens": 48978,
+          "unknownUsageCalls": 0,
+          "inferenceMs": 45837,
+          "unfinishedCalls": 0
+        }
+      }
+    }
+  ],
+  "naturalCancellation": "failed",
+  "quotedControlInLiveRoute": "passed",
+  "explicitCleanup": "5 test work items cancelled; no late notices or resources observed",
+  "singleFact": "passed; source-backed web.search result; no specialist",
+  "comparisonSelection": "passed",
+  "noProductEditsDuringLive": true,
+  "additionalDesign": "../../research-routing-followup-design-2026-11-08.md; awaiting agreement"
+}

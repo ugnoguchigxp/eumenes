@@ -68,6 +68,7 @@ export function createScratchResourceAdapter(
 			return [...ids].slice(0, RESULT_REFS).flatMap((id) => {
 				const item = store.get(id);
 				return item &&
+					!item.internal &&
 					item.origin === "written" &&
 					item.conversationId === context.conversationId
 					? [refOf(item)]
@@ -76,7 +77,7 @@ export function createScratchResourceAdapter(
 		},
 		getInTransaction(_db, id) {
 			const item = store.get(id);
-			return item ? scratchView(item) : null;
+			return item && !item.internal ? scratchView(item) : null;
 		},
 		async search(query) {
 			const since = query.since ? Date.parse(query.since) : -Infinity;
@@ -85,6 +86,7 @@ export function createScratchResourceAdapter(
 				.all()
 				.filter(
 					(item) =>
+						!item.internal &&
 						(!query.text || item.name.includes(query.text)) &&
 						item.createdAt >= since &&
 						item.createdAt <= until,
@@ -94,7 +96,7 @@ export function createScratchResourceAdapter(
 		},
 		async read(id, _signal, options) {
 			const item = store.get(id);
-			if (!item) throw new Error("item_not_found");
+			if (!item || item.internal) throw new Error("item_not_found");
 			if (!isScratchText(item.mime)) {
 				store.touch(id);
 				return { text: readPage(item, null) };

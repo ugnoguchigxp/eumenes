@@ -1,0 +1,205 @@
+{
+  "caseId": "selection-comparison",
+  "part": "cancel",
+  "startedAt": "2026-11-08T09:00:11.062Z",
+  "finishedAt": "2026-11-08T09:00:36.754Z",
+  "exitCode": 0,
+  "conversationId": "research-routing-live-20261108-selection",
+  "run": {
+    "id": "c345c14e-fb29-41a9-bcf5-aaddf6a7db6e",
+    "agentTaskId": null,
+    "requestId": "a06847d6-efc5-43e0-95c3-09f5835b1561",
+    "conversationId": "research-routing-live-20261108-selection",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 2,
+    "inputMessageId": "f20ee513-edd6-4c5d-a529-fca878ab80b1",
+    "answerMessageId": "20c54e20-bcff-40bc-934e-277985e49f63",
+    "announcement": null,
+    "error": null,
+    "jobId": "7fe49479-09e0-43b0-bebd-44cee3571c23",
+    "deadlineAt": "2026-11-08T09:03:11.161Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-08T09:00:11.161Z",
+    "updatedAt": "2026-11-08T09:00:36.112Z"
+  },
+  "newPursuitIds": [],
+  "selections": {
+    "items": [
+      {
+        "id": "335f1226-f59f-46e1-a9fa-e28233cf0bc7",
+        "runId": "c345c14e-fb29-41a9-bcf5-aaddf6a7db6e",
+        "conversationId": "research-routing-live-20261108-selection",
+        "utteranceId": null,
+        "requestId": "a06847d6-efc5-43e0-95c3-09f5835b1561",
+        "retrieval": "hybrid",
+        "candidates": [
+          {
+            "toolchainId": "browser.capture",
+            "revisionId": "toolchain:browser.capture@6",
+            "functionName": "browser_capture",
+            "rank": 1,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.research",
+            "revisionId": "toolchain:web.research@7",
+            "functionName": "web_research",
+            "rank": 2,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ui.compose",
+            "revisionId": "toolchain:ui.compose@11",
+            "functionName": "ui_create",
+            "rank": 3,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ocr.manage",
+            "revisionId": "toolchain:ocr.manage@6",
+            "functionName": "ocr",
+            "rank": 4,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "world.query",
+            "revisionId": "toolchain:world.query@8",
+            "functionName": "world_query",
+            "rank": 5,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "object-recognition.manage",
+            "revisionId": "toolchain:object-recognition.manage@2",
+            "functionName": "object_recognition",
+            "rank": 6,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "collaboration.pipeline",
+            "revisionId": "toolchain:collaboration.pipeline@2",
+            "functionName": "collaborate_pipeline",
+            "rank": 7,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_runs",
+            "revisionId": "host:read_runs@1",
+            "functionName": "read_runs",
+            "rank": 8,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_history",
+            "revisionId": "host:read_history@1",
+            "functionName": "read_history",
+            "rank": 9,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "markdown.collaborate",
+            "revisionId": "toolchain:markdown.collaborate@4",
+            "functionName": "markdown_edit",
+            "rank": 10,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.search",
+            "revisionId": "toolchain:web.search@10",
+            "functionName": "web_search",
+            "rank": 11,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          }
+        ],
+        "historyRefs": [],
+        "decision": "answer",
+        "toolchainId": null,
+        "toolchainRevisionId": null,
+        "functionName": null,
+        "request": null,
+        "taskId": null,
+        "outcome": "completed",
+        "outcomeCode": null,
+        "recipe": null,
+        "durationMs": null,
+        "createdAt": 1794128436111,
+        "settledAt": 1794128436113
+      }
+    ],
+    "nextCursor": null
+  },
+  "todos": {
+    "revision": 1794128386474,
+    "data": {
+      "rows": [
+        {
+          "id": "a7e2f93f-a7a4-4994-8f9e-1482b1b17f5c",
+          "request": "詳しいWeb調査をお願いします。東京国立博物館と国立科学博物館の公式サイトを実際に読み、常設展示での写真撮影、フラッシュ、三脚、自撮り棒の扱いを比較してください。企画展や展示ごとの例外、公式ページで確認できないことは分けて書き、推測で補わないでください。日本語の短いMarkdown報告にタイトル・比較表・出典リンクを付けて保存してください。会話の担当は切り替えずに進めてください。",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T08:59:46.474Z"
+        }
+      ],
+      "counts": {
+        "todo": 1,
+        "archived": 0
+      },
+      "total": 1,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "latestAssistant": {
+    "id": "20c54e20-bcff-40bc-934e-277985e49f63",
+    "conversationId": "research-routing-live-20261108-selection",
+    "role": "assistant",
+    "text": "承知しました。撮影ルールの調査と文書保存は中止し、追加の調査は行いません。",
+    "createdAt": "2026-11-08T09:00:36.110Z",
+    "runId": "c345c14e-fb29-41a9-bcf5-aaddf6a7db6e",
+    "delivery": {
+      "id": "0a26b1f9-13f9-438c-9744-bebec279a017",
+      "version": 2,
+      "emotion": "none",
+      "emotionConfidence": 1,
+      "motion": "neutral",
+      "tone": "natural",
+      "source": "host",
+      "confidence": 1,
+      "motionConfidence": 1,
+      "toneConfidence": 1,
+      "latencyMs": 0
+    }
+  }
+}

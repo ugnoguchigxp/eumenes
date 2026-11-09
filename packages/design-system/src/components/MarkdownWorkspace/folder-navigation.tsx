@@ -8,11 +8,13 @@ import {
 import { useState } from "react";
 import type { DocumentFolder, FolderLocation } from "./file-tree";
 import { folderKey } from "./file-tree";
+import type { LibraryMoveDrag } from "./library-move-drag";
 
 export function FolderNavigation(props: {
 	folders: DocumentFolder[];
 	selected: FolderLocation | "work" | "root";
 	onSelect(value: FolderLocation | "work" | "root"): void;
+	dropTarget?: LibraryMoveDrag["target"];
 }) {
 	return (
 		<nav className="ds-markdown-folder-nav" aria-label="フォルダ">
@@ -36,6 +38,7 @@ export function FolderNavigation(props: {
 								: ""
 						}
 						onSelect={props.onSelect}
+						dropTarget={props.dropTarget}
 						depth={0}
 					/>
 				))}
@@ -56,11 +59,13 @@ function FolderBranch({
 	folder,
 	selected,
 	onSelect,
+	dropTarget,
 	depth,
 }: {
 	folder: DocumentFolder;
 	selected: string;
 	onSelect(value: FolderLocation): void;
+	dropTarget?: LibraryMoveDrag["target"];
 	depth: number;
 }) {
 	const [expanded, setExpanded] = useState(depth === 0);
@@ -69,6 +74,7 @@ function FolderBranch({
 	return (
 		<li>
 			<div
+				{...dropTarget?.(folder)}
 				className="ds-markdown-folder-row"
 				data-active={active || undefined}
 				style={{ paddingInlineStart: 6 + depth * 16 }}
@@ -102,6 +108,7 @@ function FolderBranch({
 							folder={child}
 							selected={selected}
 							onSelect={onSelect}
+							dropTarget={dropTarget}
 							depth={depth + 1}
 						/>
 					))}

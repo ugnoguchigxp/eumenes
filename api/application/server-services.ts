@@ -1,3 +1,5 @@
+import { createAppDevelopmentRuntime } from "./app-development/runtime";
+import { createGitObservation } from "../domains/git-observation";
 import { createMemoryHostConnection } from "./memory-host";
 import type { ToolchainExecutionPort } from "../domains/tool-runtime";
 import { buildAnalysisFactory } from "./media/visual-perception";
@@ -128,6 +130,24 @@ export async function buildServices(
 		changes.publish(),
 	);
 	const uiCompositions = createUiCompositions();
+	const workflow = createAppDevelopmentRuntime({
+		store,
+		queue,
+		scheduler,
+		markdown,
+		scratch: core.scratch,
+		web: webResearch,
+		inference,
+		git: createGitObservation(resolve(dirname(dbPath), "workflow-git")),
+		destination: () =>
+			docling.documents.available()
+				? {
+						namespace: "eumenes",
+						path: "開発日誌",
+						binding: docling.documents.binding(),
+					}
+				: null,
+	});
 	let ocrCapabilities: Capabilities | null = null;
 	const ocr = createOcr({
 		analyses: buildAnalysisFactory(config, settings, store, queue),
@@ -169,7 +189,7 @@ export async function buildServices(
 		dbPath,
 		store,
 		queue,
-		uiCompositions,
+		appDevelopmentAdapter: workflow.adapter,
 		markdown,
 		ocr,
 		model3d,
@@ -196,6 +216,10 @@ export async function buildServices(
 			publish: () => changes.publish(),
 		},
 	});
+	const workflowPorts = workflow.attach({
+		capabilities: toolchain.capabilities,
+		agents: toolchain.agents.executions,
+	});
 	ocrCapabilities = toolchain.capabilities;
 	browserCapabilities = toolchain.capabilities;
 	const enabled = config.toolchainEnabled;
@@ -207,6 +231,7 @@ export async function buildServices(
 	});
 	const resources = buildResources({
 		store,
+		retireUiCompositions: true,
 		capabilities: toolchain.capabilities,
 		gateway: media.gateway,
 		events: continuity.events,
@@ -283,10 +308,12 @@ export async function buildServices(
 		agency.forgetInTransaction,
 		agency.planForgetInTransaction,
 	);
+	workflow.attachDialogue(dialogue);
 	links.attachDialogue(dialogue);
 	if (enabled && toolchains)
 		agencyExecution = configureTaskExecution({
 			settings,
+			...workflowPorts,
 			pursuit: toolchain.pursuit,
 			collaboration: toolchain.collaboration,
 			interact: browser.interact,
@@ -370,6 +397,7 @@ export async function buildServices(
 		drawingOperations: media.drawingOperations,
 		image: media.image,
 		uiCompositions,
+		workflow,
 		markdown,
 		scratch: core.scratch,
 		objectRecognition: media.objectRecognition,

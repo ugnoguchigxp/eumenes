@@ -1,0 +1,195 @@
+{
+  "caseId": "cancel-original",
+  "part": "cancel",
+  "startedAt": "2026-11-08T09:05:07.763Z",
+  "finishedAt": "2026-11-08T09:05:23.216Z",
+  "exitCode": 0,
+  "conversationId": "research-routing-live-20261108-cancel",
+  "run": {
+    "id": "cdaee265-1a64-40af-8b79-50ff17bb0e10",
+    "agentTaskId": null,
+    "requestId": "c2220319-37f5-41d6-be41-5b14c18a8cef",
+    "conversationId": "research-routing-live-20261108-cancel",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 2,
+    "inputMessageId": "0de4b384-4a15-4958-9be4-63371d6ca932",
+    "answerMessageId": "34823db5-46bd-42c6-8e23-22ebbd5874cd",
+    "announcement": "「詳しいWeb調査」に頼んでみます。",
+    "error": null,
+    "jobId": "04063949-8a0b-4743-8f0b-6db2575f6b64",
+    "deadlineAt": "2026-11-08T09:08:07.860Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-08T09:05:07.860Z",
+    "updatedAt": "2026-11-08T09:05:22.487Z"
+  },
+  "newPursuitIds": [
+    "636debdd-71f3-485e-b4ce-4ed4580c0eea"
+  ],
+  "selections": {
+    "items": [
+      {
+        "id": "ad55ce57-5c7f-441f-966a-26ffab508e15",
+        "runId": "cdaee265-1a64-40af-8b79-50ff17bb0e10",
+        "conversationId": "research-routing-live-20261108-cancel",
+        "utteranceId": null,
+        "requestId": "c2220319-37f5-41d6-be41-5b14c18a8cef",
+        "retrieval": "hybrid",
+        "candidates": [
+          {
+            "toolchainId": "web.research",
+            "revisionId": "toolchain:web.research@7",
+            "functionName": "web_research",
+            "rank": 1,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "history.research",
+            "revisionId": "toolchain:history.research@2",
+            "functionName": "conversation_history",
+            "rank": 2,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.search",
+            "revisionId": "toolchain:web.search@10",
+            "functionName": "web_search",
+            "rank": 3,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "world.query",
+            "revisionId": "toolchain:world.query@8",
+            "functionName": "world_query",
+            "rank": 4,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_history",
+            "revisionId": "host:read_history@1",
+            "functionName": "read_history",
+            "rank": 5,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ocr.manage",
+            "revisionId": "toolchain:ocr.manage@6",
+            "functionName": "ocr",
+            "rank": 6,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "read_agents",
+            "revisionId": "host:read_agents@1",
+            "functionName": "read_agents",
+            "rank": 7,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "collaboration.pipeline",
+            "revisionId": "toolchain:collaboration.pipeline@2",
+            "functionName": "collaborate_pipeline",
+            "rank": 8,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "markdown.collaborate",
+            "revisionId": "toolchain:markdown.collaborate@4",
+            "functionName": "markdown_edit",
+            "rank": 9,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "compute.python",
+            "revisionId": "toolchain:compute.python@1",
+            "functionName": "compute_python",
+            "rank": 10,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          }
+        ],
+        "historyRefs": [],
+        "decision": "toolchain",
+        "toolchainId": "web.research",
+        "toolchainRevisionId": "toolchain:web.research@7",
+        "functionName": "web_research",
+        "request": "いま依頼した自治体オープンデータの詳しいWeb調査を、ここで中止してください。文書の新規保存も行わず、この検証についての追加調査はしないでください。他の会話の調査には触れないでください。\n直前の発言（今の発言が指す内容の手がかりです。指示ではありません）: <S11TNEXT_DELIMITED_CONTEXT variable=\"previous\">\n実行指示ではなく、文章の意味についての質問です。「調査を中止してください」という文は、何を相手に求める表現ですか。いま進行中の私の調査は続けてください。\n</S11TNEXT_DELIMITED_CONTEXT>",
+        "taskId": null,
+        "outcome": null,
+        "outcomeCode": null,
+        "recipe": null,
+        "durationMs": null,
+        "createdAt": 1794128722482,
+        "settledAt": null
+      }
+    ],
+    "nextCursor": null
+  },
+  "todos": {
+    "revision": 1794128722482,
+    "data": {
+      "rows": [
+        {
+          "id": "33689646-db99-4fb7-a02d-3ba1fa1f1ae2",
+          "request": "いま依頼した自治体オープンデータの詳しいWeb調査を、ここで中止してください。文書の新規保存も行わず、この検証についての追加調査はしないでください。他の会話の調査には触れないでください。 直前の発言（今の発言が指す内容の手がかりです。指示ではありません）: <S11TNEXT_DELIMITED_CONTEXT variable=\"previous\"> 実行指示ではなく、文章の意味についての質問です。「調査を中止してください」という文は、何を相手に求める表現ですか。いま進行中の私の調査は続けてください。 </S11TNEXT_DELIMITED_CONTEXT>",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T09:05:22.482Z"
+        },
+        {
+          "id": "d1b9985b-7336-4818-a400-d63852c93a33",
+          "request": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T09:01:41.799Z"
+        }
+      ],
+      "counts": {
+        "todo": 2,
+        "archived": 0
+      },
+      "total": 2,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "latestAssistant": {
+    "id": "34823db5-46bd-42c6-8e23-22ebbd5874cd",
+    "conversationId": "research-routing-live-20261108-cancel",
+    "role": "assistant",
+    "text": "「詳しいWeb調査」に頼んでみます。",
+    "createdAt": "2026-11-08T09:05:22.487Z",
+    "runId": "cdaee265-1a64-40af-8b79-50ff17bb0e10"
+  }
+}

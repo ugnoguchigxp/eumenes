@@ -118,7 +118,10 @@ const timeLimitsV1 = z
  * `memory` bounds the earlier turns kept in full. Every field is optional: the host defaults apply.
  */
 const agentV1 = z.strictObject({
-	collaborationState: z.literal(true).optional(),
+	collaborationState: z
+		.union([z.literal(true), z.literal("host-bound")])
+		.optional(),
+	larmReasoning: z.literal("off").optional(),
 	workspace: z
 		.strictObject({
 			documentRef: hostRef("workspace"),
@@ -126,7 +129,11 @@ const agentV1 = z.strictObject({
 			inlineBytes: z.number().int().min(1024).max(98_304).optional(),
 		})
 		.optional(),
-	turn: agentTurnV1.optional(),
+	turn: agentTurnV1
+		.extend({
+			maxOutputTokens: z.number().int().min(1024).max(24576).optional(),
+		})
+		.optional(),
 	memory: z
 		.strictObject({
 			recentTurns: z.number().int().min(1).max(50).optional(),

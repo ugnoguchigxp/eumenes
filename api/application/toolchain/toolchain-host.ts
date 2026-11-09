@@ -145,6 +145,7 @@ export async function createHostToolchain(
 		store: SqliteStore;
 		dbPath?: string;
 		queue: QueueService;
+		appDevelopmentAdapter?: import("../../domains/tool-runtime").DomainAdapter;
 		uiCompositions?: UiCompositionsService;
 		markdown?: import("../../domains/markdown").MarkdownService;
 		ocr?: import("../../domains/ocr").OcrService;
@@ -195,6 +196,7 @@ export async function createHostToolchain(
 		s.webResearch,
 		{
 			timers: s.timers,
+			appDevelopmentAdapter: s.appDevelopmentAdapter,
 			uiCompositions: s.uiCompositions,
 			markdown: s.markdown,
 			ocr: s.ocr,

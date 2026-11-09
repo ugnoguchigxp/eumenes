@@ -11,6 +11,11 @@ import { getDocument } from "../repository";
 import { createBundles } from "./bundles";
 import { schemaInTransaction } from "./documents";
 import { zSchema } from "./schema";
+import {
+	isWorkflowSchema,
+	registerWorkflowSchemaInTransaction,
+	workflowSchemaInTransaction,
+} from "./workflow-schemas";
 
 /** Check the input against the package's schema (or a named tool's) and bound the context. */
 export function finishPrepare(
@@ -102,7 +107,7 @@ export function createBound(deps: {
 	/** A stored binding, artifact or schema revision. */
 	function documentInTransaction(db: Database, revisionId: string) {
 		const stored = getDocument(db, revisionId);
-		return stored
+		return stored && !isWorkflowSchema(stored)
 			? {
 					revisionId: stored.revisionId,
 					digest: stored.digest,
@@ -126,6 +131,9 @@ export function createBound(deps: {
 			prepareBoundInTransaction,
 			documentInTransaction,
 			schemaInTransaction,
+			registerWorkflowSchemaInTransaction: (db: Database, input: unknown) =>
+				registerWorkflowSchemaInTransaction(db, input, deps.now()),
+			workflowSchemaInTransaction,
 			importBundleInTransaction: bundles.importBundleInTransaction,
 		},
 	};

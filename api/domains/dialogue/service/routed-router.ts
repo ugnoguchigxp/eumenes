@@ -2,6 +2,7 @@ import { head, type Ranked, type RouteTurn } from "eumenes_router";
 import { getLogger } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { RouterTraceRecord } from "../../toolchain-history";
+import type { RoutedPipelineStep } from "../../tool-runtime";
 import type { QueryVector } from "../contracts/toolchains";
 import { availableToolchainsInTransaction } from "./delegate-conversation";
 import { availableReadTools } from "./executor-read";
@@ -19,6 +20,9 @@ import {
 	needsConfirmation,
 	operateWork,
 	readWith,
+	replyToUnresolved,
+	routerUnperformed,
+	askRouterClarification,
 	requestMemory,
 	type Fields,
 	type Step,
@@ -51,7 +55,6 @@ import { retainedChoice, switchingOf } from "./routed-search";
 import type { Turn } from "./routed-turn";
 
 const log = getLogger("dialogue");
-/** The resources one hand-over may carry (the delegate call's bound). */
 const RESOURCE_REFS = 8;
 /** What one asking of the router left the turn with. */
 type Consulted = {
@@ -61,8 +64,7 @@ type Consulted = {
 	words: string;
 	/** Null when the router failed or timed out (row 10). */
 	decision: RouteDecision | null;
-	/** The current utterance's literal answer span, validated by the structured router. */
-	answerText?: string;
+	candidateUnavailable: boolean;
 	/** The previous routed turn of the conversation, within the correction window. */
 	latest: RouterTraceRecord | null;
 	/** Writes the turn's trace again with these parts changed (a redirect carried out, a question asked once more). */
@@ -203,7 +205,12 @@ async function consult(
 	const part = result ? decidedPart(result) : undefined;
 	let candidates: RouteCandidate[] = [];
 	let decision: RouteDecision | null = null;
-	if (result) {
+	if (result?.decision.to === "unresolved") {
+		decision = result.decision;
+		error = decision.reason;
+	} else if (result?.decision.to === "clarify") {
+		decision = result.decision;
+	} else if (result) {
 		try {
 			const offered = await offer(turn, words, result, dynamic);
 			candidates = offered.candidates;
@@ -225,6 +232,7 @@ async function consult(
 			decision = null;
 		}
 	}
+	turn.signal.throwIfAborted();
 	const durationMs = Math.round(performance.now() - started);
 	const query =
 		(part && embedded.get(head(part.text, 2000))) ??
@@ -266,21 +274,25 @@ async function consult(
 		log.info("dialogue.router_decided", {
 			mode: "on",
 			source: settings.entry,
+			phase: result?.structuredAttempted ? "structured" : "direct",
 			row: decision.row,
 			kind: decidedKind(decision),
 			count: part?.result.explain.offered.length ?? 0,
 			durationMs,
 		});
-	else log.warn("dialogue.router_failed", { reason: error ?? "router_failed" });
+	else
+		log.warn("dialogue.router_failed", {
+			reason: error ?? "router_failed",
+			phase: result?.structuredAttempted ? "structured" : "direct",
+			durationMs,
+		});
 	return {
 		candidates,
 		words,
 		decision,
+		candidateUnavailable: !!result && !decision,
 		latest,
 		retrace: trace,
-		...(result?.structure?.kind === "answer"
-			? { answerText: result.structure.text }
-			: {}),
 	};
 }
 
@@ -329,10 +341,7 @@ function recordTrace(
 		});
 }
 
-/**
- * Every utterance turn when the router is on (spec router-package-integration 2026-11-04 §1 #12): the package decides
- * with no choice call, among the toolchains, the conversation, the work and the open confirmations and questions.
- */
+/** Route this utterance and carry out its final decision through the host. */
 export async function routerTurn(
 	turn: Turn,
 	router: ActiveRouter,
@@ -342,15 +351,13 @@ export async function routerTurn(
 		? `${routed.asked.request}\n${turn.utterance}`
 		: turn.utterance;
 	const consulted = await consult(turn, router, words);
+	turn.signal.throwIfAborted();
 	// A router that failed leaves the turn to the talk turn (row 10); nothing is promised.
 	if (!consulted.decision) {
-		if (router.settings.entry === "routeStructured") {
-			turn.speak(
-				systemContext("dialogue.contexts.local.router-unperformed", {}),
-			);
-			return "done";
-		}
-		return "talk";
+		const structuredEntry = router.settings.entry === "routeStructured";
+		return structuredEntry || consulted.candidateUnavailable
+			? routerUnperformed(turn, structuredEntry)
+			: "talk";
 	}
 	const step = await carryOut(turn, consulted, consulted.decision);
 	if (typeof step === "string") return step;
@@ -359,7 +366,6 @@ export async function routerTurn(
 	return "done";
 }
 
-/** The title of a candidate the host names to the user. */
 const titleOf = (c: RouteCandidate) =>
 	lineText(
 		c.kind === "toolchain" || c.kind === "read" ? c.card.title : c.id,
@@ -373,22 +379,16 @@ const ANNOUNCE = {
 const announcement = (announce: Announce, title: string) =>
 	announce === "none" ? "" : systemContext(ANNOUNCE[announce], { title });
 
-/** What a decision does (spec §3.3). */
 async function carryOut(
 	turn: Turn,
 	consulted: Consulted,
 	decision: RouteDecision,
 ): Promise<Step> {
 	switch (decision.to) {
+		case "unresolved":
+			return replyToUnresolved(turn, decision);
 		case "clarify":
-			return askBack(
-				turn,
-				[
-					decision.question,
-					systemContext("dialogue.contexts.local.router-clarify", {}),
-					...decision.unhandled,
-				].join("\n"),
-			);
+			return askRouterClarification(turn, decision);
 		case "conversation":
 			return "talk";
 		case "ask":
@@ -401,6 +401,15 @@ async function carryOut(
 			);
 		case "again":
 			return askAgain(turn, consulted, decision.candidate);
+		case "pipeline":
+			return toolchain(
+				turn,
+				consulted,
+				decision.candidate,
+				"fixed",
+				undefined,
+				decision.steps,
+			);
 		case "run":
 			if (decision.row === 9 && decision.candidate.kind === "toolchain") {
 				const selected = await chooseWholeWork(
@@ -524,11 +533,7 @@ async function run(
 			if (c.operation === "decline")
 				return declineConfirmation(turn, c.confirmation);
 			if (c.operation === "discard") return discard(turn, c);
-			return answerQuestion(
-				turn,
-				c.todo,
-				consulted.answerText ?? turn.utterance,
-			);
+			return answerQuestion(turn, c.todo, turn.utterance);
 	}
 }
 
@@ -557,6 +562,7 @@ async function prepare(
 	announce: Announce,
 	redirected?: { trace: RouterTraceRecord; wrongId: string },
 	prefilled?: Fields,
+	routedSteps?: readonly RoutedPipelineStep[],
 ): Promise<Prepared> {
 	const words = redirected
 		? `${redirected.trace.text}\n${turn.utterance}`
@@ -601,6 +607,7 @@ async function prepare(
 				fields,
 				announcement(announce, titleOf(c)),
 				words,
+				routedSteps,
 			);
 			if (step === "done") await afterHandOver(turn, consulted, c, redirected);
 			return step;
@@ -615,6 +622,7 @@ async function toolchain(
 	c: Extract<RouteCandidate, { kind: "toolchain" | "read" }>,
 	announce: Announce,
 	prefilled?: Fields,
+	routedSteps?: readonly RoutedPipelineStep[],
 ): Promise<Step> {
 	const prepared = await prepare(
 		turn,
@@ -623,6 +631,7 @@ async function toolchain(
 		announce,
 		undefined,
 		prefilled,
+		routedSteps,
 	);
 	return "step" in prepared ? prepared.step : prepared.go();
 }

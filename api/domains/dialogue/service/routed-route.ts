@@ -3,11 +3,13 @@ import {
 	DISCARD_ID,
 	MEMORY_ID,
 	predictionSet,
+	type FallbackDecision,
 	type Ranked,
 } from "eumenes_router";
 import type { ToolchainCard } from "../../capabilities";
 import type { InferencePort } from "../../inference";
 import type { RouterTrace, RouterTraceRecord } from "../../toolchain-history";
+import type { RoutedPipelineStep } from "../../tool-runtime";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { RoutedInput } from "./context";
 import { lineText } from "./input-text";
@@ -246,6 +248,13 @@ function redirects(
 export type Announce = "fixed" | "try" | "partial" | "none";
 export type RouteDecision =
 	| { row: 1 | 7 | 8; to: "conversation" }
+	| Extract<FallbackDecision, { to: "unresolved" }>
+	| {
+			row: 9;
+			to: "pipeline";
+			candidate: Extract<RouteCandidate, { kind: "toolchain" }>;
+			steps: readonly RoutedPipelineStep[];
+	  }
 	| { row: 8; to: "clarify"; question: string; unhandled: readonly string[] }
 	| { row: 8; to: "ask"; options: [RouteCandidate, RouteCandidate] }
 	| {
@@ -264,7 +273,7 @@ export function decidedId(decision: RouteDecision): string | null {
 			return CONVERSATION_ID;
 		case "ask":
 		case "clarify":
-			// The user decides between the two: nothing is decided yet.
+		case "unresolved":
 			return null;
 		default:
 			return decision.candidate.id;

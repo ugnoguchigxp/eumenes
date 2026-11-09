@@ -1,0 +1,290 @@
+[
+  {
+    "turnId": "c345c14e-fb29-41a9-bcf5-aaddf6a7db6e",
+    "candidates": [
+      {
+        "id": "conversation.respond",
+        "rank": 1,
+        "similarity": null,
+        "probability": 0.48009936310382445
+      },
+      {
+        "id": "t1.cancel",
+        "rank": 2,
+        "similarity": null,
+        "probability": 0.2317499339671225
+      },
+      {
+        "id": "t1.redirect:web.search",
+        "rank": 3,
+        "similarity": null,
+        "probability": 0.15684672552503537
+      },
+      {
+        "id": "browser.capture",
+        "rank": 4,
+        "similarity": null,
+        "probability": 0.023144641360117436
+      },
+      {
+        "id": "web.research",
+        "rank": 5,
+        "similarity": null,
+        "probability": 0.015419982908109302
+      },
+      {
+        "id": "ui.compose",
+        "rank": 6,
+        "similarity": null,
+        "probability": 0.014652815233339287
+      },
+      {
+        "id": "ocr.manage",
+        "rank": 7,
+        "similarity": null,
+        "probability": 0.011403576510403544
+      },
+      {
+        "id": "t1.amend",
+        "rank": 8,
+        "similarity": null,
+        "probability": 0.008498441719681659
+      },
+      {
+        "id": "world.query",
+        "rank": 9,
+        "similarity": null,
+        "probability": 0.008181322657711071
+      },
+      {
+        "id": "object-recognition.manage",
+        "rank": 10,
+        "similarity": null,
+        "probability": 0.006181525791628494
+      },
+      {
+        "id": "t1.check",
+        "rank": 11,
+        "similarity": null,
+        "probability": 0.004526397374688417
+      },
+      {
+        "id": "collaboration.pipeline",
+        "rank": 12,
+        "similarity": null,
+        "probability": 0.004338938375922722
+      },
+      {
+        "id": "read_runs",
+        "rank": 13,
+        "similarity": null,
+        "probability": 0.003468456749430226
+      },
+      {
+        "id": "read_history",
+        "rank": 14,
+        "similarity": null,
+        "probability": 0.002982214552489809
+      },
+      {
+        "id": "markdown.collaborate",
+        "rank": 15,
+        "similarity": null,
+        "probability": 0.0025571610538297042
+      }
+    ],
+    "selectedId": "none",
+    "route": "router",
+    "result": "success",
+    "recordedOutcome": "completed",
+    "routerMode": "on"
+  },
+  {
+    "turnId": "48f49166-5605-4ff2-9ad8-ef571fafe816",
+    "candidates": [
+      {
+        "id": "conversation.respond",
+        "rank": 1,
+        "similarity": null,
+        "probability": 0.41695586773588467
+      },
+      {
+        "id": "t1.cancel",
+        "rank": 2,
+        "similarity": null,
+        "probability": 0.21066000859165757
+      },
+      {
+        "id": "world.query",
+        "rank": 3,
+        "similarity": null,
+        "probability": 0.04405556283543578
+      },
+      {
+        "id": "ui.compose",
+        "rank": 4,
+        "similarity": null,
+        "probability": 0.03626029860685905
+      },
+      {
+        "id": "ocr.manage",
+        "rank": 5,
+        "similarity": null,
+        "probability": 0.018114105682328022
+      },
+      {
+        "id": "read_memory",
+        "rank": 6,
+        "similarity": null,
+        "probability": 0.015543831214844738
+      },
+      {
+        "id": "history.research",
+        "rank": 7,
+        "similarity": null,
+        "probability": 0.013831037496040432
+      },
+      {
+        "id": "web.research",
+        "rank": 8,
+        "similarity": null,
+        "probability": 0.009718720170818405
+      },
+      {
+        "id": "t1.amend",
+        "rank": 9,
+        "similarity": null,
+        "probability": 0.008330954155455018
+      },
+      {
+        "id": "read_history",
+        "rank": 10,
+        "similarity": null,
+        "probability": 0.008255716753401868
+      },
+      {
+        "id": "t1.check",
+        "rank": 11,
+        "similarity": null,
+        "probability": 0.0071966824815336
+      },
+      {
+        "id": "read_runs",
+        "rank": 12,
+        "similarity": null,
+        "probability": 0.004998526473996139
+      },
+      {
+        "id": "web.search",
+        "rank": 13,
+        "similarity": null,
+        "probability": 0.0043743074424359984
+      },
+      {
+        "id": "read_agents",
+        "rank": 14,
+        "similarity": null,
+        "probability": 0.003699879973167466
+      }
+    ],
+    "selectedId": "none",
+    "route": "router",
+    "result": "success",
+    "recordedOutcome": "completed",
+    "routerMode": "on"
+  },
+  {
+    "turnId": "cdaee265-1a64-40af-8b79-50ff17bb0e10",
+    "candidates": [
+      {
+        "id": "web.research",
+        "rank": 1,
+        "similarity": null,
+        "probability": 0.41622651517697357
+      },
+      {
+        "id": "conversation.respond",
+        "rank": 2,
+        "similarity": null,
+        "probability": 0.1665336249892262
+      },
+      {
+        "id": "t1.cancel",
+        "rank": 3,
+        "similarity": null,
+        "probability": 0.13452147962152036
+      },
+      {
+        "id": "history.research",
+        "rank": 4,
+        "similarity": null,
+        "probability": 0.018852014438153496
+      },
+      {
+        "id": "t1.amend",
+        "rank": 5,
+        "similarity": null,
+        "probability": 0.01367984547937619
+      },
+      {
+        "id": "web.search",
+        "rank": 6,
+        "similarity": null,
+        "probability": 0.012831299778463728
+      },
+      {
+        "id": "t1.check",
+        "rank": 7,
+        "similarity": null,
+        "probability": 0.011477124024313333
+      },
+      {
+        "id": "world.query",
+        "rank": 8,
+        "similarity": null,
+        "probability": 0.008473673588797762
+      },
+      {
+        "id": "read_history",
+        "rank": 9,
+        "similarity": null,
+        "probability": 0.00730163295957845
+      },
+      {
+        "id": "ocr.manage",
+        "rank": 10,
+        "similarity": null,
+        "probability": 0.0037436177853229567
+      },
+      {
+        "id": "read_agents",
+        "rank": 11,
+        "similarity": null,
+        "probability": 0.002369493942051191
+      },
+      {
+        "id": "collaboration.pipeline",
+        "rank": 12,
+        "similarity": null,
+        "probability": 0.0020622391463300037
+      },
+      {
+        "id": "markdown.collaborate",
+        "rank": 13,
+        "similarity": null,
+        "probability": 0.0019014999760820833
+      },
+      {
+        "id": "compute.python",
+        "rank": 14,
+        "similarity": null,
+        "probability": 0.001354507057402408
+      }
+    ],
+    "selectedId": "web.research",
+    "route": "router",
+    "result": null,
+    "recordedOutcome": null,
+    "routerMode": "on"
+  }
+]

@@ -348,14 +348,27 @@ export function runDocTool(
 	} catch (error) {
 		// The domain's refusals (a safe code such as no_change, revision_conflict, undo_limit_reached) are data
 		// for the next call; anything else (a stale turn, a store failure) still ends the turn.
-		const own = (error as { code?: unknown }).code;
+		const { code: own, documentIssues } = error as {
+			code?: unknown;
+			documentIssues?: Array<{
+				path: string;
+				rule: string;
+				keys?: string[];
+				detail?: string;
+			}>;
+		};
 		const code =
 			typeof own === "string"
 				? own
 				: error instanceof Error && DOMAIN_REFUSALS.has(error.message)
 					? error.message
 					: null;
-		if (code && /^[a-z_]+$/.test(code)) return { ok: false, error: code };
+		if (code && /^[a-z_]+$/.test(code))
+			return {
+				ok: false,
+				error: code,
+				...(documentIssues ? { issues: documentIssues, kept: true } : {}),
+			};
 		throw error;
 	}
 }

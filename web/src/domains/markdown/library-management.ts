@@ -85,7 +85,7 @@ export function useLibraryManagement(input: {
 					{ namespace, path, ...(cursor ? { cursor } : {}) },
 					c.signal,
 				);
-				if (n !== sequence.current) return;
+				if (n !== sequence.current || c.signal.aborted) return;
 				const prior = latest.current;
 				if (
 					cursor &&
@@ -123,19 +123,25 @@ export function useLibraryManagement(input: {
 				if (n === sequence.current && !c.signal.aborted)
 					setError(managementMessage(e));
 			} finally {
-				if (n === sequence.current) setLoading(false);
+				if (n === sequence.current) {
+					controller.current = null;
+					setLoading(false);
+				}
 			}
 		},
 		[client, features?.library],
 	);
 	const firstNamespace = input.namespaces[0];
 	useEffect(() => {
-		if (features?.library && firstNamespace && !latest.current)
+		if (
+			features?.library &&
+			firstNamespace &&
+			!latest.current &&
+			(!controller.current || controller.current.signal.aborted)
+		)
 			void load(firstNamespace, "");
-		return () => {
-			controller.current?.abort();
-		};
 	}, [features?.library, firstNamespace, load]);
+	useEffect(() => () => controller.current?.abort(), [load]);
 	async function adopt(
 		result: Awaited<ReturnType<EumenesClient["markdownManage"]>>,
 	) {

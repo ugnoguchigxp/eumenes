@@ -12,6 +12,7 @@ import {
 } from "./router.fixture";
 import { fakeResources } from "./resource.fixture";
 import {
+	DIRECT_ROUTER_MODEL,
 	IMAGE,
 	INSTANT,
 	MUSIC,
@@ -50,6 +51,8 @@ test("the package decides with no model call: a sure toolchain is offered by the
 	const waiting = await h!.say("猫の絵を描いて", "queued");
 	expect(waiting.announcement).toBe("「画像」に頼みます。");
 	expect(h!.state.calls).toEqual([]);
+	expect(r.structureCalls).toEqual([]);
+	expect(r.routes).toHaveLength(1);
 	expect(h!.todos()[0]).toMatchObject({ title: "猫の絵を描いて" });
 	// The utterance was embedded as the package's memory was; the reranker read the tools and a memory request (never
 	// the conversation), the newest utterance and the host's instructions.
@@ -91,23 +94,35 @@ test("the conversation leads when no tool scores: the turn talks, with one call 
 	expect(trace()).toMatchObject({ decided: "conversation.respond", row: 7 });
 });
 
-test("a toolchain best-v2 is not sure of is asked to try, in the host's words (row 3)", async () => {
+test("a deferred A is dispatched once using B's confirmed decision", async () => {
 	const r = await start();
-	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }));
-	const waiting = await h!.say("絵か何か", "queued");
-	expect(waiting.announcement).toBe("「画像」に頼んでみます。");
-	expect(trace().row).toBe(3);
-	expect(trace().set).toEqual([IMAGE.id, "conversation.respond"]);
+	const request = "絵か何か";
+	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }), weigh({ [IMAGE.id]: 0.95 }));
+	r.structures.push(
+		JSON.stringify({
+			requests: [{ text: request, target: "絵", inputs: [], after: [] }],
+		}),
+	);
+	const waiting = await h!.say(request, "queued");
+	expect(waiting.announcement).toBe("「画像」に頼みます。");
+	expect(trace().row).toBe(2);
+	expect(r.routes).toHaveLength(2);
+	expect(r.structureCalls).toHaveLength(1);
+	expect(h!.todos()).toHaveLength(1);
 });
 
-test("an unsure toolchain that changes what exists is confirmed first (row 4), and a yes above the approval line approves it (row 5)", async () => {
+test("B's decision to change what exists still requires approval from the host", async () => {
 	const r = await start({}, { cards: [EDIT, INSTANT] });
-	r.scripts.push(weigh({ [EDIT.id]: 0.45 }));
+	r.scripts.push(weigh({ [EDIT.id]: 0.45 }), weigh({ [EDIT.id]: 0.95 }));
+	r.structures.push(
+		'{"requests":[{"text":"壁紙を差し替えて","target":"壁紙","inputs":[],"after":[]}]}',
+	);
 	const asked = await h!.say("壁紙を差し替えて");
 	expect(h!.dialogue.answerText(asked.id)).toBe(
 		"編集に「壁紙を差し替えて」を頼みます。今あるものを変えます。よろしいですか？",
 	);
-	expect(trace().row).toBe(4);
+	expect(trace().row).toBe(2);
+	expect(r.structureCalls).toHaveLength(1);
 	expect(h!.todos()).toEqual([]);
 	r.scripts.push(weigh({ "c1.approve": 0.95 }));
 	const approved = await h!.say("お願い", "queued");
@@ -140,7 +155,10 @@ test("a yes below the approval line asks the host's question again and leaves th
 });
 
 test("route(): row 9 never dispatches only the first job when no planner is available", async () => {
-	const r = await start({}, { cards: [IMAGE, MUSIC], music: true });
+	const r = await start(
+		{},
+		{ cards: [IMAGE, MUSIC], music: true, routerModel: DIRECT_ROUTER_MODEL },
+	);
 	r.scripts.push(weigh({ [IMAGE.id]: 0.95, [MUSIC.id]: 0.9 }));
 	h!.state.steps.push({ text: "パイプラインを利用できません。" });
 	const waiting = await h!.say("猫の絵を描いて、曲も作って");
@@ -296,7 +314,7 @@ test("a cancellation carries the running request's identifying detail beyond its
 });
 
 test("a work is checked, corrected or cancelled by the package's decision: the host's operation, the host's words", async () => {
-	const r = await start();
+	const r = await start({}, { routerModel: DIRECT_ROUTER_MODEL });
 	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));
 	await h!.say("猫の絵を描いて", "queued");
 	r.scripts.push(weigh({ "t1.cancel": 0.95 }));
@@ -318,10 +336,13 @@ test("a work is checked, corrected or cancelled by the package's decision: the h
 });
 
 test("a doubted hand-over is redone elsewhere: the work is cancelled, the same words go to the other toolchain, and the correction is kept", async () => {
-	const r = await start({}, { cards: [IMAGE, MUSIC], music: true });
+	const r = await start(
+		{},
+		{ cards: [IMAGE, MUSIC], music: true, routerModel: DIRECT_ROUTER_MODEL },
+	);
 	r.scripts.push(weigh({ [IMAGE.id]: 0.5, [MUSIC.id]: 0.45 }));
 	const first = await h!.say("コーヒータイムに合うものを作って", "queued");
-	expect(first.announcement).toBe("「画像」に頼んでみます。");
+	expect(first.announcement).toBe("「画像」に頼みます。");
 	expect(trace().set).toEqual([IMAGE.id, MUSIC.id]);
 	r.scripts.push(weigh({ [`t1.redirect:${MUSIC.id}`]: 0.95 }));
 	const redone = await h!.say("違う、作曲してほしい", "queued");
@@ -358,11 +379,14 @@ test("the turns before go to the reranker's port, and the user's utterance befor
 });
 
 test("a correction near the utterance moves the decision, never to a sure one; disagreeing ones apply none and are put out of use; weight 0 turns them off", async () => {
-	const r = await start({}, { cards: [IMAGE, MUSIC], music: true });
+	const r = await start(
+		{},
+		{ cards: [IMAGE, MUSIC], music: true, routerModel: DIRECT_ROUTER_MODEL },
+	);
 	const ambiguous = () => weigh({ [IMAGE.id]: 0.5, [MUSIC.id]: 0.45 });
 	r.scripts.push(ambiguous());
 	expect((await h!.say("夕方に合うものを作って", "queued")).announcement).toBe(
-		"「画像」に頼んでみます。",
+		"「画像」に頼みます。",
 	);
 	h!.state.corrections = [
 		{ id: "f1", wrongId: IMAGE.id, rightId: MUSIC.id, similarity: 0.99 },
@@ -377,7 +401,7 @@ test("a correction near the utterance moves the decision, never to a sure one; d
 	];
 	r.scripts.push(ambiguous());
 	expect((await h!.say("お昼に合うものを作って", "queued")).announcement).toBe(
-		"「画像」に頼んでみます。",
+		"「画像」に頼みます。",
 	);
 	h!.state.corrections = [
 		{ id: "f1", wrongId: IMAGE.id, rightId: MUSIC.id, similarity: 0.99 },
@@ -385,7 +409,7 @@ test("a correction near the utterance moves the decision, never to a sure one; d
 	];
 	r.scripts.push(ambiguous());
 	expect((await h!.say("朝に合うものを作って", "queued")).announcement).toBe(
-		"「画像」に頼んでみます。",
+		"「画像」に頼みます。",
 	);
 	expect(h!.state.feedbackStates).toEqual([
 		{ id: "f1", state: "conflict" },
@@ -394,7 +418,7 @@ test("a correction near the utterance moves the decision, never to a sure one; d
 	await h!.close();
 	const off = await start(
 		{ feedbackWeight: 0 },
-		{ cards: [IMAGE, MUSIC], music: true },
+		{ cards: [IMAGE, MUSIC], music: true, routerModel: DIRECT_ROUTER_MODEL },
 	);
 	h!.state.corrections = [
 		{ id: "f1", wrongId: IMAGE.id, rightId: MUSIC.id, similarity: 0.99 },
@@ -402,7 +426,7 @@ test("a correction near the utterance moves the decision, never to a sure one; d
 	off.scripts.push(ambiguous());
 	expect(
 		(await h!.say("夕暮れに合うものを作って", "queued")).announcement,
-	).toBe("「画像」に頼んでみます。");
+	).toBe("「画像」に頼みます。");
 });
 
 test("with no profile saved there is no router: the turn talks, and nothing is offered or embedded", async () => {
@@ -579,4 +603,192 @@ test("routeStructured: a mixed multi-job request never falls back to running onl
 	);
 	expect(h!.todos()).toHaveLength(0);
 	expect(trace().decided).not.toBe(IMAGE.id);
+});
+
+test("invalid B asks with tools disabled and carries the original request into the next A and B", async () => {
+	const r = await start();
+	const request = "あの資料に合うものを作って";
+	const reply = "画像を作って";
+	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }));
+	r.structures.push("invalid JSON");
+	h!.state.steps.push({ text: "画像と音楽のどちらを作りますか？" });
+	const first = await h!.say(request);
+	expect(h!.dialogue.answerText(first.id)).toBe(
+		"画像と音楽のどちらを作りますか？",
+	);
+	expect(h!.state.calls[0]!.tools).toEqual([]);
+	expect(h!.state.calls[0]!.messages.at(-1)!.content).toContain(
+		'"options":["画像"]',
+	);
+	expect(h!.state.searchSlots).toEqual([]);
+	expect(h!.todos()).toEqual([]);
+	expect(trace()).toMatchObject({
+		row: 8,
+		decided: null,
+		error: "structure_failed",
+	});
+
+	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }), weigh({ [IMAGE.id]: 0.95 }));
+	r.structures.push(
+		JSON.stringify({
+			requests: [{ text: reply, target: "画像", inputs: [], after: [] }],
+		}),
+	);
+	await h!.say(reply, "queued");
+	expect(r.routes.map((call) => call.text)).toEqual([
+		request,
+		`${request}\n${reply}`,
+		reply,
+	]);
+	expect(JSON.parse(r.structureCalls[1]!.messages[1]!.content).text).toBe(
+		reply,
+	);
+	expect(h!.state.selections.at(-1)!.request).toContain(`${request}\n${reply}`);
+	expect(h!.todos()).toHaveLength(1);
+});
+
+test("B with no candidate answers without asking or allowing tools", async () => {
+	const r = await start();
+	const request = "この紙を届けて";
+	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }), weigh({}));
+	r.structures.push(
+		JSON.stringify({
+			requests: [{ text: request, target: "紙", inputs: [], after: [] }],
+		}),
+	);
+	h!.state.steps.push({
+		text: "この依頼に対応できる候補が見つかりませんでした。",
+	});
+	const first = await h!.say(request);
+	expect(h!.dialogue.answerText(first.id)).toContain(
+		"候補が見つかりませんでした",
+	);
+	expect(h!.state.calls[0]!.tools).toEqual([]);
+	expect(h!.state.calls[0]!.messages.at(-1)!.content).toContain('"options":[]');
+	expect(h!.state.searchSlots).toEqual([]);
+	expect(h!.todos()).toEqual([]);
+
+	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));
+	await h!.say("別の絵を描いて", "queued");
+	expect(r.routes.at(-1)!.text).toBe("別の絵を描いて");
+});
+
+test("B shares the same deadline across structure, embedding and scoring, and drops a late score", async () => {
+	const embedSignals: AbortSignal[] = [];
+	const r = await start(
+		{ structureTimeoutMs: 150 },
+		{
+			beforeRouterEmbed: async (_texts, signal) => {
+				embedSignals.push(signal);
+			},
+		},
+	);
+	const request = "この資料に合う画像を作ってください";
+	const part = "画像を作ってください";
+	const late = Promise.withResolvers<void>();
+	const completed = Promise.withResolvers<void>();
+	let scoringSignal: AbortSignal | undefined;
+	r.structures.push(
+		JSON.stringify({
+			requests: [
+				{ text: part, target: "画像", inputs: ["この資料"], after: [] },
+			],
+		}),
+	);
+	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }), async (input, signal) => {
+		scoringSignal = signal;
+		await late.promise;
+		const answer = await weigh({ [IMAGE.id]: 0.95 })(input, signal);
+		completed.resolve();
+		return answer;
+	});
+	h!.state.steps.push({ text: "どの画像を作りますか？" });
+	const run = await h!.say(request);
+	expect(h!.dialogue.answerText(run.id)).toBe("どの画像を作りますか？");
+	expect(trace()).toMatchObject({ decided: null, error: "structure_timeout" });
+	expect(h!.state.calls[0]!.tools).toEqual([]);
+	expect(embedSignals).toHaveLength(2);
+	expect(scoringSignal).toBe(r.structureCalls[0]!.signal);
+	expect(embedSignals[1]).toBe(scoringSignal);
+	expect(scoringSignal?.aborted).toBe(true);
+	late.resolve();
+	await completed.promise;
+	expect(h!.state.searchSlots).toEqual([]);
+	expect(h!.todos()).toEqual([]);
+});
+
+test("cancelling a turn while B is running prevents a reply and ignores the late structure", async () => {
+	const r = await start();
+	const request = "画像を作って";
+	const started = Promise.withResolvers<void>();
+	const late = Promise.withResolvers<string>();
+	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }));
+	r.structures.push(() => {
+		started.resolve();
+		return late.promise;
+	});
+	const run = await h!.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: request,
+	});
+	await started.promise;
+	await h!.dialogue.cancel(run.id);
+	late.resolve(
+		JSON.stringify({
+			requests: [{ text: request, target: "画像", inputs: [], after: [] }],
+		}),
+	);
+	const ended = await h!.dialogue.waitForTerminal(run.id);
+	expect(ended?.status).toBe("cancelled");
+	expect(r.structureCalls[0]!.signal.aborted).toBe(true);
+	expect(r.routes).toHaveLength(1);
+	expect(h!.state.calls).toEqual([]);
+	expect(h!.todos()).toEqual([]);
+});
+
+test("an unavailable candidate selected by B cannot execute or offer tools to the reply", async () => {
+	const cards = [IMAGE, INSTANT];
+	const r = await start({}, { cards });
+	const request = "画像を作って";
+	r.structures.push(
+		JSON.stringify({
+			requests: [{ text: request, target: "画像", inputs: [], after: [] }],
+		}),
+	);
+	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }), async (input, signal) => {
+		cards.shift();
+		return weigh({ [IMAGE.id]: 0.95 })(input, signal);
+	});
+	h!.state.steps.push({ text: "画像の担当を利用できませんでした。" });
+	const run = await h!.say(request);
+	expect(h!.dialogue.answerText(run.id)).toBe(
+		"画像の担当を利用できませんでした。",
+	);
+	expect(trace()).toMatchObject({
+		decided: null,
+		error: "router_candidate_unavailable",
+	});
+	expect(h!.state.calls[0]!.tools).toEqual([]);
+	expect(h!.todos()).toEqual([]);
+});
+
+test("B's explicit clarification uses the existing question without a conversation call", async () => {
+	const r = await start();
+	r.scripts.push(weigh({ [IMAGE.id]: 0.45 }));
+	r.structures.push(
+		JSON.stringify({
+			clarify: {
+				question: "どの画像を作りますか？",
+				unhandled: ["画像を作って"],
+			},
+		}),
+	);
+	const first = await h!.say("画像を作って");
+	expect(h!.dialogue.answerText(first.id)).toContain("どの画像を作りますか？");
+	expect(h!.state.calls).toEqual([]);
+	expect(h!.todos()).toEqual([]);
+	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));
+	await h!.say("灯台の絵です", "queued");
+	expect(r.routes.at(-1)!.text).toBe("画像を作って\n灯台の絵です");
 });

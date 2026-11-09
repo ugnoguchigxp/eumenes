@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PropsWithChildren } from "react";
+import { StrictMode, type PropsWithChildren } from "react";
 import type { EumenesClient } from "../../../../client";
 import type { LibraryFeatures } from "../../../../api/domains/markdown/contracts";
 import { ApiError } from "../../../../client/transport";
@@ -25,7 +25,11 @@ const features: LibraryFeatures = {
 	maxAffectedItems: 500,
 	maxCopyBytes: 20971520,
 };
-function mount(enabled = true) {
+function mount(
+	enabled = true,
+	initialNamespaces = ["eumenes"],
+	strict = false,
+) {
 	const page = {
 		namespace: "eumenes",
 		path: "",
@@ -42,7 +46,12 @@ function mount(enabled = true) {
 	};
 	const client = {
 			identity: crypto.randomUUID(),
-			markdownFiles: vi.fn(async () => page),
+			markdownFiles: vi.fn(
+				async (
+					_input: { namespace: string; path: string },
+					_signal?: AbortSignal,
+				) => page,
+			),
 			markdownOperations: vi.fn(async () => [result]),
 			markdownManage: vi.fn(async () => result),
 			markdownCheck: vi.fn(async () => result),
@@ -51,19 +60,22 @@ function mount(enabled = true) {
 		setTargetRef = vi.fn(),
 		query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 	const hook = renderHook(
-		() =>
+		(namespaces) =>
 			useLibraryManagement({
 				client: client as unknown as EumenesClient,
 				features: enabled ? features : undefined,
-				namespaces: ["eumenes"],
+				namespaces,
 				visible: true,
 				selected: "local",
 				refresh,
 				setTargetRef,
 			}),
 		{
+			initialProps: initialNamespaces,
 			wrapper: ({ children }: PropsWithChildren) => (
-				<QueryClientProvider client={query}>{children}</QueryClientProvider>
+				<QueryClientProvider client={query}>
+					{strict ? <StrictMode>{children}</StrictMode> : children}
+				</QueryClientProvider>
 			),
 		},
 	);
@@ -85,6 +97,36 @@ test("old capabilities never probe extension reads or mutations", async () => {
 	expect(h.client.markdownFiles).not.toHaveBeenCalled();
 	expect(h.client.markdownOperations).not.toHaveBeenCalled();
 	expect(h.client.markdownManage).not.toHaveBeenCalled();
+});
+test("discovering the first namespace does not replace an explicit folder load with the root", async () => {
+	const h = mount(true, []);
+	const page = { ...h.page, path: "仕事/企画" };
+	let complete!: (page: typeof h.page) => void;
+	h.client.markdownFiles.mockImplementationOnce(
+		() =>
+			new Promise((resolve) => {
+				complete = resolve;
+			}),
+	);
+	let loading!: Promise<unknown>;
+	act(() => {
+		loading = h.result.current.local(
+			event("markdown-files", { namespace: "eumenes", path: page.path }),
+		);
+	});
+	h.rerender(["eumenes"]);
+	expect(h.client.markdownFiles).toHaveBeenCalledTimes(1);
+	expect(h.client.markdownFiles.mock.calls[0]?.[1]?.aborted).toBe(false);
+	await act(async () => {
+		complete(page);
+		await loading;
+	});
+	expect(h.result.current.files?.path).toBe(page.path);
+});
+test("StrictMode can load the initial root after the first effect is cancelled", async () => {
+	const h = mount(true, ["eumenes"], true);
+	await waitFor(() => expect(h.result.current.files).toEqual(h.page));
+	expect(h.client.markdownFiles.mock.calls.at(-1)?.[1]?.aborted).toBe(false);
 });
 test("changing page ETags invalidates the assembled selection instead of mixing snapshots", async () => {
 	const h = mount();

@@ -1,0 +1,1150 @@
+{
+  "choices": [
+    {
+      "turnId": "c539de5b-9be7-417f-a2a6-71b6bbf468ce",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.8789603858543721
+        },
+        {
+          "id": "web.search",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.11068777154304467
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.08354028921639822
+        },
+        {
+          "id": "web.service-search",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.029909766857610716
+        },
+        {
+          "id": "world.query",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.006025284027843866
+        },
+        {
+          "id": "object-recognition.manage",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.00518022811468422
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.004187912820250071
+        },
+        {
+          "id": "read_agents",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.002856918129961717
+        },
+        {
+          "id": "ui.compose",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.002666091235771949
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.001759762608767616
+        },
+        {
+          "id": "browser.capture",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.0015531801056473265
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "c345c14e-fb29-41a9-bcf5-aaddf6a7db6e",
+      "candidates": [
+        {
+          "id": "conversation.respond",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.48009936310382445
+        },
+        {
+          "id": "t1.cancel",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.2317499339671225
+        },
+        {
+          "id": "t1.redirect:web.search",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.15684672552503537
+        },
+        {
+          "id": "browser.capture",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.023144641360117436
+        },
+        {
+          "id": "web.research",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.015419982908109302
+        },
+        {
+          "id": "ui.compose",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.014652815233339287
+        },
+        {
+          "id": "ocr.manage",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.011403576510403544
+        },
+        {
+          "id": "t1.amend",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.008498441719681659
+        },
+        {
+          "id": "world.query",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.008181322657711071
+        },
+        {
+          "id": "object-recognition.manage",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.006181525791628494
+        },
+        {
+          "id": "t1.check",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.004526397374688417
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 12,
+          "similarity": null,
+          "probability": 0.004338938375922722
+        },
+        {
+          "id": "read_runs",
+          "rank": 13,
+          "similarity": null,
+          "probability": 0.003468456749430226
+        },
+        {
+          "id": "read_history",
+          "rank": 14,
+          "similarity": null,
+          "probability": 0.002982214552489809
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 15,
+          "similarity": null,
+          "probability": 0.0025571610538297042
+        }
+      ],
+      "selectedId": "none",
+      "route": "router",
+      "result": "success",
+      "recordedOutcome": "completed",
+      "routerMode": "on"
+    },
+    {
+      "turnId": "88b9076b-dc84-4dcb-8658-b112de04eac5",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.6138497783605527
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.3137034467233676
+        },
+        {
+          "id": "web.search",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.058721890293460095
+        },
+        {
+          "id": "browser.operate",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.03647169750895721
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.01114346644917351
+        },
+        {
+          "id": "world.query",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.010851507222283415
+        },
+        {
+          "id": "ocr.manage",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.004739327449285691
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.003908087027644566
+        },
+        {
+          "id": "ui.compose",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.0034115629410920267
+        },
+        {
+          "id": "read_runs",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0029396711951527733
+        },
+        {
+          "id": "compute.python",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.0024822388796921615
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "48f49166-5605-4ff2-9ad8-ef571fafe816",
+      "candidates": [
+        {
+          "id": "conversation.respond",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.41695586773588467
+        },
+        {
+          "id": "t1.cancel",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.21066000859165757
+        },
+        {
+          "id": "world.query",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.04405556283543578
+        },
+        {
+          "id": "ui.compose",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.03626029860685905
+        },
+        {
+          "id": "ocr.manage",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.018114105682328022
+        },
+        {
+          "id": "read_memory",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.015543831214844738
+        },
+        {
+          "id": "history.research",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.013831037496040432
+        },
+        {
+          "id": "web.research",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.009718720170818405
+        },
+        {
+          "id": "t1.amend",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.008330954155455018
+        },
+        {
+          "id": "read_history",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.008255716753401868
+        },
+        {
+          "id": "t1.check",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.0071966824815336
+        },
+        {
+          "id": "read_runs",
+          "rank": 12,
+          "similarity": null,
+          "probability": 0.004998526473996139
+        },
+        {
+          "id": "web.search",
+          "rank": 13,
+          "similarity": null,
+          "probability": 0.0043743074424359984
+        },
+        {
+          "id": "read_agents",
+          "rank": 14,
+          "similarity": null,
+          "probability": 0.003699879973167466
+        }
+      ],
+      "selectedId": "none",
+      "route": "router",
+      "result": "success",
+      "recordedOutcome": "completed",
+      "routerMode": "on"
+    },
+    {
+      "turnId": "cdaee265-1a64-40af-8b79-50ff17bb0e10",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.41622651517697357
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.1665336249892262
+        },
+        {
+          "id": "t1.cancel",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.13452147962152036
+        },
+        {
+          "id": "history.research",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.018852014438153496
+        },
+        {
+          "id": "t1.amend",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.01367984547937619
+        },
+        {
+          "id": "web.search",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.012831299778463728
+        },
+        {
+          "id": "t1.check",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.011477124024313333
+        },
+        {
+          "id": "world.query",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.008473673588797762
+        },
+        {
+          "id": "read_history",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.00730163295957845
+        },
+        {
+          "id": "ocr.manage",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0037436177853229567
+        },
+        {
+          "id": "read_agents",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.002369493942051191
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 12,
+          "similarity": null,
+          "probability": 0.0020622391463300037
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 13,
+          "similarity": null,
+          "probability": 0.0019014999760820833
+        },
+        {
+          "id": "compute.python",
+          "rank": 14,
+          "similarity": null,
+          "probability": 0.001354507057402408
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "58740120-b460-4aae-904f-1ad91a73d036",
+      "candidates": [
+        {
+          "id": "web.search",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.6724950554070289
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.218785768963819
+        },
+        {
+          "id": "web.research",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.027053235442219825
+        },
+        {
+          "id": "browser.operate",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.018143927566595938
+        },
+        {
+          "id": "docling.desk",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.014821938427543781
+        },
+        {
+          "id": "codex-tasks.manage",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.013240984933400776
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.009320619356005774
+        },
+        {
+          "id": "read_runs",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.008858050026266153
+        },
+        {
+          "id": "ocr.manage",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.0071856667883126455
+        },
+        {
+          "id": "world.query",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.004913733516492357
+        },
+        {
+          "id": "kanban.manage",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.004156008228279211
+        }
+      ],
+      "selectedId": "web.search",
+      "route": "router",
+      "result": "success",
+      "recordedOutcome": "completed",
+      "routerMode": "on"
+    },
+    {
+      "turnId": "aa4d74f0-4b59-45cb-b747-7a5e4294e2d8",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.8315640418510495
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.26193960149289003
+        },
+        {
+          "id": "web.search",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.020584391136557294
+        },
+        {
+          "id": "web.service-search",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.009903525621203883
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.0090210652525263
+        },
+        {
+          "id": "ui.compose",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.00846532623220742
+        },
+        {
+          "id": "history.research",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.004798353264797383
+        },
+        {
+          "id": "world.query",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.004162851151868774
+        },
+        {
+          "id": "read_history",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.0027115970798546234
+        },
+        {
+          "id": "pipeline.execute",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0026842429096377044
+        },
+        {
+          "id": "read_runs",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.002189421041035314
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "3dcb4412-b9d5-41c4-b431-f6a630a4e205",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.8665432568892859
+        },
+        {
+          "id": "web.search",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.14460429731622523
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.049108283655509274
+        },
+        {
+          "id": "web.service-search",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.017658248511397925
+        },
+        {
+          "id": "world.query",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.01657358483965924
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.007897494060331444
+        },
+        {
+          "id": "ui.compose",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.006047442106014043
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.00426821121833279
+        },
+        {
+          "id": "pipeline.execute",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.002397700209086907
+        },
+        {
+          "id": "browser.capture",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.002048225522105908
+        },
+        {
+          "id": "object-recognition.manage",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.0018828174912188047
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "8c96a823-93cf-4ca4-9adc-c34fd65009ba",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.9194982814846046
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.2222160758269797
+        },
+        {
+          "id": "web.search",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.015767281912350342
+        },
+        {
+          "id": "world.query",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.005661603157013583
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.005639149886296436
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.003041121776555698
+        },
+        {
+          "id": "pipeline.execute",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.0030325094427601502
+        },
+        {
+          "id": "ui.compose",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.0021688205990072363
+        },
+        {
+          "id": "compute.python",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.001778873351987699
+        },
+        {
+          "id": "browser.capture",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0015280049803950686
+        },
+        {
+          "id": "excalidraw.edit",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.0012084666972587016
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "76ff9bd9-ae8d-4871-8a81-e02e60bd361b",
+      "candidates": [
+        {
+          "id": "web.research",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.8580418081522577
+        },
+        {
+          "id": "conversation.respond",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.2031332571445635
+        },
+        {
+          "id": "t1.cancel",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.015843578777532716
+        },
+        {
+          "id": "web.search",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.006058051838480517
+        },
+        {
+          "id": "t1.amend",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.0037981753568294293
+        },
+        {
+          "id": "world.query",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.0037656541285852373
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.0033813957801185246
+        },
+        {
+          "id": "t1.check",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.002878454427949216
+        },
+        {
+          "id": "read_history",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.002473018440614131
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.0022611947177740427
+        },
+        {
+          "id": "read_agents",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.002007845079023247
+        },
+        {
+          "id": "pipeline.execute",
+          "rank": 12,
+          "similarity": null,
+          "probability": 0.0012057801740251314
+        },
+        {
+          "id": "compute.python",
+          "rank": 13,
+          "similarity": null,
+          "probability": 0.0009400254280785901
+        },
+        {
+          "id": "excalidraw.edit",
+          "rank": 14,
+          "similarity": null,
+          "probability": 0.0009000713166722974
+        }
+      ],
+      "selectedId": "web.research",
+      "route": "router",
+      "result": null,
+      "recordedOutcome": null,
+      "routerMode": "on"
+    },
+    {
+      "turnId": "f15fd0f0-c466-41d3-b6b9-599011d19545",
+      "candidates": [
+        {
+          "id": "conversation.respond",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.18474736511147538
+        },
+        {
+          "id": "t2.cancel",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.12860205522787227
+        },
+        {
+          "id": "t1.cancel",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.07436835670549272
+        },
+        {
+          "id": "timers.manage",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.04499762872595059
+        },
+        {
+          "id": "web.research",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.03615736640236057
+        },
+        {
+          "id": "model3d.studio",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.033886013740035144
+        },
+        {
+          "id": "claude-code.repair",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.030017451860014765
+        },
+        {
+          "id": "browser.operate",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.009487721379327812
+        },
+        {
+          "id": "read_memory",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.00893271110101772
+        },
+        {
+          "id": "browser.capture",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.006246458142394821
+        },
+        {
+          "id": "object-recognition.manage",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.006244731805287535
+        },
+        {
+          "id": "compute.python",
+          "rank": 12,
+          "similarity": null,
+          "probability": 0.0029699178185012016
+        },
+        {
+          "id": "t1.check",
+          "rank": 13,
+          "similarity": null,
+          "probability": 0.0024292132181319643
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 14,
+          "similarity": null,
+          "probability": 0.0022951079464941923
+        },
+        {
+          "id": "t1.amend",
+          "rank": 15,
+          "similarity": null,
+          "probability": 0.0018836298183397449
+        },
+        {
+          "id": "t2.check",
+          "rank": 16,
+          "similarity": null,
+          "probability": 0.0015610846000593717
+        },
+        {
+          "id": "t2.amend",
+          "rank": 17,
+          "similarity": null,
+          "probability": 0.001328820495667874
+        }
+      ],
+      "selectedId": "none",
+      "route": "router",
+      "result": "success",
+      "recordedOutcome": "completed",
+      "routerMode": "on"
+    },
+    {
+      "turnId": "a0bcd636-06bc-4dde-9a8f-c033685701f1",
+      "candidates": [
+        {
+          "id": "conversation.respond",
+          "rank": 1,
+          "similarity": null,
+          "probability": 0.2976205434521299
+        },
+        {
+          "id": "t2.cancel",
+          "rank": 2,
+          "similarity": null,
+          "probability": 0.23846151307198665
+        },
+        {
+          "id": "web.search",
+          "rank": 3,
+          "similarity": null,
+          "probability": 0.07547933579063465
+        },
+        {
+          "id": "t1.cancel",
+          "rank": 4,
+          "similarity": null,
+          "probability": 0.04022518022013191
+        },
+        {
+          "id": "ui.compose",
+          "rank": 5,
+          "similarity": null,
+          "probability": 0.02167780273412749
+        },
+        {
+          "id": "t2.amend",
+          "rank": 6,
+          "similarity": null,
+          "probability": 0.0201507110102779
+        },
+        {
+          "id": "t2.check",
+          "rank": 7,
+          "similarity": null,
+          "probability": 0.013062473376868647
+        },
+        {
+          "id": "web.research",
+          "rank": 8,
+          "similarity": null,
+          "probability": 0.012289933863532863
+        },
+        {
+          "id": "t1.amend",
+          "rank": 9,
+          "similarity": null,
+          "probability": 0.010663098294892918
+        },
+        {
+          "id": "ocr.manage",
+          "rank": 10,
+          "similarity": null,
+          "probability": 0.009824748684199885
+        },
+        {
+          "id": "codex-tasks.manage",
+          "rank": 11,
+          "similarity": null,
+          "probability": 0.006569246894052179
+        },
+        {
+          "id": "t1.check",
+          "rank": 12,
+          "similarity": null,
+          "probability": 0.005943358629707665
+        },
+        {
+          "id": "read_history",
+          "rank": 13,
+          "similarity": null,
+          "probability": 0.003973537714944338
+        },
+        {
+          "id": "browser.operate",
+          "rank": 14,
+          "similarity": null,
+          "probability": 0.0032434353751068686
+        },
+        {
+          "id": "world.query",
+          "rank": 15,
+          "similarity": null,
+          "probability": 0.0031978606844913805
+        },
+        {
+          "id": "collaboration.pipeline",
+          "rank": 16,
+          "similarity": null,
+          "probability": 0.0020890496297785452
+        },
+        {
+          "id": "markdown.collaborate",
+          "rank": 17,
+          "similarity": null,
+          "probability": 0.0019761855936339203
+        }
+      ],
+      "selectedId": "none",
+      "route": "router",
+      "result": "success",
+      "recordedOutcome": "completed",
+      "routerMode": "on"
+    }
+  ],
+  "cards": [
+    {
+      "id": "web.research",
+      "kind": "dedicated",
+      "name": "詳しいWeb調査",
+      "description": "複数資料の本文を読み比べ、条件・制約・例外・共通点・相違点・不明点を検証する調査を担当する。複数の項目を比較表に整理し、出典リンク付きの調査報告を作る。結果をタイトル付きMarkdown文書として一時ファイルと利用可能なDoclingのEumenes専用領域へ保存するところまで、この担当が一つの調査として行う",
+      "useWhen": [
+        "複数の公式資料・一次資料を照合し、複数の論点の条件・制約・例外・限界を比較してほしい",
+        "相反する説明の根拠や反証を調べ、分からない点を明記した結論を得たい",
+        "調べた内容を比較表や出典付き報告としてまとめ、Markdown文書に保存してほしい"
+      ],
+      "avoidWhen": [
+        "定義・人物・指定URLの一項目など短い事実確認",
+        "専用担当で完結する天気・株価・ニュースの取得",
+        "既存文書の変更、公開、他者への送信"
+      ],
+      "examples": [
+        "自治体の防災計画を公式資料で比較し、対象者と発動条件の違いを根拠付きで整理して",
+        "この技術の性能について食い違う主張を一次資料で検証し、成立条件と分からない点をまとめて",
+        "人口減少の原因について競合する説明と反証を調べて"
+      ],
+      "operation": "task",
+      "minImpact": "create",
+      "highImpact": false,
+      "requiresApproval": false,
+      "enabled": true,
+      "version": 7,
+      "revisionId": "toolchain:web.research@7",
+      "updatedAt": null,
+      "embeddingText": "詳しいWeb調査: 複数資料の本文を読み比べ、条件・制約・例外・共通点・相違点・不明点を検証する調査を担当する。複数の項目を比較表に整理し、出典リンク付きの調査報告を作る。結果をタイトル付きMarkdown文書として一時ファイルと利用可能なDoclingのEumenes専用領域へ保存するところまで、この担当が一つの調査として行う\n複数の公式資料・一次資料を照合し、複数の論点の条件・制約・例外・限界を比較してほしい\n相反する説明の根拠や反証を調べ、分からない点を明記した結論を得たい\n調べた内容を比較表や出典付き報告としてまとめ、Markdown文書に保存してほしい\n自治体の防災計画を公式資料で比較し、対象者と発動条件の違いを根拠付きで整理して\nこの技術の性能について食い違う主張を一次資料で検証し、成立条件と分からない点をまとめて\n人口減少の原因について競合する説明と反証を調べて",
+      "embeddingPassages": [
+        "詳しいWeb調査: 複数資料の本文を読み比べ、条件・制約・例外・共通点・相違点・不明点を検証する調査を担当する。複数の項目を比較表に整理し、出典リンク付きの調査報告を作る。結果をタイトル付きMarkdown文書として一時ファイルと利用可能なDoclingのEumenes専用領域へ保存するところまで、この担当が一つの調査として行う",
+        "複数の公式資料・一次資料を照合し、複数の論点の条件・制約・例外・限界を比較してほしい",
+        "相反する説明の根拠や反証を調べ、分からない点を明記した結論を得たい",
+        "調べた内容を比較表や出典付き報告としてまとめ、Markdown文書に保存してほしい",
+        "自治体の防災計画を公式資料で比較し、対象者と発動条件の違いを根拠付きで整理して",
+        "この技術の性能について食い違う主張を一次資料で検証し、成立条件と分からない点をまとめて",
+        "人口減少の原因について競合する説明と反証を調べて"
+      ],
+      "routerText": "詳しいWeb調査: 複数資料の本文を読み比べ、条件・制約・例外・共通点・相違点・不明点を検証する調査を担当する。複数の項目を比較表に整理し、出典リンク付きの調査報告を作る。結果をタイトル付きMarkdown文書として一時ファイルと利用可能なDoclingのEumenes専用領域へ保存するところまで、この担当が一つの調査として行う（複数の公式資料・一次資料を照合し、複数の論点の条件・制約・例外・限界を比較してほしい／相反する説明の根拠や反証を調べ、分からない点を明記した結論を得たい）"
+    },
+    {
+      "id": "web.search",
+      "kind": "general",
+      "name": "Web検索",
+      "description": "公開Webの一つの事実・一つのページの内容を確認して、その場で短い回答と出典リンクを返す。用語の意味、名称、所在地、日付、受付時間、仕様の一項目を調べる単発の確認を担当する",
+      "useWhen": [
+        "公開Webで一つの事実を確認し、その場で短い出典付き回答を受け取りたい",
+        "用語の意味・正式名称・所在地・日付など一項目を調べたい",
+        "指定した一つのページで一項目の情報を確かめたい"
+      ],
+      "avoidWhen": [
+        "ニュースの整理",
+        "複数資料の比較",
+        "天気予報・株価など、専用の担当がある事柄",
+        "複数論点の比較表や調査報告の文書を作成・保存する依頼"
+      ],
+      "examples": [
+        "国立国会図書館の所在地を公式サイトで確認して",
+        "この関数の返り値を公式ドキュメントで調べ、リンクを添えて短く教えて",
+        "このページに載っている受付時間を確認して"
+      ],
+      "operation": "research",
+      "minImpact": null,
+      "highImpact": null,
+      "requiresApproval": null,
+      "enabled": true,
+      "version": 10,
+      "revisionId": "toolchain:web.search@10",
+      "updatedAt": null,
+      "embeddingText": "Web検索: 公開Webの一つの事実・一つのページの内容を確認して、その場で短い回答と出典リンクを返す。用語の意味、名称、所在地、日付、受付時間、仕様の一項目を調べる単発の確認を担当する\n公開Webで一つの事実を確認し、その場で短い出典付き回答を受け取りたい\n用語の意味・正式名称・所在地・日付など一項目を調べたい\n指定した一つのページで一項目の情報を確かめたい\n国立国会図書館の所在地を公式サイトで確認して\nこの関数の返り値を公式ドキュメントで調べ、リンクを添えて短く教えて\nこのページに載っている受付時間を確認して",
+      "embeddingPassages": [
+        "Web検索: 公開Webの一つの事実・一つのページの内容を確認して、その場で短い回答と出典リンクを返す。用語の意味、名称、所在地、日付、受付時間、仕様の一項目を調べる単発の確認を担当する",
+        "公開Webで一つの事実を確認し、その場で短い出典付き回答を受け取りたい",
+        "用語の意味・正式名称・所在地・日付など一項目を調べたい",
+        "指定した一つのページで一項目の情報を確かめたい",
+        "国立国会図書館の所在地を公式サイトで確認して",
+        "この関数の返り値を公式ドキュメントで調べ、リンクを添えて短く教えて",
+        "このページに載っている受付時間を確認して"
+      ],
+      "routerText": "Web検索: 公開Webの一つの事実・一つのページの内容を確認して、その場で短い回答と出典リンクを返す。用語の意味、名称、所在地、日付、受付時間、仕様の一項目を調べる単発の確認を担当する（公開Webで一つの事実を確認し、その場で短い出典付き回答を受け取りたい／用語の意味・正式名称・所在地・日付など一項目を調べたい）"
+    }
+  ],
+  "scope": "12 submitted dialogue turns; conversation run lists also include internal continuations, which are retained for usage correlation."
+}

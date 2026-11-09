@@ -9,7 +9,7 @@ import { registerJobs } from "./jobs";
 import { collectDocuments, publishDocument } from "./documents";
 import { end, forget, notice, reconcile } from "./lifecycle";
 import { collectWeb } from "./web";
-import { reportInTransaction, viewInTransaction } from "./view";
+import { viewInTransaction } from "./view";
 
 const log = getLogger("pursuit");
 export function createPursuit(deps: PursuitDeps) {
@@ -178,7 +178,6 @@ export function createPursuit(deps: PursuitDeps) {
 	};
 	return {
 		task,
-		reportInTransaction,
 		documentSourceInTransaction(
 			db: Database,
 			documentId: string,

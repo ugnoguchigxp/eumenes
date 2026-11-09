@@ -1,0 +1,185 @@
+{
+  "caseId": "performance-museum",
+  "part": "start",
+  "startedAt": "2026-11-08T09:06:32.643Z",
+  "finishedAt": "2026-11-08T09:06:35.286Z",
+  "exitCode": 0,
+  "conversationId": "research-routing-live-20261108-museum",
+  "run": {
+    "id": "3dcb4412-b9d5-41c4-b431-f6a630a4e205",
+    "agentTaskId": null,
+    "requestId": "02f15734-502e-499f-8db0-77136dd0f44b",
+    "conversationId": "research-routing-live-20261108-museum",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 2,
+    "inputMessageId": "6e4c4a7c-3342-425b-a961-424c2442eaad",
+    "answerMessageId": "fa1f3095-e876-48a1-92ef-a71165c819ee",
+    "announcement": "「詳しいWeb調査」に頼みます。",
+    "error": null,
+    "jobId": "920291ee-1daf-4033-a4a2-861aefe7ed3c",
+    "deadlineAt": "2026-11-08T09:09:32.732Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-08T09:06:32.732Z",
+    "updatedAt": "2026-11-08T09:06:34.658Z"
+  },
+  "newPursuitIds": [
+    "aa7a93ad-3142-491a-9042-21bf1389f84d"
+  ],
+  "selections": {
+    "items": [
+      {
+        "id": "c24b54cd-cff6-49fc-b721-462e8e456e6b",
+        "runId": "3dcb4412-b9d5-41c4-b431-f6a630a4e205",
+        "conversationId": "research-routing-live-20261108-museum",
+        "utteranceId": null,
+        "requestId": "02f15734-502e-499f-8db0-77136dd0f44b",
+        "retrieval": "hybrid",
+        "candidates": [
+          {
+            "toolchainId": "web.research",
+            "revisionId": "toolchain:web.research@7",
+            "functionName": "web_research",
+            "rank": 1,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.search",
+            "revisionId": "toolchain:web.search@10",
+            "functionName": "web_search",
+            "rank": 2,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "web.service-search",
+            "revisionId": "toolchain:web.service-search@5",
+            "functionName": "service_search",
+            "rank": 3,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "world.query",
+            "revisionId": "toolchain:world.query@8",
+            "functionName": "world_query",
+            "rank": 4,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "markdown.collaborate",
+            "revisionId": "toolchain:markdown.collaborate@4",
+            "functionName": "markdown_edit",
+            "rank": 5,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "ui.compose",
+            "revisionId": "toolchain:ui.compose@11",
+            "functionName": "ui_create",
+            "rank": 6,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "collaboration.pipeline",
+            "revisionId": "toolchain:collaboration.pipeline@2",
+            "functionName": "collaborate_pipeline",
+            "rank": 7,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "pipeline.execute",
+            "revisionId": "toolchain:pipeline.execute@2",
+            "functionName": "execute_pipeline",
+            "rank": 8,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "browser.capture",
+            "revisionId": "toolchain:browser.capture@6",
+            "functionName": "browser_capture",
+            "rank": 9,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          },
+          {
+            "toolchainId": "object-recognition.manage",
+            "revisionId": "toolchain:object-recognition.manage@2",
+            "functionName": "object_recognition",
+            "rank": 10,
+            "ftsRank": null,
+            "similarity": null,
+            "fromHistory": false
+          }
+        ],
+        "historyRefs": [],
+        "decision": "toolchain",
+        "toolchainId": "web.research",
+        "toolchainRevisionId": "toolchain:web.research@7",
+        "functionName": "web_research",
+        "request": "「詳しいWeb調査」（web_research / Pursuit）に依頼してください。東京国立博物館 https://www.tnm.jp/ と国立科学博物館 https://www.kahaku.go.jp/ の公式資料から、常設展示の写真撮影・フラッシュ・三脚・自撮り棒の扱いを比較してください。展示ごとの例外と、本文で確認できない項目も書いてください。見出しと比較表、出典リンクのある日本語Markdown報告を文書として保存するところまで進めてください。共同編集の担当への切り替えは不要です。短い報告で十分です。",
+        "taskId": null,
+        "outcome": null,
+        "outcomeCode": null,
+        "recipe": null,
+        "durationMs": null,
+        "createdAt": 1794128794652,
+        "settledAt": null
+      }
+    ],
+    "nextCursor": null
+  },
+  "todos": {
+    "revision": 1794128794652,
+    "data": {
+      "rows": [
+        {
+          "id": "45a70196-7e5b-470d-b0b0-f174370117da",
+          "request": "「詳しいWeb調査」（web_research / Pursuit）に依頼してください。東京国立博物館 https://www.tnm.jp/ と国立科学博物館 https://www.kahaku.go.jp/ の公式資料から、常設展示の写真撮影・フラッシュ・三脚・自撮り棒の扱いを比較してください。展示ごとの例外と、本文で確認できない項目も書いてください。見出しと比較表、出典リンクのある日本語Markdown報告を文書として保存するところまで進めてください。共同編集の担当への切り替えは不要です。短い報告で十分です。",
+          "status": "todo",
+          "outcome": null,
+          "summary": null,
+          "pipeline": false,
+          "archived": false,
+          "updatedAt": "2026-11-08T09:06:34.652Z"
+        }
+      ],
+      "counts": {
+        "todo": 1,
+        "archived": 0
+      },
+      "total": 1,
+      "state": "active",
+      "pageIndex": 0,
+      "pageSize": 50
+    }
+  },
+  "latestAssistant": {
+    "id": "fa1f3095-e876-48a1-92ef-a71165c819ee",
+    "conversationId": "research-routing-live-20261108-museum",
+    "role": "assistant",
+    "text": "「詳しいWeb調査」に頼みます。",
+    "createdAt": "2026-11-08T09:06:34.658Z",
+    "runId": "3dcb4412-b9d5-41c4-b431-f6a630a4e205"
+  }
+}

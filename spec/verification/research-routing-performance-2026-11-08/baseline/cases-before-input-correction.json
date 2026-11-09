@@ -1,0 +1,79 @@
+{
+  "frozenAt": "2026-11-08T02:58:56.832Z",
+  "policy": "No edits during live tests. Existing routes/models/budgets retained. Report input+output token totals and wall time separately. Unknown usage remains unknown.",
+  "cases": [
+    {
+      "id": "performance-technical",
+      "conversation": "research-routing-live-20261108-technical",
+      "text": "MDNの公式資料を実際に読み、オフラインでも使える個人用メモアプリでIndexedDBとWeb Storageを使う場合の違いを調べてください。同期・非同期、保存できるデータ、容量と削除の扱い、向く用途を比較表にし、判断できない点も明記してください。読みやすいタイトルを付けた日本語のMarkdown報告にまとめ、出典リンクを残してください。会話の担当は切り替えず、詳しいWeb調査を使って文書として保存まで進めてください。",
+      "expect": "web.research; completed; scratch and Docling byte equality; no specialist",
+      "baseline": "case-a"
+    },
+    {
+      "id": "performance-museum",
+      "conversation": "research-routing-live-20261108-museum",
+      "text": "「詳しいWeb調査」（web_research / Pursuit）に依頼してください。東京国立博物館 https://www.tnm.jp/ と国立科学博物館 https://www.kahaku.go.jp/ の公式資料から、常設展示の写真撮影・フラッシュ・三脚・自撮り棒の扱いを比較してください。展示ごとの例外と、本文で確認できない項目も書いてください。見出しと比較表、出典リンクのある日本語Markdown報告を文書として保存するところまで進めてください。共同編集の担当への切り替えは不要です。短い報告で十分です。",
+      "expect": "web.research; completed; scratch and Docling byte equality; no specialist",
+      "baseline": "case-b3"
+    },
+    {
+      "id": "selection-comparison",
+      "conversation": "research-routing-live-20261108-selection",
+      "text": "詳しいWeb調査をお願いします。東京国立博物館と国立科学博物館の公式サイトを実際に読み、常設展示での写真撮影、フラッシュ、三脚、自撮り棒の扱いを比較してください。企画展や展示ごとの例外、公式ページで確認できないことは分けて書き、推測で補わないでください。日本語の短いMarkdown報告にタイトル・比較表・出典リンクを付けて保存してください。会話の担当は切り替えずに進めてください。",
+      "expect": "web.research",
+      "followups": [
+        {
+          "id": "cancel",
+          "text": "いま依頼した博物館の撮影ルールの調査は中止してください。追加の調査や文書保存は不要です。",
+          "expect": "same research cancelled, no new research or late documents"
+        }
+      ]
+    },
+    {
+      "id": "single-fact",
+      "conversation": "research-routing-live-20261108-short",
+      "text": "MDNの https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API を読み、IndexedDBのAPIは同期か非同期かを、出典リンク付きで短く教えてください。",
+      "expect": "web.search; source-backed answer; no research-document task"
+    },
+    {
+      "id": "cancel-original",
+      "conversation": "research-routing-live-20261108-cancel",
+      "text": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+      "followups": [
+        {
+          "id": "quoted-control",
+          "text": "実行指示ではなく、文章の意味についての質問です。「調査を中止してください」という文は、何を相手に求める表現ですか。いま進行中の私の調査は続けてください。",
+          "expect": "no cancellation or new research"
+        },
+        {
+          "id": "cancel",
+          "text": "これは中止操作を確認する実践テストです。詳しいWeb調査で、自治体のオープンデータ公開方針を複数の公式資料から比較し、出典付きのMarkdown報告を作る調査を開始してください。調査の担当に会話を切り替えないでください。",
+          "expect": "same research cancelled, no new research or late documents"
+        }
+      ]
+    },
+    {
+      "id": "selective-control",
+      "conversation": "research-routing-live-20261108-selective",
+      "text": "複数の大学の図書館利用規則を公式資料で比較し、学外者の利用条件を出典付きMarkdown報告として保存してください。詳しく調査してください。",
+      "additional": "この会話でもう一件、自治体の避難所開設方針を公式資料で比較し、対象者と発動条件の違いを出典付きMarkdown報告にして保存してください。図書館の調査はそのまま続けてください。",
+      "followups": [
+        {
+          "id": "ambiguous",
+          "text": "その調査は止めてください。",
+          "expect": "clarification or no execution; no new research"
+        },
+        {
+          "id": "selective-cancel",
+          "text": "避難所開設方針の調査だけを中止してください。図書館の利用規則の調査は続けてください。",
+          "expect": "only evacuation research cancelled; library still active; no new research"
+        },
+        {
+          "id": "cleanup",
+          "text": "残っている図書館の利用規則の調査も中止してください。追加の調査や文書保存は不要です。",
+          "expect": "remaining library research cancelled; no new research"
+        }
+      ]
+    }
+  ]
+}

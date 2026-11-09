@@ -15,10 +15,12 @@ export type MarkdownResource = {
 	kind: "markdown-workspace";
 	revision: number;
 	current: MarkdownCurrent | null;
-	documents: { id: string; title: string }[];
+	preview?: MarkdownWorkspaceProps["preview"];
+	documents: MarkdownWorkspaceProps["documents"];
 	library: MarkdownLibraryEntry[];
 	libraryStatus?: "idle" | "loading" | "ready" | "error";
 	libraryHasMore?: boolean;
+	libraryNextCursor?: string | null;
 	namespaces?: string[];
 	capabilities?: MarkdownWorkspaceProps["capabilities"];
 	files?: MarkdownWorkspaceProps["files"];

@@ -27,6 +27,7 @@ const BACKENDS = [
 	"dots",
 	"image",
 	"ui-compositions",
+	"app-development",
 	"excalidraw",
 	"object-recognition",
 	"ocr",

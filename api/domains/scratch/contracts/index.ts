@@ -69,6 +69,8 @@ export type ScratchItem = {
 	origin: ScratchOrigin;
 	/** Who made it, as the conversation shows it (「利用者」, a toolchain's title). */
 	maker: string;
+	/** A backing file that is opened by its owner instead of the shared-file viewer. */
+	internal?: true;
 	width?: number;
 	height?: number;
 	/** Host-made reference data kept with an image (e.g. detected objects); never set by clients. */
@@ -84,6 +86,7 @@ export type ScratchPut = {
 	data: Uint8Array;
 	origin: ScratchOrigin;
 	maker: string;
+	internal?: true;
 	width?: number;
 	height?: number;
 	annotation?: ScratchItem["annotation"];

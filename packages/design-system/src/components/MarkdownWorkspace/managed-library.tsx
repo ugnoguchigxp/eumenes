@@ -9,14 +9,26 @@ import {
 	RefreshCw,
 } from "lucide-react";
 import { FolderNavigation } from "./folder-navigation";
-import { documentFolders } from "./file-tree";
+import { documentFolders, type FolderLocation } from "./file-tree";
 import { LibraryActionDialog } from "./library-action-dialog";
 import type { MarkdownWorkspaceProps } from "./types";
-import type { LibraryAction } from "./library-actions";
-import type { HeaderDeleteSelection } from "./library-types";
+import {
+	canMoveLibraryItems,
+	pathInFolder,
+	type LibraryAction,
+} from "./library-actions";
+import type {
+	HeaderDeleteSelection,
+	LibraryFiles,
+	LibraryItem,
+} from "./library-types";
+import { useLibraryMoveDrag, type LibraryMoveDrag } from "./library-move-drag";
+import type { RevealedDocument } from "./library-reveal";
 export function ManagedLibrary(
 	props: MarkdownWorkspaceProps & {
 		headerDelete?: HeaderDeleteSelection;
+		reveal?: RevealedDocument;
+		onBrowse?(): void;
 		localInput: boolean;
 		onEditLocal(id: string): void;
 		onEditRemote(id: string): void;
@@ -26,22 +38,33 @@ export function ManagedLibrary(
 	const files = props.files,
 		features = props.capabilities!.features!,
 		[ownSelection, setOwnSelection] = useState<string[]>([]),
-		[query, setQuery] = useState(""),
-		[work, setWork] = useState(false),
-		[action, setAction] = useState<LibraryAction | null>(null);
+		[search, setQuery] = useState(""),
+		[showWork, setWork] = useState(false),
+		[action, setAction] = useState<{
+			kind: LibraryAction;
+			files: LibraryFiles;
+			items: LibraryItem[];
+			initialPath?: string;
+		} | null>(null);
+	const work = props.reveal ? props.reveal.location === "work" : showWork;
+	const query = props.reveal ? "" : search;
+	const location =
+		typeof props.reveal?.location === "object" ? props.reveal.location : files;
 	const { selection, setSelection } = props.headerDelete ?? {
 		selection: ownSelection,
 		setSelection: setOwnSelection,
 	};
 	const folders = useMemo(
 		() =>
-			documentFolders([], props.namespaces ?? [], [
-				...(props.knownFolders ?? []),
-				...(files?.path
-					? [{ namespace: files.namespace, path: files.path }]
-					: []),
-			]),
-		[props.namespaces, props.knownFolders, files],
+			documentFolders(
+				[],
+				[
+					...(props.namespaces ?? []),
+					...(location ? [location.namespace] : []),
+				],
+				[...(props.knownFolders ?? []), ...(location?.path ? [location] : [])],
+			),
+		[props.namespaces, props.knownFolders, location],
 	);
 	const entries = files?.entries ?? [],
 		selected = entries.filter((e) => selection.includes(e.id)),
@@ -59,7 +82,33 @@ export function ManagedLibrary(
 				.toLocaleLowerCase()
 				.includes(query.toLocaleLowerCase()),
 		);
+	const moveDrag = useLibraryMoveDrag({
+		files,
+		features,
+		selected,
+		disabled: !!(
+			pending ||
+			uncertain.length ||
+			work ||
+			action ||
+			props.filesError ||
+			!props.onManage
+		),
+		onMove(source, items, destination) {
+			setAction({
+				kind: "move",
+				files: source,
+				items,
+				initialPath:
+					items.length === 1
+						? pathInFolder(items[0]!.path, destination)
+						: destination,
+			});
+		},
+	});
 	const changeFolder = (namespace: string, path: string) => {
+		props.onBrowse?.();
+		moveDrag.end();
 		setWork(false);
 		setSelection([]);
 		setQuery("");
@@ -87,10 +136,7 @@ export function ManagedLibrary(
 			action: "move",
 			label: "移動",
 			Icon: MoveRight,
-			enabled:
-				features.patch &&
-				selected.length > 0 &&
-				(selected.length === 1 || features.batch),
+			enabled: canMoveLibraryItems(selected, features),
 		},
 		{
 			action: "copy",
@@ -113,18 +159,16 @@ export function ManagedLibrary(
 		},
 	];
 	return (
-		<div className="ds-markdown-file-browser">
+		<div className="ds-markdown-file-browser" onDragEnd={moveDrag.end}>
 			<FolderNavigation
 				folders={folders}
-				selected={
-					work
-						? "work"
-						: files
-							? { namespace: files.namespace, path: files.path }
-							: "root"
-				}
+				dropTarget={moveDrag.target}
+				selected={work ? "work" : (location ?? "root")}
 				onSelect={(value) => {
 					if (value === "work") {
+						props.onBrowse?.();
+						moveDrag.end();
+						setQuery("");
 						setWork(true);
 						setSelection([]);
 						return;
@@ -135,38 +179,23 @@ export function ManagedLibrary(
 				}}
 			/>
 			<section className="ds-markdown-file-main" aria-label="ファイル一覧">
-				<nav className="ds-markdown-breadcrumb" aria-label="現在のフォルダ">
-					<span>Docling</span>
-					{files && (
-						<>
-							<button onClick={() => changeFolder(files.namespace, "")}>
-								{files.namespace}
-							</button>
-							{files.path
-								.split("/")
-								.filter(Boolean)
-								.map((part, i, parts) => (
-									<button
-										key={i}
-										onClick={() =>
-											changeFolder(
-												files.namespace,
-												parts.slice(0, i + 1).join("/"),
-											)
-										}
-									>
-										/ {part}
-									</button>
-								))}
-						</>
-					)}
-				</nav>
+				<LibraryBreadcrumb
+					location={
+						work && location
+							? { namespace: location.namespace, path: "" }
+							: location
+					}
+					dropTarget={moveDrag.target}
+					changeFolder={changeFolder}
+				/>
 				<div className="ds-markdown-file-heading">
 					<div>
 						<h2>
 							{work
 								? "作業用の文書"
-								: files?.path.split("/").at(-1) || files?.namespace || "文書"}
+								: location?.path.split("/").at(-1) ||
+									location?.namespace ||
+									"文書"}
 						</h2>
 						<span>
 							{work ? props.documents.length : entries.length}項目
@@ -179,14 +208,18 @@ export function ManagedLibrary(
 							aria-label="文書名・パスで検索"
 							placeholder="このフォルダーで検索"
 							value={query}
-							onChange={(e) => setQuery(e.target.value)}
+							onChange={(e) => {
+								props.onBrowse?.();
+								setWork(work);
+								setQuery(e.target.value);
+							}}
 						/>
 						<button
 							aria-label="ファイル一覧を更新"
 							disabled={pending}
 							onClick={() =>
-								files
-									? changeFolder(files.namespace, files.path)
+								location
+									? changeFolder(location.namespace, location.path)
 									: props.namespaces?.[0] &&
 										changeFolder(props.namespaces[0], "")
 							}
@@ -206,7 +239,14 @@ export function ManagedLibrary(
 								<button
 									key={b.action}
 									disabled={disabled || !b.enabled || !files}
-									onClick={() => setAction(b.action)}
+									onClick={() =>
+										files &&
+										setAction({
+											kind: b.action,
+											files,
+											items: b.action === "create-folder" ? [] : selected,
+										})
+									}
 								>
 									<b.Icon size={16} />
 									{b.label}
@@ -234,6 +274,7 @@ export function ManagedLibrary(
 					pending={pending}
 					limit={features.maxBatchItems || 100}
 					changeFolder={changeFolder}
+					moveDrag={moveDrag}
 				/>
 
 				{!work &&
@@ -243,19 +284,21 @@ export function ManagedLibrary(
 				{!work && files?.nextCursor && (
 					<button
 						disabled={pending}
-						onClick={() =>
-							props.onFiles?.(files.namespace, files.path, files.nextCursor!)
-						}
+						onClick={() => {
+							props.onBrowse?.();
+							props.onFiles?.(files.namespace, files.path, files.nextCursor!);
+						}}
 					>
 						続きを読み込む
 					</button>
 				)}
-				{files && action && (
+				{action && (
 					<LibraryActionDialog
 						{...props}
-						files={files}
-						action={action}
-						items={action === "create-folder" ? [] : selected}
+						files={action.files}
+						action={action.kind}
+						items={action.items}
+						initialPath={action.initialPath}
 						onClose={() => setAction(null)}
 						onEditCurrent={() => {
 							setAction(null);
@@ -266,5 +309,53 @@ export function ManagedLibrary(
 				)}
 			</section>
 		</div>
+	);
+}
+
+function LibraryBreadcrumb({
+	location,
+	dropTarget,
+	changeFolder,
+}: {
+	location?: FolderLocation;
+	dropTarget: LibraryMoveDrag["target"];
+	changeFolder(namespace: string, path: string): void;
+}) {
+	return (
+		<nav className="ds-markdown-breadcrumb" aria-label="現在のフォルダ">
+			<span>Docling</span>
+			{location && (
+				<>
+					<span>{location.namespace}</span>
+					<button
+						{...dropTarget({
+							namespace: location.namespace,
+							path: "",
+						})}
+						onClick={() => changeFolder(location.namespace, "")}
+					>
+						ルート
+					</button>
+					{location.path
+						.split("/")
+						.filter(Boolean)
+						.map((part, i, parts) => {
+							const path = parts.slice(0, i + 1).join("/");
+							return (
+								<button
+									key={path}
+									{...dropTarget({
+										namespace: location.namespace,
+										path,
+									})}
+									onClick={() => changeFolder(location.namespace, path)}
+								>
+									/ {part}
+								</button>
+							);
+						})}
+				</>
+			)}
+		</nav>
 	);
 }

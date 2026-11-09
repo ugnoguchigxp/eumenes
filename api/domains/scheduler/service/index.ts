@@ -136,6 +136,23 @@ export function createScheduler(
 			return "deferred";
 		}
 		const plan = planFire(s, at);
+		const targetInput = {
+			scheduleId: s.id,
+			scheduledAtMs: plan.scheduledAtMs,
+			payload: JSON.parse(s.targetPayloadJson),
+		};
+		const deferReason = target.deferReasonInTransaction?.(db, targetInput);
+		if (deferReason) {
+			setDeferReason(
+				db,
+				s.id,
+				/^[a-z][a-z0-9_]{0,79}$/.test(deferReason)
+					? deferReason
+					: "target_deferred",
+				at,
+			);
+			return "deferred";
+		}
 		const record = (
 			state: OccurrenceRecord["state"],
 			reason: string | null,
@@ -176,10 +193,8 @@ export function createScheduler(
 				db.exec("SAVEPOINT scheduler_materialize");
 				try {
 					const job = target.materializeInTransaction(db, {
-						scheduleId: s.id,
+						...targetInput,
 						occurrenceId,
-						scheduledAtMs: plan.scheduledAtMs,
-						payload: JSON.parse(s.targetPayloadJson),
 					});
 					db.exec("RELEASE scheduler_materialize");
 					record(
@@ -417,6 +432,8 @@ export function createScheduler(
 		createInTransaction,
 		pruneInTransaction,
 		async create(input: CreateSchedule): Promise<ScheduleDto> {
+			if (targets.get(input.target.kind)?.publicCreate === false)
+				throw new Error("invalid_unknown_target");
 			const created = await store.write((db) => createInTransaction(db, input));
 			wake();
 			return created;

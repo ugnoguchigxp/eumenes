@@ -4,6 +4,7 @@ import type { FormResource } from "./contracts";
 export const trialFormSource = "trial-form";
 /** Source of a saved work's form: submissions go to the host's answer route. */
 export const savedFormSource = "composition-form";
+const trialDefaults: FormResource["defaults"] = {};
 
 type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
@@ -64,7 +65,7 @@ export function trialPreview(definition: unknown): {
 			revision: 0,
 			submitLabel: "送信（試用）",
 			fields: form.fields as FormResource["fields"],
-			defaults: {},
+			defaults: trialDefaults,
 		},
 	};
 }

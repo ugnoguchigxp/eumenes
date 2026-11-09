@@ -1,6 +1,9 @@
 import { z } from "zod";
-import { editorDocumentSchema } from "../api/domains/markdown/contracts";
-import { libraryFeaturesSchema } from "../api/domains/markdown/contracts";
+import {
+	editorDocumentSchema,
+	libraryFeaturesSchema,
+	libraryUpdatedAt,
+} from "../api/domains/markdown/contracts";
 import { markdownLibraryClient } from "./markdown-library";
 import { callJson, json, type Transport } from "./transport";
 const entry = z.object({
@@ -10,6 +13,7 @@ const entry = z.object({
 	path: z.string(),
 	namespace: z.string(),
 	contentDigest: z.string(),
+	updatedAt: libraryUpdatedAt,
 });
 const archived = z.object({
 	entry,
