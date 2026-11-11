@@ -62,6 +62,9 @@ const schema = z.object({
 	EUMENES_HISTORY_TOOLS_ENABLED: flag(true),
 	EUMENES_WEB_RESEARCH_TOOLS_ENABLED: flag(true),
 	EUMENES_API_TOKEN: text,
+	EUMENES_CONTEXT_STILL_MCP_URL: text,
+	EUMENES_CONTEXT_STILL_MCP_TOKEN: text,
+	EUMENES_KNOWLEDGE_SELECTION_RESOURCE_ID: z.uuid().optional(),
 });
 
 export type Config = {
@@ -74,6 +77,8 @@ export type Config = {
 	origin: string;
 	/** Explicit credential only; Settings-independent resolution stays in auth-config. */
 	apiToken: string | undefined;
+	contextStill?: { url?: string; token?: string };
+	knowledgeSelectionResourceId?: string;
 	larmToken: string | undefined;
 	attitudeDatasetPath: string;
 	memoryJournalPath: string;
@@ -129,6 +134,11 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		port: v.EUMENES_PORT ?? 8787,
 		origin: v.EUMENES_ORIGIN ?? "http://127.0.0.1:5173",
 		apiToken: v.EUMENES_API_TOKEN,
+		contextStill: {
+			url: v.EUMENES_CONTEXT_STILL_MCP_URL,
+			token: v.EUMENES_CONTEXT_STILL_MCP_TOKEN,
+		},
+		knowledgeSelectionResourceId: v.EUMENES_KNOWLEDGE_SELECTION_RESOURCE_ID,
 		larmToken: resolveLarmToken(present),
 		attitudeDatasetPath:
 			v.EUMENES_ATTITUDE_DATASET ??

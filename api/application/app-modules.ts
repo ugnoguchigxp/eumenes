@@ -1,3 +1,5 @@
+import { registerKnowledge } from "./knowledge/routes";
+import type { Knowledge } from "./knowledge/service";
 import { registerRouterMemory } from "./toolchain/router-memory";
 import { registerAgency } from "./agency/routes";
 import {
@@ -116,6 +118,7 @@ export type AppServices = {
 		displayed: (id: string, notice: string) => Promise<void>;
 	};
 	dotsModule?: AppModule;
+	knowledge?: Knowledge;
 	capabilities?: Capabilities;
 	searchCheck?: import("./toolchain/toolchain-search-check").SearchCheck;
 	agents?: AgentRuntime;
@@ -201,6 +204,7 @@ export function appModules(services: AppServices): AppModule[] {
 				),
 		},
 		s.dotsModule,
+		s.knowledge && { mount: (app) => registerKnowledge(app, s.knowledge!) },
 		s.ocr && {
 			mount: (app) =>
 				registerOcr(

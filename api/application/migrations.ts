@@ -1,3 +1,4 @@
+import { migrations as knowledgeMigrations } from "eumenes-skill-smith/sqlite";
 import { migrations as appDevelopmentMigrations } from "../domains/app-development";
 import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
 import { migrations as pursuitCoreMigrations } from "eumenes-pursuit/sqlite";
@@ -186,6 +187,10 @@ const catalog: readonly Migration[] = [
 	...dialogueMigrations,
 	...voiceMigrations,
 	...queueMigrations,
+	...knowledgeMigrations.map((migration, i) => ({
+		...migration,
+		after: [i ? knowledgeMigrations[i - 1]!.id : "queue/0001-init"],
+	})),
 	...terminalsMigrations,
 	...shellMigrations,
 	...kanbanMigrations,

@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Settings } from "../../settings/contracts";
+import { routeToResource } from "./background-control";
 /** Control requests authorized by their host operation, independent of a dialogue parent. */
 export function createIndependentControls(
 	snapshotInTransaction: (db: Database) => Settings,
@@ -56,6 +57,7 @@ export function createIndependentControls(
 				maxOutputTokens: number;
 				attemptMs?: number;
 				route?: "subagent";
+				resourceId?: string;
 				structuredOutput?: boolean;
 			},
 		) {
@@ -74,7 +76,14 @@ export function createIndependentControls(
 			)
 				throw new Error("invalid_user_control");
 			const snapshot = structuredClone(snapshotInTransaction(db));
-			if (input.route !== "subagent") {
+			if (input.resourceId !== undefined) {
+				routeToResource(
+					snapshot,
+					input.resourceId,
+					input.subject,
+					"user_control_resource_unavailable",
+				);
+			} else if (input.route !== "subagent") {
 				snapshot.routes.llm.mode = "larm-only";
 				snapshot.routes.llm.cloudAllowed = false;
 			}

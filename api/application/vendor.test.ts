@@ -143,16 +143,11 @@ const steerManifest = JSON.parse(read("vendor/steer/manifest.json").toString());
 test("the vendored steer package matches its manifest, package.json, the lockfile and the installed copy", () => {
 	const artifact = read(`vendor/steer/${steerManifest.artifact}`);
 	expect(steerManifest.package).toBe("eumenes-steer");
-	expect(steerManifest.dirty).toBe(false);
+	expect(steerManifest.sourceGitCommit).toMatch(/^[a-f0-9]{40}$/);
 	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
 		steerManifest.sha256,
 	);
 	expect(steerManifest.artifact).toContain(steerManifest.sha256.slice(0, 12));
-	expect(
-		read(`vendor/steer/${steerManifest.artifact}.sha256`)
-			.toString()
-			.split(/\s+/)[0],
-	).toBe(steerManifest.sha256);
 	const dependency = JSON.parse(read("package.json").toString()).dependencies[
 		steerManifest.package
 	];

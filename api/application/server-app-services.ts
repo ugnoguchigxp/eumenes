@@ -5,6 +5,7 @@ import { registerDots } from "./work/dots-http";
 export function appServices(s: Services, secrets: readonly string[] = []) {
 	return {
 		agency: s.agency,
+		knowledge: s.knowledge,
 		capabilities: s.toolchain.capabilities,
 		searchCheck: s.searchCheck,
 		agents: s.toolchain.agents,

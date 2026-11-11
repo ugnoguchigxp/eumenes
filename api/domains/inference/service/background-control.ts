@@ -32,6 +32,8 @@ export function routeToResource(
 	snapshot: Settings,
 	resourceId: string,
 	taskId: string,
+	strictError?:
+		"background_resource_unavailable" | "user_control_resource_unavailable",
 ) {
 	const llm = snapshot.routes.llm;
 	const connectionOf = (id: string | null | undefined) => {
@@ -46,6 +48,7 @@ export function routeToResource(
 		llm.fallbackId = resourceId;
 		return;
 	}
+	if (strictError) throw new Error(strictError);
 	log.warn("inference.background_resource_unusable", { taskId });
 	const conversation =
 		llm.mode !== "larm-only" && llm.cloudAllowed
@@ -126,21 +129,16 @@ export function captureBackgroundControl(
 	}
 	const snapshot = deps.snapshot();
 	const selectedRoute = input.route;
-	if (typeof selectedRoute === "object" && selectedRoute.strict) {
-		const resource = snapshot.resources.find(
-			(r) => r.id === selectedRoute.resourceId && r.purpose === "llm",
-		);
-		const connection = snapshot.connections.find(
-			(c) => c.id === resource?.connectionId,
-		);
-		if (!resource || !connection?.enabled || !snapshot.routes.llm.cloudAllowed)
-			throw new Error("background_resource_unavailable");
-	}
-	if (input.route === undefined) {
+	if (selectedRoute === undefined) {
 		snapshot.routes.llm.mode = "larm-only";
 		snapshot.routes.llm.cloudAllowed = false;
-	} else if (input.route !== "conversation")
-		routeToResource(snapshot, input.route.resourceId, input.taskId);
+	} else if (selectedRoute !== "conversation")
+		routeToResource(
+			snapshot,
+			selectedRoute.resourceId,
+			input.taskId,
+			selectedRoute.strict ? "background_resource_unavailable" : undefined,
+		);
 	const requestId = deps.capture(db, subject, "llm", input.deadline, snapshot);
 	db.query(
 		"UPDATE inference_requests SET mode='control',output_limit=?,context_policy='exact',parents='[]' WHERE id=?",
