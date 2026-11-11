@@ -116,7 +116,7 @@ export function resolveSession(
 			!given.independent) ||
 		(given?.outputSchema !== undefined &&
 			sessionRole !== "main" &&
-			!(sessionRole === "auxiliary" && row.mode === "control")) ||
+			row.mode !== "control") ||
 		(given?.target !== undefined && sessionRole !== "main") ||
 		(given?.retainRequest !== undefined && sessionRole !== "main") ||
 		(sessionRole === "main" && row.mode !== "answer") ||

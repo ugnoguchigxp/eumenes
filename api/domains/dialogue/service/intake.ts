@@ -128,6 +128,28 @@ function recordInputInTransaction(
 	});
 }
 
+function generationPayload(
+	runId: string,
+	input: Accept,
+	specialistEpoch?: number,
+) {
+	if (specialistEpoch !== undefined)
+		return {
+			runId,
+			epoch: specialistEpoch,
+			...(input.guidanceLanguage
+				? { guidanceLanguage: input.guidanceLanguage }
+				: {}),
+		};
+	if (input.resume)
+		return {
+			runId,
+			toolchainRevisionId: input.resume.toolchainRevisionId,
+			interactionId: input.resume.interactionId,
+		};
+	return { runId };
+}
+
 /** Input acceptance: idempotent run creation, manual/voice submit, notices and the schedule target. */
 export function createIntake(deps: DialogueDeps) {
 	const { store, conversation, larm, queue, memory, clock, id } = deps;
@@ -221,15 +243,7 @@ export function createIntake(deps: DialogueDeps) {
 				: input.resume
 					? `toolchain-command:${runId}`
 					: runId,
-			payload: addressee
-				? { runId, epoch: addressee.epoch }
-				: input.resume
-					? {
-							runId,
-							toolchainRevisionId: input.resume.toolchainRevisionId,
-							interactionId: input.resume.interactionId,
-						}
-					: { runId },
+			payload: generationPayload(runId, input, addressee?.epoch),
 			subjectRef: runId,
 			lane: isSystemPrompt(input.sourceKind) ? "background" : "interactive",
 			resourceKey: "inference.llm",

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import type { SpecialistSet } from "../contracts";
+import { decodeSpecialistOutput } from "../service/specialist-output";
 import { specialistControl } from "../service/specialist-prompt";
 
 test("guidance instructions appear only for a turn that can use the tool", () => {
@@ -24,14 +25,55 @@ test("guidance instructions appear only for a turn that can use the tool", () =>
 		inputSchema: { type: "object" },
 	};
 	const instructions = specialistControl(set, [tool]).instructions;
-	expect(instructions).toContain("最初の行動として get_guidance を呼びます");
-	expect(instructions).toContain(
-		"追加情報を尋ねたりする前に、手順の候補を確認します",
-	);
-	expect(instructions).toContain("返ったSKILLは手順の候補として読みます");
-	expect(instructions).toContain("次に何をするかは担当が判断します");
+	expect(instructions).toContain("GUIDANCE_CANDIDATES");
+	expect(instructions).toContain("最後の利用者メッセージに全文");
+	expect(instructions).toContain("何を次に確認するかは担当が判断します");
 	expect(specialistControl(set).instructions).not.toContain("get_guidance");
 	expect(specialistControl(set, [tool], true).instructions).not.toContain(
 		"get_guidance",
 	);
+});
+
+test("the structured specialist reply retains two bounded sentences and rejects a third", () => {
+	const packet = {
+		action: "reply",
+		tool: null,
+		arguments: null,
+		forward: null,
+		stateUpdate: null,
+		text: { first: "版を確認します。", second: "設定も照合します。" },
+	};
+	expect(decodeSpecialistOutput(JSON.stringify(packet))).toEqual({
+		action: "reply",
+		text: "版を確認します。 設定も照合します。",
+	});
+	expect(() =>
+		decodeSpecialistOutput(
+			JSON.stringify({
+				...packet,
+				text: {
+					first: "版を確認します。 設定も照合します。",
+					second: "差分を報告します。",
+				},
+			}),
+		),
+	).toThrow();
+});
+
+test("the reply can quote an exact numbered Markdown heading and a version in two sentences", () => {
+	const packet = {
+		action: "reply",
+		tool: null,
+		arguments: null,
+		forward: null,
+		stateUpdate: null,
+		text: {
+			first: "まず「2. 報告」の字下げを確認してください。",
+			second: "CommonMark 0.31.2 の設定も照合します。",
+		},
+	};
+	expect(decodeSpecialistOutput(JSON.stringify(packet))).toEqual({
+		action: "reply",
+		text: packet.text.first + " " + packet.text.second,
+	});
 });

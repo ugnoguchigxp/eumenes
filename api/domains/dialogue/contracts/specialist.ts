@@ -242,8 +242,21 @@ type SpecialistWorkState = {
  * Application-implemented access to session toolchains and their domain work. Dialogue never
  * names a domain: everything goes through the binding's adapter.
  */
+export const guidanceLanguageSchema = z.enum(["ja", "en"]);
+export type GuidanceLanguage = z.infer<typeof guidanceLanguageSchema>;
+export type GuidanceCandidate = {
+	language: GuidanceLanguage;
+	name: string;
+	digest: string;
+	content: string;
+};
+
 export interface SpecialistPort {
 	guidance?: {
+		candidates(
+			tx: Database,
+			language?: GuidanceLanguage,
+		): readonly GuidanceCandidate[];
 		tool(
 			set: SpecialistSet,
 		): { id: string; description: string; inputSchema: unknown } | undefined;
@@ -253,6 +266,8 @@ export interface SpecialistPort {
 				sessionId: string;
 				bindingRevisionId: string;
 				revision: number;
+				language?: GuidanceLanguage;
+				report?: string;
 				deadline: number;
 				signal: AbortSignal;
 				assertCurrent(tx: Database): void;

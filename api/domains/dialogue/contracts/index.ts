@@ -2,12 +2,17 @@ import type { Database } from "bun:sqlite";
 export { agencyStatusSchema } from "./agency-status";
 import { z } from "zod";
 import type { DeliveryEmotion } from "../../delivery";
-import { addresseeSchema, runViewingSchema } from "./specialist";
+import {
+	addresseeSchema,
+	guidanceLanguageSchema,
+	runViewingSchema,
+} from "./specialist";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 const submitFields = z.object({
 	requestId: z.uuid(),
 	conversationId: z.string().min(1).max(120),
 	text: z.string().trim().max(8000),
+	guidanceLanguage: guidanceLanguageSchema.optional(),
 	presentation: z.enum(["conversation", "artifact"]).optional(),
 	attachmentIds: z
 		.array(z.uuid())

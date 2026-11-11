@@ -6,6 +6,8 @@ import {
 	createEumenesInference,
 	createSkillSmith,
 	digest,
+	fixedExplorationCandidate,
+	FIXED_EXPLORATION_REF,
 	type Authority,
 	type EumenesControl,
 	type ExecutionContext,
@@ -15,11 +17,20 @@ import {
 import { sqliteRepository } from "eumenes-skill-smith/sqlite";
 import { z } from "zod";
 import { getLogger } from "../../infrastructure/logger";
+import type {
+	GuidanceCandidate,
+	GuidanceLanguage,
+} from "../../domains/dialogue/contracts/specialist";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { QueueService } from "../../domains/queue";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
 
 const log = getLogger("knowledge");
+const languages = ["ja", "en"] as const;
+const candidates = languages.map((language): GuidanceCandidate => {
+	const { name, digest, content } = fixedExplorationCandidate(language);
+	return Object.freeze({ language, name, digest, content });
+});
 const text = z.string().trim().min(1).max(8000);
 const clause = z.strictObject({ id: z.string().min(1).max(160), text });
 const publicQuery = z.string().trim().min(1).max(512);
@@ -49,6 +60,10 @@ const guidanceTaskFields = {
 export const guidanceToolSchema = z.strictObject({
 	...guidanceTaskFields,
 	situation: situationSchema,
+	skillLanguage: z
+		.enum(languages)
+		.optional()
+		.describe("SKILLを受け取る言語。依頼の言語を使う。"),
 });
 export const submissionSchema = z.strictObject({
 	...guidanceTaskFields,
@@ -103,6 +118,8 @@ function guidanceRequest(
 	host: Pick<GuidanceRequest, "requestId" | "audience"> & {
 		environmentId: string;
 		deadlineAt: number;
+		skillLanguage?: GuidanceLanguage;
+		report?: string;
 	},
 ): GuidanceRequest {
 	return {
@@ -114,7 +131,15 @@ function guidanceRequest(
 			acceptance: input.acceptance,
 			constraints: input.constraints,
 			references: [],
-			...(input.situation ? { situation: input.situation } : {}),
+			...(host.skillLanguage ? { skillLanguage: host.skillLanguage } : {}),
+			...(input.situation
+				? {
+						situation: {
+							...input.situation,
+							...(host.report ? { report: host.report } : {}),
+						},
+					}
+				: {}),
 		},
 		audience: host.audience,
 		environment: { id: host.environmentId, capabilities: [], policy },
@@ -281,6 +306,8 @@ export function createKnowledge(options: {
 			sessionId: string;
 			bindingRevisionId: string;
 			revision: number;
+			language?: GuidanceLanguage;
+			report?: string;
 			deadline: number;
 			signal: AbortSignal;
 			assertCurrent(tx: Database): void;
@@ -304,6 +331,8 @@ export function createKnowledge(options: {
 			requestId: crypto.randomUUID(),
 			audience: "worker",
 			environmentId: context.bindingRevisionId,
+			skillLanguage: context.language ?? input.skillLanguage,
+			report: context.report,
 			// This lookup runs inside an interactive turn, independently of the build queue.
 			deadlineAt: Math.min(context.deadline, Date.now() + 8_000),
 		});
@@ -344,11 +373,17 @@ export function createKnowledge(options: {
 			kind: "ready" as const,
 			skill: delivery.skill,
 			...(delivery.exploration ? { exploration: true as const } : {}),
-			situation: input.situation,
+			situation: request.task.situation,
 		};
 	}
 
 	return {
+		explorationCandidates(tx: Database, language?: GuidanceLanguage) {
+			if (sqliteRepository.blocked(tx, FIXED_EXPLORATION_REF)) return [];
+			return language
+				? candidates.filter((candidate) => candidate.language === language)
+				: candidates;
+		},
 		submit,
 		get,
 		selectForSpecialist,

@@ -11,6 +11,7 @@ import {
 } from "../../agent-runtime";
 import type {
 	Addressee,
+	GuidanceLanguage,
 	AgencyLayerPort,
 	ConversationAgentPort,
 	Run,
@@ -49,6 +50,7 @@ export type SpecialistTurnPayload = {
 	runId: string;
 	epoch: number;
 	request?: string;
+	guidanceLanguage?: GuidanceLanguage;
 };
 export const PROMPT_TARGET_KIND = "dialogue.prompt";
 export const DEFAULT_DEADLINE_MS = RESEARCH_BUDGET.rootMilliseconds;
@@ -173,6 +175,7 @@ export interface Accept {
 	requestId: string;
 	conversationId: string;
 	text: string;
+	guidanceLanguage?: GuidanceLanguage;
 	presentation?: "conversation" | "artifact";
 	/** The toolchain a screen's form submit named: stored on the run, never offered to the main agent's selection. */
 	toolchainId?: string;

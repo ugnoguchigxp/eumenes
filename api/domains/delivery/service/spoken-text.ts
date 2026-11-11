@@ -3,6 +3,8 @@ const webUrl = /https?:\/\/[^\s<>"'、。！？\]）)]+/gi;
 const host =
 	/\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}(?::\d+)?(?:\/[^\s<>"'、。！？\]）)]*)?/gi;
 const inlineLink = /\[([^\]\n]+)\]\(<?https?:\/\/[^\n]*?>?\)/g;
+// A quoted Markdown list label is spoken as a number, without a sentence break.
+const quotedListNumber = /([「『`])([0-9]{1,9})[.](?:[ \t]+|(?=[」』`]))/g;
 const citation = /^\s*(?:ソース|出典|参考資料)\s*[:：](.*)$/;
 const withoutUrls = (text: string) =>
 	text.replace(webUrl, "").replace(host, "");
@@ -11,6 +13,7 @@ const withoutUrls = (text: string) =>
 export function spokenText(text: string): string {
 	return text
 		.replace(/出典\s*[:：][\s\S]*$/, "")
+		.replace(quotedListNumber, "$1$2番 ")
 		.split(/\r?\n/)
 		.map((line) => {
 			const source = citation.exec(line);

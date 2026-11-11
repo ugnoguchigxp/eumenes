@@ -1,17 +1,20 @@
 import { z } from "zod";
-import { systemContext } from "../../../infrastructure/system-context";
 import type { Database } from "bun:sqlite";
 import { stateProposalSchema } from "eumenes-collaboration";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import {
-	agentSystemMessage,
 	toolResultMessage,
 	type ControlContract,
 	type Receipt,
 } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
-import type { Run, SpecialistSet } from "../contracts";
+import {
+	guidanceLanguageSchema,
+	type GuidanceLanguage,
+	type Run,
+	type SpecialistSet,
+} from "../contracts";
 import {
 	byId,
 	insertSessionEvent,
@@ -31,23 +34,19 @@ import {
 import {
 	correctionMessage,
 	parseSpecialistAction,
-	specialistControl,
 	specialistViolations,
 	violationNames,
 	statefulSpecialistContract,
 	type SpecialistAction,
 } from "./specialist-prompt";
-import { viewedSpecialistTarget } from "./specialist-context";
-import { specialistObservation } from "./specialist-notices";
-import { sessionCourse, specialistTurnMessages } from "./specialist-memory";
+import { agentPolicy, isDocTool, runDocTool } from "./specialist-agent";
 import {
-	agentPolicy,
-	type AgentPolicy,
-	documentTools,
-	documentView,
-	isDocTool,
-	runDocTool,
-} from "./specialist-agent";
+	decodeSpecialistOutput,
+	SpecialistOutputError,
+	specialistOutputSchema,
+	specialistSingleSentenceOutputSchema,
+} from "./specialist-output";
+import { prepareSpecialistPrompt } from "./specialist-turn-prompt";
 import { settleSpecialistTurn } from "./specialist-settle";
 import {
 	collaborationSnapshot,
@@ -59,10 +58,6 @@ import {
 const log = getLogger("dialogue");
 
 const MAX_OUTPUT_TOKENS = 24_576;
-const HOST_EVENT_NOTICE = systemContext(
-	"dialogue.contexts.specialist-turn.host-observation",
-	{},
-);
 /** The longest repair hint of a refused operation that reaches the specialist. */
 const DETAIL_CHARS = 1000;
 /** A refusal that a retry does not fix: the request named nothing to change (spec §7.5). */
@@ -95,6 +90,15 @@ export type TurnInput = {
 	set: SpecialistSet;
 	control: ControlContract;
 	guidanceToolId?: string;
+	guidanceLanguage?: GuidanceLanguage;
+	guidanceReport?: string;
+	candidateDelivery?: {
+		acceptedAt: number;
+		workRevision: number;
+		kind: string;
+		skillDigest: string;
+		requestBytes: number;
+	};
 	messages: ChatMessage[];
 	/** Epoch ms the model calls and operations of this turn must finish by. */
 	deadline: number;
@@ -118,71 +122,6 @@ function failRun(
 	endRun(deps, tx, run, "failed", code);
 	traceFailure(deps, tx, run.id, "failed", code);
 	return { status: "stale", reason: code };
-}
-
-/**
- * The session's work document for this turn, read as its canonical text: whole, or an outline (then the agent
- * gets doc.view to read lines). Null when the binding names none or it cannot be read.
- */
-function turnDocument(
-	port: NonNullable<DialogueDeps["specialist"]>,
-	set: SpecialistSet,
-	workRef: string,
-	policy: AgentPolicy,
-	tx: Database,
-) {
-	const declared = set.agent.document;
-	const document = declared
-		? port.documentOf(set.adapterRef)?.readInTransaction(tx, workRef)
-		: null;
-	if (!declared || !document) return null;
-	return {
-		path: declared.path,
-		revision: document.revision,
-		title: document.title,
-		...documentView(document.text, policy.inlineBytes),
-		rejected: document.rejected,
-		inlineBytes: policy.inlineBytes,
-	};
-}
-
-function turnControl(
-	port: NonNullable<DialogueDeps["specialist"]>,
-	set: SpecialistSet,
-	document: ReturnType<typeof turnDocument>,
-	replyOnly: boolean,
-) {
-	const guidance =
-		document && !replyOnly ? port.guidance?.tool(set) : undefined;
-	return {
-		control: specialistControl(
-			set,
-			[
-				...documentTools(set, document?.outlined ?? false),
-				...(guidance ? [guidance] : []),
-			],
-			replyOnly,
-		),
-		...(guidance ? { guidanceToolId: guidance.id } : {}),
-	};
-}
-
-/** A host event is reference data, carried separately from the real user input. */
-function observedWork(
-	work: NonNullable<
-		ReturnType<
-			NonNullable<DialogueDeps["specialist"]>["workStateInTransaction"]
-		>
-	>,
-	hostEvent: unknown,
-) {
-	return hostEvent !== null
-		? {
-				...work,
-				current: { work: work.current, hostEvent },
-				context: { work: work.context, hostEvent },
-			}
-		: work;
 }
 
 function updatedTurn(
@@ -299,6 +238,38 @@ function stateReference(
 }
 
 /** The specialist turn: the user's utterance goes to the toolchain's specialist, never to the main model. */
+function logCandidateDelivery(input: TurnInput) {
+	if (!input.candidateDelivery) return;
+	const { acceptedAt, ...delivery } = input.candidateDelivery;
+	log.info("knowledge.specialist_candidate", {
+		...delivery,
+		durationMs: Date.now() - acceptedAt,
+	});
+}
+
+function specialistRepair(
+	input: TurnInput,
+	raw: string,
+	violations: Parameters<typeof correctionMessage>[1],
+	callsLeft: number,
+) {
+	const message = correctionMessage(raw, violations, callsLeft);
+	const singleSentence =
+		input.candidateDelivery &&
+		violations.some(
+			(issue) => "path" in issue && issue.path.startsWith("text."),
+		);
+	if (singleSentence)
+		message.content +=
+			"\n要点を first の一文にまとめ、second は null にします。原文の引用と観測値は正確に保ちます。";
+	return {
+		message,
+		outputSchema: singleSentence
+			? specialistSingleSentenceOutputSchema
+			: specialistOutputSchema,
+	};
+}
+
 export function createSpecialistTurnHandler(
 	deps: DialogueDeps,
 ): HandlerDefinition<SpecialistTurnPayload, TurnInput, TurnOutput> {
@@ -310,6 +281,7 @@ export function createSpecialistTurnHandler(
 			runId: z.string(),
 			epoch: z.number().int(),
 			request: z.string().max(8000).optional(),
+			guidanceLanguage: guidanceLanguageSchema.optional(),
 		}),
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
@@ -369,14 +341,9 @@ export function createSpecialistTurnHandler(
 			}
 			if (!transition(tx, run.id, run.revision, "running", clock()))
 				return { status: "stale", reason: "run_changed" };
-			const policy = agentPolicy(set);
-			const document = turnDocument(port, set, session.workRef, policy, tx);
-			const hostEvent = specialistObservation(deps, tx, run.id, session);
-			const tools = turnControl(port, set, document, hostEvent !== null);
 			return {
 				status: "ready",
 				input: {
-					...(hostEvent !== null ? { observation: true as const } : {}),
 					runId: run.id,
 					revision: (byId(tx, run.id) as Run).revision,
 					sessionId: session.id,
@@ -385,18 +352,16 @@ export function createSpecialistTurnHandler(
 					workRef: session.workRef,
 					conversationId: run.conversationId,
 					set,
-					...tools,
-					messages: specialistTurnMessages({
-						system: agentSystemMessage(tools.control),
-						utterance:
-							hostEvent !== null ? HOST_EVENT_NOTICE : input.message.text,
-						course: sessionCourse(deps, tx, session, run, policy),
-						work: observedWork(work, hostEvent),
-						viewing: viewedSpecialistTarget(deps, tx, run),
-						nowMs: Date.parse(clock()),
-						callsLeft: policy.maxModelCalls,
-						...(document ? { document } : {}),
-					}),
+					...prepareSpecialistPrompt(
+						deps,
+						tx,
+						run,
+						session,
+						set,
+						work,
+						input.message.text,
+						claim.payload.guidanceLanguage,
+					),
 					deadline: Date.now() + remaining,
 					limitMs: remaining,
 				},
@@ -409,6 +374,7 @@ export function createSpecialistTurnHandler(
 			const signal = AbortSignal.any([caller, timeout]);
 			return withLogContext({ runId: input.runId }, async () => {
 				try {
+					logCandidateDelivery(input);
 					return await runTurn(deps, input, signal);
 				} catch (error) {
 					if (timeout.aborted && !caller.aborted) {
@@ -449,6 +415,7 @@ export function createSpecialistTurnHandler(
 		const max = policy.maxModelCalls;
 		/** The current output was rejected once; a valid action resets it (one repair per output, D3). */
 		let repaired = false;
+		let replySchema: Record<string, unknown> = specialistOutputSchema;
 		/** An operation of this turn succeeded: the turn is not lost when its reply is. */
 		let applied = false;
 		/** Refusals per tool in this turn, against the tool's retries (spec §7.4). */
@@ -488,6 +455,7 @@ export function createSpecialistTurnHandler(
 				input.control,
 				{
 					sessionRole: "subagent",
+					...(input.candidateDelivery ? { outputSchema: replySchema } : {}),
 					taskId: input.sessionId,
 					agentSession: {
 						conversationId: input.conversationId,
@@ -502,7 +470,9 @@ export function createSpecialistTurnHandler(
 			let stateRefusal: string | null = null;
 			let stateIssues: ReturnType<typeof specialistViolations> | undefined;
 			try {
-				value = parseLlmJson(raw);
+				value = input.candidateDelivery
+					? decodeSpecialistOutput(raw)
+					: parseLlmJson(raw);
 				if (input.set.agent.collaborationState && !input.observation) {
 					const checked = await statefulAction(deps, input, signal, stillMine, {
 						value,
@@ -524,14 +494,16 @@ export function createSpecialistTurnHandler(
 					(input.set.agent.collaborationState && value !== undefined)
 				)
 					throw error;
+				if (error instanceof SpecialistOutputError) stateIssues = error.issues;
 				action = null;
 			}
 			if (!action || (input.observation && action.kind !== "reply")) {
 				const violations = action
 					? [{ path: "action", code: "host_event_reply_only" }]
-					: stateRefusal
-						? (stateIssues ?? [{ path: "stateUpdate", code: stateRefusal }])
-						: specialistViolations(value);
+					: (stateIssues ??
+						(stateRefusal
+							? [{ path: "stateUpdate", code: stateRefusal }]
+							: specialistViolations(value)));
 				log.warn("dialogue.specialist_output_rejected", {
 					reason: "invalid_contract",
 					repairAttempt: repaired ? 1 : 0,
@@ -544,10 +516,13 @@ export function createSpecialistTurnHandler(
 					);
 				}
 				repaired = true;
-				messages.push(correctionMessage(raw, violations, max - call));
+				const repair = specialistRepair(input, raw, violations, max - call);
+				messages.push(repair.message);
+				replySchema = repair.outputSchema;
 				continue;
 			}
 			repaired = false;
+			replySchema = specialistOutputSchema;
 			if (action.kind !== "invoke") return { receipts, action };
 			const lookup = action.tool === input.guidanceToolId;
 			// A lookup needs a following call to consume the result.
@@ -669,6 +644,8 @@ async function invoke(
 				sessionId: input.sessionId,
 				bindingRevisionId: input.set.bindingRevisionId,
 				revision,
+				language: input.guidanceLanguage,
+				report: input.guidanceReport,
 				deadline: input.deadline,
 				signal,
 				assertCurrent,
