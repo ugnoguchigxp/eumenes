@@ -16,7 +16,7 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { SpeechRouter } from "./speech";
 import type { AgencyCallIdentity } from "./llm-port";
 import type { AgencyStatePort } from "../../domains/dialogue";
-import type { SteerInboxPort } from "eumenes-agency/agenda";
+import type { SteeringInbox } from "eumenes-steer";
 export type AgencySettings = Settings["agency"];
 export type HostPersona = Pick<
 	Settings["general"],
@@ -88,7 +88,7 @@ export type AgencyHostDeps = {
 	 * The server's one steering inbox (eumenes-steer): words the user sends while a reply is written reach the reply's
 	 * next model call. Absent: they wait for a reply of their own.
 	 */
-	steering?: SteerInboxPort;
+	steering?: SteeringInbox;
 	/** Which capability a research ticket runs on (the revision id in the catalog); absent: the web research. */
 	researchRevision?(
 		catalog: ReadonlyArray<{

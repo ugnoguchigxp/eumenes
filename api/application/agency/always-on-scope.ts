@@ -1,15 +1,15 @@
 import {
 	createAgendaAgent,
-	createAgendaReplySteering,
 	defaultPersona,
 	speechIntervals,
+	type AgendaAddedWords,
 	type AgendaAgent,
-	type AgendaReplySteering,
 	type NoteRef,
 	type ReplyCall,
 	type SpeechIntervalSec,
 } from "eumenes-agency/agenda";
 import type { InputContext, LlmPort, LlmRequest } from "eumenes-agency";
+import { createAgendaSteering } from "./agenda-steer";
 import {
 	conversationPersona,
 	isAgendaSnapshot,
@@ -47,7 +47,7 @@ export type AgendaScope = {
 	revision: number;
 	agent: AgendaAgent;
 	/** Absent when the server made no steering inbox: words sent meanwhile wait for a reply of their own. */
-	steering: AgendaReplySteering | null;
+	steering: AgendaAddedWords | null;
 	tickets: AgendaResearchTicket[];
 	notes: AgendaNote[];
 	/** Results that came before the agent asked again for the item (after a restart): told when it does. */
@@ -199,12 +199,10 @@ export function createAgendaScope(input: {
 		...(restored ? { restore: restored.agent } : {}),
 	});
 	const steering = deps.steering
-		? createAgendaReplySteering({
+		? createAgendaSteering({
 				inbox: deps.steering,
 				read: input.text,
 				now,
-				// Replies stream to the user as they are written: the first answer stands.
-				holdsText: false,
 				targetPrefix: `agenda-reply:${id}:`,
 			})
 		: undefined;

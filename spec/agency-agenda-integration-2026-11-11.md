@@ -44,3 +44,7 @@
 - 利用者の TODO（会話内の仕事）を agent の観測にする旧の経路（`attachWork`）は、今回は接続しない（no-op。決定済み）。
 - 旧 always-on の記録は起動時に失効するが、その観測を保管した Memory の Record（`agency/observation`）と観測表は孤児として残る（決定済み。掃除は別途）。
 - 試験: `always-on.test.ts` ほか agency の4ファイルと `dialogue/test/steer-settle.test.ts`。既存の `action-kinds.test.ts`（task の報告リソース）は取込前から失敗している。
+
+## steer は Eumenes のもの（eumenes-agency 0.1.7）
+
+agency の配布物には steer を含めない（利用者、2026-11-11）。agency は返事の途中に足された言葉の受け口（`AgendaAddedWords`）と、返事の規則が読む印（`addedWordsLine`）だけを持つ。Eumenes は `api/application/agency/agenda-steer.ts` で、サーバーの eumenes-steer の受付箱（`vendor/steer`、5ba40df6）をこの受け口につなぐ。返事は書きながら流れるので、最後のモデル呼び出しの途中に届いた言葉は、その返事に取り込まず、会話の次の run が答える。

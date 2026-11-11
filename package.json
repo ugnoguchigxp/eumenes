@@ -51,7 +51,7 @@
 		"@playwright/mcp": "0.0.83",
 		"@tanstack/react-query": "5.101.0",
 		"bmp-ts": "1.0.9",
-		"eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.6-1575c3ad4fc5.tgz",
+		"eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.7-01ce0601a9ab.tgz",
 		"eumenes-collaboration": "./vendor/collaboration/eumenes-collaboration-0.4.0-ce0d56eedc6a.tgz",
 		"eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.3-be8c07de742b.tgz",
 		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.4-30721f30aa19.tgz",

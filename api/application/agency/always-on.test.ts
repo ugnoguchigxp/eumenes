@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { STEERED_MARK } from "eumenes-agency/agenda";
+import { ADDED_WORDS_MARK } from "eumenes-agency/agenda";
 import {
 	agendaFixture,
 	composeSay,
@@ -428,7 +428,7 @@ test("words sent while a reply is written reach its next model call and are answ
 		const second = seen[1]!;
 		const given = second.find((m) => m.content.includes("fixture steer words"));
 		expect(given?.role).toBe("user");
-		expect(given?.content).toStartWith(STEERED_MARK);
+		expect(given?.content).toStartWith(ADDED_WORDS_MARK);
 		// The words sent during the last call were not given: they get a reply of their own.
 		expect(second.some((m) => m.content.includes("fixture too late"))).toBe(
 			false,

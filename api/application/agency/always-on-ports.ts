@@ -5,7 +5,7 @@ import {
 	createAgendaReplyTools,
 	notesMentioned,
 	SHOW_NOTE,
-	type AgendaReplySteering,
+	type AgendaAddedWords,
 } from "eumenes-agency/agenda";
 import { agencyStatusSchema } from "../../domains/dialogue/contracts";
 import type {
@@ -132,7 +132,7 @@ export function createAgendaPorts(input: {
 		const hostNames = new Set(args.tools.tools.map((t) => t.name));
 		const offered = own.tools.filter((t) => !hostNames.has(t.name));
 		c.reply = { runId: run.runId, included: new Set(run.messageIds) };
-		let steer: ReturnType<AgendaReplySteering["begin"]> | null = null;
+		let steer: ReturnType<AgendaAddedWords["begin"]> | null = null;
 		try {
 			steer = c.steering?.begin(run.runId) ?? null;
 		} catch (error) {
