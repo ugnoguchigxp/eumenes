@@ -89,7 +89,7 @@ export function systemText(
 		Emotion: [agent.emotionRules],
 		Input: [systemContext("dialogue.contexts.system.input", {})],
 		Facts: [
-			systemContext("dialogue.contexts.system.talk-facts", {}),
+			agent.facts ?? systemContext("dialogue.contexts.system.talk-facts", {}),
 			systemContext("dialogue.contexts.system.image-history", {}),
 		],
 	};

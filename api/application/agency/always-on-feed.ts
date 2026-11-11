@@ -21,6 +21,8 @@ export function feedAgenda(input: {
 	forget(c: AgendaScope, refs: readonly string[]): void;
 	/** Shows notes the adopted reply `runId` showed (after the read). */
 	show(c: AgendaScope, noteIds: readonly string[], runId: string): void;
+	/** A reply is in the conversation: the exchange is complete (the profile writer reads it, behind the talk). */
+	exchanged(c: AgendaScope): void;
 }) {
 	const { deps, c, event, at } = input;
 	if (event.kind === "retracted") {
@@ -30,6 +32,7 @@ export function feedAgenda(input: {
 		return;
 	}
 	const shown: Array<[string, string[]]> = [];
+	let exchanged = false;
 	deps.store.read((db) => {
 		const source = deps.conversation.sourceInTransaction(db, event.sourceId);
 		if (
@@ -85,11 +88,13 @@ export function feedAgenda(input: {
 				c.agent.noteUsed(note, when);
 			// The exchange is processed: the plan sees it at once.
 			c.agent.infoChanged(at);
+			exchanged = true;
 		}
 		c.revision++;
 		c.touched = at;
 	});
 	for (const [runId, noteIds] of shown) input.show(c, noteIds, runId);
+	if (exchanged) input.exchanged(c);
 }
 
 type FeedHost = {

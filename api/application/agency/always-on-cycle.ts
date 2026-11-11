@@ -250,9 +250,10 @@ export async function collectAgendaResults(host: ResultHost) {
 			}
 			if (r.cancel) deps.state!.cancelInTransaction(db, r.rootId);
 			const taken = deps.state!.returnedInTransaction(db, r.rootId);
-			const good =
+			const done =
 				taken && (r.workStatus === "succeeded" || r.workStatus === "partial");
-			const note = good
+			// A result with nothing usable in it is a failure, not "done".
+			const note = done
 				? noteFromResult({
 						id: `n${crypto.randomUUID().slice(0, 8)}`,
 						ticket,
@@ -260,6 +261,7 @@ export async function collectAgendaResults(host: ResultHost) {
 						at: now(),
 					})
 				: null;
+			const good = note !== null;
 			const p = patchOf();
 			p.tickets = p.tickets.filter((t) => t.id !== ticket.id);
 			if (note) p.notes = keepNotes([...p.notes, note]);

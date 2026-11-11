@@ -60,6 +60,13 @@ export function attemptDuration(r: Request, source: Source) {
  */
 export const REASONING_ALLOWANCE_TOKENS = 10_000;
 
+/**
+ * Tokens added to the output limit of an independent control call that names its own reasoning level (the agency's
+ * structured calls): its caller's limit is for the visible output, and LARM counts the thinking in it. The agency's
+ * reference host adds the same 2,800 to every call; without it a 400-token utterance can be eaten by the thinking.
+ */
+export const INDEPENDENT_THINKING_HEADROOM_TOKENS = 2800;
+
 /** Provider options and bounded exchange correlation across language, delivery and synthesis. */
 export function callOptionsFor(
 	r: Request,
@@ -160,7 +167,12 @@ export function callOptionsFor(
 						Math.min(r.row.outputLimit || Infinity, r.outputLimit || Infinity) +
 						(thinksByDefault && !r.session?.readAhead
 							? REASONING_ALLOWANCE_TOKENS
-							: 0),
+							: r.session?.independent &&
+								  r.session.reasoning &&
+								  r.row.mode === "control" &&
+								  source === "larm"
+								? INDEPENDENT_THINKING_HEADROOM_TOKENS
+								: 0),
 				}
 			: {}),
 		...(r.row.attemptMs ? { attemptMs: r.row.attemptMs } : {}),

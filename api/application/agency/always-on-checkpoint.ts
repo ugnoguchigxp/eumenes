@@ -3,6 +3,7 @@ import type { AgencyHostDeps } from "./host-types";
 import {
 	agendaSources,
 	baseRef,
+	forgetProfile,
 	type AgendaNote,
 	type AgendaResearchTicket,
 } from "../../domains/dialogue";
@@ -44,6 +45,9 @@ export function createAgendaCheckpoints(input: {
 		const lost = c.notes.filter((n) => gone(n.refs));
 		const lostRefs = new Set(lost.map((n) => `note:${n.id}`));
 		c.agent.forget([...set, ...aliases, ...lostRefs]);
+		// The note goes back to before the words it read; a writer pass in flight is not kept.
+		c.profile = forgetProfile(c.profile, set) ?? c.profile;
+		c.forgetSeq++;
 		c.notes = c.notes.filter((n) => !lost.includes(n));
 		c.tickets = c.tickets.filter(
 			(t) =>

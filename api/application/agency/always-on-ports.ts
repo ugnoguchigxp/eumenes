@@ -3,8 +3,12 @@ import { runRespond, emotionName } from "eumenes-agency";
 import {
 	agendaReplyMessages,
 	createAgendaReplyTools,
+	dropRepeatedSentences,
 	notesMentioned,
+	READ_NOTE,
+	SET_QUIET,
 	SHOW_NOTE,
+	START_PREPARATION,
 	type AgendaAddedWords,
 } from "eumenes-agency/agenda";
 import { agencyStatusSchema } from "../../domains/dialogue/contracts";
@@ -13,12 +17,12 @@ import type {
 	AgentMessage,
 	ConversationAgentPort,
 } from "../../domains/dialogue/contracts";
-import { promptTime } from "../../domains/inference";
 import { getLogger } from "../../infrastructure/logger";
 import { currentInput, referencedInput } from "./input";
 import { agencyReplyParts } from "./system-context";
 import { deliveryEmotionOf } from "./speech";
 import {
+	agendaClock,
 	agendaInterval,
 	agendaReady,
 	knownOf,
@@ -28,6 +32,13 @@ import {
 import type { AgencyHostDeps } from "./host-types";
 
 const log = getLogger("agency");
+/** The calls a reply keeps in its history: the agenda's own tools. */
+const AGENDA_TOOL_NAMES: ReadonlySet<string> = new Set([
+	START_PREPARATION,
+	READ_NOTE,
+	SHOW_NOTE,
+	SET_QUIET,
+]);
 /** Tool calls a reply may add for the agenda's own tools (the host's read tools keep theirs). */
 const AGENDA_TOOL_CALLS = 3;
 /** What a reply left for the pump (its tool calls, the messages a model call took) is kept this many replies. */
@@ -75,6 +86,9 @@ export function createAgendaPorts(input: {
 		},
 		steeredInTransaction: (_db: Database, runId: string) =>
 			[...convs.values()].flatMap((c) => c.taken.get(runId) ?? []),
+		// A scope exists for every conversation the agenda has seen (no scope is made inside a prompt's transaction).
+		servesRepliesInTransaction: (_db: Database, conversationId: string) =>
+			convs.has(conversationId) && agendaReady(deps),
 		// What the reply was given, captured again at its adoption: gone means forgotten meanwhile.
 		replyInputInTransaction: (db: Database, runId: string) => {
 			const c = [...convs.values()].find((x) => x.given.has(runId));
@@ -100,11 +114,14 @@ export function createAgendaPorts(input: {
 		const citable = (ref: string) =>
 			ref.startsWith("memory:") || ref.startsWith("note:") || userIds.has(ref);
 		// The agent's state as the reply reads it, placed before the user's last message (the prompt's prefix stays).
+		// A reply to a notice or a work report asks the user nothing of its own: no question is offered.
+		const asks = run.messageIds.length > 0;
 		const built = agendaReplyMessages({
-			agent: c.agent,
+			agent: asks ? c.agent : { ...c.agent, askForReply: () => null },
 			known: knownOf(deps, at),
 			notes: c.notes.map(noteRef),
-			clock: promptTime(at).now,
+			profile: c.profile.markdown,
+			clock: agendaClock(at),
 			now: at,
 		});
 		const state = built.find(
@@ -121,6 +138,7 @@ export function createAgendaPorts(input: {
 		remember(c.given, run.runId, [
 			...knownOf(deps, at).map((k) => `memory:${k.id}`),
 			...c.notes.map((n) => `note:${n.id}`),
+			...c.profile.passes.flatMap((p) => p.sources),
 			...c.agent.view().items.flatMap((i) => i.refs.filter(citable)),
 		]);
 		const own = createAgendaReplyTools({
@@ -143,6 +161,7 @@ export function createAgendaPorts(input: {
 			});
 		}
 		let taken: string[] = [];
+		let ok = false;
 		try {
 			const reply = await runRespond({
 				messages,
@@ -172,16 +191,25 @@ export function createAgendaPorts(input: {
 						return own.call(call, signal);
 					},
 				},
-				maxToolCalls: Math.max(0, args.maxToolCalls) + AGENDA_TOOL_CALLS,
+				// Four calls in all, as the reference host allows (the host's own tools keep theirs on top).
+				maxToolCalls: Math.max(
+					AGENDA_TOOL_CALLS + 1,
+					Math.max(0, args.maxToolCalls) + AGENDA_TOOL_CALLS,
+				),
 				emotion: deps.settings.get().agency.emotion,
 				signal: args.signal,
 				onDelta: args.onDelta,
 			});
-			for (const id of notesMentioned(reply.text, c.notes.map(noteRef)))
+			// A reply that said something before a tool and again after says it once in the record.
+			const text = dropRepeatedSentences(reply.text);
+			for (const id of notesMentioned(text, c.notes.map(noteRef)))
 				c.agent.noteUsed(id, now());
 			remember(c.calls, run.runId, reply.calls);
-			return reply;
+			ok = true;
+			return { ...reply, text };
 		} finally {
+			// A reply that failed is news too: the plan looks again.
+			if (!ok) c.agent.infoChanged(now());
 			// The target is closed whatever happened (one inbox serves the whole server).
 			if (steer) taken = steer.end();
 			remember(c.taken, run.runId, taken);
@@ -207,6 +235,13 @@ export function createAgendaPorts(input: {
 			return {
 				text: reply.text,
 				ended: reply.ended,
+				...(c && args.run
+					? {
+							calls: reply.calls.filter((call) =>
+								AGENDA_TOOL_NAMES.has(call.name),
+							),
+						}
+					: {}),
 				...(reply.emotion
 					? { emotion: deliveryEmotionOf(emotionName(reply.emotion)) }
 					: {}),

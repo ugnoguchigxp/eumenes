@@ -6,6 +6,7 @@ const MARKDOWN_MAX = 8000;
 const SUMMARY_MAX = 240;
 
 type Result = {
+	status?: unknown;
 	summary?: unknown;
 	answer?: unknown;
 	document?: { title?: unknown } | null;
@@ -27,7 +28,7 @@ export function noteFromResult(input: {
 	ticket: AgendaResearchTicket;
 	summary: string;
 	at: number;
-}): AgendaNote {
+}): AgendaNote | null {
 	let result: Result | null = null;
 	try {
 		const parsed: unknown = JSON.parse(input.summary);
@@ -36,7 +37,10 @@ export function noteFromResult(input: {
 	} catch {
 		result = null;
 	}
-	const request = input.ticket.question.trim();
+	// The addresses the agent appended for the researcher are not part of what was asked.
+	const request = input.ticket.question
+		.replace(/\n?相手が示したURL:.*$/su, "")
+		.trim();
 	const title =
 		text(result?.document?.title) ||
 		request.replace(/\s+/gu, " ").slice(0, 60) ||
@@ -62,6 +66,15 @@ export function noteFromResult(input: {
 				.filter(Boolean)
 				.join("\n")
 		: input.summary.trim();
+	// A result with nothing to read (a partial report that only says it could not finish) is no note.
+	const usable = result
+		? !!text(result.answer) ||
+			!!(result.claims ?? []).some((x) => text(x.text)) ||
+			(Array.isArray(result.links) && result.links.length > 0) ||
+			!!text(result.document?.title) ||
+			(text(result.summary) !== "" && result.status === "completed")
+		: body !== "";
+	if (!usable) return null;
 	const readable = body || request;
 	return {
 		id: input.id,

@@ -1,5 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
-import { REASONING_ALLOWANCE_TOKENS } from "../service/attempt-work";
+import {
+	INDEPENDENT_THINKING_HEADROOM_TOKENS,
+	REASONING_ALLOWANCE_TOKENS,
+} from "../service/attempt-work";
 import { attemptDuration } from "../service/attempt-work";
 import { cleanup, messages, setup } from "./inference.fixture";
 afterEach(async () => {
@@ -439,6 +442,10 @@ test("independent structured controls preserve ownership and reasoning without y
 	});
 	expect(observed).not.toHaveProperty("yields");
 	expect(observed).not.toHaveProperty("onConversation");
+	// The thinking is on top of the visible output the caller asked for.
+	expect(observed).toMatchObject({
+		maxOutputTokens: 512 + INDEPENDENT_THINKING_HEADROOM_TOKENS,
+	});
 });
 
 test("an unavailable explicit background resource is rejected before any fallback call", async () => {

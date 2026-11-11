@@ -1,4 +1,10 @@
 import type { UtteranceToolCall } from "../../conversation";
+import {
+	READ_NOTE,
+	SET_QUIET,
+	SHOW_NOTE,
+	START_PREPARATION,
+} from "eumenes-agency/agenda";
 import { TOOL_NAMES } from "./generation-tools";
 import type { DocumentRefs } from "./work-items";
 
@@ -7,7 +13,18 @@ import type { DocumentRefs } from "./work-items";
  * search and the hand-over. A later turn sees that a request was found and handed over, not only the announcement;
  * with the announcement alone the model answers the next request in words only, as it sees itself do.
  */
+/** The tools of a reply the agency serves (its agenda): their calls and answers stay in the reply's own history. */
+const AGENDA_TOOLS = new Set<string>([
+	START_PREPARATION,
+	READ_NOTE,
+	SHOW_NOTE,
+	SET_QUIET,
+]);
+/** What the history keeps of one of those answers: enough to show what the reply did. */
+const AGENDA_RESULT_CHARS = 1200;
+
 const CARRIED = new Set<string>([
+	...AGENDA_TOOLS,
 	TOOL_NAMES.search,
 	TOOL_NAMES.delegate,
 	// A routed turn's question back: the next turn takes the user's answer with the request it asked about.
@@ -105,9 +122,27 @@ export function carriedToolCalls(
 ): UtteranceToolCall[] {
 	return steps
 		.filter((step) => carriesExchange(step.name))
-		.map((step) => ({
-			name: step.name,
-			arguments: carriedArguments(step.arguments),
-			result: JSON.stringify(carriedResult(step.name, step.result, refs)),
-		}));
+		.map((step) =>
+			AGENDA_TOOLS.has(step.name)
+				? {
+						name: step.name,
+						arguments: carriedArguments(step.arguments),
+						result:
+							typeof step.result === "string"
+								? step.result.slice(0, AGENDA_RESULT_CHARS)
+								: "",
+					}
+				: {
+						name: step.name,
+						arguments: carriedArguments(step.arguments),
+						result: JSON.stringify(carriedResult(step.name, step.result, refs)),
+					},
+		);
+}
+
+/** The agenda tool calls an agent utterance carries (replayed as the reply's history when the agency serves). */
+export function agendaCalls(utterance: {
+	toolCalls: readonly UtteranceToolCall[];
+}): UtteranceToolCall[] {
+	return utterance.toolCalls.filter((call) => AGENDA_TOOLS.has(call.name));
 }

@@ -9,7 +9,7 @@ import { harness } from "../toolchain/toolchain.fixture";
 import type { imageFixture } from "../media/image.fixture";
 import type { AgencyHostDeps } from "./host-types";
 
-export type CallKind = "plan" | "check" | "ask_check" | "compose";
+export type CallKind = "plan" | "check" | "ask_check" | "compose" | "profile";
 
 /** Which of the agenda's four model calls a request is, by the call's own instruction. */
 export function callKind(request: { system: string }): CallKind {
@@ -17,6 +17,7 @@ export function callKind(request: { system: string }): CallKind {
 	if (request.system.includes("調べものの重複チェック")) return "check";
 	if (request.system.includes("質問の聞き直しチェック")) return "ask_check";
 	if (request.system.includes("話す文を書く")) return "compose";
+	if (request.system.includes("メモ係")) return "profile";
 	throw new Error("fixture_unknown_call");
 }
 
@@ -43,7 +44,9 @@ const fallback = (kind: CallKind) =>
 			? { verdict: "new", coveredBy: null, request: null, reason: "fixture" }
 			: kind === "ask_check"
 				? { verdicts: [] }
-				: composeDecline();
+				: kind === "profile"
+					? { ops: [] }
+					: composeDecline();
 
 export async function agendaFixture(
 	options: {

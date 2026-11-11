@@ -27,7 +27,15 @@
 - **発話・調べものの根拠**: ticket の `refs` に加えて、モデル呼び出しが見たもの（利用者の直近の発言と、そのとき有効な記憶）を入力に含める。どれかが忘却されると発話・調べものを実行せず、保存済みの ticket も落ちる。計画が作る item の `refs` は従来どおり（依頼・約束した item は依頼の言葉に結ぶ）。
 - **steer**: サーバーに `createSteeringInbox` を一つ（`server-services.ts`）。`switching-host` の dialoguePort も `steeredInTransaction` / `replyInputInTransaction` を転送する。返事ごとに `createAgendaReplySteering`（`holdsText: false`）で target を開き、chat をラップする。返事の最中に届いた利用者のメッセージは、フィードが commit 後に `send` する。メッセージ本文は ストアから都度読み直し、忘却済みなら渡さない。
   - 二重返事の防止: 返事の run が終わるとき、モデル呼び出しが取ったメッセージ id を `AgencyLayerPort.steeredInTransaction(runId)` で受け、`generation-settle.ts` が同じ transaction でその pending 発話を log に取り込む（折り込まれた発話と同じ扱い）。次の run は `utterance_handled` で終わる（引き渡しの返事が取った言葉も同じ）。非ストリームの LARM 経路は、その呼び出しのメッセージ（steer・agenda の状態入り）で答える。run の記憶（Memory の入力）にも加えるので、忘却はその返事にも及ぶ。返事が採用されなかったときは pending のまま残り、次の run が答える。最後のモデル呼び出し中に届いたものは取られず、これまで通り次の run が答える。
-- **記憶の書き込み**: steward が continuity から書くので agenda の memory writer は足していない。計画・関心のメモ（profile）も未接続。
+- **記憶の書き込み**: steward が continuity から書くので agenda の memory writer は足していない。
+- **計画・関心のメモ（profile）**: パッケージの `updateProfile` を、返事が会話に入った後に裏で一回走らせる（返事は待たない。パスは直列）。メモは checkpoint の `profile`（最新の本文、基点、直近12パスの本文と読んだ利用者の言葉の id）に持ち、agent の `profile` と返事の状態（plans / interests）に渡す。忘却は、その言葉を最初に読んだパスの前までメモを戻す（それ以後のパスの追加分も一緒に消える。保守的）。忘却をまたいだ書き込みは採用しない。返事の根拠（上記）にも、メモを書いた言葉を含める。
+- **返事の言い直し**: 採用する返事の本文に `dropRepeatedSentences` をかける。ストリームで既に出た重複は取り消せないが、保存される本文・agent の `said`・計画は一度の形になる。
+- **返事の履歴**: 返事が呼んだ agenda の道具と答えは、返事を会話に出すとき utterance の `toolCalls` として保存し、agenda が返事を担う会話では次の返事の履歴に assistant の `tool_calls` + `tool` メッセージとして戻す（`recentMessages`、`servesRepliesInTransaction`）。F では従来どおり言葉のみ。同じ条件で、会話の最初の利用者の発言も履歴に残す（`## Memory` はその最初のメッセージに付ける）。
+- **ルーターが処理した返事**: 返事の出どころによらず、会話に出た assistant メッセージはフィードが `who:"reply"` で観測し、`infoChanged` を呼ぶ（計画が見る）。返事が失敗したときも `infoChanged`。
+- **調べものの上限**: agenda の調べもの（台帳の `agenda` 記録が根拠のもの）は `agency.actions` の同時数・日次の上限に数えない（承認の要否は従来どおり。同時には agent が一つずつ進める）。F の行動の上限は従来どおり。
+- **返事の system の整合**: agenda が返事を担うとき、F の事実規則（「Webで調べることはできず約束もしない」）の代わりに `contexts/agency/talk-facts.context.toml`（調べものは `start_preparation` で頼める）を使い、`always-on-reply` の「許可された読取りで確かめます」を外した。`.s11tnext` の catalog は `bun run context:build` で作り直した（`context:check` 通過）。
+- **時計と出力の余裕**: agent と返事の時計は CLI の形式（日本時間・曜日つき「2026/11/11(水) 14:02」）。agenda の呼び出し（独立した制御呼び出しで推論水準を名指すもの）は、見える出力の上限に 2800 トークンの余白を足す（`attempt-work.ts` の `INDEPENDENT_THINKING_HEADROOM_TOKENS`。取り込み上限 2400 は変えない）。
+- **小さなこと**: 通知・作業報告の返事は問いを足さない（`askIfFits` なし）。道具呼び出しの上限は通知でも4（host の道具に3を足す、ただし4を下回らない）。
 
 ## 保存・忘却
 
@@ -36,6 +44,11 @@
 - 発話・調べものの根拠は、実行の直前に Memory から取り直した入力（`referencedInput`）。一つでも忘却されていれば実行しない。
 
 ## 残っていること
+
+- メモは会話ごとに30件（利用者単位の保管ではない）。
+- 利用者の入力中・前景の応答中は step 全体を止める（計画・調べものも止まる。参照ホストは発話だけ止められる）。
+- 返事の履歴の tool 呼び出しは、agenda が返事を担う会話で保存した分だけ。agenda 導入前の返事には無い。
+- ルーターが処理した返事は、メッセージが会話に出た時点で観測する（出さない run は agent に見えない）。
 
 - 設定を変えると host が作り直され、記録は失効する（旧と同じ。約束も消える）。約束を残すには、失効の条件を関連する設定だけに絞る必要がある。
 - 返事の状態（記憶・メモ）は呼び出し時に作る。作った後〜採用前に忘却が起きた場合は、既存の古さ検査で返事が採用されないことに任せている。

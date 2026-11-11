@@ -133,6 +133,7 @@ export function agencyForgetting(deps: {
 						next.agent.items.length === original.agent.items.length &&
 						next.tickets.length === original.tickets.length &&
 						next.notes.length === original.notes.length &&
+						next.profile?.passes.length === original.profile?.passes.length &&
 						!agencyWorks(db, record.conversationId, true).some(
 							(w) =>
 								w.source_refs_json &&

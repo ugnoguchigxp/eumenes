@@ -140,3 +140,80 @@ test("the non-streaming call answers over the call's own messages (steered words
 	expect(seen).toHaveLength(1);
 	expect(seen[0]).toContain("steered words");
 });
+
+test("when the agency serves the replies, a reply's tool calls and the conversation's first words stay in the history", async () => {
+	h = await setup({
+		agency: {
+			workChangedInTransaction: () => {},
+			servesRepliesInTransaction: () => true,
+		},
+		conversationAgent: {
+			system: () => ({ base: "" }),
+			async respond(input) {
+				const reply = await input.chat.complete(
+					{ messages: input.messages, tools: [] },
+					input.onDelta,
+					input.signal,
+				);
+				return {
+					text: reply.text,
+					ended: false,
+					calls: [
+						{
+							name: "start_preparation",
+							arguments: '{"request":"鎌倉の天気","askedByUser":true}',
+							content: "accepted: 頼んだ",
+						},
+					],
+				};
+			},
+		},
+	});
+	h.state.steps.push(...reply("調べますね。"), ...reply("まだです。"));
+	await h.say("鎌倉の天気を調べて");
+	await h.say("どうなった？");
+	const messages = h.state.calls.at(-1)!.messages as Array<{
+		role: string;
+		content: string;
+		tool_calls?: Array<{ function: { name: string } }>;
+	}>;
+	// The first words of the conversation are kept (with `## Memory` in that first message).
+	expect(messages[1]!.role).toBe("user");
+	expect(messages[1]!.content).toContain("鎌倉の天気を調べて");
+	expect(messages[1]!.content).toContain("## Memory");
+	// The reply's own call, then what it answered, then its words.
+	const at = messages.findIndex((m) => m.tool_calls?.length);
+	expect(at).toBeGreaterThan(0);
+	expect(messages[at]!.tool_calls![0]!.function.name).toBe("start_preparation");
+	expect(messages[at + 1]).toMatchObject({
+		role: "tool",
+		content: "accepted: 頼んだ",
+	});
+	expect(messages[at + 2]).toMatchObject({ role: "assistant" });
+	expect(messages[at + 2]!.content).toContain("調べますね。");
+});
+
+test("without the agency serving, the history stays words only", async () => {
+	h = await setup({
+		conversationAgent: {
+			system: () => ({ base: "" }),
+			async respond(input) {
+				const reply = await input.chat.complete(
+					{ messages: input.messages, tools: [] },
+					input.onDelta,
+					input.signal,
+				);
+				return {
+					text: reply.text,
+					ended: false,
+					calls: [{ name: "start_preparation", arguments: "{}", content: "x" }],
+				};
+			},
+		},
+	});
+	h.state.steps.push(...reply("一つ目。"), ...reply("二つ目。"));
+	await h.say("はじめまして");
+	await h.say("つづき");
+	const roles = h.state.calls.at(-1)!.messages.map((m) => m.role);
+	expect(roles).not.toContain("tool");
+});

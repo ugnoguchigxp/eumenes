@@ -223,6 +223,8 @@ export interface AgencyLayerPort {
 	 * meanwhile, eumenes-steer): they are answered by that reply and join the log with it, so no run answers them again.
 	 */
 	steeredInTransaction?(db: Database, runId: string): readonly string[];
+	/** The agency serves this conversation's replies (it keeps their tool calls in the history). */
+	servesRepliesInTransaction?(db: Database, conversationId: string): boolean;
 	/**
 	 * What the reply of this run was given by the agency (memory, notes, the agent's state), captured now: its sources
 	 * join the run's input, so forgetting reaches the reply; `complete: false` means something it was given is gone and
@@ -266,6 +268,8 @@ export interface ConversationAgentSystem {
 	spokenReplyStyle?: string;
 	/** The leading emoji rule (section Emotion); absent when the setting is off. */
 	emotionRules?: string;
+	/** The fact rules (section Facts) in place of the host's own, where the agent serves work they would deny. */
+	facts?: string;
 }
 
 export interface ConversationAgentPort {
@@ -304,6 +308,8 @@ export interface ConversationAgentPort {
 		emotion?: DeliveryEmotion;
 		/** A tool handed the work over and ended the reply. */
 		ended: boolean;
+		/** The agency's own tool calls of the reply and what they answered: kept in the history of its replies. */
+		calls?: ReadonlyArray<{ name: string; arguments: string; content: string }>;
 	}>;
 }
 
@@ -340,6 +346,9 @@ export {
 	agendaSources,
 	agendaTicketInput,
 	forgetAgenda,
+	forgetProfile,
+	PROFILE_PASSES_KEPT,
+	type AgendaProfile,
 	baseRef,
 	type AgendaHostSnapshot,
 	type AgendaNote,

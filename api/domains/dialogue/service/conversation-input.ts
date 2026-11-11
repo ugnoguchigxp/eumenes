@@ -17,6 +17,7 @@ import { conversationHasActiveRun } from "./active-run";
 import { localHarness, type ConversationHarness } from "./harness";
 import { INPUT_HEADINGS, dataText, joinSections, section } from "./input-text";
 import { memoryItemLine } from "./result-text";
+import { agendaCalls } from "./tool-exchange";
 import { stateLinesInTransaction, stateText } from "./state-text";
 
 /** Bounds of the recent conversation and its cuts (the conversation input specification, sections 6.1 and 6.1.1). */
@@ -103,6 +104,8 @@ export function recentUtterances(
 	after: readonly Utterance[],
 	pending: ReadonlySet<string>,
 	users?: number,
+	/** The conversation's opening words are kept even when they are the user's (the agency serves the replies). */
+	keepOpening = false,
 ): Utterance[] {
 	const shown = after.filter(
 		(u) => !(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
@@ -116,6 +119,7 @@ export function recentUtterances(
 		if (asked.length > users) from = asked[asked.length - users - 1]! + 1;
 	}
 	const kept = shown.slice(from);
+	if (keepOpening && from === 0 && kept.length) return kept;
 	const start = kept.findIndex((u) => u.speaker === "agent");
 	return start < 0 ? [] : kept.slice(start);
 }
@@ -127,6 +131,8 @@ export function recentUtterances(
 export function recentMessages(
 	utterances: readonly Utterance[],
 	imageNotes: ReadonlyMap<string, string> = new Map(),
+	/** The agency serves the replies: the tools a reply called and what they answered stay in the history. */
+	withCalls = false,
 ): ChatMessage[] {
 	const messages: ChatMessage[] = [];
 	for (const u of utterances) {
@@ -137,8 +143,39 @@ export function recentMessages(
 				.filter(Boolean)
 				.join("\n"),
 		);
+		const calls = withCalls && role === "assistant" ? agendaCalls(u) : [];
+		if (calls.length) {
+			// The reply's own tool calls come back as its history: it sees what it did (the package's rule).
+			const ids = calls.map((_, k) =>
+				`${u.messageId ?? u.seq}_${k}`.replace(/[^A-Za-z0-9_-]/gu, "_"),
+			);
+			messages.push({
+				role: "assistant",
+				content: "",
+				tool_calls: calls.map((c, k) => ({
+					id: ids[k]!,
+					type: "function" as const,
+					function: { name: c.name, arguments: c.arguments },
+				})),
+			} as unknown as ChatMessage);
+			calls.forEach((c, k) =>
+				// Typed as the prefix's messages: the tool role is the chat shape the model reads.
+				messages.push({
+					role: "tool",
+					content: c.result,
+					tool_call_id: ids[k]!,
+				} as unknown as ChatMessage),
+			);
+			messages.push({ role, content: text });
+			continue;
+		}
 		const last = messages.at(-1);
-		if (last && last.role === role) last.content += `\n${text}`;
+		if (
+			last &&
+			last.role === role &&
+			!(last as { tool_calls?: unknown }).tool_calls
+		)
+			last.content += `\n${text}`;
 		else messages.push({ role, content: text });
 	}
 	return messages;
@@ -407,7 +444,15 @@ export function conversationPrefixFrom(
 					))
 			);
 		});
-	const recent = recentUtterances(after, input.pending, history.users);
+	const serves =
+		deps.agency?.servesRepliesInTransaction?.(tx, conversationId) ?? false;
+	// A cut that moved starts at the agent's words as before; the opening of a conversation keeps its first words.
+	const recent = recentUtterances(
+		after,
+		input.pending,
+		history.users,
+		serves && (cut?.seq ?? 0) === 0,
+	);
 	const said = after.filter(
 		(u) =>
 			u.speaker === "user" && !(u.messageId && input.pending.has(u.messageId)),
@@ -442,10 +487,17 @@ export function conversationPrefixFrom(
 		if (references.length)
 			imageNotes.set(utterance.messageId, imageReferenceText(references));
 	}
-	const conversation = recentMessages(recent, imageNotes);
+	const conversation = recentMessages(recent, imageNotes, serves);
 	const messages: ChatMessage[] = [{ role: "system", content: input.system }];
-	if (memory && conversation.length)
-		messages.push({ role: "user", content: memory });
+	if (memory && conversation.length) {
+		// A conversation that opens with the user's words carries `## Memory` in that first message.
+		if (conversation[0]!.role === "user")
+			conversation[0] = {
+				...conversation[0]!,
+				content: `${memory}\n\n${conversation[0]!.content}`,
+			};
+		else messages.push({ role: "user", content: memory });
+	}
 	messages.push(...conversation);
 	// A conversation resumed after a gap keeps nothing before it, but the gap is still the time since the last words.
 	const last = store

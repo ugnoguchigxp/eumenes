@@ -98,6 +98,16 @@ export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
 					NonNullable<typeof current.dialoguePort.steeredInTransaction>
 				>
 			) => current.dialoguePort.steeredInTransaction?.(...args) ?? [],
+			servesRepliesInTransaction: (
+				...args: Parameters<
+					NonNullable<typeof current.dialoguePort.servesRepliesInTransaction>
+				>
+			) => current.dialoguePort.servesRepliesInTransaction?.(...args) ?? false,
+			replyInputInTransaction: (
+				...args: Parameters<
+					NonNullable<typeof current.dialoguePort.replyInputInTransaction>
+				>
+			) => current.dialoguePort.replyInputInTransaction?.(...args) ?? null,
 		},
 		attachWork(value: AgencyWork) {
 			work = value;

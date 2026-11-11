@@ -33,6 +33,9 @@ export function agencyReplyParts(
 					}),
 				}
 			: {}),
+		...(settings.runtime === "always-on" && agenda
+			? { facts: systemContext("dialogue.contexts.agency.talk-facts", {}) }
+			: {}),
 		spokenReplyStyle: systemContext("dialogue.contexts.agency.spoken", {}),
 		...(settings.emotion
 			? {

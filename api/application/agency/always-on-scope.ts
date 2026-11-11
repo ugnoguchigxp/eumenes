@@ -16,10 +16,10 @@ import {
 	type AgencyRecord,
 	type AgendaHostSnapshot,
 	type AgendaNote,
+	type AgendaProfile,
 	type AgendaResearchTicket,
 	agendaSources,
 } from "../../domains/dialogue";
-import { promptTime } from "../../domains/inference";
 import type { AgencyHostDeps } from "./host-types";
 
 /** Notes kept per conversation: the newest ones (the older are still in the work ledger). */
@@ -31,6 +31,18 @@ export const agendaReady = (deps: AgencyHostDeps) =>
 	deps.memory.status().healthy &&
 	!!deps.state &&
 	!!deps.memory.referenceInputs;
+
+/** Local time as the user would say it (the CLI's format): "2026/11/11(水) 14:02", in Japan time. */
+export const agendaClock = (at: number) =>
+	new Date(at).toLocaleString("ja-JP", {
+		timeZone: "Asia/Tokyo",
+		weekday: "short",
+		year: "numeric",
+		month: "numeric",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
 
 /** The user's setting allows 10/60/600 s; the agenda knows 10/60/300 s (600 is read as 300). */
 export const agendaInterval = (sec: number | undefined): SpeechIntervalSec =>
@@ -69,6 +81,18 @@ export type AgendaScope = {
 	calls: Map<string, readonly ReplyCall[]>;
 	/** The user's messages a reply of the run took into a model call (eumenes-steer). */
 	taken: Map<string, string[]>;
+	/** The user's plans and interests (the package's profile note), written behind the talk. */
+	profile: AgendaProfile;
+	/** The words the profile writer has read already. */
+	profileSeen: Set<string>;
+	/** The writer's passes, one after another. */
+	profileWriting: Promise<void>;
+	/** Ends the writer's call when the scope goes. */
+	profileAbort: AbortController;
+	/** Grows with every forget: a writer pass that began before one is not kept. */
+	forgetSeq: number;
+	/** The agency's calls without the step's staleness rules (the profile writer runs beside the user's words). */
+	background: LlmPort;
 	/** What each reply was given (memory, notes, the agent's state), as references: captured again when it is adopted. */
 	given: Map<string, string[]>;
 	/** The notes a reply showed (show_note), shown to the user once the reply is adopted. */
@@ -87,6 +111,9 @@ export function agendaEnvelope(c: AgendaScope, at: number): AgendaHostSnapshot {
 		agent: c.agent.snapshot(at),
 		tickets: structuredClone(c.tickets),
 		notes: structuredClone(c.notes),
+		...(c.profile.markdown || c.profile.passes.length
+			? { profile: structuredClone(c.profile) }
+			: {}),
 	};
 }
 
@@ -194,7 +221,8 @@ export function createAgendaScope(input: {
 		notes: () => c.notes.map(noteRef),
 		persona: personaOf(deps),
 		speechIntervalSec: agendaInterval(cfg.agency.speechIntervalSec),
-		clock: (at) => promptTime(at).now,
+		profile: () => c.profile.markdown,
+		clock: agendaClock,
 		startedAt: now(),
 		...(restored ? { restore: restored.agent } : {}),
 	});
@@ -216,6 +244,14 @@ export function createAgendaScope(input: {
 		steering: steering ?? null,
 		tickets: structuredClone(restored?.tickets ?? []),
 		notes: structuredClone(restored?.notes ?? []),
+		profile: structuredClone(
+			restored?.profile ?? { markdown: "", base: "", passes: [] },
+		),
+		profileSeen: new Set(),
+		profileWriting: Promise.resolve(),
+		profileAbort: new AbortController(),
+		forgetSeq: 0,
+		background: inner,
 		finished: new Map(),
 		controller: null,
 		stepping: false,

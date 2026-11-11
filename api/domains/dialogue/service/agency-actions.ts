@@ -138,6 +138,16 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 				throw new Error("agency_approval_required");
 			const policy = limits(db);
 			const now = deps.now();
+			const record = agencyRecords(db).find(
+				(r) =>
+					r.conversationId === input.conversationId && r.epoch === input.epoch,
+			);
+			if (!record || input.deadline <= now)
+				throw new Error("agency_origin_stale");
+			const snapshot =
+				record.snapshot as import("eumenes-agency").AgencySnapshot;
+			const agenda = isAgendaSnapshot(record.snapshot) ? record.snapshot : null;
+			if (agenda) assertAgendaTicket(agenda, input);
 			const active = agencyWorks(db, input.conversationId).filter(
 				(w) => !!w.execution_id,
 			);
@@ -151,22 +161,14 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 					)
 					.get(input.conversationId, dayStart) as { n: number }
 			).n;
+			// The agenda's own research is the agent's to pace (it keeps one at a time, and the user sets no
+			// budget on the agency's thinking): the count limits are for the F host's actions. Approval stays.
 			if (
 				!policy.enabled ||
-				active.length >= policy.maxConcurrent ||
-				daily >= policy.dailyLimit
+				(!agenda &&
+					(active.length >= policy.maxConcurrent || daily >= policy.dailyLimit))
 			)
 				throw new Error("agency_action_budget");
-			const record = agencyRecords(db).find(
-				(r) =>
-					r.conversationId === input.conversationId && r.epoch === input.epoch,
-			);
-			if (!record || input.deadline <= now)
-				throw new Error("agency_origin_stale");
-			const snapshot =
-				record.snapshot as import("eumenes-agency").AgencySnapshot;
-			const agenda = isAgendaSnapshot(record.snapshot) ? record.snapshot : null;
-			if (agenda) assertAgendaTicket(agenda, input);
 			const ticket = snapshot.continuity?.issued.find(
 				(t) => t.id === input.ticketId,
 			);

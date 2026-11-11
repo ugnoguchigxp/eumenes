@@ -473,6 +473,13 @@ function createTurn(
 			)
 				throw new Error("chat_output_empty");
 			emotion = reply.emotion;
+			// The agency's own tools: the exchange keeps them with the reply (later replies see what it did).
+			for (const call of reply.calls ?? [])
+				exchange.push({
+					name: call.name,
+					arguments: call.arguments,
+					result: call.content,
+				});
 			imageAnswer = talkImageAnswer;
 			said = [said, reply.text].filter(Boolean).join("\n");
 		},

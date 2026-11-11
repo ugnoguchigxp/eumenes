@@ -12,6 +12,7 @@ import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { fixedInput } from "./input";
 import { showNote } from "./always-on-flow";
+import { writeProfile } from "./always-on-profile";
 import {
 	createAgendaScope,
 	agendaEnvelope,
@@ -155,6 +156,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		}
 	}
 	function dispose(c: AgendaScope) {
+		c.profileAbort.abort();
 		if (c.timer !== undefined) clearTimer(c.timer);
 		c.timer = undefined;
 	}
@@ -194,6 +196,19 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 						event,
 						at: now(),
 						forget: (scope, refs) => forgetRefs(scope, refs),
+						exchanged: (scope) => {
+							void track(
+								writeProfile({
+									deps,
+									c: scope,
+									now,
+									changed: () => {
+										requested = true;
+										schedule();
+									},
+								}),
+							);
+						},
 						show: (scope, noteIds, runId) => {
 							for (const id of noteIds) {
 								const note = scope.notes.find((n) => n.id === id);
