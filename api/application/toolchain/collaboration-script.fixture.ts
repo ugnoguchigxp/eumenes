@@ -1,5 +1,5 @@
 /** Scripted tests may explicitly leave state unchanged; state-meaning tests provide their own update. */
-export function collaborationScript(
+function withCollaborationState(
 	value: unknown,
 	messages: readonly { content: string }[],
 ) {
@@ -41,4 +41,36 @@ export function collaborationScript(
 		}
 	}
 	return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+/** The provider returns the structured transport for a candidate-bearing turn. */
+function structuredCollaborationScript(response: string) {
+	const {
+		action,
+		tool,
+		arguments: args,
+		text,
+		forward,
+		stateUpdate,
+	} = JSON.parse(response);
+	return JSON.stringify({
+		action,
+		tool: tool ?? null,
+		arguments: args == null ? null : JSON.stringify(args),
+		text: text ? { first: text, second: null } : null,
+		forward: forward ?? null,
+		stateUpdate: stateUpdate == null ? null : JSON.stringify(stateUpdate),
+	});
+}
+
+export function collaborationScript(
+	value: unknown,
+	messages: readonly { content: string }[],
+) {
+	const response = withCollaborationState(value, messages);
+	return messages.some((message) =>
+		message.content.startsWith("GUIDANCE_CANDIDATES="),
+	)
+		? structuredCollaborationScript(response)
+		: response;
 }

@@ -65,11 +65,17 @@ export function useSubmit(client: DialogueClient, id: string) {
 						addressee: undefined,
 					}
 				: value;
+			const locale = document.documentElement.lang;
+			const guidanceLanguage: "ja" | "en" | undefined =
+				addressee?.sessionId && (locale === "ja" || locale === "en")
+					? locale
+					: undefined;
 			const previous = pending.current;
 			const request =
 				previous?.client === client &&
 				previous.input.conversationId === id &&
 				previous.input.text === text &&
+				previous.input.guidanceLanguage === guidanceLanguage &&
 				JSON.stringify(previous.input.attachmentIds ?? []) ===
 					JSON.stringify(attachmentIds) &&
 				JSON.stringify(previous.input.fileIds ?? []) ===
@@ -85,6 +91,7 @@ export function useSubmit(client: DialogueClient, id: string) {
 								requestId: crypto.randomUUID(),
 								conversationId: id,
 								text,
+								...(guidanceLanguage ? { guidanceLanguage } : {}),
 								...(attachmentIds.length ? { attachmentIds } : {}),
 								...(fileIds.length ? { fileIds } : {}),
 								...(viewing ? { viewing } : {}),

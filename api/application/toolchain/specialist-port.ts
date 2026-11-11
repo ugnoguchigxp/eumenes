@@ -43,7 +43,7 @@ export function createSpecialistPort(deps: {
 	registry: AdapterRegistry;
 	schemas: Pick<SchemaProvider, "get">;
 	clock: () => string;
-	knowledge?: Pick<Knowledge, "selectForSpecialist">;
+	knowledge?: Pick<Knowledge, "selectForSpecialist" | "explorationCandidates">;
 }): SpecialistPort {
 	const { routing, registry, schemas, clock, knowledge } = deps;
 	const adapterOf = (ref: string) => {
@@ -61,6 +61,7 @@ export function createSpecialistPort(deps: {
 		...(knowledge
 			? {
 					guidance: {
+						candidates: knowledge.explorationCandidates,
 						tool: (set) =>
 							set.agent.sharedTools.some(
 								({ toolchainId, as }) =>

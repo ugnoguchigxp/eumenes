@@ -139,7 +139,7 @@ export type CallSession = {
 	 */
 	reasoning?: { larm: ReasoningLevel; cloud: ReasoningLevel };
 	/**
-	 * `main` or an `auxiliary` control call: one JSON value of this strict schema, without appending to the system.
+	 * A main answer or a control call: one JSON value of this strict schema, without appending to the system.
 	 * Used by host-owned Agency instructions and the conversation's decision call (the
 	 * conversation harness design, section 5.3). On LARM it is sent as the strict response format and the native tools
 	 * field is left out (the schema names the choices); a cloud attempt passes it as the output schema.

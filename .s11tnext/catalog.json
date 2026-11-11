@@ -3926,16 +3926,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "- get_guidance は、作業目的と現在の状況に合いそうなSKILLを探す道具です。利用者が状況を説明し、進め方や確認方法で迷っている点が分かったら、最初の行動として get_guidance を呼びます。確認方法を答えたり、追加情報を尋ねたりする前に、手順の候補を確認します。\n- goal に作業目的を書き、situation に CURRENT_DOCUMENT の revision と、いま迷っている点を入れます。直前の操作と観測結果が分かる場合は、利用者からの報告も lastAttempt に入れます。結果を次の応答で読めるときに呼び出します。\n- 返ったSKILLは手順の候補として読みます。対象の版、実際の状況、利用者が許可した範囲を照合し、手順を使うかと次に何をするかは担当が判断します。候補が得られない場合も、確認できている情報を基に、調査を続けるか追加の情報を尋ねるかを担当が判断します。"
+                  "value": "- GUIDANCE_CANDIDATES に、作業に使えそうな既製の探索SKILLが届きます。利用者の状況説明は最後の利用者メッセージに全文で届きます。説明に含まれる目的、直前の操作と観測結果、迷いを本文から読み取ります。\n- 候補の手順を、CURRENT_DOCUMENT の版、実際の状況、利用者が許可した範囲と照合します。どの手順を使うか、何を次に確認するかは担当が判断します。専門範囲の相談では、作業コピーを直接読めない場合も、利用者が報告した観測を基に担当が回答します。適用に必要な情報が足りなければ、確認できていることを基に追加情報を尋ねます。\n- 既製の候補で足りない場合は get_guidance で手順を探せます。goal に目的を、situation に CURRENT_DOCUMENT の revision と迷いを入れます。直前に試した操作と結果を利用者が説明していれば lastAttempt の action と result に入れます。SKILLの言語は依頼に合わせます。結果を次の応答で読めるときに呼び出します。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:9ac6da4e6dd2612352413b28da85769bc288df0e0e5f96b29841501abee5f5cc"
+          "artifactHash": "sha256:9ed8485a518189ea67735f85b83cfc41aba3f7563e6e9d396ace53ddb95f2f52"
         }
       },
-      "definitionHash": "sha256:063817f4e80342aa97998b40ba314706747efd75f9dd403e04767ea1757ed815",
-      "releaseDigest": "sha256:70f6ec14d07a07e16f520cd05092b9cb4a4eadd050d5c4eda7219f4aee11dc5f"
+      "definitionHash": "sha256:2c96b7f50dc39a8711a75332cd2e50842d9535744120df2be62bfd31b37189bd",
+      "releaseDigest": "sha256:cef15c528915aa9ace2428a4230567d6295ce26f2aba84a94d23f0b72f2b7c9d"
     },
     "dialogue.contexts.specialist-turn.rules": {
       "key": "dialogue.contexts.specialist-turn.rules",
@@ -5122,5 +5122,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:12b74db25af7c749f3163d874a23ae2afdf829a7a5b2f13602a4c18afeb469ea"
+  "catalogDigest": "sha256:1bb82f4bc2116ffd453405e9449fc4f6a87180a3a72d4ad4ef3445e153bbf7b1"
 }
