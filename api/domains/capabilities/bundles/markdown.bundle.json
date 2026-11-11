@@ -136,6 +136,31 @@
 			"redirects": []
 		},
 		{
+			"aliases": ["Markdown", "文書編集"],
+			"tags": [],
+			"useWhen": [
+				"Markdown文書や装飾文書を新しく作成、読み込み、編集する",
+				"文書の任意の部分を利用者と共同で修正する"
+			],
+			"avoidWhen": [],
+			"dependencies": ["package:markdown.collaborate@1"],
+			"kind": "toolchain",
+			"id": "markdown.collaborate",
+			"revision": 5,
+			"title": "文書の共同編集",
+			"summary": "Markdown文書を共同編集し、LARMのDocling文書APIへ保存する",
+			"examples": [
+				"会議の議事録をMarkdownで作りたい",
+				"この文書の導入と表を整理して",
+				"保存した文書を開いて見出しを直したい"
+			],
+			"packageRevisionId": "package:markdown.collaborate@1",
+			"bindingRevisionId": "binding:markdown.collaborate@5",
+			"artifactRevisionId": "artifact:markdown.workspace@4",
+			"functionName": "markdown_edit",
+			"redirects": []
+		},
+		{
 			"kind": "resource-kind",
 			"id": "resource.markdown.document",
 			"title": "文書",
@@ -248,6 +273,43 @@
 						"doc.write": 0
 					}
 				}
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "markdown.collaborate",
+			"revision": 5,
+			"execution": "session",
+			"adapterRef": "adapter:markdown@1",
+			"availabilityRef": "availability:markdown@1",
+			"tools": [],
+			"artifactRevisionId": "artifact:markdown.workspace@4",
+			"session": {
+				"targetSchemaRef": "schema:markdown-target@1"
+			},
+			"timeLimits": {
+				"runMs": 1200000,
+				"turnMs": 900000,
+				"inferenceMs": 600000
+			},
+			"agent": {
+				"workspace": {
+					"documentRef": "workspace:markdown.document@1",
+					"inlineBytes": 32768
+				},
+				"turn": {
+					"maxModelCalls": 4,
+					"retries": {
+						"doc.edit": 1,
+						"doc.write": 0
+					}
+				},
+				"sharedTools": [
+					{
+						"toolchainId": "knowledge.guidance",
+						"as": "get_guidance"
+					}
+				]
 			}
 		}
 	],

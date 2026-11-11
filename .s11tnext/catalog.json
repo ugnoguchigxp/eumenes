@@ -3,7 +3,7 @@
   "artifactVersion": 2,
   "compilerVersion": "0.1.2",
   "releaseProfile": "application",
-  "policyDigest": "sha256:a0eb5a0c0da973f036d8a4eb7e03635de8339ec0754336b103ef527973f7ab59",
+  "policyDigest": "sha256:e891a8c2ef94a198d11b6196ff71f9d6b584f675f7f5d644d0aef4598f408d01",
   "createdFrom": {
     "configPath": "s11tnext.config.toml",
     "sourceFiles": [
@@ -96,6 +96,7 @@
       "api/domains/dialogue/contexts/local/router-work.context.toml",
       "api/domains/dialogue/contexts/local/turn-failed.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/host-observation.context.toml",
+      "api/domains/dialogue/contexts/specialist-turn/knowledge-guidance.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/rules.context.toml",
       "api/domains/dialogue/contexts/system-prompt/agent-name.context.toml",
       "api/domains/dialogue/contexts/system-prompt/butler-role.context.toml",
@@ -3869,6 +3870,39 @@
       "definitionHash": "sha256:6b994922d732651b2dea7fdc430d5ef565c1e93dcc7080820c9cb1732eed73aa",
       "releaseDigest": "sha256:204900c3ec85a7c3d5ab53c93e92b14fe2b7950d3e6f73b1e062d8ded9376614"
     },
+    "dialogue.contexts.specialist-turn.knowledge-guidance": {
+      "key": "dialogue.contexts.specialist-turn.knowledge-guidance",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "- 制作や修正の進め方、仕様の適用条件、確認方法に迷い、現在の作業情報で判断できないときは、編集に進む前にget_guidanceを使います。\n- goal に達成したい目的を書き、situation に CURRENT_DOCUMENT の revision、直前の操作と観測結果、いま迷っている点を入れます。試していない操作や観測していない結果は書きません。結果を次の応答で確認できるときに呼び出します。\n- 得られた手順と資料は判断の参考にし、現在の作業で許可された範囲を守ります。参照結果を待つ間は、手元の情報で進められる確認を続けます。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:9fb3ae7c5f51b74dcfb429ee75c623dce32e35ce64f6f89665743a264eb47fef"
+        }
+      },
+      "definitionHash": "sha256:42cd7d69cadbb4f252fa37b0d4274d711b2cee8b3caf8b3aedfd655763de27c4",
+      "releaseDigest": "sha256:69f4af27ae55c72d84c252d1256b3c10063b096b9b71daf1b971f1b18304a501"
+    },
     "dialogue.contexts.specialist-turn.rules": {
       "key": "dialogue.contexts.specialist-turn.rules",
       "owner": "unowned",
@@ -5054,5 +5088,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:e41dc557db58d9d328afc3bce6df46e2653b6cffd32b4931ee4a48a307505ebd"
+  "catalogDigest": "sha256:b575d55e1168476581ab252b54ba5d5a2cefe73af65d28e56886b53d7e4ebb07"
 }

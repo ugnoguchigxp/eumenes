@@ -243,6 +243,23 @@ type SpecialistWorkState = {
  * names a domain: everything goes through the binding's adapter.
  */
 export interface SpecialistPort {
+	guidance?: {
+		tool(
+			set: SpecialistSet,
+		): { id: string; description: string; inputSchema: unknown } | undefined;
+		select(
+			args: unknown,
+			context: {
+				sessionId: string;
+				bindingRevisionId: string;
+				revision: number;
+				deadline: number;
+				signal: AbortSignal;
+				assertCurrent(tx: Database): void;
+			},
+		): Promise<unknown>;
+	};
+
 	/** Throws `capability_unavailable` when the toolchain is not a usable session toolchain. */
 	setInTransaction(db: Database, toolchainRevisionId: string): SpecialistSet;
 	/**

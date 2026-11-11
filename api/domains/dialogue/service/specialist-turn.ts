@@ -94,6 +94,7 @@ export type TurnInput = {
 	conversationId: string;
 	set: SpecialistSet;
 	control: ControlContract;
+	guidanceToolId?: string;
 	messages: ChatMessage[];
 	/** Epoch ms the model calls and operations of this turn must finish by. */
 	deadline: number;
@@ -142,6 +143,27 @@ function turnDocument(
 		...documentView(document.text, policy.inlineBytes),
 		rejected: document.rejected,
 		inlineBytes: policy.inlineBytes,
+	};
+}
+
+function turnControl(
+	port: NonNullable<DialogueDeps["specialist"]>,
+	set: SpecialistSet,
+	document: ReturnType<typeof turnDocument>,
+	replyOnly: boolean,
+) {
+	const guidance =
+		document && !replyOnly ? port.guidance?.tool(set) : undefined;
+	return {
+		control: specialistControl(
+			set,
+			[
+				...documentTools(set, document?.outlined ?? false),
+				...(guidance ? [guidance] : []),
+			],
+			replyOnly,
+		),
+		...(guidance ? { guidanceToolId: guidance.id } : {}),
 	};
 }
 
@@ -350,11 +372,7 @@ export function createSpecialistTurnHandler(
 			const policy = agentPolicy(set);
 			const document = turnDocument(port, set, session.workRef, policy, tx);
 			const hostEvent = specialistObservation(deps, tx, run.id, session);
-			const control = specialistControl(
-				set,
-				documentTools(set, document?.outlined ?? false),
-				hostEvent !== null,
-			);
+			const tools = turnControl(port, set, document, hostEvent !== null);
 			return {
 				status: "ready",
 				input: {
@@ -367,9 +385,9 @@ export function createSpecialistTurnHandler(
 					workRef: session.workRef,
 					conversationId: run.conversationId,
 					set,
-					control,
+					...tools,
 					messages: specialistTurnMessages({
-						system: agentSystemMessage(control),
+						system: agentSystemMessage(tools.control),
 						utterance:
 							hostEvent !== null ? HOST_EVENT_NOTICE : input.message.text,
 						course: sessionCourse(deps, tx, session, run, policy),
@@ -531,8 +549,9 @@ export function createSpecialistTurnHandler(
 			}
 			repaired = false;
 			if (action.kind !== "invoke") return { receipts, action };
-			// The last call cannot read a tool's result: an operation then must carry its reply (D11).
-			if (call === max && !action.text) {
+			const lookup = action.tool === input.guidanceToolId;
+			// A lookup needs a following call to consume the result.
+			if (call === max && (!action.text || lookup)) {
 				if (applied) return updated();
 				throw new Error("specialist_turn_limit");
 			}
@@ -546,9 +565,9 @@ export function createSpecialistTurnHandler(
 			);
 			if (result.ok) {
 				// Reading the document changes nothing: only an operation that may change the work counts.
-				if (action.tool !== "doc.view") applied = true;
+				if (action.tool !== "doc.view" && !lookup) applied = true;
 				// The reply the operation carried ends the turn without another call (spec §6.3).
-				if (action.text)
+				if (action.text && !lookup)
 					return hostReply(
 						result.dropped ? `${action.text}${DROPPED_NOTE}` : action.text,
 					);
@@ -631,6 +650,41 @@ async function invoke(
 			if (!deps.larm.validateReceiptInTransaction?.(tx, receipt))
 				throw new StaleTurn("permission_revoked");
 	};
+	if (action.tool === input.guidanceToolId && port.guidance) {
+		try {
+			const document = port.documentOf(input.adapterRef);
+			const revision = deps.store.read((tx) => {
+				authorized(tx);
+				return document?.readInTransaction(tx, input.workRef)?.revision;
+			});
+			if (revision === undefined) throw Error("workspace_unavailable");
+			const assertCurrent = (tx: Database) => {
+				authorized(tx);
+				if (
+					document?.readInTransaction(tx, input.workRef)?.revision !== revision
+				)
+					throw Error("guidance_revision_changed");
+			};
+			const result = await port.guidance.select(action.arguments, {
+				sessionId: input.sessionId,
+				bindingRevisionId: input.set.bindingRevisionId,
+				revision,
+				deadline: input.deadline,
+				signal,
+				assertCurrent,
+			});
+			await deps.store.write((tx) => {
+				assertCurrent(tx);
+				record(tx, { ok: true });
+			});
+			return { ok: true, result };
+		} catch (error) {
+			if (error instanceof StaleTurn || signal.aborted) throw error;
+			const code = safeCode(error, "guidance_unavailable");
+			await refused(code);
+			return { ok: false, error: code };
+		}
+	}
 	if (isDocTool(action.tool) && input.set.agent.document) {
 		const document = port.documentOf(input.adapterRef);
 		if (!document) {

@@ -65,8 +65,8 @@ test("seeding upgrades the published editor without rewriting v1, and repeated s
 				.read((db) => capabilities.toolchainsInTransaction(db))
 				.find((t) => t.id === "markdown.collaborate"),
 		).toMatchObject({
-			revisionId: "toolchain:markdown.collaborate@4",
-			bindingRevisionId: "binding:markdown.collaborate@4",
+			revisionId: "toolchain:markdown.collaborate@5",
+			bindingRevisionId: "binding:markdown.collaborate@5",
 			artifactRevisionId: "artifact:markdown.workspace@4",
 		});
 	} finally {

@@ -58,7 +58,7 @@
 		"eumenes-memory-host": "file:vendor/eumenes-memory-host/eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
 		"eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
 		"eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz",
-		"eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-5a6aa00f8bda.tgz",
+		"eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-e73448ee3a18.tgz",
 		"eumenes-steer": "file:vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
 		"eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz",
 		"eumenes_router": "file:vendor/router/eumenes_router-0.0.2-a5d5ecb08b75.tgz",

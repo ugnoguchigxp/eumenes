@@ -87,6 +87,11 @@ export interface LogFields {
 	processSignal?: string;
 	selectionId?: string;
 	toolchainId?: string;
+	/** Guidance delivery metadata. Situation values and SKILL text stay out of logs. */
+	bindingRevisionId?: string;
+	workRevision?: number;
+	lastAttemptCount?: number;
+	skillDigest?: string;
 	recipeId?: string;
 	decision?: string;
 	outcome?: string;
@@ -198,6 +203,10 @@ const keys = new Set<keyof LogFields>([
 	"requestedRejected",
 	"selectionId",
 	"toolchainId",
+	"bindingRevisionId",
+	"workRevision",
+	"lastAttemptCount",
+	"skillDigest",
 	"recipeId",
 	"decision",
 	"outcome",
