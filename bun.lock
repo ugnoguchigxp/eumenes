@@ -24,7 +24,7 @@
         "eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-c907cb70a230.tgz",
         "eumenes-steer": "file:vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz",
-        "eumenes_router": "file:vendor/router/eumenes_router-0.0.2-a5d5ecb08b75.tgz",
+        "eumenes_router": "file:vendor/router/eumenes_router-0.0.2-bf0219868c31.tgz",
         "google-auth-library": "11.1.0",
         "hono": "4.12.34",
         "llm-fetch": "file:vendor/llm-fetch/llm-fetch-0.1.4-eumenes.1.tgz",
@@ -1487,7 +1487,7 @@
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz", {}, "sha512-FDhxfk81KyuIKcgTHDyuX9SrYaOhKZa1aL0dkkwEausKzm1gRVCsLPNGfloiPoQUEtOc0rMvEr5LJVoWN3W6Hw=="],
 
-    "eumenes_router": ["eumenes_router@vendor/router/eumenes_router-0.0.2-a5d5ecb08b75.tgz", {}, "sha512-YTb2qiGcmYjYavQwz9ASSbxFf45TljhuvFt411MVh1to24CwPoYXawgpLMKqJYGRIVT+VRU8HQnzHGSok7NrEg=="],
+    "eumenes_router": ["eumenes_router@vendor/router/eumenes_router-0.0.2-bf0219868c31.tgz", {}, "sha512-+or3VV+K4DnTasGMxnT/iCZQjYYAn9NlGnHWZAGsPo2c2E2r7cDxyCYP7kMJOhuHjS5b7EuHYwXXZaQzvLErrg=="],
 
     "eventemitter3": ["eventemitter3@5.0.4", "", {}, "sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw=="],
 

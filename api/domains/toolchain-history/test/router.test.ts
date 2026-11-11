@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Hono } from "hono";
+import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { migrations as capabilityMigrations } from "../../capabilities";
 import { ROUTER_TRACE_RETENTION_MS, type RouterTrace } from "../contracts";
@@ -302,6 +303,109 @@ test("without a limit at most five corrections come back", async () => {
 			}),
 		),
 	).toHaveLength(5);
+});
+
+test("corrections preserve source order, old vectors, search limits and host validation", async () => {
+	const { store, history, clock } = setup();
+	const events: unknown[] = [];
+	configureLogging({
+		level: "info",
+		destination: {
+			write(line) {
+				const event = JSON.parse(line);
+				if (event.event.startsWith("toolchain.router_feedback_"))
+					events.push(event);
+			},
+		},
+	});
+	try {
+		const { oldest, first, tied, legacy } = await store.write((db) => {
+			const oldest = history.recordRouterFeedbackInTransaction(
+				db,
+				feedback({ rightId: "oldest" }),
+			);
+			clock.at += 1;
+			const first = history.recordRouterFeedbackInTransaction(
+				db,
+				feedback({ rightId: "first" }),
+			);
+			const tied = history.recordRouterFeedbackInTransaction(
+				db,
+				feedback({
+					rightId: "tied",
+					text: "字".repeat(2001),
+					messageIds: ["related", "m1", "related"],
+				}),
+			);
+			const legacy = history.recordRouterFeedbackInTransaction(
+				db,
+				feedback({
+					rightId: "",
+					query: { space, vector: [1] },
+				}),
+			);
+			return { oldest, first, tied, legacy };
+		});
+		const row = (id: string) =>
+			store.read((db) =>
+				db
+					.query(
+						"SELECT message_ids_json, length(query_text) AS chars, length(query_vector) AS bytes FROM router_feedback WHERE id=?",
+					)
+					.get(id),
+			);
+		expect(row(tied)).toEqual({
+			message_ids_json: '["m1","related"]',
+			chars: 2000,
+			bytes: 16,
+		});
+		expect(row(legacy)).toMatchObject({ message_ids_json: '["m1"]', bytes: 4 });
+		const near = (threshold: number, limit?: number, vector = unit(0)) =>
+			store
+				.read((db) =>
+					history.nearRouterFeedbackInTransaction(db, {
+						space,
+						vector,
+						threshold,
+						limit,
+					}),
+				)
+				.map(({ id }) => id);
+		expect(near(1)).toEqual([tied, first, oldest]);
+		expect(near(1, 0)).toEqual([]);
+		expect(near(1, 1.9)).toEqual([tied]);
+		expect(near(1, undefined, [1])).toEqual([legacy]);
+		expect(near(Number.NaN)).toEqual([]);
+		await expect(
+			store.write((db) =>
+				history.setRouterFeedbackStateInTransaction(
+					db,
+					tied,
+					"invalid" as never,
+				),
+			),
+		).rejects.toThrow("CHECK constraint failed");
+		expect(await history.setRouterFeedbackState(tied, "conflict")).toBe(true);
+		expect(await history.setRouterFeedbackState("missing", "conflict")).toBe(
+			false,
+		);
+		expect(near(1)).toEqual([first, oldest]);
+		expect(events).toMatchObject([
+			...[oldest, first, tied, legacy].map((subjectId) => ({
+				event: "toolchain.router_feedback_recorded",
+				subjectId,
+				runId: "run-1",
+				source: "redirect",
+			})),
+			{
+				event: "toolchain.router_feedback_state",
+				subjectId: tied,
+				phase: "conflict",
+			},
+		]);
+	} finally {
+		configureLogging({ level: "silent" });
+	}
 });
 
 test("a correction starts active; its state changes and the list is newest first with a filter and a bounded limit", async () => {

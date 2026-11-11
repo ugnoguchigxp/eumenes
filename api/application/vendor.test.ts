@@ -9,7 +9,13 @@ import worldPkg from "eumenes-world-model/package.json";
 import worldDistribution from "eumenes-world-model/distribution-manifest.json";
 import routerPkg from "eumenes_router/package.json";
 import { contractVersions, TURN_STRUCTURE_PROMPT } from "eumenes_router";
-import { migrations as routerSql } from "eumenes_router/sqlite";
+import {
+	dbSchemaVersion as routerDbSchemaVersion,
+	insertFeedbackInTransaction,
+	migrations as routerSql,
+	searchFeedback,
+	updateFeedbackStateInTransaction,
+} from "eumenes_router/sqlite";
 
 const root = join(import.meta.dir, "../..");
 const read = (path: string) => readFileSync(join(root, path));
@@ -174,7 +180,7 @@ test("the vendored router package matches its manifest, package.json, the lockfi
 	expect(routerManifest.package).toBe("eumenes_router");
 	expect(routerManifest.source.dirty).toBe(false);
 	expect(routerManifest.source.commit).toBe(
-		"4b5e83db6e1e7497fd6e5967008b7faa3ed0ecbb",
+		"4dc1b0a21532d66288389ca0fbc917df5543151c",
 	);
 	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
 		routerManifest.sha256,
@@ -190,7 +196,12 @@ test("the vendored router package matches its manifest, package.json, the lockfi
 	expect(dependency).toBe(`file:vendor/router/${routerManifest.artifact}`);
 	expect(routerPkg.version).toBe(routerManifest.version);
 	expect(contractVersions).toEqual(routerManifest.contractVersions);
+	expect(contractVersions.feedback).toBe(2);
+	expect(routerDbSchemaVersion).toBe(1);
 	expect(routerSql.length).toBe(routerManifest.dbSchemaVersion);
+	expect(typeof insertFeedbackInTransaction).toBe("function");
+	expect(typeof searchFeedback).toBe("function");
+	expect(typeof updateFeedbackStateInTransaction).toBe("function");
 	expect(TURN_STRUCTURE_PROMPT.version).toBe(
 		routerManifest.entries.routeStructured.structurePrompt,
 	);

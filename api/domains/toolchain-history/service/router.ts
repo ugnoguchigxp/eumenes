@@ -9,22 +9,21 @@ import {
 } from "eumenes_router";
 import {
 	examplesInTransaction,
+	forgetInTransaction,
 	importExamplesInTransaction,
+	insertFeedbackInTransaction,
 	lexicalInTransaction,
 	saveVectorsInTransaction,
+	searchFeedback,
 	srCardsInTransaction,
 	syncCardsInTransaction,
+	updateFeedbackStateInTransaction,
 	type RouterCard,
 	type VectorRow,
 } from "eumenes_router/sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	dot,
-	packVector,
-	unpackVector,
-	vectorSpaceKey,
-} from "../../capabilities";
+import { packVector, unpackVector, vectorSpaceKey } from "../../capabilities";
 import {
 	ROUTER_TRACE_RETENTION_MS,
 	type NearFeedback,
@@ -38,8 +37,6 @@ import {
 import type { RouterFeedbackRow, RouterTraceRow } from "../repository";
 
 const log = getLogger("toolchain-history");
-const NEAR_SCAN = 500;
-const NEAR_LIMIT = 5;
 const LIST_LIMIT = 200;
 const LIST_DEFAULT = 50;
 const TEXT_MAX = 2000;
@@ -246,24 +243,20 @@ export function createRouter(store: SqliteStore, now: () => number) {
 	) {
 		const id = crypto.randomUUID();
 		const at = now();
-		db.query(
-			`INSERT INTO router_feedback(id,conversation_id,message_id,message_ids_json,run_id,source,query_text,query_space,query_vector,wrong_id,right_id,state,created_at,updated_at)
-			 VALUES(?,?,?,?,?,?,?,?,?,?,?,'active',?,?)`,
-		).run(
+		insertFeedbackInTransaction(db, {
 			id,
-			input.conversationId,
-			input.messageId,
-			messageIdsJson(input.messageId, input.messageIds),
-			input.runId,
-			input.source,
-			cap(input.text),
-			vectorSpaceKey(input.query.space),
-			packVector(input.query.vector),
-			input.wrongId,
-			input.rightId,
+			conversationId: input.conversationId,
+			messageId: input.messageId,
+			messageIds: input.messageIds,
+			runId: input.runId,
+			source: input.source,
+			text: input.text,
+			space: input.query.space,
+			vector: input.query.vector,
+			wrongId: input.wrongId,
+			rightId: input.rightId,
 			at,
-			at,
-		);
+		});
 		log.info("toolchain.router_feedback_recorded", {
 			subjectId: id,
 			runId: input.runId,
@@ -276,44 +269,20 @@ export function createRouter(store: SqliteStore, now: () => number) {
 		db: Database,
 		input: RouterQuery & { threshold: number; limit?: number },
 	): NearFeedback[] {
-		const rows = db
-			.query(
-				"SELECT id,wrong_id,right_id,query_vector FROM router_feedback WHERE query_space=? AND state='active' ORDER BY created_at DESC,rowid DESC LIMIT ?",
-			)
-			.all(vectorSpaceKey(input.space), NEAR_SCAN) as Array<
-			Pick<RouterFeedbackRow, "id" | "wrong_id" | "right_id" | "query_vector">
-		>;
-		return rows
-			.map((r) => {
-				const v = unpackVector(r.query_vector);
-				return {
-					id: r.id,
-					wrongId: r.wrong_id,
-					rightId: r.right_id,
-					similarity:
-						v.length === input.vector.length
-							? dot(v, input.vector)
-							: Number.NEGATIVE_INFINITY,
-				};
-			})
-			.filter((f) => f.similarity >= input.threshold)
-			.sort((a, b) => b.similarity - a.similarity)
-			.slice(0, input.limit ?? NEAR_LIMIT);
+		return searchFeedback(db, input);
 	}
 	function setRouterFeedbackStateInTransaction(
 		db: Database,
 		id: string,
 		state: RouterFeedbackState,
 	) {
-		const changed = db
-			.query("UPDATE router_feedback SET state=?,updated_at=? WHERE id=?")
-			.run(state, now(), id).changes;
+		const changed = updateFeedbackStateInTransaction(db, id, state, now());
 		if (changed)
 			log.info("toolchain.router_feedback_state", {
 				subjectId: id,
 				phase: state,
 			});
-		return changed > 0;
+		return changed;
 	}
 	function listRouterFeedbackInTransaction(
 		db: Database,
@@ -338,18 +307,17 @@ export function createRouter(store: SqliteStore, now: () => number) {
 	) {
 		if (!messageIds.length) return 0;
 		let removed = 0;
-		for (const table of ["router_traces", "router_feedback"]) {
-			// SQLite's bound-variable limit is respected by deleting in chunks.
-			for (let i = 0; i < messageIds.length; i += 250) {
-				const chunk = messageIds.slice(i, i + 250);
-				const marks = chunk.map(() => "?").join(",");
-				removed += db
-					.query(
-						`DELETE FROM ${table} WHERE message_id IN (${marks}) OR EXISTS (SELECT 1 FROM json_each(${table}.message_ids_json) m WHERE m.value IN (${marks}))`,
-					)
-					.run(...chunk, ...chunk).changes;
-			}
+		// Each ID binds twice, so keep each delete under SQLite's variable limit.
+		for (let i = 0; i < messageIds.length; i += 250) {
+			const chunk = messageIds.slice(i, i + 250);
+			const marks = chunk.map(() => "?").join(",");
+			removed += db
+				.query(
+					`DELETE FROM router_traces WHERE message_id IN (${marks}) OR EXISTS (SELECT 1 FROM json_each(router_traces.message_ids_json) m WHERE m.value IN (${marks}))`,
+				)
+				.run(...chunk, ...chunk).changes;
 		}
+		removed += forgetInTransaction(db, messageIds);
 		if (removed) log.info("toolchain.router_forgotten", { count: removed });
 		return removed;
 	}

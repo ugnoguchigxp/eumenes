@@ -1,17 +1,17 @@
 {
 	"package": "eumenes_router",
 	"version": "0.0.2",
-	"artifact": "eumenes_router-0.0.2-a5d5ecb08b75.tgz",
-	"sha256": "a5d5ecb08b75947bade22531a3af67262af7e3301553944e4f2fcb03f32bfbfb",
+	"artifact": "eumenes_router-0.0.2-bf0219868c31.tgz",
+	"sha256": "bf0219868c31dcf5c185250b4a313fcd8c0ea2b6183c2d0f337e1bc8d226c376",
 	"source": {
-		"commit": "4b5e83db6e1e7497fd6e5967008b7faa3ed0ecbb",
+		"commit": "4dc1b0a21532d66288389ca0fbc917df5543151c",
 		"dirty": false,
-		"treeDigest": "82ed32f5a3555a3a54bd72d87a9a182aed6ff5d071c9a56e536f2db73bc80205"
+		"treeDigest": "f001f6ef0f089a7f4b16f5c782b46dd492af12ced0700081dcb2a2fda423c5db"
 	},
 	"contractVersions": {
 		"cards": 1,
 		"route": 8,
-		"feedback": 1,
+		"feedback": 2,
 		"structure": 6
 	},
 	"dbSchemaVersion": 1,
@@ -72,5 +72,5 @@
 			"note": "the host imports it (importExamplesInTransaction); made from utterances, it is not in the tarball"
 		}
 	},
-	"verifiedWith": "eumenes_router: typecheck, lint, format, required offline Python regressions, bun test 129 pass / 0 skip / 0 todo / 0 fail, mainline parity ran; tarball checksum and isolated consumer on built JavaScript/SQLite passed; wrong checksum refused"
+	"verifiedWith": "eumenes_router: typecheck, lint, format, required offline Python regressions, bun test 132 pass / 0 skip / 0 todo / 0 fail, mainline parity ran; tarball checksum and isolated consumer on built JavaScript/SQLite passed; wrong checksum refused"
 }
