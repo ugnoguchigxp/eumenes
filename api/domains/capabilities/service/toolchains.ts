@@ -264,9 +264,12 @@ export function createToolchains(
 			}
 		});
 	}
+	/** The toolchains a selection may offer: the active ones, but those a revision withdrew from selection. */
+	const selectableInTransaction = (db: Database) =>
+		activeInTransaction(db).filter((d) => d.selectable !== false);
 	function pendingVectorsInTransaction(db: Database, space: VectorSpace) {
 		const key = vectorSpaceKey(space);
-		return [...activeInTransaction(db), ...readToolEntries].flatMap((d) =>
+		return [...selectableInTransaction(db), ...readToolEntries].flatMap((d) =>
 			toolchainPassages(d).flatMap((text, item) => {
 				const row = db
 					.query(
@@ -291,7 +294,7 @@ export function createToolchains(
 	) {
 		const key = vectorSpaceKey(space);
 		const active = new Map(
-			[...activeInTransaction(db), ...readToolEntries].map(
+			[...selectableInTransaction(db), ...readToolEntries].map(
 				(d) => [d.revisionId, d] as const,
 			),
 		);
@@ -333,11 +336,16 @@ export function createToolchains(
 			 * eumenes_router package) offered for the turn.
 			 */
 			ids?: readonly string[];
+			/** Every active toolchain, withdrawn ones too: the exact revision of a work asks for its own card. */
+			unselectable?: true;
 		},
 	): ToolchainCard[] {
-		const active = [...activeInTransaction(db), ...readToolEntries].filter(
-			(d) => input.available(d.id),
-		);
+		const active = [
+			...(input.unselectable
+				? activeInTransaction(db)
+				: selectableInTransaction(db)),
+			...readToolEntries,
+		].filter((d) => input.available(d.id));
 		if (input.ids) {
 			const byId = new Map(active.map((d) => [d.id, d]));
 			return cardsOf(
@@ -493,13 +501,13 @@ export function createToolchains(
 			return { ...body, digest: cardDigest(body) };
 		};
 		return [
-			...activeInTransaction(db).map((d) => card(d, false)),
+			...selectableInTransaction(db).map((d) => card(d, false)),
 			...readToolEntries.map((d) => card(d, true)),
 		];
 	}
 	/** Every active toolchain's examples, for routing evaluation. */
 	function examplesInTransaction(db: Database) {
-		return activeInTransaction(db).map((d) => ({
+		return selectableInTransaction(db).map((d) => ({
 			id: d.id,
 			functionName: d.functionName!,
 			examples: d.examples ?? [],
@@ -519,7 +527,7 @@ export function createToolchains(
 		) =>
 			rankPastRequests(
 				db,
-				[...activeInTransaction(db), ...readToolEntries].filter((d) =>
+				[...selectableInTransaction(db), ...readToolEntries].filter((d) =>
 					input.available(d.id),
 				),
 				input.queries,

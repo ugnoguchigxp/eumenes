@@ -89,7 +89,7 @@ export type AgencyHostDeps = {
 	 * next model call. Absent: they wait for a reply of their own.
 	 */
 	steering?: SteeringInbox;
-	/** Which capability a research ticket runs on (the revision id in the catalog); absent: the web research. */
+	/** Which capability a research ticket runs on (the revision id in the catalog); absent: the web note toolchain. */
 	researchRevision?(
 		catalog: ReadonlyArray<{
 			revisionId: string;

@@ -200,6 +200,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 				await s.toolchain.pursuit?.recover();
 			},
 		},
+		{ name: "web_note_recovery", recover: () => s.toolchain.webNote.recover() },
 		{
 			name: "visual_analysis_recovery",
 			recover: async () => {
@@ -302,6 +303,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
 		{ name: "pursuit", close: () => s.toolchain.pursuit?.close() },
+		{ name: "web_note", close: () => s.toolchain.webNote.close() },
 		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },
 		{ name: "shell", close: () => s.toolchain.shell.closeAll() },
 		{ name: "terminals", close: () => s.toolchain.terminals.closeAll() },

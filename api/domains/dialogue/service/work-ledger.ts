@@ -35,7 +35,7 @@ import {
 	workNotices,
 	workPage,
 	workRefs,
-	WEB_RESEARCH_WORK,
+	WEB_RESEARCH_WORKS,
 	type ConfirmationRow,
 	type WorkOutcome,
 	type WorkRow,
@@ -461,7 +461,10 @@ export function createWorkLedger(
 			if (report.status === "done") archiveWork(db, workId, clock());
 			const next = workById(db, workId)!;
 			logResult(db, next);
-			if (next.status === "done" && next.toolchainId === WEB_RESEARCH_WORK) {
+			if (
+				next.status === "done" &&
+				WEB_RESEARCH_WORKS.includes(next.toolchainId)
+			) {
 				const messageId = next.messageIds[0];
 				if (messageId)
 					deps.resourceLedger?.linkMessageToWorkInTransaction(

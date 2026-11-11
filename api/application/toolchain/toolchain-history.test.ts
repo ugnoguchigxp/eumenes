@@ -142,7 +142,8 @@ test("without vectors every available toolchain is offered; with vectors the top
 		[
 			...toolchainBuiltins.map((d) => d.id),
 			"timers.manage",
-			"web.search",
+			// `web.search` is withdrawn from selection (`selectable: false`): it is not among the candidates.
+			"scheduler.manage",
 			"music.create",
 			"music.library",
 			// This test's explicit availability callback enables every registered entry except timers.
@@ -164,7 +165,7 @@ test("without vectors every available toolchain is offered; with vectors the top
 			)
 			.sort(),
 	);
-	// Toolchain i's passages point in direction i; the query points at web.search.
+	// Toolchain i's passages point in direction i; the query points at one of them.
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
 	// Give every registered entry a distinct direction as the catalog grows.
 	const rankedSpace = { ...space, dimension: active.length };
@@ -182,7 +183,7 @@ test("without vectors every available toolchain is offered; with vectors the top
 			),
 		),
 	);
-	const web = active.findIndex((d) => d.id === "web.search");
+	const web = active.findIndex((d) => d.id === "music.create");
 	const ranked = store.read((db) =>
 		capabilities.toolchainCandidatesInTransaction(db, {
 			text: "鎌倉の天気を教えて",
@@ -193,9 +194,24 @@ test("without vectors every available toolchain is offered; with vectors the top
 			available,
 		}),
 	);
-	expect(ranked[0]!.id).toBe("web.search");
+	expect(ranked[0]!.id).toBe("music.create");
 	expect(ranked.length).toBeLessThanOrEqual(4);
 	expect(ranked[0]!.score.similarity).toBe(1);
+	// A query pointing straight at the withdrawn Web search does not offer it.
+	const withdrawn = store.read((db) =>
+		capabilities.toolchainCandidatesInTransaction(db, {
+			text: "鎌倉の天気を教えて",
+			vector: {
+				space: rankedSpace,
+				values: oneHot(
+					active.findIndex((d) => d.id === "web.search"),
+					rankedSpace.dimension,
+				),
+			},
+			available,
+		}),
+	);
+	expect(withdrawn.map((c) => c.id)).not.toContain("web.search");
 	// A vector of another space is never compared.
 	const other = store.read((db) =>
 		capabilities.toolchainCandidatesInTransaction(db, {

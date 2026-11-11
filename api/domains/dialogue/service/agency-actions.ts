@@ -61,6 +61,8 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 		const port = deps.execution?.();
 		return port
 			? (deps.toolchains?.catalogInTransaction(db) ?? []).flatMap((entry) => {
+					// Withdrawn from selection (web.search since 2026-11-11): never offered, so never started from here.
+					if (entry.selectable === false) return [];
 					const card = deps.toolchains!.cardInTransaction(db, entry.revisionId);
 					if (!card) return [];
 					const policy = port.autonomyInTransaction?.(db, entry.revisionId);

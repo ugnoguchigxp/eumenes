@@ -8,6 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
+| [Codex の検索による調べもの（web.note）](web-note-codex-search-2026-11-11.md) | 2026-11-11、利用者の決定に基づき実装・固定試験済み（fake の Codex）。`web.search` は残すが選択から外し（`selectable:false`）、Codex SDK + Luna のライブ検索による `web.note` を単発の調べものと agency の調べものの標準にした。実 Codex での確認は未実施 |
 | [Pursuit調査結果のMarkdown保存](web-research-markdown-design-2026-11-08.md) | 2026-11-08、合意済み・実装・固定検証済み。担当を切り替えずタイトル付きMarkdownを既存scratchと利用可能なDoclingの `eumenes/research/` へ保存。関連1,558件と最終シナリオ37件、型・buildが成功。一括verifyの既存inventory問題と実接続受入は残る。[検証記録](verification/web-research-markdown-2026-11-08/README.md) |
 | [always-onのEumenes取り込み実装計画](agency-always-on-integration-plan-2026-11-08.md) | 2026-11-08、実装・固定検証を実施。独立推論、保存票・原観測、準備・通常応答、busy、排他的切替を接続。[実装・検証記録](verification/agency-always-on-integration-2026-11-08/README.md)。Live実配送の対応、全体検証の阻害、実モデル・利用者受入を区別して残す |
 | [LARM文書ライブラリ拡張への対応](markdown-library-api-design-2026-11-07.md) | 実装・固定試験・接続仕様更新済み。旧GET/PUT互換、文書/空フォルダー管理、複数選択・配下操作、固定要求の永続化とGET照合。再起動後の公開API・Artifact @4・既存一覧/編集/cache表示を確認済み。拡張配備後の実機受入は未実施。[検証記録](verification/markdown-library-api-2026-11-07/README.md) |

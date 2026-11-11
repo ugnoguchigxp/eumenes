@@ -77,9 +77,13 @@ export interface ToolchainRoutingPort {
 	 * Every active toolchain with its host runtime: the fixed map for unbound chains, the binding
 	 * and adapter availability for bound ones. Replaces the builtin array as the offer source.
 	 */
-	catalogInTransaction(
-		db: Database,
-	): Array<{ id: string; revisionId: string; runtime: ToolchainRuntimeMeta }>;
+	catalogInTransaction(db: Database): Array<{
+		id: string;
+		revisionId: string;
+		runtime: ToolchainRuntimeMeta;
+		/** `false`: the toolchain's revision is withdrawn from selection; it stays runnable when named. */
+		selectable?: false;
+	}>;
 	/** The fixed set a command sub-agent loads (profile, SKILL, tool details). */
 	commandSetInTransaction(
 		db: Database,

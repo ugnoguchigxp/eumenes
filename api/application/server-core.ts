@@ -30,6 +30,7 @@ import {
 import { getLogger } from "../infrastructure/logger";
 import { openStore } from "../infrastructure/sqlite";
 import type { Config } from "../infrastructure/config";
+import { WEB_NOTE_RESOURCE } from "../domains/web-note";
 import { createChanges } from "./events";
 import { migrations } from "./migrations";
 import { createWebReview } from "./toolchain/web-content-review";
@@ -96,6 +97,8 @@ export async function buildCore(
 			"inference.llm": 1,
 			"inference.aux": 2,
 			"web.fetch": 6,
+			// Research notes: Codex's own web search, a process of its own per run.
+			[WEB_NOTE_RESOURCE]: 2,
 		},
 	});
 	return {

@@ -156,6 +156,11 @@ export async function createHostToolchain(
 		inference: InferencePort &
 			Parameters<typeof createToolchainHostLinks>[0]["inference"];
 		webResearch: WebResearchService;
+		/** The research note task's Codex turn and its ledger record (absent: the task is not offered). */
+		webNote?: Pick<
+			import("../../domains/web-note").WebNoteDeps,
+			"turn" | "record" | "model"
+		>;
 		timers?: TimersService;
 		schedules?: import("../scheduler/scheduler-adapter").SchedulerAdapterPorts;
 		history?: boolean;
@@ -218,6 +223,7 @@ export async function createHostToolchain(
 			kanban,
 			kanbanSdk: sdkHost,
 			webResearch: s.webResearchEnabled,
+			...(s.webNote ? { webNote: s.webNote } : {}),
 			weather: {},
 			stock: {},
 			embed: s.embed,

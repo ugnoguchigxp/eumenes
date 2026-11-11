@@ -25,7 +25,11 @@ export function createSearchCheck(deps: {
 			return deps.store.read((db) => {
 				// The read tools are found by the same search (spec conversation-read-tools-design 2026-10-31 §2.6).
 				const available = new Set([
-					...deps.routing.catalogInTransaction(db).map((entry) => entry.id),
+					// A toolchain withdrawn from selection is not searched for: its past choices are only counted.
+					...deps.routing
+						.catalogInTransaction(db)
+						.filter((entry) => entry.selectable !== false)
+						.map((entry) => entry.id),
 					...READ_TOOLS.map((tool) => tool.name),
 				]);
 				const ranks: Record<string, number> = {};

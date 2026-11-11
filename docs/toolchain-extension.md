@@ -108,6 +108,8 @@ Seedに含めるのは再利用する定義だけで、会話、実行・操作�
    ```
 3. **definitionsを書く**: 新しいprofile・skill・package・toolchainを書く。本文はJSON文字列で持ち、既存revisionの本文は変えない。toolchainの必須項目は `functionName`（`^[a-z][a-z0-9_]{2,40}$`、全体で一意）、`summary`、`useWhen`（1件以上）、`examples`（3件以上・各200字以内。候補検索の索引と評価に使う）、`redirects`、`dependencies` と `packageRevisionId`（同じpackage一つ）、`bindingRevisionId`、`artifactRevisionId`。任意の `minImpact`（`none`・`create`・`modify_existing`・`irreversible`）は、その担当の仕事が既存のものに与える影響の下限で、会話エージェントの申告より大きければこちらを使う。`modify_existing`・`irreversible`の仕事は、会話エージェントが実行前の確認（依頼の`confirm`）を出してからでないと実行されない（[ContextWindow仕様](../spec/context-window-spec-2026-10-24.md) §6.7）。未宣言なら申告を使う。表示はartifact登録が担うので、旧形式の `artifact` 項目は不要（書いても使われない。新しく書かない）。
    任意の `general`（値は `true` だけ）は、話題を問わず一般的な手段（Web・ブラウザ・シェル・汎用のエージェント）で依頼をこなす汎用の担当に付ける。担当の検索は、専用の担当の上位3件とは別の枠で、1位の候補との差が 0.05 以内の汎用の担当を2件まで候補に足し、会話エージェントは合う専用の担当がないときだけ使う（[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §2〜§4）。パイプライン（bindingの `execution:"pipeline"`）も同じ形で2件までの枠を持つ。
+
+   任意の `selectable`（値は `false` だけ、toolchainのみ）は、その revision を選択から外す。Routerのcards、検索（`find_toolchain`・Agencyの能力検索）の候補、パイプラインの部品、ベクトル更新に出なくなる。revision は登録されたまま、名前（revision）を指した実行は従来どおり動く。置き換えた担当（例 `web.search` → `web.note`）を残すときに新しい revision で立てる（[web-note](../spec/web-note-codex-search-2026-11-11.md)）。
    `summary`・`useWhen`・`examples` は担当の検索の索引になる。種類ごとに書くものを分ける。専用の担当は何を扱うか（対象・物・結果）を書き、ほかの担当の持ち分の依頼を書かない。パイプラインは依頼の全体の流れを書き、各ステップ単独の依頼に似た文を書かない。汎用の担当はどうやるか（手段・場所）を書き、専用の担当がある話題（天気・株価など）の例を書かない。例文は、効果の確かめに使う過去の発言の写しにしない。
 4. **bindingを書く**:
 

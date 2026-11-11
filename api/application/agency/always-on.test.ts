@@ -649,7 +649,7 @@ test("own speech rests on the user's recent words and the memory the model saw, 
 	}
 });
 
-test("research runs on the web research capability only, never an unrelated one", () => {
+test("research runs on the web note capability only, never an unrelated one (nor the deep web research)", () => {
 	const deps = {} as Parameters<typeof researchRevision>[0];
 	const free = (revisionId: string, effect = "read") => ({
 		revisionId,
@@ -666,11 +666,19 @@ test("research runs on the web research capability only, never an unrelated one"
 		researchRevision(deps, [
 			free("toolchain:weather.forecast@1"),
 			free("toolchain:web.research@7"),
+			free("toolchain:web.search@11"),
+			free("toolchain:web.note@1"),
 		]),
-	).toBe("toolchain:web.research@7");
+	).toBe("toolchain:web.note@1");
 	expect(
 		researchRevision(deps, [
-			{ revisionId: "toolchain:web.research@7", requiresApproval: true },
+			free("toolchain:web.research@7"),
+			free("toolchain:web.search@11"),
+		]),
+	).toBeUndefined();
+	expect(
+		researchRevision(deps, [
+			{ revisionId: "toolchain:web.note@1", requiresApproval: true },
 		]),
 	).toBeUndefined();
 });

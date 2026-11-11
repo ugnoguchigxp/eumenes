@@ -396,6 +396,52 @@ export function createInference(
 				revokedRequests.add(requestId);
 		},
 		releaseTaskSession: taskSessionRelease(store, ports),
+		async recordExternalCodexAttempt(input: {
+			subject: string;
+			model: string | null;
+			started: number;
+			ended: number;
+			status: "succeeded" | "failed";
+			reason: string | null;
+			usage: {
+				input: number;
+				cachedInput: number;
+				output: number;
+				reasoning: number;
+			} | null;
+		}) {
+			await store.write((db) => {
+				const requestId = capture(
+					db,
+					input.subject,
+					"llm",
+					input.ended,
+					settings.inTransaction(db),
+				);
+				db.query("UPDATE inference_requests SET status=? WHERE id=?").run(
+					input.status === "succeeded" ? "accepted" : "failed",
+					requestId,
+				);
+				db.query(
+					"INSERT INTO inference_attempts(id,request_id,source,model,status,reason,started,ended,accepted,input_tokens,output_tokens,cache_read_tokens,reasoning_tokens,usage_model,usage_observed,session_role,billing_path,connection_name,connection_kind) VALUES(?,?,'cloud',?,?,?,?,?,?,?,?,?,?,?,?,'auxiliary','codex','Codex SDK','codex-sdk')",
+				).run(
+					crypto.randomUUID(),
+					requestId,
+					input.model,
+					input.status,
+					input.reason,
+					input.started,
+					input.ended,
+					input.status === "succeeded" ? 1 : 0,
+					input.usage?.input ?? null,
+					input.usage?.output ?? null,
+					input.usage?.cachedInput ?? null,
+					input.usage?.reasoning ?? null,
+					input.usage ? input.model : null,
+					input.usage ? 1 : 0,
+				);
+			});
+		},
 		flushCancelledRequests(requestIds: string[]) {
 			for (const requestId of requestIds)
 				if (store.read((db) => get(db, requestId))?.status === "cancelled")

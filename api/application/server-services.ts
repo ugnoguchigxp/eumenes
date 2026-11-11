@@ -47,6 +47,7 @@ import { createSpecialistPort } from "./toolchain/specialist-port";
 import { buildBrowser } from "./browser/browser-composition";
 import { createToolchainRouting } from "./toolchain/toolchain-routing";
 import { createHostToolchain } from "./toolchain/toolchain-host";
+import { createCodexWebNote } from "./web-note/codex-web-note";
 import { assembleAgency } from "./agency/assembly";
 import { createAgencyWork } from "./agency/work";
 
@@ -225,6 +226,12 @@ export async function buildServices(
 		log,
 		history: config.historyToolsEnabled,
 		webResearchEnabled: config.webResearchToolsEnabled,
+		webNote: createCodexWebNote(
+			config.env,
+			config.researchCodexExecutable,
+			inference,
+			settings,
+		),
 		embed: embedder,
 		terminalHooks: {
 			baseUrl: `http://${config.host}:${config.port}`,
@@ -335,6 +342,7 @@ export async function buildServices(
 			settings,
 			...workflowPorts,
 			pursuit: toolchain.pursuit,
+			webNote: toolchain.webNote,
 			collaboration: toolchain.collaboration,
 			interact: browser.interact,
 			queue,

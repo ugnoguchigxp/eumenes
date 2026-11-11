@@ -422,6 +422,12 @@ export type Definition = {
 	 */
 	general?: true;
 	/**
+	 * Toolchain only: `false` keeps the toolchain out of every selection (the router's cards, the search behind
+	 * `find_toolchain` and the agency's catalog search, the search check). It stays registered and runs as before for
+	 * work that names its revision (earlier works, explicit calls); nothing offers it any more.
+	 */
+	selectable?: false;
+	/**
 	 * Toolchain only, new revisions only (absent from the JSON of earlier ones): the stored
 	 * binding that connects the package's tools to a host adapter, and the stored artifact
 	 * registration that presents it. Both are set together.

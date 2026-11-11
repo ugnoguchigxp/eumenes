@@ -262,6 +262,26 @@ export interface InferencePort {
 	/** A task finished (any outcome): drops its agent sessions. Unreleased ones expire (`recover`). */
 	releaseTaskSession?(taskId: string): Promise<void>;
 	flushCancelledRequests?(requestIds: string[]): void;
+	/**
+	 * A call a host-run Codex SDK turn made outside any request of ours (the turn is not sent through a saved
+	 * connection): recorded as a finished, accepted `codex-sdk` attempt with its tokens, so usage views count it.
+	 * `subject` is unique per call.
+	 */
+	recordExternalCodexAttempt?(input: {
+		subject: string;
+		/** null: the turn ran on Codex's own default model. */
+		model: string | null;
+		started: number;
+		ended: number;
+		status: "succeeded" | "failed";
+		reason: string | null;
+		usage: {
+			input: number;
+			cachedInput: number;
+			output: number;
+			reasoning: number;
+		} | null;
+	}): Promise<void>;
 	setContextPolicyInTransaction?(
 		db: Database,
 		requestId: string,

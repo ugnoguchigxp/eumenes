@@ -1,0 +1,7 @@
+{
+	"reasoning": "low",
+	"webSearch": "live",
+	"outputMaxBytes": 65536,
+	"requestMaxChars": 8000,
+	"sourcesKept": 8
+}

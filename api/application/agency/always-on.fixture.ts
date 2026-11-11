@@ -59,12 +59,14 @@ export async function agendaFixture(
 		media?: ReturnType<typeof imageFixture>;
 		routeSpeech?: NonNullable<AgencyHostDeps["routeSpeechInTransaction"]>;
 		steering?: boolean;
+		webNote?: NonNullable<Parameters<typeof harness>[0]>["webNote"];
 	} = {},
 ) {
 	const h = await harness({
 		memory: true,
 		resources: true,
 		everyday: true,
+		...(options.webNote ? { webNote: options.webNote } : {}),
 		...(options.media
 			? { model: options.media.model, imageGateway: options.media.gateway }
 			: {}),

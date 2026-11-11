@@ -9,6 +9,7 @@ import {
 	markdownDomainSchemas,
 } from "../markdown/markdown-adapter";
 import { describePursuitAdapter } from "../pursuit/pursuit-adapter";
+import { describeWebNoteAdapter } from "../web-note/web-note-adapter";
 import {
 	DOCLING_ADAPTER_REF,
 	describeDoclingAdapter,
@@ -243,6 +244,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
 	{ ref: "adapter:pursuit@1", describe: () => describePursuitAdapter(1) },
 	{ ref: "adapter:pursuit@2", describe: () => describePursuitAdapter(2) },
+	{ ref: "adapter:web-note@1", describe: describeWebNoteAdapter },
 	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: SCHEDULER_ADAPTER_REF, describe: describeSchedulerAdapter },

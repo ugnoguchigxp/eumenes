@@ -648,6 +648,7 @@ export async function harness(options: HarnessOptions = {}) {
 		};
 	const toolchain = await createToolchain(store, queue, inference, web, {
 		webResearch: options.webResearch,
+		...(options.webNote ? { webNote: options.webNote } : {}),
 		docling: options.docling,
 		compute,
 		browser,
@@ -678,6 +679,23 @@ export async function harness(options: HarnessOptions = {}) {
 		stock: options.stock,
 	});
 	activeCapabilities = toolchain.capabilities;
+	// The research scenarios of these fixtures run the Web search executor through selection. Production withdraws
+	// it from selection (revision 11); the fixtures publish the earlier revision again unless a test is about that.
+	if (
+		!options.withdrawnWebSearch &&
+		store.read((db) =>
+			toolchain.capabilities
+				.toolchainsInTransaction(db)
+				.some((d) => d.id === "web.search"),
+		)
+	)
+		await store.write((db) =>
+			toolchain.capabilities.publishToolchainRevisionInTransaction(
+				db,
+				"web.search",
+				"toolchain:web.search@10",
+			),
+		);
 	await dotsWork?.setup();
 	const music = options.musicGateway
 		? createMusic({
@@ -834,6 +852,7 @@ export async function harness(options: HarnessOptions = {}) {
 		options.everyday ||
 		options.pipelines ||
 		options.pursuit ||
+		options.webNote ||
 		appRuntime ||
 		options.schedules
 	) {
@@ -854,6 +873,7 @@ export async function harness(options: HarnessOptions = {}) {
 			...appWorkflowPorts,
 			settings,
 			pursuit: toolchain.pursuit,
+			webNote: toolchain.webNote,
 			collaboration: toolchain.collaboration,
 			interact: browser?.interact,
 			memory,
@@ -990,6 +1010,7 @@ export async function harness(options: HarnessOptions = {}) {
 		},
 		async close() {
 			await toolchain.pursuit?.close();
+			toolchain.webNote.close();
 			await browser?.service.disconnect();
 			await kanbanRuns?.disconnect();
 			terminals?.closeAll();

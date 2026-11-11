@@ -3,6 +3,12 @@ import { createPursuit, type PursuitService } from "../../domains/pursuit";
 import { createPursuitAdapters } from "../pursuit/pursuit-adapter";
 import { createResearchDocuments } from "../pursuit/document-port";
 import { createPursuitWebPort } from "../pursuit/web-port";
+import {
+	createWebNote,
+	type WebNoteDeps,
+	type WebNoteService,
+} from "../../domains/web-note";
+import { createWebNoteAdapter } from "../web-note/web-note-adapter";
 import { createMarkdownAdapter } from "../markdown/markdown-adapter";
 import { createDoclingAdapter } from "../docling/docling-adapter";
 import { createDotsMessagingAdapter } from "../work/dots-messaging-adapter";
@@ -132,6 +138,11 @@ type ToolchainOptions = {
 	/** LARM embedding provider; without it retrieval uses full-text search only. */
 	embed?: Embed;
 	webResearch?: boolean;
+	/**
+	 * The research note task (Codex's own web search): one Codex turn and the ledger record of it. Absent: the task is
+	 * not offered.
+	 */
+	webNote?: Pick<WebNoteDeps, "turn" | "record" | "model">;
 	conversation?: import("../../domains/conversation").ConversationService;
 	timers?: import("../../domains/timers").TimersService;
 	schedules?: SchedulerAdapterPorts;
@@ -241,6 +252,7 @@ function enabledBackends(options: ToolchainOptions) {
 		...(options.markdown ? ["markdown"] : []),
 		"task-execution",
 		...(options.webResearch !== false ? ["pursuit"] : []),
+		...(options.webNote?.turn ? ["web-note"] : []),
 		...(options.webResearch !== false ? ["web"] : []),
 		...(options.timers ? ["timer"] : []),
 		...(options.dots ? ["dots"] : []),
@@ -273,6 +285,7 @@ export async function createToolchain(
 	options: ToolchainOptions = {},
 ) {
 	let pursuitRuntime: PursuitService | undefined;
+	let webNoteRuntime: WebNoteService | undefined;
 	let taskRuntime:
 		import("../../domains/agent-runtime").AgentRuntime | undefined;
 	const shared =
@@ -300,6 +313,7 @@ export async function createToolchain(
 			() => pursuitRuntime,
 			options.webResearch !== false,
 		),
+		createWebNoteAdapter(() => webNoteRuntime, !!options.webNote?.turn),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk
 			? [
@@ -421,6 +435,12 @@ export async function createToolchain(
 		web: createPursuitWebPort(web, queue),
 		documents: createResearchDocuments(options, () => pursuitRuntime),
 	});
+	webNoteRuntime = createWebNote({
+		store,
+		queue,
+		capabilities,
+		...options.webNote,
+	});
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(
 		web,
@@ -527,6 +547,7 @@ export async function createToolchain(
 	return {
 		capabilities,
 		pursuit: pursuitRuntime,
+		webNote: webNoteRuntime,
 		collaboration,
 		childOperations: children,
 		registry,

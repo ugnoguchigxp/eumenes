@@ -92,7 +92,8 @@ export function registerRevision(
 		d.bindingRevisionId !== undefined ||
 		d.artifactRevisionId !== undefined ||
 		d.minImpact !== undefined ||
-		d.general !== undefined
+		d.general !== undefined ||
+		d.selectable !== undefined
 	)
 		throw new Error("invalid_capability");
 	db.query("INSERT INTO capability_revisions VALUES(?,?,?,?,?,?)").run(
@@ -170,7 +171,8 @@ export function validateToolchain(
 		(d.redirects ?? []).some((r) => !r.when.trim() || r.toolchainId === d.id) ||
 		(d.minImpact !== undefined &&
 			!(toolchainImpacts as readonly string[]).includes(d.minImpact)) ||
-		(d.general !== undefined && d.general !== true)
+		(d.general !== undefined && d.general !== true) ||
+		(d.selectable !== undefined && d.selectable !== false)
 	)
 		throw new Error("invalid_toolchain");
 	// Tools offered to a model take one flat object; a discriminator or union is never allowed.

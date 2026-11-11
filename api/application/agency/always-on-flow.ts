@@ -19,8 +19,8 @@ type ResearchTicket = Extract<AgendaTicket, { kind: "research" }>;
 type SpeakTicket = Extract<AgendaTicket, { kind: "speak" }>;
 
 /**
- * The capability a research runs on: the web research toolchain, never another one. Without it the research cannot
- * be done (the user's request is not handed to an unrelated capability).
+ * The capability a research runs on: the web note toolchain (Codex's own web search), never another one. Without it
+ * the research cannot be done (the user's request is not handed to an unrelated capability).
  */
 export function researchRevision(
 	deps: AgencyHostDeps,
@@ -34,7 +34,7 @@ export function researchRevision(
 	return catalog.find(
 		(card) =>
 			!card.requiresApproval &&
-			card.revisionId.startsWith("toolchain:web.research@"),
+			card.revisionId.startsWith("toolchain:web.note@"),
 	)?.revisionId;
 }
 

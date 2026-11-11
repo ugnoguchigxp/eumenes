@@ -32,6 +32,7 @@ import { reference, result, total } from "./task-execution-values";
 
 export type TaskExecutionHost = {
 	pursuit?: import("../../domains/pursuit").PursuitService;
+	webNote?: import("../../domains/web-note").WebNoteService;
 	settings?: Pick<
 		import("../../domains/settings").SettingsService,
 		"inTransaction"
@@ -145,6 +146,36 @@ function configurePursuit(
 			},
 		});
 	}
+}
+function configureWebNote(
+	host: TaskExecutionHost,
+	port: ToolchainExecutionPort,
+) {
+	const { dialogue } = host;
+	const note = host.webNote;
+	if (!note) return;
+	note.configure({
+		validSourceInTransaction: port.validSourceInTransaction,
+		revokeDeliveryInTransaction: dialogue.revokeExecutionNoticeInTransaction,
+		deliveryStateInTransaction: dialogue.noticeDeliveryInTransaction,
+		deliverInTransaction(db, view, eventId) {
+			// The agency reads an autonomous note from its ledger: there is no notice to send.
+			const root = note.sourceRunInTransaction(db, view.id);
+			if (root && autonomousActionSource(db, root, Date.now())) return true;
+			return !sendExecutionNotice(
+				{
+					dialogue,
+					agents: {
+						executions: { sourceRunInTransaction: note.sourceRunInTransaction },
+					},
+				},
+				db,
+				view,
+				eventId,
+				"reference",
+			);
+		},
+	});
 }
 /** Composition of public operations. Only execution types dispatch here; the model chooses the purpose. */
 export function configureTaskExecution(host: TaskExecutionHost) {
@@ -395,6 +426,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 	};
 	agents.executions.configure(port);
 	configurePursuit(host, port);
+	configureWebNote(host, port);
 	configureCollaboration(host, port);
 	host.browser?.setTaskExecutionSource((db, frozen) => {
 		const child = (frozen as { execution?: ChildExecution } | null)?.execution;

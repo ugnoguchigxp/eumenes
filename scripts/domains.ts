@@ -517,6 +517,22 @@ export const domains = {
 			test: [],
 		},
 	},
+	"web-note": {
+		tier: 3,
+		integrationTests: [
+			"api/application/agency/web-note-research.test.ts",
+			"api/application/web-note/codex-web-note.test.ts",
+			"api/application/web-note/web-note-integration.test.ts",
+		],
+		backend: "api/domains/web-note",
+		web: null,
+		components: null,
+		depends: {
+			api: ["capabilities", "queue", "tool-runtime"],
+			web: [],
+			test: [],
+		},
+	},
 	dialogue: {
 		tier: 5,
 		backend: "api/domains/dialogue",

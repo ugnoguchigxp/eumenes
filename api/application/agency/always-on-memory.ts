@@ -7,6 +7,7 @@ const SUMMARY_MAX = 240;
 
 type Result = {
 	status?: unknown;
+	title?: unknown;
 	summary?: unknown;
 	answer?: unknown;
 	document?: { title?: unknown } | null;
@@ -42,9 +43,12 @@ export function noteFromResult(input: {
 		.replace(/\n?相手が示したURL:.*$/su, "")
 		.trim();
 	const title =
+		text(result?.title) ||
 		text(result?.document?.title) ||
 		request.replace(/\s+/gu, " ").slice(0, 60) ||
 		"調べもの";
+	// A note that already names its sources in its text does not get them listed again.
+	const answer = text(result?.answer);
 	const body = result
 		? [
 				text(result.answer) || text(result.summary),
@@ -56,6 +60,7 @@ export function noteFromResult(input: {
 					? result.limitations.map((x) => `- 限界: ${text(x)}`)
 					: []),
 				...(result.sources ?? [])
+					.filter((s) => !text(s.url) || !answer.includes(text(s.url)))
 					.map((s) => [text(s.title), text(s.url)].filter(Boolean).join(" "))
 					.filter(Boolean)
 					.map((x) => `- 出典: ${x}`),
@@ -79,7 +84,13 @@ export function noteFromResult(input: {
 	return {
 		id: input.id,
 		title,
-		summary: (text(result?.answer) || text(result?.summary) || readable)
+		// A note that brings its own title brings its own summary: the conclusion the agent plans with.
+		summary: (
+			(text(result?.title) ? text(result?.summary) : "") ||
+			text(result?.answer) ||
+			text(result?.summary) ||
+			readable
+		)
 			.replace(/\s+/gu, " ")
 			.slice(0, SUMMARY_MAX),
 		markdown: `# ${title}\n\n${readable}`.slice(0, MARKDOWN_MAX),

@@ -63,6 +63,7 @@ export function createAgencyStatePort(
 					// Runtime routes are execution contracts, not semantic topic judgments.
 					// They are checked first: a card reads the whole toolchain set, and this runs per agency checkpoint.
 					if (
+						entry.selectable === false ||
 						entry.runtime.binding ||
 						(entry.runtime.route !== "web" && entry.runtime.route !== "history")
 					)

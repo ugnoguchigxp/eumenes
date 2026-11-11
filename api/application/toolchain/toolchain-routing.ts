@@ -79,6 +79,8 @@ export function createToolchainRouting(
 			text: "",
 			// Preserve redirect identities; only the exact revision asked for is returned and enriched.
 			available: () => true,
+			// A work names its own revision, selectable or not.
+			unselectable: true,
 		}),
 	);
 	function runtimeInTransaction(
@@ -116,7 +118,16 @@ export function createToolchainRouting(
 	const catalog = perPass((db) =>
 		toolchains(db).flatMap((d) => {
 			const runtime = runtimeInTransaction(db, d);
-			return runtime ? [{ id: d.id, revisionId: d.revisionId, runtime }] : [];
+			return runtime
+				? [
+						{
+							id: d.id,
+							revisionId: d.revisionId,
+							runtime,
+							...(d.selectable === false ? { selectable: false as const } : {}),
+						},
+					]
+				: [];
 		}),
 	);
 	function adapterOf(db: Database, bindingRevisionId: string) {
@@ -218,7 +229,7 @@ export function createToolchainRouting(
 				};
 			const active = capabilities
 				.toolchainsInTransaction(db)
-				.filter((d) => input.available.has(d.id));
+				.filter((d) => d.selectable !== false && input.available.has(d.id));
 			const past = input.query
 				? history.similarSelectionsInTransaction(db, {
 						space: input.query.space,

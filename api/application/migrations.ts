@@ -3,6 +3,7 @@ import { migrations as appDevelopmentMigrations } from "../domains/app-developme
 import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
 import { migrations as pursuitCoreMigrations } from "eumenes-pursuit/sqlite";
 import { migrations as pursuitMigrations } from "../domains/pursuit";
+import { migrations as webNoteMigrations } from "../domains/web-note";
 import { migrations as ocrMigrations } from "../domains/ocr";
 import { migrations as computeMigrations } from "../domains/compute";
 import { migrations as model3dMigrations } from "../domains/model3d";
@@ -181,6 +182,7 @@ const catalog: readonly Migration[] = [
 			: ["queue/0001-init"],
 	})),
 	...pursuitMigrations,
+	...webNoteMigrations,
 	...liveVoiceMigrations,
 	retiredContinuityMigration,
 	...conversationMigrations,

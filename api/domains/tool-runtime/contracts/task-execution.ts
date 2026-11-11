@@ -57,6 +57,8 @@ export type ExecutionResult = {
 	missing: string[];
 	refs: string[];
 	code?: string;
+	/** A research note's own title (a note owner that has no saved document). */
+	title?: string;
 	/** Resource URIs the execution's children made (resource-uri plan §6.3). */
 	links?: string[];
 	document?: ExecutionDocument;

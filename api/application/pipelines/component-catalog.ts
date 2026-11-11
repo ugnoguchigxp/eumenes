@@ -13,6 +13,7 @@ export function pipelineComponents(
 ): ComponentRecord[] {
 	return context
 		.available(db, source.runId)
+		.filter((e) => e.selectable !== false)
 		.filter(
 			(e) =>
 				!["session", "read", "task", "pipeline"].includes(e.runtime.execution),

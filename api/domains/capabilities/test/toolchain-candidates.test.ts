@@ -137,23 +137,24 @@ test("the search fills each kind's slots: the three closest dedicated toolchains
 	const store = openStore(join(dir, "db"), migrations);
 	const caps = createCapabilities(
 		store,
-		new Set(["web", "history", "music", "image", "excalidraw", "dots"]),
-		{
-			bundleHost: () => ({
-				adapters: new Map(),
-				availability: new Set(),
-				inputAdapters: new Set(),
-				projections: new Set(),
-				domainSchemas: new Set(),
-			}),
-		},
+		new Set([
+			"web",
+			"web-note",
+			"history",
+			"music",
+			"image",
+			"excalidraw",
+			"dots",
+		]),
+		{ bundleHost: offlineBundleHost },
 	);
 	try {
 		await caps.seed();
 		const active = store.read((db) => caps.toolchainsInTransaction(db));
 		const general = active.filter((d) => d.general);
 		const dedicated = active.filter((d) => !d.general);
-		expect(general.map((d) => d.id)).toContain("web.search");
+		expect(general.map((d) => d.id)).toContain("web.note");
+		expect(general.find((d) => d.id === "web.search")?.selectable).toBe(false);
 		expect(dedicated.length).toBeGreaterThan(3);
 		/** Saves each toolchain's passages at `similarity` to the request [1, 0]. */
 		const place = (similarity: (id: string) => number) =>
@@ -185,18 +186,23 @@ test("the search fills each kind's slots: the three closest dedicated toolchains
 			);
 		// The general toolchain is the closest: it is offered beside the three closest dedicated ones, marked general.
 		await place((id) =>
-			id === "web.search" ? 1 : rank(id) >= 0 ? 0.95 - rank(id) * 0.01 : 0.5,
+			id === "web.note" || id === "web.search"
+				? 1
+				: rank(id) >= 0
+					? 0.95 - rank(id) * 0.01
+					: 0.5,
 		);
 		const near = search();
+		// The withdrawn Web search is as close as the note toolchain, and is never offered.
 		expect(near.map((c) => c.id)).toEqual([
-			"web.search",
+			"web.note",
 			...dedicated.slice(0, 3).map((d) => d.id),
 		]);
 		expect(near[0]!.general).toBe(true);
 		expect(near.slice(1).every((c) => !c.general)).toBe(true);
 		// A general toolchain farther than the slot's distance from the closest candidate is not offered.
 		await place((id) =>
-			id === "web.search" ? 0.9 : rank(id) >= 0 ? 0.99 - rank(id) * 0.01 : 0.5,
+			id === "web.note" ? 0.9 : rank(id) >= 0 ? 0.99 - rank(id) * 0.01 : 0.5,
 		);
 		expect(search().map((c) => c.id)).toEqual(
 			dedicated.slice(0, 3).map((d) => d.id),
@@ -212,16 +218,16 @@ test("the router's offer is exactly the ids given, in their order, read tools am
 	const store = openStore(join(dir, "db"), migrations);
 	const caps = createCapabilities(
 		store,
-		new Set(["web", "history", "music", "image", "excalidraw", "dots"]),
-		{
-			bundleHost: () => ({
-				adapters: new Map(),
-				availability: new Set(),
-				inputAdapters: new Set(),
-				projections: new Set(),
-				domainSchemas: new Set(),
-			}),
-		},
+		new Set([
+			"web",
+			"web-note",
+			"history",
+			"music",
+			"image",
+			"excalidraw",
+			"dots",
+		]),
+		{ bundleHost: offlineBundleHost },
 	);
 	try {
 		await caps.seed();
@@ -239,17 +245,17 @@ test("the router's offer is exactly the ids given, in their order, read tools am
 		expect(offered[0]!.execution).toBe("read");
 		const cards = store.read((db) => caps.routerCardsInTransaction(db));
 		for (const card of cards) expect(parseCard(card)).toEqual(card);
+		// The router is offered what selection may offer: not the Web search a revision withdrew.
 		expect(cards.map((c) => c.id)).toEqual([
-			...active.map((d) => d.id),
+			...active.filter((d) => d.selectable !== false).map((d) => d.id),
 			...cards.filter((c) => c.kind === "read").map((c) => c.id),
 		]);
+		expect(cards.map((c) => c.id)).not.toContain("web.search");
 		expect(cards.find((c) => c.id === "read_memory")).toMatchObject({
 			kind: "read",
 			impact: "none",
 		});
-		expect(
-			cards.find((c) => c.id === active.find((d) => d.general)?.id)?.kind,
-		).toBe("general");
+		expect(cards.find((c) => c.id === "web.note")?.kind).toBe("general");
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

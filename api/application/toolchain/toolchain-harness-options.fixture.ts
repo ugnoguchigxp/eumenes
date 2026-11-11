@@ -8,6 +8,8 @@ import type { Step } from "./conversation-script.fixture";
 /** The knobs of the toolchain harness (`harness` in toolchain.fixture.ts). */
 export type HarnessOptions = {
 	webResearch?: boolean;
+	/** Keep the Web search withdrawn from selection as production seeds it (the fixtures otherwise publish its earlier revision). */
+	withdrawnWebSearch?: true;
 	/** Compose the real resource registry for autonomous output delivery. */
 	resources?: boolean;
 	/** Fixed Pursuit control output; enables the registered research owner's lifecycle. */
@@ -15,6 +17,11 @@ export type HarnessOptions = {
 		schema: Record<string, unknown>,
 		messages: import("../../domains/inference/contracts").Messages,
 	) => unknown;
+	/** The research note task (Codex's own web search) with a scripted turn and a ledger record. */
+	webNote?: Pick<
+		import("../../domains/web-note").WebNoteDeps,
+		"turn" | "record" | "model"
+	>;
 	/** A real memory service (its journal in the harness directory): what the conversation's `## Memory` shows. */
 	memory?: boolean;
 	everyday?: boolean;
