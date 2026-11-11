@@ -20,8 +20,11 @@ const AGENDA_TOOLS = new Set<string>([
 	SHOW_NOTE,
 	SET_QUIET,
 ]);
-/** What the history keeps of one of those answers: enough to show what the reply did. */
-const AGENDA_RESULT_CHARS = 1200;
+/**
+ * What the history keeps of one of those answers: as much as the agency's read_note gives the reply
+ * (4000 characters of a note), so a later reply sees what the earlier one read (user, 2026-11-11).
+ */
+const AGENDA_RESULT_CHARS = 4000;
 
 const CARRIED = new Set<string>([
 	...AGENDA_TOOLS,
