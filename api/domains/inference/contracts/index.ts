@@ -232,6 +232,8 @@ export interface InferencePort {
 			attemptMs?: number;
 			/** Subagents without a dialogue parent follow the currently selected conversation LLM. */
 			route?: "subagent";
+			/** An explicitly selected saved cloud resource, with no automatic fallback. */
+			resourceId?: string;
 			/** The output schema goes to the provider as a strict schema. */
 			structuredOutput?: boolean;
 		},

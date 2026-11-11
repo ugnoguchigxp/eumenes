@@ -6,6 +6,8 @@ Eumenesの認証済みAPIからContextStillの公開資料を検索し、資料�
 
 Eumenesのbackend設定に `EUMENES_CONTEXT_STILL_MCP_URL` と `EUMENES_CONTEXT_STILL_MCP_TOKEN` を渡します。URLはContextStill v2の `/mcp`、認証にはContextStillのMCP用トークンを使います。検索・本文取得には `revision` と `contentTruncated` を公開するContextStill版が必要です。両設定を省略した場合も、固定探索SKILLの配達は利用できます。
 
+探索SKILLの選択専用に既存のクラウドLLMリソースを指定する場合は、そのUUIDを `EUMENES_KNOWLEDGE_SELECTION_RESOURCE_ID` に設定します。選択専用の接続が利用できないときはエラーを返します。会話と新規SKILL生成には、従来の推論設定を使います。
+
 ## API
 
 すべて通常のEumenes API認証が必要です。

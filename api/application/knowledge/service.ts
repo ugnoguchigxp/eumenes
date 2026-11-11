@@ -41,6 +41,15 @@ const policy = {
 	generation: 0,
 };
 const requestRefSchema = z.string().uuid();
+type CaptureInput = Parameters<
+	EumenesControl<Database>["captureUserControlInTransaction"]
+>[1];
+type KnowledgeControl = EumenesControl<Database> & {
+	captureUserControlInTransaction(
+		tx: Database,
+		input: CaptureInput & { resourceId?: string },
+	): string;
+};
 
 function boundedCalls(signal: AbortSignal, max: number): ExecutionContext {
 	let calls = 0;
@@ -58,10 +67,11 @@ function boundedCalls(signal: AbortSignal, max: number): ExecutionContext {
 export function createKnowledge(options: {
 	store: SqliteStore;
 	queue: QueueService;
-	control: EumenesControl<Database>;
+	control: KnowledgeControl;
+	selectionResourceId?: string;
 	source?: NonNullable<Ports<Database>["source"]>;
 }) {
-	const { store, queue, control, source } = options;
+	const { store, queue, control, source, selectionResourceId } = options;
 	const read = <T>(operation: (tx: Database) => T) => store.read(operation);
 	const write = <T>(operation: (tx: Database) => T) => store.write(operation);
 	const authorityFor = (tx: Database, ref: string) => {
@@ -77,6 +87,21 @@ export function createKnowledge(options: {
 		write,
 		structuredOutput: true,
 	});
+	const selectionInference = selectionResourceId
+		? createEumenesInference({
+				control: {
+					...control,
+					captureUserControlInTransaction: (tx, input) =>
+						control.captureUserControlInTransaction(tx, {
+							...input,
+							resourceId: selectionResourceId,
+						}),
+				},
+				read,
+				write,
+				structuredOutput: true,
+			})
+		: undefined;
 	const service = createSkillSmith<Database>({
 		repository: sqliteRepository,
 		now: Date.now,
@@ -104,6 +129,7 @@ export function createKnowledge(options: {
 		},
 		jobs: createBuildQueueJobs(queue),
 		inference,
+		selectionInference,
 		source,
 		assemblyMode: "baseline",
 		explorationFallback: true,

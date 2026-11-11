@@ -76,6 +76,7 @@ export async function buildServices(
 		store,
 		queue,
 		control: inference,
+		selectionResourceId: config.knowledgeSelectionResourceId,
 		source: configuredContextStill(config.contextStill ?? {}),
 	});
 	const webResearch = buildWebResearch(config, core);

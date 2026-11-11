@@ -459,3 +459,42 @@ test("an unavailable explicit background resource is rejected before any fallbac
 	).rejects.toThrow("background_resource_unavailable");
 	expect(h.calls).toHaveLength(0);
 });
+
+test("a user control can use a saved cloud resource without changing the conversation route", async () => {
+	const h = await setup();
+	const settings = h.settings.get();
+	const route = structuredClone(settings.routes.llm);
+	const baseline = settings.resources.find(
+		(resource) => resource.id === route.fallbackId,
+	)!;
+	const dedicated = {
+		...baseline,
+		id: crypto.randomUUID(),
+		model: "fixture-selection",
+	};
+	settings.resources.push(dedicated);
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: settings.revision,
+		settings,
+		keys: [],
+	});
+	const capture = (resourceId: string) =>
+		h.store.write((db) =>
+			h.inference.captureUserControlInTransaction(db, {
+				subject: "skillsmith:selection",
+				deadline: Date.now() + 5000,
+				maxOutputTokens: 128,
+				route: "subagent",
+				resourceId,
+			}),
+		);
+	const id = await capture(dedicated.id);
+	await h.inference.executeControl(id, messages, AbortSignal.timeout(1000));
+	expect(JSON.parse(String(h.payloads[0])).model).toBe(dedicated.model);
+	expect(h.settings.get().routes.llm).toEqual(route);
+	await expect(capture(crypto.randomUUID())).rejects.toThrow(
+		"user_control_resource_unavailable",
+	);
+	expect(h.calls).toHaveLength(1);
+});
