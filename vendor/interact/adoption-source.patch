@@ -3382,3 +3382,187 @@ index 0000000..d8e8d1d
 +		},
 +	};
 +}
+diff --git a/bun.lock b/bun.lock
+index 95fbc56..cf127b6 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -27,7 +27,7 @@
+     },
+     "packages/eumenes-interact": {
+       "name": "eumenes-interact",
+-      "version": "0.1.3",
++      "version": "0.1.3-eumenes.1",
+       "dependencies": {
+         "jsonrepair": "3.15.0",
+         "zod": "4.6.6",
+diff --git a/lab/scripts/package-consumer.mjs b/lab/scripts/package-consumer.mjs
+index 8c5fb3b..442c423 100644
+--- a/lab/scripts/package-consumer.mjs
++++ b/lab/scripts/package-consumer.mjs
+@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
+ import { readFileSync, writeFileSync } from "node:fs";
+ import { dirname, join } from "node:path";
+ import * as core from "eumenes-interact";
++import { decodeLlmJson, LlmJsonError } from "eumenes-interact/llm-json";
+ import * as sqlite from "eumenes-interact/sqlite";
+ import * as adapter from "eumenes-interact/adapters/playwright-mcp";
+ import {
+@@ -32,6 +33,29 @@ verify();
+ assert.equal(typeof core.startRun, "function");
+ assert.equal(typeof sqlite.createRun, "function");
+ assert.equal(typeof adapter.createPlaywrightMcpAdapter, "function");
++const start = () =>
++	core.startRun({
++		arm: "arm1",
++		request: "Read the guide.",
++		policy: { maxModelCalls: 3, retries: { default: 0 } },
++		reference: {},
++		nowMs: 0,
++	});
++const repairable = "{part:'page.back',args:{},}";
++assert.deepEqual(decodeLlmJson(repairable), {
++	value: { part: "page.back", args: {} },
++	repaired: true,
++});
++assert.equal(core.parseStep(start(), repairable).step.kind, "call");
++const incomplete = '{"part":"page.back","args":{}';
++assert.throws(
++	() => decodeLlmJson(incomplete),
++	(error) =>
++		error instanceof LlmJsonError && error.code === "llm_json_incomplete",
++);
++const rejected = core.parseStep(start(), incomplete);
++assert.equal(rejected.record.rejection, "unparsable_json");
++assert.equal(rejected.step.kind, "continue");
+ // Exercise the structural SQLite contract with the actual runtime's database.
+ const connection = process.versions.bun
+ 	? new (await import("bun:sqlite")).Database(":memory:")
+diff --git a/packages/eumenes-interact/package.json b/packages/eumenes-interact/package.json
+index a4dc681..64108ce 100644
+--- a/packages/eumenes-interact/package.json
++++ b/packages/eumenes-interact/package.json
+@@ -1,6 +1,6 @@
+ {
+ 	"name": "eumenes-interact",
+-	"version": "0.1.3",
++	"version": "0.1.3-eumenes.1",
+ 	"private": true,
+ 	"license": "MIT",
+ 	"type": "module",
+@@ -23,6 +23,10 @@
+ 			"types": "./dist/sqlite.d.ts",
+ 			"default": "./dist/sqlite.js"
+ 		},
++		"./llm-json": {
++			"types": "./dist/core/shared/json.d.ts",
++			"default": "./dist/core/shared/json.js"
++		},
+ 		"./adapters/playwright-mcp": {
+ 			"types": "./dist/adapters/playwright-mcp.d.ts",
+ 			"default": "./dist/adapters/playwright-mcp.js"
+diff --git a/packages/eumenes-interact/src/core/arm1/run.ts b/packages/eumenes-interact/src/core/arm1/run.ts
+index f6fa4b1..1937492 100644
+--- a/packages/eumenes-interact/src/core/arm1/run.ts
++++ b/packages/eumenes-interact/src/core/arm1/run.ts
+@@ -15,7 +15,7 @@ import {
+ 	type PartCall,
+ 	type PartResult,
+ } from "../../contracts/parts.ts";
+-import { parseLlmJson } from "../shared/json.ts";
++import { decodeLlmJson } from "../shared/json.ts";
+ import { promptTime } from "../shared/text.ts";
+ import { partCallJsonSchemaFor } from "../parts/schema.ts";
+ import { BLOCK_ROLES } from "../parts/snapshot.ts";
+@@ -260,7 +260,7 @@ export function parseStep(
+ 	let part: PartCall | null = null;
+ 	let value: unknown;
+ 	try {
+-		value = parseLlmJson(raw);
++		value = decodeLlmJson(raw).value;
+ 	} catch {
+ 		rejected = {
+ 			code: "unparsable_json",
+diff --git a/packages/eumenes-interact/src/core/shared/json.ts b/packages/eumenes-interact/src/core/shared/json.ts
+index 008a104..6018c38 100644
+--- a/packages/eumenes-interact/src/core/shared/json.ts
++++ b/packages/eumenes-interact/src/core/shared/json.ts
+@@ -1,9 +1,9 @@
+ // Ported from Eumenes `api/infrastructure/llm-json.ts` (commit 98b188d2): the logger is dropped and the byte
+ // length is counted without `Buffer`; the accept/reject decisions are unchanged.
+ import { jsonrepair } from "jsonrepair";
+-import { utf8Length } from "./text.ts";
++import { utf8Length } from "./utf8-length.ts";
+ 
+-class LlmJsonError extends Error {
++export class LlmJsonError extends Error {
+ 	constructor(public readonly code: string) {
+ 		super(code);
+ 	}
+@@ -123,7 +123,7 @@ function bodyOf(text: string) {
+ /** One syntax correction at the LLM-output boundary. Callers own schema,
+  * authority and retry validation. HTTP envelopes and stored JSON stay strict.
+  */
+-export function parseLlmJson(input: unknown, limit = 65536): unknown {
++export function decodeLlmJson(input: unknown, limit = 65536) {
+ 	if (typeof input !== "string") reject("llm_json_non_text");
+ 	if (utf8Length(input) > limit) reject("llm_json_too_large");
+ 	const body = bodyOf(input);
+@@ -135,7 +135,7 @@ export function parseLlmJson(input: unknown, limit = 65536): unknown {
+ 	} catch {}
+ 	const original = tokens(body);
+ 	checkStructure(original);
+-	if (parsed) return value;
++	if (parsed) return { value, repaired: false };
+ 	let corrected: string;
+ 	try {
+ 		corrected = jsonrepair(body);
+@@ -154,5 +154,5 @@ export function parseLlmJson(input: unknown, limit = 65536): unknown {
+ 		before.some((token, i) => token.value !== after[i]?.value)
+ 	)
+ 		reject();
+-	return value;
++	return { value, repaired: true };
+ }
+diff --git a/packages/eumenes-interact/src/core/shared/observation.ts b/packages/eumenes-interact/src/core/shared/observation.ts
+index 252b9bd..d2b91b0 100644
+--- a/packages/eumenes-interact/src/core/shared/observation.ts
++++ b/packages/eumenes-interact/src/core/shared/observation.ts
+@@ -1,4 +1,4 @@
+-import { utf8Length } from "./text.ts";
++import { utf8Length } from "./utf8-length.ts";
+ 
+ /**
+  * What the host lets the model see of one snapshot (Eumenes `api/domains/browser/contracts/index.ts`, spec
+diff --git a/packages/eumenes-interact/src/core/shared/text.ts b/packages/eumenes-interact/src/core/shared/text.ts
+index 2ab1032..de0b80e 100644
+--- a/packages/eumenes-interact/src/core/shared/text.ts
++++ b/packages/eumenes-interact/src/core/shared/text.ts
+@@ -162,13 +162,3 @@ export function promptTime(ms: number) {
+ 		timeZone: "Asia/Tokyo",
+ 	};
+ }
+-
+-/** UTF-8 length of a string in bytes; a lone surrogate counts as U+FFFD, as TextEncoder encodes it. */
+-export function utf8Length(text: string) {
+-	let bytes = 0;
+-	for (const char of text) {
+-		const code = char.codePointAt(0)!;
+-		bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+-	}
+-	return bytes;
+-}
+diff --git a/packages/eumenes-interact/src/core/shared/utf8-length.ts b/packages/eumenes-interact/src/core/shared/utf8-length.ts
+new file mode 100644
+index 0000000..350667c
+--- /dev/null
++++ b/packages/eumenes-interact/src/core/shared/utf8-length.ts
+@@ -0,0 +1,9 @@
++/** UTF-8 length of a string in bytes; a lone surrogate counts as U+FFFD, as TextEncoder encodes it. */
++export function utf8Length(text: string) {
++	let bytes = 0;
++	for (const char of text) {
++		const code = char.codePointAt(0)!;
++		bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
++	}
++	return bytes;
++}

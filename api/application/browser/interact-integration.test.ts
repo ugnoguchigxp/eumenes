@@ -1,6 +1,7 @@
 import { systemContext } from "../../infrastructure/system-context";
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { harness } from "../toolchain/toolchain.fixture";
@@ -12,16 +13,38 @@ import { fakeInference } from "./browser-task.fixture";
 import { until } from "../../domains/browser/test/fakes";
 import type { BrowserAssembly } from "./browser-composition";
 import { loadInteractRelease } from "./interact-release";
+import provenance from "../../../vendor/interact/provenance.json";
+import pkg from "../../../package.json";
 
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const ARTIFACT = "artifact:browser.interact.workspace@1";
 const invoke = (tool: string, args: unknown, text: string | null = null) =>
 	JSON.stringify({ action: "invoke", tool, arguments: args, text });
 
-test("canonical Skill and pinned 162-file distribution match the registered operator", () => {
+test("the Interact archive, adoption patch and installed release match the pinned distribution", () => {
+	const vendor = new URL("../../../vendor/interact/", import.meta.url);
+	const archive = readFileSync(new URL(provenance.archive, vendor));
+	const sha256 = (bytes: Uint8Array) =>
+		createHash("sha256").update(bytes).digest("hex");
+	expect(sha256(archive)).toBe(provenance.archiveSha256);
+	expect(sha256(readFileSync(new URL("adoption-source.patch", vendor)))).toBe(
+		provenance.adoptionSourcePatchSha256,
+	);
+	expect(pkg.dependencies["eumenes-interact"]).toBe(
+		`file:vendor/interact/${provenance.archive}`,
+	);
+	const lock = readFileSync(
+		new URL("../../../bun.lock", import.meta.url),
+		"utf8",
+	);
+	expect(lock).toContain(
+		`eumenes-interact@vendor/interact/${provenance.archive}`,
+	);
+	expect(lock).toContain(
+		`sha512-${createHash("sha512").update(archive).digest("base64")}`,
+	);
 	const release = loadInteractRelease();
-	// 0.1.2 adds the host contract and conformance vectors and the split part executor to the archive.
-	expect(Object.keys(release.manifest.files)).toHaveLength(162);
+	expect(Object.keys(release.manifest.files)).toHaveLength(164);
 	expect(systemContext("browser.contexts.interact.skill", {})).toBe(
 		release.body,
 	);

@@ -19,7 +19,7 @@ export type CallSessionRole = {
 	readAhead?: true;
 	/** `main` only: how much the model thinks before it answers, per target (see `CallSession`). */
 	reasoning?: NonNullable<CallSession["reasoning"]>;
-	/** `main` or auxiliary control: one JSON value of this strict schema (no native tools field). */
+	/** Main answers, auxiliary controls and parent-bound subagent controls can require strict JSON. */
 	outputSchema?: NonNullable<CallSession["outputSchema"]>;
 	cloudOutputSchema?: NonNullable<CallSession["cloudOutputSchema"]>;
 	/** `main` only: answer on the cloud without trying LARM first. */
@@ -91,6 +91,10 @@ export function resolveSession(
 		return undefined;
 	}
 	const sessionRole = given?.sessionRole ?? "auxiliary";
+	const controlSchemaAllowed =
+		row.mode === "control" &&
+		(sessionRole === "auxiliary" ||
+			(sessionRole === "subagent" && row.controlPolicyRequestId !== null));
 	if (given?.agentSession) {
 		const owner = given.agentSession;
 		if (
@@ -116,7 +120,7 @@ export function resolveSession(
 			!given.independent) ||
 		(given?.outputSchema !== undefined &&
 			sessionRole !== "main" &&
-			row.mode !== "control") ||
+			!controlSchemaAllowed) ||
 		(given?.target !== undefined && sessionRole !== "main") ||
 		(given?.retainRequest !== undefined && sessionRole !== "main") ||
 		(sessionRole === "main" && row.mode !== "answer") ||

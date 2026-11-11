@@ -177,6 +177,41 @@ function callSession(
 	};
 }
 
+function turnModelCall(
+	deps: DialogueDeps,
+	input: GenerateInput,
+	options: RoutedTurnOptions,
+	onCall: () => void,
+) {
+	const { signal } = options;
+	const session = callSession(input, options);
+
+	/** One model call on the run's request: a streamed reply (`onDelta`) or a silent choice (`outputSchema`). */
+	return (
+		messages: ChatMessage[] | AgentMessage[],
+		onDelta: ((text: string) => void) | undefined,
+		extra: Pick<CallSession, "outputSchema" | "cloudOutputSchema">,
+		tools?: NativeTool[],
+	) => {
+		signal.throwIfAborted();
+		const stream = deps.larm.executeStream;
+		if (!input.requestId || !stream) throw new Error("routed_turn_unavailable");
+		onCall();
+		return withLogContext({ phase: "generation" }, () =>
+			stream.call(
+				deps.larm,
+				input.requestId!,
+				messages as ChatMessage[],
+				signal,
+				onDelta,
+				onDelta ? options.preparation : undefined,
+				tools,
+				{ ...session, ...extra },
+			),
+		);
+	};
+}
+
 function createTurn(
 	deps: DialogueDeps,
 	input: GenerateInput,
@@ -198,32 +233,9 @@ function createTurn(
 		if (text) published = true;
 		options.delta(text);
 	};
-	const session = callSession(input, options);
-
-	/** One model call on the run's request: a streamed reply (`onDelta`) or a silent choice (`outputSchema`). */
-	const call = (
-		messages: ChatMessage[] | AgentMessage[],
-		onDelta: ((text: string) => void) | undefined,
-		extra: Pick<CallSession, "outputSchema" | "cloudOutputSchema">,
-		tools?: NativeTool[],
-	) => {
-		signal.throwIfAborted();
-		const stream = deps.larm.executeStream;
-		if (!input.requestId || !stream) throw new Error("routed_turn_unavailable");
+	const call = turnModelCall(deps, input, options, () => {
 		calls++;
-		return withLogContext({ phase: "generation" }, () =>
-			stream.call(
-				deps.larm,
-				input.requestId!,
-				messages as ChatMessage[],
-				signal,
-				onDelta,
-				onDelta ? options.preparation : undefined,
-				tools,
-				{ ...session, ...extra },
-			),
-		);
-	};
+	});
 
 	/** One host operation through the generation's executor, kept as an executed call of the turn. */
 	async function operate(

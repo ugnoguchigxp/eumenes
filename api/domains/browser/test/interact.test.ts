@@ -61,6 +61,35 @@ test("idempotent admission is owner/conversation scoped and rejects changed payl
 		),
 	).toThrow("not_found");
 });
+test("incomplete operation JSON triggers a retry before the repaired read runs", async () => {
+	const f = await fixture({
+		responses: [
+			part("page.open", { url: "https://example.com/unrequested" }).slice(
+				0,
+				-1,
+			),
+			"{part:'page.read',args:{target:null,maxChars:1000},}",
+			done,
+		],
+	});
+	const v = await f.start({ maxModelCalls: 4 });
+	const end = await f.wait(v.runId, "completed");
+	expect(end.calls).toBe(4);
+	expect(f.calls.map((call) => call.purpose)).toEqual([
+		"execute",
+		"execute",
+		"execute",
+		"completion_review",
+	]);
+	expect(f.calls[1]!.prepared.messages.at(-1)?.content).toContain(
+		'"code":"unparsable_json"',
+	);
+	expect(f.driver.calls.filter((call) => call === "act:navigate")).toHaveLength(
+		1,
+	);
+	const ops = f.store.read((db) => listOperations(db, f.owner, v.runId));
+	expect(ops.map((op) => op.status)).toEqual(["confirmed"]);
+});
 test("confirmation is bound to question/revision/generation and consumes exactly once", async () => {
 	const f = await fixture({
 		responses: [part("item.open", { item: "p1.i1" }), unmet],
