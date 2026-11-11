@@ -3926,16 +3926,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "- 制作や修正の進め方、仕様の適用条件、確認方法に迷い、現在の作業情報で判断できないときは、編集に進む前にget_guidanceを使います。\n- goal に達成したい目的を書き、situation に CURRENT_DOCUMENT の revision、直前の操作と観測結果、いま迷っている点を入れます。試していない操作や観測していない結果は書きません。結果を次の応答で確認できるときに呼び出します。\n- 得られた手順と資料は判断の参考にし、現在の作業で許可された範囲を守ります。参照結果を待つ間は、手元の情報で進められる確認を続けます。"
+                  "value": "- get_guidance は、作業目的と現在の状況に合いそうなSKILLを探す道具です。利用者が状況を説明し、進め方や確認方法で迷っている点が分かったら、最初の行動として get_guidance を呼びます。確認方法を答えたり、追加情報を尋ねたりする前に、手順の候補を確認します。\n- goal に作業目的を書き、situation に CURRENT_DOCUMENT の revision と、いま迷っている点を入れます。直前の操作と観測結果が分かる場合は、利用者からの報告も lastAttempt に入れます。結果を次の応答で読めるときに呼び出します。\n- 返ったSKILLは手順の候補として読みます。対象の版、実際の状況、利用者が許可した範囲を照合し、手順を使うかと次に何をするかは担当が判断します。候補が得られない場合も、確認できている情報を基に、調査を続けるか追加の情報を尋ねるかを担当が判断します。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:9fb3ae7c5f51b74dcfb429ee75c623dce32e35ce64f6f89665743a264eb47fef"
+          "artifactHash": "sha256:9ac6da4e6dd2612352413b28da85769bc288df0e0e5f96b29841501abee5f5cc"
         }
       },
-      "definitionHash": "sha256:42cd7d69cadbb4f252fa37b0d4274d711b2cee8b3caf8b3aedfd655763de27c4",
-      "releaseDigest": "sha256:69f4af27ae55c72d84c252d1256b3c10063b096b9b71daf1b971f1b18304a501"
+      "definitionHash": "sha256:063817f4e80342aa97998b40ba314706747efd75f9dd403e04767ea1757ed815",
+      "releaseDigest": "sha256:70f6ec14d07a07e16f520cd05092b9cb4a4eadd050d5c4eda7219f4aee11dc5f"
     },
     "dialogue.contexts.specialist-turn.rules": {
       "key": "dialogue.contexts.specialist-turn.rules",
@@ -5122,5 +5122,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:20e1e16b20b89f4d416f704ab7a39ba54765b3237d3c990771dacae98b019858"
+  "catalogDigest": "sha256:12b74db25af7c749f3163d874a23ae2afdf829a7a5b2f13602a4c18afeb469ea"
 }

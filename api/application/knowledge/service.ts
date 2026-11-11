@@ -59,7 +59,7 @@ export const submissionSchema = z.strictObject({
 export const guidanceTool = {
 	id: "get_guidance",
 	description:
-		"現在の版、試したことと結果、迷っている点をもとに、作業に使えるSKILLを参照する。",
+		"作業目的と現在の状況に合いそうなSKILLを探す。担当は返された候補を読んで、適用できるかと次の作業を判断する。",
 	inputSchema: z.toJSONSchema(guidanceToolSchema, { io: "input" }),
 };
 export const searchSchema = z.strictObject({

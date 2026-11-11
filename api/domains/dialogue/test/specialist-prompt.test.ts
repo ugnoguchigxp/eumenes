@@ -23,9 +23,13 @@ test("guidance instructions appear only for a turn that can use the tool", () =>
 		description: "制作に必要な手順を参照する",
 		inputSchema: { type: "object" },
 	};
-	expect(specialistControl(set, [tool]).instructions).toContain(
-		"編集に進む前にget_guidanceを使います",
+	const instructions = specialistControl(set, [tool]).instructions;
+	expect(instructions).toContain("最初の行動として get_guidance を呼びます");
+	expect(instructions).toContain(
+		"追加情報を尋ねたりする前に、手順の候補を確認します",
 	);
+	expect(instructions).toContain("返ったSKILLは手順の候補として読みます");
+	expect(instructions).toContain("次に何をするかは担当が判断します");
 	expect(specialistControl(set).instructions).not.toContain("get_guidance");
 	expect(specialistControl(set, [tool], true).instructions).not.toContain(
 		"get_guidance",
