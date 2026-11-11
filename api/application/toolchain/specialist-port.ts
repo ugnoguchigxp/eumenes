@@ -48,6 +48,7 @@ export function createSpecialistPort(deps: {
 		| "selectForSpecialist"
 		| "explorationCandidates"
 		| "readForSpecialist"
+		| "prepareForSpecialist"
 		| "finishSpecialistTurn"
 	>;
 }): SpecialistPort {
@@ -77,6 +78,7 @@ export function createSpecialistPort(deps: {
 								? guidanceTool
 								: undefined,
 						select: knowledge.selectForSpecialist,
+						prepare: knowledge.prepareForSpecialist,
 						read: knowledge.readForSpecialist,
 						finishTurn: knowledge.finishSpecialistTurn,
 					},

@@ -55,6 +55,7 @@ export interface LogFields {
 	jsonOffset?: number;
 	hitCount?: number;
 	documentCount?: number;
+	externalDocumentCount?: number;
 	failureCount?: number;
 	method?: string;
 	route?: string;
@@ -248,6 +249,7 @@ const keys = new Set<keyof LogFields>([
 	"jsonOffset",
 	"hitCount",
 	"documentCount",
+	"externalDocumentCount",
 	"failureCount",
 	"method",
 	"route",

@@ -313,7 +313,8 @@ export async function harness(options: HarnessOptions = {}) {
 			if (
 				options.knowledgeBuild &&
 				(system.includes("coverage で充足") ||
-					system.includes("post-build-self-review"))
+					system.includes("post-build-self-review") ||
+					system.includes("資料検索の要否だけを判断"))
 			)
 				return JSON.stringify({
 					result: await options.knowledgeBuild(messages, callOptions),

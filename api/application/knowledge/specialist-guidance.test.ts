@@ -205,6 +205,7 @@ for (const scenario of [
 		let delivered: any;
 		let requestRef: string | undefined;
 		let buildCalls = 0;
+		let intentCalls = 0;
 		let interveningTurn = false;
 		const buildGate = Promise.withResolvers<void>();
 		const busy = "busy" in scenario;
@@ -224,12 +225,33 @@ for (const scenario of [
 			knowledgeSource: mcp.source,
 			async knowledgeBuild(messages, options) {
 				expect(options?.reasoningEffort).toBe("low");
-				expect(pending).toMatchObject({ kind: "pending" });
-				buildCalls++;
-				if (busy && buildCalls === 1) await buildGate.promise;
 				const data = JSON.parse(
 					messages.find((message) => message.role === "user")!.content,
 				);
+				if (data.report === "追記です。作業コピーは変更しません。")
+					return { kind: "continue" };
+				if (typeof data.report === "string") {
+					intentCalls++;
+					expect(data.report).toBe(report);
+					return {
+						kind: "search",
+						goal: "入力値を切り分ける。",
+						acceptance: [{ id: "observe", text: "読み取りだけで確認する。" }],
+						constraints: [{ id: "read-only", text: "変更しない。" }],
+						skillLanguage: null,
+						publicSearchTask: query,
+						situation: {
+							lastAttempt: {
+								action: "検証用コピーの入力値を変更した。",
+								result: "表示と計算値が違った。",
+							},
+							uncertainty: "入力時と計算前のどちらで値が変わったか。",
+						},
+					};
+				}
+				expect(pending).toMatchObject({ kind: "pending" });
+				buildCalls++;
+				if (busy && buildCalls === 1) await buildGate.promise;
 				if (data.reviewPlan)
 					return { approved: true, reason: "条件と確認手順を照合した。" };
 				expect(data.task.situation.report).toBe(report);
@@ -270,29 +292,9 @@ for (const scenario of [
 						};
 					return { action: "reply", text: "関連する手順を探しています。" };
 				}
-				const revision = /CURRENT_DOCUMENT[^\n]* revision=(\d+)/.exec(
-					messages[1]?.content ?? "",
-				)?.[1];
-				expect(revision).toBeDefined();
-				return {
-					action: "invoke",
-					tool: "get_guidance",
-					arguments: {
-						goal: "入力値を切り分ける。",
-						acceptance: [{ id: "observe", text: "読み取りだけで確認する。" }],
-						constraints: [{ id: "read-only", text: "変更しない。" }],
-						skillLanguage: "ja",
-						publicSearchTask: query,
-						situation: {
-							revision,
-							lastAttempt: {
-								action: "検証用コピーの入力値を変更した。",
-								result: "表示と計算値が違った。",
-							},
-							uncertainty: "入力時と計算前のどちらで値が変わったか。",
-						},
-					},
-				};
+				// The dialogue model would answer directly. The separate judgment must
+				// arrange the search and put the receipt in its first input.
+				return { action: "reply", text: "手元の情報から確認できます。" };
 			},
 		});
 		try {
@@ -308,6 +310,7 @@ for (const scenario of [
 				(await host.dialogue.waitForTerminal(run.id, { timeoutMs: 6000 }))
 					?.status,
 			).toBe("completed");
+			expect(intentCalls).toBe(1);
 			if (handback) {
 				expect(requestRef).toBeDefined();
 				expect(host.queue.list({ subjectRef: requestRef }).items).toEqual([]);

@@ -47,7 +47,7 @@ import {
 	specialistSingleSentenceOutputSchema,
 } from "./specialist-output";
 import {
-	appendGuidanceNotice,
+	appendGuidanceResult,
 	prepareSpecialistPrompt,
 } from "./specialist-turn-prompt";
 import { settleSpecialistTurn } from "./specialist-settle";
@@ -391,7 +391,7 @@ export function createSpecialistTurnHandler(
 			return withLogContext({ runId: input.runId }, async () => {
 				try {
 					logCandidateDelivery(input);
-					await appendGuidanceNotice(deps, input, signal);
+					await appendGuidanceResult(deps, input, signal);
 					return await runTurn(deps, input, signal);
 				} catch (error) {
 					if (timeout.aborted && !caller.aborted) {

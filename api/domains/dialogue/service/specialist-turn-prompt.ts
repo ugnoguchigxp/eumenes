@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { systemContext } from "../../../infrastructure/system-context";
-import { agentSystemMessage } from "../../inference";
+import { agentSystemMessage, toolResultMessage } from "../../inference";
 import type { GuidanceLanguage, Run, SpecialistSet } from "../contracts";
 import { guidanceNoticeSchema } from "../contracts/specialist";
 import { byId, sessionById, type SessionRecord } from "../repository";
@@ -148,14 +148,17 @@ export function prepareSpecialistPrompt(
 	};
 }
 
-/** Resolve a stored notice through the same delivery checks as an explicit lookup. */
-export async function appendGuidanceNotice(
+/** Prepare a lookup, or resolve a stored notice through the same delivery checks as an explicit lookup. */
+export async function appendGuidanceResult(
 	deps: DialogueDeps,
 	input: TurnInput,
 	signal: AbortSignal,
 ) {
 	const port = deps.specialist;
-	if (!input.guidanceNoticeRef || !port?.guidance) return;
+	const guidance = port?.guidance;
+	const noticeRef = input.guidanceNoticeRef;
+	if (!guidance || (!noticeRef && (!input.guidanceToolId || !guidance.prepare)))
+		return;
 	const document = port.documentOf(input.adapterRef);
 	const currentRevision = (tx: Database) => {
 		const run = byId(tx, input.runId);
@@ -169,22 +172,45 @@ export async function appendGuidanceNotice(
 		return document?.readInTransaction(tx, input.workRef)?.revision;
 	};
 	const revision = deps.store.read(currentRevision);
-	const result =
-		revision === undefined
-			? { kind: "unavailable", reason: "workspace_unavailable" }
-			: await port.guidance.read(input.guidanceNoticeRef, {
-					sessionId: input.sessionId,
-					sessionEpoch: input.epoch,
-					revision,
-					signal,
-					assertCurrent(tx) {
-						if (currentRevision(tx) !== revision)
-							throw Error("guidance_revision_changed");
-					},
-				});
-	signal.throwIfAborted();
-	input.messages.splice(input.messages.length - 1, 0, {
-		role: "user",
-		content: "GUIDANCE_RESULT=" + JSON.stringify(result),
-	});
+	if (revision === undefined) {
+		if (noticeRef)
+			input.messages.splice(input.messages.length - 1, 0, {
+				role: "user",
+				content:
+					'GUIDANCE_RESULT={"kind":"unavailable","reason":"workspace_unavailable"}',
+			});
+		return;
+	}
+	const context = {
+		sessionId: input.sessionId,
+		sessionEpoch: input.epoch,
+		revision,
+		signal,
+		assertCurrent(tx: Database) {
+			if (currentRevision(tx) !== revision)
+				throw Error("guidance_revision_changed");
+		},
+	};
+	if (noticeRef) {
+		const result = await guidance.read(noticeRef, context);
+		signal.throwIfAborted();
+		input.messages.splice(input.messages.length - 1, 0, {
+			role: "user",
+			content: "GUIDANCE_RESULT=" + JSON.stringify(result),
+		});
+	} else {
+		const result = await guidance.prepare?.({
+			...context,
+			runId: input.runId,
+			bindingRevisionId: input.set.bindingRevisionId,
+			language: input.guidanceLanguage,
+			report: input.guidanceReport,
+			deadline: input.deadline,
+		});
+		signal.throwIfAborted();
+		if (result !== undefined)
+			input.messages.push(
+				toolResultMessage({ tool: input.guidanceToolId, ok: true, result }),
+			);
+	}
 }

@@ -3,7 +3,7 @@
   "artifactVersion": 2,
   "compilerVersion": "0.1.2",
   "releaseProfile": "application",
-  "policyDigest": "sha256:96cf975cf8676bc7a96159c4fd6a6394266f0aa9f1004a3bd2fc8e9f61d9af00",
+  "policyDigest": "sha256:33a4f4f26050a71013c9721fbd8213b0f951c5a39e5047958453273fe70ff7fa",
   "createdFrom": {
     "configPath": "s11tnext.config.toml",
     "sourceFiles": [
@@ -96,6 +96,7 @@
       "api/domains/dialogue/contexts/local/router-unresolved.context.toml",
       "api/domains/dialogue/contexts/local/router-work.context.toml",
       "api/domains/dialogue/contexts/local/turn-failed.context.toml",
+      "api/domains/dialogue/contexts/specialist-turn/guidance-intent.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/host-observation.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/knowledge-guidance.context.toml",
       "api/domains/dialogue/contexts/specialist-turn/rules.context.toml",
@@ -3871,6 +3872,39 @@
       "definitionHash": "sha256:080625642f7b9fccbcd9026822f8c45b75dcf799470defbdc2fb642441b59e04",
       "releaseDigest": "sha256:b8f8587228ceb36118a8bb78f7030ae655c592d51a3a2939e176da7240684f34"
     },
+    "dialogue.contexts.specialist-turn.guidance-intent": {
+      "key": "dialogue.contexts.specialist-turn.guidance-intent",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "あなたは作業担当の資料検索の要否だけを判断します。入力の report は利用者の最新の説明です。\n利用者が公開資料・事例・手順を調べたいと述べた場合は検索を選び、kind を search にします。特定の技術条件を確認する既存の手順を探す必要がある場合も検索を選びます。利用者が一般的な説明や単純な編集を求め、資料の参照が必要ない場合は kind が continue の結果を返します。\nsearch の結果には依頼の目的、利用者が指定した受入条件と制約、直前の試行と結果、迷いを簡潔に入れます。報告に試行と結果があるときは situation.lastAttempt の action と result を必ず渡します。例を含めてよいという許可や、後で担当が行う実測を、今回の受入条件や必須の前提にしません。利用者が指定していない検証、公式性、承認を必須条件として加えません。\npublicSearchTask は読み取り専用で探す公開技術の語だけで作ります。探してほしい資料・事例の公開タイトルが指定されているときは、publicSearchTask にそのタイトルを原文のまま入れます。対象の製品版や症状は手順を具体化するときに使います。題名で検索するときの検索語には追加しません。題名の公開範囲が分からないときは、そのまま転記せず公開の製品・技術名と症状から検索語を作ります。利用者の発言全体、内部パス、固有データ、秘密は入れません。報告に内部情報が混ざっていても公開の技術語だけを抽出できるなら検索できます。資料の調査を求められた場合、技術語を安全に抽出できる限り kind を search にします。\nここで手順の採用、作業実行、完成の判定はしません。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:df58f59b36d8d8631a2c7da30bfe214fa8b15e5412b03548851dd19e09f04a54"
+        }
+      },
+      "definitionHash": "sha256:429bc3603379f97deb2a68d164c591765d37e27e4d3ec314f85a136f596ee505",
+      "releaseDigest": "sha256:a635b14d6b9aa3c0f74e7eecb5d4643dd00ce02ed173b9792b8742c70a1018ac"
+    },
     "dialogue.contexts.specialist-turn.host-observation": {
       "key": "dialogue.contexts.specialist-turn.host-observation",
       "owner": "unowned",
@@ -3926,16 +3960,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "- GUIDANCE_CANDIDATES に、作業に使えそうな既製の探索SKILLが届きます。利用者の状況説明は最後の利用者メッセージに全文で届きます。説明に含まれる目的、直前の操作と観測結果、迷いを本文から読み取ります。\n- 候補の手順を、CURRENT_DOCUMENT の版、実際の状況、利用者が許可した範囲と照合します。どの手順を使うか、何を次に確認するかは担当が判断します。専門範囲の相談では、作業コピーを直接読めない場合も、利用者が報告した観測を基に担当が回答します。適用に必要な情報が足りなければ、確認できていることを基に追加情報を尋ねます。\n- 利用者が既存の資料・事例・手順を調べるよう求めたときや、確認方法に迷いがあり既製候補だけで判断する材料が足りないときは、回答を確定する前に get_guidance でContextStillを探します。goal に目的を、situation に CURRENT_DOCUMENT の revision と迷いを入れます。直前に試した操作と結果を利用者が説明していれば lastAttempt の action と result に入れます。acceptance と constraints は利用者が求めた条件を保持します。読み取り専用の依頼でも、候補内に読み取り専用の短い観測例を含められます。公式資料による証明は、依頼で求められた場合に条件にします。SKILLの言語は依頼に合わせます。publicSearchTask には検索に必要な公開の製品名・規格・一般的な症状だけを入れます。候補が準備中なら、その時点で確認できることを返し、同じターンで繰り返し照会しません。"
+                  "value": "- GUIDANCE_CANDIDATES に、作業に使えそうな既製の探索SKILLが届きます。利用者の状況説明は最後の利用者メッセージに全文で届きます。説明に含まれる目的、直前の操作と観測結果、迷いを本文から読み取ります。\n- 候補の手順を、CURRENT_DOCUMENT の版、実際の状況、利用者が許可した範囲と照合します。どの手順を使うか、何を次に確認するかは担当が判断します。専門範囲の相談では、作業コピーを直接読めない場合も、利用者が報告した観測を基に担当が回答します。適用に必要な情報が足りなければ、確認できていることを基に追加情報を尋ねます。\n- 利用者が既存の資料・事例・手順を調べるよう求めたときや、確認方法に迷いがあり既製候補だけで判断する材料が足りないときは、回答を確定する前に get_guidance でContextStillを探します。goal に目的を、situation に CURRENT_DOCUMENT の revision と迷いを入れます。直前に試した操作と結果を利用者が説明していれば lastAttempt の action と result に入れます。acceptance と constraints は利用者が求めた条件を保持します。読み取り専用の依頼でも、候補内に読み取り専用の短い観測例を含められます。公式資料による証明は、依頼で求められた場合に条件にします。SKILLの言語は依頼に合わせます。指定された公開資料・事例のタイトルがあれば、そのまま publicSearchTask に入れます。対象環境の版や症状は検索語へ足さず、手順を具体化する目的と状況に含めます。題名がない場合は検索に必要な公開の製品名・規格・一般的な症状だけを publicSearchTask に入れます。そのターンの TOOL_RESULT に get_guidance の結果があれば、検索の受付は済んでいます。準備中なら、その時点で確認できることを返し、同じターンで繰り返し照会しません。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:b46d24535b9fc7b7901fdae2c2458211e53abb8141d57ee6a75847dfc9ce8d10"
+          "artifactHash": "sha256:be3f943331ab07cf66bca8749959d1ef91dd31b50235a86a098ba01628cd1a7a"
         }
       },
-      "definitionHash": "sha256:dd29b78356de78f4c8a7cb8bba099878b65fbf5cba14a336eed9e9f70613ef94",
-      "releaseDigest": "sha256:2558b6627324572b39420abf6ece1da23597b5d0242600cc097c810758af05c3"
+      "definitionHash": "sha256:2d254a8ac75d4edd5fc706d727acc80d9ca8ad4b4016939f2c74aa5fb757b56c",
+      "releaseDigest": "sha256:b938b9e9438912f8cf1dee6cb8891bb59595fc062795af5efc1635b4549143bc"
     },
     "dialogue.contexts.specialist-turn.rules": {
       "key": "dialogue.contexts.specialist-turn.rules",
@@ -5122,5 +5156,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:9a1bd9c04491cb25bdc86a3ec288649788dd2f453dab5c522895d471d1e9096c"
+  "catalogDigest": "sha256:4e545fea28d31e8daa03c4411d49682685291eab5c66e3e7997eaf7886efc3bf"
 }

@@ -264,6 +264,14 @@ export type GuidanceReadContext = {
 	assertCurrent(tx: Database): void;
 };
 
+export type GuidanceSelectContext = GuidanceReadContext & {
+	runId: string;
+	bindingRevisionId: string;
+	language?: GuidanceLanguage;
+	report?: string;
+	deadline: number;
+};
+
 export interface SpecialistPort {
 	guidance?: {
 		candidates(
@@ -273,16 +281,8 @@ export interface SpecialistPort {
 		tool(
 			set: SpecialistSet,
 		): { id: string; description: string; inputSchema: unknown } | undefined;
-		select(
-			args: unknown,
-			context: {
-				runId: string;
-				bindingRevisionId: string;
-				language?: GuidanceLanguage;
-				report?: string;
-				deadline: number;
-			} & GuidanceReadContext,
-		): Promise<unknown>;
+		select(args: unknown, context: GuidanceSelectContext): Promise<unknown>;
+		prepare?(context: GuidanceSelectContext): Promise<unknown>;
 		read(requestRef: string, context: GuidanceReadContext): Promise<unknown>;
 		finishTurn(
 			tx: Database,

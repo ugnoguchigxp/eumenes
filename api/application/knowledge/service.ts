@@ -17,10 +17,11 @@ import {
 import { sqliteRepository } from "eumenes-skill-smith/sqlite";
 import { z } from "zod";
 import { getLogger } from "../../infrastructure/logger";
+import { systemContext } from "../../infrastructure/system-context";
 import type {
 	GuidanceCandidate,
 	GuidanceLanguage,
-	GuidanceReadContext,
+	GuidanceSelectContext,
 } from "../../domains/dialogue/contracts/specialist";
 import {
 	createSpecialistGuidance,
@@ -77,6 +78,86 @@ const guidanceQuerySchema = z.strictObject({
 		.optional()
 		.describe("SKILLを受け取る言語。依頼の言語を使う。"),
 });
+const guidanceIntent = z.discriminatedUnion("kind", [
+	z.strictObject({ kind: z.literal("continue") }),
+	guidanceQuerySchema.extend({
+		kind: z.literal("search"),
+		publicSearchTask: publicQuery,
+		situation: situationSchema.omit({ revision: true }),
+	}),
+]);
+const guidanceIntentInstructions = systemContext(
+	"dialogue.contexts.specialist-turn.guidance-intent",
+	{},
+);
+const guidanceIntentJson = z.toJSONSchema(guidanceIntent, { io: "input" });
+
+function createGuidanceIntent(
+	inference: Ports<Database>["inference"],
+	read: <T>(op: (tx: Database) => T) => T,
+) {
+	return async (context: GuidanceSelectContext) => {
+		if (!context.report || context.deadline - Date.now() < 6000) return null;
+		read(context.assertCurrent);
+		const requestRef = "guidance-intent:" + context.runId;
+		const start = performance.now();
+		const result = await inference.complete(
+			{
+				system: guidanceIntentInstructions,
+				data: {
+					report: context.report,
+					workRevision: context.revision,
+					language: context.language,
+				},
+				schema: guidanceIntentJson,
+				deadlineAt: Math.min(context.deadline - 3000, Date.now() + 32_000),
+				maxOutputTokens: 1000,
+				requestRef,
+			},
+			context.signal,
+		);
+		context.signal.throwIfAborted();
+		if (
+			!read((tx) => {
+				context.assertCurrent(tx);
+				return inference.validReceipt(tx, result.receipt, requestRef);
+			})
+		)
+			throw Error("guidance_intent_receipt_invalid");
+		const parsed = guidanceIntent.safeParse(result.value);
+		if (!parsed.success) throw Error("guidance_intent_contract_invalid");
+		const { kind } = parsed.data;
+		log.info("knowledge.specialist_search_intent", {
+			runId: context.runId,
+			decision: kind,
+			durationMs: performance.now() - start,
+		});
+		if (kind === "continue") return null;
+		const { kind: _, ...lookup } = parsed.data;
+		return {
+			...lookup,
+			situation: { ...lookup.situation, revision: String(context.revision) },
+		};
+	};
+}
+
+function logGuidanceIntentFailure(runId: string, error: unknown) {
+	log.warn("knowledge.specialist_search_intent_failed", {
+		runId,
+		reason: "guidance_intent_unavailable",
+		validationCode:
+			error instanceof Error &&
+			[
+				"guidance_intent_receipt_invalid",
+				"guidance_intent_contract_invalid",
+				"deadline_exceeded",
+				"local_timeout",
+			].includes(error.message)
+				? error.message
+				: undefined,
+	});
+}
+
 export const guidanceToolSchema = z.union([
 	guidanceQuerySchema,
 	z.strictObject({ requestRef: z.uuid().describe("準備中の候補の取得ID。") }),
@@ -179,6 +260,33 @@ function guidanceRequest(
 	};
 }
 
+function createSpecialistInference(
+	control: KnowledgeControl,
+	read: <T>(op: (tx: Database) => T) => T,
+	write: <T>(op: (tx: Database) => T) => Promise<T>,
+) {
+	return createEumenesInference({
+		control: {
+			...control,
+			captureUserControlInTransaction: (tx, input) =>
+				control.captureUserControlInTransaction(tx, {
+					...input,
+					// The host's independent-control deadline is capped at two minutes per request.
+					deadline: Math.min(input.deadline, Date.now() + 120_000),
+					attemptMs: 90_000,
+				}),
+			executeControl: (id, messages, signal, contract) =>
+				control.executeControl(id, messages, signal, {
+					...contract,
+					reasoningEffort: "low",
+				}),
+		},
+		read,
+		write,
+		structuredOutput: true,
+	});
+}
+
 /** Application adapter for authenticated delivery and specialist lookup. The SDK owns request/build state. */
 export function createKnowledge(options: {
 	store: SqliteStore;
@@ -252,26 +360,8 @@ export function createKnowledge(options: {
 		explorationFallback: true,
 	};
 	const service = createSkillSmith(ports);
-	const specialistInference = createEumenesInference({
-		control: {
-			...control,
-			captureUserControlInTransaction: (tx, input) =>
-				control.captureUserControlInTransaction(tx, {
-					...input,
-					// The host's independent-control deadline is capped at two minutes per request.
-					deadline: Math.min(input.deadline, Date.now() + 120_000),
-					attemptMs: 90_000,
-				}),
-			executeControl: (id, messages, signal, contract) =>
-				control.executeControl(id, messages, signal, {
-					...contract,
-					reasoningEffort: "low",
-				}),
-		},
-		read,
-		write,
-		structuredOutput: true,
-	});
+	const specialistInference = createSpecialistInference(control, read, write);
+	const decideGuidance = createGuidanceIntent(specialistInference, read);
 	const specialist = createSpecialistGuidance(
 		store,
 		queue,
@@ -353,13 +443,7 @@ export function createKnowledge(options: {
 	}
 	async function selectForSpecialist(
 		args: unknown,
-		context: {
-			runId: string;
-			bindingRevisionId: string;
-			language?: GuidanceLanguage;
-			report?: string;
-			deadline: number;
-		} & GuidanceReadContext,
+		context: GuidanceSelectContext,
 	) {
 		const started = performance.now();
 		const parsed = guidanceToolSchema.safeParse(args);
@@ -452,6 +536,18 @@ export function createKnowledge(options: {
 		};
 	}
 
+	async function prepareForSpecialist(context: GuidanceSelectContext) {
+		try {
+			const lookup = await decideGuidance(context);
+			return lookup ? await selectForSpecialist(lookup, context) : undefined;
+		} catch (error) {
+			context.signal.throwIfAborted();
+			read(context.assertCurrent);
+			logGuidanceIntentFailure(context.runId, error);
+			return undefined;
+		}
+	}
+
 	return {
 		explorationCandidates(tx: Database, language?: GuidanceLanguage) {
 			if (sqliteRepository.blocked(tx, FIXED_EXPLORATION_REF)) return [];
@@ -462,6 +558,10 @@ export function createKnowledge(options: {
 		submit,
 		get,
 		selectForSpecialist,
+		prepareForSpecialist:
+			source && options.specialistContextSearch
+				? prepareForSpecialist
+				: undefined,
 		readForSpecialist: specialist.read,
 		finishSpecialistTurn: specialist.finishTurn,
 		attachDialogue: specialist.attachDialogue,

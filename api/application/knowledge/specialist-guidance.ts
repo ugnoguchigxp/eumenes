@@ -70,6 +70,16 @@ export function createSpecialistGuidance(
 			const row = request(tx, ref);
 			return row && valid(tx, row.authority) ? row.authority : null;
 		},
+		observeCall: (ref, call) => {
+			log.info("knowledge.specialist_build_call", {
+				subjectId: ref,
+				phase: call.operation,
+				kind: call.kind,
+				outcome: call.outcome,
+				validationCode: call.validationCode,
+				durationMs: call.durationMs,
+			});
+		},
 	});
 	const handlerFor = (scope: string) =>
 		scope.startsWith(specialistScope) ? compactHandler : baselineHandler;
@@ -209,18 +219,20 @@ export function createSpecialistGuidance(
 		if (result.kind === "needs_input") return result;
 		if (result.kind !== "ready")
 			return { kind: "unavailable" as const, reason: result.code };
-		const strategy = store.read((tx) => {
+		const content = store.read((tx) => {
 			context.assertCurrent(tx);
-			return sqliteRepository.build(tx, result.auditRef)?.content.decision
-				.strategy;
+			return sqliteRepository.build(tx, result.auditRef)?.content;
 		});
 		log.info("knowledge.specialist_contextual_delivery", {
 			subjectId: requestRef,
 			workRevision: context.revision,
 			skillDigest: result.skill.digest,
 			documentCount: result.dependencyVersions.length,
+			externalDocumentCount: content?.dependencies.filter(
+				(source) => source.external,
+			).length,
 			count: row.usage.sourceCalls,
-			decision: strategy,
+			decision: content?.decision.strategy,
 		});
 		return { ...result, situation };
 	}
