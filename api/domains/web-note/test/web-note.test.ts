@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { waitFor } from "../../../infrastructure/wait-for";
 import { parseNote, today } from "..";
 import { noteSources } from "../service/note";
+import policy from "../service/policy.json";
 import { fixture, NOTE_TEXT } from "./web-note.fixture";
 
 /** The agency researcher's instructions (the benchmark's `instructions`), with the day filled in. */
@@ -98,7 +99,8 @@ test("a research request runs one Codex turn with the researcher's instructions 
 		f.run();
 		await waitFor(() => f.view(view.id)?.status === "completed");
 		const call = f.calls[0]!;
-		expect(call.model).toBe("fixture-model");
+		// The research model is the web note's own, whatever LLM the conversation is set to.
+		expect(call.model).toBe(policy.model);
 		expect(call.reasoning).toBe("low");
 		expect(call.webSearch).toBe("live");
 		expect(call.prompt).toBe(`${INSTRUCTIONS}\n\n依頼:\n${f.request}`);
@@ -122,7 +124,7 @@ test("a research request runs one Codex turn with the researcher's instructions 
 		expect(f.attempts).toEqual([
 			expect.objectContaining({
 				subject: `web-note:${view.id}`,
-				model: "fixture-model",
+				model: policy.model,
 				status: "succeeded",
 				usage: {
 					input: 25000,
@@ -324,40 +326,6 @@ test("a run past its deadline ends failed on recovery, and a notice left pending
 		expect(f.notices).toHaveLength(2);
 		await f.service.recover();
 		expect(f.notices).toHaveLength(2);
-	} finally {
-		await f.close();
-	}
-}, 15000);
-
-test("a model setting that cannot be used fails the run before Codex is called, and no attempt is recorded", async () => {
-	const f = await fixture({
-		model: () => {
-			throw new Error("web_note_search_resource_invalid");
-		},
-	});
-	try {
-		const view = await f.start();
-		f.run();
-		await waitFor(() => f.view(view.id)?.status === "failed");
-		expect(f.view(view.id)!.result).toMatchObject({
-			status: "failed",
-			code: "web_note_search_resource_invalid",
-		});
-		expect(f.calls).toHaveLength(0);
-		expect(f.attempts).toHaveLength(0);
-	} finally {
-		await f.close();
-	}
-}, 15000);
-
-test("without a saved model the turn runs on Codex's own default, and the attempt says so", async () => {
-	const f = await fixture({ model: () => null });
-	try {
-		const view = await f.start();
-		f.run();
-		await waitFor(() => f.view(view.id)?.status === "completed");
-		expect(f.calls[0]!.model).toBeNull();
-		expect(f.attempts[0]).toMatchObject({ model: null, status: "succeeded" });
 	} finally {
 		await f.close();
 	}

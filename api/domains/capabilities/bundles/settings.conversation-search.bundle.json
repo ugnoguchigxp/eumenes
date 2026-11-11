@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.conversation",
-			"revision": 10,
+			"revision": 11,
 			"title": "会話の設定",
 			"variants": [
 				{
@@ -159,16 +159,6 @@
 					"unset": "null",
 					"optionsSource": "query:settings.llm-resources@1",
 					"help": "未設定なら保存済みの会話用AIを別接続で使います。選んだAIが利用不能なときは他の接続へ代替しません。"
-				},
-				{
-					"fieldId": "agency.search-resource",
-					"document": "document:settings@1",
-					"path": "$.agency.searchResourceId",
-					"label": "調べものに使うAI（Codex）",
-					"control": "select",
-					"unset": "null",
-					"optionsSource": "query:settings.llm-resources@1",
-					"help": "調べもの（Webの検索）を行うCodexの接続のAIを選びます。未設定ならCodex自身の既定のAIで調べます。選んだAIがCodexの接続でないとき、調べものは失敗し、他のAIで代替しません。"
 				},
 				{
 					"fieldId": "agency.speech-interval",

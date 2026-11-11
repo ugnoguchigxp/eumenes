@@ -32,8 +32,6 @@ export async function fixture(
 		record?: ((attempt: WebNoteAttempt) => Promise<void>) | null;
 		/** The clock's start (epoch ms). */
 		at?: number;
-		/** The model of the saved setting (default a fixture model; null is Codex's own default). */
-		model?: () => string | null;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-web-note-")),
@@ -83,7 +81,6 @@ export async function fixture(
 		queue,
 		capabilities,
 		...(turn ? { turn } : {}),
-		model: options.model ?? (() => "fixture-model"),
 		record:
 			options.record === null
 				? undefined

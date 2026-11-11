@@ -13,7 +13,7 @@
 | 新しい担当 | toolchain `web.note`（関数 `web_note`）。package `web.note` は backend `web-note`、binding `web.note@1` は `execution:"task"`・adapter `adapter:web-note@1`。bundle は `api/domains/capabilities/bundles/web-note.bundle.json`。`general` なので、専用担当がなければ検索の汎用枠に出る |
 | 返すもの | 調べもののメモ。題・要約（1〜2文）・Markdown 本文（日付と出典1〜3件）。agency の調べもの担当と同じ指示（profile と SKILL の本文。今日の日付は実行時に `{{today}}` へ入る） |
 | 実行 | 新しい domain `web-note`（表 `web_note_runs`、queue ジョブ `web-note.run`、資源 `codex.search` は同時2）。1件につき Codex SDK のスレッドを新しく作り、`modelReasoningEffort:"low"`・`webSearchMode:"live"`・read-only・承認なし・空の作業ディレクトリで1ターン（値は `api/domains/web-note/service/policy.json`）。SDK の呼び出しは `packages/coding-runner/src/codex-turn.ts`（`@openai/codex-sdk` はこの package からだけ解決できる）、Codex の実行ファイルと見せる環境は既存の `codexRuntime`、機能の無効化は `disabledFeatures` から `code_mode_host` だけを除いたもの（Codex の Web 検索はこの host を通る。無効にすると検索0回で「検索できなかった」と答える。2026-11-11 実測、下記）、設定は `api/application/web-note/codex-web-note.ts` |
-| モデル | 製品コードにモデル名を書かない決まり（AGENTS.md・`api/application/fixed-names.test.ts`）に従い、保存済み設定 `agency.searchResourceId`（Codex SDK 接続の LLM 資源）の `model` を使う。未設定なら Codex 自身の既定のモデル。指した資源が無い・無効・Codex SDK 接続でないときは `web_note_search_resource_invalid` で失敗し、別のモデルでは代替しない。設定画面「会話の設定」に「調べものに使うAI（Codex）」（`settings.conversation@10`、bundle `settings.conversation-search.bundle.json`）。**利用者の決定の Luna（reasoning low）を使うには、Codex SDK 接続に Luna の資源を保存し、ここで選ぶ** |
+| モデル | 会話の LLM 設定に関係なく gpt-6-luna に固定する（利用者の決定 2026-11-11「LLMの選択に関係なく codex-sdk lunaを検索に使う想定にしていいです」）。値は `api/domains/web-note/service/policy.json` の `model` だけに書き、AGENTS.md の「モデル名をコードに書かない」決まりの例外として `api/application/fixed-names.test.ts` の `decidedModelFiles` に1ファイル・1行だけ認める。最初の版にあった設定 `agency.searchResourceId` と設定画面の項目は取り除いた（`settings.conversation@11` は @9 と同じ項目。保存済みの文書にこの値があれば読み込み時に捨てる） |
 | 失敗 | Codex の実行ファイルがない・ログインしていない・終了コード異常・空の答え・出力が大きすぎる・期限切れは、理由コード（`web_note_codex_unavailable` `web_note_codex_not_logged_in` `web_note_codex_exit` `web_note_empty_output` `web_note_output_limit` `web_note_deadline_exceeded` `web_note_turn_failed`）つきで `failed`。メモは作らない。provider の文面は記録に入れない |
 | 取消 | 作業の中止信号（queue ジョブの期限と取消）を Codex のターンへ渡し、止める。ユーザーの取消は `cancelled`。忘却は run を消す |
 | 記録 | 1回のターンごとに、推論台帳へ Codex SDK の試行として1件（`connection_kind=codex-sdk` `billing_path=codex`、入力・キャッシュ読み・出力・推論トークン）。失敗・取消も理由つきで残す。`InferencePort.recordExternalCodexAttempt` |
@@ -40,4 +40,3 @@
 ## 残っていること
 
 - Codex がログインしていない環境では `web.note` は「失敗」として終わる。実行ファイルが無い環境では担当そのものを出さない（`web-note` backend が有効にならない）。
-- 設定が未設定の間は Codex の既定のモデルで動く。Luna に固定するには上の設定を保存する必要がある（この実装は利用者の設定を書き換えない）。

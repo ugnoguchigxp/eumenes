@@ -142,7 +142,7 @@ type ToolchainOptions = {
 	 * The research note task (Codex's own web search): one Codex turn and the ledger record of it. Absent: the task is
 	 * not offered.
 	 */
-	webNote?: Pick<WebNoteDeps, "turn" | "record" | "model">;
+	webNote?: Pick<WebNoteDeps, "turn" | "record">;
 	conversation?: import("../../domains/conversation").ConversationService;
 	timers?: import("../../domains/timers").TimersService;
 	schedules?: SchedulerAdapterPorts;

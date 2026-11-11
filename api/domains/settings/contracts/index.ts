@@ -405,12 +405,6 @@ export const settingsSchema = z
 				/** Absent in existing installations: keep the adopted F host until explicitly switched. */
 				runtime: z.enum(["F", "always-on"]).optional(),
 				thinkResourceId: z.string().min(1).nullable().optional(),
-				/**
-				 * The saved LLM resource of a Codex SDK connection that the research notes (the web note task) run on: its
-				 * model is the turn's model. Unset: Codex's own default model. Read on each run; a resource that is gone or
-				 * not on a Codex SDK connection fails the run, with no other model in its place.
-				 */
-				searchResourceId: z.string().min(1).nullable().optional(),
 				speechIntervalSec: z
 					.number()
 					.int()

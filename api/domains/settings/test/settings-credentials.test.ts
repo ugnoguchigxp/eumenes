@@ -552,6 +552,23 @@ test("the removed dedicated LLM selections are not part of the settings document
 			agency: { ...s.agency, enabled: true },
 		}).success,
 	).toBe(false);
+	// The research model is fixed (user, 2026-11-11): its brief selection is not a setting, and a document saved with
+	// it still loads.
+	expect(
+		settingsSchema.safeParse({
+			...s,
+			agency: { ...s.agency, searchResourceId: null },
+		}).success,
+	).toBe(false);
+	const saved = JSON.parse(JSON.stringify(s));
+	saved.agency.searchResourceId = "resource-1";
+	await h.store.write((db) => {
+		db.query("UPDATE settings_document SET document=? WHERE id=1").run(
+			JSON.stringify(saved),
+		);
+	});
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect("searchResourceId" in reopened.get().agency).toBe(false);
 });
 
 test("agency defaults, also for saved documents without it", async () => {

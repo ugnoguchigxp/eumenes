@@ -69,13 +69,8 @@ export function registerJobs(ctx: Context) {
 		},
 		async execute(input, { signal }) {
 			if (!ctx.turn) throw new Error("web_note_codex_unavailable");
-			// No Codex call is made (and none recorded) for a setting that names an unusable resource.
-			let model: string | null;
-			try {
-				model = ctx.model?.() ?? null;
-			} catch (error) {
-				throw new Error(turnCode(error));
-			}
+			// The research model is fixed, whatever LLM the conversation is set to (user, 2026-11-11).
+			const model = policy.model;
 			const started = ctx.now();
 			const subject = `web-note:${input.id}`;
 			const attempt = (

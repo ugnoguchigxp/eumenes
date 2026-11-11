@@ -20,8 +20,8 @@ export type NoticeState = "none" | "pending" | "accepted" | "delivered";
 
 /** One Codex turn with the research instructions: the host's seam (a fake in tests). */
 export type WebNoteTurn = (input: {
-	/** The saved model of the turn; null: Codex's own default. */
-	model: string | null;
+	/** The research model (`policy.json`): fixed, whatever LLM the conversation is set to. */
+	model: string;
 	reasoning: "low" | "medium" | "high";
 	webSearch: "disabled" | "cached" | "live";
 	prompt: string;
@@ -40,8 +40,7 @@ export type WebNoteTurn = (input: {
 /** The finished turn as the inference ledger records it (a Codex SDK attempt). */
 export type WebNoteAttempt = {
 	subject: string;
-	/** null: Codex's own default model. */
-	model: string | null;
+	model: string;
 	started: number;
 	ended: number;
 	status: "succeeded" | "failed";

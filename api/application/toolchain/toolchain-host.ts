@@ -159,7 +159,7 @@ export async function createHostToolchain(
 		/** The research note task's Codex turn and its ledger record (absent: the task is not offered). */
 		webNote?: Pick<
 			import("../../domains/web-note").WebNoteDeps,
-			"turn" | "record" | "model"
+			"turn" | "record"
 		>;
 		timers?: TimersService;
 		schedules?: import("../scheduler/scheduler-adapter").SchedulerAdapterPorts;

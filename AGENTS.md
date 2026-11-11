@@ -15,6 +15,7 @@
 - LARM の接続先は SQLite に保存済みの設定を正本とする。接続先の環境変数を要求したり、利用者に同じ接続先を再確認したりしない。live 検証は backend の settings domain の読み取り専用操作を使い、テスト接続先は設定 API で保存する。
 - 画像生成は、保存済みの LARM 接続先の catalog から capability `media.image.generate`（protocol `larm.image-generation.v1`）を持つサービスを発見して使う。profile 名・モデル名をコード・設定・手順に固定しない。サービス発見・確保応答の `services[].url` と `description` を確認し、手順は `docs/larm.md` に従う。参照画像編集は現行APIでは未対応。
 - LLM・音声・画像・音楽の profile 名とモデル名は、コード（定数・分岐・既定値・エラーメッセージ）とファイル名に書かない。SQLite に保存した設定と、catalog から実行時に得た値だけを使う。
+  - 例外（利用者の決定、2026-11-11）: Web の調べもの `web.note` のモデルは、会話の LLM 設定に関係なく Codex SDK の決まったモデルを使い、`api/domains/web-note/service/policy.json` の `model` だけに書く（`api/application/fixed-names.test.ts` の `decidedModelFiles`）。
 - 検証は `bun run verify -- --domain <name>` を使い、変更の影響がある利用側 domain も選んで確認する。E2E は対象 domain の試験ファイルを明示して個別に実行する。`verify:all` にブラウザE2Eは含めない。fixture、live、実機器受入の結果を分けて記録する。
 - 実装済み、検証済み、計画を区別する。実機器の3往復受入を通すまで音声 MVP の完成を宣言しない。
 - 障害調査では `bun run logs -- --level warn` から始め、runId・jobId・HTTPの `X-Request-Id` で JSONL を絞る。手順は `docs/logging.md`。ログに会話本文・音声・認証情報・設定・Providerの生応答を渡さない。

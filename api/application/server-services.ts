@@ -230,7 +230,6 @@ export async function buildServices(
 			config.env,
 			config.researchCodexExecutable,
 			inference,
-			settings,
 		),
 		embed: embedder,
 		terminalHooks: {

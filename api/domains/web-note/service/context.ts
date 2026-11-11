@@ -13,11 +13,6 @@ export type WebNoteDeps = {
 	capabilities: Capabilities;
 	/** One Codex turn (the host's Codex SDK; a fake in tests). Absent: the task is not offered. */
 	turn?: WebNoteTurn;
-	/**
-	 * The model the turn runs on: the model of the saved Codex resource; null is Codex's own default. Throws a coded
-	 * `web_note_` error when the setting names a resource that cannot be used (no other model takes its place).
-	 */
-	model?(): string | null;
 	/** Records a finished turn in the inference ledger (a Codex SDK attempt, with its tokens). */
 	record?(attempt: WebNoteAttempt): Promise<void>;
 	now?: () => number;

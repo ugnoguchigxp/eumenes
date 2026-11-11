@@ -13,7 +13,8 @@ const isObject = (v: unknown): v is Json =>
  *   (a stored key or an env ref: "api-key"; nothing: "subscription").
  * - The removed Managed Agents fields are dropped.
  * - The LARM sentence-language switch becomes `englishSpeechEnabled`; its classifier selector is dropped.
- * - The removed dedicated LLM selections (`subagent`, `agency.resourceId`) and the agency ON/OFF (`agency.enabled`: spontaneous speech is always on) are dropped: every inference
+ * - The removed dedicated LLM selections (`subagent`, `agency.resourceId`, and `agency.searchResourceId`: the research
+ *   model is fixed, user 2026-11-11) and the agency ON/OFF (`agency.enabled`: spontaneous speech is always on) are dropped: every inference
  *   other than World curation runs on the one LLM configured for the conversation.
  * - The removed `codingSupervision` section (instruction approval for the retired CLI runner) is dropped.
  * - Speech has no fallback: a `larm-preferred` speech route becomes `larm-only`.
@@ -30,6 +31,7 @@ export function migrateStoredSettings(
 		if (isObject(rest.agency)) {
 			const {
 				resourceId: _resourceId,
+				searchResourceId: _searchResourceId,
 				enabled: _enabled,
 				...agency
 			} = rest.agency;
