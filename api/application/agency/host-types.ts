@@ -16,6 +16,7 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { SpeechRouter } from "./speech";
 import type { AgencyCallIdentity } from "./llm-port";
 import type { AgencyStatePort } from "../../domains/dialogue";
+import type { SteerInboxPort } from "eumenes-agency/agenda";
 export type AgencySettings = Settings["agency"];
 export type HostPersona = Pick<
 	Settings["general"],
@@ -35,7 +36,10 @@ export type AgencyHostDeps = {
 		| "appendInTransaction"
 	>;
 	/** `foregroundBusy()` serves the user right now (conversation answers, ASR, TTS); background calls never count. */
-	inference: { foregroundBusy(): boolean; onActivity?(listener: () => void): () => void };
+	inference: {
+		foregroundBusy(): boolean;
+		onActivity?(listener: () => void): () => void;
+	};
 	settings: {
 		get(): { agency: AgencySettings; general: HostPersona };
 		/** The committed settings as the transaction sees them (the delivery fence reads this, not the cache). */
@@ -47,7 +51,14 @@ export type AgencyHostDeps = {
 	};
 	/** The user's State items are the topic material (hostTopics mode). */
 	memory: Pick<MemoryService, "status" | "list"> &
-		Partial<Pick<MemoryService, "referenceInputs" | "isBlockedInTransaction">>;
+		Partial<
+			Pick<
+				MemoryService,
+				| "referenceInputs"
+				| "isBlockedInTransaction"
+				| "blockMessagesInTransaction"
+			>
+		>;
 	/** Frozen conversation prefix and State, including all host input dependencies. */
 	captureContext?(
 		conversationId: string,
@@ -73,6 +84,19 @@ export type AgencyHostDeps = {
 			todoRefs?: readonly string[];
 		},
 	): void;
+	/**
+	 * The server's one steering inbox (eumenes-steer): words the user sends while a reply is written reach the reply's
+	 * next model call. Absent: they wait for a reply of their own.
+	 */
+	steering?: SteerInboxPort;
+	/** Which capability a research ticket runs on (the revision id in the catalog); absent: the web research. */
+	researchRevision?(
+		catalog: ReadonlyArray<{
+			revisionId: string;
+			requiresApproval: boolean;
+			effect?: string | null;
+		}>,
+	): string | undefined;
 	nowMs?(): number;
 	setTimer?(fn: () => void, ms: number): unknown;
 	clearTimer?(handle: unknown): void;

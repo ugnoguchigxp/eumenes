@@ -3,6 +3,7 @@ import { conversationPersona } from "../../domains/dialogue";
 import type { ConversationAgentSystem } from "../../domains/dialogue/contracts";
 import type { Settings } from "../../domains/settings";
 import { systemContext } from "../../infrastructure/system-context";
+import { agendaReplyRules } from "./always-on-system";
 
 type Persona = Pick<Settings["general"], "agentName" | "userName" | "persona">;
 const feelingNames = emotions
@@ -12,12 +13,17 @@ const feelingNames = emotions
 /** Only Eumenes-authored instruction assets; Agency supplies the public execution contracts. */
 export function agencyReplyParts(
 	settings: Settings["agency"],
+	/** The agenda serves the reply now (always-on, and its memory ready): only then are its rules in the system. */
+	agenda = true,
 ): ConversationAgentSystem {
 	return {
 		base: [
 			systemContext("dialogue.contexts.agency.reply", {}),
-			...(settings.runtime === "always-on"
-				? [systemContext("dialogue.contexts.agency.always-on-reply", {})]
+			...(settings.runtime === "always-on" && agenda
+				? [
+						systemContext("dialogue.contexts.agency.always-on-reply", {}),
+						agendaReplyRules(),
+					]
 				: []),
 		].join("\n\n"),
 		...(settings.interests.length

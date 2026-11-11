@@ -1,26 +1,41 @@
 import type { Database } from "bun:sqlite";
-import { createAlwaysOnCheckpoints } from "./always-on-checkpoint";
-import { runAlwaysOnCycle, collectAlwaysOnResults } from "./always-on-cycle";
-import { createAlwaysOnPorts } from "./always-on-ports";
-import { pumpAlwaysOnHost } from "./always-on-feed";
-import { isAlwaysOnSnapshot, type AgencyRecord } from "../../domains/dialogue";
+import { createAgendaCheckpoints } from "./always-on-checkpoint";
+import {
+	collectAgendaResults,
+	mayStep,
+	runAgendaStep,
+} from "./always-on-cycle";
+import { createAgendaPorts } from "./always-on-ports";
+import { feedAgenda, pumpAgendaHost } from "./always-on-feed";
+import { isAgendaSnapshot, type AgencyRecord } from "../../domains/dialogue";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { fixedInput } from "./input";
+import { showNote } from "./always-on-flow";
 import {
-	createAlwaysOnScope,
-	alwaysOnEnvelope,
-	type AlwaysOnScope,
+	createAgendaScope,
+	agendaEnvelope,
+	agendaReady,
+	type AgendaScope,
 } from "./always-on-scope";
 import type { AgencyHostDeps } from "./host-types";
 import type { AgencyWork } from "./work";
 import { createAgencyActivity } from "./always-on-activity";
 import type { AgencyActivity } from "../../domains/dialogue/contracts/agency-status";
-/** Host orchestration only. Meaning and action choice stay in the adopted always-on agent. */
+
+/**
+ * The always-on runtime: the agenda agent (eumenes-agency/agenda) of each conversation, and what Eumenes runs around
+ * it. Host orchestration only: the agent keeps the list of things to do and decides when and which; the host feeds it
+ * the conversation, hands its tickets to the toolchains and the speech path, and saves what it owes across a restart.
+ */
 export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	const now = deps.nowMs ?? Date.now;
 	const log = getLogger("agency");
-	const convs = new Map<string, AlwaysOnScope>();
+	const setTimer = deps.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
+	const clearTimer =
+		deps.clearTimer ??
+		((id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>));
+	const convs = new Map<string, AgendaScope>();
 	const persisted = new Map<string, number>();
 	const recovering = new Set<string>();
 	const stoppers: Array<() => void> = [];
@@ -31,7 +46,6 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		savedCursor = -1;
 	let activeId: string | null = null;
 	let display: { id: string; until: number } | null = null;
-	let work: AgencyWork | undefined;
 	let pumping: Promise<void> | null = null;
 	let requested = false;
 	const settings = () => {
@@ -43,25 +57,26 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	const activity = createAgencyActivity({
 		now,
 		changed: () => syncBusy(),
-		setTimer: deps.setTimer ?? ((fn, ms) => setTimeout(fn, ms)),
-		clearTimer:
-			deps.clearTimer ??
-			((id) => clearTimeout(id as ReturnType<typeof setTimeout>)),
+		setTimer,
+		clearTimer,
 	});
-	const on = () =>
-		started &&
-		!closed &&
-		deps.settings.get().agency.runtime === "always-on" &&
-		deps.memory.status().healthy &&
-		!!deps.state &&
-		!!deps.memory.referenceInputs;
+	const on = () => started && !closed && agendaReady(deps);
 	const track = <T>(p: Promise<T>): Promise<T> => {
 		inflight.add(p);
 		void p.finally(() => inflight.delete(p)).catch(() => {});
 		return p;
 	};
+	const text = (messageId: string) =>
+		deps.store.read((db) => {
+			const source = deps.conversation.sourceInTransaction(db, messageId);
+			return source.state === "available" &&
+				source.message.role === "user" &&
+				!deps.memory.isBlockedInTransaction?.(db, messageId)
+				? source.message.text
+				: null;
+		});
 	function make(id: string, previous?: AgencyRecord) {
-		const c = createAlwaysOnScope({
+		const c = createAgendaScope({
 			deps,
 			id,
 			epoch:
@@ -69,15 +84,9 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 				deps.store.read((db) => deps.state!.epochInTransaction(db, id)),
 			...(previous ? { previous } : {}),
 			now,
-			run: (c) => track(run(c)),
-			settled: async (c) => {
-				if (closed || convs.get(c.id) !== c) return;
-				c.revision++;
-				await track(save()).catch((error) =>
-					log.warn("agency.checkpoint_failed", {
-						reason: toErrorCode(error, "checkpoint_failed"),
-					}),
-				);
+			text,
+			kick: (scope) => {
+				void kickScope(scope);
 			},
 		});
 		convs.set(id, c);
@@ -93,40 +102,69 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		const record = deps.store.read((db) =>
 			deps.state!.recordsInTransaction(db).find((r) => r.conversationId === id),
 		);
-		if (record && !isAlwaysOnSnapshot(record.snapshot))
+		if (record && !isAgendaSnapshot(record.snapshot))
 			throw new Error("agency_runtime_not_recovered");
 		return make(id, record);
 	}
-	function busy(c: AlwaysOnScope) {
+	function busy(c: AgendaScope) {
 		return (
 			activity.busy(c.id) ||
 			deps.inference.foregroundBusy() ||
 			deps.store.read((db) => deps.conversationBusy(db, c.id))
 		);
 	}
+	const cycleHost = () => ({
+		deps,
+		convs,
+		on,
+		now,
+		busy,
+		digest,
+		save: () => save(),
+		active: () => activeId,
+		refresh: (c: AgendaScope) => refresh(c),
+	});
+	/** The timer of the agent's next step: none while the user is typing, answered or elsewhere. */
+	function arm(c: AgendaScope) {
+		if (c.timer !== undefined) clearTimer(c.timer);
+		c.timer = undefined;
+		if (closed || c.stepping || !mayStep(cycleHost(), c)) return;
+		const next = c.agent.nextAt(now());
+		if (next === null) return;
+		const at = Math.max(next, c.backoffUntil);
+		c.timer = setTimer(
+			() => {
+				c.timer = undefined;
+				void kickScope(c);
+			},
+			Math.max(0, at - now()),
+		);
+	}
+	/** One step now (or right after the one running), then the timer for the next. */
+	function kickScope(c: AgendaScope) {
+		return track(
+			runAgendaStep(cycleHost(), c).finally(() => {
+				if (convs.get(c.id) === c) arm(c);
+			}),
+		);
+	}
 	function syncBusy() {
 		for (const c of convs.values()) {
-			const next =
-				busy(c) || c.id !== activeId || !on() || recovering.has(c.id);
-			if (next !== c.busy) {
-				c.busy = next;
-				if (next) c.heartbeat.enter();
-				else {
-					c.heartbeat.leave(now());
-					c.heartbeat.event(now());
-				}
-			}
-			c.scheduler.rearm();
+			c.busy = busy(c) || c.id !== activeId || !on() || recovering.has(c.id);
+			arm(c);
 		}
 	}
-	function invalidate(c: AlwaysOnScope) {
+	function dispose(c: AgendaScope) {
+		if (c.timer !== undefined) clearTimer(c.timer);
+		c.timer = undefined;
+	}
+	function invalidate(c: AgendaScope) {
 		c.generation++;
 		c.controller?.abort();
-		c.agent.invalidate();
 		c.revision++;
 	}
-	const { save, saveInTransaction, refresh, forgetInTransaction } =
-		createAlwaysOnCheckpoints({
+	const { save, saveInTransaction, refresh, forgetInTransaction, forgetRefs } =
+		createAgendaCheckpoints({
 			deps,
 			convs,
 			now,
@@ -138,48 +176,83 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 				savedCursor = value;
 			},
 		});
-	const run = (c: AlwaysOnScope) =>
-		runAlwaysOnCycle(
-			{
-				deps,
-				convs,
-				on,
-				now,
-				busy,
-				refresh,
-				digest,
-				save,
-				active: () => activeId,
-			},
-			c,
-		);
+	/** The outbox up to its head, into the agents. Synchronous: the cursor and the agents move together. */
+	function feedEvents() {
+		for (;;) {
+			const events = deps.store.read((db) =>
+				deps.conversation.changesInTransaction(db, cursor, 200),
+			);
+			for (const event of events) {
+				if (
+					event.namespace === "conversation" &&
+					event.sourceKind === "message"
+				) {
+					const c = conv(event.conversationId);
+					feedAgenda({
+						deps,
+						c,
+						event,
+						at: now(),
+						forget: (scope, refs) => forgetRefs(scope, refs),
+						show: (scope, noteIds, runId) => {
+							for (const id of noteIds) {
+								const note = scope.notes.find((n) => n.id === id);
+								if (note)
+									void track(
+										showNote(deps, scope, note, runId, now()).catch((error) =>
+											log.warn("agency.show_note_failed", {
+												subjectId: scope.id,
+												reason: toErrorCode(error, "show_note_failed"),
+											}),
+										),
+									);
+							}
+						},
+					});
+					if (event.speaker === "user" && (!display || display.until <= now()))
+						activeId = c.id;
+				}
+				cursor = event.seq;
+			}
+			if (events.length < 200) break;
+		}
+	}
 	const collect = () =>
-		collectAlwaysOnResults({
+		collectAgendaResults({
 			deps,
 			convs,
 			now,
-			hostDigest,
 			conv,
-			make,
-			invalidate,
 			saveInTransaction,
 			collected() {
 				for (const c of convs.values()) persisted.set(c.id, c.revision);
 				savedCursor = cursor;
 			},
 		});
-	const { dialoguePort, conversationAgent, status } = createAlwaysOnPorts({
+	const { dialoguePort, conversationAgent, status } = createAgendaPorts({
 		deps,
 		convs,
-		now,
+		serving: (id) => {
+			if (!on()) return null;
+			try {
+				return conv(id);
+			} catch {
+				return null;
+			}
+		},
 		active: () => activeId,
 		display: () => display,
+		now,
+		catchUp: () => {
+			if (on()) feedEvents();
+		},
 		changed: () => {
 			requested = true;
+			schedule();
 		},
 	});
 	const pump = () =>
-		pumpAlwaysOnHost({
+		pumpAgendaHost({
 			deps,
 			convs,
 			persisted,
@@ -188,15 +261,10 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			now,
 			refresh,
 			invalidate,
-			conv,
-			work,
+			feedEvents,
 			collect,
 			syncBusy,
-			feed: () => ({ cursor, activeId, display }),
-			adopt(value) {
-				cursor = value.cursor;
-				activeId = value.activeId;
-			},
+			dispose,
 			async save() {
 				if (
 					cursor !== savedCursor ||
@@ -233,10 +301,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 				deps.state!.quarantineLegacyInTransaction(db);
 				deps.state!.recoverForgottenInTransaction(db);
 				for (const r of deps.state!.recordsInTransaction(db))
-					if (
-						!isAlwaysOnSnapshot(r.snapshot) ||
-						r.settingsDigest !== hostDigest
-					)
+					if (!isAgendaSnapshot(r.snapshot) || r.settingsDigest !== hostDigest)
 						deps.state!.revokeInTransaction(db, r.conversationId);
 			});
 		},
@@ -253,7 +318,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			for (const r of deps.store.read((db) =>
 				deps.state!.recordsInTransaction(db),
 			))
-				if (isAlwaysOnSnapshot(r.snapshot)) make(r.conversationId, r);
+				if (isAgendaSnapshot(r.snapshot)) make(r.conversationId, r);
 			stoppers.push(deps.store.onCommit(schedule));
 			if (deps.inference.onActivity)
 				stoppers.push(deps.inference.onActivity(syncBusy));
@@ -266,15 +331,15 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			activity.close();
 			for (const c of convs.values()) {
 				invalidate(c);
-				c.scheduler.dispose();
+				dispose(c);
 			}
 			await Promise.allSettled(inflight);
 			if (deps.state && deps.memory.referenceInputs) await save();
 		},
 		dialoguePort,
 		conversationAgent,
-		attachWork(value: AgencyWork) {
-			work = value;
+		attachWork(_value: AgencyWork) {
+			// The agenda's work is its own research; the TODOs of the conversation are the dialogue's.
 		},
 		forgetInTransaction,
 		planForgetInTransaction: (
@@ -293,10 +358,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			const c = conv(id);
 			activeId = id;
 			display = { id, until: now() + 45_000 };
-			if (entering) {
-				c.heartbeat.event(now());
-				c.revision++;
-			}
+			if (entering) c.revision++;
 			syncBusy();
 			if (entering) await save();
 			return status(id);
@@ -306,7 +368,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			const c = convs.get(id);
 			return c
 				? {
-						snapshot: alwaysOnEnvelope(c),
+						snapshot: agendaEnvelope(c, now()),
 						generation: c.generation,
 						idle: status(id).idle,
 					}

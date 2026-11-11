@@ -63,16 +63,20 @@ function retryNotAdopted(
 	run: Run,
 	input: GenerateInput | null | undefined,
 	payload: GeneratePayload,
+	/** Retry even when no action was committed (the reply rested on something forgotten meanwhile). */
+	force = false,
 ): boolean {
 	if (!input || payload.notAdopted) return false;
-	const committed = deps.continuity.events
-		.loggedAfterInTransaction(tx, run.conversationId, input.lastSeq)
-		.some(
-			(event) =>
-				event.type === "acted" &&
-				event.by === "agent" &&
-				SIDE_EFFECTS.has(String(eventFields(event).action)),
-		);
+	const committed =
+		force ||
+		deps.continuity.events
+			.loggedAfterInTransaction(tx, run.conversationId, input.lastSeq)
+			.some(
+				(event) =>
+					event.type === "acted" &&
+					event.by === "agent" &&
+					SIDE_EFFECTS.has(String(eventFields(event).action)),
+			);
 	if (!committed) return false;
 	const { job } = deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
@@ -110,6 +114,66 @@ function handleFailedUtterances(
 		);
 }
 
+/**
+ * What the agency gave this run's reply (memory, notes, its state) and the words a model call of it took (eumenes-steer)
+ * rest in the run's input, so forgetting them forgets the reply. False when any of it is gone: the reply is not adopted.
+ */
+function recordAgencyInput(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+): boolean {
+	const memory = deps.memory?.referenceInputs;
+	const given = deps.agency?.replyInputInTransaction?.(tx, run.id) ?? null;
+	const steered = steeredIds(deps, tx, run);
+	const taken =
+		steered.length && memory
+			? memory.captureInTransaction(tx, { messageIds: steered })
+			: null;
+	const known =
+		memory && (given || taken) ? memory.readRunInTransaction(tx, run.id) : null;
+	if (memory && known)
+		memory.recordRunInTransaction(tx, run.id, {
+			sources: [
+				...new Set([
+					...known.sources,
+					...(given?.sources ?? []),
+					...(taken?.sources ?? []),
+				]),
+			],
+			complete:
+				known.complete &&
+				(given?.complete ?? true) &&
+				(taken?.complete ?? true),
+		});
+	return (given?.complete ?? true) && (taken?.complete ?? true);
+}
+
+const steeredIds = (deps: DialogueDeps, tx: Database, run: Run) =>
+	deps.agency?.steeredInTransaction?.(tx, run.id) ?? [];
+
+/**
+ * Words the user sent while this run's reply was written and a model call of it took (eumenes-steer) are answered by
+ * this reply: they join the log with it, so no run answers them a second time. The reply that was not adopted leaves
+ * them pending, for the next run.
+ */
+function handleSteered(deps: DialogueDeps, tx: Database, run: Run) {
+	for (const id of steeredIds(deps, tx, run)) {
+		const seqs = deps.continuity.events
+			.ofMessageInTransaction(tx, id)
+			.filter(
+				(event) =>
+					event.conversationId === run.conversationId &&
+					event.status === "pending" &&
+					event.type === "said" &&
+					event.by === "user",
+			)
+			.map((event) => event.seq);
+		if (seqs.length)
+			deps.continuity.events.handleInTransaction(tx, run.conversationId, seqs);
+	}
+}
+
 function fail(
 	deps: DialogueDeps,
 	tx: Database,
@@ -144,7 +208,11 @@ export function createGenerationSettlement(
 			const result = outcome.result;
 			if (!input) return "stale";
 			// A handed-over run is queued behind its work already; nothing more is adopted here.
-			if (result.handover?.handed) return "applied";
+			if (result.handover?.handed) {
+				// Words the handing-over reply took are answered by it.
+				if (input.final.kind === "utterances") handleSteered(deps, tx, run);
+				return "applied";
+			}
 			if (run.status !== "running" || run.revision !== input.revision)
 				return "stale";
 			const stale = generationStale(deps, tx, input);
@@ -152,6 +220,11 @@ export function createGenerationSettlement(
 				return retryNotAdopted(deps, tx, run, input, claim.payload)
 					? "applied"
 					: fail(deps, tx, run, stale, input);
+			// What the agency gave the reply is gone (forgotten meanwhile): it is written again, not adopted.
+			if (!result.handover && !recordAgencyInput(deps, tx, run))
+				return retryNotAdopted(deps, tx, run, input, claim.payload, true)
+					? "applied"
+					: fail(deps, tx, run, "memory_stale", input);
 			// The answer spoke of a report whose evidence changed since (H4/R8): it is not adopted, nor is the report.
 			if (
 				input.agent &&
@@ -189,8 +262,10 @@ export function createGenerationSettlement(
 					runId: run.id,
 					reason: "permission_revoked",
 				});
-			if (input.final.kind === "utterances")
+			if (input.final.kind === "utterances") {
 				events.handleInTransaction(tx, run.conversationId, input.final.seqs);
+				handleSteered(deps, tx, run);
+			}
 			// A task or a pipeline runs on its own: its announcement is the answer of this run.
 			const text = result.handover?.announcement ?? result.text;
 			let messageId: string | null = null;

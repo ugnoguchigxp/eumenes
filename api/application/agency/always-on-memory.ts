@@ -1,76 +1,81 @@
-import type { Database } from "bun:sqlite";
-import {
-	isAlwaysOnSnapshot,
-	type AgencyRecord,
-	type AlwaysOnHostSnapshot,
-} from "../../domains/dialogue";
-import type { AgencyHostDeps } from "./host-types";
-import { staleInputSources } from "./input";
+import type { AgendaNote, AgendaResearchTicket } from "../../domains/dialogue";
+import { NOTES_KEPT } from "./always-on-scope";
 
-/** Reuse the same canonical Records and dependency registry as the adopted host. */
-export function persistAlwaysOnMemory(
-	deps: AgencyHostDeps,
-	db: Database,
-	record: AgencyRecord,
-): AgencyRecord {
-	if (!isAlwaysOnSnapshot(record.snapshot))
-		throw new Error("agency_snapshot_invalid");
-	const snap = record.snapshot;
-	const memory = deps.memory.referenceInputs;
-	if (!memory || !deps.state) throw new Error("agency_memory_unavailable");
-	if (staleInputSources(deps, db, record.sourceRefs).length)
-		throw new Error("agency_input_stale");
-	const inputs = new Map(snap.agent.observationInputs);
-	const rows = new Map(
-		deps.state
-			.observationsInTransaction(db, record.conversationId)
-			.filter((r) => r.scope === record.scope)
-			.map((r) => [r.observationId, r]),
-	);
-	for (const observation of snap.agent.observations) {
-		const input = inputs.get(observation.id);
-		if (!input?.complete) throw new Error("agency_input_incomplete");
-		const content = JSON.stringify({ observation, input });
-		const previous = rows.get(observation.id);
-		if (previous) {
-			const old = memory.readRecordInTransaction(db, {
-				recordId: previous.ref.id,
-				revision: previous.ref.revision,
-			});
-			if (!old || old.content !== content)
-				throw new Error("agency_archive_conflict");
-			continue;
-		}
-		const ref = memory.captureRecordInTransaction(db, {
-			origin: {
-				namespace: "agency",
-				kind: "observation",
-				id: `${record.scope}:${observation.id}`,
-			},
-			mediaType: "application/json",
-			content,
-		});
-		deps.state.saveObservationInTransaction(db, {
-			conversationId: record.conversationId,
-			scope: record.scope,
-			observationId: observation.id,
-			ref,
-			input,
-		});
+/** A note's body is bounded: it is read by the reply and shown, never a store of whole pages. */
+const MARKDOWN_MAX = 8000;
+const SUMMARY_MAX = 240;
+
+type Result = {
+	summary?: unknown;
+	answer?: unknown;
+	document?: { title?: unknown } | null;
+	claims?: Array<{ text?: unknown; status?: unknown }>;
+	sources?: Array<{ url?: unknown; title?: unknown }>;
+	limitations?: unknown;
+	links?: unknown;
+};
+
+const text = (value: unknown) =>
+	typeof value === "string" ? value.trim() : "";
+
+/**
+ * The note a returned work becomes: its title (the document the research saved, or the request), a short summary the
+ * agent plans with, and the Markdown it reads. Only the adopted result of the work ledger is turned into one.
+ */
+export function noteFromResult(input: {
+	id: string;
+	ticket: AgendaResearchTicket;
+	summary: string;
+	at: number;
+}): AgendaNote {
+	let result: Result | null = null;
+	try {
+		const parsed: unknown = JSON.parse(input.summary);
+		if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+			result = parsed as Result;
+	} catch {
+		result = null;
 	}
-	deps.state.refreshDependenciesInTransaction(
-		db,
-		record.conversationId,
-		record.scope,
-		record.sourceRefs,
-	);
-	const snapshot: AlwaysOnHostSnapshot = {
-		...snap,
-		memoryObservations: true,
-		agent: {
-			...snap.agent,
-			observations: snap.agent.observations.map((o) => ({ ...o, text: "" })),
-		},
+	const request = input.ticket.question.trim();
+	const title =
+		text(result?.document?.title) ||
+		request.replace(/\s+/gu, " ").slice(0, 60) ||
+		"調べもの";
+	const body = result
+		? [
+				text(result.answer) || text(result.summary),
+				...(result.claims ?? [])
+					.map((x) => text(x.text))
+					.filter(Boolean)
+					.map((x) => `- ${x}`),
+				...(Array.isArray(result.limitations)
+					? result.limitations.map((x) => `- 限界: ${text(x)}`)
+					: []),
+				...(result.sources ?? [])
+					.map((s) => [text(s.title), text(s.url)].filter(Boolean).join(" "))
+					.filter(Boolean)
+					.map((x) => `- 出典: ${x}`),
+				...(Array.isArray(result.links)
+					? result.links.map((x) => `- 作ったもの: ${text(x)}`)
+					: []),
+			]
+				.filter(Boolean)
+				.join("\n")
+		: input.summary.trim();
+	const readable = body || request;
+	return {
+		id: input.id,
+		title,
+		summary: (text(result?.answer) || text(result?.summary) || readable)
+			.replace(/\s+/gu, " ")
+			.slice(0, SUMMARY_MAX),
+		markdown: `# ${title}\n\n${readable}`.slice(0, MARKDOWN_MAX),
+		at: input.at,
+		refs: [...input.ticket.refs],
+		ticketId: input.ticket.id,
 	};
-	return { ...record, snapshot };
 }
+
+/** The newest notes stay in the checkpoint. */
+export const keepNotes = (notes: readonly AgendaNote[]) =>
+	[...notes].sort((a, b) => a.at - b.at).slice(-NOTES_KEPT);

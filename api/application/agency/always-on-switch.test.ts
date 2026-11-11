@@ -1,13 +1,18 @@
 import { expect, test } from "bun:test";
-import { alwaysOnFixture, thinkWait } from "./always-on.fixture";
+import { agendaFixture, composeSay } from "./always-on.fixture";
 import { createSwitchingAgencyHost } from "./switching-host";
 import { waitFor, settle } from "../../infrastructure/wait-for";
-import { isAlwaysOnSnapshot } from "../../domains/dialogue";
+import { isAgendaSnapshot } from "../../domains/dialogue";
 
-test("switching drains old think before starting F and can return to one always-on owner", async () => {
-	const pending = Promise.withResolvers<ReturnType<typeof thinkWait>>();
-	const f = await alwaysOnFixture({
-		reply: (_r, n) => (n === 1 ? pending.promise : thinkWait()),
+test("switching drains the old plan before starting F and can return to one always-on owner", async () => {
+	const pending = Promise.withResolvers<unknown>();
+	const f = await agendaFixture({
+		script: (kind, _request, n) =>
+			kind === "plan" && n === 1
+				? pending.promise
+				: kind === "compose"
+					? composeSay("stale after switch")
+					: undefined,
 	});
 	const host = createSwitchingAgencyHost(f.deps);
 	const checked = async (
@@ -36,25 +41,29 @@ test("switching drains old think before starting F and can return to one always-
 		await host.attend("ao");
 		await f.user("a");
 		await f.advance();
-		await checked("first think", () => f.requests.length === 1);
+		await checked("first plan", () => f.requests.length === 1);
 		await apply("F");
-		await checked("abort old think", () => f.signals[0]!.aborted);
+		await checked("abort old plan", () => f.signals[0]!.aborted);
 		pending.resolve({
-			...thinkWait(),
-			action: {
-				kind: "speak",
-				utterance: "stale after switch",
-				toolName: null,
-				toolInput: null,
-				evidenceRefs: [],
-			},
+			add: [
+				{
+					kind: "talk",
+					text: "stale",
+					refs: ["a"],
+					value: 5,
+					reason: "fixture",
+					topic: "stale",
+				},
+			],
+			drop: [],
+			focus: "",
 		});
 		await checked("F attention", async () => {
 			try {
 				await host.attend("ao");
 				return (
 					!!host.inspect("ao") &&
-					!isAlwaysOnSnapshot(host.inspect("ao")!.snapshot)
+					!isAgendaSnapshot(host.inspect("ao")!.snapshot)
 				);
 			} catch {
 				return false;
@@ -69,7 +78,7 @@ test("switching drains old think before starting F and can return to one always-
 		await checked("AO attend", async () => {
 			try {
 				await host.attend("ao");
-				return isAlwaysOnSnapshot(host.inspect("ao")!.snapshot);
+				return isAgendaSnapshot(host.inspect("ao")!.snapshot);
 			} catch {
 				return false;
 			}
@@ -78,9 +87,9 @@ test("switching drains old think before starting F and can return to one always-
 		await settle();
 		await f.advance();
 		await waitFor(() => f.requests.length === 2 && !host.status("ao").busy);
-		expect(f.requests.map((r) => r.purpose)).toEqual(["think", "think"]);
+		expect(f.kinds).toEqual(["plan", "plan"]);
 	} finally {
-		pending.resolve(thinkWait());
+		pending.resolve({ add: [], drop: [], focus: "" });
 		await host.close();
 		await f.close();
 	}

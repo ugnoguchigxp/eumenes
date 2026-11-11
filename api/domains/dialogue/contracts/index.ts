@@ -218,6 +218,20 @@ export interface AgencyLayerPort {
 	): readonly string[];
 	/** A TODO of the conversation finished or asks the user something: the agent's opportunity to say so. */
 	workChangedInTransaction(db: Database, conversationId: string): void;
+	/**
+	 * The user's messages the reply of this run took into one of its model calls while it was written (words sent
+	 * meanwhile, eumenes-steer): they are answered by that reply and join the log with it, so no run answers them again.
+	 */
+	steeredInTransaction?(db: Database, runId: string): readonly string[];
+	/**
+	 * What the reply of this run was given by the agency (memory, notes, the agent's state), captured now: its sources
+	 * join the run's input, so forgetting reaches the reply; `complete: false` means something it was given is gone and
+	 * the reply is not adopted.
+	 */
+	replyInputInTransaction?(
+		db: Database,
+		runId: string,
+	): { sources: readonly string[]; complete: boolean } | null;
 }
 
 /** A message of a conversation agent's reply, in the chat shape the model reads. */
@@ -258,6 +272,13 @@ export interface ConversationAgentPort {
 	/** The agent's parts of the system message; fixed by the settings, so the cached prefix holds. */
 	system(): ConversationAgentSystem;
 	respond(input: {
+		/** The run this reply answers for, when it answers the user's words (the agency steers its reply by them). */
+		run?: {
+			conversationId: string;
+			runId: string;
+			/** The user's messages this reply's prompt already holds. */
+			messageIds: readonly string[];
+		};
 		messages: AgentMessage[];
 		chat: {
 			complete(
@@ -315,8 +336,12 @@ export const errorStatus = {
 	toolchain_unavailable: 503,
 } as const satisfies Record<string, HttpErrorStatus>;
 export {
-	isAlwaysOnSnapshot,
-	alwaysOnSources,
-	alwaysOnTicketInput,
-	type AlwaysOnHostSnapshot,
+	isAgendaSnapshot,
+	agendaSources,
+	agendaTicketInput,
+	forgetAgenda,
+	baseRef,
+	type AgendaHostSnapshot,
+	type AgendaNote,
+	type AgendaResearchTicket,
 } from "./agency-always-on";

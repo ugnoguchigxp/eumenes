@@ -1,3 +1,4 @@
+import { createSteeringInbox } from "eumenes-steer";
 import { createAppDevelopmentRuntime } from "./app-development/runtime";
 import { createGitObservation } from "../domains/git-observation";
 import { createMemoryHostConnection } from "./memory-host";
@@ -257,6 +258,9 @@ export async function buildServices(
 			)
 		: undefined;
 	const liveBridge = createLiveBridge();
+	// One steering inbox per server (eumenes-steer): words the user sends while a reply is written reach that
+	// reply's next model call. The agency opens one target per reply; dialogue and pursuit may share it later.
+	const steering = createSteeringInbox({ now: Date.now });
 	let agencyExecution: ToolchainExecutionPort | undefined;
 	const agency = assembleAgency(
 		{
@@ -272,6 +276,7 @@ export async function buildServices(
 				execution: () => agencyExecution,
 			},
 			...liveBridge.agency,
+			steering,
 		},
 		() => dialogue,
 	);

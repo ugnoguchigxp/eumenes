@@ -1,35 +1,61 @@
-import type { LlmPort, LlmRequest, ThinkOutput } from "eumenes-agency";
+import type { LlmPort, LlmRequest } from "eumenes-agency";
+import { createSteeringInbox } from "eumenes-steer";
+import { SET_QUIET, START_PREPARATION } from "eumenes-agency/agenda";
 import { createAgencyStatePort } from "../../domains/dialogue";
 import { createAlwaysOnHost } from "./always-on-host";
 import { createAgencyWork } from "./work";
 import { settle } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
 import type { imageFixture } from "../media/image.fixture";
+import type { AgencyHostDeps } from "./host-types";
 
-export const thinkWait = (): ThinkOutput => ({
-	thought: "fixture thought",
-	drive: "presence",
-	userOps: [],
-	stockOps: [],
-	pace: { op: "none", minutes: null, evidenceRefs: [] },
-	action: {
-		kind: "wait",
-		utterance: null,
-		toolName: null,
-		toolInput: null,
-		evidenceRefs: [],
-	},
-	next: "normal",
+export type CallKind = "plan" | "check" | "ask_check" | "compose";
+
+/** Which of the agenda's four model calls a request is, by the call's own instruction. */
+export function callKind(request: { system: string }): CallKind {
+	if (request.system.includes("この呼び出しは「計画」")) return "plan";
+	if (request.system.includes("調べものの重複チェック")) return "check";
+	if (request.system.includes("質問の聞き直しチェック")) return "ask_check";
+	if (request.system.includes("話す文を書く")) return "compose";
+	throw new Error("fixture_unknown_call");
+}
+
+export const planNothing = () => ({ add: [], drop: [], focus: "" });
+export const composeDecline = () => ({
+	utterance: null,
+	emotion: null,
+	decline: "fixture",
+	questions: 0,
+	choice: false,
+});
+export const composeSay = (utterance: string) => ({
+	utterance,
+	emotion: null,
+	decline: null,
+	questions: 0,
+	choice: false,
 });
 
-export async function alwaysOnFixture(
+const fallback = (kind: CallKind) =>
+	kind === "plan"
+		? planNothing()
+		: kind === "check"
+			? { verdict: "new", coveredBy: null, request: null, reason: "fixture" }
+			: kind === "ask_check"
+				? { verdicts: [] }
+				: composeDecline();
+
+export async function agendaFixture(
 	options: {
-		reply?(
+		/** The scripted model: the value each call returns (default: nothing to plan, nothing to say). */
+		script?(
+			kind: CallKind,
 			request: LlmRequest<unknown>,
 			n: number,
-		): ThinkOutput | Promise<ThinkOutput>;
+		): unknown | Promise<unknown>;
 		media?: ReturnType<typeof imageFixture>;
-		routeSpeech?: () => boolean;
+		routeSpeech?: NonNullable<AgencyHostDeps["routeSpeechInTransaction"]>;
+		steering?: boolean;
 	} = {},
 ) {
 	const h = await harness({
@@ -54,8 +80,10 @@ export async function alwaysOnFixture(
 		foreground = false;
 	const timers = new Map<number, { at: number; fn(): void }>();
 	const requests: LlmRequest<unknown>[] = [];
+	const kinds: CallKind[] = [];
 	const signals: AbortSignal[] = [];
 	const activities = new Set<() => void>();
+	const steering = createSteeringInbox({ now: () => now });
 	const port = createAgencyStatePort({
 		agents: h.toolchain.agents,
 		toolchains: h.routing,
@@ -67,24 +95,19 @@ export async function alwaysOnFixture(
 		memory: h.memory!,
 		now: () => now,
 	});
+	const catalogOf = (db: Parameters<typeof port.catalogInTransaction>[0]) =>
+		port
+			.catalogInTransaction(db)
+			.filter(
+				(c) =>
+					!options.media || c.revisionId.startsWith("toolchain:image.create@"),
+			);
 	const deps = {
 		store: h.store,
 		conversation: h.conversation,
 		settings: h.settings,
 		memory: h.memory!,
-		state: {
-			...port,
-			catalogInTransaction: (
-				db: Parameters<typeof port.catalogInTransaction>[0],
-			) =>
-				port
-					.catalogInTransaction(db)
-					.filter(
-						(c) =>
-							!options.media ||
-							c.revisionId.startsWith("toolchain:image.create@"),
-					),
-		},
+		state: { ...port, catalogInTransaction: catalogOf },
 		inference: {
 			foregroundBusy: () => foreground,
 			onActivity(listener: () => void) {
@@ -101,12 +124,16 @@ export async function alwaysOnFixture(
 		): LlmPort => ({
 			async complete<T>(request: LlmRequest<T>, signal: AbortSignal) {
 				next(request as LlmRequest<unknown>);
+				const kind = callKind(request);
 				requests.push(request as LlmRequest<unknown>);
+				kinds.push(kind);
 				signals.push(signal);
-				const value = await (options.reply?.(
+				const value = await (options.script?.(
+					kind,
 					request as LlmRequest<unknown>,
 					requests.length,
-				) ?? thinkWait());
+				) ?? fallback(kind));
+				signal.throwIfAborted();
 				return {
 					value: request.schema.parse(value),
 					model: "fixture",
@@ -127,6 +154,15 @@ export async function alwaysOnFixture(
 		clearTimer(id: unknown) {
 			timers.delete(id as number);
 		},
+		...(options.steering === false ? {} : { steering }),
+		...(options.media
+			? {
+					researchRevision: (catalog: ReadonlyArray<{ revisionId: string }>) =>
+						catalog.find((c) =>
+							c.revisionId.startsWith("toolchain:image.create@"),
+						)?.revisionId,
+				}
+			: {}),
 		...(options.routeSpeech
 			? { routeSpeechInTransaction: options.routeSpeech }
 			: {}),
@@ -139,12 +175,19 @@ export async function alwaysOnFixture(
 	return {
 		h,
 		requests,
+		kinds,
 		signals,
 		port,
 		deps,
+		steering,
 		get host() {
 			return host;
 		},
+		get now() {
+			return now;
+		},
+		/** The calls of one kind, in order. */
+		calls: (kind: CallKind) => requests.filter((_, i) => kinds[i] === kind),
 		async start() {
 			await host.recover();
 			host.attachWork(createAgencyWork({ dialogue: h.dialogue }));
@@ -152,13 +195,26 @@ export async function alwaysOnFixture(
 			await host.attend("ao");
 			await settle();
 		},
-		async user(id: string, conversationId = "ao") {
+		async user(id: string, conversationId = "ao", text = `fixture ${id}`) {
 			await h.store.write((db) =>
 				h.conversation.appendInTransaction(db, {
 					id,
 					conversationId,
 					role: "user",
-					text: `fixture ${id}`,
+					text,
+					runId: null,
+					createdAt: new Date(now).toISOString(),
+				}),
+			);
+			await settle();
+		},
+		async assistant(id: string, text: string, conversationId = "ao") {
+			await h.store.write((db) =>
+				h.conversation.appendInTransaction(db, {
+					id,
+					conversationId,
+					role: "assistant",
+					text,
 					runId: null,
 					createdAt: new Date(now).toISOString(),
 				}),
@@ -191,3 +247,62 @@ export async function alwaysOnFixture(
 		},
 	};
 }
+
+/** A reply of the conversation's agent that calls the given tools (one model call, then the answer). */
+export async function replyWith(
+	f: Awaited<ReturnType<typeof agendaFixture>>,
+	tools: Array<{ name: string; arguments: Record<string, unknown> }>,
+	options: {
+		runId?: string;
+		messageIds?: string[];
+		host?: Pick<typeof f.host, "conversationAgent">;
+	} = {},
+) {
+	let call = 0;
+	const seen: Array<{ role: string; content: string }[]> = [];
+	const offered: string[][] = [];
+	const reply = await (options.host ?? f.host).conversationAgent.respond({
+		run: {
+			conversationId: "ao",
+			runId: options.runId ?? "run-1",
+			messageIds: options.messageIds ?? ["user-a"],
+		},
+		messages: [
+			{ role: "system", content: "fixture system" },
+			{ role: "user", content: "## User\nfixture user" },
+		],
+		chat: {
+			async complete(request) {
+				seen.push(request.messages.map((m) => ({ ...m })));
+				offered.push(request.tools.map((t) => t.name));
+				call++;
+				return call === 1 && tools.length
+					? {
+							text: "",
+							toolCalls: tools.map((t, i) => ({
+								id: `call-${i}`,
+								name: t.name,
+								arguments: JSON.stringify(t.arguments),
+							})),
+						}
+					: { text: "fixture answer", toolCalls: [] };
+			},
+		},
+		tools: {
+			tools: [],
+			call: async () => ({ content: "host tool" }),
+		},
+		signal: new AbortController().signal,
+		onDelta: () => {},
+		maxToolCalls: 0,
+	});
+	return { reply, seen, offered };
+}
+
+export const promiseResearch = [
+	{ name: SET_QUIET, arguments: { scope: "all", kind: "said", minutes: 30 } },
+	{
+		name: START_PREPARATION,
+		arguments: { request: "fixture promised research", askedByUser: true },
+	},
+];

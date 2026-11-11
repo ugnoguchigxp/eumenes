@@ -20,6 +20,8 @@ export function assembleAgency(
 		| "memory"
 		| "routeSpeechInTransaction"
 		| "state"
+		| "steering"
+		| "researchRevision"
 	> & {
 			inference: AgencyHostDeps["inference"] &
 				Parameters<typeof createAgencyLlmPort>[0]["inference"] & {

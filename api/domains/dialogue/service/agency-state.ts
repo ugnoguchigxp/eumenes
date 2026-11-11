@@ -1,12 +1,6 @@
-import {
-	readAgencyRecords,
-	canRestoreAlwaysOnRecord,
-} from "./agency-state-memory";
+import { readAgencyRecords } from "./agency-state-memory";
 import { agencyResults } from "./agency-results";
-import {
-	isAlwaysOnSnapshot,
-	alwaysOnTicketInput,
-} from "../contracts/agency-always-on";
+import { isAgendaSnapshot } from "../contracts/agency-always-on";
 import { eraseAgencyActionWork } from "./agency-action-work";
 import {
 	createAgencyActions,
@@ -19,6 +13,7 @@ import { staleAgencySources } from "./agency-sources";
 import type { Database } from "bun:sqlite";
 import {
 	revokeAgencyWork,
+	agencyWorkActive,
 	agencyRecords,
 	claimAgencyDispatch,
 	agencyEpoch,
@@ -105,14 +100,11 @@ export function createAgencyStatePort(
 					derived: { "memory.records": recordIds },
 				});
 			for (const record of agencyRecords(db)) {
-				const alwaysOn = isAlwaysOnSnapshot(record.snapshot)
-					? record.snapshot
-					: null;
-				const snap = (alwaysOn?.agent ??
-					record.snapshot) as import("eumenes-agency").AgencySnapshot & {
-					memoryObservations?: boolean;
-				};
-				if (alwaysOn?.memoryObservations ?? snap.memoryObservations) {
+				const snap =
+					record.snapshot as import("eumenes-agency").AgencySnapshot & {
+						memoryObservations?: boolean;
+					};
+				if (!isAgendaSnapshot(record.snapshot) && snap.memoryObservations) {
 					const archived = new Set(
 						agencyObservations(db, record.conversationId)
 							.filter((row) => row.scope === record.scope)
@@ -122,9 +114,7 @@ export function createAgencyStatePort(
 						.filter(
 							(o) =>
 								!archived.has(o.id) &&
-								!(alwaysOn?.agent.forgotten ?? snap.forgottenRefs)?.includes(
-									o.id,
-								) &&
+								!snap.forgottenRefs?.includes(o.id) &&
 								deps.memory!.referenceInputs.isRecordOriginForgottenInTransaction(
 									db,
 									{
@@ -157,22 +147,18 @@ export function createAgencyStatePort(
 						sourceRefs: stale,
 					});
 			}
-			for (const record of agencyRecords(db))
-				if (
-					isAlwaysOnSnapshot(record.snapshot) &&
-					!canRestoreAlwaysOnRecord(db, record, deps.memory)
-				)
-					revoke(db, record.conversationId);
 		},
 		quarantineLegacyInTransaction(db: Database) {
 			for (const record of agencyRecords(db))
 				if (
-					!isAlwaysOnSnapshot(record.snapshot) &&
+					!isAgendaSnapshot(record.snapshot) &&
 					!(record.snapshot as import("eumenes-agency").AgencySnapshot | null)
 						?.provenance
 				)
 					revoke(db, record.conversationId);
 		},
+		workActiveInTransaction: (db: Database, rootId: string) =>
+			agencyWorkActive(db, rootId),
 		staleSourcesInTransaction: (db: Database, refs: readonly string[]) =>
 			staleAgencySources(
 				db,
@@ -182,13 +168,8 @@ export function createAgencyStatePort(
 		observationsInTransaction: agencyObservations,
 		messageInputInTransaction(db: Database, messageId: string) {
 			for (const record of agencyRecords(db)) {
-				if (isAlwaysOnSnapshot(record.snapshot)) {
-					const ticket = record.snapshot.tickets.find(
-						(t) => messageId === `agency:${record.scope}:${t.id}`,
-					);
-					if (ticket) return alwaysOnTicketInput(record.snapshot, ticket.id);
-					continue;
-				}
+				// The agenda's speech records its own input with the message (Memory keeps it).
+				if (isAgendaSnapshot(record.snapshot)) continue;
 				const snapshot =
 					record.snapshot as import("eumenes-agency").AgencySnapshot;
 				const attempt = snapshot.state.attempts?.find(

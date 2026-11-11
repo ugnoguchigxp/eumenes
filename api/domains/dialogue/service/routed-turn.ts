@@ -392,13 +392,24 @@ function createTurn(
 			>;
 			try {
 				reply = await deps.conversationAgent.respond({
+					// Every reply of a run is the agency's to serve (notices and work reports too), not only the user's words.
+					run: {
+						conversationId: input.conversationId,
+						runId: input.runId,
+						messageIds:
+							input.final.kind === "utterances" ? input.final.messageIds : [],
+					},
 					messages: messages as AgentMessage[],
 					chat: {
 						async complete(request, onDelta, chatSignal) {
 							const output = conversationOutput(onDelta, system);
 							// A port without the streamed call answers in one piece, as the agent loop's does.
 							if (!input.requestId || !deps.larm.executeStream) {
-								const text = await deps.larm.answer(messages, chatSignal);
+								// The messages of this call (steered words and the agency's state are in them), not the prompt's.
+								const text = await deps.larm.answer(
+									request.messages as ChatMessage[],
+									chatSignal,
+								);
 								output.delta(text);
 								return { text: output.finish(text), toolCalls: [] };
 							}

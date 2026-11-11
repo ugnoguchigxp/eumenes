@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
-import { alwaysOnFixture } from "./always-on.fixture";
-import { createAlwaysOnScope } from "./always-on-scope";
-import { createAlwaysOnCheckpoints } from "./always-on-checkpoint";
-import { observationInput } from "./input";
+import { agendaFixture, promiseResearch, replyWith } from "./always-on.fixture";
+import { createAgendaScope } from "./always-on-scope";
+import { createAgendaCheckpoints } from "./always-on-checkpoint";
 import { settle } from "../../infrastructure/wait-for";
+import { isAgendaSnapshot } from "../../domains/dialogue";
 
 test("a queued checkpoint rejects a changed capture and saves all latest scopes with the feed", async () => {
-	const f = await alwaysOnFixture();
+	const f = await agendaFixture();
 	const gate = Promise.withResolvers<void>();
 	const deps = {
 		...f.deps,
@@ -20,18 +20,18 @@ test("a queued checkpoint rejects a changed capture and saves all latest scopes 
 			},
 		},
 	};
-	const c = createAlwaysOnScope({
+	const c = createAgendaScope({
 		deps,
 		id: "ao",
 		epoch: 0,
 		now: Date.now,
-		run: async () => null,
-		settled: async () => {},
+		text: () => null,
+		kick: () => {},
 	});
 	const convs = new Map([[c.id, c]]);
 	let cursor = 1,
 		savedCursor = 0;
-	const checkpoints = createAlwaysOnCheckpoints({
+	const checkpoints = createAgendaCheckpoints({
 		deps,
 		convs,
 		now: Date.now,
@@ -43,16 +43,7 @@ test("a queued checkpoint rejects a changed capture and saves all latest scopes 
 		},
 	});
 	const observe = (id: string) => {
-		c.agent.observe(
-			{
-				id,
-				actor: "user",
-				kind: "exchange.adopted",
-				occurredAt: Date.now(),
-				text: `fixture ${id}`,
-			},
-			f.h.store.read((db) => observationInput(f.deps, db, id)),
-		);
+		c.agent.observe({ id, who: "user", text: `fixture ${id}`, at: Date.now() });
 		c.revision++;
 	};
 	try {
@@ -68,6 +59,7 @@ test("a queued checkpoint rejects a changed capture and saves all latest scopes 
 		expect(await checkpoints.save()).toBe(true);
 		const records = f.h.store.read((db) => f.port.recordsInTransaction(db));
 		expect(records).toHaveLength(1);
+		expect(isAgendaSnapshot(records[0]!.snapshot)).toBe(true);
 		expect(f.h.store.read((db) => f.port.feedInTransaction(db))).toEqual({
 			cursor: 2,
 			activeId: "ao",
@@ -75,79 +67,119 @@ test("a queued checkpoint rejects a changed capture and saves all latest scopes 
 		expect(savedCursor).toBe(2);
 	} finally {
 		gate.resolve();
-		c.scheduler.dispose();
 		await f.close();
 	}
 });
 
-for (const failure of ["unknown-version", "missing-record"] as const) {
-	test(`recovery isolates ${failure} while another conversation remains available`, async () => {
-		const f = await alwaysOnFixture();
-		try {
-			await f.start();
-			await f.user("a");
-			await f.user("b", "b");
-			await f.host.attend("b");
-			await settle();
-			await f.host.close();
-			await f.h.store.write((db) => {
-				if (failure === "unknown-version")
-					db.query(
-						"UPDATE dialogue_agency_state SET snapshot_json=? WHERE conversation_id='ao'",
-					).run(JSON.stringify({ kind: "always-on", version: 999 }));
-				else {
-					const row = f.port
-						.observationsInTransaction(db, "ao")
-						.find((r) => r.observationId === "a")!;
-					f.port.deleteObservationInTransaction(db, row);
-				}
-			});
-			await f.restart();
-			expect(f.host.inspect("ao")).toBeNull();
-			expect(
-				f.host
-					.inspect("b")!
-					.snapshot.agent.observations.some((o) => o.id === "b"),
-			).toBe(true);
-			await expect(f.host.attend("ao")).resolves.toMatchObject({
-				tracked: true,
-			});
-		} finally {
-			await f.close();
-		}
-	});
-}
-
-test("incomplete host input cannot reach the think provider even before any forgetting", async () => {
-	const f = await alwaysOnFixture();
-	const c = createAlwaysOnScope({
-		deps: f.deps,
-		id: "ao",
-		epoch: 0,
-		now: Date.now,
-		run: async () => null,
-		settled: async () => {},
-	});
+test("recovery isolates an unknown snapshot and revokes an old always-on record while another conversation remains", async () => {
+	const f = await agendaFixture();
 	try {
-		c.agent.observe(
-			{
-				id: "untracked",
-				actor: "host",
-				kind: "source.changed",
-				occurredAt: Date.now(),
-				text: "fixture untracked source",
-			},
-			{ sources: [], complete: false },
-		);
-		await c.agent.tick(
-			Date.now(),
-			() => ({ busy: false }),
-			new AbortController().signal,
-		);
-		expect(f.requests).toHaveLength(0);
-		expect(c.agent.view().thoughts).toHaveLength(0);
+		await f.start();
+		await f.user("a");
+		await f.user("b", "b");
+		await f.host.attend("b");
+		await settle();
+		await f.host.close();
+		await f.h.store.write((db) => {
+			db.query(
+				"UPDATE dialogue_agency_state SET snapshot_json=? WHERE conversation_id='ao'",
+			).run(JSON.stringify({ kind: "always-on", version: 999 }));
+		});
+		await f.restart();
+		expect(f.host.inspect("ao")).toBeNull();
+		expect(f.host.inspect("b")).not.toBeNull();
+		await expect(f.host.attend("ao")).resolves.toMatchObject({ tracked: true });
 	} finally {
-		c.scheduler.dispose();
+		await f.close();
+	}
+});
+
+test("a checkpoint keeps the open promises and the quiet across a restart, and not the words", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		// The reply promises a research and asks for a pause of everything: the research stays queued.
+		const { seen } = await replyWith(f, promiseResearch);
+		expect(seen).toHaveLength(2);
+		await f.host.attend("ao");
+		await settle();
+		const before = f.host.inspect("ao")!.snapshot.agent;
+		expect(before.items.map((i) => i.text)).toEqual([
+			"fixture promised research",
+		]);
+		expect(before.quiet.allUntil).not.toBeNull();
+		await f.restart();
+		const after = f.host.inspect("ao")!.snapshot.agent;
+		expect(after.items.map((i) => [i.text, i.requested, i.promised])).toEqual([
+			["fixture promised research", true, true],
+		]);
+		expect(after.quiet.allUntil).toBe(before.quiet.allUntil);
+		const saved = f.h.store.read((db) =>
+			db
+				.query(
+					"SELECT snapshot_json FROM dialogue_agency_state WHERE conversation_id='ao'",
+				)
+				.get(),
+		) as { snapshot_json: string };
+		expect(saved.snapshot_json).not.toContain("fixture user-a");
+		// Nothing runs while the pause lasts: no plan, no research.
+		await f.advance();
+		expect(f.requests).toHaveLength(0);
+		expect(f.h.toolchain.agents.executions.list("ao")).toHaveLength(0);
+	} finally {
+		await f.close();
+	}
+});
+
+test("forgetting a message forgets the items that rest on it, running and saved", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		await f.user("user-b");
+		await replyWith(f, promiseResearch);
+		await f.host.attend("ao");
+		await settle();
+		const items = () => f.host.inspect("ao")!.snapshot.agent.items;
+		// The request rests on the user's latest words (user-b); user-a is another line.
+		expect(items()).toHaveLength(1);
+		await f.h.memory!.forget({
+			conversationId: "ao",
+			messageIds: ["user-a"],
+			itemIds: [],
+		});
+		expect(items()).toHaveLength(1);
+		await f.h.memory!.forget({
+			conversationId: "ao",
+			messageIds: ["user-b"],
+			itemIds: [],
+		});
+		expect(items()).toHaveLength(0);
+		expect(f.host.inspect("ao")!.snapshot.agent.quiet.allUntil).not.toBeNull();
+		await f.restart();
+		expect(f.host.inspect("ao")!.snapshot.agent.items).toHaveLength(0);
+	} finally {
+		await f.close();
+	}
+});
+
+test("forgetting reaches a saved record no agent holds", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		await replyWith(f, promiseResearch);
+		await f.host.attend("ao");
+		await settle();
+		await f.host.close();
+		// A purge while the host is down: the saved record is rewritten.
+		await f.h.store.write((db) =>
+			f.port.forgetInTransaction(db, { messageIds: ["user-a"], itemIds: [] }),
+		);
+		await f.restart();
+		expect(f.host.inspect("ao")!.snapshot.agent.items).toHaveLength(0);
+	} finally {
 		await f.close();
 	}
 });

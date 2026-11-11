@@ -1,0 +1,10 @@
+{
+	"package": "eumenes-steer",
+	"version": "0.1.0",
+	"artifact": "eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
+	"sha256": "1ca04b8bee9b839016a14987fc903282c1b57665eca1e89457681c3990f1e705",
+	"size": 6241,
+	"gitSha": "1250b2071392bf54204fda871cd371830713ce45",
+	"dirty": false,
+	"verifiedWith": "eumenes_steer bun run pack:check (offline install, typecheck and tests in a separate folder); eumenes_agency 0.1.6 pack check (a host typed and run with this inbox)"
+}

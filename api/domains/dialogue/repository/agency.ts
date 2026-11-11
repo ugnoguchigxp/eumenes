@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { hash } from "../../capabilities";
-import { isAlwaysOnSnapshot } from "../contracts/agency-always-on";
+import { isAgendaSnapshot } from "../contracts/agency-always-on";
 
 export const agencyMigration = `
 CREATE TABLE dialogue_agency_state (
@@ -217,11 +217,10 @@ export function currentAgencyWork(db: Database, r: AgencyWorkRow): boolean {
 		.get(r.conversation_id, r.epoch) as { snapshot_json: string | null } | null;
 	if (!row?.snapshot_json) return false;
 	const value: unknown = JSON.parse(row.snapshot_json);
-	if (isAlwaysOnSnapshot(value))
-		return (
-			value.agent.state.preparing.some((p) => p.ticketId === r.ticket_id) &&
-			value.tickets.some((t) => t.id === r.ticket_id && t.action === "prepare")
-		);
+	// The agenda's research is current while the host still holds its ticket (the agent keeps only requested or
+	// promised items across a restart; the ticket is the authority for the work, never the item).
+	if (isAgendaSnapshot(value))
+		return value.tickets.some((t) => t.id === r.ticket_id);
 	const snapshot = JSON.parse(row.snapshot_json) as {
 		state: {
 			intents: Array<{ id: string; state: string; workRef?: string | null }>;
@@ -260,6 +259,11 @@ export function autonomousResearchSource(
 		candidateId: r.candidate_id,
 		ticketId: r.ticket_id,
 	};
+}
+/** Work not yet returned nor revoked: its result is still to come. */
+export function agencyWorkActive(db: Database, root: string): boolean {
+	const w = agencyWork(db, root);
+	return !!w && !w.revoked && !w.returned;
 }
 export function revokeAgencyWork(db: Database, id: string) {
 	db.query(

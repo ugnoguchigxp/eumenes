@@ -3,13 +3,13 @@ import { eraseAgencyActionWork } from "./agency-action-work";
 import type { Database } from "bun:sqlite";
 import {
 	prepareForgetting,
-	prepareAlwaysOnForgetting,
 	type AgencySnapshot,
 	type InputContext,
 } from "eumenes-agency";
 import {
-	isAlwaysOnSnapshot,
-	alwaysOnSources,
+	isAgendaSnapshot,
+	agendaSources,
+	forgetAgenda,
 } from "../contracts/agency-always-on";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { MemoryService, ForgetPurge } from "../../memory";
@@ -125,32 +125,39 @@ export function agencyForgetting(deps: {
 				)
 					continue;
 				const snapshot = record.snapshot as AgencySnapshot;
-				if (isAlwaysOnSnapshot(record.snapshot)) {
+				if (isAgendaSnapshot(record.snapshot)) {
 					const original = record.snapshot;
-					const recordRefs = observationReferences(
-						observations,
-						record.conversationId,
-						record.scope,
-						input,
-					);
-					const agent = prepareAlwaysOnForgetting(original.agent, recordRefs);
-					const forgotten = new Set(agent.forgotten);
-					const next = {
-						...original,
-						revision: original.revision + 1,
-						agent,
-						tickets: original.tickets.filter(
-							(t) =>
-								![...t.inputs, ...t.evidenceRefs].some((r) => forgotten.has(r)),
-						),
-					};
-					const retained = new Set(
-						agent.state.preparing.map((p) => p.ticketId),
-					);
+					// What the agent cites are the messages and `memory:` references themselves.
+					const next = forgetAgenda(original, refs);
+					if (
+						next.agent.items.length === original.agent.items.length &&
+						next.tickets.length === original.tickets.length &&
+						next.notes.length === original.notes.length &&
+						!agencyWorks(db, record.conversationId, true).some(
+							(w) =>
+								w.source_refs_json &&
+								(JSON.parse(w.source_refs_json) as string[]).some((ref) =>
+									refs.has(ref),
+								),
+						)
+					)
+						continue;
+					// The work a forgotten reference started, and the work behind a forgotten note, is erased.
+					const lost = new Set([
+						...original.tickets
+							.filter((t) => !next.tickets.some((x) => x.id === t.id))
+							.map((t) => t.id),
+						...original.notes
+							.filter((n) => !next.notes.some((x) => x.id === n.id))
+							.map((n) => n.ticketId),
+					]);
 					for (const w of agencyWorks(db, record.conversationId, true))
 						if (
-							!retained.has(w.ticket_id) &&
-							!next.tickets.some((t) => t.id === w.ticket_id)
+							lost.has(w.ticket_id) ||
+							(w.source_refs_json &&
+								(JSON.parse(w.source_refs_json) as string[]).some((ref) =>
+									refs.has(ref),
+								))
 						) {
 							if (w.execution_id) {
 								eraseAgencyActionWork(db, w.execution_id, deps.now());
@@ -159,7 +166,7 @@ export function agencyForgetting(deps: {
 							deps.agents?.deleteTaskDataInTransaction(db, w.root_id);
 							revokeAgencyWork(db, w.root_id);
 						}
-					const sourceRefs = alwaysOnSources(next);
+					const sourceRefs = agendaSources(next);
 					if (
 						!saveAgency(
 							db,

@@ -1,26 +1,27 @@
 import { expect, test } from "bun:test";
-import { isAlwaysOnSnapshot } from "../../domains/dialogue";
+import { isAgendaSnapshot } from "../../domains/dialogue";
 import { defaultLimits } from "eumenes-agency";
-import { alwaysOnFixture, thinkWait } from "./always-on.fixture";
+import { agendaFixture, planNothing, type CallKind } from "./always-on.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import { imageFixture } from "../media/image.fixture";
 
-const prepare = (request: { prompt: string }) => {
-	const d = JSON.parse(request.prompt);
-	return {
-		...thinkWait(),
-		action: {
-			kind: "prepare" as const,
-			utterance: null,
-			toolName: d.tools[0].name,
-			toolInput: JSON.stringify({ question: "fixture preparation" }),
-			evidenceRefs: ["user-a"],
+const planPicture = {
+	add: [
+		{
+			kind: "research",
+			text: "fixture preparation",
+			refs: ["user-a"],
+			value: 5,
+			reason: "fixture",
+			topic: "picture",
 		},
-	};
+	],
+	drop: [],
+	focus: "picture",
 };
 
-test("an invented always-on ticket cannot authorize a registered capability", async () => {
-	const f = await alwaysOnFixture();
+test("an invented ticket cannot authorize a registered capability", async () => {
+	const f = await agendaFixture();
 	try {
 		await f.start();
 		await f.user("user-a");
@@ -48,17 +49,24 @@ test("an invented always-on ticket cannot authorize a registered capability", as
 	}
 });
 
-test("preparation result rollback is retried once through the existing ledger without duplicate execution", async () => {
-	const f = await alwaysOnFixture({
+test("a result whose adoption rolled back is adopted once on the next pass, without a second execution", async () => {
+	let planned = false;
+	const f = await agendaFixture({
 		media: imageFixture("success"),
-		reply: (request) => prepare(request),
+		script: (kind: CallKind) => {
+			if (kind === "plan" && !planned) {
+				planned = true;
+				return planPicture;
+			}
+			return kind === "plan" ? planNothing() : undefined;
+		},
 	});
 	let failures = 0;
 	const save = f.deps.state.saveInTransaction;
 	f.deps.state.saveInTransaction = (db, record, at) => {
 		if (
-			isAlwaysOnSnapshot(record.snapshot) &&
-			record.snapshot.agent.state.stock.some((s) => s.kind === "finding") &&
+			isAgendaSnapshot(record.snapshot) &&
+			record.snapshot.notes.length > 0 &&
 			failures === 0
 		) {
 			failures++;
@@ -69,25 +77,15 @@ test("preparation result rollback is retried once through the existing ledger wi
 	try {
 		await f.start();
 		await f.user("user-a");
-		await f.advance();
-		await waitFor(() =>
-			f.host
-				.inspect("ao")!
-				.snapshot.agent.state.stock.some((s) => s.kind === "finding"),
-		);
-		expect(failures).toBe(1);
+		await f.advance(1000);
+		await waitFor(() => failures === 1);
+		// The volatile state follows only a committed write: the next pass adopts the result.
+		await waitFor(() => f.host.inspect("ao")!.snapshot.notes.length === 1);
+		expect(f.h.toolchain.agents.executions.list("ao")).toHaveLength(1);
 		await f.restart();
 		expect(f.h.toolchain.agents.executions.list("ao")).toHaveLength(1);
-		expect(
-			f.host
-				.inspect("ao")!
-				.snapshot.agent.observations.filter((o) => o.kind === "work.returned"),
-		).toHaveLength(1);
-		expect(
-			f.host
-				.inspect("ao")!
-				.snapshot.agent.state.stock.filter((s) => s.kind === "finding"),
-		).toHaveLength(1);
+		expect(f.host.inspect("ao")!.snapshot.notes).toHaveLength(1);
+		expect(f.host.inspect("ao")!.snapshot.tickets).toHaveLength(0);
 	} finally {
 		await f.close();
 	}

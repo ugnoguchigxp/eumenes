@@ -67,3 +67,41 @@ export function observationInput(
 		complete: source.state === "available" && source.message.role === "user",
 	};
 }
+
+/**
+ * The sources behind what the agenda agent cites (a user's message, `memory:<id>`, `note:<id>`): captured now from
+ * Memory, so the action that rests on them is refused once any was forgotten. A note rests on what it was made from.
+ */
+export function referencedInput(
+	deps: AgencyHostDeps,
+	db: Database,
+	notes: readonly { id: string; refs: readonly string[] }[],
+	refs: readonly string[],
+): InputContext {
+	const messageIds = new Set<string>();
+	const itemIds = new Set<string>();
+	let complete = true;
+	const seen = new Set<string>();
+	const visit = (ref: string) => {
+		const base = ref.replace(/:c\d+$/u, "");
+		if (seen.has(base)) return;
+		seen.add(base);
+		if (base.startsWith("memory:")) itemIds.add(base.slice("memory:".length));
+		else if (base.startsWith("note:")) {
+			const note = notes.find((n) => n.id === base.slice("note:".length));
+			if (note) note.refs.forEach(visit);
+			else complete = false;
+		} else if (!base.startsWith("profile:")) messageIds.add(base);
+	};
+	refs.forEach(visit);
+	if (!deps.memory.referenceInputs)
+		return { sources: [...messageIds], complete };
+	const captured = deps.memory.referenceInputs.captureInTransaction(db, {
+		messageIds: [...messageIds],
+		itemIds: [...itemIds],
+	});
+	return {
+		sources: captured.sources,
+		complete: complete && captured.complete,
+	};
+}

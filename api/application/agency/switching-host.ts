@@ -2,6 +2,7 @@ import { createAgencyHost } from "./host";
 import { createAlwaysOnHost } from "./always-on-host";
 import { fixedInput } from "./input";
 import { agencyReplyParts } from "./system-context";
+import { agendaReady } from "./always-on-scope";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import type { AgencyHostDeps } from "./host-types";
@@ -60,7 +61,8 @@ export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
 			await current.close();
 		},
 		conversationAgent: {
-			system: () => agencyReplyParts(deps.settings.get().agency),
+			system: () =>
+				agencyReplyParts(deps.settings.get().agency, agendaReady(deps)),
 			respond: (
 				...args: Parameters<typeof current.conversationAgent.respond>
 			) => current.conversationAgent.respond(...args),
@@ -91,6 +93,11 @@ export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
 					typeof current.dialoguePort.workChangedInTransaction
 				>
 			) => current.dialoguePort.workChangedInTransaction(...args),
+			steeredInTransaction: (
+				...args: Parameters<
+					NonNullable<typeof current.dialoguePort.steeredInTransaction>
+				>
+			) => current.dialoguePort.steeredInTransaction?.(...args) ?? [],
 		},
 		attachWork(value: AgencyWork) {
 			work = value;

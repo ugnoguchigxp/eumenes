@@ -93,18 +93,28 @@ const agencyManifest = JSON.parse(
 test("the vendored agency package matches its manifest, package.json, the lockfile and the installed copy", () => {
 	const artifact = read(`vendor/agency/${agencyManifest.artifact}`);
 	expect(agencyManifest.package).toBe("eumenes-agency");
-	// The adopted candidate includes measured, uncommitted core fixes. Bind that exact diff as well as the artifact.
-	expect(agencyManifest.dirty).toBe(true);
-	expect(agencyManifest.adoptionSource.baseCommit).toBe(agencyManifest.gitSha);
-	expect(
-		createHash("sha256")
-			.update(read(`vendor/agency/${agencyManifest.adoptionSource.patchFile}`))
-			.digest("hex"),
-	).toBe(agencyManifest.adoptionSource.patchSha256);
-	expect(agencyManifest.adoptionSource.sourceHash).toMatch(/^[a-f0-9]{64}$/);
-	expect(
-		Object.keys(agencyManifest.adoptionSource.sourceFiles).length,
-	).toBeGreaterThan(0);
+	expect(agencyManifest.gitSha).toMatch(/^[a-f0-9]{40}$/);
+	if (agencyManifest.dirty) {
+		// A candidate with uncommitted core fixes: bind that exact diff as well as the artifact.
+		expect(agencyManifest.adoptionSource.baseCommit).toBe(
+			agencyManifest.gitSha,
+		);
+		expect(
+			createHash("sha256")
+				.update(
+					read(`vendor/agency/${agencyManifest.adoptionSource.patchFile}`),
+				)
+				.digest("hex"),
+		).toBe(agencyManifest.adoptionSource.patchSha256);
+		expect(agencyManifest.adoptionSource.sourceHash).toMatch(/^[a-f0-9]{64}$/);
+		expect(
+			Object.keys(agencyManifest.adoptionSource.sourceFiles).length,
+		).toBeGreaterThan(0);
+	} else {
+		// Built from a committed source (0.1.6: the agenda agent at 1575c3a): the commit is the source.
+		expect(agencyManifest.dirty).toBe(false);
+		expect(agencyManifest.adoptionSource).toBeUndefined();
+	}
 	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
 		agencyManifest.sha256,
 	);
@@ -124,6 +134,38 @@ test("the vendored agency package matches its manifest, package.json, the lockfi
 	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
 	expect(lock).toContain(
 		`${agencyManifest.package}@vendor/agency/${agencyManifest.artifact}`,
+	);
+	expect(lock).toContain(integrity);
+});
+
+const steerManifest = JSON.parse(read("vendor/steer/manifest.json").toString());
+
+test("the vendored steer package matches its manifest, package.json, the lockfile and the installed copy", () => {
+	const artifact = read(`vendor/steer/${steerManifest.artifact}`);
+	expect(steerManifest.package).toBe("eumenes-steer");
+	expect(steerManifest.dirty).toBe(false);
+	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
+		steerManifest.sha256,
+	);
+	expect(steerManifest.artifact).toContain(steerManifest.sha256.slice(0, 12));
+	expect(
+		read(`vendor/steer/${steerManifest.artifact}.sha256`)
+			.toString()
+			.split(/\s+/)[0],
+	).toBe(steerManifest.sha256);
+	const dependency = JSON.parse(read("package.json").toString()).dependencies[
+		steerManifest.package
+	];
+	expect(dependency).toBe(`file:vendor/steer/${steerManifest.artifact}`);
+	// Its exports name only the source entry: the installed copy is read where it lies.
+	const steerPkg = JSON.parse(
+		read("node_modules/eumenes-steer/package.json").toString(),
+	);
+	expect(steerPkg.version).toBe(steerManifest.version);
+	const lock = read("bun.lock").toString();
+	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
+	expect(lock).toContain(
+		`${steerManifest.package}@vendor/steer/${steerManifest.artifact}`,
 	);
 	expect(lock).toContain(integrity);
 });

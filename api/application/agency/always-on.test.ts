@@ -1,223 +1,114 @@
 import { expect, test } from "bun:test";
-import { alwaysOnFixture, thinkWait } from "./always-on.fixture";
-import { waitFor } from "../../infrastructure/wait-for";
+import { STEERED_MARK } from "eumenes-agency/agenda";
+import {
+	agendaFixture,
+	composeSay,
+	planNothing,
+	replyWith,
+	type CallKind,
+} from "./always-on.fixture";
+import { agendaReplyRules } from "./always-on-system";
+import { agencyReplyParts } from "./system-context";
+import { researchRevision } from "./always-on-flow";
+import { createSwitchingAgencyHost } from "./switching-host";
+import { settle, waitFor } from "../../infrastructure/wait-for";
 import { imageFixture } from "../media/image.fixture";
 
-test("always-on owns one heartbeat, stores canonical bodies in Memory and restores actual speech", async () => {
-	const f = await alwaysOnFixture({
-		reply: () => ({
-			...thinkWait(),
-			action: {
-				kind: "speak",
-				utterance: "fixture own speech",
-				toolName: null,
-				toolInput: null,
-				evidenceRefs: [],
-			},
-		}),
-	});
-	try {
-		await f.start();
-		await f.user("user-a");
-		await f.advance();
-		await waitFor(
-			() => f.host.inspect("ao")!.snapshot.agent.state.pacing.unanswered === 1,
-		);
-		expect(f.requests.map((r) => r.purpose)).toEqual(["think"]);
-		const saved = f.h.store.read((db) =>
-			db
-				.query(
-					"SELECT snapshot_json FROM dialogue_agency_state WHERE conversation_id='ao'",
-				)
-				.get(),
-		) as { snapshot_json: string };
-		expect(saved.snapshot_json).not.toContain("fixture user-a");
-		await f.restart();
-		expect(f.host.inspect("ao")!.snapshot.agent.state.pacing.unanswered).toBe(
-			1,
-		);
-		expect(
-			f.h.conversation.get("ao").messages.filter((m) => m.role === "assistant"),
-		).toHaveLength(1);
-	} finally {
-		await f.close();
-	}
+const planResearch = (ref: string) => ({
+	add: [
+		{
+			kind: "research",
+			text: "fixture independent picture",
+			refs: [ref],
+			value: 5,
+			reason: "fixture",
+			topic: "picture",
+		},
+	],
+	drop: [],
+	focus: "picture",
 });
 
-test("new user words invalidate the action while an independent think continues", async () => {
-	const pending = Promise.withResolvers<ReturnType<typeof thinkWait>>();
-	const f = await alwaysOnFixture({ reply: () => pending.promise });
-	try {
-		await f.start();
-		await f.user("user-a");
-		await f.advance();
-		await waitFor(() => f.requests.length === 1);
-		await f.user("user-b");
-		expect(f.signals[0]!.aborted).toBe(false);
-		pending.resolve({
-			...thinkWait(),
-			action: {
-				kind: "speak",
-				utterance: "stale speech",
-				toolName: null,
-				toolInput: null,
-				evidenceRefs: [],
-			},
-		});
-		await waitFor(
-			() =>
-				f.host.inspect("ao")!.snapshot.agent.state.thoughts.length === 1 &&
-				f.host.status("ao").busy === false,
+const agencyMessages = (f: Awaited<ReturnType<typeof agendaFixture>>) =>
+	f.h.conversation
+		.get("ao")
+		.messages.filter(
+			(m) => m.role === "assistant" && m.id.startsWith("agency:"),
 		);
-		expect(
-			f.h.conversation
-				.get("ao")
-				.messages.some((m) => m.text === "stale speech"),
-		).toBe(false);
-	} finally {
-		pending.resolve(thinkWait());
-		await f.close();
-	}
-});
 
-test("a Live handoff is not counted as delivered or replayed after restart", async () => {
-	const f = await alwaysOnFixture({
-		routeSpeech: () => true,
-		reply: () => ({
-			...thinkWait(),
-			action: {
-				kind: "ask",
-				utterance: "fixture proposal",
-				toolName: null,
-				toolInput: null,
-				evidenceRefs: [],
-			},
-		}),
-	});
-	try {
-		await f.start();
-		await f.user("user-a");
-		await f.advance();
-		await waitFor(() => f.requests.length === 1 && !f.host.status("ao").busy);
-		expect(f.host.inspect("ao")!.snapshot.agent.state.pacing.unanswered).toBe(
-			0,
-		);
-		expect(
-			f.h.conversation.get("ao").messages.filter((m) => m.role === "assistant"),
-		).toHaveLength(0);
-		await f.restart();
-		expect(f.host.inspect("ao")!.snapshot.tickets).toHaveLength(0);
-	} finally {
-		await f.close();
-	}
-});
-
-test("preparation uses the registered image owner and returns a real result once", async () => {
+test("a user line becomes a plan, a research, a note and the agent's own speech with an agency id", async () => {
 	const media = imageFixture("success");
-	const f = await alwaysOnFixture({
+	let planned = false;
+	const f = await agendaFixture({
 		media,
-		reply: (request, n) => {
-			const d = JSON.parse(request.prompt);
-			const tool = d.tools[0];
-			if (n === 1)
-				return {
-					...thinkWait(),
-					action: {
-						kind: "prepare",
-						utterance: null,
-						toolName: tool.name,
-						toolInput: JSON.stringify({
-							question: "fixture independent picture",
-						}),
-						evidenceRefs: ["user-a"],
-					},
-				};
-			const stock = d.stock.find((s: { kind: string }) => s.kind === "finding");
-			return stock
-				? {
-						...thinkWait(),
-						action: {
-							kind: "speak",
-							utterance: "fixture result ready",
-							toolName: null,
-							toolInput: null,
-							evidenceRefs: [stock.id],
-						},
-					}
-				: thinkWait();
+		script: (kind: CallKind, request) => {
+			if (kind === "plan" && !planned && request.prompt.includes("user-a")) {
+				planned = true;
+				return planResearch("user-a");
+			}
+			if (kind === "compose") return composeSay("fixture result ready");
+			return kind === "plan" ? planNothing() : undefined;
 		},
 	});
 	try {
 		await f.start();
 		await f.user("user-a");
-		await f.advance();
-		await waitFor(() =>
-			f.host
-				.inspect("ao")!
-				.snapshot.agent.state.stock.some((s) => s.kind === "finding"),
-		);
-		expect(f.h.toolchain.agents.executions.list("ao")).toHaveLength(1);
-		await f.advance();
+		await f.advance(1000);
+		// The plan became a research ticket: the ledger holds the work and the checkpoint its ticket.
 		await waitFor(
-			() => f.host.inspect("ao")!.snapshot.agent.state.pacing.unanswered === 1,
+			() => f.h.toolchain.agents.executions.list("ao").length === 1,
 		);
-		expect(JSON.stringify(f.h.dialogue.conversationResources("ao"))).toContain(
-			'"image"',
-		);
-		await f.restart();
-		expect(f.h.toolchain.agents.executions.list("ao")).toHaveLength(1);
-		await f.h.memory!.forget({
-			conversationId: "ao",
-			messageIds: ["user-a"],
-			itemIds: [],
-		});
-		expect(f.host.inspect("ao")!.snapshot.agent.state.stock).toHaveLength(0);
+		const snapshot = () => f.host.inspect("ao")!.snapshot;
+		// The result comes back through the ledger as a note.
+		await waitFor(() => snapshot().notes.length === 1);
+		expect(snapshot().tickets).toHaveLength(0);
+		expect(snapshot().notes[0]!.ticketId).toBeTruthy();
+		// The note is told to the user: own speech, delivered with the agency id.
+		for (let i = 0; i < 20 && agencyMessages(f).length === 0; i++)
+			await f.advance(15_000);
+		const spoken = agencyMessages(f);
+		expect(spoken).toHaveLength(1);
+		expect(spoken[0]!.text).toBe("fixture result ready");
+		expect(spoken[0]!.id).toStartWith("agency:");
+		expect(f.host.status("ao").idle?.unanswered).toBe(1);
 	} finally {
 		await f.close();
 	}
 });
 
-test("corrected versions replace old derived state and remain usable after restart", async () => {
-	const f = await alwaysOnFixture();
-	try {
-		await f.start();
-		await f.user("user-a");
-		await f.advance();
-		await waitFor(
-			() =>
-				f.host.inspect("ao")!.snapshot.agent.state.thoughts.length === 1 &&
-				!f.host.status("ao").busy,
-		);
-		await f.h.conversation.correct({
-			messageId: "user-a",
-			text: "fixture corrected words",
-		});
-		await waitFor(() =>
-			f.host
-				.inspect("ao")!
-				.snapshot.agent.observations.some(
-					(o) => o.text === "fixture corrected words",
-				),
-		);
-		expect(f.host.inspect("ao")!.snapshot.agent.state.thoughts).toHaveLength(0);
-		await f.advance();
-		await waitFor(() => f.requests.length === 2 && !f.host.status("ao").busy);
-		expect(f.requests[1]!.prompt).toContain("fixture corrected words");
-		await f.restart();
-		expect(
-			f.host
-				.inspect("ao")!
-				.snapshot.agent.observations.some(
-					(o) => o.text === "fixture corrected words",
-				),
-		).toBe(true);
-	} finally {
-		await f.close();
-	}
+const planTalk = (ref: string) => ({
+	add: [
+		{
+			kind: "talk",
+			text: "fixture own thought",
+			refs: [ref],
+			value: 4,
+			reason: "fixture",
+			topic: "thought",
+		},
+	],
+	drop: [],
+	focus: "thought",
 });
 
-test("screen typing blocks new ticks and a saved heartbeat preserves its backoff", async () => {
-	const f = await alwaysOnFixture();
+/** The pace of the agent's own speech, in the fixture's clock: advance until it has spoken. */
+async function untilSpoken(f: Awaited<ReturnType<typeof agendaFixture>>) {
+	for (let i = 0; i < 20 && agencyMessages(f).length === 0; i++)
+		await f.advance(15_000);
+}
+
+test("typing, a foreground answer and a reply being made hold the agent's thinking and speech", async () => {
+	let planned = false;
+	const f = await agendaFixture({
+		script: (kind: CallKind) => {
+			if (kind === "plan" && !planned) {
+				planned = true;
+				return planTalk("user-a");
+			}
+			if (kind === "compose") return composeSay("fixture own speech");
+			return kind === "plan" ? planNothing() : undefined;
+		},
+	});
 	try {
 		await f.start();
 		await f.user("user-a");
@@ -230,31 +121,135 @@ test("screen typing blocks new ticks and a saved heartbeat preserves its backoff
 			visible: true,
 		};
 		await f.host.attend("ao", report);
-		await f.advance();
+		// The lease of a screen lasts 45 s.
+		await f.advance(30_000);
 		expect(f.requests).toHaveLength(0);
-		await f.host.attend("ao", { ...report, revision: 2, typing: false });
-		await f.advance();
-		await waitFor(
-			() =>
-				f.requests.length === 1 &&
-				f.host.status("ao").idle?.nextIntervalSec === 20,
-		);
-		await f.restart();
-		expect(f.host.status("ao").idle?.nextIntervalSec).toBe(20);
+		expect(f.host.status("ao").idle?.blockedBy).toBe("busy");
+		f.setBusy(true);
+		await f.host.attend("ao", {
+			...report,
+			revision: 2,
+			sentAt: f.now,
+			typing: false,
+		});
+		await f.advance(60_000);
+		expect(f.requests).toHaveLength(0);
+		f.setBusy(false);
+		await f.advance(1000);
+		await waitFor(() => f.requests.length >= 1);
+		await untilSpoken(f);
+		expect(agencyMessages(f).map((m) => m.text)).toEqual([
+			"fixture own speech",
+		]);
+		// Typing again holds the next line.
+		await f.host.attend("ao", {
+			...report,
+			revision: 3,
+			sentAt: f.now,
+			typing: true,
+		});
+		const count = f.requests.length;
+		await f.advance(30_000);
+		expect(f.requests).toHaveLength(count);
 	} finally {
 		await f.close();
 	}
 });
 
-test("forgetting one conversation leaves another independent think running", async () => {
-	const pending = Promise.withResolvers<ReturnType<typeof thinkWait>>();
-	const f = await alwaysOnFixture({ reply: () => pending.promise });
+test("a Live handoff is a proposal the voice session takes: no message is appended by the agency", async () => {
+	let planned = false;
+	let origin: { id: string } | undefined;
+	const f = await agendaFixture({
+		routeSpeech: (_db, _conversationId, _text, from) => {
+			origin = from;
+			return true;
+		},
+		script: (kind: CallKind) => {
+			if (kind === "plan" && !planned) {
+				planned = true;
+				return planTalk("user-a");
+			}
+			return kind === "compose" ? composeSay("fixture proposal") : undefined;
+		},
+	});
+	try {
+		await f.start();
+		await f.user("user-a");
+		for (let i = 0; i < 20 && f.host.status("ao").idle?.unanswered === 0; i++)
+			await f.advance(15_000);
+		expect(f.host.status("ao").idle?.unanswered).toBe(1);
+		expect(agencyMessages(f)).toHaveLength(0);
+		// The session asks for the line's input when it speaks it: a complete one, with the `agency:` id.
+		expect(origin?.id).toStartWith("agency:");
+		const input = f.h.store.read((db) =>
+			f.host.dialoguePort.inputForMessageInTransaction!(db, origin!.id),
+		);
+		expect(input?.complete).toBe(true);
+	} finally {
+		await f.close();
+	}
+});
+
+test("the user's words call off the plan out and speech written for older words is not said", async () => {
+	const pending = Promise.withResolvers<unknown>();
+	const f = await agendaFixture({
+		script: (kind: CallKind, _request, n) =>
+			kind === "plan" && n === 1
+				? pending.promise
+				: kind === "compose"
+					? composeSay("stale speech")
+					: undefined,
+	});
+	try {
+		await f.start();
+		await f.user("user-a");
+		await f.advance(1000);
+		await waitFor(() => f.requests.length === 1);
+		await f.user("user-b");
+		expect(f.signals[0]!.aborted).toBe(true);
+		pending.resolve(planTalk("user-a"));
+		await f.advance(300_000);
+		expect(agencyMessages(f).some((m) => m.text === "stale speech")).toBe(
+			false,
+		);
+	} finally {
+		pending.resolve(planNothing());
+		await f.close();
+	}
+});
+
+test("a corrected line replaces the old words in what the agent plans from", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		await f.advance(1000);
+		await waitFor(() => f.requests.length === 1 && !f.host.status("ao").busy);
+		await f.h.conversation.correct({
+			messageId: "user-a",
+			text: "fixture corrected words",
+		});
+		await settle();
+		await f.advance(1000);
+		await waitFor(() => f.requests.length === 2);
+		expect(f.requests[1]!.prompt).toContain("fixture corrected words");
+		expect(f.requests[1]!.prompt).not.toContain("fixture user-a");
+	} finally {
+		await f.close();
+	}
+});
+
+test("forgetting in one conversation leaves another conversation's plan running", async () => {
+	const pending = Promise.withResolvers<unknown>();
+	const f = await agendaFixture({
+		script: (kind: CallKind) => (kind === "plan" ? pending.promise : undefined),
+	});
 	try {
 		await f.start();
 		await f.user("a-source");
 		await f.user("b-source", "b");
 		await f.host.attend("b");
-		await f.advance();
+		await f.advance(1000);
 		await waitFor(() => f.requests.length === 1);
 		await f.h.memory!.forget({
 			conversationId: "ao",
@@ -262,133 +257,417 @@ test("forgetting one conversation leaves another independent think running", asy
 			itemIds: [],
 		});
 		expect(f.signals[0]!.aborted).toBe(false);
-		pending.resolve(thinkWait());
-		await waitFor(
-			() =>
-				f.host.inspect("b")!.snapshot.agent.state.thoughts.length === 1 &&
-				!f.host.status("b").busy,
-		);
+		pending.resolve(planNothing());
+		await waitFor(() => !f.host.status("b").busy && f.host.status("b").tracked);
 		await f.restart();
-		expect(
-			f.host
-				.inspect("b")!
-				.snapshot.agent.observations.some((o) => o.id === "b-source"),
-		).toBe(true);
+		expect(f.host.inspect("b")).not.toBeNull();
 	} finally {
-		pending.resolve(thinkWait());
+		pending.resolve(planNothing());
 		await f.close();
 	}
 });
 
-test("forgetting a canonical observation Record survives recovery", async () => {
-	const f = await alwaysOnFixture();
+test("the reply's system holds the package's rules for the agenda, with the tools the host offers", async () => {
+	const f = await agendaFixture();
 	try {
-		await f.start();
-		await f.user("user-a");
-		await f.advance();
-		await waitFor(
-			() =>
-				f.host.inspect("ao")!.snapshot.agent.state.thoughts.length === 1 &&
-				!f.host.status("ao").busy,
-		);
-		const row = f.h.store.read((db) =>
-			f.port
-				.observationsInTransaction(db, "ao")
-				.find((r) => r.observationId === "user-a"),
-		)!;
-		await f.h.memory!.forget({
-			conversationId: "ao",
-			messageIds: [],
-			itemIds: [],
-			derived: { "memory.records": [row.ref.id] },
-		});
-		await f.restart();
-		expect(
-			f.host
-				.inspect("ao")!
-				.snapshot.agent.observations.some((o) => o.id === "user-a"),
-		).toBe(false);
-		expect(f.host.inspect("ao")!.snapshot.agent.state.thoughts).toHaveLength(0);
+		const base = f.host.conversationAgent.system().base;
+		expect(base).toContain(agendaReplyRules());
+		expect(base).toContain("start_preparation");
+		expect(base).toContain("read_note");
+		// Eumenes' own persona and emotion rules stay outside the package's span.
+		expect(base).not.toContain("【気持ちの絵文字】");
 	} finally {
 		await f.close();
 	}
 });
 
-test("a confirmed normal reply shares preparation through existing State and stock operations", async () => {
-	const f = await alwaysOnFixture({
+test("a reply sees the agent's state, reads a note, asks for research and shows the note through the agent's tools", async () => {
+	let planned = false;
+	const f = await agendaFixture({
 		media: imageFixture("success"),
-		reply: (request, n) => {
-			const d = JSON.parse(request.prompt);
-			if (n === 1)
-				return {
-					...thinkWait(),
-					action: {
-						kind: "prepare",
-						utterance: null,
-						toolName: d.tools[0].name,
-						toolInput: JSON.stringify({
-							question: "fixture preparation for normal reply",
-						}),
-						evidenceRefs: ["user-a"],
-					},
-				};
-			const stock = d.stock.find((s: { kind: string }) => s.kind === "finding");
-			return stock && request.prompt.includes("fixture normal result shared")
-				? {
-						...thinkWait(),
-						stockOps: [
-							{ op: "stock.drop", id: stock.id, text: null, targets: [] },
-						],
-					}
-				: thinkWait();
+		script: (kind: CallKind) => {
+			if (kind === "plan" && !planned) {
+				planned = true;
+				return planResearch("user-a");
+			}
+			return kind === "plan" ? planNothing() : undefined;
 		},
 	});
 	try {
 		await f.start();
 		await f.user("user-a");
-		await f.advance();
-		await waitFor(() =>
+		await f.advance(1000);
+		await waitFor(() => f.host.inspect("ao")!.snapshot.notes.length === 1);
+		const note = f.host.inspect("ao")!.snapshot.notes[0]!;
+		await f.user("user-b");
+		const { seen } = await replyWith(
+			f,
+			[
+				{ name: "read_note", arguments: { id: note.id } },
+				{
+					name: "start_preparation",
+					arguments: { request: "fixture follow-up", askedByUser: true },
+				},
+				{ name: "show_note", arguments: { id: note.id } },
+			],
+			{ runId: "run-2", messageIds: ["user-b"] },
+		);
+		// The first model call: the system, the agent's state before the user's last message.
+		expect(seen[0]!.map((m) => m.role)).toEqual(["system", "user", "user"]);
+		expect(seen[0]![1]!.content).toStartWith("<あなたの今の状態");
+		expect(seen[0]![1]!.content).toContain(note.id);
+		expect(seen[0]![2]!.content).toBe("## User\nfixture user");
+		// The second: what the three tools answered.
+		const tools = seen[1]!.filter((m) => m.role === "tool");
+		expect(tools).toHaveLength(3);
+		expect(tools[0]!.content).toContain("<メモ");
+		expect(tools[0]!.content).toContain(note.title);
+		expect(tools[1]!.content).toMatch(/^(accepted|queued)/u);
+		expect(tools[2]!.content).toStartWith("shown");
+		expect(
 			f.host
 				.inspect("ao")!
-				.snapshot.agent.state.stock.some((s) => s.kind === "finding"),
-		);
-		await f.h.store.write((db) => {
-			const input = f.host.dialoguePort.inputForContextInTransaction!(db, "ao");
-			expect(input.complete).toBe(true);
-			expect(
-				f.host.dialoguePort.stateForContextInTransaction!(db, "ao").join("\n"),
-			).toContain('"finding"');
-			f.h.conversation.appendInTransaction(db, {
-				id: "normal-answer",
-				conversationId: "ao",
-				role: "assistant",
-				text: "fixture normal result shared",
-				runId: null,
-				createdAt: new Date().toISOString(),
-			});
-			f.h.memory!.referenceInputs.recordMessageInTransaction(
-				db,
-				"normal-answer",
-				input,
+				.snapshot.agent.items.some(
+					(i) => i.text === "fixture follow-up" && i.requested,
+				),
+		).toBe(true);
+		// The note is shown once the reply is adopted (its message appears), as one message per reply and note,
+		// never as an `agency:` line, and kept out of what the model is told and what memory learns from.
+		const shownNotes = () =>
+			f.h.conversation
+				.get("ao")
+				.messages.filter((m) => m.id.startsWith("agency-note:"));
+		expect(shownNotes()).toHaveLength(0);
+		const adopt = async () => {
+			await f.h.store.write((db) =>
+				f.h.conversation.appendInTransaction(db, {
+					id: "answer-2",
+					conversationId: "ao",
+					role: "assistant",
+					text: "fixture answer",
+					runId: "run-2",
+					createdAt: new Date(f.now).toISOString(),
+				}),
 			);
-		});
-		await waitFor(() =>
-			f.host
-				.inspect("ao")!
-				.snapshot.agent.observations.some((o) => o.id === "normal-answer"),
-		);
-		await f.advance();
-		await waitFor(() => f.requests.length === 2 && !f.host.status("ao").busy);
-		expect(f.host.inspect("ao")!.snapshot.agent.state.stock).toHaveLength(0);
-		expect(f.host.inspect("ao")!.snapshot.agent.state.pacing.unanswered).toBe(
-			0,
-		);
-		expect(JSON.stringify(f.h.dialogue.conversationResources("ao"))).toContain(
-			'"image"',
-		);
-		await f.restart();
-		expect(f.host.inspect("ao")!.snapshot.agent.state.stock).toHaveLength(0);
+			await settle();
+		};
+		await adopt();
+		await waitFor(() => shownNotes().length === 1);
+		expect(shownNotes()[0]!.text).toContain(note.title);
+		expect(
+			f.h.store.read((db) =>
+				f.deps.memory.isBlockedInTransaction!(db, shownNotes()[0]!.id),
+			),
+		).toBe(true);
+		expect(shownNotes()[0]!.id).toEndWith(`:run-2:${note.id}`);
 	} finally {
 		await f.close();
 	}
+});
+
+/** A reply whose model calls are scripted: `onCall` may do things (the user typing) before a call answers. */
+async function steered(
+	f: Awaited<ReturnType<typeof agendaFixture>>,
+	onCall: (n: number) => Promise<void>,
+	runId = "run-steer",
+	host: Pick<typeof f.host, "conversationAgent"> = f.host,
+) {
+	let call = 0;
+	const seen: Array<{ role: string; content: string }[]> = [];
+	await host.conversationAgent.respond({
+		run: { conversationId: "ao", runId, messageIds: ["user-a"] },
+		messages: [
+			{ role: "system", content: "fixture system" },
+			{ role: "user", content: "## User\nfixture user-a" },
+		],
+		chat: {
+			async complete(request) {
+				call++;
+				seen.push(request.messages.map((m) => ({ ...m })));
+				await onCall(call);
+				return call === 1
+					? {
+							text: "",
+							toolCalls: [
+								{
+									id: "c1",
+									name: "set_quiet",
+									arguments: JSON.stringify({
+										scope: "speech",
+										kind: "said",
+										minutes: 1,
+									}),
+								},
+							],
+						}
+					: { text: "fixture answer", toolCalls: [] };
+			},
+		},
+		tools: { tools: [], call: async () => ({ content: "host" }) },
+		signal: new AbortController().signal,
+		onDelta: () => {},
+		maxToolCalls: 0,
+	});
+	return seen;
+}
+
+test("words sent while a reply is written reach its next model call and are answered by that reply", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		const seen = await steered(f, async (n) => {
+			// The user writes during the first model call (the tool call follows) and again during the last.
+			if (n === 1) await f.user("user-b", "ao", "fixture steer words");
+			if (n === 2) await f.user("user-c", "ao", "fixture too late");
+		});
+		expect(seen).toHaveLength(2);
+		expect(
+			seen[0]!.some((m) => m.content.includes("fixture steer words")),
+		).toBe(false);
+		const second = seen[1]!;
+		const given = second.find((m) => m.content.includes("fixture steer words"));
+		expect(given?.role).toBe("user");
+		expect(given?.content).toStartWith(STEERED_MARK);
+		// The words sent during the last call were not given: they get a reply of their own.
+		expect(second.some((m) => m.content.includes("fixture too late"))).toBe(
+			false,
+		);
+		const taken = f.h.store.read((db) =>
+			f.host.dialoguePort.steeredInTransaction!(db, "run-steer"),
+		);
+		expect(taken).toEqual(["user-b"]);
+	} finally {
+		await f.close();
+	}
+});
+
+test("without a steering inbox the words wait for a reply of their own", async () => {
+	const f = await agendaFixture({ steering: false });
+	try {
+		await f.start();
+		await f.user("user-a");
+		const seen = await steered(f, async (n) => {
+			if (n === 1) await f.user("user-b", "ao", "fixture steer words");
+		});
+		expect(
+			seen[1]!.some((m) => m.content.includes("fixture steer words")),
+		).toBe(false);
+		expect(
+			f.h.store.read((db) =>
+				f.host.dialoguePort.steeredInTransaction!(db, "run-steer"),
+			),
+		).toEqual([]);
+	} finally {
+		await f.close();
+		await settle();
+	}
+});
+
+test("words a forgotten message left are not given to a reply", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		const seen = await steered(f, async (n) => {
+			if (n === 1) {
+				await f.user("user-b", "ao", "fixture steer words");
+				await f.h.memory!.forget({
+					conversationId: "ao",
+					messageIds: ["user-b"],
+					itemIds: [],
+				});
+			}
+		});
+		expect(
+			seen[1]!.some((m) => m.content.includes("fixture steer words")),
+		).toBe(false);
+	} finally {
+		await f.close();
+	}
+});
+
+test("the switching host forwards what a steered reply took, so the settle sees it", async () => {
+	const f = await agendaFixture();
+	const host = createSwitchingAgencyHost(f.deps);
+	try {
+		await host.recover();
+		host.start();
+		await host.attend("ao");
+		await f.user("user-a");
+		await steered(
+			f,
+			async (n) => {
+				if (n === 1) await f.user("user-b", "ao", "fixture steer words");
+			},
+			"run-switch",
+			host,
+		);
+		expect(
+			f.h.store.read((db) =>
+				host.dialoguePort.steeredInTransaction!(db, "run-switch"),
+			),
+		).toEqual(["user-b"]);
+	} finally {
+		await host.close();
+		await f.close();
+	}
+});
+
+test("words that are not the user's own (a scheduled prompt) are not given to a reply", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		const seen = await steered(f, async (n) => {
+			if (n === 1) {
+				await f.user("user-sched", "ao", "fixture scheduled prompt");
+				await f.h.store.write((db) =>
+					f.h.memory!.blockMessagesInTransaction(db, {
+						conversationId: "ao",
+						messageIds: ["user-sched"],
+						reason: "scheduled_prompt",
+					}),
+				);
+			}
+		});
+		expect(
+			seen[1]!.some((m) => m.content.includes("fixture scheduled prompt")),
+		).toBe(false);
+	} finally {
+		await f.close();
+	}
+});
+
+test("a reply is given the agent's state and tools whatever turn it answers, and its input rests on what it was given", async () => {
+	const media = imageFixture("success");
+	let planned = false;
+	const f = await agendaFixture({
+		media,
+		script: (kind: CallKind) => {
+			if (kind === "plan" && !planned) {
+				planned = true;
+				return planResearch("user-a");
+			}
+			return kind === "plan" ? planNothing() : undefined;
+		},
+	});
+	try {
+		await f.start();
+		await f.user("user-a");
+		await f.advance(1000);
+		await waitFor(() => f.host.inspect("ao")!.snapshot.notes.length === 1);
+		// A turn that answers a notice, not the user's words: no message ids, still the state and the tools.
+		const { seen, offered } = await replyWith(f, [], {
+			runId: "run-notice",
+			messageIds: [],
+		});
+		expect(seen[0]![1]!.content).toStartWith("<あなたの今の状態");
+		expect(offered[0]).toEqual(
+			expect.arrayContaining(["start_preparation", "read_note", "set_quiet"]),
+		);
+		// What it was given rests in its input, complete while the note's sources stand.
+		const given = () =>
+			f.h.store.read((db) =>
+				f.host.dialoguePort.replyInputInTransaction!(db, "run-notice"),
+			);
+		expect(given()?.complete).toBe(true);
+		expect(given()?.sources).toContain("user-a");
+		// Forgotten meanwhile: the reply is not adopted over it.
+		await f.h.memory!.forget({
+			conversationId: "ao",
+			messageIds: ["user-a"],
+			itemIds: [],
+		});
+		expect(given()?.complete).toBe(false);
+	} finally {
+		await f.close();
+	}
+});
+
+test("the reply's system holds the agenda's rules only where the agenda serves the reply", async () => {
+	const f = await agendaFixture();
+	try {
+		const settings = f.h.settings.get().agency;
+		expect(agencyReplyParts(settings, true).base).toContain(
+			"start_preparation",
+		);
+		expect(agencyReplyParts(settings, false).base).not.toContain(
+			"start_preparation",
+		);
+		const host = createSwitchingAgencyHost(f.deps);
+		expect(host.conversationAgent.system().base).toContain("start_preparation");
+		await host.close();
+	} finally {
+		await f.close();
+	}
+});
+
+test("own speech rests on the user's recent words and the memory the model saw, not only on the line it cites", async () => {
+	let planned = false;
+	const f = await agendaFixture({
+		script: (kind: CallKind) => {
+			if (kind === "plan" && !planned) {
+				planned = true;
+				return planTalk("user-a");
+			}
+			return kind === "compose" ? composeSay("fixture own speech") : undefined;
+		},
+	});
+	try {
+		await f.start();
+		await f.user("user-a");
+		await f.user("user-b");
+		await untilSpoken(f);
+		const spoken = agencyMessages(f);
+		expect(spoken).toHaveLength(1);
+		const input = f.h.store.read((db) =>
+			f.deps.memory.referenceInputs!.readMessageInTransaction(
+				db,
+				spoken[0]!.id,
+			),
+		);
+		// The plan cited user-a; the model also saw user-b.
+		expect(input?.sources).toContain("user-b");
+		const current = () =>
+			f.h.store.read((db) =>
+				f.deps.memory.referenceInputs!.isCurrentInTransaction(db, input!),
+			);
+		expect(current()).toBe(true);
+		// Forgetting a line the model saw reaches the speech written over it.
+		await f.h.memory!.forget({
+			conversationId: "ao",
+			messageIds: ["user-b"],
+			itemIds: [],
+		});
+		expect(current()).toBe(false);
+	} finally {
+		await f.close();
+	}
+});
+
+test("research runs on the web research capability only, never an unrelated one", () => {
+	const deps = {} as Parameters<typeof researchRevision>[0];
+	const free = (revisionId: string, effect = "read") => ({
+		revisionId,
+		requiresApproval: false,
+		effect,
+	});
+	expect(
+		researchRevision(deps, [
+			free("toolchain:weather.forecast@1"),
+			free("toolchain:image.create@1", "create"),
+		]),
+	).toBeUndefined();
+	expect(
+		researchRevision(deps, [
+			free("toolchain:weather.forecast@1"),
+			free("toolchain:web.research@7"),
+		]),
+	).toBe("toolchain:web.research@7");
+	expect(
+		researchRevision(deps, [
+			{ revisionId: "toolchain:web.research@7", requiresApproval: true },
+		]),
+	).toBeUndefined();
 });

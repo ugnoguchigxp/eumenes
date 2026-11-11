@@ -1,143 +1,134 @@
 import { z } from "zod";
-import type {
-	AlwaysOnSnapshot,
-	AlwaysOnTicket,
-	InputContext,
-} from "eumenes-agency";
+import {
+	agendaSnapshotSchema,
+	type AgendaSnapshot,
+} from "eumenes-agency/agenda";
 
-/** Host-owned envelope. Pending speech is never replayed; tickets certify real effects and returns. */
-export type AlwaysOnHostSnapshot = {
-	kind: "always-on";
+/**
+ * The always-on runtime is the agenda agent (eumenes-agency/agenda): code keeps the list of things to do, the model
+ * reads words and writes content. What outlives a restart is what was promised and not finished (research asked for
+ * or promised, results not told yet) and the quiet the user asked for, plus the host's own bookkeeping: the research
+ * it handed to the toolchains, and the notes (the results it adopted). Pending speech is never replayed.
+ */
+
+/** A research handed to a toolchain: the ledger row `dialogue_agency_work` is keyed by `id` (the ticket id of the start). */
+export type AgendaResearchTicket = {
+	/** The ticket the work was started with (the work row's `ticket_id`). */
+	id: string;
+	/** The agent's item it serves; a ticket made after a restart for the same item takes over this work. */
+	itemId: string;
+	/** The ticket the agent waits on now (differs from `id` after a restart). */
+	agentTicketId: string;
+	revisionId: string;
+	question: string;
+	at: number;
+	/** What it rests on, as the agent cites it: message ids, `memory:<id>`, `note:<id>`. */
+	refs: string[];
+	/** The sources of those references (Memory stamps) captured when it started. */
+	inputs: string[];
+};
+
+/** A result of the researcher, kept for the agent to read (the host's note store of the conversation). */
+export type AgendaNote = {
+	id: string;
+	title: string;
+	summary: string;
+	markdown: string;
+	at: number;
+	refs: string[];
+	/** The work it came from (the ticket id of the start). */
+	ticketId: string;
+};
+
+/** Host-owned envelope of one conversation's agenda agent. */
+export type AgendaHostSnapshot = {
+	kind: "agenda";
 	version: 1;
 	revision: number;
-	agent: AlwaysOnSnapshot;
-	tickets: AlwaysOnTicket[];
-	memoryObservations?: true;
+	agent: AgendaSnapshot;
+	tickets: AgendaResearchTicket[];
+	notes: AgendaNote[];
 };
 
 const strings = z.array(z.string());
-const count = z.number().int().nonnegative();
-const timed = z.object({ at: z.number(), inputs: strings });
-const derived = timed.extend({ id: z.string() });
-const snapshotSchema = z.object({
-	kind: z.literal("always-on"),
+const snapshotSchema = z.strictObject({
+	kind: z.literal("agenda"),
 	version: z.literal(1),
-	revision: count,
-	memoryObservations: z.literal(true).optional(),
+	revision: z.number().int().nonnegative(),
+	agent: agendaSnapshotSchema,
 	tickets: z.array(
-		timed.extend({
-			id: z.string(),
-			tickId: z.string(),
-			action: z.enum(["speak", "ask", "prepare"]),
-			utterance: z.string().nullable(),
-			toolName: z.string().nullable(),
-			toolInput: z.string().nullable(),
-			drive: z.string(),
-			evidenceRefs: strings,
+		z.strictObject({
+			id: z.string().min(1),
+			itemId: z.string().min(1),
+			agentTicketId: z.string().min(1),
+			revisionId: z.string().min(1),
+			question: z.string(),
+			at: z.number(),
+			refs: strings,
+			inputs: strings,
 		}),
 	),
-	agent: z.object({
-		version: z.literal(1),
-		seq: count,
-		forgotten: strings,
-		observationInputs: z.array(
-			z.tuple([
-				z.string(),
-				z.object({ sources: strings, complete: z.boolean() }),
-			]),
-		),
-		observations: z.array(
-			z.object({
-				id: z.string(),
-				seq: count,
-				text: z.string(),
-				kind: z.string(),
-				actor: z.enum(["user", "agent", "tool", "host"]),
-				occurredAt: z.number(),
-				refs: strings.optional(),
-			}),
-		),
-		state: z.object({
-			nextId: count,
-			seenSeq: count,
-			thoughts: z.array(
-				derived.extend({ text: z.string(), drive: z.string() }),
-			),
-			facts: z.array(
-				derived.extend({
-					text: z.string(),
-					aspect: z.string(),
-					basis: z.enum(["stated", "observed", "hypothesis"]),
-					evidence: strings,
-					reason: z.string().nullable(),
-					updatedAt: z.number(),
-				}),
-			),
-			gaps: z.array(
-				derived.extend({
-					question: z.string(),
-					why: z.string().nullable(),
-					status: z.enum(["open", "answered", "declined"]),
-					askedAt: z.number().nullable(),
-					evidence: strings,
-				}),
-			),
-			stock: z.array(
-				derived.extend({
-					text: z.string(),
-					kind: z.enum(["finding", "idea", "question"]),
-					targets: strings,
-					sourceRefs: strings,
-					freshUntil: z.number(),
-					usedAt: z.number().nullable(),
-				}),
-			),
-			preparing: z.array(
-				timed.extend({
-					ticketId: z.string(),
-					toolName: z.string(),
-					toolInput: z.string(),
-					refs: strings,
-				}),
-			),
-			pacing: z.object({
-				lastAgentAt: z.number().nullable(),
-				lastOwnAt: z.number().nullable(),
-				unanswered: count,
-				muteUntil: z.number().nullable(),
-				prepareMuteUntil: z.number().nullable(),
-				stopped: z.boolean(),
-				lastOwnWasAsk: z.boolean(),
-			}),
+	notes: z.array(
+		z.strictObject({
+			id: z.string().min(1),
+			title: z.string(),
+			summary: z.string(),
+			markdown: z.string(),
+			at: z.number(),
+			refs: strings,
+			ticketId: z.string(),
 		}),
-	}),
+	),
 });
-export function isAlwaysOnSnapshot(
-	value: unknown,
-): value is AlwaysOnHostSnapshot {
+
+export function isAgendaSnapshot(value: unknown): value is AgendaHostSnapshot {
 	return snapshotSchema.safeParse(value).success;
 }
 
-export function alwaysOnSources(value: AlwaysOnHostSnapshot): string[] {
-	const s = value.agent;
+/** Message ids refer to the user's lines; a corrected line is `<id>:c<seq>` for the agent. */
+export const baseRef = (ref: string) => ref.replace(/:c\d+$/u, "");
+
+/** Every reference the checkpoint rests on (dependency registration and forgetting reach). */
+export function agendaSources(value: AgendaHostSnapshot): string[] {
 	return [
 		...new Set([
-			...s.observations.flatMap((o) => [o.id, ...(o.refs ?? [])]),
-			...(s.observationInputs ?? []).flatMap(([, i]) => i.sources),
-			...s.state.thoughts.flatMap((x) => x.inputs),
-			...s.state.facts.flatMap((x) => x.inputs),
-			...s.state.gaps.flatMap((x) => x.inputs),
-			...s.state.stock.flatMap((x) => x.inputs),
-			...s.state.preparing.flatMap((x) => x.inputs),
-			...value.tickets.flatMap((t) => t.inputs),
+			...value.agent.items.flatMap((i) => i.refs.map(baseRef)),
+			...value.tickets.flatMap((t) => [...t.refs.map(baseRef), ...t.inputs]),
+			...value.notes.flatMap((n) => n.refs.map(baseRef)),
 		]),
 	];
 }
 
-export function alwaysOnTicketInput(
-	snapshot: AlwaysOnHostSnapshot,
-	id: string,
-): InputContext | null {
+/** The input a research ticket was started with; it authorizes the work (never a forged ticket). */
+export function agendaTicketInput(snapshot: AgendaHostSnapshot, id: string) {
 	const ticket = snapshot.tickets.find((t) => t.id === id);
 	return ticket ? { sources: ticket.inputs, complete: true } : null;
+}
+
+/**
+ * What forgetting `refs` leaves of a checkpoint: items, tickets and notes that rest on them are gone. The same rule
+ * the running agent applies (`AgendaAgent.forget`), for a record no agent holds.
+ */
+export function forgetAgenda(
+	value: AgendaHostSnapshot,
+	refs: ReadonlySet<string>,
+): AgendaHostSnapshot {
+	const gone = (list: readonly string[]) =>
+		list.some((ref) => refs.has(ref) || refs.has(baseRef(ref)));
+	const lost = new Set(
+		value.notes.filter((n) => gone(n.refs)).map((n) => `note:${n.id}`),
+	);
+	const items = value.agent.items.filter(
+		(i) => !gone(i.refs) && !i.refs.some((r) => lost.has(r)),
+	);
+	return {
+		...value,
+		revision: value.revision + 1,
+		agent: { ...value.agent, items },
+		tickets: value.tickets.filter(
+			(t) =>
+				!gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lost.has(r)),
+		),
+		notes: value.notes.filter((n) => !gone(n.refs)),
+	};
 }

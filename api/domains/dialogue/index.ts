@@ -33,8 +33,12 @@ export { createAgencyStatePort } from "./service/agency-state";
 export type { AgencyStatePort, AgencyRecord } from "./service/agency-state";
 export type { SharedFilesPort } from "./contracts/resources";
 export {
-	isAlwaysOnSnapshot,
-	alwaysOnSources,
-	alwaysOnTicketInput,
-	type AlwaysOnHostSnapshot,
+	isAgendaSnapshot,
+	agendaSources,
+	agendaTicketInput,
+	forgetAgenda,
+	baseRef,
+	type AgendaHostSnapshot,
+	type AgendaNote,
+	type AgendaResearchTicket,
 } from "./contracts/agency-always-on";

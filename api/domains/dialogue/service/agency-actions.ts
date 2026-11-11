@@ -19,8 +19,9 @@ import {
 } from "../repository/agency";
 import { agencyActionWork, eraseAgencyActionWork } from "./agency-action-work";
 import {
-	isAlwaysOnSnapshot,
-	alwaysOnTicketInput,
+	isAgendaSnapshot,
+	agendaTicketInput,
+	type AgendaHostSnapshot,
 } from "../contracts/agency-always-on";
 
 export type AgencyActionDeps = {
@@ -164,15 +165,13 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 				throw new Error("agency_origin_stale");
 			const snapshot =
 				record.snapshot as import("eumenes-agency").AgencySnapshot;
-			const alwaysOn = isAlwaysOnSnapshot(record.snapshot)
-				? record.snapshot
-				: null;
-			if (alwaysOn) assertAlwaysOnTicket(alwaysOn, input);
+			const agenda = isAgendaSnapshot(record.snapshot) ? record.snapshot : null;
+			if (agenda) assertAgendaTicket(agenda, input);
 			const ticket = snapshot.continuity?.issued.find(
 				(t) => t.id === input.ticketId,
 			);
 			if (
-				!alwaysOn &&
+				!agenda &&
 				(!ticket ||
 					ticket.action !== "tool" ||
 					ticket.toolName !== "delegate" ||
@@ -233,8 +232,8 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 			);
 			const source = autonomousActionSource(db, input.rootId, now);
 			if (!source) throw new Error("agency_origin_stale");
-			const provenance = alwaysOn
-				? alwaysOnTicketInput(alwaysOn, input.ticketId)
+			const provenance = agenda
+				? agendaTicketInput(agenda, input.ticketId)
 				: (
 						record.snapshot as import("eumenes-agency").AgencySnapshot
 					).provenance?.entries.find(
@@ -365,8 +364,9 @@ export function stopAgencyExecution(
 		);
 }
 
-function assertAlwaysOnTicket(
-	alwaysOn: import("../contracts/agency-always-on").AlwaysOnHostSnapshot,
+/** The work must be the research ticket the host saved before it started; nothing else authorizes it. */
+function assertAgendaTicket(
+	agenda: AgendaHostSnapshot,
 	input: {
 		ticketId: string;
 		revisionId: string;
@@ -377,19 +377,13 @@ function assertAlwaysOnTicket(
 ) {
 	const digest = (value: unknown) =>
 		hash(canonicalJson(value, { keyOrder: "codeUnit", omitUndefined: true }));
-	const ownTicket = alwaysOn.tickets.find((t) => t.id === input.ticketId);
+	const own = agenda.tickets.find((t) => t.id === input.ticketId);
 	if (
-		!ownTicket ||
-		ownTicket.action !== "prepare" ||
-		ownTicket.toolName !== input.revisionId ||
-		digest(JSON.parse(ownTicket.toolInput!)) !==
-			digest({
-				question: input.question,
-				...(input.arguments ? { arguments: input.arguments } : {}),
-			}) ||
-		digest([...ownTicket.inputs].sort()) !==
-			digest([...input.sourceRefs].sort()) ||
-		!alwaysOn.agent.state.preparing.some((p) => p.ticketId === input.ticketId)
+		!own ||
+		own.revisionId !== input.revisionId ||
+		own.question !== input.question ||
+		input.arguments !== undefined ||
+		digest([...own.inputs].sort()) !== digest([...input.sourceRefs].sort())
 	)
 		throw new Error("agency_origin_stale");
 }
