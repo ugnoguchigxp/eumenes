@@ -247,6 +247,7 @@ async function agentRequest(
 	onDelta?: (text: string) => void,
 	options?: import("../../larm").LarmCallOptions,
 	role?: CallSessionRole,
+	nativeWebSearch?: true,
 ) {
 	if (row.purpose !== "llm") throw new Error("cloud_agent_purpose_unsupported");
 	if (!env.agents) throw new Error("cloud_agent_unavailable");
@@ -273,6 +274,7 @@ async function agentRequest(
 			baseUrl: connection.baseUrl,
 			credential,
 			auth: connection.auth,
+			nativeWebSearch,
 			messages: fitted.messages,
 			tools:
 				options?.toolOutputFormat === "json-schema"
@@ -337,7 +339,13 @@ export async function cloudRequest(
 	onDelta?: (text: string) => void,
 	options?: import("../../larm").LarmCallOptions,
 	role?: CallSessionRole,
+	nativeWebSearch?: true,
 ) {
+	if (
+		nativeWebSearch &&
+		(connection.kind !== "codex-sdk" || row.mode !== "control")
+	)
+		throw new Error("cloud_agent_web_search_unavailable");
 	if (row.purpose === "llm")
 		input = await cloudImages(
 			input as Messages,
@@ -360,6 +368,7 @@ export async function cloudRequest(
 			onDelta,
 			options,
 			role,
+			nativeWebSearch,
 		);
 	if (!credential) throw new Error("cloud_credential_unavailable");
 	if (connection.kind === "cloudflare-workers-ai") {

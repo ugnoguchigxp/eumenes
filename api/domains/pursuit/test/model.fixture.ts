@@ -5,11 +5,15 @@ export function researchScript(
 		sourceStart?: number;
 		grader?: boolean;
 		document?: boolean;
+		answer?: string;
 	} = {},
 ) {
 	let proposals = 0,
 		asked = false;
-	return (schema: Record<string, unknown>) => {
+	return (
+		schema: Record<string, unknown>,
+		messages: readonly { content: unknown }[] = [],
+	) => {
 		const properties = schema.properties as Record<string, unknown>;
 		if (properties.strategy)
 			return {
@@ -41,6 +45,112 @@ export function researchScript(
 				brokenAssumption: "",
 				direction: "回答を確認",
 			};
+		const draft = {
+			completion: "complete",
+			...(options.document ? { title: "一次資料の比較調査" } : {}),
+			answer:
+				options.answer ??
+				"本文で確認した結論です。[資料](https://example.com/source)",
+			summary: "本文に基づく結論",
+			claims: [
+				{ text: "本文で確認した事実", status: "verified", evidence: ["e1"] },
+			],
+			limitations: [],
+			stopReason: "依頼の条件を本文で確認した",
+		};
+		if (properties.basis) {
+			const packet = JSON.parse(String(messages.at(-1)?.content));
+			const state = JSON.parse(packet.state.split("\n\n").at(-1));
+			const attempts = state.attempts as {
+				tool: string;
+				state: string;
+				seq: number;
+			}[];
+			const used = (tool: string) => attempts.some((a) => a.tool === tool);
+			const action = (tool: string, input: object) => ({
+				tool,
+				inputJson: JSON.stringify(input),
+				text: null,
+				expectedStatus: "ok",
+				expectedObservation: "必要な根拠を取得",
+				refutedIf: "status:error",
+				whatChanged: "",
+			});
+			const base = {
+				basis: state.basis,
+				progress: {
+					assessed: state.newlyUnassessed,
+					kind: state.previousProgress?.length
+						? attempts.length
+							? "evidence"
+							: "reasoning"
+						: "initial",
+					change: "調査の現状を確認",
+					criteria: ["answer"],
+					evidence: attempts
+						.filter((a) => a.state === "settled")
+						.map((a) => a.seq),
+					conclusions: [],
+				},
+				choice: "act",
+				reason: "本文と回答を照合",
+				missing: "",
+				contribution: "必要な証拠を確認",
+				route: "advance",
+				actions: [] as ReturnType<typeof action>[],
+				sequence: false,
+				waitAfterDispatch: false,
+				cancelPending: false,
+				renewStrategy: null,
+				renewHypothesis: null,
+			};
+			if (options.consult && !asked) {
+				asked = true;
+				return {
+					...base,
+					choice: "consult",
+					missing: "対象期間",
+					reason: "比較の対象期間を教えてください",
+				};
+			}
+			if (state.pending.length) return { ...base, choice: "wait" };
+			if (!used("web_lookup"))
+				return {
+					...base,
+					waitAfterDispatch: true,
+					actions: [
+						action("web_lookup", { query: "一次資料 比較", language: "ja" }),
+					],
+				};
+			if (!used("web_read"))
+				return {
+					...base,
+					waitAfterDispatch: true,
+					actions: [action("web_read", { url: "https://example.com/source" })],
+				};
+			if (options.sourceStart !== undefined && !used("source_read"))
+				return {
+					...base,
+					actions: [
+						action("source_read", {
+							evidence: "e1",
+							start: options.sourceStart,
+							limit: 1000,
+						}),
+					],
+				};
+			if (state.savedReadBack)
+				return {
+					...base,
+					choice: options.grader === false ? "partial" : "complete",
+				};
+			return {
+				...base,
+				choice: "complete",
+				sequence: true,
+				actions: [action("report_draft", draft), action("report_read", {})],
+			};
+		}
 		if (!properties.kind) throw new Error("fixture_schema_unknown");
 		const base = {
 			tool: null,
@@ -70,24 +180,7 @@ export function researchScript(
 		const steps: Array<[string, unknown]> = [
 			["web_lookup", { query: "一次資料 比較", language: "ja" }],
 			["web_read", { url: "https://example.com/source" }],
-			[
-				"report_draft",
-				{
-					completion: "complete",
-					...(options.document ? { title: "一次資料の比較調査" } : {}),
-					answer: "本文で確認した結論です。[資料](https://example.com/source)",
-					summary: "本文に基づく結論",
-					claims: [
-						{
-							text: "本文で確認した事実",
-							status: "verified",
-							evidence: ["e1"],
-						},
-					],
-					limitations: [],
-					stopReason: "依頼の条件を本文で確認した",
-				},
-			],
+			["report_draft", draft],
 			["report_read", {}],
 		];
 		if (options.sourceStart !== undefined)

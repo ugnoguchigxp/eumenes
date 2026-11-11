@@ -82,6 +82,7 @@ export function core(ctx: Context, id: string, epoch: number) {
 				verdictLabel: "refutation",
 				claimFeedback: "verdict",
 				attemptCount: "all",
+				...(state.execution ? { execution: state.execution } : {}),
 			},
 		};
 	});

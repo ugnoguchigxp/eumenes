@@ -1,6 +1,7 @@
 import { ExternalAppLauncherView } from "./external-app-components";
 import { DotsMessagingView } from "./dots-messaging-components";
 import { WorkMenuView, WorkResultView } from "./work-components";
+import { ScheduleAgendaView } from "./schedule-agenda";
 import { GoogleAccountsView } from "./google-accounts-components";
 import { OcrMediaView, OcrPanelView } from "./ocr-components";
 import { ObjectRecognitionWorkspaceView } from "./object-recognition-components";
@@ -132,6 +133,7 @@ const renderers = {
 	"dots-messaging": DotsMessagingView,
 	"work-menu": WorkMenuView,
 	"work-result": WorkResultView,
+	"schedule-agenda": ScheduleAgendaView,
 	"google-accounts": GoogleAccountsView,
 	"ui-studio": UiStudioView,
 	"text-block": TextBlockView,

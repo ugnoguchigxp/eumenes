@@ -13,7 +13,7 @@ import { current, type Context } from "./context";
 export function collectWeb(ctx: Context, db: Database) {
 	const rows = db
 		.query(
-			"SELECT * FROM pursuit_runs WHERE state='waiting_child' AND data_json IS NOT NULL",
+			"SELECT * FROM pursuit_runs WHERE state IN ('waiting_child','queued','deciding') AND data_json IS NOT NULL",
 		)
 		.all() as RunRow[];
 	for (const candidate of rows) {
@@ -23,6 +23,12 @@ export function collectWeb(ctx: Context, db: Database) {
 		} catch {
 			continue;
 		}
+		const state = stateOf(row);
+		if (
+			state.publication ||
+			(row.state !== "waiting_child" && !state.execution)
+		)
+			continue;
 		let ready = false;
 		for (const op of pendingWeb(db, row)) {
 			if (op.outcome_json) {
@@ -31,7 +37,7 @@ export function collectWeb(ctx: Context, db: Database) {
 			}
 			const result = ctx.web.current(op.external_id);
 			if (result.state === "waiting") continue;
-			let number = documents(db, row).length;
+			let number = documents(db, row, true).length;
 			const acquired = result.documents.map((doc) => {
 				const evidence = `e${++number}`;
 				db.query(
@@ -74,10 +80,10 @@ export function collectWeb(ctx: Context, db: Database) {
 			).run(JSON.stringify(outcome), op.id);
 			ready = true;
 		}
-		if (ready) {
+		if (ready && row.state === "waiting_child" && !row.job_id) {
 			row.state = "queued";
-			ctx.enqueue(db, row);
-			save(db, row, stateOf(row), ctx.now());
+			ctx.enqueue(db, row, state.execution === "productive");
+			save(db, row, state, ctx.now());
 		}
 	}
 }

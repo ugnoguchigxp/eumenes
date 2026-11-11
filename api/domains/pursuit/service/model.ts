@@ -34,13 +34,27 @@ export interface ResearchModel {
 	): Promise<LlmResult<T>>;
 }
 const log = getLogger("pursuit");
-export function model(ctx: Context, id: string, epoch: number): ResearchModel {
+export function model(
+	ctx: Context,
+	id: string,
+	epoch: number,
+	decisionId?: string,
+): ResearchModel {
 	return {
 		async complete(request, signal) {
+			signal.throwIfAborted();
 			const started = ctx.now();
 			const captured = await ctx.store.write((db) => {
 				const row = current(ctx, db, id, epoch),
 					state = stateOf(row);
+				if (
+					decisionId &&
+					(state.decision?.operationId !== decisionId ||
+						state.decision.response ||
+						ctx.queue.getInTransaction(db, state.decision.jobId)?.state !==
+							"running")
+				)
+					throw new Error("pursuit_decision_not_pending");
 				if (state.modelCalls >= state.limits.modelCalls)
 					throw new Error("pursuit_model_budget_exceeded");
 				if (
@@ -128,7 +142,8 @@ export function model(ctx: Context, id: string, epoch: number): ResearchModel {
 					},
 				);
 				return await ctx.store.write((db) => {
-					current(ctx, db, id, epoch);
+					signal.throwIfAborted();
+					const row = current(ctx, db, id, epoch);
 					if (
 						ctx.inference.validateReceiptInTransaction &&
 						!ctx.inference.validateReceiptInTransaction(db, receipt)
@@ -143,6 +158,7 @@ export function model(ctx: Context, id: string, epoch: number): ResearchModel {
 						purpose: request.purpose,
 						durationMs: ctx.now() - started,
 						promptTokens: usage.inputTokens ?? undefined,
+						cachedTokens: usage.cacheReadTokens ?? undefined,
 						completionTokens: usage.outputTokens ?? undefined,
 					});
 					const text =
@@ -182,7 +198,7 @@ export function model(ctx: Context, id: string, epoch: number): ResearchModel {
 						!ctx.inference.acceptInTransaction(db, receipt)
 					)
 						throw new Error("pursuit_receipt_revoked");
-					return {
+					const response = {
 						value: parsed.data,
 						model: usage.model ?? "unreported",
 						inputTokens: usage.inputTokens,
@@ -190,6 +206,19 @@ export function model(ctx: Context, id: string, epoch: number): ResearchModel {
 						cacheReadTokens: usage.cacheReadTokens ?? null,
 						latencyMs: ctx.now() - started,
 					};
+					if (decisionId) {
+						const state = stateOf(row);
+						if (
+							state.decision?.operationId !== decisionId ||
+							state.decision.response ||
+							ctx.queue.getInTransaction(db, state.decision.jobId)?.state !==
+								"running"
+						)
+							throw new Error("pursuit_decision_not_pending");
+						state.decision.response = response;
+						save(db, row, state, ctx.now());
+					}
+					return response;
 				});
 			} finally {
 				await ctx.store.write((db) => {

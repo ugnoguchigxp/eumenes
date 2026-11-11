@@ -1,5 +1,5 @@
 import type { UiStudioResource } from "./ui-studio-contracts";
-import { listRefreshSource } from "./composition-contracts";
+import { iconTableCell, listRefreshSource } from "./composition-contracts";
 
 type RecordValue = Record<string, unknown>;
 
@@ -46,7 +46,14 @@ export function displayWorkflowOutput(
 	} else if (table) {
 		delete part.series;
 		part.rows = rows.map((row: RecordValue) =>
-			table.columns.map((key) => cell(row?.[key])),
+			table.columns.map((key) => {
+				const value = row?.[key];
+				if (value && typeof value === "object" && "icon" in value) {
+					const icon = iconTableCell.safeParse(value);
+					if (icon.success) return icon.data;
+				}
+				return cell(value);
+			}),
 		);
 	} else if (sections) {
 		const groups = new Map<string, string[][]>();

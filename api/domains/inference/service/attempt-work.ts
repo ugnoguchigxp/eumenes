@@ -327,6 +327,7 @@ export function startWork(
 			args.delta,
 			args.callOptions,
 			r.session,
+			r.control?.nativeWebSearch,
 		);
 	const p = env.port(row.snapshot);
 	if (row.purpose === "llm") {

@@ -11,3 +11,8 @@ export {
 export type { /** @public */ AcquisitionPort } from "./adapters/llm-fetch";
 
 export { migrations } from "./repository";
+export {
+	codexSearchMessages,
+	codexSearchProvider,
+	parseCodexSearchHits,
+} from "./adapters/codex-search";

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
+import type { LlmResult } from "eumenes-pursuit";
 import type { Prepared } from "../../capabilities";
 import type {
 	ExecutionDocument,
@@ -71,6 +72,13 @@ export type HostState = {
 	modelCalls: number;
 	webCalls: number;
 	searches: number;
+	execution?: "productive";
+	decision?: {
+		operationId: string;
+		jobId: string;
+		response?: LlmResult<unknown>;
+		errorCode?: string;
+	};
 	draft: ResearchDraft | null;
 	snapshots: Record<string, ResearchDraft | null>;
 	command?: { kind: "answer"; consultationId: string; text: string };

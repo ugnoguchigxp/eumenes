@@ -13,6 +13,8 @@ export type ControlContract = {
 	instructions: string;
 	outputSchema: unknown;
 	reasoningEffort?: "low";
+	/** Host opt-in for the isolated public search worker. */
+	nativeWebSearch?: true;
 	/** For a bounded transcription control on a LARM provider that accepts thinking disabled. */
 	larmReasoning?: "off";
 };

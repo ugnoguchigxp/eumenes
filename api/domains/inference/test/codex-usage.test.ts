@@ -170,3 +170,57 @@ test("usage writes drain even when the SDK turn fails after reporting cumulative
 	expect(saved).toHaveLength(1);
 	expect(saved[0]!.slice(0, 4)).toEqual([1000, 100, 400, 0]);
 });
+
+test("native Web search is isolated and requires a completed search in the current turn", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "web-codex-"));
+	const command = join(dir, "fixture");
+	await writeFile(
+		command,
+		`#!${process.execPath}
+import { createInterface } from "node:readline";
+const out = m => process.stdout.write(JSON.stringify(m)+"\\n");
+if (!process.argv.includes('web_search="' + (process.env.SEARCH_MODE ?? "disabled") + '"')) process.exit(2);
+createInterface({input:process.stdin}).on("line",line=>{
+const m=JSON.parse(line);
+if(m.method==="initialize")out({id:m.id,result:{}});
+if(m.method==="config/read")out({id:m.id,result:{config:{mcp_servers:{inherited:{}}}}});
+if(m.method==="thread/start"){
+ if(m.params.sandbox!=="read-only" || m.params.config.mcp_servers.inherited.enabled!==false) process.exit(3);
+ out({id:m.id,result:{thread:{id:"t"}}});
+}
+if(m.method==="turn/start"){
+ out({id:m.id,result:{turn:{id:"u"}}});
+ if(process.env.SEARCH_EVENT) out({method:"item/completed",params:{threadId:"t",turnId:process.env.SEARCH_EVENT,item:{type:"webSearch"}}});
+ out({method:"item/completed",params:{threadId:"t",turnId:"u",item:{type:"agentMessage",text:"ok"}}});
+ out({method:"turn/completed",params:{threadId:"t",turn:{id:"u",status:"completed"}}});
+}});
+`,
+		{ mode: 0o700 },
+	);
+	const run = (nativeWebSearch?: true, event?: string) =>
+		runCodexTurn(
+			{
+				command,
+				env: {
+					SEARCH_MODE: nativeWebSearch ? "live" : "disabled",
+					...(event ? { SEARCH_EVENT: event } : {}),
+				},
+			},
+			{
+				cwd: dir,
+				model: "fixture",
+				instructions: "",
+				prompt: "public lookup",
+				signal: AbortSignal.timeout(5000),
+				nativeWebSearch,
+			},
+			(reason) => new Error(reason),
+		);
+	try {
+		expect((await run()).text).toBe("ok");
+		await expect(run(true, "other")).rejects.toThrow("web_search_missing");
+		expect((await run(true, "u")).text).toBe("ok");
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});

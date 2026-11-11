@@ -9,11 +9,20 @@ import {
 	type DataTableColumn,
 	Formula,
 } from "@eumenes/design-system";
+import {
+	Cloud,
+	CloudLightning,
+	CloudRain,
+	CloudSnow,
+	CloudSun,
+	Sun,
+} from "lucide-react";
 import { useMemo } from "react";
 import type {
 	CompositionModel,
 	CompositionPoint,
 	CompositionValue,
+	tableIconNames,
 } from "./composition-contracts";
 import { evaluateExpression, parseExpression } from "./composition-expressions";
 import {
@@ -25,6 +34,15 @@ import type { ArtifactRequest } from "./contracts";
 
 /** Rows a data-table shows; the rest is reported as omitted. */
 const maxTableRows = 200;
+type TableIcon = (typeof tableIconNames)[number];
+const tableIcons = {
+	sun: Sun,
+	"cloud-sun": CloudSun,
+	cloud: Cloud,
+	"cloud-rain": CloudRain,
+	"cloud-snow": CloudSnow,
+	"cloud-lightning": CloudLightning,
+} satisfies Record<TableIcon, typeof Sun>;
 
 const noScope = { get: () => undefined };
 
@@ -88,7 +106,9 @@ export function DataTableView({ request }: { request: ArtifactRequest }) {
 	const table = useMemo(() => {
 		if (request.view !== "data-table") return null;
 		const columns = request.columns;
-		let values: CompositionValue[][];
+		let values: Array<
+			Array<CompositionValue | { icon: TableIcon; text: string }>
+		>;
 		let omittedRows = 0;
 		if (request.series) {
 			const points = pointsOf(model?.value(request.series));
@@ -118,6 +138,15 @@ export function DataTableView({ request }: { request: ArtifactRequest }) {
 		const rows = values.map((row) =>
 			columns.map((column, index) => {
 				const cell = row[index] ?? null;
+				if (typeof cell === "object" && cell !== null && "icon" in cell) {
+					const Icon = tableIcons[cell.icon];
+					return (
+						<span className="aui-table-icon-cell" data-icon={cell.icon}>
+							<Icon aria-hidden="true" size={20} strokeWidth={1.75} />
+							<span>{cell.text}</span>
+						</span>
+					);
+				}
 				return typeof cell === "string"
 					? cell
 					: formatCompositionValue(cell, formatOf(column));

@@ -251,6 +251,19 @@ export type GuidanceCandidate = {
 	content: string;
 };
 
+export const guidanceNoticeSchema = z.strictObject({
+	kind: z.literal("knowledge.guidance"),
+	requestRef: z.uuid(),
+});
+
+export type GuidanceReadContext = {
+	sessionId: string;
+	sessionEpoch: number;
+	revision: number;
+	signal: AbortSignal;
+	assertCurrent(tx: Database): void;
+};
+
 export interface SpecialistPort {
 	guidance?: {
 		candidates(
@@ -263,16 +276,20 @@ export interface SpecialistPort {
 		select(
 			args: unknown,
 			context: {
-				sessionId: string;
+				runId: string;
 				bindingRevisionId: string;
-				revision: number;
 				language?: GuidanceLanguage;
 				report?: string;
 				deadline: number;
-				signal: AbortSignal;
-				assertCurrent(tx: Database): void;
-			},
+			} & GuidanceReadContext,
 		): Promise<unknown>;
+		read(requestRef: string, context: GuidanceReadContext): Promise<unknown>;
+		finishTurn(
+			tx: Database,
+			sessionId: string,
+			runId: string,
+			completed: boolean,
+		): void;
 	};
 
 	/** Throws `capability_unavailable` when the toolchain is not a usable session toolchain. */

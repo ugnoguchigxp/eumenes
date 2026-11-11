@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
+import { collaborationScript } from "./collaboration-script.fixture";
 import {
 	routedChoice,
 	searchThenDelegate,
@@ -122,7 +123,7 @@ async function rig() {
 								messages,
 							)
 						: step;
-				return typeof value === "string" ? value : JSON.stringify(value);
+				return collaborationScript(value, messages);
 			}
 			mainPrompts.push(messages.map((m) => ({ ...m })));
 			// The conversation's choice for a user's utterance (the local harness's routed turn): the script decides
@@ -352,6 +353,115 @@ test("ui_create opens the work and the same run continues as the specialist's tu
 	expect(prompt[0]!.content).toContain('"id":"doc.write"');
 	expect(referenceOf(prompt).course).toEqual([]);
 	expect(prompt[2]!.content).toBe("来場者アンケートのUIを作ってください");
+});
+
+test("the UI collaboration baseline exposes the updated work and source-backed conditions after each reply", async () => {
+	const r = await rig();
+	const opening =
+		"来場者アンケートを作って。満足度は必須で、見出しは初回アンケート。";
+	const correction = "見出しだけ来場者の声に変えてください。";
+	const answer =
+		(utterance: string, title: string, first: boolean) =>
+		(_signal: AbortSignal, prompt: Prompt) => {
+			const lines = prompt[1]!.content.split("\n");
+			const base = JSON.parse(
+				lines
+					.find((line) => line.startsWith("STATE_UPDATE_BASE="))!
+					.slice("STATE_UPDATE_BASE=".length),
+			);
+			const registry = JSON.parse(
+				lines
+					.find((line) => line.startsWith("SOURCE_REGISTRY="))!
+					.slice("SOURCE_REGISTRY=".length),
+			) as {
+				sourceText: Array<{ ref: string; text: string }>;
+			};
+			const source = registry.sourceText.find(
+				(entry) => entry.text === utterance,
+			)!;
+			const condition = (
+				id: string,
+				value: string | boolean,
+				supersedes: string[] = [],
+			) => ({
+				id,
+				value,
+				kind: "condition",
+				status: "confirmed",
+				sourceRefs: [source.ref],
+				supersedes,
+			});
+			return {
+				...reply("確認しました。"),
+				stateUpdate: {
+					...base,
+					upserts: first
+						? [condition("required", true), condition("heading", title)]
+						: [condition("heading-corrected", title, ["heading"])],
+				},
+			};
+		};
+	const checkpoint = async () => {
+		const session = (await r.session())!;
+		const response = await r.h.request(
+			`/api/specialist-sessions/${session.id}/collaboration-state`,
+		);
+		expect(response.status).toBe(200);
+		const { state } = (await response.json()) as {
+			state: {
+				work: { ref: string; revision: number };
+				facts: Array<{
+					id: string;
+					status: string;
+					value: unknown;
+					sourceRefs: string[];
+				}>;
+			};
+		};
+		const { work } = (await r.source()).data;
+		expect(state.work).toMatchObject({
+			ref: work!.workRef,
+			revision: work!.revision,
+		});
+		expect(session.activeRunId).toBeNull();
+		return { state, work: work! };
+	};
+	const first = await r.start(
+		[apply("初回アンケート"), answer(opening, "初回アンケート", true)],
+		opening,
+	);
+	expect(first.status).toBe("completed");
+	const before = await checkpoint();
+	expect(before.work.title).toBe("初回アンケート");
+	const required = before.state.facts.find((fact) => fact.id === "required")!;
+	expect(required).toMatchObject({
+		status: "confirmed",
+		value: true,
+		sourceRefs: [expect.any(String)],
+	});
+
+	r.script.specialist.push(
+		apply("来場者の声"),
+		answer(correction, "来場者の声", false),
+	);
+	const second = await r.sayAndWait(correction);
+	expect(second.status).toBe("completed");
+	const after = await checkpoint();
+	expect(after.work.title).toBe("来場者の声");
+	expect(after.work.definition.children[1].fields[0].required).toBe(true);
+	expect(after.state.facts).toContainEqual(required);
+	expect(after.state.facts.find((fact) => fact.id === "heading")).toMatchObject(
+		{ status: "retracted", value: "初回アンケート" },
+	);
+	const heading = after.state.facts.find(
+		(fact) => fact.id === "heading-corrected",
+	)!;
+	expect(heading).toMatchObject({
+		status: "confirmed",
+		value: "来場者の声",
+		sourceRefs: [expect.any(String)],
+	});
+	expect(heading.sourceRefs).not.toEqual(required.sourceRefs);
 });
 
 test("later utterances go to the specialist without the main model; an explanation does not grow the undo history", async () => {

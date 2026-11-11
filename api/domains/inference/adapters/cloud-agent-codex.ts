@@ -177,6 +177,7 @@ export async function runCodex(
 							: ""),
 				prompt,
 				images,
+				nativeWebSearch: call.nativeWebSearch,
 				...(call.reasoningEffort
 					? { reasoningEffort: call.reasoningEffort }
 					: {}),

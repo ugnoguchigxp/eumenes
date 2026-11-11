@@ -25,6 +25,10 @@ export function stopChildren(
 		ctx.queue.cancelInTransaction(db, row.job_id, "pursuit_stopped");
 		ctx.abortJobs.add(row.job_id);
 	}
+	if (state.decision) {
+		ctx.queue.cancelInTransaction(db, state.decision.jobId, "pursuit_stopped");
+		ctx.abortJobs.add(state.decision.jobId);
+	}
 	if (row.active_request) {
 		ctx.inference.cancelRequestsInTransaction?.(db, [row.active_request]);
 		ctx.abortRequests.add(row.active_request);
@@ -52,6 +56,7 @@ export function end(
 	row.state = status;
 	row.step++;
 	const state = stateOf(row);
+	delete state.decision;
 	state.result = finalResult(db, row, code);
 	save(db, row, state, ctx.now());
 	ctx.notice(db, row);
@@ -108,16 +113,34 @@ export function reconcile(ctx: Context, db: Database, recovering = false) {
 			ctx.forget(db, candidate.id);
 			continue;
 		}
-		if (!active(row) || stateOf(row).publication) continue;
+		const state = stateOf(row);
+		if (!active(row) || state.publication) continue;
 		if (row.deadline <= ctx.now()) {
 			end(
 				ctx,
 				db,
 				row,
-				stateOf(row).draft ? "partial" : "failed",
+				state.draft ? "partial" : "failed",
 				"pursuit_deadline_exceeded",
 			);
 			continue;
+		}
+		if (row.state === "waiting_child" && !row.job_id && state.decision) {
+			const job = ctx.queue.getInTransaction(db, state.decision.jobId);
+			if (
+				!job ||
+				!["queued", "running", "retry_wait", "cancel_requested"].includes(
+					job.state,
+				)
+			) {
+				if (!state.decision.response)
+					state.decision.errorCode ??=
+						job?.errorCode ?? "pursuit_decision_job_lost";
+				row.state = "queued";
+				ctx.enqueue(db, row);
+				save(db, row, state, ctx.now());
+				continue;
+			}
 		}
 		if (
 			recovering &&
@@ -126,7 +149,7 @@ export function reconcile(ctx: Context, db: Database, recovering = false) {
 		) {
 			row.state = "queued";
 			ctx.enqueue(db, row);
-			save(db, row, stateOf(row), ctx.now());
+			save(db, row, state, ctx.now());
 		} else if (["queued", "deciding"].includes(row.state) && row.job_id) {
 			const job = ctx.queue.getInTransaction(db, row.job_id);
 			if (!job || !["queued", "running", "retry_wait"].includes(job.state))
@@ -134,7 +157,7 @@ export function reconcile(ctx: Context, db: Database, recovering = false) {
 					ctx,
 					db,
 					row,
-					stateOf(row).draft ? "partial" : "failed",
+					state.draft ? "partial" : "failed",
 					job?.errorCode ?? "pursuit_job_lost",
 				);
 		}

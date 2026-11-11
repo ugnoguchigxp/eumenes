@@ -305,6 +305,134 @@ test("natural language → app draft → confirmed save → protected Web → Op
 	}
 }, 20000);
 
+test("following one comparison source keeps the other source available", async () => {
+	const entry = "https://example.com/entry";
+	const detail = "https://example.com/detail";
+	const other = "https://example.org/detail";
+	const request = "二つの資料の値を日付ごとに比較して";
+	const h = await fixture({
+		request,
+		git: createGitObservation("/unused"),
+		draft: {
+			...movies,
+			schemas: [
+				{
+					name: "comparison",
+					schema: {
+						type: "object",
+						properties: {
+							rows: {
+								type: "array",
+								items: {
+									type: "object",
+									properties: {
+										title: { type: "string" },
+										startTime: { type: "string" },
+										format: { type: "string" },
+									},
+									required: ["title", "startTime", "format"],
+									additionalProperties: false,
+								},
+							},
+						},
+						required: ["rows"],
+						additionalProperties: false,
+					},
+				},
+			],
+			workflow: {
+				...movies.workflow,
+				publish: {
+					...movies.workflow.publish,
+					schemaRef: "schema:generated:comparison",
+				},
+			},
+		},
+		webFixture: {
+			acquisition: {
+				close: async () => {},
+				execute: async (input) => {
+					const observedAt = new Date().toISOString();
+					return {
+						freshUntilMs: null,
+						bodies:
+							input.operation === "read"
+								? [
+										{
+											url: input.url,
+											title: "検証資料",
+											fetchedAt: observedAt,
+											text: input.url === entry ? "資料の案内" : "掲載値 10:00",
+											acquisitionTruncated: false,
+											...(input.url === entry
+												? { links: [{ url: detail, label: "詳細" }] }
+												: {}),
+										},
+									]
+								: [],
+						result: {
+							provider: "llm-fetch@0.1.4-eumenes.1",
+							observedAt,
+							cache: "bypass",
+							documents: [],
+							failures: [],
+							hits:
+								input.operation === "lookup"
+									? [entry, other].map((url) => ({
+											url,
+											title: "検証資料",
+											provider: "fixture",
+											snippet: "資料",
+											trust: "untrusted",
+											tainted: true,
+											verification: "search_summary",
+										}))
+									: [],
+						},
+					};
+				},
+			},
+			control: (messages) => {
+				const packet = JSON.parse(messages.at(-1)!.content);
+				if (packet.hits) return JSON.stringify({ hitNumbers: [1, 2] });
+				if (!packet.sources) return JSON.stringify({ query: "二つの資料" });
+				const urls = packet.sources.map(
+					(source: { url: string }) => source.url,
+				);
+				if (!urls.includes(detail))
+					return JSON.stringify({ data: null, follow: [detail] });
+				expect(urls).toContain(other);
+				return JSON.stringify({
+					data: {
+						rows: [detail, other].map((title) => ({
+							title,
+							startTime: "10:00",
+							format: "検証",
+						})),
+					},
+					follow: [],
+				});
+			},
+		},
+	});
+	try {
+		const id = await h.create();
+		await h.action(
+			"run",
+			{ appId: id, revision: "1", values: JSON.stringify({ date }) },
+			id,
+		);
+		await h.completed(id);
+		const { data } = (await h.source(id)).data.viewing;
+		expect(data.rows.map((row: { title: string }) => row.title)).toEqual([
+			detail,
+			other,
+		]);
+	} finally {
+		await h.close();
+	}
+}, 20000);
+
 test("a verified date URL survives failure of the final extraction", async () => {
 	let attempts = 0;
 	const h = await fixture({

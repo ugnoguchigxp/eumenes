@@ -150,6 +150,7 @@ export function readFailure(
 export function createWebAcquisition(
 	options: {
 		search?: SearchProvider;
+		searchTimeoutMs?: number;
 		now?: () => number;
 		fetcher?: SafeHttpFetcher;
 		review?: BuiltinContextGuardOptions["review"];
@@ -182,7 +183,7 @@ export function createWebAcquisition(
 	const hitsClient = createLlmFetch({
 		search,
 		cache: { enabled: false },
-		searchTimeoutMs: 10000,
+		searchTimeoutMs: options.searchTimeoutMs ?? 10000,
 	});
 	async function read(
 		url: string,

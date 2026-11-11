@@ -2,7 +2,8 @@ import type { Database } from "bun:sqlite";
 import { systemContext } from "../../../infrastructure/system-context";
 import { agentSystemMessage } from "../../inference";
 import type { GuidanceLanguage, Run, SpecialistSet } from "../contracts";
-import type { SessionRecord } from "../repository";
+import { guidanceNoticeSchema } from "../contracts/specialist";
+import { byId, sessionById, type SessionRecord } from "../repository";
 import type { DialogueDeps } from "./context";
 import {
 	agentPolicy,
@@ -15,6 +16,8 @@ import { sessionCourse, specialistTurnMessages } from "./specialist-memory";
 import { specialistObservation } from "./specialist-notices";
 import { structuredSpecialistControl } from "./specialist-output";
 import { specialistControl } from "./specialist-prompt";
+import { turnRefusal } from "./specialist-core";
+import type { TurnInput } from "./specialist-turn";
 
 const HOST_EVENT_NOTICE = systemContext(
 	"dialogue.contexts.specialist-turn.host-observation",
@@ -79,6 +82,7 @@ export function prepareSpecialistPrompt(
 	const policy = agentPolicy(set);
 	const document = turnDocument(port, set, session.workRef, policy, tx);
 	const hostEvent = specialistObservation(deps, tx, run.id, session);
+	const notice = guidanceNoticeSchema.safeParse(hostEvent);
 	const guidance =
 		document && hostEvent === null ? port.guidance?.tool(set) : undefined;
 	const candidates =
@@ -120,6 +124,7 @@ export function prepareSpecialistPrompt(
 		control: modelControl,
 		messages,
 		...(hostEvent !== null ? { observation: true as const } : {}),
+		...(notice.success ? { guidanceNoticeRef: notice.data.requestRef } : {}),
 		...(guidance
 			? {
 					guidanceToolId: guidance.id,
@@ -141,4 +146,45 @@ export function prepareSpecialistPrompt(
 				}
 			: {}),
 	};
+}
+
+/** Resolve a stored notice through the same delivery checks as an explicit lookup. */
+export async function appendGuidanceNotice(
+	deps: DialogueDeps,
+	input: TurnInput,
+	signal: AbortSignal,
+) {
+	const port = deps.specialist;
+	if (!input.guidanceNoticeRef || !port?.guidance) return;
+	const document = port.documentOf(input.adapterRef);
+	const currentRevision = (tx: Database) => {
+		const run = byId(tx, input.runId);
+		const session = sessionById(tx, input.sessionId);
+		if (
+			run?.status !== "running" ||
+			run.revision !== input.revision ||
+			turnRefusal(session, input.runId, input.epoch, deps.clock())
+		)
+			throw Error("guidance_turn_stale");
+		return document?.readInTransaction(tx, input.workRef)?.revision;
+	};
+	const revision = deps.store.read(currentRevision);
+	const result =
+		revision === undefined
+			? { kind: "unavailable", reason: "workspace_unavailable" }
+			: await port.guidance.read(input.guidanceNoticeRef, {
+					sessionId: input.sessionId,
+					sessionEpoch: input.epoch,
+					revision,
+					signal,
+					assertCurrent(tx) {
+						if (currentRevision(tx) !== revision)
+							throw Error("guidance_revision_changed");
+					},
+				});
+	signal.throwIfAborted();
+	input.messages.splice(input.messages.length - 1, 0, {
+		role: "user",
+		content: "GUIDANCE_RESULT=" + JSON.stringify(result),
+	});
 }

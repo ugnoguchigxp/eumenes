@@ -311,6 +311,14 @@ export async function harness(options: HarnessOptions = {}) {
 				});
 			const system = messages[0]!.content;
 			if (
+				options.knowledgeBuild &&
+				(system.includes("coverage で充足") ||
+					system.includes("post-build-self-review"))
+			)
+				return JSON.stringify({
+					result: await options.knowledgeBuild(messages, callOptions),
+				});
+			if (
 				options.appDevelopment?.control &&
 				/OUTPUT_SCHEMA=.*"(?:follow|markdown|query|hitNumbers|dateLinkNumber)"/s.test(
 					system,
@@ -799,6 +807,17 @@ export async function harness(options: HarnessOptions = {}) {
 		image,
 		music,
 	);
+	const knowledge =
+		options.knowledgeSelectionResourceId || options.knowledgeSource
+			? createKnowledge({
+					store,
+					queue,
+					control: inference,
+					selectionResourceId: options.knowledgeSelectionResourceId,
+					source: options.knowledgeSource,
+					specialistContextSearch: !!options.knowledgeSource,
+				})
+			: undefined;
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		excalidraw: drawingOperations,
@@ -829,18 +848,10 @@ export async function harness(options: HarnessOptions = {}) {
 			registry: toolchain.registry,
 			schemas: toolchain.schemas,
 			clock: () => new Date().toISOString(),
-			...(options.knowledgeSelectionResourceId
-				? {
-						knowledge: createKnowledge({
-							store,
-							queue,
-							control: inference,
-							selectionResourceId: options.knowledgeSelectionResourceId,
-						}),
-					}
-				: {}),
+			knowledge,
 		}),
 	});
+	knowledge?.attachDialogue(dialogue);
 	toolchainLinks.attachDialogue(dialogue);
 	appRuntime?.attachDialogue(dialogue);
 	const appWorkflowPorts = appRuntime?.attach({

@@ -60,8 +60,8 @@ test.each([[undefined], [86_400_000]])(
 				}
 			},
 		});
-		const artifact = "/api/toolchain-artifacts/artifact:scheduler.pending@1";
-		const source = artifact + "/sources/pending-schedules";
+		const artifact = "/api/toolchain-artifacts/artifact:scheduler.pending@2";
+		const source = artifact + "/sources/agenda";
 		const list = async () => {
 			const response = await h.request(source);
 			expect(response.status).toBe(200);
@@ -95,6 +95,7 @@ test.each([[undefined], [86_400_000]])(
 			expect(catalog.artifacts).toContainEqual(
 				expect.objectContaining({
 					artifactId: "scheduler.pending",
+					artifactRevisionId: "artifact:scheduler.pending@2",
 					launcher: expect.objectContaining({ label: "実行予約" }),
 				}),
 			);
@@ -103,8 +104,8 @@ test.each([[undefined], [86_400_000]])(
 				(await (await h.request(artifact)).json()).artifact.variants[0]
 					.definition,
 			).toMatchObject({
-				view: "collection-workspace",
-				source: "pending-schedules",
+				view: "schedule-agenda",
+				source: "agenda",
 			});
 			expect(await list()).toEqual([]);
 			expect(await say(original)).toBe("何時に声をかけますか。");
@@ -124,6 +125,7 @@ test.each([[undefined], [86_400_000]])(
 					title: args.text,
 					nextDueAt: at,
 					interval,
+					intervalMs: intervalMs ?? null,
 				}),
 			]);
 			now = Date.parse(at);
@@ -185,7 +187,7 @@ test("the reservation list includes paused workflows and excludes internal timer
 			h.scheduler.list().items.map(({ targetKind }) => targetKind),
 		).toContain("timer.expire");
 		const response = await h.request(
-			"/api/toolchain-artifacts/artifact:scheduler.pending@1/sources/pending-schedules",
+			"/api/toolchain-artifacts/artifact:scheduler.pending@2/sources/agenda",
 		);
 		expect(response.status).toBe(200);
 		expect((await response.json()).data.items).toEqual([
@@ -194,6 +196,7 @@ test("the reservation list includes paused workflows and excludes internal timer
 				kind: "ワークフロー",
 				state: "paused",
 				nextDueAt: null,
+				intervalMs: 86_400_000,
 			}),
 		]);
 	} finally {

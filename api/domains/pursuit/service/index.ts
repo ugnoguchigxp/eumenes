@@ -28,7 +28,7 @@ export function createPursuit(deps: PursuitDeps) {
 			if (!source) throw new Error("pursuit_not_configured");
 			return source;
 		},
-		enqueue(db, row) {
+		enqueue(db, row, receiptOnly = false) {
 			row.step++;
 			const job = deps.queue.enqueueInTransaction(db, {
 				scope: "pursuit",
@@ -37,8 +37,14 @@ export function createPursuit(deps: PursuitDeps) {
 				subjectRef: row.id,
 				concurrencyKey: `pursuit:${row.id}`,
 				lane: "background",
+				resourceKey: receiptOnly ? null : "inference.llm",
 				deadlineAtMs: row.deadline,
-				payload: { id: row.id, epoch: row.epoch, step: row.step },
+				payload: {
+					id: row.id,
+					epoch: row.epoch,
+					step: row.step,
+					...(receiptOnly ? { receiptOnly } : {}),
+				},
 				maxAttempts: 1,
 			});
 			row.job_id = job.job.id;
@@ -130,6 +136,9 @@ export function createPursuit(deps: PursuitDeps) {
 				snapshots: {},
 				result: null,
 				saveDocument: binding.adapterRef === "adapter:pursuit@2",
+				...(binding.adapterRef === "adapter:pursuit@2"
+					? { execution: "productive" as const }
+					: {}),
 			};
 			const row: RunRow = {
 				id,

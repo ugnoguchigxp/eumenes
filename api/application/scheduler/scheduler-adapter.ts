@@ -8,6 +8,7 @@ import { sha256Hex } from "../../infrastructure/digest";
 
 export const SCHEDULER_ADAPTER_REF = "adapter:scheduler@1";
 const LIST = "query:scheduler.pending@1";
+const AGENDA = "query:scheduler.agenda@1";
 const REGISTER = "scheduler.register";
 const PROMPT = "dialogue.prompt";
 
@@ -19,7 +20,7 @@ export const describeSchedulerAdapter = () => ({
 			{ inputSchemaRef: "builtin:schedulePrompt", effect: "write" as const },
 		],
 	]),
-	queries: new Set([LIST]),
+	queries: new Set([LIST, AGENDA]),
 	inputAdapters: new Map(),
 	projections: new Set<string>(),
 	availability: "availability:scheduler@1",
@@ -68,7 +69,8 @@ function intervalLabel(ms: number | null) {
 function pendingRows(
 	db: Database,
 	scheduler: SchedulerService,
-	workflowTitle?: WorkflowTitle,
+	workflowTitle: WorkflowTitle | undefined,
+	withInterval: boolean,
 ) {
 	return scheduler
 		.pendingInTransaction(db)
@@ -98,6 +100,7 @@ function pendingRows(
 					status: schedule.state === "paused" ? "一時停止" : "予約済み",
 					nextDueAt: schedule.state === "active" ? schedule.nextDueAt : null,
 					interval: intervalLabel(schedule.intervalMs),
+					...(withInterval ? { intervalMs: schedule.intervalMs } : {}),
 				},
 			];
 		});
@@ -154,10 +157,17 @@ export function createSchedulerAdapter(
 				: null;
 		},
 		sourceInTransaction(db, query) {
-			return query === LIST
+			return query === LIST || query === AGENDA
 				? {
 						revision: 0,
-						data: { items: pendingRows(db, scheduler, workflowTitle) },
+						data: {
+							items: pendingRows(
+								db,
+								scheduler,
+								workflowTitle,
+								query === AGENDA,
+							),
+						},
 					}
 				: null;
 		},

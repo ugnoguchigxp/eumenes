@@ -12,7 +12,7 @@ for (const kind of ["research", "instant", "pipeline", "task"] as const) {
 			everyday: true,
 			resources: true,
 			timers: true,
-			...(kind === "task" ? { pursuit: (schema) => script(schema) } : {}),
+			...(kind === "task" ? { pursuit: script } : {}),
 			...(kind === "instant" ? { weather: { fetch: weather.fetch } } : {}),
 			...(kind === "pipeline"
 				? {
@@ -102,7 +102,7 @@ for (const kind of ["research", "instant", "pipeline", "task"] as const) {
 test("an autonomous owner's question reaches its TODO and resumes only from a real user answer", async () => {
 	const script = researchScript({ consult: true, document: true });
 	const h = await harness({
-		pursuit: (schema) => script(schema),
+		pursuit: script,
 		firstRound: () => ({ text: "対象期間を受け取りました。" }),
 	});
 	const a = actionHost(h, {

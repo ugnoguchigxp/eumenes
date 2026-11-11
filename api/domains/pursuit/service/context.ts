@@ -26,7 +26,7 @@ export type Context = PursuitDeps & {
 	source: () => SourcePort;
 	abortJobs: Set<string>;
 	abortRequests: Set<string>;
-	enqueue(db: Database, row: RunRow): void;
+	enqueue(db: Database, row: RunRow, receiptOnly?: boolean): void;
 	forget(db: Database, id: string): void;
 	notice(db: Database, row: RunRow): void;
 };

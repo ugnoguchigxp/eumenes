@@ -507,6 +507,7 @@ export const domains = {
 			"api/application/pursuit/document-integration.test.ts",
 			"api/application/pursuit/document-registration.test.ts",
 			"api/application/pursuit/pursuit-integration.test.ts",
+			"api/application/pursuit/vendor.test.ts",
 		],
 		backend: "api/domains/pursuit",
 		web: null,

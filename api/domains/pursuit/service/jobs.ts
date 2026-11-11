@@ -1,25 +1,32 @@
 import { z } from "zod";
-import type { ToolOutcome } from "eumenes-pursuit";
+import type { StepResult, ToolOutcome } from "eumenes-pursuit";
 import { current, type Context } from "./context";
 import { core, operationKey } from "./core";
 import { active, pendingWeb, rowOf, save, stateOf } from "../repository";
-import { end } from "./lifecycle";
+import { end, stopChildren } from "./lifecycle";
 import { finalResult } from "./view";
+import { queueDecision, registerDecision } from "./decision";
 
 const payload = z.strictObject({
 	id: z.uuid(),
 	epoch: z.int().min(0),
 	step: z.int().min(1),
+	receiptOnly: z.literal(true).optional(),
 });
 type Payload = z.infer<typeof payload>;
-type Completed = { status: string; pending: boolean; completed: boolean };
+type Completed = {
+	status: string;
+	pending: boolean;
+	completed: boolean;
+	pendingDecision?: string;
+};
 export function registerJobs(ctx: Context) {
+	registerDecision(ctx);
 	ctx.queue.registerHandler<Payload, Payload, Completed>({
 		kind: "pursuit.step",
 		payloadVersions: [1],
 		schema: payload,
 		recovery: "replay_safe",
-		resourceKey: "inference.llm",
 		prepareInTransaction(db, claim) {
 			const row = rowOf(db, claim.payload.id);
 			if (
@@ -78,13 +85,19 @@ export function registerJobs(ctx: Context) {
 			});
 			const next = ctx.store.readSnapshot((db) => {
 				const row = current(ctx, db, id, epoch);
+				const state = stateOf(row);
 				return {
-					command: stateOf(row).command,
+					command: state.command,
 					operation: pendingWeb(db, row).find((o) => o.outcome_json),
+					decision: state.decision,
 				};
 			});
+			const productive = startInput.conditions.execution === "productive";
+			if (input.receiptOnly && (!productive || next.command || !next.operation))
+				throw new Error("pursuit_tool_receipt_missing");
+			let step: StepResult;
 			if (next.command) {
-				await engine.answer(
+				step = await engine.answer(
 					started.pursuitId,
 					next.command.consultationId,
 					next.command.text,
@@ -97,7 +110,7 @@ export function registerJobs(ctx: Context) {
 				});
 			} else if (next.operation) {
 				const op = next.operation;
-				await engine.completeTool(
+				step = await engine.completeTool(
 					started.pursuitId,
 					op.attempt_id,
 					op.id,
@@ -111,14 +124,52 @@ export function registerJobs(ctx: Context) {
 						"UPDATE pursuit_web_operations SET adopted=1 WHERE id=? AND adopted=0",
 					).run(op.id);
 				});
-			} else await engine.step(started.pursuitId, runtime, execution.signal);
-			const view = await engine.view(started.pursuitId);
+			} else if (next.decision?.response || next.decision?.errorCode) {
+				const decision = next.decision;
+				step = decision.response
+					? await engine.completeDecision(
+							started.pursuitId,
+							decision.operationId,
+							decision.response,
+							runtime,
+							execution.signal,
+						)
+					: await engine.cancel(
+							started.pursuitId,
+							`進捗判断の受領に失敗しました（${decision.errorCode}）`,
+							runtime,
+							execution.signal,
+						);
+				await ctx.store.write((db) => {
+					const row = current(ctx, db, id, epoch);
+					const state = stateOf(row);
+					if (state.decision?.operationId !== decision.operationId)
+						throw new Error("pursuit_decision_conflict");
+					delete state.decision;
+					save(db, row, state, ctx.now());
+				});
+			} else
+				step = await engine.step(started.pursuitId, runtime, execution.signal);
+			let view = await engine.view(started.pursuitId);
 			if (!view) throw new Error("pursuit_core_missing");
+			if (
+				productive &&
+				!input.receiptOnly &&
+				view.report?.verificationIssue &&
+				!execution.signal.aborted
+			) {
+				await engine.reverify(started.pursuitId, runtime, execution.signal);
+				view = (await engine.view(started.pursuitId))!;
+			}
 			return {
 				status: view.status,
-				pending: view.attempts.some(
-					(a) => a.state === "started" && a.pendingOperationId !== null,
-				),
+				pending:
+					step.workReady !== undefined
+						? !step.workReady
+						: view.attempts.some(
+								(a) => a.state === "started" && a.pendingOperationId !== null,
+							),
+				pendingDecision: step.pendingDecision?.operationId,
 				completed:
 					view.status === "completed" &&
 					view.report?.outcome === "completed" &&
@@ -153,6 +204,17 @@ export function registerJobs(ctx: Context) {
 			}
 			if (outcome.type !== "success") {
 				row.job_id = null;
+				const state = stateOf(row);
+				if (
+					outcome.type === "interrupted" &&
+					state.execution === "productive" &&
+					(!row.active_request || claim.payload.receiptOnly || state.decision)
+				) {
+					row.state = "queued";
+					ctx.enqueue(db, row);
+					save(db, row, state, ctx.now());
+					return "applied";
+				}
 				end(
 					ctx,
 					db,
@@ -170,6 +232,8 @@ export function registerJobs(ctx: Context) {
 				state = stateOf(row);
 			row.job_id = null;
 			if (["completed", "incomplete", "stopped"].includes(result.status)) {
+				if (state.execution === "productive") stopChildren(ctx, db, row);
+				delete state.decision;
 				row.state =
 					result.completed && state.draft?.completion === "complete"
 						? "completed"
@@ -181,12 +245,20 @@ export function registerJobs(ctx: Context) {
 				row.state = "waiting_user";
 				save(db, row, state, ctx.now());
 				ctx.notice(db, row);
-			} else if (result.pending) {
-				row.state = "waiting_child";
-				save(db, row, state, ctx.now());
 			} else {
-				row.state = "queued";
-				ctx.enqueue(db, row);
+				if (result.pendingDecision)
+					queueDecision(ctx, db, row, state, result.pendingDecision);
+				const webReady = pendingWeb(db, row).some(
+					(op) => op.outcome_json !== null,
+				);
+				const ready =
+					!result.pending ||
+					state.decision?.response ||
+					state.decision?.errorCode ||
+					webReady;
+				row.state = ready ? "queued" : "waiting_child";
+				if (ready)
+					ctx.enqueue(db, row, webReady && state.execution === "productive");
 				save(db, row, state, ctx.now());
 			}
 			return "applied";
