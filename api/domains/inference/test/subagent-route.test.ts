@@ -48,7 +48,7 @@ test("an independent control carries its declared attempt budget to cloud execut
 });
 
 for (const mode of ["cloud-only", "larm-only"] as const)
-	test(`a child control uses its parent's ${mode} LLM route and exact context`, async () => {
+	test(`a child control with a schema uses its parent's ${mode} LLM route and exact context`, async () => {
 		let localCalls = 0;
 		const cloud: Record<string, unknown>[] = [];
 		const h = await setup({
@@ -110,7 +110,16 @@ for (const mode of ["cloud-only", "larm-only"] as const)
 			messages,
 			new AbortController().signal,
 			undefined,
-			{ sessionRole: "subagent", taskId: "fixture-child" },
+			{
+				sessionRole: "subagent",
+				taskId: "fixture-child",
+				outputSchema: {
+					type: "object",
+					properties: { action: { const: "finish" } },
+					required: ["action"],
+					additionalProperties: false,
+				},
+			},
 		);
 		expect(receipt.value).toBe('{"action":"finish"}');
 		expect(localCalls).toBe(mode === "larm-only" ? 1 : 0);

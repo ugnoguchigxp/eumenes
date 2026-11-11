@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { decodeLlmJson, parseLlmJson } from "./llm-json";
+import { LlmJsonError as SharedLlmJsonError } from "eumenes-interact/llm-json";
+import { decodeLlmJson, LlmJsonError, parseLlmJson } from "./llm-json";
 import { configureLogging, withLogContext } from "./logger";
 
 afterEach(() => configureLogging({ level: "silent" }));
@@ -63,11 +64,30 @@ for (const input of [
 		expect(() => parseLlmJson(input)).toThrow();
 	});
 test("output budgets and depth are enforced before adoption", () => {
-	expect(() => parseLlmJson('{"日本語":1}', 8)).toThrow("llm_json_too_large");
+	const value = "界".repeat(21843) + "😀a";
+	const exact = JSON.stringify(value);
+	expect(Buffer.byteLength(exact)).toBe(65536);
+	expect(decodeLlmJson(exact)).toEqual({ value, repaired: false });
+	expect(() => parseLlmJson(exact + " ")).toThrow("llm_json_too_large");
+	expect(decodeLlmJson("{a:1}", 7)).toEqual({
+		value: { a: 1 },
+		repaired: true,
+	});
+	expect(() => parseLlmJson("{a:1}", 6)).toThrow("llm_json_too_large");
+	expect(decodeLlmJson("[".repeat(64) + "0" + "]".repeat(64)).repaired).toBe(
+		false,
+	);
 	expect(() => parseLlmJson("[".repeat(65) + "0" + "]".repeat(65))).toThrow(
 		"llm_json_too_deep",
 	);
 	expect(() => parseLlmJson(new Uint8Array())).toThrow("llm_json_non_text");
+});
+test("escaped duplicate keys throw the same error class through both import paths", () => {
+	expect(LlmJsonError).toBe(SharedLlmJsonError);
+	expect(() => decodeLlmJson('{"a":1,"\\u0061":2}')).toThrow(LlmJsonError);
+	expect(() => decodeLlmJson('{"a":1,"\\u0061":2}')).toThrow(
+		"llm_json_duplicate_key",
+	);
 });
 test("correction does not invent, remove or coerce contract fields", () => {
 	expect(parseLlmJson('{durationSeconds:"20", extra:"keep",}')).toEqual({

@@ -297,6 +297,56 @@ function hostTodo(
 	};
 }
 
+function confirmationLedger(
+	clock: DialogueDeps["clock"],
+	id: DialogueDeps["id"],
+) {
+	return {
+		confirmationByRefInTransaction: confirmationByRef,
+		issueConfirmationInTransaction(
+			db: Database,
+			input: ConfirmationInput,
+			messageIds: readonly string[],
+		): ConfirmationRow {
+			const issuedAt = clock();
+			const row = {
+				...input,
+				words: input.words ?? null,
+				id: id(),
+				issuedAt,
+				expiresAt: new Date(
+					Date.parse(issuedAt) + CONFIRMATION_TTL_MS,
+				).toISOString(),
+			};
+			insertConfirmation(db, row, messageIds);
+			return confirmationById(db, row.id)!;
+		},
+		confirmationInTransaction: confirmationById,
+		useConfirmationInTransaction: (db: Database, confirmationId: string) =>
+			useConfirmation(db, confirmationId, clock()),
+		/** The user declined the confirmation `c<ref>`: it is closed and can no longer be approved. */
+		withdrawConfirmationInTransaction: (
+			db: Database,
+			conversationId: string,
+			ref: number,
+		) => withdrawConfirmation(db, conversationId, ref, clock()),
+		pendingConfirmationsInTransaction(
+			db: Database,
+			conversationId: string,
+		): PendingConfirmation[] {
+			return openConfirmations(db, conversationId, clock()).map((row) => ({
+				id: row.id,
+				ref: row.ref,
+				toolchain: row.toolchainId,
+				// What the user said, not the request the agent reads (which may carry the utterance before it).
+				request: row.words ?? row.request,
+				impact: row.impact,
+				target: row.targetLabel,
+			}));
+		},
+	};
+}
+
 /**
  * The conversation's TODO ledger: a TODO per piece of work handed to a toolchain, its state as the work's owner
  * reports it, each reported question or result as an event of the log, the archive as the work finishes with its
@@ -363,7 +413,6 @@ export function createWorkLedger(
 		workInTransaction: workById,
 		/** The TODO the model names `t<ref>`. */
 		workByRefInTransaction: workByRef,
-		confirmationByRefInTransaction: confirmationByRef,
 		refsInTransaction: (db: Database, conversationId: string) =>
 			documentRefsInTransaction(deps, db, conversationId),
 		/** Run-centric work the run waits for and that has not finished (task executions run on their own). */
@@ -564,47 +613,7 @@ export function createWorkLedger(
 				},
 			);
 		},
-		issueConfirmationInTransaction(
-			db: Database,
-			input: ConfirmationInput,
-			messageIds: readonly string[],
-		): ConfirmationRow {
-			const issuedAt = clock();
-			const row = {
-				...input,
-				words: input.words ?? null,
-				id: id(),
-				issuedAt,
-				expiresAt: new Date(
-					Date.parse(issuedAt) + CONFIRMATION_TTL_MS,
-				).toISOString(),
-			};
-			insertConfirmation(db, row, messageIds);
-			return confirmationById(db, row.id)!;
-		},
-		confirmationInTransaction: confirmationById,
-		useConfirmationInTransaction: (db: Database, confirmationId: string) =>
-			useConfirmation(db, confirmationId, clock()),
-		/** The user declined the confirmation `c<ref>`: it is closed and can no longer be approved. */
-		withdrawConfirmationInTransaction: (
-			db: Database,
-			conversationId: string,
-			ref: number,
-		) => withdrawConfirmation(db, conversationId, ref, clock()),
-		pendingConfirmationsInTransaction(
-			db: Database,
-			conversationId: string,
-		): PendingConfirmation[] {
-			return openConfirmations(db, conversationId, clock()).map((row) => ({
-				id: row.id,
-				ref: row.ref,
-				toolchain: row.toolchainId,
-				// What the user said, not the request the agent reads (which may carry the utterance before it).
-				request: row.words ?? row.request,
-				impact: row.impact,
-				target: row.targetLabel,
-			}));
-		},
+		...confirmationLedger(clock, id),
 	};
 }
 export type WorkLedger = ReturnType<typeof createWorkLedger>;

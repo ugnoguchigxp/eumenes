@@ -15,8 +15,30 @@ import {
 	type ExecutionRow,
 } from "../repository/executions";
 import type { ExecutionContext } from "./execution-context";
-
 import type { ExecutionOps } from "./execution-store";
+
+function purge(ctx: ExecutionContext, db: Database, row: ExecutionRow) {
+	const { now } = ctx;
+	const children = (
+		db
+			.query(
+				"SELECT input_json FROM agent_execution_steps WHERE execution_id=? AND input_json IS NOT NULL",
+			)
+			.all(row.id) as { input_json: string }[]
+	).map(
+		(r) =>
+			JSON.parse(r.input_json) as import("../../tool-runtime").ChildExecution,
+	);
+	for (const event of db
+		.query(
+			"SELECT id FROM agent_execution_events WHERE execution_id=? AND state IN ('pending','accepted')",
+		)
+		.all(row.id) as { id: string }[])
+		ctx.port().revokeDeliveryInTransaction?.(db, event.id);
+	ctx.port().purgeSourcesInTransaction?.(db, executionSource(row), children);
+	eraseExecutionBodies(db, row, now());
+}
+
 export function executionAccess(
 	ctx: ExecutionContext,
 	ops: ExecutionOps,
@@ -24,26 +46,6 @@ export function executionAccess(
 	configured: () => boolean,
 ) {
 	const { store, now } = ctx;
-	function purge(db: Database, row: ExecutionRow) {
-		const children = (
-			db
-				.query(
-					"SELECT input_json FROM agent_execution_steps WHERE execution_id=? AND input_json IS NOT NULL",
-				)
-				.all(row.id) as { input_json: string }[]
-		).map(
-			(r) =>
-				JSON.parse(r.input_json) as import("../../tool-runtime").ChildExecution,
-		);
-		for (const event of db
-			.query(
-				"SELECT id FROM agent_execution_events WHERE execution_id=? AND state IN ('pending','accepted')",
-			)
-			.all(row.id) as { id: string }[])
-			ctx.port().revokeDeliveryInTransaction?.(db, event.id);
-		ctx.port().purgeSourcesInTransaction?.(db, executionSource(row), children);
-		eraseExecutionBodies(db, row, now());
-	}
 	return {
 		forgetInTransaction(db: Database, id: string) {
 			const row = executionRow(db, id);
@@ -56,7 +58,7 @@ export function executionAccess(
 					"execution_source_forgotten",
 					"cancelled",
 				);
-			purge(db, executionRow(db, id)!);
+			purge(ctx, db, executionRow(db, id)!);
 		},
 		stopRequestedInTransaction(
 			db: Database,
@@ -144,7 +146,7 @@ export function executionAccess(
 				if (!dependent) continue;
 				if (isExecutionActive(row))
 					ops.fail(db, row, state, "execution_source_forgotten", "cancelled");
-				purge(db, executionRow(db, row.id)!);
+				purge(ctx, db, executionRow(db, row.id)!);
 				erased.add(row.id);
 			}
 		},
@@ -299,7 +301,7 @@ export function executionAccess(
 						ctx.port().validSourceInTransaction(db, executionSource(row))
 					)
 						continue;
-					purge(db, row);
+					purge(ctx, db, row);
 				}
 				for (const row of db
 					.query(
