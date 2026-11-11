@@ -20,9 +20,16 @@ import { getLogger } from "../../infrastructure/logger";
 import type {
 	GuidanceCandidate,
 	GuidanceLanguage,
+	GuidanceReadContext,
 } from "../../domains/dialogue/contracts/specialist";
+import {
+	createSpecialistGuidance,
+	specialistBuildHorizonMs,
+	specialistScope,
+} from "./specialist-guidance";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { QueueService } from "../../domains/queue";
+import type { ControlContract } from "../../domains/inference";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
 
 const log = getLogger("knowledge");
@@ -57,14 +64,23 @@ const guidanceTaskFields = {
 	acceptance: z.array(clause).min(1).max(32),
 	constraints: z.array(clause).max(32).default([]),
 };
-export const guidanceToolSchema = z.strictObject({
+const guidanceQuerySchema = z.strictObject({
 	...guidanceTaskFields,
 	situation: situationSchema,
+	publicSearchTask: publicQuery
+		.optional()
+		.describe(
+			"ContextStillで探す公開技術の検索語。製品や規格の公開名と一般的な症状を使い、会話の原文、非公開のプロジェクト情報、秘密を含めない。",
+		),
 	skillLanguage: z
 		.enum(languages)
 		.optional()
 		.describe("SKILLを受け取る言語。依頼の言語を使う。"),
 });
+export const guidanceToolSchema = z.union([
+	guidanceQuerySchema,
+	z.strictObject({ requestRef: z.uuid().describe("準備中の候補の取得ID。") }),
+]);
 export const submissionSchema = z.strictObject({
 	...guidanceTaskFields,
 	requestId: z.string().uuid(),
@@ -83,7 +99,6 @@ export const searchSchema = z.strictObject({
 });
 type Submission = z.infer<typeof submissionSchema>;
 const scope = "knowledge:local-owner";
-const specialistScope = "knowledge:specialist:";
 const policy = {
 	id: "knowledge:direct-delivery",
 	version: "1",
@@ -94,10 +109,18 @@ const requestRefSchema = z.string().uuid();
 type CaptureInput = Parameters<
 	EumenesControl<Database>["captureUserControlInTransaction"]
 >[1];
-type KnowledgeControl = EumenesControl<Database> & {
+type HostControl = EumenesControl<Database>;
+type ExecuteControl = HostControl["executeControl"];
+type KnowledgeControl = HostControl & {
+	executeControl(
+		id: Parameters<ExecuteControl>[0],
+		messages: Parameters<ExecuteControl>[1],
+		signal: AbortSignal,
+		contract: ControlContract,
+	): ReturnType<ExecuteControl>;
 	captureUserControlInTransaction(
 		tx: Database,
-		input: CaptureInput & { resourceId?: string },
+		input: CaptureInput & { resourceId?: string; attemptMs?: number },
 	): string;
 };
 
@@ -163,6 +186,7 @@ export function createKnowledge(options: {
 	control: KnowledgeControl;
 	selectionResourceId?: string;
 	source?: NonNullable<Ports<Database>["source"]>;
+	specialistContextSearch?: boolean;
 }) {
 	const { store, queue, control, source, selectionResourceId } = options;
 	const read = <T>(operation: (tx: Database) => T) => store.read(operation);
@@ -195,7 +219,7 @@ export function createKnowledge(options: {
 				structuredOutput: true,
 			})
 		: undefined;
-	const service = createSkillSmith<Database>({
+	const ports: Ports<Database> = {
 		repository: sqliteRepository,
 		now: Date.now,
 		id: () => crypto.randomUUID(),
@@ -226,8 +250,35 @@ export function createKnowledge(options: {
 		source,
 		assemblyMode: "baseline",
 		explorationFallback: true,
+	};
+	const service = createSkillSmith(ports);
+	const specialistInference = createEumenesInference({
+		control: {
+			...control,
+			captureUserControlInTransaction: (tx, input) =>
+				control.captureUserControlInTransaction(tx, {
+					...input,
+					// The host's independent-control deadline is capped at two minutes per request.
+					deadline: Math.min(input.deadline, Date.now() + 120_000),
+					attemptMs: 90_000,
+				}),
+			executeControl: (id, messages, signal, contract) =>
+				control.executeControl(id, messages, signal, {
+					...contract,
+					reasoningEffort: "low",
+				}),
+		},
+		read,
+		write,
+		structuredOutput: true,
 	});
-	const handler = createBuildJobHandler({ service, write, authorityFor });
+	const specialist = createSpecialistGuidance(
+		store,
+		queue,
+		{ ...ports, inference: specialistInference },
+		createBuildJobHandler({ service, write, authorityFor }),
+	);
+	const { handler } = specialist;
 	// The SDK and host pin different Zod releases. Use a host schema at the queue boundary.
 	queue.registerHandler({
 		...handler,
@@ -303,23 +354,47 @@ export function createKnowledge(options: {
 	async function selectForSpecialist(
 		args: unknown,
 		context: {
-			sessionId: string;
+			runId: string;
 			bindingRevisionId: string;
-			revision: number;
 			language?: GuidanceLanguage;
 			report?: string;
 			deadline: number;
-			signal: AbortSignal;
-			assertCurrent(tx: Database): void;
-		},
+		} & GuidanceReadContext,
 	) {
 		const started = performance.now();
 		const parsed = guidanceToolSchema.safeParse(args);
 		if (!parsed.success) throw Error("specialist_invalid_arguments");
 		const { data: input } = parsed;
+		if ("requestRef" in input)
+			return specialist.read(input.requestRef, context);
 		if (input.situation.revision !== String(context.revision))
 			throw Error("guidance_revision_mismatch");
 		const { signal, assertCurrent } = context;
+		if (input.publicSearchTask) {
+			if (!source || !options.specialistContextSearch)
+				return {
+					kind: "unavailable",
+					reason: "contextstill_search_unavailable",
+				} as const;
+			const request = guidanceRequest(input, {
+				requestId: context.runId,
+				audience: "worker",
+				environmentId: context.bindingRevisionId,
+				skillLanguage: context.language ?? input.skillLanguage,
+				report: context.report,
+				// The original reply, disclosure, generation and review share this job deadline.
+				deadlineAt: Date.now() + specialistBuildHorizonMs,
+			});
+			return specialist.submit(
+				{
+					...request,
+					limits: { ...request.limits, modelCalls: 4, sourceCalls: 16 },
+				},
+				input.publicSearchTask,
+				context.runId,
+				context,
+			);
+		}
 		const auth: Authority = {
 			principal: CONVERSATION_DEFAULT_PRINCIPAL,
 			scope: specialistScope + context.sessionId,
@@ -387,6 +462,9 @@ export function createKnowledge(options: {
 		submit,
 		get,
 		selectForSpecialist,
+		readForSpecialist: specialist.read,
+		finishSpecialistTurn: specialist.finishTurn,
+		attachDialogue: specialist.attachDialogue,
 		async search(input: z.infer<typeof searchSchema>, signal: AbortSignal) {
 			if (!source) return null;
 			const bounded = AbortSignal.any([signal, AbortSignal.timeout(8_000)]);
@@ -418,4 +496,9 @@ export function configuredContextStill(config: {
 		endpoint: config.url,
 		token: config.token,
 	});
+}
+
+/** Model-authored queries stay inside the local, operator-configured knowledge service. */
+export function permitsSpecialistContextSearch(url?: string) {
+	return !!url && ["127.0.0.1", "[::1]"].includes(new URL(url).hostname);
 }

@@ -232,6 +232,7 @@ function settleHandback(
 		if (sibling) forwardToMain(deps, tx, sibling, record, leaving, label);
 	}
 	// The turn gives the work back: an end or a suspension must not find it busy.
+	port.guidance?.finishTurn(tx, record.id, run.id, false);
 	releaseSpecialistTurn(deps, tx, run);
 	let state: "suspended" | "ended" | "closing";
 	if (action.kind === "return" && work?.dirty) {

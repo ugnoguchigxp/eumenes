@@ -1,5 +1,9 @@
 import { createSteeringInbox } from "eumenes-steer";
-import { configuredContextStill, createKnowledge } from "./knowledge/service";
+import {
+	configuredContextStill,
+	createKnowledge,
+	permitsSpecialistContextSearch,
+} from "./knowledge/service";
 import { createAppDevelopmentRuntime } from "./app-development/runtime";
 import { createGitObservation } from "../domains/git-observation";
 import { createMemoryHostConnection } from "./memory-host";
@@ -53,6 +57,23 @@ import { createAgencyWork } from "./agency/work";
 
 const log = getLogger("server");
 
+function buildKnowledge(
+	core: Awaited<ReturnType<typeof buildCore>>,
+	config: Config,
+) {
+	const { store, queue, inference } = core;
+	return createKnowledge({
+		store,
+		queue,
+		control: inference,
+		selectionResourceId: config.knowledgeSelectionResourceId,
+		source: configuredContextStill(config.contextStill ?? {}),
+		specialistContextSearch: permitsSpecialistContextSearch(
+			config.contextStill?.url,
+		),
+	});
+}
+
 /**
  * Constructs every service. Nothing is recovered, started or listening yet, and
  * the process environment is not read: all values come from `config`.
@@ -74,13 +95,7 @@ export async function buildServices(
 		serviceTests,
 		queue,
 	} = core;
-	const knowledge = createKnowledge({
-		store,
-		queue,
-		control: inference,
-		selectionResourceId: config.knowledgeSelectionResourceId,
-		source: configuredContextStill(config.contextStill ?? {}),
-	});
+	const knowledge = buildKnowledge(core, config);
 	const webResearch = buildWebResearch(config, core);
 	const scheduler = createScheduler(store, queue);
 	const timers = createTimers(
@@ -337,6 +352,7 @@ export async function buildServices(
 	);
 	workflow.attachDialogue(dialogue);
 	links.attachDialogue(dialogue);
+	knowledge.attachDialogue(dialogue);
 	if (enabled && toolchains)
 		agencyExecution = configureTaskExecution({
 			settings,

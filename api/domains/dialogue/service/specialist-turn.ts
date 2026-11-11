@@ -46,7 +46,10 @@ import {
 	specialistOutputSchema,
 	specialistSingleSentenceOutputSchema,
 } from "./specialist-output";
-import { prepareSpecialistPrompt } from "./specialist-turn-prompt";
+import {
+	appendGuidanceNotice,
+	prepareSpecialistPrompt,
+} from "./specialist-turn-prompt";
 import { settleSpecialistTurn } from "./specialist-settle";
 import {
 	collaborationSnapshot,
@@ -80,6 +83,7 @@ export type TurnOutput = {
 };
 export type TurnInput = {
 	observation?: true;
+	guidanceNoticeRef?: string;
 	runId: string;
 	revision: number;
 	sessionId: string;
@@ -375,6 +379,7 @@ export function createSpecialistTurnHandler(
 			return withLogContext({ runId: input.runId }, async () => {
 				try {
 					logCandidateDelivery(input);
+					await appendGuidanceNotice(deps, input, signal);
 					return await runTurn(deps, input, signal);
 				} catch (error) {
 					if (timeout.aborted && !caller.aborted) {
@@ -642,6 +647,8 @@ async function invoke(
 			};
 			const result = await port.guidance.select(action.arguments, {
 				sessionId: input.sessionId,
+				sessionEpoch: input.epoch,
+				runId: input.runId,
 				bindingRevisionId: input.set.bindingRevisionId,
 				revision,
 				language: input.guidanceLanguage,

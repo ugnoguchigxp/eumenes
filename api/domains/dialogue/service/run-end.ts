@@ -19,6 +19,12 @@ export function runEndedInTransaction(
 ): void {
 	if (run.specialistSessionId) {
 		releaseSpecialistTurn(deps, tx, run);
+		deps.specialist?.guidance?.finishTurn(
+			tx,
+			run.specialistSessionId,
+			run.id,
+			state === "completed",
+		);
 		return;
 	}
 	// Work the run was waiting for ends with it: its TODO is done with the run's outcome (section 10.1).

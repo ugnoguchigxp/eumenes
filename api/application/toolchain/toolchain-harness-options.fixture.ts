@@ -64,6 +64,15 @@ export type HarnessOptions = {
 	>[2];
 	/** Use the real guidance adapter with this fixture cloud resource. */
 	knowledgeSelectionResourceId?: string;
+	knowledgeSource?: NonNullable<
+		Parameters<
+			typeof import("../knowledge/service").createKnowledge
+		>[0]["source"]
+	>;
+	knowledgeBuild?: (
+		messages: import("../../domains/inference/contracts").Messages,
+		options: Parameters<LarmPort["answer"]>[2],
+	) => unknown;
 	/** Script only the collaborative specialist, retaining the real parent/command fixture. */
 	specialist?: (
 		messages: import("../../domains/inference/contracts").Messages,
