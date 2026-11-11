@@ -1,0 +1,8 @@
+{
+	"package": "eumenes-steer",
+	"version": "0.1.0",
+	"artifact": "eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
+	"sha256": "1ca04b8bee9b839016a14987fc903282c1b57665eca1e89457681c3990f1e705",
+	"sourceGitCommit": "1250b2071392bf54204fda871cd371830713ce45",
+	"verifiedWith": "Bun 1.4.4; 24 Steer tests; strict TypeScript; offline TGZ installation and relocation"
+}

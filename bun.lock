@@ -20,6 +20,7 @@
         "eumenes-memory-host": "file:vendor/eumenes-memory-host/eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
         "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
         "eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz",
+        "eumenes-steer": "file:vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz",
         "eumenes_router": "file:vendor/router/eumenes_router-0.0.2-a5d5ecb08b75.tgz",
         "google-auth-library": "11.1.0",
@@ -1476,6 +1477,8 @@
     "eumenes-pipeline": ["eumenes-pipeline@vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz", { "dependencies": { "zod": "4.6.7" } }, "sha512-aqEYhMhMv0oNEztE797S6UJzvYU02Rpf1cS5LBxJNWLMk9LnlmsKmkAw8dpzSbgW5Z05rFJcHKq//nHWz42skg=="],
 
     "eumenes-pursuit": ["eumenes-pursuit@vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz", { "dependencies": { "zod": "4.6.6" } }, "sha512-clOrPYsA7pYR+ntf6gJlDBhcaRpKVaG4HX/3WoAnk3MdgGmXDIpE8D+tozsvH6s39JVIjdCb7yNej57wE+fA0Q=="],
+
+    "eumenes-steer": ["eumenes-steer@vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz", {}, "sha512-d3viR9CIK/qNKPBav9hR2bIY+kNl1fPyQW4a893LrkKvlA8EsUzQRH9StDWfku3QTBnNoBNjYK/lCbeCmcQHYg=="],
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz", {}, "sha512-FDhxfk81KyuIKcgTHDyuX9SrYaOhKZa1aL0dkkwEausKzm1gRVCsLPNGfloiPoQUEtOc0rMvEr5LJVoWN3W6Hw=="],
 
