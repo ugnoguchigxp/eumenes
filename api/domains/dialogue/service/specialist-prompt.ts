@@ -38,6 +38,10 @@ export const violationNames = contract.violationNames;
 
 const HOST_RULES = systemContext("dialogue.contexts.specialist-turn.rules", {});
 const RULES = [collaborationInstructions.rules, HOST_RULES].join("\n");
+const GUIDANCE_RULES = systemContext(
+	"dialogue.contexts.specialist-turn.knowledge-guidance",
+	{},
+);
 
 /** The binding chooses profile, skills and tools; session execution and authority stay in the host. */
 export function specialistControl(
@@ -87,29 +91,33 @@ export function specialistControl(
 					},
 				}
 			: schema;
+	const tools = replyOnly
+		? []
+		: [
+				...set.tools.map((tool) => ({
+					id: tool.id,
+					description: tool.summary,
+					inputSchema: tool.schema,
+				})),
+				...hostTools,
+			];
+	const rules = tools.some(({ id }) => id === "get_guidance")
+		? RULES + "\n" + GUIDANCE_RULES
+		: RULES;
 	const control = agentControl({
 		profile: set.profile,
 		skills: set.skills,
 		rules:
 			set.agent.collaborationState && !replyOnly
-				? RULES +
+				? rules +
 					"\n" +
 					collaborationInstructions.state +
 					(hostBound
 						? "\n今回記録すべき状態の変更がある場合だけ、stateUpdateにupsertsとremovalsを返します。ホストが版と作業参照を結び付けます。"
 						: "\nstateUpdateには今回のSTATE_UPDATE_BASEをそのまま使い、意味のある変更があればupsertsとremovalsだけを編集します。expectedRevisionは更新前の値なので増やしません。workは操作前の版を保持します。") +
 					"同じ出力のactionで次の一手を示し、未観測の結果は確定しません。"
-				: RULES,
-		tools: replyOnly
-			? []
-			: [
-					...set.tools.map((tool) => ({
-						id: tool.id,
-						description: tool.summary,
-						inputSchema: tool.schema,
-					})),
-					...hostTools,
-				],
+				: rules,
+		tools,
 		outputSchema,
 	});
 	return { ...control, larmReasoning: set.agent.larmReasoning };

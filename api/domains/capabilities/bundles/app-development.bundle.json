@@ -96,6 +96,33 @@
 			"packageRevisionId": "package:app-development.studio@7",
 			"bindingRevisionId": "binding:app-development.studio@7",
 			"artifactRevisionId": "artifact:app-development.studio@2"
+		},
+		{
+			"kind": "toolchain",
+			"id": "app.develop",
+			"revision": 8,
+			"title": "Webアプリ開発",
+			"summary": "会話で画面や実行手順を作り、利用者が確認して保存する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"利用者が繰り返し開いて使える画面、データを更新する小さなアプリ、定期処理やレポートを新しく作る、または修正する"
+			],
+			"avoidWhen": [
+				"依頼が一回限りの情報確認で、アプリや定期処理の制作を求めていない"
+			],
+			"dependencies": ["package:app-development.studio@7"],
+			"functionName": "develop_app",
+			"examples": [
+				"辻堂の映画館で上映作品と開始時刻を日付ごとに確認できるアプリを作って",
+				"対象のGitHubプロジェクトを毎日確認して開発日誌を保存するアプリを作って",
+				"入力した金額から割り勘を計算する画面を作って",
+				"読んだ本のタイトル、読了日、感想を記録し、あとから読み返したり編集できるアプリを作って"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:app-development.studio@7",
+			"bindingRevisionId": "binding:app-development.studio@8",
+			"artifactRevisionId": "artifact:app-development.studio@2"
 		}
 	],
 	"bindings": [
@@ -131,6 +158,46 @@
 				},
 				"collaborationState": "host-bound",
 				"larmReasoning": "off"
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "app-development.studio",
+			"revision": 8,
+			"execution": "session",
+			"adapterRef": "adapter:app-development@1",
+			"availabilityRef": "availability:app-development@1",
+			"tools": [],
+			"artifactRevisionId": "artifact:app-development.studio@2",
+			"session": {
+				"targetSchemaRef": "builtin:uiTargetRef"
+			},
+			"timeLimits": {
+				"runMs": 1200000,
+				"turnMs": 900000,
+				"inferenceMs": 600000
+			},
+			"agent": {
+				"workspace": {
+					"documentRef": "workspace:app-development.definition@1",
+					"inlineBytes": 32768
+				},
+				"turn": {
+					"maxModelCalls": 4,
+					"retries": {
+						"doc.edit": 1,
+						"doc.write": 1
+					},
+					"maxOutputTokens": 6144
+				},
+				"collaborationState": "host-bound",
+				"larmReasoning": "off",
+				"sharedTools": [
+					{
+						"toolchainId": "knowledge.guidance",
+						"as": "get_guidance"
+					}
+				]
 			}
 		}
 	],

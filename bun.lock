@@ -20,7 +20,7 @@
         "eumenes-memory-host": "file:vendor/eumenes-memory-host/eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
         "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
         "eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz",
-        "eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-5a6aa00f8bda.tgz",
+        "eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-e73448ee3a18.tgz",
         "eumenes-steer": "file:vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz",
         "eumenes_router": "file:vendor/router/eumenes_router-0.0.2-a5d5ecb08b75.tgz",
@@ -1479,7 +1479,7 @@
 
     "eumenes-pursuit": ["eumenes-pursuit@vendor/pursuit/eumenes-pursuit-0.0.4-7964f15d6308.tgz", { "dependencies": { "zod": "4.6.6" } }, "sha512-clOrPYsA7pYR+ntf6gJlDBhcaRpKVaG4HX/3WoAnk3MdgGmXDIpE8D+tozsvH6s39JVIjdCb7yNej57wE+fA0Q=="],
 
-    "eumenes-skill-smith": ["eumenes-skill-smith@vendor/skill-smith/eumenes-skill-smith-0.1.0-5a6aa00f8bda.tgz", { "dependencies": { "mdast-util-from-markdown": "2.0.2", "zod": "4.6.6" } }, "sha512-LZHEDqWJKKu4yVhVtGmnxgl5nrZR7eQP+z+tJxzYfbiE6gwxnQ3zkoFlZBcfu1jjfpCKVEH7G3nqrGs9e1//1Q=="],
+    "eumenes-skill-smith": ["eumenes-skill-smith@vendor/skill-smith/eumenes-skill-smith-0.1.0-e73448ee3a18.tgz", { "dependencies": { "mdast-util-from-markdown": "2.0.2", "zod": "4.6.6" } }, "sha512-0tyCj6MDdG2MFvIRe+G9sqVOwtMxnT6MM7WXpbnbnCvVoH+UQR9wHsNjxSKrBHWzK8JGiLNY9xm9KYpGUvKz+Q=="],
 
     "eumenes-steer": ["eumenes-steer@vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz", {}, "sha512-d3viR9CIK/qNKPBav9hR2bIY+kNl1fPyQW4a893LrkKvlA8EsUzQRH9StDWfku3QTBnNoBNjYK/lCbeCmcQHYg=="],
 

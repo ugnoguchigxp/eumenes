@@ -318,6 +318,7 @@ export async function buildServices(
 						routing: toolchains,
 						registry: toolchain.registry,
 						schemas: toolchain.schemas,
+						knowledge,
 						clock: () => new Date().toISOString(),
 					}),
 				}

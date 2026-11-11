@@ -14,26 +14,61 @@ import {
 } from "eumenes-skill-smith";
 import { sqliteRepository } from "eumenes-skill-smith/sqlite";
 import { z } from "zod";
+import { getLogger } from "../../infrastructure/logger";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { QueueService } from "../../domains/queue";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
 
+const log = getLogger("knowledge");
 const text = z.string().trim().min(1).max(8000);
 const clause = z.strictObject({ id: z.string().min(1).max(160), text });
 const publicQuery = z.string().trim().min(1).max(512);
-export const submissionSchema = z.strictObject({
-	requestId: z.string().uuid(),
-	goal: text,
+const situationText = z.string().trim().min(1).max(1000);
+const situationSchema = z.strictObject({
+	revision: z
+		.string()
+		.min(1)
+		.max(160)
+		.describe(
+			"現在の作業版。CURRENT_DOCUMENT の revision を文字列で指定する。",
+		),
+	lastAttempt: z
+		.strictObject({
+			action: situationText.describe("直前に試したこと"),
+			result: situationText.describe("その操作で観測した結果"),
+		})
+		.optional()
+		.describe("実際に試した操作がある場合に指定する。"),
+	uncertainty: situationText.describe("いま判断に迷っている点"),
+});
+const guidanceTaskFields = {
+	goal: text.describe("作業の目的"),
 	acceptance: z.array(clause).min(1).max(32),
 	constraints: z.array(clause).max(32).default([]),
+};
+export const guidanceToolSchema = z.strictObject({
+	...guidanceTaskFields,
+	situation: situationSchema,
+});
+export const submissionSchema = z.strictObject({
+	...guidanceTaskFields,
+	requestId: z.string().uuid(),
+	situation: situationSchema.optional(),
 	publicSearchTask: publicQuery.optional(),
 });
+export const guidanceTool = {
+	id: "get_guidance",
+	description:
+		"現在の版、試したことと結果、迷っている点をもとに、作業に使えるSKILLを参照する。",
+	inputSchema: z.toJSONSchema(guidanceToolSchema, { io: "input" }),
+};
 export const searchSchema = z.strictObject({
 	query: publicQuery,
 	limit: z.number().int().min(1).max(20).default(8),
 });
 type Submission = z.infer<typeof submissionSchema>;
 const scope = "knowledge:local-owner";
+const specialistScope = "knowledge:specialist:";
 const policy = {
 	id: "knowledge:direct-delivery",
 	version: "1",
@@ -63,7 +98,40 @@ function boundedCalls(signal: AbortSignal, max: number): ExecutionContext {
 	};
 }
 
-/** Authenticated local-owner application adapter. The SDK owns request/build state. */
+function guidanceRequest(
+	input: Pick<Submission, "goal" | "acceptance" | "constraints" | "situation">,
+	host: Pick<GuidanceRequest, "requestId" | "audience"> & {
+		environmentId: string;
+		deadlineAt: number;
+	},
+): GuidanceRequest {
+	return {
+		contractVersion: "skillsmith.v1",
+		requestId: host.requestId,
+		delivery: "artifact",
+		task: {
+			goal: input.goal,
+			acceptance: input.acceptance,
+			constraints: input.constraints,
+			references: [],
+			...(input.situation ? { situation: input.situation } : {}),
+		},
+		audience: host.audience,
+		environment: { id: host.environmentId, capabilities: [], policy },
+		limits: {
+			deadlineAt: host.deadlineAt,
+			modelCalls: 3,
+			sourceCalls: 12,
+			candidates: 8,
+			documents: 4,
+			outputBytes: 32768,
+			inputBytes: 65536,
+			outputTokens: 4096,
+		},
+	};
+}
+
+/** Application adapter for authenticated delivery and specialist lookup. The SDK owns request/build state. */
 export function createKnowledge(options: {
 	store: SqliteStore;
 	queue: QueueService;
@@ -109,7 +177,7 @@ export function createKnowledge(options: {
 		authority: {
 			valid: (tx, auth, refs) =>
 				auth.principal === CONVERSATION_DEFAULT_PRINCIPAL &&
-				auth.scope === scope &&
+				(auth.scope === scope || auth.scope.startsWith(specialistScope)) &&
 				auth.epoch === 0 &&
 				refs.every((ref) => !sqliteRepository.blocked(tx, ref)),
 		},
@@ -172,29 +240,12 @@ export function createKnowledge(options: {
 			permissions: ["build"],
 			...(input.publicSearchTask ? { searchTask: input.publicSearchTask } : {}),
 		};
-		const request: GuidanceRequest = {
-			contractVersion: "skillsmith.v1",
+		const request = guidanceRequest(input, {
 			requestId: input.requestId,
-			delivery: "artifact",
-			task: {
-				goal: input.goal,
-				acceptance: input.acceptance,
-				constraints: input.constraints,
-				references: [],
-			},
 			audience: "external",
-			environment: { id: "eumenes:direct-delivery", capabilities: [], policy },
-			limits: {
-				deadlineAt: Date.now() + 120_000,
-				modelCalls: 3,
-				sourceCalls: 12,
-				candidates: 8,
-				documents: 4,
-				outputBytes: 32768,
-				inputBytes: 65536,
-				outputTokens: 4096,
-			},
-		};
+			environmentId: "eumenes:direct-delivery",
+			deadlineAt: Date.now() + 120_000,
+		});
 		const existing = (tx: Database) => {
 			const old = sqliteRepository.requestByKey(tx, scope, input.requestId);
 			if (!old) return null;
@@ -224,9 +275,83 @@ export function createKnowledge(options: {
 		});
 		return get(ref, signal);
 	}
+	async function selectForSpecialist(
+		args: unknown,
+		context: {
+			sessionId: string;
+			bindingRevisionId: string;
+			revision: number;
+			deadline: number;
+			signal: AbortSignal;
+			assertCurrent(tx: Database): void;
+		},
+	) {
+		const started = performance.now();
+		const parsed = guidanceToolSchema.safeParse(args);
+		if (!parsed.success) throw Error("specialist_invalid_arguments");
+		const { data: input } = parsed;
+		if (input.situation.revision !== String(context.revision))
+			throw Error("guidance_revision_mismatch");
+		const { signal, assertCurrent } = context;
+		const auth: Authority = {
+			principal: CONVERSATION_DEFAULT_PRINCIPAL,
+			scope: specialistScope + context.sessionId,
+			epoch: 0,
+			sourceRefs: [],
+			permissions: ["build"],
+		};
+		const request = guidanceRequest(input, {
+			requestId: crypto.randomUUID(),
+			audience: "worker",
+			environmentId: context.bindingRevisionId,
+			// This lookup runs inside an interactive turn, independently of the build queue.
+			deadlineAt: Math.min(context.deadline, Date.now() + 8_000),
+		});
+		const prepared = read((tx) => {
+			assertCurrent(tx);
+			return service.prepareSkillSelection(tx, request, auth);
+		});
+		const choice = await service.selectSkill(prepared, boundedCalls(signal, 1));
+		if (choice.decision.kind === "miss") {
+			read(assertCurrent);
+			return { kind: "unavailable", reason: choice.decision.reason } as const;
+		}
+		const ref = await write((tx) => {
+			assertCurrent(tx);
+			const reply = service.bindSkillSelection(tx, prepared, choice, auth);
+			if (!reply.requestRef) throw Error("knowledge_submission_failed");
+			return reply.requestRef;
+		});
+		const delivery = await service.getSkillDelivery(
+			ref,
+			auth,
+			read,
+			signal,
+			boundedCalls(signal, request.limits.sourceCalls),
+		);
+		read(assertCurrent);
+		if (delivery.kind !== "ready")
+			return { kind: "unavailable" as const, reason: delivery.kind };
+		log.info("knowledge.specialist_delivery", {
+			bindingRevisionId: context.bindingRevisionId,
+			workRevision: context.revision,
+			lastAttemptCount: input.situation.lastAttempt ? 1 : 0,
+			kind: delivery.exploration ? "exploration" : "approved",
+			skillDigest: delivery.skill.digest,
+			durationMs: performance.now() - started,
+		});
+		return {
+			kind: "ready" as const,
+			skill: delivery.skill,
+			...(delivery.exploration ? { exploration: true as const } : {}),
+			situation: input.situation,
+		};
+	}
+
 	return {
 		submit,
 		get,
+		selectForSpecialist,
 		async search(input: z.infer<typeof searchSchema>, signal: AbortSignal) {
 			if (!source) return null;
 			const bounded = AbortSignal.any([signal, AbortSignal.timeout(8_000)]);

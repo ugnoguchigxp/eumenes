@@ -53,6 +53,7 @@ import type { HarnessOptions } from "./toolchain-harness-options.fixture";
 import { createToolchain } from "./toolchain";
 import { createToolchainHostLinks } from "./toolchain-host";
 import { createTimers } from "../../domains/timers";
+import { createKnowledge } from "../knowledge/service";
 import { createSpecialistPort } from "./specialist-port";
 import { configureTaskExecution } from "./task-execution-port";
 import { taskMediaPorts } from "./task-media-execution";
@@ -810,6 +811,16 @@ export async function harness(options: HarnessOptions = {}) {
 			registry: toolchain.registry,
 			schemas: toolchain.schemas,
 			clock: () => new Date().toISOString(),
+			...(options.knowledgeSelectionResourceId
+				? {
+						knowledge: createKnowledge({
+							store,
+							queue,
+							control: inference,
+							selectionResourceId: options.knowledgeSelectionResourceId,
+						}),
+					}
+				: {}),
 		}),
 	});
 	toolchainLinks.attachDialogue(dialogue);

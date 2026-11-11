@@ -55,6 +55,8 @@ export type HarnessOptions = {
 	inferenceOptions?: Parameters<
 		typeof import("../../domains/inference").createInference
 	>[2];
+	/** Use the real guidance adapter with this fixture cloud resource. */
+	knowledgeSelectionResourceId?: string;
 	/** Script only the collaborative specialist, retaining the real parent/command fixture. */
 	specialist?: (
 		messages: import("../../domains/inference/contracts").Messages,

@@ -2,10 +2,10 @@
 	"package": "eumenes-skill-smith",
 	"version": "0.1.0",
 	"contractVersion": "skillsmith.v1",
-	"sourceGitCommit": "5a6aa00f8bdabbdbd3c2edf681da5fbdbe4c82ff",
+	"sourceGitCommit": "e73448ee3a185613477a08dbfdb2c4d60ad105d7",
 	"sourceGitDirty": false,
-	"sourceDigest": "f248a109713cc9c93f840b81625610323f4514e3af0afc2e9eede8a76807ecb6",
-	"sha256": "4df964f21ab6796e7db579511ffdc7014bbfb5b63e544ca7eeb9e9b4f567b2e8",
-	"artifact": "eumenes-skill-smith-0.1.0-5a6aa00f8bda.tgz",
-	"sizeBytes": 131940
+	"sourceDigest": "99434067cb71d5095c44ab7d0b433cf5fe66e91fcf20af777459080d8adef01e",
+	"sha256": "c775a80deac97a6d481d4a85947477c222a58231f56220a6f9d5d8e2f52b382b",
+	"artifact": "eumenes-skill-smith-0.1.0-e73448ee3a18.tgz",
+	"sizeBytes": 132710
 }

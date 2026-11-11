@@ -9,6 +9,7 @@ import type {
 	AdapterRegistry,
 	SessionWorkAdapter,
 } from "../../domains/tool-runtime";
+import { guidanceTool, type Knowledge } from "../knowledge/service";
 import type { SchemaProvider } from "./toolchain-adapters";
 
 /** Saved items a session may start from (the adapter's own list, at most this many). */
@@ -42,8 +43,9 @@ export function createSpecialistPort(deps: {
 	registry: AdapterRegistry;
 	schemas: Pick<SchemaProvider, "get">;
 	clock: () => string;
+	knowledge?: Pick<Knowledge, "selectForSpecialist">;
 }): SpecialistPort {
-	const { routing, registry, schemas, clock } = deps;
+	const { routing, registry, schemas, clock, knowledge } = deps;
 	const adapterOf = (ref: string) => {
 		const adapter = registry.get(ref);
 		if (!adapter) throw new Error("capability_unavailable");
@@ -56,6 +58,21 @@ export function createSpecialistPort(deps: {
 		return session;
 	};
 	return {
+		...(knowledge
+			? {
+					guidance: {
+						tool: (set) =>
+							set.agent.sharedTools.some(
+								({ toolchainId, as }) =>
+									toolchainId === "knowledge.guidance" &&
+									as === guidanceTool.id,
+							)
+								? guidanceTool
+								: undefined,
+						select: knowledge.selectForSpecialist,
+					},
+				}
+			: {}),
 		setInTransaction(db: Database, toolchainRevisionId: string): SpecialistSet {
 			if (!routing.sessionSetInTransaction)
 				throw new Error("capability_unavailable");
