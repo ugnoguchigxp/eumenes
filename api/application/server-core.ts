@@ -33,6 +33,7 @@ import type { Config } from "../infrastructure/config";
 import { WEB_NOTE_RESOURCE } from "../domains/web-note";
 import { createChanges } from "./events";
 import { migrations } from "./migrations";
+import { createCodexWebSearch } from "./toolchain/codex-web-search";
 import { createWebReview } from "./toolchain/web-content-review";
 
 const log = getLogger("server");
@@ -125,9 +126,9 @@ export type Core = Awaited<ReturnType<typeof buildCore>>;
 /** Web research on its own cache database; an unopenable cache only disables caching. */
 export function buildWebResearch(
 	config: Config,
-	core: Pick<Core, "store" | "queue" | "inference">,
+	core: Pick<Core, "store" | "queue" | "inference" | "settings">,
 ) {
-	const { store, queue, inference } = core;
+	const { store, queue, inference, settings } = core;
 	// v2: named migrations. The earlier file named them by position and is not read.
 	const cachePath = resolve(
 		join(dirname(config.dbPath), "cache/web-research-v2.sqlite3"),
@@ -144,6 +145,12 @@ export function buildWebResearch(
 		cache: webCache,
 		review: createWebReview(store, inference, 120000),
 		acquisition: createWebAcquisition({
+			...(config.env.EUMENES_CODEX_WEB_SEARCH === "1"
+				? {
+						search: createCodexWebSearch(store, settings, inference),
+						searchTimeoutMs: 30_000,
+					}
+				: {}),
 			review: createWebReview(store, inference, 120000),
 		}),
 		acquisitionTimeoutMs: 30000,

@@ -3,7 +3,8 @@ import { afterAll, expect, test } from "bun:test";
 import { JSDOM } from "jsdom";
 import { Fragment, type ReactNode } from "react";
 import type { CompositionModelDefinition } from "./composition-contracts";
-import type { ArtifactRequest } from "./contracts";
+import { parseRequest, type ArtifactRequest } from "./contracts";
+import { displayWorkflowOutput } from "./ui-studio-workflow-output";
 
 // The views need a DOM; bun test has none, so install jsdom's before React DOM loads.
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
@@ -195,6 +196,41 @@ test("a data-table shows static rows, formatted by column", async () => {
 	);
 	expect(text(view.container, "tbody")).toContain("¥120");
 	expect(text(view.container, "tbody")).toContain("りんご");
+	await view.unmount();
+});
+
+test("a workflow table shows a registered SVG beside the original text", async () => {
+	const definition = displayWorkflowOutput({
+		id: "forecast",
+		title: "予報比較",
+		savedRevision: 1,
+		definition: {
+			view: "data-table",
+			columns: [{ header: "日付" }, { header: "予報" }],
+			rows: [["", ""]],
+		},
+		bindings: {
+			inputs: {},
+			table: { path: [], rowsKey: "rows", columns: ["date", "forecast"] },
+		},
+		data: {
+			rows: [
+				{ date: "11/15", forecast: { icon: "cloud-rain", text: "晴れ一時雨" } },
+				{ date: "11/16", forecast: "くもり" },
+			],
+		},
+	});
+	const view = await mount(
+		undefined,
+		<DataTableView request={parseRequest(definition)} />,
+	);
+	const rows = view.container.querySelectorAll("tbody tr");
+	expect(rows[0]?.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
+		"true",
+	);
+	expect(rows[0]?.textContent).toBe("11/15晴れ一時雨");
+	expect(rows[1]?.querySelector("svg")).toBeNull();
+	expect(rows[1]?.textContent).toBe("11/16くもり");
 	await view.unmount();
 });
 

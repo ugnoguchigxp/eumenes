@@ -91,6 +91,36 @@
 			"bindingRevisionId": "binding:scheduler.collaborator@1",
 			"artifactRevisionId": "artifact:scheduler.pending@1",
 			"minImpact": "create"
+		},
+		{
+			"kind": "toolchain",
+			"id": "scheduler.manage",
+			"revision": 2,
+			"title": "実行予約",
+			"summary": "日時を指定して会話での回答を予約する。単発・固定間隔の予約の条件を対話で決める。",
+			"aliases": [],
+			"tags": ["予約", "定期実行"],
+			"useWhen": [
+				"指定日時にこの会話で知らせる、問いかける、文章で回答する仕事を予約したい",
+				"同じ会話の仕事を決まった間隔で繰り返し予約したい"
+			],
+			"avoidWhen": [
+				"経過時間を計るタイマーやストップウォッチを使いたい",
+				"保存済みワークフローの予約を有効にしたい",
+				"時刻を指定せず今すぐ回答が欲しい"
+			],
+			"dependencies": ["package:scheduler.collaborator@1"],
+			"packageRevisionId": "package:scheduler.collaborator@1",
+			"functionName": "schedule_conversation",
+			"examples": [
+				"明日の午前8時に、この会話で持ち物を確認するよう声をかけて",
+				"毎晩21時に、この会話で一日の振り返りを促して",
+				"来週の月曜の昼に、次の読書会のテーマ案をこの会話に出して"
+			],
+			"redirects": [],
+			"bindingRevisionId": "binding:scheduler.collaborator@2",
+			"artifactRevisionId": "artifact:scheduler.pending@2",
+			"minImpact": "create"
 		}
 	],
 	"bindings": [
@@ -109,6 +139,23 @@
 				}
 			],
 			"artifactRevisionId": "artifact:scheduler.pending@1",
+			"session": {}
+		},
+		{
+			"kind": "binding",
+			"id": "scheduler.collaborator",
+			"revision": 2,
+			"execution": "session",
+			"adapterRef": "adapter:scheduler@1",
+			"availabilityRef": "availability:scheduler@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:scheduler.register@1",
+					"operationId": "scheduler.register",
+					"inputSchemaRef": "builtin:schedulePrompt"
+				}
+			],
+			"artifactRevisionId": "artifact:scheduler.pending@2",
 			"session": {}
 		}
 	],
@@ -147,14 +194,63 @@
 					"rowKey": "id",
 					"rowsPath": "items",
 					"columns": [
-						{ "key": "title", "label": "内容" },
-						{ "key": "kind", "label": "種類" },
-						{ "key": "nextDueAt", "label": "次回", "format": "date" },
-						{ "key": "interval", "label": "繰り返し" },
-						{ "key": "status", "label": "状態", "format": "badge" }
+						{
+							"key": "title",
+							"label": "内容"
+						},
+						{
+							"key": "kind",
+							"label": "種類"
+						},
+						{
+							"key": "nextDueAt",
+							"label": "次回",
+							"format": "date"
+						},
+						{
+							"key": "interval",
+							"label": "繰り返し"
+						},
+						{
+							"key": "status",
+							"label": "状態",
+							"format": "badge"
+						}
 					]
 				}
 			],
+			"launcher": {
+				"label": "実行予約",
+				"description": "会話とワークフローの予約一覧を見る",
+				"order": 16
+			}
+		},
+		{
+			"kind": "artifact",
+			"id": "scheduler.pending",
+			"revision": 2,
+			"title": "実行予約",
+			"defaultVariant": "standard",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "schedule-agenda",
+						"source": "agenda",
+						"title": "実行予約"
+					}
+				}
+			],
+			"sourceBindings": [
+				{
+					"source": "agenda",
+					"adapterRef": "adapter:scheduler@1",
+					"query": "query:scheduler.agenda@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [],
 			"launcher": {
 				"label": "実行予約",
 				"description": "会話とワークフローの予約一覧を見る",

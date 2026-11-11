@@ -67,6 +67,7 @@ export function controls(
 				state.result = null;
 				delete state.publication;
 				delete state.command;
+				delete state.decision;
 				state.source.amendments = [...(state.source.amendments ?? []), control];
 			}
 			// A superseded question/result must not be delivered by a queued notice.

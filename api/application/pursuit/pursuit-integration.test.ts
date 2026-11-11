@@ -7,25 +7,12 @@ import { estimateTextTokens } from "../../infrastructure/context-budget";
 import { createPursuitReportResourceAdapter } from "../../domains/pursuit";
 
 test("conversation selects the registered research task, uses the existing guarded Web owner, and adopts its full sourced report", async () => {
-	const script = researchScript({ document: true }),
-		answer =
+	const answer =
 			"本文で確認した結論です。".repeat(80) +
 			"[資料](https://example.com/source)",
 		request = "複数資料を比較して反証と結論を整理して";
 	const h = await harness({
-		pursuit: (schema) => {
-			const step = script(schema);
-			if (
-				"inputJson" in step &&
-				step.tool === "report_draft" &&
-				step.inputJson
-			) {
-				const draft = JSON.parse(step.inputJson);
-				draft.answer = answer;
-				step.inputJson = JSON.stringify(draft);
-			}
-			return step;
-		},
+		pursuit: researchScript({ document: true, answer }),
 		discoveryTarget: () => "web_research",
 		firstRound: (_tools, _question, messages) =>
 			searchThenDelegate((c) => c.id === "web.research", request, {

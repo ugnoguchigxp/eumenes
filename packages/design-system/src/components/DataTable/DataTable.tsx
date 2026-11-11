@@ -1,6 +1,7 @@
 import { cn } from "@/utils/cn";
+import type { ReactNode } from "react";
 
-export type DataTableCell = string | number;
+export type DataTableCell = ReactNode;
 
 export interface DataTableColumn {
 	header: string;

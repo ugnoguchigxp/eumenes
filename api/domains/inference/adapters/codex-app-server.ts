@@ -14,6 +14,7 @@ export type CodexTurn = {
 	prompt: string;
 	images?: import("../../../infrastructure/chat-image-parts").MessageImage[];
 	outputSchema?: unknown;
+	nativeWebSearch?: true;
 	reasoningEffort?: "low" | "medium" | "high";
 	signal: AbortSignal;
 	/** The current agent message so far (cumulative), on every delta. */
@@ -46,6 +47,7 @@ export async function runCodexTurn(
 			let messageId: string | undefined;
 			let message = "";
 			let final = "";
+			let searched = false;
 			let usage: CodexUsage | null = null;
 			let usageModel: string | null = turn.model;
 			onNotification((method, params) => {
@@ -71,6 +73,14 @@ export async function runCodexTurn(
 					const item = params.item as { type?: string; text?: unknown };
 					if (item?.type === "agentMessage" && typeof item.text === "string")
 						final = item.text;
+					if (
+						item?.type === "webSearch" &&
+						threadId &&
+						params.threadId === threadId &&
+						turnId &&
+						params.turnId === turnId
+					)
+						searched = true;
 				} else if (method === "thread/tokenUsage/updated") {
 					if (
 						!threadId ||
@@ -110,7 +120,9 @@ export async function runCodexTurn(
 				} else if (method === "turn/completed") {
 					const t = params.turn as { id?: string; status?: string };
 					if (turnId && t?.id !== turnId) return;
-					if (t?.status === "completed")
+					if (t?.status === "completed" && turn.nativeWebSearch && !searched)
+						finish(fail("web_search_missing"));
+					else if (t?.status === "completed")
 						finish(null, {
 							text: final,
 							inputTokens: usage?.inputTokens ?? null,
@@ -186,5 +198,6 @@ export async function runCodexTurn(
 			});
 			return await done.promise;
 		},
+		turn.nativeWebSearch,
 	);
 }

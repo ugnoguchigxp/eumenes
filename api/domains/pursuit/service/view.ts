@@ -79,6 +79,12 @@ export function finalResult(
 			})),
 		limitations: draft?.limitations,
 		assurance: "model",
-		stopReason: draft?.stopReason ?? core?.report?.reason ?? code,
+		stopReason:
+			(core?.input.conditions.execution === "productive"
+				? core.report?.reason
+				: undefined) ??
+			draft?.stopReason ??
+			core?.report?.reason ??
+			code,
 	};
 }

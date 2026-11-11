@@ -46,6 +46,7 @@ export type CloudAgentCall = {
 	/** JSON Schema the final text must satisfy (control requests). */
 	outputSchema?: Record<string, unknown>;
 	reasoningEffort?: "low" | "medium" | "high";
+	nativeWebSearch?: true;
 	signal: AbortSignal;
 	onDelta?: (text: string) => void;
 };

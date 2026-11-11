@@ -17,6 +17,7 @@ import {
 import { waitFor } from "../../infrastructure/wait-for";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { harness } from "../toolchain/toolchain.fixture";
+import type { HarnessOptions } from "../toolchain/toolchain-harness-options.fixture";
 import { workflowRefs } from "./workflow-operations";
 
 export const artifact = "artifact:app-development.studio@2";
@@ -172,6 +173,12 @@ export async function fixture(input: {
 	timerNow?: () => number;
 	beforeExtract?: () => void;
 	beforeNavigation?: () => void;
+	webFixture?: {
+		acquisition: NonNullable<HarnessOptions["acquisition"]>;
+		control: NonNullable<
+			NonNullable<HarnessOptions["appDevelopment"]>["control"]
+		>;
+	};
 	live?: {
 		model: ReturnType<typeof createLiveLarm>;
 		archive?: ArchivePort;
@@ -210,7 +217,9 @@ export async function fixture(input: {
 				}
 			: {}),
 		markdown: input.live?.archive ?? archive,
-		acquisition: input.live ? createWebAcquisition() : undefined,
+		acquisition: input.live
+			? createWebAcquisition()
+			: input.webFixture?.acquisition,
 		timerNow: input.timerNow,
 		discoveryTarget: () => "develop_app",
 		firstRound: (_tools, _question, messages) =>
@@ -234,7 +243,9 @@ export async function fixture(input: {
 			destination: input.live?.destination
 				? () => input.live!.destination!
 				: undefined,
-			control: (messages) => {
+			control: (messages, signal, options) => {
+				if (input.webFixture)
+					return input.webFixture.control(messages, signal, options);
 				const packet = JSON.parse(messages.at(-1)!.content);
 				if (packet.hits) {
 					calls.push("select");

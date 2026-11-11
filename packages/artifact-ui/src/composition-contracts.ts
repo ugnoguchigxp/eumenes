@@ -251,7 +251,19 @@ const chartPoint = z.strictObject({
 	x: z.union([z.number(), z.string().min(1).max(160)]),
 	y: z.number(),
 });
-const tableCell = z.union([z.string().max(480), z.number()]);
+export const tableIconNames = [
+	"sun",
+	"cloud-sun",
+	"cloud",
+	"cloud-rain",
+	"cloud-snow",
+	"cloud-lightning",
+] as const;
+export const iconTableCell = z.strictObject({
+	icon: z.enum(tableIconNames),
+	text: text(480),
+});
+const tableCell = z.union([z.string().max(480), z.number(), iconTableCell]);
 
 /** View schemas added to `viewRegistry`. */
 export const compositionViewRegistry = {

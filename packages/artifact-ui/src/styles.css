@@ -260,6 +260,19 @@
 	max-width: 72rem;
 	margin-inline: auto;
 }
+.aui-table-icon-cell {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	white-space: normal;
+}
+.aui-table-icon-cell > svg {
+	flex: none;
+	color: var(--muted-foreground);
+}
+.aui-table-icon-cell:is([data-icon="sun"], [data-icon="cloud-sun"]) > svg {
+	color: var(--warning);
+}
 .aui-composition-grid {
 	grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 	align-items: start;

@@ -1,0 +1,9 @@
+{
+	"package": "eumenes-evaluator",
+	"version": "0.1.0",
+	"artifact": "eumenes-evaluator-0.1.0-1178a3fad04b.tgz",
+	"sha256": "1178a3fad04b8708b9cb1f0c8dd7ece50056ab317c3f5ba6b5afa037d943b708",
+	"size": 61040,
+	"gitSha": "9a11d038b073a806d62efb61edec5383a4d65680",
+	"verifiedWith": "Eumenes vendored package integration tests (Quick and Standard with host Steer)"
+}

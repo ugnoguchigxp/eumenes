@@ -1,11 +1,11 @@
 {
 	"package": "eumenes-pursuit",
-	"version": "0.0.4",
-	"artifact": "eumenes-pursuit-0.0.4-7964f15d6308.tgz",
-	"sha256": "7964f15d630879bc37cbabfa3d5f65b3ef59a88e041854e7ebc569016704ee97",
-	"sourceGitCommit": "2b6af95044409b94ac6cfaef23db22db94d1e9ff",
-	"hostContract": "1.11",
-	"dbSchemaVersion": 8,
-	"verifiedWith": "543 local tests passed; 12 existing skips; typecheck/lint passed",
-	"files": 80
+	"version": "0.0.7",
+	"artifact": "eumenes-pursuit-0.0.7-625925edf98c.tgz",
+	"sha256": "625925edf98c8003380a05b29dc36804dfa6fbd00e909ba4a39de268f5ef8c48",
+	"sourceGitCommit": "d1cfbb8ece0e9d8fe08fb15bd29b368c40f4bb12",
+	"hostContract": "1.13",
+	"dbSchemaVersion": 10,
+	"verifiedWith": "Clean consumer package test; 0.0.4 migration and run resume; productive last-slot partial save and one independent verification",
+	"files": 88
 }

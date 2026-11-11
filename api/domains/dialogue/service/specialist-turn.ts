@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import { stateProposalSchema } from "eumenes-collaboration";
-import { parseLlmJson } from "../../../infrastructure/llm-json";
+import { LlmJsonError, parseLlmJson } from "../../../infrastructure/llm-json";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import {
 	toolResultMessage,
@@ -169,6 +169,20 @@ const stateChanges = z.looseObject({
 		.pick({ upserts: true, removals: true })
 		.nullish(),
 });
+const fullStateUpdate = z.looseObject({ stateUpdate: stateProposalSchema });
+
+function proposalRefusal(error: z.ZodError) {
+	return {
+		ok: false as const,
+		reason: "proposal_invalid",
+		issues: error.issues.slice(0, 8).map((issue) => ({
+			path: issue.path.join("."),
+			code: issue.code,
+			...("expected" in issue ? { expected: issue.expected } : {}),
+		})),
+	};
+}
+
 async function statefulAction(
 	deps: DialogueDeps,
 	input: TurnInput,
@@ -184,22 +198,20 @@ async function statefulAction(
 	let value = output.value;
 	if (output.baseline) {
 		const proposal = stateChanges.safeParse(value);
-		if (!proposal.success)
-			return {
-				ok: false as const,
-				reason: "proposal_invalid",
-				issues: proposal.error.issues.slice(0, 8).map(({ path, code }) => ({
-					path: path.join(".") || "stateUpdate",
-					code,
-				})),
-			};
+		if (!proposal.success) return proposalRefusal(proposal.error);
 		value = {
 			...proposal.data,
 			stateUpdate: { ...output.baseline, ...proposal.data.stateUpdate },
 		};
 	}
 	const checked = statefulSpecialistContract.check(value);
-	if (!checked.ok) return checked;
+	if (!checked.ok) {
+		if (checked.reason === "proposal_invalid") {
+			const proposal = fullStateUpdate.safeParse(value);
+			if (!proposal.success) return proposalRefusal(proposal.error);
+		}
+		return checked;
+	}
 	const adopted = await deps.store.write((tx) => {
 		stillMine(tx);
 		signal.throwIfAborted();
@@ -472,12 +484,19 @@ export function createSpecialistTurnHandler(
 			const raw = String(receipt.value);
 			let value: unknown;
 			let action: SpecialistAction | null = null;
-			let stateRefusal: string | null = null;
-			let stateIssues: ReturnType<typeof specialistViolations> | undefined;
+			let issues: ReturnType<typeof specialistViolations> | undefined;
 			try {
 				value = input.candidateDelivery
 					? decodeSpecialistOutput(raw)
 					: parseLlmJson(raw);
+			} catch (error) {
+				signal.throwIfAborted();
+				if (error instanceof SpecialistOutputError) issues = error.issues;
+				else if (error instanceof LlmJsonError)
+					issues = [{ path: "", code: error.code }];
+				else throw error;
+			}
+			if (!issues) {
 				if (input.set.agent.collaborationState && !input.observation) {
 					const checked = await statefulAction(deps, input, signal, stillMine, {
 						value,
@@ -486,29 +505,16 @@ export function createSpecialistTurnHandler(
 						baseline,
 					});
 					if (checked.ok) action = checked.action;
-					else {
-						stateRefusal = checked.reason;
-						if ("issues" in checked && checked.issues)
-							stateIssues = [...checked.issues];
-					}
+					else if ("violations" in checked) issues = checked.violations;
+					else if ("issues" in checked && checked.issues)
+						issues = [...checked.issues];
+					else issues = [{ path: "stateUpdate", code: checked.reason }];
 				} else action = parseSpecialistAction(value);
-			} catch (error) {
-				if (
-					error instanceof StaleTurn ||
-					signal.aborted ||
-					(input.set.agent.collaborationState && value !== undefined)
-				)
-					throw error;
-				if (error instanceof SpecialistOutputError) stateIssues = error.issues;
-				action = null;
 			}
 			if (!action || (input.observation && action.kind !== "reply")) {
 				const violations = action
 					? [{ path: "action", code: "host_event_reply_only" }]
-					: (stateIssues ??
-						(stateRefusal
-							? [{ path: "stateUpdate", code: stateRefusal }]
-							: specialistViolations(value)));
+					: (issues ?? specialistViolations(value));
 				log.warn("dialogue.specialist_output_rejected", {
 					reason: "invalid_contract",
 					repairAttempt: repaired ? 1 : 0,

@@ -94,12 +94,17 @@ export function save(db: Database, row: RunRow, state: HostState, now: number) {
 	if (changed.changes !== 1) throw new Error("pursuit_revision_conflict");
 	row.revision++;
 }
-export const documents = (db: Database, row: RunRow) =>
+export const documents = (db: Database, row: RunRow, includePending = false) =>
 	db
 		.query(
-			"SELECT * FROM pursuit_documents WHERE run_id=? AND epoch=? ORDER BY rowid",
+			`SELECT d.* FROM pursuit_documents d WHERE d.run_id=? AND d.epoch=?
+			AND (? OR NOT EXISTS (
+				SELECT 1 FROM pursuit_web_operations o, json_each(o.outcome_json, '$.refs') r
+				WHERE o.run_id=d.run_id AND o.epoch=d.epoch AND o.adopted=0
+				AND json_extract(r.value, '$.note')=d.id
+			)) ORDER BY d.rowid`,
 		)
-		.all(row.id, row.epoch) as DocumentRow[];
+		.all(row.id, row.epoch, Number(includePending)) as DocumentRow[];
 export const pendingWeb = (db: Database, row: RunRow) =>
 	db
 		.query(

@@ -228,6 +228,15 @@ export const viewRegistry = {
 		label: "仕事の結果",
 		schema: z.strictObject({ view: z.literal("work-result"), source, title }),
 	},
+	"schedule-agenda": {
+		name: "ScheduleAgenda",
+		label: "実行予約の予定一覧",
+		schema: z.strictObject({
+			view: z.literal("schedule-agenda"),
+			source,
+			title,
+		}),
+	},
 	"drawing-workspace": {
 		name: "DrawingWorkspace",
 		label: "図を描く・編集する",

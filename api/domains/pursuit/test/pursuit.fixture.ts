@@ -20,6 +20,11 @@ export async function fixture(
 		unknownUsage?: boolean;
 		holdModel?: Promise<void>;
 		grader?: boolean;
+		productive?: boolean;
+		respond?: (
+			schema: Record<string, unknown>,
+			messages: import("../../inference/contracts").Messages,
+		) => unknown | Promise<unknown>;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-pursuit-")),
@@ -29,13 +34,16 @@ export async function fixture(
 		valid = true,
 		calls = 0;
 	const observations = new Map<string, WebObservation>(),
+		requestedUrls = new Map<string, string>(),
 		cancelled = new Set<string>(),
 		erased = new Set<string>(),
 		notices: unknown[] = [];
 	const gradePrompts: string[] = [];
 	const gradeInstructions: string[] = [];
 	const modelPackets: Array<Record<string, any>> = [];
-	const script = researchScript({ ...options, document: !!options.documents }),
+	const productive = !!(options.productive || options.documents);
+	const script =
+			options.respond ?? researchScript({ ...options, document: productive }),
 		receiptIds = new Set<string>();
 	const inference: InferencePort = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
@@ -62,7 +70,10 @@ export async function fixture(
 			}
 			if (options.holdModel) await options.holdModel;
 			const value = JSON.stringify(
-				script(control!.outputSchema as Record<string, unknown>),
+				await script(
+					control!.outputSchema as Record<string, unknown>,
+					_messages,
+				),
 			);
 			const attemptId = crypto.randomUUID();
 			receiptIds.add(attemptId);
@@ -106,6 +117,8 @@ export async function fixture(
 	const web: ResearchWebPort = {
 		startInTransaction(db, input) {
 			const id = input.requestId;
+			if (typeof input.arguments.url === "string")
+				requestedUrls.set(id, input.arguments.url);
 			db.query("INSERT INTO fixture_web VALUES (?,?)").run(id, input.kind);
 			observations.set(id, {
 				state: "waiting",
@@ -142,7 +155,7 @@ export async function fixture(
 			bundleHost: offlineBundleHost,
 		});
 		await capabilities.seed();
-		if (!options.documents)
+		if (!productive)
 			await store.write((db) => {
 				// Recreate the previously published package and skill for legacy lifecycle/recovery fixtures.
 				db.query(
@@ -186,10 +199,10 @@ export async function fixture(
 			},
 			request,
 			references: [],
-			toolchainRevisionId: options.documents
+			toolchainRevisionId: productive
 				? "toolchain:web.research@7"
 				: "toolchain:web.research@5",
-			bindingRevisionId: options.documents
+			bindingRevisionId: productive
 				? "binding:pursuit.research@3"
 				: "binding:pursuit.research@2",
 		}),
@@ -234,9 +247,9 @@ export async function fixture(
 			await running.service.recover();
 			start();
 		},
-		finishWeb() {
+		finishWeb(only?: string) {
 			for (const [id, value] of observations)
-				if (value.state === "waiting") {
+				if (value.state === "waiting" && (!only || only === id)) {
 					const kind = store.read(
 						(db) =>
 							(
@@ -261,7 +274,8 @@ export async function fixture(
 							kind === "read"
 								? [
 										{
-											url: "https://example.com/source",
+											url:
+												requestedUrls.get(id) ?? "https://example.com/source",
 											title: "一次資料",
 											text: options.body ?? "本文で確認した事実",
 											fetchedAt: new Date(now).toISOString(),

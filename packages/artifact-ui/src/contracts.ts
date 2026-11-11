@@ -1,4 +1,9 @@
 import type { MarkdownResource } from "./markdown-components";
+import type { ScheduleAgendaResource } from "./schedule-agenda-contracts";
+export {
+	scheduleAgendaData,
+	type ScheduleAgendaResource,
+} from "./schedule-agenda-contracts";
 export type { MarkdownResource } from "./markdown-components";
 import type { DotsMessagingResource } from "./dots-messaging-components";
 import type { WorkMenuResource, WorkResultResource } from "./work-components";
@@ -327,6 +332,7 @@ export type Resource =
 	  }
 	| WorkMenuResource
 	| WorkResultResource
+	| ScheduleAgendaResource
 	| GoogleAccountsResource
 	| DotsMessagingResource
 	| ObjectRecognitionResource

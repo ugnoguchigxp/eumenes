@@ -18,6 +18,7 @@ export async function withCodexTransport<T>(
 			receive: (method: string, params: Record<string, unknown>) => void,
 		): void;
 	}) => Promise<T>,
+	nativeWebSearch?: true,
 ) {
 	signal.throwIfAborted();
 	const overrides = [
@@ -26,7 +27,7 @@ export async function withCodexTransport<T>(
 		"project_doc_max_bytes=0",
 		'history.persistence="none"',
 		"mcp_servers={}",
-		'web_search="disabled"',
+		nativeWebSearch ? 'web_search="live"' : 'web_search="disabled"',
 	];
 	const child = spawn(
 		runtime.command,

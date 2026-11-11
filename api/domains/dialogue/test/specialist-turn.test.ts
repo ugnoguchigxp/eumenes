@@ -6,6 +6,7 @@ import { registerDialogue } from "../controller";
 import {
 	STUDIO,
 	STUDIO_ARTIFACT,
+	NO_AGENT,
 	approve,
 	setup,
 	type Harness,
@@ -94,6 +95,50 @@ function rejectedIssues(h: Harness) {
 		issues: JSON.parse(message.content.split("REJECTED_OUTPUT=")[1]!).issues,
 	};
 }
+
+test("a host-bound repair gets the JSON failure or the field that failed validation", async () => {
+	const h = await harness({
+		agent: { ...NO_AGENT, collaborationState: "host-bound" },
+	});
+	await start(h);
+	const cases = [
+		{
+			output: '{"action":',
+			issue: { path: "", code: "llm_json_incomplete" },
+		},
+		{
+			output: { action: "reply", text: 5 },
+			issue: { path: "text", code: "invalid_type", expected: "string" },
+		},
+		{
+			output: {
+				...reply("確認しました。"),
+				stateUpdate: {
+					upserts: [
+						{
+							id: "area",
+							kind: "condition",
+							status: "proposed",
+							value: "東京",
+							sourceRefs: ["fixture"],
+						},
+					],
+					removals: [],
+				},
+			},
+			issue: {
+				path: "stateUpdate.upserts.0.supersedes",
+				code: "invalid_type",
+				expected: "array",
+			},
+		},
+	];
+	for (const { output, issue } of cases) {
+		h.state.specialist.push(output, reply("直しました。"));
+		expect((await h.ask("続けて")).status).toBe("completed");
+		expect(rejectedIssues(h).issues).toEqual([issue]);
+	}
+});
 
 test("a repair call says where the output broke the contract: schema path and kind, or the reply's measured length, never an internal code name", async () => {
 	const h = await harness();

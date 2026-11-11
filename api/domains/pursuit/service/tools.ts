@@ -100,6 +100,9 @@ export function researchTools(
 							sideEffect: name === "report_draft" ? "workspace" : "none",
 							readsWorkspace: name === "report_read",
 							readsBack: name === "report_read",
+							...(name === "report_draft"
+								? { reuseWriteIgnoring: ["stopReason"] }
+								: {}),
 							reread:
 								"保存本文はsource_read/source_find、回答案はreport_readで読み直せます。",
 						}) satisfies ToolDescriptor,
