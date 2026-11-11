@@ -1,3 +1,4 @@
+import { configuredContextStill, createKnowledge } from "./knowledge/service";
 import { createAppDevelopmentRuntime } from "./app-development/runtime";
 import { createGitObservation } from "../domains/git-observation";
 import { createMemoryHostConnection } from "./memory-host";
@@ -71,6 +72,12 @@ export async function buildServices(
 		serviceTests,
 		queue,
 	} = core;
+	const knowledge = createKnowledge({
+		store,
+		queue,
+		control: inference,
+		source: configuredContextStill(config.contextStill ?? {}),
+	});
 	const webResearch = buildWebResearch(config, core);
 	const scheduler = createScheduler(store, queue);
 	const timers = createTimers(
@@ -385,6 +392,7 @@ export async function buildServices(
 			})
 		: undefined;
 	return {
+		knowledge,
 		liveVoice,
 		store,
 		changes,

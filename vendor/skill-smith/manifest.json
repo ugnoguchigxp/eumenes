@@ -1,0 +1,11 @@
+{
+	"package": "eumenes-skill-smith",
+	"version": "0.1.0",
+	"contractVersion": "skillsmith.v1",
+	"sourceGitCommit": "5a6aa00f8bdabbdbd3c2edf681da5fbdbe4c82ff",
+	"sourceGitDirty": false,
+	"sourceDigest": "f248a109713cc9c93f840b81625610323f4514e3af0afc2e9eede8a76807ecb6",
+	"sha256": "4df964f21ab6796e7db579511ffdc7014bbfb5b63e544ca7eeb9e9b4f567b2e8",
+	"artifact": "eumenes-skill-smith-0.1.0-5a6aa00f8bda.tgz",
+	"sizeBytes": 131940
+}
