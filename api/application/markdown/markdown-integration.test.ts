@@ -107,6 +107,7 @@ test("conversation switches to collaborator, edits arbitrary document ranges and
 		expect(owner).toMatchObject({
 			toolchainId: "markdown.collaborate",
 			adapterRef: "adapter:markdown@1",
+			agentLabel: "Collaboration",
 			state: "active",
 		});
 		expect(prompts[0]).toContain("共同作業サブエージェント");

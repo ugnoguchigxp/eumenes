@@ -325,14 +325,25 @@ test.each(["browser request", "bare URL request", "dedicated"] as const)(
 			if (!originalTab) throw new Error("opened_browser_tab_missing");
 			const dedicated = h.dialogue.specialistSession("main");
 			if (fromConversation) expect(dedicated).toBeNull();
-			else expect(dedicated?.toolchainId).toBe("collaboration.brave");
+			else {
+				const response = await h.request("/api/conversations/main/specialist");
+				expect(response.status).toBe(200);
+				expect((await response.json()).session).toMatchObject({
+					toolchainId: "collaboration.brave",
+					title: "Braveの共同作業",
+					agentLabel: "Collaboration",
+				});
+			}
 			expect(
 				service.tabs().find((tab) => tab.tabRef === originalTab)?.url,
 			).toBe(`${origin}/list`);
 			await service.openTab("self", null, `${origin}/unrelated`);
 			await say(switchRequest);
 			const common = h.dialogue.specialistSession("main");
-			expect(common?.toolchainId).toBe("collaboration.task");
+			expect(common).toMatchObject({
+				toolchainId: "collaboration.task",
+				agentLabel: "Collaboration",
+			});
 			expect(common?.id).not.toBe(dedicated?.id);
 			expect(
 				service.listTasks(CONVERSATION_DEFAULT_PRINCIPAL, "main"),
