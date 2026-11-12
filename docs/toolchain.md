@@ -67,6 +67,8 @@ Router（担当の振り分け）: `eumenes_router` パッケージ（`vendor/ro
 
 検索は同期したカードの全文検索とLARMの埋め込み（passage）、採点は保存profileの文脈判定（`decision.context`）、best-v2、訂正の補正と決定表を使います。best-v2の記憶は `router import-memory` で取り込み、Gitにはありません。hostは実在する仕事・承認・質問・切替待ちと進行中の担当を候補へ加えます。選択した担当は `find_toolchain` のofferと既存の権限・影響・承認・TODO・Queueを通して実行します。複数作業の決定は登録済みPipelineへ元依頼全体を渡し、利用できない場合に先頭の仕事だけを代わりに実行しません。
 
+Routerが会話に決めた回では、agendaが返事を担う会話に限り、返事が `find_toolchain`（検索）と `delegate`（その返事で見つけた担当への依頼）を使えます。引き渡しは上と同じ権限・影響・承認・TODO・Queueを通ります（[agency.md](agency.md)の「会話の返事から担当に頼む」）。
+
 引数を要する担当は、その担当に限定した欄埋めを会話モデルが行います。保留への回答は同じ仕事へ戻し、構造化回答のschemaに合わない自然文だけを既存の形変換で一回補います。訂正は `router_feedback` に保存し、`feedbackNear` と `feedbackWeight` の範囲で補正します。記録は `router_traces`（30日）、訂正の一覧は `GET /api/toolchain-history/router-feedback`、取消は `POST /api/toolchain-history/router-feedback/:id/state`です。元発言の忘却で派生記録も削除します。方式の評価はRouterのbench、hostの操作・成果物・通知はEumenesの結合と通常会話の受入で確認します。
 
 読む道具: 会話の回の読む道具（`read_memory` 記憶・`read_history` 会話ログ・`read_runs` 最近の回・`read_agents` 担当の作業・`read_world` World）は担当ではなく、bundle も持たないが、検索の文を `api/domains/capabilities/contracts/read-tools.ts` に持ち、担当と同じ索引（key `host:<関数名>@<版>`）で専用の担当の枠を取り合う。候補に出ると execution は `read` で、選ぶ呼出しは即答の担当と同じ形（`choice` と `inputs`）で選び、ホストが読んで会話の回が話す。候補に出なくても、会話の回の呼出しに native tools として渡り、1回だけ呼べる（[設計](../spec/conversation-read-tools-design-2026-10-31.md)）。

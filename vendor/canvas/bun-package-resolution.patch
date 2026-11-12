@@ -1,0 +1,29 @@
+diff --git a/src/server/preview.ts b/src/server/preview.ts
+index aa6d30440df2e8747ef0ffd10fc47d47e04d0ace..090c4860811a646486d0e88d0f0949469de425c8 100644
+--- a/src/server/preview.ts
++++ b/src/server/preview.ts
+@@ -1,12 +1,14 @@
+ // プレビューオリジンの配信。固定シェルと、作品ごとの Worker スクリプトを返す。
+ import { randomBytes } from "node:crypto";
+ import { readFileSync } from "node:fs";
+-import { join } from "node:path";
++import { createRequire } from "node:module";
++import { dirname, join } from "node:path";
+ import type { ArtworkBody } from "../contract/artwork";
+ import { resolveLibraries, type HostLibrary } from "../contract/libraries";
+ import { instrumentLoops } from "./instrument-loops";
+ 
+ const SRC = join(import.meta.dir, "..");
++const resolve = createRequire(import.meta.url).resolve;
+ const read = (p: string) => readFileSync(join(SRC, p), "utf8");
+ 
+ export const WORKER_CSP = "default-src 'none'";
+@@ -102,7 +104,7 @@ export function librarySource(lib: HostLibrary): Promise<string> {
+   let p = libCache.get(lib.id);
+   if (!p) {
+     p = (async () => {
+-      const packageDir = join(SRC, "..", "node_modules", lib.pkg);
++      const packageDir = dirname(resolve(`${lib.pkg}/package.json`));
+       const pkg = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8")) as { version: string };
+       if (pkg.version !== lib.version) throw new Error(`${lib.pkg} の版が固定と違う（実際 ${pkg.version}、固定 ${lib.version}）`);
+       const r = await Bun.build({ entrypoints: [join(SRC, "preview/libs", lib.shim)], format: "iife", minify: true, target: "browser" });

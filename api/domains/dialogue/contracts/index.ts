@@ -1,5 +1,9 @@
 import type { Database } from "bun:sqlite";
-export { agencyStatusSchema } from "./agency-status";
+export {
+	agencyStatusSchema,
+	agencyThoughtsSchema,
+	type AgencyThought,
+} from "./agency-status";
 import { z } from "zod";
 import type { DeliveryEmotion } from "../../delivery";
 import {
@@ -280,6 +284,11 @@ export interface ConversationAgentSystem {
 export interface ConversationAgentPort {
 	/** The agent's parts of the system message; fixed by the settings, so the cached prefix holds. */
 	system(): ConversationAgentSystem;
+	/**
+	 * The agent's reply to the user's words may look for a toolchain and hand work to it (its rules say how): the host
+	 * offers it `find_toolchain` and `delegate` then (spec router-package-integration, 2026-11-12). Absent: it may not.
+	 */
+	handsWork?(): boolean;
 	respond(input: {
 		/** The run this reply answers for, when it answers the user's words (the agency steers its reply by them). */
 		run?: {

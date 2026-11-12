@@ -79,6 +79,7 @@ export function HiyoriAvatarBackground({
 						reduced.matches ? 0 : readAssistantMouth(),
 						latest.current.cue?.intensity,
 						viewRef.current,
+						reduced.matches ? null : latest.current.cue,
 					);
 				} catch {
 					element.dataset.avatarState = "render-failed";

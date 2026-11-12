@@ -13,10 +13,13 @@ import { createLiveBridge } from "./media/live-bridge";
 import { createLateResources } from "./resources/late";
 import { buildResources } from "./resources/wiring";
 import { buildMarkdown } from "./markdown/markdown-composition";
+import { createCanvasRuntime, canvasPreviewOrigin } from "./canvas/runtime";
+import { createCanvasJobs } from "./canvas/jobs";
+import { createCanvasAdapter } from "./canvas/adapter";
 import { buildDocling } from "./docling/docling-composition";
 import { createDotsMessages } from "./work/dots-messages";
 import { createDotsWork } from "./work/dots-work";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { GoogleProvider } from "../domains/google-accounts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { createContinuityService } from "../domains/continuity";
@@ -202,8 +205,28 @@ export async function buildServices(
 	});
 	// The toolchain's `resources` tool and `resource.read` reach the registry and ledger once they exist.
 	const lateResources = createLateResources(store);
+	const previewOrigin = config.toolchainEnabled
+		? canvasPreviewOrigin(config.origin, config.env.EUMENES_CANVAS_PREVIEW_PORT)
+		: null;
+	const canvasRuntime = previewOrigin
+		? createCanvasRuntime({
+				hostOrigin: config.origin,
+				previewOrigin,
+				dataDir: join(dirname(dbPath), "canvas"),
+				store,
+				inference,
+			})
+		: null;
+	const canvas = canvasRuntime
+		? {
+				runtime: canvasRuntime,
+				jobs: createCanvasJobs(queue, canvasRuntime, store, conversation),
+			}
+		: undefined;
 	const { toolchain, links } = await createHostToolchain({
 		resources: lateResources,
+		canvasAdapter:
+			canvas && createCanvasAdapter(canvas.runtime, canvas.jobs, conversation),
 		scratch: core.scratch,
 		docling,
 		dotsWork: createDotsWork({
@@ -315,6 +338,7 @@ export async function buildServices(
 			},
 			...liveBridge.agency,
 			steering,
+			publish: () => changes.publish(),
 		},
 		() => dialogue,
 	);
@@ -446,6 +470,7 @@ export async function buildServices(
 		connectionModels: core.connectionModels,
 		serviceTests,
 		docling,
+		canvas,
 		excalidraw: media.excalidraw,
 		drawingOperations: media.drawingOperations,
 		image: media.image,

@@ -1,3 +1,4 @@
+import { CanvasWorkspaceView } from "./canvas-components";
 import { ExternalAppLauncherView } from "./external-app-components";
 import { DotsMessagingView } from "./dots-messaging-components";
 import { WorkMenuView, WorkResultView } from "./work-components";
@@ -168,6 +169,7 @@ const renderers = {
 	"kanban-board": KanbanBoardView,
 	"activity-timeline": ActivityTimelineView,
 	"drawing-workspace": DrawingWorkspaceView,
+	"canvas-workspace": CanvasWorkspaceView,
 	"image-workspace": ImageWorkspaceView,
 	"image-creation-form": ImageCreationView,
 	"image-preview": ImagePreviewView,

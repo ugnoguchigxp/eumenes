@@ -1,3 +1,4 @@
+import { canvasWebAdapter } from "../domains/canvas/toolchain-adapter";
 import { markdownWebAdapter } from "../domains/markdown/toolchain-adapter";
 import { doclingWebAdapter } from "../domains/docling/toolchain-adapter";
 import { collaborationWebAdapters } from "../domains/collaboration/toolchain-adapter";
@@ -32,6 +33,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	...collaborationWebAdapters,
 	usageWebAdapter,
 	doclingWebAdapter,
+	canvasWebAdapter,
 	markdownWebAdapter,
 	dotsMessagingWebAdapter,
 	dotsWorkWebAdapter,

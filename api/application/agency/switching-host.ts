@@ -7,7 +7,10 @@ import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import type { AgencyHostDeps } from "./host-types";
 import type { AgencyWork } from "./work";
-import type { AgencyActivity } from "../../domains/dialogue/contracts/agency-status";
+import type {
+	AgencyActivity,
+	AgencyThought,
+} from "../../domains/dialogue/contracts/agency-status";
 type Legacy = ReturnType<typeof createAgencyHost>;
 
 /** One owner at a time. A switch drains and invalidates the previous owner before constructing the next. */
@@ -63,6 +66,8 @@ export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
 		conversationAgent: {
 			system: () =>
 				agencyReplyParts(deps.settings.get().agency, agendaReady(deps)),
+			// As the agenda's rules in the system above: they say how to look for a toolchain and hand work over.
+			handsWork: () => agendaReady(deps),
 			respond: (
 				...args: Parameters<typeof current.conversationAgent.respond>
 			) => current.conversationAgent.respond(...args),
@@ -129,6 +134,9 @@ export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
 					? Promise.resolve(current.status(id))
 					: current.attend(id),
 		status: (id: string) => current.status(id),
+		/** The agenda's thoughts; the F host shows none. */
+		thoughts: (id: string): AgencyThought[] =>
+			"thoughts" in current ? current.thoughts(id) : [],
 		inspect: (id: string) => current.inspect(id),
 	};
 }

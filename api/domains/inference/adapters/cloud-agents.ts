@@ -2,7 +2,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { runClaudeAgent } from "./cloud-agent-claude";
 import { runCodex } from "./cloud-agent-codex";
 import { fail, safeAgentError, type CloudAgents } from "./cloud-agent-shared";
-import { codexRuntime } from "./codex-sdk";
+import type { CodexHost } from "./codex-host";
 export {
 	anthropicBase,
 	anthropicFetch,
@@ -19,13 +19,18 @@ export type {
 export function createCloudAgents(
 	environment: Readonly<Record<string, string | undefined>>,
 	options: {
-		codexExecutable?: string;
+		/** The Codex processes and threads (undefined: Codex is not installed). */
+		codexHost?: CodexHost;
 		/** Test seam for the Claude Agent SDK entry point. */
 		claudeQuery?: typeof query;
 	} = {},
 ): CloudAgents {
-	const codex = codexRuntime(environment, options.codexExecutable);
+	const codex = options.codexHost;
 	return {
+		forget: () => codex?.forget(),
+		close: async () => {
+			await codex?.close();
+		},
 		async run(call) {
 			call.signal.throwIfAborted();
 			try {

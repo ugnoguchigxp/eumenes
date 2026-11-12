@@ -5,6 +5,7 @@ import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createCloudAgents } from "../adapters/cloud-agents";
+import { createCodexHost } from "../adapters/codex-host";
 import { createConnectionModels } from "../service/connection-models";
 import type { Connection } from "../../settings";
 import { inputImages } from "./image-input.fixture";
@@ -28,13 +29,17 @@ createInterface({input:process.stdin}).on("line", line => {
 const m=JSON.parse(line); appendFileSync(${JSON.stringify(record)},line+"\\n");
 if(m.method==="initialize")out({id:m.id,result:{}});
 if(m.method==="model/list")out({id:m.id,result:{data:[{model:"fixture-model",displayName:"fixture",...(JSON.parse(readFileSync(${JSON.stringify(capability)},"utf8"))===null?{}:{inputModalities:JSON.parse(readFileSync(${JSON.stringify(capability)},"utf8"))})}],nextCursor:null}});
-if(m.method==="config/read")out({id:m.id,result:{config:{}}});
+if(m.method==="thread/revert"||m.method==="thread/delete")out({id:m.id,result:{}});
 if(m.method==="thread/start")out({id:m.id,result:{thread:{id:"t"}}});
 if(m.method==="turn/start"){out({id:m.id,result:{turn:{id:"u"}}});out({method:"item/started",params:{threadId:"t",item:{type:"userMessage",id:"user",content:m.params.input}}});out({method:"item/completed",params:{threadId:"t",item:{type:"userMessage",id:"user",content:m.params.input}}});out({method:"item/completed",params:{threadId:"t",item:{type:"agentMessage",text:readFileSync(${JSON.stringify(behavior)},"utf8")==="answer"?"answer":"x".repeat(2*1024*1024)}}});out({method:"turn/completed",params:{threadId:"t",turn:{id:"u",status:"completed"}}});}
 });
 `,
 		{ mode: 0o700 },
 	);
+	const host = createCodexHost(
+		{ PATH: "" },
+		{ executable: command, home: join(dir, "home") },
+	)!;
 	try {
 		const connection: Connection = {
 			id: "c",
@@ -51,7 +56,7 @@ if(m.method==="turn/start"){out({id:m.id,result:{turn:{id:"u"}}});out({method:"i
 				credential: () => null,
 			} as never,
 			{ PATH: "" },
-			{ codexExecutable: command },
+			{ codexHost: host },
 		);
 		expect(
 			(await models.list("c", AbortSignal.timeout(5000)))!.models[0]!
@@ -68,7 +73,7 @@ if(m.method==="turn/start"){out({id:m.id,result:{turn:{id:"u"}}});out({method:"i
 		const image = (await inputImages())[1]!;
 		const result = await createCloudAgents(
 			{ PATH: "" },
-			{ codexExecutable: command },
+			{ codexHost: host },
 		).run({
 			kind: "codex-sdk",
 			model: "fixture-model",
@@ -101,7 +106,7 @@ if(m.method==="turn/start"){out({id:m.id,result:{turn:{id:"u"}}});out({method:"i
 			// Omitted capabilities must stay unknown; the fixture never starts another turn.
 			await writeFile(capability, JSON.stringify(modalities));
 			await expect(
-				createCloudAgents({ PATH: "" }, { codexExecutable: command }).run({
+				createCloudAgents({ PATH: "" }, { codexHost: host }).run({
 					kind: "codex-sdk",
 					model: "fixture-model",
 					baseUrl: connection.baseUrl,
@@ -123,7 +128,7 @@ if(m.method==="turn/start"){out({id:m.id,result:{turn:{id:"u"}}});out({method:"i
 		expect(bytes.length).toBeGreaterThan(2 * 1024 * 1024);
 		const largeResult = await createCloudAgents(
 			{ PATH: "" },
-			{ codexExecutable: command },
+			{ codexHost: host },
 		).run({
 			kind: "codex-sdk",
 			model: "fixture-model",
@@ -141,7 +146,7 @@ if(m.method==="turn/start"){out({id:m.id,result:{turn:{id:"u"}}});out({method:"i
 		expect(largeResult.text).toBe("answer");
 		await writeFile(behavior, "oversized-answer");
 		await expect(
-			createCloudAgents({ PATH: "" }, { codexExecutable: command }).run({
+			createCloudAgents({ PATH: "" }, { codexHost: host }).run({
 				kind: "codex-sdk",
 				model: "fixture-model",
 				baseUrl: connection.baseUrl,
@@ -157,6 +162,7 @@ if(m.method==="turn/start"){out({id:m.id,result:{turn:{id:"u"}}});out({method:"i
 			}),
 		).rejects.toThrow("cloud_agent_output_limit");
 	} finally {
+		await host.close();
 		await rm(dir, { recursive: true, force: true });
 	}
 });

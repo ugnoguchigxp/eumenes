@@ -1,11 +1,11 @@
 import type { query } from "@anthropic-ai/claude-agent-sdk";
 import { expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import type { Connection, Resource } from "../../settings/contracts";
 import { type CloudAgentCall } from "../adapters/cloud-agent-shared";
 import { createCloudAgents } from "../adapters/cloud-agents";
+import { fakeCodex } from "./codex.fixture";
 import type { RequestRow } from "../repository";
 import { cloudRequest, type CloudEnv } from "../service/cloud";
 
@@ -227,41 +227,11 @@ test("Claude Agent SDK gets outputFormat and its structured output becomes the t
 	expect(Object.keys(seen.options ?? {})).not.toContain("outputFormat");
 });
 
-test("Codex SDK isolates inherited MCP servers and passes the schema even without tools", async () => {
-	const dir = await mkdtemp(join(tmpdir(), "eumenes-codex-schema-"));
-	const record = join(dir, "turn.json");
-	const threadRecord = join(dir, "thread.json");
-	const command = join(dir, "codex");
-	// A minimal app-server: answers the handshake, records turn/start, completes the turn.
-	await writeFile(
-		command,
-		`#!${process.execPath}
-import { createInterface } from "node:readline";
-import { writeFileSync } from "node:fs";
-const out = (m) => process.stdout.write(JSON.stringify(m) + "\\n");
-createInterface({ input: process.stdin }).on("line", (line) => {
-	const m = JSON.parse(line);
-	if (m.method === "initialize") out({ id: m.id, result: {} });
-	else if (m.method === "config/read") out({ id: m.id, result: { config: { mcp_servers: { ambient: { command: "unused", env: { SECRET: "fixture-private" } }, "team.research": { enabled: true } } } } });
-	else if (m.method === "thread/start") {
-		writeFileSync(${JSON.stringify(threadRecord)}, JSON.stringify(m.params));
-		out({ id: m.id, result: { thread: { id: "t1" } } });
-	}
-	else if (m.method === "turn/start") {
-		writeFileSync(${JSON.stringify(record)}, JSON.stringify(m.params));
-		out({ id: m.id, result: { turn: { id: "u1" } } });
-		out({ method: "item/completed", params: { threadId: "t1", item: { type: "agentMessage", text: '{"done":true}' } } });
-		out({ method: "turn/completed", params: { threadId: "t1", turn: { id: "u1", status: "completed" } } });
-	}
-});
-`,
-		{ mode: 0o700 },
-	);
+test("Codex SDK passes the schema even without tools, always names the thinking level, and runs in the dedicated home", async () => {
+	const codex = await fakeCodex();
 	try {
-		const agents = createCloudAgents(
-			{ PATH: "" },
-			{ codexExecutable: command },
-		);
+		const agents = codex.agents(codex.host());
+		await codex.behave({ text: '{"done":true}' });
 		for (const reasoningEffort of [undefined, "low"] as const) {
 			const result = await agents.run({
 				kind: "codex-sdk",
@@ -274,23 +244,37 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 				signal: AbortSignal.timeout(5000),
 			});
 			expect(result.text).toBe('{"done":true}');
-			const turn = JSON.parse(await readFile(record, "utf8"));
+			const turn = (await codex.of("turn/start")).at(-1)!.params;
 			expect(turn.outputSchema).toEqual(schema);
-			expect(turn.effort).toBe(reasoningEffort);
-			const thread = JSON.parse(await readFile(threadRecord, "utf8"));
-			expect(thread.config.mcp_servers).toEqual({
-				ambient: { enabled: false },
-				"team.research": { enabled: false },
-			});
-			expect(thread.config.features).toMatchObject({
-				code_mode_host: false,
-				shell_tool: false,
-				apps: false,
-				plugins: false,
-			});
-			expect(JSON.stringify(thread)).not.toContain("fixture-private");
+			// A call that names none sends the level it had under the person's own Codex settings.
+			expect(turn.effort).toBe(reasoningEffort ?? "high");
 		}
+		const [spawn] = await codex.of("spawn");
+		expect(spawn!.params.home).toBe(codex.home);
+		expect(spawn!.params.cwd).toBe(
+			await realpath(join(codex.home, "workspace")),
+		);
+		const argv: string[] = spawn!.params.argv;
+		for (const setting of [
+			"skills.include_instructions=false",
+			"include_permissions_instructions=false",
+			"include_collaboration_mode_instructions=false",
+			"include_environment_context=false",
+			"features.shell_snapshot=false",
+			"features.shell_tool=false",
+		])
+			expect(argv).toContain(setting);
+		expect(argv.some((a) => a.startsWith("mcp_servers"))).toBe(false);
+		expect(await codex.of("config/read")).toEqual([]);
+		const [thread] = await codex.of("thread/start");
+		expect(thread!.params).toMatchObject({
+			ephemeral: false,
+			sandbox: "read-only",
+			approvalPolicy: "never",
+			cwd: join(codex.home, "workspace"),
+			config: { features: { shell_tool: false, apps: false, plugins: false } },
+		});
 	} finally {
-		await rm(dir, { recursive: true, force: true });
+		await codex.cleanup();
 	}
 });

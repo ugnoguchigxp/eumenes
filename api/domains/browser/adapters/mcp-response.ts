@@ -1,143 +1,30 @@
-import type { DriverTab } from "../contracts/ports";
+import {
+	parseToolResult as parsePlaywrightToolResult,
+	type McpToolResult,
+	type ParsedToolResult as PlaywrightToolResult,
+} from "eumenes-interact/adapters/playwright-mcp/response";
 
-/**
- * Parsing of `@playwright/mcp` 0.0.83 tool results. The text format belongs to that exact
- * version (pinned in package.json); adapters-mcp tests pin the shapes, so a version bump
- * must pass them. Nothing here logs or stores response text.
- */
+export {
+	linkFileName,
+	parseTabList,
+} from "eumenes-interact/adapters/playwright-mcp/response";
+export type {
+	McpContent,
+	McpSnapshotBody,
+	McpToolResult,
+} from "eumenes-interact/adapters/playwright-mcp/response";
 
-export type McpContent =
-	| { type: "text"; text: string }
-	| { type: "image"; data: string; mimeType: string };
-
-export type McpToolResult = { content?: McpContent[]; isError?: boolean };
-
-export type McpSnapshotBody =
-	| { kind: "inline"; text: string }
-	/** Written by MCP into its output directory; only the file name is kept. */
-	| { kind: "file"; name: string };
-
-export type ParsedToolResult = {
-	isError: boolean;
-	/** `### Error` section text; present on failures. */
-	error?: string;
-	/** `### Result` section text (tab lists, evaluate output). */
-	result?: string;
+export type ParsedToolResult = Omit<PlaywrightToolResult, "page"> & {
 	page?: { url: string; title: string };
-	/** `### Ran Playwright code` body without its fence. */
-	code?: string;
-	snapshot?: McpSnapshotBody;
-	images: { mimeType: string; data: string }[];
 };
 
-function parseSections(text: string): Map<string, string> {
-	const sections = new Map<string, string>();
-	for (const section of text.split(/^### /m).slice(1)) {
-		const newline = section.indexOf("\n");
-		if (newline === -1) continue;
-		sections.set(section.slice(0, newline), section.slice(newline + 1).trim());
-	}
-	return sections;
-}
-
-/**
- * The closing fence of an inline snapshot: a line of three backticks that ends the text or is followed by the
- * next section header. The snapshot is page text, so it may contain such lines itself; the real fence is the
- * last one, because everything MCP writes after the snapshot is made of host sections only.
- */
-const FENCE_END = /\n```[ \t]*(?=\n### |\s*$)/g;
-const SNAPSHOT_LINK = /\[Snapshot\]\(([^)\n]+)\)/;
-
-/**
- * The snapshot is cut out first: it carries page text, so it must not be split on `### `.
- * Returns the snapshot and the remaining text for section parsing.
- */
-function extractSnapshot(text: string): {
-	rest: string;
-	snapshot?: McpSnapshotBody;
-} {
-	const header = /^### Snapshot\n/m.exec(text);
-	if (!header) return { rest: text };
-	const before = text.slice(0, header.index);
-	const after = text.slice(header.index + header[0].length);
-	if (after.startsWith("```yaml\n")) {
-		const body = `\n${after.slice("```yaml\n".length)}`;
-		const end = [...body.matchAll(FENCE_END)].at(-1);
-		if (!end) return { rest: before };
-		return {
-			rest: `${before}${body.slice(end.index + end[0].length)}`,
-			snapshot: { kind: "inline", text: body.slice(1, end.index) },
-		};
-	}
-	const nextHeader = after.search(/^### /m);
-	const section = nextHeader === -1 ? after : after.slice(0, nextHeader);
-	const rest = `${before}${nextHeader === -1 ? "" : after.slice(nextHeader)}`;
-	const link = SNAPSHOT_LINK.exec(section);
-	const name = link?.[1] ? linkFileName(link[1]) : undefined;
-	return name ? { rest, snapshot: { kind: "file", name } } : { rest };
-}
-
-/** Only the base name is trusted: links are relative to MCP's workspace or absolute. */
-export function linkFileName(link: string): string | undefined {
-	if (link.includes("\0")) return undefined;
-	const name = link.split(/[\\/]/).pop();
-	return name && name !== "." && name !== ".." ? name : undefined;
-}
-
-function parsePage(section: string | undefined) {
-	if (!section) return undefined;
-	const url = /^- Page URL: (.*)$/m.exec(section)?.[1];
-	if (url === undefined) return undefined;
-	return { url, title: /^- Page Title: (.*)$/m.exec(section)?.[1] ?? "" };
-}
-
-/** The code of the `### Ran Playwright code` section: a fenced block, or the bare text. */
-function parseCode(section: string | undefined) {
-	if (!section) return undefined;
-	const fenced = /^```[a-z]*\n([\s\S]*?)\n?```$/.exec(section.trim());
-	const code = (fenced ? fenced[1]! : section).trim();
-	return code || undefined;
-}
-
 export function parseToolResult(raw: McpToolResult): ParsedToolResult {
-	const content = raw.content ?? [];
-	const first = content[0];
-	const text = first?.type === "text" ? first.text : "";
-	const { rest, snapshot } = extractSnapshot(text);
-	const sections = parseSections(rest);
+	const parsed = parsePlaywrightToolResult(raw);
 	return {
-		isError: raw.isError === true || sections.has("Error"),
-		error: sections.get("Error"),
-		result: sections.get("Result"),
-		page: parsePage(sections.get("Page")),
-		code: parseCode(sections.get("Ran Playwright code")),
-		snapshot,
-		images: content.flatMap((item) =>
-			item.type === "image"
-				? [{ mimeType: item.mimeType, data: item.data }]
-				: [],
-		),
+		...parsed,
+		page: parsed.page && { ...parsed.page, title: parsed.page.title ?? "" },
+		code: parsed.code,
 	};
-}
-
-const TAB_LINE = /^- (\d+):( \(current\))? \[(.*)\]\((.*)\)(?: \[crashed\])?$/;
-
-/** `- 1: (current) [Title](url)` lines; `null` when the section is not a tab list. */
-export function parseTabList(result: string | undefined): DriverTab[] | null {
-	if (result === undefined) return null;
-	if (result.startsWith("No open tabs")) return [];
-	const tabs: DriverTab[] = [];
-	for (const line of result.split("\n")) {
-		const match = TAB_LINE.exec(line.trimEnd());
-		if (!match) return null;
-		tabs.push({
-			index: Number(match[1]),
-			title: match[3] ?? "",
-			url: match[4] ?? "",
-			current: match[2] !== undefined,
-		});
-	}
-	return tabs;
 }
 
 export type ToolFailure = { code: string; dispatched: boolean };

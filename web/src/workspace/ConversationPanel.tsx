@@ -8,6 +8,7 @@ import { useMonitoringItems } from "../domains/monitoring";
 import { ConversationComposer } from "./ConversationComposer";
 import { ConversationHistory } from "./ConversationHistory";
 import { ConversationStatusBar } from "./ConversationStatusBar";
+import { useAnswerAvatarCue } from "./useAnswerAvatarCue";
 import { usePanelFileDrop } from "./usePanelFileDrop";
 import { usePanelResources } from "./usePanelResources";
 import { ScratchViewer } from "./ScratchViewer";
@@ -40,6 +41,14 @@ export function ConversationPanel({
 		replay.subtitle ?? (phase === "playing" ? voice.subtitle : null);
 	const subtitles = settings.data?.general.subtitles;
 	const backgroundKind = settings.data?.general.background ?? "light-fairy";
+	const hiyori = backgroundKind === "live2d-hiyori";
+	const answerCue = useAnswerAvatarCue(
+		state.conversation.data?.messages,
+		!hiyori || !!replay.avatarCue || !!voice.avatarCue || state.live.playing,
+	);
+	const replayCue =
+		hiyori || replay.avatarCue?.speaking ? replay.avatarCue : null;
+	const voiceCue = hiyori || voice.avatarCue?.speaking ? voice.avatarCue : null;
 	const monitored = useMonitoringItems(
 		client,
 		backgroundKind === "spatial" && !settings.isPending,
@@ -66,7 +75,7 @@ export function ConversationPanel({
 				items={monitored}
 				interactive={chatHidden}
 				active={!settings.isPending}
-				cue={replay.avatarCue ?? voice.avatarCue}
+				cue={replayCue ?? voiceCue ?? answerCue}
 				phase={
 					phase === "playing"
 						? "neutral"

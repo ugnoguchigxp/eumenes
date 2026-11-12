@@ -1,21 +1,17 @@
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import { systemContext } from "../../../infrastructure/system-context";
-import { AGENT_ROOT_PREFIX, trackClaudeRoot } from "./claude-session";
-import { callId } from "./cloud-agent-shared";
-import { runCodexTurn } from "./codex-app-server";
-import { type CodexRuntime } from "./codex-sdk";
-
+import type { Messages } from "../contracts";
 import {
+	appendParts,
+	callId,
 	checkedText,
 	fail,
 	promptParts,
-	removeRoot,
 	type CloudAgentCall,
 	type CloudAgentResult,
 } from "./cloud-agent-shared";
+import type { CodexHost } from "./codex-host";
 /** Codex has no host-defined functions: a strict output schema chooses reply or call. */
 function codexChoiceSchema(tools: NativeTool[]) {
 	return {
@@ -141,85 +137,103 @@ export function codexReplyPrefix(partial: string): string {
 	return out;
 }
 
+/** A message as the thread sees it: the same content hashes to the same value; image bytes are part of it. */
+function messageDigest(message: Messages[number]) {
+	return createHash("sha256")
+		.update(
+			JSON.stringify([
+				message.role,
+				message.content,
+				message.tool_calls ?? null,
+				message.tool_call_id ?? null,
+				(message.images ?? []).map((image) =>
+					createHash("sha256").update(image.bytes).digest("hex"),
+				),
+			]),
+		)
+		.digest("hex");
+}
+
 export async function runCodex(
-	runtime: CodexRuntime,
+	host: CodexHost,
 	call: CloudAgentCall,
 ): Promise<CloudAgentResult> {
-	const cwd = await mkdtemp(join(tmpdir(), AGENT_ROOT_PREFIX));
-	const untrack = trackClaudeRoot(cwd);
-	try {
-		const { system, prompt, images } = promptParts(call.messages);
-
-		const tools = call.tools?.length ? call.tools : undefined;
+	const { system, prompt, images, turn: body } = promptParts(call.messages);
+	const tools = call.tools?.length ? call.tools : undefined;
+	let streamed = "";
+	const result = await host.run(
 		// Without a key the CLI keeps its own login; a key binds the saved API host.
-		const keyed: CodexRuntime = call.credential
-			? {
-					command: runtime.command,
-					env: { ...runtime.env, CODEX_API_KEY: call.credential },
-					extraArgs: ["-c", `openai_base_url=${JSON.stringify(call.baseUrl)}`],
-				}
-			: runtime;
-		let streamed = "";
-		const result = await runCodexTurn(
-			keyed,
-			{
-				cwd,
-				model: call.model,
-				instructions:
-					system +
-					(tools
-						? codexFunctions(tools)
-						: call.outputSchema
-							? systemContext(
-									"inference.contexts.cloud-agents.structured-completion",
-									{},
-								)
-							: ""),
-				prompt,
-				images,
-				nativeWebSearch: call.nativeWebSearch,
-				...(call.reasoningEffort
-					? { reasoningEffort: call.reasoningEffort }
-					: {}),
-				...(tools
-					? { outputSchema: codexChoiceSchema(tools) }
+		{ credential: call.credential, baseUrl: call.baseUrl },
+		{
+			...(call.attemptId ? { attemptId: call.attemptId } : {}),
+			...(call.connectionId ? { connectionId: call.connectionId } : {}),
+			model: call.model,
+			instructions:
+				system +
+				(tools
+					? codexFunctions(tools)
 					: call.outputSchema
-						? { outputSchema: call.outputSchema }
-						: {}),
-				signal: call.signal,
-				onUsage: call.onUsage,
-				onMessage: (text) => {
-					// With tools the turn is a JSON choice: only its reply text streams.
-					const visible = tools ? codexReplyPrefix(checkedText(text)) : text;
-					if (!call.onDelta || !visible.startsWith(streamed)) return;
-					const delta = visible.slice(streamed.length);
-					if (delta) call.onDelta(delta);
-					streamed = visible;
-				},
+						? systemContext(
+								"inference.contexts.cloud-agents.structured-completion",
+								{},
+							)
+						: ""),
+			messages: body.map((message) => ({
+				digest: messageDigest(message),
+				assistant: message.role === "assistant",
+			})),
+			input: (from) =>
+				from === 0 ? { prompt, images } : appendParts(body.slice(from)),
+			nativeWebSearch: call.nativeWebSearch,
+			// A call that names none still thinks as hard as before the Codex home was Eumenes' own.
+			reasoningEffort: call.reasoningEffort ?? "high",
+			...(tools
+				? { outputSchema: codexChoiceSchema(tools) }
+				: call.outputSchema
+					? { outputSchema: call.outputSchema }
+					: {}),
+			signal: call.signal,
+			onUsage: call.onUsage,
+			// A function call is answered by the host in a call that continues this one.
+			...(tools
+				? {
+						awaitsMore: (text: string) => {
+							try {
+								return Boolean(codexChoice(text, tools).toolCalls);
+							} catch {
+								return false;
+							}
+						},
+					}
+				: {}),
+			onMessage: (text) => {
+				// With tools the turn is a JSON choice: only its reply text streams.
+				const visible = tools ? codexReplyPrefix(checkedText(text)) : text;
+				if (!call.onDelta || !visible.startsWith(streamed)) return;
+				const delta = visible.slice(streamed.length);
+				if (delta) call.onDelta(delta);
+				streamed = visible;
 			},
-			fail,
-		);
-		call.signal.throwIfAborted();
-		const final = checkedText(result.text);
-		const choice = tools ? codexChoice(final, tools) : { text: final };
-		if (!choice.toolCalls && !choice.text.trim()) throw fail("empty_output");
-		// Deliver whatever the stream did not cover (no deltas, or a final tail).
-		if (
-			call.onDelta &&
-			choice.text.startsWith(streamed) &&
-			choice.text.length > streamed.length
-		)
-			call.onDelta(choice.text.slice(streamed.length));
-		return {
-			...choice,
-			inputTokens: result.inputTokens,
-			outputTokens: result.outputTokens,
-			cacheReadTokens: result.cacheReadTokens,
-			cacheCreationTokens: result.cacheCreationTokens,
-			reasoningTokens: result.reasoningTokens,
-			usageModel: result.usageModel,
-		};
-	} finally {
-		await removeRoot(cwd, untrack);
-	}
+		},
+	);
+	call.signal.throwIfAborted();
+	const final = checkedText(result.text);
+	const choice = tools ? codexChoice(final, tools) : { text: final };
+	if (!choice.toolCalls && !choice.text.trim()) throw fail("empty_output");
+	// Deliver whatever the stream did not cover (no deltas, or a final tail).
+	if (
+		call.onDelta &&
+		choice.text.startsWith(streamed) &&
+		choice.text.length > streamed.length
+	)
+		call.onDelta(choice.text.slice(streamed.length));
+	return {
+		...choice,
+		inputTokens: result.inputTokens,
+		outputTokens: result.outputTokens,
+		cacheReadTokens: result.cacheReadTokens,
+		cacheCreationTokens: result.cacheCreationTokens,
+		reasoningTokens: result.reasoningTokens,
+		usageModel: result.usageModel,
+	};
 }

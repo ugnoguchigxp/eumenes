@@ -257,6 +257,7 @@ export const domains = {
 		backend: "api/domains/capabilities",
 		web: null,
 		components: null,
+		integrationTests: ["api/application/canvas/canvas.test.ts"],
 		depends: { api: [], web: [], test: [] },
 	},
 	pipelines: {

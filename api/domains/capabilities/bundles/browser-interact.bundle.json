@@ -100,9 +100,7 @@
 			"summary": "隔離した部品実行",
 			"schemaKey": "toolchainRequest",
 			"profileRevisionId": "profile:browser.interact@1",
-			"requiredSkillRevisionIds": [
-				"skill:browser.interact@1"
-			],
+			"requiredSkillRevisionIds": ["skill:browser.interact@1"],
 			"toolRevisionIds": [
 				"tool:browser.interact.start@1",
 				"tool:browser.interact.status@1",
@@ -112,15 +110,9 @@
 		{
 			"aliases": [],
 			"tags": [],
-			"useWhen": [
-				"検証入口からブラウザ作業を進める"
-			],
-			"avoidWhen": [
-				"通常会話からの自動選択"
-			],
-			"dependencies": [
-				"package:browser.interact@1"
-			],
+			"useWhen": ["検証入口からブラウザ作業を進める"],
+			"avoidWhen": ["通常会話からの自動選択"],
+			"dependencies": ["package:browser.interact@1"],
 			"kind": "toolchain",
 			"id": "browser.interact",
 			"revision": 1,
@@ -291,10 +283,7 @@
 					"inputSchemaRef": "schema:browser.interact.start-form@1",
 					"effect": "write",
 					"inputAdapterRef": "input:browser.interact-start@1",
-					"confidentialFields": [
-						"request",
-						"url"
-					]
+					"confidentialFields": ["request", "url"]
 				},
 				{
 					"actionId": "answer",
@@ -304,9 +293,7 @@
 					"inputSchemaRef": "schema:browser.interact.answer-form@1",
 					"inputAdapterRef": "input:browser.interact-answer@1",
 					"effect": "write",
-					"confidentialFields": [
-						"text"
-					]
+					"confidentialFields": ["text"]
 				},
 				{
 					"actionId": "cancel",
@@ -380,9 +367,7 @@
 						"maxLength": 512
 					}
 				},
-				"required": [
-					"conversationId"
-				]
+				"required": ["conversationId"]
 			}
 		},
 		{
@@ -399,9 +384,7 @@
 						"maxLength": 64
 					}
 				},
-				"required": [
-					"taskRef"
-				]
+				"required": ["taskRef"]
 			}
 		},
 		{
@@ -414,14 +397,10 @@
 				"properties": {
 					"intent": {
 						"type": "string",
-						"enum": [
-							"cancel"
-						]
+						"enum": ["cancel"]
 					}
 				},
-				"required": [
-					"intent"
-				]
+				"required": ["intent"]
 			}
 		},
 		{
@@ -436,9 +415,7 @@
 						"type": "boolean"
 					}
 				},
-				"required": [
-					"confirmed"
-				]
+				"required": ["confirmed"]
 			}
 		},
 		{
@@ -476,10 +453,7 @@
 					},
 					"decision": {
 						"type": "string",
-						"enum": [
-							"allow",
-							"deny"
-						]
+						"enum": ["allow", "deny"]
 					},
 					"text": {
 						"type": "string",
@@ -520,11 +494,7 @@
 						"maxLength": 512
 					}
 				},
-				"required": [
-					"request",
-					"url",
-					"conversationId"
-				]
+				"required": ["request", "url", "conversationId"]
 			}
 		}
 	]

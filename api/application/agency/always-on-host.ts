@@ -24,7 +24,10 @@ import type { AgencyWork } from "./work";
 import { createAgencyActivity } from "./always-on-activity";
 import { createAgendaHearing } from "./always-on-heard";
 import { recallConversation } from "./always-on-recovery";
-import type { AgencyActivity } from "../../domains/dialogue/contracts/agency-status";
+import type {
+	AgencyActivity,
+	AgencyThought,
+} from "../../domains/dialogue/contracts/agency-status";
 
 /**
  * The always-on runtime: the agenda agent (eumenes-agency/agenda) of each conversation, and what Eumenes runs around
@@ -439,6 +442,10 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			return status(id);
 		},
 		status,
+		/** What the agent of the conversation thought lately (display only). */
+		thoughts: (id: string): AgencyThought[] => [
+			...(convs.get(id)?.thoughts ?? []),
+		],
 		inspect: (id: string) => {
 			const c = convs.get(id);
 			return c

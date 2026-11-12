@@ -237,6 +237,15 @@ export const viewRegistry = {
 			title,
 		}),
 	},
+	"canvas-workspace": {
+		name: "CanvasWorkspace",
+		label: "Canvasアプリ",
+		schema: z.strictObject({
+			view: z.literal("canvas-workspace"),
+			source,
+			title,
+		}),
+	},
 	"drawing-workspace": {
 		name: "DrawingWorkspace",
 		label: "図を描く・編集する",

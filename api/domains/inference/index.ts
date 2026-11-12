@@ -1,5 +1,6 @@
 export { createCloudAgents } from "./adapters/cloud-agents";
 export { codexRuntime, disabledFeatures } from "./adapters/codex-sdk";
+export { createCodexHost } from "./adapters/codex-host";
 export {
 	EVENT_SHARE_OF_LOG,
 	REFERENCE_WINDOW_TOKENS,

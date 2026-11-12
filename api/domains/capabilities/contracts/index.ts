@@ -220,7 +220,14 @@ export {
 	dotsWorkAnswerV1,
 	dotsWorkStopV1,
 } from "./dots-work";
+export const canvasProduce = z.strictObject({
+	artworkId: z
+		.string()
+		.regex(/^a_[A-Za-z0-9_-]{12}$/)
+		.optional(),
+});
 export const validators = {
+	canvasProduce,
 	...collaborationInputs,
 	browserInteractStart,
 	browserInteractTarget,

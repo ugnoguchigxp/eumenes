@@ -22,7 +22,7 @@
 - **メモの出どころ**: 会話ごとのドキュメント一覧 API はない。台帳が返した結果（実行結果の `answer` / `summary` / `claims` / `sources` / `document.title`）を、調べものを頼んだ ticket の `refs` つきのメモにして checkpoint に持つ（最新30件、本文は最大8000字）。`read_note` はこれを読む。`show_note` は、その返事が採用されて assistant メッセージが現れた後に、メモを Markdown ドメインの文書にして、その文書を付けた `agency-note:<scope>:<runId>:<noteId>` のメッセージを会話に出す（返事と調べものにつき1件。`agency:` ではないので自動音声で読み上げない。本文は題と要約だけで、メモの本文は会話に入れない）。Web 由来の文書なので、モデルへ渡す履歴には入れず（`recordSpoke` しない）、Memory はブロックして学習しない。採用されなかった返事は表示しない。詳細は下記「メモは Markdown 文書として表示する」。
 - **調べものの機能選択**: `toolchain:web.note@…` だけ（承認不要のもの。Codex の検索による調べもの、[web-note-codex-search-2026-11-11](web-note-codex-search-2026-11-11.md)）。`web.research`（Pursuit の深い調査）や他の機能には回さない（2026-11-11 までは `web.research`）。結果は題・要約・Markdown 本文・出典を持ち、そのままメモになる。なければ、承認が要る・予算超過と同じく「できなかった」として agent に返す（10秒ごとの再試行にしない）。サーバーからの個別指定は不要（既定がこの選択）。研究 ticket は checkpoint の保存が他の変更で競合しても、すぐ取り直して開始する。
 - **LLM**: purpose は think。agent の呼び出しには `input` が無いので、旧の入力ガードの代わりに世代（利用者の言葉・訂正・忘却で増える）と中止信号で古さを判定する。reasoning は設定がなければ low（出力 400〜1500 トークンを使い切らせない）。出力上限 2400 は agent の要求（最大 1500）以内。
-- **返事**: system には Eumenes の人格・感情規則の外側に、パッケージの `agendaReplySystem` の「仕組み」〜「返事の仕方」の範囲を加える（`always-on-system.ts`）。状態（記憶・メモ・調査記録・静かな時間・`askIfFits`）は `agendaReplyMessages` が作る状態メッセージを、利用者の最後のメッセージの前に差し込む（プロンプト先頭は変わらない）。返事はどのターン（通知・作業報告・引き渡しも）でも agenda の道具と状態を持つ。agenda が使えない間（runtime が always-on でない、Memory が不健全、台帳なし）は system からも agenda の規則を外す（`agencyReplyParts(settings, agenda)`）。道具は `start_preparation` `read_note` `show_note` `set_quiet`（`find_toolchain` / `delegate` は Router の host 操作なので渡さない）。呼び出し上限は host の道具の上限に3を足す。返事の道具呼び出しは次の返事の履歴として agent の `said` に入る。
+- **返事**: system には Eumenes の人格・感情規則の外側に、パッケージの `agendaReplySystem` の「仕組み」〜「返事の仕方」の範囲を加える（`always-on-system.ts`）。状態（記憶・メモ・調査記録・静かな時間・`askIfFits`）は `agendaReplyMessages` が作る状態メッセージを、利用者の最後のメッセージの前に差し込む（プロンプト先頭は変わらない）。返事はどのターン（通知・作業報告・引き渡しも）でも agenda の道具と状態を持つ。agenda が使えない間（runtime が always-on でない、Memory が不健全、台帳なし）は system からも agenda の規則を外す（`agencyReplyParts(settings, agenda)`）。道具は `start_preparation` `read_note` `show_note` `set_quiet`。`find_toolchain` / `delegate` は配布物のもの（`delegatedTo` の調べもの）ではなく host の道具で、利用者の発言に答える会話の返事に渡す（2026-11-12 改訂。[Router の設計](router-package-integration-2026-11-04.md)の「会話の返事から担当に頼む道」。返事の規則は配布物の `toolchains: true` の範囲）。呼び出し上限は host の道具の上限に3を足す。返事の道具呼び出しは次の返事の履歴として agent の `said` に入る。
 - **返事の根拠**: 返事に渡した記憶・メモ・状態が引く参照（`memory:` / `note:` / 利用者のメッセージ）を `AgencyLayerPort.replyInputInTransaction(runId)` で採用時に Memory から取り直し、run の入力に加える。一つでも失われていれば（採用前に忘却）その返事は採用せず、一度だけ書き直し、それでも失われていれば `memory_stale` で失敗する。
 - **発話・調べものの根拠**: ticket の `refs` に加えて、モデル呼び出しが見たもの（利用者の直近の発言と、そのとき有効な記憶）を入力に含める。どれかが忘却されると発話・調べものを実行せず、保存済みの ticket も落ちる。計画が作る item の `refs` は従来どおり（依頼・約束した item は依頼の言葉に結ぶ）。
 - **steer**: サーバーに `createSteeringInbox` を一つ（`server-services.ts`）。`switching-host` の dialoguePort も `steeredInTransaction` / `replyInputInTransaction` を転送する。返事ごとに `createAgendaReplySteering`（`holdsText: false`）で target を開き、chat をラップする。返事の最中に届いた利用者のメッセージは、フィードが commit 後に `send` する。メッセージ本文は ストアから都度読み直し、忘却済みなら渡さない。
@@ -36,6 +36,29 @@
 - **返事の system の整合**: agenda が返事を担うとき、F の事実規則（「Webで調べることはできず約束もしない」）の代わりに `contexts/agency/talk-facts.context.toml`（調べものは `start_preparation` で頼める）を使い、`always-on-reply` の「許可された読取りで確かめます」を外した。`.s11tnext` の catalog は `bun run context:build` で作り直した（`context:check` 通過）。
 - **時計と出力の余裕**: agent と返事の時計は CLI の形式（日本時間・曜日つき「2026/11/11(水) 14:02」）。agenda の呼び出し（独立した制御呼び出しで推論水準を名指すもの）は、見える出力の上限に 2800 トークンの余白を足す（`attempt-work.ts` の `INDEPENDENT_THINKING_HEADROOM_TOKENS`。取り込み上限 2400 は変えない）。
 - **小さなこと**: 通知・作業報告の返事は問いを足さない（`askIfFits` なし）。道具呼び出しの上限は通知でも4（host の道具に3を足す、ただし4を下回らない）。
+
+## 思考の表示（2026-11-11 追加）
+
+参照ホストの CLI（`eumenes_agency/standalone/agenda.ts` の plan 表示）と同じく、agenda が考えたことを会話欄に出す（利用者の依頼、2026-11-11。吹き出しにせず表示だけ）。
+
+| 種類（`kind`） | いつ | 表示の例 |
+| --- | --- | --- |
+| `plan` | step の計画が item を足した | `💭 + 調べる: 週末の天気（土曜に出かける予定）` |
+| `drop` | 計画が item を落とした | `💭 - 週末の天気（もう答えた）` |
+| `check` | 調べものの重複確認が new 以外 | `💭 一部は調べ済み（n1a2b3c4 と同じ）: 日曜の降水確率` |
+| `repeat` | 問いを聞かないことにした | `💭 聞かない（もう聞いた）: 何時に出ますか — 先ほど聞いた` |
+| `decline` | 発話を書く呼び出しが見送った | `💭 見送り: 週末の天気 — 今は作業中` |
+| `research` | 調べものを渡した（受付拒否・できなかったも） | `🔎 [頼まれた] 週末の天気` / `🔎 週末の天気（受付拒否）` |
+| `researched` | 調べものの結果が返った | `📝 週末の天気: 土曜は晴れ…` |
+| `profile` | 予定と関心のメモを書いた | `🗓 土曜に出かける予定` |
+| `quiet` | 返事が静かな時間を変えた | `🤫 30分、自分から話しかけません（調べものは続けます）` |
+| `error` | 計画の呼び出し・step が失敗した | `⚠ 考えられませんでした（llm_timeout）` |
+
+- **保存しない**: 会話ごとに最新100件をサーバーのメモリーに持つだけ（`AgendaScope.thoughts`）。会話のメッセージにも checkpoint にも入れない。だから読み上げ・Memory の学習・モデルへの履歴・エクスポートのどれにも入らない。再起動で消える。
+- **忘却**: 思考は参照を持たないので、その会話で何かが忘却されたら全部消す（保守的）。
+- **配信**: `GET /api/agency/conversations/:id/thoughts` → `{ thoughts: [{ id, at, kind, text }] }`。思考が増えた・消えたときは SSE の change を出す（`AgencyHostDeps.publish`）。F の host は常に空。
+- **画面**: 会話欄で、各思考をその後に書かれた最初のメッセージの前に置く（それより新しいものは最後のメッセージの後）。`.agency-thought` の薄い1行で、吹き出し・読み上げボタン・完了の読み上げ通知はない。古いメッセージを畳んでいる間は、その時刻の思考も畳む。
+- ログには思考の本文を出さない（従来どおり件数・理由コードだけ）。
 
 ## 参照ホスト（CLI）との挙動差の解消（2026-11-12）
 
@@ -94,6 +117,7 @@
 ## steer は Eumenes のもの（eumenes-agency 0.1.7）
 
 agency の配布物には steer を含めない（利用者、2026-11-11）。agency は返事の途中に足された言葉の受け口（`AgendaAddedWords`）と、返事の規則が読む印（`addedWordsLine`）だけを持つ。Eumenes は `api/application/agency/agenda-steer.ts` で、サーバーの eumenes-steer の受付箱（`vendor/steer`、5ba40df6）をこの受け口につなぐ。返事は書きながら流れるので、最後のモデル呼び出しの途中に届いた言葉は、その返事に取り込まず、会話の次の run が答える。
+
 
 ## 入力中・応答中でも頼まれた調べものを始める（2026-11-12 改訂、利用者の決定）
 

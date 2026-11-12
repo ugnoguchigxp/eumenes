@@ -1,3 +1,4 @@
+import { registerCanvasRoutes } from "./canvas/routes";
 import { registerKnowledge } from "./knowledge/routes";
 import type { Knowledge } from "./knowledge/service";
 import { registerRouterMemory } from "./toolchain/router-memory";
@@ -112,6 +113,10 @@ export type AppModule = { mount(app: Hono): void };
 
 /** The services a production or test composition may route to. Only the core five are mandatory. */
 export type AppServices = {
+	canvas?: {
+		runtime: import("./canvas/runtime").CanvasRuntime;
+		jobs: import("./canvas/jobs").CanvasJobs;
+	};
 	agency?: Parameters<typeof registerAgency>[1];
 	liveVoice?: {
 		live: LiveVoiceService;
@@ -195,6 +200,10 @@ export function appModules(services: AppServices): AppModule[] {
 				}),
 		},
 		s.docling && { mount: (app) => registerDocling(app, s.docling!) },
+		s.canvas && {
+			mount: (app) =>
+				registerCanvasRoutes(app, s.canvas!.runtime, s.canvas!.jobs),
+		},
 		s.markdown && { mount: (app) => registerMarkdown(app, s.markdown!) },
 		s.scratch && { mount: (app) => registerScratch(app, s.scratch!) },
 		s.changes && {

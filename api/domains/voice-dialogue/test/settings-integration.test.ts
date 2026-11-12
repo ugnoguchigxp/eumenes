@@ -446,6 +446,7 @@ test("audio-off answers retain a whole-answer expression and replay judges each 
 		);
 		expect(speech.delivery?.id).not.toBe(saved?.id);
 		expect(speech.delivery?.emotion).toBe("warmth");
+		expect(speech.avatarDelivery).toEqual(saved);
 	}
 	expect(judgments).toBe(4);
 });

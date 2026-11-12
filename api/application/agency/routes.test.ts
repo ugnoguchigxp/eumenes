@@ -37,3 +37,38 @@ test("attention and read-only status expose no conversation or memory contents",
 	expect(bad.status).toBe(400);
 	expect(h.host.status("screen").activeConversationId).toBe("screen");
 });
+
+test("thoughts are served per conversation; a host without them shows none", async () => {
+	const host = {
+		status: () => ({}) as never,
+		attend: async () => ({}) as never,
+		thoughts: (id: string) =>
+			id === "ao"
+				? [
+						{
+							id: "t1",
+							at: 1,
+							kind: "plan" as const,
+							text: "調べる: 天気（予定）",
+						},
+					]
+				: [],
+	};
+	const app = new Hono();
+	registerAgency(app, host);
+	const shown = await (
+		await app.request("/api/agency/conversations/ao/thoughts")
+	).json();
+	expect(shown).toEqual({
+		thoughts: [{ id: "t1", at: 1, kind: "plan", text: "調べる: 天気（予定）" }],
+	});
+	const plain = new Hono();
+	registerAgency(plain, { status: host.status, attend: host.attend });
+	expect(
+		await (await plain.request("/api/agency/conversations/ao/thoughts")).json(),
+	).toEqual({ thoughts: [] });
+	const bad = await app.request(
+		`/api/agency/conversations/${"x".repeat(161)}/thoughts`,
+	);
+	expect(bad.status).toBe(400);
+});

@@ -50,6 +50,11 @@ export function createAgendaCheckpoints(input: {
 		// The note goes back to before the words it read; a writer pass in flight is not kept.
 		c.profile = forgetProfile(c.profile, set) ?? c.profile;
 		c.forgetSeq++;
+		// Thoughts carry no refs: any forget takes them all off the screen.
+		if (c.thoughts.length) {
+			c.thoughts = [];
+			c.thoughtsChanged();
+		}
 		c.notes = c.notes.filter((n) => !lostRefs.has(`note:${n.id}`));
 		c.retired = c.retired.filter((n) => !lostRefs.has(`note:${n.id}`));
 		if (lost.length)

@@ -1,5 +1,7 @@
 import { loadCubismCore } from "./load";
 import type { AvatarMotion } from "../../../../../api/domains/delivery/contracts";
+import type { AvatarCue } from "../controller";
+import { createHiyoriMotions, type HiyoriMotionReferences } from "./motion";
 import { createFace } from "./face";
 import { idleParameters } from "./idle";
 import { defaultAvatarView, type AvatarView } from "../view";
@@ -30,6 +32,7 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 			Textures: string[];
 			Physics: string;
 			Pose: string;
+			Motions?: HiyoriMotionReferences;
 		};
 	};
 	const [mocBytes, physicsBytes, poseBytes] = await Promise.all([
@@ -64,9 +67,11 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 	);
 	const pose = sdk.CubismPose.create(poseBytes, poseBytes.byteLength);
 	let disposed = false;
+	let motions: ReturnType<typeof createHiyoriMotions> | undefined;
 	const dispose = () => {
 		if (disposed) return;
 		disposed = true;
+		motions?.dispose();
 		renderer.release();
 		for (const texture of textures) gl.deleteTexture(texture);
 		sdk.CubismPhysics.delete(physics);
@@ -115,7 +120,14 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 		}
 		signal.throwIfAborted();
 		model.saveParameters();
-		const face = createFace();
+		motions = createHiyoriMotions(
+			sdk,
+			model,
+			home,
+			setting.FileReferences.Motions,
+			signal,
+		);
+		let face = createFace();
 		const ids = new Map<
 			string,
 			import("../../../../../vendor/live2d/framework.js").Id
@@ -151,17 +163,30 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 				mouthOpen: number,
 				intensity = 1,
 				view: AvatarView = defaultAvatarView,
+				cue?: AvatarCue | null,
 			) {
 				if (disposed) return;
 				const dt = Math.min(0.1, Math.max(0, time - last));
+				if (time === 0 && last > 0) face = createFace();
 				last = time;
 				model.loadParameters();
 				for (const [key, value] of Object.entries(idleParameters(time)))
 					set(key, value);
-				physics.evaluate(model, dt);
-				const values = face(time, dt, motion, mouthOpen, intensity);
+				const values = face(
+					time,
+					dt,
+					motion,
+					mouthOpen,
+					intensity,
+					cue?.emotion,
+				);
 				for (const [key, value] of Object.entries(values)) set(key, value);
+				if (time === 0) motions?.stop();
+				else motions?.update(dt, cue);
+				physics.evaluate(model, dt);
 				mouth = values.ParamMouthOpenY;
+				// The clips have authored mouth curves. Keep their shapes and use audio for opening.
+				set("ParamMouthOpenY", mouth);
 				pose.updateParameters(model, dt);
 				model.update();
 				gl.viewport(0, 0, canvas.width, canvas.height);

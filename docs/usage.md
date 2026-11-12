@@ -21,6 +21,6 @@ usage domainは公開読み取りportから数値を受け、集計と単価履�
 
 登録は `usage-dashboard.bundle.json`、`artifact:usage.dashboard@2`、`artifact:settings.hub@10`、`adapter:usage@1`。OpenUIの `usage-dashboard` は共通DesignSystem部品を呼ぶ登録view。独自の全画面ルートやWorkspaceArtifactsの分岐は追加しない。
 
-Codex実通信は毎回ephemeral threadを新規作成し1turn実行する。従ってthreadのtotalが今回のattempt量となる。lastは直近の上流呼出しであり、全量として使わない。将来thread再開を追加する場合は開始前累計を差し引く必要がある。モデル変更通知があった累計を元モデルだけに付けず「不明・複数モデル」に残す。
+Codex実通信は固定スレッドを再利用する（`append` は同じスレッドへ足し、`reset` は先頭まで巻き戻す）。thread/tokenUsage/updated の `total` はスレッドの累計なので、ターン開始時点の累計（新規スレッドと巻き戻し直後は0）を引いた差をその呼出しの量として記録する。lastは直近の上流呼出しであり、全量として使わない。差が負になる累計は量として扱わない。モデル変更通知があったターンの量を元モデルだけに付けず「不明・複数モデル」に残す。
 
 根拠: [Liveの利用量と終了](https://developers.openai.com/api/docs/guides/live-conversations#usage-and-graceful-close)、[Codexの累計加算契約](https://github.com/openai/codex/blob/main/codex-rs/protocol/src/protocol.rs)、[app-serverのusage型](https://github.com/openai/codex/blob/main/codex-rs/app-server-protocol/src/protocol/v2/thread.rs)。

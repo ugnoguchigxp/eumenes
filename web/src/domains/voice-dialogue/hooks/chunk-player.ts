@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { VoiceTurn } from "../../../../../api/domains/voice-dialogue/contracts";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
 import type { AudioController } from "../../audio";
-import type { AvatarCue } from "../../avatar";
+import { deliveryAvatarCue, type AvatarCue } from "../../avatar";
 import { queryRoots } from "../../../queryKeys";
 import { chunkTiming, timedVoiceAudio } from "./audio-timing";
 
@@ -100,11 +100,13 @@ export function queueChunks(
 								fetchLateMs: Math.max(0, Math.round(at - previous)),
 							};
 						if (!playable()) return;
-						if ((deps.volume() ?? 1) > 0)
+						const cue = deliveryAvatarCue(key, chunk.delivery);
+						const audible = (deps.volume() ?? 1) > 0;
+						if (audible || cue.emotion)
 							deps.setAvatarCue(() => ({
-								key,
-								motion: chunk.delivery?.motion ?? "neutral",
-								speaking: true,
+								...cue,
+								gestureKey: `voice:${turn.utteranceId}`,
+								speaking: audible,
 							}));
 					},
 				});

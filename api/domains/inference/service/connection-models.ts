@@ -1,4 +1,5 @@
 import { codexModels } from "../adapters/codex-models";
+import type { CodexHost } from "../adapters/codex-host";
 import { workersModels } from "./workers-ai-models";
 import Anthropic from "@anthropic-ai/sdk";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -139,7 +140,7 @@ export function createConnectionModels(
 		fetch?: typeof fetch;
 		claudeQuery?: typeof query;
 		now?: () => number;
-		codexExecutable?: string;
+		codexHost?: CodexHost;
 		store?: SqliteStore;
 	} = {},
 ): ConnectionModelsService {
@@ -170,7 +171,7 @@ function createListing(
 		fetch?: typeof fetch;
 		claudeQuery?: typeof query;
 		now?: () => number;
-		codexExecutable?: string;
+		codexHost?: CodexHost;
 	},
 ): ConnectionModelsService {
 	const now = options.now ?? Date.now;
@@ -229,11 +230,10 @@ function createListing(
 				const value =
 					connection.kind === "codex-sdk"
 						? await codexModels(
-								environment,
+								options.codexHost,
 								connection,
 								credential,
 								signal,
-								options.codexExecutable,
 							)
 						: await workersModels(
 								connection,

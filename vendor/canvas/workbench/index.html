@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas 検証ホスト</title>
+<link rel="stylesheet" href="/app.css">
+<script type="module" src="/client-log.js"></script>
+<script type="module" src="/app.js"></script>
+</head>
+<body>
+<header class="top"><h1>Canvas 検証ホスト</h1><span id="model-note" class="note">固定モデル応答</span></header>
+<main class="layout">
+  <aside class="sidebar">
+    <div class="side-head"><h2>作品</h2><button id="new-artwork" type="button">新規</button></div>
+    <button id="refresh-artworks" type="button">作品情報を再取得</button>
+    <div id="artworks-status" role="status"></div>
+    <ul id="artworks" aria-label="作品一覧"></ul>
+    <h2>版</h2>
+    <div id="restore-status" role="status"></div>
+    <div id="revisions-status" role="status"></div>
+    <ol id="revisions" aria-label="版の履歴"></ol>
+  </aside>
+  <section class="chat" aria-label="会話">
+    <div id="current" class="current">新規の作品</div>
+    <ol id="messages"></ol>
+    <form id="composer" method="dialog">
+      <textarea id="message" rows="3" aria-label="依頼" placeholder="例：落ち物ゲームを作って"></textarea>
+      <div class="row"><button id="send" type="submit">送信</button><button id="cancel" type="button" disabled>取消</button><span id="run-status" role="status"></span></div>
+    </form>
+  </section>
+  <section class="stage-wrap" aria-label="プレビュー">
+    <div id="preview-host" class="preview-host mode-frame">
+      <div class="toolbar">
+        <button type="button" data-mode="frame" aria-pressed="true">枠内</button>
+        <button type="button" data-mode="fill" aria-pressed="false">ブラウザ全面</button>
+        <button type="button" data-mode="fullscreen" aria-pressed="false">全画面</button>
+        <button type="button" id="exit-mode">戻る</button>
+        <button type="button" id="stop">停止</button>
+        <button type="button" id="restart">再実行</button>
+        <span id="preview-label" class="note"></span>
+      </div>
+      <div id="preview-frame" class="frame" role="region" aria-label="作品プレビュー"></div>
+    </div>
+    <div id="preview-error" class="preview-error" role="alert" hidden><p id="preview-error-text"></p><button id="preview-retry" type="button">再接続</button></div>
+    <div id="page-warning" class="page-warning" role="alert" hidden></div>
+    <div id="notice" class="notice" role="status"></div>
+    <div id="candidate" class="candidate" hidden>
+      <div><strong>候補</strong> <span id="cand-title"></span> <code id="cand-digest"></code></div>
+      <div id="cand-changes"></div>
+      <ul id="cand-checks"></ul>
+      <div id="cand-review" hidden>
+        <div id="cand-review-head"></div>
+        <ul id="cand-requirements" aria-label="要件ごとの判定"></ul>
+        <ul id="cand-findings" aria-label="検証の指摘"></ul>
+      </div>
+      <div id="cand-unconfirmed"></div>
+      <button id="save" type="button">保存</button> <span id="save-status" role="status"></span>
+    </div>
+  </section>
+</main>
+</body>
+</html>

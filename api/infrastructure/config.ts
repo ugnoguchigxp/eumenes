@@ -50,6 +50,7 @@ const schema = z.object({
 	EUMENES_LOG_LEVEL: text,
 	EUMENES_HOST: text,
 	EUMENES_PORT: integer(65_535),
+	EUMENES_CANVAS_PREVIEW_PORT: integer(65_535),
 	EUMENES_ORIGIN: text,
 	EUMENES_ATTITUDE_DATASET: text,
 	EUMENES_MEMORY_JOURNAL: text,

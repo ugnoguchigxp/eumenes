@@ -17,6 +17,7 @@ import {
 import type { AgendaHearing } from "./always-on-heard";
 import { keepNotes, noteFromResult } from "./always-on-memory";
 import { holdNote, noteRef, type AgendaScope } from "./always-on-scope";
+import { researchThought, stepThoughts, think } from "./always-on-thoughts";
 import type { ScopePatch } from "./always-on-checkpoint";
 import type { AgendaNote } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
@@ -126,6 +127,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			}
 			c.revision++;
 			logCalls(c, out);
+			stepThoughts(c, out);
 			const current = () => on() && convs.get(c.id) === c;
 			// A line is for the conversation as the step saw it; a user who is busy only delays it.
 			const speech = (db: Database) =>
@@ -156,10 +158,9 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 		// Called off (the user spoke, a forget): the next step follows at once. A failing step waits a little.
 		if (!signal?.aborted) {
 			c.backoffUntil = now() + RESEARCH_RETRY_MS;
-			log.warn("agency.cycle_failed", {
-				subjectId: c.id,
-				reason: toErrorCode(error, "agency_cycle_failed"),
-			});
+			const reason = toErrorCode(error, "agency_cycle_failed");
+			log.warn("agency.cycle_failed", { subjectId: c.id, reason });
+			think(c, now(), "error", `考えられませんでした（${reason}）`);
 		}
 	} finally {
 		// A step called off started nothing: the research that waited is tried again.
@@ -195,6 +196,7 @@ async function handleTicket(
 			});
 			outcome = { status: "refused" };
 		}
+		researchThought(c, now(), ticket, outcome.status);
 		if (outcome.status === "refused")
 			c.agent.researchStarted(ticket.id, false, now());
 		else if (outcome.status === "failed") {
@@ -337,6 +339,14 @@ export async function collectAgendaResults(host: ResultHost) {
 			kept.push(keepNote(deps, a.c, a.note));
 		}
 		const at = now();
+		think(
+			a.c,
+			at,
+			"researched",
+			a.note
+				? `${a.note.title}: ${a.note.summary}`
+				: "調べものは結果を得られませんでした",
+		);
 		a.c.agent.researchReturned({
 			ticketId: a.agentTicketId,
 			at,

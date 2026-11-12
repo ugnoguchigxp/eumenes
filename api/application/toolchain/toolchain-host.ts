@@ -145,6 +145,7 @@ export async function createHostToolchain(
 		store: SqliteStore;
 		dbPath?: string;
 		queue: QueueService;
+		canvasAdapter?: import("../../domains/tool-runtime").DomainAdapter;
 		appDevelopmentAdapter?: import("../../domains/tool-runtime").DomainAdapter;
 		uiCompositions?: UiCompositionsService;
 		markdown?: import("../../domains/markdown").MarkdownService;
@@ -204,6 +205,7 @@ export async function createHostToolchain(
 			timers: s.timers,
 			schedules: s.schedules,
 			appDevelopmentAdapter: s.appDevelopmentAdapter,
+			canvasAdapter: s.canvasAdapter,
 			uiCompositions: s.uiCompositions,
 			markdown: s.markdown,
 			ocr: s.ocr,

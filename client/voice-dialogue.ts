@@ -5,7 +5,10 @@ import {
 	type InputTiming,
 	type ChunkGap,
 } from "../api/domains/voice-dialogue/contracts";
-import { avatarMotionSchema } from "../api/domains/delivery/contracts";
+import {
+	avatarMotionSchema,
+	deliveryEmotionSchema,
+} from "../api/domains/delivery/contracts";
 import { z } from "zod";
 import {
 	ApiError,
@@ -159,9 +162,13 @@ export function voiceDialogueClient(transport: Transport) {
 			const motion = avatarMotionSchema.safeParse(
 				response.headers.get("X-Avatar-Motion"),
 			);
+			const emotion = deliveryEmotionSchema.safeParse(
+				response.headers.get("X-Avatar-Emotion"),
+			);
 			return {
 				wav: new Uint8Array(await response.arrayBuffer()),
 				motion: motion.success ? motion.data : ("neutral" as const),
+				...(emotion.success ? { emotion: emotion.data } : {}),
 			};
 		},
 		voiceSample: async (

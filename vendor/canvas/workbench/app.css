@@ -1,0 +1,43 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; font-size: 14px; color: #222; background: #f4f4f6; }
+.top { display: flex; align-items: center; gap: 12px; padding: 6px 12px; background: #20242c; color: #fff; }
+.top h1 { font-size: 16px; margin: 0; }
+.note { color: #888; font-size: 12px; }
+.layout { display: grid; grid-template-columns: 200px 300px 1fr; gap: 8px; padding: 8px; height: calc(100vh - 40px); }
+.sidebar, .chat, .stage-wrap { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; overflow: auto; min-width: 0; }
+.side-head { display: flex; justify-content: space-between; align-items: center; }
+h2 { font-size: 14px; margin: 6px 0; }
+#artworks, #revisions { padding-left: 18px; margin: 0; }
+#artworks li button, #revisions li button { font-size: 12px; }
+#artworks li.active > button:first-child { font-weight: bold; }
+.chat { display: flex; flex-direction: column; }
+#messages { flex: 1; list-style: none; padding: 0; margin: 4px 0; overflow: auto; }
+#messages li { margin: 4px 0; padding: 6px; border-radius: 6px; white-space: pre-wrap; }
+#messages li.user { background: #e7f0ff; }
+#messages li.assistant { background: #f1f1f1; }
+#composer textarea { width: 100%; resize: vertical; }
+.row { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+.current { font-weight: bold; }
+.preview-host { display: flex; flex-direction: column; background: #111; border-radius: 4px; }
+.preview-host .toolbar { display: flex; gap: 4px; padding: 4px; background: #2a2e36; flex-wrap: wrap; align-items: center; }
+.preview-host .toolbar button[aria-pressed="true"] { background: #4a7bd8; color: #fff; }
+.preview-host .frame { width: 100%; height: 420px; }
+.preview-host.mode-fill { position: fixed; inset: 0; z-index: 1000; border-radius: 0; }
+.preview-host.mode-fill .frame, .preview-host.mode-fullscreen .frame { flex: 1; height: auto; }
+.preview-host:fullscreen { width: 100vw; height: 100vh; }
+.preview-frame { width: 100%; height: 100%; border: 0; display: block; }
+.candidate { margin-top: 8px; padding: 6px; border: 1px solid #cde; border-radius: 6px; background: #f7fbff; }
+.candidate code { font-size: 11px; color: #666; }
+#cand-checks { margin: 4px 0; padding-left: 18px; font-size: 12px; }
+.pass { color: #176a1b; }
+.fail { color: #b00020; }
+#cand-review { margin: 4px 0; font-size: 12px; }
+#cand-review ul { margin: 2px 0; padding-left: 18px; }
+#cand-review li.fail, #cand-review li.blocking { color: #b00020; }
+#cand-review li.warning { color: #9a6a00; }
+#cand-review li.unknown, #cand-review li.info { color: #888; }
+/* ページ直接モード（design.md §8）の警告。作品を開くたびに出す */
+.page-warning { margin-top: 8px; padding: 8px; border: 1px solid #d08000; border-radius: 6px; background: #fff7e6; color: #6a3d00; font-size: 13px; }
+.notice { min-height: 1.2em; color: #a05a00; font-size: 12px; }
+.preview-error { margin-top: 8px; padding: 8px; border: 1px solid #e0a0a0; border-radius: 6px; background: #fff3f3; color: #8a1020; font-size: 13px; }
+.preview-error p { margin: 0 0 6px; }

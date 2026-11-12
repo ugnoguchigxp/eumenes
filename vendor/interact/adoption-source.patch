@@ -3566,3 +3566,191 @@ index 0000000..350667c
 +	}
 +	return bytes;
 +}
+diff --git a/lab/scripts/package-consumer.mjs b/lab/scripts/package-consumer.mjs
+--- a/lab/scripts/package-consumer.mjs
++++ b/lab/scripts/package-consumer.mjs
+@@ -1,12 +1,21 @@
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+ import { createRequire } from "node:module";
+-import { readFileSync, writeFileSync } from "node:fs";
++import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import * as core from "eumenes-interact";
+ import { decodeLlmJson, LlmJsonError } from "eumenes-interact/llm-json";
+ import * as sqlite from "eumenes-interact/sqlite";
+ import * as adapter from "eumenes-interact/adapters/playwright-mcp";
++import {
++	McpTransportError,
++	startMcpSession,
++} from "eumenes-interact/adapters/mcp/session";
++import {
++	parseTabList,
++	parseToolResult,
++} from "eumenes-interact/adapters/playwright-mcp/response";
+ import {
+ 	assertChoiceQuoted,
+ 	assertValueQuoted,
+@@ -33,6 +42,78 @@
+ assert.equal(typeof core.startRun, "function");
+ assert.equal(typeof sqlite.createRun, "function");
+ assert.equal(typeof adapter.createPlaywrightMcpAdapter, "function");
++const tabs = "- 0: (current) [Fixture](https://example.test/)";
++const response = {
++	content: [
++		{
++			type: "text",
++			text: [
++				"### Result",
++				tabs,
++				"### Ran Playwright code",
++				"```js",
++				"await page.title();",
++				"```",
++				"### Page",
++				"- Page URL: https://example.test/",
++			].join("\n"),
++		},
++	],
++};
++const parsed = parseToolResult(response);
++assert.equal(parsed.code, "await page.title();");
++assert.deepEqual(parsed.page, { url: "https://example.test/" });
++assert.deepEqual(parseTabList(parsed.result), [
++	{ index: 0, current: true, url: "https://example.test/", title: "Fixture" },
++]);
++const workDir = mkdtempSync(join(tmpdir(), "interact-stdio-consumer-"));
++const childPath = join(workDir, "fixture.cjs");
++writeFileSync(
++	childPath,
++	`
++const readline = require("node:readline");
++readline.createInterface({ input: process.stdin }).on("line", (line) => {
++  const { id, method } = JSON.parse(line);
++  if (id === undefined) return;
++  const answer = method === "initialize" ? { result: { serverInfo: { version: "fixture" } } }
++    : method === "tools/call" ? { result: ${JSON.stringify(response)} }
++    : { error: { code: -32601 } };
++  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, ...answer }) + "\\n");
++});
++`,
++);
++const launch = { command: process.execPath, args: [childPath] };
++try {
++	const session = startMcpSession({ ...launch, cwd: workDir, env: {} });
++	try {
++		await assert.rejects(
++			session.request("missing", {}, { timeoutMs: 5000 }),
++			(error) =>
++				error instanceof McpTransportError &&
++				error.rpcCode === -32601 &&
++				error.dispatched,
++		);
++	} finally {
++		await session.close();
++	}
++	assert.equal(session.exited(), true);
++	const browser = adapter.createPlaywrightMcpAdapter({
++		launch,
++		workDir,
++		correlationId: "consumer",
++		browser: { mode: "isolated", headless: true },
++	});
++	try {
++		await browser.open(new AbortController().signal);
++		assert.equal(browser.state(), "open");
++		assert.equal(browser.toolInfo().version, "fixture");
++	} finally {
++		await browser.close();
++	}
++	assert.equal(browser.state(), "closed");
++} finally {
++	rmSync(workDir, { recursive: true, force: true });
++}
+ const start = () =>
+ 	core.startRun({
+ 		arm: "arm1",
+@@ -261,5 +342,8 @@
+ 		tamperDetected: true,
+ 		sqlite: true,
+ 		conformance: true,
++		mcpSession: true,
++		playwrightResponse: true,
++		standaloneAdapter: true,
+ 	}),
+ );
+diff --git a/packages/eumenes-interact/package.json b/packages/eumenes-interact/package.json
+--- a/packages/eumenes-interact/package.json
++++ b/packages/eumenes-interact/package.json
+@@ -1,6 +1,6 @@
+ {
+ 	"name": "eumenes-interact",
+-	"version": "0.1.3-eumenes.1",
++	"version": "0.1.3-eumenes.2",
+ 	"private": true,
+ 	"license": "MIT",
+ 	"type": "module",
+@@ -31,6 +31,14 @@
+ 			"types": "./dist/adapters/playwright-mcp.d.ts",
+ 			"default": "./dist/adapters/playwright-mcp.js"
+ 		},
++		"./adapters/mcp/session": {
++			"types": "./dist/adapters/mcp/session.d.ts",
++			"default": "./dist/adapters/mcp/session.js"
++		},
++		"./adapters/playwright-mcp/response": {
++			"types": "./dist/adapters/playwright-mcp/response-parser.d.ts",
++			"default": "./dist/adapters/playwright-mcp/response-parser.js"
++		},
+ 		"./package.json": "./package.json",
+ 		"./distribution-manifest.json": "./distribution-manifest.json",
+ 		"./parts": {
+diff --git a/packages/eumenes-interact/src/adapters/playwright-mcp/response.ts b/packages/eumenes-interact/src/adapters/playwright-mcp/response.ts
+--- a/packages/eumenes-interact/src/adapters/playwright-mcp/response.ts
++++ b/packages/eumenes-interact/src/adapters/playwright-mcp/response.ts
+@@ -27,6 +27,8 @@
+ 	result?: string;
+ 	/** `title` is absent when the page has none: MCP omits the line then. */
+ 	page?: { url: string; title?: string };
++	/** `### Ran Playwright code` body without its fence. */
++	code?: string;
+ 	snapshot?: McpSnapshotBody;
+ 	/** Image content, base64 as MCP sends it. */
+ 	images: { mimeType: string; data: string }[];
+@@ -94,17 +96,26 @@
+ 	return title === undefined ? { url } : { url, title };
+ }
+ 
++function parseCode(section: string | undefined) {
++	if (!section) return undefined;
++	const fenced = /^```[a-z]*\n([\s\S]*?)\n?```$/.exec(section.trim());
++	const code = (fenced ? fenced[1]! : section).trim();
++	return code || undefined;
++}
++
+ export function parseToolResult(raw: McpToolResult): ParsedToolResult {
+ 	const content = raw.content ?? [];
+ 	const first = content[0];
+ 	const text = first?.type === "text" ? first.text : "";
+ 	const { rest, snapshot } = extractSnapshot(text);
+ 	const sections = parseSections(rest);
++	const code = parseCode(sections.get("Ran Playwright code"));
+ 	return {
+ 		isError: raw.isError === true || sections.has("Error"),
+ 		error: sections.get("Error"),
+ 		result: sections.get("Result"),
+ 		page: parsePage(sections.get("Page")),
++		...(code === undefined ? {} : { code }),
+ 		snapshot,
+ 		images: content.flatMap((item) =>
+ 			item.type === "image"
+diff --git a/packages/eumenes-interact/src/adapters/playwright-mcp/response-parser.ts b/packages/eumenes-interact/src/adapters/playwright-mcp/response-parser.ts
+new file mode 100644
+--- /dev/null
++++ b/packages/eumenes-interact/src/adapters/playwright-mcp/response-parser.ts
+@@ -0,0 +1,4 @@
++/** Playwright MCP wire parsing. Each driver owns error classification and retries. */
++export type { McpContent, McpToolResult } from "../mcp/common.ts";
++export { linkFileName, parseTabList, parseToolResult } from "./response.ts";
++export type { McpSnapshotBody, McpTab, ParsedToolResult } from "./response.ts";

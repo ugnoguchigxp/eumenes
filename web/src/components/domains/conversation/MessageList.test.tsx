@@ -169,6 +169,86 @@ test("what is shown for a hidden input keeps its place between the bubbles", () 
 	expect(shown.nextElementSibling).toBe(bubbles[1]);
 	expect(screen.queryByText(/task_finished/)).toBeNull();
 });
+test("the agent's thoughts are plain lines placed between the messages by time, not bubbles", () => {
+	const at = (s: string) => Date.parse(`2026-11-11T10:00:${s}Z`);
+	const { container } = render(
+		<MessageList
+			conversation={{
+				id: "main",
+				revision: 1,
+				messages: [
+					{
+						...base,
+						id: "u1",
+						role: "user",
+						text: "最初の発言",
+						createdAt: "2026-11-11T10:00:10Z",
+					},
+					{
+						...base,
+						id: "a1",
+						role: "assistant",
+						text: "返事",
+						createdAt: "2026-11-11T10:00:20Z",
+					},
+				],
+			}}
+			thoughts={[
+				{
+					id: "t1",
+					at: at("15"),
+					kind: "plan",
+					text: "調べる: 天気（予定がある）",
+				},
+				{ id: "t2", at: at("30"), kind: "decline", text: "見送り: まだ早い" },
+				{ id: "t3", at: at("31"), kind: "research", text: "週末の天気" },
+			]}
+		/>,
+	);
+	const rows = [
+		...container.querySelectorAll(".messages > article, .agency-thought"),
+	];
+	expect(rows.map((r) => r.textContent)).toEqual([
+		expect.stringContaining("最初の発言"),
+		"💭 + 調べる: 天気（予定がある）",
+		expect.stringContaining("返事"),
+		"💭 見送り: まだ早い",
+		"🔎 週末の天気",
+	]);
+	// Not bubbles: no article, no reply button, nothing for the screen reader's answer announcement.
+	expect(container.querySelectorAll("article")).toHaveLength(2);
+	expect(container.querySelector(".agency-thought")?.tagName).toBe("P");
+});
+test("thoughts from the time of folded messages are folded with them", () => {
+	const messages = Array.from({ length: 25 }, (_, i) => ({
+		...base,
+		id: `m${i}`,
+		role: "user" as const,
+		text: `発言${i}`,
+		createdAt: new Date(Date.UTC(2026, 10, 11, 10, 0, i * 2)).toISOString(),
+	}));
+	const { container } = render(
+		<MessageList
+			conversation={{ id: "main", revision: 1, messages }}
+			thoughts={[
+				{
+					id: "old",
+					at: Date.UTC(2026, 10, 11, 10, 0, 1),
+					kind: "plan",
+					text: "古い思考",
+				},
+				{
+					id: "new",
+					at: Date.UTC(2026, 10, 11, 10, 0, 47),
+					kind: "plan",
+					text: "新しい思考",
+				},
+			]}
+		/>,
+	);
+	const thoughts = [...container.querySelectorAll(".agency-thought")];
+	expect(thoughts.map((t) => t.textContent)).toEqual(["💭 + 新しい思考"]);
+});
 test("adopted emotion belongs beside the assistant name, preserves body and follows a custom name", () => {
 	const { container, rerender } = render(
 		<MessageList

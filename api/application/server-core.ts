@@ -14,6 +14,7 @@ import { createSettings } from "../domains/settings";
 import {
 	createInference,
 	createCloudAgents,
+	createCodexHost,
 	createConnectionModels,
 } from "../domains/inference";
 import { localHarness } from "../domains/dialogue";
@@ -70,15 +71,18 @@ export async function buildCore(
 		judge: createActivityRecorder(),
 		embedding: createActivityRecorder(),
 	};
+	// Codex runs in a home of its own next to the database (see codex-home.ts), never the person's ~/.codex.
+	const codexHost = createCodexHost(config.env, {
+		executable: config.researchCodexExecutable,
+		home: join(dirname(resolve(dbPath)), "codex-home"),
+	});
 	const connectionModels = createConnectionModels(settings, config.env, {
 		store,
-		codexExecutable: config.researchCodexExecutable,
+		codexHost,
 	});
 	const inference = createInference(store, settings, {
 		connectionModels,
-		cloudAgents: createCloudAgents(config.env, {
-			codexExecutable: config.researchCodexExecutable,
-		}),
+		cloudAgents: createCloudAgents(config.env, { codexHost }),
 		token: config.larmToken,
 		providerHosts: config.larmProviderHosts,
 		keepLarmConnection: true,

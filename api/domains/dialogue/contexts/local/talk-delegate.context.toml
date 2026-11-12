@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/routed-talk-work.ts
+text = '''find_toolchain で見つけた担当に仕事を頼む。toolchain に候補の id、request に何をしてほしいかを書く。担当は会話を読んでいないので、request だけで伝わるように具体的に書く。mode は execute だけで、impact は書かなくてよい。結果の delegated が true なら引き渡した（予告はホストが利用者に伝え、結果は後で届く）。answered が true なら答えが answer にある。delegated・answered が false なら頼めておらず、code が理由。'''

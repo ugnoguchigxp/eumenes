@@ -4,6 +4,7 @@ import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { agendaClock, knownOf, type AgendaScope } from "./always-on-scope";
 import type { AgencyHostDeps } from "./host-types";
+import { think } from "./always-on-thoughts";
 
 const log = getLogger("agency");
 
@@ -46,6 +47,10 @@ export function writeProfile(input: {
 			});
 			if (!out.changed || c.forgetSeq !== seq || c.profileAbort.signal.aborted)
 				return;
+			if (out.applied.length)
+				think(c, now(), "profile", out.applied.join(" / "));
+			if (out.rejected.length)
+				think(c, now(), "profile", `見送り: ${out.rejected.join(" / ")}`);
 			const passes = [
 				...c.profile.passes,
 				{ markdown: out.markdown, sources: evidence },

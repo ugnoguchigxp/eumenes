@@ -5,14 +5,11 @@ import { createVoiceResponder } from "./respond";
 import { createInputCollector } from "./input";
 import type { Database } from "bun:sqlite";
 import type { Speech } from "./speech-state";
-import type { SpeechPreparation } from "../../delivery";
 import { getLogger } from "../../../infrastructure/logger";
 import { toErrorCode } from "../../../infrastructure/error-code";
 const log = getLogger("voice-dialogue");
-import { SpeechSentences } from "./sentences";
-import { spokenText } from "./spoken-text";
 import { cancelHeard, recordPlayed } from "./playback";
-import { replaySentences, replayTextMatches } from "./replay-playback";
+import { createReplaySpeech, replaySentences } from "./replay-playback";
 import { createSpeechClaims } from "./speech-claims";
 import { connectAnnouncementDelivery } from "./announcement-delivery";
 
@@ -207,61 +204,7 @@ export function createVoiceDialogue(
 				throw new Error("replay_text_invalid");
 			return larm.speak(text, signal);
 		},
-		async replaySpeech(
-			text: string,
-			signal: AbortSignal,
-			runId?: string,
-			messageId?: string,
-		) {
-			if (externalActive()) throw new Error("live_legacy_voice_disabled");
-			if (!text.trim() || text.length > 400)
-				throw new Error("replay_text_invalid");
-			if (runId) {
-				const run = dialogue.get(runId);
-				if (!replayTextMatches(run, dialogue.answerText(runId), text))
-					throw new Error("replay_text_invalid");
-			}
-			const context = runId ? dialogue.answerContext?.(runId) : undefined;
-
-			const replayRun = runId ? dialogue.get(runId) : undefined;
-			// A runless message's own feeling (agency utterance), only for a clause of that message.
-			const own =
-				!runId && messageId ? dialogue.hostMessageDelivery(messageId) : null;
-			const hostDelivery =
-				own &&
-				new SpeechSentences().append(spokenText(own.text), true).includes(text)
-					? own.delivery
-					: undefined;
-			const preparation: SpeechPreparation = {
-				...(replayRun
-					? {
-							collection: {
-								conversationId: replayRun.conversationId,
-								turnId: replayRun.id,
-								granularity: "answer",
-								chunkOrder: null,
-							},
-						}
-					: {}),
-				...(context ? { context } : {}),
-				...(hostDelivery ? { delivery: hostDelivery } : {}),
-				deliveryScope: "chunk",
-			};
-			const speech = larm.speakWithDelivery
-				? await larm.speakWithDelivery(text, signal, preparation)
-				: { wav: await larm.speak(text, signal) };
-			signal.throwIfAborted();
-			if (runId && speech.delivery)
-				await store.write((db) => {
-					signal.throwIfAborted();
-					dialogue.recordAnswerDeliveryInTransaction(
-						db,
-						runId,
-						speech.delivery!,
-					);
-				});
-			return speech;
-		},
+		replaySpeech: createReplaySpeech({ store, dialogue, larm, externalActive }),
 		/** Synthesizes a fixed sample with unsaved voice settings. */
 		async sampleAudio(override: SpeechOverride, signal: AbortSignal) {
 			if (externalActive()) throw new Error("live_legacy_voice_disabled");

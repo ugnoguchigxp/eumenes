@@ -44,7 +44,7 @@ test("the Interact archive, adoption patch and installed release match the pinne
 		`sha512-${createHash("sha512").update(archive).digest("base64")}`,
 	);
 	const release = loadInteractRelease();
-	expect(Object.keys(release.manifest.files)).toHaveLength(164);
+	expect(Object.keys(release.manifest.files)).toHaveLength(166);
 	expect(systemContext("browser.contexts.interact.skill", {})).toBe(
 		release.body,
 	);

@@ -269,6 +269,7 @@ async function agentRequest(
 		.run({
 			kind: connection.kind as CloudAgentKind,
 			connectionId: connection.id,
+			attemptId,
 			...(session ? { session } : {}),
 			model: resource.model,
 			baseUrl: connection.baseUrl,

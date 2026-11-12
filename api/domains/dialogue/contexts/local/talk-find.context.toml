@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/routed-talk-work.ts
+text = '''仕事を任せられる専門の担当（toolchain）を探す。query に、してほしい仕事の内容を書く。結果の candidates は担当の候補で、id・title・summary（できること）・useWhen（向いている依頼）を持つ。候補がないときは空で返る。'''

@@ -2,13 +2,15 @@ import { expect, test } from "bun:test";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runCodexTurn } from "../adapters/codex-app-server";
+import { createCodexHost } from "../adapters/codex-host";
+import type { ThreadMessage } from "../adapters/codex-threads";
 import { codexUsage } from "../adapters/codex-usage";
+import { codexCall, fakeCodex, user } from "./codex.fixture";
 import { cloudRequest, type CloudEnv } from "../service/cloud";
 import type { RequestRow } from "../repository";
 import type { Connection, Resource } from "../../settings";
 
-test("whole ephemeral thread totals include every upstream completion; last and duplicates are not added", async () => {
+test("a turn's usage is the thread total less the total at its start; last and duplicates are not added", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "usage-codex-"));
 	const command = join(dir, "fixture");
 	await writeFile(
@@ -16,39 +18,49 @@ test("whole ephemeral thread totals include every upstream completion; last and 
 		`#!${process.execPath}
 import { createInterface } from "node:readline";
 const out = (m) => process.stdout.write(JSON.stringify(m)+"\\n");
+let turns = 0;
 createInterface({input:process.stdin}).on("line",line=>{
 const m=JSON.parse(line);
 if(m.method==="initialize")out({id:m.id,result:{}});
-if(m.method==="config/read")out({id:m.id,result:{config:{}}});
 if(m.method==="thread/start")out({id:m.id,result:{thread:{id:"t"}}});
 if(m.method==="turn/start"){
-out({id:m.id,result:{turn:{id:"u"}}});
-for(const [threadId,turnId,n] of [["other","u",9999],["t","other",9999],["t","u",100],["t","u",250],["t","u",250],["t","u",100]]){
+const base = turns++ * 1000;
+out({id:m.id,result:{turn:{id:"u"+turns}}});
+const turnId = "u"+turns;
+for(const [threadId,id,n] of [["other",turnId,9999],["t","other",9999],["t",turnId,base+100],["t",turnId,base+250],["t",turnId,base+250],["t",turnId,base+100]]){
 const part={inputTokens:n,outputTokens:n/10,cachedInputTokens:n/2,cacheWriteInputTokens:0,reasoningOutputTokens:n/25};
-out({method:"thread/tokenUsage/updated",params:{threadId,turnId,tokenUsage:{total:part,last:{...part,inputTokens:7}}}});
+out({method:"thread/tokenUsage/updated",params:{threadId,turnId:id,tokenUsage:{total:part,last:{...part,inputTokens:7}}}});
 }
-out({method:"model/rerouted",params:{threadId:"t",turnId:"u",fromModel:"fixture-a",toModel:"fixture-b"}});
-out({method:"item/completed",params:{threadId:"t",item:{type:"agentMessage",text:"ok"}}});
-out({method:"turn/completed",params:{threadId:"t",turn:{id:"u",status:"completed"}}});
+if(turns===1)out({method:"model/rerouted",params:{threadId:"t",turnId,fromModel:"fixture-a",toModel:"fixture-b"}});
+out({method:"item/completed",params:{threadId:"t",turnId,item:{type:"agentMessage",text:"ok"}}});
+out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"completed"}}});
 }});
 `,
 		{ mode: 0o700 },
 	);
+	const host = createCodexHost(
+		{ PATH: "" },
+		{ executable: command, home: join(dir, "home") },
+	)!;
 	try {
-		const observations: unknown[] = [];
-		const result = await runCodexTurn(
-			{ command, env: {} },
-			{
-				cwd: dir,
-				model: "fixture-a",
-				instructions: "",
-				prompt: "",
-				signal: AbortSignal.timeout(5000),
-				onUsage: (u) => observations.push(u),
-			},
-			(s) => new Error(s),
-		);
-		expect(result).toMatchObject({
+		const run = async (messages: ThreadMessage[]) => {
+			const observations: unknown[] = [];
+			const result = await host.run(
+				{ credential: null, baseUrl: "https://example.test" },
+				{
+					model: "fixture-a",
+					instructions: "",
+					messages,
+					input: () => ({ prompt: "p", images: [] }),
+					reasoningEffort: "high",
+					signal: AbortSignal.timeout(5000),
+					onUsage: (u) => observations.push(u),
+				},
+			);
+			return { result, observations };
+		};
+		const first = await run([{ digest: "a", assistant: false }]);
+		expect(first.result).toMatchObject({
 			text: "ok",
 			inputTokens: 250,
 			outputTokens: 25,
@@ -56,59 +68,36 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:"u",status:"completed
 			reasoningTokens: 10,
 			usageModel: null,
 		});
-		expect(observations).not.toHaveLength(0);
+		expect(first.observations).not.toHaveLength(0);
+		// The same thread continued: the total began this turn at 250 / 25 / 125 / 10 and the turn added the rest.
+		const second = await run([
+			{ digest: "a", assistant: false },
+			{ digest: "b", assistant: true },
+			{ digest: "c", assistant: false },
+		]);
+		expect(second.result).toMatchObject({
+			inputTokens: 1250 - 250,
+			outputTokens: 125 - 25,
+			cacheReadTokens: 625 - 125,
+			reasoningTokens: 50 - 10,
+			usageModel: "fixture-a",
+		});
 		expect(
 			codexUsage(
 				{ total: { inputTokens: 100, outputTokens: -1 } },
 				"fixture-a",
 			),
 		).toBeNull();
+		// A total below the start of the turn is not a usage.
+		expect(
+			codexUsage(
+				{ total: { inputTokens: 100, outputTokens: 10 } },
+				"fixture-a",
+				{ input: 200, output: 0, cached: 0, cacheWrite: 0, reasoning: 0 },
+			),
+		).toBeNull();
 	} finally {
-		await rm(dir, { recursive: true, force: true });
-	}
-});
-
-test("an unreadable inherited MCP configuration never starts a model turn", async () => {
-	const dir = await mkdtemp(join(tmpdir(), "isolation-codex-"));
-	const command = join(dir, "fixture");
-	const started = join(dir, "started");
-	await writeFile(
-		command,
-		`#!${process.execPath}
-import { createInterface } from "node:readline";
-import { writeFileSync } from "node:fs";
-const out = m => process.stdout.write(JSON.stringify(m)+"\\n");
-createInterface({input:process.stdin}).on("line", line => {
- const m=JSON.parse(line);
- if(m.method==="initialize")out({id:m.id,result:{}});
- if(m.method==="config/read")out({id:m.id,result:JSON.parse(process.env.FIXTURE_CONFIG)});
- if(m.method==="thread/start" || m.method==="turn/start")writeFileSync(${JSON.stringify(started)}, "unexpected");
-});
-`,
-		{ mode: 0o700 },
-	);
-	try {
-		for (const config of [
-			null,
-			{ config: [] },
-			{ config: { mcp_servers: [] } },
-		]) {
-			await expect(
-				runCodexTurn(
-					{ command, env: { FIXTURE_CONFIG: JSON.stringify(config) } },
-					{
-						cwd: dir,
-						model: "fixture",
-						instructions: "",
-						prompt: "",
-						signal: AbortSignal.timeout(5000),
-					},
-					(s) => new Error(s),
-				),
-			).rejects.toThrow("codex_config_invalid");
-			expect(await Bun.file(started).exists()).toBe(false);
-		}
-	} finally {
+		await host.close();
 		await rm(dir, { recursive: true, force: true });
 	}
 });
@@ -172,55 +161,21 @@ test("usage writes drain even when the SDK turn fails after reporting cumulative
 });
 
 test("native Web search is isolated and requires a completed search in the current turn", async () => {
-	const dir = await mkdtemp(join(tmpdir(), "web-codex-"));
-	const command = join(dir, "fixture");
-	await writeFile(
-		command,
-		`#!${process.execPath}
-import { createInterface } from "node:readline";
-const out = m => process.stdout.write(JSON.stringify(m)+"\\n");
-if (!process.argv.includes('web_search="' + (process.env.SEARCH_MODE ?? "disabled") + '"')) process.exit(2);
-createInterface({input:process.stdin}).on("line",line=>{
-const m=JSON.parse(line);
-if(m.method==="initialize")out({id:m.id,result:{}});
-if(m.method==="config/read")out({id:m.id,result:{config:{mcp_servers:{inherited:{}}}}});
-if(m.method==="thread/start"){
- if(m.params.sandbox!=="read-only" || m.params.config.mcp_servers.inherited.enabled!==false) process.exit(3);
- out({id:m.id,result:{thread:{id:"t"}}});
-}
-if(m.method==="turn/start"){
- out({id:m.id,result:{turn:{id:"u"}}});
- if(process.env.SEARCH_EVENT) out({method:"item/completed",params:{threadId:"t",turnId:process.env.SEARCH_EVENT,item:{type:"webSearch"}}});
- out({method:"item/completed",params:{threadId:"t",turnId:"u",item:{type:"agentMessage",text:"ok"}}});
- out({method:"turn/completed",params:{threadId:"t",turn:{id:"u",status:"completed"}}});
-}});
-`,
-		{ mode: 0o700 },
-	);
-	const run = (nativeWebSearch?: true, event?: string) =>
-		runCodexTurn(
-			{
-				command,
-				env: {
-					SEARCH_MODE: nativeWebSearch ? "live" : "disabled",
-					...(event ? { SEARCH_EVENT: event } : {}),
-				},
-			},
-			{
-				cwd: dir,
-				model: "fixture",
-				instructions: "",
-				prompt: "public lookup",
-				signal: AbortSignal.timeout(5000),
-				nativeWebSearch,
-			},
-			(reason) => new Error(reason),
-		);
+	const codex = await fakeCodex();
 	try {
-		expect((await run()).text).toBe("ok");
-		await expect(run(true, "other")).rejects.toThrow("web_search_missing");
-		expect((await run(true, "u")).text).toBe("ok");
+		const agents = codex.agents(codex.host());
+		const run = (nativeWebSearch?: true) =>
+			agents.run(codexCall([user("public lookup")], { nativeWebSearch }));
+		expect((await run()).text).toBe("answer");
+		await codex.behave({ search: "other" });
+		await expect(run(true)).rejects.toThrow("cloud_agent_web_search_missing");
+		await codex.behave({ search: "this" });
+		expect((await run(true)).text).toBe("answer");
+		const argv = (await codex.of("spawn")).map((r) => r.params.argv.join(" "));
+		expect(argv).toHaveLength(2);
+		expect(argv[0]).toContain('web_search="disabled"');
+		expect(argv[1]).toContain('web_search="live"');
 	} finally {
-		await rm(dir, { recursive: true, force: true });
+		await codex.cleanup();
 	}
 });

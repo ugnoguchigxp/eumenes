@@ -366,7 +366,7 @@ export async function routerTurn(
 	return "done";
 }
 
-const titleOf = (c: RouteCandidate) =>
+export const titleOf = (c: RouteCandidate) =>
 	lineText(
 		c.kind === "toolchain" || c.kind === "read" ? c.card.title : c.id,
 	).slice(0, 30);
@@ -376,7 +376,7 @@ const ANNOUNCE = {
 	try: "dialogue.contexts.local.router-announce-try",
 	partial: "dialogue.contexts.local.router-announce",
 } as const;
-const announcement = (announce: Announce, title: string) =>
+export const announcement = (announce: Announce, title: string) =>
 	announce === "none" ? "" : systemContext(ANNOUNCE[announce], { title });
 
 async function carryOut(

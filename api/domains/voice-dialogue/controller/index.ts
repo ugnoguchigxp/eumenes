@@ -9,6 +9,7 @@ import {
 } from "../../../infrastructure/http";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
+import { acceptedEmotion } from "../../delivery/contracts";
 import {
 	replayInputSchema,
 	sampleInputSchema,
@@ -143,12 +144,13 @@ export function registerVoiceDialogue(
 				parsed.data.runId,
 				parsed.data.messageId,
 			);
+			const avatar = speech.avatarDelivery;
+			const emotion = avatar ? acceptedEmotion(avatar) : null;
 			return c.body(new Uint8Array(speech.wav), 200, {
 				"Content-Type": "audio/wav",
 				"Cache-Control": "no-store",
-				...(speech.delivery
-					? { "X-Avatar-Motion": speech.delivery.motion }
-					: {}),
+				...(avatar ? { "X-Avatar-Motion": avatar.motion } : {}),
+				...(emotion ? { "X-Avatar-Emotion": emotion } : {}),
 			});
 		} catch (error) {
 			// Only machine-readable codes (e.g. larm_inference_401) reach the client.

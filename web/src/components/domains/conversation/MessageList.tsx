@@ -8,7 +8,9 @@ import {
 	acceptedEmotion,
 	type SpeechDelivery,
 } from "../../../../../api/domains/delivery/contracts";
+import type { AgencyThought } from "../../../../../api/domains/dialogue/contracts/agency-status";
 import {
+	Fragment,
 	type ReactNode,
 	memo,
 	useEffect,
@@ -28,8 +30,65 @@ function completionAnnouncement(text: string) {
 		: `回答が完了しました。${text.slice(0, ANNOUNCE_LIMIT)}…続きは会話欄で確認できます。`;
 }
 
+const THOUGHT_MARK: Record<AgencyThought["kind"], string> = {
+	plan: "💭",
+	drop: "💭",
+	check: "💭",
+	repeat: "💭",
+	decline: "💭",
+	research: "🔎",
+	researched: "📝",
+	profile: "🗓",
+	quiet: "🤫",
+	error: "⚠",
+};
+const THOUGHT_PREFIX: Partial<Record<AgencyThought["kind"], string>> = {
+	plan: "+ ",
+	drop: "- ",
+};
+
+/**
+ * Each thought goes before the first message written after it; the newer ones follow the last message. While older
+ * messages are folded away, the thoughts from that time are folded with them.
+ */
+export function placeThoughts(
+	rows: readonly Pick<Message, "createdAt">[],
+	thoughts: readonly AgencyThought[],
+	folded: boolean,
+) {
+	const before: AgencyThought[][] = rows.map(() => []);
+	const after: AgencyThought[] = [];
+	const times = rows.map((m) => Date.parse(m.createdAt));
+	for (const thought of thoughts) {
+		const index = times.findIndex((t) => t > thought.at);
+		if (index === -1) after.push(thought);
+		else if (index > 0 || !folded) before[index]!.push(thought);
+	}
+	return { before, after };
+}
+
+/** One thought of the agent: a plain dim line, not a bubble. */
+const ThoughtRow = memo(function ThoughtRow({
+	thought,
+}: {
+	thought: AgencyThought;
+}) {
+	return (
+		<p
+			className="agency-thought"
+			data-kind={thought.kind}
+			title={new Date(thought.at).toLocaleTimeString("ja-JP")}
+		>
+			<span aria-hidden="true">{THOUGHT_MARK[thought.kind]}</span>{" "}
+			{THOUGHT_PREFIX[thought.kind] ?? ""}
+			{thought.text}
+		</p>
+	);
+});
+
 export const MessageList = memo(function MessageList({
 	conversation,
+	thoughts,
 	client,
 	streaming,
 	replayingId,
@@ -45,6 +104,8 @@ export const MessageList = memo(function MessageList({
 	onOpenResource,
 }: {
 	conversation: Conversation | undefined;
+	/** The agent's thoughts, shown as plain lines between the messages by time (not bubbles, not read aloud). */
+	thoughts?: readonly AgencyThought[];
 	client?: EumenesClient;
 	streaming?: string;
 	replayingId?: string | null;
@@ -102,6 +163,7 @@ export const MessageList = memo(function MessageList({
 		: firstVisible
 			? messages.slice(messages.indexOf(firstVisible))
 			: [];
+	const placed = placeThoughts(rows, thoughts ?? [], hidden > 0);
 	return (
 		<div className="messages">
 			<output
@@ -120,22 +182,29 @@ export const MessageList = memo(function MessageList({
 					さらに20件表示
 				</button>
 			)}
-			{rows.map((message) => (
-				<MessageRow
-					key={message.id}
-					message={message}
-					client={client}
-					assistantLabel={assistantLabel}
-					editing={message.id === editingId}
-					replaying={message.id === replayingId}
-					edited={!!editedIds?.has(message.id)}
-					onReplay={onReplay}
-					onEdit={message.id === editableId ? onEdit : undefined}
-					onOpenResource={onOpenResource}
-					renderInsideMessage={renderInsideMessage}
-					renderFollowingMessage={renderFollowingMessage}
-					renderHiddenMessage={renderHiddenMessage}
-				/>
+			{rows.map((message, index) => (
+				<Fragment key={message.id}>
+					{placed.before[index]?.map((thought) => (
+						<ThoughtRow key={thought.id} thought={thought} />
+					))}
+					<MessageRow
+						message={message}
+						client={client}
+						assistantLabel={assistantLabel}
+						editing={message.id === editingId}
+						replaying={message.id === replayingId}
+						edited={!!editedIds?.has(message.id)}
+						onReplay={onReplay}
+						onEdit={message.id === editableId ? onEdit : undefined}
+						onOpenResource={onOpenResource}
+						renderInsideMessage={renderInsideMessage}
+						renderFollowingMessage={renderFollowingMessage}
+						renderHiddenMessage={renderHiddenMessage}
+					/>
+				</Fragment>
+			))}
+			{placed.after.map((thought) => (
+				<ThoughtRow key={thought.id} thought={thought} />
 			))}
 			{!all.length && !streaming && (
 				<p className="empty">

@@ -30,6 +30,7 @@ export function appServices(s: Services, secrets: readonly string[] = []) {
 		music: s.music,
 		image: s.image,
 		docling: s.docling,
+		canvas: s.canvas,
 		markdown: s.markdown,
 		excalidraw: s.excalidraw,
 		drawingOperations: s.drawingOperations,

@@ -297,6 +297,11 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		createSpecialistSessionsLifecycle(s.dialogue),
 		{ name: "web_research", close: () => s.webResearch.close() },
 		{ name: "queue", close: () => s.queue.close(10_000) },
+		{
+			name: "canvas",
+			recover: async () => s.canvas?.runtime.start(),
+			close: () => s.canvas?.runtime.close(),
+		},
 		// The MCP child stops before the queue that drives it (reverse order: closed first).
 		{ name: "browser_sweep", close: () => browserSweep.idle() },
 		{ name: "browser", close: () => s.browser.close() },

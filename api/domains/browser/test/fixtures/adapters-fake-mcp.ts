@@ -228,6 +228,9 @@ async function call(id: unknown, name: string, args: Record<string, unknown>) {
 	}
 }
 
+const isolationPath = argv.includes("--config")
+	? argv[argv.indexOf("--config") + 1]
+	: undefined;
 log({
 	kind: "start",
 	pid: process.pid,
@@ -235,6 +238,9 @@ log({
 	envKeys: Object.keys(process.env).sort(),
 	executablePath: process.env.PLAYWRIGHT_MCP_EXECUTABLE_PATH,
 	cwd: process.cwd(),
+	isolation: isolationPath
+		? JSON.parse(readFileSync(isolationPath, "utf8"))
+		: undefined,
 });
 
 let buffer = "";

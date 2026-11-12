@@ -1,10 +1,16 @@
 /** The normal background-control path, with request state in RAM and saved configuration read-only. */
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { SqliteStore } from "../api/infrastructure/sqlite";
 import { createSettings } from "../api/domains/settings";
-import { createInference, createCloudAgents } from "../api/domains/inference";
+import {
+	createCloudAgents,
+	createCodexHost,
+	createInference,
+} from "../api/domains/inference";
 import { migrations } from "../api/application/migrations";
 import { resolveLarmToken } from "../api/infrastructure/auth-config";
 
@@ -22,6 +28,8 @@ export async function routerIssueInference(dbPath: string) {
 		write: async <T>(fn: (tx: Database) => T) => fn(db),
 	} as SqliteStore;
 	let memory: SqliteStore | undefined;
+	// A Codex home of the evaluation's own: the backend empties its home when it starts, and so would this.
+	const codexRoot = await mkdtemp(join(tmpdir(), "router-issue-codex-"));
 	try {
 		const saved = await createSettings(reader, { dbPath, env: process.env });
 		const requestDb = new Database(":memory:");
@@ -57,7 +65,11 @@ export async function routerIssueInference(dbPath: string) {
 			},
 			{
 				token: resolveLarmToken(process.env),
-				cloudAgents: createCloudAgents(process.env),
+				cloudAgents: createCloudAgents(process.env, {
+					codexHost: createCodexHost(process.env, {
+						home: join(codexRoot, "codex-home"),
+					}),
+				}),
 			},
 		);
 		return {
@@ -106,11 +118,13 @@ export async function routerIssueInference(dbPath: string) {
 				await inference.close();
 				await memory!.close();
 				db.close();
+				await rm(codexRoot, { recursive: true, force: true });
 			},
 		};
 	} catch (error) {
 		await memory?.close();
 		db.close();
+		await rm(codexRoot, { recursive: true, force: true });
 		throw error;
 	}
 }

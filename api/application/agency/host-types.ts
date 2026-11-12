@@ -137,6 +137,8 @@ export type AgencyHostDeps = {
 			effect?: string | null;
 		}>,
 	): string | undefined;
+	/** Tells the screens something they show changed outside a database commit (the agent's thoughts). */
+	publish?(): void;
 	nowMs?(): number;
 	setTimer?(fn: () => void, ms: number): unknown;
 	clearTimer?(handle: unknown): void;

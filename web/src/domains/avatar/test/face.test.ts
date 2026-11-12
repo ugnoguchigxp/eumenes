@@ -1,6 +1,17 @@
 import { expect, test } from "vitest";
 import { createBlink, createFace } from "../live2d/face";
 
+test("feelings that share a gesture can keep different facial expressions", () => {
+	const warmth = createFace(() => 1)(1, 1, "agreeing", 0, 1, "warmth");
+	const wry = createFace(() => 1)(1, 1, "agreeing", 0, 1, "wry");
+	const sadness = createFace(() => 1)(1, 1, "downcast", 0, 1, "sadness");
+	const apology = createFace(() => 1)(1, 1, "downcast", 0, 1, "apologetic");
+	expect(warmth.ParamBrowLY).toBe(warmth.ParamBrowRY);
+	expect(wry.ParamBrowLY).toBeGreaterThan(wry.ParamBrowRY);
+	expect(apology.ParamBrowLY).toBeGreaterThan(sadness.ParamBrowLY);
+	expect(apology.ParamMouthOpenY).toBe(0);
+});
+
 test("blinks use bounded random intervals and reopen without a timer", () => {
 	const blink = createBlink(() => 0);
 	expect(blink(2.9)).toBe(0);

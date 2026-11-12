@@ -1,4 +1,8 @@
-export { createAvatarPlayback, type AvatarCue } from "./controller";
+export {
+	createAvatarPlayback,
+	deliveryAvatarCue,
+	type AvatarCue,
+} from "./controller";
 export {
 	defaultAvatarView,
 	readAvatarView,

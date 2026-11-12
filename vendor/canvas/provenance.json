@@ -1,0 +1,24 @@
+{
+	"package": "eumenes-canvas",
+	"version": "0.1.0",
+	"sourceRepository": "https://github.com/ugnoguchigxp/eumenes_canvas",
+	"sourceCommit": "09e3814650ac11cebdfb909ce054fbc6f12f0150",
+	"workingTreeChanges": false,
+	"sourceArchive": "eumenes-canvas-0.1.0-96a607d997fe.tgz",
+	"sourceArchiveSha256": "96a607d997fe4de75616759735b158be7a530100dce8887255550dedc0e5af6b",
+	"archive": "eumenes-canvas-0.1.0-5bd98dd17e61.tgz",
+	"archiveSha256": "5bd98dd17e61054d1c699925a24426bc1f7b7f1fd73172a5f204ed2a4922956d",
+	"layout": "Bun package/ prefix. Upstream sources and docs are byte-identical. Playwright is supplied by Eumenes. TypeScript declarations are emitted under the upstream compiler settings; exports resolve to the unmodified runtime source.",
+	"installPatch": "bun-package-resolution.patch",
+	"installPatchSha256": "4f9a2c0c7a2f7e85d815a1064b6bbe76b4ec6a1784c4281cafc15f541bc17b85",
+	"contracts": {
+		"canvas-artwork/1": "docs/artwork-contract-v1.md",
+		"canvas-artwork/2": "docs/artwork-contract-v2-page.md"
+	},
+	"playwright": "Resolved from the Eumenes installation rather than an archive dependency.",
+	"workbenchFiles": {
+		"index.html": "9a80e86b99d27a476381367cc25b15b36826438c5eadf3a4a66a4596582b88fc",
+		"app.js": "3ccc5c12fd28ee74c5f29cb3b338856e52d01fcc1f99adbe67c1aa2e4a346e67",
+		"app.css": "1eae5b6c67fd939fb4994d877639554e0f63bf32db17ebe25bd579e700f4e8e9"
+	}
+}

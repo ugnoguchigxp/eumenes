@@ -97,9 +97,20 @@ export function createApp(options: AppOptions) {
 	const app = new Hono();
 	app.use("*", async (c, next) => {
 		await next();
-		// API responses are never rendered as documents, so allow nothing.
-		for (const [name, value] of Object.entries(securityHeaders))
+		// Canvas serves a fixed, authenticated workbench document. It supplies its own
+		// same-origin framing rule and an allowlist for the isolated preview.
+		const canvasWorkbench =
+			c.req.path === "/api/canvas/workbench/index.html" &&
+			c.res.status === 200 &&
+			c.res.headers.get("X-Frame-Options") === "SAMEORIGIN";
+		for (const [name, value] of Object.entries(securityHeaders)) {
+			if (
+				canvasWorkbench &&
+				(name === "X-Frame-Options" || name === "Content-Security-Policy")
+			)
+				continue;
 			c.header(name, value);
+		}
 	});
 	app.use("/api/*", async (c, next) => {
 		const requestId = crypto.randomUUID();

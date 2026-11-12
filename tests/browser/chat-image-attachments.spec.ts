@@ -169,17 +169,15 @@ test("full chat paste and drop, picker, thumbnail removal, image-only send, relo
 				: [],
 		).length;
 	expect(talks.map(imageCount)).toEqual([3, 0]);
-	await page
-		.getByLabel("添付画像を選択")
-		.setInputFiles(
-			await Promise.all(
-				files.map(async (f) => ({
-					name: f.name,
-					mimeType: f.type,
-					buffer: Buffer.from(await f.arrayBuffer()),
-				})),
-			),
-		);
+	await page.getByLabel("添付画像を選択").setInputFiles(
+		await Promise.all(
+			files.map(async (f) => ({
+				name: f.name,
+				mimeType: f.type,
+				buffer: Buffer.from(await f.arrayBuffer()),
+			})),
+		),
+	);
 	await expect(page.locator(".draft-image")).toHaveCount(3);
 	await input.fill("添付し直した画像を比較して");
 	await page.getByRole("button", { name: "送信", exact: true }).click();
@@ -312,13 +310,11 @@ test("cloud-only composer sends images without requiring a LARM connection", asy
 		if (r.url().endsWith("/api/larm/connect")) larmConnects++;
 	});
 	const file = (await syntheticImages())[1]!;
-	await page
-		.getByLabel("添付画像を選択")
-		.setInputFiles({
-			name: file.name,
-			mimeType: file.type,
-			buffer: Buffer.from(await file.arrayBuffer()),
-		});
+	await page.getByLabel("添付画像を選択").setInputFiles({
+		name: file.name,
+		mimeType: file.type,
+		buffer: Buffer.from(await file.arrayBuffer()),
+	});
 	await expect(
 		page.getByText("添付画像は選択中のクラウド接続先へ送ります。", {
 			exact: false,

@@ -8,7 +8,7 @@ archive の基準: その文書が担当した実装がコードにあり、本�
 
 | 文書 | 状態 |
 | --- | --- |
-| [Codex 経路の入力キャッシュ構造の是正](codex-input-cache-structure-2026-11-12.md) | 2026-11-12、設計（未実装・合意待ち）。呼出しごとの新規スレッドでキャッシュの鍵が毎回変わること、本文の前に呼出しごとに変わる環境情報が入ること、利用者個人の Codex 設定が混入することを実物の要求で確認。専用ホーム・常駐プロセス・固定スレッドの巻き戻しで直す |
+| [Codex 経路の入力キャッシュ構造の是正](codex-input-cache-structure-2026-11-12.md) | 2026-11-12、P1〜P4 を実装。fixture と捕捉（実 Codex CLI・通信なし）で検証済み、live は未実施。呼出しごとの新規スレッドでキャッシュの鍵が毎回変わること、本文の前に呼出しごとに変わる環境情報が入ること、利用者個人の Codex 設定が混入することを実物の要求で確認。専用ホーム・常駐プロセス・固定スレッドの巻き戻しで直す |
 | [Codex の検索による調べもの（web.note）](web-note-codex-search-2026-11-11.md) | 2026-11-11、利用者の決定に基づき実装・固定試験済み（fake の Codex）。`web.search` は残すが選択から外し（`selectable:false`）、Codex SDK + Luna のライブ検索による `web.note` を単発の調べものと agency の調べものの標準にした。実 Codex での確認は未実施 |
 | [Pursuit調査結果のMarkdown保存](web-research-markdown-design-2026-11-08.md) | 2026-11-08、合意済み・実装・固定検証済み。担当を切り替えずタイトル付きMarkdownを既存scratchと利用可能なDoclingの `eumenes/research/` へ保存。関連1,558件と最終シナリオ37件、型・buildが成功。一括verifyの既存inventory問題と実接続受入は残る。[検証記録](verification/web-research-markdown-2026-11-08/README.md) |
 | [always-onのEumenes取り込み実装計画](agency-always-on-integration-plan-2026-11-08.md) | 2026-11-08、実装・固定検証を実施。独立推論、保存票・原観測、準備・通常応答、busy、排他的切替を接続。[実装・検証記録](verification/agency-always-on-integration-2026-11-08/README.md)。Live実配送の対応、全体検証の阻害、実モデル・利用者受入を区別して残す |

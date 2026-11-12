@@ -103,6 +103,7 @@ import { createRecipePorts } from "./toolchain-recipes";
 import { createVectorRefresh, type Embed } from "./toolchain-vectors";
 import { routerFixedCards } from "../../domains/dialogue";
 type ToolchainOptions = {
+	canvasAdapter?: import("../../domains/tool-runtime").DomainAdapter;
 	docling?: import("../../domains/docling").DoclingService;
 	dotsWork?: import("../work/dots-work").DotsWork;
 	dotsConfiguration?: import("../work/dots-tasks").DotsTasks["config"];
@@ -249,6 +250,7 @@ const createResearchRuntime = (
 function enabledBackends(options: ToolchainOptions) {
 	return new Set([
 		...(options.docling ? ["docling"] : []),
+		...(options.canvasAdapter ? ["canvas"] : []),
 		...(options.markdown ? ["markdown"] : []),
 		"task-execution",
 		...(options.webResearch !== false ? ["pursuit"] : []),
@@ -308,6 +310,7 @@ export async function createToolchain(
 		...collaboration.adapters,
 		...(options.markdown ? [createMarkdownAdapter(options.markdown)] : []),
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
+		...(options.canvasAdapter ? [options.canvasAdapter] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
 		...createPursuitAdapters(
 			() => pursuitRuntime,

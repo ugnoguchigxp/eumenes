@@ -182,3 +182,5 @@ export type {
 	MarkdownDraft,
 	MarkdownWorkspaceProps,
 } from "./components/MarkdownWorkspace/types";
+
+export { CanvasWorkbench } from "./components/CanvasWorkbench";

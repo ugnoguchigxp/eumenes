@@ -47,9 +47,10 @@ export const searchArgs = z
 		query: z.string().trim().min(1).max(2000),
 		/**
 		 * The router's offer (spec router-package-integration 2026-11-04 §1 #11): exactly these toolchains and read tools,
-		 * without a search; the host's own call only.
+		 * without a search; the host's own call only. Absent: the host searches for `query` (the talk turn's reply looking
+		 * for a toolchain, same spec 2026-11-12).
 		 */
-		ids: z.array(id).min(1).max(128),
+		ids: z.array(id).min(1).max(128).optional(),
 	})
 	.strict();
 

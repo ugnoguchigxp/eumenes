@@ -192,7 +192,9 @@ export function createInference(
 			db: Database,
 			input: AgentAttemptRevocation,
 		) {
-			for (const requestId of revokeAgentAttempts(db, input))
+			for (const requestId of revokeAgentAttempts(db, input, () =>
+				options.cloudAgents?.forget?.(),
+			))
 				revokedRequests.add(requestId);
 		},
 		releaseTaskSession: taskSessionRelease(store, ports),
@@ -319,6 +321,7 @@ export function createInference(
 			);
 			await Promise.allSettled(closingPorts);
 			await judges.close();
+			await options.cloudAgents?.close?.();
 		},
 	} satisfies InferencePort & Record<string, unknown>;
 	return service;

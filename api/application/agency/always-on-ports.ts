@@ -31,6 +31,7 @@ import {
 	type AgendaScope,
 } from "./always-on-scope";
 import type { AgencyHostDeps } from "./host-types";
+import { quietThought } from "./always-on-thoughts";
 
 const log = getLogger("agency");
 /** The calls a reply keeps in its history: the agenda's own tools. */
@@ -166,6 +167,7 @@ export function createAgendaPorts(input: {
 		}
 		let taken: string[] = [];
 		let ok = false;
+		const quiet = { ...c.agent.view().quiet };
 		try {
 			const reply = await runRespond({
 				messages,
@@ -214,6 +216,7 @@ export function createAgendaPorts(input: {
 		} finally {
 			// A reply that failed is news too: the plan looks again.
 			if (!ok) c.agent.infoChanged(now());
+			quietThought(c, now(), quiet, c.agent.view().quiet);
 			// The target is closed whatever happened (one inbox serves the whole server).
 			if (steer) taken = steer.end();
 			remember(c.taken, run.runId, taken);
@@ -227,6 +230,8 @@ export function createAgendaPorts(input: {
 	const conversationAgent: ConversationAgentPort = {
 		system: () =>
 			agencyReplyParts(deps.settings.get().agency, agendaReady(deps)),
+		// The same condition as the agenda's rules in the system: they say how to look for a toolchain and hand over.
+		handsWork: () => agendaReady(deps),
 		async respond(args) {
 			const c = args.run ? serving(args.run.conversationId) : null;
 			const reply =

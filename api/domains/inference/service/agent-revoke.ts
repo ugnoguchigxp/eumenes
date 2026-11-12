@@ -6,15 +6,19 @@ import type { AgentAttemptRevocation } from "../contracts";
  * that finished but whose answer is not adopted yet. A revoked attempt never becomes `succeeded` again, so its
  * receipt is refused at adoption. Returns the requests whose running call has to be aborted after the commit.
  * Idempotent: a second call finds nothing left to revoke.
+ * An agent that keeps threads between calls (`forgetThreads`) drops all of them: what a thread holds of a forgotten
+ * message cannot be told apart from the rest, so none of it stays.
  */
 export function revokeAgentAttempts(
 	db: Database,
 	input: AgentAttemptRevocation,
+	forgetThreads?: () => void,
 	now = Date.now(),
 ): string[] {
 	const messages = new Set(input.messageIds);
 	const items = new Set(input.itemIds);
 	if (!messages.size && !items.size) return [];
+	forgetThreads?.();
 	const rows = db
 		.query(
 			`SELECT a.id, a.request_id AS requestId, a.refs FROM inference_attempts a

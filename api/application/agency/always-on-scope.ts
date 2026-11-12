@@ -21,6 +21,7 @@ import {
 	agendaSources,
 } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
+import type { AgencyThought } from "../../domains/dialogue/contracts/agency-status";
 import type { Unheard } from "./always-on-heard";
 
 /** Notes kept per conversation: the newest ones (the older are still in the work ledger). */
@@ -110,6 +111,11 @@ export type AgendaScope = {
 	proposals: Map<string, InputContext>;
 	/** Words of the agent a screen may still be reading aloud: said (to the agent) when the reading ends. */
 	unheard: Unheard[];
+	/** What the agent thought lately, for the chat column (display only: not saved, cleared by a forget). */
+	thoughts: AgencyThought[];
+	thoughtSeq: number;
+	/** Tells the screens a thought was added. */
+	thoughtsChanged(): void;
 	/** The host's step, run by the scheduler (set by the host). */
 	kick(): void;
 };
@@ -302,6 +308,9 @@ export function createAgendaScope(input: {
 		given: new Map(),
 		shows: new Map(),
 		unheard: [],
+		thoughts: [],
+		thoughtSeq: 0,
+		thoughtsChanged: () => deps.publish?.(),
 		kick: () => input.kick(c),
 	};
 	return c;

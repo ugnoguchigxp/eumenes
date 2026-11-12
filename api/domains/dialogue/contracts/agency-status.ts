@@ -14,6 +14,34 @@ export const agencyActivitySchema = z
 	.strict();
 export type AgencyActivity = z.infer<typeof agencyActivitySchema>;
 
+/**
+ * What the agenda agent of a conversation thought lately (what it planned, dropped, checked, held back, looked up),
+ * for the chat column. Display only: kept in the server's memory, never stored with the conversation, spoken, learned
+ * from or handed to a model. Cleared when anything of the conversation is forgotten.
+ */
+export const agencyThoughtKinds = [
+	"plan",
+	"drop",
+	"check",
+	"repeat",
+	"decline",
+	"research",
+	"researched",
+	"profile",
+	"quiet",
+	"error",
+] as const;
+export const agencyThoughtSchema = z.object({
+	id: z.string(),
+	at: z.number(),
+	kind: z.enum(agencyThoughtKinds),
+	text: z.string(),
+});
+export type AgencyThought = z.infer<typeof agencyThoughtSchema>;
+export const agencyThoughtsSchema = z.object({
+	thoughts: z.array(agencyThoughtSchema),
+});
+
 /** Operational metadata only: no observation, memory, prompt or connection contents. */
 export const agencyStatusSchema = z.object({
 	conversationId: z.string(),

@@ -56,19 +56,25 @@ export function askedRequest(before: string | undefined, utterance: string) {
 	return `${before.slice(0, ARGUMENT_CHARS - newest.length - 1)}\n${newest}`;
 }
 
-/** A question back: spoken, and kept as the step the next turn takes the user's answer with. */
-export function askBack(turn: Turn, say: string): Step {
+/**
+ * A question back: spoken, and kept as the step the next turn takes the user's answer with. `request` is what was
+ * asked about when it is not the user's own words (the talk turn's reply wrote it; theirs may be a bare yes).
+ */
+export function askBack(turn: Turn, say: string, request?: string): Step {
 	turn.speak(say);
-	recordQuestion(turn);
+	recordQuestion(turn, request);
 	return "done";
 }
 
-function recordQuestion(turn: Turn): void {
+function recordQuestion(turn: Turn, request?: string): void {
 	turn.signal.throwIfAborted();
 	turn.exchange.push({
 		name: ASK_STEP,
 		arguments: JSON.stringify({
-			request: askedRequest(turn.routed?.asked?.request, turn.utterance),
+			request:
+				request === undefined
+					? askedRequest(turn.routed?.asked?.request, turn.utterance)
+					: request.slice(0, ARGUMENT_CHARS),
 		}),
 		result: {},
 	});

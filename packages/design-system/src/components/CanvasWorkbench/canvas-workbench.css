@@ -1,0 +1,16 @@
+.canvas-workbench {
+	display: block;
+	width: 100%;
+	height: clamp(22rem, 65dvh, 52rem);
+	border: 0;
+	border-radius: 12px;
+	background: var(--color-background, Canvas);
+}
+.canvas-workbench-expanded {
+	position: fixed;
+	inset: 0;
+	width: 100vw;
+	height: 100dvh;
+	border-radius: 0;
+	z-index: 1000;
+}

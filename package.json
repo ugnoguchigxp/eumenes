@@ -49,12 +49,14 @@
 		"@eumenes/design-system": "workspace:*",
 		"@excalidraw/excalidraw": "0.18.1",
 		"@playwright/mcp": "0.0.83",
+		"@playwright/test": "1.61.1",
 		"@tanstack/react-query": "5.101.0",
 		"bmp-ts": "1.0.9",
 		"eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.7-01ce0601a9ab.tgz",
+		"eumenes-canvas": "file:vendor/canvas/eumenes-canvas-0.1.0-5bd98dd17e61.tgz",
 		"eumenes-collaboration": "./vendor/collaboration/eumenes-collaboration-0.4.0-ce0d56eedc6a.tgz",
 		"eumenes-evaluator": "file:vendor/evaluator/eumenes-evaluator-0.1.0-1178a3fad04b.tgz",
-		"eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.3-eumenes.1-407275538563.tgz",
+		"eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.3-eumenes.2-a88153a824ec.tgz",
 		"eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.4-30721f30aa19.tgz",
 		"eumenes-memory-host": "file:vendor/eumenes-memory-host/eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
 		"eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
@@ -80,7 +82,6 @@
 	},
 	"devDependencies": {
 		"@modelcontextprotocol/client": "2.4.0",
-		"@playwright/test": "1.61.1",
 		"@testing-library/dom": "10.4.1",
 		"@testing-library/react": "16.3.2",
 		"@types/bun": "1.3.14",
@@ -97,5 +98,8 @@
 		"typescript": "7.0.2",
 		"vite": "8.3.5",
 		"vitest": "4.1.8"
+	},
+	"patchedDependencies": {
+		"eumenes-canvas@vendor/canvas/eumenes-canvas-0.1.0-5bd98dd17e61.tgz": "vendor/canvas/bun-package-resolution.patch"
 	}
 }

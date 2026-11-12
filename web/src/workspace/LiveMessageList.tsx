@@ -21,10 +21,12 @@ export function LiveMessageList({
 }) {
 	const streaming = useRunProgress(client, activeRunId);
 	const messageCount = list.conversation?.messages.length ?? 0;
+	const lastThought = list.thoughts?.at(-1)?.id;
 	useEffect(() => {
 		followLatestIfPinned();
 	}, [
 		messageCount,
+		lastThought,
 		activeRunId,
 		announcement,
 		streaming,

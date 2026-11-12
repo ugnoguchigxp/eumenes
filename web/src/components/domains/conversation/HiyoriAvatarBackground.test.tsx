@@ -75,6 +75,7 @@ test("phase and replay cues reach the same mounted model with speech amplitude",
 		0.45,
 		undefined,
 		defaultAvatarView,
+		null,
 	);
 	view.rerender(
 		<HiyoriAvatarBackground
@@ -95,6 +96,7 @@ test("phase and replay cues reach the same mounted model with speech amplitude",
 		0.45,
 		0.6,
 		defaultAvatarView,
+		expect.objectContaining({ key: "speech:1", motion: "joyful" }),
 	);
 	vi.mocked(readAssistantMouth).mockReturnValue(0);
 	view.rerender(<HiyoriAvatarBackground active phase="listening" />);
@@ -105,6 +107,7 @@ test("phase and replay cues reach the same mounted model with speech amplitude",
 		0,
 		undefined,
 		defaultAvatarView,
+		null,
 	);
 	expect(createHiyori).toHaveBeenCalledTimes(1);
 	view.unmount();
@@ -119,6 +122,7 @@ test("reduced motion renders a still neutral reference without speech analysis",
 		0,
 		undefined,
 		defaultAvatarView,
+		null,
 	);
 	expect(readAssistantMouth).not.toHaveBeenCalled();
 });
@@ -175,11 +179,14 @@ test("manual framing redraws once in reduced motion without starting animation o
 	const before = model.render.mock.calls.length;
 	fireEvent.click(screen.getByRole("button", { name: "上半身" }));
 	expect(model.render).toHaveBeenCalledTimes(before + 1);
-	expect(model.render).toHaveBeenLastCalledWith(0, "neutral", 0, undefined, {
-		zoom: 2.2,
-		x: 0,
-		y: 0,
-	});
+	expect(model.render).toHaveBeenLastCalledWith(
+		0,
+		"neutral",
+		0,
+		undefined,
+		{ zoom: 2.2, x: 0, y: 0 },
+		null,
+	);
 	expect(requestAnimationFrame).not.toHaveBeenCalled();
 	expect(createHiyori).toHaveBeenCalledTimes(1);
 });

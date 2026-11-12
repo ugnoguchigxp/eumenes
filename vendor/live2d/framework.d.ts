@@ -59,3 +59,29 @@ export class CubismPose {
 	static delete(pose: CubismPose): void;
 	updateParameters(model: Model, delta: number): void;
 }
+
+export class CubismMotion {
+	static create(
+		bytes: ArrayBuffer,
+		size: number,
+		onFinished: undefined,
+		onBegan: undefined,
+		checkConsistency: boolean,
+	): CubismMotion | null;
+	setEffectIds(blink: Id[], lipSync: Id[]): void;
+	setFadeInTime(seconds: number): void;
+	setFadeOutTime(seconds: number): void;
+	setWeight(weight: number): void;
+	setLoop(loop: boolean): void;
+	release(): void;
+}
+
+export class CubismMotionManager {
+	startMotion(motion: CubismMotion, autoDelete: boolean): object;
+	getCubismMotionQueueEntry(
+		handle: object,
+	): { setFadeOut(seconds: number): void } | null;
+	updateMotion(model: Model, delta: number): boolean;
+	stopAllMotions(): void;
+	release(): void;
+}

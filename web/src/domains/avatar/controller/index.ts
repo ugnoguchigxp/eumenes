@@ -1,12 +1,32 @@
-import type { AvatarMotion } from "../../../../../api/domains/delivery/contracts";
+import {
+	acceptedEmotion,
+	type AvatarMotion,
+	type DeliveryEmotion,
+	type SpeechDelivery,
+} from "../../../../../api/domains/delivery/contracts";
 
 export type AvatarCue = {
 	key: string;
 	motion: AvatarMotion;
+	emotion?: DeliveryEmotion;
+	/** An utterance or playback identity shared by its audio clauses. */
+	gestureKey?: string;
 	speaking?: boolean;
 	/** Presentation strength, independent of classifier confidence. */
 	intensity?: number;
 };
+
+export function deliveryAvatarCue(
+	key: string,
+	delivery?: SpeechDelivery,
+): AvatarCue {
+	const emotion = delivery ? acceptedEmotion(delivery) : null;
+	return {
+		key,
+		motion: delivery?.motion ?? "neutral",
+		...(emotion ? { emotion } : {}),
+	};
+}
 /** Reaction variants of the `touched` motion, by what was touched. */
 const reactions = {
 	head: "touched-head",

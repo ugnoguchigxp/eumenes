@@ -1,10 +1,10 @@
 {
-  "package": "llm-fetch",
-  "version": "0.1.4-eumenes.1",
-  "artifact": "llm-fetch-0.1.4-eumenes.1.tgz",
-  "sha256": "78fe62ed33ab76b601a9bd1f12b4285ea38b047ce837adbfba80edb2810ef0e2",
-  "sizeBytes": 417382,
-  "sourceCommit": "fd180e89c8f97b30422831d48eb4e5984aa996a7",
-  "sourceRepository": "https://github.com/ugnoguchigxp/LLM-fetch",
-  "sourcePackageVersion": "0.1.4"
+	"package": "llm-fetch",
+	"version": "0.1.4-eumenes.1",
+	"artifact": "llm-fetch-0.1.4-eumenes.1.tgz",
+	"sha256": "78fe62ed33ab76b601a9bd1f12b4285ea38b047ce837adbfba80edb2810ef0e2",
+	"sizeBytes": 417382,
+	"sourceCommit": "fd180e89c8f97b30422831d48eb4e5984aa996a7",
+	"sourceRepository": "https://github.com/ugnoguchigxp/LLM-fetch",
+	"sourcePackageVersion": "0.1.4"
 }

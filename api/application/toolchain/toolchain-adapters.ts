@@ -1,4 +1,9 @@
 import {
+	canvasAdapterRef,
+	canvasDomainSchemas,
+	describeCanvasAdapter,
+} from "../canvas/adapter";
+import {
 	APP_ADAPTER,
 	appDevelopmentDomainSchemas,
 	describeAppDevelopmentAdapter,
@@ -169,6 +174,7 @@ import {
 const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...dotsWorkDomainSchemas,
 	...doclingDomainSchemas,
+	...canvasDomainSchemas,
 	...markdownDomainSchemas,
 	...timerDomainSchemas,
 	"domain:ocr.receipt@1": z.union([
@@ -238,6 +244,7 @@ export const hostAdapterDescriptions: Array<
 	})),
 	{ ref: USAGE_ADAPTER_REF, describe: describeUsageAdapter },
 	{ ref: DOCLING_ADAPTER_REF, describe: describeDoclingAdapter },
+	{ ref: canvasAdapterRef, describe: describeCanvasAdapter },
 	{ ref: DOTS_DELEGATION_ADAPTER_REF, describe: describeDotsDelegationAdapter },
 	{ ref: DOTS_MESSAGING_ADAPTER_REF, describe: describeDotsMessagingAdapter },
 	{ ref: SHELL_ADAPTER_REF, describe: describeShellAdapter },

@@ -103,6 +103,7 @@ export function ConversationHistory({
 				announcement={activeRun?.announcement}
 				followLatestIfPinned={state.followLatestIfPinned}
 				conversation={conversation.data}
+				thoughts={state.thoughts.data}
 				onOpenResource={onOpenResource}
 				renderInsideMessage={renderInsideMessage}
 				renderFollowingMessage={renderFollowingMessage}

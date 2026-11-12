@@ -32,8 +32,9 @@ export type AgentSessionCall = {
 export type CloudAgentCall = {
 	onUsage?: (usage: import("./codex-usage").CodexUsage) => void;
 	kind: CloudAgentKind;
-	/** The saved connection (log correlation only). */
+	/** The saved connection and the attempt this call belongs to (log correlation only). */
 	connectionId?: string;
+	attemptId?: string;
 	session?: AgentSessionCall;
 	model: string;
 	baseUrl: string;
@@ -66,6 +67,10 @@ export type CloudAgentResult = {
 };
 export type CloudAgents = {
 	run(call: CloudAgentCall): Promise<CloudAgentResult>;
+	/** Something was forgotten: whatever an agent kept of past calls is dropped. */
+	forget?(): void;
+	/** Stops what the agents keep running between calls. */
+	close?(): Promise<void>;
 };
 
 const log = getLogger("inference");
@@ -84,16 +89,45 @@ export function promptParts(messages: Messages, context?: ContextSplit) {
 	);
 	const { turns: history, pending } = normalizeHistory(parts.history);
 	const turns = [...pending, ...parts.turn];
-	let prompt =
+	const rendered = renderTurn(
+		turns,
+		parts.turn,
 		turns.length === 1 && turns[0]!.role === "user"
+			? null
+			: context
+				? "turn-context"
+				: "conversation-context",
+	);
+	return {
+		system:
+			parts.instructions.join("\n\n") ||
+			systemContext("inference.contexts.cloud-agents.default-system", {}),
+		history,
+		prompt: rendered.prompt,
+		images: rendered.images,
+		/** The messages past the instructions (no session context: all of them). */
+		turn: parts.turn,
+	};
+}
+
+/**
+ * What a thread that already holds the front of a call is sent: the messages past that front, in the format of a
+ * turn of a session (the earlier part is in the thread).
+ */
+export function appendParts(messages: Messages) {
+	return renderTurn(messages, messages, "turn-context");
+}
+
+function renderTurn(
+	turns: ReadonlyArray<{ role: string; content: string }>,
+	imaged: Messages,
+	preface: "turn-context" | "conversation-context" | null,
+) {
+	let prompt =
+		preface === null
 			? turns[0]!.content
-			: (context
-					? systemContext("inference.contexts.cloud-agents.turn-context", {}) +
-						"\n"
-					: systemContext(
-							"inference.contexts.cloud-agents.conversation-context",
-							{},
-						) + "\n") +
+			: systemContext(`inference.contexts.cloud-agents.${preface}`, {}) +
+				"\n" +
 				JSON.stringify(
 					turns.map((turn) => {
 						const { role, content } = turn;
@@ -108,10 +142,10 @@ export function promptParts(messages: Messages, context?: ContextSplit) {
 						};
 					}),
 				);
-	const images = parts.turn.flatMap((m) => m.images ?? []);
+	const images = imaged.flatMap((m) => m.images ?? []);
 	if (images.length) {
 		let next = 1;
-		const references = parts.turn.flatMap((m, i) =>
+		const references = imaged.flatMap((m, i) =>
 			m.images?.length
 				? [{ message: i + 1, images: m.images.map(() => next++) }]
 				: [],
@@ -119,14 +153,7 @@ export function promptParts(messages: Messages, context?: ContextSplit) {
 		prompt += "\n\nAttached image references: " + JSON.stringify(references);
 	}
 	if (!prompt.trim() && !images.length) throw fail("empty_prompt");
-	return {
-		system:
-			parts.instructions.join("\n\n") ||
-			systemContext("inference.contexts.cloud-agents.default-system", {}),
-		history,
-		prompt,
-		images,
-	};
+	return { prompt, images };
 }
 
 export function checkedText(text: string) {

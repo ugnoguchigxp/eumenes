@@ -84,6 +84,7 @@ export async function agendaFixture(
 	});
 	let now = Date.now(),
 		serial = 0,
+		published = 0,
 		foreground = false;
 	const timers = new Map<number, { at: number; fn(): void }>();
 	const requests: LlmRequest<unknown>[] = [];
@@ -198,6 +199,9 @@ export async function agendaFixture(
 		}),
 		conversationBusy: () => false,
 		recordSpokeInTransaction: () => {},
+		publish: () => {
+			published++;
+		},
 		nowMs: () => now,
 		setTimer(fn: () => void, ms: number) {
 			timers.set(++serial, { at: now + ms, fn });
@@ -238,6 +242,10 @@ export async function agendaFixture(
 		},
 		get now() {
 			return now;
+		},
+		/** How many times the host told the screens something changed outside a commit (its thoughts). */
+		get published() {
+			return published;
 		},
 		/** The calls of one kind, in order. */
 		calls: (kind: CallKind) => requests.filter((_, i) => kinds[i] === kind),

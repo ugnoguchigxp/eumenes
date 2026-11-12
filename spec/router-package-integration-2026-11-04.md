@@ -80,3 +80,44 @@ bun run cli -- router set entry routeStructured   # B を試すとき
 | B | 15 | 1 | 9.961秒 | 68.572秒 |
 
 完了した全ターンの会話モデルは各1回。Bの12件は構造段の時間切れ後に案内または聞き返しで完了したため、Bの集計に含めた。計測中にサーバーが再起動し、32件目のBは `interrupted`（`shutdown`）で終了した。目標は各20件で、今回のp95は各群の観測最大値に当たる。集計と実行IDごとの記録は `verification-reports/router-live-20261109-185321/` に保存した。
+
+## 2026-11-12 会話の返事から担当に頼む道（利用者の決定）
+
+利用者の指示（2026-11-12）:「routingが先にタスクを判断するため、会話エージェントが、toolchainを使うことが出来ないようです。routingを使わなくても会話エージェントがtoolchainを使ってどのツールを使うかという道はのこしておきましょうか。会話の流れで、作りましょうか？はいお願いします。に対応出来ずツールを見つけられません」
+
+ログ（2026-11-12 10:09〜10:29）では、Router が保留（行 3・7）→ 構造の判断が会話（行 1）→ 会話の返事、という回が続いた。その返事が持つ道具は読む道具 4 つと agenda の道具だけで、担当を探すことも頼むこともできなかった。返事の事実規則も「何を作るかを一言で言い直してもらう」だった。§2 の「`find_toolchain` の会話からの検索」を消した決定を、会話の返事の分だけ改める。Router の決定と、その後の動作は変えない。
+
+| # | こと | 決め |
+| --- | --- | --- |
+| 1 | いつ | Router が会話に決めた回、Router がない回、Router が決められず会話に回した回（行 10）の返事。利用者の発言に答える回だけ（通知・作業報告の回、host が読んだ結果を伝える回、Router の聞き返し・未確定の案内の回には渡さない） |
+| 2 | 誰に | agenda が返事を担う会話だけ（`ConversationAgentPort.handsWork()`。返事の規則と道具を同じ条件で渡す）。F の返事には渡さない |
+| 3 | 道具 | `find_toolchain`（`query`）と `delegate`（`toolchain`・`request`。`mode` は `execute` だけ、`impact` は読まない）。名前は agency の配布物の道具と同じで、host の道具が優先される（agency 側の `delegatedTo` の調べものにはしない） |
+| 4 | 探す | 既存の `find_toolchain` の host 操作を `ids` なしで呼ぶ（全文検索・埋め込み・過去の選択による検索。権限・利用可否・記録の検査は同じ）。返事に見せる候補は担当だけ（読む道具は返事が直接持つ。パイプラインは Router の構造の判断のもの）。見せるのは `id`・`title`・`summary`・`useWhen`・`produces`（履歴に残る検索の形と同じ鍵。欄の schema は見せない） |
+| 5 | 頼む | その返事の中で見つけた担当だけ。欄は Router の引き渡しと同じ 1 候補の欄埋め（`fieldsOf`）で埋め、同じ host 操作（`handWith`・即答の `delegate`）で実行する。依頼文は返事が書いた `request`（利用者の「はい」だけでは中身がないため）。TODO の題（先頭 120 字）と確認の引用もこの `request`。未保存の作業の破棄（`resolveUnsaved`）は返事の文からは通さない（利用者自身の言葉による Router の `switch.discard` だけ） |
+| 6 | 予告 | Router の引き渡しと同じ host の文（`router-announce`）。返事は予告を書かない |
+| 7 | 呼び出しの上限 | host の道具は 1 回の返事で 3 回（探す・頼む・読む）。agenda の道具の分（3 回）はその上に足す |
+| 8 | Router の学習 | しない。返事からの引き渡しは Router の記録（`router_traces`）と訂正（`router_feedback`）に結び付けない。担当の選択の記録（`recordSelectionInTransaction`）は従来どおり残る |
+
+### `delegate` の結果
+
+| 起きたこと | 返事に返すもの | 返事 |
+| --- | --- | --- |
+| 仕事を引き渡した | `{"delegated":true}` | そこで終わる（予告が回の答え。結果は従来どおり後で届く） |
+| 既存のものを変える・取り消せない依頼 | `{"confirmation":true}` | そこで終わる（host の確認文を言う。次の回の「はい」は Router の `c<n>.approve`） |
+| 欄埋めが聞き返した | `{"asked":true}` | そこで終わる（host が質問を言う。聞き返しの記録には返事が書いた `request` を残し、次の回の Router はそれと利用者の答えを合わせて読む） |
+| 即答の担当が答えた | `{"answered":true,"answer":…}` | 続く（返事が自分の言葉で伝える） |
+| 即答の担当が答えられなかった | `{"answered":false,"code":…}` | 続く |
+| 欄埋めが依頼を読み取れなかった | `{"delegated":false,"code":"request_unclear"}` | 続く |
+| この返事で見つけていない担当 | `{"delegated":false,"code":"unknown_toolchain"}` | 続く（先に探す） |
+| host が断った | `{"delegated":false,"code":<理由>}` | 続く（できなかったと伝える） |
+
+- 返事が道具の前に話した言葉があるとき、host が道具の中で言う文（確認文・質問）はその後ろに、行を分けて続く（画面・読み上げ・保存される答えで同じ順）。
+- 引き渡しで終わった回の答えは予告だけで、返事がその前に話した言葉は答えの記録に残らない（Router 導入前の引き渡しと同じ）。
+
+### 規則の文
+
+- agenda の返事の規則は、配布物の `agendaReplySystem(undefined, { toolchains: true })` の範囲を使う（探してから持ちかける・乗ってもらえたら頼む、の規則が入る。文は配布物が正本）。
+- 事実規則 `contexts/agency/talk-facts` の「制作物はこの返事では書かず、言い直してもらう」を、「`find_toolchain` と `delegate` が渡されているときは担当を探して頼む。渡されていないときは言い直してもらう」に改める。
+- 道具の説明は `contexts/local/talk-find`・`contexts/local/talk-delegate`。
+
+試験: `api/domains/dialogue/test/talk-work.test.ts`（探す→頼む→引き渡しで終わる、前置きの後の確認、即答、見つけていない担当、パイプラインの除外、聞き返しと次の回、読み取れない依頼、返事が仕事を頼まない agent には渡さない）、`api/application/agency/always-on.test.ts`（agenda の規則・事実規則・`handsWork`）。

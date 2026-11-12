@@ -27,6 +27,7 @@ import { parseChoice, strictChoiceSchema } from "./routed-choice";
 import type { Step } from "./routed-actions";
 import { activeRouter } from "./routed-package";
 import { routerTurn } from "./routed-router";
+import { createTalkWork } from "./routed-talk-work";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 
 const log = getLogger("dialogue");
@@ -303,7 +304,8 @@ function createTurn(
 			signal.throwIfAborted();
 			const words = text.trim();
 			if (!words) return;
-			const piece = said ? `\n${words}` : words;
+			// After words of a reply still being written (its tool speaks for the host), on a line of their own too.
+			const piece = said || published ? `\n${words}` : words;
 			said += piece;
 			delta(piece);
 		},
@@ -365,9 +367,13 @@ function createTurn(
 		/**
 		 * The talk turn: one streamed call; `notice` adds what the host found for it to tell. On the user's words it may
 		 * call one read tool, and a second call answers with what was read (spec conversation-read-tools-design
-		 * 2026-10-31 §2); `tools: false` when the host has read for it already.
+		 * 2026-10-31 §2); `tools: false` when the host has read for it already. An agent whose reply hands work over
+		 * may also look for a toolchain and hand the work to it (spec router-package-integration, 2026-11-12).
 		 */
-		async talk(notice?: string, { tools = true }: { tools?: boolean } = {}) {
+		async talk(
+			notice?: string,
+			{ tools = true }: { tools?: boolean } = {},
+		): Promise<void> {
 			signal.throwIfAborted();
 			let talkImageAnswer: GenerationOutcome["imageAnswer"];
 			const messages = notice
@@ -378,27 +384,41 @@ function createTurn(
 					? messages[0].content
 					: undefined;
 			// Tool calls come back on the streamed call only; a port without it answers in one piece.
-			const reads =
+			const acts = !!(
 				tools &&
 				input.final.kind === "utterances" &&
 				input.requestId &&
 				deps.larm.executeStream
-					? deps.store.read((db) => availableReadTools(deps, db))
-					: [];
+			);
+			const reads = acts
+				? deps.store.read((db) => availableReadTools(deps, db))
+				: [];
+			// The way to a toolchain stands on the routed input (the fill reads it) and on the agent's own rules.
+			const work =
+				acts &&
+				input.routed &&
+				deps.toolchains &&
+				deps.work &&
+				deps.conversationAgent.handsWork?.()
+					? createTalkWork(this)
+					: null;
 			log.info("dialogue.read_tools_offered", {
 				count: reads.length,
 				kind: reads.join(","),
+				...(work ? { source: "work" } : {}),
 			});
 			const act = this.act;
 			// What this talk spoke, and whether it read: a call that fails after a read gets the host's words after it.
 			let spoken = "";
 			let toolMade = false;
-			const offeredTools = [
+			const saidBefore = said;
+			const readTools = [
 				...readToolDefinitions(reads),
 				...(reads.includes("read_memory") && deps.steward
 					? [MEMORY_REQUEST_TOOL]
 					: []),
 			];
+			const offeredTools = [...readTools, ...(work?.tools ?? [])];
 			let reply: Awaited<
 				ReturnType<DialogueDeps["conversationAgent"]["respond"]>
 			>;
@@ -459,15 +479,21 @@ function createTurn(
 							}
 						},
 					},
-					tools: conversationToolPort(offeredTools, act, () => {
-						toolMade = true;
-					}),
+					tools: conversationToolPort(
+						offeredTools,
+						act,
+						() => {
+							toolMade = true;
+						},
+						work,
+					),
 					signal,
 					onDelta: (text) => {
 						spoken += text;
 						delta(text);
 					},
-					maxToolCalls: offeredTools.length ? 1 : 0,
+					// One read; with the way to a toolchain, a search and a hand-over beside it.
+					maxToolCalls: (readTools.length ? 1 : 0) + (work ? 2 : 0),
 				});
 			} catch (error) {
 				const code = error instanceof Error ? error.message : "";
@@ -477,8 +503,10 @@ function createTurn(
 				this.speak(SAID_FAILED);
 				return;
 			}
-			// The user spoke and was told nothing: a failed reply, not silence (a notice may go unanswered).
+			// The user spoke and was told nothing: a failed reply, not silence (a notice may go unanswered). A reply a
+			// hand-over ended says nothing itself: the host's announcement is the answer.
 			if (
+				!reply.ended &&
 				!reply.text.trim() &&
 				!said.trim() &&
 				input.final.kind === "utterances"
@@ -493,19 +521,23 @@ function createTurn(
 					result: call.content,
 				});
 			imageAnswer = talkImageAnswer;
-			said = [said, reply.text].filter(Boolean).join("\n");
+			// The host's words said inside a tool (a confirmation, a question back) came after what the reply had said.
+			const hosted = said.slice(saidBefore.length).trim();
+			said = [saidBefore.trim(), reply.text, hosted].filter(Boolean).join("\n");
 		},
 	};
 }
 
 /**
  * The talk turn's read tools (spec conversation-read-tools-design 2026-10-31): only those offered run, through the
- * turn's executor; any other name, or arguments that are no object, is refused and never run.
+ * turn's executor; any other name, or arguments that are no object, is refused and never run. `work` takes the
+ * search for a toolchain and the hand-over to it.
  */
 function conversationToolPort(
 	tools: readonly AgentToolDefinition[],
 	act: Turn["act"],
 	onRead: () => void,
+	work: ReturnType<typeof createTalkWork> | null,
 ) {
 	return {
 		tools,
@@ -529,6 +561,8 @@ function conversationToolPort(
 					}),
 				};
 			onRead();
+			if (work?.handles(toolCall.name))
+				return work.call(toolCall.name, args as Record<string, unknown>);
 			const read = await act(toolCall.name, args as Record<string, unknown>);
 			if ("refused" in read)
 				return {

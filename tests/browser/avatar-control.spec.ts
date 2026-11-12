@@ -31,7 +31,7 @@ test.afterAll(() => {
 	if (directory) rmSync(directory, { recursive: true, force: true });
 });
 
-test("replay hook drives the real face and mouth, returns to the conversation phase, and keeps framing stable while the head idles", async ({
+test("new messages and replay drive the real face and mouth, then return to the conversation phase", async ({
 	playwright,
 }) => {
 	test.skip(
@@ -62,7 +62,7 @@ test("replay hook drives the real face and mouth, returns to the conversation ph
 						"web/src/domains/settings/sounds/task-completed-en-male.wav",
 					),
 					contentType: "audio/wav",
-					headers: { "X-Avatar-Motion": "joyful" },
+					headers: { "X-Avatar-Motion": "joyful", "X-Avatar-Emotion": "joy" },
 				});
 			if (path === "/fixture.js")
 				return route.fulfill({
@@ -89,8 +89,23 @@ test("replay hook drives the real face and mouth, returns to the conversation ph
 		await expect
 			.poll(async () => (await stats())?.ParamBrowLY)
 			.toBeGreaterThan(0.2);
+		await expect(page.getByRole("img", { name: "喜び" })).toHaveCount(1);
+		await expect(page.getByLabel("会話の表情")).toHaveText("idle");
+		await page.getByRole("button", { name: "新しい発言を受け取る" }).click();
+		await expect(page.getByRole("img", { name: "喜び" })).toHaveCount(2);
+		await expect(page.getByLabel("会話の表情")).toHaveText("joy");
+		await expect
+			.poll(async () => (await stats())?.ParamEyeLSmile)
+			.toBeGreaterThan(0.25);
+		if (existsSync("web/public/live2d/hiyori/motions/Hiyori_m08.motion3.json"))
+			await expect
+				.poll(async () => (await stats())?.ParamBodyAngleY, { intervals: [50] })
+				.toBeGreaterThan(2);
+		expect((await stats())?.ParamMouthOpenY).toBe(0);
+		await expect(page.getByLabel("会話の表情")).toHaveText("idle");
 		await page.getByRole("button", { name: "読み上げる", exact: true }).click();
 		await expect(page.getByLabel("発話の状態")).toHaveText("joyful");
+		await expect(page.getByLabel("会話の表情")).toHaveText("joy");
 		await expect
 			.poll(async () => (await stats())?.ParamMouthOpenY, { intervals: [50] })
 			.toBeGreaterThan(0.1);

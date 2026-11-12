@@ -38,11 +38,16 @@ afterEach(() => {
 });
 function fixture(
 	settings: { outputVolume?: number; outputDevice?: string } = {},
+	emotion?: Awaited<ReturnType<VoiceDialogueClient["replaySpeech"]>>["emotion"],
 ) {
 	const fake = fakeOutput();
 	const client = {
 		replaySentences: async () => ["句。"],
-		replaySpeech: async () => ({ wav: new Uint8Array(44), motion: "joyful" }),
+		replaySpeech: async () => ({
+			wav: new Uint8Array(44),
+			motion: "joyful",
+			emotion,
+		}),
 	} as unknown as VoiceDialogueClient;
 	const createOutput = vi.fn((_device: string) => fake.output);
 	const hook = renderHook(() => useReplay(client, settings, { createOutput }));
@@ -109,6 +114,24 @@ test("muted replay does not start a speaking gesture", async () => {
 		played[0]!.onEnded();
 		await finished;
 	});
+});
+
+test("muted replay can convey an adopted emotion without a speaking gesture", async () => {
+	const { hook, played } = fixture({ outputVolume: 0 }, "joy");
+	let finished!: Promise<void>;
+	act(() => {
+		finished = hook.result.current.play("one", "一。");
+	});
+	await waitFor(() => expect(played).toHaveLength(1));
+	expect(hook.result.current.avatarCue).toMatchObject({
+		emotion: "joy",
+		speaking: false,
+	});
+	await act(async () => {
+		played[0]!.onEnded();
+		await finished;
+	});
+	expect(hook.result.current.avatarCue).toBeNull();
 });
 
 test("replay shares the live session controller and interrupts the live reply first", async () => {

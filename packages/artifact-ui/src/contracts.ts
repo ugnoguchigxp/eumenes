@@ -320,6 +320,12 @@ export type SettingsResource = {
 	volume: number;
 };
 export type Resource =
+	| {
+			kind: "canvas-workspace";
+			revision: number;
+			conversationId?: string;
+			visible: boolean;
+	  }
 	| MarkdownResource
 	| UsageDashboardResource
 	| {

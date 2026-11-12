@@ -1,0 +1,148 @@
+{
+	"formatVersion": 1,
+	"bundleId": "canvas-app",
+	"pins": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "canvas.app",
+			"revision": 1,
+			"title": "Canvasアプリの制作受付",
+			"summary": "Canvas専用担当へ作品の制作・修正・修復を委ねる",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "あなたはCanvasアプリの制作受付担当。Canvasで操作できる作品を作る・修正する・修復する依頼を専門ランタイムに渡す。保存済みの作品を変更する場合は、ホストが提示した一覧から対象を照合する。作品のコード生成と観測はCanvas専門担当が行う。"
+		},
+		{
+			"kind": "skill",
+			"id": "canvas.app",
+			"revision": 1,
+			"title": "Canvasアプリへの委譲",
+			"summary": "原依頼と対象作品を渡し、受付と候補提示を区別する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "新規制作は canvas.produce に空の引数を渡す。変更や修復は snapshot にある対象の artworkId を渡す。複数の対象が考えられて特定できない場合は一問だけ確認する。元の依頼はホストが渡す。依頼文を改変した引数や、コード、接続先、所有者を生成しない。制作を受け付けたら候補をCanvasアプリの画面で確認できると案内する。保存・復元は利用者が画面で確定する。"
+		},
+		{
+			"kind": "tool",
+			"id": "canvas.produce",
+			"revision": 1,
+			"title": "Canvas作品を制作する",
+			"summary": "Canvas専用ランタイムへ制作を依頼する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "canvas",
+			"schemaKey": "canvasProduce"
+		},
+		{
+			"kind": "package",
+			"id": "canvas.app",
+			"revision": 1,
+			"title": "Canvasアプリ",
+			"summary": "Canvas作品の制作を委ねる",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:canvas.app@1",
+				"skill:canvas.app@1",
+				"tool:canvas.produce@1"
+			],
+			"backend": "canvas",
+			"schemaKey": "toolchainRequest",
+			"profileRevisionId": "profile:canvas.app@1",
+			"requiredSkillRevisionIds": ["skill:canvas.app@1"],
+			"toolRevisionIds": ["tool:canvas.produce@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "canvas.app",
+			"revision": 1,
+			"title": "Canvasアプリ",
+			"summary": "遊べるゲーム、操作できる可視化、シミュレーションなどのCanvas作品を制作・修正する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"Canvasで操作できるゲーム・可視化・シミュレーションを作りたい",
+				"保存したCanvas作品を修正・修復したい"
+			],
+			"avoidWhen": ["実行できる作品を作らず、図やコードの説明だけを求めている"],
+			"dependencies": ["package:canvas.app@1"],
+			"functionName": "canvas_app",
+			"examples": [
+				"キーボードで操作する落ち物ゲームを作って",
+				"操作できるばねのシミュレーションを作って",
+				"保存したCanvas作品の凡例を押して絞り込めるようにして"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:canvas.app@1",
+			"bindingRevisionId": "binding:canvas.app@1",
+			"artifactRevisionId": "artifact:canvas.workspace@1"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "canvas.app",
+			"revision": 1,
+			"execution": "command",
+			"adapterRef": "adapter:canvas@1",
+			"availabilityRef": "availability:canvas@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:canvas.produce@1",
+					"operationId": "canvas.produce",
+					"inputSchemaRef": "builtin:canvasProduce"
+				}
+			],
+			"outputSchemaRef": "domain:canvas.receipt@1",
+			"resultProjectionRef": "projection:canvas.receipt@1",
+			"artifactRevisionId": "artifact:canvas.workspace@1"
+		}
+	],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "canvas.workspace",
+			"revision": 1,
+			"title": "Canvasアプリ",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "canvas-workspace",
+						"title": "Canvasアプリ",
+						"source": "canvas"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "canvas",
+					"adapterRef": "adapter:canvas@1",
+					"query": "query:canvas.workspace@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [],
+			"launcher": {
+				"label": "Canvasアプリ",
+				"description": "作品の制作・操作・保存と版の復元",
+				"order": 46
+			}
+		}
+	],
+	"schemas": []
+}

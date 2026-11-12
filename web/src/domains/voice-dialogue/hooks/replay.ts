@@ -147,7 +147,9 @@ export function useReplay(
 							if (sounding.current === target) sounding.current = null;
 							if (started && valid()) {
 								setSubtitle(null);
-								setAvatarCue((cue) => (cue?.key === key ? null : cue));
+								setAvatarCue((cue) =>
+									cue?.key === key ? { ...cue, speaking: false } : cue,
+								);
 							}
 							resolve();
 						};
@@ -168,12 +170,17 @@ export function useReplay(
 									spoken = true;
 									sounding.current = target;
 									setSubtitle(sentences[i] ?? null);
-									if (volume > 0)
+									if (volume > 0 || speech.emotion)
 										setAvatarCue({
 											key,
 											motion: speech.motion,
-											speaking: true,
+											...(speech.emotion ? { emotion: speech.emotion } : {}),
+											gestureKey: mine.automatic
+												? `message:${id}`
+												: playbackKey,
+											speaking: volume > 0,
 										});
+									else setAvatarCue(null);
 								},
 							})
 							.then(() => {

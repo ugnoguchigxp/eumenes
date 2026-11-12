@@ -23,6 +23,7 @@ export function assembleAgency(
 		| "steering"
 		| "researchRevision"
 		| "noteDocuments"
+		| "publish"
 	> & {
 			inference: AgencyHostDeps["inference"] &
 				Parameters<typeof createAgencyLlmPort>[0]["inference"] & {

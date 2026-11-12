@@ -294,6 +294,49 @@ test("a corrected line replaces the old words in what the agent plans from", asy
 	}
 });
 
+test("the agent's plan, research and result are shown as thoughts until the words they rest on are forgotten", async () => {
+	const media = imageFixture("success");
+	let planned = false;
+	const f = await agendaFixture({
+		media,
+		script: (kind: CallKind, request) => {
+			if (kind === "plan" && !planned && request.prompt.includes("user-a")) {
+				planned = true;
+				return planResearch("user-a");
+			}
+			return kind === "plan" ? planNothing() : undefined;
+		},
+	});
+	try {
+		await f.start();
+		await f.user("user-a");
+		await f.advance(1000);
+		await waitFor(() =>
+			f.host.thoughts("ao").some((t) => t.kind === "researched"),
+		);
+		const thoughts = f.host.thoughts("ao");
+		expect(thoughts.map((t) => [t.kind, t.text]).slice(0, 2)).toEqual([
+			["plan", "調べる: fixture independent picture（fixture）"],
+			["research", "fixture independent picture"],
+		]);
+		expect(new Set(thoughts.map((t) => t.id)).size).toBe(thoughts.length);
+		expect(f.published).toBeGreaterThanOrEqual(thoughts.length > 0 ? 1 : 0);
+		// Another conversation shows none of them.
+		expect(f.host.thoughts("b")).toEqual([]);
+		const before = f.published;
+		await f.h.memory!.forget({
+			conversationId: "ao",
+			messageIds: ["user-a"],
+			itemIds: [],
+		});
+		await settle();
+		expect(f.host.thoughts("ao")).toEqual([]);
+		expect(f.published).toBeGreaterThan(before);
+	} finally {
+		await f.close();
+	}
+});
+
 test("forgetting in one conversation leaves another conversation's plan running", async () => {
 	const pending = Promise.withResolvers<unknown>();
 	const f = await agendaFixture({
@@ -329,6 +372,12 @@ test("the reply's system holds the package's rules for the agenda, with the tool
 		expect(base).toContain(agendaReplyRules());
 		expect(base).toContain("start_preparation");
 		expect(base).toContain("read_note");
+		// The way to a toolchain: the rules say how, the talk turn offers the two tools, and the facts allow it.
+		expect(base).toContain("find_toolchain");
+		expect(f.host.conversationAgent.handsWork?.()).toBe(true);
+		expect(f.host.conversationAgent.system().facts).toContain(
+			"find_toolchain と delegate が渡されているときは担当を探して頼みます。",
+		);
 		// Eumenes' own persona and emotion rules stay outside the package's span.
 		expect(base).not.toContain("【気持ちの絵文字】");
 	} finally {
@@ -783,6 +832,7 @@ test("the reply's system holds the agenda's rules only where the agenda serves t
 		);
 		const host = createSwitchingAgencyHost(f.deps);
 		expect(host.conversationAgent.system().base).toContain("start_preparation");
+		expect(host.conversationAgent.handsWork()).toBe(true);
 		await host.close();
 	} finally {
 		await f.close();

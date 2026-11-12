@@ -1,13 +1,24 @@
-import type { AvatarMotion } from "../../../../../api/domains/delivery/contracts";
+import type {
+	AvatarMotion,
+	DeliveryEmotion,
+} from "../../../../../api/domains/delivery/contracts";
 
 type Expression = {
 	smile: number;
 	eyes: number;
 	brow: number;
+	browTilt: number;
 	cheek: number;
 	form: number;
 };
-const neutral: Expression = { smile: 0, eyes: 1, brow: 0, cheek: 0, form: 0 };
+const neutral: Expression = {
+	smile: 0,
+	eyes: 1,
+	brow: 0,
+	browTilt: 0,
+	cheek: 0,
+	form: 0,
+};
 // Model presentation only: selected motions keep their presets; neutral can gently smile at rest.
 const expressions: Record<AvatarMotion, Partial<Expression>> = {
 	neutral: {},
@@ -23,6 +34,11 @@ const expressions: Record<AvatarMotion, Partial<Expression>> = {
 	shy: { eyes: 0.85, cheek: 0.6, form: 0.3 },
 	sleepy: { eyes: 0.5, brow: -0.1 },
 	greeting: { smile: 0.6, form: 0.7 },
+};
+
+const emotionVariants: Partial<Record<DeliveryEmotion, Partial<Expression>>> = {
+	wry: { smile: 0.17, eyes: 0.81, browTilt: 0.3, form: 0.27 },
+	apologetic: { eyes: 0.89, brow: 0.22, cheek: 0.13, form: -0.3 },
 };
 
 /** Display-clock blinking: no timers, natural intervals and brief close/open phases. */
@@ -51,6 +67,7 @@ export function createFace(random = Math.random) {
 		motion: AvatarMotion,
 		mouth: number,
 		intensity = 1,
+		emotion?: DeliveryEmotion,
 	) => {
 		const smile = ((1 - Math.cos(time * 0.8)) / 2) ** 2;
 		const preset =
@@ -59,10 +76,15 @@ export function createFace(random = Math.random) {
 						smile: smile * 0.4,
 						eyes: 1 - smile * 0.12,
 						brow: smile * 0.12,
+						browTilt: 0,
 						cheek: smile * 0.08,
 						form: smile * 0.5,
 					}
-				: { ...neutral, ...expressions[motion] };
+				: {
+						...neutral,
+						...expressions[motion],
+						...(emotion && emotionVariants[emotion]),
+					};
 		const strength = Number.isFinite(intensity)
 			? Math.max(0, Math.min(1, intensity))
 			: 1;
@@ -77,8 +99,8 @@ export function createFace(random = Math.random) {
 			ParamEyeROpen: open,
 			ParamEyeLSmile: current.smile,
 			ParamEyeRSmile: current.smile,
-			ParamBrowLY: current.brow,
-			ParamBrowRY: current.brow,
+			ParamBrowLY: current.brow + current.browTilt,
+			ParamBrowRY: current.brow - current.browTilt,
 			ParamCheek: current.cheek,
 			ParamMouthForm: current.form,
 			// The amplitude owns this parameter, even for surprise and after a stop.

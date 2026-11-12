@@ -18,11 +18,12 @@ export type Filled = { fields: Record<string, unknown> } | { step: Step };
 type Target =
 	Extract<RouteCandidate, { kind: "toolchain" | "read" }> | "memory";
 
-/** The fields of the target for `text`. */
+/** The fields of the target for `text`; `asked` is the request a question back keeps when `text` is not the user's. */
 export function fieldsOf(
 	turn: Turn,
 	text: string,
 	target: Target,
+	asked?: string,
 ): Promise<Filled> {
 	if (target !== "memory") {
 		const { choice } = target;
@@ -35,11 +36,16 @@ export function fieldsOf(
 		)
 			return Promise.resolve({ fields: {} });
 	}
-	return fill(turn, text, target);
+	return fill(turn, text, target, asked);
 }
 
 /** The conversation model fills the one candidate's fields (it may also find nothing to ask for, or ask back). */
-async function fill(turn: Turn, text: string, target: Target): Promise<Filled> {
+async function fill(
+	turn: Turn,
+	text: string,
+	target: Target,
+	asked?: string,
+): Promise<Filled> {
 	const routed = turn.routed!;
 	const candidate = target === "memory" ? MEMORY_REQUEST : target.choice;
 	const chosen = await turn.choose(
@@ -61,7 +67,11 @@ async function fill(turn: Turn, text: string, target: Target): Promise<Filled> {
 		return { step: "talk" };
 	if (chosen.choice === "ask")
 		return {
-			step: askBack(turn, typeof chosen.say === "string" ? chosen.say : ""),
+			step: askBack(
+				turn,
+				typeof chosen.say === "string" ? chosen.say : "",
+				asked,
+			),
 		};
 	if (chosen.choice !== (target === "memory" ? MEMORY_REQUEST : target.id))
 		return { step: "talk" };

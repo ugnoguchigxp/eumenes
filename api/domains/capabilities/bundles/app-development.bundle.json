@@ -82,9 +82,7 @@
 			"avoidWhen": [
 				"依頼が一回限りの情報確認で、アプリや定期処理の制作を求めていない"
 			],
-			"dependencies": [
-				"package:app-development.studio@7"
-			],
+			"dependencies": ["package:app-development.studio@7"],
 			"functionName": "develop_app",
 			"examples": [
 				"辻堂の映画館で上映作品と開始時刻を日付ごとに確認できるアプリを作って",
@@ -372,9 +370,7 @@
 					"effect": "write",
 					"operationId": "app-development.record",
 					"inputAdapterRef": "input:app-development.record@1",
-					"confidentialFields": [
-						"record"
-					]
+					"confidentialFields": ["record"]
 				},
 				{
 					"actionId": "storage-page",
@@ -405,9 +401,7 @@
 						"maxLength": 64
 					}
 				},
-				"required": [
-					"id"
-				]
+				"required": ["id"]
 			}
 		},
 		{
@@ -471,11 +465,7 @@
 						"maxLength": 96000
 					}
 				},
-				"required": [
-					"workRef",
-					"expectedRevision",
-					"text"
-				]
+				"required": ["workRef", "expectedRevision", "text"]
 			}
 		},
 		{
@@ -502,11 +492,7 @@
 						"maxLength": 12000
 					}
 				},
-				"required": [
-					"appId",
-					"revision",
-					"values"
-				]
+				"required": ["appId", "revision", "values"]
 			}
 		},
 		{
@@ -533,11 +519,7 @@
 						"maxLength": 64
 					}
 				},
-				"required": [
-					"appId",
-					"revision",
-					"anchor"
-				]
+				"required": ["appId", "revision", "anchor"]
 			}
 		},
 		{
@@ -564,11 +546,7 @@
 						"maxLength": 64
 					}
 				},
-				"required": [
-					"appId",
-					"revision",
-					"runId"
-				]
+				"required": ["appId", "revision", "runId"]
 			}
 		},
 		{
@@ -590,10 +568,7 @@
 						"maxLength": 16
 					}
 				},
-				"required": [
-					"appId",
-					"revision"
-				]
+				"required": ["appId", "revision"]
 			}
 		},
 		{
@@ -620,11 +595,7 @@
 						"maxLength": 64
 					}
 				},
-				"required": [
-					"appId",
-					"revision",
-					"digest"
-				]
+				"required": ["appId", "revision", "digest"]
 			}
 		},
 		{
@@ -656,12 +627,7 @@
 						"maxLength": 12000
 					}
 				},
-				"required": [
-					"appId",
-					"revision",
-					"collection",
-					"record"
-				]
+				"required": ["appId", "revision", "collection", "record"]
 			}
 		},
 		{
@@ -678,9 +644,7 @@
 						"maxLength": 3
 					}
 				},
-				"required": [
-					"page"
-				]
+				"required": ["page"]
 			}
 		},
 		{
@@ -723,10 +687,7 @@
 						"properties": {
 							"operation": {
 								"type": "string",
-								"enum": [
-									"list",
-									"get"
-								]
+								"enum": ["list", "get"]
 							},
 							"id": {
 								"type": "string",
@@ -758,22 +719,13 @@
 										"maxLength": 160
 									}
 								},
-								"required": [
-									"field",
-									"value"
-								]
+								"required": ["field", "value"]
 							}
 						},
-						"required": [
-							"operation"
-						]
+						"required": ["operation"]
 					}
 				},
-				"required": [
-					"revision",
-					"collection",
-					"request"
-				]
+				"required": ["revision", "collection", "request"]
 			}
 		}
 	]

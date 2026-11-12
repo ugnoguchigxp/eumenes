@@ -550,7 +550,7 @@ test("replay HTTP returns the adopted Laya motion with the same audio and suppor
 	}
 });
 
-test("a runless message's host delivery reaches synthesis only for a clause of that message", async () => {
+test("host delivery reaches synthesis only for a clause of its own message, with or without a run", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-replay-host-"));
 	const store = openStore(join(dir, "db.sqlite3"), []);
 	const prepared: Array<SpeechPreparation | undefined> = [];
@@ -574,6 +574,18 @@ test("a runless message's host delivery reaches synthesis only for a clause of t
 	};
 	const own = hostDelivery("sadness");
 	const dialogue = {
+		get: (id: string) =>
+			id === "run-1"
+				? {
+						id,
+						status: "completed",
+						conversationId: "main",
+						answerMessageId: "answer-1",
+					}
+				: undefined,
+		answerText: () => "そっか。つらかったね。",
+		answerDelivery: () => own,
+		recordAnswerDeliveryInTransaction: () => false,
 		hostMessageDelivery: (id: string) =>
 			id === "agency:s1:t1"
 				? { text: "そっか。つらかったね。", delivery: own }
@@ -604,6 +616,21 @@ test("a runless message's host delivery reaches synthesis only for a clause of t
 		);
 		expect(prepared[1]?.delivery).toBeUndefined();
 		expect(prepared[2]?.delivery).toBeUndefined();
+		const app = new Hono();
+		registerVoiceDialogue(app, service);
+		const request = (text: string) =>
+			app.request("/api/voice/replay/audio", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ runId: "run-1", text }),
+			});
+		const runReply = await request("つらかったね。");
+		expect(runReply.status).toBe(200);
+		expect(prepared[3]?.delivery).toEqual(own);
+		expect(runReply.headers.get("X-Avatar-Motion")).toBe("downcast");
+		expect(runReply.headers.get("X-Avatar-Emotion")).toBe("sadness");
+		expect((await request("別の文。")).ok).toBe(false);
+		expect(prepared).toHaveLength(4);
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

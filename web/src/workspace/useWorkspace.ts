@@ -115,6 +115,13 @@ export function useWorkspace({
 	const followLatest = useRef(true);
 	const [showLatest, setShowLatest] = useState(false);
 	const conversation = useConversation(client, "main");
+	// The agenda's thoughts, shown between the messages (display only; none while the agenda does not run).
+	const thoughts = useQuery({
+		queryKey: [queryRoots.dialogue, client.identity, "main", "agency-thoughts"],
+		queryFn: ({ signal }) => client.agencyThoughts("main", signal),
+		select: (data) => data.thoughts,
+		retry: 0,
+	});
 	const runs = useRuns(client, "main");
 	const watchTimerRun = useTimerArtifacts(client, openTimer, runs.data);
 	const submit = useSubmit(client, "main");
@@ -325,6 +332,7 @@ export function useWorkspace({
 		historyRef,
 		showLatest,
 		conversation,
+		thoughts,
 		runs,
 		voice,
 		timerAudio,

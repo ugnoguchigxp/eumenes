@@ -158,6 +158,34 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 利用可能な場合だけ `exitCode`、許可した `processSignal`、HTTPの `status`、許可したProviderコードの `validationCode` を追加します。SDKイベントと例外の生メッセージはメモリー内で分類し、通常ログ・会話・DBへ保存しません。`inferenceId/attemptId/jobId/subjectId` からagentの `runId/taskId` を辿ります。`queue.settled.reason` とtask APIのerrorCodeにも分類を保持し、会話のcompletedを調査成功とは扱いません。
 
 
+## Codexの常駐プロセスとスレッド
+
+接続種別 `codex-sdk` は、組（API キーの有無と値・接続先・Web検索の有無）ごとに `codex app-server` を1つ常駐させ、その上の固定スレッドに会話を載せます（[設計](../spec/codex-input-cache-structure-2026-11-12.md)）。Codex のホームは SQLite と同じ場所の `codex-home/` で、backend の起動時に空にして作り直します。個人の `~/.codex` は読みません（CLI ログインの `auth.json` だけをリンクで共有します）。スレッドが1本もなくなったプロセスは止め、最後のプロセスが終わるとホームを空にします。
+
+| イベント（info） | 項目 | 内容 |
+| --- | --- | --- |
+| `inference.codex_thread` | `mode` | `new`（スレッドを作って全部を送る）・`append`（スレッドに載っている分の続きなので、増えた分だけを送る）・`reset`（スレッドを先頭まで巻き戻して全部を送る）。呼出しごとに1行 |
+| | `count` | その時点で生きているスレッド数（使用中を含む。上限は全体で32、同じ先頭の空きは2） |
+| | `attemptId`・`connectionId` | 呼出しの試行と保存済み接続の ID |
+| `inference.codex_process` | `outcome` | `started`（ハンドシェイクまで終わった）・`exited` |
+| | `count` | その時点で生きているプロセス数 |
+| | `exitCode`・`processSignal` | `exited` のとき、分かる場合だけ |
+
+会話本文・指示文・出力 schema・認証情報・Codex の生応答は出しません。見分けに使うハッシュも出しません。
+
+読み方:
+
+- 同じ会話で `reset` ばかりが続くとき、続きの判定（先頭の一致、その直後が assistant、その後ろに1件以上）が成り立っていません。`new` が続くときは、先頭（モデル・system・ツール一覧・出力 schema・思考量）が呼出しごとに変わっています。`append` の `usage` は、その呼出しが足した分（スレッドの累計の差）です。
+- `exited` の直後の呼出しは、新しいプロセスで `new` から始まります（スレッドは作り直し）。`count: 0` の `exited` は最後のプロセスの終了で、そのときホームは空にされます。10分使われなかった後の `exited`（スレッドがなくなったための停止）は正常です。
+- スレッドの捨て（10分の空き、作ってから30分、先頭ごとに空き2本、全体32本、取消で2秒以内に止まらない、ターンの失敗、忘却）は `thread/delete` で行い、ログは出しません。削除できなかったスレッドの記録ファイルはアダプタが消します。
+- 忘却では、空いているスレッドをすぐ捨て、実行中のターンは終わりを待ってから捨てます。その後すべてのプロセスを止めてホームを空にします。その間に来た呼出しは、空になるまで待ってから新しいプロセスで始まります。
+- 起動したプロセスが15秒以内に初期化へ応答しないときは止め、その呼出しは `cloud_agent_codex_unavailable` で失敗します。
+- 出力の上限（1フレーム1 MiB、1ターン4 MiB）はターンごとです。超えると `cloud_agent_output_limit` でそのターンが失敗し、スレッドは捨てられます。
+
+スレッドを捨てた後も、Codex 自身の SQLite（`logs_*`・`thread_history_*` の WAL）に本文が残ることがあります。これらはホームごと、最後のプロセスの終了時（10分の空きの後、または忘却の後）と backend の起動時に消えます。
+
+入力の中身は `bun scripts/codex-wire-capture.ts` で確認できます。実 Codex CLI を一時ホームで起動し、通信なしの受け口へ向けて、最初の呼出し・`append`・`reset` の `input` の並びと `prompt_cache_key` を表示します。モデルは呼びません。
+
 ## LLM生成JSONの補正と拒否
 
 `llm_json.rejected` は共通JSON処理が補正を採用できなかった理由をdebugで記録します。`reason` は `llm_json_duplicate_key`（重複キー）、`llm_json_unsafe_repair`（値・構造の変更が必要）、`llm_json_incomplete`（途中切断）、`llm_json_too_deep`（深さ超過）、`llm_json_too_large`（容量超過）、`llm_json_invalid_syntax` 等の固定コードです。容量と、その処理のrunId/jobId等の実行コンテキストを記録し、キー名・値・生応答は含めません。補正成功はdebugの `llm_json.corrected` で区別します。これは保存前の構文観測であり、取消・古い結果・rollbackを確定した処理失敗として扱いません。処理の拒否は各domainの採用判定後の既存warnログが正本です。

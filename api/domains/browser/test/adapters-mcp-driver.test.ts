@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { waitFor as until } from "../../../infrastructure/wait-for";
+import { createInteractDriver } from "../adapters/interact-driver";
 import { createMcpBrowserDriver } from "../adapters/mcp-driver";
 import { ALLOWED_MCP_TOOLS } from "../adapters/mcp-driver-tools";
 import type {
@@ -46,6 +47,7 @@ function setup(
 		callTimeoutMs?: number;
 		stopGraceMs?: number;
 		executablePath?: string;
+		isolated?: boolean;
 	} = {},
 ) {
 	const root = mkdtempSync(join(tmpdir(), "eumenes-browser-adapters-"));
@@ -54,9 +56,8 @@ function setup(
 	const setConfig = (next: Record<string, unknown>) =>
 		writeFileSync(join(root, "fake-config.json"), JSON.stringify(next));
 	setConfig(config);
-	const driver = createMcpBrowserDriver({
+	const launchOptions = {
 		executablePath: options.executablePath ?? "/fake/brave",
-		extensionToken: options.extensionToken,
 		outputDir,
 		connectTimeoutMs: options.connectTimeoutMs ?? 10_000,
 		callTimeoutMs: options.callTimeoutMs ?? 10_000,
@@ -64,7 +65,13 @@ function setup(
 			? { stopGraceMs: options.stopGraceMs }
 			: {}),
 		launch: { command: process.execPath, args: [FAKE] },
-	});
+	};
+	const driver = options.isolated
+		? createInteractDriver(launchOptions)
+		: createMcpBrowserDriver({
+				...launchOptions,
+				extensionToken: options.extensionToken,
+			});
 	drivers.push(driver);
 	const log = (): Call[] => {
 		try {
@@ -89,6 +96,7 @@ function setup(
 				envKeys: string[];
 				executablePath: string;
 				cwd: string;
+				isolation?: unknown;
 			},
 	};
 }
@@ -138,6 +146,54 @@ test("connect starts the pinned child with only three env vars and a managed out
 		name: "browser_tabs",
 		args: { action: "list" },
 	});
+});
+
+test("isolated Interact runs and the normal connection each own their child", async () => {
+	const normal = setup({}, { extensionToken: "fixture" });
+	const first = setup(
+		{ initialUrl: "https://first.test/" },
+		{ isolated: true },
+	);
+	const second = setup(
+		{ initialUrl: "https://second.test/" },
+		{ isolated: true },
+	);
+	for (const { driver } of [normal, first, second])
+		expect((await driver.connect(NEVER)).state).toBe("connected");
+	expect(
+		new Set([normal.start().pid, first.start().pid, second.start().pid]).size,
+	).toBe(3);
+	expect(normal.start().argv).toContain("--extension");
+	expect(normal.start().envKeys).toContain("PLAYWRIGHT_MCP_EXTENSION_TOKEN");
+	for (const run of [first, second]) {
+		expect(run.start().argv).toEqual([
+			"--config",
+			join(run.outputDir, "isolation.json"),
+			"--output-dir",
+			run.outputDir,
+			"--no-webmcp",
+		]);
+		expect(run.start().envKeys).not.toContain("PLAYWRIGHT_MCP_EXTENSION_TOKEN");
+		expect(run.start().isolation).toMatchObject({
+			browser: {
+				isolated: true,
+				launchOptions: {
+					executablePath: "/fake/brave",
+					headless: true,
+					args: expect.arrayContaining(["--mute-audio"]),
+				},
+				contextOptions: { acceptDownloads: false, serviceWorkers: "block" },
+			},
+		});
+	}
+	expect((await first.driver.listTabs())[0]?.url).toBe("https://first.test/");
+	await first.driver.disconnect();
+	expect(alive(first.start().pid)).toBe(false);
+	expect(readdirSync(first.outputDir)).toEqual([]);
+	expect((await second.driver.listTabs())[0]?.url).toBe("https://second.test/");
+	expect((await normal.driver.listTabs())[0]?.url).toBe(
+		"http://127.0.0.1:5173/",
+	);
 });
 
 test("without a saved executable the driver is not configured and starts nothing", async () => {
