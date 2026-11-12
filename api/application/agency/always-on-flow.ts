@@ -164,19 +164,31 @@ export async function startResearch(input: {
 	}
 }
 
+/** The user began to type, to speak or to be read to in the instant before a line was stored: the line is held. */
+export const SPEECH_BUSY = "agency_busy";
+
+/** The message of a line the agent says on its own. */
+export const speechId = (c: AgendaScope, ticketId: string) =>
+	`agency:${c.scope}:${ticketId}`;
+
 /** Speaks one line of the agent: the same message id, Live routing and receipts as every agency utterance. */
 export async function deliverSpeak(input: {
 	deps: AgencyHostDeps;
 	c: AgendaScope;
 	ticket: SpeakTicket;
 	at: number;
-	/** The origin is still current and the user can be spoken to (inside the writer). */
-	current(db: Database): boolean;
+	/**
+	 * Inside the writer: the origin is still current (`stale` when not), and the user can be spoken to (`busy` while
+	 * they type, are answered or are read to).
+	 */
+	current(db: Database): "ok" | "stale" | "busy";
 }): Promise<"appended" | "routed"> {
 	const { deps, c, ticket, at } = input;
-	const messageId = `agency:${c.scope}:${ticket.id}`;
+	const messageId = speechId(c, ticket.id);
 	return deps.store.write((db) => {
-		if (!input.current(db)) throw new Error("agency_origin_stale");
+		const state = input.current(db);
+		if (state === "busy") throw new Error(SPEECH_BUSY);
+		if (state !== "ok") throw new Error("agency_origin_stale");
 		const context: InputContext = referencedInput(deps, db, c.notes, [
 			...ticket.refs,
 			...seenRefs(deps, c, at),

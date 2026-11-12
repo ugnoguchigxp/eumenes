@@ -550,6 +550,8 @@ export const domains = {
 			"api/application/agency/routes.test.ts",
 			"api/application/agency/always-on.test.ts",
 			"api/application/agency/always-on-activity.test.ts",
+			"api/application/agency/always-on-heard.test.ts",
+			"api/application/agency/always-on-pace.test.ts",
 			"api/application/agency/always-on-switch.test.ts",
 			"api/application/agency/always-on-authority.test.ts",
 			"api/application/agency/always-on-checkpoint.test.ts",

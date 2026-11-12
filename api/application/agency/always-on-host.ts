@@ -22,6 +22,8 @@ import {
 import type { AgencyHostDeps } from "./host-types";
 import type { AgencyWork } from "./work";
 import { createAgencyActivity } from "./always-on-activity";
+import { createAgendaHearing } from "./always-on-heard";
+import { recallConversation } from "./always-on-recovery";
 import type { AgencyActivity } from "../../domains/dialogue/contracts/agency-status";
 
 /**
@@ -61,6 +63,22 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		setTimer,
 		clearTimer,
 	});
+	// When the agent's words count as said: at the end of their reading on a screen of the conversation.
+	const hearing = createAgendaHearing({
+		now,
+		attended: (id) => activity.attended(id),
+		playing: (id) => activity.playing(id),
+		setTimer,
+		clearTimer,
+		wake: () => syncBusy(),
+		failed: (c, error) =>
+			log.warn("agency.heard_failed", {
+				subjectId: c.id,
+				reason: toErrorCode(error, "heard_failed"),
+			}),
+	});
+	/** Steps that hold a line until the user is free again. */
+	const idleWaiters = new Set<() => void>();
 	const on = () => started && !closed && agendaReady(deps);
 	const track = <T>(p: Promise<T>): Promise<T> => {
 		inflight.add(p);
@@ -90,6 +108,8 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 				void kickScope(scope);
 			},
 		});
+		// The scope joins a conversation that may be under way (a restart is not a new one for the user).
+		recallConversation(deps, c, now());
 		convs.set(id, c);
 		if (previous) {
 			persisted.set(id, c.revision);
@@ -109,6 +129,8 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	}
 	function busy(c: AgendaScope) {
 		return (
+			// Its last words are still being read aloud.
+			c.unheard.length > 0 ||
 			activity.busy(c.id) ||
 			deps.inference.foregroundBusy() ||
 			deps.store.read((db) => deps.conversationBusy(db, c.id))
@@ -124,7 +146,23 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		save: () => save(),
 		active: () => activeId,
 		refresh: (c: AgendaScope) => refresh(c),
+		hearing,
+		idle,
 	});
+	function idle(c: AgendaScope) {
+		// The user's words (or a forget) make the held line stale: the wait ends, and the retry drops it.
+		const generation = c.generation;
+		return new Promise<boolean>((resolve) => {
+			const look = () => {
+				const gone = closed || convs.get(c.id) !== c || !on();
+				if (!gone && c.generation === generation && busy(c)) return;
+				idleWaiters.delete(look);
+				resolve(!gone);
+			};
+			idleWaiters.add(look);
+			look();
+		});
+	}
 	/** The timer of the agent's next step: none while the user is typing, answered or elsewhere. */
 	function arm(c: AgendaScope) {
 		if (c.timer !== undefined) clearTimer(c.timer);
@@ -150,12 +188,19 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		);
 	}
 	function syncBusy() {
+		// A reading that ended: its words are said now, before anything is planned.
+		let heard = false;
+		for (const c of convs.values()) heard = hearing.check(c) || heard;
 		for (const c of convs.values()) {
 			c.busy = busy(c) || c.id !== activeId || !on() || recovering.has(c.id);
 			arm(c);
 		}
+		for (const look of idleWaiters) look();
+		// What was said is saved, and the plan of it is due.
+		if (heard) schedule();
 	}
 	function dispose(c: AgendaScope) {
+		hearing.dispose(c);
 		c.profileAbort.abort();
 		if (c.timer !== undefined) clearTimer(c.timer);
 		c.timer = undefined;
@@ -164,6 +209,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		c.generation++;
 		c.controller?.abort();
 		c.revision++;
+		for (const look of idleWaiters) look();
 	}
 	const { save, saveInTransaction, refresh, forgetInTransaction, forgetRefs } =
 		createAgendaCheckpoints({
@@ -195,6 +241,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 						c,
 						event,
 						at: now(),
+						hearing,
 						forget: (scope, refs) => forgetRefs(scope, refs),
 						exchanged: (scope) => {
 							void track(
@@ -261,6 +308,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		catchUp: () => {
 			if (on()) feedEvents();
 		},
+		heard: (c) => hearing.flush(c, now()),
 		changed: () => {
 			requested = true;
 			schedule();
@@ -344,7 +392,10 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			closed = true;
 			for (const stop of stoppers.splice(0)) stop();
 			activity.close();
+			for (const look of idleWaiters) look();
 			for (const c of convs.values()) {
+				// What was being read is said: the checkpoint does not owe it again.
+				hearing.flush(c, now());
 				invalidate(c);
 				dispose(c);
 			}

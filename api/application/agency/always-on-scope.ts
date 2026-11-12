@@ -21,6 +21,7 @@ import {
 	agendaSources,
 } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
+import type { Unheard } from "./always-on-heard";
 
 /** Notes kept per conversation: the newest ones (the older are still in the work ledger). */
 export const NOTES_KEPT = 30;
@@ -99,6 +100,8 @@ export type AgendaScope = {
 	shows: Map<string, string[]>;
 	/** The input of each line handed to a Live session as a proposal (the session asks for it when it speaks). */
 	proposals: Map<string, InputContext>;
+	/** Words of the agent a screen may still be reading aloud: said (to the agent) when the reading ends. */
+	unheard: Unheard[];
 	/** The host's step, run by the scheduler (set by the host). */
 	kick(): void;
 };
@@ -266,6 +269,7 @@ export function createAgendaScope(input: {
 		proposals: new Map(),
 		given: new Map(),
 		shows: new Map(),
+		unheard: [],
 		kick: () => input.kick(c),
 	};
 	return c;

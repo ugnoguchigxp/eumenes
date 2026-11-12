@@ -61,6 +61,23 @@ export function createAgencyActivity(input: {
 					(s.activity.playing || (s.activity.visible && s.activity.typing)),
 			);
 		},
+		/** A screen shows the conversation: what is said in it may be read aloud there. */
+		attended(conversationId: string) {
+			expire();
+			return [...screens.values()].some(
+				(s) => s.conversationId === conversationId && !s.activity.leaving,
+			);
+		},
+		/** A screen of the conversation is reading aloud (also when hidden). */
+		playing(conversationId: string) {
+			expire();
+			return [...screens.values()].some(
+				(s) =>
+					s.conversationId === conversationId &&
+					!s.activity.leaving &&
+					s.activity.playing,
+			);
+		},
 		close() {
 			if (timer !== undefined) input.clearTimer(timer);
 			screens.clear();

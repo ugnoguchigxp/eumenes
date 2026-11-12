@@ -47,3 +47,42 @@ test("activity leases respect revisions, hidden playback, independent screens an
 	leases.close();
 	expect(timers.size).toBe(0);
 });
+
+test("a screen on the conversation is attended, and reading aloud is told apart from typing", () => {
+	let now = Date.now();
+	const leases = createAgencyActivity({
+		now: () => now,
+		changed: () => {},
+		setTimer: () => ({}),
+		clearTimer: () => {},
+	});
+	const report = {
+		screenId: crypto.randomUUID(),
+		revision: 1,
+		sentAt: now,
+		visible: true,
+		typing: true,
+		playing: false,
+	};
+	expect(leases.attended("a")).toBe(false);
+	leases.update("a", report);
+	expect(leases.attended("a")).toBe(true);
+	expect(leases.attended("b")).toBe(false);
+	expect(leases.playing("a")).toBe(false);
+	// A hidden screen still reads aloud.
+	leases.update("a", {
+		...report,
+		revision: 2,
+		typing: false,
+		playing: true,
+		visible: false,
+	});
+	expect(leases.playing("a")).toBe(true);
+	leases.update("a", { ...report, revision: 3, playing: true, leaving: true });
+	expect(leases.playing("a")).toBe(false);
+	expect(leases.attended("a")).toBe(false);
+	leases.update("a", { ...report, screenId: crypto.randomUUID() });
+	now += 45_000;
+	expect(leases.attended("a")).toBe(false);
+	leases.close();
+});

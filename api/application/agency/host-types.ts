@@ -28,6 +28,7 @@ export type AgencyHostDeps = {
 	store: Pick<SqliteStore, "read" | "write" | "onCommit">;
 	conversation: Pick<
 		ConversationService,
+		| "get"
 		| "changesInTransaction"
 		| "outboxHeadInTransaction"
 		| "sourceInTransaction"

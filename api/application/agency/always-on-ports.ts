@@ -62,6 +62,8 @@ export function createAgendaPorts(input: {
 	now(): number;
 	/** Reads the outbox up to its head into the agents (the user's words are in before the reply is written). */
 	catchUp(): void;
+	/** A reply begins: what the agent was saying counts as said now (the reply follows it). */
+	heard(c: AgendaScope): void;
 	changed(): void;
 }) {
 	const { deps, convs, serving, active, display, now, catchUp, changed } =
@@ -104,6 +106,7 @@ export function createAgendaPorts(input: {
 		args: Parameters<ConversationAgentPort["respond"]>[0],
 	) {
 		catchUp();
+		input.heard(c);
 		const at = now();
 		const userIds = new Set(
 			c.agent

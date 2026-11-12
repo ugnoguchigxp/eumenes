@@ -7,7 +7,13 @@ import {
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { currentInput, fixedInput } from "./input";
-import { deliverSpeak, startResearch } from "./always-on-flow";
+import {
+	deliverSpeak,
+	speechId,
+	SPEECH_BUSY,
+	startResearch,
+} from "./always-on-flow";
+import type { AgendaHearing } from "./always-on-heard";
 import { keepNotes, noteFromResult } from "./always-on-memory";
 import { noteRef, type AgendaScope } from "./always-on-scope";
 import type { ScopePatch } from "./always-on-checkpoint";
@@ -26,6 +32,9 @@ type CycleHost = {
 	save(): Promise<boolean>;
 	active(): string | null;
 	refresh(c: AgendaScope): Promise<void>;
+	hearing: AgendaHearing;
+	/** Resolves when the user of the scope is free again (true), or the scope or the host is gone (false). */
+	idle(c: AgendaScope): Promise<boolean>;
 };
 type ResultHost = Pick<CycleHost, "deps" | "convs" | "now"> & {
 	conv(id: string): AgendaScope;
@@ -95,23 +104,25 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			}
 			c.revision++;
 			logCalls(c, out);
-			const current = (db: Database, speech: boolean) =>
-				on() &&
-				convs.get(c.id) === c &&
-				(!speech ||
-					(c.generation === generation &&
-						!controller.signal.aborted &&
-						digest() === before &&
-						fixedInput({
-							agency: deps.settings.inTransaction(db).agency,
-							general: deps.settings.inTransaction(db).general,
-						}).sources[0] === before &&
-						deps.conversation.latestOrdinalInTransaction(db, c.id) ===
-							ordinal &&
-						active() === c.id &&
-						!busy(c)));
+			const current = () => on() && convs.get(c.id) === c;
+			// A line is for the conversation as the step saw it; a user who is busy only delays it.
+			const speech = (db: Database) =>
+				!current() ||
+				c.generation !== generation ||
+				controller.signal.aborted ||
+				digest() !== before ||
+				fixedInput({
+					agency: deps.settings.inTransaction(db).agency,
+					general: deps.settings.inTransaction(db).general,
+				}).sources[0] !== before ||
+				deps.conversation.latestOrdinalInTransaction(db, c.id) !== ordinal ||
+				active() !== c.id
+					? "stale"
+					: busy(c)
+						? "busy"
+						: "ok";
 			for (const ticket of out.tickets)
-				await handleTicket(host, c, ticket, current);
+				await handleTicket(host, c, ticket, current, speech);
 			c.revision++;
 			await host.save().catch((error) =>
 				log.warn("agency.checkpoint_failed", {
@@ -138,7 +149,8 @@ async function handleTicket(
 	host: CycleHost,
 	c: AgendaScope,
 	ticket: AgendaTicket,
-	current: (db: Database, speech: boolean) => boolean,
+	current: () => boolean,
+	speech: (db: Database) => "ok" | "stale" | "busy",
 ) {
 	const { deps, now } = host;
 	if (ticket.kind === "research") {
@@ -148,7 +160,7 @@ async function handleTicket(
 				deps,
 				c,
 				ticket,
-				current: (db) => current(db, false),
+				current,
 				save: host.save,
 				now,
 			});
@@ -177,29 +189,45 @@ async function handleTicket(
 		c.revision++;
 		return;
 	}
-	let delivered = true;
-	try {
-		// A Live handoff is a proposal the voice session takes; the agent counts it as said.
-		await deliverSpeak({
-			deps,
-			c,
-			ticket,
-			at: now(),
-			current: (db) => current(db, true),
-		});
-	} catch (error) {
-		delivered = false;
-		log.warn("agency.delivery_failed", {
-			subjectId: c.id,
-			reason: toErrorCode(error, "agency_delivery_failed"),
-		});
+	let deliveredAt: number | null = null;
+	for (;;) {
+		const at = now();
+		try {
+			// A Live handoff is a proposal the voice session takes; the agent counts it as said.
+			await deliverSpeak({ deps, c, ticket, at, current: speech });
+			deliveredAt = at;
+			break;
+		} catch (error) {
+			const reason = toErrorCode(error, "agency_delivery_failed");
+			// The user began to type or to be answered in the instant before the line was stored: the line is held
+			// to the end of that, as the agent holds a line it wrote ahead, and not said if they spoke meanwhile.
+			if (reason === SPEECH_BUSY && (await host.idle(c))) continue;
+			log.warn("agency.delivery_failed", { subjectId: c.id, reason });
+			break;
+		}
 	}
-	c.agent.recordDelivery({
-		ticketId: ticket.id,
-		at: now(),
-		status: delivered ? "succeeded" : "failed",
-	});
 	c.revision++;
+	if (deliveredAt === null) {
+		c.agent.recordDelivery({
+			ticketId: ticket.id,
+			at: now(),
+			status: "failed",
+		});
+		return;
+	}
+	// The line is said when the user has heard it: the agent's gaps run from the end of the reading.
+	host.hearing.appeared(
+		c,
+		{ id: speechId(c, ticket.id), at: deliveredAt, own: true },
+		(saidAt) => {
+			c.agent.recordDelivery({
+				ticketId: ticket.id,
+				at: saidAt,
+				status: "succeeded",
+			});
+			c.revision++;
+		},
+	);
 }
 
 /**
