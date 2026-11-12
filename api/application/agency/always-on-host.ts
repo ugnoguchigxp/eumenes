@@ -114,11 +114,11 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		if (previous) {
 			persisted.set(id, c.revision);
 			recovering.add(id);
+			// The notes a restart brought back are kept as documents too (one made before is not made again).
+			for (const note of c.notes) void track(keepNote(deps, c, note));
 		}
 		return c;
 	}
-			// The notes a restart brought back are kept as documents too (one made before is not made again).
-			for (const note of c.notes) void track(keepNote(deps, c, note));
 	function conv(id: string) {
 		const current = convs.get(id);
 		if (current) return current;

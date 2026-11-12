@@ -109,7 +109,6 @@ export async function agendaFixture(
 				(c) =>
 					!options.media || c.revisionId.startsWith("toolchain:image.create@"),
 			);
-	const deps = {
 	/** The Markdown domain's side of a shown note, in memory: saved after `noteSavingPolls` looks, then linked. */
 	const documents = {
 		started: [] as Array<{ id: string; title: string; markdown: string }>,
@@ -154,8 +153,9 @@ export async function agendaFixture(
 			documents.forgotten.push(...noteIds);
 		},
 	};
-		store: h.store,
+	const deps = {
 		noteDocuments,
+		store: h.store,
 		conversation: h.conversation,
 		settings: h.settings,
 		memory: h.memory!,
@@ -229,11 +229,11 @@ export async function agendaFixture(
 		requests,
 		kinds,
 		signals,
+		documents,
 		port,
 		deps,
 		steering,
 		get host() {
-		documents,
 			return host;
 		},
 		get now() {

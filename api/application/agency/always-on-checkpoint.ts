@@ -49,16 +49,16 @@ export function createAgendaCheckpoints(input: {
 		c.profile = forgetProfile(c.profile, set) ?? c.profile;
 		c.forgetSeq++;
 		c.notes = c.notes.filter((n) => !lost.includes(n));
-		c.tickets = c.tickets.filter(
-			(t) =>
-				!gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lostRefs.has(r)),
-		);
-		for (const [item, done] of c.finished)
 		if (lost.length)
 			deps.noteDocuments?.forget(
 				c.id,
 				lost.map((n) => n.id),
 			);
+		c.tickets = c.tickets.filter(
+			(t) =>
+				!gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lostRefs.has(r)),
+		);
+		for (const [item, done] of c.finished)
 			if (done.note && lost.some((n) => n.id === done.note!.id))
 				c.finished.delete(item);
 		c.revision++;

@@ -340,6 +340,7 @@ test("a reply sees the agent's state, reads a note, asks for research and shows 
 	let planned = false;
 	const f = await agendaFixture({
 		media: imageFixture("success"),
+		noteSavingPolls: 2,
 		script: (kind: CallKind) => {
 			if (kind === "plan" && !planned) {
 				planned = true;
@@ -390,7 +391,6 @@ test("a reply sees the agent's state, reads a note, asks for research and shows 
 		// domain, carried by one message per reply and note, never an `agency:` line, and kept out of what the model
 		// is told and what memory learns from. The note's text is in the document, not in the conversation.
 		const shownNotes = () =>
-		noteSavingPolls: 2,
 			f.h.conversation
 				.get("ao")
 				.messages.filter((m) => m.id.startsWith("agency-note:"));
@@ -409,6 +409,10 @@ test("a reply sees the agent's state, reads a note, asks for research and shows 
 			await settle();
 		};
 		await adopt();
+		// The document is still being saved: nothing is shown yet.
+		await f.advance(500);
+		expect(shownNotes()).toHaveLength(0);
+		await f.advance(500);
 		await waitFor(() => shownNotes().length === 1);
 		expect(shownNotes()[0]!.text).toBe(
 			[note.title, note.summary].filter(Boolean).join("\n"),
@@ -479,10 +483,6 @@ async function steered(
 							],
 						}
 					: { text: "fixture answer", toolCalls: [] };
-		// The document is still being saved: nothing is shown yet.
-		await f.advance(500);
-		expect(shownNotes()).toHaveLength(0);
-		await f.advance(500);
 			},
 		},
 		tools: { tools: [], call: async () => ({ content: "host" }) },

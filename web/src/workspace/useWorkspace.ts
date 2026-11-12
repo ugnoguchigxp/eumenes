@@ -158,6 +158,7 @@ export function useWorkspace({
 		screenOutput.subscribe,
 		screenOutput.speaking,
 	);
+	const typing = useTyping(input);
 	useAgencyAttention(client, "main", {
 		typing,
 		playing: speaking || live.playing,
@@ -165,7 +166,6 @@ export function useWorkspace({
 	const mute = useVoiceMute(client);
 	const automaticInput = input.dictated && voice.active;
 	const recognitionId = voice.recognitionId;
-	const typing = useTyping(input);
 	const recognitionText = voice.transcription?.text;
 	useEffect(() => {
 		if (

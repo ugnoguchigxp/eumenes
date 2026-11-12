@@ -109,8 +109,8 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 				deps.conversation.latestOrdinalInTransaction(db, c.id),
 			);
 			const before = digest();
-			const controller = new AbortController();
 			c.triedWhileBusy = busy(c) ? researchWaiting(c) : "";
+			const controller = new AbortController();
 			signal = controller.signal;
 			c.controller = controller;
 			c.revision++;
@@ -162,9 +162,9 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			});
 		}
 	} finally {
-		c.stepping = false;
 		// A step called off started nothing: the research that waited is tried again.
 		if (signal?.aborted) c.triedWhileBusy = "";
+		c.stepping = false;
 		c.controller = null;
 	}
 }
@@ -329,9 +329,9 @@ export async function collectAgendaResults(host: ResultHost) {
 		if (patch.size) saveInTransaction(db, patch);
 	});
 	// Committed: the volatile state follows (a rolled-back write above leaves the scopes as they were).
+	const kept: Promise<void>[] = [];
 	for (const a of adopted) {
 		a.c.tickets = a.c.tickets.filter((t) => t.id !== a.ticketId);
-	const kept: Promise<void>[] = [];
 		if (a.note) {
 			a.c.notes = keepNotes([...a.c.notes, a.note]);
 			kept.push(keepNote(deps, a.c, a.note));
@@ -353,6 +353,6 @@ export async function collectAgendaResults(host: ResultHost) {
 		a.c.kick();
 	}
 	collected();
-}
 	// Each note is kept as a Markdown document from here on.
 	await Promise.all(kept);
+}
