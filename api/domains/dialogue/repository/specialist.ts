@@ -48,7 +48,13 @@ CREATE INDEX dialogue_specialist_events_session ON dialogue_specialist_events(se
 
 /** One recorded step: the hand-over's request, or an operation's short outcome (never a work's content). */
 export type SessionEvent =
-	| { kind: "handover"; runId: string; request: string }
+	| {
+			kind: "handover";
+			runId: string;
+			request: string;
+			references?: import("../../tool-runtime").ExecutionReference[];
+			previousSessionId?: string;
+	  }
 	| {
 			kind: "tool";
 			runId: string;
@@ -220,17 +226,32 @@ export function sessionById(db: Database, id: string): SessionRecord | null {
 		.get(id);
 	return row ? map(row as Record<string, unknown>) : null;
 }
-/** The conversation's one session that has not ended (any of active, suspended, closing). */
+/** The active addressee, or the most recent recoverable session when the main agent listens. */
 export function liveSession(
 	db: Database,
 	conversationId: string,
 ): SessionRecord | null {
 	const row = db
 		.query(
-			"SELECT * FROM dialogue_specialist_sessions WHERE conversation_id = ? AND state <> 'ended'",
+			`SELECT * FROM dialogue_specialist_sessions WHERE conversation_id = ? AND state <> 'ended'
+			 ORDER BY CASE state WHEN 'active' THEN 0 WHEN 'closing' THEN 1 ELSE 2 END, updated_at DESC, id DESC LIMIT 1`,
 		)
 		.get(conversationId);
 	return row ? map(row as Record<string, unknown>) : null;
+}
+export function parkedSessions(
+	db: Database,
+	conversationId: string,
+	toolchainId: string,
+): SessionRecord[] {
+	return (
+		db
+			.query(
+				`SELECT * FROM dialogue_specialist_sessions
+			 WHERE conversation_id=? AND toolchain_id=? AND state='suspended' ORDER BY updated_at DESC,id DESC`,
+			)
+			.all(conversationId, toolchainId) as Record<string, unknown>[]
+	).map(map);
 }
 /** Sessions the sweep looks at: past their expiry or closing; the caller adds the clean-suspended ones. */
 export function sweepCandidates(db: Database, now: string): SessionRecord[] {

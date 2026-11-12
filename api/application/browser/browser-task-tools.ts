@@ -37,6 +37,7 @@ export const workSchema = z.strictObject({
 	evidence: z.array(z.string()).max(64),
 	/** Captures this task started; the task waits for them before it ends. */
 	captures: z.array(z.string()).max(8),
+	excerpt: z.string().max(3000).optional(),
 });
 export type Work = z.infer<typeof workSchema>;
 
@@ -95,6 +96,8 @@ const HINTS: Record<string, string> = {
 		"その名前の変数は今回のScriptに宣言されていません。browser.page.scriptのvariablesに名前・説明・今回の値を宣言してから使ってください。",
 	script_title_has_value:
 		"titleに変数の値が入っています。手続きを表す名称に直して再公開してください。",
+	script_evidence_invalid:
+		"完了には今回のタブの最新observationRefが必要です。接続状態やタブ一覧は観測ではありません。接続は操作の準備として扱い、依頼された操作の結果を観測してから完了にしてください。",
 	browser_history_not_found:
 		"その履歴はありません。REFERENCE.historyのhistoryIdを使ってください。",
 	navigation_scheme_blocked: "httpとhttps以外は開けません。",
@@ -381,6 +384,19 @@ const result = (r: TaskToolResult): ToolOutcome => ({
 const declared = (effect: Effect | undefined) => (effect ? { effect } : {});
 
 export const PAGE_TOOLS: Readonly<Record<string, Spec<SchemaKey>>> = {
+	"browser.page.text": spec({
+		schemaKey: "browserPageText",
+		async run({ quote, ...args }, env) {
+			if (!env.api.readText) throw new Error("extraction_unavailable");
+			const read = await env.api.readText(needTab(env.work), args);
+			env.work.seen = addSeen(env.work.seen, read.text);
+			if (quote === undefined) return result({ ok: true, ...read });
+			const start = read.text.indexOf(quote);
+			if (start < 0) return result(refusal("excerpt_not_observed"));
+			env.work.excerpt = read.text.slice(start, start + quote.length);
+			return result({ ok: true, excerpt: env.work.excerpt });
+		},
+	}),
 	"browser.page.collect": spec({
 		schemaKey: "browserResearchCollect",
 		async run(args, env) {

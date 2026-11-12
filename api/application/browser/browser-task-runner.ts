@@ -134,6 +134,8 @@ const endedState = (core: TaskState, work: Work, cited?: string[]) => ({
 	callsMade: core.callsMade,
 	refusals: core.refusals,
 	captures: work.captures,
+	lastTabRef: work.tabRef,
+	...(cited && work.excerpt ? { excerpt: work.excerpt } : {}),
 	...(cited ? { cited } : {}),
 });
 const taskFailed = (
@@ -244,8 +246,11 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 			: input.request;
 		if (!source) throw new Error("execution_source_invalid");
 		const operator = store.read((db) => operatorOf(db, caps, input));
-		if (frozen.caller && !api.connection().availability.available)
+		if (frozen.caller && !api.connection().availability.available) {
+			if ((frozen.caller as { kind?: unknown }).kind === "collaboration")
+				throw new Error("browser_disconnected");
 			await api.connect();
+		}
 		const tabs = (await api.tabs()).filter((t) => t.status !== "closed");
 		// A tab the request named is that tab or none: the task never moves to another one.
 		const target = input.tabRef
@@ -403,7 +408,15 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 			return taskFailed(p.core, p.work, "observation_budget_exceeded");
 		await env.api.progress("thinking");
 		signal.throwIfAborted();
-		const raw = await infer(input, messages, signal);
+		const raw = await infer(input, messages, signal).catch((error: unknown) => {
+			// An empty model turn has issued no tool call. Use the task's existing repair budget.
+			if (
+				error instanceof Error &&
+				error.message === "cloud_agent_empty_output"
+			)
+				return "";
+			throw error;
+		});
 		signal.throwIfAborted();
 		const { state: core, step } = recordOutput(p.core, raw);
 		log.info("browser.task_step", {
@@ -435,6 +448,7 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 				};
 			}
 			case "invoke": {
+				const tabRef = p.work.tabRef;
 				const out = await runTool(step.tool, step.arguments, env);
 				signal.throwIfAborted();
 				if (out.kind === "stop") {
@@ -452,6 +466,11 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 					};
 				}
 				// Refs of the pages read so far are void once a newer observation arrives.
+				if (
+					tabRef !== p.work.tabRef ||
+					(out.result.ok && "observation" in out.result)
+				)
+					delete p.work.excerpt;
 				const recorded = recordToolResult(
 					out.result.ok && "observation" in out.result
 						? expireObservations(core)

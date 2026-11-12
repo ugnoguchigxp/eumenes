@@ -23,11 +23,17 @@ import { traceFailure, traceOutcome } from "./selection-outcome";
 import {
 	blockSpecialistMessages,
 	endOrMarkClosing,
+	safeCode,
 	turnRefusal,
 } from "./specialist-core";
 import { releaseSpecialistTurn } from "./specialist-turn-end";
-import { specialistObservation } from "./specialist-notices";
+import {
+	observationExcerpt,
+	specialistObservation,
+} from "./specialist-notices";
 import type { TurnInput, TurnOutput } from "./specialist-turn";
+import { startSpecialistSession } from "./specialist-start";
+import { specialistHandoffReferences } from "./specialist-handoff-context";
 
 function failTurn(
 	deps: DialogueDeps,
@@ -169,6 +175,7 @@ export function settleSpecialistTurn(
 		deps.clock(),
 	);
 	if (refusal || !session) return failTurn(deps, tx, run, refusal ?? "x");
+	let deliveredExcerpt: string | undefined;
 	try {
 		if (
 			!deps.specialist?.workStateInTransaction(
@@ -179,7 +186,11 @@ export function settleSpecialistTurn(
 		)
 			return failTurn(deps, tx, run, "specialist_work_revoked");
 		if (run.sourceKind === "notice") {
-			specialistObservation(deps, tx, run.id, session);
+			deliveredExcerpt = observationExcerpt(
+				specialistObservation(deps, tx, run.id, session),
+			);
+			if (input.observedExcerpt !== deliveredExcerpt)
+				return failTurn(deps, tx, run, "specialist_event_source_invalid");
 			if (outcome.result.action.kind !== "reply")
 				return failTurn(deps, tx, run, "specialist_event_action_forbidden");
 		}
@@ -193,12 +204,60 @@ export function settleSpecialistTurn(
 	if (action.kind === "reply") {
 		if (!acceptRunAnswer(deps, tx, run))
 			return failTurn(deps, tx, run, "permission_revoked");
-		const messageId = appendSpecialistAnswer(deps, tx, run, action.text);
+		const messageId = appendSpecialistAnswer(
+			deps,
+			tx,
+			run,
+			deliveredExcerpt ?? action.text,
+		);
 		const done = endRun(deps, tx, run, "completed", null, messageId);
 		if (done) traceOutcome(deps, tx, run.id, { outcome: "completed" });
 		return done ? "applied" : "stale";
 	}
+	if (action.kind === "handoff")
+		return settleHandoff(deps, tx, run, session, action);
 	return settleHandback(deps, tx, run, session, action);
+}
+
+function settleHandoff(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	session: SessionRecord,
+	action: Extract<TurnOutput["action"], { kind: "handoff" }>,
+): ReturnType<Handler["settleInTransaction"]> {
+	tx.exec("SAVEPOINT specialist_handoff");
+	try {
+		for (const queued of unfinishedSessionRuns(tx, session.id)) {
+			const sibling = queued.id === run.id ? null : byId(tx, queued.id);
+			if (sibling)
+				forwardToMain(deps, tx, sibling, session, "ended", session.label);
+		}
+		releaseSpecialistTurn(deps, tx, run);
+		const ended = endOrMarkClosing(deps, tx, session, "closed", run.id);
+		if (ended.state !== "ended") throw Error("specialist_closing");
+		setRunSession(tx, run.id, null);
+		const started = startSpecialistSession(deps, tx, run, {
+			...action.handoff,
+			handoffFrom: session.id,
+			references: specialistHandoffReferences(tx, session.id),
+		});
+		if (!started.ok) throw Error(started.code);
+		if (!transition(tx, run.id, run.revision, "queued", deps.clock()))
+			throw Error("specialist_session_changed");
+		if (action.text) appendSpecialistAnswer(deps, tx, run, action.text);
+		tx.exec("RELEASE specialist_handoff");
+		return "applied";
+	} catch (error) {
+		tx.exec("ROLLBACK TO specialist_handoff");
+		tx.exec("RELEASE specialist_handoff");
+		return failTurn(
+			deps,
+			tx,
+			run,
+			safeCode(error, "specialist_handoff_failed"),
+		);
+	}
 }
 
 /** return / discard: the turn gives the work back; the session is suspended or ended. */

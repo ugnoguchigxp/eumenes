@@ -79,6 +79,7 @@ export type Request = {
 	/** The user's own words behind the request, when it carries more than they said. */
 	words?: string;
 	inputs?: Record<string, unknown>;
+	diagnosticRef?: string;
 	target?: string;
 	resolveUnsaved?: "discard";
 	announcement: string;

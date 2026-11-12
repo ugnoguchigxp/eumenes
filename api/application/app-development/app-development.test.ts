@@ -1,4 +1,5 @@
 import {
+	artifact,
 	date,
 	movie,
 	place,
@@ -18,6 +19,7 @@ import {
 import { sha256Hex } from "../../infrastructure/digest";
 import { createCapabilities } from "../../domains/capabilities";
 import { offlineBundleHost } from "../toolchain/toolchain-adapters";
+import { createSchedulerDiagnostics } from "../scheduler/scheduler-diagnostics";
 import { createLiveLarm } from "../../../scripts/live-larm";
 import { createDocling } from "../../domains/docling";
 import { markdownArchive } from "../markdown/markdown-composition";
@@ -552,9 +554,8 @@ test("natural language → daily reservation → real Git fetch/diff → durable
 			{ appId: id, revision: "1", anchor: new Date(anchor).toISOString() },
 			id,
 		);
-		expect((await h.source(id)).data.viewing.status.schedule.intervalMs).toBe(
-			86_400_000,
-		);
+		const scheduled = (await h.source(id)).data.viewing.status.schedule;
+		expect(scheduled.intervalMs).toBe(86_400_000);
 		const direct = await h.request("/api/schedules", {
 			requestId: crypto.randomUUID(),
 			target: {
@@ -577,6 +578,53 @@ test("natural language → daily reservation → real Git fetch/diff → durable
 		expect(await h.scheduler.tick()).toBe(1);
 		const second = await h.completed(id, first.runId);
 		expect(second.result.checkpointCount).toBe(1);
+		const reader = createSchedulerDiagnostics({
+			scheduler: h.scheduler,
+			queue: h.queue,
+			apps: h.appRuntime!.apps,
+		});
+		const diagnosis = (
+			viewing: { artifactRevisionId: string; targetRef: string } | null,
+		) =>
+			h.store.read((db) =>
+				reader.readInTransaction(
+					db,
+					{
+						conversationId: "main",
+						viewing,
+						registrationVisible: () => true,
+						run: () => null,
+						answerSaved: () => false,
+					},
+					{
+						kind: "schedule",
+						id: scheduled.id,
+						at: new Date(now).toISOString(),
+					},
+				),
+			);
+		expect(diagnosis(null)).toMatchObject({
+			coverage: "partial",
+			scope: { workflow: "unverified" },
+			items: [],
+		});
+		expect(
+			diagnosis({ artifactRevisionId: artifact, targetRef: id }).items,
+		).toEqual([
+			expect.objectContaining({
+				kind: "workflow",
+				occurrences: [
+					expect.objectContaining({
+						state: "dispatched",
+						result: expect.objectContaining({
+							id: second.runId,
+							state: "completed",
+							resultSaved: true,
+						}),
+					}),
+				],
+			}),
+		]);
 		expect(h.observed.map((unit) => unit.state)).toEqual([
 			"baseline",
 			"changed",

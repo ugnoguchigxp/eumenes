@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { withinJsonLimits } from "eumenes-collaboration";
+import type { QueueService } from "../../queue";
 import type {
 	Check,
 	ChildView,
@@ -18,19 +19,71 @@ import {
 } from "../repository";
 import { createWorkContext, fail, json, terminal } from "./work-context";
 import { createChildOperations } from "./work-children";
+import { createWorkReviews } from "./work-reviews";
 
 /** Canonical work only. Dialogue owns sessions; existing execution domains own child work. */
-export function createCollaborationWorks(now: () => number = Date.now) {
+export function createCollaborationWorks(
+	now: () => number = Date.now,
+	queue?: QueueService,
+) {
 	let ports: Ports | undefined;
 	const host = () => ports ?? fail("collaboration_unavailable");
-	const context = createWorkContext(host, now);
-	const { current, live, held, state, authority, response, purge } = context;
+	const context = createWorkContext(host, now, (db, row) =>
+		reviews.invalidate(db, row),
+	);
+	const reviews = createWorkReviews(context, queue);
+	const { current, live, held, authority, response, purge } = context;
+	function taskTurn(
+		db: Database,
+		input: { workRef: string; sessionId: string; runId: string },
+	) {
+		const row = held(db, input.workRef, input.sessionId, input.runId);
+		if (row.kind !== "task") fail("work_not_found");
+		authority(db, row);
+		return row;
+	}
+	const state = (db: Database, row: WorkRow) => {
+		const view = context.state(db, row);
+		const review = reviews.view(db, row);
+		return {
+			...view,
+			current: { ...view.current, review },
+			context: review
+				? {
+						...view.context,
+						review: {
+							revision: review.revision,
+							status: review.status,
+							summary: "summary" in review ? review.summary : undefined,
+						},
+					}
+				: view.context,
+		};
+	};
 	return {
 		configure(value: Ports) {
 			ports = value;
 		},
 		available: (db: Database, kind: CollaborationKind) =>
 			ports?.available(db, kind) ?? false,
+		review: reviews.start,
+		cancelReview: reviews.cancel,
+		taskOffers(
+			db: Database,
+			input: Parameters<typeof taskTurn>[1],
+			offers?: readonly string[],
+		): string[] {
+			const row = taskTurn(db, input);
+			if (offers) {
+				db.query("UPDATE collaboration_works SET offer_json=? WHERE id=?").run(
+					JSON.stringify({ runId: input.runId, offers }),
+					row.id,
+				);
+				return [...offers];
+			}
+			const saved = row.offer_json && JSON.parse(row.offer_json);
+			return saved?.runId === input.runId ? saved.offers : [];
+		},
 		open(
 			db: Database,
 			kind: WorkKind,
@@ -150,7 +203,8 @@ export function createCollaborationWorks(now: () => number = Date.now) {
 			},
 		) {
 			const row = held(db, input.workRef, input.sessionId, input.runId);
-			if (row.kind === "schedule") fail("work_not_found");
+			if (row.kind === "schedule" || row.kind === "task")
+				fail("work_not_found");
 			if (row.revision !== input.baseRevision) fail("revision_conflict");
 			if (row.child_id) {
 				const child = host().view(db, row.kind, current(db, row), row.child_id);
@@ -169,6 +223,7 @@ export function createCollaborationWorks(now: () => number = Date.now) {
 				current(db, row),
 			);
 			if (!checked.ok) fail("collaboration_definition_invalid");
+			reviews.invalidate(db, row);
 			db.query(
 				"UPDATE collaboration_works SET document_json=?,title=?,revision=revision+1,rejected_json=NULL,child_id=NULL,child_epoch=NULL,child_digest=NULL,child_json=NULL,updated_at=? WHERE id=?",
 			).run(
@@ -193,8 +248,15 @@ export function createCollaborationWorks(now: () => number = Date.now) {
 		) {
 			const row = held(db, input.workRef, input.sessionId, input.runId);
 			if (row.kind === "schedule") fail("work_not_found");
-			authority(db, row);
+			const owner = authority(db, row);
 			response(db, row, input.runId);
+			if (
+				row.kind === "task" &&
+				(!row.child_id ||
+					row.child_epoch !== owner.epoch ||
+					!host().view(db, row.kind, current(db, row), row.child_id))
+			)
+				fail("collaboration_child_changed");
 			if (row.child_id)
 				host().cancel(db, row.kind, current(db, row), row.child_id);
 		},

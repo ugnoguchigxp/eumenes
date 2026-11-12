@@ -33,6 +33,18 @@ export function specialistAuthority(
 		: null;
 }
 
+/** A browser child supplies exact text only after validating it against its observation. */
+export function observationExcerpt(event: unknown): string | undefined {
+	const result = event as { status?: unknown; excerpt?: unknown } | null;
+	if (
+		result?.status === "completed" &&
+		typeof result.excerpt === "string" &&
+		result.excerpt.length > 0 &&
+		result.excerpt.length <= 3000
+	)
+		return result.excerpt;
+}
+
 /** A host observation resumes the owning session with its real original input; it creates no user message. */
 export function notifySpecialist(
 	deps: DialogueDeps,

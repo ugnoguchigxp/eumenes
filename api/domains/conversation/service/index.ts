@@ -262,6 +262,17 @@ export function createConversationService(
 				return at ? messagesBefore(db, conversationId, at.ordinal, limit) : [];
 			});
 		},
+		turnsBeforeInTransaction(
+			db: Database,
+			conversationId: string,
+			messageId: string,
+			limit: number,
+		): Message[] {
+			const at = getMessage(db, messageId);
+			return at?.message.conversationId === conversationId
+				? messagesBefore(db, conversationId, at.ordinal, limit)
+				: [];
+		},
 		messagesInTransaction(db: Database, id: string): Message[] {
 			return listMessages(db, id);
 		},

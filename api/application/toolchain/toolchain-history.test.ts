@@ -148,6 +148,7 @@ test("without vectors every available toolchain is offered; with vectors the top
 			"music.library",
 			// This test's explicit availability callback enables every registered entry except timers.
 			"browser.interact",
+			"collaboration.brave",
 			"collaboration.interact",
 			"collaboration.pipeline",
 			"pipeline.execute",

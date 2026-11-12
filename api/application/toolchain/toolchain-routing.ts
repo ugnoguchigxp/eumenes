@@ -416,6 +416,9 @@ function agentOf(
 							: {}),
 					}
 				: null,
+		...(agent?.conversationHandoff
+			? { conversationHandoff: true as const }
+			: {}),
 		...(agent?.collaborationState
 			? { collaborationState: agent.collaborationState }
 			: {}),

@@ -80,6 +80,10 @@ export type HarnessOptions = {
 		signal: AbortSignal | undefined,
 		options: Parameters<LarmPort["answer"]>[2],
 	) => unknown | Promise<unknown>;
+	workflowReview?: (
+		messages: import("../../domains/inference/contracts").Messages,
+		signal: AbortSignal | undefined,
+	) => unknown | Promise<unknown>;
 	embed?: import("./toolchain-vectors").Embed;
 	musicGateway?: () => LarmPlayground;
 	imageGateway?: () => LarmPlayground;

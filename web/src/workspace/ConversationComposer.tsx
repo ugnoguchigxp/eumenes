@@ -52,7 +52,7 @@ function StewardNode({
 		.filter(Boolean)
 		.join("／");
 	return (
-		<div className="route-part route-steward">
+		<div className="route-part">
 			<span
 				className={`route-node${running ? " active" : ""}${errors.length ? " failed" : ""}`}
 				title={title || undefined}
@@ -107,9 +107,18 @@ export function ConversationComposer({
 		editInput,
 		audioError,
 		edit,
+		specialist,
 	} = state;
 	const editing = edit.editing;
 	const live = state.live;
+	const { addressee, addresseeStatus, session } = specialist;
+	const isSpecialist = addressee.kind === "specialist";
+	const agentLabel =
+		addresseeStatus === "pending"
+			? "確認中"
+			: addresseeStatus === "error"
+				? "未確認"
+				: (isSpecialist ? session?.agentLabel : undefined) ?? addressee.label;
 	const inputPhase = useStore(store, (audio) => audio.inputPhase);
 	const starting = voice.active && inputPhase === "starting";
 	const route = [
@@ -146,10 +155,19 @@ export function ConversationComposer({
 						</span>
 					</div>
 				))}
-				<StewardNode
-					activity={state.stewardActivity.data}
-					loadReport={state.stewardErrorReport}
-				/>
+				<div className="route-side">
+					<StewardNode
+						activity={state.stewardActivity.data}
+						loadReport={state.stewardErrorReport}
+					/>
+					<span
+						className="route-node route-agent"
+						data-specialist={isSpecialist || undefined}
+						title={isSpecialist ? addressee.label : undefined}
+					>
+						担当 {agentLabel}
+					</span>
+				</div>
 			</div>
 			<output className="composer-status" aria-live="polite">
 				{live?.active && (
@@ -211,8 +229,8 @@ export function ConversationComposer({
 						}
 					}}
 					placeholder={
-						state.specialist.addressee.kind === "specialist"
-							? `${state.specialist.addressee.label}へのメッセージを入力、または話しかけてください`
+					isSpecialist
+						? `${addressee.label}へのメッセージを入力、または話しかけてください`
 							: "メッセージを入力、または話しかけてください"
 					}
 					maxLength={8000}

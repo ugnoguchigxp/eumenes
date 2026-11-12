@@ -220,6 +220,23 @@ export function executionAccess(
 			const row = table(db) ? executionRow(db, id) : null;
 			return row ? executionView(row) : null;
 		},
+		continuationInTransaction(
+			db: Database,
+			conversationId: string,
+			id: string,
+			sessionId?: string,
+		) {
+			const row = table(db) ? executionRow(db, id) : null;
+			if (!row?.source_json || row.conversation_id !== conversationId)
+				return null;
+			const source = executionSource(row);
+			return !source.origin &&
+				(!source.specialistSessionId ||
+					source.specialistSessionId === sessionId) &&
+				ctx.port().validSourceInTransaction(db, source)
+				? executionView(row)
+				: null;
+		},
 		cancelWorkflowInTransaction(
 			db: Database,
 			id: string,

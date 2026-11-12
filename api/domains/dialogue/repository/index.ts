@@ -479,6 +479,13 @@ export const migrations: readonly Migration[] = [
 		sql: resourceAttachedMigration,
 	},
 	collaborationStateMigration,
+	{
+		id: "dialogue/0040-specialist-parked",
+		after: ["dialogue/0039-collaboration-state"],
+		sql: `DROP INDEX dialogue_specialist_live;
+CREATE UNIQUE INDEX dialogue_specialist_live ON dialogue_specialist_sessions(conversation_id) WHERE state='active';
+CREATE INDEX dialogue_specialist_conversation ON dialogue_specialist_sessions(conversation_id,state,updated_at);`,
+	},
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

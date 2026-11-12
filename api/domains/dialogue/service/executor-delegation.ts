@@ -7,6 +7,7 @@ import {
 	saveConfirmationRefs,
 } from "../repository/resources";
 import { referencesOfUris, resolveDelegateRefs } from "./delegate-refs";
+import { REPAIR_TOOLCHAIN, verifiedDiagnostic } from "./diagnostic-evidence";
 import { eventText } from "./event-text";
 import {
 	TOOL_NAMES,
@@ -134,6 +135,17 @@ export async function handOver(
 		committed = await store.write((tx) => {
 			signal.throwIfAborted();
 			const run = current(tx);
+			if (
+				chosen.diagnosticRef &&
+				!verifiedDiagnostic(
+					deps,
+					tx,
+					run.conversationId,
+					chosen.diagnosticRef,
+					run.id,
+				)
+			)
+				throw new HandoverRefused("diagnostic_evidence_changed");
 			adoptHere(x, tx, run);
 			if (
 				chosen.confirmationId &&
@@ -150,6 +162,9 @@ export async function handOver(
 					? { resolveUnsaved: chosen.resolveUnsaved }
 					: {}),
 				...(chosen.inputs ? { inputs: chosen.inputs } : {}),
+				...(chosen.diagnosticRef
+					? { diagnosticRef: chosen.diagnosticRef }
+					: {}),
 				...(chosen.routedSteps ? { routedSteps: chosen.routedSteps } : {}),
 				references: chosen.references ?? [],
 			});
@@ -269,6 +284,19 @@ export function confirm(
 	const { store } = deps;
 	return store.write((tx): ToolOutcome => {
 		const run = current(tx);
+		if (
+			chosen.diagnosticRef &&
+			!verifiedDiagnostic(
+				deps,
+				tx,
+				run.conversationId,
+				chosen.diagnosticRef,
+				run.id,
+			)
+		)
+			return {
+				result: { delegated: false, code: "diagnostic_evidence_changed" },
+			};
 		// The item is named as the toolchain offers it, so the open confirmations tell two on one request apart.
 		const target = chosen.target
 			? targetOf(x, tx, chosen.card, chosen.target)
@@ -282,7 +310,9 @@ export function confirm(
 				toolchainId: chosen.card.id,
 				toolchainRevisionId: chosen.card.revisionId,
 				request: chosen.request,
-				inputs: chosen.inputs ?? null,
+				inputs: chosen.diagnosticRef
+					? { ...chosen.inputs, diagnosticRef: chosen.diagnosticRef }
+					: (chosen.inputs ?? null),
 				target: chosen.target ?? null,
 				targetLabel: target.label,
 				resolveUnsaved: chosen.resolveUnsaved ?? null,
@@ -327,7 +357,10 @@ export async function delegate(
 		const approved = store.read((db) => approval(x, db, args.confirmation));
 		if (!approved.ok) {
 			// A confirmation whose item is gone can never be approved: it is closed, so a second yes asks nothing.
-			if (approved.code === "target_not_found")
+			if (
+				approved.code === "target_not_found" ||
+				approved.code === "diagnostic_evidence_changed"
+			)
 				await store.write((tx) => {
 					const run = x.current(tx);
 					const closed = deps.work!.withdrawConfirmationInTransaction(
@@ -378,7 +411,11 @@ export async function delegate(
 	// The request text is what the toolchain works from; an instant one needed only its inputs.
 	const request = args.request;
 	if (!request) throw requestRequired();
-	const inputs = args.inputs;
+	if (args.diagnosticRef && card.id !== REPAIR_TOOLCHAIN)
+		return {
+			result: { delegated: false, code: "diagnostic_ref_not_supported" },
+		};
+	const { diagnosticRef: _reserved, ...inputs } = args.inputs ?? {};
 	const { uris, references } = await resolveDelegateRefs(
 		deps,
 		x.input.conversationId,
@@ -390,7 +427,8 @@ export async function delegate(
 		request,
 		...(routedSteps ? { routedSteps } : {}),
 		...(uris.length ? { references, refUris: uris } : {}),
-		...(inputs ? { inputs } : {}),
+		...(args.inputs ? { inputs } : {}),
+		...(args.diagnosticRef ? { diagnosticRef: args.diagnosticRef } : {}),
 		...(args.target ? { target: args.target } : {}),
 		...(args.resolveUnsaved ? { resolveUnsaved: args.resolveUnsaved } : {}),
 		...(args.words ? { words: args.words } : {}),
@@ -487,6 +525,14 @@ export function approval(
 	if (!enough) return { ok: false, code: "confirmation_not_heard" };
 	const card = toolchains!.cardInTransaction(db, row.toolchainRevisionId);
 	if (!card) return { ok: false, code: "toolchain_unavailable" };
+	const { diagnosticRef: evidence, ...inputs } = row.inputs ?? {};
+	if (
+		evidence !== undefined &&
+		(card.id !== REPAIR_TOOLCHAIN ||
+			typeof evidence !== "string" ||
+			!verifiedDiagnostic(deps, db, input.conversationId, evidence))
+	)
+		return { ok: false, code: "diagnostic_evidence_changed" };
 	// The item must still be there before the approval is announced (its hand-over would be refused after it).
 	if (row.target && !targetOf(x, db, card, row.target))
 		return { ok: false, code: "target_not_found" };
@@ -495,7 +541,8 @@ export function approval(
 		request: {
 			card,
 			request: row.request,
-			...(row.inputs ? { inputs: row.inputs } : {}),
+			...(row.inputs ? { inputs } : {}),
+			...(typeof evidence === "string" ? { diagnosticRef: evidence } : {}),
 			...(row.target ? { target: row.target } : {}),
 			...(row.resolveUnsaved ? { resolveUnsaved: row.resolveUnsaved } : {}),
 			...(row.words ? { words: row.words } : {}),

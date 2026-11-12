@@ -48,6 +48,7 @@ export function dispatchInTransaction(
 		target?: string;
 		resolveUnsaved?: "discard";
 		inputs?: Record<string, unknown>;
+		diagnosticRef?: string;
 		references: ExecutionReference[];
 		/** A command toolchain's question this run answers: the interaction it resumes. */
 		interactionId?: string;
@@ -118,6 +119,9 @@ export function dispatchInTransaction(
 				payload: {
 					runId: run.id,
 					toolchainRevisionId: card.revisionId,
+					...(input.diagnosticRef
+						? { diagnosticRef: input.diagnosticRef }
+						: {}),
 					...(input.interactionId
 						? { interactionId: input.interactionId }
 						: {}),
@@ -136,6 +140,7 @@ export function dispatchInTransaction(
 			const operation: SessionStart = {
 				revisionId: card.revisionId,
 				request,
+				references: input.references,
 				...(input.target ? { target: input.target } : {}),
 				...(input.resolveUnsaved
 					? { resolveUnsaved: input.resolveUnsaved }

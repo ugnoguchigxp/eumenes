@@ -103,6 +103,10 @@ export type AgencyHostDeps = {
 	captureContext?(
 		conversationId: string,
 	): { messages: Messages; input: InputContext } | null;
+	backgroundDiagnostic?(
+		db: Database,
+		conversationId: string,
+	): { text: string; digest: string } | null;
 	/**
 	 * Builds the background LLM port of one conversation. `next` names each call (unique decision id, the
 	 * conversation's current execution generation); the host wraps the port to log.

@@ -513,9 +513,27 @@ select:focus-visible {
 	background: var(--primary);
 	box-shadow: 0 0 8px var(--primary);
 }
-/* The steward runs beside the answer path, not on it: set apart by space instead of an arrow. */
-.route-part.route-steward {
+/* Keep the two independent indicators together when the answer path wraps. */
+.route-side {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
 	margin-left: 14px;
+}
+.route-side > .route-part {
+	flex-shrink: 0;
+}
+.route-agent {
+	display: block;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.route-agent[data-specialist="true"] {
+	border-color: var(--primary);
+	color: var(--foreground);
 }
 .route-node.failed i {
 	background: var(--destructive);

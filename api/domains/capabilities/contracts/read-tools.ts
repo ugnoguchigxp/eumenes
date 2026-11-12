@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+export const scheduleReadTarget = z.strictObject({
+	kind: z.enum(["schedule"]),
+	id: z.uuid().optional().describe("既知の予約ID。候補を確認する場合は省く。"),
+	at: z.iso
+		.datetime({ offset: true })
+		.optional()
+		.describe("確認する回の予定日時（時差付き ISO 8601）。"),
+});
+export type ScheduleReadTarget = z.infer<typeof scheduleReadTarget>;
+
 /**
  * The conversation's read tools (spec conversation-read-tools-design 2026-10-31): the host reads its own records for
  * the conversation agent, with no sub-agent and no bundle. Each is a native tool of the talk call, and its search
@@ -60,9 +70,20 @@ export const readToolInputs = {
 				.min(1)
 				.max(5)
 				.optional()
-				.describe("何回前まで見るか（1〜5、書かなければ1）。"),
+				.describe("最近の会話実行を読むときだけ指定する（1〜5、既定1）。"),
+			target: scheduleReadTarget
+				.optional()
+				.describe(
+					'予約の有無・実行結果には必ず指定する。IDも日時も不明なら target は {"kind":"schedule"} だけでよい。count は省く。',
+				),
 		})
-		.strict(),
+		.strict()
+		.refine(
+			({ count, target }) => count === undefined || target === undefined,
+			{
+				path: ["target"],
+			},
+		),
 	read_agents: z
 		.object({
 			count: z
@@ -143,15 +164,16 @@ export const READ_TOOLS: readonly ReadTool[] = [
 	},
 	{
 		name: "read_runs",
-		revision: 1,
+		revision: 2,
 		title: "実行の記録の確認",
 		subject: "最近の回",
 		description:
-			"最近の依頼がどう扱われたか（会話として答えたか、どの担当を選んだか、成功・失敗とその理由）を確かめる。count に何回前まで見るか。",
+			'Eumenes の予約の有無、次回予定、実行・スキップ、後続結果は {"target":{"kind":"schedule"}} で確認する。IDと時刻は分かる場合だけ target に足す。target を省いた呼出しが読むのは最近の会話実行（count、既定1）。',
 		useWhen: [
 			"「さっきの依頼はなぜ失敗したの？」と、依頼の結果や失敗の理由を確かめたい",
 			"「なんで調べてくれなかったの？」と、依頼がどう扱われたかを確かめたい",
 			"「実行ログを見て」と、最近の実行の記録を確かめたい",
+			"Eumenes 自身の予約が登録されたか、予定時刻に動いたか、どこで止まったかを確認したい",
 		],
 		examples: [
 			"実行ログを確認して",
@@ -159,6 +181,8 @@ export const READ_TOOLS: readonly ReadTool[] = [
 			"今の依頼、どの担当に頼んだの？",
 			"なんで記憶を見てくれなかったの？",
 			"最近のエラーを確認して",
+			"この会話の予約は登録されてる？",
+			"今朝の実行予約が動いたか確認して",
 		],
 	},
 	{
@@ -208,20 +232,13 @@ export const READ_TOOLS: readonly ReadTool[] = [
 export function readToolParameters(
 	name: ReadToolName,
 ): Record<string, unknown> {
-	const { $schema: _, ...schema } = z.toJSONSchema(
-		readToolInputs[name],
-	) as Record<string, unknown>;
-	const properties = schema.properties as
-		Record<string, Record<string, unknown>> | undefined;
-	if (!properties) return schema;
-	return {
-		...schema,
-		properties: Object.fromEntries(
-			Object.entries(properties).map(
-				([key, { pattern: _pattern, format: _format, ...rest }]) => [key, rest],
-			),
-		),
-	};
+	const { $schema: _, ...schema } = z.toJSONSchema(readToolInputs[name], {
+		override: ({ jsonSchema }) => {
+			delete jsonSchema.pattern;
+			delete jsonSchema.format;
+		},
+	});
+	return schema;
 }
 
 /** The index key of a read tool's revision (never a capability revision). */

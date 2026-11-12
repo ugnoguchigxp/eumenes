@@ -24,6 +24,7 @@ import type { GoogleProvider } from "../domains/google-accounts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
+import { createSchedulerDiagnostics } from "./scheduler/scheduler-diagnostics";
 import { configureTaskExecution } from "./toolchain/task-execution-port";
 import { toolchainForgetPurge } from "./toolchain/toolchain-forget";
 import { createSearchCheck } from "./toolchain/toolchain-search-check";
@@ -343,6 +344,11 @@ export async function buildServices(
 		() => dialogue,
 	);
 	const dialogue = createDialogueService({
+		diagnostics: createSchedulerDiagnostics({
+			scheduler,
+			queue,
+			apps: workflow.apps,
+		}),
 		externalOutput: liveBridge.externalOutput,
 		resources: resources.dialogue,
 		agency: agency.dialoguePort,

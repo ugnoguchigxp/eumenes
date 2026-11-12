@@ -649,9 +649,9 @@ export function withdrawConfirmation(
 	return (
 		db
 			.query(
-				"UPDATE dialogue_confirmations SET superseded_at = ? WHERE conversation_id = ? AND ref = ? AND used_at IS NULL AND superseded_at IS NULL",
+				"UPDATE dialogue_confirmations SET superseded_at = ? WHERE conversation_id = ? AND ref = ? AND used_at IS NULL AND superseded_at IS NULL AND expires_at > ?",
 			)
-			.run(at, conversationId, ref).changes === 1
+			.run(at, conversationId, ref, at).changes === 1
 	);
 }
 

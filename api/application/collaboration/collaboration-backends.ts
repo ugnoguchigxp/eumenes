@@ -13,6 +13,7 @@ import type {
 	ExecutionView,
 	ToolchainExecutionPort,
 } from "../../domains/tool-runtime";
+import type { collaborationBrave } from "./collaboration-brave";
 
 export type CollaborationInteract = BrowserInteractService & {
 	setCollaborationSourceGuard(
@@ -30,7 +31,7 @@ const sourceWithHistory = (
 		.filter((item) => item.messageId !== source.messageId)
 		.map(({ messageId, request, digest }) => ({ messageId, request, digest })),
 });
-function pipelineView(view: ExecutionView): ChildView {
+export function executionChildView(view: ExecutionView): ChildView {
 	const status =
 		view.status === "queued" ||
 		view.status === "deciding" ||
@@ -59,6 +60,7 @@ function pipelineView(view: ExecutionView): ChildView {
 							? { expiresAt: view.question.expiresAt }
 							: {}),
 					},
+					inputSchema: view.question.inputSchema,
 				}
 			: {}),
 	};
@@ -103,9 +105,12 @@ export function collaborationBackends(deps: {
 	capabilities: Capabilities;
 	execution: ToolchainExecutionPort;
 	interact?: CollaborationInteract;
+	brave?: ReturnType<typeof collaborationBrave>;
+	task: ReturnType<typeof import("./collaboration-task").collaborationTask>;
+	review?: Ports["review"];
 	interactAvailable(db: Database): boolean;
 }): Ports {
-	const { dialogue, agents, execution, interact } = deps;
+	const { dialogue, agents, execution, interact, brave, task } = deps;
 	interact?.setCollaborationSourceGuard((db, source) => {
 		try {
 			return (
@@ -133,17 +138,31 @@ export function collaborationBackends(deps: {
 		return interact;
 	};
 	return {
+		review: deps.review,
 		report: (db, sessionId, childId) =>
 			dialogue.specialistResultTextInTransaction(db, sessionId, childId),
 		source: (db, runId) =>
 			dialogue.specialistExecutionSourceInTransaction(db, runId),
+		contributingSource: dialogue.specialistContributionInTransaction,
 		authority: dialogue.specialistAuthorityInTransaction,
+		continuation: task.continuation,
+		amend: task.amend,
 		available: (db, kind) =>
-			kind === "pipeline"
-				? !!pipeline(db) &&
-					agents.executions.pipelinesAvailableInTransaction(db)
-				: !!interact && deps.interactAvailable(db),
+			kind === "task"
+				? true
+				: kind === "brave"
+					? (brave?.available(db) ?? false)
+					: kind === "pipeline"
+						? !!pipeline(db) &&
+							agents.executions.pipelinesAvailableInTransaction(db)
+						: !!interact && deps.interactAvailable(db),
 		context(db, kind, source) {
+			if (kind === "task")
+				return {
+					...task.context(db, source),
+					brave: brave?.context(db, source),
+				};
+			if (kind === "brave") return brave?.context(db, source);
 			return kind === "pipeline"
 				? {
 						contractVersion: "p0-3",
@@ -152,6 +171,8 @@ export function collaborationBackends(deps: {
 				: { available: deps.interactAvailable(db) };
 		},
 		check(db, kind, value, source) {
+			if (kind === "task") return { ok: true, value };
+			if (kind === "brave") return brave!.check(value);
 			if (kind === "interact") {
 				const parsed = z
 					.strictObject({ startUrl: z.url().max(2048) })
@@ -176,6 +197,29 @@ export function collaborationBackends(deps: {
 					};
 		},
 		start(db, kind, input) {
+			if (
+				kind === "task" &&
+				input.value &&
+				typeof input.value === "object" &&
+				"brave" in input.value
+			) {
+				if (!brave) throw new Error("browser_disconnected");
+				return brave.start(
+					db,
+					{
+						...input,
+						value: input.value.brave,
+						previousChildId:
+							input.previousChildId &&
+							brave.owns(db, input.source, input.previousChildId)
+								? input.previousChildId
+								: undefined,
+					},
+					true,
+				);
+			}
+			if (kind === "task") return task.start(db, input);
+			if (kind === "brave") return brave!.start(db, input);
 			const source = sourceWithHistory(input.source, input.history);
 			if (
 				!withinJsonLimits(source) ||
@@ -185,7 +229,7 @@ export function collaborationBackends(deps: {
 			if (kind === "pipeline") {
 				const card = pipeline(db);
 				if (!card) throw new Error("pipeline_unavailable");
-				return pipelineView(
+				return executionChildView(
 					agents.executions.startPipelineInTransaction(db, {
 						source,
 						toolchainRevisionId: card.revisionId,
@@ -217,19 +261,29 @@ export function collaborationBackends(deps: {
 			);
 		},
 		view(db, kind, source, id) {
+			if (kind === "task" && brave?.owns(db, source, id))
+				return brave.view(db, source, id);
+			if (kind === "task") return task.view(db, source, id);
+			if (kind === "brave") return brave?.view(db, source, id) ?? null;
 			if (kind === "interact")
 				return interactView(
 					browser().statusInTransaction(db, owner, source.conversationId, id),
 				);
 			const view = agents.executions.viewInTransaction(db, id);
 			return view?.conversationId === source.conversationId
-				? pipelineView(view)
+				? executionChildView(view)
 				: null;
 		},
-		answer(db, kind, source, response, child, input, history) {
+		answer(db, kind, source, response, child, input, history, workRef) {
 			if (!child.question) throw new Error("collaboration_question_closed");
+			if (
+				kind === "brave" ||
+				(kind === "task" && brave?.owns(db, source, child.id))
+			)
+				return brave!.answer(db, workRef, source, response, child, input);
+			if (kind === "task") return task.answer(db, response, child, input);
 			if (kind === "pipeline")
-				return pipelineView(
+				return executionChildView(
 					agents.executions.controlInTransaction(
 						db,
 						source.conversationId,
@@ -270,7 +324,8 @@ export function collaborationBackends(deps: {
 					db,
 					source.specialistSessionId,
 				);
-			if (kind === "interact")
+			if (kind === "brave" || kind === "task") brave?.forget(db, workRef);
+			else if (kind === "interact")
 				browser().purgeExecutionInTransaction(db, workRef);
 			else if (kind === "pipeline")
 				agents.executions.purgeSourcesInTransaction(db, {
@@ -279,7 +334,14 @@ export function collaborationBackends(deps: {
 				});
 		},
 		cancel(db, kind, source, id) {
-			if (kind === "pipeline") {
+			if (
+				kind === "brave" ||
+				(kind === "task" && brave?.owns(db, source, id))
+			) {
+				brave?.cancel(db, source, id);
+				return;
+			}
+			if (kind === "pipeline" || kind === "task") {
 				agents.executions.cancelByUserInTransaction(
 					db,
 					source.conversationId,

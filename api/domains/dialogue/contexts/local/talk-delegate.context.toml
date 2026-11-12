@@ -1,2 +1,6 @@
 # Source: api/domains/dialogue/service/routed-talk-work.ts
-text = '''find_toolchain で見つけた担当に仕事を頼む。toolchain に候補の id、request に何をしてほしいかを書く。直前の提案への承諾なら、提案の内容と合意した条件を含める。担当は会話を読んでいないので、request だけで伝わるように具体的に書く。mode は execute だけで、impact は書かなくてよい。結果の delegated が true なら引き渡した（予告はホストが利用者に伝え、結果は後で届く）。answered が true なら答えが answer にある。delegated・answered が false なら頼めておらず、code が理由。'''
+text = '''find_toolchain で見つけた担当に仕事を頼む。toolchain に候補の id、request に利用者が依頼した対象、作業、条件を書く。提案への承諾は、その提案のうち利用者が合意した範囲で引き継ぐ。利用者の最新の訂正を過去の提案や資料より優先する。調査、変更、画面を開くことはそれぞれ別の操作として扱い、利用者が指定した範囲を保つ。対象や作業が特定できなければ、依頼を作る前に一度確認する。担当は会話を読んでいないので、request だけで伝わるように具体的に書く。mode は execute だけで、impact は書かなくてよい。
+
+ユーザーが Eumenes の不具合の分析・修正を依頼し、対象に合う内部診断の参照があれば、エラー修正担当への最初の分析依頼の diagnosticRef に指定する。分析後の実装依頼は、承認された改善案と範囲を request に書く。
+
+結果の delegated が true なら引き渡した（予告はホストが利用者に伝え、結果は後で届く）。confirmation が true なら承認待ち。answered が true なら答えが answer にある。delegated・answered が false なら頼めておらず、code が理由。'''

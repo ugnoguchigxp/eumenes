@@ -1,4 +1,5 @@
 import { createToolchainCommandHandler } from "./toolchain-command";
+import { backgroundDiagnostic } from "./diagnostic-evidence";
 import { createSpecialistOps } from "./specialist-commands";
 import { flushCancelled } from "./specialist-core";
 import { createSpecialistTurnHandler } from "./specialist-turn";
@@ -168,6 +169,7 @@ interface DialogueServiceOptions {
 	image?: ImagePort;
 	objectRecognition?: ObjectRecognitionPort;
 	worldContext?: WorldContextPort;
+	diagnostics?: DialogueDeps["diagnostics"];
 	/** The conversation agent's opportunity when work changes. */
 	agency?: AgencyLayerPort;
 	/** The conversation agent that answers every generation. */
@@ -216,54 +218,22 @@ async function stopUnhandedReply(
 }
 
 export function createDialogueService({
-	externalOutput,
-	store,
-	conversation,
-	larm,
-	queue,
 	clock = () => new Date().toISOString(),
 	id = () => crypto.randomUUID(),
-	continuity,
-	memory,
-	steward,
-	agents,
-	objectRecognition,
-	excalidraw,
-	image,
-	music,
-	worldContext,
-	agency,
-	conversationAgent,
-	toolchains,
-	resources,
-	specialist,
-	logFile,
 	keeper: keeperOptions,
+	...options
 }: DialogueServiceOptions) {
-	const deps: DialogueDeps = {
-		externalOutput,
-		store,
+	const deps: DialogueDeps = { ...options, clock, id };
+	const {
+		agents,
 		conversation,
 		larm,
+		logFile,
 		queue,
-		clock,
-		id,
-		continuity,
-		memory,
-		steward,
-		agents,
-		objectRecognition,
-		excalidraw,
-		image,
-		music,
-		worldContext,
-		agency,
-		conversationAgent,
-		toolchains,
 		resources,
-		specialist,
-		...(logFile ? { logFile } : {}),
-	};
+		store,
+		toolchains,
+	} = deps;
 	const progress = createProgress(deps);
 	const intake = createIntake(deps);
 	// Handlers read `deps.interactions`, so it exists before any is registered.
@@ -290,6 +260,8 @@ export function createDialogueService({
 		executionCommands: executionCommands(deps),
 		/** True while the conversation has a queued or running run (the agency host waits for a quiet moment). */
 		conversationHasActiveRunInTransaction: conversationHasActiveRun,
+		backgroundDiagnosticInTransaction: (db: Database, conversationId: string) =>
+			backgroundDiagnostic(deps, db, conversationId),
 		executionSourceInTransaction: (db: Database, runId: string) =>
 			executionSourceInTransaction(deps, db, runId),
 		notifyInTransaction: intake.notifyInTransaction,

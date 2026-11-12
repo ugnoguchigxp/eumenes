@@ -1,5 +1,21 @@
 import type { Database } from "bun:sqlite";
-import type { TaskRow } from "../repository";
+import { taskRow, type TaskRow } from "../repository";
+
+export function isCollaborationTaskInTransaction(
+	db: Database,
+	id: string,
+	conversationId: string,
+	sessionId: string,
+) {
+	const row = taskRow(db, id);
+	if (row?.origin !== "child" || row.conversation_id !== conversationId)
+		return false;
+	const caller = JSON.parse(row.frozen_json ?? "{}").caller;
+	return (
+		caller?.kind === "collaboration" &&
+		caller.source?.specialistSessionId === sessionId
+	);
+}
 
 /** A delegated execution's view of its task: the status plus the calls made, the result text and the deadline. */
 export function taskExecutionResult<V extends object>(view: V, row: TaskRow) {
@@ -9,6 +25,12 @@ export function taskExecutionResult<V extends object>(view: V, row: TaskRow) {
 		callsMade: core.callsMade ?? core.core?.callsMade ?? 0,
 		result: row.result_text,
 		deadline: row.deadline,
+		...(core.ended === true && "lastTabRef" in core
+			? { lastTabRef: core.lastTabRef as string | null }
+			: {}),
+		...(core.ended === true && typeof core.excerpt === "string"
+			? { excerpt: core.excerpt as string }
+			: {}),
 	};
 }
 
@@ -20,9 +42,12 @@ export function purgeTaskExecution(
 ) {
 	const rows = db
 		.query(
-			"SELECT id,owner FROM browser_tasks WHERE origin='task' AND json_extract(frozen_json,'$.execution.executionId')=?",
+			`SELECT id,owner FROM browser_tasks
+			 WHERE (origin='task' AND json_extract(frozen_json,'$.execution.executionId')=?)
+			    OR (origin='child' AND json_extract(frozen_json,'$.caller.kind')='collaboration'
+			        AND json_extract(frozen_json,'$.caller.workRef')=?)`,
 		)
-		.all(executionId) as { id: string; owner: string }[];
+		.all(executionId, executionId) as { id: string; owner: string }[];
 	for (const row of rows) {
 		cancel(db, row.owner, row.id);
 		db.query(

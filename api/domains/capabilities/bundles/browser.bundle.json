@@ -1477,6 +1477,50 @@
 			"functionName": "browser_capture",
 			"bindingRevisionId": "binding:browser.capture@6",
 			"artifactRevisionId": "artifact:browser.workspace@6"
+		},
+		{
+			"aliases": ["ブラウザ", "タブ操作", "ページ操作"],
+			"tags": [],
+			"useWhen": [
+				"Braveへの接続を始めたい",
+				"単発のタブ操作を頼みたい",
+				"操作の状況を知りたい・操作をやめたい"
+			],
+			"avoidWhen": [
+				"利用者が開いたタブで作業を続ける、本文を抜粋・読み上げる",
+				"公開情報の検索や本文の取得だけで足りる",
+				"タブを画像として保存したいだけ"
+			],
+			"dependencies": ["package:browser.operate@5"],
+			"kind": "toolchain",
+			"id": "browser.operate",
+			"revision": 9,
+			"title": "ブラウザの操作",
+			"summary": "Braveへの接続と単発のタブ操作、進行中の操作の状況確認・中止",
+			"examples": [
+				"ブラウザに接続して",
+				"このURLを開いて",
+				"さっきの操作はどうなった？"
+			],
+			"redirects": [
+				{
+					"when": "直前に開いたページで操作を続ける、または開いたタブで指定箇所を読み取り、抜粋・読み上げをする依頼",
+					"toolchainId": "collaboration.brave"
+				},
+				{
+					"when": "公開情報の検索や本文の取得だけで足りる依頼",
+					"toolchainId": "web.search"
+				},
+				{
+					"when": "タブやページを画像として保存したいだけの依頼",
+					"toolchainId": "browser.capture"
+				}
+			],
+			"packageRevisionId": "package:browser.operate@5",
+			"functionName": "browser_operate",
+			"bindingRevisionId": "binding:browser.operate@6",
+			"artifactRevisionId": "artifact:browser.workspace@6",
+			"general": true
 		}
 	],
 	"bindings": [

@@ -25,6 +25,7 @@ export function taskApi(
 		approvals: ReturnType<typeof createApprovals>;
 		captures: ReturnType<typeof createCaptures>;
 		refreshTabs: () => Promise<TabView[]>;
+		readText: ReturnType<typeof import("./read-text").createReadText>;
 	},
 ): TaskApi {
 	const { store } = ctx;
@@ -75,6 +76,11 @@ export function taskApi(
 		});
 	return {
 		progress,
+		readText: async (tabRef, input) => {
+			store.read((db) => assertActive(db));
+			await progress("observing");
+			return deps.readText(owner, task.id, tabRef, input, signal);
+		},
 		collect: async (input) => {
 			const page = await store.write((db) => {
 				assertActive(db);

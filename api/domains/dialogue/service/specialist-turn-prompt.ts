@@ -13,10 +13,14 @@ import {
 } from "./specialist-agent";
 import { viewedSpecialistTarget } from "./specialist-context";
 import { sessionCourse, specialistTurnMessages } from "./specialist-memory";
-import { specialistObservation } from "./specialist-notices";
+import {
+	observationExcerpt,
+	specialistObservation,
+} from "./specialist-notices";
 import { structuredSpecialistControl } from "./specialist-output";
 import { specialistControl } from "./specialist-prompt";
 import { turnRefusal } from "./specialist-core";
+import { specialistHandoffContext } from "./specialist-handoff-context";
 import type { TurnInput } from "./specialist-turn";
 
 const HOST_EVENT_NOTICE = systemContext(
@@ -115,6 +119,20 @@ export function prepareSpecialistPrompt(
 		callsLeft: policy.maxModelCalls,
 		...(document ? { document } : {}),
 	});
+	if (hostEvent === null) {
+		const context = specialistHandoffContext(
+			deps,
+			tx,
+			session,
+			!!set.agent.conversationHandoff,
+			run.id,
+		);
+		if (context)
+			messages.splice(messages.length - 1, 0, {
+				role: "user",
+				content: "CONVERSATION_HANDOFF=" + JSON.stringify(context),
+			});
+	}
 	if (delivery)
 		messages.splice(messages.length - 1, 0, {
 			role: "user",
@@ -124,6 +142,7 @@ export function prepareSpecialistPrompt(
 		control: modelControl,
 		messages,
 		...(hostEvent !== null ? { observation: true as const } : {}),
+		observedExcerpt: observationExcerpt(hostEvent),
 		...(notice.success ? { guidanceNoticeRef: notice.data.requestRef } : {}),
 		...(guidance
 			? {

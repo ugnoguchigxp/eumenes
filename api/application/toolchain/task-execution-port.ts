@@ -206,15 +206,17 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		},
 		...taskExecutionSources(host, context),
 		cardInTransaction: routing.cardInTransaction,
-		async find(query, source, signal) {
+		async find(query, source, signal, options) {
 			const vector = await routing.embedQuery(query, signal);
-			if (!vector) throw new Error("embedding_unavailable");
+			if (!vector && !options?.lexicalFallback)
+				throw new Error("embedding_unavailable");
 			return store.read(
 				(db) =>
 					routing.routeInTransaction(db, {
 						runId: source.runId,
 						text: query,
-						query: vector,
+						query: vector ?? undefined,
+						lexicalFallback: options?.lexicalFallback,
 						available: new Set(
 							available(db, source.runId)
 								.filter(

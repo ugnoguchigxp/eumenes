@@ -126,19 +126,36 @@ export function executionCommands(
 		conversationId: string,
 		raw: unknown,
 		answerMessageId: string,
+		specialist?: ExecutionSource,
 	) {
 		const input = executionControl.parse(raw);
 		const row = executionRow(db, input.workRef);
 		if (!row || row.conversation_id !== conversationId)
 			throw new Error("execution_not_found");
-		const controlSource = ctx
-			.port()
-			.controlSourceInTransaction(
-				db,
-				conversationId,
-				answerMessageId,
-				executionSource(row),
-			);
+		const original = executionSource(row);
+		const controlSource =
+			specialist &&
+			(input.action === "answer" || input.action === "amend") &&
+			!original.specialistSessionId &&
+			!original.origin &&
+			specialist.specialistSessionId &&
+			specialist.conversationId === conversationId &&
+			specialist.messageId === answerMessageId &&
+			ctx.port().validSourceInTransaction(db, specialist)
+				? {
+						messageId: answerMessageId,
+						request: specialist.request,
+						digest: specialist.digest,
+						specialistSessionId: specialist.specialistSessionId,
+					}
+				: ctx
+						.port()
+						.controlSourceInTransaction(
+							db,
+							conversationId,
+							answerMessageId,
+							original,
+						);
 		if (!controlSource) throw new Error("execution_source_invalid");
 		if (row.request_revision !== input.expectedRevision)
 			throw new Error("revision_conflict");

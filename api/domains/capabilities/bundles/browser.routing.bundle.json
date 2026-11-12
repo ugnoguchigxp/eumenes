@@ -1,0 +1,113 @@
+{
+	"formatVersion": 1,
+	"bundleId": "browser.routing",
+	"pins": [
+		{
+			"revisionId": "package:browser.operate@6",
+			"digest": "17b310656757195b7fbf0d58f75b63a3a82e27032508d9bcd58eaa264ccbe146"
+		},
+		{
+			"revisionId": "package:browser.capture@1",
+			"digest": "2f345e4bfa9bcf8cb27755904121ebf46adfc0a193c5d8b60b0759704be6c9de"
+		}
+	],
+	"definitions": [
+		{
+			"aliases": [
+				"ブラウザ",
+				"URLを開く",
+				"リンクを開く",
+				"タブを開く",
+				"タブ操作",
+				"ページ操作"
+			],
+			"tags": [],
+			"useWhen": [
+				"指定されたURLやリンクをブラウザで開き、ページを画面に表示する",
+				"新しいタブでページを開く、現在のタブを別のページへ移動する、タブを切り替える",
+				"ブラウザを接続する、またはブラウザ操作の状況を確認する・中止する"
+			],
+			"avoidWhen": [
+				"利用者が開いたタブで作業を続ける、本文を抜粋・読み上げる",
+				"公開情報の検索や本文の取得だけで足りる",
+				"タブを画像として保存したいだけ"
+			],
+			"dependencies": ["package:browser.operate@6"],
+			"kind": "toolchain",
+			"id": "browser.operate",
+			"revision": 11,
+			"title": "ブラウザの操作",
+			"summary": "指定のURLやリンクをブラウザのタブで開いて表示する。タブの新規作成・移動・切替、Braveへの接続、操作の状況確認と中止を行う。",
+			"examples": [
+				"このリンクをブラウザで開いて",
+				"このURLを開いて",
+				"このページを新しいタブに出して",
+				"隣のタブに切り替えて",
+				"さっきの操作はどうなった？"
+			],
+			"redirects": [
+				{
+					"when": "直前に開いたページで操作を続ける、または開いたタブで指定箇所を読み取り、抜粋・読み上げをする依頼",
+					"toolchainId": "collaboration.brave"
+				},
+				{
+					"when": "公開情報の検索や本文の取得だけで足りる依頼",
+					"toolchainId": "web.search"
+				},
+				{
+					"when": "タブやページを画像として保存したいだけの依頼",
+					"toolchainId": "browser.capture"
+				}
+			],
+			"packageRevisionId": "package:browser.operate@6",
+			"functionName": "browser_operate",
+			"bindingRevisionId": "binding:browser.operate@6",
+			"artifactRevisionId": "artifact:browser.workspace@6",
+			"general": true
+		},
+		{
+			"aliases": ["スクリーンショット", "画面キャプチャ", "画面撮影"],
+			"tags": [],
+			"useWhen": [
+				"今のタブやEumenesの画面をスクリーンショットとして保存したい",
+				"ページの全体や指定箇所を撮影して画像にしたい",
+				"撮影の状況を知りたい、または撮影を中止したい"
+			],
+			"avoidWhen": [
+				"指定のURLをブラウザに表示する、タブを開く・移動する・切り替える",
+				"新しい絵や写真を作りたい",
+				"公開情報の検索や本文の取得だけで足りる"
+			],
+			"dependencies": ["package:browser.capture@1"],
+			"kind": "toolchain",
+			"id": "browser.capture",
+			"revision": 7,
+			"title": "ブラウザの撮影",
+			"summary": "開いているタブやEumenesの画面をスクリーンショットとして撮影し、画像に保存する。見えている範囲やページ全体を撮影できる。",
+			"examples": [
+				"今のタブのスクリーンショットを撮って",
+				"ページ全体を画像にして",
+				"この画面をキャプチャして",
+				"さっきの撮影はどうなった？",
+				"撮影をやめて"
+			],
+			"redirects": [
+				{
+					"when": "新しい絵や写真を作る依頼",
+					"toolchainId": "image.create"
+				},
+				{
+					"when": "公開情報の検索や本文の取得だけで足りる依頼",
+					"toolchainId": "web.search"
+				}
+			],
+			"packageRevisionId": "package:browser.capture@1",
+			"functionName": "browser_capture",
+			"bindingRevisionId": "binding:browser.capture@6",
+			"artifactRevisionId": "artifact:browser.workspace@6"
+		}
+	],
+	"bindings": [],
+	"artifacts": [],
+	"schemas": []
+}

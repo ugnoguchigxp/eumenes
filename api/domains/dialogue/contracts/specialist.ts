@@ -28,6 +28,8 @@ const specialistSessionSchema = z.object({
 	toolchainRevisionId: z.string(),
 	/** The toolchain's display title (who the user is talking to). */
 	title: z.string(),
+	/** The registered agent type's display name, which can cover several toolchains. */
+	agentLabel: z.string().optional(),
 	artifactRevisionId: z.string(),
 	adapterRef: z.string(),
 	workRef: z.string(),
@@ -159,6 +161,8 @@ export type SpecialistSet = {
 	 * take the host defaults (`agentPolicy`). `document` is the work document the adapter declares for it.
 	 */
 	agent: {
+		/** Read recent same-conversation context when taking over an ongoing task. */
+		conversationHandoff?: true;
 		/** Opt-in source-backed state, extracted in the same control call. Frozen in a new binding revision. */
 		collaborationState?: true | "host-bound";
 		larmReasoning?: "off";
@@ -273,6 +277,12 @@ export type GuidanceSelectContext = GuidanceReadContext & {
 };
 
 export interface SpecialistPort {
+	agentLabel?(adapterRef: string): string | undefined;
+	prepareRead?(
+		set: SpecialistSet,
+		input: import("../../tool-runtime").SpecialistInvocation,
+		signal: AbortSignal,
+	): Promise<unknown> | undefined;
 	guidance?: {
 		candidates(
 			tx: Database,
@@ -357,8 +367,12 @@ export interface SpecialistPort {
 			runId: string;
 			conversationId: string;
 			workRef: string;
+			prepared?: unknown;
 		},
-	): { answerContext: unknown };
+	): {
+		answerContext: unknown;
+		specialistHandoff?: import("../../tool-runtime").SpecialistHandoff;
+	};
 	/** Wake the adapter after the writer transaction committed. */
 	afterCommit(adapterRef: string): void;
 	/** The work document of the binding's adapter; null when it declares none. */

@@ -254,6 +254,9 @@ export async function handWith(
 		announcement,
 		// Keep the complete words for request-based delegation.
 		request: typeof fields.request === "string" ? fields.request : words,
+		...(typeof fields.diagnosticRef === "string"
+			? { diagnosticRef: fields.diagnosticRef }
+			: {}),
 		// `new` makes something new: the request names no saved item.
 		...(typeof fields.target === "string" && fields.target !== NEW_TARGET
 			? { target: fields.target }
@@ -293,7 +296,9 @@ export async function handWith(
 			};
 		turn.speak(
 			confirmStatement(candidate, {
-				request: request.words ?? request.request,
+				request: request.diagnosticRef
+					? `診断 ${request.diagnosticRef} の原因分析を依頼する。${request.words ?? request.request}`
+					: (request.words ?? request.request),
 				...(request.target ? { target: request.target } : {}),
 			}),
 		);
@@ -315,7 +320,13 @@ export async function approveConfirmation(
 		announcement: SAID.approved,
 	});
 	if (!("outcome" in approved) || !approved.outcome.end)
-		turn.speak(SAID.failed);
+		turn.speak(
+			"outcome" in approved &&
+				(approved.outcome.result as { code?: string }).code ===
+					"diagnostic_evidence_changed"
+				? "確認時の診断結果を現在の記録で再確認できません。予約を確認し直してから依頼できます。"
+				: SAID.failed,
+		);
 	return "done";
 }
 

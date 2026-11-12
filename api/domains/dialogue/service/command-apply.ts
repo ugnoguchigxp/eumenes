@@ -5,6 +5,10 @@ import type { BoundCommandSet } from "../contracts/toolchains";
 import type { Run } from "../contracts";
 import type { DialogueDeps } from "./context";
 import { delegateConversation } from "./delegate-conversation";
+import {
+	diagnosticRepairPrompt,
+	verifiedDiagnostic,
+} from "./diagnostic-evidence";
 
 export type CommandInput = {
 	conversationId: string;
@@ -19,6 +23,7 @@ export type CommandInput = {
 	snapshot: unknown;
 	/** The request the conversation handed over (or the interaction kept) for this chain. */
 	request: string;
+	diagnosticRef?: string;
 	/** Present for bound command toolchains: tools map to registered adapter operations. */
 	boundSet?: BoundCommandSet;
 	/** Present when this run resumes an interaction: the generation and epoch it started under. */
@@ -55,6 +60,17 @@ export function applyCommand(
 	answerJob: (note?: string) => void,
 ) {
 	const { agents, conversation } = deps;
+	const diagnostic = input.diagnosticRef
+		? verifiedDiagnostic(deps, tx, run.conversationId, input.diagnosticRef)
+		: null;
+	if (input.diagnosticRef && !diagnostic)
+		throw new Error("diagnostic_evidence_changed");
+	if (
+		diagnostic &&
+		(result.command as BoundInvocation | undefined)?.operationName !==
+			"claude-code.request"
+	)
+		throw new Error("diagnostic_repair_operation_invalid");
 	if (result.question) {
 		// The sub-agent needs one value from the user: the answer asks it. A bound
 		// chain keeps the question, atomically with this run's settlement.
@@ -91,7 +107,16 @@ export function applyCommand(
 	} else if (input.boundSet) {
 		const bound = deps.toolchains?.bound;
 		if (!agents || !bound) throw new Error("adapter_unavailable");
-		const command = result.command as BoundInvocation;
+		const chosen = result.command as BoundInvocation;
+		const command = diagnostic
+			? {
+					...chosen,
+					input: {
+						prompt: diagnosticRepairPrompt(diagnostic),
+						task: "予約の診断結果を調査",
+					},
+				}
+			: chosen;
 		// The frozen package capability the agent runtime executes the operation with.
 		const actionCapability = bound.prepareInTransaction(
 			tx,

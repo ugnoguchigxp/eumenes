@@ -240,6 +240,14 @@ export const validators = {
 	computePythonSubmit,
 	computeJobTarget,
 	computeArtifactTarget,
+	browserPageText: z.strictObject({
+		observationRef: z.uuid(),
+		elementRef: z
+			.string()
+			.regex(/^e[1-9][0-9]*$/)
+			.optional(),
+		quote: z.string().trim().min(1).max(3000).optional(),
+	}),
 	browserResearchCollect: z.strictObject({
 		observationRef: z.uuid(),
 		blockRefs: z

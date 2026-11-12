@@ -4,6 +4,7 @@ import type { RouteCandidate } from "./routed-route";
 import { styleOf } from "./routed-search";
 import type { Turn } from "./routed-turn";
 import { getLogger } from "../../../infrastructure/logger";
+import { REPAIR_TOOLCHAIN } from "./diagnostic-evidence";
 
 const log = getLogger("dialogue");
 
@@ -24,6 +25,7 @@ export function fieldsOf(
 	text: string,
 	target: Target,
 	asked?: string,
+	diagnosticProvided = false,
 ): Promise<Filled> {
 	if (target !== "memory") {
 		const { choice } = target;
@@ -31,6 +33,11 @@ export function fieldsOf(
 		// The word that lets the suspended unsaved work go is read by the conversation model alone.
 		if (
 			turn.routed!.switching !== choice.id &&
+			!(
+				choice.id === REPAIR_TOOLCHAIN &&
+				!diagnosticProvided &&
+				turn.routed?.diagnosticRefs?.length
+			) &&
 			!inputs?.properties &&
 			!choice.targets?.length
 		)

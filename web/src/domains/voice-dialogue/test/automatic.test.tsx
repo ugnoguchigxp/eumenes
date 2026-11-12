@@ -397,23 +397,34 @@ test("losing the playback screen stops the reading in progress and drops the que
 	expect(player.play).toHaveBeenCalledOnce();
 });
 
-test("a specialist's answer is read only while the conversation is switched to that specialist", async () => {
-	const { hook, player } = fixture();
+test("an observed excerpt is read once while its Collaboration session is the speaker", async () => {
+	const { hook, player, claim } = fixture();
+	const excerpt = {
+		id: "answer:during",
+		text: "準備ができたら、設定画面で接続先を保存します。",
+	};
 	const during = {
-		...answer("during").run,
+		...answer("during", "notice").run,
 		specialistSessionId: "session-1",
 	};
 	const after = { ...answer("after").run, specialistSessionId: "session-1" };
 	hook.rerender({
 		runs: [during],
-		messages: [answer("during").message],
+		messages: [excerpt],
 		enabled: true,
 		speakerSession: "session-1",
 	});
 	await waitFor(() => expect(player.play).toHaveBeenCalledOnce());
+	expect(claim).toHaveBeenCalledExactlyOnceWith("run:during:answer");
+	expect(player.play).toHaveBeenCalledWith(
+		excerpt.id,
+		excerpt.text,
+		during.id,
+		{ automatic: true },
+	);
 	hook.rerender({
 		runs: [during, after],
-		messages: [answer("during").message, answer("after").message],
+		messages: [excerpt, answer("after").message],
 		enabled: true,
 		speakerSession: null,
 	});

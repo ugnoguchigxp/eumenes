@@ -390,35 +390,13 @@ function createTurn(
 				input.requestId &&
 				deps.larm.executeStream
 			);
-			const reads = acts
-				? deps.store.read((db) => availableReadTools(deps, db))
-				: [];
-			// The way to a toolchain stands on the routed input (the fill reads it) and on the agent's own rules.
-			const work =
-				acts &&
-				input.routed &&
-				deps.toolchains &&
-				deps.work &&
-				deps.conversationAgent.handsWork?.()
-					? createTalkWork(this)
-					: null;
-			log.info("dialogue.read_tools_offered", {
-				count: reads.length,
-				kind: reads.join(","),
-				...(work ? { source: "work" } : {}),
-			});
-			const act = this.act;
 			// What this talk spoke, and whether it read: a call that fails after a read gets the host's words after it.
 			let spoken = "";
 			let toolMade = false;
 			const saidBefore = said;
-			const readTools = [
-				...readToolDefinitions(reads),
-				...(reads.includes("read_memory") && deps.steward
-					? [MEMORY_REQUEST_TOOL]
-					: []),
-			];
-			const offeredTools = [...readTools, ...(work?.tools ?? [])];
+			const toolPort = conversationToolPort(this, acts, () => {
+				toolMade = true;
+			});
 			let reply: Awaited<
 				ReturnType<DialogueDeps["conversationAgent"]["respond"]>
 			>;
@@ -479,21 +457,13 @@ function createTurn(
 							}
 						},
 					},
-					tools: conversationToolPort(
-						offeredTools,
-						act,
-						() => {
-							toolMade = true;
-						},
-						work,
-					),
+					tools: toolPort,
 					signal,
 					onDelta: (text) => {
 						spoken += text;
 						delta(text);
 					},
-					// One read; with the way to a toolchain, a search and a hand-over beside it.
-					maxToolCalls: (readTools.length ? 1 : 0) + (work ? 2 : 0),
+					maxToolCalls: toolPort.maxToolCalls,
 				});
 			} catch (error) {
 				const code = error instanceof Error ? error.message : "";
@@ -529,18 +499,37 @@ function createTurn(
 }
 
 /**
- * The talk turn's read tools (spec conversation-read-tools-design 2026-10-31): only those offered run, through the
- * turn's executor; any other name, or arguments that are no object, is refused and never run. `work` takes the
- * search for a toolchain and the hand-over to it.
+ * The reply's read and work tools. Only offered tools run and their arguments must be objects. Work tools
+ * require the routed input and an agent whose reply may hand work over.
  */
-function conversationToolPort(
-	tools: readonly AgentToolDefinition[],
-	act: Turn["act"],
-	onRead: () => void,
-	work: ReturnType<typeof createTalkWork> | null,
-) {
+function conversationToolPort(turn: Turn, acts: boolean, onCall: () => void) {
+	const { deps, input } = turn;
+	const reads = acts
+		? deps.store.read((db) => availableReadTools(deps, db))
+		: [];
+	const work =
+		acts &&
+		input.routed &&
+		deps.toolchains &&
+		deps.work &&
+		deps.conversationAgent.handsWork?.()
+			? createTalkWork(turn)
+			: null;
+	log.info("dialogue.read_tools_offered", {
+		count: reads.length,
+		kind: reads.join(","),
+		...(work ? { source: "work" } : {}),
+	});
+	const readTools = [
+		...readToolDefinitions(reads),
+		...(reads.includes("read_memory") && deps.steward
+			? [MEMORY_REQUEST_TOOL]
+			: []),
+	];
+	const tools = [...readTools, ...(work?.tools ?? [])];
 	return {
 		tools,
+		maxToolCalls: (readTools.length ? 1 : 0) + (work?.tools.length ?? 0),
 		async call(toolCall: AgentToolCall) {
 			let args: unknown;
 			try {
@@ -560,10 +549,13 @@ function conversationToolPort(
 						code: "invalid_tool_call",
 					}),
 				};
-			onRead();
+			onCall();
 			if (work?.handles(toolCall.name))
 				return work.call(toolCall.name, args as Record<string, unknown>);
-			const read = await act(toolCall.name, args as Record<string, unknown>);
+			const read = await turn.act(
+				toolCall.name,
+				args as Record<string, unknown>,
+			);
 			if ("refused" in read)
 				return {
 					content: refusalText(read.refused.message, read.refused.repair ?? []),

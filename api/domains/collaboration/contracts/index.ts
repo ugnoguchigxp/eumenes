@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 
-export type CollaborationKind = "pipeline" | "interact";
+export type CollaborationKind = "pipeline" | "interact" | "brave" | "task";
 export type WorkKind = CollaborationKind | "schedule";
 /** Resolved from a real dialogue input, never from a model's claimed approval. */
 export type Source = {
@@ -35,6 +35,8 @@ export type ChildView = {
 		| "indeterminate";
 	revision: number;
 	summary?: string;
+	excerpt?: string;
+	inputSchema?: Record<string, unknown>;
 	question?: {
 		id: string;
 		prompt: string;
@@ -49,10 +51,57 @@ export type Authority = {
 	epoch: number;
 	active: boolean;
 };
+export type ReviewConditions =
+	| { state: "none" | "unavailable" }
+	| {
+			state: "available";
+			entries: {
+				id: string;
+				text: string;
+				sources: { id: string; version: string; active: boolean }[];
+			}[];
+	  };
+export type ReviewInput = {
+	id: string;
+	workRef: string;
+	revision: number;
+	document: unknown;
+	source: Source;
+	request: string;
+	conditions: ReviewConditions;
+};
+export type ReviewOutcome = {
+	status: "completed" | "incomplete" | "failed" | "cancelled";
+	summary: string;
+	result?: unknown;
+};
+export type ReviewPort = {
+	conditions(db: Database, sessionId: string): ReviewConditions;
+	evaluate(
+		input: ReviewInput,
+		deadline: number,
+		signal: AbortSignal,
+		current: (db: Database) => boolean,
+	): Promise<ReviewOutcome>;
+};
 export type Ports = {
 	/** The owning specialist's adopted explanation of this exact child's terminal result. */
 	report?(db: Database, sessionId: string, childId: string): string | null;
+	review?: ReviewPort;
+	continuation?(db: Database, source: Source, id: string): ChildView | null;
+	amend?(
+		db: Database,
+		response: Source,
+		childId: string,
+		revision: number,
+		request: string,
+	): ChildView;
 	source(db: Database, runId: string): Source | null;
+	/** Recheck a contribution already registered to the work, even if the utterance was handed over. */
+	contributingSource?(
+		db: Database,
+		input: Pick<Source, "runId" | "messageId" | "conversationId" | "digest">,
+	): boolean;
 	authority(db: Database, sessionId: string): Authority | null;
 	available(db: Database, kind: CollaborationKind): boolean;
 	context(db: Database, kind: CollaborationKind, source: Source): unknown;
@@ -72,6 +121,7 @@ export type Ports = {
 			response: Source;
 			history: Source[];
 			value: unknown;
+			previousChildId?: string;
 		},
 	): ChildView;
 	view(
@@ -88,6 +138,7 @@ export type Ports = {
 		child: ChildView,
 		input: unknown,
 		history: Source[],
+		workRef: string,
 	): ChildView;
 	forget(db: Database, kind: WorkKind, source: Source, workRef: string): void;
 	cancel(
@@ -103,7 +154,9 @@ export type Ports = {
 			epoch: number;
 			sourceRunId: string;
 			eventId: string;
-			event: ChildView;
+			event:
+				| ChildView
+				| (ReviewOutcome & { kind: "review"; id: string; revision: number });
 		},
 	): boolean;
 };

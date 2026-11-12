@@ -143,6 +143,7 @@ test.each([
 	["私について記憶していることを教えて", "read_memory"],
 	["さっきの依頼はどうして失敗したの？", "read_runs"],
 	["実行ログを見せて", "read_runs"],
+	["今朝の実行予約が動いたか確認して", "read_runs"],
 	["サブエージェントは何をしたの？", "read_agents"],
 	["さっきの調べものでどのページを見た？", "read_agents"],
 	["World だと Eumenes について何が記録されてる？", "read_world"],

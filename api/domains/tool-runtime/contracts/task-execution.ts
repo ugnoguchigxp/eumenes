@@ -104,6 +104,13 @@ export type RoutedPipelineStep = {
 	after: readonly number[];
 };
 
+export type ExecutionResponse = {
+	messageId: string;
+	request: string;
+	digest: string;
+	/** A verified response sent to a specialist following a pre-existing execution. */
+	specialistSessionId?: string;
+};
 export type ExecutionSource = {
 	conversationId: string;
 	messageId: string | null;
@@ -123,8 +130,8 @@ export type ExecutionSource = {
 	/** Host-issued authority of a collaborative session. Never inferred from model output. */
 	specialistSessionId?: string;
 	specialistEpoch?: number;
-	amendments?: Array<{ messageId: string; request: string; digest: string }>;
-	responses?: Array<{ messageId: string; request: string; digest: string }>;
+	amendments?: ExecutionResponse[];
+	responses?: ExecutionResponse[];
 };
 /** A registered task owner. Dialogue owns the TODO; this port owns the actual work. */
 export interface TaskLifecyclePort {
@@ -238,6 +245,7 @@ export interface ToolchainExecutionPort {
 		query: string,
 		source: ExecutionSource,
 		signal: AbortSignal,
+		options?: { lexicalFallback?: boolean },
 	): Promise<ToolchainCard[]>;
 	childDeadlineInTransaction?(
 		db: Database,

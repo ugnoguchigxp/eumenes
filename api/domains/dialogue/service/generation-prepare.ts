@@ -1,5 +1,6 @@
 import { backgroundInput } from "./background-input";
 import type { Database } from "bun:sqlite";
+import { recentDiagnostics } from "./diagnostic-evidence";
 import { reportNoticeInTransaction } from "./report-notice";
 import { getLogger } from "../../../infrastructure/logger";
 import type { ConversationEvent } from "../../continuity";
@@ -514,9 +515,15 @@ export function createPrepare(
 			refs,
 		});
 		// A routed turn talks on the time alone; its choice calls read the work and what is presented.
+		const diagnostics = notice
+			? []
+			: recentDiagnostics(deps, tx, conversationId);
+		const diagnosticLines = diagnostics.map(({ line }) => line);
+		stateLines.push(...diagnosticLines);
 		const state = stateText([
 			...stateLines.slice(0, 1),
 			...agencyStateLines(deps, tx, conversationId),
+			...diagnosticLines,
 		]);
 		const messages = withLastMessage(
 			prefix,
@@ -549,13 +556,16 @@ export function createPrepare(
 				// Scheduled prompts can receive an answer but carry no authority to start work.
 				...(final.kind === "utterances" && !isSystemPrompt(current.sourceKind)
 					? {
-							routed: routedInputInTransaction(deps, tx, {
-								conversationId,
-								nowMs,
-								state: stateLines,
-								lastAgent,
-								prefix,
-							}),
+							routed: {
+								...routedInputInTransaction(deps, tx, {
+									conversationId,
+									nowMs,
+									state: stateLines,
+									lastAgent,
+									prefix,
+								}),
+								diagnosticRefs: diagnostics.map(({ ref }) => ref),
+							},
 						}
 					: {}),
 				final,

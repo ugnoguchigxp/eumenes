@@ -110,6 +110,9 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 				deps.conversation.latestOrdinalInTransaction(db, c.id),
 			);
 			const before = digest();
+			const diagnosis = deps.store.read(
+				(db) => deps.backgroundDiagnostic?.(db, c.id) ?? null,
+			);
 			c.triedWhileBusy = busy(c) ? researchWaiting(c) : "";
 			const controller = new AbortController();
 			signal = controller.signal;
@@ -117,12 +120,14 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			c.revision++;
 			let out: StepOutcome;
 			try {
+				c.stepDiagnostic = diagnosis;
 				out = await c.agent.step(
 					now(),
 					() => ({ busy: busy(c) || c.id !== active() || !on() }),
 					controller.signal,
 				);
 			} finally {
+				c.stepDiagnostic = null;
 				if (c.controller === controller) c.controller = null;
 			}
 			c.revision++;
@@ -140,6 +145,8 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 					general: deps.settings.inTransaction(db).general,
 				}).sources[0] !== before ||
 				deps.conversation.latestOrdinalInTransaction(db, c.id) !== ordinal ||
+				(diagnosis &&
+					deps.backgroundDiagnostic?.(db, c.id)?.digest !== diagnosis.digest) ||
 				active() !== c.id
 					? "stale"
 					: busy(c)

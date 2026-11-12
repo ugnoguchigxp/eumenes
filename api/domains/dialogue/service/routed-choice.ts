@@ -1,5 +1,6 @@
 import { systemContext } from "../../../infrastructure/system-context";
 import type { ChatMessage, RoutedInput } from "./context";
+import { REPAIR_TOOLCHAIN } from "./diagnostic-evidence";
 import { INPUT_HEADINGS, dataText, lineText } from "./input-text";
 import { toolResultText } from "./result-text";
 
@@ -77,6 +78,7 @@ function candidateBranch(
 	switching: string | null,
 	/** The branch has `say`: false when the host says its own words (the router's fill). */
 	withSay = true,
+	diagnosticRefs: readonly string[] = [],
 ): Schema {
 	const choice = only(candidate.id);
 	const say: Record<string, Schema> = withSay ? { say: SAY } : {};
@@ -103,8 +105,17 @@ function candidateBranch(
 			...(candidate.id === switching
 				? { resolveUnsaved: only("discard") }
 				: {}),
+			...(candidate.id === REPAIR_TOOLCHAIN && diagnosticRefs.length
+				? {
+						diagnosticRef: {
+							...oneOf(diagnosticRefs),
+							description:
+								"今回の調査対象に合う、ホストが示した診断の参照。無関係なら省く。",
+						},
+					}
+				: {}),
 		},
-		["refs", "resolveUnsaved"],
+		["refs", "resolveUnsaved", "diagnosticRef"],
 	);
 }
 
@@ -128,7 +139,11 @@ function memoryBranch(withSay = true): Schema {
  */
 export function fillSchema(
 	candidate: ChoiceCandidate | ChoiceCandidate[] | typeof MEMORY_REQUEST,
-	{ resources, switching }: Pick<RoutedInput, "resources" | "switching">,
+	{
+		resources,
+		switching,
+		diagnosticRefs,
+	}: Pick<RoutedInput, "resources" | "switching" | "diagnosticRefs">,
 ): Schema {
 	return {
 		anyOf: [
@@ -136,12 +151,18 @@ export function fillSchema(
 			branch({ choice: only("ask"), say: SAY }),
 			...(Array.isArray(candidate)
 				? candidate.map((item) =>
-						candidateBranch(item, resources, switching, false),
+						candidateBranch(item, resources, switching, false, diagnosticRefs),
 					)
 				: [
 						candidate === MEMORY_REQUEST
 							? memoryBranch(false)
-							: candidateBranch(candidate, resources, switching, false),
+							: candidateBranch(
+									candidate,
+									resources,
+									switching,
+									false,
+									diagnosticRefs,
+								),
 					]),
 		],
 	};

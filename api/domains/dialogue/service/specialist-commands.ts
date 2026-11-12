@@ -137,6 +137,13 @@ export function createSpecialistOps(deps: DialogueDeps) {
 			if (record.state !== "suspended")
 				throw new Error("session_not_suspended");
 			if (expired) throw new Error("session_expired");
+			const addressee = liveSession(tx, record.conversationId);
+			if (
+				addressee &&
+				addressee.id !== record.id &&
+				addressee.state === "active"
+			)
+				throw new Error("session_already_active");
 			patchSession(
 				tx,
 				record.id,

@@ -9,10 +9,16 @@ import {
 	type CollaborationState,
 	type StateHostContext,
 } from "eumenes-collaboration";
-import { byId, sessionById, type SessionRecord } from "../repository";
+import {
+	byId,
+	sessionById,
+	sessionEvents,
+	type SessionRecord,
+} from "../repository";
 import {
 	collaborationState,
 	collaborationSources,
+	type SourceRow,
 } from "../repository/collaboration-state";
 import type { DialogueDeps } from "./context";
 import { specialistExecutionSource } from "./specialist-source";
@@ -22,6 +28,99 @@ const hash = (value: string) =>
 const fail = (reason: string): never => {
 	throw new Error(reason);
 };
+
+function activeSource(
+	deps: DialogueDeps,
+	db: Database,
+	conversationId: string,
+	source: SourceRow,
+) {
+	const message = deps.conversation.messageInTransaction(
+		db,
+		source.message_id,
+	)?.message;
+	return (
+		!!source.active &&
+		message?.role === "user" &&
+		message.conversationId === conversationId &&
+		sourceDigest(message.text) === source.digest &&
+		!deps.memory?.isSourceRevokedInTransaction(db, source.message_id)
+	);
+}
+
+/** The reviewer sees only confirmed conditions with live user-message provenance. */
+export function specialistReviewConditions(
+	deps: DialogueDeps,
+	db: Database,
+	sessionId: string,
+) {
+	const session = sessionById(db, sessionId);
+	const saved = collaborationState(db, sessionId);
+	if (!session || !saved) return { state: "unavailable" as const };
+	const state = collaborationStateSchema.safeParse(JSON.parse(saved.body));
+	if (!state.success) return { state: "unavailable" as const };
+	const facts = state.data.facts.filter(
+		(fact) => fact.kind === "condition" && fact.status === "confirmed",
+	);
+	if (!facts.length) return { state: "none" as const };
+	const known = new Map(
+		collaborationSources(db, sessionId).map((source) => [source.ref, source]),
+	);
+	const entries = [];
+	for (const fact of facts) {
+		const sources = [];
+		for (const ref of fact.sourceRefs) {
+			const source = known.get(ref);
+			if (!source || !activeSource(deps, db, session.conversationId, source))
+				return { state: "unavailable" as const };
+			sources.push({
+				id: source.message_id,
+				version: source.digest,
+				active: true,
+			});
+		}
+		const text =
+			typeof fact.value === "string" ? fact.value : JSON.stringify(fact.value);
+		if (!text || text.length > 12000) return { state: "unavailable" as const };
+		entries.push({ id: fact.id, text, sources });
+	}
+	return { state: "available" as const, entries };
+}
+
+function inheritedConditions(
+	deps: DialogueDeps,
+	db: Database,
+	session: SessionRecord,
+) {
+	const handoff = sessionEvents(db, session.id).find(
+		(event) => event.kind === "handover",
+	);
+	const previous = handoff?.previousSessionId
+		? sessionById(db, handoff.previousSessionId)
+		: null;
+	const empty = { facts: [], sources: [] };
+	if (!previous || previous.conversationId !== session.conversationId)
+		return empty;
+	const old = collaborationState(db, previous.id);
+	if (!old) return empty;
+	const saved = collaborationStateSchema.safeParse(JSON.parse(old.body));
+	if (!saved.success) return empty;
+	const known = new Map(
+		collaborationSources(db, previous.id)
+			.filter((source) =>
+				activeSource(deps, db, session.conversationId, source),
+			)
+			.map((source) => [source.ref, source]),
+	);
+	const facts = saved.data.facts.filter(
+		(fact) =>
+			fact.kind === "condition" &&
+			fact.status === "confirmed" &&
+			fact.sourceRefs.every((ref) => known.has(ref)),
+	);
+	const used = new Set(facts.flatMap(({ sourceRefs }) => sourceRefs));
+	return { facts, sources: [...used].map((ref) => known.get(ref)!) };
+}
 
 /** Only real message versions are registered; the same message edited later has a new source ref. */
 export function collaborationSnapshot(
@@ -54,19 +153,25 @@ export function collaborationSnapshot(
 	};
 	let row = collaborationState(db, session.id);
 	if (!row) {
+		const inherited = inheritedConditions(deps, db, session);
+		const sourceRevision = inherited.sources.length ? 1 : 0;
 		const state: CollaborationState = {
 			stateSchemaVersion: 1,
 			coreContractVersion: 1,
 			packageVersion: "0.4.0",
 			sessionId: session.id,
 			revision: 0,
-			sourceRevision: 0,
+			sourceRevision,
 			work: workVersion,
-			facts: [],
+			facts: inherited.facts,
 		};
 		db.query(
-			"INSERT INTO dialogue_collaboration_states(session_id,body,source_revision) VALUES(?,?,0)",
-		).run(session.id, JSON.stringify(state));
+			"INSERT INTO dialogue_collaboration_states(session_id,body,source_revision) VALUES(?,?,?)",
+		).run(session.id, JSON.stringify(state), sourceRevision);
+		for (const source of inherited.sources)
+			db.query(
+				"INSERT INTO dialogue_collaboration_sources VALUES(?,?,?,?,1)",
+			).run(session.id, source.ref, source.message_id, source.digest);
 		row = collaborationState(db, session.id)!;
 	}
 	if (!withinJsonLimits(JSON.parse(row.body))) fail("json_resource_limit");
@@ -74,18 +179,7 @@ export function collaborationSnapshot(
 	let sourceRevision = row.source_revision;
 	const invalid = new Set<string>();
 	for (const source of collaborationSources(db, session.id)) {
-		const message = deps.conversation.messageInTransaction(
-			db,
-			source.message_id,
-		)?.message;
-		if (
-			!source.active ||
-			!message ||
-			message.role !== "user" ||
-			message.conversationId !== session.conversationId ||
-			sourceDigest(message.text) !== source.digest ||
-			deps.memory?.isSourceRevokedInTransaction(db, source.message_id)
-		)
+		if (!activeSource(deps, db, session.conversationId, source))
 			invalid.add(source.ref);
 	}
 	// Inactive refs stay inactive, but need not bump the generation on every read.

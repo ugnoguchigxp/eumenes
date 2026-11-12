@@ -59,12 +59,21 @@ export function taskExecutionSources(
 				!!current &&
 				hash(current) === hash(original) &&
 				![...(amendments ?? []), ...(responses ?? [])].some((update) => {
-					const control = port.controlSourceInTransaction(
-						db,
-						source.conversationId,
-						update.messageId,
-						source,
-					);
+					const sessionId = update.specialistSessionId;
+					const control =
+						sessionId && !source.specialistSessionId && !source.origin
+							? dialogue.specialistExecutionResponseInTransaction(
+									db,
+									source.conversationId,
+									update.messageId,
+									sessionId,
+								)
+							: port.controlSourceInTransaction(
+									db,
+									source.conversationId,
+									update.messageId,
+									source,
+								);
 					return !control || hash(control) !== hash(update);
 				})
 			);

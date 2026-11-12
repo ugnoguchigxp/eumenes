@@ -601,6 +601,7 @@ test("CLI reads catalogue, task and summary through the authenticated API", asyn
 			if (args[0] === "capabilities") {
 				// Every registered package, including the research owner and shared collaboration tools.
 				expect(value.items.map((item: { id: string }) => item.id)).toEqual([
+					"collaboration.brave",
 					"collaboration.interact",
 					"collaboration.pipeline",
 					"pipeline.execute",

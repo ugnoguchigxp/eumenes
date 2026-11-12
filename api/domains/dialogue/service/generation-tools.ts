@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
 import { readToolInputs, type ReadToolName } from "../../capabilities";
+import { diagnosticRef } from "../contracts/diagnostics";
 import {
 	ValidationFailure,
 	repairIssues,
@@ -67,6 +68,7 @@ export const delegateArgs = z.discriminatedUnion("mode", [
 			/** Asked for by the definition; absent, the host takes it from the target and the toolchain (D7). */
 			impact: z.enum(impacts).optional(),
 			inputs: z.record(z.string(), z.unknown()).optional(),
+			diagnosticRef: diagnosticRef.optional(),
 			target: id.optional(),
 			/** The resources handed over with the request (`a<n>` of the ledger). */
 			refs: z

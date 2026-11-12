@@ -14,7 +14,7 @@ test("the applied first migration retains its deployed checksum", () => {
 	);
 });
 
-test("upgrading an existing work preserves it and adds the start reference once", async () => {
+test("upgrading an existing work preserves it and adds empty start and review slots", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-collaboration-upgrade-"));
 	const path = join(dir, "test.sqlite3");
 	try {
@@ -32,7 +32,7 @@ test("upgrading an existing work preserves it and adds the start reference once"
 					db
 						.query(
 							`SELECT title, document_json, last_answer_message_id,
- last_start_message_id, created_at, updated_at FROM collaboration_works WHERE id='w1'`,
+ last_start_message_id, review_json, created_at, updated_at FROM collaboration_works WHERE id='w1'`,
 						)
 						.get(),
 				),
@@ -41,6 +41,7 @@ test("upgrading an existing work preserves it and adds the start reference once"
 				document_json: '{"request":"kept"}',
 				last_answer_message_id: "answer1",
 				last_start_message_id: null,
+				review_json: null,
 				created_at: 1,
 				updated_at: 2,
 			});

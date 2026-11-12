@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { createLiveLarm } from "../../../scripts/live-larm";
 import { z } from "zod";
 import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { jstDay } from "../../infrastructure/jst-time";
@@ -10,6 +11,59 @@ import {
 	toolResults,
 } from "../toolchain/conversation-script.fixture";
 import { harness } from "../toolchain/toolchain.fixture";
+
+test.skipIf(process.env.EUMENES_VERIFY_SCHEDULER_LLM !== "1")(
+	"live model reads a reservation without being given its ID or scheduled time",
+	async () => {
+		const h = await harness({
+			schedules: true,
+			liveRouting: true,
+			model: createLiveLarm(),
+			conversationAgent: { ...testConversationAgent, handsWork: () => true },
+		});
+		try {
+			const conversationId = `schedule-live-${crypto.randomUUID()}`;
+			const reservation = await h.scheduler.create({
+				requestId: crypto.randomUUID(),
+				target: {
+					kind: "dialogue.prompt",
+					payload: { conversationId, text: "合成の検証用リマインドです。" },
+				},
+				schedule: {
+					type: "once",
+					at: new Date(Date.now() + 600_000).toISOString(),
+				},
+				misfirePolicy: "coalesce",
+				graceMs: 300_000,
+			});
+			const response = await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId,
+				text: "Eumenes 自身の実行予約がこの会話に登録されているか、実行した記録があるか、内部記録を確認してください。",
+			});
+			expect(response.status).toBe(202);
+			const { id } = await response.json();
+			expect(
+				(await h.dialogue.waitForTerminal(id, { timeoutMs: 55_000 }))?.status,
+			).toBe("completed");
+			const evidence = h.store.read((db) =>
+				h.dialogue.backgroundDiagnosticInTransaction(db, conversationId),
+			);
+			expect(evidence, h.dialogue.answerText(id) ?? "").not.toBeNull();
+			expect(JSON.parse(evidence!.text).items).toEqual([
+				expect.objectContaining({
+					id: reservation.id,
+					state: "active",
+					occurrences: [],
+				}),
+			]);
+			expect(h.dialogue.answerText(id)).toMatch(/予約/);
+		} finally {
+			await h.close();
+		}
+	},
+	65_000,
+);
 
 test.each([false, true])(
 	"conversation finds a reservation without embeddings and delivers the scheduled reply (approval: %s)",

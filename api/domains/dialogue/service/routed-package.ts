@@ -12,6 +12,7 @@ import {
 	type VectorSpace as PackageSpace,
 } from "eumenes_router";
 import { getLogger } from "../../../infrastructure/logger";
+import { systemContext } from "../../../infrastructure/system-context";
 import type { InferencePort } from "../../inference";
 import type { QueryVector } from "../contracts/toolchains";
 import type { DialogueDeps } from "./context";
@@ -34,6 +35,10 @@ import type { Turn } from "./routed-turn";
 const log = getLogger("dialogue");
 /** The structure model's answer is one small JSON object (the package's prompt asks for nothing else). */
 const STRUCTURE_OUTPUT_TOKENS = 1024;
+const HANDOFF_STRUCTURE = systemContext(
+	"dialogue.contexts.local.router-structure-handoff",
+	{},
+);
 
 /**
  * The saved router, with the port that asks LARM's context judgment (spec router-package-integration 2026-11-04 §1).
@@ -182,8 +187,8 @@ export function portsOf(
 }
 
 /**
- * The structure model (`routeStructured`; spec router-package-integration 2026-11-04 §1 #8): the package's prompt as
- * it was measured, sent once to the saved structure resource (else the conversation route) as a background control
+ * The structure model (`routeStructured`; spec router-package-integration 2026-11-04 §1 #8): the package's prompt and
+ * the host's handoff guidance, sent once to the saved structure resource (else the conversation route) as a background control
  * request with low reasoning effort. A failed or slow model returns no valid structure; the structured path stops
  * before work starts, and never falls back to routing a partial request.
  */
@@ -220,7 +225,7 @@ async function analyzeOf(
 		const receipt = await larm.executeControl(
 			requestId,
 			[
-				{ role: "system", content: prompt.system },
+				{ role: "system", content: `${prompt.system}\n\n${HANDOFF_STRUCTURE}` },
 				{ role: "user", content: prompt.user },
 			],
 			signal,

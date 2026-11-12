@@ -168,7 +168,7 @@ export function createMarkdownAdapter(service: MarkdownService): DomainAdapter {
 			return { revision: data.revision, data };
 		},
 		targetInput: () => ({}),
-		session: service.session,
+		session: { ...service.session, agentLabel: "Collaboration" },
 		afterCommit: service.afterCommit,
 	};
 }

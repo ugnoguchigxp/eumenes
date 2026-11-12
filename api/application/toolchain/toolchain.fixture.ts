@@ -47,6 +47,7 @@ import { createQueue } from "../../domains/queue";
 import { createScheduler } from "../../domains/scheduler";
 import { createWebResearch } from "../../domains/web-research";
 import { createDialogueService } from "../../domains/dialogue";
+import { createSchedulerDiagnostics } from "../scheduler/scheduler-diagnostics";
 import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createVoiceDialogue } from "../../domains/voice-dialogue";
 import type { HarnessOptions } from "./toolchain-harness-options.fixture";
@@ -310,6 +311,8 @@ export async function harness(options: HarnessOptions = {}) {
 					confidence: 0.99,
 				});
 			const system = messages[0]!.content;
+			if (options.workflowReview && system.includes("あなたは独立した評価担当です"))
+				return JSON.stringify(await options.workflowReview(messages, _signal));
 			if (
 				options.knowledgeBuild &&
 				(system.includes("coverage で充足") ||
@@ -820,6 +823,9 @@ export async function harness(options: HarnessOptions = {}) {
 				})
 			: undefined;
 	const dialogue = createDialogueService({
+		diagnostics: options.schedules
+			? createSchedulerDiagnostics({ scheduler, queue, apps: appRuntime?.apps })
+			: undefined,
 		conversationAgent: options.conversationAgent ?? testConversationAgent,
 		excalidraw: drawingOperations,
 		objectRecognition: objectRecognition?.port(CONVERSATION_DEFAULT_PRINCIPAL),

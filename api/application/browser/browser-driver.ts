@@ -70,6 +70,12 @@ export function createSavedPathDriver(options: {
 		newTab: async (url) => current().newTab(url),
 		closeTab: async (index) => current().closeTab(index),
 		snapshot: async (signal) => current().snapshot(signal),
+		async readText(ref, maxChars, signal) {
+			const driver = current();
+			if (!driver.readText)
+				throw new BrowserDriverError("extraction_unavailable", false);
+			return driver.readText(ref, maxChars, signal);
+		},
 		act: async (action, signal) => current().act(action, signal),
 		runReplay: async (code, signal) => current().runReplay(code, signal),
 		inspectTarget: async (ref) => current().inspectTarget(ref),

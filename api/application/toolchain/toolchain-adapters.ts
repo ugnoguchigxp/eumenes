@@ -238,7 +238,7 @@ export function bundleHostOf(
 export const hostAdapterDescriptions: Array<
 	Pick<DomainAdapter, "ref" | "describe">
 > = [
-	...(["pipeline", "interact"] as const).map((kind) => ({
+	...(["pipeline", "interact", "brave", "task"] as const).map((kind) => ({
 		ref: collaborationRef(kind),
 		describe: () => describeCollaborationAdapter(kind),
 	})),

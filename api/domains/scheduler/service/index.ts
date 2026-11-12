@@ -73,6 +73,34 @@ function cursorOf(value: string | null): number | null {
 	return n;
 }
 
+const scheduleReads = {
+	getInTransaction(db: Tx, id: string): ScheduleDto | null {
+		return dtoOrNull(getSchedule(db, id));
+	},
+	getByRequestInTransaction: (db: Tx, requestId: string) =>
+		dtoOrNull(getByRequest(db, requestId)),
+	schedulesForTargetInTransaction: (
+		db: Tx,
+		target: { kind: string; key: string; value: string },
+		limit: number,
+	) => listSchedules(db, undefined, null, limit, target).map(toDto),
+	occurrencesInTransaction: (db: Tx, id: string, limit: number, at?: string) =>
+		listOccurrences(
+			db,
+			id,
+			null,
+			limit,
+			at === undefined ? undefined : Date.parse(at),
+		).map((o) => ({
+			id: o.id,
+			scheduledAt: iso(o.scheduledAtMs),
+			state: o.state,
+			reason: o.reason,
+			jobId: o.jobId,
+			subjectRef: o.subjectRef,
+		})),
+};
+
 function schedulePage(
 	db: Tx,
 	state: string | undefined,
@@ -483,11 +511,7 @@ export function createScheduler(
 			wake();
 			return created;
 		},
-		getInTransaction(db: Tx, id: string): ScheduleDto | null {
-			return dtoOrNull(getSchedule(db, id));
-		},
-		getByRequestInTransaction: (db: Tx, requestId: string) =>
-			dtoOrNull(getByRequest(db, requestId)),
+		...scheduleReads,
 		pendingInTransaction: (db: Tx) =>
 			[
 				...listSchedules(db, "active", null, maxSchedules),

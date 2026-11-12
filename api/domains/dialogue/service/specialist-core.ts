@@ -143,6 +143,7 @@ export function sessionView(
 		toolchainId: record.toolchainId,
 		toolchainRevisionId: record.toolchainRevisionId,
 		title: record.title,
+		agentLabel: deps.specialist?.agentLabel?.(record.adapterRef),
 		artifactRevisionId: record.artifactRevisionId,
 		adapterRef: record.adapterRef,
 		workRef: record.workRef,

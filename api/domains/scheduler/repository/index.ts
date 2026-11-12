@@ -153,9 +153,14 @@ export function listSchedules(
 	state: string | undefined,
 	cursor: number | null,
 	limit: number,
+	target?: { kind: string; key: string; value: string },
 ): ScheduleRecord[] {
 	const where: string[] = [];
 	const params: Array<string | number> = [];
+	if (target) {
+		where.push("target_kind=? AND json_extract(target_payload_json, ?)=?");
+		params.push(target.kind, `$.${target.key}`, target.value);
+	}
 	if (state) {
 		where.push("state=?");
 		params.push(state);
@@ -285,16 +290,18 @@ export function listOccurrences(
 	scheduleId: string,
 	cursor: number | null,
 	limit: number,
+	scheduledAtMs?: number,
 ): OccurrenceRecord[] {
 	return (
 		db
 			.query(
-				`SELECT id, schedule_id, schedule_revision, scheduled_at_ms, state, job_id, subject_ref, reason, created_at_ms, seq FROM scheduler_occurrences WHERE schedule_id=? ${cursor === null ? "" : "AND seq<?"} ORDER BY seq DESC LIMIT ?`,
+				`SELECT id, schedule_id, schedule_revision, scheduled_at_ms, state, job_id, subject_ref, reason, created_at_ms, seq FROM scheduler_occurrences WHERE schedule_id=? ${cursor === null ? "" : "AND seq<?"} ${scheduledAtMs === undefined ? "" : "AND scheduled_at_ms=?"} ORDER BY seq DESC LIMIT ?`,
 			)
 			.all(
-				...(cursor === null
-					? [scheduleId, limit]
-					: [scheduleId, cursor, limit]),
+				scheduleId,
+				...(cursor === null ? [] : [cursor]),
+				...(scheduledAtMs === undefined ? [] : [scheduledAtMs]),
+				limit,
 			) as Row[]
 	).map((r) => ({
 		id: r.id as string,

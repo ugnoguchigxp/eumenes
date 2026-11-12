@@ -20,7 +20,9 @@ const resource = z.object({
 });
 
 /** Registered OpenUI components show the host's canonical draft and child result; editing continues in chat. */
-const adapter = (kind: "pipeline" | "interact"): WebArtifactAdapter => ({
+const adapter = (
+	kind: "pipeline" | "interact" | "brave" | "task",
+): WebArtifactAdapter => ({
 	adapterRef: `adapter:collaboration.${kind}@1`,
 	useArtifact(context) {
 		const query = useQuery({
@@ -71,6 +73,6 @@ const adapter = (kind: "pipeline" | "interact"): WebArtifactAdapter => ({
 		};
 	},
 });
-export const collaborationWebAdapters = (["pipeline", "interact"] as const).map(
-	adapter,
-);
+export const collaborationWebAdapters = (
+	["pipeline", "interact", "brave", "task"] as const
+).map(adapter);

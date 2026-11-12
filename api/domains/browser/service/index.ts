@@ -1,4 +1,8 @@
-import { purgeTaskExecution, taskExecutionResult } from "./execution-data";
+import {
+	isCollaborationTaskInTransaction,
+	purgeTaskExecution,
+	taskExecutionResult,
+} from "./execution-data";
 import type { Database } from "bun:sqlite";
 import { createHostResolver } from "../adapters/host-resolver";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -23,6 +27,7 @@ import {
 	activeConnection,
 	expireApprovals,
 	listTasks,
+	pendingApprovals,
 	purgeEnded,
 	taskRow,
 	taskByRequest,
@@ -44,6 +49,7 @@ import {
 import { createGrants } from "./grants";
 import { createHistoryApi } from "./histories";
 import { createOperations } from "./operations";
+import { createReadText } from "./read-text";
 import { createReplays } from "./replay";
 import { workspaceSource } from "./workspace-source";
 import { reconcileChecked, tabViews } from "./tabs";
@@ -118,6 +124,7 @@ export function createBrowser(deps: {
 	const grants = createGrants(ctx);
 	const approvals = createApprovals(ctx, grants);
 	const operations = createOperations(ctx, grants, approvals);
+	const readText = createReadText(ctx);
 	const captures = createCaptures(ctx);
 	const tasks = createTasks(ctx, apiFor, approvals);
 	const replays = createReplays(ctx, { connection, operations });
@@ -136,6 +143,7 @@ export function createBrowser(deps: {
 			approvals,
 			captures,
 			refreshTabs,
+			readText,
 		});
 	}
 
@@ -177,6 +185,9 @@ export function createBrowser(deps: {
 			owner: string,
 			id: string,
 		) => taskExecutionResult(tasks.status(db, owner, id), taskRow(db, id)!),
+		isCollaborationTaskInTransaction,
+		taskApprovalExpiryInTransaction: (db: Database, id: string) =>
+			pendingApprovals(db, id, 0).at(0)?.expires_at,
 		taskStatusInTransaction: (db: Database, owner: string, id: string) =>
 			tasks.status(db, owner, id),
 		taskByRequestInTransaction: (db: Database, requestId: string) =>
@@ -188,6 +199,13 @@ export function createBrowser(deps: {
 		},
 		setChildAuthority(check: NonNullable<Ctx["childValid"]>) {
 			ctx.childValid = check;
+		},
+		setCollaborationTaskAuthority(check: NonNullable<Ctx["childValid"]>) {
+			const previous = ctx.childValid;
+			ctx.childValid = (db, caller) =>
+				(caller as { kind?: unknown } | null)?.kind === "collaboration"
+					? check(db, caller)
+					: (previous?.(db, caller) ?? false);
 		},
 		researchPages: (id: string) => ctx.research.read(id),
 		releaseResearch: (id: string) => ctx.research.clear(id),
@@ -211,6 +229,9 @@ export function createBrowser(deps: {
 		availability: () => service.connection().availability,
 		availableInTransaction: (db: Database) =>
 			connectionView(ctx, db).availability.available,
+		taskAvailableInTransaction: (db: Database) =>
+			!!ctx.runTaskStep && connectionView(ctx, db).availability.available,
+		tabsInTransaction: (db: Database) => tabViews(ctx, db),
 		tabs: () => store.read((db) => tabViews(ctx, db)),
 		refreshTabs,
 		/** Opens a new tab (the URL is checked like any navigation); the result carries its `tabRef`. */
@@ -286,6 +307,11 @@ export function createBrowser(deps: {
 			store.read((db) => tasks.status(db, owner, id)),
 		listTasks: (owner: string, conversationId?: string) =>
 			store.read((db) => listTasks(db, owner, 20, conversationId)),
+		recentTasksInTransaction: (
+			db: Database,
+			owner: string,
+			conversationId: string,
+		) => listTasks(db, owner, 8, conversationId),
 		/** The step the S2 worker's runner drives; exposed for tests of the hook. */
 		taskRow: (id: string) => store.read((db) => taskRow(db, id)),
 		startCaptureInTransaction: (db: Database, input: StartCaptureInput) =>

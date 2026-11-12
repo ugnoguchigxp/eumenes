@@ -49,6 +49,10 @@ export type Serial = ReturnType<typeof createSerial>;
 /** What a task step may do, bound to its task: every call is checked against the task's lease, epoch and grants. */
 export type TaskApi = {
 	collect?(input: unknown): Promise<unknown>;
+	readText?(
+		tabRef: string,
+		input: { observationRef: string; elementRef?: string },
+	): Promise<{ text: string; truncated: boolean }>;
 	progress(phase: TaskPhase): Promise<void>;
 	connection(): import("../contracts").ConnectionView;
 	connect(): Promise<import("../contracts").ConnectionView>;

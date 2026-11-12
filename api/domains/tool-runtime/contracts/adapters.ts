@@ -58,6 +58,14 @@ export type AdapterResult = {
 	replay: boolean;
 	/** Short projection handed to the conversation answer (never the full receipt body). */
 	answerContext?: unknown;
+	/** A session adapter can request the existing specialist handoff after this turn. */
+	specialistHandoff?: SpecialistHandoff;
+};
+export type SpecialistHandoff = { revisionId: string; request: string };
+export type SpecialistInvocation = {
+	operationName: string;
+	input: Record<string, unknown>;
+	origin: Extract<AdapterOrigin, { kind: "specialist" }>;
 };
 
 /** A field-level reason a UI input was not accepted; nothing is saved. */
@@ -150,6 +158,8 @@ export interface WorkDocumentAdapter {
  * call runs inside the caller's writer transaction and is idempotent where noted.
  */
 export interface SessionWorkAdapter {
+	/** Display name of the agent that takes over the conversation. */
+	agentLabel?: string;
 	/**
 	 * Start a work for a new session: empty when `targetRef` is null, otherwise from that saved
 	 * item (a ref this adapter issued through `choicesInTransaction`). Throws `target_not_found`.
@@ -207,6 +217,11 @@ export interface InstantAdapter {
 }
 
 export interface DomainAdapter {
+	/** Optional read preparation outside the writer; invoke rechecks the live turn before adopting it. */
+	prepareSpecialistRead?(
+		input: SpecialistInvocation,
+		signal: AbortSignal,
+	): Promise<unknown>;
 	/** Registered lifecycle of an artifact-free task binding. */
 	task?: import("./task-execution").TaskLifecyclePort;
 	/** Domain-owned follow-up of an accepted asynchronous operation. No intent dispatch lives here. */
@@ -295,6 +310,7 @@ export interface DomainAdapter {
 			requestId: string;
 			issuedAt: string;
 			origin: AdapterOrigin;
+			prepared?: unknown;
 		},
 	): AdapterResult;
 	/** The saved result of an earlier operation by its domain operation id, or null. */

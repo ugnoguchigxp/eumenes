@@ -70,13 +70,14 @@ export function workflowScheduleInTransaction(
 	scope: string,
 	workflowId: string,
 	scheduleId?: string,
+	includeInactive = false,
 ) {
 	return db
 		.query<
 			{ schedule_id: string; definition_revision: number },
 			[string, string, string | null]
 		>(
-			"SELECT schedule_id,definition_revision FROM workflow_schedules WHERE scope=? AND workflow_id=? AND active=1 AND schedule_id=COALESCE(?,schedule_id)",
+			`SELECT schedule_id,definition_revision FROM workflow_schedules WHERE scope=? AND workflow_id=? ${includeInactive && scheduleId ? "" : "AND active=1"} AND schedule_id=COALESCE(?,schedule_id)`,
 		)
 		.get(scope, workflowId, scheduleId ?? null);
 }

@@ -308,6 +308,7 @@ export function useSpecialistWorkspace({
 		session,
 		refetchSession,
 		addresseeNow,
+		addresseeStatus: query.data === undefined ? query.status : "success",
 		addressee:
 			session?.state === "active"
 				? { kind: "specialist" as const, label: session.title }

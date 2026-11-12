@@ -12,12 +12,14 @@ import {
 import { recognitionCommand } from "../../capabilities";
 import type { HandlerDefinition } from "../../queue";
 import { ANSWER_TEXT_SCHEMA } from "../contracts/command-interactions";
+import { diagnosticRef } from "../contracts/diagnostics";
 import type { Run } from "../contracts";
 import { byId, linkAnswer, transition } from "../repository";
 import { endRun } from "./run-end";
 import { COMMAND_KIND, GENERATE_KIND, type DialogueDeps } from "./context";
 import { applyCommand } from "./command-apply";
 import { commandSource } from "./command-source";
+import { verifiedDiagnostic } from "./diagnostic-evidence";
 import type {
 	BoundInvocation,
 	CommandInput,
@@ -120,6 +122,82 @@ export function parseToolCommand(
 	return command.data;
 }
 
+async function executeCommand(
+	deps: DialogueDeps,
+	input: CommandInput,
+	signal: AbortSignal,
+): Promise<CommandOutput> {
+	const { larm } = deps;
+	return withLogContext({ runId: input.runId }, async () => {
+		// A command is one call: its agent session ends with the call, whatever the outcome.
+		const receipt = await larm.executeControl!(
+			input.requestId,
+			input.messages,
+			signal,
+			input.control,
+			{
+				sessionRole: "subagent",
+				taskId: input.runId,
+				agentSession: {
+					conversationId: input.conversationId,
+					agentId: input.runId,
+				},
+			},
+		).finally(() =>
+			larm
+				.releaseTaskSession?.(input.runId)
+				.catch((error) =>
+					log.warn("dialogue.task_session_release_failed", {}, error),
+				),
+		);
+		let value: unknown;
+		try {
+			value = parseLlmJson(receipt.value as string);
+		} catch {
+			throw new Error("toolchain_command_invalid_json");
+		}
+		const parsed = commandOutputFor(questionRefsOf(input.boundSet)).safeParse(
+			value,
+		);
+		if (!parsed.success) throw new Error("toolchain_command_invalid_contract");
+		const out = parsed.data;
+		if (out.action === "clarify") {
+			if (!out.question) throw new Error("toolchain_command_invalid_contract");
+			return {
+				receipt,
+				question: out.question,
+				answerSchema: out.answerSchema ?? "builtin:answerText",
+			};
+		}
+		if (input.boundSet) {
+			const bound = deps.toolchains?.bound;
+			if (!bound) throw new Error("adapter_unavailable");
+			const checked = bound.parseInvocation(
+				input.boundSet,
+				out.tool ?? "",
+				out.arguments ?? {},
+			);
+			if (!checked.ok) {
+				log.warn("dialogue.operation_rejected", {
+					reason: "command_arguments_invalid",
+					validationCode: checked.code,
+				});
+				throw new Error("toolchain_command_invalid_arguments");
+			}
+			const invocation: BoundInvocation = {
+				bindingRevisionId: input.boundSet.bindingRevisionId,
+				adapterRef: input.boundSet.adapterRef,
+				packageRevisionId: input.boundSet.packageRevisionId,
+				toolRevisionId: checked.toolRevisionId,
+				operationName: checked.operationName,
+				input: checked.input,
+			};
+			return { receipt, command: invocation };
+		}
+		return { receipt, command: parseToolCommand(input, out) };
+	});
+}
+
 /**
  * The command sub-agent of a toolchain (timers, project delegation): it loads the toolchain's
  * fixed set (profile, SKILL, tool details), turns the request into one typed operation, and the
@@ -128,7 +206,12 @@ export function parseToolCommand(
 export function createToolchainCommandHandler(
 	deps: DialogueDeps,
 ): HandlerDefinition<
-	{ runId: string; toolchainRevisionId: string; interactionId?: string },
+	{
+		runId: string;
+		toolchainRevisionId: string;
+		interactionId?: string;
+		diagnosticRef?: string;
+	},
 	CommandInput,
 	CommandOutput
 > {
@@ -150,6 +233,7 @@ export function createToolchainCommandHandler(
 			toolchainRevisionId: z.string(),
 			/** Set when the run resumes an interaction after its question was answered. */
 			interactionId: z.string().optional(),
+			diagnosticRef: diagnosticRef.optional(),
 		}),
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
@@ -183,6 +267,18 @@ export function createToolchainCommandHandler(
 			}
 			const { request, original, resume, snapshot, tools, toolIds } =
 				loaded.source;
+			const evidence = claim.payload.diagnosticRef
+				? verifiedDiagnostic(
+						deps,
+						tx,
+						run.conversationId,
+						claim.payload.diagnosticRef,
+					)
+				: null;
+			if (claim.payload.diagnosticRef && !evidence) {
+				fail(tx, run, "diagnostic_evidence_changed");
+				return { status: "stale", reason: "diagnostic_evidence_changed" };
+			}
 			// Preparation alone may take up to 60 seconds. Use the run's remaining budget,
 			// keeping the existing reserve for the answer, rather than expiring during readiness.
 			const deadline = Date.parse(run.deadlineAt!) - 15000;
@@ -199,6 +295,7 @@ export function createToolchainCommandHandler(
 				{
 					request,
 					originalRequest: original,
+					...(evidence ? { diagnostic: evidence } : {}),
 					snapshot,
 					...(resume?.exchanges.length
 						? { previousQuestions: resume.exchanges }
@@ -226,6 +323,9 @@ export function createToolchainCommandHandler(
 					snapshot,
 					request,
 					...(set.binding ? { boundSet: set.binding } : {}),
+					...(claim.payload.diagnosticRef
+						? { diagnosticRef: claim.payload.diagnosticRef }
+						: {}),
 					...(resume && claim.payload.interactionId
 						? {
 								interaction: {
@@ -239,78 +339,7 @@ export function createToolchainCommandHandler(
 				},
 			};
 		},
-		async execute(input, { signal }) {
-			return withLogContext({ runId: input.runId }, async () => {
-				// A command is one call: its agent session ends with the call, whatever the outcome.
-				const receipt = await larm.executeControl!(
-					input.requestId,
-					input.messages,
-					signal,
-					input.control,
-					{
-						sessionRole: "subagent",
-						taskId: input.runId,
-						agentSession: {
-							conversationId: input.conversationId,
-							agentId: input.runId,
-						},
-					},
-				).finally(() =>
-					larm
-						.releaseTaskSession?.(input.runId)
-						.catch((error) =>
-							log.warn("dialogue.task_session_release_failed", {}, error),
-						),
-				);
-				let value: unknown;
-				try {
-					value = parseLlmJson(receipt.value as string);
-				} catch {
-					throw new Error("toolchain_command_invalid_json");
-				}
-				const parsed = commandOutputFor(
-					questionRefsOf(input.boundSet),
-				).safeParse(value);
-				if (!parsed.success)
-					throw new Error("toolchain_command_invalid_contract");
-				const out = parsed.data;
-				if (out.action === "clarify") {
-					if (!out.question)
-						throw new Error("toolchain_command_invalid_contract");
-					return {
-						receipt,
-						question: out.question,
-						answerSchema: out.answerSchema ?? "builtin:answerText",
-					};
-				}
-				if (input.boundSet) {
-					const bound = deps.toolchains?.bound;
-					if (!bound) throw new Error("adapter_unavailable");
-					const checked = bound.parseInvocation(
-						input.boundSet,
-						out.tool ?? "",
-						out.arguments ?? {},
-					);
-					if (!checked.ok) {
-						log.warn("dialogue.operation_rejected", {
-							reason: "command_arguments_invalid",
-							validationCode: checked.code,
-						});
-						throw new Error("toolchain_command_invalid_arguments");
-					}
-					const invocation: BoundInvocation = {
-						bindingRevisionId: input.boundSet.bindingRevisionId,
-						adapterRef: input.boundSet.adapterRef,
-						packageRevisionId: input.boundSet.packageRevisionId,
-						toolRevisionId: checked.toolRevisionId,
-						operationName: checked.operationName,
-						input: checked.input,
-					};
-					return { receipt, command: invocation };
-				}
-				return { receipt, command: parseToolCommand(input, out) };
-			});
-		},
+		execute: (input, { signal }) => executeCommand(deps, input, signal),
 		classify: () => "fail",
 		settleInTransaction(tx, claim, input, outcome) {
 			const run = byId(tx, claim.payload.runId);

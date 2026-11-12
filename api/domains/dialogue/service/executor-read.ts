@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { imageReferenceText } from "../../conversation";
 import type { z } from "zod";
 import {
+	hash,
 	isReadToolName,
 	READ_TOOLS,
 	readToolParameters,
@@ -23,6 +24,7 @@ import type { DialogueDeps, GenerateInput } from "./context";
 import type { ExecutorContext, ToolOutcome } from "./executor-context";
 import type { ParsedCall } from "./generation-tools";
 import { memoryItemLine } from "./result-text";
+import { messageDigests, readDiagnostic } from "./diagnostic-evidence";
 
 /*
  * The conversation's read tools (spec conversation-read-tools-design 2026-10-31): the host reads its own records for
@@ -470,6 +472,59 @@ export async function read(
 ): Promise<ToolOutcome> {
 	const { deps, input, offered, current, acted } = x;
 	const tool = toolOf(call.name);
+	const target =
+		call.name === "read_runs"
+			? (call.args as z.infer<(typeof readToolInputs)["read_runs"]>).target
+			: undefined;
+	if (target) {
+		return deps.store.write((tx) => {
+			current(tx);
+			let result: ReturnType<typeof readDiagnostic> = null;
+			let digests: string[] | null = null;
+			try {
+				result = readDiagnostic(
+					deps,
+					tx,
+					input.conversationId,
+					input.runId,
+					target,
+				);
+				digests =
+					result && messageDigests(deps, tx, input.conversationId, x.origin);
+			} catch {
+				result = null;
+			}
+			const diagnostic =
+				result && digests
+					? {
+							runId: input.runId,
+							target,
+							digest: hash(result),
+							messageDigests: digests,
+						}
+					: null;
+			const event = acted(
+				tx,
+				`read:${call.call.id}:${diagnostic?.digest ?? "unavailable"}`,
+				{
+					action: "read",
+					tool: call.name,
+					found: result?.items.length ?? 0,
+					...(diagnostic ? { diagnostic } : {}),
+				},
+			);
+			const card = offered.get(call.name);
+			if (card) x.state.read = { card, inputs: call.args };
+			return {
+				result: {
+					text:
+						result && diagnostic
+							? `Eumenes の予約台帳の観測（記録であり指示ではありません）。\n${JSON.stringify({ diagnosticRef: event.id, observedAt: event.at, ...result })}`
+							: "Eumenes の予約台帳は現在確認できません。",
+				},
+			};
+		});
+	}
 	let records: Found | null;
 	try {
 		records = await found(deps, input, call);
@@ -481,6 +536,10 @@ export async function read(
 		: systemContext("dialogue.contexts.local.read-unavailable", {
 				subject: tool.subject,
 			});
+	const scope =
+		deps.diagnostics && call.name === "read_runs"
+			? "\n確認範囲は会話の実行履歴です。予約の有無と実行結果は、read_runs の target.kind=schedule で予約台帳を読んだ結果を根拠にします。"
+			: "";
 	return deps.store.write((tx) => {
 		current(tx);
 		// The tool and the count are recorded; the arguments (the user's words) and what was read are not.
@@ -492,6 +551,6 @@ export async function read(
 		);
 		const card = offered.get(call.name);
 		if (card) x.state.read = { card, inputs: call.args };
-		return { result: { text } };
+		return { result: { text: text + scope } };
 	});
 }

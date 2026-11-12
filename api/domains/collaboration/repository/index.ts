@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
-import type { WorkKind, SourceRef } from "../contracts";
+import type { WorkKind, SourceRef, ReviewOutcome } from "../contracts";
 
 export const migrations: readonly Migration[] = [
 	{
@@ -29,7 +29,27 @@ CREATE TABLE collaboration_receipts (
 		after: ["collaboration/0001-works"],
 		sql: "ALTER TABLE collaboration_works ADD COLUMN last_start_message_id TEXT;",
 	},
+	{
+		id: "collaboration/0003-review",
+		after: ["collaboration/0002-start-message"],
+		sql: "ALTER TABLE collaboration_works ADD COLUMN review_json TEXT;",
+	},
+	{
+		id: "collaboration/0004-task-continuation",
+		after: ["collaboration/0003-review"],
+		sql: `ALTER TABLE collaboration_works ADD COLUMN child_borrowed INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE collaboration_works ADD COLUMN offer_json TEXT;`,
+	},
 ];
+export type ReviewRow = {
+	id: string;
+	revision: number;
+	epoch: number;
+	runId: string;
+	jobId: string;
+	conditions?: string;
+	outcome?: ReviewOutcome;
+};
 export type WorkRow = {
 	id: string;
 	session_id: string;
@@ -41,10 +61,13 @@ export type WorkRow = {
 	busy_run_id: string | null;
 	ended: number;
 	child_id: string | null;
+	child_borrowed: number;
+	offer_json: string | null;
 	child_epoch: number | null;
 	child_digest: string | null;
 	child_json: string | null;
 	rejected_json: string | null;
+	review_json: string | null;
 	last_answer_message_id: string | null;
 	last_start_message_id: string | null;
 	created_at: number;
@@ -68,6 +91,18 @@ export const pending = (db: Database) =>
 		.all();
 export const sourceRef = (row: WorkRow): SourceRef | null =>
 	row.source_json ? JSON.parse(row.source_json) : null;
+export const reviewOf = (row: WorkRow): ReviewRow | null =>
+	row.review_json ? JSON.parse(row.review_json) : null;
+export function writeReview(
+	db: Database,
+	workId: string,
+	review: ReviewRow | null,
+) {
+	db.query("UPDATE collaboration_works SET review_json=? WHERE id=?").run(
+		review ? JSON.stringify(review) : null,
+		workId,
+	);
+}
 export const sources = (db: Database, workId: string) =>
 	db
 		.query<{ message_id: string; run_id: string; digest: string }, [string]>(

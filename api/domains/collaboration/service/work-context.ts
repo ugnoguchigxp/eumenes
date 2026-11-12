@@ -14,7 +14,11 @@ export const json = (text: string | null): unknown =>
 export const terminal = (view: ChildView) =>
 	view.status !== "running" && view.status !== "waiting_user";
 
-export function createWorkContext(host: () => Ports, now: () => number) {
+export function createWorkContext(
+	host: () => Ports,
+	now: () => number,
+	invalidateReview?: (db: Database, row: WorkRow) => void,
+) {
 	function current(db: Database, row: WorkRow): Source {
 		const ref = sourceRef(row);
 		const source = ref && host().source(db, ref.runId);
@@ -29,11 +33,17 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 		for (const used of sources(db, row.id)) {
 			const actual = host().source(db, used.run_id);
 			if (
-				!actual ||
-				actual.messageId !== used.message_id ||
-				actual.digest !== used.digest ||
-				actual.specialistSessionId !== row.session_id ||
-				actual.conversationId !== source.conversationId
+				(!actual ||
+					actual.messageId !== used.message_id ||
+					actual.digest !== used.digest ||
+					actual.specialistSessionId !== row.session_id ||
+					actual.conversationId !== source.conversationId) &&
+				!host().contributingSource?.(db, {
+					runId: used.run_id,
+					messageId: used.message_id,
+					digest: used.digest,
+					conversationId: source.conversationId,
+				})
 			)
 				fail("collaboration_source_invalid");
 		}
@@ -58,12 +68,17 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 				: null;
 		if (child && !withinJsonLimits(child))
 			fail("collaboration_result_capacity");
+		const available =
+			source && row.kind !== "schedule"
+				? host().context(db, row.kind, source)
+				: null;
 		return {
 			workRef: row.id,
 			savedRef: null,
 			dirty: row.document_json
 				? child?.status !== "completed"
 				: !!row.child_id &&
+					!row.child_borrowed &&
 					(!child || !terminal(child) || child.status === "indeterminate"),
 			busy: !!row.busy_run_id,
 			revision: row.revision,
@@ -72,6 +87,8 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 				{
 					pipeline: "手順の共同編集",
 					interact: "ブラウザの共同作業",
+					brave: "Braveの共同作業",
+					task: "Collaboration",
 					schedule: "実行予約",
 				}[row.kind],
 			current: {
@@ -79,15 +96,13 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 				revision: row.revision,
 				request: source?.request,
 				child,
+				...(row.kind === "task" || row.kind === "brave" ? { available } : {}),
 			},
 			context: source
 				? {
 						originalRequest: source.request,
 						child,
-						available:
-							row.kind === "schedule"
-								? null
-								: host().context(db, row.kind, source),
+						available,
 					}
 				: {},
 		};
@@ -145,9 +160,10 @@ export function createWorkContext(host: () => Ports, now: () => number) {
 		return answer;
 	}
 	function purge(db: Database, row: WorkRow, erase = false) {
+		invalidateReview?.(db, row);
 		const ref = sourceRef(row),
 			source = ref && host().source(db, ref.runId);
-		if (ref && row.child_id && row.kind !== "schedule")
+		if (ref && row.child_id && !row.child_borrowed && row.kind !== "schedule")
 			host().cancel(
 				db,
 				row.kind,

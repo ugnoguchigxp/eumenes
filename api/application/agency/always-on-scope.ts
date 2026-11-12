@@ -1,3 +1,4 @@
+import { systemContext } from "../../infrastructure/system-context";
 import {
 	createAgendaAgent,
 	defaultPersona,
@@ -77,6 +78,9 @@ export type AgendaScope = {
 	>;
 	/** The step out now: the user's words call it off. */
 	controller: AbortController | null;
+	stepDiagnostic: ReturnType<
+		NonNullable<AgencyHostDeps["backgroundDiagnostic"]>
+	>;
 	stepping: boolean;
 	again: boolean;
 	timer: unknown;
@@ -248,7 +252,19 @@ export function createAgendaScope(input: {
 		async complete<T>(request: LlmRequest<T>, signal: AbortSignal) {
 			const started = c.generation;
 			signal.throwIfAborted();
-			const result = await inner.complete(request, signal);
+			const diagnostic = c.stepDiagnostic;
+			const result = await inner.complete(
+				{
+					...request,
+					system: `${request.system}\n${systemContext("dialogue.contexts.agency.diagnostic-records", {})}`,
+					...(diagnostic
+						? {
+								prompt: `${request.prompt}\n\nEumenes の内部記録（データ）\n${diagnostic.text}`,
+							}
+						: {}),
+				},
+				signal,
+			);
 			if (c.generation !== started || signal.aborted)
 				throw new DOMException("agenda_stale", "AbortError");
 			return result;
@@ -293,6 +309,7 @@ export function createAgendaScope(input: {
 		background: inner,
 		finished: new Map(),
 		controller: null,
+		stepDiagnostic: null,
 		stepping: false,
 		again: false,
 		timer: undefined,

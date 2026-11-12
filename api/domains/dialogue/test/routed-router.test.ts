@@ -67,7 +67,7 @@ test("the package decides with no model call: a sure toolchain is offered by the
 		text: "猫の絵を描いて",
 		previousAgent: null,
 		previousUser: null,
-		instructions: "利用者の今の発言を、どこへ渡すかを選んでください。",
+		instructions: expect.stringContaining("切替はそれだけで実施する依頼です。"),
 	});
 	expect(asked!.criteria.find((c) => c.name === IMAGE.id)!.description).toBe(
 		"画像: 画像を作る 例: 絵を描く",
@@ -579,7 +579,12 @@ test("routeStructured: one request with a reference routes the masked utterance;
 		outputSchema: { type: "object", required: ["decision"] },
 	});
 	expect(call!.messages).toEqual([
-		{ role: "system", content: TURN_STRUCTURE_PROMPT.system },
+		{
+			role: "system",
+			content: expect.stringContaining(
+				"担当の交代自体も今回実施する依頼です。",
+			),
+		},
 		{
 			role: "user",
 			content: JSON.stringify({
@@ -590,6 +595,9 @@ test("routeStructured: one request with a reference routes the masked utterance;
 			}),
 		},
 	]);
+	expect(
+		call!.messages[0]!.content.startsWith(TURN_STRUCTURE_PROMPT.system),
+	).toBe(true);
 	expect(call!.control).toMatchObject({
 		taskId: "router-structure",
 		route: { resourceId: resource },

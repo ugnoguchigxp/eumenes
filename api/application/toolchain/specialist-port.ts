@@ -65,6 +65,16 @@ export function createSpecialistPort(deps: {
 		return session;
 	};
 	return {
+		agentLabel: (ref) => registry.get(ref)?.session?.agentLabel,
+		prepareRead(set, input, signal) {
+			const adapter = adapterOf(set.adapterRef);
+			if (
+				set.tools.some((tool) => tool.operationName === input.operationName) &&
+				adapter.describe().operations.get(input.operationName)?.effect ===
+					"read"
+			)
+				return adapter.prepareSpecialistRead?.(input, signal);
+		},
 		...(knowledge
 			? {
 					guidance: {
@@ -157,6 +167,7 @@ export function createSpecialistPort(deps: {
 				input: input.input,
 				requestId: input.requestId,
 				issuedAt: clock(),
+				prepared: input.prepared,
 				origin: {
 					kind: "specialist",
 					sessionId: input.sessionId,
@@ -165,7 +176,10 @@ export function createSpecialistPort(deps: {
 					workRef: input.workRef,
 				},
 			});
-			return { answerContext: result.answerContext ?? null };
+			return {
+				answerContext: result.answerContext ?? null,
+				specialistHandoff: result.specialistHandoff,
+			};
 		},
 		afterCommit: (adapterRef) => registry.get(adapterRef)?.afterCommit?.(),
 		documentOf(adapterRef) {

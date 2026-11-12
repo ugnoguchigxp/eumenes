@@ -7,6 +7,7 @@ import {
 	insertSessionEvent,
 	linkAnswer,
 	liveSession,
+	parkedSessions,
 	patchSession,
 	setRunSession,
 	type SessionRecord,
@@ -40,6 +41,8 @@ export type SessionStart = {
 	target?: string;
 	/** The user confirmed dropping the unsaved work of another target. */
 	resolveUnsaved?: "discard";
+	references?: import("../../tool-runtime").ExecutionReference[];
+	handoffFrom?: string;
 };
 
 /** Queue the specialist's turn; a toolchain with its own run time gets it from here. */
@@ -52,6 +55,10 @@ export function enqueueTurn(
 	epoch: number,
 	request: string,
 	recordHandover = true,
+	handoff?: Pick<
+		Extract<import("../repository").SessionEvent, { kind: "handover" }>,
+		"references" | "previousSessionId"
+	>,
 ) {
 	const run = extendRunForToolchain(deps, tx, handed, set);
 	const { job } = deps.queue.enqueueInTransaction(tx, {
@@ -72,7 +79,12 @@ export function enqueueTurn(
 		insertSessionEvent(
 			tx,
 			sessionId,
-			{ kind: "handover", runId: run.id, request: request.slice(0, 8000) },
+			{
+				kind: "handover",
+				runId: run.id,
+				request: request.slice(0, 8000),
+				...handoff,
+			},
 			deps.clock(),
 		);
 }
@@ -177,6 +189,38 @@ function start(
 ): StartResult {
 	const port = deps.specialist!;
 	const now = deps.clock();
+	const resume = (session: SessionRecord) => {
+		const epoch =
+			session.state === "suspended" ? session.epoch + 1 : session.epoch;
+		patchSession(
+			tx,
+			session.id,
+			{
+				state: "active",
+				epoch,
+				expiresAt: expiryAfter(now),
+				pendingSwitch: null,
+				bump: session.state === "suspended" || session.pendingSwitch !== null,
+			},
+			now,
+		);
+		addressTurn(deps, tx, run, session);
+		enqueueTurn(
+			deps,
+			tx,
+			run,
+			port.setInTransaction(tx, session.toolchainRevisionId),
+			session.id,
+			epoch,
+			chosen.request,
+			true,
+			{
+				references: chosen.references,
+				previousSessionId: chosen.handoffFrom,
+			},
+		);
+		return { ok: true } as const;
+	};
 	let live = liveSession(tx, run.conversationId);
 	if (live && sessionExpired(live, now)) {
 		const ended = endOrMarkClosing(deps, tx, live, "expired");
@@ -191,26 +235,14 @@ function start(
 			live.toolchainId === set.toolchainId &&
 			(work?.savedRef ?? null) === target;
 		if (same) {
-			// The same work goes on: a suspended one is resumed (a new addressee epoch), an active one continues.
-			const epoch = live.state === "suspended" ? live.epoch + 1 : live.epoch;
-			patchSession(
-				tx,
-				live.id,
-				{
-					state: "active",
-					epoch,
-					expiresAt: expiryAfter(now),
-					pendingSwitch: null,
-					bump: live.state === "suspended" || live.pendingSwitch !== null,
-				},
-				now,
-			);
-			addressTurn(deps, tx, run, live);
-			enqueueTurn(deps, tx, run, set, live.id, epoch, chosen.request);
-			return { ok: true };
+			return resume(live);
 		}
 		const dirty = work?.dirty ?? false;
-		if (dirty && work) {
+		const park =
+			(set.agent.conversationHandoff || chosen.handoffFrom) &&
+			dirty &&
+			live.state === "suspended";
+		if (dirty && work && !park) {
 			const pending = live.pendingSwitch;
 			const confirmed =
 				chosen.resolveUnsaved === "discard" &&
@@ -240,15 +272,24 @@ function start(
 				return { ok: true };
 			}
 		}
-		const switched = endOrMarkClosing(
-			deps,
-			tx,
-			live,
-			dirty ? "discarded" : "closed",
-		);
-		deferFlush(deps, switched);
-		if (switched.state === "closing") return refuse("specialist_closing");
+		if (!park) {
+			const switched = endOrMarkClosing(
+				deps,
+				tx,
+				live,
+				dirty ? "discarded" : "closed",
+			);
+			deferFlush(deps, switched);
+			if (switched.state === "closing") return refuse("specialist_closing");
+		}
 	}
+	const parked = parkedSessions(tx, run.conversationId, set.toolchainId).find(
+		(session) =>
+			!sessionExpired(session, now) &&
+			port.workStateInTransaction(tx, session.adapterRef, session.workRef)
+				?.savedRef === target,
+	);
+	if (parked) return resume(parked);
 	const session = openSessionInTransaction(
 		deps,
 		tx,
@@ -257,7 +298,22 @@ function start(
 		target,
 	);
 	addressTurn(deps, tx, run, session);
-	enqueueTurn(deps, tx, run, set, session.id, session.epoch, chosen.request);
+	enqueueTurn(
+		deps,
+		tx,
+		run,
+		set,
+		session.id,
+		session.epoch,
+		chosen.request,
+		true,
+		{
+			references: chosen.references,
+			previousSessionId:
+				chosen.handoffFrom ??
+				(set.agent.conversationHandoff ? live?.id : undefined),
+		},
+	);
 	return { ok: true };
 }
 

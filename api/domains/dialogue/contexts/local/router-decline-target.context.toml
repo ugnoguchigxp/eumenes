@@ -1,5 +1,5 @@
 # Source: api/domains/dialogue/service/routed-route.ts
-text = '''「[[toolchain]]」に「[[request]]」を頼む確認（対象「[[target]]」）に、いいえと答える。'''
+text = '''「[[toolchain]]」に「[[request]]」を頼む確認（対象「[[target]]」）を拒否するか、訂正して元の依頼を取り下げる。'''
 
 [variables.toolchain]
 type = "string"

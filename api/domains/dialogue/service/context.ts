@@ -105,6 +105,8 @@ export type RoutedInput = {
 	todos: Array<{ ref: number; title: string; request?: string; open: boolean }>;
 	/** The resources `## State` names (`a<n>`): the only ones a choice may hand over with its request. */
 	resources: string[];
+	/** Host-issued observations available for a repair request. */
+	diagnosticRefs?: string[];
 	/**
 	 * The toolchain a hand-over waits for the user's word on, because a suspended work is unsaved (`## State` says
 	 * 別の作業への切替の確認待ち): only its branch may carry `resolveUnsaved`.
@@ -225,6 +227,7 @@ export type DialogueDeps = {
 	objectRecognition?: ObjectRecognitionPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	worldContext?: WorldContextPort;
+	diagnostics?: import("../contracts/diagnostics").DiagnosticsPort;
 	/** The operational log file (`config.logFile`) the read tool `read_runs` reads warnings from; absent: none read. */
 	logFile?: () => string | undefined;
 	/** The agency layer: told when a TODO changed (its opportunity to report). */

@@ -24,6 +24,8 @@ const QUERY_CHARS = 2000;
 const REQUEST_CHARS = 8000;
 /** The TODO's title, taken from the request the reply wrote (`## State` shows it in every later turn). */
 const TITLE_CHARS = 120;
+const CONFIRMATION_PREVIEW_CHARS = 240;
+const DECLINE_CONFIRMATION = "decline_confirmation";
 
 /** The reply's two tools; what they do is the host's text, when to use them the agent's rules. */
 export const TALK_WORK_TOOLS: readonly AgentToolDefinition[] = [
@@ -47,6 +49,11 @@ export const TALK_WORK_TOOLS: readonly AgentToolDefinition[] = [
 			properties: {
 				toolchain: { type: "string" },
 				request: { type: "string" },
+				diagnosticRef: {
+					type: "string",
+					description:
+						"エラー修正に渡す場合、内部診断でホストが返した参照 e<n>。対象に合う参照だけを指定する。",
+				},
 				// The agent's rules name these two; the host decides both itself.
 				mode: { type: "string", enum: ["execute"] },
 				impact: { type: "string" },
@@ -66,6 +73,43 @@ const answer = (value: Record<string, unknown>, end = false): Answer => ({
 /** The talk turn's hand-over tools for one reply: `delegate` takes only a toolchain this reply found. */
 export function createTalkWork(turn: Turn) {
 	const found = new Map<string, Found>();
+	const pending = new Map(
+		turn.routed!.pending.confirmations.map((item) => [`c${item.ref}`, item]),
+	);
+	const tools: AgentToolDefinition[] = [...TALK_WORK_TOOLS];
+	if (pending.size)
+		tools.push({
+			name: DECLINE_CONFIRMATION,
+			description: systemContext(
+				"dialogue.contexts.local.talk-decline-confirmation",
+				{},
+			),
+			parameters: {
+				type: "object",
+				additionalProperties: false,
+				required: ["confirmation"],
+				properties: {
+					confirmation: {
+						type: "string",
+						enum: [...pending.keys()],
+						description: JSON.stringify(
+							Array.from(
+								pending,
+								([confirmation, { toolchain, request, target }]) => ({
+									confirmation,
+									toolchain,
+									request: lineText(request).slice(
+										0,
+										CONFIRMATION_PREVIEW_CHARS,
+									),
+									target: target && lineText(target).slice(0, TITLE_CHARS),
+								}),
+							),
+						),
+					},
+				},
+			},
+		});
 
 	async function find(args: Record<string, unknown>): Promise<Answer> {
 		const query = typeof args.query === "string" ? args.query.trim() : "";
@@ -126,7 +170,13 @@ export function createTalkWork(turn: Turn) {
 		if (!c) return answer({ delegated: false, code: "unknown_toolchain" });
 		// The reply wrote the request; what the toolchain takes besides it is filled as for the router's hand-over.
 		const said = turn.said();
-		const filled = await fieldsOf(turn, request, c, request);
+		const filled = await fieldsOf(
+			turn,
+			request,
+			c,
+			request,
+			typeof args.diagnosticRef === "string",
+		);
 		if ("step" in filled) {
 			if (filled.step !== "done")
 				return answer({ delegated: false, code: "request_unclear" });
@@ -168,6 +218,9 @@ export function createTalkWork(turn: Turn) {
 		const fields: Fields = {
 			...(resources.length ? { refs: resources } : {}),
 			...given,
+			...(typeof args.diagnosticRef === "string"
+				? { diagnosticRef: args.diagnosticRef }
+				: {}),
 			request: typeof given.request === "string" ? given.request : request,
 			// The user's own words may be a bare yes: the TODO is titled by the request the reply wrote.
 			words: lineText(request).slice(0, TITLE_CHARS),
@@ -198,11 +251,25 @@ export function createTalkWork(turn: Turn) {
 		);
 	}
 
+	async function decline(args: Record<string, unknown>): Promise<Answer> {
+		const confirmation =
+			typeof args.confirmation === "string"
+				? pending.get(args.confirmation)
+				: undefined;
+		if (!confirmation || Object.keys(args).length !== 1)
+			return answer({ declined: false, code: "unknown_confirmation" });
+		return (await turn.decline(confirmation.ref))
+			? answer({ declined: true })
+			: answer({ declined: false, code: "confirmation_not_open" });
+	}
+
 	return {
-		tools: TALK_WORK_TOOLS,
-		handles: (name: string) =>
-			name === TOOL_NAMES.search || name === TOOL_NAMES.delegate,
-		call: (name: string, args: Record<string, unknown>) =>
-			name === TOOL_NAMES.search ? find(args) : delegate(args),
+		tools,
+		handles: (name: string) => tools.some((tool) => tool.name === name),
+		call(name: string, args: Record<string, unknown>) {
+			if (name === TOOL_NAMES.search) return find(args);
+			if (name === DECLINE_CONFIRMATION) return decline(args);
+			return delegate(args);
+		},
 	};
 }
