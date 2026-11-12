@@ -53,6 +53,8 @@ export interface ToolchainRoutingPort {
 			available: ReadonlySet<string>;
 			/** Discovery must not expand the catalog when embedding retrieval fails. */
 			strict?: boolean;
+			/** Allow matching registered toolchains by text when embedding retrieval yields no candidates. */
+			lexicalFallback?: boolean;
 			/**
 			 * The router's offer (spec router-package-integration 2026-11-04 §1 #11): exactly these toolchains and read
 			 * tools, without a search.

@@ -1,7 +1,152 @@
 import { expect, test } from "bun:test";
 import { z } from "zod";
-import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
+import { jstDay } from "../../infrastructure/jst-time";
+import {
+	afterUtterance,
+	delegate,
+	findToolchain,
+	searchThenDelegate,
+	toolResults,
+} from "../toolchain/conversation-script.fixture";
 import { harness } from "../toolchain/toolchain.fixture";
+
+test.each([false, true])(
+	"conversation finds a reservation without embeddings and delivers the scheduled reply (approval: %s)",
+	async (approval) => {
+		const conversationId = "packing";
+		const request = approval
+			? "明日から毎朝8時に、この会話で持ち物を知らせてください"
+			: "明日の朝8時に持ち物を知らせて";
+		const proposal =
+			"明日から毎朝8時に、この会話で持ち物を知らせるよう予約しますか？";
+		const userInput = approval ? "はい、お願いします" : request;
+		const intervalMs = approval ? 86_400_000 : undefined;
+		const scheduledText =
+			"出かける前に持ち物を確認するよう声をかけてください。";
+		const scheduledAnswer = "出かける前に持ち物を確認してください。";
+		const usualAnswer = "今日はどんな話をしましょうか。";
+		const registered = "朝8時に持ち物を知らせるよう予約しました。";
+		let now = Date.now();
+		const nextDay = jstDay(now + 86_400_000);
+		const at = `${nextDay}T08:00:00+09:00`;
+		const dueAt = Date.parse(at);
+		let invoked = false;
+		const h = await harness({
+			schedules: true,
+			timers: true,
+			timerNow: () => now,
+			liveRouting: true,
+			conversationAgent: {
+				...testConversationAgent,
+				handsWork: () => true,
+			},
+			parent: (messages) => {
+				const latest = messages.at(-1)?.content ?? "";
+				if (latest.includes("朝の持ち物を忘れてしまう")) return proposal;
+				if (latest.includes(scheduledText)) return scheduledAnswer;
+				return usualAnswer;
+			},
+			firstRound: (_tools, question, messages) => {
+				if (question !== userInput) return;
+				if (approval)
+					expect(
+						messages.some((message) => message.content.includes(proposal)),
+					).toBe(true);
+				const result = toolResults(
+					afterUtterance(messages),
+					"find_toolchain",
+				)[0];
+				if (!result) return { calls: [findToolchain(request)] };
+				const { candidates } = JSON.parse(result) as {
+					candidates: Array<{ id: string }>;
+				};
+				const candidate = candidates.find(
+					({ id }) => id === "scheduler.manage",
+				);
+				expect(candidate).toBeDefined();
+				return { calls: [delegate(candidate!.id, request)] };
+			},
+			specialist: (messages) => {
+				if (!invoked) {
+					invoked = true;
+					expect(messages.at(-1)?.content).toBe(userInput);
+					if (approval)
+						expect(messages[1]?.content).toContain(
+							JSON.stringify({ handedOverRequest: request }).slice(1, -1),
+						);
+					return {
+						action: "invoke",
+						tool: "scheduler.register",
+						arguments: { text: scheduledText, at, intervalMs },
+					};
+				}
+				expect(messages[0]?.content).toContain("forward: false");
+				expect(messages.at(-1)?.content).toContain('"ok":true');
+				return { action: "return", forward: false, text: registered };
+			},
+		});
+		const say = async (text: string) => {
+			const response = await h.request("/api/runs", {
+				requestId: crypto.randomUUID(),
+				conversationId,
+				text,
+			});
+			expect(response.status).toBe(202);
+			const { id } = await response.json();
+			expect(
+				(await h.dialogue.waitForTerminal(id, { timeoutMs: 6000 }))?.status,
+			).toBe("completed");
+			return h.dialogue.answerText(id);
+		};
+		try {
+			if (approval) {
+				expect(await say("朝の持ち物を忘れてしまう")).toBe(proposal);
+				expect(h.scheduler.list().items).toEqual([]);
+			}
+			expect(await say(userInput)).toBe(registered);
+			expect(
+				await (
+					await h.request(`/api/conversations/${conversationId}/specialist`)
+				).json(),
+			).toMatchObject({ session: null });
+			expect(await say("ところで、話題を変えてもいい？")).toBe(usualAnswer);
+			const [schedule] = h.scheduler.list().items;
+			expect(h.scheduler.list().items).toEqual([
+				expect.objectContaining({
+					targetPayload: { conversationId, text: scheduledText },
+					nextDueAt: new Date(dueAt).toISOString(),
+					intervalMs: intervalMs ?? null,
+				}),
+			]);
+			now = dueAt - 1;
+			expect(await h.scheduler.tick()).toBe(0);
+			now = dueAt;
+			expect(await h.scheduler.tick()).toBe(1);
+			const [occurrence] = h.scheduler.listOccurrences(schedule!.id).items;
+			const run = await h.dialogue.waitForTerminal(occurrence!.subjectRef!, {
+				timeoutMs: 6000,
+			});
+			expect(run).toMatchObject({
+				conversationId,
+				status: "completed",
+				sourceKind: "schedule",
+			});
+			const history = await (
+				await h.request(`/api/conversations/${conversationId}`)
+			).json();
+			expect(history.messages.at(-1)).toMatchObject({
+				role: "assistant",
+				text: scheduledAnswer,
+				runId: run!.id,
+			});
+			expect(await h.scheduler.tick()).toBe(0);
+		} finally {
+			await h.close();
+		}
+	},
+	15_000,
+);
 
 test.each([[undefined], [86_400_000]])(
 	"a collaborator clarifies and registers once per turn (interval %s)",

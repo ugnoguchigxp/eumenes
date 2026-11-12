@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { cardDigest, type Card } from "eumenes_router";
+import { capByKind, cardDigest, trigramQuery, type Card } from "eumenes_router";
 import { get, retainedDefinition } from "../repository";
 import { zSchema } from "./schema";
 import { createArtifacts } from "./artifacts";
@@ -91,6 +91,7 @@ function cardsOf(
 	active: readonly FixedDefinition[],
 	similarity: ReadonlyMap<string, number>,
 	historical: ReadonlySet<string>,
+	ftsRanks?: ReadonlyMap<string, number>,
 ): ToolchainCard[] {
 	const functionOf = new Map(active.map((d) => [d.id, d.functionName!]));
 	const producers = producersInTransaction(db);
@@ -123,7 +124,7 @@ function cardsOf(
 		),
 		score: {
 			rank: i + 1,
-			ftsRank: null,
+			ftsRank: ftsRanks?.get(d.id) ?? null,
 			similarity: similarity.has(d.revisionId)
 				? Number(similarity.get(d.revisionId)!.toFixed(4))
 				: null,
@@ -245,6 +246,109 @@ function rankPastRequests(
 	});
 }
 
+type ToolchainSearch = {
+	text: string;
+	vector?: { space: VectorSpace; values: number[] };
+	available: (toolchainId: string) => boolean;
+	fromHistory?: string[];
+	limit?: number;
+	strict?: boolean;
+	lexicalFallback?: boolean;
+	/** Fill the slots of each kind (`CANDIDATE_SLOTS`) instead of the first `limit`. */
+	slots?: true;
+	/**
+	 * Exactly these toolchains and read tools, in this order, without a search: the ones the router (the
+	 * eumenes_router package) offered for the turn.
+	 */
+	ids?: readonly string[];
+	/** Every active toolchain, withdrawn ones too: the exact revision of a work asks for its own card. */
+	unselectable?: true;
+};
+
+/**
+ * Retrieve toolchains by similarity, or use the registered full-text index when requested and no vectors match.
+ * Past choices are reference data and never change this similarity. Retrieval only:
+ * the conversation model makes the choice.
+ */
+function candidatesOf(
+	db: Database,
+	input: ToolchainSearch,
+	toolchains: readonly FixedDefinition[],
+): ToolchainCard[] {
+	const active = [...toolchains, ...readToolEntries].filter((d) =>
+		input.available(d.id),
+	);
+	if (input.ids) {
+		const byId = new Map(active.map((d) => [d.id, d]));
+		return cardsOf(
+			db,
+			[...new Set(input.ids)].flatMap((id) => byId.get(id) ?? []),
+			active,
+			new Map(),
+			new Set(),
+		);
+	}
+	const similarity = input.vector
+		? similaritiesOf(
+				indexRows(db, vectorSpaceKey(input.vector.space)),
+				input.vector.values,
+				new Map(active.map((d) => [d.revisionId, d])),
+			)
+		: new Map<string, number>();
+	const historical = new Set<string>();
+	for (const id of input.fromHistory ?? []) {
+		const d = active.find((x) => x.id === id);
+		if (d) historical.add(d.revisionId);
+	}
+	const ranked = rankBy(active, similarity);
+	const limit = Math.min(8, Math.max(1, input.limit ?? 4));
+	if (!ranked.length && input.lexicalFallback) {
+		const query = trigramQuery(input.text);
+		if (!query) return [];
+		const activeById = new Map(active.map((d) => [d.id, d]));
+		const hits = db
+			.query<{ id: string }, [string]>(
+				`SELECT i.id FROM capability_search
+				JOIN capability_items i ON i.key=capability_search.key
+				WHERE capability_search MATCH ? AND i.kind='toolchain'
+				ORDER BY bm25(capability_search), i.id`,
+			)
+			.all(query)
+			.map(({ id }) => id)
+			.filter((id) => activeById.has(id));
+		const ids = input.slots
+			? capByKind(
+					hits,
+					(id) => kindOf(db, activeById.get(id)!),
+					CANDIDATE_SLOTS,
+				)
+			: hits.slice(0, limit);
+		return cardsOf(
+			db,
+			ids.map((id) => activeById.get(id)!),
+			active,
+			similarity,
+			historical,
+			new Map(hits.map((id, index) => [id, index + 1])),
+		);
+	}
+	// Preserve the existing all-capability fallback when embeddings are unavailable.
+	const candidates = similarity.size
+		? input.slots
+			? slotted(
+					ranked,
+					(d) => similarity.get(d.revisionId)!,
+					(d) => kindOf(db, d),
+					CANDIDATE_SLOTS,
+				)
+			: ranked.slice(0, limit)
+		: input.strict
+			? []
+			: // Every available toolchain; the read tools are found by similarity only.
+				active.filter((d) => !readToolSchemas.has(d.revisionId));
+	return cardsOf(db, candidates, active, similarity, historical);
+}
+
 export function createToolchains(
 	closure: (db: Database, revisionId: string) => FixedDefinition[],
 	now: () => number,
@@ -314,76 +418,6 @@ export function createToolchains(
 				packVector(row.vector),
 			);
 		}
-	}
-	/**
-	 * Retrieve toolchains by similarity to the current request embedding.
-	 * Past choices are reference data and never change this similarity. Retrieval only:
-	 * the conversation model makes the choice.
-	 */
-	function candidatesInTransaction(
-		db: Database,
-		input: {
-			text: string;
-			vector?: { space: VectorSpace; values: number[] };
-			available: (toolchainId: string) => boolean;
-			fromHistory?: string[];
-			limit?: number;
-			strict?: boolean;
-			/** Fill the slots of each kind (`CANDIDATE_SLOTS`) instead of the first `limit`. */
-			slots?: true;
-			/**
-			 * Exactly these toolchains and read tools, in this order, without a search: the ones the router (the
-			 * eumenes_router package) offered for the turn.
-			 */
-			ids?: readonly string[];
-			/** Every active toolchain, withdrawn ones too: the exact revision of a work asks for its own card. */
-			unselectable?: true;
-		},
-	): ToolchainCard[] {
-		const active = [
-			...(input.unselectable
-				? activeInTransaction(db)
-				: selectableInTransaction(db)),
-			...readToolEntries,
-		].filter((d) => input.available(d.id));
-		if (input.ids) {
-			const byId = new Map(active.map((d) => [d.id, d]));
-			return cardsOf(
-				db,
-				[...new Set(input.ids)].flatMap((id) => byId.get(id) ?? []),
-				active,
-				new Map(),
-				new Set(),
-			);
-		}
-		const similarity = input.vector
-			? similaritiesOf(
-					indexRows(db, vectorSpaceKey(input.vector.space)),
-					input.vector.values,
-					new Map(active.map((d) => [d.revisionId, d])),
-				)
-			: new Map<string, number>();
-		const historical = new Set<string>();
-		for (const id of input.fromHistory ?? []) {
-			const d = active.find((x) => x.id === id);
-			if (d) historical.add(d.revisionId);
-		}
-		const ranked = rankBy(active, similarity);
-		// Preserve the existing all-capability fallback when embeddings are unavailable.
-		const candidates = similarity.size
-			? input.slots
-				? slotted(
-						ranked,
-						(d) => similarity.get(d.revisionId)!,
-						(d) => kindOf(db, d),
-						CANDIDATE_SLOTS,
-					)
-				: ranked.slice(0, Math.min(8, Math.max(1, input.limit ?? 4)))
-			: input.strict
-				? []
-				: // Every available toolchain; the read tools are found by similarity only.
-					active.filter((d) => !readToolSchemas.has(d.revisionId));
-		return cardsOf(db, candidates, active, similarity, historical);
 	}
 	/** The exact active toolchain revision and its package, or an error code. */
 	function resolveInTransaction(db: Database, revisionId: string) {
@@ -517,7 +551,12 @@ export function createToolchains(
 		toolchainsInTransaction: activeInTransaction,
 		pendingToolchainVectorsInTransaction: pendingVectorsInTransaction,
 		saveToolchainVectorsInTransaction: saveVectorsInTransaction,
-		toolchainCandidatesInTransaction: candidatesInTransaction,
+		toolchainCandidatesInTransaction(db: Database, input: ToolchainSearch) {
+			const toolchains = input.unselectable
+				? activeInTransaction(db)
+				: selectableInTransaction(db);
+			return candidatesOf(db, input, toolchains);
+		},
 		rankPastRequestsInTransaction: (
 			db: Database,
 			input: {

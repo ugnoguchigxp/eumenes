@@ -10,7 +10,7 @@ import {
 	planWindow,
 } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
-import type { Run } from "../contracts";
+import { isSystemPrompt, type Run } from "../contracts";
 import { byId, transition } from "../repository";
 import { agencyWork } from "../repository/agency";
 import { liveSession } from "../repository/specialist";
@@ -546,7 +546,8 @@ export function createPrepare(
 				harness,
 				messages,
 				utterances: texts,
-				...(final.kind === "utterances"
+				// Scheduled prompts can receive an answer but carry no authority to start work.
+				...(final.kind === "utterances" && !isSystemPrompt(current.sourceKind)
 					? {
 							routed: routedInputInTransaction(deps, tx, {
 								conversationId,

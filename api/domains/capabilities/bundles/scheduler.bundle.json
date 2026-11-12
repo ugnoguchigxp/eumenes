@@ -121,6 +121,69 @@
 			"bindingRevisionId": "binding:scheduler.collaborator@2",
 			"artifactRevisionId": "artifact:scheduler.pending@2",
 			"minImpact": "create"
+		},
+		{
+			"kind": "skill",
+			"id": "scheduler.register",
+			"revision": 2,
+			"title": "会話タスクを予約する",
+			"summary": "日時と間隔を確認し、保存結果を伝えて通常会話に戻る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "1. 利用者が直前の提案を承諾した場合は、REFERENCE.handedOverRequest から合意した内容と日時を読み取ります。登録の許可は利用者の発言で確かめます。次回の会話が単独で読んでも仕事が分かる文を text にします。現在時刻とタイムゾーンはホストが渡す時刻情報を使い、指定された初回の日時をオフセット付きISO 8601にします。内容や日時が曖昧なときは、足りない条件を一つ質問します。\n2. 一回の予約では intervalMs を省略します。繰り返しは1分から365日の固定間隔です。毎日同じ日本時間なら24時間を指定します。暦の月・営業日・外部ツールを動かす依頼は、この会話予約で引き受けず、対応する入口を案内します。保存済みアプリの定期処理はそのアプリの予約操作から登録します。\n3. 条件が揃った登録依頼には、返答用の text を付けずに scheduler.register を呼び、TOOL_RESULT を確認します。引数の text は予約時刻に実行する依頼文です。保存が成功したら、action は return、forward: false とし、返答用の text で初回の日時と繰り返しを短く伝えて通常会話へ戻ります。失敗時は理由を伝えます。予約の一覧は『実行予約』で確認できます。"
+		},
+		{
+			"kind": "package",
+			"id": "scheduler.collaborator",
+			"revision": 2,
+			"title": "実行予約",
+			"summary": "会話で予約内容を決め、保存結果を伝えて通常会話に戻る",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:scheduler.collaborator@1",
+				"skill:scheduler.register@2",
+				"tool:scheduler.register@1"
+			],
+			"schemaKey": "toolchainRequest",
+			"profileRevisionId": "profile:scheduler.collaborator@1",
+			"requiredSkillRevisionIds": ["skill:scheduler.register@2"],
+			"toolRevisionIds": ["tool:scheduler.register@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "scheduler.manage",
+			"revision": 3,
+			"title": "実行予約",
+			"summary": "指定日時に同じ会話でリマインド、声かけ、文章での回答を届ける。単発と固定間隔の繰り返しに対応する。",
+			"aliases": [],
+			"tags": ["予約", "定期実行", "リマインド"],
+			"useWhen": [
+				"指定日時にこの会話で知らせる、思い出させる、声をかける、文章で回答する仕事を予約したい",
+				"毎日や毎週など、同じ会話の仕事を決まった間隔で繰り返したい"
+			],
+			"avoidWhen": [
+				"経過時間を計るタイマーやストップウォッチを使いたい",
+				"保存済みワークフローの予約を有効にしたい",
+				"時刻を指定せず今すぐ回答が欲しい"
+			],
+			"dependencies": ["package:scheduler.collaborator@2"],
+			"packageRevisionId": "package:scheduler.collaborator@2",
+			"functionName": "schedule_conversation",
+			"examples": [
+				"明日の午前8時に、この会話で持ち物を確認するよう声をかけて",
+				"毎晩21時に、この会話で一日の振り返りを促して",
+				"来週の月曜の昼に、次の読書会のテーマ案をこの会話に出して"
+			],
+			"redirects": [],
+			"bindingRevisionId": "binding:scheduler.collaborator@2",
+			"artifactRevisionId": "artifact:scheduler.pending@2",
+			"minImpact": "create"
 		}
 	],
 	"bindings": [

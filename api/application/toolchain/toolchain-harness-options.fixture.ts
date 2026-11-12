@@ -56,6 +56,7 @@ export type HarnessOptions = {
 		messages: import("../../domains/inference/contracts").Messages,
 	) => { name: string; arguments: Record<string, unknown> };
 	model?: LarmPort;
+	conversationAgent?: import("../../domains/dialogue").ConversationAgentPort;
 	/** Keep the host's real tool lookup and conversation decision for a live acceptance run. */
 	liveRouting?: boolean;
 	/** Cloud transport seams for end-to-end attachment verification, with no external calls. */

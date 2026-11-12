@@ -820,7 +820,7 @@ export async function harness(options: HarnessOptions = {}) {
 				})
 			: undefined;
 	const dialogue = createDialogueService({
-		conversationAgent: testConversationAgent,
+		conversationAgent: options.conversationAgent ?? testConversationAgent,
 		excalidraw: drawingOperations,
 		objectRecognition: objectRecognition?.port(CONVERSATION_DEFAULT_PRINCIPAL),
 		image,

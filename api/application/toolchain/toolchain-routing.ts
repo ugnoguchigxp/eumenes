@@ -250,6 +250,7 @@ export function createToolchainRouting(
 				available: (id) => input.available.has(id),
 				fromHistory,
 				strict: input.strict,
+				lexicalFallback: input.lexicalFallback,
 				// A task's search fills each kind's slots.
 				...(input.strict ? { slots: true as const } : {}),
 			});

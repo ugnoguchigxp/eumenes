@@ -49,6 +49,7 @@ export async function find(
 				...availableReadTools(deps, tx),
 			]),
 			strict: true,
+			lexicalFallback: true,
 			...(ids ? { ids } : {}),
 		});
 		x.state.search = {
