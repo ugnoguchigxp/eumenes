@@ -159,8 +159,19 @@ test("a cloud provider gets the fill in strict form: one object, every field req
 		type: "string",
 		enum: ["none", "ask", "weather"],
 	});
-	// A toolchain's inputs go as the JSON text of their object.
-	expect(properties.inputs!.type).toEqual(["string", "null"]);
+	// A toolchain's inputs keep their named fields, so the provider holds the answer to them (a bare value in their
+	// place is not a valid answer); the bounds stay the toolchain's own check.
+	expect(properties.inputs).toEqual({
+		anyOf: [
+			{
+				type: "object",
+				additionalProperties: false,
+				required: ["place"],
+				properties: { place: { type: "string" } },
+			},
+			{ type: "null" },
+		],
+	});
 	expect(
 		strictBreaks(
 			strictChoiceSchema(
@@ -180,4 +191,66 @@ test("a cloud provider gets the fill in strict form: one object, every field req
 			}),
 		),
 	).toEqual({ choice: "weather", inputs: { place: "鎌倉" } });
+});
+
+test("strict inputs: a field the answer may leave out is required and nullable, and its null is dropped; inputs with no named field go as JSON text", () => {
+	const history: ChoiceCandidate = {
+		id: "read_history",
+		title: "会話の記録",
+		execution: "read",
+		inputs: {
+			type: "object",
+			properties: {
+				query: { type: "string", minLength: 1, description: "探す語" },
+				speaker: { type: "string", enum: ["user", "assistant"] },
+				count: { type: "integer", minimum: 1, maximum: 5 },
+				names: {
+					type: "array",
+					minItems: 1,
+					items: { type: "string", maxLength: 60 },
+				},
+			},
+			required: ["names"],
+			additionalProperties: false,
+		},
+	};
+	const strict = strictChoiceSchema(
+		fillSchema(history, { resources: [], switching: null }),
+	);
+	expect(strictBreaks(strict)).toEqual([]);
+	const inputs = (
+		strict.properties as Record<
+			string,
+			{ anyOf: Array<Record<string, unknown>> }
+		>
+	).inputs!.anyOf[0]!;
+	expect(inputs.required).toEqual(["query", "speaker", "count", "names"]);
+	expect(inputs.properties).toEqual({
+		query: { type: ["string", "null"], description: "探す語" },
+		speaker: { type: ["string", "null"], enum: ["user", "assistant", null] },
+		count: { type: ["integer", "null"] },
+		names: { type: "array", items: { type: "string" } },
+	});
+	expect(
+		parseChoice(
+			JSON.stringify({
+				choice: "read_history",
+				inputs: { query: null, speaker: "user", count: null, names: ["旅行"] },
+			}),
+		),
+	).toEqual({
+		choice: "read_history",
+		inputs: { speaker: "user", names: ["旅行"] },
+	});
+	// Inputs that name no field (any object) can not be held strictly: they stay the JSON text of their object.
+	const open: ChoiceCandidate = {
+		id: "open",
+		title: "自由な欄",
+		execution: "instant",
+	};
+	const text = (
+		strictChoiceSchema(fillSchema(open, { resources: [], switching: null }))
+			.properties as Record<string, Record<string, unknown>>
+	).inputs!;
+	expect(text.type).toEqual(["string", "null"]);
 });

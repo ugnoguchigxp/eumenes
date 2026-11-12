@@ -11,7 +11,7 @@ import { isAgendaSnapshot, type AgencyRecord } from "../../domains/dialogue";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { fixedInput } from "./input";
-import { showNote } from "./always-on-flow";
+import { keepNote, showNote } from "./always-on-flow";
 import { writeProfile } from "./always-on-profile";
 import {
 	createAgendaScope,
@@ -117,6 +117,8 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		}
 		return c;
 	}
+			// The notes a restart brought back are kept as documents too (one made before is not made again).
+			for (const note of c.notes) void track(keepNote(deps, c, note));
 	function conv(id: string) {
 		const current = convs.get(id);
 		if (current) return current;
@@ -163,12 +165,15 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			look();
 		});
 	}
-	/** The timer of the agent's next step: none while the user is typing, answered or elsewhere. */
+	/**
+	 * The timer of the agent's next step: none while the user is elsewhere; while the user is typing or answered,
+	 * only for research that waits to start (at once).
+	 */
 	function arm(c: AgendaScope) {
 		if (c.timer !== undefined) clearTimer(c.timer);
 		c.timer = undefined;
 		if (closed || c.stepping || !mayStep(cycleHost(), c)) return;
-		const next = c.agent.nextAt(now());
+		const next = busy(c) ? now() : c.agent.nextAt(now());
 		if (next === null) return;
 		const at = Math.max(next, c.backoffUntil);
 		c.timer = setTimer(
@@ -261,7 +266,11 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 								const note = scope.notes.find((n) => n.id === id);
 								if (note)
 									void track(
-										showNote(deps, scope, note, runId, now()).catch((error) =>
+										showNote(deps, scope, note, runId, {
+											now,
+											setTimer,
+											clearTimer,
+										}).catch((error) =>
 											log.warn("agency.show_note_failed", {
 												subjectId: scope.id,
 												reason: toErrorCode(error, "show_note_failed"),

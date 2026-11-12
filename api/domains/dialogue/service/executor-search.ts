@@ -144,6 +144,8 @@ export async function instant(
 		: {
 				result: {
 					answered: false,
+					// Why it has no answer, for the reply that takes the request over.
+					...(answered.ok ? {} : { code: answered.code }),
 					...(prepared.fallback
 						? { fallback: prepared.fallback.toolchainId }
 						: {}),

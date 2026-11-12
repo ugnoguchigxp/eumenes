@@ -12,6 +12,7 @@ import {
 import type { HandlerDefinition } from "../../queue";
 import type { Run } from "../contracts";
 import { byId, transition } from "../repository";
+import { agencyWork } from "../repository/agency";
 import { liveSession } from "../repository/specialist";
 import { withAttachmentNotes } from "./attachment-context";
 import {
@@ -244,6 +245,10 @@ function routedInputInTransaction(
 			?.todosInTransaction(tx, input.conversationId)
 			.filter((todo) => todo.status !== "done") ?? [];
 	// The finished work `## State` lists may be checked, as it shows them (a forgotten one has no title).
+	// The agency's own research is the agent's work, not work the user handed over: the router is not offered it, so
+	// nothing the user says is taken as its check, correction or cancellation (its result is the agent's note).
+	const own = (row: { runId: string } | null | undefined) =>
+		!!row && !!agencyWork(tx, row.runId);
 	const finished = namedTodos(input.state).flatMap((ref) => {
 		if (todos.some((todo) => todo.ref === ref)) return [];
 		const row = deps.work?.workByRefInTransaction(
@@ -251,7 +256,9 @@ function routedInputInTransaction(
 			input.conversationId,
 			ref,
 		);
-		return row?.title ? [{ ref, title: row.title, open: false }] : [];
+		return row?.title && !own(row)
+			? [{ ref, title: row.title, open: false }]
+			: [];
 	});
 	return {
 		memory: input.prefix.memory,
@@ -283,12 +290,19 @@ function routedInputInTransaction(
 			),
 		},
 		todos: [
-			...todos.map((todo) => ({
-				ref: todo.ref,
-				title: todo.title,
-				request: deps.work?.workInTransaction(tx, todo.id)?.request,
-				open: true,
-			})),
+			...todos.flatMap((todo) => {
+				const row = deps.work?.workInTransaction(tx, todo.id);
+				return own(row)
+					? []
+					: [
+							{
+								ref: todo.ref,
+								title: todo.title,
+								request: row?.request,
+								open: true,
+							},
+						];
+			}),
 			...finished,
 		],
 		resources: namedResources(input.state),

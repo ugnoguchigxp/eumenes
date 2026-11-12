@@ -1,0 +1,14 @@
+# Source: api/domains/dialogue/service/routed-actions.ts
+text = '''担当「[[title]]」は、この依頼に答えを出せませんでした（[[code]]）。依頼はまだ満たされていません。この返事で使える手段があれば、それで応えます。なければ、答えを出せなかったことを伝えます。'''
+
+[variables.title]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"
+
+[variables.code]
+type = "string"
+trust = "trusted"
+placement = "inline"
+encoding = "raw"

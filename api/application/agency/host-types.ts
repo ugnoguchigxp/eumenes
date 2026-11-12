@@ -22,8 +22,47 @@ export type HostPersona = Pick<
 	Settings["general"],
 	"agentName" | "userName" | "persona"
 >;
+/**
+ * A research note as a document of the Markdown domain: saved as a Markdown file (and in the document library when it
+ * is connected) as the note arrives, so the notes are kept there when the agent's own list lets them go; a note the
+ * reply shows is put on a message of the conversation, whose screen shows it.
+ */
+export type NoteDocumentPort = {
+	/** Starts saving the note as a document and returns the document's id; the same note is the same document. */
+	startInTransaction(
+		db: Database,
+		note: {
+			conversationId: string;
+			noteId: string;
+			title: string;
+			markdown: string;
+			/** When the note was made: the day its document is filed under. */
+			at: number;
+		},
+	): string;
+	/** `pending` while it is saved; then the document's resource, or why there is none. */
+	stateInTransaction(
+		db: Database,
+		id: string,
+	): "pending" | { uri: string; label: string } | { code: string };
+	/** Puts the document on a message of the conversation (the message's chip). */
+	linkInTransaction(
+		db: Database,
+		input: {
+			conversationId: string;
+			messageId: string;
+			uri: string;
+			label: string;
+		},
+	): void;
+	/** The notes were forgotten: their documents are no longer offered. */
+	forget(conversationId: string, noteIds: readonly string[]): void;
+};
+
 export type AgencyHostDeps = {
 	state?: AgencyStatePort;
+	/** Keeps and shows research notes as Markdown documents; absent: notes are not kept and cannot be shown. */
+	noteDocuments?: NoteDocumentPort;
 	routeSpeechInTransaction?: SpeechRouter;
 	store: Pick<SqliteStore, "read" | "write" | "onCommit">;
 	conversation: Pick<

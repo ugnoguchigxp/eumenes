@@ -9,6 +9,7 @@ import { toErrorCode } from "../../infrastructure/error-code";
 import { currentInput, fixedInput } from "./input";
 import {
 	deliverSpeak,
+	keepNote,
 	speechId,
 	SPEECH_BUSY,
 	startResearch,
@@ -42,12 +43,32 @@ type ResultHost = Pick<CycleHost, "deps" | "convs" | "now"> & {
 	collected(): void;
 };
 
-/** Whether the scope may think and speak now: the active conversation, with nobody typing or being answered. */
-export const mayStep = (host: CycleHost, c: AgendaScope) =>
-	host.on() &&
-	host.convs.get(c.id) === c &&
-	c.id === host.active() &&
-	!host.busy(c);
+/**
+ * The research that waits to start (none while one runs). It starts even while the user types, is answered or
+ * listens: the agent holds its plan and its own words itself then, and what was asked for does not wait for a pause.
+ */
+export function researchWaiting(c: AgendaScope) {
+	const view = c.agent.view();
+	return view.researching
+		? ""
+		: view.items
+				.filter((i) => i.kind === "research" && i.status === "open")
+				.map((i) => i.id)
+				.join(" ");
+}
+
+/**
+ * Whether a step of the scope has something to do now: the active conversation, and either nobody typing or being
+ * answered, or research that waits and was not tried yet while they are (one step for each set of waiting research:
+ * what that step could not start waits for the pause).
+ */
+export function mayStep(host: CycleHost, c: AgendaScope) {
+	if (!host.on() || host.convs.get(c.id) !== c || c.id !== host.active())
+		return false;
+	if (!host.busy(c)) return true;
+	const waiting = researchWaiting(c);
+	return waiting !== "" && waiting !== c.triedWhileBusy;
+}
 
 const logCalls = (c: AgendaScope, out: StepOutcome) => {
 	for (const call of [
@@ -89,6 +110,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			);
 			const before = digest();
 			const controller = new AbortController();
+			c.triedWhileBusy = busy(c) ? researchWaiting(c) : "";
 			signal = controller.signal;
 			c.controller = controller;
 			c.revision++;
@@ -141,6 +163,8 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 		}
 	} finally {
 		c.stepping = false;
+		// A step called off started nothing: the research that waited is tried again.
+		if (signal?.aborted) c.triedWhileBusy = "";
 		c.controller = null;
 	}
 }
@@ -307,7 +331,11 @@ export async function collectAgendaResults(host: ResultHost) {
 	// Committed: the volatile state follows (a rolled-back write above leaves the scopes as they were).
 	for (const a of adopted) {
 		a.c.tickets = a.c.tickets.filter((t) => t.id !== a.ticketId);
-		if (a.note) a.c.notes = keepNotes([...a.c.notes, a.note]);
+	const kept: Promise<void>[] = [];
+		if (a.note) {
+			a.c.notes = keepNotes([...a.c.notes, a.note]);
+			kept.push(keepNote(deps, a.c, a.note));
+		}
 		const at = now();
 		a.c.agent.researchReturned({
 			ticketId: a.agentTicketId,
@@ -326,3 +354,5 @@ export async function collectAgendaResults(host: ResultHost) {
 	}
 	collected();
 }
+	// Each note is kept as a Markdown document from here on.
+	await Promise.all(kept);

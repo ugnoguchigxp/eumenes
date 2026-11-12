@@ -76,6 +76,8 @@ export type AgendaScope = {
 	backoffUntil: number;
 	busy: boolean;
 	touched: number;
+	/** The research that waited when a step last ran while the user was typing or answered (see `mayStep`). */
+	triedWhileBusy: string;
 	/** The reply being written (its run and the user's messages its prompt holds already). */
 	reply: { runId: string; included: Set<string> } | null;
 	/** What each reply did, until its message is observed (the agent's record of its own tool calls). */
@@ -267,6 +269,7 @@ export function createAgendaScope(input: {
 		calls: new Map(),
 		taken: new Map(),
 		proposals: new Map(),
+		triedWhileBusy: "",
 		given: new Map(),
 		shows: new Map(),
 		unheard: [],

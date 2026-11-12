@@ -19,6 +19,7 @@ import {
 import { toolchainArtifactsQuery } from "../domains/toolchain-artifacts/launcher";
 import { toolchainWebAdapters } from "./toolchain-adapters";
 import type { WorkspaceState } from "./useWorkspace";
+import { useShownNotes } from "./useShownNotes";
 
 const CONVERSATION_ID = "main";
 const NO_VIEWER = () => {};
@@ -83,6 +84,11 @@ export function usePanelResources(
 		notify: notice.show,
 	});
 	const resources = useConversationResources(client, CONVERSATION_ID);
+	useShownNotes(
+		state.conversation.data?.messages,
+		resources.data,
+		openResource,
+	);
 	return {
 		resources,
 		openResource,

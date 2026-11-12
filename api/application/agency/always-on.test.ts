@@ -66,6 +66,12 @@ test("a user line becomes a plan, a research, a note and the agent's own speech 
 		await waitFor(() => snapshot().notes.length === 1);
 		expect(snapshot().tickets).toHaveLength(0);
 		expect(snapshot().notes[0]!.ticketId).toBeTruthy();
+		// The note is kept as a Markdown document as it arrives, without anyone asking to see it.
+		const [note] = snapshot().notes;
+		await waitFor(() => f.documents.started.length === 1);
+		expect(f.documents.started).toEqual([
+			{ id: `doc-${note!.id}`, title: note!.title, markdown: note!.markdown },
+		]);
 		// The note is told to the user: own speech, delivered with the agency id.
 		for (let i = 0; i < 20 && agencyMessages(f).length === 0; i++)
 			await f.advance(15_000);
@@ -74,6 +80,11 @@ test("a user line becomes a plan, a research, a note and the agent's own speech 
 		expect(spoken[0]!.text).toBe("fixture result ready");
 		expect(spoken[0]!.id).toStartWith("agency:");
 		expect(f.host.status("ao").idle?.unanswered).toBe(1);
+		// A restart brings the note back and asks for its document again: the same document, made once.
+		f.documents.started.length = 0;
+		await f.restart();
+		await waitFor(() => f.documents.started.length === 1);
+		expect(f.documents.started[0]!.id).toBe(`doc-${note!.id}`);
 	} finally {
 		await f.close();
 	}
@@ -153,6 +164,47 @@ test("typing, a foreground answer and a reply being made hold the agent's thinki
 		});
 		const count = f.requests.length;
 		await f.advance(30_000);
+		expect(f.requests).toHaveLength(count);
+	} finally {
+		await f.close();
+	}
+});
+
+test("research the reply asked for starts while the user is typing or answered; the plan and own speech still wait", async () => {
+	const f = await agendaFixture({
+		media: imageFixture("success"),
+		script: (kind: CallKind) => (kind === "plan" ? planNothing() : undefined),
+	});
+	try {
+		await f.start();
+		await f.user("user-a");
+		await f.host.attend("ao", {
+			screenId: crypto.randomUUID(),
+			revision: 1,
+			sentAt: Date.now(),
+			typing: true,
+			playing: false,
+			visible: true,
+		});
+		f.setBusy(true);
+		await replyWith(f, [
+			{
+				name: "start_preparation",
+				arguments: { request: "fixture asked research", askedByUser: true },
+			},
+		]);
+		await f.advance(1000);
+		// The request is saved first; its step follows on the next timer.
+		await f.advance(1000);
+		await waitFor(
+			() => f.h.toolchain.agents.executions.list("ao").length === 1,
+		);
+		expect(f.host.status("ao").idle?.blockedBy).toBe("busy");
+		// Only the check before the research ran: the plan is held, and the step is not run over and over.
+		expect(f.calls("plan")).toHaveLength(0);
+		const count = f.requests.length;
+		await f.advance(20_000);
+		expect(f.calls("plan")).toHaveLength(0);
 		expect(f.requests).toHaveLength(count);
 	} finally {
 		await f.close();
@@ -334,9 +386,11 @@ test("a reply sees the agent's state, reads a note, asks for research and shows 
 					(i) => i.text === "fixture follow-up" && i.requested,
 				),
 		).toBe(true);
-		// The note is shown once the reply is adopted (its message appears), as one message per reply and note,
-		// never as an `agency:` line, and kept out of what the model is told and what memory learns from.
+		// The note is shown once the reply is adopted (its message appears): it becomes a document of the Markdown
+		// domain, carried by one message per reply and note, never an `agency:` line, and kept out of what the model
+		// is told and what memory learns from. The note's text is in the document, not in the conversation.
 		const shownNotes = () =>
+		noteSavingPolls: 2,
 			f.h.conversation
 				.get("ao")
 				.messages.filter((m) => m.id.startsWith("agency-note:"));
@@ -356,7 +410,28 @@ test("a reply sees the agent's state, reads a note, asks for research and shows 
 		};
 		await adopt();
 		await waitFor(() => shownNotes().length === 1);
-		expect(shownNotes()[0]!.text).toContain(note.title);
+		expect(shownNotes()[0]!.text).toBe(
+			[note.title, note.summary].filter(Boolean).join("\n"),
+		);
+		// Every note is a document (the one shown, and those nobody asked to see); only the shown one is linked.
+		expect(f.documents.started.map((d) => d.id).sort()).toEqual(
+			f.host
+				.inspect("ao")!
+				.snapshot.notes.map((n) => `doc-${n.id}`)
+				.sort(),
+		);
+		expect(f.documents.started).toContainEqual({
+			id: `doc-${note.id}`,
+			title: note.title,
+			markdown: note.markdown,
+		});
+		expect(f.documents.links).toEqual([
+			{
+				messageId: shownNotes()[0]!.id,
+				uri: `eumenes://markdown.document/generated-doc-${note.id}`,
+				label: note.title,
+			},
+		]);
 		expect(
 			f.h.store.read((db) =>
 				f.deps.memory.isBlockedInTransaction!(db, shownNotes()[0]!.id),
@@ -404,6 +479,10 @@ async function steered(
 							],
 						}
 					: { text: "fixture answer", toolCalls: [] };
+		// The document is still being saved: nothing is shown yet.
+		await f.advance(500);
+		expect(shownNotes()).toHaveLength(0);
+		await f.advance(500);
 			},
 		},
 		tools: { tools: [], call: async () => ({ content: "host" }) },

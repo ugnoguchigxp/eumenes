@@ -1,5 +1,26 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../client";
+
+/** The field is still this long: the user is not typing any more (the agenda host's own rule). */
+export const TYPING_IDLE_MS = 4_000;
+
+/**
+ * Whether the user is typing: text they wrote themselves, changed within the last moments. Text the voice session
+ * put in the field, or a draft left as it is, is not typing (a field that merely holds text held the agent for hours).
+ */
+export function useTyping(draft: { text: string; dictated: boolean }) {
+	const [typing, setTyping] = useState(false);
+	const own = draft.text.length > 0 && !draft.dictated;
+	useEffect(() => {
+		// The field's change is the event; the state follows it and ends on its own.
+		// eslint-disable-next-line react/set-state-in-effect
+		setTyping(own);
+		if (!own) return;
+		const timer = setTimeout(() => setTyping(false), TYPING_IDLE_MS);
+		return () => clearTimeout(timer);
+	}, [own, draft.text]);
+	return typing;
+}
 
 /** Screen leases contain activity flags only; no draft text is sent. */
 export function useAgencyAttention(

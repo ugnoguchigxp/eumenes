@@ -40,3 +40,7 @@ live：既存20件を変更せず比較し、別の仕事名・曖昧な複数�
 同じ保存済み接続はrootのunionを拒否し、object内のunionを受け付けた。この再現結果に従い、5種の判断を `{"decision": 判断オブジェクト}` で包む。packageが現在の有限参照と全文から閉じたschemaを生成し、hostは既存の厳密出力flagとともにそのまま渡す。全文はenum、参照は提示集合のenumに限定する。package側でも排他構造・全文・有限参照・原文部分・依存関係を再検査する。旧形式へのfallbackは追加しない。route契約7 / structure契約5、指示v7として固定する。判断の種類・担当選択・権限・取消可能状態の検査は変えない。
 
 現在の指示はv8。native schema接続後に残った、対象が同程度に当てはまる候補を一覧順で選ぶ誤りを受け、参照選択には一意な根拠が必要なこと、質問への回答には不足情報の具体的な指定が必要なことを明記した。契約7/5は同じである。現在版の部分・結合・domainとlive結果、未達条件は[継続検証](verification/project-issues-first-batch-2026-11-06/live-continuation/README.md)を正本とする。
+
+### 取消先に agency 自身の調べものを含めない（2026-11-12）
+
+構造解析へ渡す取消候補は、利用者が頼んだ仕事に限る。agency が自分で始めた調べものは台帳に載るが、候補にも取消先にもしない。経緯と変更箇所は [agency-agenda-integration](agency-agenda-integration-2026-11-11.md) の「agency の調べものは会話のルーターの候補にしない」。

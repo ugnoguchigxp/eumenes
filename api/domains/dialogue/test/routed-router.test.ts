@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
+import { insertAgencyWork } from "../repository/agency";
 import { confirmationResourceUris } from "../repository/resources";
+import { insertWork } from "../repository/work";
 import {
 	EDIT,
 	ROUTER,
@@ -259,7 +261,7 @@ test("a fill that finds nothing to ask for leaves the turn to the talk turn; one
 	expect(r.routes.at(-1)!.text).toBe("時刻を教えて\n東京");
 });
 
-test("a hand-over the host refuses, or an instant toolchain that cannot answer, is said in the host's failure words, with no call to try again", async () => {
+test("a hand-over the host refuses is said in the host's failure words, with no call to try again; an instant toolchain that ran without an answer leaves the request to the talk turn, told what failed", async () => {
 	const r = await start();
 	r.scripts.push(weigh({ [INSTANT.id]: 0.95 }));
 	h!.state.steps.push(choice({ choice: INSTANT.id, inputs: {} }));
@@ -271,11 +273,18 @@ test("a hand-over the host refuses, or an instant toolchain that cannot answer, 
 	h!.state.instantAnswer = null;
 	r.scripts.push(weigh({ [INSTANT.id]: 0.95 }));
 	h!.state.steps.push(choice({ choice: INSTANT.id, inputs: { city: "東京" } }));
+	h!.state.steps.push({ text: "時刻は分かりませんでした。" });
 	const unanswered = await h!.say("東京は今何時？");
 	expect(h!.dialogue.answerText(unanswered.id)).toBe(
-		"うまく頼めませんでした。もう一度言ってもらえますか。",
+		"時刻は分かりませんでした。",
 	);
-	expect(h!.state.calls).toHaveLength(2);
+	// The fill, then the talk: it reads the user's words with the host's notice of what could not be answered.
+	expect(h!.state.calls).toHaveLength(3);
+	expect(h!.state.calls[2]!.session?.outputSchema).toBeUndefined();
+	const told = String(h!.state.calls[2]!.messages.at(-1)!.content);
+	expect(told).toContain("## Host notice");
+	expect(told).toContain(`担当「${INSTANT.title}」`);
+	expect(told).toContain("lookup_failed");
 });
 
 test("a memory request is filled by the one-candidate call and taken by the host's operation", async () => {
@@ -333,6 +342,53 @@ test("a work is checked, corrected or cancelled by the package's decision: the h
 		"「もう一度絵を描いて」を取りやめますか？",
 	);
 	expect(h!.todos()).toHaveLength(1);
+});
+
+test("the agency's own research is not a work the router is offered: nothing the user says checks, corrects or cancels it", async () => {
+	const r = await start({}, { routerModel: DIRECT_ROUTER_MODEL });
+	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));
+	await h!.say("猫の絵を描いて", "queued");
+	// The agent's research stands in the same ledger as the user's work, under the agent's own run.
+	const root = "agency:scope:t1";
+	await h!.store.write((db) => {
+		insertAgencyWork(db, {
+			root_id: root,
+			conversation_id: "main",
+			epoch: 1,
+			ticket_id: "t1",
+			intent_id: "",
+			candidate_id: "",
+			question: "猫の絵の描き方を調べてください。",
+			toolchain_revision_id: IMAGE.revisionId,
+			deadline: Date.now() + 60_000,
+			source_refs_json: "[]",
+		});
+		insertWork(db, {
+			id: crypto.randomUUID(),
+			conversationId: "main",
+			runId: root,
+			toolchainId: IMAGE.id,
+			toolchainRevisionId: IMAGE.revisionId,
+			execution: "task",
+			request: "猫の絵の描き方を調べてください。",
+			title: "[調べもの] 猫の絵の描き方を調べてください。",
+			sourceRef: "execution-1",
+			dedupeKey: root,
+			createdAt: new Date().toISOString(),
+			messageIds: [],
+		});
+	});
+	expect(h!.todos()).toHaveLength(2);
+	r.scripts.push(weigh({}));
+	h!.state.steps.push({ text: "調べてみますね。" });
+	await h!.say("これも調べてみてもらえますか");
+	const offered = names(r.routes.at(-1)!);
+	expect(offered).toEqual(
+		expect.arrayContaining(["t1.check", "t1.amend", "t1.cancel"]),
+	);
+	expect(offered.filter((name) => name.startsWith("t2."))).toEqual([]);
+	// Both are still there: the research was not touched.
+	expect(h!.todos()).toHaveLength(2);
 });
 
 test("a doubted hand-over is redone elsewhere: the work is cancelled, the same words go to the other toolchain, and the correction is kept", async () => {

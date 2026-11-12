@@ -32,7 +32,23 @@ export function agencyResults(
 					];
 				if (w.execution_id) {
 					const view = actions.result(db, w.root_id);
-					if (!view?.result) return [];
+					// The execution is gone (its owner forgot it): the work ends here, or its TODO would stay open
+					// for ever and the ticket would never come back.
+					if (!view)
+						return [
+							{
+								general: true,
+								cancel: false,
+								rootId: w.root_id,
+								conversationId: w.conversation_id,
+								epoch: w.epoch,
+								ticketId: w.ticket_id,
+								status: "failed" as const,
+								workStatus: "failed" as const,
+								summary: "agency_execution_lost",
+							},
+						];
+					if (!view.result) return [];
 					return [
 						{
 							general: true,
@@ -149,7 +165,13 @@ export function agencyResults(
 					return false;
 				}
 				const view = actions.result(db, rootId);
-				if (!view?.result) return false;
+				// Nothing is left to adopt of an execution that is gone: its TODO is closed with it.
+				if (!view) {
+					actions.discard(db, rootId);
+					returnAgencyWork(db, rootId);
+					return false;
+				}
+				if (!view.result) return false;
 				try {
 					actions.synchronize(db, view);
 				} catch (error) {

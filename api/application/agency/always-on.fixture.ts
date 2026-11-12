@@ -7,7 +7,7 @@ import { createAgencyWork } from "./work";
 import { settle } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
 import type { imageFixture } from "../media/image.fixture";
-import type { AgencyHostDeps } from "./host-types";
+import type { AgencyHostDeps, NoteDocumentPort } from "./host-types";
 
 export type CallKind = "plan" | "check" | "ask_check" | "compose" | "profile";
 
@@ -60,6 +60,8 @@ export async function agendaFixture(
 		routeSpeech?: NonNullable<AgencyHostDeps["routeSpeechInTransaction"]>;
 		steering?: boolean;
 		webNote?: NonNullable<Parameters<typeof harness>[0]>["webNote"];
+		/** How many looks find a shown note's document still being saved. */
+		noteSavingPolls?: number;
 	} = {},
 ) {
 	const h = await harness({
@@ -108,7 +110,52 @@ export async function agendaFixture(
 					!options.media || c.revisionId.startsWith("toolchain:image.create@"),
 			);
 	const deps = {
+	/** The Markdown domain's side of a shown note, in memory: saved after `noteSavingPolls` looks, then linked. */
+	const documents = {
+		started: [] as Array<{ id: string; title: string; markdown: string }>,
+		links: [] as Array<{ messageId: string; uri: string; label: string }>,
+		forgotten: [] as string[],
+		polls: new Map<string, number>(),
+		failing: null as string | null,
+	};
+	const noteDocuments: NoteDocumentPort = {
+		startInTransaction(_db, note) {
+			const id = `doc-${note.noteId}`;
+			if (!documents.started.some((d) => d.id === id)) {
+				documents.started.push({
+					id,
+					title: note.title,
+					markdown: note.markdown,
+				});
+				documents.polls.set(id, options.noteSavingPolls ?? 0);
+			}
+			return id;
+		},
+		stateInTransaction(_db, id) {
+			const left = documents.polls.get(id) ?? 0;
+			if (left > 0) {
+				documents.polls.set(id, left - 1);
+				return "pending";
+			}
+			if (documents.failing) return { code: documents.failing };
+			return {
+				uri: `eumenes://markdown.document/generated-${id}`,
+				label: documents.started.find((d) => d.id === id)!.title,
+			};
+		},
+		linkInTransaction(_db, input) {
+			documents.links.push({
+				messageId: input.messageId,
+				uri: input.uri,
+				label: input.label,
+			});
+		},
+		forget(_conversationId, noteIds) {
+			documents.forgotten.push(...noteIds);
+		},
+	};
 		store: h.store,
+		noteDocuments,
 		conversation: h.conversation,
 		settings: h.settings,
 		memory: h.memory!,
@@ -186,6 +233,7 @@ export async function agendaFixture(
 		deps,
 		steering,
 		get host() {
+		documents,
 			return host;
 		},
 		get now() {

@@ -1,5 +1,5 @@
 import { useNotificationAudio } from "./useNotificationAudio";
-import { useAgencyAttention } from "./useAgencyAttention";
+import { useAgencyAttention, useTyping } from "./useAgencyAttention";
 import { useScreenSound } from "./useScreenSound";
 import { chatSend } from "./chat-send";
 import { useChatAttachments } from "./useChatAttachments";
@@ -159,12 +159,13 @@ export function useWorkspace({
 		screenOutput.speaking,
 	);
 	useAgencyAttention(client, "main", {
-		typing: input.text.length > 0,
+		typing,
 		playing: speaking || live.playing,
 	});
 	const mute = useVoiceMute(client);
 	const automaticInput = input.dictated && voice.active;
 	const recognitionId = voice.recognitionId;
+	const typing = useTyping(input);
 	const recognitionText = voice.transcription?.text;
 	useEffect(() => {
 		if (

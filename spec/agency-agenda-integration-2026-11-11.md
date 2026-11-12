@@ -19,7 +19,7 @@
 ## 継ぎ目と決定
 
 - **発話間隔**: 設定は 10/60/600 秒、agenda は 10/60/300 秒。600 は 300 として読む（設定契約は変更しない）。台帳の `claimDispatch` は epoch の栅としてだけ使い、間隔は 0 にした。間隔は agent 自身の規則で、調べものの開始が発話を遅らせない。
-- **メモの出どころ**: 会話ごとのドキュメント一覧 API はない。台帳が返した結果（実行結果の `answer` / `summary` / `claims` / `sources` / `document.title`）を、調べものを頼んだ ticket の `refs` つきのメモにして checkpoint に持つ（最新30件、本文は最大8000字）。`read_note` はこれを読む。`show_note` は、その返事が採用されて assistant メッセージが現れた後に、本文を `agency-note:<scope>:<runId>:<noteId>` のメッセージとして会話に出す（返事と調べものにつき1件。`agency:` ではないので自動音声で読み上げない）。Web 由来の文書なので、モデルへ渡す履歴には入れず（`recordSpoke` しない）、Memory はブロックして学習しない。採用されなかった返事は表示しない。pursuit が保存する Markdown 文書とは今は結ばない。
+- **メモの出どころ**: 会話ごとのドキュメント一覧 API はない。台帳が返した結果（実行結果の `answer` / `summary` / `claims` / `sources` / `document.title`）を、調べものを頼んだ ticket の `refs` つきのメモにして checkpoint に持つ（最新30件、本文は最大8000字）。`read_note` はこれを読む。`show_note` は、その返事が採用されて assistant メッセージが現れた後に、メモを Markdown ドメインの文書にして、その文書を付けた `agency-note:<scope>:<runId>:<noteId>` のメッセージを会話に出す（返事と調べものにつき1件。`agency:` ではないので自動音声で読み上げない。本文は題と要約だけで、メモの本文は会話に入れない）。Web 由来の文書なので、モデルへ渡す履歴には入れず（`recordSpoke` しない）、Memory はブロックして学習しない。採用されなかった返事は表示しない。詳細は下記「メモは Markdown 文書として表示する」。
 - **調べものの機能選択**: `toolchain:web.note@…` だけ（承認不要のもの。Codex の検索による調べもの、[web-note-codex-search-2026-11-11](web-note-codex-search-2026-11-11.md)）。`web.research`（Pursuit の深い調査）や他の機能には回さない（2026-11-11 までは `web.research`）。結果は題・要約・Markdown 本文・出典を持ち、そのままメモになる。なければ、承認が要る・予算超過と同じく「できなかった」として agent に返す（10秒ごとの再試行にしない）。サーバーからの個別指定は不要（既定がこの選択）。研究 ticket は checkpoint の保存が他の変更で競合しても、すぐ取り直して開始する。
 - **LLM**: purpose は think。agent の呼び出しには `input` が無いので、旧の入力ガードの代わりに世代（利用者の言葉・訂正・忘却で増える）と中止信号で古さを判定する。reasoning は設定がなければ low（出力 400〜1500 トークンを使い切らせない）。出力上限 2400 は agent の要求（最大 1500）以内。
 - **返事**: system には Eumenes の人格・感情規則の外側に、パッケージの `agendaReplySystem` の「仕組み」〜「返事の仕方」の範囲を加える（`always-on-system.ts`）。状態（記憶・メモ・調査記録・静かな時間・`askIfFits`）は `agendaReplyMessages` が作る状態メッセージを、利用者の最後のメッセージの前に差し込む（プロンプト先頭は変わらない）。返事はどのターン（通知・作業報告・引き渡しも）でも agenda の道具と状態を持つ。agenda が使えない間（runtime が always-on でない、Memory が不健全、台帳なし）は system からも agenda の規則を外す（`agencyReplyParts(settings, agenda)`）。道具は `start_preparation` `read_note` `show_note` `set_quiet`（`find_toolchain` / `delegate` は Router の host 操作なので渡さない）。呼び出し上限は host の道具の上限に3を足す。返事の道具呼び出しは次の返事の履歴として agent の `said` に入る。
@@ -79,14 +79,14 @@
 ## 残っていること
 
 - メモは会話ごとに30件（利用者単位の保管ではない）。
-- 利用者の入力中・前景の応答中は step 全体を止める（計画・調べものも止まる。参照ホストは発話だけ止められる）。
+- 利用者の入力中・前景の応答中は、計画と発話を止める（agent 自身の規則）。待っている調べものの開始は止めない（下記「2026-11-12 改訂」）。
 - 返事の履歴の tool 呼び出しは、agenda が返事を担う会話で保存した分だけ。agenda 導入前の返事には無い。
 - ルーターが処理した返事は、メッセージが会話に出た時点で観測する（出さない run は agent に見えない）。
 
 - 設定を変えると host が作り直され、記録は失効する（旧と同じ。約束も消える）。約束を残すには、失効の条件を関連する設定だけに絞る必要がある。
 - 返事の状態（記憶・メモ）は呼び出し時に作る。作った後〜採用前に忘却が起きた場合は、既存の古さ検査で返事が採用されないことに任せている。
 - Live への発話の提案は、受け付けられた時点で「言った」と数える（実際に話されたかは未確認）。
-- 返事で使ったメモの `show_note` は、pursuit の Markdown 文書（Docling `eumenes` / `research/<題>.md`）ではなく、メモ本文を会話に出す。
+- 返事で使ったメモの `show_note` は、Markdown ドメインの文書として表示する（下記「メモは Markdown 文書として表示する」。2026-11-12 までは、メモ本文を会話のメッセージとして出していた）。
 - 利用者の TODO（会話内の仕事）を agent の観測にする旧の経路（`attachWork`）は、今回は接続しない（no-op。決定済み）。
 - 旧 always-on の記録は起動時に失効するが、その観測を保管した Memory の Record（`agency/observation`）と観測表は孤児として残る（決定済み。掃除は別途）。
 - 試験: `always-on.test.ts` ほか agency の4ファイルと `dialogue/test/steer-settle.test.ts`。既存の `action-kinds.test.ts`（task の報告リソース）は取込前から失敗している。
@@ -94,3 +94,70 @@
 ## steer は Eumenes のもの（eumenes-agency 0.1.7）
 
 agency の配布物には steer を含めない（利用者、2026-11-11）。agency は返事の途中に足された言葉の受け口（`AgendaAddedWords`）と、返事の規則が読む印（`addedWordsLine`）だけを持つ。Eumenes は `api/application/agency/agenda-steer.ts` で、サーバーの eumenes-steer の受付箱（`vendor/steer`、5ba40df6）をこの受け口につなぐ。返事は書きながら流れるので、最後のモデル呼び出しの途中に届いた言葉は、その返事に取り込まず、会話の次の run が答える。
+
+## 入力中・応答中でも頼まれた調べものを始める（2026-11-12 改訂、利用者の決定）
+
+2026-11-11 夜〜11-12 朝、音声で話している間じゅう agency が一度も動かず、頼んだ調べものが再起動まで（7時間以上）始まらなかった。原因は二つで、どちらも直した。
+
+| 原因 | 直したこと | 場所 |
+| --- | --- | --- |
+| 画面が「入力欄に文字がある」ことを入力中（`typing`）と報告していた。音声の認識文は入力欄に入ったまま残るので、音声で一度話すと、画面が見えている間ずっと入力中になった | 入力中は「利用者が自分で書いた文が、直近 4 秒以内に変わった」ときだけ（参照ホストの `typingIdleMs` と同じ）。音声が入れた文と、置いたままの下書きは入力中ではない | `web/src/workspace/useAgencyAttention.ts` の `useTyping` |
+| busy（入力中・再生中・前景の推論・進行中の run）の間は step そのものを止めていたので、返事が `start_preparation` で引き受けた調べものも、静かになるまで始まらなかった | busy の間も、待っている調べもの（open の research、実行中が無いとき）があれば step を1回走らせる。agent は busy の間、計画と発話を自分で止めるので、走るのは重複確認と調べものの開始だけ。同じ待ちの組に対しては1回だけ（始められなかった分は静かになってから）。利用者の発言で中止された step は、もう一度試す | `always-on-cycle.ts` の `mayStep` / `researchWaiting`、`always-on-host.ts` の `arm` |
+
+- busy でない間の動き（`agent.nextAt` のタイマー）は変えていない。
+- 会話が active でない・host が止まっている・復旧中は、従来どおり何も走らない。
+
+## メモは Markdown 文書として表示する（2026-11-12、利用者の決定）
+
+「agency に組み込まれている表示は外し、すでにある Markdown のドメイン形式でメモを表示する」。`show_note` がメモ本文を会話のメッセージに書く表示をやめ、詳しい Web 調査の報告（[web-research-markdown-design-2026-11-08](web-research-markdown-design-2026-11-08.md)）と同じ Markdown ドメインの生成文書にした。
+
+| 項目 | 内容 |
+| --- | --- |
+| いつ | 調べものが返ってメモになったとき（2026-11-12 改訂。下の「メモを Markdown に蓄積する」）。`show_note` はその文書を会話に出す |
+| 文書 | `markdown.generated` の所有者 `agency-note`。題はメモの題、本文はメモの Markdown そのまま。ローカルは scratch の `<題>.md`、Docling がつながっていれば `eumenes` の `notes/<日付>_<題>_<noteId>.md` へ新規保存（既存の Queue・PUT 1回・GET 照合を共用） |
+| 同じメモ | 会話とメモから決まる固定の文書 id。何度表示しても文書は1つ。再起動でローカルが失効し、Docling へ未送信だった文書だけ作り直す（送信結果が不明のものは作り直さない） |
+| 会話 | 保存の終端を待ってから（最長 210 秒）、文書を資源として会話に登録し、`agency-note:` のメッセージのチップにする。本文は題と要約 |
+| 画面 | メッセージが届いたら、その文書を Markdown の画面で開く（Docling 保存済みなら既存の Plate 編集、ローカルだけなら読み取り専用の Plate 表示）。画面を開いたときに既にあったメッセージは自動では開かず、チップから開く（`web/src/workspace/useShownNotes.ts`） |
+| 失敗 | scratch も Docling も使えない・保存の期限切れは、メッセージを出さず `agency.show_note_failed` を記録する |
+| 忘却 | メモが忘却されたら、ローカルのファイルと生成文書の記録を消し、保存待ちは止める。Docling へ確定保存された文書は利用者の文書として残す（調査報告と同じ） |
+
+- 場所: `api/application/agency/note-documents.ts`（`NoteDocumentPort` の実装、`server-services.ts` で接続）、`always-on-flow.ts` の `showNote`。
+- 保存待ちはサーバーのメモリー上で行う。待っている間に再起動すると、そのメッセージは出ない（文書は Markdown の一覧に残る）。
+- 試験: `api/application/agency/note-documents.test.ts`（Docling あり・なし）、`always-on.test.ts`、`web/src/workspace/useShownNotes.test.tsx`。
+
+
+## agency の調べものは会話のルーターの候補にしない（2026-11-12）
+
+2026-11-12 10:10〜10:12（JST）、URL を貼った調査依頼と「はい、開いてみて」（メモを表示するかへの返事）が 3 回続けて「うまく頼めませんでした」で終わった。どれも、ルーターの構造解析（`turn-structure-v8`）が発言を「既存の仕事の取消」（`control`）に当て、host がその取消を実行できなかった結果である。取消先は agency 自身の調べものだった。
+
+| 回 | 発言 | 取消先に選ばれたもの | 取消が失敗した理由 |
+| --- | --- | --- | --- |
+| 1 | URL ＋「これとか調べて見てもらえますか？」 | `t89`（そのとき実行中だった agency の調べもの） | 選ばれた直後に調べものが終わった |
+| 2・3 | 「はい、開いてみて。」 | `t85`（1 時間前から閉じていなかった agency の調べもの） | 実行がもう無かった |
+
+agency の調べものは、成果の資源を会話に結ぶために会話の仕事の台帳（`dialogue_work`、題は `[担当名] 問い`）に載る。台帳の開いている仕事はそのままルーターの候補（確認・訂正・取消）と構造解析の取消先になっていたので、agency が調べている間は、利用者の発言がその調べものの取消に当たり得た。取消が通る場合は、頼んでいない取消が実行される。直したのは次の 2 点。
+
+| 原因 | 直したこと | 場所 |
+| --- | --- | --- |
+| agency 自身の調べものが、利用者の仕事と同じくルーターの候補・取消先になっていた | ルーターに渡す仕事（`RoutedInput.todos`）から、agency の仕事（`dialogue_agency_work` の `root_id` を run とする台帳の仕事）を外す。開いている仕事も、`## State` が示す終わった仕事も対象。保留質問（`pending.questions`）と `## State` の表示は変えていない | `api/domains/dialogue/service/generation-prepare.ts` の `routedInputInTransaction` |
+| 所有者が実行を捨てた調べもの（出どころの失効などで web.note が run を忘れたもの）は結果を返さないので、ticket が戻らず、台帳の仕事が開いたまま残った | 実行が無くなった仕事は、失敗として agent に返し、台帳の仕事を閉じる（`discard`） | `api/domains/dialogue/service/agency-results.ts` の `resultsInTransaction` / `returnedInTransaction` |
+
+- agency の調べものを声で取り消す経路は無くなる（静かにしてほしいときは `set_quiet`）。調べものの結果は、従来どおり返事の `read_note` / `show_note` で扱う。
+- 構造解析が取消でない発言を `control` にした判断そのものは `eumenes_router` の側の課題で、host では変えていない。利用者が頼んだ仕事が実行中の間は、同じ誤りが起こり得る。
+- 試験: `api/domains/dialogue/test/routed-router.test.ts`（agency の仕事が候補に出ない）、`api/application/agency/web-note-research.test.ts`（実行が無くなった調べものが閉じる）。
+
+## メモを Markdown に蓄積する（2026-11-12、利用者の決定）
+
+「Markdown に蓄積する形が取れたら、メモを捨てなくて良い。会話エージェントのメモ一覧からは削除しても良いが、Markdown は残せるようにしたい」。メモを文書にするのを `show_note` のときから、メモができたときへ移した。
+
+| 項目 | 内容 |
+| --- | --- |
+| いつ | 調べものの結果がメモとして採用された直後（`collectAgendaResults`）。再起動で戻ってきたメモも同じ（作成済みの文書は作り直さない） |
+| 保存先 | Docling の `eumenes` の `notes/<YYYY-MM-DD>_<題>_<noteId>.md`（日付は日本時間のメモ作成日）。詳しい Web 調査の報告（`research/`）とは別のフォルダー。Docling が無いときは scratch の一時ファイルだけ |
+| agent のメモ一覧から外れたとき | 一覧は新しい 30 件（`NOTES_KEPT`）だけを持つ。外れたメモの文書には何もしない（Docling の文書も、その起動中のローカルのファイルも残る）。文書の保存は「agent がそのメモを持っているか」に依らない |
+| 忘却（元の発言の忘却・出どころの失効） | 従来どおり。ローカルのファイルと生成文書の記録を消し、Docling へ確定保存された文書は利用者の文書として残す |
+| 保存の失敗 | メモは agent のメモのまま。`agency.note_document_failed` を記録する。Docling へ送れなかった文書は、次の再起動でメモがまだ一覧にあれば作り直す |
+| `show_note` | 同じ文書（会話とメモから決まる id）を待って、会話のメッセージに付ける。一覧から外れたメモは `show_note` では出せず、Markdown の一覧から開く |
+
+- 場所: `always-on-flow.ts` の `keepNote`、`always-on-cycle.ts`（結果の採用後）、`always-on-host.ts`（scope の復元後）、`note-documents.ts`（`held` の照会を廃止、保存先を `notes/` へ）。
+- 試験: `always-on.test.ts`（届いたメモが文書になる、再起動後も同じ文書、表示していないメモも文書になる）、`note-documents.test.ts`（日付つきの保存先）。

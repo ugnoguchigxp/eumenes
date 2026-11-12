@@ -56,6 +56,7 @@ import { assembleAgency } from "./agency/assembly";
 import { createAgencyWork } from "./agency/work";
 
 const log = getLogger("server");
+import { createNoteDocuments } from "./agency/note-documents";
 
 function buildKnowledge(
 	core: Awaited<ReturnType<typeof buildCore>>,
@@ -314,10 +315,18 @@ export async function buildServices(
 		resources: resources.dialogue,
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
+	// The agency's research notes are documents of the Markdown domain, as a research report is.
+	const noteDocuments = createNoteDocuments({
+		store,
+		markdown,
+		scratch: core.scratch,
+		ledger: () => dialogue.resourceLedger,
+	});
 		logFile: () => config.logFile,
 		// The context keeper is off for now (2026-10-29 user instruction, the review fixes design C5): no State of its
 		// own reaches the input, and the recent conversation is cut by the host's fixed rules alone.
 		objectRecognition: enabled
+			noteDocuments,
 			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
 			: undefined,
 		music: enabled ? media.music : undefined,

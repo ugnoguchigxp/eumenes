@@ -1,7 +1,11 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { AgencyActivity } from "../../../api/domains/dialogue/contracts/agency-status";
-import { useAgencyAttention } from "./useAgencyAttention";
+import {
+	TYPING_IDLE_MS,
+	useAgencyAttention,
+	useTyping,
+} from "./useAgencyAttention";
 
 afterEach(() => {
 	cleanup();
@@ -62,4 +66,28 @@ test("settled requests renew a finite lease while a screen is mounted", async ()
 	mounted.unmount();
 	await vi.advanceTimersByTimeAsync(60_000);
 	expect(client.agencyAttention).toHaveBeenCalledTimes(4);
+});
+
+test("typing is the user's own text while it changes: dictated text and a draft left still are not", async () => {
+	vi.useFakeTimers();
+	const hook = renderHook((draft) => useTyping(draft), {
+		initialProps: { text: "", dictated: false },
+	});
+	expect(hook.result.current).toBe(false);
+	hook.rerender({ text: "認識した文", dictated: true });
+	expect(hook.result.current).toBe(false);
+	hook.rerender({ text: "書", dictated: false });
+	expect(hook.result.current).toBe(true);
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(TYPING_IDLE_MS - 1);
+	});
+	hook.rerender({ text: "書き", dictated: false });
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(TYPING_IDLE_MS - 1);
+	});
+	expect(hook.result.current).toBe(true);
+	await act(async () => {
+		await vi.advanceTimersByTimeAsync(1);
+	});
+	expect(hook.result.current).toBe(false);
 });

@@ -20,7 +20,7 @@ import { ARGUMENT_CHARS, ASK_STEP } from "./tool-exchange";
  */
 
 /** How a step of the turn ended: it said what it had to, the talk turn answers, or the choice is made again. */
-export type Step = "done" | "talk" | { retry: string; exclude?: string };
+export type Step = "done" | "talk" | { retry: string };
 
 /** The words the host says itself (the local harness rebuild plan, sections 4.3 and 4.4). */
 export const SAID = {
@@ -192,7 +192,10 @@ export async function readWith(
 	return "done";
 }
 
-/** An instant toolchain answers from the inputs: the host says its answer. */
+/**
+ * An instant toolchain answers from the inputs: the host says its answer. One that ran and has no answer leaves the
+ * request to the talk turn, with a notice of what could not be answered.
+ */
 export async function instantWith(
 	turn: Turn,
 	candidate: ChoiceCandidate,
@@ -214,11 +217,18 @@ export async function instantWith(
 		turn.speak(result.answer);
 		return "done";
 	}
-	// The toolchain could not answer: another candidate may (its own description names which).
-	return {
-		retry: `${candidate.title}: ${String(result.code ?? "no_answer")}`,
-		exclude: candidate.id,
-	};
+	// The toolchain could not answer: the request is still open, so the talk turn takes it, told what failed (the
+	// reply may have means of its own, research for one). The host starts nothing else itself.
+	await turn.talk(
+		systemContext("dialogue.contexts.local.instant-unanswered", {
+			title: lineText(candidate.title).slice(0, 30),
+			code:
+				typeof result.code === "string" && /^[\w.-]{1,60}$/u.test(result.code)
+					? result.code
+					: "no_answer",
+		}),
+	);
+	return "done";
 }
 
 /**
@@ -285,10 +295,7 @@ export async function handWith(
 	}
 	if (handed.outcome.end) return "done";
 	const code = (handed.outcome.result as { code?: unknown }).code;
-	return {
-		retry: `${candidate.title}: ${String(code ?? "not_delegated")}`,
-		exclude: candidate.id,
-	};
+	return { retry: `${candidate.title}: ${String(code ?? "not_delegated")}` };
 }
 
 /** The user said yes to the confirmation `c<n>`: handed over as it was issued, or the host's failure words. */

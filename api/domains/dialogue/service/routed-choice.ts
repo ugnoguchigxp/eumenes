@@ -245,8 +245,8 @@ export function answerMessages(input: {
 
 /**
  * A choice call's answer: the object it returned, or null when it is not one with a `choice`. A cloud provider's strict
- * form (`strictChoiceSchema`) fills every field: the ones it left null are dropped, and inputs written as a JSON text
- * are read back into their object.
+ * form (`strictChoiceSchema`) fills every field: the ones it left null are dropped (those of the inputs too), and
+ * inputs written as a JSON text are read back into their object.
  */
 export function parseChoice(
 	value: unknown,
@@ -273,18 +273,93 @@ export function parseChoice(
 		} catch {
 			// Unreadable inputs are left as they are: the toolchain's own check refuses them.
 		}
+	if ("inputs" in chosen) chosen.inputs = withoutNulls(chosen.inputs);
 	return chosen as Record<string, unknown> & { choice: string };
 }
 
-/** A field in the strict form: no length ranges; an object the provider can not hold strictly as its JSON text. */
+/** The inputs without the fields the strict form made the answer fill with null (the ones it left out). */
+function withoutNulls(value: unknown): unknown {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+	return Object.fromEntries(
+		Object.entries(value)
+			.filter(([, field]) => field !== null)
+			.map(([key, field]) => [key, withoutNulls(field)]),
+	);
+}
+
+/** The value types an inputs field keeps in the strict form. */
+const PLAIN_TYPES = ["string", "number", "integer", "boolean"];
+
+/**
+ * One field of a candidate's inputs in the strict form: its type, its allowed values and its description. The
+ * bounds stay the toolchain's own check. Null when the provider can not hold the field so.
+ */
+function strictInput(field: Schema): Schema | null {
+	const described =
+		typeof field.description === "string"
+			? { description: field.description }
+			: {};
+	if (field.type === "object") {
+		const inner = strictInputs(field);
+		return inner && { ...inner, ...described };
+	}
+	if (field.type === "array") {
+		const items =
+			field.items && typeof field.items === "object"
+				? strictInput(field.items as Schema)
+				: null;
+		return items && { type: "array", items, ...described };
+	}
+	if (typeof field.type !== "string" || !PLAIN_TYPES.includes(field.type))
+		return null;
+	return {
+		type: field.type,
+		...(Array.isArray(field.enum) ? { enum: field.enum } : {}),
+		...described,
+	};
+}
+
+/**
+ * A candidate's inputs in the strict form: an object of its named fields, every one required and null when the
+ * answer leaves it out, so the provider holds the answer to the fields themselves. Null when the inputs name no
+ * field or hold a shape past plain values, lists and objects of them: those go as their JSON text.
+ */
+function strictInputs(schema: Schema): Schema | null {
+	const fields = Object.entries(
+		(schema.properties ?? {}) as Record<string, Schema>,
+	);
+	if (!fields.length) return null;
+	const required = new Set(
+		Array.isArray(schema.required) ? (schema.required as string[]) : [],
+	);
+	const properties: Record<string, Schema> = {};
+	for (const [key, field] of fields) {
+		const strict = strictInput(field);
+		if (!strict) return null;
+		properties[key] = required.has(key) ? strict : nullable(strict);
+	}
+	return {
+		type: "object",
+		additionalProperties: false,
+		required: Object.keys(properties),
+		properties,
+	};
+}
+
+/**
+ * A field in the strict form: no length ranges; a candidate's inputs as an object of their named fields, or as
+ * their JSON text when the provider can not hold them strictly.
+ */
 function strictField(field: Schema): Schema {
 	if (Array.isArray(field.anyOf))
 		return { anyOf: (field.anyOf as Schema[]).map(strictField) };
 	if (field.type === "object")
-		return {
-			type: "string",
-			description: "選んだ担当の欄を、JSON の object の文字列で",
-		};
+		return (
+			strictInputs(field) ?? {
+				type: "string",
+				description: "選んだ担当の欄を、JSON の object の文字列で",
+			}
+		);
 	if (field.type === "array")
 		return { type: "array", items: strictField(field.items as Schema) };
 	const { minLength: _min, maxLength: _max, ...rest } = field;
@@ -313,7 +388,8 @@ function mergedField(variants: readonly Schema[]): Schema {
 function nullable(field: Schema): Schema {
 	if (Array.isArray(field.anyOf))
 		return { anyOf: [...(field.anyOf as Schema[]), { type: "null" }] };
-	if (field.type === undefined) return { anyOf: [field, { type: "null" }] };
+	if (field.type === undefined || field.type === "object")
+		return { anyOf: [field, { type: "null" }] };
 	if (Array.isArray(field.enum))
 		return {
 			...field,
@@ -326,8 +402,9 @@ function nullable(field: Schema): Schema {
 /**
  * A choice schema (`choiceSchema`, `pendingSchema`) in the form a cloud provider's strict structured output takes: one
  * object holding every branch's fields side by side, `choice` required, every other field required and null when the
- * choice does not use it, no additional properties and no length ranges. LARM keeps the branches; on the cloud the
- * host's own checks hold what the branches held (a field of another branch is refused there).
+ * choice does not use it, no additional properties and no length ranges; a candidate's inputs keep their named
+ * fields (`strictInputs`). LARM keeps the branches; on the cloud the host's own checks hold what the branches held (a
+ * field of another branch is refused there).
  */
 export function strictChoiceSchema(schema: Schema): Schema {
 	const branches = (schema.anyOf as Schema[] | undefined) ?? [schema];
