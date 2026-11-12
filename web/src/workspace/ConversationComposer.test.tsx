@@ -6,6 +6,7 @@ import {
 	screen,
 } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import type { SpecialistSession } from "../../../api/domains/dialogue/contracts";
 import { createAudioStore } from "../domains/audio";
 import { ConversationComposer } from "./ConversationComposer";
 import type { WorkspaceState } from "./useWorkspace";
@@ -225,7 +226,10 @@ test("the badge beside the memory keeper follows the conversation addressee duri
 		specialistSessionId: null,
 	} as WorkspaceState["activeRun"];
 	const composer = (
-		specialist: typeof normal | typeof brave | object,
+		specialist: Pick<
+			WorkspaceState["specialist"],
+			"addressee" | "addresseeStatus"
+		> & { session: Pick<SpecialistSession, "agentLabel"> | null },
 		activeRun?: WorkspaceState["activeRun"],
 	) => (
 		<ConversationComposer
@@ -241,7 +245,9 @@ test("the badge beside the memory keeper follows the conversation addressee duri
 	expect(screen.getByText("担当 通常")).toBeTruthy();
 	view.rerender(composer(brave));
 	const badge = screen.getByText("担当 Collaboration");
-	expect(badge).toBe(screen.getByText("メモリー整理").parentElement?.nextElementSibling);
+	expect(badge).toBe(
+		screen.getByText("メモリー整理").parentElement?.nextElementSibling,
+	);
 	expect(badge.getAttribute("title")).toBe("Braveの共同作業");
 	view.rerender(composer(brave, canvasRun));
 	expect(screen.getByText("担当 Collaboration")).toBe(badge);
