@@ -63,6 +63,12 @@ export type AgendaScope = {
 	steering: AgendaAddedWords | null;
 	tickets: AgendaResearchTicket[];
 	notes: AgendaNote[];
+	/**
+	 * The notes the list let go (it keeps the newest), as their references only. A note that left the list is not a
+	 * forgotten one: what rests on it (a reply being written, a line, a research) is still whole while the words the
+	 * note read are there. Not saved with the checkpoint.
+	 */
+	retired: Array<{ id: string; refs: string[] }>;
 	/** Results that came before the agent asked again for the item (after a restart): told when it does. */
 	finished: Map<
 		string,
@@ -137,6 +143,28 @@ export function agendaRecord(
 		settingsDigest,
 		sourceRefs: agendaSources(snapshot),
 	};
+}
+
+/** The notes a reference may name: those the list holds, and those it let go (`AgendaScope.retired`). */
+export const citableNotes = (
+	c: Pick<AgendaScope, "notes" | "retired">,
+): Array<{ id: string; refs: readonly string[] }> => [...c.notes, ...c.retired];
+
+/** How many notes the list let go are still known by their references. */
+const RETIRED_KEPT = 200;
+
+/** Adds a note to the scope's list. The notes the list lets go for it stay citable (`AgendaScope.retired`). */
+export function holdNote(
+	c: Pick<AgendaScope, "notes" | "retired">,
+	kept: AgendaNote[],
+) {
+	c.retired = [
+		...c.retired,
+		...c.notes
+			.filter((n) => !kept.some((k) => k.id === n.id))
+			.map((n) => ({ id: n.id, refs: [...n.refs] })),
+	].slice(-RETIRED_KEPT);
+	c.notes = kept;
 }
 
 export const noteRef = (n: AgendaNote): NoteRef => ({
@@ -264,6 +292,7 @@ export function createAgendaScope(input: {
 		timer: undefined,
 		backoffUntil: 0,
 		triedWhileBusy: "",
+		retired: [],
 		busy: false,
 		touched: now(),
 		reply: null,

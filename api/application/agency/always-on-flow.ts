@@ -4,7 +4,12 @@ import { RESEARCH_TTL_MS, type AgendaTicket } from "eumenes-agency/agenda";
 import type { AgendaNote } from "../../domains/dialogue";
 import { referencedInput } from "./input";
 import { persistSpeech } from "./speech";
-import { knownOf, noteRef, type AgendaScope } from "./always-on-scope";
+import {
+	citableNotes,
+	knownOf,
+	noteRef,
+	type AgendaScope,
+} from "./always-on-scope";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { getLogger } from "../../infrastructure/logger";
 import type { AgencyHostDeps } from "./host-types";
@@ -113,7 +118,7 @@ export async function startResearch(input: {
 		);
 		return {
 			revisionId,
-			context: referencedInput(deps, db, c.notes, [
+			context: referencedInput(deps, db, citableNotes(c), [
 				...ticket.refs,
 				...seenRefs(deps, c, input.now()),
 			]),
@@ -192,7 +197,7 @@ export async function deliverSpeak(input: {
 		const state = input.current(db);
 		if (state === "busy") throw new Error(SPEECH_BUSY);
 		if (state !== "ok") throw new Error("agency_origin_stale");
-		const context: InputContext = referencedInput(deps, db, c.notes, [
+		const context: InputContext = referencedInput(deps, db, citableNotes(c), [
 			...ticket.refs,
 			...seenRefs(deps, c, at),
 		]);
@@ -250,7 +255,7 @@ export function keepNote(
 	return deps.store
 		.write((db) => {
 			// Forgotten meanwhile: no document is made of it.
-			if (!c.notes.some((n) => n.id === note.id)) return;
+			if (!citableNotes(c).some((n) => n.id === note.id)) return;
 			documents.startInTransaction(db, {
 				conversationId: c.id,
 				noteId: note.id,
@@ -296,7 +301,9 @@ export async function showNote(
 	const shown = (db: Database) =>
 		deps.conversation.sourceInTransaction(db, messageId).state === "available";
 	const origin = (db: Database) => {
-		const context = referencedInput(deps, db, c.notes, [`note:${note.id}`]);
+		const context = referencedInput(deps, db, citableNotes(c), [
+			`note:${note.id}`,
+		]);
 		if (!context.complete) throw new Error("agency_origin_stale");
 		return context;
 	};

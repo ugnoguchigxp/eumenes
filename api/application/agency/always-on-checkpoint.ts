@@ -11,6 +11,7 @@ import { staleInputSources } from "./input";
 import {
 	agendaEnvelope,
 	agendaRecord,
+	citableNotes,
 	type AgendaScope,
 } from "./always-on-scope";
 
@@ -42,13 +43,15 @@ export function createAgendaCheckpoints(input: {
 			...view.said.map((s) => s.id),
 			...view.items.flatMap((i) => i.refs),
 		].filter((ref) => set.has(baseRef(ref)));
-		const lost = c.notes.filter((n) => gone(n.refs));
+		// A note the list let go is forgotten with the words it read, as one it holds.
+		const lost = citableNotes(c).filter((n) => gone(n.refs));
 		const lostRefs = new Set(lost.map((n) => `note:${n.id}`));
 		c.agent.forget([...set, ...aliases, ...lostRefs]);
 		// The note goes back to before the words it read; a writer pass in flight is not kept.
 		c.profile = forgetProfile(c.profile, set) ?? c.profile;
 		c.forgetSeq++;
-		c.notes = c.notes.filter((n) => !lost.includes(n));
+		c.notes = c.notes.filter((n) => !lostRefs.has(`note:${n.id}`));
+		c.retired = c.retired.filter((n) => !lostRefs.has(`note:${n.id}`));
 		if (lost.length)
 			deps.noteDocuments?.forget(
 				c.id,

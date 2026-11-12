@@ -11,7 +11,7 @@ import { agendaReplyRules } from "./always-on-system";
 import { agencyReplyParts } from "./system-context";
 import { researchRevision } from "./always-on-flow";
 import { noteFromResult } from "./always-on-memory";
-import { agendaClock } from "./always-on-scope";
+import { agendaClock, NOTES_KEPT } from "./always-on-scope";
 import type { AgendaHostSnapshot } from "../../domains/dialogue";
 import { createSwitchingAgencyHost } from "./switching-host";
 import { settle, waitFor } from "../../infrastructure/wait-for";
@@ -666,6 +666,110 @@ test("a reply is given the agent's state and tools whatever turn it answers, and
 		await f.close();
 	}
 });
+
+test("a note the full list lets go for a newer one is not a forgotten one: the reply given it stays whole, until the words it read are forgotten", async () => {
+	const planned = new Set<string>();
+	// The second research is held until the reply is being written.
+	let release!: () => void;
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let turns = 0;
+	const f = await agendaFixture({
+		webNote: {
+			turn: async () => {
+				if (++turns > 1) await gate;
+				return {
+					text: "題: fixture note\n要約: fixture summary\n---\nfixture body",
+					searches: 1,
+					usage: null,
+				};
+			},
+		},
+		script: (kind: CallKind, request) => {
+			if (kind !== "plan") return undefined;
+			for (const ref of ["user-a", "user-b"])
+				if (!planned.has(ref) && request.prompt.includes(ref)) {
+					planned.add(ref);
+					return {
+						add: [
+							{
+								kind: "research",
+								text: `fixture picture of ${ref}`,
+								refs: [ref],
+								value: 5,
+								reason: "fixture",
+								topic: ref,
+							},
+						],
+						drop: [],
+						focus: ref,
+					};
+				}
+			return planNothing();
+		},
+	});
+	const notes = () => f.host.inspect("ao")!.snapshot.notes;
+	try {
+		await f.start();
+		await f.user("user-a");
+		await f.advance(1000);
+		await waitFor(() => notes().length === 1);
+		// The list is full: the checkpoint holds as many notes of the first research as the list keeps.
+		await f.host.close();
+		await f.h.store.write((db) => {
+			const row = db
+				.query(
+					"SELECT snapshot_json FROM dialogue_agency_state WHERE conversation_id='ao'",
+				)
+				.get() as { snapshot_json: string };
+			const snapshot = JSON.parse(row.snapshot_json) as AgendaHostSnapshot;
+			const [note] = snapshot.notes;
+			snapshot.notes = Array.from({ length: NOTES_KEPT }, (_, i) => ({
+				...note!,
+				id: `full-${i}`,
+				at: note!.at + i,
+			}));
+			db.query(
+				"UPDATE dialogue_agency_state SET snapshot_json=? WHERE conversation_id='ao'",
+			).run(JSON.stringify(snapshot));
+		});
+		await f.restart();
+		expect(notes()).toHaveLength(NOTES_KEPT);
+		// A research is under way when a reply is written; the reply is given the notes, the oldest among them.
+		await f.user("user-b");
+		await waitFor(async () => {
+			await f.advance(1000);
+			return turns === 2;
+		});
+		await replyWith(f, [], { runId: "run-full", messageIds: [] });
+		const given = () =>
+			f.h.store.read((db) =>
+				f.host.dialoguePort.replyInputInTransaction!(db, "run-full"),
+			);
+		expect(given()?.complete).toBe(true);
+		// The research comes back before the reply is adopted: its note takes the place of the oldest one.
+		release();
+		await waitFor(async () => {
+			await f.advance(1000);
+			return notes().some((n) => n.refs.includes("user-b"));
+		});
+		expect(notes()).toHaveLength(NOTES_KEPT);
+		expect(notes().some((n) => n.id === "full-0")).toBe(false);
+		// The reply is not written again for it.
+		expect(given()?.complete).toBe(true);
+		// The words the old note read are forgotten: now the reply does rest on something gone.
+		await f.h.memory!.forget({
+			conversationId: "ao",
+			messageIds: ["user-a"],
+			itemIds: [],
+		});
+		expect(given()?.complete).toBe(false);
+	} finally {
+		release();
+		await f.close();
+	}
+}, 30_000);
 
 test("the reply's system holds the agenda's rules only where the agenda serves the reply", async () => {
 	const f = await agendaFixture();

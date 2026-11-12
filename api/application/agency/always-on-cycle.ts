@@ -16,7 +16,7 @@ import {
 } from "./always-on-flow";
 import type { AgendaHearing } from "./always-on-heard";
 import { keepNotes, noteFromResult } from "./always-on-memory";
-import { noteRef, type AgendaScope } from "./always-on-scope";
+import { holdNote, noteRef, type AgendaScope } from "./always-on-scope";
 import type { ScopePatch } from "./always-on-checkpoint";
 import type { AgendaNote } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
@@ -333,7 +333,7 @@ export async function collectAgendaResults(host: ResultHost) {
 	for (const a of adopted) {
 		a.c.tickets = a.c.tickets.filter((t) => t.id !== a.ticketId);
 		if (a.note) {
-			a.c.notes = keepNotes([...a.c.notes, a.note]);
+			holdNote(a.c, keepNotes([...a.c.notes, a.note]));
 			kept.push(keepNote(deps, a.c, a.note));
 		}
 		const at = now();

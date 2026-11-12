@@ -161,3 +161,17 @@ agency の調べものは、成果の資源を会話に結ぶために会話の�
 
 - 場所: `always-on-flow.ts` の `keepNote`、`always-on-cycle.ts`（結果の採用後）、`always-on-host.ts`（scope の復元後）、`note-documents.ts`（`held` の照会を廃止、保存先を `notes/` へ）。
 - 試験: `always-on.test.ts`（届いたメモが文書になる、再起動後も同じ文書、表示していないメモも文書になる）、`note-documents.test.ts`（日付つきの保存先）。
+
+## 一覧から外れたメモは忘却ではない（2026-11-12）
+
+2026-11-12 11:30（JST）、返事の読み上げが始まった直後に止まり（`generation_replaced`）、同じ発言への返事が約 22 秒後にもう一度作られた。返事を書いている間に調べものの結果が届き、満杯（30 件）のメモ一覧から一番古いメモが押し出されたためである。返事は渡されたメモ全部に依拠し、採用時に「渡したものがまだあるか」を確かめる。押し出されたメモは一覧に無いので「忘却された」と判定され、返事は採用されずに書き直された。メモが 30 件に達してからは、返事の途中で調べものが返るたびに起きる。
+
+| 項目 | 内容 |
+| --- | --- |
+| 直したこと | 一覧から押し出されたメモは、参照（id と `refs`）だけを scope に残す（`retired`、最新 200 件、checkpoint には保存しない）。メモへの参照は「一覧にあるメモ＋押し出されたメモ」で解決する |
+| 効く場所 | 返事の採用（`replyInputInTransaction`）、調べものの開始、自分からの発話、`show_note`、メモの文書化 |
+| 忘却 | 押し出されたメモも、読んだ発言・記憶が忘却されれば一覧のメモと同じに扱う（参照を消し、agent に伝え、文書のローカルと記録を消す）。それに依拠する返事は従来どおり採用されない |
+| 再起動 | `retired` は消える。書きかけの返事も残らないので、今回の現象には影響しない |
+
+- 場所: `always-on-scope.ts`（`retired`、`citableNotes`、`holdNote`）、`always-on-cycle.ts`、`always-on-ports.ts`、`always-on-flow.ts`、`always-on-checkpoint.ts`。
+- 試験: `always-on.test.ts`「a note the full list lets go for a newer one is not a forgotten one」（修正を外すと失敗する）。

@@ -25,6 +25,7 @@ import {
 	agendaClock,
 	agendaInterval,
 	agendaReady,
+	citableNotes,
 	knownOf,
 	noteRef,
 	type AgendaScope,
@@ -95,7 +96,7 @@ export function createAgendaPorts(input: {
 		replyInputInTransaction: (db: Database, runId: string) => {
 			const c = [...convs.values()].find((x) => x.given.has(runId));
 			return c
-				? referencedInput(deps, db, c.notes, c.given.get(runId) ?? [])
+				? referencedInput(deps, db, citableNotes(c), c.given.get(runId) ?? [])
 				: null;
 		},
 	};
