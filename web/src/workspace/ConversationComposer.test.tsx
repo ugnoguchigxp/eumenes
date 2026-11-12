@@ -196,6 +196,67 @@ test("the memory keeper is lit while a step runs and offers the error report fro
 	).toBeNull();
 });
 
+test("the badge beside the memory keeper follows the conversation addressee during delegation", () => {
+	const store = createAudioStore();
+	const base = {
+		voice: { active: false },
+		phase: "idle",
+		attachments: { items: [], files: { items: [] } },
+		mute: { ready: true, muted: false, busy: false },
+		draft: "",
+		submit: { isPending: false },
+		edit: { editing: null, target: null },
+		stewardActivity: {},
+	} as unknown as WorkspaceState;
+	const normal = {
+		addressee: { kind: "normal", label: "通常", suspended: null },
+		addresseeStatus: "success",
+		session: null,
+	} as const;
+	const brave = {
+		addressee: { kind: "specialist", label: "Braveの共同作業" },
+		addresseeStatus: "success",
+		session: { agentLabel: "Collaboration" },
+	} as const;
+	const canvasRun = {
+		id: "canvas-run",
+		status: "running",
+		pinnedToolchainId: "toolchain:canvas.app@1",
+		specialistSessionId: null,
+	} as WorkspaceState["activeRun"];
+	const composer = (
+		specialist: typeof normal | typeof brave | object,
+		activeRun?: WorkspaceState["activeRun"],
+	) => (
+		<ConversationComposer
+			state={{ ...base, specialist, activeRun } as WorkspaceState}
+			store={store}
+		/>
+	);
+	const view = render(composer({ ...normal, addresseeStatus: "pending" }));
+	expect(screen.getByText("担当 確認中")).toBeTruthy();
+	view.rerender(composer({ ...normal, addresseeStatus: "error" }));
+	expect(screen.getByText("担当 未確認")).toBeTruthy();
+	view.rerender(composer(normal, canvasRun));
+	expect(screen.getByText("担当 通常")).toBeTruthy();
+	view.rerender(composer(brave));
+	const badge = screen.getByText("担当 Collaboration");
+	expect(badge).toBe(screen.getByText("メモリー整理").parentElement?.nextElementSibling);
+	expect(badge.getAttribute("title")).toBe("Braveの共同作業");
+	view.rerender(composer(brave, canvasRun));
+	expect(screen.getByText("担当 Collaboration")).toBe(badge);
+	view.rerender(
+		composer({
+			...normal,
+			addressee: { ...normal.addressee, suspended: "Braveの共同作業" },
+			session: brave.session,
+		}),
+	);
+	expect(screen.getByText("担当 通常")).toBeTruthy();
+	view.rerender(composer(brave));
+	expect(screen.getByText("担当 Collaboration")).toBeTruthy();
+});
+
 test("Live starts beside send, offers settings, and turns both legacy routes OFF while active", () => {
 	const start = vi.fn(),
 		stop = vi.fn(),
