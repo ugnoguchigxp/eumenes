@@ -66,6 +66,8 @@ export function researchWaiting(c: AgendaScope) {
 export function mayStep(host: CycleHost, c: AgendaScope) {
 	if (!host.on() || host.convs.get(c.id) !== c || c.id !== host.active())
 		return false;
+	if (host.deps.store.read((db) => host.deps.backgroundPaused?.(db, c.id)))
+		return false;
 	if (!host.busy(c)) return true;
 	const waiting = researchWaiting(c);
 	return waiting !== "" && waiting !== c.triedWhileBusy;
@@ -137,6 +139,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			// A line is for the conversation as the step saw it; a user who is busy only delays it.
 			const speech = (db: Database) =>
 				!current() ||
+				deps.backgroundPaused?.(db, c.id) ||
 				c.generation !== generation ||
 				controller.signal.aborted ||
 				digest() !== before ||
@@ -192,7 +195,7 @@ async function handleTicket(
 				deps,
 				c,
 				ticket,
-				current,
+				current: (db) => current() && !deps.backgroundPaused?.(db, c.id),
 				save: host.save,
 				now,
 			});

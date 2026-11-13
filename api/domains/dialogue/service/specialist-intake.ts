@@ -4,6 +4,17 @@ import { liveSession, type SessionRecord } from "../repository";
 import type { DialogueDeps } from "./context";
 import { endOrMarkClosing, sessionExpired } from "./specialist-core";
 
+export function activeSpecialistAgentLabel(
+	deps: DialogueDeps,
+	db: Database,
+	conversationId: string,
+) {
+	const session = liveSession(db, conversationId);
+	return session?.state === "active" && !sessionExpired(session, deps.clock())
+		? (deps.specialist?.agentLabel?.(session.adapterRef) ?? null)
+		: null;
+}
+
 /**
  * The session an utterance of this conversation is addressed to (null: the main agent takes it). Only an
  * active, unexpired session is addressed; an expired one is not extended: it is ended here and the utterance

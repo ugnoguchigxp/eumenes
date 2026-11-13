@@ -116,6 +116,8 @@ export type AgencyHostDeps = {
 	): LlmPort;
 	/** True when the conversation has a queued or running run (inside a transaction, read-only). */
 	conversationBusy(db: Database, conversationId: string): boolean;
+	/** A specialist has the conversation and handles its requests and replies. */
+	backgroundPaused?(db: Database, conversationId: string): boolean;
 	/** Records the agency's utterance as an event of the conversation, in the transaction that stores it. */
 	recordSpokeInTransaction(
 		db: Database,

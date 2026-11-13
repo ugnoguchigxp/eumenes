@@ -12,13 +12,16 @@ import type {
 const target = collaborationInputs.collaborationBraveStart.omit({
 	expectedRevision: true,
 });
+const imageTarget = collaborationInputs.collaborationBraveImage.omit({
+	expectedRevision: true,
+});
 const caller = z.strictObject({
 	kind: z.literal("collaboration"),
 	workRef: z.uuid(),
 	source: z.custom<ExecutionSource>(),
 });
 
-export function collaborationBrave(
+function registerTaskAuthority(
 	browser: BrowserService,
 	execution: Pick<ToolchainExecutionPort, "validSourceInTransaction">,
 ) {
@@ -30,6 +33,13 @@ export function collaborationBrave(
 			execution.validSourceInTransaction(db, parsed.data.source)
 		);
 	});
+}
+
+export function collaborationBrave(
+	browser: BrowserService,
+	execution: Pick<ToolchainExecutionPort, "validSourceInTransaction">,
+) {
+	registerTaskAuthority(browser, execution);
 
 	const available = browser.taskAvailableInTransaction;
 	const task = (db: Database, source: Source, id: string) => {
@@ -85,9 +95,15 @@ export function collaborationBrave(
 			url?: string;
 			continueFrom?: string;
 			approvePending?: boolean;
+			visual?: {
+				mode: "reuse" | "capture";
+				captureId?: string;
+				tabRef?: string;
+				range?: string;
+			};
 		},
 	) {
-		const { source, root, workRef, brief, ...args } = input;
+		const { source, root, workRef, brief, visual, ...args } = input;
 		const authority: ExecutionSource =
 			source.messageId === root.messageId
 				? root
@@ -101,7 +117,8 @@ export function collaborationBrave(
 							},
 						],
 					};
-		if (!available(db)) throw new Error("browser_disconnected");
+		if (visual?.mode !== "reuse" && !available(db))
+			throw new Error("browser_disconnected");
 		if (!execution.validSourceInTransaction(db, authority))
 			throw new Error("execution_source_invalid");
 		const started = browser.startTaskInTransaction(db, {
@@ -110,11 +127,12 @@ export function collaborationBrave(
 			conversationId: source.conversationId,
 			request: source.request,
 			origin: "child",
-			scriptRequired: true,
+			scriptRequired: !visual || !!args.url,
 			frozen: {
 				brief,
-				packageRevisionId: "package:browser.brave-operator@1",
+				packageRevisionId: "package:browser.brave-operator@4",
 				caller: { kind: "collaboration", workRef, source: authority },
+				...(visual ? { visual } : {}),
 			},
 		});
 		return view(db, source, started.taskId);
@@ -167,6 +185,16 @@ export function collaborationBrave(
 								state,
 								request: requestSummary,
 								tabRef: tabRef && live.has(tabRef) ? tabRef : null,
+								...(found.visualCaptureRef &&
+								source.specialistSessionId &&
+								browser.isCollaborationTaskInTransaction(
+									db,
+									taskId,
+									source.conversationId,
+									source.specialistSessionId,
+								)
+									? { visualCaptureId: found.visualCaptureRef }
+									: {}),
 							},
 						];
 					}),
@@ -186,23 +214,56 @@ export function collaborationBrave(
 			input: Parameters<Ports["start"]>[2],
 			explicitTarget = false,
 		) {
-			const { request: brief, tabRef, url } = target.parse(input.value);
+			const image = imageTarget.safeParse(input.value);
+			const {
+				request: brief,
+				tabRef,
+				url,
+			} = image.success ? image.data : target.parse(input.value);
 			const previous = input.previousChildId
 				? task(db, input.source, input.previousChildId)
 				: null;
 			const lastTab =
 				previous &&
 				("lastTabRef" in previous ? previous.lastTabRef : previous.tabRef);
+			const mode = image.success ? image.data.mode : undefined;
+			if (
+				mode === "recapture" &&
+				(!lastTab || url || (tabRef && tabRef !== lastTab))
+			)
+				throw new Error("tab_lost");
+			const captureId =
+				(image.success ? image.data.captureId : undefined) ??
+				previous?.visualCaptureRef;
+			const capture =
+				mode === "reuse" && captureId && !url
+					? browser.collaborationCaptureInTransaction(
+							db,
+							owner,
+							{
+								kind: "collaboration",
+								workRef: input.workRef,
+								source: input.response,
+							},
+							captureId,
+						)
+					: undefined;
+			if (
+				mode === "reuse" &&
+				(!capture || url || (tabRef && tabRef !== capture.tabRef))
+			)
+				throw new Error("browser_capture_not_found");
 			// A continuation without a new explicit tab stays on the previous tab even if focus changed.
-			if (previous && !lastTab && !tabRef && !url) throw new Error("tab_lost");
-			if (explicitTarget && !previous && !tabRef && !url)
+			if (!capture && previous && !lastTab && !tabRef && !url)
+				throw new Error("tab_lost");
+			if (explicitTarget && !capture && !previous && !tabRef && !url)
 				throw new Error("tab_lost");
 			const activeTab = !previous
 				? browser
 						.tabsInTransaction(db)
 						.find((tab) => tab.active && tab.status === "idle")?.tabRef
 				: undefined;
-			const chosen = tabRef ?? lastTab ?? activeTab;
+			const chosen = tabRef ?? capture?.tabRef ?? lastTab ?? activeTab;
 			if (!chosen && !url) throw new Error("tab_lost");
 			return start(db, {
 				workRef: input.workRef,
@@ -210,8 +271,26 @@ export function collaborationBrave(
 				source: input.response,
 				root: input.source,
 				brief,
-				tabRef: chosen,
+				tabRef: mode === "reuse" ? undefined : chosen,
 				url,
+				...(mode
+					? {
+							visual: {
+								mode: mode === "reuse" ? "reuse" : "capture",
+								...(capture && {
+									captureId: capture.id,
+									tabRef: capture.tabRef,
+									range: capture.range,
+								}),
+								...(mode === "recapture" &&
+								!url &&
+								chosen === lastTab &&
+								previous?.visualCaptureRange
+									? { range: previous.visualCaptureRange }
+									: {}),
+							},
+						}
+					: {}),
 			});
 		},
 		answer(

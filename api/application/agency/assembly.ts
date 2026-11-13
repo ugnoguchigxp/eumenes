@@ -41,7 +41,13 @@ export function assembleAgency(
 		| "recordSpontaneousInTransaction"
 		| "conversationTaskInTransaction"
 	> &
-		Partial<Pick<DialogueService, "backgroundDiagnosticInTransaction">>,
+		Partial<
+			Pick<
+				DialogueService,
+				| "backgroundDiagnosticInTransaction"
+				| "activeSpecialistAgentLabelInTransaction"
+			>
+		>,
 ) {
 	const { store, inference } = deps;
 	const state =
@@ -75,6 +81,11 @@ export function assembleAgency(
 			}),
 		conversationBusy: (db, conversationId) =>
 			dialogue().conversationHasActiveRunInTransaction(db, conversationId),
+		backgroundPaused: (db, conversationId) =>
+			dialogue().activeSpecialistAgentLabelInTransaction?.(
+				db,
+				conversationId,
+			) === "Collaboration",
 		backgroundDiagnostic: (db, conversationId) =>
 			dialogue().backgroundDiagnosticInTransaction?.(db, conversationId) ??
 			null,

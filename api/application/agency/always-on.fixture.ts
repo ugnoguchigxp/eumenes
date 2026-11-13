@@ -60,6 +60,7 @@ export async function agendaFixture(
 		routeSpeech?: NonNullable<AgencyHostDeps["routeSpeechInTransaction"]>;
 		steering?: boolean;
 		webNote?: NonNullable<Parameters<typeof harness>[0]>["webNote"];
+		backgroundPaused?: AgencyHostDeps["backgroundPaused"];
 		/** How many looks find a shown note's document still being saved. */
 		noteSavingPolls?: number;
 	} = {},
@@ -198,6 +199,7 @@ export async function agendaFixture(
 			},
 		}),
 		conversationBusy: () => false,
+		backgroundPaused: options.backgroundPaused,
 		recordSpokeInTransaction: () => {},
 		publish: () => {
 			published++;

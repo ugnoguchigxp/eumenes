@@ -93,6 +93,8 @@ export type TaskApi = {
 	): Promise<CaptureView>;
 	/** A capture this task started; it only runs while the task does, so the task waits for it. */
 	captureStatus(captureId: string): CaptureView;
+	/** Pixels from this task's ready capture, under the current execution authority. */
+	readCapture?(captureId: string): Promise<Uint8Array>;
 };
 
 /**

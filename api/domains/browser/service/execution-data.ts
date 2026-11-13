@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { taskRow, type TaskRow } from "../repository";
+import { captureRow, taskRow, type TaskRow } from "../repository";
 
 export function isCollaborationTaskInTransaction(
 	db: Database,
@@ -31,7 +31,47 @@ export function taskExecutionResult<V extends object>(view: V, row: TaskRow) {
 		...(core.ended === true && typeof core.excerpt === "string"
 			? { excerpt: core.excerpt as string }
 			: {}),
+		...(row.state === "completed" && typeof core.visualCaptureRef === "string"
+			? {
+					visualCaptureRef: core.visualCaptureRef as string,
+					visualCaptureRange: core.visualCaptureRange as string | undefined,
+				}
+			: {}),
 	};
+}
+
+/** Only pixels used by a completed child of this same Collaboration work can be reviewed. */
+export function collaborationCapture(
+	db: Database,
+	owner: string,
+	caller: unknown,
+	id: string,
+) {
+	const capture = captureRow(db, id);
+	const task = capture?.task_id ? taskRow(db, capture.task_id) : null;
+	const root = JSON.parse(task?.frozen_json ?? "{}").caller;
+	const current = caller as {
+		kind?: string;
+		workRef?: string;
+		source?: { conversationId?: string; specialistSessionId?: string };
+	} | null;
+	if (
+		!capture ||
+		capture.owner !== owner ||
+		capture.state !== "local_ready" ||
+		task?.state !== "completed" ||
+		task.origin !== "child" ||
+		current?.kind !== "collaboration" ||
+		root?.kind !== "collaboration" ||
+		!current.workRef ||
+		current.workRef !== root.workRef ||
+		!current.source?.specialistSessionId ||
+		current.source.specialistSessionId !== root.source?.specialistSessionId ||
+		current.source.conversationId !== capture.conversation_id ||
+		JSON.parse(task.core_state_json ?? "{}").visualCaptureRef !== id
+	)
+		throw new Error("browser_capture_not_found");
+	return { capture, root };
 }
 
 /** Remove delegated source copies after the owning execution is forgotten. */

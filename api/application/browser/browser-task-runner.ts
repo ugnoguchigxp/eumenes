@@ -33,6 +33,7 @@ import {
 	type TaskState,
 } from "../../domains/inference";
 import { expireObservations } from "./browser-fold";
+import { withCaptureImage } from "./browser-task-image";
 import { addSeen, clip, originOf, placeOf } from "./browser-text";
 import {
 	FATAL_CODES,
@@ -78,6 +79,14 @@ const frozenSchema = z.strictObject({
 	caller: z.unknown().optional(),
 	modelStepMs: z.number().int().min(5000).max(90000).optional(),
 	maxModelCalls: z.number().int().min(1).max(12).optional(),
+	visual: z
+		.strictObject({
+			mode: z.enum(["reuse", "capture"]),
+			captureId: z.uuid().optional(),
+			tabRef: z.uuid().optional(),
+			range: z.enum(["viewport", "full-page", "element"]).optional(),
+		})
+		.optional(),
 });
 
 /** The persisted job state: the single-shot core's state and what the host keeps for the tools. */
@@ -118,7 +127,6 @@ type Operator = {
 	profile: string;
 	skills: string[];
 	tools: AgentTool[];
-	toolIds: string[];
 	/** The schema key each offered tool was registered with. */
 	schemaKeys: ReadonlyMap<string, string>;
 	turn: Parameters<typeof resolveTaskPolicy>[0];
@@ -135,6 +143,12 @@ const endedState = (core: TaskState, work: Work, cited?: string[]) => ({
 	refusals: core.refusals,
 	captures: work.captures,
 	lastTabRef: work.tabRef,
+	...(cited && work.visualCaptureRef
+		? {
+				visualCaptureRef: work.visualCaptureRef,
+				visualCaptureRange: work.visualRange,
+			}
+		: {}),
 	...(cited && work.excerpt ? { excerpt: work.excerpt } : {}),
 	...(cited ? { cited } : {}),
 });
@@ -213,7 +227,6 @@ function operatorOf(
 		profile,
 		skills: skills as string[],
 		tools,
-		toolIds: tools.map((t: AgentTool) => t.id),
 		schemaKeys: new Map(
 			(pack.toolRevisionIds ?? []).flatMap((id: string) => {
 				const tool = byId.get(id);
@@ -224,8 +237,133 @@ function operatorOf(
 	};
 }
 
+/** The task's first job: its operator, the target tab and its observation, and the core's first state. */
+async function beginTask(
+	ports: TaskRunnerPorts,
+	input: TaskStepInput,
+	api: TaskApi,
+): Promise<Persisted> {
+	const { store } = ports;
+	const caps = ports.capabilities();
+	if (!caps) throw new Error("capability_unavailable");
+	const frozen = frozenSchema.parse(input.frozen ?? {});
+	const source = frozen.execution
+		? store.read((db) => ports.taskExecutionSourceInTransaction?.(db, frozen))
+		: input.request;
+	if (!source) throw new Error("execution_source_invalid");
+	const operator = store.read((db) => operatorOf(db, caps, input));
+	const visual = frozen.visual;
+	const reuse = visual?.mode === "reuse";
+	if (!reuse && frozen.caller && !api.connection().availability.available) {
+		if ((frozen.caller as { kind?: unknown }).kind === "collaboration")
+			throw new Error("browser_disconnected");
+		await api.connect();
+	}
+	const tabs = reuse
+		? []
+		: (await api.tabs()).filter((t) => t.status !== "closed");
+	// A tab the request named is that tab or none: the task never moves to another one.
+	const target = input.tabRef
+		? tabs.find((t) => t.tabRef === input.tabRef)
+		: (tabs.find((t) => t.active) ?? tabs[0]);
+	if (!target && (input.tabRef || (!input.scriptRequired && !frozen.caller)))
+		throw new Error("tab_lost");
+	const safeTarget = target?.status === "blocked" ? undefined : target;
+	const observation = safeTarget ? await api.observe(safeTarget.tabRef) : null;
+	const approved = reuse ? [] : api.approvals();
+	const history = visual ? [] : api.histories();
+	const offered = reuse
+		? operator.tools.filter((tool) => tool.id === "browser.page.image_regions")
+		: visual && !input.url
+			? operator.tools.filter((tool) =>
+					[
+						"browser.page.observe",
+						"browser.page.capture_image",
+						"browser.page.image_regions",
+					].includes(tool.id),
+				)
+			: operator.tools;
+	// With no issued input reference, the only available input source is a request quotation.
+	// Present that existing contract with its required pair, rather than two optional sources.
+	const tools = approved.some((item) => item.kind === "input_value")
+		? offered
+		: offered.map((tool) =>
+				tool.id === "browser.page.type"
+					? {
+							...tool,
+							inputSchema: zSchema(
+								operator.schemaKeys.get(tool.id) === "browserPageTypeValue"
+									? "browserPageType"
+									: "browserPageType2",
+							),
+						}
+					: tool,
+			);
+	const work: Work = {
+		tabRef: reuse ? (visual.tabRef ?? null) : (safeTarget?.tabRef ?? null),
+		origin: observation ? originOf(observation.url) : null,
+		tools: tools.map((tool) => tool.id),
+		seen: addSeen(
+			[],
+			...tabs.map((t) => t.title),
+			observation ? `${observation.title}\n${observation.text}` : "",
+		),
+		evidence: observation ? [observation.observationRef] : [],
+		captures: [],
+		...(visual ? { visualMode: visual.mode } : {}),
+		...(visual?.range ? { visualRange: visual.range } : {}),
+		...(reuse && visual.captureId
+			? { visualCaptureRef: visual.captureId, evidence: [visual.captureId] }
+			: {}),
+	};
+	const core = startTask({
+		control: taskControl({
+			profile: operator.profile,
+			skills: operator.skills,
+			rules: RULES,
+			tools,
+		}),
+		request: source,
+		...(frozen.brief ? { brief: frozen.brief } : {}),
+		reference: {
+			...(input.url ? { requestedUrl: input.url } : {}),
+			...(reuse ? {} : { connection: api.connection() }),
+			...(visual ? { visual } : {}),
+			scriptRequired: !!input.scriptRequired,
+			target:
+				safeTarget && observation
+					? {
+							tabRef: safeTarget.tabRef,
+							title: clip(observation.title, 100),
+							place: placeOf(observation.url),
+						}
+					: null,
+			tabs: tabs.slice(0, 20).map((t) => ({
+				tabRef: t.tabRef,
+				title: clip(t.title, 100),
+				place: placeOf(t.url),
+				active: t.active,
+				status: t.status,
+			})),
+			observation: observation ? observationView(observation) : null,
+			...(approved.length ? { approved: approvedView(approved) } : {}),
+			...(history.length ? { history } : {}),
+		},
+		referenceIntro: REFERENCE_INTRO,
+		correction: CORRECTION,
+		policy: resolveTaskPolicy(
+			frozen.maxModelCalls
+				? { ...operator.turn, maxModelCalls: frozen.maxModelCalls }
+				: operator.turn,
+			DEFAULT_MODEL_CALLS,
+		),
+		nowMs: Date.now(),
+	});
+	return { v: 1, core, work };
+}
+
 export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
-	const { store, inference } = ports;
+	const { inference } = ports;
 
 	const infer = taskInference(ports);
 
@@ -234,107 +372,6 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 		const used = inference.countControlTokens?.(messages) ?? null;
 		const window = inference.savedLlmContextWindow?.() ?? null;
 		return used === null || window === null || used + OUTPUT_TOKENS <= window;
-	}
-
-	/** The task's first job: its operator, the target tab and its observation, and the core's first state. */
-	async function begin(input: TaskStepInput, api: TaskApi): Promise<Persisted> {
-		const caps = ports.capabilities();
-		if (!caps) throw new Error("capability_unavailable");
-		const frozen = frozenSchema.parse(input.frozen ?? {});
-		const source = frozen.execution
-			? store.read((db) => ports.taskExecutionSourceInTransaction?.(db, frozen))
-			: input.request;
-		if (!source) throw new Error("execution_source_invalid");
-		const operator = store.read((db) => operatorOf(db, caps, input));
-		if (frozen.caller && !api.connection().availability.available) {
-			if ((frozen.caller as { kind?: unknown }).kind === "collaboration")
-				throw new Error("browser_disconnected");
-			await api.connect();
-		}
-		const tabs = (await api.tabs()).filter((t) => t.status !== "closed");
-		// A tab the request named is that tab or none: the task never moves to another one.
-		const target = input.tabRef
-			? tabs.find((t) => t.tabRef === input.tabRef)
-			: (tabs.find((t) => t.active) ?? tabs[0]);
-		if (!target && (input.tabRef || (!input.scriptRequired && !frozen.caller)))
-			throw new Error("tab_lost");
-		const safeTarget = target?.status === "blocked" ? undefined : target;
-		const observation = safeTarget
-			? await api.observe(safeTarget.tabRef)
-			: null;
-		const approved = api.approvals();
-		const history = api.histories();
-		// With no issued input reference, the only available input source is a request quotation.
-		// Present that existing contract with its required pair, rather than two optional sources.
-		const tools = approved.some((item) => item.kind === "input_value")
-			? operator.tools
-			: operator.tools.map((tool) =>
-					tool.id === "browser.page.type"
-						? {
-								...tool,
-								inputSchema: zSchema(
-									operator.schemaKeys.get(tool.id) === "browserPageTypeValue"
-										? "browserPageType"
-										: "browserPageType2",
-								),
-							}
-						: tool,
-				);
-		const work: Work = {
-			tabRef: safeTarget?.tabRef ?? null,
-			origin: observation ? originOf(observation.url) : null,
-			tools: operator.toolIds,
-			seen: addSeen(
-				[],
-				...tabs.map((t) => t.title),
-				observation ? `${observation.title}\n${observation.text}` : "",
-			),
-			evidence: observation ? [observation.observationRef] : [],
-			captures: [],
-		};
-		const core = startTask({
-			control: taskControl({
-				profile: operator.profile,
-				skills: operator.skills,
-				rules: RULES,
-				tools,
-			}),
-			request: source,
-			...(frozen.brief ? { brief: frozen.brief } : {}),
-			reference: {
-				...(input.url ? { requestedUrl: input.url } : {}),
-				connection: api.connection(),
-				scriptRequired: !!input.scriptRequired,
-				target:
-					safeTarget && observation
-						? {
-								tabRef: safeTarget.tabRef,
-								title: clip(observation.title, 100),
-								place: placeOf(observation.url),
-							}
-						: null,
-				tabs: tabs.slice(0, 20).map((t) => ({
-					tabRef: t.tabRef,
-					title: clip(t.title, 100),
-					place: placeOf(t.url),
-					active: t.active,
-					status: t.status,
-				})),
-				observation: observation ? observationView(observation) : null,
-				...(approved.length ? { approved: approvedView(approved) } : {}),
-				...(history.length ? { history } : {}),
-			},
-			referenceIntro: REFERENCE_INTRO,
-			correction: CORRECTION,
-			policy: resolveTaskPolicy(
-				frozen.maxModelCalls
-					? { ...operator.turn, maxModelCalls: frozen.maxModelCalls }
-					: operator.turn,
-				DEFAULT_MODEL_CALLS,
-			),
-			nowMs: Date.now(),
-		});
-		return { v: 1, core, work };
 	}
 
 	function restore(coreState: unknown): Persisted {
@@ -408,15 +445,18 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 			return taskFailed(p.core, p.work, "observation_budget_exceeded");
 		await env.api.progress("thinking");
 		signal.throwIfAborted();
-		const raw = await infer(input, messages, signal).catch((error: unknown) => {
-			// An empty model turn has issued no tool call. Use the task's existing repair budget.
-			if (
-				error instanceof Error &&
-				error.message === "cloud_agent_empty_output"
-			)
-				return "";
-			throw error;
-		});
+		const visualMessages = await withCaptureImage(messages, env);
+		const raw = await infer(input, visualMessages, signal).catch(
+			(error: unknown) => {
+				// An empty model turn has issued no tool call. Use the task's existing repair budget.
+				if (
+					error instanceof Error &&
+					error.message === "cloud_agent_empty_output"
+				)
+					return "";
+				throw error;
+			},
+		);
 		signal.throwIfAborted();
 		const { state: core, step } = recordOutput(p.core, raw);
 		log.info("browser.task_step", {
@@ -424,6 +464,9 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 			attempt: input.step,
 			controlAction: step.kind,
 			...(step.kind === "invoke" ? { kind: step.tool } : {}),
+			...(p.work.visualCaptureRef
+				? { subjectId: p.work.visualCaptureRef }
+				: {}),
 		});
 		switch (step.kind) {
 			case "repair":
@@ -438,6 +481,26 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 					text: step.text,
 				};
 			case "finish": {
+				if (
+					p.work.visualMode &&
+					(!p.work.visualCaptureRef ||
+						(p.work.visualMode === "reuse" && !p.work.visualRegions))
+				) {
+					if (
+						p.work.visualRepair ||
+						core.callsMade >= core.policy.maxModelCalls
+					)
+						return taskFailed(core, p.work, "capture_image_required");
+					p.work.visualRepair = true;
+					core.messages.push({
+						role: "user",
+						content:
+							p.work.visualMode === "reuse"
+								? "指定箇所の画像をまだ確認していません。browser.page.image_regions で元画像の指定箇所を切り出してから答えてください。"
+								: "撮影画像がまだありません。browser.page.capture_image で撮影し、その画像を確認してから答えてください。",
+					});
+					return cont(p, core);
+				}
 				await settleCaptures(env);
 				const cited = step.refs.filter((ref) => p.work.evidence.includes(ref));
 				return {
@@ -471,6 +534,10 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 					(out.result.ok && "observation" in out.result)
 				)
 					delete p.work.excerpt;
+				if (tabRef !== p.work.tabRef) {
+					delete p.work.visualCaptureRef;
+					delete p.work.visualRegions;
+				}
 				const recorded = recordToolResult(
 					out.result.ok && "observation" in out.result
 						? expireObservations(core)
@@ -500,7 +567,7 @@ export function createTaskRunner(ports: TaskRunnerPorts): TaskStepRunner {
 		try {
 			const p =
 				input.coreState == null
-					? await begin(input, api)
+					? await beginTask(ports, input, api)
 					: restore(input.coreState);
 			const outcome = await advance(input, p, {
 				api,
@@ -525,6 +592,7 @@ function taskInference(ports: TaskRunnerPorts) {
 		messages: ReturnType<typeof taskMessages>,
 		signal: AbortSignal,
 	) {
+		signal.throwIfAborted();
 		if (!inference.captureUserControlInTransaction || !inference.executeControl)
 			throw new Error("control_unavailable");
 		const deadline = Math.min(

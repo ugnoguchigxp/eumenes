@@ -10,6 +10,7 @@ import type { createCaptures } from "./captures";
 import type { Ctx, TaskApi } from "./context";
 import type { Database } from "bun:sqlite";
 import type { CaptureView } from "../contracts";
+import { collaborationCapture } from "./execution-data";
 /** The task-bound API: saved Script cursor, active epoch and existing operation guards. */
 export function taskApi(
 	ctx: Ctx,
@@ -47,7 +48,7 @@ export function taskApi(
 			throw new Error("task_not_active");
 		return current;
 	};
-	const assertActive = (db: Database) => {
+	const assertAuthority = (db: Database) => {
 		const current = currentTask(db);
 		if (
 			current.origin === "child" &&
@@ -59,8 +60,10 @@ export function taskApi(
 			!ctx.taskExecutionSource?.(db, JSON.parse(current.frozen_json ?? "{}"))
 		)
 			throw new Error("execution_source_invalid");
-		return checkScript(current, binding);
+		return current;
 	};
+	const assertActive = (db: Database) =>
+		checkScript(assertAuthority(db), binding);
 	const assertObserved = (db: Database) => {
 		const observed = ctx.research.current(task.id);
 		if (
@@ -178,6 +181,32 @@ export function taskApi(
 			const view = store.read((db) => captures.status(db, owner, captureId));
 			if (view.taskId !== task.id) throw new Error("browser_capture_not_found");
 			return view;
+		},
+		async readCapture(captureId) {
+			const assertCapture = () =>
+				store.read((db) => {
+					signal.throwIfAborted();
+					const current = assertAuthority(db);
+					if (captures.status(db, owner, captureId).taskId === task.id) return;
+					const frozen = JSON.parse(current.frozen_json ?? "{}");
+					if (
+						frozen.visual?.mode !== "reuse" ||
+						frozen.visual.captureId !== captureId
+					)
+						throw new Error("browser_capture_not_found");
+					const { root } = collaborationCapture(
+						db,
+						owner,
+						frozen.caller,
+						captureId,
+					);
+					if (!ctx.childValid?.(db, root))
+						throw new Error("browser_capture_not_found");
+				});
+			assertCapture();
+			const { bytes } = await captures.content(owner, captureId);
+			assertCapture();
+			return bytes;
 		},
 	};
 }

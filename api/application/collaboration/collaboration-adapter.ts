@@ -69,6 +69,13 @@ export function describeCollaborationAdapter(kind: CollaborationKind) {
 							},
 						],
 						[
+							operation("brave", "image"),
+							{
+								inputSchemaRef: "builtin:collaborationBraveImage",
+								effect: "write" as const,
+							},
+						],
+						[
 							operation(kind, "find"),
 							{
 								inputSchemaRef: "builtin:collaborationTaskFind",
@@ -214,10 +221,14 @@ export function createCollaborationAdapter(
 				watch(db, origin.workRef, request.requestId);
 			} else if (
 				kind === "task" &&
-				request.operationName === operation("brave", "start")
+				(request.operationName === operation("brave", "start") ||
+					request.operationName === operation("brave", "image"))
 			) {
-				const { expectedRevision, ...input } =
-					collaborationInputs.collaborationBraveStart.parse(request.input);
+				const { expectedRevision, ...input } = (
+					request.operationName === operation("brave", "image")
+						? collaborationInputs.collaborationBraveImage
+						: collaborationInputs.collaborationBraveStart
+				).parse(request.input);
 				value = works.start(db, {
 					...bound,
 					expectedRevision,
@@ -316,7 +327,7 @@ export function createCollaborationAdapter(
 		},
 		targetInput: () => ({}),
 		session: {
-		agentLabel: "Collaboration",
+			agentLabel: "Collaboration",
 			openInTransaction: (db, input) =>
 				works.open(db, kind, input.sessionId, input.targetRef),
 			stateInTransaction: works.state,

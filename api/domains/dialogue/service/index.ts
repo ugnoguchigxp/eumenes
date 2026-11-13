@@ -1,6 +1,7 @@
 import { createToolchainCommandHandler } from "./toolchain-command";
 import { backgroundDiagnostic } from "./diagnostic-evidence";
 import { createSpecialistOps } from "./specialist-commands";
+import { activeSpecialistAgentLabel } from "./specialist-intake";
 import { flushCancelled } from "./specialist-core";
 import { createSpecialistTurnHandler } from "./specialist-turn";
 import { createCommandInteractions } from "./command-interactions";
@@ -278,6 +279,10 @@ export function createDialogueService({
 		resourceLedger: deps.resourceLedger,
 		/** The conversation's live specialist session, or null (`GET /api/conversations/:id/specialist`). */
 		specialistSession: specialistOps.session,
+		activeSpecialistAgentLabelInTransaction: (
+			db: Database,
+			conversationId: string,
+		) => activeSpecialistAgentLabel(deps, db, conversationId),
 		/** True only for an active or suspended session that has not expired (the guard of the work's screen operations). */
 		specialistSessionLiveInTransaction: specialistOps.liveInTransaction,
 		/** return / resume / discard / close from the screen: idempotent by requestId, guarded by the revision. */

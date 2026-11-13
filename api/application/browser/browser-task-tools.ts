@@ -10,7 +10,7 @@ import {
 	type OperationOutcome,
 	type TaskApi,
 } from "../../domains/browser";
-import type { SchemaKey, validators } from "../../domains/capabilities";
+import { type SchemaKey, validators } from "../../domains/capabilities";
 import type { TaskToolResult } from "../../domains/inference";
 import { addSeen, clip, fromPage, originOf, placeOf } from "./browser-text";
 
@@ -37,6 +37,11 @@ export const workSchema = z.strictObject({
 	evidence: z.array(z.string()).max(64),
 	/** Captures this task started; the task waits for them before it ends. */
 	captures: z.array(z.string()).max(8),
+	visualCaptureRef: z.uuid().optional(),
+	visualRegions: validators.browserPageImageRegions.shape.regions.optional(),
+	visualMode: z.enum(["reuse", "capture"]).optional(),
+	visualRange: z.enum(["viewport", "full-page", "element"]).optional(),
+	visualRepair: z.boolean().optional(),
 	excerpt: z.string().max(3000).optional(),
 });
 export type Work = z.infer<typeof workSchema>;
@@ -97,7 +102,7 @@ const HINTS: Record<string, string> = {
 	script_title_has_value:
 		"titleに変数の値が入っています。手続きを表す名称に直して再公開してください。",
 	script_evidence_invalid:
-		"完了には今回のタブの最新observationRefが必要です。接続状態やタブ一覧は観測ではありません。接続は操作の準備として扱い、依頼された操作の結果を観測してから完了にしてください。",
+		"完了には今回のタブの最新observationRefが必要です。接続状態やタブ一覧は観測ではありません。captureIdもobservationRefとは別です。接続は操作の準備として扱い、依頼された操作の結果を観測してから完了にしてください。",
 	browser_history_not_found:
 		"その履歴はありません。REFERENCE.historyのhistoryIdを使ってください。",
 	navigation_scheme_blocked: "httpとhttps以外は開けません。",
@@ -106,6 +111,8 @@ const HINTS: Record<string, string> = {
 	navigation_credentials_blocked: "認証情報を含むURLは開けません。",
 	navigation_invalid_url: "URLの形が正しくありません。",
 	capture_dimensions_exceeded: "撮影範囲が大きすぎます（各辺2500pxまで）。",
+	capture_range_changed:
+		"rangeには結果に示した前回と同じ撮影範囲を使ってください。",
 };
 
 /** Only authored contract hints may be returned; validator messages can otherwise contain input data. */
@@ -363,6 +370,48 @@ const captureResult = (v: CaptureView): TaskToolResult =>
 				height: v.height,
 			}
 		: refusal(v.errorCode ?? "capture_failed", { captureId: v.captureId });
+
+async function capturePage(
+	a: z.infer<(typeof validators)["browserPageCapture"]>,
+	env: ToolEnv,
+	inspect = false,
+) {
+	if (inspect) {
+		if (
+			!env.work.visualCaptureRef &&
+			env.work.visualRange &&
+			a.range !== env.work.visualRange
+		)
+			return result(
+				refusal("capture_range_changed", { range: env.work.visualRange }),
+			);
+		delete env.work.visualCaptureRef;
+		delete env.work.visualRegions;
+	}
+	const tabRef = needTab(env.work);
+	const started = await env.api.capture(
+		a.range === "element"
+			? {
+					tabRef,
+					range: "element",
+					elementRef: a.ref!,
+					observationRef: a.observationRef!,
+				}
+			: { tabRef, range: a.range },
+	);
+	env.work.captures = [...env.work.captures, started.captureId].slice(-8);
+	remember(env.work, started.captureId);
+	const saved = captureResult(await settleCapture(env, started.captureId));
+	if (inspect && saved.ok) {
+		env.work.visualCaptureRef = started.captureId;
+		env.work.visualRange = a.range;
+	}
+	return result(
+		inspect && saved.ok && a.observationRef
+			? { ...saved, observationRef: a.observationRef }
+			: saved,
+	);
+}
 
 type Spec<K extends SchemaKey> = {
 	schemaKey: K;
@@ -640,21 +689,19 @@ export const PAGE_TOOLS: Readonly<Record<string, Spec<SchemaKey>>> = {
 	}),
 	"browser.page.capture": spec({
 		schemaKey: "browserPageCapture",
-		async run(a, env) {
-			const tabRef = needTab(env.work);
-			const started = await env.api.capture(
-				a.range === "element"
-					? {
-							tabRef,
-							range: "element",
-							elementRef: a.ref!,
-							observationRef: a.observationRef!,
-						}
-					: { tabRef, range: a.range },
-			);
-			env.work.captures = [...env.work.captures, started.captureId].slice(-8);
-			remember(env.work, started.captureId);
-			return result(captureResult(await settleCapture(env, started.captureId)));
+		run: capturePage,
+	}),
+	"browser.page.capture_image": spec({
+		schemaKey: "browserPageCapture",
+		run: (a, env) => capturePage(a, env, true),
+	}),
+	"browser.page.image_regions": spec({
+		schemaKey: "browserPageImageRegions",
+		async run({ regions }, env) {
+			const captureId = env.work.visualCaptureRef;
+			if (!captureId) throw new Error("browser_capture_not_found");
+			env.work.visualRegions = regions;
+			return result({ ok: true, captureId, regions });
 		},
 	}),
 };

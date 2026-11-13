@@ -226,6 +226,16 @@ export const canvasProduce = z.strictObject({
 		.regex(/^a_[A-Za-z0-9_-]{12}$/)
 		.optional(),
 });
+const imageCoordinate = z.number().int().min(0).max(1000);
+const imageRegion = z
+	.strictObject({
+		left: imageCoordinate,
+		top: imageCoordinate,
+		right: imageCoordinate,
+		bottom: imageCoordinate,
+	})
+	.refine((r) => r.left < r.right && r.top < r.bottom, "image_region_empty");
+
 export const validators = {
 	canvasProduce,
 	...collaborationInputs,
@@ -240,6 +250,15 @@ export const validators = {
 	computePythonSubmit,
 	computeJobTarget,
 	computeArtifactTarget,
+	browserPageImageRegions: z.strictObject({
+		regions: z
+			.array(imageRegion)
+			.min(1)
+			.max(2)
+			.describe(
+				"画像全体の左上(0,0)・右下(1000,1000)を基準にした矩形。指定された順",
+			),
+	}),
 	browserPageText: z.strictObject({
 		observationRef: z.uuid(),
 		elementRef: z

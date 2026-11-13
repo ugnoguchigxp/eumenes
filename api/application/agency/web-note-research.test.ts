@@ -90,6 +90,42 @@ test("the agenda's research ticket starts the web note task, and its note reache
 	}
 }, 30_000);
 
+test("the agenda cannot start a search while Collaboration has the conversation", async () => {
+	let paused = false;
+	let searched = 0;
+	const plan = planOnce("明日の七里ヶ浜の日の出時刻");
+	const f = await agendaFixture({
+		backgroundPaused: () => paused,
+		script(kind, request) {
+			const next = plan(kind, request);
+			// Collaboration takes the conversation while the background plan is in progress.
+			if (next?.add.length) paused = true;
+			return next;
+		},
+		webNote: {
+			turn: async () => {
+				searched++;
+				return { text: NOTE, searches: 1, usage: null };
+			},
+		},
+	});
+	try {
+		await f.start();
+		await f.user("user-0");
+		await waitFor(async () => {
+			await f.advance(1000);
+			return paused;
+		});
+		const calls = f.requests.length;
+		await f.advance(20_000);
+		expect(f.requests).toHaveLength(calls);
+		expect(searched).toBe(0);
+		expect(f.host.inspect("ao")!.snapshot.tickets).toHaveLength(0);
+	} finally {
+		await f.close();
+	}
+}, 30_000);
+
 test("a research that cannot be done is a failed research for the agent, with no note", async () => {
 	const f = await agendaFixture({
 		script: planOnce("明日の七里ヶ浜の日の出時刻"),

@@ -1,4 +1,5 @@
 import {
+	collaborationCapture,
 	isCollaborationTaskInTransaction,
 	purgeTaskExecution,
 	taskExecutionResult,
@@ -58,6 +59,41 @@ import { createTasks, type StartTaskInput } from "./tasks";
 export type { StartCaptureInput } from "./captures";
 export type { StartTaskInput } from "./tasks";
 export type { TaskApi, TaskStepRunner } from "./context";
+
+function taskExecutionPorts(ctx: Ctx, tasks: ReturnType<typeof createTasks>) {
+	return {
+		purgeTaskExecutionInTransaction: (db: Database, executionId: string) =>
+			purgeTaskExecution(db, executionId, tasks.cancelInTransaction),
+		setTaskExecutionSource(read: NonNullable<Ctx["taskExecutionSource"]>) {
+			ctx.taskExecutionSource = read;
+		},
+		taskExecutionSourceInTransaction: (db: Database, frozen: unknown) =>
+			ctx.taskExecutionSource?.(db, frozen) ?? null,
+		taskExecutionResultInTransaction: (
+			db: Database,
+			owner: string,
+			id: string,
+		) => taskExecutionResult(tasks.status(db, owner, id), taskRow(db, id)!),
+		isCollaborationTaskInTransaction,
+		collaborationCaptureInTransaction(
+			db: Database,
+			owner: string,
+			caller: unknown,
+			id: string,
+		) {
+			const { capture, root } = collaborationCapture(db, owner, caller, id);
+			if (!ctx.childValid?.(db, root))
+				throw new Error("browser_capture_not_found");
+			return {
+				id: capture.id,
+				tabRef: capture.tab_ref,
+				range: capture.range,
+				width: capture.png_width,
+				height: capture.png_height,
+			};
+		},
+	};
+}
 
 export function createBrowser(deps: {
 	store: SqliteStore;
@@ -173,19 +209,7 @@ export function createBrowser(deps: {
 	};
 
 	const service = {
-		purgeTaskExecutionInTransaction: (db: Database, executionId: string) =>
-			purgeTaskExecution(db, executionId, tasks.cancelInTransaction),
-		setTaskExecutionSource(read: NonNullable<Ctx["taskExecutionSource"]>) {
-			ctx.taskExecutionSource = read;
-		},
-		taskExecutionSourceInTransaction: (db: Database, frozen: unknown) =>
-			ctx.taskExecutionSource?.(db, frozen) ?? null,
-		taskExecutionResultInTransaction: (
-			db: Database,
-			owner: string,
-			id: string,
-		) => taskExecutionResult(tasks.status(db, owner, id), taskRow(db, id)!),
-		isCollaborationTaskInTransaction,
+		...taskExecutionPorts(ctx, tasks),
 		taskApprovalExpiryInTransaction: (db: Database, id: string) =>
 			pendingApprovals(db, id, 0).at(0)?.expires_at,
 		taskStatusInTransaction: (db: Database, owner: string, id: string) =>
