@@ -3,7 +3,7 @@ import type { TaskExecutionHost } from "../toolchain/task-execution-port";
 import { collaborationBackends } from "./collaboration-backends";
 import { collaborationBrave } from "./collaboration-brave";
 import { collaborationTask } from "./collaboration-task";
-import { workflowReviewer } from "../evaluator/workflow-review";
+import { workflowReviewer } from "../review/workflow-review";
 
 /** Attach public lifecycle ports only after the shared execution port is ready. */
 export function configureCollaboration(
@@ -11,7 +11,11 @@ export function configureCollaboration(
 	execution: ToolchainExecutionPort,
 ) {
 	if (!host.collaboration) return;
-	const evaluate = workflowReviewer(host.store, host.inference);
+	const evaluate = workflowReviewer(
+		host.store,
+		host.inference,
+		host.capabilities,
+	);
 	const task = collaborationTask(host, execution);
 	host.collaboration.configure(
 		collaborationBackends({

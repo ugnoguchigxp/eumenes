@@ -311,8 +311,13 @@ export async function harness(options: HarnessOptions = {}) {
 					confidence: 0.99,
 				});
 			const system = messages[0]!.content;
-			if (options.workflowReview && system.includes("あなたは独立した評価担当です"))
-				return JSON.stringify(await options.workflowReview(messages, _signal));
+			if (
+				options.reviewSubagent &&
+				system.includes("あなたはEumenesの評価担当です")
+			)
+				return JSON.stringify(
+					await options.reviewSubagent(messages, _signal, callOptions),
+				);
 			if (
 				options.knowledgeBuild &&
 				(system.includes("coverage で充足") ||

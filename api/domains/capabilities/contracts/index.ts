@@ -6,7 +6,9 @@ import { drawingRequest, drawingPlan } from "./excalidraw";
 export { drawingRequest, drawingPlan };
 import { z } from "zod";
 import { collaborationInputs } from "./collaboration";
+import { appReviewInput } from "./review";
 export { collaborationInputs } from "./collaboration";
+export { appReviewInput } from "./review";
 import { guidedResearchInput } from "./guided-research";
 import {
 	uiCompositionDelete,
@@ -239,6 +241,7 @@ const imageRegion = z
 export const validators = {
 	canvasProduce,
 	...collaborationInputs,
+	appReview: appReviewInput,
 	browserInteractStart,
 	browserInteractTarget,
 	browserInteractAnswer,

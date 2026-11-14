@@ -22,7 +22,9 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import { createWorkflowAuthoring } from "../pipelines/workflow-authoring";
 import { createWorkflowExecutionAuthority } from "../pipelines/workflow-execution-source";
 import { createWorkflowStepExecution } from "../pipelines/workflow-step-execution";
+import { createReviewSubagent } from "../review/subagent";
 import { createAppDevelopmentAdapter } from "./app-development-adapter";
+import { createAppReview } from "./app-review";
 import { createAppWorkflowControls } from "./workflow-controls";
 import {
 	createWorkflowOperations,
@@ -67,6 +69,7 @@ export function createAppDevelopmentRuntime(deps: {
 	let authoring: ReturnType<typeof createWorkflowAuthoring>;
 	let workflow: ReturnType<typeof createAppWorkflowControls>;
 	let operations: ReturnType<typeof createWorkflowOperations>;
+	let evaluate: ReturnType<typeof createReviewSubagent>;
 	let dialogue:
 		| Pick<
 				DialogueService,
@@ -110,6 +113,17 @@ export function createAppDevelopmentRuntime(deps: {
 			dialogue?.specialistSessionLiveInTransaction(db, sessionId) ?? false,
 		context: () => operations?.operationInfo(),
 		grantDigest,
+		review: createAppReview(apps, {
+			store,
+			evaluate: () => evaluate,
+			source: (db, runId, sessionId, epoch) =>
+				dialogue?.specialistExecutionSourceInTransaction(
+					db,
+					runId,
+					sessionId,
+					epoch,
+				) ?? null,
+		}),
 	});
 	return {
 		apps,
@@ -119,6 +133,7 @@ export function createAppDevelopmentRuntime(deps: {
 			agents: AgentRuntime["executions"];
 		}) {
 			const { capabilities, agents } = deps;
+			evaluate = createReviewSubagent(store, inference, capabilities);
 			operations = createWorkflowOperations({
 				inference,
 				web,

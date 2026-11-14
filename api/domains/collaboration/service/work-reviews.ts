@@ -155,6 +155,7 @@ export function createWorkReviews(context: WorkContext, queue?: QueueService) {
 						document: json(row.document_json),
 						source,
 						request: user.request,
+						requestMessageId: user.messageId,
 						conditions: conditions(db, row.session_id),
 					},
 				},

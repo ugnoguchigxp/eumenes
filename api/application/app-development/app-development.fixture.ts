@@ -173,6 +173,8 @@ export async function fixture(input: {
 	timerNow?: () => number;
 	beforeExtract?: () => void;
 	beforeNavigation?: () => void;
+	specialist?: HarnessOptions["specialist"];
+	reviewSubagent?: HarnessOptions["reviewSubagent"];
 	webFixture?: {
 		acquisition: NonNullable<HarnessOptions["acquisition"]>;
 		control: NonNullable<
@@ -228,16 +230,19 @@ export async function fixture(input: {
 				input.request,
 				{ announcement: "アプリの制作を始めます。", impact: "create" },
 			)(messages),
-		specialist: () => ({
-			action: "invoke",
-			tool: "doc.write",
-			arguments: {
-				baseRevision: 0,
-				title: "アプリの下書き",
-				content: input.draft,
-			},
-			text: "下書きができました。",
-		}),
+		reviewSubagent: input.reviewSubagent,
+		specialist:
+			input.specialist ??
+			(() => ({
+				action: "invoke",
+				tool: "doc.write",
+				arguments: {
+					baseRevision: 0,
+					title: "アプリの下書き",
+					content: input.draft,
+				},
+				text: "下書きができました。",
+			})),
 		appDevelopment: {
 			git: input.git,
 			destination: input.live?.destination

@@ -121,6 +121,85 @@
 			"packageRevisionId": "package:app-development.studio@7",
 			"bindingRevisionId": "binding:app-development.studio@8",
 			"artifactRevisionId": "artifact:app-development.studio@2"
+		},
+		{
+			"kind": "skill",
+			"id": "app-development.review",
+			"revision": 1,
+			"title": "下書きの評価",
+			"summary": "依頼の範囲に合うときに下書きの評価を使う",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者がレビューを頼んだとき、または依頼の範囲で評価が役立つと判断したときは、CURRENT_DOCUMENTの版をapp-development.reviewへ渡します。利用者の操作・認知負荷には人間工学、実行手順と要件の照合にはワークフローのSKILLを選びます。結果を受け取ったら、同じ版の最重要の所見を、下書きの具体的な文言や位置、利用者への影響、最小の修正案とともに短く伝えます。実画面や操作が未確認なら一言添えます。返答は担当の出力上限に収め、評価全体を転記しません。評価結果を受けて下書きを変更するのは利用者が修正を依頼した場合です。評価を始めるときは、action=invoke、tool=app-development.review、argumentsにexpectedRevisionとskillを返します。人間工学のskillはskill:review.human-factors@1、ワークフローのskillはskill:review.workflow@1です。invokeのtextは省略し、TOOL_RESULTを読んでからreplyを返します。"
+		},
+		{
+			"kind": "tool",
+			"id": "app-development.review",
+			"revision": 1,
+			"title": "下書きの評価",
+			"summary": "現在の版を対象に、指定した観点の評価と根拠を取得する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"schemaKey": "appReview"
+		},
+		{
+			"kind": "package",
+			"id": "app-development.studio",
+			"revision": 8,
+			"title": "Webアプリ開発",
+			"summary": "会話で画面や実行手順を作り、利用者が確認して保存する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:app-development.studio@2",
+				"skill:app-development.studio@6",
+				"skill:app-development.source-ui@1",
+				"skill:app-development.review@1",
+				"tool:app-development.review@1"
+			],
+			"backend": "app-development",
+			"profileRevisionId": "profile:app-development.studio@2",
+			"requiredSkillRevisionIds": [
+				"skill:app-development.studio@6",
+				"skill:app-development.source-ui@1",
+				"skill:app-development.review@1"
+			],
+			"toolRevisionIds": ["tool:app-development.review@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "app.develop",
+			"revision": 9,
+			"title": "Webアプリ開発",
+			"summary": "会話で画面や実行手順を作り、利用者が確認して保存する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"利用者が繰り返し開いて使える画面、データを更新する小さなアプリ、定期処理やレポートを新しく作る、または修正する"
+			],
+			"avoidWhen": [
+				"依頼が一回限りの情報確認で、アプリや定期処理の制作を求めていない"
+			],
+			"dependencies": ["package:app-development.studio@8"],
+			"functionName": "develop_app",
+			"examples": [
+				"辻堂の映画館で上映作品と開始時刻を日付ごとに確認できるアプリを作って",
+				"対象のGitHubプロジェクトを毎日確認して開発日誌を保存するアプリを作って",
+				"入力した金額から割り勘を計算する画面を作って",
+				"読んだ本のタイトル、読了日、感想を記録し、あとから読み返したり編集できるアプリを作って"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:app-development.studio@8",
+			"bindingRevisionId": "binding:app-development.studio@9",
+			"artifactRevisionId": "artifact:app-development.studio@2"
 		}
 	],
 	"bindings": [
@@ -166,6 +245,52 @@
 			"adapterRef": "adapter:app-development@1",
 			"availabilityRef": "availability:app-development@1",
 			"tools": [],
+			"artifactRevisionId": "artifact:app-development.studio@2",
+			"session": {
+				"targetSchemaRef": "builtin:uiTargetRef"
+			},
+			"timeLimits": {
+				"runMs": 1200000,
+				"turnMs": 900000,
+				"inferenceMs": 600000
+			},
+			"agent": {
+				"workspace": {
+					"documentRef": "workspace:app-development.definition@1",
+					"inlineBytes": 32768
+				},
+				"turn": {
+					"maxModelCalls": 4,
+					"retries": {
+						"doc.edit": 1,
+						"doc.write": 1
+					},
+					"maxOutputTokens": 6144
+				},
+				"collaborationState": "host-bound",
+				"larmReasoning": "off",
+				"sharedTools": [
+					{
+						"toolchainId": "knowledge.guidance",
+						"as": "get_guidance"
+					}
+				]
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "app-development.studio",
+			"revision": 9,
+			"execution": "session",
+			"adapterRef": "adapter:app-development@1",
+			"availabilityRef": "availability:app-development@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:app-development.review@1",
+					"operationId": "app-development.review",
+					"inputSchemaRef": "builtin:appReview"
+				}
+			],
 			"artifactRevisionId": "artifact:app-development.studio@2",
 			"session": {
 				"targetSchemaRef": "builtin:uiTargetRef"

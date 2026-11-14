@@ -28,6 +28,9 @@ export const domains = {
 		backend: "api/domains/collaboration",
 		web: "web/src/domains/collaboration",
 		components: null,
+		integrationTests: [
+			"api/application/collaboration/collaboration-review.test.ts",
+		],
 		depends: { api: [], web: [], test: [] },
 	},
 	usage: {
@@ -174,6 +177,7 @@ export const domains = {
 		backend: "api/domains/app-development",
 		integrationTests: [
 			"api/application/app-development/app-development.test.ts",
+			"api/application/app-development/app-review.test.ts",
 			"api/application/app-development/storage-recovery.test.ts",
 			"api/application/app-development/app-storage.test.ts",
 		],

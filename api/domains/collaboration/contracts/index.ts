@@ -68,6 +68,7 @@ export type ReviewInput = {
 	document: unknown;
 	source: Source;
 	request: string;
+	requestMessageId: string;
 	conditions: ReviewConditions;
 };
 export type ReviewOutcome = {

@@ -32,6 +32,7 @@ import {
 } from "./storage-runtime";
 import { workflowRefs } from "./workflow-operations";
 import { createStudioSource, studio, records } from "./app-development-source";
+import { appReviewOperation, type createAppReview } from "./app-review";
 
 export const APP_ADAPTER = "adapter:app-development@1";
 const workspace = "workspace:app-development.definition@1";
@@ -92,12 +93,22 @@ const draftIssue = (error: unknown) =>
 
 export const describeAppDevelopmentAdapter = () => ({
 	owner: "app-development",
-	operations: new Map(
-		Object.keys(inputs).map((key) => [
-			nameOf(key as Operation),
-			{ inputSchemaRef: schemaRef(key), effect: "write" as const },
-		]),
-	),
+	operations: new Map<
+		string,
+		{ inputSchemaRef: string; effect: "read" | "write" }
+	>([
+		...Object.keys(inputs).map(
+			(key) =>
+				[
+					nameOf(key as Operation),
+					{ inputSchemaRef: schemaRef(key), effect: "write" as const },
+				] as const,
+		),
+		[
+			appReviewOperation,
+			{ inputSchemaRef: "builtin:appReview", effect: "read" as const },
+		],
+	]),
 	queries: new Set([studio, records]),
 	inputAdapters: new Map(
 		Object.entries(inputs).map(([key, validator]) => [
@@ -158,6 +169,7 @@ type AdapterDependencies = {
 	sessionLive(db: Database, id: string): boolean;
 	context(db: Database): unknown;
 	grantDigest(publishKind: unknown): string;
+	review: ReturnType<typeof createAppReview>;
 };
 
 export function createAppDevelopmentAdapter(
@@ -227,6 +239,10 @@ export function createAppDevelopmentAdapter(
 		ref: APP_ADAPTER,
 		finishSave,
 		describe: describeAppDevelopmentAdapter,
+		prepareSpecialistRead: async (input, signal) =>
+			input.operationName === appReviewOperation
+				? deps.review.prepare(input, signal)
+				: undefined,
 		availableInTransaction: () => true,
 		snapshotInTransaction: (db) => ({ items: service.list(db) }),
 		choicesInTransaction: (db, ref) =>
@@ -237,6 +253,17 @@ export function createAppDevelopmentAdapter(
 						.map(({ id, title }) => ({ ref: id, label: title }))
 				: [],
 		invokeInTransaction(db, request) {
+			if (request.operationName === appReviewOperation) {
+				if (request.origin.kind !== "specialist")
+					throw new Error("origin_not_allowed");
+				return deps.review.adopt(
+					db,
+					request.origin,
+					request.input,
+					request.prepared,
+					request.requestId,
+				);
+			}
 			if (
 				request.origin.kind !== "ui" ||
 				request.origin.scope !== service.scope

@@ -7,8 +7,6 @@ const request = "20秒のタイマーの手順を一緒に作ってください"
 const condition = "タイマーは20秒に設定する";
 const location = {
 	evidenceId: "workflow",
-	startLine: null,
-	endLine: null,
 	pointer: "/steps/0/task",
 };
 const finding = {
@@ -17,9 +15,12 @@ const finding = {
 	trigger: "手順を実行した場合",
 	impact: "通知が10秒遅れます。",
 	severity: "medium",
+	confidence: "high",
 	primary: location,
 	evidence: [location],
 	conditionId: "duration",
+	minimalFix: "20秒に変更します。",
+	verify: "手順の時間指定を確定条件と照合します。",
 };
 const draft = (seconds: number) => ({
 	request,
@@ -65,7 +66,8 @@ test("the same Collaboration session reviews two draft versions with grounded fi
 					impact: "create",
 				},
 			)(messages),
-		workflowReview(messages) {
+		reviewSubagent(messages) {
+			expect(messages[0]?.content).toContain("ワークフロー下書きの評価");
 			const input = JSON.parse(messages.at(-1)!.content);
 			const task = input.evidence.find(
 				(entry: { id: string }) => entry.id === "workflow",
@@ -73,11 +75,12 @@ test("the same Collaboration session reviews two draft versions with grounded fi
 			requests.push({
 				version: input.target.version,
 				seconds: task,
-				conditions: input.conditions,
+				conditions: input.conditions.entries,
 			});
 			const correct = task.includes("20秒");
 			return {
 				findings: correct ? [] : [finding],
+				unverified: [],
 				scopeChecks: [
 					{ evidenceId: "workflow", status: "checked", reason: null },
 				],
@@ -213,9 +216,7 @@ test("the same Collaboration session reviews two draft versions with grounded fi
 			);
 		const first = current()!.revision;
 		operation = "review";
-		expect(await say("Evaluatorで今の下書きをレビューして")).toBe(
-			"評価を始めました。",
-		);
+		expect(await say("今の下書きをレビューして")).toBe("評価を始めました。");
 		await waitForNotice(first).catch((error: unknown) => {
 			throw new Error(
 				JSON.stringify({

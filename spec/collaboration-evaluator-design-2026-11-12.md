@@ -1,8 +1,10 @@
 # 共同作業でのEvaluator利用
 
+2026-11-14の方針と現行の接続は [SKILLを使う評価サブエージェント](skill-based-review-design-2026-11-14.md) を参照。この文書は導入当時の記録。
+
 2026-11-12 利用者承認。Collaborationが作業中の成果物を評価し、指摘と根拠を受け取って利用者との対話を続ける。
 
-Eumenes本体はコミット `9a11d038` に対応する `eumenes-evaluator` 0.1.0 を固定依存として持つ。初回の接続は、この版が提供するワークフロー全体のQuick評価を使う。根拠位置はワークフローJSONのポインタで確認する。 [固定配布物の出所](../vendor/evaluator/manifest.json) · [本体での固定試験](../api/application/evaluator/vendor.test.ts)
+Eumenes本体はコミット `9a11d038` に対応する `eumenes-evaluator` 0.1.0 を固定依存としていた。初回の接続は、この版が提供するワークフロー全体のQuick評価を使った。根拠位置はワークフローJSONのポインタで確認した。
 
 ## 初回の対象
 
@@ -24,7 +26,7 @@ Pipelineの共同編集にある現在の下書きを対象にする。レビュ
 ## 実装と検証
 
 - `toolchain:collaboration.pipeline@3`、`binding:collaboration.pipeline@3`、`package:collaboration.pipeline@2` に、`collaboration.pipeline.review` と `collaboration.pipeline.review.cancel` を登録した。評価Queueは `collaboration.review`。旧版の作業レコードは `collaboration/0003-review` で保持される。 [登録定義](../api/domains/capabilities/bundles/collaboration.bundle.json)
-- 固定モデルの結合試験で、利用者発言に結び付いた20秒の条件に対し、初稿の30秒を根拠位置付きで指摘し、修正した版で充足を返した。同じ担当に通知され、成果物の評価欄も版に追随した。タイマーは作成されなかった。 [結合試験](../api/application/collaboration/collaboration-evaluator.test.ts)
+- 固定モデルの結合試験で、利用者発言に結び付いた20秒の条件に対し、初稿の30秒を根拠位置付きで指摘し、修正した版で充足を返した。同じ担当に通知され、成果物の評価欄も版に追随した。タイマーは作成されなかった。 [後継の結合試験](../api/application/collaboration/collaboration-review.test.ts)
 - 実行中の編集、取消、忘却、sessionの世代変更で、遅れて返った評価を通知しないことを確認した。関連するバックエンド90件、登録16件、画面2件、型検査とSQL境界検査が通過した。領域全体の検証は保存スナップショットの試験検出で止まった。 [失効の固定試験](../api/domains/collaboration/test/reviews.test.ts)
 
 ## 再起動後の実モデル検証（2026-11-12）
