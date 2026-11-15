@@ -13,9 +13,10 @@ export function createAudioPlayback(deps: {
 	options: AudioOptions;
 	outputWatch: ReturnType<typeof createOutputWatch>;
 	emit: (phase: AudioState["phase"], error?: string) => void;
+	isCapturing: () => boolean;
 }) {
-	const { state, options, outputWatch, emit } = deps;
-	let releaseOutput: (() => void) | undefined;
+	const { state, options, outputWatch, emit, isCapturing } = deps;
+	let output: ReturnType<typeof connectPlaybackOutput> | undefined;
 	let playback: AudioBufferSourceNode | undefined;
 	let playbackAudible = false;
 	let keepAliveSource: AudioBufferSourceNode | undefined;
@@ -64,6 +65,9 @@ export function createAudioPlayback(deps: {
 		},
 		get forcedGateUntil() {
 			return forcedInputGateUntil;
+		},
+		updateSpeechVolume() {
+			output?.setDucked(isCapturing());
 		},
 		startKeepAlive,
 		stopKeepAlive() {
@@ -140,11 +144,12 @@ export function createAudioPlayback(deps: {
 			const next = state.context.createBufferSource();
 			next.buffer = buffer;
 			const volume = playOptions.volume ?? 1;
-			releaseOutput = connectPlaybackOutput(
+			output = connectPlaybackOutput(
 				state.context,
 				next,
 				volume,
 				playOptions.assistantSpeech ?? false,
+				isCapturing(),
 			);
 			playback = next;
 			playbackAudible = volume > 0;
@@ -157,8 +162,8 @@ export function createAudioPlayback(deps: {
 			next.onended = () => {
 				if (playback === next) {
 					interruptedPlayback = undefined;
-					releaseOutput?.();
-					releaseOutput = undefined;
+					output?.release();
+					output = undefined;
 					if (playbackAudible) listenAfter = performance.now() + OUTPUT_TAIL_MS;
 					if (playbackSuppressInput) forcedInputGateUntil = listenAfter;
 					playbackSuppressInput = false;
@@ -175,8 +180,8 @@ export function createAudioPlayback(deps: {
 			emit("playing");
 		},
 		stopPlayback() {
-			releaseOutput?.();
-			releaseOutput = undefined;
+			output?.release();
+			output = undefined;
 			playbackEpoch++;
 			finishPlayback();
 			if (playbackSuppressInput)

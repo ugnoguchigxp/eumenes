@@ -145,7 +145,17 @@ export function createAudioController(
 			level: lastLevel,
 		});
 
-	const output = createAudioPlayback({ state, options, outputWatch, emit });
+	const output = createAudioPlayback({
+		state,
+		options,
+		outputWatch,
+		emit,
+		isCapturing: () => speaking,
+	});
+	function setSpeaking(active: boolean) {
+		speaking = active;
+		output.updateSpeechVolume();
+	}
 
 	function pushFrame(frame: Float32Array) {
 		encoder ??= createIncrementalEncoder(state.context!.sampleRate);
@@ -178,7 +188,7 @@ export function createAudioController(
 		drainRecorder = undefined;
 		drain?.();
 		const shouldFlush = speaking;
-		speaking = false;
+		setSpeaking(false);
 		inputPaused = true;
 		inputReady = false;
 		inputEpoch++;
@@ -289,7 +299,7 @@ export function createAudioController(
 						frame.fill(0);
 						if (!wasGated) {
 							const discarded = speaking;
-							speaking = false;
+							if (discarded) setSpeaking(false);
 							resetRecording();
 							candidateFrames = [];
 							candidateSamples = 0;
@@ -318,7 +328,7 @@ export function createAudioController(
 							candidateSamples -= candidateFrames.shift()?.length ?? 0;
 						}
 						if (observation?.hasSpeech) {
-							speaking = true;
+							setSpeaking(true);
 							resetRecording();
 							for (const candidate of candidateFrames) pushFrame(candidate);
 							clock.confirmed(sampleCount);
@@ -340,7 +350,7 @@ export function createAudioController(
 							return;
 						}
 						if (observation?.shouldFinalize) {
-							speaking = false;
+							setSpeaking(false);
 							detector?.restart();
 							flush();
 						}

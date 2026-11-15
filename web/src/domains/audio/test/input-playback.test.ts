@@ -17,6 +17,10 @@ test.each([
 	async ({ mode, volume, gated }) => {
 		const nodes = stubWorkletNode();
 		const sources: Array<{ onended: (() => void) | null }> = [];
+		const gains: Array<{
+			value: number;
+			setTargetAtTime: ReturnType<typeof vi.fn>;
+		}> = [];
 		vi.stubGlobal("navigator", {
 			mediaDevices: {
 				getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }),
@@ -24,6 +28,7 @@ test.each([
 		});
 		class Context {
 			sampleRate = 48000;
+			currentTime = 0;
 			destination = {};
 			audioWorklet = workletModule;
 			async resume() {}
@@ -35,7 +40,12 @@ test.each([
 				return {};
 			}
 			createGain() {
-				return { gain: { value: 1 }, connect() {}, disconnect() {} };
+				const gain = { value: 1, setTargetAtTime: vi.fn() };
+				gains.push(gain);
+				return { gain, connect() {}, disconnect() {} };
+			}
+			createAnalyser() {
+				return { fftSize: 0, disconnect() {} };
 			}
 			createBufferSource() {
 				const source = {
@@ -75,9 +85,12 @@ test.each([
 		};
 		await audio.play(new Uint8Array(44), () => {}, {
 			volume,
+			assistantSpeech: mode !== "timer-tone",
 			suppressInput: mode === "timer-tone",
 		});
 		utterance();
+		if (mode !== "timer-tone" && (gated || volume === 0))
+			expect(gains[0]!.setTargetAtTime).not.toHaveBeenCalled();
 		const first = gated ? 0 : 1;
 		expect([speech, segments]).toEqual([first, first]);
 		sources[0]?.onended?.();
@@ -88,12 +101,37 @@ test.each([
 		utterance();
 		expect([speech, segments]).toEqual([second + 1, second + 1]);
 		half = false;
-		await audio.play(new Uint8Array(44), () => {});
+		await audio.play(new Uint8Array(44), () => {}, {
+			assistantSpeech: true,
+			volume: 0.6,
+		});
+		const replyGain = gains.at(-1)!;
+		expect(replyGain.value).toBe(0.6);
 		// Barge-in over our own reply takes clearer, longer speech (0.4 s) than a normal start.
 		utterance(7);
 		expect([speech, segments]).toEqual([second + 1, second + 1]);
-		utterance(12);
+		expect(replyGain.setTargetAtTime).not.toHaveBeenCalled();
+		for (let i = 0; i < 12; i++) feed(0.2);
+		expect(speech).toBe(second + 2);
+		expect(replyGain.setTargetAtTime).toHaveBeenCalledExactlyOnceWith(
+			0.006,
+			0,
+			0.005,
+		);
+		await audio.play(new Uint8Array(44), () => {}, { assistantSpeech: true });
+		const nextGain = gains.at(-1)!;
+		expect(nextGain.value).toBe(0.01);
+		for (let i = 0; i < 18; i++) feed(0);
 		expect([speech, segments]).toEqual([second + 2, second + 2]);
+		expect(nextGain.setTargetAtTime).toHaveBeenCalledExactlyOnceWith(
+			1,
+			0,
+			0.02,
+		);
+		for (let i = 0; i < 12; i++) feed(0.2);
+		expect(nextGain.setTargetAtTime).toHaveBeenLastCalledWith(0.01, 0, 0.005);
+		audio.pauseInput();
+		expect(nextGain.setTargetAtTime).toHaveBeenLastCalledWith(1, 0, 0.02);
 		await audio.stop();
 	},
 );
