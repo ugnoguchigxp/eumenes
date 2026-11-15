@@ -6,8 +6,10 @@ import { sha256Hex } from "../../../infrastructure/digest";
 export function staleAgencySources(
 	db: Database,
 	refs: readonly string[],
-	capabilities: readonly string[],
+	capabilities: () => readonly string[],
 ): string[] {
+	// A catalog is needed only for capability references and is current for this check.
+	let currentCapabilities: Set<string> | undefined;
 	return refs.filter((ref) => {
 		if (ref.startsWith("host-work:")) {
 			const [id, revision] = JSON.parse(ref.slice("host-work:".length)) as [
@@ -23,9 +25,8 @@ export function staleAgencySources(
 			const row = confirmationById(db, id);
 			return !row || sha256Hex(JSON.stringify(row)) !== digest;
 		}
-		return (
-			ref.startsWith("capability:") &&
-			!capabilities.includes(ref.slice("capability:".length))
-		);
+		if (!ref.startsWith("capability:")) return false;
+		currentCapabilities ??= new Set(capabilities());
+		return !currentCapabilities.has(ref.slice("capability:".length));
 	});
 }

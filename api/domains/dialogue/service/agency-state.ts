@@ -161,11 +161,7 @@ export function createAgencyStatePort(
 		workActiveInTransaction: (db: Database, rootId: string) =>
 			agencyWorkActive(db, rootId),
 		staleSourcesInTransaction: (db: Database, refs: readonly string[]) =>
-			staleAgencySources(
-				db,
-				refs,
-				catalog(db).map((c) => c.revisionId),
-			),
+			staleAgencySources(db, refs, () => catalog(db).map((c) => c.revisionId)),
 		observationsInTransaction: agencyObservations,
 		messageInputInTransaction(db: Database, messageId: string) {
 			for (const record of agencyRecords(db)) {
