@@ -60,15 +60,30 @@ export async function agendaFixture(
 		routeSpeech?: NonNullable<AgencyHostDeps["routeSpeechInTransaction"]>;
 		steering?: boolean;
 		webNote?: NonNullable<Parameters<typeof harness>[0]>["webNote"];
+		dialogue?: Pick<
+			NonNullable<Parameters<typeof harness>[0]>,
+			"voiceText" | "firstRound"
+		>;
 		backgroundPaused?: AgencyHostDeps["backgroundPaused"];
 		/** How many looks find a shown note's document still being saved. */
 		noteSavingPolls?: number;
 	} = {},
 ) {
+	let host: ReturnType<typeof createAlwaysOnHost>;
 	const h = await harness({
 		memory: true,
 		resources: true,
 		everyday: true,
+		...(options.dialogue
+			? {
+					...options.dialogue,
+					conversationAgent: {
+						system: () => host.conversationAgent.system(),
+						handsWork: () => host.conversationAgent.handsWork?.() ?? false,
+						respond: (args) => host.conversationAgent.respond(args),
+					},
+				}
+			: {}),
 		...(options.webNote ? { webNote: options.webNote } : {}),
 		...(options.media
 			? { model: options.media.model, imageGateway: options.media.gateway }
@@ -235,7 +250,7 @@ export async function agendaFixture(
 			? { routeSpeechInTransaction: options.routeSpeech }
 			: {}),
 	};
-	let host = createAlwaysOnHost(deps);
+	host = createAlwaysOnHost(deps);
 	h.memory!.registerForgetPurge(
 		(db, p) => host.forgetInTransaction(db, p),
 		(db, p) => host.planForgetInTransaction(db, p),

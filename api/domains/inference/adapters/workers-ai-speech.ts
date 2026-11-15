@@ -1,7 +1,7 @@
-import { spawn } from "node:child_process";
-import { Readable } from "node:stream";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Connection, Resource } from "../../settings/contracts";
+import { isWav } from "../service/wav";
+import { decodeSpeechAsWav } from "./speech-audio";
 import {
 	object,
 	speechContract,
@@ -9,56 +9,13 @@ import {
 	workersUrl,
 } from "./workers-ai";
 
-const isWav = (bytes: Uint8Array) =>
-	bytes.length >= 44 &&
-	new TextDecoder().decode(bytes.subarray(0, 4)) === "RIFF" &&
-	new TextDecoder().decode(bytes.subarray(8, 12)) === "WAVE";
-
 /** Normalize the provider's encoded audio at the backend boundary. No files or remote inputs. */
 export async function workersAudio(bytes: Uint8Array, signal: AbortSignal) {
 	signal.throwIfAborted();
 	if (isWav(bytes)) return bytes;
 	const decoder = Bun.which("ffmpeg");
 	if (!decoder) throw new Error("workers_ai_audio_decoder_unavailable");
-	const child = spawn(
-		decoder,
-		[
-			"-nostdin",
-			"-v",
-			"error",
-			"-protocol_whitelist",
-			"pipe",
-			"-i",
-			"pipe:0",
-			"-acodec",
-			"pcm_s16le",
-			"-f",
-			"wav",
-			"pipe:1",
-		],
-		{ stdio: ["pipe", "pipe", "ignore"], signal, timeout: 15_000 },
-	);
-	const done = new Promise<boolean>((resolve) => {
-		child.once("error", () => resolve(false));
-		child.once("close", (code) => resolve(code === 0));
-	});
-	child.stdin.on("error", () => {});
-	child.stdin.end(bytes);
-	try {
-		const wav = await readBounded(
-			Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
-			{
-				limit: 16_000_000,
-				tooLarge: "response_too_large",
-				missing: "invalid_tts_audio",
-			},
-		);
-		if (!(await done) || !isWav(wav)) throw new Error("invalid_tts_audio");
-		signal.throwIfAborted();
-		return wav;
-	} finally {
-		child.kill();
-	}
+	return decodeSpeechAsWav(bytes, signal, decoder);
 }
 
 export async function workersSpeechRequest(

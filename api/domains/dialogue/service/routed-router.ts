@@ -20,7 +20,6 @@ import {
 	operateWork,
 	readWith,
 	replyToUnresolved,
-	routerUnperformed,
 	askRouterClarification,
 	requestMemory,
 	type Fields,
@@ -328,11 +327,17 @@ export async function routerTurn(
 		: turn.utterance;
 	const consulted = await consult(turn, router, words);
 	turn.signal.throwIfAborted();
-	// The whole request is held if its judgment or validated hand-off failed.
-	if (!consulted.decision) return routerUnperformed(turn);
+	if (!consulted.decision) {
+		if (turn.deps.debugDiagnostics?.enabled())
+			turn.debug.debugRouterFailure = true;
+		await turn.talk(undefined, { readOnly: true });
+		return "done";
+	}
 	const step = await carryOut(turn, consulted, consulted.decision);
 	if (typeof step === "string") return step;
 	// The host could not carry it out: it says so, and the router's choice is not made again.
+	if (turn.deps.debugDiagnostics?.enabled())
+		turn.debug.debugRouterFailure = true;
 	turn.speak(SAID.failed);
 	return "done";
 }

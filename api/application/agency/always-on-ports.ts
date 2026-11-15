@@ -129,7 +129,7 @@ export function createAgendaPorts(input: {
 			ref.startsWith("memory:") || ref.startsWith("note:") || userIds.has(ref);
 		// The agent's state as the reply reads it, placed before the user's last message (the prompt's prefix stays).
 		// A reply to a notice or a work report asks the user nothing of its own: no question is offered.
-		const asks = run.messageIds.length > 0;
+		const asks = !args.readOnly && run.messageIds.length > 0;
 		const built = agendaReplyMessages({
 			agent: asks ? c.agent : { ...c.agent, askForReply: () => null },
 			known: knownOf(deps, at),
@@ -161,13 +161,15 @@ export function createAgendaPorts(input: {
 			now,
 		};
 		const own = createAgendaReplyTools(toolInput);
-		const ownNames = new Set(own.tools.map((t) => t.name));
 		const hostNames = new Set(args.tools.tools.map((t) => t.name));
-		const offered = own.tools.filter((t) => !hostNames.has(t.name));
+		const offered = own.tools.filter(
+			(t) => !hostNames.has(t.name) && (!args.readOnly || t.name === READ_NOTE),
+		);
+		const offeredNames = new Set(offered.map((t) => t.name));
 		c.reply = { runId: run.runId, included: new Set(run.messageIds) };
 		let steer: ReturnType<AgendaAddedWords["begin"]> | null = null;
 		try {
-			steer = c.steering?.begin(run.runId) ?? null;
+			if (!args.readOnly) steer = c.steering?.begin(run.runId) ?? null;
 		} catch (error) {
 			// No steer for this reply: words sent meanwhile get a reply of their own.
 			log.warn("agency.steer_unavailable", {
@@ -185,7 +187,7 @@ export function createAgendaPorts(input: {
 				tools: {
 					tools: [...args.tools.tools, ...offered],
 					async call(call, signal) {
-						if (!ownNames.has(call.name) || hostNames.has(call.name))
+						if (!offeredNames.has(call.name))
 							return args.tools.call(call, signal);
 						if (call.name === READ_NOTE) {
 							// The package's short preview cuts at 4,000 characters. Keep its validation and note-used

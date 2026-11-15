@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+	debugDiagnosticDetailSchema,
+	debugDiagnosticsSchema,
 	errorReportSchema,
 	runSchema,
 	specialistSessionResponseSchema,
@@ -15,6 +17,24 @@ import { watchRun } from "./run-stream";
 export function dialogueClient(transport: Transport) {
 	return {
 		identity: transport.identity,
+		debugDiagnostics: (id: string, signal?: AbortSignal) =>
+			callJson(
+				transport,
+				debugDiagnosticsSchema,
+				`/api/conversations/${encodeURIComponent(id)}/debug-diagnostics`,
+				{ signal },
+			),
+		debugDiagnosticDetail: (
+			id: string,
+			diagnosticId: string,
+			signal?: AbortSignal,
+		) =>
+			callJson(
+				transport,
+				debugDiagnosticDetailSchema,
+				`/api/conversations/${encodeURIComponent(id)}/debug-diagnostics/${encodeURIComponent(diagnosticId)}`,
+				{ signal },
+			),
 		watchRun: (
 			id: string,
 			signal: AbortSignal,

@@ -201,6 +201,8 @@ function reportExternalWork(
 	db: Database,
 	next: WorkRow,
 ) {
+	const result = next.result as { replyInConversation?: unknown } | null;
+	if (result?.replyInConversation === true) return;
 	if (next.status === "done")
 		deps.externalOutput?.report?.(db, {
 			id: `work:${next.id}:${next.revision}`,
@@ -375,6 +377,7 @@ export function createWorkLedger(
 		| "resources"
 		| "resourceLedger"
 		| "externalOutput"
+		| "debugDiagnostics"
 	>,
 	images?: GeneratedImagesForWork,
 ) {
@@ -524,6 +527,18 @@ export function createWorkLedger(
 			const next = workById(db, workId)!;
 			images?.reserve(db, next, links);
 			logResult(db, next);
+			if (
+				next.status === "done" &&
+				(next.outcome === "failed" || next.outcome === "interrupted")
+			)
+				deps.debugDiagnostics?.enqueue(
+					db,
+					next.conversationId,
+					next.runId,
+					next.runId,
+					false,
+					next.id,
+				);
 			if (
 				next.status === "done" &&
 				WEB_RESEARCH_WORKS.includes(next.toolchainId)

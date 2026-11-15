@@ -7,7 +7,7 @@ import {
 	type AgendaNote,
 	type AgendaResearchTicket,
 } from "../../domains/dialogue";
-import { staleInputSources } from "./input";
+import { staleInputSources, staleMemoryRefs } from "./input";
 import {
 	agendaEnvelope,
 	agendaRecord,
@@ -103,9 +103,13 @@ export function createAgendaCheckpoints(input: {
 	}
 
 	async function refresh(c: AgendaScope) {
-		const stale = deps.store.read((db) =>
-			staleInputSources(deps, db, agendaSources(agendaEnvelope(c, now()))),
-		);
+		const stale = deps.store.read((db) => {
+			const sources = agendaSources(agendaEnvelope(c, now()));
+			return [
+				...staleInputSources(deps, db, sources),
+				...staleMemoryRefs(deps, db, sources),
+			];
+		});
 		if (!stale.length) return;
 		invalidate(c);
 		forgetRefs(c, stale);

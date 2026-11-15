@@ -79,8 +79,13 @@ export function createLogReader(file: string) {
 		 * Emits each record in file order, oldest generation first. `contains` skips a line before it is
 		 * parsed when it does not match, so a lookup by ID does not parse the whole log.
 		 */
-		async read(emit: (entry: LogEntry) => void, contains?: RegExp) {
+		async read(
+			emit: (entry: LogEntry) => void,
+			contains?: RegExp,
+			signal?: AbortSignal,
+		) {
 			for (const path of logGenerations(file)) {
+				signal?.throwIfAborted();
 				let fd: number;
 				try {
 					fd = openSync(path, "r");
@@ -99,6 +104,7 @@ export function createLogReader(file: string) {
 				const stream = createReadStream(path, {
 					fd,
 					autoClose: true,
+					signal,
 					start: offset,
 					end: info.size - 1,
 				});
@@ -133,6 +139,7 @@ export function createLogReader(file: string) {
 export async function readLogEntries(
 	file: string,
 	ids: Iterable<string>,
+	signal?: AbortSignal,
 ): Promise<LogEntry[]> {
 	const wanted = new Set(ids);
 	if (!wanted.size) return [];
@@ -142,10 +149,14 @@ export async function readLogEntries(
 			.join("|"),
 	);
 	const found: LogEntry[] = [];
-	await createLogReader(file).read((entry) => {
-		if (LOG_ID_KEYS.some((key) => wanted.has(entry[key] as string)))
-			found.push(entry);
-	}, pattern);
+	await createLogReader(file).read(
+		(entry) => {
+			if (LOG_ID_KEYS.some((key) => wanted.has(entry[key] as string)))
+				found.push(entry);
+		},
+		pattern,
+		signal,
+	);
 	return found
 		.map((entry, order) => ({ entry, order }))
 		.sort(

@@ -12,7 +12,18 @@ export type HostState = {
 	bindingRevisionId: string;
 	/** The package's profile and SKILL, with `{{today}}` still in them. */
 	instructions: string;
+	/** Present only for a source inspection. Once captured, the commit is immutable. */
+	inspection?: { commit?: string };
 	result: ExecutionResult | null;
+};
+
+export type InspectSource = {
+	resolveCommit(signal: AbortSignal): Promise<string>;
+	inspect(input: {
+		commit: string;
+		prompt: string;
+		signal: AbortSignal;
+	}): Promise<{ result: ExecutionResult; usage: WebNoteAttempt["usage"] }>;
 };
 
 /** How the notice of a finished run reaches the conversation. */
@@ -40,7 +51,7 @@ export type WebNoteTurn = (input: {
 /** The finished turn as the inference ledger records it (a Codex SDK attempt). */
 export type WebNoteAttempt = {
 	subject: string;
-	model: string;
+	model: string | null;
 	started: number;
 	ended: number;
 	status: "succeeded" | "failed";

@@ -73,3 +73,26 @@ test("mermaid fences do not emit a duplicate hidden source", () => {
 	expect(html).toContain("mermaid-block");
 	expect(html).not.toContain("mermaid-source");
 });
+
+test("source paths are quoted and a diff containing backticks stays in its code block", () => {
+	const html = renderSafeMarkdown(
+		"> **ソース：** `api/start.ts`\n\n````diff\n-old\n```\n+new\n````",
+	);
+	expect(html).toContain(
+		"<blockquote><p><strong>ソース：</strong> <code>api/start.ts</code>",
+	);
+	expect(html).toContain('<code class="language-diff">-old\n```\n+new</code>');
+});
+
+test("each source code block is independently closed, while normal chat code stays open", () => {
+	const text =
+		"> ソース：`api/a.ts`\n\n```diff\n-old\n+new\n```\n\n> ソース：`api/b.ts`\n\n```\ncode\n```";
+	const shown = renderSafeMarkdown(text, true);
+	expect(shown.match(/<details class="source-code-disclosure">/g)).toHaveLength(
+		2,
+	);
+	expect(shown).not.toContain("<details open");
+	expect(shown).toContain("<summary>差分を表示</summary>");
+	expect(shown).toContain("<summary>コードを表示</summary>");
+	expect(renderSafeMarkdown(text)).not.toContain("<details");
+});

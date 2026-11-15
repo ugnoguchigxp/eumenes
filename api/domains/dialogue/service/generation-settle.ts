@@ -20,13 +20,16 @@ import type { Handover } from "./executor-context";
 import { eventFields, SIDE_EFFECTS } from "./event-fields";
 import { generationStale } from "./generation-stream";
 import { adoptMemoryWindow } from "./memory-window";
-import { consumeAnswer } from "./result-intake";
+import { consumeAnswer, type ReportedWork } from "./result-intake";
 import { acceptRunAnswer, endRun, type RunEndState } from "./run-end";
 import { carriedToolCalls, type ExchangeStep } from "./tool-exchange";
 
 const log = getLogger("dialogue");
 
 export type GenerationResult = {
+	displayText?: string;
+	debugTarget?: string;
+	debugRouterFailure?: true;
 	imageAnswer?: ImageAnswerTrace;
 	/** The speech the generation ends with ("" for silence or a handover). */
 	text: string;
@@ -270,8 +273,9 @@ export function createGenerationSettlement(
 			const text = result.handover?.announcement ?? result.text;
 			let messageId: string | null = null;
 			const external =
-				deps.externalOutput?.offer(tx, run, text, !!result.confirmation) ??
-				false;
+				result.displayText === undefined &&
+				(deps.externalOutput?.offer(tx, run, text, !!result.confirmation) ??
+					false);
 			if (external && result.confirmation) {
 				events.appendInTransaction(tx, {
 					conversationId: run.conversationId,
@@ -290,6 +294,7 @@ export function createGenerationSettlement(
 					conversationId: run.conversationId,
 					role: "assistant",
 					text,
+					displayText: result.displayText,
 					createdAt: clock(),
 					runId: run.id,
 				});
@@ -335,6 +340,23 @@ export function createGenerationSettlement(
 				deps.toolchains?.settleSelectionInTransaction(tx, run.id, {
 					outcome: "completed",
 				});
+			if (done && result.debugTarget)
+				deps.debugDiagnostics?.enqueue(
+					tx,
+					run.conversationId,
+					result.debugTarget,
+					run.id,
+					true,
+				);
+			if (done && result.debugRouterFailure)
+				deps.debugDiagnostics?.enqueue(
+					tx,
+					run.conversationId,
+					run.id,
+					run.id,
+					false,
+					"router",
+				);
 			return done ? "applied" : "stale";
 		}
 		// A run that is already terminal (e.g. cancelled), or handed over to another job, keeps its state.
@@ -478,4 +500,38 @@ function said(
 		fields: { ref: event.id, heard: "full" },
 		dedupeKey: `delivered:${event.id}`,
 	});
+}
+
+/** A registered task can deliver its already formatted answer without a second model call. */
+export function finishReportedWork(
+	deps: DialogueDeps,
+	tx: Database,
+	run: Run,
+	intake: ReportedWork | null,
+) {
+	const work = intake?.rows[0];
+	const result = work?.result as {
+		replyInConversation?: unknown;
+		answer?: unknown;
+	} | null;
+	const text = result?.answer;
+	if (
+		work?.outcome === "cancelled" ||
+		result?.replyInConversation !== true ||
+		typeof text !== "string" ||
+		!text.trim()
+	)
+		return endRun(deps, tx, run, "completed", null);
+	const messageId = deps.id();
+	deps.conversation.appendInTransaction(tx, {
+		id: messageId,
+		conversationId: run.conversationId,
+		role: "assistant",
+		text,
+		displayText: intake?.displayAnswer,
+		createdAt: deps.clock(),
+		runId: run.id,
+	});
+	said(deps, tx, run, messageId, text, { text });
+	return endRun(deps, tx, run, "completed", null, messageId);
 }

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { toErrorCode } from "../../../infrastructure/error-code";
+import type { ExecutionResult } from "../../tool-runtime";
 import type { WebNoteAttempt, WebNoteTurn } from "../contracts";
 import { active, rowOf, save, stateOf } from "../repository";
 import { WEB_NOTE_RESOURCE, type Context } from "./context";
@@ -11,8 +12,69 @@ import policy from "./policy.json";
 export const WEB_NOTE_JOB = "web-note.run";
 const payload = z.strictObject({ id: z.uuid() });
 type Payload = z.infer<typeof payload>;
-type Prepared = { id: string; instructions: string; request: string };
-type Done = Note & { searches: number };
+type Prepared = {
+	id: string;
+	jobId: string;
+	instructions: string;
+	request: string;
+	inspection?: { commit?: string };
+};
+type Done = { note: Note } | { inspection: ExecutionResult };
+
+async function inspect(ctx: Context, input: Prepared, signal: AbortSignal) {
+	const source = ctx.inspectSource;
+	if (!source) throw new Error("inspect_source_unavailable");
+	const started = ctx.now();
+	const record = (
+		status: WebNoteAttempt["status"],
+		reason: string | null,
+		usage: WebNoteAttempt["usage"],
+	) =>
+		ctx
+			.record?.({
+				subject: `inspect-source:${input.id}`,
+				model: null,
+				started,
+				ended: ctx.now(),
+				status,
+				reason,
+				usage,
+			})
+			.catch(() => {});
+	try {
+		const candidate =
+			input.inspection?.commit ?? (await source.resolveCommit(signal));
+		const commit = await ctx.store.write((db) => {
+			signal.throwIfAborted();
+			const row = current(ctx, db, input.id);
+			const state = stateOf(row);
+			if (row.job_id !== input.jobId || !state.inspection)
+				throw new Error("inspect_source_stale");
+			if (state.inspection.commit) return state.inspection.commit;
+			state.inspection.commit = candidate;
+			save(db, row, state, ctx.now());
+			return candidate;
+		});
+		const { result, usage } = await source.inspect({
+			commit,
+			prompt: `${input.instructions}\n\n依頼:\n${input.request}`,
+			signal,
+		});
+		await record(
+			result.status === "failed" ? "failed" : "succeeded",
+			result.code ?? null,
+			usage,
+		);
+		return { inspection: result };
+	} catch (error) {
+		const candidate = toErrorCode(error, "");
+		const code = candidate.startsWith("inspect_source_")
+			? candidate
+			: "inspect_source_turn_failed";
+		await record("failed", code, null);
+		throw new Error(code);
+	}
+}
 
 /** A turn failure as a stable code; provider and process text never reaches a record. */
 function turnCode(error: unknown): string {
@@ -62,12 +124,15 @@ export function registerJobs(ctx: Context) {
 				status: "ready",
 				input: {
 					id: row.id,
+					jobId: claim.jobId,
 					instructions: state.instructions,
 					request: state.request,
+					inspection: state.inspection,
 				},
 			};
 		},
 		async execute(input, { signal }) {
+			if (input.inspection) return inspect(ctx, input, signal);
 			if (!ctx.turn) throw new Error("web_note_codex_unavailable");
 			// The research model is fixed, whatever LLM the conversation is set to (user, 2026-11-11).
 			const model = policy.model;
@@ -123,7 +188,7 @@ export function registerJobs(ctx: Context) {
 				throw new Error("web_note_empty_output");
 			}
 			await attempt("succeeded", null, turn.usage)?.catch(() => {});
-			return { ...parseNote(turn.text), searches: turn.searches };
+			return { note: parseNote(turn.text) };
 		},
 		classify: () => "fail",
 		settleInTransaction(db, claim, _input, outcome) {
@@ -145,8 +210,11 @@ export function registerJobs(ctx: Context) {
 				return "stale";
 			}
 			if (outcome.type === "success") {
-				const { searches: _searches, ...note } = outcome.result;
-				finish(ctx, db, row, "completed", noteResult(note, ctx.now()));
+				const result =
+					"inspection" in outcome.result
+						? outcome.result.inspection
+						: noteResult(outcome.result.note, ctx.now());
+				finish(ctx, db, row, result.status, result);
 			} else if (outcome.type === "interrupted")
 				end(ctx, db, row, "interrupted", outcome.errorCode);
 			else

@@ -40,6 +40,7 @@ export async function setup(
 		dataset?: boolean;
 		speechText?: (text: string) => string;
 		fetch?: typeof fetch;
+		env?: Record<string, string | undefined>;
 		localMs?: number;
 		llmContextWindow?: LarmPort["llmContextWindow"];
 	} = {},
@@ -55,7 +56,10 @@ export async function setup(
 		controlMigration,
 		...inferenceMigrations.slice(4).map((m) => m.sql),
 	]);
-	const settings = await createSettings(store, { dbPath, env: {} });
+	const settings = await createSettings(store, {
+		dbPath,
+		env: options.env ?? {},
+	});
 	const s = settings.get();
 	const connectionId = crypto.randomUUID();
 	for (const purpose of ["llm", "asr", "tts"] as const) {
@@ -80,7 +84,7 @@ export async function setup(
 	});
 	await settings.apply({
 		requestId: crypto.randomUUID(),
-		expectedRevision: 0,
+		expectedRevision: s.revision,
 		settings: s,
 		keys: [{ connectionId, value: "fixture-key" }],
 	});

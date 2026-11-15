@@ -5,6 +5,7 @@ import {
 	type InferencePort,
 } from "../../domains/inference";
 import type { WebNoteDeps } from "../../domains/web-note";
+import { createCodexSourceInspect } from "./codex-source-inspect";
 
 /**
  * The research note task's Codex: the codex executable and the only environment it may see (`codexRuntime`), no
@@ -49,5 +50,20 @@ export function createCodexWebNote(
 				}
 			: {}),
 		record: async (attempt) => inference.recordExternalCodexAttempt?.(attempt),
+	};
+}
+
+export async function createCodexInspection(
+	environment: Readonly<Record<string, string | undefined>>,
+	executable: string,
+	inference: Pick<InferencePort, "recordExternalCodexAttempt">,
+) {
+	return {
+		...createCodexWebNote(environment, executable, inference),
+		inspectSource: await createCodexSourceInspect(
+			environment,
+			executable,
+			process.cwd(),
+		),
 	};
 }

@@ -1,2 +1,2 @@
-# Source: api/domains/dialogue/service/routed-actions.ts
-text = '''依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。'''
+# Source: api/domains/dialogue/service/routed-turn.ts
+text = '''担当を見つけられませんでした。会話と手元の資料で答えられることは、そのまま自分で答えてください。操作が必要な場合は、まだ実施していないと伝え、必要なことを確認してください。'''

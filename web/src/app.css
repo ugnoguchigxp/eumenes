@@ -379,6 +379,17 @@ select:focus-visible {
 	padding: 0;
 	background: transparent;
 }
+.markdown-content .source-code-disclosure {
+	margin-bottom: 10px;
+}
+.source-code-disclosure > summary {
+	width: fit-content;
+	cursor: pointer;
+	color: var(--primary);
+}
+.source-code-disclosure[open] > summary {
+	margin-bottom: 6px;
+}
 .markdown-content blockquote {
 	padding-left: 11px;
 	border-left: 3px solid var(--muted-foreground);

@@ -21,6 +21,8 @@ type Report =
 			links?: readonly string[];
 	  };
 
+export type ReportedWork = { rows: WorkRow[]; displayAnswer?: string };
+
 const executionOutcome: Partial<Record<ExecutionStatus, WorkOutcome>> = {
 	completed: "succeeded",
 	partial: "partial",
@@ -89,7 +91,7 @@ export function intakeInTransaction(
 	tx: Database,
 	run: Run,
 	payload: GeneratePayload,
-): WorkRow[] | null {
+): ReportedWork | null {
 	const ledger = deps.work;
 	if (!ledger) return null;
 	const changed: WorkRow[] = [];
@@ -107,7 +109,7 @@ export function intakeInTransaction(
 		if (!notice) return null;
 		const row = ledger.workOfSourceInTransaction(tx, notice.workRef);
 		if (row && notice.report) report(row, notice.report);
-		return changed;
+		return { rows: changed, displayAnswer: notice.displayAnswer };
 	}
 	const waiting = ledger.waitingOfRunInTransaction(tx, run.id);
 	if (waiting.length === 0) return null;
@@ -115,7 +117,7 @@ export function intakeInTransaction(
 		const next = runReport(deps, tx, run, row, payload);
 		if (next) report(row, next);
 	}
-	return changed;
+	return { rows: changed };
 }
 
 /** The report of one piece of run-centric work, or null while its owner has nothing new. */
@@ -187,7 +189,7 @@ function taskNotice(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
-): { workRef: string; report: Report | null } | null {
+): { workRef: string; report: Report | null; displayAnswer?: string } | null {
 	const text = deps.conversation.messageInTransaction(tx, run.inputMessageId)
 		?.message.text;
 	let raw: { kind?: unknown; workRef?: unknown };
@@ -217,6 +219,7 @@ function taskNotice(
 	const outcome = executionOutcome[view.status];
 	return {
 		workRef: view.id,
+		displayAnswer: view.result?.displayAnswer,
 		report: outcome
 			? {
 					status: "done",

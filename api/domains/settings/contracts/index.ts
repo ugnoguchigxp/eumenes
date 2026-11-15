@@ -12,6 +12,8 @@ export {
 } from "./notification-sounds";
 import { spatialSettingsShape } from "./spatial";
 import { endpoint, cloudEndpoint } from "./endpoints";
+import { googleCloudTts } from "./google-cloud-tts";
+export { googleCloudTts } from "./google-cloud-tts";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 export { cloudEndpoint } from "./endpoints";
 export {
@@ -21,10 +23,11 @@ export {
 } from "./local-services";
 export const purposeSchema = z.enum(["llm", "asr", "tts"]);
 export type Purpose = z.infer<typeof purposeSchema>;
-/** The cloud protocol: OpenAI-compatible HTTP, Workers AI speech, or an agent SDK (LLM only). */
+/** The cloud protocol used by the connection. */
 const connectionKinds = [
 	"openai-compatible",
 	"cloudflare-workers-ai",
+	googleCloudTts.kind,
 	"codex-sdk",
 	"claude-agent-sdk",
 ] as const;
@@ -41,7 +44,8 @@ export type BillingPath =
 	| "claude-api-key"
 	| "codex"
 	| "openai-compatible"
-	| "cloudflare-workers-ai";
+	| "cloudflare-workers-ai"
+	| typeof googleCloudTts.kind;
 export function billingPath(connection: {
 	kind?: ConnectionKind;
 	auth?: AgentAuth;
@@ -52,7 +56,8 @@ export function billingPath(connection: {
 				? "claude-subscription"
 				: "claude-api-key";
 		case "cloudflare-workers-ai":
-			return "cloudflare-workers-ai";
+		case googleCloudTts.kind:
+			return connection.kind;
 		case "codex-sdk":
 			return "codex";
 		default:
@@ -361,6 +366,7 @@ export const settingsSchema = z
 			.object({
 				/** Absent in existing installations: keep the adopted F host until explicitly switched. */
 				runtime: z.enum(["F", "always-on"]).optional(),
+				debugMode: z.boolean().optional(),
 				thinkResourceId: z.string().min(1).nullable().optional(),
 				speechIntervalSec: z
 					.number()
@@ -438,6 +444,23 @@ export const settingsSchema = z
 				ctx.addIssue({ code: "custom", message: "読み上げ音声が必要です" });
 		}
 		for (const c of s.connections) {
+			if (
+				c.kind === googleCloudTts.kind &&
+				(c.baseUrl !== googleCloudTts.baseUrl ||
+					c.envRef !== googleCloudTts.envRef ||
+					s.resources.some(
+						(r) =>
+							r.connectionId === c.id &&
+							(r.purpose !== "tts" ||
+								r.language !== googleCloudTts.language ||
+								r.model !== r.voice),
+					))
+			)
+				ctx.addIssue({
+					code: "custom",
+					message:
+						"Google Cloud Text-to-Speechには日本語の読み上げ音声と環境変数の認証が必要です",
+				});
 			if (c.kind === "cloudflare-workers-ai") {
 				if (
 					!c.accountId ||
@@ -563,6 +586,18 @@ export const applySchema = z
 					code: "custom",
 					message: "外部ホストには https が必要です",
 					path: ["settings", "connections", index, "baseUrl"],
+				});
+		});
+		input.keys.forEach((key, index) => {
+			if (
+				input.settings.connections.some(
+					(c) => c.id === key.connectionId && c.kind === googleCloudTts.kind,
+				)
+			)
+				ctx.addIssue({
+					code: "custom",
+					message: "Google Cloud Text-to-Speechの認証は環境変数で設定します",
+					path: ["keys", index],
 				});
 		});
 	});

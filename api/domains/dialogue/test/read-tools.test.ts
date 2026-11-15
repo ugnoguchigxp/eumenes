@@ -177,6 +177,33 @@ test("a conversation without a steward cannot offer or submit a memory mutation"
 	expect(h.state.stewardRequests).toEqual([]);
 });
 
+test("a correction of transcribed speech carries its target and corrected content to the steward", async () => {
+	h = await setup({ memory: true });
+	const correction = {
+		operation: "request",
+		kind: "correct",
+		what: "先ほどの接続についての発言で、一本の改善と記録された内容",
+		detail:
+			"正しくは一本の回線。ASRの誤認であり、接続を変更したという意味ではない。",
+	};
+	// The model supplies the interpretation; the host must preserve it in the existing request path.
+	h.state.steps.push(
+		choice({ choice: "none" }),
+		{ calls: [{ name: "memory", args: correction }] },
+		{ text: "回線ですね。訂正を受け付けました。" },
+	);
+	await h.say("一本の回線と言ったんです。改善はASRの誤認です。");
+	expect(h.state.stewardRequests).toEqual([
+		expect.objectContaining({
+			kind: correction.kind,
+			what: correction.what,
+			detail: correction.detail,
+		}),
+	]);
+	expect(toolResult(h.state.calls.at(-1)!)).toContain('"accepted":true');
+	expect(h.memory!.list()).toEqual([]);
+});
+
 test("the conversation log is read from before the current words, the recent runs with how each was handled", async () => {
 	h = await setup();
 	h.state.steps.push(...reply("京都、いいですね。"));

@@ -10,7 +10,7 @@ import {
 	type Runner as ClaudeRunner,
 } from "../../domains/claude-code";
 import { createClaudeCodeTaskAdapter } from "../work/claude-code-task-adapter";
-import { createWebNoteAdapter } from "../web-note/web-note-adapter";
+import { createWebNoteAdapters } from "../web-note/web-note-adapter";
 import { createMarkdownAdapter } from "../markdown/markdown-adapter";
 import { createArchiveResearchAdapter } from "../markdown/archive-research-adapter";
 import {
@@ -151,7 +151,7 @@ type ToolchainOptions = {
 	 * The research note task (Codex's own web search): one Codex turn and the ledger record of it. Absent: the task is
 	 * not offered.
 	 */
-	webNote?: Pick<WebNoteDeps, "turn" | "record">;
+	webNote?: Pick<WebNoteDeps, "turn" | "record" | "inspectSource">;
 	claudeRunner?: ClaudeRunner;
 	conversation?: import("../../domains/conversation").ConversationService;
 	timers?: import("../../domains/timers").TimersService;
@@ -263,6 +263,7 @@ function enabledBackends(options: ToolchainOptions) {
 		...(options.markdown ? ["markdown"] : []),
 		"task-execution",
 		...(options.webNote?.turn ? ["web-note"] : []),
+		...(options.webNote?.inspectSource ? ["inspect-source"] : []),
 		...(options.webResearch !== false ? ["web"] : []),
 		...(options.timers ? ["timer"] : []),
 		...(options.dots ? ["dots"] : []),
@@ -345,7 +346,7 @@ export async function createToolchain(
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		...(options.canvasAdapter ? [options.canvasAdapter] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
-		createWebNoteAdapter(() => webNoteRuntime, !!options.webNote?.turn),
+		...createWebNoteAdapters(() => webNoteRuntime),
 		createClaudeCodeTaskAdapter(() => claudeCode),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk

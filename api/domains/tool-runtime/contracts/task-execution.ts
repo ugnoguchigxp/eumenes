@@ -65,6 +65,10 @@ export type ExecutionResult = {
 	document?: ExecutionDocument;
 	/** A research owner's bounded report; source IDs are issued only after reading a guarded body. */
 	answer?: string;
+	/** A task owner may deliver its bounded answer verbatim in the requesting conversation. */
+	replyInConversation?: true;
+	/** Complete visual rendering for a conversation reply. Never part of a work or agent projection. */
+	displayAnswer?: string;
 	sources?: Array<{
 		sourceId: string;
 		url: string;
@@ -388,13 +392,14 @@ export function executionCallSession(child: ChildExecution) {
 
 /** Bounded conversation projection; the persisted result remains the source of truth. */
 export function executionNoticeResult(result: ExecutionResult | null) {
-	return result
-		? {
-				...result,
-				summary: result.summary.slice(0, 2000),
-				fulfilled: result.fulfilled.slice(0, 8).map((x) => x.slice(0, 120)),
-				missing: result.missing.slice(0, 8).map((x) => x.slice(0, 120)),
-				refs: result.refs.slice(0, 8),
-			}
-		: null;
+	if (!result) return null;
+	const { displayAnswer: _displayAnswer, ...publicResult } = result;
+	return {
+		...publicResult,
+		...(result.replyInConversation ? { answer: result.summary } : {}),
+		summary: result.summary.slice(0, 2000),
+		fulfilled: result.fulfilled.slice(0, 8).map((x) => x.slice(0, 120)),
+		missing: result.missing.slice(0, 8).map((x) => x.slice(0, 120)),
+		refs: result.refs.slice(0, 8),
+	};
 }

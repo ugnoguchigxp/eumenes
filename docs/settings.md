@@ -28,6 +28,8 @@ World画面は最初に「資料」を開き、取り込んだ原資料を総件
 
 設定アーティファクトの「会話」「音声と入力」「表示」では、画面内の「設定の変更をすべて保存」から保存できます。共通下書きにある他の設定画面の変更も一緒に保存します。保存内容を確認する場合は「変更一覧を開く」を使います。保存中は再送を止め、失敗時は入力を保持して同じ画面から再試行できます。
 
+「会話」の「デバッグモード」は開発用の設定です。有効にして保存すると、失敗した処理や依頼との食い違いについて、エージェントが確認できたことを会話欄に表示します。「詳細」から元の実行と確認範囲を参照できます。初期値はオフです。保存後に再起動は不要で、オフにすると診断表示と診断専用の推論が止まります。診断の説明は通常の会話履歴や長期記憶に保存しません。詳しい範囲と上限は [実装計画](../spec/conversation-debug-diagnostics-implementation-plan-2026-11-15.md) を参照してください。
+
 「表示」は背景、テーマ、読み上げ字幕の有効化、字幕デザイン、字幕サイズを扱います。字幕のプレビューは未保存の選択を反映し、会話の背景・テーマ・読み上げ中の字幕は保存した値を使います。端末設定に合わせるテーマは端末の明暗の変更にも追従します。
 
 「表示」の「会話の背景」では、光の妖精とSpatialを選び、「設定の変更をすべて保存」で保存できます。Spatialは表示中、1分ごとに `GET /api/monitoring/snapshot` を読み、Eumenes側の実測（CPU・Memory・SSD、Eumenes Backend、LLM・ASR・TTS・Embedding・態度判定・画像生成・楽曲生成）を表示します（[設計](../spec/spatial-monitoring-eumenes-design-2026-10-18.md)）。LARMホストの計測は後続です。モデルの組込みは [背景とSpatial](backgrounds.md) を参照してください。
@@ -63,6 +65,12 @@ World画面は最初に「資料」を開き、取り込んだ原資料を総件
 Account ID・APIトークンの変更、接続の無効化・削除では、既存の接続世代による失効を適用し、古い一覧や実行結果を採用しません。従来のOpenAI互換接続やSDK接続はそのまま使えます。
 
 APIの根拠: [Workers AIの認証](https://developers.cloudflare.com/workers-ai/get-started/rest-api/)、[モデル検索](https://developers.cloudflare.com/api/resources/ai/subresources/models/methods/list/)、[入出力schema](https://developers.cloudflare.com/api/resources/ai/subresources/models/subresources/schema/methods/get/)。
+
+### Google Cloud の読み上げ
+
+Eumenes のサーバー環境に `GOOGLE_CLOUD_API_KEY` があると、起動時に音声接続を登録します。チャット欄上部の「TTSモデル」で「Google Cloud（日本語・女性）」の音声を選ぶと、読み上げがクラウドに切り替わります。Google の一覧から日本語（日本）の女性 Chirp 3 HD を取得し、声ごとに候補を表示します。
+
+`ffmpeg` が使えるサーバーでは Google から MP3 を受け取り、既存のブラウザー再生に合わせてサーバー内で WAV に変換します。`ffmpeg` がない環境では Google から WAV を受け取ります。
 
 ### エージェントSDKの接続（会話用途のみ）
 

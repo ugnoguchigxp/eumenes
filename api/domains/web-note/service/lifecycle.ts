@@ -85,7 +85,16 @@ export function end(
 	status: "failed" | "cancelled" | "interrupted",
 	code: string,
 ) {
-	finish(ctx, db, row, status, failedResult(status, code));
+	const result = failedResult(status, code);
+	if (status !== "cancelled" && stateOf(row).inspection) {
+		result.title = "ソース調査";
+		result.summary = "今回は表示できる抜粋がありません。";
+		result.answer = result.summary;
+		result.replyInConversation = true;
+		result.displayAnswer = `**一部抜粋**\n\n${result.summary}`;
+		result.status = "partial";
+	}
+	finish(ctx, db, row, result.status, result);
 }
 export function forget(ctx: Context, db: Database, id: string) {
 	const row = rowOf(db, id);

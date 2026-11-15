@@ -43,6 +43,9 @@ export type ToolExecutor = (
 ) => Promise<ToolOutcome>;
 
 export type GenerationOutcome = {
+	displayText?: string;
+	debugTarget?: string;
+	debugRouterFailure?: true;
 	lookupSources?: Array<{ url: string; title: string }>;
 	imageAnswer?: ImageAnswerTrace;
 	/** The speech the generation ends with ("" when it said nothing). */

@@ -8,7 +8,11 @@ import { useSpeechModels } from "./useSpeechModels";
 
 afterEach(cleanup);
 
-function setup(workersModels: unknown[] = []) {
+function setup(
+	catalog: unknown[] = [],
+	provider:
+		"cloudflare-workers-ai" | "google-cloud-tts" = "cloudflare-workers-ai",
+) {
 	const saved = settingsFixture();
 	saved.connections = [
 		{
@@ -20,12 +24,15 @@ function setup(workersModels: unknown[] = []) {
 			epoch: 0,
 			envRef: null,
 		},
-		...(workersModels.length
+		...(catalog.length
 			? [
 					{
 						id: "workers",
-						kind: "cloudflare-workers-ai" as const,
-						name: "Workers",
+						kind: provider,
+						name:
+							provider === "google-cloud-tts"
+								? "Google Cloud（日本語・女性）"
+								: "Workers",
 						baseUrl: "https://workers.test",
 						enabled: true,
 						epoch: 0,
@@ -49,7 +56,7 @@ function setup(workersModels: unknown[] = []) {
 			providers: [{ name: "asr", model: "local-recognition" }],
 		})),
 		connectionModels: vi.fn(async () => ({
-			models: workersModels,
+			models: catalog,
 			account: { auth: "api-key", subscriptionType: null },
 		})),
 		applySettings: vi.fn(async ({ settings }: { settings: Settings }) => ({
@@ -101,6 +108,63 @@ test("failed save keeps the saved selection and reports an error", async () => {
 	expect(hook.result.current.tts.selected).toBe("larm");
 });
 
+test("keeps the saved Google voice and offers another voice as a separate TTS option", async () => {
+	const voiceId = (name: string) => `ja-JP-Chirp3-HD-${name}`;
+	const voice = voiceId("FixtureB");
+	const { saved, hook, client } = setup(
+		["FixtureA", "FixtureB"].map((name) => ({
+			id: voiceId(name),
+			displayName: name,
+			purpose: "tts",
+			contextWindow: null,
+			speech: speech({
+				voiceRequired: true,
+				voiceDefault: voiceId(name),
+				languageRequired: true,
+				languageDefault: "ja-JP",
+			}),
+		})),
+		"google-cloud-tts",
+	);
+	saved.resources.push({
+		id: "current-google-voice",
+		connectionId: "workers",
+		purpose: "tts",
+		model: voiceId("FixtureA"),
+		voice: voiceId("FixtureA"),
+		language: "ja-JP",
+		contextWindow: null,
+	});
+	saved.routes.tts.mode = "cloud-only";
+	saved.routes.tts.fallbackId = "current-google-voice";
+	await waitFor(() =>
+		expect(hook.result.current.tts.options.map((o) => o.label)).toEqual([
+			"LARM",
+			"音声接続 / test-tts",
+			"Google Cloud（日本語・女性） / FixtureA",
+			"Google Cloud（日本語・女性） / FixtureB",
+		]),
+	);
+	expect(hook.result.current.tts.selected).toBe("current-google-voice");
+	expect(hook.result.current.asr.options.map((o) => o.id)).toEqual([
+		"larm",
+		"asr",
+	]);
+	const option = hook.result.current.tts.options.at(-1)!;
+	await act(() => hook.result.current.select("tts", option.id));
+	const { resources, routes } = client.applySettings.mock.calls[0]![0].settings;
+	expect(resources.at(-1)).toMatchObject({
+		purpose: "tts",
+		model: voice,
+		voice,
+		language: "ja-JP",
+	});
+	expect(routes.tts).toMatchObject({
+		mode: "cloud-only",
+		fallbackId: resources.at(-1)!.id,
+	});
+});
+
 const speech = (overrides: Record<string, unknown> = {}) => ({
 	supported: true,
 	reason: null,
@@ -115,7 +179,7 @@ const speech = (overrides: Record<string, unknown> = {}) => ({
 	...overrides,
 });
 
-test("lists unregistered Workers AI speech models and registers one when picked", async () => {
+test("offers Workers AI for ASR and hides its registered and catalog TTS models", async () => {
 	const { saved, client, hook } = setup([
 		{
 			id: "@cf/vendor/speak",
@@ -146,30 +210,37 @@ test("lists unregistered Workers AI speech models and registers one when picked"
 			contextWindow: null,
 		},
 	]);
+	saved.resources.push({
+		id: "workers-tts",
+		connectionId: "workers",
+		purpose: "tts",
+		model: "@cf/vendor/saved-speak",
+		contextWindow: null,
+		voice: "angus",
+	});
 	await waitFor(() =>
-		expect(hook.result.current.tts.options.map((o) => o.label)).toEqual([
-			"LARM",
-			"音声接続 / test-tts",
-			"Workers / @cf/vendor/speak",
-		]),
+		expect(hook.result.current.asr.options.map((o) => o.label)).toContain(
+			"Workers / @cf/vendor/listen",
+		),
 	);
-	expect(hook.result.current.asr.options.map((o) => o.label)).toContain(
-		"Workers / @cf/vendor/listen",
-	);
-	const option = hook.result.current.tts.options[2]!;
-	await act(() => hook.result.current.select("tts", option.id));
+	expect(hook.result.current.tts.options.map((o) => o.label)).toEqual([
+		"LARM",
+		"音声接続 / test-tts",
+	]);
+	const option = hook.result.current.asr.options[2]!;
+	await act(() => hook.result.current.select("asr", option.id));
 	const sent = client.applySettings.mock.calls[0]![0].settings;
 	const added = sent.resources.find(
-		(r: Settings["resources"][number]) => r.model === "@cf/vendor/speak",
+		(r: Settings["resources"][number]) => r.model === "@cf/vendor/listen",
 	)!;
 	expect(added).toMatchObject({
 		connectionId: "workers",
-		purpose: "tts",
-		voice: "angus",
+		purpose: "asr",
+		voice: null,
 		contextWindow: null,
 	});
 	expect(sent.resources).toHaveLength(saved.resources.length + 1);
-	expect(sent.routes.tts).toMatchObject({
+	expect(sent.routes.asr).toMatchObject({
 		mode: "cloud-only",
 		cloudAllowed: true,
 		fallbackId: added.id,

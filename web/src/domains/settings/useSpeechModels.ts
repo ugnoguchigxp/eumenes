@@ -34,9 +34,11 @@ export function useSpeechModels(client: EumenesClient) {
 		staleTime: 60_000,
 	});
 	const value = query.data;
-	// Workers AI publishes its speech models; a failed list only hides the unregistered ones.
+	// A failed catalog request only hides the unregistered models.
 	const speechConnections = (value?.connections ?? []).filter(
-		(c) => c.kind === "cloudflare-workers-ai" && c.enabled,
+		(c) =>
+			c.enabled &&
+			(c.kind === "cloudflare-workers-ai" || c.kind === "google-cloud-tts"),
 	);
 	const modelLists = useQueries({
 		queries: speechConnections.map((c) => ({
@@ -60,6 +62,8 @@ export function useSpeechModels(client: EumenesClient) {
 		];
 		for (const connection of value?.connections ?? []) {
 			if (!connection.enabled) continue;
+			if (purpose === "tts" && connection.kind === "cloudflare-workers-ai")
+				continue;
 			const listed =
 				modelLists[speechConnections.findIndex((c) => c.id === connection.id)]
 					?.data?.models ?? [];
@@ -69,7 +73,7 @@ export function useSpeechModels(client: EumenesClient) {
 			for (const r of registered)
 				options.push({
 					id: r.id,
-					label: `${connection.name} / ${r.model}`,
+					label: `${connection.name} / ${listed.find((m) => m.id === r.model)?.displayName ?? r.model}`,
 				});
 			for (const m of listed) {
 				if (

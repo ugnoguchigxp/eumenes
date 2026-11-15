@@ -237,9 +237,14 @@ export function createConversationService(
 		) {
 			return recordAnswerDelivery(db, runId, conversationId, delivery);
 		},
-		get(id: string): Conversation {
+		get(id: string, options?: { includeDisplay?: boolean }): Conversation {
 			return store.read((db) => {
-				const { messages, hasMore } = tailMessages(db, id, GET_MESSAGE_LIMIT);
+				const { messages, hasMore } = tailMessages(
+					db,
+					id,
+					GET_MESSAGE_LIMIT,
+					options?.includeDisplay,
+				);
 				return {
 					id,
 					revision: revision(db, id),

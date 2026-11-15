@@ -228,6 +228,9 @@ export type DialogueDeps = {
 	objectRecognition?: ObjectRecognitionPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	worldContext?: WorldContextPort;
+	debugDiagnostics?: ReturnType<
+		typeof import("./debug-diagnostics").createDebugDiagnostics
+	>;
 	diagnostics?: import("../contracts/diagnostics").DiagnosticsPort;
 	/** The operational log file (`config.logFile`) the read tool `read_runs` reads warnings from; absent: none read. */
 	logFile?: () => string | undefined;
@@ -242,6 +245,10 @@ export type DialogueDeps = {
 		text: string;
 		sources: Array<{ url: string; title: string }>;
 	}>;
+	sourceLookup?: (
+		query: string,
+		signal: AbortSignal,
+	) => Promise<{ text: string; displayText?: string }>;
 	/** Session toolchains and their domain work; without it no specialist session exists. */
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */

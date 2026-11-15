@@ -21,6 +21,7 @@ import {
 	createDecipheriv,
 	createHmac,
 	randomBytes,
+	randomUUID,
 } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -29,6 +30,7 @@ import { createFileExclusive } from "../../../infrastructure/atomic-file";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	defaultSubtitles,
+	googleCloudTts,
 	routerPatchSchema,
 	purposeSchema,
 	settingsSchema,
@@ -189,11 +191,6 @@ export async function createSettings(
 		c.setAuthTag(tag);
 		return Buffer.concat([c.update(bytes), c.final()]).toString("utf8");
 	}
-	await store.write((db) => {
-		if (!db.query("SELECT id FROM settings_document").get())
-			save(db, defaults(env));
-		else persistStoredMigration(db);
-	});
 	const listeners = new Set<() => void>();
 	function credential(db: Database, c: Connection): string | null {
 		if (c.envRef) {
@@ -212,6 +209,34 @@ export async function createSettings(
 		envRefAllowlist,
 		encrypt,
 		credential,
+	});
+	await store.write((db) => {
+		if (!db.query("SELECT id FROM settings_document").get())
+			save(db, defaults(env));
+		else persistStoredMigration(db);
+		if (!env[googleCloudTts.envRef]?.trim()) return;
+		const settings = read(db);
+		const id = "718657dd-4254-431d-8401-ab103465da97";
+		if (
+			settings.connections.some((c) => c.kind === googleCloudTts.kind) ||
+			db.query("SELECT 1 FROM settings_connection_epochs WHERE id=?").get(id)
+		)
+			return;
+		settings.connections.push({
+			id,
+			kind: googleCloudTts.kind,
+			name: "Google Cloud（日本語・女性）",
+			baseUrl: googleCloudTts.baseUrl,
+			envRef: googleCloudTts.envRef,
+			enabled: true,
+			epoch: 0,
+		});
+		applyInTransaction(db, {
+			requestId: randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys: [],
+		});
 	});
 	function notifyChanged() {
 		for (const fn of listeners) fn();

@@ -12,10 +12,12 @@ import {
 	runViewingSchema,
 } from "./specialist";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
+/** The longest utterance the user may send (typed, corrected or spoken), in characters. */
+export const UTTERANCE_MAX_CHARS = 4000;
 const submitFields = z.object({
 	requestId: z.uuid(),
 	conversationId: z.string().min(1).max(120),
-	text: z.string().trim().max(8000),
+	text: z.string().trim().max(UTTERANCE_MAX_CHARS),
 	guidanceLanguage: guidanceLanguageSchema.optional(),
 	presentation: z.enum(["conversation", "artifact"]).optional(),
 	attachmentIds: z
@@ -71,7 +73,10 @@ export const publicSubmitSchema = submitFields
 export type PublicSubmit = z.infer<typeof publicSubmitSchema>;
 /** The latest utterance's corrected text, answered again (the prompt edit design, section 4.1). */
 export const resubmitSchema = z
-	.object({ requestId: z.uuid(), text: z.string().trim().max(8000) })
+	.object({
+		requestId: z.uuid(),
+		text: z.string().trim().max(UTTERANCE_MAX_CHARS),
+	})
 	.strict();
 export type Resubmit = z.infer<typeof resubmitSchema>;
 export const runSchema = z.object({
@@ -306,6 +311,8 @@ export interface ConversationAgentPort {
 			messageIds: readonly string[];
 		};
 		messages: AgentMessage[];
+		/** Only read tools may be offered or run, including tools supplied by the agent itself. */
+		readOnly?: boolean;
 		chat: {
 			complete(
 				request: { messages: AgentMessage[]; tools: AgentToolDefinition[] },
@@ -376,3 +383,5 @@ export {
 	type AgendaNote,
 	type AgendaResearchTicket,
 } from "./agency-always-on";
+
+export * from "./debug-diagnostics";

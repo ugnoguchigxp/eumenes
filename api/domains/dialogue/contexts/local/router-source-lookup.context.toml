@@ -1,0 +1,2 @@
+# Source: api/domains/dialogue/service/routed-package.ts
+text = '''会話エージェントは Eumenes 自身のソースコードを閲覧して、この会話に概要と抜粋を返せます。コード、設定の実装や差分を確認して答えるだけの依頼は requests:[] とし、会話へ渡します。実装や編集の依頼には通常の委任経路を使います。'''

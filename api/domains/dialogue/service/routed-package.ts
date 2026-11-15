@@ -1,6 +1,8 @@
 import { HostAction, hostActionAnalyzer } from "./router-host-action";
 import {
+	head,
 	routeWithSelection,
+	STRUCTURE_LIMITS,
 	type RouteCandidate as PackageCandidate,
 	type RouteDecision as PackageDecision,
 	type SelectionMode,
@@ -266,10 +268,19 @@ export async function offer(
 export async function routeByEntry(
 	turn: Turn,
 	router: ActiveRouter,
-	routeTurn: SelectionTurn,
+	given: SelectionTurn,
 	embedded: Map<string, QueryVector>,
 	mode: SelectionMode = "conversation",
 ): Promise<Routed> {
+	// The router reads the head of a long utterance; one with no words (attachments only) asks for no work.
+	const text = head(given.state.text.trim(), STRUCTURE_LIMITS.text);
+	if (!text && mode === "conversation")
+		return {
+			decision: { row: 1, to: "conversation" },
+			structure: null,
+			parts: [],
+		};
+	const routeTurn = { ...given, state: { ...given.state, text } };
 	const timeout = AbortSignal.timeout(router.settings.structureTimeoutMs);
 	const signal = AbortSignal.any([turn.signal, timeout]);
 	const env = { store: turn.deps.store, port: turn.deps.toolchains!, signal };
@@ -286,6 +297,14 @@ export async function routeByEntry(
 							HANDOFF_STRUCTURE,
 							...(turn.deps.lookup
 								? [systemContext(LOOKUP_STRUCTURE, {})]
+								: []),
+							...(turn.deps.sourceLookup
+								? [
+										systemContext(
+											"dialogue.contexts.local.router-source-lookup",
+											{},
+										),
+									]
 								: []),
 						].join("\n\n"),
 					},

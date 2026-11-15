@@ -122,6 +122,20 @@ export function useWorkspace({
 		select: (data) => data.thoughts,
 		retry: 0,
 	});
+	const debugMode =
+		settings.data?.agency.debugMode === true && !settings.isError;
+	const debugDiagnostics = useQuery({
+		queryKey: [
+			queryRoots.dialogue,
+			client.identity,
+			"main",
+			"debug-diagnostics",
+			debugMode,
+		],
+		queryFn: ({ signal }) => client.debugDiagnostics("main", signal),
+		enabled: debugMode,
+		retry: false,
+	});
 	const runs = useRuns(client, "main");
 	const watchTimerRun = useTimerArtifacts(client, openTimer, runs.data);
 	const submit = useSubmit(client, "main");
@@ -186,6 +200,17 @@ export function useWorkspace({
 	const phase = useStore(store, (state) => state.phase);
 	const audioError = useStore(store, (state) => state.error);
 	const cache = useQueryClient();
+	useEffect(() => {
+		if (!debugMode)
+			cache.removeQueries({
+				queryKey: [
+					queryRoots.dialogue,
+					client.identity,
+					"main",
+					"debug-diagnostics",
+				],
+			});
+	}, [cache, client.identity, debugMode]);
 	const changesState = useSyncExternalStore(
 		client.subscribeChangesState,
 		client.changesState,
@@ -289,6 +314,8 @@ export function useWorkspace({
 		...historyScroll,
 		conversation,
 		thoughts,
+		debugMode,
+		debugDiagnostics,
 		runs,
 		voice,
 		timerAudio,

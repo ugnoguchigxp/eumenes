@@ -22,6 +22,7 @@ const BACKENDS = [
 	"task-execution",
 	"pursuit",
 	"web-note",
+	"inspect-source",
 	"web",
 	"history",
 	"timer",

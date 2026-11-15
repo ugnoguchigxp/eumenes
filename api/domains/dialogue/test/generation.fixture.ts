@@ -56,6 +56,7 @@ export const userOf = (call: Call) =>
 export type Call = {
 	messages: ChatMessage[];
 	tools: string[];
+	toolDefinitions?: unknown;
 	/** The session the call carried (its output limit and reasoning). */
 	session?: CallSession;
 };
@@ -369,6 +370,13 @@ export function routerCards(cards: readonly ToolchainCard[]): RouterCard[] {
 }
 
 export type SetupOptions = {
+	debugDiagnostics?: Parameters<
+		typeof createDialogueService
+	>[0]["debugDiagnostics"];
+	debugInference?: Pick<
+		InferencePort,
+		"captureInTransaction" | "executeRequest"
+	>;
 	screenInTransaction?: ToolchainRoutingPort["screenInTransaction"];
 	externalOutput?: Parameters<
 		typeof createDialogueService
@@ -554,6 +562,7 @@ export async function setup(options: SetupOptions = {}) {
 			state.calls.push({
 				messages: messages.map((m) => ({ ...m })),
 				tools: (tools ?? []).map((t) => t.function.name),
+				toolDefinitions: tools,
 				...(session ? { session } : {}),
 			});
 			// The model's answer is fixed when the call is made; the gate only holds its delivery.
@@ -565,6 +574,7 @@ export async function setup(options: SetupOptions = {}) {
 			if (step.text) delta?.(step.text);
 			return receipt(requestId, step);
 		},
+		...options.debugInference,
 	} as unknown as InferencePort;
 	const cardOf = (revisionId: string) =>
 		cards.find((c) => c.revisionId === revisionId);
@@ -758,6 +768,7 @@ export async function setup(options: SetupOptions = {}) {
 	const queue = createQueue(store, options.queue ?? {});
 	const dialogue = createDialogueService({
 		externalOutput: options.externalOutput,
+		debugDiagnostics: options.debugDiagnostics,
 		store,
 		conversation,
 		larm,

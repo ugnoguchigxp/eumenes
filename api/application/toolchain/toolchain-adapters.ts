@@ -14,7 +14,11 @@ import {
 	markdownDomainSchemas,
 } from "../markdown/markdown-adapter";
 import { describeClaudeCodeTaskAdapter } from "../work/claude-code-task-adapter";
-import { describeWebNoteAdapter } from "../web-note/web-note-adapter";
+import {
+	describeInspectSourceAdapter,
+	describeWebNoteAdapter,
+} from "../web-note/web-note-adapter";
+import { INSPECT_SOURCE_ADAPTER } from "../../domains/web-note";
 import {
 	ARCHIVE_RESEARCH_ADAPTER,
 	describeArchiveResearchAdapter,
@@ -260,6 +264,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: SHELL_ADAPTER_REF, describe: describeShellAdapter },
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
 	{ ref: "adapter:web-note@1", describe: describeWebNoteAdapter },
+	{ ref: INSPECT_SOURCE_ADAPTER, describe: describeInspectSourceAdapter },
 	{
 		ref: "adapter:claude-code-task@1",
 		describe: describeClaudeCodeTaskAdapter,

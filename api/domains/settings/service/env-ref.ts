@@ -1,9 +1,13 @@
+import { googleCloudTts } from "../contracts/google-cloud-tts";
+
 /** Official API hosts a provider key may be sent to; any other host needs an explicit allowlist. */
 export const providerKeyHosts: Record<string, (host: string) => boolean> = {
 	OPENAI_API_KEY: (h) => h === "api.openai.com",
 	ANTHROPIC_API_KEY: (h) => h === "api.anthropic.com",
 	GEMINI_API_KEY: (h) => h === "generativelanguage.googleapis.com",
 	GOOGLE_API_KEY: (h) => h === "generativelanguage.googleapis.com",
+	[googleCloudTts.envRef]: (h) =>
+		h === new URL(googleCloudTts.baseUrl).hostname,
 	AZURE_OPENAI_API_KEY: (h) =>
 		/^[a-z0-9][a-z0-9-]{0,62}\.openai\.azure\.com$/.test(h),
 	GROQ_API_KEY: (h) => h === "api.groq.com",
@@ -16,6 +20,7 @@ export function isAllowedEnvRef(
 	allowlist: readonly string[],
 	baseUrl: string,
 ): boolean {
+	if (name === googleCloudTts.envRef) return baseUrl === googleCloudTts.baseUrl;
 	if (name.startsWith("EUMENES_CLOUD_") || allowlist.includes(name))
 		return true;
 	const hostRule = Object.hasOwn(providerKeyHosts, name)

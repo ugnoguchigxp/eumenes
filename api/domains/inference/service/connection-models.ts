@@ -5,7 +5,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { SettingsService } from "../../settings";
-import type { AgentAuth, Connection } from "../../settings/contracts";
+import {
+	googleCloudTts,
+	type AgentAuth,
+	type Connection,
+} from "../../settings/contracts";
 import {
 	anthropicBase,
 	anthropicFetch,
@@ -16,9 +20,10 @@ import {
 } from "../adapters/cloud-agents";
 import type { ConnectionModels } from "../contracts";
 import { learnedContextWindows } from "./agent-session";
+import { googleCloudTtsModels } from "../adapters/google-cloud-tts";
 
 export type ConnectionModelsService = {
-	/** Runtime models of a saved agent or Workers AI connection; null for an unsupported connection. */
+	/** Runtime models of a saved connection; null if it has no supported catalog. */
 	list(
 		connectionId: string,
 		signal: AbortSignal,
@@ -186,6 +191,7 @@ function createListing(
 				!connection.enabled ||
 				(connection.kind !== "codex-sdk" &&
 					connection.kind !== "cloudflare-workers-ai" &&
+					connection.kind !== googleCloudTts.kind &&
 					(connection.kind !== "claude-agent-sdk" || !connection.auth))
 			)
 				return null;
@@ -223,51 +229,39 @@ function createListing(
 				)
 					throw new Error("stale_connection_settings");
 			};
-			if (
-				connection.kind === "cloudflare-workers-ai" ||
-				connection.kind === "codex-sdk"
-			) {
-				const value =
-					connection.kind === "codex-sdk"
-						? await codexModels(
-								options.codexHost,
-								connection,
-								credential,
-								signal,
-							)
-						: await workersModels(
-								connection,
-								credential!,
-								options.fetch ?? fetch,
-								signal,
-							);
-				assertCurrent();
-				for (const [k, entry] of cache)
-					if (now() - entry.at >= ttlMs) cache.delete(k);
-				if (cache.size >= maxEntries) cache.delete(cache.keys().next().value!);
-				cache.set(key, { at: now(), value });
-				return value;
-			}
 			let value: ConnectionModels;
-			try {
-				value =
-					auth === "api-key"
-						? await apiKeyModels(
-								connection,
-								credential!,
-								options.fetch ?? fetch,
-								signal,
-							)
-						: await subscriptionModels(
-								environment,
-								connection,
-								credential!,
-								options.claudeQuery ?? query,
-								signal,
-							);
-			} catch (error) {
-				signal.throwIfAborted();
-				throw safeAgentError(error);
+			const send = options.fetch ?? fetch;
+			switch (connection.kind) {
+				case "codex-sdk":
+					value = await codexModels(
+						options.codexHost,
+						connection,
+						credential,
+						signal,
+					);
+					break;
+				case "cloudflare-workers-ai":
+					value = await workersModels(connection, credential!, send, signal);
+					break;
+				case googleCloudTts.kind:
+					value = await googleCloudTtsModels(send, credential!, signal);
+					break;
+				default:
+					try {
+						value =
+							auth === "api-key"
+								? await apiKeyModels(connection, credential!, send, signal)
+								: await subscriptionModels(
+										environment,
+										connection,
+										credential!,
+										options.claudeQuery ?? query,
+										signal,
+									);
+					} catch (error) {
+						signal.throwIfAborted();
+						throw safeAgentError(error);
+					}
 			}
 			assertCurrent();
 			for (const [k, entry] of cache)

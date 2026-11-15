@@ -221,6 +221,15 @@ export function resultText(
 		};
 	if (source.status !== "done")
 		return { text: `${name}は実行中です。`, items: 0 };
+	const summary = source.result as {
+		replyInConversation?: unknown;
+		summary?: unknown;
+	} | null;
+	if (
+		summary?.replyInConversation === true &&
+		typeof summary.summary === "string"
+	)
+		return { text: lineText(summary.summary), items: 0 };
 	const outcome = source.outcome ?? "succeeded";
 	if (
 		outcome === "failed" ||

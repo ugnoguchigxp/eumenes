@@ -614,31 +614,11 @@ export function createErrorReport(deps: {
 			run.agentTaskId && deps.agents ? deps.agents.list(run.id) : [];
 		const kind = errorReportKind(run, tasks);
 		if (!kind) return { ok: false, reason: "not_applicable" };
-		const file = deps.logFile();
-		let entries: LogEntry[] = [];
-		if (file) {
-			try {
-				// The IDs the run's own records name lead to the rest: its jobs, tasks, tool calls and Web runs.
-				const own = await readLogEntries(file, [run.id]);
-				const related = new Set<string>([run.id, run.requestId]);
-				if (run.jobId) related.add(run.jobId);
-				for (const task of tasks) related.add(task.id);
-				for (const entry of own)
-					for (const key of [
-						"requestId",
-						"jobId",
-						"taskId",
-						"invocationId",
-						"operationId",
-					]) {
-						const value = entry[key];
-						if (typeof value === "string") related.add(value);
-					}
-				entries = await readLogEntries(file, related);
-			} catch {
-				entries = [];
-			}
-		}
+		const { entries, logMissing } = await readRunLogs(
+			deps.logFile(),
+			run,
+			tasks,
+		);
 		return {
 			ok: true,
 			runId: run.id,
@@ -647,8 +627,48 @@ export function createErrorReport(deps: {
 				kind,
 				tasks,
 				entries,
-				logMissing: !file || entries.length === 0,
+				logMissing,
 			}),
 		};
 	};
+}
+
+export async function readRunLogs(
+	file: string | undefined,
+	run: Run,
+	tasks: readonly TaskDto[],
+	signal?: AbortSignal,
+) {
+	let entries: LogEntry[] = [];
+	if (file) {
+		try {
+			// The IDs the run's own records name lead to the rest: its jobs, tasks, tool calls and Web runs.
+			const own = await readLogEntries(file, [run.id], signal);
+			const related = new Set<string>([run.id, run.requestId]);
+			if (run.jobId) related.add(run.jobId);
+			for (const task of tasks) related.add(task.id);
+			for (const entry of own)
+				for (const key of [
+					"requestId",
+					"jobId",
+					"taskId",
+					"invocationId",
+					"operationId",
+				]) {
+					const value = entry[key];
+					if (typeof value === "string") related.add(value);
+				}
+			entries = await readLogEntries(file, related, signal);
+		} catch {
+			entries = [];
+		}
+	}
+	return { entries, logMissing: !file || entries.length === 0 };
+}
+
+export function observedFailure(entries: LogEntry[], code: string | null) {
+	const entry = build(entries, new Set(code ? [code] : [])).first;
+	return entry
+		? { event: safe(entry.event), reason: reasonOf(entry) }
+		: undefined;
 }

@@ -277,6 +277,60 @@ test("a correct request updates an item and is shown to the user once as a notic
 	expect(h.notices()).toContain("訂正の依頼を反映しました。");
 });
 
+test("a transcription correction replaces the recorded fact and preserves unrelated memory", async () => {
+	const h = await setup();
+	const beforeText = "接続は一本の改善にまとめている";
+	const afterText = "接続は一本の回線にまとめている";
+	h.inference.script("curate-memory", {
+		...empty,
+		remember: [
+			remember({ kind: "personal_fact", key: "connection", text: beforeText }),
+			remember(),
+		],
+	});
+	await h.run({ user: `${beforeText}。辛い食べ物が好き`, end: "completed" });
+	await h.drain();
+	const before = h.memory
+		.list()
+		.find((item) => item.semanticKey === "connection")!;
+	const unrelated = h.memory
+		.list()
+		.find((item) => item.semanticKey === "food.spicy")!;
+	h.inference.script("curate-memory", (data) => {
+		const ref = (data.longTerm as Array<{ key: string; ref: string }>).find(
+			(item) => item.key === "connection",
+		)!.ref;
+		expect(data.requests).toContainEqual(
+			expect.objectContaining({ kind: "correct", detail: afterText }),
+		);
+		return {
+			...empty,
+			resolve: [resolve({ action: "update", refs: [ref], text: afterText })],
+		};
+	});
+	const run = await h.run({
+		user: "一本の回線と言ったんです。改善はASRの誤認です。",
+		end: "completed",
+		requests: [{ kind: "correct", what: beforeText, detail: afterText }],
+	});
+	await h.drain();
+	const items = h.memory.list();
+	expect(items).toHaveLength(2);
+	expect(items).toContainEqual(unrelated);
+	expect(items.find((item) => item.semanticKey === "connection")).toMatchObject(
+		{
+			text: afterText,
+			origin: "user_confirmed",
+			sourceMessageIds: [run.inputMessageId],
+		},
+	);
+	expect(
+		h.memory.list(true).find((item) => item.id === before.id)?.status,
+	).toBe("superseded");
+	expect(h.inbox().at(-1)?.state).toBe("done");
+	expect(h.notices()).toContain("訂正の依頼を反映しました。");
+});
+
 test("a withdraw request takes back a request that was not applied yet: the forget is not carried out", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", { ...empty, remember: [remember()] });

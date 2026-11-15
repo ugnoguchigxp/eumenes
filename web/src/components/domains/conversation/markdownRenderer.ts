@@ -93,7 +93,10 @@ function tableCells(line: string): string[] {
  * A bounded, safe Markdown projection for completed chat messages. Raw HTML is
  * always escaped; only the small tag set emitted here can reach the WebView.
  */
-export function renderSafeMarkdown(content: string): string {
+export function renderSafeMarkdown(
+	content: string,
+	collapseCode = false,
+): string {
 	const lines = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
 	const blocks: string[] = [];
 	let index = 0;
@@ -103,25 +106,31 @@ export function renderSafeMarkdown(content: string): string {
 			index += 1;
 			continue;
 		}
-		const fence = line.match(/^\s*```([A-Za-z0-9_+-]{0,40})\s*$/);
+		const fence = line.match(/^\s*(`{3,})([A-Za-z0-9_+-]{0,40})\s*$/);
 		if (fence) {
 			const code: string[] = [];
 			index += 1;
-			while (index < lines.length && !/^\s*```\s*$/.test(lines[index] ?? "")) {
+			while (index < lines.length) {
+				const closing = (lines[index] ?? "").match(/^\s*(`{3,})\s*$/);
+				if (closing && closing[1]!.length >= fence[1]!.length) break;
 				code.push(lines[index] ?? "");
 				index += 1;
 			}
 			if (index < lines.length) index += 1;
-			const languageName = (fence[1] ?? "").toLowerCase();
+			const languageName = (fence[2] ?? "").toLowerCase();
 			const language = languageName
 				? ` class="language-${escapeHtml(languageName)}"`
 				: "";
 			const source = escapeHtml(code.join("\n"));
 			const renderedFence = `<pre data-lang="${escapeHtml(languageName)}"><code${language}>${source}</code></pre>`;
-			blocks.push(
+			const block =
 				languageName === "mermaid"
 					? `<div class="mermaid-block">${renderedFence}</div>`
-					: renderedFence,
+					: renderedFence;
+			blocks.push(
+				collapseCode
+					? `<details class="source-code-disclosure"><summary>${languageName === "diff" ? "差分を表示" : "コードを表示"}</summary>${block}</details>`
+					: block,
 			);
 			continue;
 		}

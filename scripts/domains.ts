@@ -545,6 +545,7 @@ export const domains = {
 		integrationTests: [
 			"api/application/agency/web-note-research.test.ts",
 			"api/application/web-note/codex-web-note.test.ts",
+			"api/application/web-note/source-inspect.test.ts",
 			"api/application/web-note/web-note-integration.test.ts",
 		],
 		backend: "api/domains/web-note",
@@ -602,6 +603,7 @@ export const domains = {
 		backend: "api/domains/voice-dialogue",
 		web: "web/src/domains/voice-dialogue",
 		components: null,
+		integrationTests: ["api/application/agency/router-failure-voice.test.ts"],
 		depends: {
 			api: ["delivery", "dialogue", "inference"],
 			web: ["audio", "avatar", "dialogue", "settings"],

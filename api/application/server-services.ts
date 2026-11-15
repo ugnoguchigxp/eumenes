@@ -1,5 +1,8 @@
 import { generatedImageInput } from "./media/generated-image-input";
-import { createConversationLookup } from "../domains/web-note";
+import {
+	createConversationLookup,
+	createConversationSourceLookup,
+} from "../domains/web-note";
 import { createSteeringInbox } from "eumenes-steer";
 import {
 	configuredContextStill,
@@ -59,7 +62,7 @@ import { createSpecialistPort } from "./toolchain/specialist-port";
 import { buildBrowser } from "./browser/browser-composition";
 import { createToolchainRouting } from "./toolchain/toolchain-routing";
 import { createHostToolchain } from "./toolchain/toolchain-host";
-import { createCodexWebNote } from "./web-note/codex-web-note";
+import { createCodexInspection } from "./web-note/codex-web-note";
 import { assembleAgency } from "./agency/assembly";
 import { createNoteDocuments } from "./agency/note-documents";
 import { createAgencyWork } from "./agency/work";
@@ -229,7 +232,7 @@ export async function buildServices(
 				jobs: createCanvasJobs(queue, canvasRuntime, store, conversation),
 			}
 		: undefined;
-	const webNote = createCodexWebNote(
+	const webNote = await createCodexInspection(
 		config.env,
 		config.researchCodexExecutable,
 		inference,
@@ -357,6 +360,11 @@ export async function buildServices(
 		() => dialogue,
 	);
 	const dialogue = createDialogueService({
+		debugDiagnostics: {
+			enabled: (tx) => settings.inTransaction(tx).agency.debugMode === true,
+			onChange: settings.onChange,
+			publish: () => changes.publish(),
+		},
 		diagnostics: createSchedulerDiagnostics({
 			scheduler,
 			queue,
@@ -367,6 +375,9 @@ export async function buildServices(
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
 		lookup: createConversationLookup(webNote),
+		sourceLookup: enabled
+			? createConversationSourceLookup(webNote, store, toolchain.capabilities)
+			: undefined,
 		logFile: () => config.logFile,
 		// The context keeper is off for now (2026-10-29 user instruction, the review fixes design C5): no State of its
 		// own reaches the input, and the recent conversation is cut by the host's fixed rules alone.

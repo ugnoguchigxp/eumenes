@@ -426,7 +426,7 @@ test("conversation skips search and an unavailable planner prevents partial exec
 		"画像も作って",
 	]);
 	expect(h!.dialogue.answerText(waiting.id)).toBe(
-		"依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。",
+		"パイプラインを利用できません。",
 	);
 	expect(h!.todos()).toHaveLength(0);
 	expect(trace(1).decided).not.toBe(MUSIC.id);
@@ -435,15 +435,57 @@ test("conversation skips search and an unavailable planner prevents partial exec
 test("A failed structure model leaves the entire request unperformed without direct fallback", async () => {
 	const r = await start({});
 	r.structures.push(new Error("cloud_http_529"));
+	h!.state.steps.push({ text: "画像はまだ作っていません。" });
 	const stopped = await h!.say("この音楽に合う画像を作って");
-	expect(h!.dialogue.answerText(stopped.id)).toContain(
-		"今回の作業はまだ実施していません",
-	);
+	expect(h!.dialogue.answerText(stopped.id)).toBe("画像はまだ作っていません。");
 	expect(r.routes).toEqual([]);
 	expect(h!.todos()).toHaveLength(0);
 	expect(h!.state.selections.every((selection) => !selection.toolchainId)).toBe(
 		true,
 	);
+});
+
+test("a reply after invalid routing cannot delegate, approve, or cancel", async () => {
+	const r = await start({}, { cards: [IMAGE, EDIT] });
+	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));
+	await h!.say("猫の絵を描いて", "queued");
+	r.scripts.push(weigh({ [EDIT.id]: 0.95 }));
+	await h!.say("壁紙を差し替えて");
+	const confirmations = () =>
+		h!.store.read((db) =>
+			db
+				.query("SELECT id, used_at, superseded_at FROM dialogue_confirmations")
+				.all(),
+		);
+	const pending = confirmations();
+	expect(pending).toHaveLength(1);
+	expect(pending[0]).toMatchObject({ used_at: null, superseded_at: null });
+	const [work] = h!.todos();
+	expect(work).toBeDefined();
+	for (const [request, name, args] of [
+		[
+			"別の画像も頼んで",
+			"delegate",
+			{ toolchain: IMAGE.id, request: "別の画像", mode: "execute" },
+		],
+		["壁紙の変更を承認します", "approve", { confirmation: "c1" }],
+		["猫の絵は取り消して", "work", { todo: "t1", operation: "cancel" }],
+	] as const) {
+		r.structures.push("{}");
+		h!.state.steps.push(
+			{ calls: [{ name, args }] },
+			{ text: "作業はまだ実施していません。" },
+		);
+		const run = await h!.say(request);
+		expect(h!.dialogue.answerText(run.id)).toBe("作業はまだ実施していません。");
+		expect(h!.state.calls.at(-2)!.tools).toEqual(["read_history", "read_runs"]);
+		expect(h!.state.calls.at(-1)!.messages.at(-1)!.content).toContain(
+			"invalid_tool_call",
+		);
+	}
+	expect(confirmations()).toEqual(pending);
+	expect(h!.todos()).toEqual([work!]);
+	expect(h!.archived()).toEqual([]);
 });
 
 test("A mixed multi-job request never falls back to running only its first tool", async () => {
@@ -522,14 +564,12 @@ test("structure, embedding and selection share a deadline and ignore a late sele
 		return answer;
 	});
 	h!.state.steps.push({
-		text: "依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。",
+		text: "画像はまだ作っていません。",
 	});
 	const run = await h!.say(request);
-	expect(h!.dialogue.answerText(run.id)).toBe(
-		"依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。",
-	);
+	expect(h!.dialogue.answerText(run.id)).toBe("画像はまだ作っていません。");
 	expect(trace()).toMatchObject({ decided: null, error: "timeout" });
-	expect(h!.state.calls).toEqual([]);
+	expect(h!.state.calls).toHaveLength(1);
 	expect(embedSignals).toHaveLength(1);
 	expect(scoringSignal).toBe(r.structureCalls[0]!.signal);
 	expect(embedSignals[0]).toBe(scoringSignal);
@@ -570,7 +610,7 @@ test("cancelling a turn while structure is running prevents a reply and ignores 
 	expect(h!.todos()).toEqual([]);
 });
 
-test("an unavailable candidate selected by the model cannot execute or offer tools to the reply", async () => {
+test("an unavailable candidate selected by the model cannot execute, and the reply only gets reads", async () => {
 	const cards = [IMAGE, INSTANT];
 	const r = await start({}, { cards });
 	const request = "画像を作って";
@@ -584,17 +624,15 @@ test("an unavailable candidate selected by the model cannot execute or offer too
 		return weigh({ [IMAGE.id]: 0.95 })(input, signal);
 	});
 	h!.state.steps.push({
-		text: "依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。",
+		text: "画像はまだ作っていません。",
 	});
 	const run = await h!.say(request);
-	expect(h!.dialogue.answerText(run.id)).toBe(
-		"依頼全体の内容や引継ぎ先を確認できなかったため、今回の作業はまだ実施していません。依頼を確認してから進めます。",
-	);
+	expect(h!.dialogue.answerText(run.id)).toBe("画像はまだ作っていません。");
 	expect(trace()).toMatchObject({
 		decided: null,
 		error: "router_candidate_unavailable",
 	});
-	expect(h!.state.calls).toEqual([]);
+	expect(h!.state.calls[0]!.tools).toEqual(["read_history", "read_runs"]);
 	expect(h!.todos()).toEqual([]);
 });
 

@@ -1,4 +1,7 @@
-import type { WebNoteService } from "../../domains/web-note";
+import {
+	INSPECT_SOURCE_ADAPTER,
+	type WebNoteService,
+} from "../../domains/web-note";
 import type { DomainAdapter } from "../../domains/tool-runtime";
 
 export function describeWebNoteAdapter() {
@@ -14,10 +17,14 @@ export function describeWebNoteAdapter() {
 		autonomy: "read" as const,
 	};
 }
+export function describeInspectSourceAdapter() {
+	const { autonomy: _autonomy, ...shared } = describeWebNoteAdapter();
+	return { ...shared, availability: "availability:inspect-source@1" };
+}
 /** Registered lifecycle; the dialogue's common task path and the agency's research select this owner. */
-export function createWebNoteAdapter(
+function createWebNoteAdapter(
 	service: () => WebNoteService | undefined,
-	enabled = true,
+	inspection: boolean,
 ): DomainAdapter {
 	const required = () => {
 		const value = service();
@@ -25,10 +32,14 @@ export function createWebNoteAdapter(
 		return value;
 	};
 	return {
-		ref: "adapter:web-note@1",
-		describe: describeWebNoteAdapter,
+		ref: inspection ? INSPECT_SOURCE_ADAPTER : "adapter:web-note@1",
+		describe: inspection
+			? describeInspectSourceAdapter
+			: describeWebNoteAdapter,
 		availableInTransaction: () =>
-			enabled && (service()?.availableInTransaction() ?? false),
+			inspection
+				? service()?.inspectionAvailableInTransaction() === true
+				: service()?.availableInTransaction() === true,
 		artifactAvailableInTransaction: () => false,
 		task: {
 			startInTransaction: (db, input) =>
@@ -57,3 +68,10 @@ export function createWebNoteAdapter(
 		afterCommit: () => service()?.flush(),
 	};
 }
+
+export const createWebNoteAdapters = (
+	service: () => WebNoteService | undefined,
+) => [
+	createWebNoteAdapter(service, false),
+	createWebNoteAdapter(service, true),
+];

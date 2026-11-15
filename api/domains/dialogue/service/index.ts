@@ -6,6 +6,10 @@ import {
 } from "./generated-images";
 import { imageObservationText } from "./generated-image-text";
 import { createToolchainCommandHandler } from "./toolchain-command";
+import {
+	createDebugDiagnostics,
+	type DebugDiagnosticsOptions,
+} from "./debug-diagnostics";
 import { backgroundDiagnostic } from "./diagnostic-evidence";
 import { createSpecialistOps } from "./specialist-commands";
 import { activeSpecialistAgentLabel } from "./specialist-intake";
@@ -178,12 +182,14 @@ interface DialogueServiceOptions {
 	generatedImages?: GeneratedImagePort;
 	objectRecognition?: ObjectRecognitionPort;
 	worldContext?: WorldContextPort;
+	debugDiagnostics?: DebugDiagnosticsOptions;
 	diagnostics?: DialogueDeps["diagnostics"];
 	/** The conversation agent's opportunity when work changes. */
 	agency?: AgencyLayerPort;
 	/** The conversation agent that answers every generation. */
 	conversationAgent: ConversationAgentPort;
 	lookup?: DialogueDeps["lookup"];
+	sourceLookup?: DialogueDeps["sourceLookup"];
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	/** The resource registry and the kinds each toolchain makes; without it the conversation has no resources. */
 	resources?: ResourceAccess;
@@ -231,6 +237,7 @@ export function createDialogueService({
 	clock = () => new Date().toISOString(),
 	id = () => crypto.randomUUID(),
 	keeper: keeperOptions,
+	debugDiagnostics,
 	...options
 }: DialogueServiceOptions) {
 	const deps: DialogueDeps = { ...options, clock, id };
@@ -244,6 +251,8 @@ export function createDialogueService({
 		store,
 		toolchains,
 	} = deps;
+	if (debugDiagnostics)
+		deps.debugDiagnostics = createDebugDiagnostics(deps, debugDiagnostics);
 	const progress = createProgress(deps);
 	const intake = createIntake(deps);
 	// Handlers read `deps.interactions`, so it exists before any is registered.
@@ -326,6 +335,7 @@ export function createDialogueService({
 		},
 		/** The diagnostic text of a failed run (`GET /api/runs/:id/error-report`). */
 		errorReport,
+		debugDiagnostics: deps.debugDiagnostics,
 		promptTarget: intake.promptTarget,
 		progress: progress.progress,
 		subscribeProgress: progress.subscribeProgress,
@@ -504,6 +514,7 @@ export function createDialogueService({
 		},
 		/** Runs are stopped by the queue's own shutdown; nothing is owned here. */
 		async close() {
+			deps.debugDiagnostics?.close();
 			keeper?.close();
 			await agentSync.close();
 			progress.close();

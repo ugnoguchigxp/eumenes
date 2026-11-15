@@ -3,7 +3,12 @@ import { getLogger } from "../../../infrastructure/logger";
 import { executionControl, type TaskLifecyclePort } from "../../tool-runtime";
 import type { HostState, SourcePort } from "../contracts";
 import { active, rowOf } from "../repository";
-import { ADAPTER, type Context, type WebNoteDeps } from "./context";
+import {
+	ADAPTER,
+	INSPECT_SOURCE_ADAPTER,
+	type Context,
+	type WebNoteDeps,
+} from "./context";
 import { registerJobs, WEB_NOTE_JOB } from "./jobs";
 import {
 	current,
@@ -14,7 +19,11 @@ import {
 } from "./lifecycle";
 import policy from "./policy.json";
 
-export { WEB_NOTE_RESOURCE, type WebNoteDeps } from "./context";
+export {
+	INSPECT_SOURCE_ADAPTER,
+	WEB_NOTE_RESOURCE,
+	type WebNoteDeps,
+} from "./context";
 
 const log = getLogger("web-note");
 
@@ -40,8 +49,7 @@ export function createWebNote(deps: WebNoteDeps) {
 
 	const task: TaskLifecyclePort = {
 		startInTransaction(db, input) {
-			if (closed || !source || !ctx.turn)
-				throw new Error("web_note_unavailable");
+			if (closed || !source) throw new Error("web_note_unavailable");
 			if (!input.toolchainRevisionId || !input.bindingRevisionId)
 				throw new Error("web_note_unavailable");
 			if (!source.validSourceInTransaction(db, input.source))
@@ -51,12 +59,22 @@ export function createWebNote(deps: WebNoteDeps) {
 					input.toolchainRevisionId,
 				),
 				binding = set.binding?.document;
+			const inspection = binding?.adapterRef === INSPECT_SOURCE_ADAPTER;
 			if (
 				set.binding?.revisionId !== input.bindingRevisionId ||
 				binding?.execution !== "task" ||
-				binding.adapterRef !== ADAPTER
+				(!inspection && binding.adapterRef !== ADAPTER)
 			)
 				throw new Error("web_note_binding_invalid");
+			if (inspection) {
+				if (!ctx.inspectSource) throw new Error("inspect_source_unavailable");
+				if (
+					input.source.origin ||
+					!input.source.messageId ||
+					input.source.specialistSessionId !== undefined
+				)
+					throw new Error("inspect_source_conversation_required");
+			} else if (!ctx.turn) throw new Error("web_note_unavailable");
 			const request = input.request.trim();
 			if (!request || request.length > policy.requestMaxChars)
 				throw new Error("web_note_request_invalid");
@@ -72,6 +90,7 @@ export function createWebNote(deps: WebNoteDeps) {
 				toolchainRevisionId: input.toolchainRevisionId,
 				bindingRevisionId: input.bindingRevisionId,
 				instructions: [set.profile, ...set.skills].join("\n"),
+				...(inspection ? { inspection: {} } : {}),
 				result: null,
 			};
 			const job = ctx.queue.enqueueInTransaction(db, {
@@ -150,6 +169,8 @@ export function createWebNote(deps: WebNoteDeps) {
 		},
 		availableInTransaction: () =>
 			!closed && source !== undefined && deps.turn !== undefined,
+		inspectionAvailableInTransaction: () =>
+			!closed && source !== undefined && deps.inspectSource !== undefined,
 		sourceRunInTransaction(db: Database, id: string) {
 			try {
 				return rowSource(current(ctx, db, id, true).data_json);

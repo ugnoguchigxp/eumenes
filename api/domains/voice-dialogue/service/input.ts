@@ -1,4 +1,4 @@
-import type { RunViewing } from "../../dialogue/contracts";
+import { UTTERANCE_MAX_CHARS, type RunViewing } from "../../dialogue/contracts";
 import { measureStage } from "../../../infrastructure/performance";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
@@ -15,8 +15,6 @@ import type { createVoiceResponder } from "./respond";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 const log = getLogger("voice-dialogue");
-/** The dialogue input limit: a merged input must still be accepted when sent. */
-const MAX_TEXT = 8000;
 
 /**
  * Serializes recognition per session, while answering stays on the existing dialogue queue.
@@ -99,7 +97,8 @@ export function createInputCollector({
 			],
 		};
 		const text = [previous?.text, addition].filter(Boolean).join("\n");
-		if (prepared.sources.length > 32 || text.length > MAX_TEXT)
+		// A merged input is still an utterance the dialogue accepts.
+		if (prepared.sources.length > 32 || text.length > UTTERANCE_MAX_CHARS)
 			throw new Error("voice_input_capacity");
 		if (previous) {
 			if (

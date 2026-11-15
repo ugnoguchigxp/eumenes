@@ -19,3 +19,7 @@ export function probeWav() {
 	view.setUint32(40, 32000, true);
 	return bytes;
 }
+export const isWav = (bytes: Uint8Array) =>
+	bytes.length >= 44 &&
+	new TextDecoder().decode(bytes.subarray(0, 4)) === "RIFF" &&
+	new TextDecoder().decode(bytes.subarray(8, 12)) === "WAVE";

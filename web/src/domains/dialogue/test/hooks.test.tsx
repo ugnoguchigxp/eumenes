@@ -20,6 +20,10 @@ function setup() {
 	let loseResponse = true;
 	const api: DialogueClient = {
 		identity: "http://127.0.0.1:8787",
+		debugDiagnostics: async () => ({ entries: [], omitted: 0 }),
+		debugDiagnosticDetail: async () => {
+			throw new Error("not_used");
+		},
 		runs: async () => [...accepted.values()],
 		watchRun: async () => {},
 		run: async (id) => accepted.get(id)!,

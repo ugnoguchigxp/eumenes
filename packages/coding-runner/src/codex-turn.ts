@@ -25,6 +25,8 @@ export type CodexTurnInput = {
 	configOverrides?: string[];
 	prompt: string;
 	signal: AbortSignal;
+	/** Host-owned working directory and mandatory filesystem permission profile for source inspection. */
+	inspection?: { directory: string; outputSchema: object };
 };
 export type CodexTurnResult = {
 	text: string;
@@ -44,7 +46,9 @@ export async function runCodexTurn(
 	input.signal.throwIfAborted();
 	// The SDK waits forever on an executable that cannot start: fail here, with the system's own code.
 	accessSync(input.command, constants.X_OK);
-	const directory = await mkdtemp(join(tmpdir(), "eumenes-codex-turn-"));
+	const directory =
+		input.inspection?.directory ??
+		(await mkdtemp(join(tmpdir(), "eumenes-codex-turn-")));
 	try {
 		const codex = new Codex({
 			codexPathOverride: input.command,
@@ -58,12 +62,16 @@ export async function runCodexTurn(
 			...(input.model ? { model: input.model } : {}),
 			modelReasoningEffort: input.reasoning,
 			webSearchMode: input.webSearch,
-			sandboxMode: "read-only",
+			// Passing a legacy sandbox mode here would override the stricter permission profile.
+			...(!input.inspection ? { sandboxMode: "read-only" as const } : {}),
 			approvalPolicy: "never",
 			skipGitRepoCheck: true,
 			workingDirectory: directory,
 		});
-		const turn = await thread.run(input.prompt, { signal: input.signal });
+		const turn = await thread.run(input.prompt, {
+			signal: input.signal,
+			outputSchema: input.inspection?.outputSchema,
+		});
 		input.signal.throwIfAborted();
 		return {
 			text: turn.finalResponse,
@@ -78,6 +86,7 @@ export async function runCodexTurn(
 				: null,
 		};
 	} finally {
-		await rm(directory, { recursive: true, force: true }).catch(() => {});
+		if (!input.inspection)
+			await rm(directory, { recursive: true, force: true }).catch(() => {});
 	}
 }

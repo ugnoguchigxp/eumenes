@@ -115,15 +115,6 @@ export function askRouterClarification(
 	);
 }
 
-export function routerUnperformed(turn: Turn): Step {
-	const notice = systemContext(
-		"dialogue.contexts.local.router-unperformed",
-		{},
-	);
-	turn.speak(notice);
-	return "done";
-}
-
 /** A memory request: said as `say` once the steward took it. */
 export async function requestMemory(
 	turn: Turn,

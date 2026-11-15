@@ -15,7 +15,7 @@ export type HarnessOptions = {
 	/** The research note task (Codex's own web search) with a scripted turn and a ledger record. */
 	webNote?: Pick<
 		import("../../domains/web-note").WebNoteDeps,
-		"turn" | "record"
+		"turn" | "record" | "inspectSource"
 	>;
 	/** A real memory service (its journal in the harness directory): what the conversation's `## Memory` shows. */
 	memory?: boolean;

@@ -454,7 +454,7 @@ export const WEB_RESEARCH_WORKS: readonly string[] = [
 	"web.research",
 	"web.note",
 ];
-const NOTICE = `archived_at IS NOT NULL AND status = 'done' AND outcome IN ('succeeded','partial','failed','interrupted') AND title != '' AND toolchain_id NOT IN (${WEB_RESEARCH_WORKS.map((id) => `'${id}'`).join(",")})`;
+const NOTICE = `archived_at IS NOT NULL AND status = 'done' AND outcome IN ('succeeded','partial','failed','interrupted') AND title != '' AND json_extract(result_json, '$.replyInConversation') IS NOT 1 AND toolchain_id NOT IN (${WEB_RESEARCH_WORKS.map((id) => `'${id}'`).join(",")})`;
 
 /** The completion notices of every conversation, newest first, at most `limit`, and how many are unread in all. */
 export function workNotices(

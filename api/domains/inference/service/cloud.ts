@@ -2,6 +2,8 @@ import { imageMessageParts } from "../../../infrastructure/chat-image-parts";
 import { cloudImages, checkImageRequest } from "./cloud-images";
 import type { ConnectionModelsService } from "./connection-models";
 import { workersSpeechRequest } from "../adapters/workers-ai-speech";
+import { googleCloudSpeech } from "../adapters/google-cloud-tts";
+import { isWav } from "./wav";
 import { readChatResponse } from "../../../infrastructure/chat-stream";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import {
@@ -11,7 +13,7 @@ import {
 } from "../../../infrastructure/context-budget";
 import { getLogger } from "../../../infrastructure/logger";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import { billingPath } from "../../settings/contracts";
+import { billingPath, googleCloudTts } from "../../settings/contracts";
 import {
 	isAgentConnection,
 	type SettingsService,
@@ -372,6 +374,19 @@ export async function cloudRequest(
 			nativeWebSearch,
 		);
 	if (!credential) throw new Error("cloud_credential_unavailable");
+	if (connection.kind === googleCloudTts.kind) {
+		if (row.purpose !== "tts" || typeof input !== "string")
+			throw new Error("google_cloud_tts_purpose_unsupported");
+		const audio = await googleCloudSpeech(
+			env.fetch ?? fetch,
+			credential,
+			resource,
+			input,
+			signal,
+		);
+		await recordUsage(env, attemptId, connection, {});
+		return audio;
+	}
 	if (connection.kind === "cloudflare-workers-ai") {
 		const value = await workersSpeechRequest(
 			env.fetch ?? fetch,
@@ -488,12 +503,7 @@ export async function cloudRequest(
 		row.purpose === "tts" ? 16_000_000 : 1_000_000,
 	);
 	if (row.purpose === "tts") {
-		if (
-			bytes.length < 44 ||
-			new TextDecoder().decode(bytes.subarray(0, 4)) !== "RIFF" ||
-			new TextDecoder().decode(bytes.subarray(8, 12)) !== "WAVE"
-		)
-			throw new Error("invalid_tts_audio");
+		if (!isWav(bytes)) throw new Error("invalid_tts_audio");
 		return bytes;
 	}
 	let json: { text?: unknown; usage?: unknown } | null;

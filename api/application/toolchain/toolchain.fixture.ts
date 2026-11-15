@@ -49,6 +49,7 @@ import { createQueue } from "../../domains/queue";
 import { createScheduler } from "../../domains/scheduler";
 import { createWebResearch } from "../../domains/web-research";
 import { createDialogueService } from "../../domains/dialogue";
+import { createConversationSourceLookup } from "../../domains/web-note";
 import { createSchedulerDiagnostics } from "../scheduler/scheduler-diagnostics";
 import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 import { createVoiceDialogue } from "../../domains/voice-dialogue";
@@ -794,6 +795,13 @@ export async function harness(options: HarnessOptions = {}) {
 				})
 			: undefined;
 	const dialogue = createDialogueService({
+		sourceLookup:
+			options.webNote &&
+			createConversationSourceLookup(
+				options.webNote,
+				store,
+				toolchain.capabilities,
+			),
 		diagnostics: options.schedules
 			? createSchedulerDiagnostics({ scheduler, queue, apps: appRuntime?.apps })
 			: undefined,

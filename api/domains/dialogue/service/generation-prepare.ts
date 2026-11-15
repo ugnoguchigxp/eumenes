@@ -44,6 +44,7 @@ import {
 } from "./result-intake";
 import { resultText } from "./result-text";
 import { acceptRunAnswer, endRun } from "./run-end";
+import { finishReportedWork } from "./generation-settle";
 import type { WorkRow } from "../repository/work";
 import {
 	madeOf,
@@ -382,7 +383,8 @@ export function createPrepare(
 		const conversationId = run.conversationId;
 		const nowMs = Date.parse(clock());
 		// The work this run waited for, or a task's notice, reports into its TODO first (section 9.1).
-		const changed = intakeInTransaction(deps, tx, current, claim.payload);
+		const intake = intakeInTransaction(deps, tx, current, claim.payload);
+		const changed = intake?.rows ?? null;
 		if (changed && changed.length === 0) {
 			endRun(deps, tx, current, "cancelled", "work_report_stale");
 			return { status: "stale", reason: "work_report_stale" };
@@ -409,7 +411,7 @@ export function createPrepare(
 					runId: run.id,
 					reason: "permission_revoked",
 				});
-			endRun(deps, tx, current, "completed", null);
+			finishReportedWork(deps, tx, current, notice ? intake : null);
 			agency?.workChangedInTransaction(tx, conversationId);
 			return { status: "stale", reason: "work_reported" };
 		}

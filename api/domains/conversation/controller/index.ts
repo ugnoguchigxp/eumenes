@@ -56,7 +56,7 @@ export function registerConversation(app: Hono, service: ConversationService) {
 		});
 	});
 	app.get("/api/conversations/:id", (c) =>
-		c.json(service.get(c.req.param("id"))),
+		c.json(service.get(c.req.param("id"), { includeDisplay: true })),
 	);
 	function historyRoute<T>(
 		operation: string,

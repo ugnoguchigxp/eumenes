@@ -1,4 +1,5 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/prefer-tag-over-role -- This labelled scroll region needs focus for keyboard history navigation. */
+import { DebugDiagnostic } from "./DebugDiagnostic";
 import { useCallback } from "react";
 import type { EumenesClient } from "../../../client";
 import type { Message } from "../../../api/domains/conversation/contracts";
@@ -33,6 +34,8 @@ export function ConversationHistory({
 		edit,
 		runs,
 		settings,
+		debugMode,
+		debugDiagnostics,
 		historyRef,
 		contentRef,
 		showLatest,
@@ -67,16 +70,38 @@ export function ConversationHistory({
 			) : null,
 		[resourceData, openResource],
 	);
+	const debugEntries =
+		debugMode && !debugDiagnostics.isError
+			? debugDiagnostics.data?.entries
+			: undefined;
 	const renderFollowingMessage = useCallback(
 		(message: Message) => (
-			<RunDetails
-				client={client}
-				message={message}
-				runs={runList}
-				agentName={agentName}
-			/>
+			<>
+				<RunDetails
+					client={client}
+					message={message}
+					runs={runList}
+					agentName={agentName}
+				/>
+				{message.role === "user" &&
+					debugEntries
+						?.filter((entry) =>
+							runList?.some(
+								(run) =>
+									run.id === entry.runId && run.inputMessageId === message.id,
+							),
+						)
+						.map((entry) => (
+							<DebugDiagnostic
+								key={entry.id}
+								client={client}
+								entry={entry}
+								conversationId={message.conversationId}
+							/>
+						))}
+			</>
 		),
-		[client, runList, agentName],
+		[client, runList, agentName, debugEntries],
 	);
 	const renderHiddenMessage = useCallback(
 		(message: Message) => (
@@ -107,6 +132,14 @@ export function ConversationHistory({
 			onScroll={(event) => onHistoryScroll(event.currentTarget)}
 		>
 			<div className="chat-history-content" ref={contentRef}>
+				{debugMode && (
+					<p className="agency-thought">
+						デバッグモード
+						{debugDiagnostics.data?.omitted
+							? ` · 診断を${debugDiagnostics.data.omitted}件省略`
+							: ""}
+					</p>
+				)}
 				<LiveMessageList
 					client={client}
 					activeRunId={activeRun?.id}

@@ -53,7 +53,10 @@ export function runEndedInTransaction(
  * false: the run had already moved on, nothing was recorded.
  */
 export function endRun(
-	deps: Pick<DialogueDeps, "steward" | "specialist" | "clock" | "work">,
+	deps: Pick<
+		DialogueDeps,
+		"steward" | "specialist" | "clock" | "work" | "debugDiagnostics"
+	>,
 	tx: Database,
 	run: Run,
 	state: RunEndState,
@@ -73,6 +76,8 @@ export function endRun(
 	)
 		return false;
 	runEndedInTransaction(deps, tx, run, state);
+	if (state === "failed" || state === "interrupted")
+		deps.debugDiagnostics?.enqueue(tx, run.conversationId, run.id);
 	return true;
 }
 

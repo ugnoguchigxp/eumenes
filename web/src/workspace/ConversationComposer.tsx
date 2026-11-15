@@ -257,7 +257,7 @@ export function ConversationComposer({
 							? `${addressee.label}へのメッセージを入力、または話しかけてください`
 							: "メッセージを入力、または話しかけてください"
 					}
-					maxLength={8000}
+					maxLength={4000}
 					rows={3}
 				/>
 				<div className="composer-actions">

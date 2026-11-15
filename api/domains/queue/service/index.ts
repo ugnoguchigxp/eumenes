@@ -1,3 +1,4 @@
+import type { JobState } from "../contracts";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { canonicalJson, sha256Hex } from "../../../infrastructure/digest";
 import type { JobDto, JobList, QueueStatus } from "../contracts";
@@ -173,6 +174,13 @@ export function createQueue(
 			return result;
 		},
 		getInTransaction: (tx: Tx, id: string) => getJob(tx, id),
+		listByKindInTransaction: (
+			tx: Tx,
+			kind: string,
+			state: JobState | undefined,
+			limit: number,
+			scope?: string,
+		) => listJobs(tx, { kind, state, scope }, null, limit),
 		findByDedupeInTransaction: findByDedupe,
 		/** Deletes settled jobs older than 14 days and outcome_unknown ones older than 90; their dedupe keys become reusable. */
 		pruneInTransaction: (tx: Tx, at: number, limit = 500) =>

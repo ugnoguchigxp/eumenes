@@ -20,6 +20,7 @@ const backends = new Set([
 	"docling",
 	"web",
 	"web-note",
+	"inspect-source",
 	"history",
 	"timer",
 	"music",

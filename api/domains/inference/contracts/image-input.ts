@@ -8,6 +8,7 @@ const imageRoute = z.object({
 		"claude-agent-sdk",
 		"openai-compatible",
 		"cloudflare-workers-ai",
+		"google-cloud-tts",
 	]),
 	status: z.enum(["supported", "unsupported", "unknown", "failed"]),
 	/** LARM's authoritative claim contract; never presented as cloud retention. */

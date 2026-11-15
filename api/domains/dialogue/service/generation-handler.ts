@@ -140,6 +140,9 @@ export function createGenerationHandler(
 							});
 						log.info("dialogue.generation_completed");
 						return {
+							...(generated.displayText !== undefined
+								? { displayText: generated.displayText }
+								: {}),
 							text: reportedLinks(
 								deps,
 								input,
@@ -150,6 +153,12 @@ export function createGenerationHandler(
 								? { imageAnswer: generated.imageAnswer }
 								: {}),
 							exchange: generated.exchange,
+							...(generated.debugTarget
+								? { debugTarget: generated.debugTarget }
+								: {}),
+							...(generated.debugRouterFailure
+								? { debugRouterFailure: true as const }
+								: {}),
 							...(generated.receipt ? { receipt: generated.receipt } : {}),
 							...(generated.emotion ? { emotion: generated.emotion } : {}),
 							...(generated.executed.some((entry) => entry.outcome.confirmation)

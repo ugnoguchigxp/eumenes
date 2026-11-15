@@ -110,11 +110,15 @@ test("a redirect that was carried out is what its trace decided, so the next red
 test("a read of the router's own that fails is a router failure: the request is held", async () => {
 	const r = await start();
 	h!.state.failRouterRead = true;
-	h!.state.steps.push({ text: "はい。" });
+	h!.state.steps.push({ text: "画像の作成はまだ始めていません。" });
 	const run = await h!.say("絵を描いて");
-	expect(h!.dialogue.answerText(run.id)).toContain(
-		"今回の作業はまだ実施していません",
+	expect(h!.dialogue.answerText(run.id)).toBe(
+		"画像の作成はまだ始めていません。",
 	);
+	expect(h!.state.calls[0]!.messages[0]!.content).toContain(
+		"担当を見つけられませんでした",
+	);
+	expect(h!.todos()).toEqual([]);
 	expect(r.routes).toEqual([]);
 	expect(trace()).toMatchObject({
 		row: 0,

@@ -23,6 +23,27 @@ export function staleInputSources(
 		...(deps.state?.staleSourcesInTransaction(db, sources) ?? []),
 	];
 }
+
+/**
+ * The plain `memory:<id>` references whose item is no longer current (superseded, deactivated, expired). A reply that
+ * cites one is refused at adoption (`referencedInput`), so the agenda lets go of what rests on it as well.
+ */
+export function staleMemoryRefs(
+	deps: AgencyHostDeps,
+	db: Database,
+	sources: readonly string[],
+): string[] {
+	const refs = [...new Set(sources.filter((r) => r.startsWith("memory:")))];
+	if (!refs.length || !deps.memory.referenceInputs) return [];
+	const status = deps.memory.status();
+	if (!status.enabled || !status.healthy) return [];
+	const current = new Set(
+		deps.memory.referenceInputs.captureInTransaction(db, {
+			itemIds: refs.map((r) => r.slice("memory:".length)),
+		}).sources,
+	);
+	return refs.filter((r) => !current.has(r));
+}
 export function currentInput(
 	deps: AgencyHostDeps,
 	db: Database,

@@ -27,6 +27,19 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 			SSE_HEADERS,
 		);
 	});
+	app.get("/api/conversations/:id/debug-diagnostics", (c) => {
+		const result = service.debugDiagnostics?.list(c.req.param("id"));
+		c.header("Cache-Control", "no-store");
+		return result ? c.json(result) : c.json({ error: "not_found" }, 404);
+	});
+	app.get("/api/conversations/:id/debug-diagnostics/:diagnosticId", (c) => {
+		const result = service.debugDiagnostics?.detail(
+			c.req.param("id"),
+			c.req.param("diagnosticId"),
+		);
+		c.header("Cache-Control", "no-store");
+		return result ? c.json(result) : c.json({ error: "not_found" }, 404);
+	});
 	app.get("/api/conversations/:id/runs", (c) =>
 		c.json(service.list(c.req.param("id"))),
 	);

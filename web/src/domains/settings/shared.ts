@@ -9,6 +9,7 @@ export const billingPathLabels: Record<
 	"claude-api-key": "Claude（API）",
 	codex: "Codex",
 	"cloudflare-workers-ai": "Cloudflare Workers AI",
+	"google-cloud-tts": "Google Cloud Text-to-Speech",
 };
 
 export const presentationLabel: Record<string, string> = {

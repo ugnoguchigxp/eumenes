@@ -84,9 +84,10 @@ test("an invented question reference fails before answering or starting a replac
 	await h.asked("何秒ですか", "builtin:answerText");
 	const before = h.interaction()!;
 	structure('{"answer":{"ref":"t9.answer","text":"15秒です"}}');
+	h.state.steps.push({ text: "回答はまだ作業に送っていません。" });
 	const run = await h.say("15秒です");
-	expect(h.dialogue.answerText(run.id)).toContain(
-		"今回の作業はまだ実施していません",
+	expect(h.dialogue.answerText(run.id)).toBe(
+		"回答はまだ作業に送っていません。",
 	);
 	expect(h.interaction()).toMatchObject({
 		id: before.id,
@@ -123,6 +124,7 @@ test("structured cancellation reaches the same command and rejects a later answe
 		{ ref: "t1.cancel", title: todo.title },
 	]);
 	const after = structure('{"answer":{"ref":"t1.answer","text":"15秒です"}}');
+	h.state.steps.push({ text: "回答はまだ作業に送っていません。" });
 	await h.say("15秒です");
 	expect(JSON.parse(after[0]!).pending).toEqual([]);
 	expect(JSON.parse(after[0]!).controls).toEqual([]);
@@ -146,10 +148,9 @@ test("a model's partial answer or cancellation cannot omit the rest of the utter
 		],
 	]) {
 		structure(raw!);
+		h.state.steps.push({ text: "作業はまだ実施していません。" });
 		const run = await h.say(text!);
-		expect(h.dialogue.answerText(run.id)).toContain(
-			"今回の作業はまだ実施していません",
-		);
+		expect(h.dialogue.answerText(run.id)).toBe("作業はまだ実施していません。");
 		expect(h.interaction()).toMatchObject({
 			id: before.id,
 			status: "waiting_input",

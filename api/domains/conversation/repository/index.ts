@@ -274,6 +274,10 @@ export function correctMessage(
 			? { status: "retracted" }
 			: { status: "not_found" };
 	if (found.message.text === input.text) return { status: "unchanged" };
+	if (displayTableReady(db))
+		db.query("DELETE FROM message_displays WHERE message_id = ?").run(
+			input.messageId,
+		);
 	const next = textRevision(input.text);
 	db.query("UPDATE messages SET text = ? WHERE id = ?").run(
 		input.text,
@@ -323,6 +327,10 @@ export function retractMessage(
 			? { status: "unchanged" }
 			: { status: "not_found" };
 	// Tombstone in place (dialogue_runs keep their foreign keys valid).
+	if (displayTableReady(db))
+		db.query("DELETE FROM message_displays WHERE message_id = ?").run(
+			input.messageId,
+		);
 	db.query(
 		"UPDATE messages SET text = '', retracted_at = ? WHERE id = ? AND retracted_at IS NULL",
 	).run(input.at, input.messageId);
@@ -461,6 +469,13 @@ export function appendMessage(
 		...(ready ? [message.presentation ?? "conversation"] : []),
 	);
 	writeAttribution(db, message);
+	if (message.displayText !== undefined) {
+		if (message.role !== "assistant" || message.displayText.length > 32768)
+			throw new Error("message_display_invalid");
+		db.query(
+			"INSERT INTO message_displays(message_id, text) VALUES (?, ?)",
+		).run(message.id, message.displayText);
+	}
 	// A runless message may carry the host's delivery (run answers record theirs per run).
 	if (message.delivery && message.runId === null) {
 		if (!messageDeliveryReady(db))
@@ -514,14 +529,39 @@ function safeDelivery(row: MessageRow): SpeechDelivery | undefined {
 	});
 	return undefined;
 }
-function toMessage(row: MessageRow, db: Database): Message {
+const displayReady = new WeakMap<Database, boolean>();
+function displayTableReady(db: Database) {
+	const cached = displayReady.get(db);
+	if (cached !== undefined) return cached;
+	const ready =
+		db
+			.query(
+				"SELECT 1 FROM sqlite_master WHERE type='table' AND name='message_displays'",
+			)
+			.get() !== null;
+	displayReady.set(db, ready);
+	return ready;
+}
+
+function toMessage(
+	row: MessageRow,
+	db: Database,
+	includeDisplay = false,
+): Message {
 	const delivery = safeDelivery(row);
+	const display =
+		includeDisplay && row.role === "assistant" && displayTableReady(db)
+			? (db
+					.query("SELECT text FROM message_displays WHERE message_id = ?")
+					.get(row.id) as { text: string } | null)
+			: null;
 	return {
 		...readAttribution(db, row.id),
 		id: row.id,
 		conversationId: row.conversation_id,
 		role: row.role,
 		text: row.text,
+		...(display ? { displayText: display.text } : {}),
 		...(row.presentation === "artifact"
 			? { presentation: "artifact" as const }
 			: {}),
@@ -545,6 +585,7 @@ export function tailMessages(
 	db: Database,
 	id: string,
 	limit: number,
+	includeDisplay = false,
 ): { messages: Message[]; hasMore: boolean } {
 	const rows = db
 		.query(
@@ -556,7 +597,7 @@ export function tailMessages(
 		messages: rows
 			.slice(0, limit)
 			.reverse()
-			.map((row) => toMessage(row, db)),
+			.map((row) => toMessage(row, db, includeDisplay)),
 		hasMore,
 	};
 }
@@ -733,4 +774,9 @@ export const migrations: readonly Migration[] = [
 	utteranceNoticeMigration,
 	imageAnswersMigration,
 	imageAnswerSequencesMigration,
+	{
+		id: "conversation/0019-message-displays",
+		after: ["conversation/0018-image-answer-sequences"],
+		sql: "CREATE TABLE message_displays (message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE, text TEXT NOT NULL)",
+	},
 ];

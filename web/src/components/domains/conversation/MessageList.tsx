@@ -330,7 +330,8 @@ const MessageRow = memo(function MessageRow({
 				)}
 				{message.role === "assistant" ? (
 					<MarkdownContent
-						text={message.text}
+						text={message.displayText ?? message.text}
+						collapseCode={message.displayText !== undefined}
 						onOpenResource={onOpenResource}
 					/>
 				) : (
@@ -348,12 +349,17 @@ const RESOURCE_LINK = /^eumenes:/i;
 
 const MarkdownContent = memo(function MarkdownContent({
 	text,
+	collapseCode,
 	onOpenResource,
 }: {
 	text: string;
+	collapseCode?: boolean;
 	onOpenResource?: (uri: string) => void;
 }) {
-	const html = useMemo(() => renderSafeMarkdown(text), [text]);
+	const html = useMemo(
+		() => renderSafeMarkdown(text, collapseCode),
+		[text, collapseCode],
+	);
 	return (
 		// Links are handled by delegation: the HTML is a string, so it has no handlers of its own.
 		// eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions

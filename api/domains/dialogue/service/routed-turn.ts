@@ -105,7 +105,9 @@ export async function runRoutedTurn(
 	input: GenerateInput,
 	options: RoutedTurnOptions,
 ): Promise<GenerationOutcome> {
-	const turn = createTurn(deps, input, options);
+	const debug: Pick<GenerationOutcome, "debugTarget" | "debugRouterFailure"> =
+		{};
+	const turn = createTurn(deps, input, options, debug);
 	const { routed } = turn;
 	let kind: "talk" | "request" | "pending" = "talk";
 	try {
@@ -134,9 +136,11 @@ export async function runRoutedTurn(
 	}
 	log.info("dialogue.turn_routed", { kind, count: turn.calls() });
 	options.signal.throwIfAborted();
-	const { receipt, emotion, imageAnswer } = turn.result();
+	const { receipt, emotion, imageAnswer, displayText } = turn.result();
 	return {
 		text: turn.said().trim(),
+		...(displayText !== undefined ? { displayText } : {}),
+		...debug,
 		...(turn.lookupSources.length ? { lookupSources: turn.lookupSources } : {}),
 		...(receipt ? { receipt } : {}),
 		...(emotion ? { emotion } : {}),
@@ -208,10 +212,13 @@ function turnModelCall(
 	};
 }
 
+type TalkOptions = { tools?: boolean; readOnly?: boolean };
+
 function createTurn(
 	deps: DialogueDeps,
 	input: GenerateInput,
 	options: RoutedTurnOptions,
+	debug: Pick<GenerationOutcome, "debugTarget" | "debugRouterFailure">,
 ) {
 	const { signal } = options;
 	const executed: GenerationOutcome["executed"] = [];
@@ -219,6 +226,7 @@ function createTurn(
 	const lookupSources: NonNullable<GenerationOutcome["lookupSources"]> = [];
 	let receipt: Receipt | undefined;
 	let imageAnswer: GenerationOutcome["imageAnswer"];
+	let displayText: string | undefined;
 	let said = "";
 	let emotion: GenerationOutcome["emotion"];
 	let calls = 0;
@@ -294,7 +302,8 @@ function createTurn(
 		calls: () => calls,
 		said: () => said,
 		published: () => published,
-		result: () => ({ receipt, emotion, imageAnswer }),
+		result: () => ({ receipt, emotion, imageAnswer, displayText }),
+		debug,
 
 		/** The host's own words: spoken as they are, and part of the answer. */
 		speak(text: string) {
@@ -311,9 +320,10 @@ function createTurn(
 		 * The host's words that end a turn whose calls failed before a word: the answer, not streamed, so it is spoken
 		 * once the run's answer is accepted (speech while the run is running stands on a model call of it).
 		 */
-		answer(text: string) {
+		answer(text: string, visual?: string) {
 			imageAnswer = undefined;
 			said = text.trim();
+			displayText = visual;
 		},
 
 		/**
@@ -369,13 +379,14 @@ function createTurn(
 		 */
 		async talk(
 			notice?: string,
-			{ tools = true }: { tools?: boolean } = {},
+			{ tools = true, readOnly = false }: TalkOptions = {},
 		): Promise<void> {
 			signal.throwIfAborted();
 			let talkImageAnswer: GenerationOutcome["imageAnswer"];
-			const messages = notice
+			const prepared = notice
 				? withNotice(input.messages, notice)
 				: input.messages;
+			const messages = readOnly ? withRouterFailure(prepared) : prepared;
 			const system =
 				input.harness.gates.systemCopy && messages[0]?.role === "system"
 					? messages[0].content
@@ -391,9 +402,14 @@ function createTurn(
 			let spoken = "";
 			let toolMade = false;
 			const saidBefore = said;
-			const toolPort = conversationToolPort(this, acts, () => {
-				toolMade = true;
-			});
+			const toolPort = conversationToolPort(
+				this,
+				{ acts, readOnly },
+				() => {
+					toolMade = true;
+				},
+				(target) => (debug.debugTarget = target),
+			);
 			let reply: Awaited<
 				ReturnType<DialogueDeps["conversationAgent"]["respond"]>
 			>;
@@ -407,6 +423,7 @@ function createTurn(
 							input.final.kind === "utterances" ? input.final.messageIds : [],
 					},
 					messages: messages as AgentMessage[],
+					...(readOnly ? { readOnly } : {}),
 					chat: {
 						async complete(request, onDelta, chatSignal) {
 							const output = conversationOutput(onDelta, system);
@@ -480,6 +497,7 @@ function createTurn(
 				input.final.kind === "utterances"
 			)
 				throw new Error("chat_output_empty");
+			if (debug.debugTarget) return;
 			emotion = reply.emotion;
 			// The agency's own tools: the exchange keeps them with the reply (later replies see what it did).
 			for (const call of reply.calls ?? [])
@@ -488,6 +506,7 @@ function createTurn(
 					arguments: call.arguments,
 					result: call.content,
 				});
+			if (displayText !== undefined) return;
 			imageAnswer = talkImageAnswer;
 			// The host's words said inside a tool (a confirmation, a question back) came after what the reply had said.
 			const hosted = said.slice(saidBefore.length).trim();
@@ -501,14 +520,21 @@ function createTurn(
  * require the routed input and an agent whose reply may hand work over.
  */
 const LOOKUP_TOOL = "lookup_public_information";
+const SOURCE_LOOKUP_TOOL = "inspect_source";
 
-function conversationToolPort(turn: Turn, acts: boolean, onCall: () => void) {
+function conversationToolPort(
+	turn: Turn,
+	{ acts, readOnly }: { acts: boolean; readOnly: boolean },
+	onCall: () => void,
+	onDebugTarget: (target: string) => void,
+) {
 	const { deps, input } = turn;
 	const reads = acts
 		? deps.store.read((db) => availableReadTools(deps, db))
 		: [];
 	const work =
 		acts &&
+		!readOnly &&
 		input.routed &&
 		deps.toolchains &&
 		deps.work &&
@@ -520,13 +546,28 @@ function conversationToolPort(turn: Turn, acts: boolean, onCall: () => void) {
 		kind: reads.join(","),
 		...(work ? { source: "work" } : {}),
 	});
+	const debug =
+		acts && deps.debugDiagnostics?.enabled()
+			? deps.debugDiagnostics
+			: undefined;
 	const readTools = [
-		...readToolDefinitions(reads),
-		...(reads.includes("read_memory") && deps.steward
+		...readToolDefinitions(reads).map((tool) =>
+			debug && tool.name === "read_runs"
+				? {
+						...tool,
+						description:
+							tool.description +
+							" Eumenes自身の失敗や依頼との食い違いを診断するときは target.kind=run を指定します。",
+						parameters: withDebugTarget(tool.parameters),
+					}
+				: tool,
+		),
+		...(!readOnly && reads.includes("read_memory") && deps.steward
 			? [MEMORY_REQUEST_TOOL]
 			: []),
 	];
-	const lookup = acts ? deps.lookup : undefined;
+	const lookup = acts && !readOnly ? deps.lookup : undefined;
+	const sourceLookup = acts && !readOnly ? deps.sourceLookup : undefined;
 	const tools = [...readTools, ...(work?.tools ?? [])];
 	if (lookup)
 		tools.push({
@@ -542,10 +583,24 @@ function conversationToolPort(turn: Turn, acts: boolean, onCall: () => void) {
 				properties: { query: { type: "string" } },
 			},
 		});
+	if (sourceLookup)
+		tools.push({
+			name: SOURCE_LOOKUP_TOOL,
+			description: systemContext("dialogue.contexts.agency.source-lookup", {}),
+			parameters: {
+				type: "object",
+				additionalProperties: false,
+				required: ["query"],
+				properties: { query: { type: "string" } },
+			},
+		});
 	return {
 		tools,
 		maxToolCalls:
-			(readTools.length ? 1 : 0) + (work?.tools.length ?? 0) + (lookup ? 1 : 0),
+			(readTools.length ? 1 : 0) +
+			(work?.tools.length ?? 0) +
+			(lookup ? 1 : 0) +
+			(sourceLookup ? 1 : 0),
 		async call(toolCall: AgentToolCall) {
 			let args: unknown;
 			try {
@@ -566,6 +621,35 @@ function conversationToolPort(turn: Turn, acts: boolean, onCall: () => void) {
 					}),
 				};
 			onCall();
+			if (debug && toolCall.name === "read_runs" && debugRunRequested(args)) {
+				const target = debug.target(input.conversationId, input.runId, args);
+				if (Array.isArray(target))
+					return {
+						content: JSON.stringify({
+							candidates: target,
+							instruction:
+								"記録された候補です。利用者がどの実行を指しているか曖昧な場合は確認してください。",
+						}),
+					};
+				if (!target)
+					return {
+						content: JSON.stringify({
+							code: "debug_diagnostic_target_unavailable",
+						}),
+					};
+				onDebugTarget(target);
+				return { content: "", end: true };
+			}
+			if (sourceLookup && toolCall.name === SOURCE_LOOKUP_TOOL) {
+				const { query } = args as { query?: unknown };
+				if (typeof query !== "string" || !query.trim() || query.length > 8000)
+					return { content: JSON.stringify({ code: "lookup_query_invalid" }) };
+				const result = await sourceLookup(query.trim(), turn.signal);
+				turn.signal.throwIfAborted();
+				turn.answer(result.text, result.displayText ?? result.text);
+				log.info("dialogue.source_lookup_completed");
+				return { content: "", end: true };
+			}
 			if (lookup && toolCall.name === LOOKUP_TOOL) {
 				const { query } = args as { query?: unknown };
 				if (typeof query !== "string" || !query.trim() || query.length > 2000)
@@ -609,4 +693,55 @@ function withNotice(messages: ChatMessage[], notice: string): ChatMessage[] {
 	const last = copy.at(-1)!;
 	last.content = `${last.content}\n\n${INPUT_HEADINGS.notice}\n${notice}`;
 	return copy;
+}
+
+function withRouterFailure(messages: ChatMessage[]): ChatMessage[] {
+	const [system, ...rest] = messages;
+	if (system?.role !== "system") return messages;
+	const instruction = systemContext(
+		"dialogue.contexts.local.router-unperformed",
+		{},
+	);
+	return [
+		{ ...system, content: `${system.content}\n\n${instruction}` },
+		...rest,
+	];
+}
+
+function debugRunRequested(args: object) {
+	const target = (args as { target?: unknown }).target;
+	return (
+		!!target &&
+		typeof target === "object" &&
+		"kind" in target &&
+		target.kind === "run"
+	);
+}
+
+function withDebugTarget(parameters: Record<string, unknown>) {
+	const properties = parameters.properties as Record<string, unknown>;
+	return {
+		...parameters,
+		properties: {
+			...properties,
+			target: {
+				anyOf: [
+					properties.target,
+					{
+						type: "object",
+						required: ["kind"],
+						additionalProperties: false,
+						properties: {
+							kind: { type: "string", enum: ["run"] },
+							id: {
+								type: "string",
+								description:
+									"対象の実行または診断のID。直前の依頼なら省略できます。",
+							},
+						},
+					},
+				],
+			},
+		},
+	};
 }
