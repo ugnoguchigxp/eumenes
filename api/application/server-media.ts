@@ -11,7 +11,12 @@ import { createImage } from "../domains/image";
 import type { ConversationService } from "../domains/conversation";
 import { sharedImageImports } from "./scratch/shared-image-import";
 import { createModel3d } from "../domains/model3d";
-import { createLarmPlayground, createLocalServices } from "../domains/larm";
+import {
+	createVideoClient,
+	createLarmPlayground,
+	createLocalServices,
+} from "../domains/larm";
+import { createVideo } from "../domains/video";
 import { createMusic } from "../domains/music";
 import {
 	createObjectRecognition,
@@ -160,6 +165,23 @@ export function buildModel3d(
 				createdAt: notice.at,
 				runId: null,
 			});
+		},
+	});
+}
+
+export function buildVideo(
+	config: Config,
+	core: Pick<Core, "store" | "queue" | "settings">,
+) {
+	const { store, queue, settings } = core;
+	return createVideo({
+		store,
+		queue,
+		port: () => {
+			const baseUrl = settings.get().larm.baseUrl;
+			return baseUrl && config.larmToken
+				? createVideoClient({ baseUrl, token: config.larmToken })
+				: null;
 		},
 	});
 }

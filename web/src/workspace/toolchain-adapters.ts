@@ -1,3 +1,4 @@
+import { videoWebAdapter } from "../domains/video/toolchain-adapter";
 import { canvasWebAdapter } from "../domains/canvas/toolchain-adapter";
 import { markdownWebAdapter } from "../domains/markdown/toolchain-adapter";
 import { doclingWebAdapter } from "../domains/docling/toolchain-adapter";
@@ -42,6 +43,7 @@ export const toolchainWebAdapters = createWebAdapterRegistry([
 	timerWebAdapter,
 	schedulerWebAdapter,
 	musicScreenWebAdapter,
+	videoWebAdapter,
 	imageScreenWebAdapter,
 	model3dWebAdapter,
 	computeWebAdapter,

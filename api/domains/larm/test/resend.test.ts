@@ -7,6 +7,7 @@ import {
 	checkRefusal,
 	claimWhenReady,
 	isCapacityBusy,
+	isOnDemandBusy,
 	LarmCapacityBusy,
 	sendAgainIfLost,
 } from "../service/resend";
@@ -167,4 +168,28 @@ test("a not-ready claim is repeated after each wait until it is ready", async ()
 		),
 	).toBe("claimed");
 	expect(waits).toBe(2);
+});
+
+test("exclusive work is a distinct refusal and never becomes a queued capacity retry", async () => {
+	const rejected = () =>
+		refusal(
+			409,
+			{ error: { code: "on_demand_busy" } },
+			{ "Retry-After": "30" },
+		);
+	const error = await checkRefusal(
+		rejected(),
+		"/v1/videos/generations",
+		true,
+	).catch((e: unknown) => e);
+	expect(isOnDemandBusy(error)).toBe(true);
+	expect(isCapacityBusy(error)).toBe(false);
+	let calls = 0;
+	await expect(
+		sendAgainIfLost(async () => {
+			calls++;
+			await checkRefusal(rejected(), "/v1/agent-connections", false);
+		}),
+	).rejects.toThrow("on_demand_busy");
+	expect(calls).toBe(1);
 });

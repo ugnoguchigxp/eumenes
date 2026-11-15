@@ -2,17 +2,25 @@ import { expect, test } from "bun:test";
 import { harness } from "../toolchain/toolchain.fixture";
 import { actionHost } from "./action-host.fixture";
 import { weatherFetch } from "../weather/weather.fixture";
-import { researchScript } from "../../domains/pursuit/test/model.fixture";
 
-for (const kind of ["research", "instant", "pipeline", "task"] as const) {
+for (const kind of ["instant", "pipeline", "task"] as const) {
 	test(`Agency uses the registered ${kind} execution contract without a manufactured user run`, async () => {
 		const weather = weatherFetch();
-		const script = researchScript({ document: true });
 		const h = await harness({
 			everyday: true,
 			resources: true,
 			timers: true,
-			...(kind === "task" ? { pursuit: script } : {}),
+			...(kind === "task"
+				? {
+						webNote: {
+							turn: async () => ({
+								text: "題: 確認\n要約: 確認しました\n---\n[根拠](https://example.com)",
+								searches: 1,
+								usage: null,
+							}),
+						},
+					}
+				: {}),
 			...(kind === "instant" ? { weather: { fetch: weather.fetch } } : {}),
 			...(kind === "pipeline"
 				? {
@@ -48,9 +56,7 @@ for (const kind of ["research", "instant", "pipeline", "task"] as const) {
 					? "weather.forecast"
 					: kind === "pipeline"
 						? "pipeline.execute"
-						: kind === "task"
-							? "web.research"
-							: "web.search",
+						: "web.note",
 			question:
 				kind === "instant"
 					? "散歩する場所の明日の天気を確認する"
@@ -84,12 +90,6 @@ for (const kind of ["research", "instant", "pipeline", "task"] as const) {
 					?.status,
 			).toBe("succeeded");
 			expect(h.dialogue.list("agency-action")).toHaveLength(0);
-			if (kind === "task")
-				expect(
-					h.dialogue
-						.conversationResources("agency-action")
-						.resources.some((r) => r.kind === "report"),
-				).toBe(true);
 			if (kind !== "task" && kind !== "pipeline")
 				expect(h.parentContexts).toHaveLength(0);
 		} finally {
@@ -98,59 +98,3 @@ for (const kind of ["research", "instant", "pipeline", "task"] as const) {
 		}
 	}, 15000);
 }
-
-test("an autonomous owner's question reaches its TODO and resumes only from a real user answer", async () => {
-	const script = researchScript({ consult: true, document: true });
-	const h = await harness({
-		pursuit: script,
-		firstRound: () => ({ text: "対象期間を受け取りました。" }),
-	});
-	const a = actionHost(h, {
-		id: "web.research",
-		question: "関心に関連する情報を確認して整理する",
-	});
-	try {
-		await a.start();
-		const { waitFor } = await import("../../infrastructure/wait-for");
-		await waitFor(() =>
-			h.todos("agency-action").some((t) => t.status === "waiting"),
-		);
-		const row = a.rows()[0]!;
-		const owner = h.store.read((db) =>
-			h.routing.taskInTransaction!(db, a.target.revisionId),
-		)!;
-		const view = h.store.read((db) =>
-			owner.viewInTransaction(db, row.execution_id),
-		)!;
-		expect(view.question).not.toBeNull();
-		expect(row.returned).toBe(0);
-		const answer = await h.dialogue.submit({
-			requestId: crypto.randomUUID(),
-			conversationId: "agency-action",
-			text: "対象期間は今年です。",
-		});
-		await h.dialogue.waitForTerminal(answer.id, { timeoutMs: 5000 });
-		await h.store.write((db) =>
-			owner.controlInTransaction(
-				db,
-				"agency-action",
-				{
-					workRef: view.id,
-					expectedRevision: view.revision,
-					action: "answer",
-					questionRef: view.question!.id,
-					input: { answer: "今年" },
-				},
-				answer.inputMessageId,
-			),
-		);
-		await a.returned();
-		expect(
-			h.store.read((db) => owner.viewInTransaction(db, row.execution_id)),
-		).toMatchObject({ status: "completed" });
-		expect(a.rows()).toHaveLength(1);
-	} finally {
-		await a.close();
-		await h.close();
-	}
-}, 15000);

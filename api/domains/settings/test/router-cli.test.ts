@@ -21,29 +21,17 @@ function harness() {
 	return { call, patches, shown };
 }
 
-test("status reads the settings, and clear-profile removes the profile", async () => {
+test("status reads settings and set sends the resource, deadline and feedback values", async () => {
 	const h = harness();
 	expect(await h.call("status")).toBe(0);
 	expect(await h.call()).toBe(0);
 	expect(h.shown).toEqual([{ mode: "off" }, { mode: "off" }]);
-	await h.call("clear-profile");
-	expect(h.patches).toEqual([{ profile: null }]);
-});
-
-test("set sends the entry, the structure resource, the profile and the numbers as typed values", async () => {
-	const h = harness();
-	await h.call("set", "entry", "routeStructured");
 	await h.call("set", "structureResource", "none");
-	await h.call("set", "profile", "router-p");
-	await h.call("set", "timeoutMs", "1500");
-	await h.call("set", "accept", "0.7");
+	await h.call("set", "structureTimeoutMs", "1500");
 	await h.call("set", "feedbackWeight", "0");
 	expect(h.patches).toEqual([
-		{ entry: "routeStructured" },
 		{ structureResourceId: null },
-		{ profile: "router-p" },
-		{ timeoutMs: 1500 },
-		{ accept: 0.7 },
+		{ structureTimeoutMs: 1500 },
 		{ feedbackWeight: 0 },
 	]);
 });

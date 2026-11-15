@@ -43,10 +43,12 @@ export {
 } from "./contracts/capacity";
 export {
 	checkRefusal,
+	isOnDemandBusy,
 	isCapacityBusy,
 	LarmCapacityBusy,
 	sendAgainIfLost,
 } from "./service/resend";
+export { LARM_ON_DEMAND_BUSY } from "./contracts/on-demand";
 export { settleCapacityWait } from "./service/capacity-wait";
 export { silentWav, code as playgroundError } from "./service/playground-http";
 
@@ -71,3 +73,9 @@ export type {
 } from "./contracts/visual-perception";
 
 export { analysisCreate } from "./contracts/visual-perception";
+
+export {
+	createVideoClient,
+	VideoHttpError,
+	type VideoClient,
+} from "./service/video";

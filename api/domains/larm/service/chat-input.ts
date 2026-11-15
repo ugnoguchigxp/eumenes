@@ -6,6 +6,7 @@ import {
 } from "../contracts/chat-input";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Provider } from "./profiles";
+import { onDemandRefusal } from "./resend";
 import { chatRequest } from "./chat-request";
 import type { LarmCallOptions, LarmPort } from "../contracts";
 import { getLogger, type LogFields } from "../../../infrastructure/logger";
@@ -122,7 +123,11 @@ export async function countChatBody(
 				...responseFields,
 				...(await tokenCountRejection(response, signal, p.token)),
 			};
-			throw new Error("chat_token_count_unavailable");
+			throw (
+				onDemandRefusal(response.status, {
+					code: responseFields.validationCode,
+				}) ?? new Error("chat_token_count_unavailable")
+			);
 		}
 		phase = "response_body";
 		const bytes = await readBounded(response.body, {

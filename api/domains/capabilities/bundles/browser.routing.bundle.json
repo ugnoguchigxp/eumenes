@@ -35,7 +35,7 @@
 			"dependencies": ["package:browser.operate@6"],
 			"kind": "toolchain",
 			"id": "browser.operate",
-			"revision": 11,
+			"revision": 12,
 			"title": "ブラウザの操作",
 			"summary": "指定のURLやリンクをブラウザのタブで開いて表示する。タブの新規作成・移動・切替、Braveへの接続、操作の状況確認と中止を行う。",
 			"examples": [
@@ -49,10 +49,6 @@
 				{
 					"when": "直前に開いたページで操作を続ける、または開いたタブで指定箇所を読み取り、抜粋・読み上げをする依頼",
 					"toolchainId": "collaboration.brave"
-				},
-				{
-					"when": "公開情報の検索や本文の取得だけで足りる依頼",
-					"toolchainId": "web.search"
 				},
 				{
 					"when": "タブやページを画像として保存したいだけの依頼",
@@ -81,7 +77,7 @@
 			"dependencies": ["package:browser.capture@1"],
 			"kind": "toolchain",
 			"id": "browser.capture",
-			"revision": 7,
+			"revision": 8,
 			"title": "ブラウザの撮影",
 			"summary": "開いているタブやEumenesの画面をスクリーンショットとして撮影し、画像に保存する。見えている範囲やページ全体を撮影できる。",
 			"examples": [
@@ -95,10 +91,6 @@
 				{
 					"when": "新しい絵や写真を作る依頼",
 					"toolchainId": "image.create"
-				},
-				{
-					"when": "公開情報の検索や本文の取得だけで足りる依頼",
-					"toolchainId": "web.search"
 				}
 			],
 			"packageRevisionId": "package:browser.capture@1",

@@ -16,6 +16,11 @@ export function createWebErasure(
 		queue.cancelInTransaction(db, run.job_id, reason);
 		return [run.job_id];
 	}
+	store.onCommit(() => {
+		for (const id of forgotten)
+			if (!store.read((db) => byId(db, id))) forgetDelivery(id);
+		forgotten.clear();
+	});
 	return {
 		cancelInTransaction,
 		forgetInTransaction(db: Database, id: string) {
@@ -23,11 +28,6 @@ export function createWebErasure(
 			db.query("DELETE FROM web_research_runs WHERE id=?").run(id);
 			forgotten.add(id);
 			return jobs;
-		},
-		flushForgotten() {
-			for (const id of forgotten)
-				if (!store.read((db) => byId(db, id))) forgetDelivery(id);
-			forgotten.clear();
 		},
 	};
 }

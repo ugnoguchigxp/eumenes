@@ -370,10 +370,12 @@ test("the reply's system holds the package's rules for the agenda, with the tool
 	try {
 		const base = f.host.conversationAgent.system().base;
 		expect(base).toContain(agendaReplyRules());
-		expect(base).toContain("start_preparation");
+		expect(f.host.conversationAgent.system().facts).toContain(
+			"start_preparation",
+		);
 		expect(base).toContain("read_note");
 		// The way to a toolchain: the rules say how, the talk turn offers the two tools, and the facts allow it.
-		expect(base).toContain("find_toolchain");
+		expect(base).toContain("【あなたの仕組み】");
 		expect(f.host.conversationAgent.handsWork?.()).toBe(true);
 		expect(f.host.conversationAgent.system().facts).toContain(
 			"find_toolchain と delegate が渡されているときは担当を探して頼みます。",
@@ -824,14 +826,14 @@ test("the reply's system holds the agenda's rules only where the agenda serves t
 	const f = await agendaFixture();
 	try {
 		const settings = f.h.settings.get().agency;
-		expect(agencyReplyParts(settings, true).base).toContain(
+		expect(agencyReplyParts(settings, true).facts).toContain(
 			"start_preparation",
 		);
-		expect(agencyReplyParts(settings, false).base).not.toContain(
-			"start_preparation",
-		);
+		expect(agencyReplyParts(settings, false).facts).toBeUndefined();
 		const host = createSwitchingAgencyHost(f.deps);
-		expect(host.conversationAgent.system().base).toContain("start_preparation");
+		expect(host.conversationAgent.system().facts).toContain(
+			"start_preparation",
+		);
 		expect(host.conversationAgent.handsWork()).toBe(true);
 		await host.close();
 	} finally {
@@ -898,20 +900,20 @@ test("research runs on the web note capability only, never an unrelated one (nor
 	expect(
 		researchRevision(deps, [
 			free("toolchain:weather.forecast@1"),
-			free("toolchain:web.research@7"),
-			free("toolchain:web.search@11"),
-			free("toolchain:web.note@1"),
+			free("toolchain:history.research@3"),
+			free("toolchain:web.service-search@5"),
+			free("toolchain:web.note@2"),
 		]),
-	).toBe("toolchain:web.note@1");
+	).toBe("toolchain:web.note@2");
 	expect(
 		researchRevision(deps, [
-			free("toolchain:web.research@7"),
-			free("toolchain:web.search@11"),
+			free("toolchain:history.research@3"),
+			free("toolchain:web.service-search@5"),
 		]),
 	).toBeUndefined();
 	expect(
 		researchRevision(deps, [
-			{ revisionId: "toolchain:web.note@1", requiresApproval: true },
+			{ revisionId: "toolchain:web.note@2", requiresApproval: true },
 		]),
 	).toBeUndefined();
 });
@@ -991,7 +993,7 @@ test("a result without anything to read is a failed research, and the addresses 
 		id: "t1",
 		itemId: "a1",
 		agentTicketId: "t1",
-		revisionId: "toolchain:web.research@7",
+		revisionId: "toolchain:history.research@3",
 		question:
 			"鎌倉の紫陽花の見頃を調べる\n相手が示したURL: https://example.com/kamakura",
 		at: 0,

@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import type { BestV2Model } from "eumenes_router";
 import type { RouterCard } from "eumenes_router/sqlite";
 import type {
 	FixedDefinition,
@@ -187,10 +186,6 @@ export interface ToolchainRoutingPort {
 		db: Database,
 		text: string,
 	): ReadonlyMap<string, number>;
-	routerModelInTransaction?(
-		db: Database,
-		space: VectorSpace,
-	): BestV2Model | null;
 	/** The titles of these toolchains and read tools (those that are active), by id. */
 	titlesInTransaction?(
 		db: Database,

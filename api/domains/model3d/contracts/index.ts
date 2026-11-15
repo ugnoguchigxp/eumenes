@@ -138,6 +138,8 @@ const errorLabels: Record<string, string> = {
 	model3d_asset_missing: "完了しましたが、LARMが完成品を返しませんでした",
 	model3d_invalid_request: "入力内容をLARMが受け付けませんでした",
 	model3d_auth_failed: "LARMの接続先とControl認証を確認してください",
+	on_demand_busy:
+		"LARMでほかの処理が実行中です。終了してから再度お試しください",
 	model3d_idempotency_conflict:
 		"同じ依頼に別の内容が送られました。元の依頼を確認してください",
 	model3d_unavailable: "LARMの3D生成が利用できません",

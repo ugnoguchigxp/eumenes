@@ -351,7 +351,6 @@ export function createToolchainRouting(
 		...(embedRouter ? { embedRouter } : {}),
 		routerCardsInTransaction: history.routerCardsInTransaction,
 		routerLexicalInTransaction: history.routerLexicalInTransaction,
-		routerModelInTransaction: history.routerModelInTransaction,
 		titlesInTransaction(db, ids) {
 			const wanted = new Set(ids);
 			return new Map(

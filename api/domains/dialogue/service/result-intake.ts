@@ -257,9 +257,10 @@ export function reportedLinks(
 	deps: DialogueDeps,
 	input: GenerateInput,
 	text: string,
+	lookupSources: Array<{ url: string }> = [],
 ): string {
 	const ledger = deps.work;
-	if (!ledger || !text) return text;
+	if (!text) return text;
 	const triggered = input.trigger.flatMap((trigger) =>
 		trigger.kind === "todo_changed" && Array.isArray(trigger.todos)
 			? (trigger.todos as Array<{ id?: unknown }>).flatMap((todo) =>
@@ -268,25 +269,35 @@ export function reportedLinks(
 			: [],
 	);
 	const ids = [...new Set([...triggered, ...input.shown.todos])];
-	if (ids.length === 0) return text;
-	const results = deps.store.read((db) =>
-		ids.flatMap((id) => {
-			const row = ledger.workInTransaction(db, id);
-			return row?.status === "done" ? [row.result] : [];
-		}),
-	);
-	if (results.length === 0) return text;
+	if (ids.length === 0 && !lookupSources.length) return text;
+	const results =
+		ledger && ids.length
+			? deps.store.read((db) =>
+					ids.flatMap((id) => {
+						const row = ledger.workInTransaction(db, id);
+						return row?.status === "done" ? [row.result] : [];
+					}),
+				)
+			: [];
+	if (results.length === 0 && !lookupSources.length) return text;
 	const reports = results.filter(
 		(result): result is { sources: unknown[]; claims?: unknown[] } =>
 			!!result &&
 			typeof result === "object" &&
 			Array.isArray((result as { sources?: unknown }).sources),
 	);
-	if (reports.length === 0)
+	if (reports.length === 0 && !lookupSources.length)
 		return researchCitations(text, null, { preserveLinkLabels: false });
+	const verified = lookupSources.map(({ url }, index) => ({
+		url,
+		sourceId: `lookup-${index}`,
+	}));
 	const projection = JSON.stringify({
-		sources: reports.flatMap((report) => report.sources),
-		claims: reports.flatMap((report) => report.claims ?? []),
+		sources: [...reports.flatMap((report) => report.sources), ...verified],
+		claims: [
+			...reports.flatMap((report) => report.claims ?? []),
+			{ sourceIds: verified.map(({ sourceId }) => sourceId) },
+		],
 	});
 	return researchCitations(text, projection, { requireSources: true });
 }

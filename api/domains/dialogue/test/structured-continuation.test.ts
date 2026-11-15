@@ -1,3 +1,4 @@
+import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { afterEach, expect, test } from "bun:test";
 import {
 	setup,
@@ -13,26 +14,14 @@ afterEach(async () => {
 });
 
 function structure(raw: string) {
-	const original = h!.larm.executeControl!.bind(h!.larm);
-	const snapshot = h!.larm.snapshotInTransaction!.bind(h!.larm);
+	const original = h!.larm.selectRouter!;
 	const prompts: string[] = [];
 	Object.assign(h!.larm, {
-		snapshotInTransaction: (tx: never) => {
-			const saved = snapshot(tx);
-			return {
-				...saved,
-				router: { ...saved.router, entry: "routeStructured" },
-			};
-		},
-		captureBackgroundControlInTransaction: () => "structure-fixture",
-		executeControl: async (...args: Parameters<typeof original>) => {
-			if (args[0] !== "structure-fixture") return original(...args);
-			prompts.push(args[1].at(-1)!.content);
-			return {
-				requestId: args[0],
-				attemptId: "structure",
-				value: JSON.stringify({ decision: JSON.parse(raw) }),
-			};
+		selectRouter: async (...args: Parameters<typeof original>) => {
+			if (args[0].version !== TURN_STRUCTURE_PROMPT.version)
+				return original(...args);
+			prompts.push(args[0].user);
+			return JSON.stringify({ decision: JSON.parse(raw) });
 		},
 	});
 	return prompts;

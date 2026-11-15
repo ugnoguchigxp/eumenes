@@ -21,7 +21,7 @@ export type RouterTrace = {
 	/** `shadow` only in traces written before the router package (spec router-package-integration 2026-11-04). */
 	mode: "shadow" | "on";
 	/** The router package's entry that decided (absent in traces written before it). */
-	entry?: "route" | "routeStructured";
+	entry?: "route" | "routeStructured" | "routeWithSelection";
 	/** best-v2's top-two gap, and whether it was too small to be sure. */
 	gate?: number | null;
 	defer?: boolean | null;
@@ -33,13 +33,14 @@ export type RouterTrace = {
 		id: string;
 		kind: RouterCandidateKind;
 		/** LARM's probability. */
-		raw: number;
+		raw: number | null;
 		/** The correction added to its log-probability (0 without a near correction). */
-		correction: number;
+		correction: number | null;
 		/** The probability after the correction. */
-		p: number;
-		/** LARM's independent score, when it gives one. */
+		p: number | null;
+		/** Search match score for selection, or the archived independent score. */
 		score: number | null;
+		searchRank?: number | null;
 	}>;
 	/** The prediction set, best first (at most 3): the alternatives a correction may move to. */
 	set: string[];

@@ -1,20 +1,13 @@
 import { test, expect } from "bun:test";
 import { EvidenceCatalog } from "../service/evidence-catalog";
 import { workerContext } from "../service/context";
-import {
-	workerDeadline,
-	explorationBudget,
-	modelLimit,
-} from "../service/exploration";
+import { workerDeadline, explorationBudget } from "../service/exploration";
 import { verifyReport } from "../service/verify-report";
 import type { Prepared } from "../../capabilities";
 import type { Source } from "../../tool-runtime";
 import type { Task } from "../contracts";
 import { controlInstructions, delegatedTaskRules } from "../../inference";
-import {
-	searchAction,
-	firstResearchAction,
-} from "../service/research-contract";
+import { firstResearchAction } from "../service/research-contract";
 import { researchReport } from "../service/research-contract";
 import { z } from "zod";
 import { lookupInput, zSchema } from "../../capabilities";
@@ -41,47 +34,6 @@ const source = (body: string): Source => ({
 	url: "https://example.com/",
 	fetchedAt: "2026-10-10T00:00:00Z",
 	truncated: false,
-});
-test("quick Web work is bounded independently of question wording while Codex research keeps exploration", () => {
-	const quick = {
-		...prepared,
-		package: { ...prepared.package, id: "web.quick" },
-	} as Prepared;
-	for (const question of ["語句の意味", "最新情報", "大量の資料の比較"]) {
-		const p = { ...quick, input: { question } };
-		expect(modelLimit(p)).toBe(5);
-		expect(explorationBudget(task, p, [], 0)).toMatchObject({
-			maxLocalCalls: 0,
-			maxExternalCalls: 2,
-			maxSearches: 1,
-			maxReads: 1,
-		});
-		expect(
-			explorationBudget({ ...task, model_calls: 4 }, p, [], 0).canOperate,
-		).toBe(true);
-		expect(
-			explorationBudget({ ...task, model_calls: 5 }, p, [], 0).canOperate,
-		).toBe(false);
-		const data = JSON.parse(
-			workerContext(task, p, [], [], [], new EvidenceCatalog(), 0).messages[2]!
-				.content,
-		);
-		expect(data.budget.limits).toMatchObject({
-			searches: 1,
-			reads: 1,
-			localCalls: 0,
-		});
-	}
-	const search = {
-		...prepared,
-		package: { ...prepared.package, id: "web.search" },
-	} as Prepared;
-	expect(explorationBudget(task, search, [], 0)).toMatchObject({
-		maxSearches: 1,
-		maxReads: 3,
-	});
-	expect(modelLimit(prepared)).toBe(12);
-	expect(explorationBudget(task, prepared, [], 0).maxLocalCalls).toBe(4);
 });
 test("retired evidence cannot be reported and its reference is never reassigned", () => {
 	const catalog = new EvidenceCatalog();
@@ -572,64 +524,38 @@ test("a replayed observation moved after new material never pushes the packet pa
 		expect(shown.has(entry.reference)).toBe(true);
 });
 
-test("every route carries the shared rules, and the step contract is also returned as values", async () => {
+test("the generic route carries shared rules and a valid executable example", async () => {
 	const { commonRules } = await import("../service/worker-control");
-	for (const id of ["web.quick", "web.search", "web.recipe", undefined]) {
-		const p = {
-			...prepared,
-			package: { ...prepared.package, ...(id ? { id } : {}) },
-		} as Prepared;
-		const context = workerContext(
-			task,
-			p,
-			[],
-			[],
-			[],
-			new EvidenceCatalog(),
-			0,
-		);
-		const system = context.messages[0]!.content;
-		expect(system).toContain(commonRules);
-		expect(system).toContain(delegatedTaskRules);
-		expect(context.messages).toHaveLength(3);
-		expect(system).toBe(controlInstructions(context.control));
-		expect(context.control.instructions).not.toContain("\nOUTPUT_SCHEMA=");
-		if (id) {
-			// Inspect the mission data and the executable contract. Phrase matching
-			// cannot establish that a model follows the instruction (live eval does).
-			expect(JSON.parse(context.messages.at(-1)!.content).task).toEqual(
-				p.input,
-			);
-			expect(system).not.toContain("\nOUTPUT_SCHEMA=");
-			const examples = JSON.parse(system.split("\nOUTPUT_FORMAT=")[1]!);
-			expect(examples).toHaveLength(1);
-			for (const example of examples)
-				expect(searchAction.safeParse(example).success).toBe(true);
-			expect(Object.keys(examples[0])).toEqual(["action", "report"]);
-			expect(Object.keys(examples[0].report)).toEqual([
-				"outcome",
-				"summary",
-				"claims",
-				"limitations",
-			]);
-			expect(JSON.stringify(examples).length).toBeLessThan(300);
-		} else {
-			// The requirement-graded route also shows a minimal example, not the whole schema.
-			expect(system).not.toContain("\nOUTPUT_SCHEMA=");
-			const examples = JSON.parse(system.split("\nOUTPUT_FORMAT=")[1]!);
-			expect(examples.map((e: { action: string }) => e.action)).toEqual([
-				"finish",
-			]);
-			for (const example of examples)
-				expect(firstResearchAction.safeParse(example).success).toBe(true);
-		}
-	}
+	const context = workerContext(
+		task,
+		prepared,
+		[],
+		[],
+		[],
+		new EvidenceCatalog(),
+		0,
+	);
+	const system = context.messages[0]!.content;
+	expect(system).toContain(commonRules);
+	expect(system).toContain(delegatedTaskRules);
+	expect(context.messages).toHaveLength(3);
+	expect(system).toBe(controlInstructions(context.control));
+	expect(context.control.instructions).not.toContain("\nOUTPUT_SCHEMA=");
+	expect(JSON.parse(context.messages.at(-1)!.content).task).toEqual(
+		prepared.input,
+	);
+	const examples = JSON.parse(system.split("\nOUTPUT_FORMAT=")[1]!);
+	expect(examples.map((example: { action: string }) => example.action)).toEqual(
+		["finish"],
+	);
+	for (const example of examples)
+		expect(firstResearchAction.safeParse(example).success).toBe(true);
 });
 
 test("search invocation examples name an offered executable tool and disappear for replay-only tools", () => {
 	const p = {
 		...prepared,
-		package: { ...prepared.package, id: "web.recipe" },
+		package: { ...prepared.package, id: "world.query" },
 	} as Prepared;
 	for (const replayOnly of [false, true]) {
 		const context = workerContext(
@@ -639,7 +565,7 @@ test("search invocation examples name an offered executable tool and disappear f
 				{
 					executionRef: "x",
 					replayOnly,
-					tool: { id: "recipe.find", schemaKey: "recipeFind" },
+					tool: { id: "web.lookup", schemaKey: "lookupV2" },
 				},
 			],
 			[],
@@ -654,7 +580,7 @@ test("search invocation examples name an offered executable tool and disappear f
 			(example: { action: string }) => example.action === "invoke",
 		);
 		expect(invokes.map((example: { tool: string }) => example.tool)).toEqual(
-			replayOnly ? [] : ["recipe.find"],
+			replayOnly ? [] : ["web.lookup"],
 		);
 		expect(context.messages[0]!.content).not.toContain('"tool":"TOOLS');
 	}

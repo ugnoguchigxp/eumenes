@@ -14,6 +14,7 @@ import {
  */
 type Row = {
 	kind: string;
+	revision?: number;
 	label: string;
 	owner: string;
 	actions: ResourceActionName[];
@@ -80,11 +81,12 @@ const rows: Row[] = [
 	},
 	{
 		kind: "report",
+		revision: 3,
 		label: "調査報告",
 		owner: "web-research",
 		actions: ["open", "read"],
 		defaultAction: "read",
-		producedBy: ["web.search", "web.service-search", "history.research"],
+		producedBy: ["web.service-search", "history.research"],
 		summary: "Web調査と会話履歴調査の報告",
 	},
 	{
@@ -187,6 +189,7 @@ export const resourceKindBuiltins: Definition[] = [
 		};
 		return {
 			...base(),
+			revision: row.revision ?? 1,
 			kind: "resource-kind",
 			id: resourceKindItemId(row.kind),
 			title: row.label,

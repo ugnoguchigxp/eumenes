@@ -184,3 +184,5 @@ export type {
 } from "./components/MarkdownWorkspace/types";
 
 export { CanvasWorkbench } from "./components/CanvasWorkbench";
+
+export * from "./components/VideoWorkspace";

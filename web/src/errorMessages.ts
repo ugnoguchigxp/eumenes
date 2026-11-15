@@ -1,6 +1,32 @@
 import { ApiConnectionError, ApiError } from "../../client/transport";
 
 const messages: Record<string, string> = {
+	on_demand_busy:
+		"LARMでほかの処理が実行中です。処理が終了してから、もう一度お試しください。",
+	invalid_video_request:
+		"動画の説明・タイトル・シードの入力範囲を確認してください。",
+	invalid_idempotency_key:
+		"依頼IDを確認できませんでした。画面を更新して状態を確認してください。",
+	idempotency_conflict:
+		"同じ依頼IDに別の送信内容が登録されています。受付状態を確認してください。",
+	video_busy:
+		"動画の処理が続いています。取消が確定するか処理が終了してからお試しください。",
+	video_unavailable: "LARMの動画生成サービスを利用できません。",
+	not_configured: "LARMの接続・動画サービスの設定を確認してください。",
+	video_storage_full:
+		"動画の保存容量が不足しています。不要な保存動画を整理してください。",
+	video_not_found: "対象の動画が見つかりません。一覧を更新してください。",
+	video_connection_changed:
+		"LARMの接続設定が変わりました。元の接続設定で受付状態を確認してください。",
+	video_connection_failed: "LARMの動画サービスと通信できませんでした。",
+	invalid_video_response: "LARMから返った動画の情報を確認できませんでした。",
+	video_acceptance_unconfirmed:
+		"動画生成の受付が不明です。同じ依頼で受付状態を確認してください。",
+	generation_interrupted:
+		"LARMの再起動で動画生成が中断されました。作成するには改めて依頼してください。",
+	worker_stop_failed:
+		"動画ワーカーの停止を確認できませんでした。LARMで新規処理の受付が制限されています。",
+
 	live_storage_failed:
 		"会話を保存できないため、音声会話を停止しました。保存先の問題を解消してから開始してください。",
 	live_permission_required:

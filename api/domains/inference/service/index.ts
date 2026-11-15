@@ -1,3 +1,4 @@
+import { createRouterSelection } from "./router-selection";
 import { createRequestOperations } from "./request-operations";
 import { connectionAccess } from "./connection-access";
 import { createProbes } from "./probes";
@@ -27,7 +28,6 @@ import type {
 import { createAgentSweeper } from "./agent-sweep";
 import { releaseTaskSessions } from "./agent-session";
 import { revokeAgentAttempts } from "./agent-revoke";
-import { createJudges } from "./judges";
 import { createSpeechLane } from "./speech-lane";
 
 /** Subjects of requests that do not serve the user right now (World extraction, background controls, probes). */
@@ -73,7 +73,6 @@ export function createInference(
 	const active = new Map<string, Running>();
 	const cooldown = new Map<string, number>();
 	const closingPorts = new Set<Promise<void>>();
-	const judges = createJudges({ settings, options });
 	const screen = createScreenPresence(
 		() => port(settings.get()),
 		(changed) => settings.onChange(changed),
@@ -291,10 +290,7 @@ export function createInference(
 			// Task sessions nobody released and a crashed host's temporary directories, now and then hourly.
 			await sweeper.start();
 		},
-		/** The router's reranker on its own port (spec router-package-integration 2026-11-04 §1 #4). */
-		...judges.ports,
-		/** After the HTTP server listens: the saved router's connection is made ahead of the first utterance. */
-		startRouter: () => judges.start(),
+		...createRouterSelection(settings, options.fetch),
 		async close() {
 			screen.close();
 			unsubscribeCollection();
@@ -320,7 +316,6 @@ export function createInference(
 				),
 			);
 			await Promise.allSettled(closingPorts);
-			await judges.close();
 			await options.cloudAgents?.close?.();
 		},
 	} satisfies InferencePort & Record<string, unknown>;

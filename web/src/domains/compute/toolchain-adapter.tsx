@@ -1,3 +1,4 @@
+import { describeError } from "../../errorMessages";
 import { useEffect, useRef, useState } from "react";
 import type {
 	ComputeWorkspaceResource,
@@ -119,7 +120,14 @@ export const computeWebAdapter: WebArtifactAdapter = {
 							}
 							artifacts.push({ ...a, url: activeUrls.get(key) });
 						}
-						jobs.push({ ...job, artifacts });
+						jobs.push({
+							...job,
+							artifacts,
+							error:
+								job.error?.code === "on_demand_busy"
+									? { ...job.error, message: describeError(job.error.code) }
+									: job.error,
+						});
 					}
 					const live = new Set(
 						jobs.flatMap((j) =>

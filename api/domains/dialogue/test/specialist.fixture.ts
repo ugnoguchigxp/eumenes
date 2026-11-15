@@ -25,9 +25,8 @@ import type { RouteInput } from "../../inference/contracts";
 import {
 	FIXTURE_ROUTER,
 	IMAGE,
-	ROUTER_MODEL,
 	ROUTER_SPACE,
-	routeBySteps,
+	selectionBySteps,
 	routerCards,
 	sectionLines,
 	type Call,
@@ -182,7 +181,8 @@ export async function setup(options: Options = {}) {
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		// The router decides every utterance turn: its context judgment reads the scripted steps.
-		route: routeBySteps(state.steps, state.routerAsked),
+		routerSelectionAvailable: () => true,
+		selectRouter: selectionBySteps(state.steps, state.routerAsked),
 		snapshotInTransaction: () => ({
 			general: { agentName: "", userName: "", persona: "butler" },
 			router: FIXTURE_ROUTER,
@@ -505,7 +505,6 @@ export async function setup(options: Options = {}) {
 		}),
 		routerCardsInTransaction: () => routerCards(cards),
 		routerLexicalInTransaction: () => new Map(),
-		routerModelInTransaction: () => ROUTER_MODEL,
 		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
 			new Map(
 				cards.filter((c) => ids.includes(c.id)).map((c) => [c.id, c.title]),

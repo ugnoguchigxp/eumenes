@@ -197,7 +197,7 @@ const instantBindingV1 = z.strictObject({
 	adapterRef: hostRef("adapter"),
 	availabilityRef: hostRef("availability"),
 	tools: z.array(bindingTool).length(1),
-	fallbackToolchainId: slug,
+	fallbackToolchainId: slug.optional(),
 });
 /** Any binding kind; unknown `execution` values are rejected. */
 export const taskBindingV1 = z.strictObject({

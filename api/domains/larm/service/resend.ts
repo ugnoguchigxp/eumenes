@@ -1,3 +1,4 @@
+import { LARM_ON_DEMAND_BUSY } from "../contracts/on-demand";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import { getLogger } from "../../../infrastructure/logger";
 import {
@@ -53,6 +54,20 @@ function explained(body: unknown) {
 		resource: typeof resource === "string" ? resource : null,
 	};
 }
+class LarmOnDemandBusy extends Error {
+	constructor(readonly status = 409) {
+		super(LARM_ON_DEMAND_BUSY);
+	}
+}
+export const isOnDemandBusy = (e: unknown): e is Error =>
+	e instanceof Error && e.message === LARM_ON_DEMAND_BUSY;
+
+export function onDemandRefusal(status: number, body: unknown) {
+	return status === 409 && explained(body).code === LARM_ON_DEMAND_BUSY
+		? new LarmOnDemandBusy()
+		: null;
+}
+
 /** Only a short identifier is logged; LARM's message and body never are. */
 const logged = (code: string | null) =>
 	code && /^[a-z][a-z0-9_]{0,63}$/.test(code) ? code : "unknown";
@@ -107,6 +122,8 @@ export async function checkRefusal(
 	} catch {
 		await response.body?.cancel().catch(() => {});
 	}
+	const exclusive = onDemandRefusal(response.status, body);
+	if (exclusive) throw exclusive;
 	const busy =
 		waitable && capacityRefusal(response.status, body, response.headers, path);
 	if (busy) throw busy;

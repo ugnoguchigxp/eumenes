@@ -53,7 +53,18 @@ export function migrateStoredSettings(
 		const { intent: _intent, ...rest } = raw;
 		raw = rest;
 		if (isObject(rest.router)) {
-			const { mode: _mode, ...router } = rest.router;
+			const {
+				mode: _mode,
+				profile: _profile,
+				entry: _entry,
+				timeoutMs: _timeout,
+				accept: _accept,
+				low: _low,
+				margin: _margin,
+				approve: _approve,
+				multi: _multi,
+				...router
+			} = rest.router;
 			raw = { ...rest, router };
 		}
 	}

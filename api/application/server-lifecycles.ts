@@ -194,12 +194,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "compute_discovery", recover: () => s.compute.refresh() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
 		{ name: "workflow_recovery", recover: () => s.workflow.recover() },
-		{
-			name: "pursuit_recovery",
-			recover: async () => {
-				await s.toolchain.pursuit?.recover();
-			},
-		},
 		{ name: "web_note_recovery", recover: () => s.toolchain.webNote.recover() },
 		{
 			name: "visual_analysis_recovery",
@@ -249,7 +243,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		// This boot's shared files start empty; the last boot's are removed in the background.
 		{ name: "scratch_start", start: () => s.scratch.start() },
 		{ name: "agents_start", start: () => s.toolchain.agents.start() },
-		{ name: "pursuit_start", start: () => s.toolchain.pursuit?.start() },
 		{ name: "queue_start", start: () => s.queue.start() },
 		{
 			name: "task_report_delivery_start",
@@ -307,7 +300,6 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "browser", close: () => s.browser.close() },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
-		{ name: "pursuit", close: () => s.toolchain.pursuit?.close() },
 		{ name: "web_note", close: () => s.toolchain.webNote.close() },
 		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },
 		{ name: "shell", close: () => s.toolchain.shell.closeAll() },

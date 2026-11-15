@@ -434,12 +434,11 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		toolchain.schemas,
 		toolchain.worldAvailable,
 	);
-	// The router decides every utterance turn: its context judgment is this fixture's model, asked as a choice.
+	// Adapt the fixture model to the router's selection contract.
 	await attachFixtureRouter({
 		store,
 		inference,
 		routing,
-		settings,
 		capabilities: toolchain.capabilities,
 		ask: askModel(model),
 	});

@@ -13,7 +13,6 @@ import {
 	type VectorSpace,
 } from "../../domains/capabilities";
 import { createToolchainHistory } from "../../domains/toolchain-history";
-import { createRecipePorts } from "./toolchain-recipes";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -86,7 +85,7 @@ test("a toolchain is offered only where its whole package is registered", async 
 	const ids = store.read((db) =>
 		capabilities.toolchainsInTransaction(db).map((d) => d.id),
 	);
-	expect(ids).toContain("web.search");
+	expect(ids).not.toContain("web.search");
 	expect(ids).not.toContain("timers.manage");
 	expect(ids).not.toContain("history.research");
 });
@@ -142,7 +141,6 @@ test("without vectors every available toolchain is offered; with vectors the top
 		[
 			...toolchainBuiltins.map((d) => d.id),
 			"timers.manage",
-			// `web.search` is withdrawn from selection (`selectable: false`): it is not among the candidates.
 			"scheduler.manage",
 			"music.create",
 			"music.library",
@@ -151,6 +149,7 @@ test("without vectors every available toolchain is offered; with vectors the top
 			"collaboration.brave",
 			"collaboration.interact",
 			"collaboration.pipeline",
+			"collaboration.task",
 			"pipeline.execute",
 			// The dots delegation bundle (backend `dots`, offered by this setup).
 			"dots.delegate",
@@ -198,21 +197,6 @@ test("without vectors every available toolchain is offered; with vectors the top
 	expect(ranked[0]!.id).toBe("music.create");
 	expect(ranked.length).toBeLessThanOrEqual(4);
 	expect(ranked[0]!.score.similarity).toBe(1);
-	// A query pointing straight at the withdrawn Web search does not offer it.
-	const withdrawn = store.read((db) =>
-		capabilities.toolchainCandidatesInTransaction(db, {
-			text: "鎌倉の天気を教えて",
-			vector: {
-				space: rankedSpace,
-				values: oneHot(
-					active.findIndex((d) => d.id === "web.search"),
-					rankedSpace.dimension,
-				),
-			},
-			available,
-		}),
-	);
-	expect(withdrawn.map((c) => c.id)).not.toContain("web.search");
 	// A vector of another space is never compared.
 	const other = store.read((db) =>
 		capabilities.toolchainCandidatesInTransaction(db, {
@@ -232,7 +216,7 @@ test("a selection is traced from offer to outcome and later offered as reference
 	const web = store.read((db) =>
 		capabilities
 			.toolchainsInTransaction(db)
-			.find((d) => d.id === "web.search")!,
+			.find((d) => d.id === "history.research")!,
 	);
 	await store.write((db) => {
 		history.recordSelectionInTransaction(db, {
@@ -241,9 +225,9 @@ test("a selection is traced from offer to outcome and later offered as reference
 			retrieval: "embedding",
 			candidates: [
 				{
-					toolchainId: "web.search",
+					toolchainId: "history.research",
 					revisionId: web.revisionId,
-					functionName: "web_search",
+					functionName: "conversation_history",
 					rank: 1,
 					ftsRank: null,
 					similarity: 0.9,
@@ -252,9 +236,9 @@ test("a selection is traced from offer to outcome and later offered as reference
 			],
 			historyRefs: [],
 			decision: "toolchain",
-			toolchainId: "web.search",
+			toolchainId: "history.research",
 			toolchainRevisionId: web.revisionId,
-			functionName: "web_search",
+			functionName: "conversation_history",
 			request: "鎌倉の天気",
 			query: { space, vector: oneHot(0) },
 		});
@@ -266,7 +250,7 @@ test("a selection is traced from offer to outcome and later offered as reference
 	const saved = history.getSelection("run-1")!;
 	expect(saved).toMatchObject({
 		decision: "toolchain",
-		functionName: "web_search",
+		functionName: "conversation_history",
 		request: "鎌倉の天気",
 		taskId: "task-1",
 		outcome: "answered",
@@ -283,7 +267,7 @@ test("a selection is traced from offer to outcome and later offered as reference
 	expect(past).toEqual([
 		expect.objectContaining({
 			request: "鎌倉の天気",
-			functionName: "web_search",
+			functionName: "conversation_history",
 			outcome: "answered",
 		}),
 	]);
@@ -311,7 +295,7 @@ test("a selection is traced from offer to outcome and later offered as reference
 test("a saved procedure is found by its signature and suspended after three failed reads", async () => {
 	const { store, history } = await setup(["web"]);
 	const id = await store.write((db) =>
-		history.saveRecipeInTransaction(db, "web.search", {
+		history.saveRecipeInTransaction(db, "history.research", {
 			signature: "天気予報: 神奈川県鎌倉市",
 			url: "https://example.com/kamakura",
 			readHint: "今日と明日の予報欄",
@@ -320,7 +304,7 @@ test("a saved procedure is found by its signature and suspended after three fail
 	const find = () =>
 		store.read((db) =>
 			history.findRecipesInTransaction(db, {
-				toolchainId: "web.search",
+				toolchainId: "history.research",
 				text: "鎌倉市の天気予報",
 			}),
 		);
@@ -330,10 +314,10 @@ test("a saved procedure is found by its signature and suspended after three fail
 			history.recordRecipeResultInTransaction(db, id, false);
 	});
 	expect(find()).toEqual([]);
-	expect(history.listRecipes("web.search")[0]!.state).toBe("suspended");
+	expect(history.listRecipes("history.research")[0]!.state).toBe("suspended");
 	// A new successful URL for the same signature brings it back.
 	await store.write((db) =>
-		history.saveRecipeInTransaction(db, "web.search", {
+		history.saveRecipeInTransaction(db, "history.research", {
 			signature: "天気予報: 神奈川県鎌倉市",
 			url: "https://example.com/kamakura-v2",
 			readHint: "予報欄",
@@ -343,7 +327,7 @@ test("a saved procedure is found by its signature and suspended after three fail
 	// A procedure the user disabled is never revived by a report.
 	await history.setRecipeState(id, "disabled");
 	await store.write((db) =>
-		history.saveRecipeInTransaction(db, "web.search", {
+		history.saveRecipeInTransaction(db, "history.research", {
 			signature: "天気予報: 神奈川県鎌倉市",
 			url: "https://example.com/kamakura-v3",
 			readHint: "予報欄",
@@ -351,71 +335,4 @@ test("a saved procedure is found by its signature and suspended after three fail
 	);
 	expect(history.listRecipes()[0]!.state).toBe("disabled");
 	expect(find()).toEqual([]);
-});
-
-test("a proposed procedure is kept only when the answer cites the page it read", async () => {
-	const { store, history } = await setup(["web"]);
-	const reads: Array<{ url: string; state: string }> = [];
-	const tools = {
-		invocationsInTransaction: () =>
-			reads.map((r, i) => ({
-				id: `inv-${i}`,
-				arguments: { url: r.url },
-				toolRevisionId: "tool:web.read@1",
-				state: r.state,
-				superseded: false,
-			})),
-		observationsInTransaction: () => [],
-	};
-	const ports = createRecipePorts(
-		history,
-		() => ({}) as never,
-		() => tools as never,
-	);
-	const report = (url: string, basis: "page" | "snippet") =>
-		({
-			version: 2,
-			outcome: "answered",
-			summary: "晴れ",
-			claims: [],
-			limitations: [],
-			sources: [{ sourceId: "s1", url, basis }],
-		}) as never;
-	const proposal = {
-		signature: "天気予報: 神奈川県鎌倉市",
-		url: "https://example.com/kamakura",
-		readHint: "予報欄",
-	};
-	const hook = (r: unknown) =>
-		store.write((db) =>
-			ports.onSearchReport(db, {
-				taskId: "task",
-				rootRunId: "run",
-				packageId: "web.recipe",
-				report: r as never,
-				recipe: proposal,
-			}),
-		);
-	// Only a search snippet backs the answer: nothing is kept.
-	await hook(report(proposal.url, "snippet"));
-	expect(history.listRecipes()).toEqual([]);
-	// The read page backs the answer: the procedure is kept.
-	reads.push({ url: proposal.url, state: "succeeded" });
-	await hook(report(proposal.url, "page"));
-	expect(history.listRecipes().map((r) => r.url)).toEqual([proposal.url]);
-	// Other packages never keep procedures.
-	await store.write((db) =>
-		ports.onSearchReport(db, {
-			taskId: "task",
-			rootRunId: "run",
-			packageId: "web.search",
-			report: report("https://example.com/other", "page"),
-			recipe: {
-				...proposal,
-				signature: "別",
-				url: "https://example.com/other",
-			},
-		}),
-	);
-	expect(history.listRecipes()).toHaveLength(1);
 });

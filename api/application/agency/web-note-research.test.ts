@@ -69,7 +69,7 @@ test("the agenda's research ticket starts the web note task, and its note reache
 			db.query("SELECT toolchain_revision_id FROM dialogue_agency_work").all(),
 		) as Array<{ toolchain_revision_id: string }>;
 		expect(works.map((w) => w.toolchain_revision_id)).toEqual([
-			"toolchain:web.note@1",
+			"toolchain:web.note@2",
 		]);
 		expect(prompts).toHaveLength(1);
 		expect(prompts[0]).toContain("依頼:\n明日の七里ヶ浜の日の出時刻");

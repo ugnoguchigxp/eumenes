@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { onDemandRefusal } from "./resend";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import {
 	computeEnvironment,
@@ -108,7 +109,9 @@ export function createComputeClient(options: {
 				const body = JSON.parse(
 					new TextDecoder().decode(await bytes(r, 16384, signal)),
 				);
-				if (codes.has(body?.error?.code)) code = body.error.code;
+				const exclusive = onDemandRefusal(r.status, body);
+				if (exclusive) code = exclusive.message;
+				else if (codes.has(body?.error?.code)) code = body.error.code;
 			} catch {
 				await r.body?.cancel().catch(() => {});
 			}

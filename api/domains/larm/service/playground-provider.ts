@@ -1,3 +1,4 @@
+import { checkRefusal } from "./resend";
 import type { EmbeddingSpace, LarmTestTarget } from "../contracts/playground";
 import type { Fetcher } from "./profiles";
 import { json, list, object, post, str } from "./playground-http";
@@ -175,7 +176,8 @@ export function createProviderAccess({
 				}),
 			);
 			if (!r.ok) {
-				await r.body?.cancel();
+				if (r.status === 409) await checkRefusal(r, "embedding", false);
+				else await r.body?.cancel();
 				throw new Error(`larm_http_${r.status}`);
 			}
 			const data = await json(r);

@@ -1,76 +1,38 @@
 {
 	"package": "eumenes_router",
-	"version": "0.0.2",
-	"artifact": "eumenes_router-0.0.2-bf0219868c31.tgz",
-	"sha256": "bf0219868c31dcf5c185250b4a313fcd8c0ea2b6183c2d0f337e1bc8d226c376",
+	"version": "0.0.3",
+	"artifact": "eumenes_router-0.0.3-5167c9f6fe48.tgz",
+	"sha256": "5167c9f6fe48de43a85d6445d12d1fa9bac7be231fca48b4c8a47dbfc3763f4e",
 	"source": {
-		"commit": "4dc1b0a21532d66288389ca0fbc917df5543151c",
+		"commit": "40b9fa0de2ef8e7cb7d1d3bf4a4d1cec0990a592",
 		"dirty": false,
-		"treeDigest": "f001f6ef0f089a7f4b16f5c782b46dd492af12ced0700081dcb2a2fda423c5db"
+		"treeDigest": "60060df0256a571ea876cffdd15afb9ec5381a41c577e089d41f8737087bfe6d"
 	},
 	"contractVersions": {
 		"cards": 1,
-		"route": 8,
+		"route": 9,
 		"feedback": 2,
-		"structure": 6
+		"structure": 6,
+		"selection": 1
 	},
 	"dbSchemaVersion": 1,
 	"entries": {
-		"route": {
-			"flavor": "direct",
-			"ports": [
-				"embed",
-				"rerank",
-				"read.cards",
-				"read.lexical",
-				"read.nearFeedback",
-				"model",
-				"settings"
-			]
-		},
-		"routeStructured": {
-			"flavor": "structured",
-			"ports": [
-				"analyze",
-				"embed",
-				"rerank",
-				"read.cards",
-				"read.lexical",
-				"read.nearFeedback",
-				"model",
-				"settings"
+		"routeWithSelection": {
+			"modes": [
+				"conversation",
+				"tools-only"
 			],
-			"structurePrompt": "turn-structure-v8"
-		},
-		"routeWithFallback": {
-			"flavor": "conditional-structured",
+			"defaultMode": "conversation",
 			"ports": [
 				"embed",
-				"rerank",
 				"read.cards",
 				"read.lexical",
 				"read.nearFeedback",
-				"model",
-				"settings",
-				"beginStructured"
+				"select"
 			],
+			"selectionPrompt": "route-selection-v1",
 			"structurePrompt": "turn-structure-v8"
 		}
 	},
-	"bestV2": {
-		"format": "best-v2.v2",
-		"version": "best-v2/2026-11-03",
-		"source": "4442fe7939835c60",
-		"deferBelow": 0.2989432082621926,
-		"extraTools": 10
-	},
-	"requires": {
-		"memory": {
-			"format": "best-v2-memory.v1",
-			"source": "4442fe7939835c60",
-			"dimension": 384,
-			"note": "the host imports it (importExamplesInTransaction); made from utterances, it is not in the tarball"
-		}
-	},
-	"verifiedWith": "eumenes_router: typecheck, lint, format, required offline Python regressions, bun test 132 pass / 0 skip / 0 todo / 0 fail, mainline parity ran; tarball checksum and isolated consumer on built JavaScript/SQLite passed; wrong checksum refused"
+	"verifiedWith": "eumenes_router: typecheck, lint, format, required offline Python regressions, bun test 140 pass / 0 skip / 0 todo / 0 fail, historical parity ran; tarball checksum and isolated consumer on built JavaScript/SQLite passed; wrong checksum refused"
 }

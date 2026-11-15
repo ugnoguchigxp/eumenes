@@ -10,7 +10,7 @@ import { musicRequest } from "./music-request";
 import { createMusicLibrary } from "./music-library";
 import { createProviderAccess } from "./playground-provider";
 import { createPlaygroundCatalog } from "./playground-catalog";
-import { checkRefusal, isCapacityBusy } from "./resend";
+import { checkRefusal, isCapacityBusy, isOnDemandBusy } from "./resend";
 import type {
 	LarmTestTarget,
 	TestHealth,
@@ -402,6 +402,7 @@ export function createLarmPlayground(config: {
 				j = await json(accepted);
 			} catch (e) {
 				if (
+					isOnDemandBusy(e) ||
 					isCapacityBusy(e) ||
 					/^larm_http_(400|401|403|404|409|422|429)$/.test(code(e))
 				)

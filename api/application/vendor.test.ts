@@ -180,7 +180,7 @@ test("the vendored router package matches its manifest, package.json, the lockfi
 	expect(routerManifest.package).toBe("eumenes_router");
 	expect(routerManifest.source.dirty).toBe(false);
 	expect(routerManifest.source.commit).toBe(
-		"4dc1b0a21532d66288389ca0fbc917df5543151c",
+		"40b9fa0de2ef8e7cb7d1d3bf4a4d1cec0990a592",
 	);
 	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
 		routerManifest.sha256,
@@ -203,11 +203,12 @@ test("the vendored router package matches its manifest, package.json, the lockfi
 	expect(typeof searchFeedback).toBe("function");
 	expect(typeof updateFeedbackStateInTransaction).toBe("function");
 	expect(TURN_STRUCTURE_PROMPT.version).toBe(
-		routerManifest.entries.routeStructured.structurePrompt,
+		routerManifest.entries.routeWithSelection.structurePrompt,
 	);
-	expect(TURN_STRUCTURE_PROMPT.version).toBe(
-		routerManifest.entries.routeWithFallback.structurePrompt,
-	);
+	expect(routerManifest.entries.routeWithSelection.modes).toEqual([
+		"conversation",
+		"tools-only",
+	]);
 	const lock = read("bun.lock").toString();
 	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
 	expect(lock).toContain(

@@ -1,13 +1,7 @@
 import { join } from "node:path";
-import {
-	BEST_V2_FEATURES,
-	BEST_V2_FORMAT,
-	BEST_V2_MEMORY_FORMAT,
-	loadBestV2,
-	type BestV2Params,
-} from "eumenes_router";
+import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import type { RouterCard } from "eumenes_router/sqlite";
-import type { RouteAnswer, RouteInput } from "../../inference/contracts";
+import type { RouteInput } from "../../inference/contracts";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
@@ -154,57 +148,9 @@ export const ROUTER_SPACE = {
 	artifactDigest: "d",
 	dimension: 2,
 };
-const featureWeight = (
-	weights: Partial<Record<(typeof BEST_V2_FEATURES)[number], number>>,
-) => BEST_V2_FEATURES.map((f) => weights[f] ?? 0);
-/**
- * A best-v2 whose probability is the context judgment's score alone, with the conversation at a fixed level:
- * σ(10·score − 4) for a candidate scored, σ(0) = 0.5 for the conversation. A score of 0.95 is sure (≈1.0), 0.45 is
- * the top but not sure (≈0.62, within the gate of the conversation), 0 is nothing (≈0.02).
- */
-const ROUTER_PARAMS: BestV2Params = {
-	format: BEST_V2_FORMAT,
-	version: "fixture",
-	source: "fixture",
-	features: [...BEST_V2_FEATURES],
-	ranker: {
-		mean: featureWeight({}),
-		scale: BEST_V2_FEATURES.map(() => 1),
-		coef: featureWeight({ rr: 10, is_conv: 4 }),
-		intercept: -4,
-	},
-	gate: { deferBelow: 0.2 },
-	fuse: { weight: 2, conversation: 0.18, top: 8 },
-	extra: { tools: 4 },
-	knn: { neighbors: 1, dimension: 2 },
-};
-const routerModel = (deferBelow: number) =>
-	loadBestV2(
-		{ ...ROUTER_PARAMS, gate: { deferBelow } },
-		{
-			format: BEST_V2_MEMORY_FORMAT,
-			source: "fixture",
-			dimension: 2,
-			labels: ["conversation.respond"],
-			vectors: btoa(
-				String.fromCharCode(...new Uint8Array(new Float32Array([1, 0]).buffer)),
-			),
-		},
-	);
-export const ROUTER_MODEL = routerModel(ROUTER_PARAMS.gate.deferBelow);
-export const DIRECT_ROUTER_MODEL = routerModel(0);
-/** The router as the fixtures save it: a profile, the package's `route` entry and the product's lines. */
 export const FIXTURE_ROUTER = {
-	profile: "router-fixture-profile",
-	entry: "route" as const,
 	structureResourceId: null,
 	structureTimeoutMs: 8000,
-	timeoutMs: 2000,
-	accept: 0.6,
-	low: 0.3,
-	margin: 0.15,
-	approve: 0.85,
-	multi: 0.5,
 	feedbackNear: 0.95,
 	feedbackWeight: 2,
 };
@@ -264,33 +210,118 @@ export function idsOfChoice(
 	return [choice];
 }
 
-/**
- * LARM's context judgment of the fixtures: the next scripted step, when it is a choice, makes its candidate a sure
- * top (0.95, with `ROUTER_MODEL`); anything else scores nothing, so the conversation leads.
- */
-export function routeBySteps(steps: Step[], routes?: RouteInput[]) {
-	return async (input: RouteInput): Promise<RouteAnswer> => {
-		routes?.push(input);
+type Selector = NonNullable<InferencePort["selectRouter"]>;
+export type ChoiceInput = Pick<
+	RouteInput,
+	"text" | "criteria" | "previousUser" | "previousAgent" | "instructions"
+>;
+type Reference = {
+	ref: string;
+	title?: string;
+	question?: string;
+	description?: string;
+};
+
+export function fixtureSelection(
+	pick: (input: ChoiceInput, signal: AbortSignal) => Promise<string[]>,
+) {
+	let intended: string[] = [];
+	return async (
+		prompt: Parameters<Selector>[0],
+		signal: AbortSignal,
+		explicit = false,
+	): Promise<string> => {
+		const data = JSON.parse(prompt.user);
+		const { text } = data as { text: string };
+		const context = {
+			previousUser: data.previousUser ?? null,
+			previousAgent: data.previousAgent ?? null,
+			instructions: prompt.system,
+		};
+		if (prompt.version === TURN_STRUCTURE_PROMPT.version) {
+			const pending: Reference[] = data.pending ?? [];
+			const controls: Reference[] = data.controls ?? [];
+			const host: Reference[] = data.hostActions ?? [];
+			const refs = [...pending, ...controls, ...host];
+			intended = await pick(
+				{
+					...context,
+					text,
+					criteria: refs.map((r) => ({
+						name: r.ref,
+						description: r.description ?? r.question ?? r.title ?? "",
+					})),
+				},
+				signal,
+			);
+			const ref = intended[0];
+			const key = pending.some((r) => r.ref === ref)
+				? "answer"
+				: controls.some((r) => r.ref === ref)
+					? "control"
+					: host.some((r) => r.ref === ref)
+						? "hostAction"
+						: null;
+			if (key)
+				return JSON.stringify({
+					decision: {
+						[key]: { ref, text: key === "hostAction" ? data.latest : text },
+					},
+				});
+			return JSON.stringify({
+				decision: {
+					requests: intended.length
+						? [{ text, target: null, inputs: [], after: [] }]
+						: [],
+				},
+			});
+		}
+		const choices: Record<string, unknown> = {};
+		for (const request of data.requests as Array<{
+			index: string;
+			text: string;
+			candidates: Array<{ id: string; description: string }>;
+		}>) {
+			const criteria = request.candidates.map(({ id, description }) => ({
+				name: id,
+				description,
+			}));
+			const choice =
+				!explicit && prompt.system.includes("場合は conversation")
+					? intended
+					: await pick({ ...context, text: request.text, criteria }, signal);
+			const id = choice.find((id) =>
+				criteria.some((criterion) => criterion.name === id),
+			);
+			choices[request.index] = id
+				? { kind: "candidate", id }
+				: { kind: "no_match" };
+		}
+		intended = [];
+		return JSON.stringify({ selections: choices });
+	};
+}
+
+export function selectionBySteps(steps: Step[], routes?: RouteInput[]) {
+	return fixtureSelection(async ({ text, criteria }) => {
 		const picked = pickedBy(steps[0]);
+		routes?.push({
+			text,
+			criteria,
+			previousAgent: "",
+			previousUser: "",
+			instructions: "",
+		});
 		if (picked) {
 			steps.shift();
 			if (picked.next) steps.unshift(picked.next);
+			return picked.ids;
 		}
-		const names = input.criteria.map((c) => c.name);
-		const scores = Object.fromEntries(
-			names.map((name) => [name, picked?.ids.includes(name) ? 0.95 : 0]),
-		);
-		return {
-			choice: names.find((name) => scores[name]) ?? names[0]!,
-			probabilities: Object.fromEntries(
-				names.map((name) => [name, 1 / names.length]),
-			),
-			scores,
-			model: "router-fixture-model",
-			headRevision: "head-1",
-			calibrationRevision: "cal-1",
-		};
-	};
+		const delegate = steps[0]?.calls?.find((call) => call.name === "delegate");
+		return typeof delegate?.args.toolchain === "string"
+			? [delegate.args.toolchain]
+			: [];
+	});
 }
 
 /** The fixture's toolchains as the router package's synced cards, with the conversation's and a memory request's. */
@@ -342,7 +373,7 @@ export type SetupOptions = {
 	extraMigrations?: import("../../../infrastructure/sqlite").Migration[];
 	/** Cards the catalog lists (default: image and instant). */
 	cards?: ToolchainCard[];
-	routerModel?: typeof ROUTER_MODEL;
+	selectRouter?: InferencePort["selectRouter"];
 	beforeRouterEmbed?: (
 		texts: readonly string[],
 		signal: AbortSignal,
@@ -354,6 +385,7 @@ export type SetupOptions = {
 	agency?: AgencyLayerPort;
 	/** The conversation agent (default: the agency's own reply loop, see conversation-agent.fixture.ts). */
 	conversationAgent?: ConversationAgentPort;
+	lookup?: Parameters<typeof createDialogueService>[0]["lookup"];
 	worldContext?: WorldContextPort;
 	/** Queue limits (the queue's own options). */
 	queue?: Parameters<typeof createQueue>[1];
@@ -419,8 +451,8 @@ export async function setup(options: SetupOptions = {}) {
 		/** The texts the router package embedded; a failure of the embedding with this code. */
 		routerEmbeds: [] as string[],
 		routerEmbedFails: null as string | null,
-		/** best-v2's memory was imported (without it the router decides nothing). */
-		routerMemory: true,
+		/** Whether the router can use the selection provider. */
+		routerAvailable: true,
 		/** The router's traces as the store was asked to keep them, and the work each was linked to. */
 		traces: [] as RouterTraceRecord[],
 		traceModes: [] as string[],
@@ -454,7 +486,9 @@ export async function setup(options: SetupOptions = {}) {
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		// The router decides every utterance turn: its context judgment reads the scripted steps.
-		route: routeBySteps(state.steps, state.routerAsked),
+		routerSelectionAvailable: () => state.routerAvailable,
+		selectRouter:
+			options.selectRouter ?? selectionBySteps(state.steps, state.routerAsked),
 		requestFor: (_db: unknown, runId: string) =>
 			options.settings && !captured.has(runId) ? null : `req:${runId}`,
 		...(options.settings
@@ -553,8 +587,6 @@ export async function setup(options: SetupOptions = {}) {
 		},
 		routerCardsInTransaction: () => routerCards(cards),
 		routerLexicalInTransaction: () => new Map(),
-		routerModelInTransaction: () =>
-			state.routerMemory ? (options.routerModel ?? ROUTER_MODEL) : null,
 		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
 			new Map(
 				cards.filter((c) => ids.includes(c.id)).map((c) => [c.id, c.title]),
@@ -566,6 +598,7 @@ export async function setup(options: SetupOptions = {}) {
 			>[1],
 		) => {
 			state.traceModes.push(input.trace.mode);
+			const prior = state.traces.find((t) => t.runId === input.runId);
 			state.traces = state.traces.filter((t) => t.runId !== input.runId);
 			state.traces.push({
 				runId: input.runId,
@@ -575,7 +608,7 @@ export async function setup(options: SetupOptions = {}) {
 				text: input.text,
 				query: input.query,
 				decided: input.trace.decided,
-				workId: null,
+				workId: prior?.workId ?? null,
 				set: input.trace.set,
 				createdAt: Date.now() + state.offsetMs,
 				row: input.trace.row,
@@ -728,6 +761,7 @@ export async function setup(options: SetupOptions = {}) {
 		clock,
 		continuity,
 		conversationAgent: options.conversationAgent ?? testConversationAgent,
+		lookup: options.lookup,
 		toolchains,
 		image,
 		...(music ? { music } : {}),

@@ -13,7 +13,6 @@ import {
 	describeMarkdownAdapter,
 	markdownDomainSchemas,
 } from "../markdown/markdown-adapter";
-import { describePursuitAdapter } from "../pursuit/pursuit-adapter";
 import { describeWebNoteAdapter } from "../web-note/web-note-adapter";
 import {
 	DOCLING_ADAPTER_REF,
@@ -55,6 +54,11 @@ import {
 	shellDomainSchemas,
 } from "../shell/shell-adapter";
 import { z } from "zod";
+import {
+	describeVideoAdapter,
+	VIDEO_ADAPTER_REF,
+} from "../media/video-adapter";
+import { videoCommandReceipt } from "../../domains/video/contracts";
 import {
 	TASK_ADAPTER_REF,
 	describeTaskAdapter,
@@ -187,6 +191,7 @@ const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...uiCompositionsDomainSchemas,
 	...appDevelopmentDomainSchemas,
 	...model3dDomainSchemas,
+	"domain:video.receipt@1": videoCommandReceipt,
 	...computeDomainSchemas,
 	...browserDomainSchemas,
 	...interactDomainSchemas,
@@ -249,13 +254,12 @@ export const hostAdapterDescriptions: Array<
 	{ ref: DOTS_MESSAGING_ADAPTER_REF, describe: describeDotsMessagingAdapter },
 	{ ref: SHELL_ADAPTER_REF, describe: describeShellAdapter },
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
-	{ ref: "adapter:pursuit@1", describe: () => describePursuitAdapter(1) },
-	{ ref: "adapter:pursuit@2", describe: () => describePursuitAdapter(2) },
 	{ ref: "adapter:web-note@1", describe: describeWebNoteAdapter },
 	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: SCHEDULER_ADAPTER_REF, describe: describeSchedulerAdapter },
 	{ ref: OCR_ADAPTER_REF, describe: describeOcrAdapter },
+	{ ref: VIDEO_ADAPTER_REF, describe: describeVideoAdapter },
 	{ ref: MODEL3D_ADAPTER_REF, describe: describeModel3dAdapter },
 	{ ref: COMPUTE_ADAPTER_REF, describe: describeComputeAdapter },
 	{ ref: BROWSER_ADAPTER_REF, describe: describeBrowserAdapter },

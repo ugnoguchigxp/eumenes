@@ -1,6 +1,6 @@
 import type { ComputePort } from "../../domains/compute";
 import type { DrawingConnection } from "../../domains/excalidraw";
-import type { LarmPlayground, LarmPort } from "../../domains/larm";
+import type { LarmPlayground, LarmPort, VideoClient } from "../../domains/larm";
 import type { createSettings } from "../../domains/settings";
 import type { AcquisitionPort } from "../../domains/web-research";
 import type { Step } from "./conversation-script.fixture";
@@ -9,14 +9,9 @@ import type { Step } from "./conversation-script.fixture";
 export type HarnessOptions = {
 	webResearch?: boolean;
 	/** Keep the Web search withdrawn from selection as production seeds it (the fixtures otherwise publish its earlier revision). */
-	withdrawnWebSearch?: true;
 	/** Compose the real resource registry for autonomous output delivery. */
 	resources?: boolean;
 	/** Fixed Pursuit control output; enables the registered research owner's lifecycle. */
-	pursuit?: (
-		schema: Record<string, unknown>,
-		messages: import("../../domains/inference/contracts").Messages,
-	) => unknown;
 	/** The research note task (Codex's own web search) with a scripted turn and a ledger record. */
 	webNote?: Pick<
 		import("../../domains/web-note").WebNoteDeps,
@@ -43,6 +38,7 @@ export type HarnessOptions = {
 		messages: import("../../domains/inference/contracts").Messages,
 	) => unknown;
 	computePort?: ComputePort;
+	videoPort?: VideoClient;
 	dots?: boolean;
 	discoveryTarget?: (query: string) => string;
 	acquisition?: AcquisitionPort;

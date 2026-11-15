@@ -1,4 +1,4 @@
-import { head, type Ranked, type RouteTurn } from "eumenes_router";
+import { head, type SelectionTurn } from "eumenes_router";
 import { getLogger } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { RouterTraceRecord } from "../../toolchain-history";
@@ -12,7 +12,6 @@ import {
 	SAID,
 	answerQuestion,
 	approveConfirmation,
-	askBack,
 	checkWork,
 	declineConfirmation,
 	handWith,
@@ -28,7 +27,6 @@ import {
 	type Step,
 } from "./routed-actions";
 import { fieldsOf } from "./routed-fields";
-import { chooseWholeWork } from "./routed-work-choice";
 import {
 	decidedPart,
 	hostDecision,
@@ -64,7 +62,6 @@ type Consulted = {
 	words: string;
 	/** Null when the router failed or timed out (row 10). */
 	decision: RouteDecision | null;
-	candidateUnavailable: boolean;
 	/** The previous routed turn of the conversation, within the correction window. */
 	latest: RouterTraceRecord | null;
 	/** Writes the turn's trace again with these parts changed (a redirect carried out, a question asked once more). */
@@ -126,7 +123,6 @@ async function consult(
 ): Promise<Consulted> {
 	const { deps, input } = turn;
 	const routed = turn.routed!;
-	const { settings } = router;
 	const port = deps.toolchains!;
 	const started = performance.now();
 	const embedded = new Map<string, QueryVector>();
@@ -147,15 +143,7 @@ async function consult(
 					? deps.store.read((tx) => port.titlesInTransaction!(tx, ids))
 					: new Map(),
 		});
-		// best-v2 needs the memory of the embedding's space: the utterance is embedded first, once.
 		const text = words.trim();
-		const first = head(text, 2000);
-		const r = await port.embedRouter!([first], turn.signal);
-		embedded.set(first, { space: r.space, vector: r.vectors[0]! });
-		const model = deps.store.read((tx) =>
-			port.routerModelInTransaction!(tx, r.space),
-		);
-		if (!model) throw new Error("router_memory_missing");
 		const { available, resource } = deps.store.read((tx) => ({
 			available: new Set<string>([
 				...availableToolchainsInTransaction(deps, tx),
@@ -163,15 +151,9 @@ async function consult(
 			]),
 			resource: referencedKindInTransaction(tx, input.runId),
 		}));
-		// The candidate asked about in the turn before (rows 5 and 6) was put to the user: the answer needs `low` only.
-		const asked =
-			previous?.trace.mode === "on" &&
-			(previous.trace.row === 5 || previous.trace.row === 6)
-				? previous.trace.decided
-				: null;
-		const routeTurn: RouteTurn = {
+		const routeTurn: SelectionTurn = {
 			state: {
-				text: settings.entry === "routeStructured" ? turn.utterance : text,
+				text,
 				previousAgent: routed.previousReply,
 				previousUser: routed.earlier.at(-1) ?? null,
 			},
@@ -189,14 +171,9 @@ async function consult(
 			retained: input.retained.map((entry) => entry.card.id),
 			available: (id) =>
 				id === CONVERSATION_ID || id === MEMORY_ID || available.has(id),
-			instructions: systemContext(
-				"dialogue.contexts.local.router-instructions",
-				{},
-			),
 			resource,
-			asked,
 		};
-		result = await routeByEntry(turn, router, routeTurn, model, embedded);
+		result = await routeByEntry(turn, router, routeTurn, embedded);
 	} catch (cause) {
 		// A cancelled run is the run's, not the router's.
 		if (turn.signal.aborted) throw cause;
@@ -222,16 +199,19 @@ async function consult(
 				),
 			);
 			if (!decision) error = "router_candidate_unavailable";
-			const conflicts = [
-				...new Set(result.parts.flatMap((p) => p.result.explain.conflicts)),
-			];
-			if (conflicts.length) await markConflicts(turn, conflicts);
 		} catch (cause) {
 			if (turn.signal.aborted) throw cause;
 			error = reasonOf(cause);
 			decision = null;
 		}
 	}
+	if (result) {
+		const conflicts = [
+			...new Set(result.parts.flatMap((part) => part.conflicts)),
+		];
+		if (conflicts.length) await markConflicts(turn, conflicts);
+	}
+
 	turn.signal.throwIfAborted();
 	const durationMs = Math.round(performance.now() - started);
 	const query =
@@ -239,14 +219,11 @@ async function consult(
 		embedded.get(head(words.trim(), 2000)) ??
 		null;
 	const traced = {
-		ranked: decision && part ? part.result.corrected : ([] as Ranked[]),
+		candidates: part?.candidates ?? [],
 		decision,
-		answer: decision && part ? part.result.answer : null,
 		durationMs,
 		error,
-		entry: settings.entry,
-		gate: part?.result.explain.gate ?? null,
-		defer: part?.result.explain.defer ?? null,
+		entry: "routeWithSelection" as const,
 		structure: result?.structure
 			? {
 					requests: result.structure.requests.length,
@@ -273,24 +250,23 @@ async function consult(
 	if (decision)
 		log.info("dialogue.router_decided", {
 			mode: "on",
-			source: settings.entry,
-			phase: result?.structuredAttempted ? "structured" : "direct",
+			source: "routeWithSelection",
+			phase: result?.structure ? "structured" : "direct",
 			row: decision.row,
 			kind: decidedKind(decision),
-			count: part?.result.explain.offered.length ?? 0,
+			count: part?.candidates.length ?? 0,
 			durationMs,
 		});
 	else
 		log.warn("dialogue.router_failed", {
 			reason: error ?? "router_failed",
-			phase: result?.structuredAttempted ? "structured" : "direct",
+			phase: result?.structure ? "structured" : "direct",
 			durationMs,
 		});
 	return {
 		candidates,
 		words,
 		decision,
-		candidateUnavailable: !!result && !decision,
 		latest,
 		retrace: trace,
 	};
@@ -352,13 +328,8 @@ export async function routerTurn(
 		: turn.utterance;
 	const consulted = await consult(turn, router, words);
 	turn.signal.throwIfAborted();
-	// A router that failed leaves the turn to the talk turn (row 10); nothing is promised.
-	if (!consulted.decision) {
-		const structuredEntry = router.settings.entry === "routeStructured";
-		return structuredEntry || consulted.candidateUnavailable
-			? routerUnperformed(turn, structuredEntry)
-			: "talk";
-	}
+	// The whole request is held if its judgment or validated hand-off failed.
+	if (!consulted.decision) return routerUnperformed(turn);
 	const step = await carryOut(turn, consulted, consulted.decision);
 	if (typeof step === "string") return step;
 	// The host could not carry it out: it says so, and the router's choice is not made again.
@@ -391,16 +362,6 @@ async function carryOut(
 			return askRouterClarification(turn, decision);
 		case "conversation":
 			return "talk";
-		case "ask":
-			return askBack(
-				turn,
-				systemContext("dialogue.contexts.local.router-ask", {
-					first: titleOf(decision.options[0]),
-					second: titleOf(decision.options[1]),
-				}),
-			);
-		case "again":
-			return askAgain(turn, consulted, decision.candidate);
 		case "pipeline":
 			return toolchain(
 				turn,
@@ -411,87 +372,10 @@ async function carryOut(
 				decision.steps,
 			);
 		case "run":
-			if (decision.row === 9 && decision.candidate.kind === "toolchain") {
-				const selected = await chooseWholeWork(
-					turn,
-					consulted.words,
-					decision.candidate,
-					consulted.candidates,
-				);
-				if ("step" in selected) return selected.step;
-				if (selected.candidate.id !== decision.candidate.id)
-					await consulted.retrace({ decided: selected.candidate.id });
-				return toolchain(
-					turn,
-					consulted,
-					selected.candidate,
-					decision.announce,
-					selected.fields,
-				);
-			}
 			return run(turn, consulted, decision.candidate, decision.announce);
 	}
 }
 
-/**
- * Not sure enough to do it: the host asks once more and does nothing. The trace keeps the candidate asked about as
- * decided, so the answer in the next turn is held to `low` only.
- */
-async function askAgain(
-	turn: Turn,
-	consulted: Consulted,
-	c: RouteCandidate,
-): Promise<Step> {
-	const { deps, input } = turn;
-	const latest = consulted.latest;
-	if (c.kind === "pending" && c.operation === "discard")
-		turn.speak(
-			systemContext("dialogue.contexts.local.router-switch-ask", {
-				title: lineText(c.title).slice(0, 30),
-			}),
-		);
-	else if (c.kind === "pending" && c.operation === "approve")
-		turn.speak(
-			systemContext("dialogue.contexts.local.router-reconfirm", {
-				toolchain: lineText(c.toolchain).slice(0, 30),
-			}),
-		);
-	else if (c.kind === "redirect") {
-		turn.speak(
-			systemContext("dialogue.contexts.local.router-redirect-ask", {
-				title: lineText(c.title).slice(0, 40),
-				to: lineText(c.target).slice(0, 30),
-			}),
-		);
-		// The answer is a redirect of the same work to the same toolchain: its context goes on in this turn's trace.
-		if (latest?.workId) {
-			await consulted.retrace({
-				text: latest.text,
-				query: latest.query,
-				set: latest.set,
-				messageIds: [
-					...new Set([...messagesOf(turn, latest), ...latest.messageIds]),
-				],
-			});
-			const port = deps.toolchains;
-			await deps.store
-				.write((tx) =>
-					port?.linkRouterWorkInTransaction?.(tx, input.runId, latest.workId!),
-				)
-				.catch((error: unknown) => {
-					log.warn("dialogue.router_trace_failed", { reason: reasonOf(error) });
-				});
-		}
-	} else
-		turn.speak(
-			systemContext("dialogue.contexts.local.router-cancel-ask", {
-				title: lineText(c.kind === "work" ? c.title : "").slice(0, 40),
-			}),
-		);
-	return "done";
-}
-
-/** One candidate the router decided to do. */
 async function run(
 	turn: Turn,
 	consulted: Consulted,

@@ -61,7 +61,7 @@ test("the current music request reaches generation after unrelated Web and image
 					})),
 				),
 			);
-			for (const id of ["web.search", "image.create"]) {
+			for (const id of ["web.service-search", "image.create"]) {
 				const d = active.find((d) => d.id === id)!;
 				h.toolchain.history.recordSelectionInTransaction(db, {
 					runId: `previous-${id}`,

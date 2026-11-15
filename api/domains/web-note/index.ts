@@ -7,3 +7,4 @@ export {
 export { migrations } from "./repository";
 export type { SourcePort, WebNoteAttempt, WebNoteTurn } from "./contracts";
 export { parseNote, today } from "./service/note";
+export { createConversationLookup } from "./service/lookup";

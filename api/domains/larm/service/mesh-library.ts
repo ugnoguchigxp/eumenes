@@ -19,7 +19,7 @@ import {
 	type MeshGenerationRequest,
 } from "../contracts/mesh";
 import { bytes, json } from "./playground-http";
-import { capacityRefusal, retryAfter } from "./resend";
+import { capacityRefusal, onDemandRefusal, retryAfter } from "./resend";
 
 type Control = (
 	path: string,
@@ -46,7 +46,9 @@ async function refusal(r: Response, path: string, submits: boolean) {
 	let reason: string | null = null;
 	try {
 		const body = await json(r);
-		const busy = submits && capacityRefusal(r.status, body, r.headers, path);
+		const busy =
+			onDemandRefusal(r.status, body) ??
+			(submits && capacityRefusal(r.status, body, r.headers, path));
 		if (busy) return busy;
 		const value = body.code ?? body.error ?? body.reason;
 		const text =

@@ -363,6 +363,15 @@ export const viewRegistry = {
 			title,
 		}),
 	},
+	"video-workspace": {
+		name: "VideoWorkspace",
+		label: "動画生成",
+		schema: z.strictObject({
+			view: z.literal("video-workspace"),
+			source,
+			title,
+		}),
+	},
 	"model3d-workspace": {
 		name: "Model3dWorkspace",
 		label: "3Dモデルの生成・検索・表示",

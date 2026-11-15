@@ -34,6 +34,7 @@ const BACKENDS = [
 	"object-recognition",
 	"ocr",
 	"model3d",
+	"video",
 	"compute",
 	"browser",
 	"shell",

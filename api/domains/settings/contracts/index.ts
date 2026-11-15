@@ -214,75 +214,44 @@ const personas = ["butler", "maid", "strategist", "sage"] as const;
 const backgroundSchema = z.enum(["light-fairy", "spatial", "live2d-hiyori"]);
 export type BackgroundKind = z.infer<typeof backgroundSchema>;
 export const backgroundKinds = backgroundSchema.options;
-/**
- * The router (spec router-package-integration 2026-11-04 §1, §3): the eumenes_router package decides every utterance
- * turn once a profile is saved, by its `entry` (`route`: the whole utterance; `routeStructured`: the structure model
- * first, then each request). The thresholds are the decision table's; a measurement changes them, not the code.
- */
-export const routerEntries = ["route", "routeStructured"] as const;
-/** τ低 ≤ τ採用 ≤ τ承認 (spec toolchain-router-redesign §3.3). */
-export function routerThresholdsOrdered(t: {
-	low: number;
-	accept: number;
-	approve: number;
-}) {
-	return t.low <= t.accept && t.accept <= t.approve;
-}
-const routerProfile = z.string().trim().min(1).max(200);
-const routerTimeoutMs = z.number().int().min(100).max(10000);
 const routerStructureTimeoutMs = z.number().int().min(1000).max(30000);
 const routerUnit = z.number().min(0).max(1);
 const routerFeedbackWeight = z.number().min(0).max(5);
+const routerSettingsShape = {
+	/** The decision resource, with the conversation's cloud resource as the default. */
+	structureResourceId: z.uuid().nullable(),
+	/** One deadline across structure, retrieval and selection. */
+	structureTimeoutMs: routerStructureTimeoutMs,
+	/** Minimum vector similarity for applying a saved correction. */
+	feedbackNear: routerUnit,
+	/** A positive weight enables candidate expansion from agreeing nearby corrections. */
+	feedbackWeight: routerFeedbackWeight,
+};
+const routerDefaults = {
+	structureResourceId: null,
+	structureTimeoutMs: 8000,
+	feedbackNear: 0.95,
+	feedbackWeight: 2,
+};
 export const routerSettingsSchema = z
 	.object({
-		/**
-		 * The LARM Agent Profile whose context judgment (`decision.context`) is the router's reranker; absent until
-		 * saved, and then the router is not asked.
-		 */
-		profile: routerProfile.optional(),
-		/** Which of the package's two entries decides (the tarball holds both). */
-		entry: z.enum(routerEntries).default("route"),
-		/** The cloud LLM resource the structure model runs on (`routeStructured`); null keeps the conversation route. */
-		structureResourceId: z.uuid().nullable().default(null),
-		/** How long a turn waits for structure before leaving the whole request unperformed. */
-		structureTimeoutMs: routerStructureTimeoutMs.default(8000),
-		/** How long a turn waits for the router (each call) before it goes on without it. */
-		timeoutMs: routerTimeoutMs.default(2000),
-		/** τ採用: the top candidate is taken at least this probable, with `margin` over the second. */
-		accept: routerUnit.default(0.6),
-		/** τ低: below this, the top candidate is not taken (the host asks, or the turn talks). */
-		low: routerUnit.default(0.3),
-		/** δ: the least lead of the top candidate over the second for row 2. */
-		margin: routerUnit.default(0.15),
-		/** τ承認: a confirmation is approved only this probable. */
-		approve: routerUnit.default(0.85),
-		/** τ多: two toolchains scoring at least this (independently) make a request of several jobs. */
-		multi: routerUnit.default(0.5),
-		/** θ: a correction applies to an utterance at least this similar (inner product in the search's space). */
-		feedbackNear: routerUnit.default(0.95),
-		/** β: the most a correction moves a candidate's log-probability. 0 turns the corrections off. */
-		feedbackWeight: routerFeedbackWeight.default(2),
+		structureResourceId: routerSettingsShape.structureResourceId.default(
+			routerDefaults.structureResourceId,
+		),
+		structureTimeoutMs: routerSettingsShape.structureTimeoutMs.default(
+			routerDefaults.structureTimeoutMs,
+		),
+		feedbackNear: routerSettingsShape.feedbackNear.default(
+			routerDefaults.feedbackNear,
+		),
+		feedbackWeight: routerSettingsShape.feedbackWeight.default(
+			routerDefaults.feedbackWeight,
+		),
 	})
-	.strict()
-	// The decision table's lines keep their order: an approval is never easier than taking a candidate (§3.5).
-	.refine(routerThresholdsOrdered, "low ≤ accept ≤ approve");
+	.strict();
 export type RouterSettings = z.infer<typeof routerSettingsSchema>;
-/** A change of the router's settings: the fields given replace the saved ones; a null profile removes it. */
 export const routerPatchSchema = z
-	.object({
-		profile: routerProfile.nullable(),
-		entry: z.enum(routerEntries),
-		structureResourceId: z.uuid().nullable(),
-		structureTimeoutMs: routerStructureTimeoutMs,
-		timeoutMs: routerTimeoutMs,
-		accept: routerUnit,
-		low: routerUnit,
-		margin: routerUnit,
-		approve: routerUnit,
-		multi: routerUnit,
-		feedbackNear: routerUnit,
-		feedbackWeight: routerFeedbackWeight,
-	})
+	.object(routerSettingsShape)
 	.partial()
 	.strict();
 export const settingsSchema = z
@@ -372,19 +341,7 @@ export const settingsSchema = z
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})
 			.strict(),
-		router: routerSettingsSchema.default({
-			entry: "route",
-			structureResourceId: null,
-			structureTimeoutMs: 8000,
-			timeoutMs: 2000,
-			accept: 0.6,
-			low: 0.3,
-			margin: 0.15,
-			approve: 0.85,
-			multi: 0.5,
-			feedbackNear: 0.95,
-			feedbackWeight: 2,
-		}),
+		router: routerSettingsSchema.default(routerDefaults),
 		world: z
 			.object({
 				/**

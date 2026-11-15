@@ -1,11 +1,11 @@
 import { migrations as knowledgeMigrations } from "eumenes-skill-smith/sqlite";
 import { migrations as appDevelopmentMigrations } from "../domains/app-development";
 import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
-import { migrations as pursuitCoreMigrations } from "eumenes-pursuit/sqlite";
 import { migrations as pursuitMigrations } from "../domains/pursuit";
 import { migrations as webNoteMigrations } from "../domains/web-note";
 import { migrations as ocrMigrations } from "../domains/ocr";
 import { migrations as computeMigrations } from "../domains/compute";
+import { migrations as videoMigrations } from "../domains/video";
 import { migrations as model3dMigrations } from "../domains/model3d";
 import { migrations as browserMigrations } from "../domains/browser";
 import { interactMigrations as browserInteractMigrations } from "../domains/browser";
@@ -174,13 +174,6 @@ const routerPackageMigrations: Migration[] = routerPackageSql.map((sql, i) => ({
 import { migrations as liveVoiceMigrations } from "../domains/live-voice";
 /** Every migration of the product, in no meaningful order. */
 const catalog: readonly Migration[] = [
-	...pursuitCoreMigrations.map((m, i) => ({
-		id: `pursuit-core/${String(i + 1).padStart(4, "0")}`,
-		sql: m.sql,
-		after: i
-			? [`pursuit-core/${String(i).padStart(4, "0")}`]
-			: ["queue/0001-init"],
-	})),
 	...pursuitMigrations,
 	...webNoteMigrations,
 	...liveVoiceMigrations,
@@ -218,6 +211,7 @@ const catalog: readonly Migration[] = [
 	...objectRecognitionMigrations,
 	...ocrMigrations,
 	...model3dMigrations,
+	...videoMigrations,
 	...computeMigrations,
 	...browserMigrations,
 	...packageMigrations("interact-package", interactPackageSql, [

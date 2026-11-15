@@ -90,9 +90,13 @@ function MicLevelMeter({ store }: { store: AudioStore }) {
 export function ConversationComposer({
 	state,
 	store,
+	videoNotice,
+	videoBusy = false,
 }: {
 	state: WorkspaceState;
 	store: AudioStore;
+	videoNotice?: string;
+	videoBusy?: boolean;
 }) {
 	const {
 		voice,
@@ -118,7 +122,7 @@ export function ConversationComposer({
 			? "確認中"
 			: addresseeStatus === "error"
 				? "未確認"
-				: (isSpecialist ? session?.agentLabel : undefined) ?? addressee.label;
+				: ((isSpecialist ? session?.agentLabel : undefined) ?? addressee.label);
 	const inputPhase = useStore(store, (audio) => audio.inputPhase);
 	const starting = voice.active && inputPhase === "starting";
 	const route = [
@@ -205,7 +209,11 @@ export function ConversationComposer({
 					)}
 				</div>
 			)}
-			<form className="chat-composer" onSubmit={send}>
+			{videoNotice && <output className="chat-error">{videoNotice}</output>}
+			<form
+				className="chat-composer"
+				onSubmit={videoBusy ? (event) => event.preventDefault() : send}
+			>
 				{!editing && <ChatImagePreviews state={state} />}
 				{!editing && <ChatFilePreviews state={state} />}
 				<Textarea
@@ -229,8 +237,8 @@ export function ConversationComposer({
 						}
 					}}
 					placeholder={
-					isSpecialist
-						? `${addressee.label}へのメッセージを入力、または話しかけてください`
+						isSpecialist
+							? `${addressee.label}へのメッセージを入力、または話しかけてください`
 							: "メッセージを入力、または話しかけてください"
 					}
 					maxLength={8000}
@@ -249,7 +257,7 @@ export function ConversationComposer({
 							}
 							disabled={
 								live?.active ||
-								(!voice.active && (phase !== "idle" || !!editing))
+								(!voice.active && (videoBusy || phase !== "idle" || !!editing))
 							}
 							aria-label={voice.active ? "マイクを停止" : "音声を開始"}
 						>
@@ -296,6 +304,7 @@ export function ConversationComposer({
 						<Button
 							type="submit"
 							disabled={
+								videoBusy ||
 								!draft.trim() ||
 								edit.pending ||
 								(!!live?.active && live.session?.status !== "active")
@@ -307,6 +316,7 @@ export function ConversationComposer({
 						<Button
 							type="submit"
 							disabled={
+								videoBusy ||
 								(!draft.trim() &&
 									!state.attachments.items.length &&
 									!state.attachments.files.items.length) ||

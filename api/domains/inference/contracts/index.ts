@@ -64,12 +64,7 @@ import type {
 	NativeTool,
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
-import type {
-	ChatInput,
-	ChatMessage,
-	RouteAnswer,
-	RouteInput,
-} from "../../larm";
+import type { ChatInput, ChatMessage } from "../../larm";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 export interface Receipt {
 	toolCalls?: NativeToolCall[];
@@ -308,7 +303,11 @@ export interface InferencePort {
 	 * The router of the saved router profile, on its own LARM connection (spec toolchain-router-redesign §3.2): it
 	 * throws when the router is off or unconfigured or failed, and the caller keeps the turn going without it.
 	 */
-	route?(input: RouteInput, signal: AbortSignal): Promise<RouteAnswer>;
+	routerSelectionAvailable?(): boolean;
+	selectRouter?(
+		prompt: Parameters<import("eumenes_router").Analyze>[0],
+		signal: AbortSignal,
+	): Promise<string>;
 	transcribe(wav: Uint8Array, signal: AbortSignal): Promise<string>;
 	speak(
 		text: string,

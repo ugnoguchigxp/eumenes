@@ -17,6 +17,7 @@ export type HandlerDeps = {
 	validInTransaction?: (db: Database, row: JobRow) => boolean;
 };
 const safeCodes = new Set([
+	"on_demand_busy",
 	"invalid_request",
 	"limit_exceeded",
 	"unauthorized",

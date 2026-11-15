@@ -142,6 +142,30 @@ DELETE FROM capability_items WHERE id='resources.manage' AND kind IN ('toolchain
 		sql: `DELETE FROM capability_artifact_pointers WHERE artifact_id='settings.external-work';`,
 		after: ["capabilities/0009-retire-resources-manage"],
 	},
+	{
+		id: "capabilities/0011-retire-legacy-research",
+		after: ["capabilities/0010-retire-external-work"],
+		sql: `DELETE FROM capability_toolchain_vectors WHERE revision_id IN (
+			SELECT id FROM capability_revisions WHERE item_key IN ('toolchain:web.search','toolchain:web.research'));
+DELETE FROM capability_search WHERE key IN ('toolchain:web.search','toolchain:web.research','package:web.search','package:web.quick','package:web.recipe','profile:web.guided','skill:web.guided','package:pursuit.research','profile:pursuit.research','skill:pursuit.research','tool:recipe.find');
+DELETE FROM capability_items WHERE key IN ('toolchain:web.search','toolchain:web.research','package:web.search','package:web.quick','package:web.recipe','profile:web.guided','skill:web.guided','package:pursuit.research','profile:pursuit.research','skill:pursuit.research','tool:recipe.find');
+DELETE FROM capability_artifact_pointers WHERE artifact_id='pursuit.report';`,
+	},
+	{
+		id: "capabilities/0012-retire-older-web-packages",
+		after: ["capabilities/0011-retire-legacy-research"],
+		sql: `DELETE FROM capability_search WHERE key IN (
+	SELECT key FROM capability_items WHERE origin='builtin' AND key IN (
+		'package:web.research','package:web.lookup','package:web.read',
+		'profile:web.quick','profile:web.recipe','profile:web.research',
+		'skill:web.recipe','skill:web.research','skill:web.search','tool:web.forecast','tool:web.quote'
+	));
+DELETE FROM capability_items WHERE origin='builtin' AND key IN (
+	'package:web.research','package:web.lookup','package:web.read',
+	'profile:web.quick','profile:web.recipe','profile:web.research',
+	'skill:web.recipe','skill:web.research','skill:web.search','tool:web.forecast','tool:web.quote'
+);`,
+	},
 ];
 
 export type DocumentKind = "binding" | "artifact" | "schema";

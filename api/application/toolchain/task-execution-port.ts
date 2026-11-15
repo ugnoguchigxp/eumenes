@@ -31,7 +31,6 @@ import { taskExecutionStops } from "./task-execution-stops";
 import { reference, result, total } from "./task-execution-values";
 
 export type TaskExecutionHost = {
-	pursuit?: import("../../domains/pursuit").PursuitService;
 	webNote?: import("../../domains/web-note").WebNoteService;
 	settings?: Pick<
 		import("../../domains/settings").SettingsService,
@@ -118,34 +117,6 @@ export function sendExecutionNotice(
 		}),
 	});
 	return true;
-}
-function configurePursuit(
-	host: TaskExecutionHost,
-	port: ToolchainExecutionPort,
-) {
-	const { dialogue } = host;
-	if (host.pursuit) {
-		const pursuit = host.pursuit;
-		pursuit.configure({
-			...port,
-			deliverInTransaction(db, view, eventId) {
-				return !sendExecutionNotice(
-					{
-						dialogue,
-						agents: {
-							executions: {
-								sourceRunInTransaction: pursuit.sourceRunInTransaction,
-							},
-						},
-					},
-					db,
-					view,
-					eventId,
-					"reference",
-				);
-			},
-		});
-	}
 }
 function configureWebNote(
 	host: TaskExecutionHost,
@@ -427,7 +398,6 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		},
 	};
 	agents.executions.configure(port);
-	configurePursuit(host, port);
 	configureWebNote(host, port);
 	configureCollaboration(host, port);
 	host.browser?.setTaskExecutionSource((db, frozen) => {

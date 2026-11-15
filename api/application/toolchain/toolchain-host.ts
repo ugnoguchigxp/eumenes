@@ -153,6 +153,7 @@ export async function createHostToolchain(
 		docling?: import("../../domains/docling").DoclingService;
 		compute?: import("../../domains/compute").ComputeService;
 		model3d?: import("../../domains/model3d").Model3dService;
+		video?: import("../../domains/video").VideoService;
 		browser?: import("../browser/browser-composition").BrowserAssembly;
 		inference: InferencePort &
 			Parameters<typeof createToolchainHostLinks>[0]["inference"];
@@ -211,6 +212,7 @@ export async function createHostToolchain(
 			ocr: s.ocr,
 			docling: s.docling,
 			model3d: s.model3d,
+			video: s.video,
 			compute: s.compute,
 			browser: s.browser,
 			...links.options,

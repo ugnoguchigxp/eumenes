@@ -116,7 +116,6 @@ async function main() {
 		if (stopping) return;
 		log.info("server.ready");
 		// LARM connections begin only once the server is ready; startup never waits behind them.
-		services.inference.startRouter();
 		// Probe once so the UI reports a real result before the first message.
 		void services.inference.connect().then(
 			() =>

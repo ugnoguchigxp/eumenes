@@ -1,4 +1,8 @@
 import { spatialPreferences } from "../components/SpatialPreferences";
+import {
+	useVideoAdmission,
+	videoAdmissionMessage,
+} from "../domains/video/admission";
 import { useMemo } from "react";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
@@ -27,6 +31,7 @@ export function ConversationPanel({
 	chatHidden?: boolean;
 }) {
 	const resources = usePanelResources(client, state);
+	const admission = useVideoAdmission(client).data?.state;
 	const { panel, dragging } = usePanelFileDrop(state);
 	const {
 		replay,
@@ -101,7 +106,12 @@ export function ConversationPanel({
 					最新の発言へ ↓
 				</button>
 			)}
-			<ConversationComposer state={state} store={store} />
+			<ConversationComposer
+				state={state}
+				store={store}
+				videoNotice={videoAdmissionMessage(admission)}
+				videoBusy={admission === "active" || admission === "unconfirmed"}
+			/>
 			<ScratchViewer
 				client={client}
 				id={resources.scratch.id}

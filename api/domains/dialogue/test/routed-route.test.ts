@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
-import type { Ranked } from "eumenes_router";
-import { ROUTE_LIMITS } from "eumenes_router";
+import type { SelectionCandidate } from "eumenes_router";
 import type { RouterTraceRecord } from "../../toolchain-history";
 import type { RoutedInput } from "../service/context";
 import {
@@ -154,8 +153,7 @@ test("a description that carries the user's words stays within the router's boun
 		titles,
 	});
 	expect(candidates.length).toBeGreaterThan(8);
-	for (const c of candidates)
-		expect(c.passage.length).toBeLessThanOrEqual(ROUTE_LIMITS.description);
+	for (const c of candidates) expect(c.passage.length).toBeLessThanOrEqual(600);
 });
 
 test("a delimiter inside the user's words cannot close the context it sits in", () => {
@@ -218,46 +216,43 @@ test("only the newest six work are offered", () => {
 	]);
 });
 
-test("the trace keeps the package's ranking, the prediction set, the row, the entry and best-v2's gate", () => {
-	const ranked = (id: string, p: number): Ranked => ({
+test("the trace keeps search rank and match score without a model probability", () => {
+	const ranked = (
+		id: string,
+		searchRank: number,
+		matchScore: number,
+	): SelectionCandidate => ({
 		candidate: { id, kind: "conversation", passage: id },
-		raw: p,
-		correction: 0,
-		p,
-		score: null,
+		searchRank,
+		matchScore,
 	});
 	const made = routerTrace({
-		ranked: [ranked(IMAGE.id, 0.7), ranked(MUSIC.id, 0.25), ranked("x", 0.05)],
+		candidates: [ranked(IMAGE.id, 1, 0.7), ranked(MUSIC.id, 2, 0.25)],
 		decision: { row: 1, to: "conversation" },
-		answer: { headRevision: "head-1", model: "m" },
 		durationMs: 12,
 		error: null,
-		entry: "routeStructured",
-		gate: 0.45,
-		defer: false,
+		entry: "routeWithSelection",
 		structure: { requests: 1, parts: 1 },
 	});
 	expect(made).toMatchObject({
 		mode: "on",
-		entry: "routeStructured",
+		entry: "routeWithSelection",
 		row: 1,
 		decided: "conversation.respond",
-		set: [IMAGE.id, MUSIC.id],
-		gate: 0.45,
-		defer: false,
+		set: ["conversation.respond", IMAGE.id, MUSIC.id],
 		structure: { requests: 1, parts: 1 },
-		revision: "head-1",
+		candidates: [
+			{ id: IMAGE.id, searchRank: 1, score: 0.7, p: null },
+			{ id: MUSIC.id, searchRank: 2, score: 0.25, p: null },
+		],
 	});
 	expect(
 		routerTrace({
-			ranked: [],
+			candidates: [],
 			decision: null,
-			answer: null,
 			durationMs: 2000,
 			error: "timeout",
-			entry: "route",
-			gate: null,
-			defer: null,
+			entry: "routeWithSelection",
 			structure: null,
 		}),
 	).toMatchObject({ row: 0, decided: null, set: [], error: "timeout" });

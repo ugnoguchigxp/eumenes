@@ -71,7 +71,7 @@ test("a hand-over's search and delegation are kept with its announcement, the ne
 		{
 			// The host offered what the router ranked, for the user's words.
 			name: "find_toolchain",
-			args: { query: "猫の絵を描いて", ids: [IMAGE.id, INSTANT.id] },
+			args: { query: "猫の絵を描いて", ids: [INSTANT.id, IMAGE.id] },
 			result: JSON.stringify(FOUND),
 		},
 		{
@@ -113,7 +113,7 @@ test("a confirmation's number and a refused call are kept; the read is not", asy
 	expect(said).toContain("よろしいですか？");
 	expect(
 		kept("記憶にはありませんでした。").toolCalls.map((c) => c.name),
-	).toEqual(["find_toolchain"]);
+	).toEqual([]);
 	const calls = kept(said).toolCalls;
 	expect(calls.map((c) => c.name)).toEqual([
 		"find_toolchain",

@@ -108,7 +108,9 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				request.packageRevisionId ??
 				capabilities.activePackageRevisionInTransaction(
 					db,
-					request.kind === "history" ? "history.research" : "web.quick",
+					request.kind === "history"
+						? "history.research"
+						: "web.service-search",
 				);
 			const workerInput = {
 				question: request.question,

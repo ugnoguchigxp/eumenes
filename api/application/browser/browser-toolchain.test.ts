@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { rerankDocument } from "eumenes_router";
+import { cardPassages } from "eumenes_router";
 import { z } from "zod";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -42,7 +42,7 @@ afterEach(async () => {
 });
 
 const noRequests = { userMessageInTransaction: () => null };
-const REVISION = "toolchain:browser.capture@7";
+const REVISION = "toolchain:browser.capture@8";
 const BINDING = "binding:browser.capture@6";
 const conversation: AdapterOrigin = {
 	kind: "conversation",
@@ -202,7 +202,7 @@ test("a validated invocation reaches the adapter and starts a capture of that ta
 	await until(() => s.driver.calls.includes("measure"));
 });
 
-const OPERATE = "toolchain:browser.operate@11";
+const OPERATE = "toolchain:browser.operate@12";
 const OPERATE_BINDING = "binding:browser.operate@6";
 
 test("the active router descriptions distinguish opening a link from taking a screenshot", async () => {
@@ -212,12 +212,14 @@ test("the active router descriptions distinguish opening a link from taking a sc
 	);
 	const operate = cards.find((card) => card.id === "browser.operate")!;
 	const capture = cards.find((card) => card.id === "browser.capture")!;
-	expect(operate.revision).toBe("11");
-	expect(capture.revision).toBe("7");
-	expect(rerankDocument(operate)).toContain("このURLを開いて");
-	expect(rerankDocument(operate)).toContain("このリンクをブラウザで開いて");
-	expect(rerankDocument(capture)).toContain("スクリーンショット");
-	expect(rerankDocument(capture)).not.toContain("接続");
+	expect(operate.revision).toBe("12");
+	expect(capture.revision).toBe("8");
+	expect(cardPassages(operate).join("\n")).toContain("このURLを開いて");
+	expect(cardPassages(operate).join("\n")).toContain(
+		"このリンクをブラウザで開いて",
+	);
+	expect(cardPassages(capture).join("\n")).toContain("スクリーンショット");
+	expect(cardPassages(capture).join("\n")).not.toContain("接続");
 });
 
 test("the operate toolchain is a command toolchain that starts a single-shot task with the binding's policy", async () => {

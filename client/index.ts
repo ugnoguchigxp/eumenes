@@ -10,6 +10,7 @@ import { ocrClient } from "./ocr";
 import { objectRecognitionClient } from "./object-recognition";
 import { excalidrawClient } from "./excalidraw";
 import { imageClient } from "./image";
+import { videoClient } from "./video";
 import { musicClient } from "./music";
 import { dotsClient } from "./dots";
 import { requirementsClient } from "./requirements";
@@ -49,6 +50,7 @@ export function createClient(
 		...markdownClient(transport),
 		...computeClient(transport),
 		...musicClient(transport),
+		...videoClient(transport),
 		...imageClient(transport),
 		...objectRecognitionClient(transport),
 		...ocrClient(transport),

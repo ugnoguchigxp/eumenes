@@ -154,7 +154,7 @@ test("the search fills each kind's slots: the three closest dedicated toolchains
 		const general = active.filter((d) => d.general);
 		const dedicated = active.filter((d) => !d.general);
 		expect(general.map((d) => d.id)).toContain("web.note");
-		expect(general.find((d) => d.id === "web.search")?.selectable).toBe(false);
+		expect(general.find((d) => d.id === "web.search")).toBeUndefined();
 		expect(dedicated.length).toBeGreaterThan(3);
 		/** Saves each toolchain's passages at `similarity` to the request [1, 0]. */
 		const place = (similarity: (id: string) => number) =>

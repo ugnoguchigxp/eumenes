@@ -70,7 +70,7 @@
 		{
 			"kind": "toolchain",
 			"id": "weather.forecast",
-			"revision": 2,
+			"revision": 3,
 			"title": "天気予報",
 			"summary": "今日・明日・明後日の天気予報（天気・最高最低気温・降水確率）を、言われた地名から気象庁の予報で即答する。担当への依頼文や予告は不要で、この関数の呼び出しがそのまま回答になる。今日から3日目までの天気の依頼はWeb検索より先にこの担当を使う。3日より先・時刻ごと・現在の気温は対象外",
 			"aliases": ["天気予報"],
@@ -96,13 +96,8 @@
 				"明日は？"
 			],
 			"packageRevisionId": "package:weather.forecast@2",
-			"redirects": [
-				{
-					"when": "3日より先の予報、時刻ごとの予報、現在の気温や降水量、台風や警報の詳細を知りたい場合",
-					"toolchainId": "web.search"
-				}
-			],
-			"bindingRevisionId": "binding:weather.forecast@2",
+			"redirects": [],
+			"bindingRevisionId": "binding:weather.forecast@3",
 			"functionName": "weather_forecast"
 		}
 	],
@@ -110,7 +105,7 @@
 		{
 			"kind": "binding",
 			"id": "weather.forecast",
-			"revision": 2,
+			"revision": 3,
 			"execution": "instant",
 			"adapterRef": "adapter:weather@1",
 			"availabilityRef": "availability:weather@1",
@@ -120,8 +115,7 @@
 					"operationId": "weather.forecast",
 					"inputSchemaRef": "builtin:weatherPlace"
 				}
-			],
-			"fallbackToolchainId": "web.search"
+			]
 		}
 	],
 	"artifacts": [],

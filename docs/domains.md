@@ -17,6 +17,7 @@
 | `ocr` | 3 | `api/domains/ocr/index.ts` | `web/src/domains/ocr/` | `packages/design-system/src/components/OcrWorkspace/index.ts` | `capabilities`、`inference`、`queue`、`resources`、`larm` | `resources` | なし |
 | `object-recognition` | 1 | `api/domains/object-recognition/index.ts` | `web/src/domains/object-recognition/index.ts` | なし | `capabilities`、`queue`、`larm` | なし | なし |
 | `compute` | 1 | `api/domains/compute/index.ts` | `web/src/domains/compute/` | `packages/design-system/src/components/ComputeWorkspace/index.tsx` | `queue`、`resources` | `resources` | なし |
+| `video` | 1 | `api/domains/video/index.ts` | `web/src/domains/video/` | `packages/design-system/src/components/VideoWorkspace/index.ts` | `larm`、`queue` | なし | なし |
 | `model3d` | 1 | `api/domains/model3d/index.ts` | `web/src/domains/model3d/` | `packages/design-system/src/components/Model3dWorkspace/index.ts` | `larm`、`queue`、`resources` | `resources` | なし |
 | `browser` | 1 | `api/domains/browser/index.ts` | `web/src/domains/browser/` | `packages/design-system/src/components/BrowserWorkspace/index.ts` | `queue`、`resources` | `resources` | なし |
 | `kanban` | 1 | `api/domains/kanban/index.ts` | `web/src/domains/kanban/index.ts` | なし | `capabilities`、`resources` | `resources` | なし |
@@ -61,7 +62,7 @@
 | `queue` | 0 | `api/domains/queue/index.ts` | なし | なし | なし | なし | なし |
 | `scheduler` | 1 | `api/domains/scheduler/index.ts` | `web/src/domains/scheduler/` | なし | `queue` | なし | なし |
 | `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | `resources` | なし |
-| `pursuit` | 3 | `api/domains/pursuit/index.ts` | なし | なし | `capabilities`、`inference`、`queue`、`resources`、`tool-runtime` | なし | なし |
+| `pursuit` | 3 | `api/domains/pursuit/index.ts` | なし | なし | `capabilities`、`resources`、`tool-runtime` | なし | なし |
 | `web-note` | 3 | `api/domains/web-note/index.ts` | なし | なし | `capabilities`、`queue`、`tool-runtime` | なし | なし |
 | `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`continuity`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`resources`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `goals` |
 | `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference` | `audio`、`avatar`、`dialogue`、`settings` | なし |

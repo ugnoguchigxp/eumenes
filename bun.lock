@@ -21,11 +21,10 @@
         "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.4-30721f30aa19.tgz",
         "eumenes-memory-host": "file:vendor/eumenes-memory-host/eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz",
         "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
-        "eumenes-pursuit": "file:vendor/pursuit/eumenes-pursuit-0.0.7-625925edf98c.tgz",
         "eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-c907cb70a230.tgz",
         "eumenes-steer": "file:vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
         "eumenes-world-model": "file:vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz",
-        "eumenes_router": "file:vendor/router/eumenes_router-0.0.2-bf0219868c31.tgz",
+        "eumenes_router": "file:vendor/router/eumenes_router-0.0.3-5167c9f6fe48.tgz",
         "google-auth-library": "11.1.0",
         "hono": "4.12.34",
         "llm-fetch": "file:vendor/llm-fetch/llm-fetch-0.1.4-eumenes.1.tgz",
@@ -1484,7 +1483,6 @@
 
     "eumenes-pipeline": ["eumenes-pipeline@vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz", { "dependencies": { "zod": "4.6.7" } }, "sha512-aqEYhMhMv0oNEztE797S6UJzvYU02Rpf1cS5LBxJNWLMk9LnlmsKmkAw8dpzSbgW5Z05rFJcHKq//nHWz42skg=="],
 
-    "eumenes-pursuit": ["eumenes-pursuit@vendor/pursuit/eumenes-pursuit-0.0.7-625925edf98c.tgz", { "dependencies": { "zod": "4.6.6" } }, "sha512-DzFNzhUWJrDqY380gInFQYypARBO61HZBz62NSp0N3pJuJO8f7qJhbCjT1M876gcnJcAgg4xIYyWphzmhwq78g=="],
 
     "eumenes-skill-smith": ["eumenes-skill-smith@vendor/skill-smith/eumenes-skill-smith-0.1.0-c907cb70a230.tgz", { "dependencies": { "mdast-util-from-markdown": "2.0.2", "zod": "4.6.6" } }, "sha512-fGUFl27vgEHcA/wjcWgHmcsg5k2vKOEOx0cW5k53dKv8oll39BIyNlc5SbJZKF8bA36Y9hjj3OXKKbBUe/2hSg=="],
 
@@ -1492,7 +1490,7 @@
 
     "eumenes-world-model": ["eumenes-world-model@vendor/world/eumenes-world-model-0.0.1-2cbdf5a5b960.tgz", {}, "sha512-FDhxfk81KyuIKcgTHDyuX9SrYaOhKZa1aL0dkkwEausKzm1gRVCsLPNGfloiPoQUEtOc0rMvEr5LJVoWN3W6Hw=="],
 
-    "eumenes_router": ["eumenes_router@vendor/router/eumenes_router-0.0.2-bf0219868c31.tgz", {}, "sha512-+or3VV+K4DnTasGMxnT/iCZQjYYAn9NlGnHWZAGsPo2c2E2r7cDxyCYP7kMJOhuHjS5b7EuHYwXXZaQzvLErrg=="],
+    "eumenes_router": ["eumenes_router@vendor/router/eumenes_router-0.0.3-5167c9f6fe48.tgz", {}, "sha512-koBzJp0kFpRKbgAxQ6Q84h3RuM96qtsgeVJAc8fdqeJcMoGVhoUYPzNaNxjkkw7XOdXq5OMeKqrttH4tRkbW9w=="],
 
     "eventemitter3": ["eventemitter3@5.0.4", "", {}, "sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw=="],
 
@@ -2566,7 +2564,6 @@
 
     "eumenes-pipeline/zod": ["zod@4.6.7", "", {}, "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="],
 
-    "eumenes-pursuit/zod": ["zod@4.6.6", "", {}, "sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA=="],
 
     "eumenes-skill-smith/zod": ["zod@4.6.6", "", {}, "sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA=="],
 

@@ -1,4 +1,5 @@
 import { getLogger } from "../../../infrastructure/logger";
+import { checkRefusal } from "./resend";
 import type { Fetcher } from "./profiles";
 
 const log = getLogger("larm");
@@ -52,6 +53,7 @@ export function createControl({
 						]),
 		});
 		if (accepted && !accepted.includes(response.status)) {
+			if (response.status === 409) await checkRefusal(response, path, false);
 			log.warn("larm.control_rejected", {
 				route: path
 					.split("?")[0]!

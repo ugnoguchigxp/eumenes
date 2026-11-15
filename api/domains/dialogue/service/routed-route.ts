@@ -2,9 +2,8 @@ import {
 	CONVERSATION_ID,
 	DISCARD_ID,
 	MEMORY_ID,
-	predictionSet,
-	type FallbackDecision,
-	type Ranked,
+	type RouteDecision as PackageDecision,
+	type SelectionCandidate,
 } from "eumenes_router";
 import type { ToolchainCard } from "../../capabilities";
 import type { InferencePort } from "../../inference";
@@ -15,12 +14,7 @@ import type { RoutedInput } from "./context";
 import { lineText } from "./input-text";
 import type { ChoiceCandidate } from "./routed-choice";
 
-/**
- * The host's side of the router (spec router-package-integration 2026-11-04): the candidates only the host can make
- * (its work, its open confirmations and questions, a redirect of the work just handed over), the candidates it carries
- * out, and the trace of a turn. The eumenes_router package searches the toolchains, scores every candidate and decides
- * by the decision table; every word of a candidate's description here is a SystemContext of the dialogue domain.
- */
+/** Host-only operations, admitted toolchains, and the trace of the router's decision. */
 export type RouterSettings = ReturnType<
 	NonNullable<InferencePort["snapshotInTransaction"]>
 >["router"];
@@ -142,7 +136,10 @@ export function dynamicCandidates(input: {
 				kind: "work",
 				todo: `t${todo.ref}`,
 				operation,
-				title: todo.title,
+				title:
+					operation === "cancel"
+						? short(todo.request ?? todo.title, CONTROL_TITLE_CHARS)
+						: todo.title,
 				passage: context(WORK[operation], {
 					title: short(
 						operation === "cancel" ? (todo.request ?? todo.title) : todo.title,
@@ -247,8 +244,8 @@ function redirects(
 /** What the turn does (the decision table's row the case belongs to), with the candidates the host carries out. */
 export type Announce = "fixed" | "try" | "partial" | "none";
 export type RouteDecision =
-	| { row: 1 | 7 | 8; to: "conversation" }
-	| Extract<FallbackDecision, { to: "unresolved" }>
+	| { row: 1; to: "conversation" }
+	| Extract<PackageDecision, { to: "unresolved" }>
 	| {
 			row: 9;
 			to: "pipeline";
@@ -256,22 +253,18 @@ export type RouteDecision =
 			steps: readonly RoutedPipelineStep[];
 	  }
 	| { row: 8; to: "clarify"; question: string; unhandled: readonly string[] }
-	| { row: 8; to: "ask"; options: [RouteCandidate, RouteCandidate] }
 	| {
-			row: 2 | 3 | 4 | 5 | 6 | 9;
+			row: 2 | 4 | 5 | 6;
 			to: "run";
 			candidate: RouteCandidate;
 			announce: Announce;
-	  }
-	/** Not sure enough to do it (a yes, a cancellation): the host asks once more instead. */
-	| { row: 5 | 6; to: "again"; candidate: RouteCandidate };
+	  };
 
 /** The id a decision lands on, as the trace keeps it. */
 export function decidedId(decision: RouteDecision): string | null {
 	switch (decision.to) {
 		case "conversation":
 			return CONVERSATION_ID;
-		case "ask":
 		case "clarify":
 		case "unresolved":
 			return null;
@@ -282,24 +275,16 @@ export function decidedId(decision: RouteDecision): string | null {
 
 /** What the log names of a decision: its kind, never the words. */
 export function decidedKind(decision: RouteDecision): string {
-	return decision.to === "run" || decision.to === "again"
-		? decision.candidate.kind
-		: decision.to;
+	return decision.to === "run" ? decision.candidate.kind : decision.to;
 }
 
 /** The trace of one routed turn: what was offered, the probabilities, what was decided, and how the package routed. */
 export function routerTrace(input: {
-	/** The package's ranking of the text the decision came from (the whole utterance, or its request part). */
-	ranked: readonly Ranked[];
+	candidates: readonly SelectionCandidate[];
 	decision: RouteDecision | null;
-	answer: { headRevision: string | null; model: string } | null;
 	durationMs: number;
 	error: string | null;
 	entry: NonNullable<RouterTrace["entry"]>;
-	/** best-v2's top-two gap and whether it was too small to be sure. */
-	gate: number | null;
-	defer: boolean | null;
-	/** The structure model's requests and the parts routed (`routeStructured`); null when it gave no structure. */
 	structure: RouterTrace["structure"];
 	/** The id the trace keeps as decided, when it is not the decision's own (a redirect that was carried out). */
 	decided?: string | null;
@@ -309,24 +294,31 @@ export function routerTrace(input: {
 	return {
 		mode: "on",
 		entry: input.entry,
-		revision: input.answer?.headRevision ?? null,
-		model: input.answer?.model ?? null,
-		candidates: input.ranked.map((r) => ({
-			id: r.candidate.id,
-			kind: r.candidate.kind,
-			raw: r.raw,
-			correction: r.correction,
-			p: r.p,
-			score: r.score,
-		})),
-		set: input.set
-			? input.set
-			: !input.decision
-				? []
-				: input.decision.to === "ask"
-					? // The two the user is asked to choose between: the answer is one of them.
-						input.decision.options.map((o) => o.id)
-					: predictionSet(input.ranked),
+		revision: null,
+		model: null,
+		candidates: input.candidates.map(
+			({ candidate, searchRank, matchScore }) => ({
+				id: candidate.id,
+				kind: candidate.kind,
+				raw: null,
+				correction: null,
+				p: null,
+				score: matchScore,
+				searchRank,
+			}),
+		),
+		set:
+			input.set ??
+			(input.decision
+				? [
+						...new Set(
+							[
+								decidedId(input.decision),
+								...input.candidates.map(({ candidate }) => candidate.id),
+							].filter((id): id is string => id !== null),
+						),
+					].slice(0, 3)
+				: []),
 		row: input.decision?.row ?? 0,
 		decided:
 			input.decided !== undefined
@@ -334,8 +326,6 @@ export function routerTrace(input: {
 				: input.decision
 					? decidedId(input.decision)
 					: null,
-		gate: input.gate,
-		defer: input.defer,
 		structure: input.structure,
 		durationMs: input.durationMs,
 		error: input.error,

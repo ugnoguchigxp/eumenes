@@ -1,6 +1,6 @@
 import type { TestInput } from "../contracts/playground";
 import { code, json, post } from "./playground-http";
-import { capacityRefusal } from "./resend";
+import { capacityRefusal, onDemandRefusal } from "./resend";
 
 /**
  * The image POST is sent once; a capacity refusal is thrown for the owning domain to send it again
@@ -38,12 +38,9 @@ export async function generateImageRequest(
 			try {
 				failure = await json(response);
 			} catch {}
-			const busy = capacityRefusal(
-				response.status,
-				failure,
-				response.headers,
-				endpoint,
-			);
+			const busy =
+				onDemandRefusal(response.status, failure) ??
+				capacityRefusal(response.status, failure, response.headers, endpoint);
 			if (busy) throw busy;
 			const error = failure.error;
 			const errorCode =

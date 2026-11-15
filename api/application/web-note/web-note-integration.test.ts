@@ -18,7 +18,6 @@ test("a single lookup from the conversation is handed to the web note task, neve
 	const offered: string[] = [];
 	const prompts: string[] = [];
 	const h = await harness({
-		withdrawnWebSearch: true,
 		webNote: {
 			turn: async (call) => {
 				prompts.push(call.prompt);

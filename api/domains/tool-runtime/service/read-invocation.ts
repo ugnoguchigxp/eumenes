@@ -168,8 +168,7 @@ export function createReadInvocation({
 		const isLocal =
 			localKind === "saved_read" ||
 			localKind === "history" ||
-			localKind === "world" ||
-			localKind === "recipe";
+			localKind === "world";
 		const previous = db
 			.query(
 				`SELECT * FROM tool_invocations WHERE owner_task_id=? AND tool_revision_id=? AND args_digest=?${hasSupersededColumn(db) ? " AND superseded=0" : ""} ORDER BY finished_at DESC LIMIT 1`,

@@ -34,12 +34,12 @@ import {
 
 const URL_A = "https://weather.example.com/kamakura";
 const base = { revision: 1, aliases: [], tags: [], useWhen: [], avoidWhen: [] };
-/** The research package of the archived-route tests: current Web tools under the report contract of a search. */
-const archivedWebPackage = (): Definition[] => [
+/** Fixed tools for isolated report and batch execution tests. */
+const webPackage = (batch: boolean): Definition[] => [
 	{
 		...base,
 		kind: "profile",
-		id: "web.quick",
+		id: "fixture.web",
 		title: "簡単なWeb確認の担当",
 		summary: "語句や短い最新情報を確認する",
 		dependencies: [],
@@ -48,7 +48,7 @@ const archivedWebPackage = (): Definition[] => [
 	{
 		...base,
 		kind: "skill",
-		id: "web.search",
+		id: "fixture.web",
 		title: "検索結果の返却",
 		summary: "依頼に必要な公開情報と出典を速やかに返す",
 		dependencies: [],
@@ -58,21 +58,21 @@ const archivedWebPackage = (): Definition[] => [
 		...base,
 		revision: 2,
 		kind: "package",
-		id: "web.quick",
-		title: "簡単なWeb確認",
+		id: batch ? "fixture.web" : "world.query",
+		title: "テスト用の公開情報確認",
 		summary: "語句や短い最新情報の検索とページ取得",
 		useWhen: ["語句確認や短い最新情報の確認"],
 		avoidWhen: ["長文調査", "複数資料の整理・比較"],
 		backend: "web",
-		schemaKey: "research",
+		schemaKey: batch ? "guidedResearch" : "research",
 		dependencies: [
-			"profile:web.quick@1",
-			"skill:web.search@1",
+			"profile:fixture.web@1",
+			"skill:fixture.web@1",
 			"tool:web.lookup@2",
 			"tool:web.read@1",
 		],
-		profileRevisionId: "profile:web.quick@1",
-		requiredSkillRevisionIds: ["skill:web.search@1"],
+		profileRevisionId: "profile:fixture.web@1",
+		requiredSkillRevisionIds: ["skill:fixture.web@1"],
 		toolRevisionIds: ["tool:web.lookup@2", "tool:web.read@1"],
 	},
 ];
@@ -134,9 +134,9 @@ export async function harness(
 			))
 				caps.registerBuiltinInTransaction(db, d);
 		});
-	if (!guided)
+	if (!serviceSearch)
 		await store.write((db) => {
-			for (const d of archivedWebPackage())
+			for (const d of webPackage(guided))
 				caps.registerBuiltinInTransaction(db, d);
 		});
 	const queue = createQueue(store);
@@ -254,7 +254,17 @@ export async function harness(
 		store.write((db) =>
 			agents.startInTransaction(db, {
 				rootRunId: runId,
-				input: { kind, question },
+				input: {
+					kind,
+					question,
+					...(kind === "web" && !serviceSearch
+						? {
+								packageRevisionId: guided
+									? "package:fixture.web@2"
+									: "package:world.query@2",
+							}
+						: {}),
+				},
 				deadline: Date.now() + 120_000,
 			}),
 		);
@@ -314,13 +324,11 @@ export async function harness(
 		) as { contract_json: string } | null;
 		const t = task(taskId),
 			data = {
-				reportMode: [
-					"package:web.quick@2",
-					"package:web.recipe@1",
-					"package:web.search@1",
-				].includes(t.package_revision_id ?? "")
-					? "search"
-					: undefined,
+				reportMode: guided
+					? "guided-web"
+					: t.package_revision_id === "package:world.query@2"
+						? "search"
+						: undefined,
 				task: JSON.parse(t.input_json!),
 				originalRequest:
 					JSON.parse(t.input_json!).originalRequest ??

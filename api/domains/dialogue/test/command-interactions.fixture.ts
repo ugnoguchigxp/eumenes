@@ -15,9 +15,8 @@ import { COMMAND_KIND, type ChatMessage } from "../service/context";
 import type { RouteInput } from "../../inference/contracts";
 import {
 	FIXTURE_ROUTER,
-	ROUTER_MODEL,
 	ROUTER_SPACE,
-	routeBySteps,
+	selectionBySteps,
 	routerCards,
 } from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
@@ -143,7 +142,8 @@ export async function setup(
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		// The router decides every utterance turn: its context judgment reads the scripted steps.
-		route: routeBySteps(state.steps, state.routerAsked),
+		routerSelectionAvailable: () => true,
+		selectRouter: selectionBySteps(state.steps, state.routerAsked),
 		snapshotInTransaction: () => ({
 			general: { agentName: "", userName: "", persona: "butler" },
 			router: FIXTURE_ROUTER,
@@ -325,9 +325,18 @@ export async function setup(
 			space: ROUTER_SPACE,
 			vectors: texts.map(() => [1, 0]),
 		}),
-		routerCardsInTransaction: () => routerCards([current()]),
+		routerCardsInTransaction: () =>
+			routerCards([
+				current(),
+				{
+					...current(),
+					id: "research.web",
+					revisionId: "toolchain:research.web@1",
+					title: "調べもの",
+					execution: "research",
+				},
+			]),
 		routerLexicalInTransaction: () => new Map(),
-		routerModelInTransaction: () => ROUTER_MODEL,
 		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
 			new Map(ids.includes(card.id) ? [[card.id, card.title]] : []),
 		routeInTransaction: (

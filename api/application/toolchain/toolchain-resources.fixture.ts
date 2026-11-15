@@ -16,7 +16,7 @@ export function fixtureResources(
 	music: unknown,
 ) {
 	const resources =
-		options.pursuit || options.resources
+		options.resources
 			? createResourceAccess({
 					store,
 					kinds: () =>

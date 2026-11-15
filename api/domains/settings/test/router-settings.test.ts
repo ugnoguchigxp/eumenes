@@ -4,29 +4,18 @@ import { registerSettings } from "..";
 import { settingsSchema } from "../contracts";
 import { cleanup, setup } from "./settings.fixture";
 
-/**
- * The router's settings (spec router-package-integration 2026-11-04 §3): no profile until saved, the package's
- * `route` entry, changed on their own without touching the speaking-attitude judge's settings.
- */
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
 
 const defaults = {
-	entry: "route" as const,
 	structureResourceId: null,
 	structureTimeoutMs: 8000,
-	timeoutMs: 2000,
-	accept: 0.6,
-	low: 0.3,
-	margin: 0.15,
-	approve: 0.85,
-	multi: 0.5,
 	feedbackNear: 0.95,
 	feedbackWeight: 2,
 };
 
-test("the router starts without a profile, and an older document reads the same", async () => {
+test("the router has defaults and older documents without router settings read the same", async () => {
 	const h = await setup();
 	expect(h.settings.get().router).toEqual(defaults);
 	const older = structuredClone(h.settings.get()) as Record<string, unknown>;
@@ -40,29 +29,18 @@ test("a change of the router's settings moves the revision, notifies once and le
 	let changed = 0;
 	h.settings.onChange(() => changed++);
 	expect(
-		await h.settings.configureRouter({
-			profile: "router-p",
-			entry: "routeStructured",
-		}),
-	).toEqual({
-		...defaults,
-		profile: "router-p",
-		entry: "routeStructured",
-	});
+		await h.settings.configureRouter({ structureTimeoutMs: 3500 }),
+	).toEqual({ ...defaults, structureTimeoutMs: 3500 });
 	const after = h.settings.get();
 	expect(after.revision).toBe(before.revision + 1);
 	expect(after.larm).toEqual(before.larm);
 	expect(changed).toBe(1);
-	await h.settings.configureRouter({ accept: 0.7, feedbackWeight: 0 });
+	await h.settings.configureRouter({ feedbackWeight: 0 });
 	expect(h.settings.get().router).toEqual({
 		...defaults,
-		profile: "router-p",
-		entry: "routeStructured",
-		accept: 0.7,
+		structureTimeoutMs: 3500,
 		feedbackWeight: 0,
 	});
-	await h.settings.configureRouter({ profile: null });
-	expect(h.settings.get().router.profile).toBeUndefined();
 });
 
 test("an unknown mode, a field out of range or an unknown field is refused and changes nothing", async () => {
@@ -70,7 +48,6 @@ test("an unknown mode, a field out of range or an unknown field is refused and c
 	const before = h.settings.get();
 	for (const input of [
 		{ mode: "legacy" },
-		// The router has no mode: it decides every utterance turn (a saved one is dropped at startup).
 		{ mode: "on" },
 		{ entry: "direct" },
 		{ structureTimeoutMs: 500 },
@@ -85,7 +62,6 @@ test("an unknown mode, a field out of range or an unknown field is refused and c
 		{ profile: "" },
 		{ threshold: 0.5 },
 		"on",
-		// The lines keep their order (low ≤ accept ≤ approve), alone or with the saved ones.
 		{ approve: 0.5 },
 		{ low: 0.7 },
 		{ accept: 0.2, low: 0.3 },
@@ -107,18 +83,38 @@ test("the API reads and changes the router's settings", async () => {
 	expect(await read.json()).toEqual(defaults);
 	const patch = await app.request("/api/settings/router", {
 		method: "PATCH",
-		body: JSON.stringify({ timeoutMs: 800, profile: "router-p" }),
+		body: JSON.stringify({ structureTimeoutMs: 1200, feedbackNear: 0.9 }),
 	});
 	expect(patch.status).toBe(200);
 	expect(await patch.json()).toMatchObject({
-		timeoutMs: 800,
-		profile: "router-p",
+		structureTimeoutMs: 1200,
+		feedbackNear: 0.9,
 	});
-	expect(h.settings.get().router.profile).toBe("router-p");
+	expect(h.settings.get().router.feedbackNear).toBe(0.9);
 	const invalid = await app.request("/api/settings/router", {
 		method: "PATCH",
 		body: "not json",
 	});
 	expect(invalid.status).toBe(400);
 	expect(await invalid.json()).toEqual({ error: "invalid_router_settings" });
+});
+
+test("persisted settings keep decision and feedback settings when the reranker fields are retired", async () => {
+	const h = await setup();
+	const old = {
+		...h.settings.get(),
+		router: {
+			...defaults,
+			entry: "routeStructured",
+			profile: "previous",
+			accept: 0.7,
+			feedbackNear: 0.85,
+		},
+	};
+	await h.store.write((db) =>
+		db
+			.query("UPDATE settings_document SET document=? WHERE id=1")
+			.run(JSON.stringify(old)),
+	);
+	expect(h.settings.get().router).toEqual({ ...defaults, feedbackNear: 0.85 });
 });

@@ -115,16 +115,12 @@ export function askRouterClarification(
 	);
 }
 
-export async function routerUnperformed(
-	turn: Turn,
-	structuredEntry: boolean,
-): Promise<Step> {
+export function routerUnperformed(turn: Turn): Step {
 	const notice = systemContext(
 		"dialogue.contexts.local.router-unperformed",
 		{},
 	);
-	if (structuredEntry) turn.speak(notice);
-	else await turn.talk(notice, { tools: false });
+	turn.speak(notice);
 	return "done";
 }
 

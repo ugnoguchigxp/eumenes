@@ -5,7 +5,6 @@ import type { Task } from "../contracts";
 import type { EvidenceCatalog } from "./evidence-catalog";
 import type { GuidedReport } from "./guided-contract";
 import { owner } from "./runtime-context";
-import type { SearchReportHook } from "./runtime-context";
 import { parentProjection, verifyReport } from "./verify-report";
 
 /** Completion is a response judgement; certainty is retained per requested fact. */
@@ -16,7 +15,6 @@ export function saveGuidedReport(
 	catalog: EvidenceCatalog,
 	tools: ToolRuntime,
 	now: number,
-	accepted: { hook?: SearchReportHook; packageId?: string } = {},
 ) {
 	const candidateResults = catalog.candidates.results(raw.candidateRefs ?? []);
 	const claims = raw.claims
@@ -96,11 +94,4 @@ export function saveGuidedReport(
 		JSON.stringify(projection),
 		hash(projection),
 	);
-	accepted.hook?.(db, {
-		taskId: task.id,
-		rootRunId: task.root_run_id,
-		packageId: accepted.packageId ?? "",
-		report,
-		recipe: raw.recipe,
-	});
 }

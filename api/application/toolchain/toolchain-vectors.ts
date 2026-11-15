@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { BestV2Memory, Card } from "eumenes_router";
+import type { Card } from "eumenes_router";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import { getLogger } from "../../infrastructure/logger";
 import type { Capabilities, VectorSpace } from "../../domains/capabilities";
@@ -18,7 +18,7 @@ const QUERY_TIMEOUT_MS = 2500;
 const PASSAGE_TIMEOUT_MS = 30_000;
 
 /**
- * Background embedding of toolchain passages and saved procedure signatures, and the
+ * Background embedding of toolchain passages, and the
  * per-request query embedding. Vectors are stored with their space; a provider change makes
  * old vectors unused until they are recomputed. Failures never block a conversation.
  */
@@ -82,19 +82,6 @@ export function createVectorRefresh(
 				),
 			);
 		}
-		const recipes = store.read((db) =>
-			history.pendingRecipeVectorsInTransaction(db, space),
-		);
-		if (recipes.length) {
-			const r = await passages(recipes.map((t) => t.text));
-			await store.write((db) =>
-				history.saveRecipeVectorsInTransaction(
-					db,
-					r.space,
-					recipes.map((t, i) => ({ ...t, vector: r.vectors[i]! })),
-				),
-			);
-		}
 		// The router package's cards, and the vectors of their passages it misses in this space.
 		const cards = routerCards ? store.read((db) => routerCards(db)) : [];
 		const pending = cards.length
@@ -112,9 +99,9 @@ export function createVectorRefresh(
 				),
 			);
 		}
-		if (toolchains.length || recipes.length || pending.length)
+		if (toolchains.length || pending.length)
 			log.info("toolchain.vectors_refreshed", {
-				count: toolchains.length + recipes.length + pending.length,
+				count: toolchains.length + pending.length,
 			});
 	}
 	function refresh() {
@@ -138,20 +125,6 @@ export function createVectorRefresh(
 				"passage",
 				AbortSignal.any([signal, AbortSignal.timeout(QUERY_TIMEOUT_MS)]),
 			);
-		},
-		/** Stores best-v2's memory in the provider's current space (the host brings it: it is not in Git). */
-		async importRouterMemory(memory: BestV2Memory) {
-			if (!embed) throw new Error("embedding_unavailable");
-			const { space } = await embed(
-				["toolchain"],
-				"passage",
-				AbortSignal.timeout(PASSAGE_TIMEOUT_MS),
-			);
-			const count = await store.write((db) =>
-				history.importRouterMemoryInTransaction(db, memory, space),
-			);
-			void refresh();
-			return { count, source: memory.source };
 		},
 		/** Passages embedded now, for a trial of a draft that is not in the index (undefined without a provider). */
 		async embedPassages(texts: string[]) {

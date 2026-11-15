@@ -1,3 +1,4 @@
+import { createConversationLookup } from "../domains/web-note";
 import { createSteeringInbox } from "eumenes-steer";
 import {
 	configuredContextStill,
@@ -26,6 +27,7 @@ import { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
 import { createSchedulerDiagnostics } from "./scheduler/scheduler-diagnostics";
 import { configureTaskExecution } from "./toolchain/task-execution-port";
+import { forgetPursuitReports } from "../domains/pursuit";
 import { toolchainForgetPurge } from "./toolchain/toolchain-forget";
 import { createSearchCheck } from "./toolchain/toolchain-search-check";
 import { taskMediaPorts } from "./toolchain/task-media-execution";
@@ -47,7 +49,7 @@ import {
 } from "../domains/monitoring";
 import { buildCore, buildWebResearch } from "./server-core";
 import { buildCompute } from "./compute/compute-composition";
-import { buildMedia, buildModel3d } from "./server-media";
+import { buildVideo, buildMedia, buildModel3d } from "./server-media";
 import { buildTasks } from "./server-tasks";
 import { assembleCuration } from "./server-world";
 import { createTimerAnnouncements } from "./timers/timer-announcements";
@@ -190,6 +192,7 @@ export async function buildServices(
 		capabilities: () => ocrCapabilities,
 	});
 	const model3d = buildModel3d(config, { core, conversation });
+	const video = buildVideo(config, core);
 	const compute = buildCompute(config, {
 		core,
 		conversation,
@@ -224,6 +227,11 @@ export async function buildServices(
 				jobs: createCanvasJobs(queue, canvasRuntime, store, conversation),
 			}
 		: undefined;
+	const webNote = createCodexWebNote(
+		config.env,
+		config.researchCodexExecutable,
+		inference,
+	);
 	const { toolchain, links } = await createHostToolchain({
 		resources: lateResources,
 		canvasAdapter:
@@ -245,6 +253,7 @@ export async function buildServices(
 		markdown,
 		ocr,
 		model3d,
+		video,
 		compute,
 		browser,
 		inference,
@@ -266,11 +275,7 @@ export async function buildServices(
 		log,
 		history: config.historyToolsEnabled,
 		webResearchEnabled: config.webResearchToolsEnabled,
-		webNote: createCodexWebNote(
-			config.env,
-			config.researchCodexExecutable,
-			inference,
-		),
+		webNote,
 		embed: embedder,
 		terminalHooks: {
 			baseUrl: `http://${config.host}:${config.port}`,
@@ -313,7 +318,7 @@ export async function buildServices(
 		: undefined;
 	const liveBridge = createLiveBridge();
 	// One steering inbox per server (eumenes-steer): words the user sends while a reply is written reach that
-	// reply's next model call. The agency opens one target per reply; dialogue and pursuit may share it later.
+	// reply's next model call. The agency opens one target per reply.
 	const steering = createSteeringInbox({ now: Date.now });
 	let agencyExecution: ToolchainExecutionPort | undefined;
 	// The agency's research notes are documents of the Markdown domain, as a research report is.
@@ -353,6 +358,7 @@ export async function buildServices(
 		resources: resources.dialogue,
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
+		lookup: createConversationLookup(webNote),
 		logFile: () => config.logFile,
 		// The context keeper is off for now (2026-10-29 user instruction, the review fixes design C5): no State of its
 		// own reaches the input, and the recent conversation is cut by the host's fixed rules alone.
@@ -395,7 +401,6 @@ export async function buildServices(
 		agencyExecution = configureTaskExecution({
 			settings,
 			...workflowPorts,
-			pursuit: toolchain.pursuit,
 			webNote: toolchain.webNote,
 			collaboration: toolchain.collaboration,
 			interact: browser.interact,
@@ -423,6 +428,15 @@ export async function buildServices(
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
 	memory.registerForgetPurge(toolchainForgetPurge(toolchain));
+	memory.registerForgetPurge((db, purge) => {
+		forgetPursuitReports(
+			db,
+			purge.messageIds,
+			Date.now(),
+			(id) => webResearch.forgetInTransaction(db, id),
+			(id) => dialogue.revokeExecutionNoticeInTransaction(db, id),
+		);
+	});
 	const audioDeps = {
 		...core,
 		conversation,
@@ -487,6 +501,7 @@ export async function buildServices(
 		objectRecognition: media.objectRecognition,
 		ocr,
 		model3d,
+		video,
 		compute,
 		browser,
 		music: media.music,

@@ -15,17 +15,13 @@ import {
 	searchAction,
 } from "./research-contract";
 import { guidedActionFor, guidedWeb } from "./guided-contract";
-import { returnsSearchResults, isQuickWeb } from "./exploration";
+import { returnsSearchResults } from "./exploration";
 export type WorkerTool = {
 	executionRef: string;
 	replayOnly?: boolean;
 	tool: { id: string; schemaKey?: SchemaKey; summary?: string };
 };
 const searchPolicy = systemContext("agent-runtime.contexts.search.policy", {});
-const quickSearchPolicy = systemContext(
-	"agent-runtime.contexts.quick-search.policy",
-	{},
-);
 /** L1: shared by every route except the guided one, and never replaced by a route policy. */
 export const commonRules = systemContext(
 	"agent-runtime.contexts.worker-control.common-rules",
@@ -114,9 +110,7 @@ export function createWorkerControl(
 	const routePolicy = ownSet
 		? dependencies.map((d) => d.body!.trim()).join("\n\n")
 		: search
-			? isQuickWeb(prepared)
-				? quickSearchPolicy
-				: searchPolicy
+			? searchPolicy
 			: researchPolicy;
 	const outputSchema = z.toJSONSchema(
 		guided

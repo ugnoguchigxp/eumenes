@@ -7,7 +7,7 @@ import { fixture, NOTE_TEXT } from "./web-note.fixture";
 
 /** The agency researcher's instructions (the benchmark's `instructions`), with the day filled in. */
 const INSTRUCTIONS = [
-	"あなたは調べもの担当（web_research）です。利用者のパーソナルエージェントに頼まれたことを、Web検索で調べます。今日は2026年11月11日(水)です。",
+	"あなたは調査メモの担当です。利用者のパーソナルエージェントに頼まれたことを、Web検索で調べます。今日は2026年11月11日(水)です。",
 	"結論を日本語の Markdown メモにまとめ、次の形だけで返します。",
 	"1行目: 題: <内容が分かる短い題>",
 	"2行目: 要約: <メモの結論を1〜2文>",

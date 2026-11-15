@@ -72,18 +72,14 @@ test("a reply that agreed to make something finds the toolchain and hands it the
 					title: IMAGE.title,
 					summary: IMAGE.summary,
 					useWhen: IMAGE.useWhen,
-				},
-				{
-					id: INSTANT.id,
-					title: INSTANT.title,
-					summary: INSTANT.summary,
-					useWhen: INSTANT.useWhen,
+					searchRank: expect.any(Number),
+					matchScore: expect.any(Number),
 				},
 			],
 		},
 	]);
-	// A search of the host's own, not the router's offer.
-	expect(h.state.searchSlots.at(-1)).toBeUndefined();
+	// The host pins exactly the candidate selected in tools-only mode.
+	expect(h.state.searchSlots.at(-1)).toEqual([IMAGE.id]);
 	expect(h.todos().map((todo) => todo.title)).toEqual([
 		"夕暮れの猫の絵を描いてください",
 	]);
@@ -174,16 +170,7 @@ test("a pipeline is the router's to plan: the search does not show it, and it ca
 	);
 	await h.say("お願い");
 	expect(toolResults(h.state.calls.at(-1)!)).toEqual([
-		{
-			candidates: [
-				{
-					id: IMAGE.id,
-					title: IMAGE.title,
-					summary: IMAGE.summary,
-					useWhen: IMAGE.useWhen,
-				},
-			],
-		},
+		{ candidates: [], code: "no_candidate" },
 		{ delegated: false, code: "unknown_toolchain" },
 	]);
 	expect(h.todos()).toHaveLength(0);
@@ -237,4 +224,41 @@ test("an agent whose reply does not hand work over is offered neither tool, and 
 	).toContain("invalid_tool_call");
 	// The router's own offer is the only search of the turn.
 	expect(h.state.searchSlots.every((ids) => ids !== undefined)).toBe(true);
+});
+
+test("the conversation can look up current information and read the cited evidence before replying", async () => {
+	const seen: string[] = [];
+	h = await setup({
+		async lookup(query, signal) {
+			signal.throwIfAborted();
+			seen.push(query);
+			return {
+				text: "東京地方は雨です。",
+				sources: [{ url: "https://www.jma.go.jp/", title: "気象庁" }],
+			};
+		},
+	});
+	h.state.steps.push(
+		choice({ choice: "none" }),
+		{
+			calls: [
+				{
+					name: "lookup_public_information",
+					args: { query: "東京地方の11月15日の予報" },
+				},
+			],
+		},
+		{ text: "11月15日の東京地方は雨です。[別サイト](https://example.org/)" },
+	);
+	const run = await h.say("11月15日の東京の天気は？");
+	expect(seen).toEqual(["東京地方の11月15日の予報"]);
+	expect(toolResults(h.state.calls.at(-1)!)).toEqual([
+		{
+			text: "東京地方は雨です。",
+			sources: [{ url: "https://www.jma.go.jp/", title: "気象庁" }],
+		},
+	]);
+	expect(h.dialogue.answerText(run.id)).toContain("https://www.jma.go.jp/");
+	expect(h.dialogue.answerText(run.id)).not.toContain("https://example.org/");
+	expect(h.todos()).toHaveLength(0);
 });

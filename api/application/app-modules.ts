@@ -1,7 +1,6 @@
 import { registerCanvasRoutes } from "./canvas/routes";
 import { registerKnowledge } from "./knowledge/routes";
 import type { Knowledge } from "./knowledge/service";
-import { registerRouterMemory } from "./toolchain/router-memory";
 import { registerAgency } from "./agency/routes";
 import {
 	registerRouterExport,
@@ -32,6 +31,8 @@ import { recognitionSharing } from "./media/recognition-sharing";
 import { registerImage, type ImageService } from "../domains/image";
 import { registerGooglePhotoImport } from "./media/google-photo-import";
 import { registerLibraryAttachment } from "./media/library-attachment";
+import { registerVideoAdmission } from "./media/video-admission";
+import { registerVideo, type VideoService } from "../domains/video";
 import { registerMusic, type MusicService } from "../domains/music";
 import {
 	registerCapabilities,
@@ -146,6 +147,7 @@ export type AppServices = {
 	/** The Spatial background's monitoring snapshot (absent: the route does not exist). */
 	monitoring?: MonitoringService;
 	music?: MusicService;
+	video?: VideoService;
 	image?: ImageService;
 	docling?: DoclingService;
 	markdown?: MarkdownService;
@@ -161,8 +163,6 @@ export type AppServices = {
 	tasks?: TasksService;
 	toolchainHistory?: ToolchainHistory;
 	routerExport?: ReturnType<typeof createRouterExport>;
-	/** best-v2's memory for the router package (spec router-package-integration 2026-11-04 §1 #6). */
-	routerMemory?: Parameters<typeof registerRouterMemory>[1];
 	timers?: TimersService;
 	/** Resource URIs (absent: the routes do not exist). */
 	resources?: Pick<Resources, "access">;
@@ -188,6 +188,7 @@ export type AppServices = {
 export function appModules(services: AppServices): AppModule[] {
 	const s = services;
 	const modules: Array<AppModule | undefined> = [
+		s.video && { mount: (app) => registerVideoAdmission(app, s.video!) },
 		s.agency && { mount: (app) => registerAgency(app, s.agency!) },
 		s.liveVoice && {
 			mount: (app) =>
@@ -270,6 +271,7 @@ export function appModules(services: AppServices): AppModule[] {
 			},
 		},
 		s.music && { mount: (app) => registerMusic(app, s.music!) },
+		s.video && { mount: (app) => registerVideo(app, s.video!) },
 		s.capabilities && {
 			mount: (app) => registerCapabilities(app, s.capabilities!),
 		},
@@ -299,9 +301,6 @@ export function appModules(services: AppServices): AppModule[] {
 		s.tasks && { mount: (app) => registerTasks(app, s.tasks!) },
 		s.routerExport && {
 			mount: (app) => registerRouterExport(app, s.routerExport!),
-		},
-		s.routerMemory && {
-			mount: (app) => registerRouterMemory(app, s.routerMemory!),
 		},
 		s.toolchainHistory && {
 			mount: (app) => registerToolchainHistory(app, s.toolchainHistory!),

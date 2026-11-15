@@ -1,7 +1,5 @@
 import { expect } from "bun:test";
 import { Database } from "bun:sqlite";
-import { BEST_V2_PARAMS } from "eumenes_router";
-import { examplesInTransaction } from "eumenes_router/sqlite";
 import {
 	type createLiveLarm,
 	liveLarmSettings,
@@ -384,43 +382,6 @@ export async function fixture(input: {
 			settings: saved,
 			keys: [],
 		});
-		if (realModel) {
-			const response = await readLocalSettings("router");
-			await h.settings.configureRouter(response);
-			const { space } = await playground!.embed(
-				["toolchain"],
-				"passage",
-				AbortSignal.timeout(20000),
-			);
-			const db = new Database(
-				process.env.EUMENES_DB || "./data/eumenes.sqlite3",
-				{ readonly: true },
-			);
-			try {
-				const memory = examplesInTransaction(db, {
-					source: BEST_V2_PARAMS.source,
-					space,
-				});
-				if (!memory) throw new Error("live_router_memory_unavailable");
-				await h.toolchain.importRouterMemory(memory);
-			} finally {
-				db.close();
-			}
-			h.inference.startRouter();
-			await h.inference.route(
-				{
-					text: "準備確認",
-					previousAgent: "",
-					previousUser: "",
-					instructions: "依頼と合う項目を選ぶ。",
-					criteria: [
-						{ name: "ready", description: "準備確認の依頼" },
-						{ name: "other", description: "別の依頼" },
-					],
-				},
-				AbortSignal.timeout(20000),
-			);
-		}
 	}
 	const source = async (target?: string) => {
 		const response = await h.request(

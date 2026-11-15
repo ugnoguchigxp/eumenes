@@ -36,6 +36,8 @@ import type { TodoResource } from "./todo-components";
 export type { TodoResource } from "./todo-components";
 import type { Model3dWorkspaceResource } from "./model3d-components";
 import type { BrowserWorkspaceResource } from "./browser-components";
+import type { VideoWorkspaceResource } from "./video-components";
+export type { VideoWorkspaceResource } from "./video-components";
 import type { MusicResource, GenerationResource } from "./media-contracts";
 import type { UiStudioResource } from "./ui-studio-contracts";
 import type {
@@ -346,6 +348,7 @@ export type Resource =
 	| KanbanResource
 	| ActivityResource
 	| ImageWorkspaceResource
+	| VideoWorkspaceResource
 	| Model3dWorkspaceResource
 	| ComputeWorkspaceResource
 	| BrowserWorkspaceResource

@@ -42,11 +42,6 @@ type RuntimeDeps = {
 		clearTimeout: typeof clearTimeout;
 	};
 	log: ReturnType<typeof getLogger>;
-	/**
-	 * Runs in the transaction that accepts a search report: the toolchain may keep a saved
-	 * procedure proposed in it. The report is already verified against the task's sources.
-	 */
-	onSearchReport?: SearchReportHook;
 	/** Reads a resource by URI for the sub-agent tool `resource.read`; without it the tool is not offered. */
 	resources?: ResourceReadPort;
 	/** Writes a shared file for the sub-agent tool `scratch.write`; without it the tool is not offered. */
@@ -56,17 +51,6 @@ type RuntimeDeps = {
 		rootId: string,
 	) => boolean;
 };
-export type SearchReportHook = (
-	db: import("bun:sqlite").Database,
-	input: {
-		taskId: string;
-		rootRunId: string;
-		packageId: string;
-		report: import("../contracts").Report;
-		recipe?: unknown;
-	},
-) => void;
-
 /** The runtime's only mutable state; created once per `createAgentRuntime`. */
 export type RuntimeState = {
 	traceIds: Set<string>;

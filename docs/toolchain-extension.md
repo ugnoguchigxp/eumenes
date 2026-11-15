@@ -115,7 +115,7 @@ bundleには公開する役割、操作、受領結果とArtifactを記述する
 3. **definitionsを書く**: 新しいprofile・skill・package・toolchainを書く。本文はJSON文字列で持ち、既存revisionの本文は変えない。toolchainの必須項目は `functionName`（`^[a-z][a-z0-9_]{2,40}$`、全体で一意）、`summary`、`useWhen`（1件以上）、`examples`（3件以上・各200字以内。候補検索の索引と評価に使う）、`redirects`、`dependencies` と `packageRevisionId`（同じpackage一つ）、`bindingRevisionId`、`artifactRevisionId`。任意の `minImpact`（`none`・`create`・`modify_existing`・`irreversible`）は、その担当の仕事が既存のものに与える影響の下限で、会話エージェントの申告より大きければこちらを使う。`modify_existing`・`irreversible`の仕事は、会話エージェントが実行前の確認（依頼の`confirm`）を出してからでないと実行されない（[ContextWindow仕様](../spec/context-window-spec-2026-10-24.md) §6.7）。未宣言なら申告を使う。表示はartifact登録が担うので、旧形式の `artifact` 項目は不要（書いても使われない。新しく書かない）。
    任意の `general`（値は `true` だけ）は、話題を問わず一般的な手段（Web・ブラウザ・シェル・汎用のエージェント）で依頼をこなす汎用の担当に付ける。担当の検索は、専用の担当の上位3件とは別の枠で、1位の候補との差が 0.05 以内の汎用の担当を2件まで候補に足し、会話エージェントは合う専用の担当がないときだけ使う（[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §2〜§4）。パイプライン（bindingの `execution:"pipeline"`）も同じ形で2件までの枠を持つ。
 
-   任意の `selectable`（値は `false` だけ、toolchainのみ）は、その revision を選択から外す。Routerのcards、検索（`find_toolchain`・Agencyの能力検索）の候補、パイプラインの部品、ベクトル更新に出なくなる。revision は登録されたまま、名前（revision）を指した実行は従来どおり動く。置き換えた担当（例 `web.search` → `web.note`）を残すときに新しい revision で立てる（[web-note](../spec/web-note-codex-search-2026-11-11.md)）。
+   任意の `selectable`（値は `false` だけ、toolchainのみ）は、その revision を選択から外す。Routerのcards、検索（`find_toolchain`・Agencyの能力検索）の候補、パイプラインの部品、ベクトル更新に出なくなる。revision は登録されたまま、名前（revision）を指した実行は従来どおり動く。選択を停止するときは新しい revision に設定する。
    `summary`・`useWhen`・`examples` は担当の検索の索引になる。種類ごとに書くものを分ける。専用の担当は何を扱うか（対象・物・結果）を書き、ほかの担当の持ち分の依頼を書かない。パイプラインは依頼の全体の流れを書き、各ステップ単独の依頼に似た文を書かない。汎用の担当はどうやるか（手段・場所）を書き、専用の担当がある話題（天気・株価など）の例を書かない。例文は、効果の確かめに使う過去の発言の写しにしない。
 4. **bindingを書く**:
 
@@ -532,49 +532,6 @@ Excalidrawの登録例は `builtin/excalidraw.ts` と `builtin/excalidraw/SKILL.
 
 登録順は依存が先、packageが最後。`dependencies`は依存閉包を作る一覧、`profileRevisionId`・`requiredSkillRevisionIds`・`toolRevisionIds`はその中で実際に使う役割指定なので、両方を揃える。profileとskillには空でないbody、toolにはschemaKeyが必要。packageにも入力に合うschemaKeyを指定する。
 
-#### 最小例 既存のquick担当を改訂する
-
-新しい公開操作やadapterを作らず、`web.quick@2`のSkillを変える例。`api/domains/capabilities/builtin/web-research.ts`の既存配列の組立て後へ追加する想定である。`Definition`は`../contracts`からimportする。
-
-```ts
-const quickV2 = builtins.find(
-  d => d.kind === "package" && d.id === "web.quick" && d.revision === 2,
-)!;
-const briefSkill: Definition = {
-  kind: "skill", id: "web.brief", revision: 1,
-  title: "短い公開情報の確認", summary: "要点と出典を短く返す",
-  aliases: [], tags: [], useWhen: [], avoidWhen: [], dependencies: [],
-  body: "依頼に答える資料を取得し、対象・時点・単位を保って要点を短く返します。不足は明示します。",
-};
-builtins.push(briefSkill, {
-  ...quickV2,
-  revision: 3,
-  dependencies: quickV2.dependencies.map(ref =>
-    ref === "skill:web.search@1" ? "skill:web.brief@1" : ref),
-  requiredSkillRevisionIds: ["skill:web.brief@1"],
-});
-```
-
-この例ではツールチェーン`web.search`の`packageRevisionId`を新しい版へ向ける(ツールチェーンも新revisionにする)。`start-task.ts`はツールチェーンが指すpackageを起動するので変更不要。旧`@2`は削除しない。metadataはpackage IDの`web.quick`に紐づくため変更不要。会話ツール、tool schema、外部adapter、inferenceには変更不要。報告契約と共通方針はそのまま使い、Skillで上位の権限・予算を変えない。
-
-#### 新しいpackage IDを並行して追加する場合
-
-上の例でpackageを`id: "web.brief", revision: 1`にすれば別IDの定義になる。ただし、次も必要になる。
-
-- `runtime-meta.ts`のpackagesへ `"web.brief": { budget: "quick", report: "search" }` を追加する。
-- 既存quickと併存させる場合、`package:web.brief@1`を指す別のツールチェーン(例 `functionName:"web_brief"`)を登録する。`aliases`や`useWhen`だけを追加しても起動先は変わらない。
-- 既存経路を置き換える場合は、起動先と説明を更新する。どちらの用途かを先に決め、併存の依頼で既定経路を勝手に置き換えない。
-
-併存の配線例は次の対応を一組として実装する。これは未実装の例である。
-
-| 接続 | 例で追加する内容 |
-| --- | --- |
-| `seeds/toolchains.json` | `web.brief`ツールチェーン。`useWhen`・`examples`・既存`web.search`との`redirects`を双方に書く。登録定義の依頼は共通の`{request}`。会話エージェントは依頼の`execute`に予告を付け、hostは予告の配信後に委譲する |
-| `runtime-meta.ts` | toolchainsへ`"web.brief": { execution: "research", route: "web" }` |
-| 結合fixture | 呼出しから開始したpackageRevisionIdまで確認。会話の選択と起動先が一致することを試す |
-
-`web.brief`というIDや上の分岐を共通機構へ追加するのは、利用者がこの独立経路を必要としている場合だけ。単に短く答えたい場合は先の既存package改訂で足りる。
-
 ### 付録C 既存backendにツールを追加する
 
 #### 変更箇所と順序
@@ -694,6 +651,6 @@ export const archiveBuiltins: Definition[] = [
 
 新規DBへの登録だけでなく、旧版をseed済みの隔離DBへ新版を追加するケースも用意する。既存DBを削除して競合を隠さない。有効な現行版・旧版の読取り・二度目のseedの冪等性を確認する。
 
-### 背景Web調査のCodex検索（試験用）
+### 会話の外部情報検索
 
-既存の `web_search` と `web_research` が使う検索取得に、Codexの組込みWeb検索を接続できる。起動環境で `EUMENES_CODEX_WEB_SEARCH=1` を指定し、保存済みの会話LLMルートを有効なCodex SDK接続のクラウド専用に設定したときに選ばれる。取得した候補の本文確認と出典採用は既存のWeb調査に従う。組込み検索は公開用の問いを受け取る独立した推論でだけ有効になる。実モデルから検索完了イベントが得られることを隔離環境で確認してから利用する。
+会話エージェントは `lookup_public_information` を通して Codex のライブ検索を使います。調査メモは `web.note` で保存します。 [会話からの外部情報検索](web-research.md)

@@ -3,6 +3,7 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	isCapacityBusy,
+	LARM_ON_DEMAND_BUSY,
 	LARM_CAPACITY_TIMEOUT,
 	LARM_CAPACITY_WAITING,
 	settleCapacityWait,
@@ -362,7 +363,9 @@ function registerSubmit(deps: Deps) {
 			}
 			if (r.state !== "submitting") return "stale";
 			const code =
-				"errorCode" in outcome && /^model3d_[a-z_]+$/.test(outcome.errorCode)
+				"errorCode" in outcome &&
+				(/^model3d_[a-z_]+$/.test(outcome.errorCode) ||
+					outcome.errorCode === LARM_ON_DEMAND_BUSY)
 					? outcome.errorCode
 					: "model3d_submission_unconfirmed";
 			deps.notify(
@@ -454,7 +457,9 @@ function registerPoll(deps: Deps) {
 			}
 			if (outcome.type !== "success") {
 				const code =
-					"errorCode" in outcome && /^model3d_[a-z_]+$/.test(outcome.errorCode)
+					"errorCode" in outcome &&
+					(/^model3d_[a-z_]+$/.test(outcome.errorCode) ||
+						outcome.errorCode === LARM_ON_DEMAND_BUSY)
 						? outcome.errorCode
 						: "model3d_status_unconfirmed";
 				deps.notify(
@@ -672,7 +677,9 @@ function registerOperation(deps: Deps) {
 				settleOperation(db, o.id, "completed", null);
 			} else {
 				const code =
-					"errorCode" in outcome && /^model3d_[a-z_]+$/.test(outcome.errorCode)
+					"errorCode" in outcome &&
+					(/^model3d_[a-z_]+$/.test(outcome.errorCode) ||
+						outcome.errorCode === LARM_ON_DEMAND_BUSY)
 						? outcome.errorCode
 						: "model3d_operation_unconfirmed";
 				// An asset LARM no longer has leaves the index either way.

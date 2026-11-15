@@ -50,14 +50,7 @@ export function settingsClient(t: Transport) {
 				"/api/settings/router",
 				json(routerPatchSchema.parse(input), "PATCH"),
 			),
-		/** Imports best-v2's memory for the router package (spec router-package-integration 2026-11-04 §1 #6). */
-		importRouterMemory: async (memory: unknown) =>
-			callJson(
-				t,
-				z.object({ count: z.number().int(), source: z.string() }),
-				"/api/router/memory",
-				json(memory),
-			),
+
 		applySettings: async (input: ApplySettings) =>
 			callJson(t, settingsSchema, "/api/settings/apply", json(input)),
 		connectionModels: async (

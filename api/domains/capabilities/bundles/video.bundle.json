@@ -1,0 +1,389 @@
+{
+	"formatVersion": 1,
+	"bundleId": "video",
+	"pins": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "video.studio",
+			"revision": 1,
+			"title": "動画生成担当",
+			"summary": "文章から音声付きMP4を生成する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者の依頼に応じて動画生成画面を開くか、動画の生成を依頼します。"
+		},
+		{
+			"kind": "skill",
+			"id": "video.studio",
+			"revision": 1,
+			"title": "動画生成の手順",
+			"summary": "入力・受付・完成の区別",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "作成を頼まれたら、場面、動き、希望する音を prompt に書き、title と seed は指定に応じて渡す。現在の生成は音声付きMP4、480×480、5秒、24fps、4ステップ。参照画像や別の寸法・長さが必須なら対応できる条件を伝え、承諾を待つ。画面・保存済み一覧・取消を求められたら画面を開き、利用者自身が選べるようにする。送信開始と受付、完成を区別し、画面で状態を追跡できると伝える。処理中や送信結果不明のときは別の依頼を自動送信しない。"
+		},
+		{
+			"kind": "tool",
+			"id": "video.open",
+			"revision": 1,
+			"title": "動画生成画面を開く",
+			"summary": "生成、進捗、保存動画の画面を開く",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "video",
+			"schemaKey": "emptyInput"
+		},
+		{
+			"kind": "tool",
+			"id": "video.generate",
+			"revision": 1,
+			"title": "動画生成を依頼する",
+			"summary": "文章を受け取り、動画生成サービスへの送信を開始する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "video",
+			"schemaKey": "videoGenerate"
+		},
+		{
+			"kind": "package",
+			"id": "video.studio",
+			"revision": 1,
+			"title": "動画生成",
+			"summary": "動画生成と保存一覧の画面",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:video.studio@1",
+				"skill:video.studio@1",
+				"tool:video.open@1",
+				"tool:video.generate@1"
+			],
+			"backend": "video",
+			"schemaKey": "toolchainRequest",
+			"profileRevisionId": "profile:video.studio@1",
+			"requiredSkillRevisionIds": ["skill:video.studio@1"],
+			"toolRevisionIds": ["tool:video.open@1", "tool:video.generate@1"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "video.studio",
+			"revision": 1,
+			"title": "動画生成",
+			"summary": "文章から音声付きの短いMP4を生成し、保存動画を管理する",
+			"aliases": ["動画制作"],
+			"tags": [],
+			"useWhen": [
+				"文章から音声付き動画を作りたい",
+				"生成状況や保存した動画を見たい"
+			],
+			"avoidWhen": ["既存の動画を分析したい", "静止画だけが必要"],
+			"dependencies": ["package:video.studio@1"],
+			"examples": [
+				"海辺を歩く犬の短い動画を作って",
+				"動画生成の進み具合を見たい",
+				"保存した動画一覧を開いて"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:video.studio@1",
+			"functionName": "video_studio",
+			"bindingRevisionId": "binding:video.command@1",
+			"artifactRevisionId": "artifact:video.workspace@1"
+		},
+		{
+			"kind": "toolchain",
+			"id": "video.studio",
+			"revision": 2,
+			"title": "動画生成",
+			"summary": "文章から音声付きの短いMP4を生成し、保存動画を管理する",
+			"aliases": ["動画制作"],
+			"tags": [],
+			"useWhen": [
+				"文章から音声付き動画を作りたい",
+				"生成状況や保存した動画を見たい"
+			],
+			"avoidWhen": ["既存の動画を分析したい", "静止画だけが必要"],
+			"dependencies": ["package:video.studio@1"],
+			"examples": [
+				"海辺を歩く犬の短い動画を作って",
+				"動画生成の進み具合を見たい",
+				"保存した動画一覧を開いて"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:video.studio@1",
+			"functionName": "video_studio",
+			"bindingRevisionId": "binding:video.command@2",
+			"artifactRevisionId": "artifact:video.workspace@2"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "video.command",
+			"revision": 1,
+			"execution": "command",
+			"adapterRef": "adapter:video@1",
+			"availabilityRef": "availability:video@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:video.open@1",
+					"operationId": "video.open",
+					"inputSchemaRef": "builtin:emptyInput"
+				},
+				{
+					"toolRevisionId": "tool:video.generate@1",
+					"operationId": "video.generate",
+					"inputSchemaRef": "builtin:videoGenerate"
+				}
+			],
+			"artifactRevisionId": "artifact:video.workspace@1",
+			"outputSchemaRef": "domain:video.receipt@1",
+			"resultProjectionRef": "projection:video.receipt@1"
+		},
+		{
+			"kind": "binding",
+			"id": "video.command",
+			"revision": 2,
+			"execution": "command",
+			"adapterRef": "adapter:video@1",
+			"availabilityRef": "availability:video@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:video.open@1",
+					"operationId": "video.open",
+					"inputSchemaRef": "builtin:emptyInput"
+				},
+				{
+					"toolRevisionId": "tool:video.generate@1",
+					"operationId": "video.generate",
+					"inputSchemaRef": "builtin:videoGenerate"
+				}
+			],
+			"artifactRevisionId": "artifact:video.workspace@2",
+			"outputSchemaRef": "domain:video.receipt@1",
+			"resultProjectionRef": "projection:video.receipt@1"
+		}
+	],
+	"artifacts": [
+		{
+			"kind": "artifact",
+			"id": "video.workspace",
+			"revision": 1,
+			"title": "動画生成",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "video-workspace",
+						"source": "video",
+						"title": "動画生成"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "video",
+					"adapterRef": "adapter:video@1",
+					"query": "query:video.workspace@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "generate",
+					"eventAction": "video-generate",
+					"source": "video",
+					"inputSchemaRef": "builtin:videoGenerate",
+					"effect": "local"
+				},
+				{
+					"actionId": "reconcile",
+					"eventAction": "video-reconcile",
+					"source": "video",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "video-cancel",
+					"source": "video",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "select",
+					"eventAction": "video-select",
+					"source": "video",
+					"inputSchemaRef": "schema:video-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "delete",
+					"eventAction": "video-delete",
+					"source": "video",
+					"inputSchemaRef": "schema:video-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "video-refresh",
+					"source": "video",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "動画生成",
+				"order": 31
+			}
+		},
+		{
+			"kind": "artifact",
+			"id": "video.workspace",
+			"revision": 2,
+			"title": "動画生成",
+			"variants": [
+				{
+					"id": "standard",
+					"label": "標準",
+					"definition": {
+						"view": "video-workspace",
+						"source": "video",
+						"title": "動画生成"
+					}
+				}
+			],
+			"defaultVariant": "standard",
+			"sourceBindings": [
+				{
+					"source": "video",
+					"adapterRef": "adapter:video@1",
+					"query": "query:video.workspace@1",
+					"target": "none"
+				}
+			],
+			"actionBindings": [
+				{
+					"actionId": "generate",
+					"eventAction": "video-generate",
+					"source": "video",
+					"inputSchemaRef": "schema:video-screen-generate@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "reconcile",
+					"eventAction": "video-reconcile",
+					"source": "video",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "cancel",
+					"eventAction": "video-cancel",
+					"source": "video",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				},
+				{
+					"actionId": "select",
+					"eventAction": "video-select",
+					"source": "video",
+					"inputSchemaRef": "schema:video-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "delete",
+					"eventAction": "video-delete",
+					"source": "video",
+					"inputSchemaRef": "schema:video-id@1",
+					"effect": "local"
+				},
+				{
+					"actionId": "refresh",
+					"eventAction": "video-refresh",
+					"source": "video",
+					"inputSchemaRef": "builtin:emptyInput",
+					"effect": "local"
+				}
+			],
+			"launcher": {
+				"label": "動画生成",
+				"order": 31
+			}
+		}
+	],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "video-id",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string",
+						"minLength": 38,
+						"maxLength": 38
+					}
+				},
+				"required": ["id"]
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "video-screen-generate",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"additionalProperties": false,
+				"properties": {
+					"prompt": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 8192
+					},
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 256
+					},
+					"seed": {
+						"type": "integer",
+						"minimum": 0,
+						"maximum": 2147483647
+					},
+					"width": {
+						"type": "integer",
+						"minimum": 1
+					},
+					"height": {
+						"type": "integer",
+						"minimum": 1
+					},
+					"durationSeconds": {
+						"type": "number",
+						"minimum": 0
+					}
+				},
+				"required": ["prompt", "width", "height", "durationSeconds"]
+			}
+		}
+	]
+}

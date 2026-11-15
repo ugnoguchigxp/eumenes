@@ -1,8 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { createPursuit, type PursuitService } from "../../domains/pursuit";
-import { createPursuitAdapters } from "../pursuit/pursuit-adapter";
-import { createResearchDocuments } from "../pursuit/document-port";
-import { createPursuitWebPort } from "../pursuit/web-port";
 import {
 	createWebNote,
 	type WebNoteDeps,
@@ -85,6 +81,7 @@ import {
 	createInferenceAdapter,
 	type InferenceAdapterPorts,
 } from "../settings/inference-adapter";
+import { createVideoAdapter } from "../media/video-adapter";
 import { createMusicScreenAdapter } from "../media/music-screen-adapter";
 import { createImageScreenAdapter } from "../media/image-screen-adapter";
 import { createUiCompositionsAdapter } from "../media/ui-compositions-adapter";
@@ -99,7 +96,6 @@ import {
 } from "./toolchain-adapters";
 import { createReadPorts } from "./research-history-ports";
 import { createToolchainHistory } from "../../domains/toolchain-history";
-import { createRecipePorts } from "./toolchain-recipes";
 import { createVectorRefresh, type Embed } from "./toolchain-vectors";
 import { routerFixedCards } from "../../domains/dialogue";
 type ToolchainOptions = {
@@ -126,6 +122,7 @@ type ToolchainOptions = {
 	ocr?: import("../../domains/ocr").OcrService;
 	compute?: import("../../domains/compute").ComputeService;
 	model3d?: import("../../domains/model3d").Model3dService;
+	video?: import("../../domains/video").VideoService;
 	/** Brave tabs and local captures (absent: not offered). */
 	browser?: Pick<BrowserAssembly, "service" | "effects" | "requests"> &
 		Partial<Pick<BrowserAssembly, "interact">>;
@@ -253,7 +250,6 @@ function enabledBackends(options: ToolchainOptions) {
 		...(options.canvasAdapter ? ["canvas"] : []),
 		...(options.markdown ? ["markdown"] : []),
 		"task-execution",
-		...(options.webResearch !== false ? ["pursuit"] : []),
 		...(options.webNote?.turn ? ["web-note"] : []),
 		...(options.webResearch !== false ? ["web"] : []),
 		...(options.timers ? ["timer"] : []),
@@ -272,6 +268,7 @@ function enabledBackends(options: ToolchainOptions) {
 		...(options.worldResearch ? ["world-query"] : []),
 		...(options.ocr ? ["ocr"] : []),
 		...(options.model3d ? ["model3d"] : []),
+		...(options.video ? ["video"] : []),
 		...(options.compute ? ["compute"] : []),
 		...(options.browser ? ["browser"] : []),
 		...(options.excalidraw ? ["excalidraw"] : []),
@@ -286,7 +283,6 @@ export async function createToolchain(
 	web: WebResearchService,
 	options: ToolchainOptions = {},
 ) {
-	let pursuitRuntime: PursuitService | undefined;
 	let webNoteRuntime: WebNoteService | undefined;
 	let taskRuntime:
 		import("../../domains/agent-runtime").AgentRuntime | undefined;
@@ -312,10 +308,6 @@ export async function createToolchain(
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		...(options.canvasAdapter ? [options.canvasAdapter] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
-		...createPursuitAdapters(
-			() => pursuitRuntime,
-			options.webResearch !== false,
-		),
 		createWebNoteAdapter(() => webNoteRuntime, !!options.webNote?.turn),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk
@@ -350,6 +342,7 @@ export async function createToolchain(
 			? [createGoogleAccountsAdapter(options.googleAccounts)]
 			: []),
 		...(options.music ? [createMusicScreenAdapter()] : []),
+		...(options.video ? [createVideoAdapter(options.video)] : []),
 		...(options.image ? [createImageScreenAdapter()] : []),
 		...(options.appDevelopmentAdapter ? [options.appDevelopmentAdapter] : []),
 		...(options.uiCompositions
@@ -429,15 +422,6 @@ export async function createToolchain(
 		bundleHost: () => bundleHostOf(registry),
 	});
 	await capabilities.seed();
-	// Keep the owner alive after disablement so retained work can still be cancelled or erased.
-	pursuitRuntime = createPursuit({
-		store,
-		queue,
-		inference,
-		capabilities,
-		web: createPursuitWebPort(web, queue),
-		documents: createResearchDocuments(options, () => pursuitRuntime),
-	});
 	webNoteRuntime = createWebNote({
 		store,
 		queue,
@@ -450,11 +434,6 @@ export async function createToolchain(
 		options.history === false ? undefined : options.conversation,
 		() => agents,
 		options.blockedMessages,
-	);
-	const recipes = createRecipePorts(
-		history,
-		() => agents,
-		() => tools,
 	);
 	const world = options.worldResearch?.(() => agents);
 	const worldPorts = () => {
@@ -503,7 +482,6 @@ export async function createToolchain(
 
 	const adapter = researchToolAdapter({
 		reads,
-		recipes,
 		world,
 		worldPorts,
 		web,
@@ -531,7 +509,6 @@ export async function createToolchain(
 		queue,
 		inference,
 		reconcileThrottleMs: options.reconcileThrottleMs,
-		onSearchReport: recipes.onSearchReport,
 		...(options.resources ? { resources: options.resources.read } : {}),
 		...(options.sharedWrite ? { sharedWrite: options.sharedWrite } : {}),
 	});
@@ -549,7 +526,6 @@ export async function createToolchain(
 	);
 	return {
 		capabilities,
-		pursuit: pursuitRuntime,
 		webNote: webNoteRuntime,
 		collaboration,
 		childOperations: children,
@@ -585,14 +561,11 @@ export async function createToolchain(
 		embedQuery: vectors.embedQuery,
 		/** The router package's embedding of what it routes (passages); throws when unavailable. */
 		embedRouter: vectors.embedRouter,
-		/** Stores best-v2's memory for the router package in the current embedding space. */
-		importRouterMemory: vectors.importRouterMemory,
 	};
 }
 
 function researchToolAdapter(deps: {
 	reads: ReturnType<typeof createReadPorts>;
-	recipes: ReturnType<typeof createRecipePorts>;
 	world: ReturnType<NonNullable<ToolchainOptions["worldResearch"]>> | undefined;
 	worldPorts: () => ReturnType<NonNullable<ToolchainOptions["worldResearch"]>>;
 	web: WebResearchService;
@@ -607,16 +580,8 @@ function researchToolAdapter(deps: {
 	>["source"];
 	tools: () => ReturnType<typeof createToolRuntime>;
 }): ToolAdapter {
-	const {
-		reads,
-		recipes,
-		world,
-		worldPorts,
-		web,
-		options,
-		children,
-		researchSource,
-	} = deps;
+	const { reads, world, worldPorts, web, options, children, researchSource } =
+		deps;
 	return {
 		...reads,
 		releaseTask(id) {
@@ -629,11 +594,9 @@ function researchToolAdapter(deps: {
 				: reads.operationFingerprintInTransaction!(db, r);
 		},
 		localInTransaction(db, r) {
-			return r.tool.id === "recipe.find"
-				? recipes.findInTransaction(db, r)
-				: r.tool.backend === "world-query"
-					? worldPorts().localInTransaction!(db, r)
-					: reads.localInTransaction!(db, r);
+			return r.tool.backend === "world-query"
+				? worldPorts().localInTransaction!(db, r)
+				: reads.localInTransaction!(db, r);
 		},
 		// World readings are checked against the World; every other source against the reads.
 		validateEvidenceInTransaction(db, owner, sources, proofs) {

@@ -1,3 +1,4 @@
+import { describeError } from "../../errorMessages";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -124,24 +125,26 @@ export function useMusicCreation(
 						? "楽曲の制作を取り消しました"
 						: "楽曲を生成しています",
 			description:
-				statusItem?.state === "generating" &&
-				statusItem.phase === "waiting_capacity"
-					? capacityWaitingMessage
-					: status === "failed" &&
-						  [
-								"larm_http_400",
-								"music_request_invalid",
-								"music_plan_invalid_contract",
-								"music_duration_exceeded",
-						  ].includes(statusItem?.errorCode ?? "")
-						? "用途・長さ・歌詞・生成オプションの指定を確認してください。上限を超えた長さや矛盾する条件は送れません。"
-						: statusItem?.errorCode === "larm_capacity_timeout"
-							? capacityTimeoutMessage
-							: statusItem?.state === "planning"
-								? "テーマから曲調を考えています。"
-								: running(run.data?.status) && !submitted
-									? "制作依頼を受け付けました。"
-									: undefined,
+				statusItem?.errorCode === "on_demand_busy"
+					? describeError(statusItem.errorCode)
+					: statusItem?.state === "generating" &&
+						  statusItem.phase === "waiting_capacity"
+						? capacityWaitingMessage
+						: status === "failed" &&
+							  [
+									"larm_http_400",
+									"music_request_invalid",
+									"music_plan_invalid_contract",
+									"music_duration_exceeded",
+							  ].includes(statusItem?.errorCode ?? "")
+							? "用途・長さ・歌詞・生成オプションの指定を確認してください。上限を超えた長さや矛盾する条件は送れません。"
+							: statusItem?.errorCode === "larm_capacity_timeout"
+								? capacityTimeoutMessage
+								: statusItem?.state === "planning"
+									? "テーマから曲調を考えています。"
+									: running(run.data?.status) && !submitted
+										? "制作依頼を受け付けました。"
+										: undefined,
 			canCancel: !!cancelRunId,
 		},
 	};

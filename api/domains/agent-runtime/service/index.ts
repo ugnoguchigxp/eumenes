@@ -10,7 +10,7 @@ import { createLifecycle } from "./lifecycle";
 import { createMaintenance } from "./maintenance";
 import { createQueries } from "./queries";
 import { createReconcile } from "./reconcile";
-import { createRuntimeState, type SearchReportHook } from "./runtime-context";
+import { createRuntimeState } from "./runtime-context";
 import type { ResourceReadPort, SharedWritePort } from "./resource-access";
 import { createStartTask } from "./start-task";
 import { createStepHandler } from "./step-handler";
@@ -27,7 +27,6 @@ export function createAgentRuntime({
 	now = Date.now,
 	reconcileThrottleMs = 25,
 	timers = { setTimeout, clearTimeout },
-	onSearchReport,
 	resources,
 	sharedWrite,
 	autonomousResearch,
@@ -45,7 +44,6 @@ export function createAgentRuntime({
 		setTimeout: typeof setTimeout;
 		clearTimeout: typeof clearTimeout;
 	};
-	onSearchReport?: SearchReportHook;
 	/** Reads a resource by URI for the sub-agent tool `resource.read` (the registry's `read`). */
 	resources?: ResourceReadPort;
 	/** Writes a shared file for the sub-agent tool `scratch.write`. */
@@ -67,7 +65,6 @@ export function createAgentRuntime({
 			reconcileThrottleMs,
 			timers,
 			log: getLogger("agent-runtime"),
-			onSearchReport,
 			resources,
 			...(sharedWrite ? { sharedWrite } : {}),
 			autonomousResearch,

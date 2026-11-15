@@ -19,15 +19,16 @@ import { offlineBundleHost } from "./toolchain-adapters";
 const backends = new Set([
 	"docling",
 	"web",
-	"pursuit",
 	"web-note",
 	"history",
 	"timer",
 	"music",
 	"dots",
 	"image",
+	"video",
 	"ui-compositions",
 	"app-development",
+	"canvas",
 	"markdown",
 	"excalidraw",
 	"object-recognition",
@@ -265,7 +266,7 @@ test("normal server assembly seeds toolchains and launchers without a separate i
 				caps.toolchainsInTransaction(db).map((d) => d.id),
 			);
 			expect(ids).toContain("timers.manage");
-			expect(ids).toContain("web.search");
+			expect(ids).not.toContain("web.search");
 			const artifacts = services.store.read((db) =>
 				caps.artifactsInTransaction(db).map((a) => a.artifactId),
 			);

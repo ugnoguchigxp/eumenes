@@ -1,3 +1,4 @@
+import { createVideo } from "../../domains/video";
 import { createAppDevelopmentRuntime } from "../app-development/runtime";
 import { collaborationScript } from "./collaboration-script.fixture";
 import { offeredKinds } from "./toolchain-command.fixture";
@@ -241,7 +242,7 @@ export async function harness(options: HarnessOptions = {}) {
 				? options.routeTool
 				: options.timers && /タイマー/.test(question)
 					? "timer"
-					: "web_search";
+					: "service_search";
 		const wanted = store.read(
 			(db) =>
 				toolchain.capabilities
@@ -281,29 +282,6 @@ export async function harness(options: HarnessOptions = {}) {
 		},
 		answer: async (messages, _signal, callOptions) => {
 			calls++;
-			if (options.pursuit) {
-				const system = messages[0]?.content ?? "";
-				const marker = system.lastIndexOf("OUTPUT_SCHEMA=");
-				const question = messages
-					.filter((m) => m.role === "user")
-					.at(-1)?.content;
-				let packet: { delegatedRequest?: unknown; state?: unknown } = {};
-				try {
-					packet = JSON.parse(question ?? "{}");
-				} catch {
-					/* Not a structured control call. */
-				}
-				if (marker >= 0 && typeof packet.state === "string") {
-					const schema = JSON.parse(
-						system.slice(marker + "OUTPUT_SCHEMA=".length),
-					);
-					if (
-						typeof packet.delegatedRequest === "string" ||
-						schema.properties?.passed
-					)
-						return JSON.stringify(options.pursuit(schema, messages));
-				}
-			}
 			if (messages[0]!.content.includes("転記された発話の主要な言語"))
 				return JSON.stringify({
 					status: "identified",
@@ -609,6 +587,9 @@ export async function harness(options: HarnessOptions = {}) {
 			})
 		: undefined;
 	await compute?.refresh();
+	const video = options.videoPort
+		? createVideo({ store, queue, port: () => options.videoPort! })
+		: undefined;
 	// The data-driven settings and records screens, as the server composes them.
 	const toolchainLinks = createToolchainHostLinks({
 		settings,
@@ -668,6 +649,7 @@ export async function harness(options: HarnessOptions = {}) {
 		...(options.webNote ? { webNote: options.webNote } : {}),
 		docling: options.docling,
 		compute,
+		video,
 		browser,
 		...toolchainLinks.options,
 		dots: !!dotsWork,
@@ -696,23 +678,7 @@ export async function harness(options: HarnessOptions = {}) {
 		stock: options.stock,
 	});
 	activeCapabilities = toolchain.capabilities;
-	// The research scenarios of these fixtures run the Web search executor through selection. Production withdraws
-	// it from selection (revision 11); the fixtures publish the earlier revision again unless a test is about that.
-	if (
-		!options.withdrawnWebSearch &&
-		store.read((db) =>
-			toolchain.capabilities
-				.toolchainsInTransaction(db)
-				.some((d) => d.id === "web.search"),
-		)
-	)
-		await store.write((db) =>
-			toolchain.capabilities.publishToolchainRevisionInTransaction(
-				db,
-				"web.search",
-				"toolchain:web.search@10",
-			),
-		);
+
 	await dotsWork?.setup();
 	const music = options.musicGateway
 		? createMusic({
@@ -790,7 +756,6 @@ export async function harness(options: HarnessOptions = {}) {
 		options,
 		toolchain,
 		store,
-		settings,
 		inference,
 		ask: (messages, round) =>
 			choiceByScript(messages as never, round, (loop) =>
@@ -874,7 +839,6 @@ export async function harness(options: HarnessOptions = {}) {
 	if (
 		options.everyday ||
 		options.pipelines ||
-		options.pursuit ||
 		options.webNote ||
 		appRuntime ||
 		options.schedules
@@ -895,7 +859,6 @@ export async function harness(options: HarnessOptions = {}) {
 			...options.workflowRuntime?.(toolchain.agents),
 			...appWorkflowPorts,
 			settings,
-			pursuit: toolchain.pursuit,
 			webNote: toolchain.webNote,
 			collaboration: toolchain.collaboration,
 			interact: browser?.interact,
@@ -924,6 +887,7 @@ export async function harness(options: HarnessOptions = {}) {
 		token: "fixture-token-for-toolchain-browser",
 		origin: process.env.EUMENES_ORIGIN ?? "http://localhost",
 		modules: appModules({
+			video,
 			scratch: options.scratch,
 			markdown,
 			docling: options.docling,
@@ -954,7 +918,6 @@ export async function harness(options: HarnessOptions = {}) {
 		}),
 	});
 	toolchain.agents.start();
-	if (options.pursuit) toolchain.pursuit?.start();
 	queue.start();
 	const request = async (path: string, body?: unknown) =>
 		app.request(path, {
@@ -1032,7 +995,6 @@ export async function harness(options: HarnessOptions = {}) {
 			return calls;
 		},
 		async close() {
-			await toolchain.pursuit?.close();
 			toolchain.webNote.close();
 			await browser?.service.disconnect();
 			await kanbanRuns?.disconnect();

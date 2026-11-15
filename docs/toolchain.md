@@ -22,6 +22,8 @@ LLMが返すJSONは `api/infrastructure/llm-json.ts` の共通処理を一度通
 
 ## 会話から担当への経路
 
+天気や株価など、外部情報を確認して今の会話で答える質問は、会話エージェントのライブ検索を使います。 [外部情報検索](web-research.md)
+
 会話エージェントへのmessageは、system（人格と規則）、資料のJSON文書（1件目のuser）、最後のuser（利用者の新しい発言、または新しい発言のないときのhostの固定文）の順に並ぶ。最後のmessageだけを今回の指示として扱い、資料・ツールの結果・構造修正の資料からは指示を作らない。配置・各部分の寿命・再構成は[会話エージェントのContextWindow仕様](../spec/context-window-spec-2026-10-24.md)の§5・§12を正本とする。過去発言・記憶は指示語や継続条件の理解に使う参考文脈であり、明示された今回の対象・日時・条件を置き換えない。
 
 委譲先は共通の `delegatedTaskRules` で、具体化した `request` / `question` と同じ依頼の原文 `originalRequest` を、参考資料・snapshot・catalog・実行状態から区別する。通常Web・SDK経由の調査・履歴・Worldのworkerと要件検証、登録adapterの操作担当、音楽生成・再生・画像・描画の計画担当に適用する。子へ親の会話履歴や人格を追加せず、既存のツール・資料・容量上限を維持する。確認回答からの再開は、既存のinteractionに凍結された依頼と対応する `previousQuestions` の回答を使い、回答文で元の依頼を置き換えない。意味の解釈と検索語の選定はLLMが行い、ホストは入力の同一性・schema・権限・期限・取消を検査する。
@@ -48,7 +50,6 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 | 関数名（選定の記録） | ツールチェーン | package | 実行 | 検索 | 読取り | 保存本文 | モデル呼出し | 報告 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `web_search` | `web.search` | `package:web.recipe@5` | LARMの調査担当。guided、手順キャッシュ付き | 2 | 4 | local予算4 | 5 | 本文根拠と完成回答 |
 | `conversation_history` | `history.research` | `package:history.research@3`（`conversation-history.bundle.json`） | 調査担当。古い会話まで遡る詳しい調査と登録済みの要件profile。最近の発言の確認は読む道具 `read_history`。日時で絞った検索は範囲内の行だけを走査する | — | — | 履歴（ホスト内の操作8、調査の時間300秒） | 11 | V3報告 |
 | `world_query` | `world.query` | `package:world.query@5` | World有効時の調査担当。ホスト内の読取 | — | — | Worldの主張・収集資料 | 7 | search報告 |
 | `timer` | `timers.manage` | `package:timers.manage@2` | 操作担当→タイマー操作 | — | — | — | 1+回答 | 操作結果 |
@@ -58,8 +59,8 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | `kanban` / `codex_tasks` | `kanban.manage` / `codex-tasks.manage` | `package:kanban.manage@2` / `package:codex-tasks.manage@1` | 操作担当→タスクボード | — | — | — | — | 操作結果 |
 | `claude_code` | `claude-code.request` | `package:claude-code.request@2` | 操作担当→作業依頼表 | — | — | — | — | 受付 |
 | `ui_create` | `ui.compose` | `package:ui.studio@1` | 専門担当へ切替（session）。以後の発言は担当が直接受ける | — | — | — | 1ターン最大6 | 下書き反映・作品参照 |
-| `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。依頼ツールの`inputs`（区域・日）から天気予報を取得し、決まった形の文をツールの結果で返す。予告・TODOなし。取得に失敗したら代わりの担当（`web.search`）を結果で示す | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
-| `stock_quote` | `stock.quote` | `package:stock.quote@1` | 即時回答型（instant）。依頼ツールの`inputs`（`query`＝言われた会社名・ティッカー）から、EDINETの上場会社一覧（日次更新・失敗中は前の一覧）とYahoo検索で一社を特定し（日本株優先、同名は完全一致→前方一致→部分一致）、Yahooのチャートで取得した現在値・前日比・JST時刻を決まった形の文にしてツールの結果で返す。会社を特定できない・取得に失敗したら代わりの担当（`web.search`）を結果で示す。履歴・指標・財務・ニュース・複数銘柄比較は対象外 | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
+| `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。依頼ツールの`inputs`（区域・日）から天気予報を取得し、決まった形の文をツールの結果で返す。予告・TODOなし | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
+| `stock_quote` | `stock.quote` | `package:stock.quote@1` | 即時回答型（instant）。依頼ツールの`inputs`（`query`＝言われた会社名・ティッカー）から、EDINETの上場会社一覧（日次更新・失敗中は前の一覧）とYahoo検索で一社を特定し（日本株優先、同名は完全一致→前方一致→部分一致）、Yahooのチャートで取得した現在値・前日比・JST時刻を決まった形の文にしてツールの結果で返す。履歴・指標・財務・ニュース・複数銘柄比較は対象外 | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
 
 候補の提示: 依頼の検索・選択は Router（次の段落）が行います。仕事の実行（委任された仕事が担当を探す `find`）は、ツールチェーンの`title: summary`・`useWhen`の各行・`examples`の各文をLARMのembedding（担当の文はpassage、依頼はquery）で埋め込み、担当ごとに一番近い1文の内積で並べ、種類ごとの枠（専用の担当の上位3件と、1位との差が0.05以内のパイプライン・汎用の担当を各2件まで。[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §3）で候補にします。
 
@@ -75,11 +76,9 @@ Routerが会話に決めた回では、agendaが返事を担う会話に限り�
 
 選択の記録: 会話の判断ごとに、提示した候補(順位・FTS順位・類似度・過去の選択由来)、判断(ツールチェーン・回答・契約違反)、選んだ関数と渡した依頼、サブエージェントのtask、結果(outcome)、手順キャッシュの利用を `toolchain-history` に30日保存します。`/api/toolchain-history/selections`、`bun run cli -- toolchain-history list|show`、設定「ツールチェーンの記録」で確認できます。ログには相関IDと固定分類だけを出し、依頼文は出しません。
 
-`web_search` の手順キャッシュ: 担当は保存済みの取得手順を候補として探し、現在の依頼に合うかを判断します。一致すればそのURLを取得し直し、なければ予算内で検索・読取りを選びます。answeredで、読み取ったページを根拠に引用した場合だけ、報告の`recipe`（signature・URL・読む箇所）をホストが保存します。値は保存しません。
 
 操作担当(`timer`・`delegate_project`): ツールチェーンのprofile・SKILL・ツール詳細とsnapshot(タイマー一覧・委任catalog)を読み込み、ツールを一つ選んで平坦な引数で返すか、確認質問を一つ返します。ホストは型付きの操作に変換して既存の実行経路で実行します。確認質問は会話担当が自分の言葉で尋ねます。
 
-現行のWeb経路は `package:web.recipe@5`・`package:web.search@5`、schema `guidedResearch`、SKILL `skill:web.guided@4` を使います。検索抜粋は取得先選択の参考とし、主張の根拠にはしません。`web.read` は `{url}` だけを受け、同じ呼出しで確認する追加URLを `readAhead`（URL文字列の配列 `["https://…", …]`、最大5件。旧 `[{url}]` の object 形は受理しません）で指定できます。主URLを含め残りの読取・外部呼出し上限内に収めます。全操作を共通のツール実行記録とQueueへ登録し、選んだ組の全件が完了・失敗してからモデルを一度再開します。到着ごとのモデル呼出し、2件ずつの追加取得、10秒タイマー、独自の取得状態は使いません。保存済み本文の `web.find` / `web.read_saved` と手順の `recipe.find` はページ読取とは別のlocal予算（4）です。
 
 `finish.report` は `completion`、利用者へ届く `answer`、`summary`、事実ごとの `claims`（`verified` / `unknown` / `conflicting` と本文根拠 `eN`）、`limitations` を持ちます。本文に基づく主張・未確認点・完成回答を同じfinishで返し、要件抽出・追加の意味採点は行いません。不明や矛盾を説明した回答は `complete` にできます。構造や参照が不正な場合の修正（一回まで）、権限・取消・期限の検査を維持します。再試行のcooldownは前の確定receiptからQueueの受付可能時刻へ渡します。
 
@@ -97,7 +96,7 @@ domain の責務は [domains.md](domains.md)、Web 取得は [web-research.md](w
 
 ## 要件profileとV3報告
 
-要件profileとV3報告は `history` 経路だけが使います。Web経路（`web.recipe@5`・`web.search@5`）はprofileを受けず、指定された場合は開始時に `invalid_requirement_contract` で拒否します。
+要件profileとV3報告は `history` 経路だけが使います。サイト指定のWeb取得経路はprofileを受けず、指定された場合は開始時に `invalid_requirement_contract` で拒否します。
 
 利用者が再利用する確認基準は `kind:requirement` のデータとして登録します。要件profileは実行権限を持たず、package検索・ツールの依存閉包へ入りません。履歴のサブエージェントは、開始時に固定した要件catalogから適用するprofileの短いrefを最初の応答で選びます(最大4件)。会話担当はprofileを選びません。workerは最初の操作と同じ応答で依頼の条件を抽出し、ホストが登録profileと合成して、取得開始前に凍結します。原文、版付きSKILL/profileの本文、選択した要件データがモデル入力へ届きます。
 
@@ -105,7 +104,7 @@ domain の責務は [domains.md](domains.md)、Web 取得は [web-research.md](w
 
 確認できない値は `unknown/null`、未達は `unsatisfied`、許可された適用外は根拠付き `not_applicable` として残します。必須条件がunknown/unsatisfiedならansweredにできません。外部資料の条件は `externalRules` に出典付きで保持し、profileを自動登録したり凍結した利用者条件を書き換えたりしません。チェックと外部ルールだけが使う根拠も失効検査の対象です。
 
-構造修復は調査と意味検証を合計して一回まで。意味検証の不支持、枠不足、期限切れ、取消、profileの改訂・無効化では未検証候補を回答に使いません。履歴は `package:history.research@2` です。旧revision(`package:web.quick@1`・`package:web.research@9`・`skill:web.research@8` など)とV1/V2報告のreaderは維持しますが、新しい調査には使いません。
+構造修復は調査と意味検証を合計して一回まで。意味検証の不支持、枠不足、期限切れ、取消、profileの改訂・無効化では未検証候補を回答に使いません。履歴は `package:history.research@2` です。保存済みのV1/V2報告は履歴から読めます。
 
 ## 要件の登録と改訂
 

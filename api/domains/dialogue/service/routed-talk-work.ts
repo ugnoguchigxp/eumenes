@@ -1,5 +1,7 @@
+import { availableToolchainsInTransaction } from "./delegate-conversation";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { AgentToolDefinition } from "../contracts";
+import { reasonOf, routeByEntry } from "./routed-package";
 import { TOOL_NAMES } from "./generation-tools";
 import { lineText } from "./input-text";
 import { handWith, type Fields } from "./routed-actions";
@@ -12,7 +14,7 @@ import { ASK_STEP } from "./tool-exchange";
 
 /**
  * The talk turn's way to a toolchain (spec router-package-integration, 2026-11-12): when the router left the turn to
- * the conversation, the reply itself may look for a toolchain and hand it the work. Looking is the host's search;
+ * the conversation, the reply itself may look for a toolchain and hand it the work. Looking ranks up to five candidates and asks the decision model to select one;
  * handing over runs the router's own hand-over (the same fields fill, the same host operations, the host's
  * announcement), so a request reaches a toolchain by one code path whoever chose it.
  */
@@ -114,8 +116,56 @@ export function createTalkWork(turn: Turn) {
 	async function find(args: Record<string, unknown>): Promise<Answer> {
 		const query = typeof args.query === "string" ? args.query.trim() : "";
 		if (!query) return answer({ candidates: [], code: "invalid_arguments" });
+		const router = turn.router;
+		if (!router)
+			return answer({ candidates: [], code: "router_selection_unavailable" });
+		const text = Array.from(query).slice(0, QUERY_CHARS).join("");
+		let selected;
+		try {
+			const available = turn.deps.store.read((db) => {
+				const ready = availableToolchainsInTransaction(turn.deps, db);
+				return new Set(
+					turn.deps
+						.toolchains!.catalogInTransaction(db)
+						.filter(
+							({ id, runtime, selectable }) =>
+								ready.has(id) &&
+								selectable !== false &&
+								runtime.execution !== "pipeline" &&
+								runtime.execution !== "read",
+						)
+						.map(({ id }) => id),
+				);
+			});
+			selected = await routeByEntry(
+				turn,
+				router,
+				{
+					state: { text, previousAgent: null, previousUser: null },
+					available: (id) => available.has(id),
+				},
+				new Map(),
+				"tools-only",
+			);
+		} catch (cause) {
+			if (turn.signal.aborted) throw cause;
+			return answer({ candidates: [], code: reasonOf(cause) });
+		}
+		if (selected.decision.to !== "run")
+			return answer({
+				candidates: [],
+				code: selected.decision.to === "clarify" ? "clarify" : "no_candidate",
+				...(selected.decision.to === "clarify"
+					? { question: selected.decision.question }
+					: {}),
+			});
+		const selectedId = selected.decision.candidate.id;
+		const rank = selected.parts[0]?.candidates.find(
+			({ candidate }) => candidate.id === selectedId,
+		);
 		const searched = await turn.act(TOOL_NAMES.search, {
-			query: query.slice(0, QUERY_CHARS),
+			query: text,
+			ids: [selectedId],
 		});
 		if ("refused" in searched)
 			return answer({ candidates: [], code: searched.refused.message });
@@ -126,7 +176,8 @@ export function createTalkWork(turn: Turn) {
 		const shown: Record<string, unknown>[] = [];
 		for (const card of searched.outcome.search?.cards ?? []) {
 			// The reply has the read tools itself, and a pipeline is the router's to plan.
-			if (card.read || card.execution === "pipeline") continue;
+			if (card.id !== selectedId || card.read || card.execution === "pipeline")
+				continue;
 			const choice = result.candidates?.find((c) => c.id === card.id);
 			if (!choice) continue;
 			found.set(card.id, {
@@ -141,6 +192,8 @@ export function createTalkWork(turn: Turn) {
 				title: card.title,
 				summary: card.summary,
 				useWhen: card.useWhen,
+				searchRank: rank?.searchRank ?? null,
+				matchScore: rank?.matchScore ?? null,
 				...(choice.produces?.length ? { produces: choice.produces } : {}),
 			});
 		}
@@ -155,7 +208,14 @@ export function createTalkWork(turn: Turn) {
 			};
 		return answer({
 			candidates: shown,
-			...(typeof result.code === "string" ? { code: result.code } : {}),
+			...(!shown.length
+				? {
+						code:
+							typeof result.code === "string"
+								? result.code
+								: "router_candidate_unavailable",
+					}
+				: {}),
 		});
 	}
 

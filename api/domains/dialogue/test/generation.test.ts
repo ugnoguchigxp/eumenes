@@ -31,7 +31,6 @@ test("an utterance is answered with plain text: the said events, a full delivery
 	expect(call.tools).toEqual(["read_history", "read_runs"]);
 	const log = h.log();
 	expect(log.map((e) => [e.type, e.by, h!.fields(e).action ?? null])).toEqual([
-		["acted", "agent", "find_toolchain"],
 		["said", "user", null],
 		["said", "agent", null],
 		["delivered", "host", null],

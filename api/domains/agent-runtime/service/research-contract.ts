@@ -89,19 +89,7 @@ export const firstResearchAction = z
 			},
 		],
 	});
-const findings = draftReportBase
-	.omit({ checks: true, externalRules: true })
-	.extend({
-		/** Optional: a fetch procedure worth keeping, judged by the host before it is saved. */
-		recipe: z
-			.object({
-				signature: z.string().trim().min(1).max(200),
-				url: z.string().max(2048),
-				readHint: z.string().trim().min(1).max(200),
-			})
-			.strict()
-			.optional(),
-	});
+const findings = draftReportBase.omit({ checks: true, externalRules: true });
 export const searchReport = z.discriminatedUnion("outcome", [
 	findings.extend({
 		outcome: z.enum(["answered", "partial"]),

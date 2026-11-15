@@ -105,7 +105,7 @@ test("an instant binding has no field filled from the host's values: its argumen
 		const toolchain = bundle.definitions.find(
 			(d: any) => d.kind === "toolchain",
 		);
-		toolchain.revision = 3;
+		toolchain.revision += 1;
 		toolchain.bindingRevisionId = "binding:weather.forecast@3";
 		const result = await dryRun(store, caps, bundle);
 		expect(result.issues.map((i) => i.code)).toContain("invalid_format");
@@ -119,7 +119,7 @@ test("an adapter that does not answer instant bindings is refused", async () => 
 		const toolchain = bundle.definitions.find(
 			(d: any) => d.kind === "toolchain",
 		);
-		toolchain.revision = 3;
+		toolchain.revision += 1;
 		toolchain.bindingRevisionId = "binding:weather.forecast@3";
 		const result = await dryRun(store, caps, bundle, host(false));
 		expect(result.issues.map((i) => i.code)).toContain("unregistered_adapter");
@@ -132,7 +132,7 @@ test("an instant toolchain that also names an artifact is refused", async () => 
 		const toolchain = bundle.definitions.find(
 			(d: any) => d.kind === "toolchain",
 		);
-		toolchain.revision = 3;
+		toolchain.revision += 1;
 		toolchain.artifactRevisionId = "artifact:timers.workspace@3";
 		const result = await dryRun(store, caps, bundle);
 		expect(result.issues.map((i) => i.code)).toContain("invalid_toolchain");

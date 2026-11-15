@@ -140,7 +140,12 @@ export function createGenerationHandler(
 							});
 						log.info("dialogue.generation_completed");
 						return {
-							text: reportedLinks(deps, input, generated.text),
+							text: reportedLinks(
+								deps,
+								input,
+								generated.text,
+								generated.lookupSources,
+							),
 							...(generated.imageAnswer
 								? { imageAnswer: generated.imageAnswer }
 								: {}),

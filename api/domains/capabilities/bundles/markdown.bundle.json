@@ -171,9 +171,9 @@
 				"owner": "markdown",
 				"actions": ["open", "read"],
 				"defaultAction": "open",
-				"producedBy": ["markdown.collaborate", "web.research"]
+				"producedBy": ["markdown.collaborate"]
 			},
-			"revision": 2,
+			"revision": 3,
 			"aliases": [],
 			"tags": [],
 			"useWhen": [],

@@ -1,6 +1,13 @@
+import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import type { RouteAnswer, RouteInput } from "../../inference/contracts";
 import type { ToolchainCard } from "../../capabilities";
-import { IMAGE, setup, type SetupOptions } from "./generation.fixture";
+import {
+	IMAGE,
+	INSTANT,
+	fixtureSelection,
+	setup,
+	type SetupOptions,
+} from "./generation.fixture";
 import { settings, type Snapshot } from "./harness.fixture";
 
 /** A second toolchain that changes what exists, so its hand-over is confirmed first. */
@@ -14,16 +21,8 @@ export const EDIT: ToolchainCard = {
 };
 
 export const ROUTER = {
-	profile: "router-fixture-profile" as string | undefined,
-	entry: "route" as "route" | "routeStructured",
 	structureResourceId: null as string | null,
 	structureTimeoutMs: 8000,
-	timeoutMs: 2000,
-	accept: 0.6,
-	low: 0.3,
-	margin: 0.15,
-	approve: 0.85,
-	multi: 0.5,
 	feedbackNear: 0.95,
 	feedbackWeight: 2,
 };
@@ -32,11 +31,7 @@ export type Script = (
 	signal: AbortSignal,
 ) => Promise<RouteAnswer>;
 
-/**
- * LARM's context judgment: these scores for the criteria named (0 for the rest; the conversation is never sent), and
- * probabilities in proportion. With the fixture's best-v2 a score of 0.95 is a sure top, 0.45 a top that is not sure,
- * and the conversation leads when nothing scores (generation.fixture `ROUTER_MODEL`).
- */
+/** Ordered fixture preferences for the otherwise scripted decision API. */
 export const weigh =
 	(scores: Record<string, number>): Script =>
 	async (input) => {
@@ -71,10 +66,7 @@ export type StructureCall = {
 	signal: AbortSignal;
 };
 
-/**
- * A harness with the router saved as `router` says, LARM's context judgment scripted (its calls are `routes`) and the
- * structure model scripted (`structures`: an answer, or an Error it fails with; its calls are `structureCalls`).
- */
+/** Fixture with independently scripted structure and candidate selection. */
 export async function startRouter(
 	router: Partial<typeof ROUTER> = {},
 	options: SetupOptions = {},
@@ -90,46 +82,68 @@ export async function startRouter(
 	const scripts: Script[] = [];
 	const structures: Array<string | Error | (() => Promise<string>)> = [];
 	const structureCalls: StructureCall[] = [];
-	const controls = new Map<string, Record<string, unknown>>();
-	Object.assign(h.larm, {
-		route: async (input: RouteInput, signal: AbortSignal) => {
-			routes.push(input);
+	let explicit = false;
+	const select = fixtureSelection(
+		async (
+			{ text, criteria, previousUser, previousAgent, instructions },
+			signal,
+		) => {
 			const next = scripts.shift();
-			if (!next) throw new Error("fixture_route_missing");
-			return next(input, signal);
+			if (!next) return [];
+			const received: RouteInput = {
+				text,
+				criteria,
+				previousAgent,
+				previousUser,
+				instructions,
+			};
+			routes.push(received);
+			const adapterInput = {
+				...received,
+				criteria: [
+					...criteria,
+					...(options.cards ?? [IMAGE, INSTANT])
+						.filter(({ id }) => !criteria.some(({ name }) => name === id))
+						.map(({ id, summary }) => ({ name: id, description: summary })),
+					...(!criteria.some(({ name }) => name === "memory.request")
+						? [{ name: "memory.request", description: "" }]
+						: []),
+				],
+			};
+			const picked = await next(adapterInput, signal);
+			return Object.entries(picked.scores ?? {})
+				.filter(([, score]) => score > 0)
+				.sort((a, b) => b[1] - a[1])
+				.map(([id]) => id);
 		},
-		captureBackgroundControlInTransaction: (
-			_db: unknown,
-			control: Record<string, unknown>,
-		) => {
-			const id = `structure-${controls.size + 1}`;
-			controls.set(id, control);
-			return id;
-		},
-		executeControl: async (
-			requestId: string,
-			messages: Array<{ role: string; content: string }>,
+	);
+	Object.assign(h.larm, {
+		selectRouter: async (
+			prompt: Parameters<typeof select>[0],
 			signal: AbortSignal,
-			options: unknown,
-			session: unknown,
 		) => {
+			if (prompt.version !== TURN_STRUCTURE_PROMPT.version)
+				return select(prompt, signal, explicit);
+			explicit = structures.length > 0;
+			if (!explicit) return select(prompt, signal);
 			structureCalls.push({
-				control: controls.get(requestId)!,
-				messages,
-				options,
-				session,
+				control: {},
+				messages: [
+					{ role: "system", content: prompt.system },
+					{ role: "user", content: prompt.user },
+				],
+				options: { outputSchema: prompt.outputSchema },
+				session: null,
 				signal,
 			});
-			const next = structures.shift();
-			if (next === undefined) throw new Error("fixture_structure_missing");
+			const next = structures.shift()!;
 			if (next instanceof Error) throw next;
-			let value = typeof next === "function" ? await next() : next;
+			const value = typeof next === "function" ? await next() : next;
 			try {
-				value = JSON.stringify({ decision: JSON.parse(value) });
+				return JSON.stringify({ decision: JSON.parse(value) });
 			} catch {
-				/* Deliberately malformed fixture. */
+				return value;
 			}
-			return { requestId, attemptId: "structure", value };
 		},
 	});
 	return { h, routes, scripts, structures, structureCalls };

@@ -280,7 +280,7 @@ test("a question of a task is reported into its TODO, ordinary chat keeps it wai
 	}
 }, 15000);
 
-test("an instant child keeps the registered arguments and follows its explicit research fallback inside the same logical call", async () => {
+test("an instant child keeps the registered arguments and reports the provider failure without invoking another capability", async () => {
 	const { weatherFetch } = await import("../weather/weather.fixture");
 	const weather = weatherFetch({
 		forecast: () => new Response("unavailable", { status: 503 }),
@@ -317,13 +317,13 @@ test("an instant child keeps the registered arguments and follows its explicit r
 						contextRefs: [],
 					},
 				};
-			expect(packet.results[0].state).toBe("completed");
+			expect(packet.results[0].state).toBe("failed");
 			return {
 				name: "complete_task",
 				arguments: {
-					summary: "代替の調査結果を確認しました。",
-					fulfilled: ["forecast checked"],
-					missing: [],
+					summary: "天気を取得できませんでした。",
+					fulfilled: [],
+					missing: ["forecast unavailable"],
 					refs: packet.results.flatMap((r: { refs: string[] }) => r.refs),
 				},
 			};
@@ -338,10 +338,10 @@ test("an instant child keeps the registered arguments and follows its explicit r
 		});
 		await waitFor(
 			() =>
-				h.toolchain.agents.executions.list("main")[0]?.status === "completed",
+				h.toolchain.agents.executions.list("main")[0]?.status === "partial",
 			{ timeout: 5000 },
 		);
-		expect(steps).toBe(3);
+		expect(steps).toBe(4);
 		expect(h.dialogue.answerText(source.id)).toBe(
 			"「日常の複数操作」に頼みます。",
 		);
@@ -355,7 +355,8 @@ test("an instant child keeps the registered arguments and follows its explicit r
 			source: { runId: source.id },
 			arguments: { place: "鎌倉", day: "tomorrow" },
 		});
-		expect(JSON.parse(rows[0]!.result_json).ref.kind).toBe("research");
+		expect(JSON.parse(rows[0]!.result_json)).toMatchObject({ state: "failed" });
+		expect(h.workerContexts).toEqual([]);
 		expect(h.commandContexts).toEqual([]);
 	} finally {
 		await h.close();

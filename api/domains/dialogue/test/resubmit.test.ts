@@ -58,7 +58,7 @@ test("an edit while the answer is generated stops the run, corrects the utteranc
 	);
 	// The log's pending copy is the corrected one: the next generation reads what the user meant.
 	expect(pending().map((e) => h!.fields(e).text)).toEqual(["猫の絵を描いて"]);
-	h.state.steps.push(...reply("猫です。"));
+	h.state.steps.push({ text: "猫です。" });
 	release();
 	await waitFor(() => h!.dialogue.get(result.run.id)?.status === "completed");
 	expect(h.dialogue.answerText(result.run.id)).toBe("猫です。");
@@ -184,10 +184,26 @@ test("a repeated requestId is one edit and one run", async () => {
 });
 
 test("finding a toolchain commits nothing: the utterance is still edited, and its exchange moves to the new run", async () => {
-	h = await setup();
+	h = await setup({
+		async selectRouter(prompt) {
+			if (!prompt.version.startsWith("route-selection"))
+				return JSON.stringify({
+					decision: {
+						requests: [
+							{
+								text: JSON.parse(prompt.user).text,
+								target: null,
+								inputs: [],
+								after: [],
+							},
+						],
+					},
+				});
+			return '{"selections":{"0":{"kind":"conversation"}}}';
+		},
+	});
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	// The host offered what the router ranked before the talk call, which is held.
 	h.state.steps.push({ text: "犬です。" });
 	const run = await submit("犬の絵");
 	await waitFor(() => h!.state.calls.length === 1);
@@ -197,7 +213,7 @@ test("finding a toolchain commits nothing: the utterance is still edited, and it
 	const result = await resubmit(run.inputMessageId, "猫の絵");
 	if (!result.ok) throw new Error(result.code);
 	expect(h.conversation.message(run.inputMessageId)?.runId).toBe(result.run.id);
-	h.state.steps.push(...reply("猫です。"));
+	h.state.steps.push({ text: "猫です。" });
 	release();
 	await waitFor(() => h!.dialogue.get(result.run.id)?.status === "completed");
 	expect(

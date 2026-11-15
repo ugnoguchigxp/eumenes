@@ -99,13 +99,7 @@ function completedTalk(
 	};
 }
 
-/**
- * One turn of the local harness (the local harness rebuild plan, section 4): the eumenes_router package decides every
- * utterance turn, the conversation among the toolchains, the work and the open confirmations and questions (spec
- * router-package-integration 2026-11-04 §1 #12), with no model call of its own; the model talks (one call, no tools)
- * when the turn is the conversation's, when no router is saved, or when it could not decide. Every word for the user
- * goes out through one mouth, so what was said is the answer.
- */
+/** Route a new utterance, then let the conversation agent reply or carry out the selected action. */
 export async function runRoutedTurn(
 	deps: DialogueDeps,
 	input: GenerateInput,
@@ -143,6 +137,7 @@ export async function runRoutedTurn(
 	const { receipt, emotion, imageAnswer } = turn.result();
 	return {
 		text: turn.said().trim(),
+		...(turn.lookupSources.length ? { lookupSources: turn.lookupSources } : {}),
 		...(receipt ? { receipt } : {}),
 		...(emotion ? { emotion } : {}),
 		...(imageAnswer ? { imageAnswer } : {}),
@@ -221,6 +216,7 @@ function createTurn(
 	const { signal } = options;
 	const executed: GenerationOutcome["executed"] = [];
 	const exchange: ExchangeStep[] = [];
+	const lookupSources: NonNullable<GenerationOutcome["lookupSources"]> = [];
 	let receipt: Receipt | undefined;
 	let imageAnswer: GenerationOutcome["imageAnswer"];
 	let said = "";
@@ -294,6 +290,7 @@ function createTurn(
 		utterance: input.utterances.join("\n"),
 		executed,
 		exchange,
+		lookupSources,
 		calls: () => calls,
 		said: () => said,
 		published: () => published,
@@ -502,6 +499,8 @@ function createTurn(
  * The reply's read and work tools. Only offered tools run and their arguments must be objects. Work tools
  * require the routed input and an agent whose reply may hand work over.
  */
+const LOOKUP_TOOL = "lookup_public_information";
+
 function conversationToolPort(turn: Turn, acts: boolean, onCall: () => void) {
 	const { deps, input } = turn;
 	const reads = acts
@@ -526,10 +525,26 @@ function conversationToolPort(turn: Turn, acts: boolean, onCall: () => void) {
 			? [MEMORY_REQUEST_TOOL]
 			: []),
 	];
+	const lookup = acts ? deps.lookup : undefined;
 	const tools = [...readTools, ...(work?.tools ?? [])];
+	if (lookup)
+		tools.push({
+			name: LOOKUP_TOOL,
+			description: systemContext(
+				"dialogue.contexts.agency.external-lookup",
+				{},
+			),
+			parameters: {
+				type: "object",
+				additionalProperties: false,
+				required: ["query"],
+				properties: { query: { type: "string" } },
+			},
+		});
 	return {
 		tools,
-		maxToolCalls: (readTools.length ? 1 : 0) + (work?.tools.length ?? 0),
+		maxToolCalls:
+			(readTools.length ? 1 : 0) + (work?.tools.length ?? 0) + (lookup ? 1 : 0),
 		async call(toolCall: AgentToolCall) {
 			let args: unknown;
 			try {
@@ -550,6 +565,19 @@ function conversationToolPort(turn: Turn, acts: boolean, onCall: () => void) {
 					}),
 				};
 			onCall();
+			if (lookup && toolCall.name === LOOKUP_TOOL) {
+				const { query } = args as { query?: unknown };
+				if (typeof query !== "string" || !query.trim() || query.length > 2000)
+					return { content: JSON.stringify({ code: "lookup_query_invalid" }) };
+				try {
+					const result = await lookup(query.trim(), turn.signal);
+					turn.lookupSources.push(...result.sources);
+					return { content: JSON.stringify(result) };
+				} catch {
+					turn.signal.throwIfAborted();
+					return { content: JSON.stringify({ code: "lookup_unavailable" }) };
+				}
+			}
 			if (work?.handles(toolCall.name))
 				return work.call(toolCall.name, args as Record<string, unknown>);
 			const read = await turn.act(

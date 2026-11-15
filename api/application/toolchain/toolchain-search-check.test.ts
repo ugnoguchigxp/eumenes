@@ -44,7 +44,7 @@ test("a past choice is ranked again from its stored vector; one the slots would 
 	await capabilities.seed();
 	const history = createToolchainHistory(store);
 	const active = store.read((db) => capabilities.toolchainsInTransaction(db));
-	expect(active.find((d) => d.id === "web.search")?.general).toBe(true);
+	expect(active.find((d) => d.id === "history.research")).toBeDefined();
 	// The music toolchain is the one a music request is close to; every other toolchain is far from both requests.
 	await store.write((db) =>
 		capabilities.saveToolchainVectorsInTransaction(
@@ -75,7 +75,7 @@ test("a past choice is ranked again from its stored vector; one the slots would 
 		);
 	await choose("r1", "music.create", oneHot(0));
 	// The general toolchain chosen for this request is far from the closest candidate: the slots leave it out.
-	await choose("r2", "web.search", oneHot(0));
+	await choose("r2", "history.research", oneHot(0));
 	await choose("r3", "retired.chain", oneHot(0));
 	const check = createSearchCheck({
 		store,
@@ -97,7 +97,7 @@ test("a past choice is ranked again from its stored vector; one the slots would 
 		ranks: { "1": 1 },
 	});
 	expect(result.missed).toEqual([
-		expect.objectContaining({ toolchainId: "web.search" }),
+		expect.objectContaining({ toolchainId: "history.research" }),
 	]);
 	expect(Object.keys(result.missed[0]!).sort()).toEqual([
 		"createdAt",

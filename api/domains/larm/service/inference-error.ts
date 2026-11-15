@@ -1,16 +1,18 @@
 import { readBounded } from "../../../infrastructure/bounded-read";
+import { onDemandRefusal } from "./resend";
 export class LarmInferenceError extends Error {
 	constructor(
 		public status: number,
 		public code?: string,
 	) {
 		super(
-			code &&
+			onDemandRefusal(status, { code })?.message ??
+				(code &&
 				/^(image_(reference_unsupported|role_unsupported|detail_unsupported|too_large|count_exceeded|dimensions_exceeded|format_unsupported|mime_mismatch|not_supported|invalid)|body_too_large|output_parameter_unsupported|output_budget_exceeded|context_budget_exceeded|chat_token_count_unavailable|chat_input_contract_unavailable|gateway_timeout)$/.test(
 					code,
 				)
-				? code
-				: `larm_inference_${status}`,
+					? code
+					: `larm_inference_${status}`),
 		);
 	}
 }

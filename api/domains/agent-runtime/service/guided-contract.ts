@@ -26,14 +26,6 @@ const guidedReport = z
 		summary: z.string().min(1).max(1200),
 		claims: z.array(claim).max(8),
 		limitations: z.array(z.string().max(300)).max(8),
-		recipe: z
-			.object({
-				signature: z.string().trim().min(1).max(200),
-				url: z.string().url().max(2048),
-				readHint: z.string().trim().min(1).max(200),
-			})
-			.strict()
-			.optional(),
 	})
 	.strict();
 const invoke = z
@@ -60,7 +52,6 @@ export const guidedAction = z.discriminatedUnion("action", [
 ]);
 
 export const candidateReport = guidedReport
-	.omit({ recipe: true })
 	.extend({
 		resultKind: z
 			.enum(["candidates", "facts", "mixed"])

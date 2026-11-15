@@ -175,6 +175,7 @@ interface DialogueServiceOptions {
 	agency?: AgencyLayerPort;
 	/** The conversation agent that answers every generation. */
 	conversationAgent: ConversationAgentPort;
+	lookup?: DialogueDeps["lookup"];
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	/** The resource registry and the kinds each toolchain makes; without it the conversation has no resources. */
 	resources?: ResourceAccess;

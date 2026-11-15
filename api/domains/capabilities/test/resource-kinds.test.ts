@@ -142,7 +142,7 @@ test("produces lists the kinds a toolchain creates and the candidate card carrie
 			store.read((db) => caps.producesInTransaction(db, id));
 		expect(produces("image.create")).toEqual(["image"]);
 		expect(produces("music.create")).toEqual(["music.track"]);
-		expect(produces("web.search")).toEqual(["report"]);
+		expect(produces("history.research")).toEqual(["report"]);
 		expect(produces("history.research")).toEqual(["report"]);
 		expect(produces("kanban.manage")).toEqual(["code.task"]);
 		expect(produces("timers.manage")).toEqual([]);
@@ -331,5 +331,62 @@ test("revisions are versioned: seeding again changes nothing, a changed revision
 		expect(stored.some((s) => s.id === "resource-kind:resource.image@1")).toBe(
 			true,
 		);
+	});
+});
+
+test("seeding updates the stored report kind without rewriting its deployed revisions", async () => {
+	await withCapabilities(async (caps, store) => {
+		const current = resourceKindBuiltins.find(
+			(d) => d.id === "resource.report",
+		)!;
+		const { resourceKindData } = current as Definition & {
+			resourceKindData: ResourceKindRegistration;
+		};
+		await store.write((db) => {
+			for (const revision of [1, 2])
+				caps.registerBuiltinInTransaction(db, {
+					...current,
+					revision,
+					summary:
+						revision === 1
+							? "Web調査と会話履歴調査の報告"
+							: "Web調査と会話履歴調査、長考調査の報告",
+					resourceKindData: {
+						...resourceKindData,
+						producedBy: [
+							"web.search",
+							...resourceKindData.producedBy,
+							...(revision === 2 ? ["web.research"] : []),
+						],
+					},
+				});
+		});
+		const read = () =>
+			store.read((db) =>
+				db
+					.query(
+						"SELECT id, definition_hash FROM capability_revisions WHERE item_key='resource-kind:resource.report' ORDER BY revision",
+					)
+					.all(),
+			);
+		const original = read();
+		await caps.seed();
+		await caps.seed();
+		expect(read().slice(0, 2)).toEqual(original);
+		expect(read()).toHaveLength(3);
+		const report = store.read((db) =>
+			db
+				.query(
+					`SELECT i.active_revision_id AS revision,
+					json_extract(r.definition_json, '$.resourceKindData.producedBy') AS producers
+				FROM capability_items i JOIN capability_revisions r ON r.id=i.active_revision_id
+				WHERE i.key='resource-kind:resource.report'`,
+				)
+				.get(),
+		);
+		expect(report).toEqual({
+			revision: "resource-kind:resource.report@3",
+			producers: JSON.stringify(["web.service-search", "history.research"]),
+		});
 	});
 });

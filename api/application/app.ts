@@ -142,7 +142,7 @@ export function createApp(options: AppOptions) {
 			c.header("Access-Control-Expose-Headers", "X-Request-Id");
 			c.header(
 				"Access-Control-Allow-Headers",
-				"Authorization, Content-Type, Last-Event-ID, X-Session-Id, X-Generation, X-Sequence, X-Utterance-Id",
+				"Authorization, Content-Type, Idempotency-Key, Last-Event-ID, X-Session-Id, X-Generation, X-Sequence, X-Utterance-Id",
 			);
 			c.header(
 				"Access-Control-Allow-Methods",

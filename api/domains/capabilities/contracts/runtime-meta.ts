@@ -9,7 +9,7 @@ export type ToolRuntimeMeta = {
 	/**
 	 * search: external search; read: external read; saved_read: read of a body saved earlier;
 	 * history: read of the conversation history; world: read of the host's own World (claims
-	 * with their evidence); recipe: saved fetch procedures of the toolchain (host-local);
+	 * with their evidence);
 	 * local_action: host action (no network).
 	 */
 	operation:
@@ -18,7 +18,6 @@ export type ToolRuntimeMeta = {
 		| "saved_read"
 		| "history"
 		| "world"
-		| "recipe"
 		| "local_action"
 		| "child";
 	/**
@@ -32,11 +31,7 @@ export type ToolRuntimeMeta = {
 	cursorPaging?: boolean;
 };
 export type PackageRuntimeMeta = {
-	/**
-	 * quick: the small web budget (one search, one read, fewer model calls).
-	 * recipe: quick plus one saved-procedure lookup and one extra read for a failed fixed URL.
-	 */
-	budget?: "quick" | "recipe" | "service";
+	budget?: "service";
 	/** Return source-linked findings directly, without requirement extraction or grading. */
 	report?: "search";
 	/**
@@ -55,7 +50,6 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	"browser.research": { operation: "child" },
 	"web.lookup": { operation: "search" },
 	"web.read": { operation: "read", urlScope: "request_or_observed" },
-	"recipe.find": { operation: "recipe" },
 	"web.find": { operation: "saved_read", requiresSavedBody: true },
 	"web.read_saved": { operation: "saved_read", requiresSavedBody: true },
 	"history.search": { operation: "history", cursorPaging: true },
@@ -74,9 +68,6 @@ const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
 		context: "set",
 		researchMs: 330000,
 	},
-	"web.quick": { budget: "quick", report: "search" },
-	"web.search": { report: "search" },
-	"web.recipe": { budget: "recipe", report: "search", context: "set" },
 	"world.query": { report: "search", context: "set" },
 	// Reaches back over old conversations (spec conversation-read-tools-design 2026-10-31 §8).
 	"history.research": { researchMs: 300000 },
@@ -84,7 +75,6 @@ const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
 const toolchains: Readonly<
 	Record<string, import("./toolchains").ToolchainRuntimeMeta>
 > = {
-	"web.search": { execution: "research", route: "web", autonomy: "read" },
 	"web.service-search": {
 		execution: "research",
 		route: "web",
@@ -114,7 +104,7 @@ const toolchains: Readonly<
 	},
 	"music.library": { execution: "music-playback", requires: "music" },
 };
-/** Host metadata of a toolchain by definition id (e.g. `web.search`). */
+/** Host metadata of a toolchain by definition id. */
 export function toolchainRuntimeOf(
 	toolchainId: string,
 ): import("./toolchains").ToolchainRuntimeMeta | undefined {
@@ -128,7 +118,7 @@ export function toolRuntimeOf(revisionId: string): ToolRuntimeMeta | undefined {
 	const id = toolRevisionPattern.exec(revisionId)?.[1];
 	return id && Object.hasOwn(tools, id) ? tools[id] : undefined;
 }
-/** Metadata of the package with this definition id (e.g. `web.quick`). */
+/** Metadata of the package with this definition id. */
 export function packageRuntimeOf(
 	packageId: string,
 ): PackageRuntimeMeta | undefined {

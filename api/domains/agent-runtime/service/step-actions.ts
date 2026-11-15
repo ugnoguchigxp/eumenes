@@ -470,9 +470,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					(action.report as { outcome?: string }).outcome ?? "",
 				) &&
 				input.grants.some((g) => !g.replayOnly && !HOST_TOOLS.has(g.id)) &&
-				!tools
-					.invocationsInTransaction(db, t.id)
-					.some((i) => toolRuntimeOf(i.toolRevisionId)?.operation !== "recipe")
+				!tools.invocationsInTransaction(db, t.id).length
 			)
 				throw new ValidationFailure("invalid_report", [
 					{
@@ -493,10 +491,7 @@ export function createStepActions(ctx: RuntimeContext, ops: TaskOps) {
 					outcome.result,
 				);
 			} else if (input.search) {
-				saveSearchReport(db, t, action.report, input.catalog, tools, now(), {
-					hook: ctx.deps.onSearchReport,
-					packageId: prepared.get(t.id)?.package.id,
-				});
+				saveSearchReport(db, t, action.report, input.catalog, tools, now());
 				db.query(
 					"UPDATE agent_tasks SET report_state='available' WHERE id=?",
 				).run(t.id);

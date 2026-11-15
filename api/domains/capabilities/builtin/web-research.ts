@@ -37,15 +37,4 @@ export const builtins: Definition[] = [
 		summary: t.title,
 		dependencies: [],
 	})),
-	{
-		...base,
-		kind: "tool",
-		id: "recipe.find",
-		title: "保存済みの取得手順",
-		summary:
-			"同じ要求の保存済み取得手順の候補を返す。titleは手順の要約、urlは取得し直すページ",
-		dependencies: [],
-		backend: "web",
-		schemaKey: "recipeFind",
-	},
 ];

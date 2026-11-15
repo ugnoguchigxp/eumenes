@@ -97,6 +97,14 @@ export const domains = {
 		components: "packages/design-system/src/components/ComputeWorkspace",
 		depends: { api: ["queue", "resources"], web: ["resources"], test: [] },
 	},
+	video: {
+		tier: 1,
+		backend: "api/domains/video",
+		web: "web/src/domains/video",
+		components: "packages/design-system/src/components/VideoWorkspace",
+		integrationTests: ["api/application/media/video.test.ts"],
+		depends: { api: ["larm", "queue"], web: [], test: [] },
+	},
 	model3d: {
 		tier: 1,
 		backend: "api/domains/model3d",
@@ -508,17 +516,12 @@ export const domains = {
 	},
 	pursuit: {
 		tier: 3,
-		integrationTests: [
-			"api/application/pursuit/document-integration.test.ts",
-			"api/application/pursuit/document-registration.test.ts",
-			"api/application/pursuit/pursuit-integration.test.ts",
-			"api/application/pursuit/vendor.test.ts",
-		],
+		integrationTests: ["api/application/pursuit/upgrade.test.ts"],
 		backend: "api/domains/pursuit",
 		web: null,
 		components: null,
 		depends: {
-			api: ["capabilities", "inference", "queue", "resources", "tool-runtime"],
+			api: ["capabilities", "resources", "tool-runtime"],
 			web: [],
 			test: [],
 		},

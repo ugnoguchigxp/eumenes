@@ -774,6 +774,7 @@ select:focus-visible {
 	:is(
 		.music-workspace,
 		.image-workspace,
+		.ds-video-workspace,
 		.terminal-workspace,
 		.canvas-workbench
 	)
@@ -788,6 +789,7 @@ select:focus-visible {
 		:is(
 			.music-workspace,
 			.image-workspace,
+			.ds-video-workspace,
 			.terminal-workspace,
 			.canvas-workbench
 		)
@@ -799,6 +801,7 @@ select:focus-visible {
 		:is(
 			.music-workspace,
 			.image-workspace,
+			.ds-video-workspace,
 			.terminal-workspace,
 			.canvas-workbench
 		)
@@ -814,6 +817,7 @@ select:focus-visible {
 		:is(
 			.music-workspace,
 			.image-workspace,
+			.ds-video-workspace,
 			.terminal-workspace,
 			.canvas-workbench
 		)
@@ -830,7 +834,12 @@ select:focus-visible {
 	border-radius: 0;
 }
 .artifact-panel-body:has(
-		:is(.music-workspace, .image-workspace, .terminal-workspace)
+		:is(
+			.music-workspace,
+			.image-workspace,
+			.ds-video-workspace,
+			.terminal-workspace
+		)
 	)
 	.aui-composition {
 	display: flex;

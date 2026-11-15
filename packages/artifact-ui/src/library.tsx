@@ -1,3 +1,4 @@
+import { VideoWorkspaceView } from "./video-components";
 import { CanvasWorkspaceView } from "./canvas-components";
 import { ExternalAppLauncherView } from "./external-app-components";
 import { DotsMessagingView } from "./dots-messaging-components";
@@ -181,6 +182,7 @@ const renderers = {
 	"usage-dashboard": UsageDashboardView,
 	"avatar-motion-lab": AvatarMotionLabView,
 	"model3d-workspace": Model3dWorkspaceView,
+	"video-workspace": VideoWorkspaceView,
 	"compute-workspace": ComputeWorkspaceView,
 	"browser-workspace": BrowserWorkspaceView,
 	"browser-settings": BrowserSettingsView,

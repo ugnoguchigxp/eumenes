@@ -1,16 +1,7 @@
 import type { Database } from "bun:sqlite";
+import { type Card, type VectorSpace as RouterSpace } from "eumenes_router";
 import {
-	BEST_V2_PARAMS,
-	loadBestV2,
-	type BestV2Memory,
-	type BestV2Model,
-	type Card,
-	type VectorSpace as RouterSpace,
-} from "eumenes_router";
-import {
-	examplesInTransaction,
 	forgetInTransaction,
-	importExamplesInTransaction,
 	insertFeedbackInTransaction,
 	lexicalInTransaction,
 	saveVectorsInTransaction,
@@ -106,38 +97,6 @@ const routerSpace = (space: RouterQuery["space"]): RouterSpace => ({
  * router-package-integration 2026-11-04 §1 #2) are read and written here through the package, on this connection.
  */
 export function createRouter(store: SqliteStore, now: () => number) {
-	/** best-v2 with the memory of a space, made once per import (its vectors are read from the database once). */
-	let model: { key: string; model: BestV2Model | null } | undefined;
-	function routerModelInTransaction(
-		db: Database,
-		space: RouterQuery["space"],
-	): BestV2Model | null {
-		const key = vectorSpaceKey(space);
-		if (model?.key !== key) {
-			const memory = examplesInTransaction(db, {
-				source: BEST_V2_PARAMS.source,
-				space: routerSpace(space),
-			});
-			model = {
-				key,
-				model: memory ? loadBestV2(BEST_V2_PARAMS, memory) : null,
-			};
-		}
-		return model.model;
-	}
-	/** Stores best-v2's memory in the space (it was made from utterances: the host brings it, Git does not). */
-	function importRouterMemoryInTransaction(
-		db: Database,
-		memory: BestV2Memory,
-		space: RouterQuery["space"],
-	): number {
-		if (memory.source !== BEST_V2_PARAMS.source)
-			throw new Error("router_memory_source_mismatch");
-		const count = importExamplesInTransaction(db, memory, routerSpace(space));
-		model = undefined;
-		log.info("toolchain.router_memory_imported", { count });
-		return count;
-	}
 	function syncRouterCardsInTransaction(
 		db: Database,
 		cards: readonly Card[],
@@ -322,8 +281,6 @@ export function createRouter(store: SqliteStore, now: () => number) {
 		return removed;
 	}
 	return {
-		routerModelInTransaction,
-		importRouterMemoryInTransaction,
 		syncRouterCardsInTransaction,
 		saveRouterVectorsInTransaction,
 		routerCardsInTransaction,

@@ -1,19 +1,16 @@
+import { HostAction, hostActionAnalyzer } from "./router-host-action";
 import {
-	routeStructured,
-	routeWithFallback,
-	type BeginStructured,
-	type FallbackDecision,
+	routeWithSelection,
 	type RouteCandidate as PackageCandidate,
-	type RoutePorts,
-	type Analyze,
-	type RouteResult,
-	type RouteTurn,
-	type StructuredResult,
+	type RouteDecision as PackageDecision,
+	type SelectionMode,
+	type SelectionPorts,
+	type SelectionResult,
+	type SelectionTurn,
 	type VectorSpace as PackageSpace,
 } from "eumenes_router";
 import { getLogger } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
-import type { InferencePort } from "../../inference";
 import type { QueryVector } from "../contracts/toolchains";
 import type { DialogueDeps } from "./context";
 import { TOOL_NAMES } from "./generation-tools";
@@ -27,53 +24,37 @@ import {
 import { retainedChoice } from "./routed-search";
 import type { Turn } from "./routed-turn";
 
-/**
- * The eumenes_router package on the host's ports (spec router-package-integration 2026-11-04 §1): the router the turn
- * may ask, the package's ports (LARM's embedding and context judgment, the package's tables, best-v2, the structure
- * model), and the package's decision made the host's: the host's own offer of what it ranked, and its candidates by id.
- */
 const log = getLogger("dialogue");
-/** The structure model's answer is one small JSON object (the package's prompt asks for nothing else). */
-const STRUCTURE_OUTPUT_TOKENS = 1024;
+const LOOKUP_STRUCTURE = "dialogue.contexts.local.router-external-lookup";
 const HANDOFF_STRUCTURE = systemContext(
 	"dialogue.contexts.local.router-structure-handoff",
 	{},
 );
 
-/**
- * The saved router, with the port that asks LARM's context judgment (spec router-package-integration 2026-11-04 §1).
- */
-export type ActiveRouter = {
-	settings: RouterSettings;
-	route: NonNullable<InferencePort["route"]>;
-};
-
-/** What the package's ports are made of: the host's store and routing port, and the signal of the caller. */
-export type RouterEnv = {
+export type ActiveRouter = { settings: RouterSettings };
+type RouterEnv = {
 	store: DialogueDeps["store"];
 	port: NonNullable<DialogueDeps["toolchains"]>;
 	signal: AbortSignal;
 };
 
-/** The router the host may ask: none until a profile is saved, none when a port it needs is missing. */
 export function activeRouter(
 	deps: Pick<DialogueDeps, "larm" | "toolchains" | "store">,
 ): ActiveRouter | null {
-	const snapshot = deps.larm.snapshotInTransaction?.bind(deps.larm);
-	const route = deps.larm.route?.bind(deps.larm);
 	const port = deps.toolchains;
 	if (
-		!snapshot ||
-		!route ||
+		!deps.larm.selectRouter ||
+		!deps.larm.routerSelectionAvailable?.() ||
+		!deps.larm.snapshotInTransaction ||
 		!port?.embedRouter ||
 		!port.routerCardsInTransaction ||
-		!port.routerLexicalInTransaction ||
-		!port.routerModelInTransaction
+		!port.routerLexicalInTransaction
 	)
 		return null;
-	const settings = deps.store.read((tx) => snapshot(tx)).router;
-	if (!settings?.profile) return null;
-	return { settings, route };
+	return {
+		settings: deps.store.read((tx) => deps.larm.snapshotInTransaction!(tx))
+			.router,
+	};
 }
 
 /** A failure as the log may name it: a code, never the words of a message. */
@@ -92,19 +73,11 @@ const packageSpace = (space: QueryVector["space"]): PackageSpace => ({
 	dimension: space.dimension,
 });
 
-/**
- * The package's ports on the host's (spec router-package-integration 2026-11-04 §1 #4–#6): LARM's embedding (as
- * passages) and context judgment, each LARM call bounded by `timeoutMs`; the package's tables read on the host's
- * connection, one short read between the awaits; best-v2 with the memory of the embedding's space. `embedded` keeps
- * every text's vector (the trace and a later correction are found by it).
- */
-export function portsOf(
+function searchPorts(
 	env: RouterEnv,
 	router: ActiveRouter,
-	model: RoutePorts["model"],
 	embedded: Map<string, QueryVector>,
-	rerankTimeoutMs: number | null = router.settings.timeoutMs,
-): RoutePorts {
+): Omit<SelectionPorts, "select"> {
 	const { store, port, signal } = env;
 	const { settings } = router;
 	return {
@@ -124,22 +97,6 @@ export function portsOf(
 				vectors: vectors.map((v) => v.vector),
 			};
 		},
-		async rerank(input) {
-			const timeout =
-				rerankTimeoutMs === null
-					? undefined
-					: AbortSignal.timeout(rerankTimeoutMs);
-			const scoring = timeout ? AbortSignal.any([signal, timeout]) : signal;
-			try {
-				scoring.throwIfAborted();
-				const answer = await router.route(input, scoring);
-				scoring.throwIfAborted();
-				return answer;
-			} catch (cause) {
-				if (signal.aborted) throw cause;
-				throw new Error(reasonOf(cause, timeout));
-			}
-		},
 		read: {
 			cards: (query) =>
 				store.read((tx) => port.routerCardsInTransaction!(tx, query)),
@@ -157,117 +114,28 @@ export function portsOf(
 						)
 					: [],
 		},
-		model,
 		settings: {
-			accept: settings.accept,
-			low: settings.low,
-			margin: settings.margin,
-			approve: settings.approve,
-			multi: settings.multi,
 			feedbackNear: settings.feedbackNear,
 			feedbackWeight: settings.feedbackWeight,
 		},
-		// The package's lines are ids and numbers; they go out under the log's own field names.
-		log: ({ name, fields }) =>
-			log.info("dialogue.router_package", {
-				phase: name,
-				...(typeof fields.row === "number" ? { row: fields.row } : {}),
-				...(typeof fields.candidates === "number"
-					? { candidateCount: fields.candidates }
-					: {}),
-				...(typeof fields.parts === "number" ? { count: fields.parts } : {}),
-				...(typeof fields.requests === "number"
-					? { hitCount: fields.requests }
-					: {}),
-				...(typeof fields.defer === "number"
-					? { outcome: fields.defer ? "defer" : "sure" }
-					: {}),
-			}),
 	};
 }
 
-/**
- * The structure model (`routeStructured`; spec router-package-integration 2026-11-04 §1 #8): the package's prompt and
- * the host's handoff guidance, sent once to the saved structure resource (else the conversation route) as a background control
- * request with low reasoning effort. A failed or slow model returns no valid structure; the structured path stops
- * before work starts, and never falls back to routing a partial request.
- */
-async function analyzeOf(
-	turn: Turn,
-	router: ActiveRouter,
-	prompt: Parameters<Analyze>[0],
-	scope: { deadline: number; timeout: AbortSignal; signal: AbortSignal },
-): Promise<string> {
-	const { deps, input } = turn;
-	const { larm } = deps;
-	const { settings } = router;
-	const { deadline, timeout, signal } = scope;
-	try {
-		if (!larm.captureBackgroundControlInTransaction || !larm.executeControl)
-			throw new Error("structure_unavailable");
-		const requestId = await deps.store.write((tx) => {
-			signal.throwIfAborted();
-			return larm.captureBackgroundControlInTransaction!(tx, {
-				taskId: "router-structure",
-				decisionId: input.runId,
-				authorityEpoch: 1,
-				executionGeneration: 1,
-				deadline,
-				taskDeadline: deadline,
-				maxOutputTokens: STRUCTURE_OUTPUT_TOKENS,
-				structuredOutput: true,
-				route: settings.structureResourceId
-					? { resourceId: settings.structureResourceId }
-					: "conversation",
-			});
-		});
-		signal.throwIfAborted();
-		const receipt = await larm.executeControl(
-			requestId,
-			[
-				{ role: "system", content: `${prompt.system}\n\n${HANDOFF_STRUCTURE}` },
-				{ role: "user", content: prompt.user },
-			],
-			signal,
-			{
-				instructions: "",
-				outputSchema: prompt.outputSchema,
-				reasoningEffort: "low",
-			},
-			{ sessionRole: "auxiliary" },
-		);
-		signal.throwIfAborted();
-		return typeof receipt.value === "string"
-			? receipt.value
-			: new TextDecoder().decode(receipt.value);
-	} catch (cause) {
-		if (turn.signal.aborted) throw cause;
-		log.warn("dialogue.router_structure_failed", {
-			reason: reasonOf(cause, timeout),
-		});
-		return "";
-	}
-}
+export type Routed = SelectionResult;
 
-/** The routing of one turn by the package's entry, as one shape: the parts it routed and the decision. */
-export type Routed = {
-	parts: ReadonlyArray<{ text: string; result: RouteResult }>;
-	decision: FallbackDecision;
-	structure: StructuredResult["structure"] | null;
-	structuredAttempted: boolean;
-};
-
-/** The package's evidence part; a multi-job pipeline keeps the full original request. */
 export function decidedPart(routed: Routed) {
-	return isPipelineDecision(routed.decision)
-		? undefined
-		: (routed.parts.find((p) => p.result.decision === routed.decision) ??
-				routed.parts[0]);
+	if (routed.decision.to === "pipeline") return;
+	const id = routed.decision.to === "run" ? routed.decision.candidate.id : null;
+	return (
+		routed.parts.find(
+			(part) => part.selection.kind === "candidate" && part.selection.id === id,
+		) ?? routed.parts[0]
+	);
 }
 
 /** Honor the router's multi-job decision through the registered planner, without a first-job fallback. */
 export function hostDecision(
-	decision: FallbackDecision,
+	decision: PackageDecision,
 	hostOf: (c: PackageCandidate) => RouteCandidate | null,
 	pipelineCandidate?: RouteCandidate,
 ): RouteDecision | null {
@@ -277,27 +145,7 @@ export function hostDecision(
 			return decision;
 		case "conversation":
 			return decision;
-		case "ask": {
-			const first = hostOf(decision.options[0]);
-			const second = hostOf(decision.options[1]);
-			return first && second
-				? { row: 8, to: "ask", options: [first, second] }
-				: null;
-		}
 		case "run": {
-			const candidate = hostOf(decision.candidate);
-			if (decision.row === 9)
-				return candidate && pipelineCandidate
-					? {
-							row: 9,
-							to: "run",
-							candidate: pipelineCandidate,
-							announce: "fixed",
-						}
-					: null;
-			return candidate ? { ...decision, candidate } : null;
-		}
-		case "again": {
 			const candidate = hostOf(decision.candidate);
 			return candidate ? { ...decision, candidate } : null;
 		}
@@ -338,23 +186,24 @@ export async function offer(
 	candidates: RouteCandidate[];
 	hostOf: (c: PackageCandidate) => RouteCandidate | null;
 }> {
-	const pipelineIds = isPipelineDecision(routed.decision)
-		? turn.deps.store.read((db) =>
-				turn.deps
-					.toolchains!.catalogInTransaction(db)
-					.filter(
-						(e) =>
-							e.runtime.execution === "pipeline" &&
-							e.runtime.binding?.available,
-					)
-					.map((e) => e.id),
-			)
-		: [];
+	const pipelineIds =
+		routed.decision.to === "pipeline"
+			? turn.deps.store.read((db) =>
+					turn.deps
+						.toolchains!.catalogInTransaction(db)
+						.filter(
+							(e) =>
+								e.runtime.execution === "pipeline" &&
+								e.runtime.binding?.available,
+						)
+						.map((e) => e.id),
+				)
+			: [];
 	const ids = [
 		...new Set([
 			...pipelineIds,
 			...routed.parts.flatMap((p) =>
-				p.result.corrected
+				p.candidates
 					.map((r) => r.candidate)
 					.filter((c) => c.kind === "toolchain" || c.kind === "read")
 					.map((c) => c.id),
@@ -414,69 +263,72 @@ export async function offer(
 	return { candidates: [...tools.values(), ...dynamic], hostOf };
 }
 
-/** Use the saved entry. The usual entry only starts the structured scope when the package requests it. */
 export async function routeByEntry(
 	turn: Turn,
 	router: ActiveRouter,
-	routeTurn: RouteTurn,
-	model: RoutePorts["model"],
+	routeTurn: SelectionTurn,
 	embedded: Map<string, QueryVector>,
+	mode: SelectionMode = "conversation",
 ): Promise<Routed> {
-	const env = {
-		store: turn.deps.store,
-		port: turn.deps.toolchains!,
-		signal: turn.signal,
-	};
-	let structuredAttempted = false;
-	const beginStructured: BeginStructured = () => {
-		structuredAttempted = true;
-		const ms = router.settings.structureTimeoutMs;
-		const timeout = AbortSignal.timeout(ms);
-		const deadline = Date.parse(turn.deps.clock()) + ms;
-		const signal = AbortSignal.any([turn.signal, timeout]);
-		return {
-			deadline: timeout,
-			ports: {
-				...portsOf({ ...env, signal }, router, model, embedded, null),
-				analyze: (prompt) =>
-					analyzeOf(turn, router, prompt, { deadline, timeout, signal }),
+	const timeout = AbortSignal.timeout(router.settings.structureTimeoutMs);
+	const signal = AbortSignal.any([turn.signal, timeout]);
+	const env = { store: turn.deps.store, port: turn.deps.toolchains!, signal };
+	const call = turn.deps.larm.selectRouter!.bind(turn.deps.larm);
+	const started = performance.now();
+	try {
+		const analyze = hostActionAnalyzer(
+			(prompt) =>
+				call(
+					{
+						...prompt,
+						system: [
+							prompt.system,
+							HANDOFF_STRUCTURE,
+							...(turn.deps.lookup
+								? [systemContext(LOOKUP_STRUCTURE, {})]
+								: []),
+						].join("\n\n"),
+					},
+					signal,
+				),
+			routeTurn.dynamic ?? [],
+			turn.utterance,
+		);
+		const result = await routeWithSelection(
+			{
+				...searchPorts(env, router, embedded),
+				select: (prompt) => call(prompt, signal),
+				analyze,
 			},
-			turn: {
-				...routeTurn,
-				state: { ...routeTurn.state, text: turn.utterance },
-			},
-		};
-	};
-	if (router.settings.entry === "routeStructured") {
-		const scope = beginStructured();
-		const structured = await routeStructured(scope.ports, scope.turn!);
-		scope.deadline.throwIfAborted();
-		return {
-			parts: structured.parts,
-			decision: structured.decision,
-			structure: structured.structure,
-			structuredAttempted,
-		};
+			routeTurn,
+			{ mode, signal },
+		).catch((cause: unknown): Routed => {
+			signal.throwIfAborted();
+			if (!(cause instanceof HostAction)) throw cause;
+			return { decision: cause.decision, structure: null, parts: [] };
+		});
+		log.info("dialogue.router_selection", {
+			source: mode,
+			kind: result.decision.to,
+			candidateCount: Math.max(
+				0,
+				...result.parts.map((part) => part.candidates.length),
+			),
+			count: result.parts.reduce(
+				(sum, part) => sum + part.candidates.length,
+				0,
+			),
+			durationMs: Math.round(performance.now() - started),
+		});
+		return result;
+	} catch (cause) {
+		if (turn.signal.aborted) throw cause;
+		const reason = reasonOf(cause, timeout);
+		log.warn("dialogue.router_selection_failed", {
+			source: mode,
+			reason,
+			durationMs: Math.round(performance.now() - started),
+		});
+		throw new Error(reason);
 	}
-	const { decision, direct, structured } = await routeWithFallback(
-		portsOf(env, router, model, embedded),
-		routeTurn,
-		beginStructured,
-		turn.signal,
-	);
-	return {
-		parts: structured?.parts ?? [
-			{ text: routeTurn.state.text, result: direct },
-		],
-		decision,
-		structure: structured?.structure ?? null,
-		structuredAttempted,
-	};
-}
-
-/** Translate both published multi-job variants of the pinned router contract. */
-function isPipelineDecision(decision: FallbackDecision) {
-	return (
-		decision.to === "pipeline" || (decision.to === "run" && decision.row === 9)
-	);
 }

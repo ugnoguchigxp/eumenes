@@ -72,7 +72,7 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 	// Any toolchain's result may name a shared file it wrote (spec/server-scratch-cache-design-2026-11-07.md §3).
 	expect(
 		services.store.read((db) =>
-			services.resources.dialogue.producesInTransaction(db, "web.research"),
+			services.resources.dialogue.producesInTransaction(db, "history.research"),
 		),
 	).toContain("scratch");
 	const items = createLifecycles(services, { name: "http", close: () => {} });
@@ -125,11 +125,11 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"shell",
 		"kanban",
 		"web_note",
-		"pursuit",
 		"agents",
 		"capabilities",
 		"browser",
 		"browser_sweep",
+		"canvas",
 		"queue",
 		"web_research",
 		"specialist_sessions",

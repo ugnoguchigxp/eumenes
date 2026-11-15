@@ -234,6 +234,7 @@ export type StatusResponse = z.infer<typeof statusResponseSchema>;
 
 /** HTTP status of each error code this domain throws; merged by `api/application/error-status.ts`. */
 export const errorStatus = {
+	on_demand_busy: 409,
 	larm_base_url_unconfigured: 409,
 	larm_provider_host_mismatch: 502,
 } as const satisfies Record<string, HttpErrorStatus>;
@@ -249,3 +250,5 @@ export {
 } from "./music-library";
 export { musicProviders, musicGenerationInput } from "./music-generation";
 export * from "./capacity";
+
+export * from "./video";

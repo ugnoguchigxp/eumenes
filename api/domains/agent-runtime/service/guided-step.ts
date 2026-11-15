@@ -1,5 +1,4 @@
 import type { Prepared } from "../../capabilities";
-import { toolRuntimeOf } from "../../capabilities";
 import type { Task } from "../contracts";
 import { get, update } from "../repository";
 import { guidedActionFor, type GuidedAction } from "./guided-contract";
@@ -33,9 +32,7 @@ export function applyGuidedAction(
 		invoke(action);
 	} else {
 		if (
-			!ctx.deps.tools
-				.invocationsInTransaction(db, t.id)
-				.some((i) => toolRuntimeOf(i.toolRevisionId)?.operation !== "recipe") &&
+			!ctx.deps.tools.invocationsInTransaction(db, t.id).length &&
 			input.grants.length
 		)
 			throw new Error("invalid_report");
@@ -46,7 +43,6 @@ export function applyGuidedAction(
 			input.catalog,
 			ctx.deps.tools,
 			ctx.deps.now(),
-			{ hook: ctx.deps.onSearchReport, packageId: p.package.id },
 		);
 		for (const id of ctx.deps.tools.cancelInTransaction(db, t.id))
 			ctx.state.abortJobs.add(id);

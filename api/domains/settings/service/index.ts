@@ -30,7 +30,6 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import {
 	defaultSubtitles,
 	routerPatchSchema,
-	routerThresholdsOrdered,
 	purposeSchema,
 	settingsSchema,
 	type ApplySettings,
@@ -276,22 +275,13 @@ export async function createSettings(
 		valid: validSettings,
 		applyInTransaction,
 		notifyChanged,
-		/**
-		 * Changes the router's settings alone (spec router-package-integration 2026-11-04 §3): the given fields replace
-		 * the saved ones and the document's revision moves on; a null profile removes the saved one. A structure model
-		 * that is not a saved LLM resource is refused like any other bad value.
-		 */
+		/** Patch the decision resource, deadline and search feedback. */
 		async configureRouter(raw: unknown): Promise<RouterSettings> {
 			const patch = routerPatchSchema.safeParse(raw);
 			if (!patch.success) throw new Error("invalid_router_settings");
 			const saved = await store.write((db) => {
 				const current = read(db);
-				const { profile, ...rest } = patch.data;
-				const router = { ...current.router, ...rest };
-				if (profile === null) delete router.profile;
-				else if (profile !== undefined) router.profile = profile;
-				if (!routerThresholdsOrdered(router))
-					throw new Error("invalid_router_settings");
+				const router = { ...current.router, ...patch.data };
 				const parsed = settingsSchema.safeParse({
 					...current,
 					revision: current.revision + 1,

@@ -1,3 +1,4 @@
+import { videoGenerate } from "./video";
 import { cliRun } from "./cli";
 export { cliRun };
 import { recognitionManageV2, recognitionCommand } from "./object-recognition";
@@ -190,17 +191,6 @@ const historyRead = z
 	})
 	.strict()
 	.refine((v) => v.before + v.after < 10);
-/** Saved fetch procedures of the current toolchain; the sub-agent judges whether one matches. */
-const recipeFindInput = z
-	.object({
-		query: z
-			.string()
-			.trim()
-			.min(1)
-			.max(200)
-			.describe("現在の依頼を対象と知りたい内容で短く表した文。"),
-	})
-	.strict();
 import {
 	computePythonSubmit,
 	computeJobTarget,
@@ -338,7 +328,6 @@ export const validators = {
 		.refine((v) => !!v.url !== !!v.candidateRef),
 	lookupV2: lookupInput,
 	read: readInput,
-	recipeFind: recipeFindInput,
 	toolchainRequest,
 	timerStart,
 	timerList,
@@ -368,6 +357,7 @@ export const validators = {
 	resourceRead,
 	scratchWrite,
 	stockQuote,
+	videoGenerate,
 	model3dGenerate,
 	model3dFind,
 	model3dTarget,

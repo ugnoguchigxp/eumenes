@@ -1,8 +1,10 @@
+import { LARM_ON_DEMAND_BUSY } from "../contracts/on-demand";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { LogFields } from "../../../infrastructure/logger";
 
 // Provider values are never free-form log text. Unknown codes and IDs stay private.
 const codes = new Set([
+	LARM_ON_DEMAND_BUSY,
 	"unauthorized",
 	"forbidden",
 	"invalid_request",
