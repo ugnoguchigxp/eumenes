@@ -57,6 +57,8 @@ function codexChoice(final: string, tools: NativeTool[]): CloudAgentResult {
 	} catch {
 		throw fail("invalid_output");
 	}
+	if (value?.reply !== null && typeof value?.reply !== "string")
+		throw fail("invalid_output");
 	const call = value?.tool;
 	if (call && typeof call === "object") {
 		const name = call.name;
@@ -75,7 +77,8 @@ function codexChoice(final: string, tools: NativeTool[]): CloudAgentResult {
 		if (!args || typeof args !== "object" || Array.isArray(args))
 			throw fail("invalid_tool_call");
 		return {
-			text: "",
+			// Agency already keeps and speaks a tool preamble before executing it.
+			text: typeof value.reply === "string" ? value.reply : "",
 			toolCalls: [{ id: callId(), name, arguments: JSON.stringify(args) }],
 		};
 	}
@@ -95,7 +98,7 @@ const jsonEscapes: Record<string, string> = {
 };
 /**
  * The decoded part of `reply` that a partial `{"reply": "...` choice already fixes,
- * so a reply streams while the call path stays silent. Stops before an incomplete escape.
+ * so a reply or tool preamble streams. Stops before an incomplete escape.
  */
 export function codexReplyPrefix(partial: string): string {
 	const head = /^\s*\{\s*"reply"\s*:\s*"/.exec(partial);

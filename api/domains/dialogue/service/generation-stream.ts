@@ -42,7 +42,7 @@ export function generationStale(
 }
 
 /**
- * Streams the agent's body to backend speech consumers while adoption still governs stored history.
+ * Streams the agent's body to speech and live text consumers while adoption governs stored history.
  * A commit that makes the generation stale aborts both generation and unplayed speech at once.
  */
 export function createAnswerStream(

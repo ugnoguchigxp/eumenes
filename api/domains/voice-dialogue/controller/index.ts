@@ -10,6 +10,7 @@ import {
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
 import { acceptedEmotion } from "../../delivery/contracts";
+import { registerRunSpeech } from "./run-speech";
 import {
 	replayInputSchema,
 	sampleInputSchema,
@@ -50,6 +51,7 @@ export function registerVoiceDialogue(
 			return c.json({ error: "live_legacy_voice_disabled" }, 409);
 		await next();
 	});
+	registerRunSpeech(app, service);
 	app.post("/api/voice/sessions", async (c) => {
 		const parsed = await parseJsonBody(c, voiceStartSchema);
 		if (!parsed.ok) return parsed.response;

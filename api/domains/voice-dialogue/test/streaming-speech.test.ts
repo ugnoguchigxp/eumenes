@@ -124,7 +124,10 @@ test("clauses are synthesized during generation, keep their own tone and are not
 	expect(states).toHaveLength(2);
 	expect(h.dialogue.get(runId)?.status).toBe("running");
 	expect(h.dialogue.answerText(runId)).toBeNull();
-	expect(h.dialogue.progress(runId)?.text).toBe("");
+	expect(h.dialogue.progress(runId)).toMatchObject({
+		text: "よかった、大変でしたね。",
+		provisional: { generationId: expect.any(String), sequence: 1 },
+	});
 	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
 	source.push("続けましょう");
 	source.finish();
@@ -336,6 +339,72 @@ test("correcting the source while generating aborts queued speech and discards a
 	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBeNull();
 });
 
+for (const adopted of [true, false])
+	test(`an adoption retry replaces old audio and reports its final result: ${adopted ? "played" : "memory_stale"}`, async () => {
+		const first = stream();
+		const next = stream();
+		let generations = 0;
+		let complete = false;
+		const h = await setup(
+			undefined,
+			{
+				transcribe: async () => "話してください。",
+				answerStream: (...args) =>
+					(++generations === 1 ? first : next).answerStream!(...args),
+				speak: async () => wav(),
+			},
+			undefined,
+			{
+				workChangedInTransaction: () => {},
+				replyInputInTransaction: () => ({ sources: [], complete }),
+			},
+		);
+		const id = await start(h, first);
+		const runId = h.voice.get(id)!.runId!;
+		try {
+			first.push("最初の句。置き換わる句。");
+			await until(() => h.voice.get(id)?.audioChunks.length === 2);
+			await h.voice.played(id, 0);
+			first.finish();
+			await until(() => next.started);
+			expect(h.voice.get(id)?.audioChunks).toEqual([]);
+			expect(h.voice.takeAudio(id, 1)).toBeNull();
+			complete = adopted;
+			next.push("新しい回答です。");
+			await until(() => {
+				const voice = h.voice.get(id);
+				if (voice?.status === "failed")
+					throw new Error(voice.error ?? "voice_failed");
+				return !!voice?.audioChunks.length;
+			});
+			const [chunk] = h.voice.get(id)!.audioChunks;
+			expect(chunk).toMatchObject({ text: "新しい回答です。" });
+			expect(chunk!.index).toBeGreaterThan(1);
+			await h.voice.played(id, 1);
+			expect(h.voice.takeAudio(id, chunk!.index)).toEqual(wav());
+			next.finish();
+			if (!adopted) {
+				await until(() => h.voice.get(id)?.status === "failed");
+				expect(h.voice.get(id)).toMatchObject({
+					error: "memory_stale",
+					audioChunks: [],
+				});
+				expect(h.dialogue.get(runId)).toMatchObject({
+					status: "failed",
+					error: "memory_stale",
+				});
+				return;
+			}
+			await until(() => h.voice.get(id)?.status === "ready");
+			await h.voice.played(id, chunk!.index);
+			expect(h.voice.get(id)).toMatchObject({ status: "played", error: null });
+			expect(h.dialogue.answerText(runId)).toBe("新しい回答です。");
+		} finally {
+			first.finish();
+			next.finish();
+		}
+	});
+
 test("a failed generation discards ready audio without mixing a fallback answer into it", async () => {
 	const source = stream();
 	const h = await setup(undefined, {
@@ -469,4 +538,65 @@ test("URLs and source lines remain on screen but never reach the speech judge or
 	expect(spoken).toEqual(["本文です。"]);
 	expect(judged).toEqual(spoken);
 	expect(h.dialogue.answerText(h.voice.get(id)!.runId!)).toBe(answer);
+});
+
+test("an inline search citation normalized at adoption does not stop playback of the final clause", async () => {
+	const source = stream();
+	const url = "https://example.org/facts";
+	const spoken: string[] = [];
+	const h = await setup(
+		undefined,
+		{
+			transcribe: async () => "根拠を調べてください。",
+			answerStream: async (messages, signal, onDelta, options) => {
+				if (
+					options?.tools?.some(
+						(tool) => tool.function.name === "lookup_public_information",
+					) &&
+					!messages.some((message) => message.tool_call_id)
+				) {
+					options.onToolCalls!([
+						{
+							id: "lookup-fixture",
+							name: "lookup_public_information",
+							arguments: JSON.stringify({ query: "根拠となる資料" }),
+						},
+					]);
+					return "";
+				}
+				return source.answerStream!(messages, signal, onDelta, options);
+			},
+			speak: async (text) => {
+				spoken.push(text);
+				return wav();
+			},
+		},
+		async () => ({
+			text: "資料を確認しました。",
+			sources: [{ url, title: "資料" }],
+		}),
+	);
+	const id = await start(h, source);
+	const runId = h.voice.get(id)!.runId!;
+	const tail = "補足は画面に表示します";
+	source.push(`調べました。根拠は[資料](${url})にあります。${tail}`);
+	await until(() => h.voice.get(id)?.audioChunks.length === 2);
+	expect(h.dialogue.get(runId)?.status).toBe("running");
+	expect(h.voice.takeAudio(id, 0)).toEqual(wav());
+	await h.voice.played(id, 0);
+	source.finish();
+	await until(() => {
+		const status = h.voice.get(id)?.status;
+		return status === "ready" || status === "failed";
+	});
+	expect(h.dialogue.answerText(runId)).toBe(
+		`調べました。根拠は[資料](<${url}>)にあります。${tail}`,
+	);
+	expect(h.voice.get(id)).toMatchObject({ status: "ready", error: null });
+	expect(spoken).toEqual(["調べました。", "根拠は資料にあります。", tail]);
+	for (const index of [1, 2]) {
+		expect(h.voice.takeAudio(id, index)).toEqual(wav());
+		await h.voice.played(id, index);
+	}
+	expect(h.voice.get(id)?.status).toBe("played");
 });

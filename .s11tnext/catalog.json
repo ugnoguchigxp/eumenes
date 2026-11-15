@@ -5082,16 +5082,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "\n\nFUNCTIONS: These are functions provided by the host application, not local Codex tools. When one should handle the request, return the selection as JSON: set tool to {name, arguments} and reply to null. The host validates permissions and arguments, executes the selected function, and supplies its result in the next call. Do not execute a local tool instead. Select a needed function before answering a question that requires its records. Do not claim that a function ran, failed, needs approval, or succeeded without its actual result. Otherwise set reply to your answer and tool to null."
+                  "value": "\n\nFUNCTIONS: These are functions provided by the host application, not local Codex tools. When one should handle the request, return the selection as JSON: set tool to {name, arguments}. For a function that takes time, such as an external lookup, set reply to one short sentence saying what you will do before the user waits. Do not repeat a preamble already spoken in this turn; for a quick operation with nothing useful to say, reply may be null. A preamble states your intent, not an answer or a claim that work started. The host validates permissions and arguments, executes the selected function, and supplies its result in the next call. Do not execute a local tool instead. Select a needed function before answering a question that requires its records. Do not claim that a function ran, failed, needs approval, or succeeded without its actual result. Otherwise set reply to your answer and tool to null."
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:da7cbe4b78965c2a5428da174d3dfe9e5ca8fc2e35ca3c69dcd64c7960c5bfad"
+          "artifactHash": "sha256:94b7dcce036acd6aa262adf963154caaf6ccabeadea95ea13e809539083f8cac"
         }
       },
-      "definitionHash": "sha256:ae1cb8f41168af5697a3a83377239f6f533ab650ffd91df698640209de72d5c5",
-      "releaseDigest": "sha256:7bcf050fbaa28bb0c8431a481b81515f24c626461cc4f71a47465cf60566d441"
+      "definitionHash": "sha256:330f0c6311437524d248e18ac927f6db54103e8b7b28f92a6c867054f17986e3",
+      "releaseDigest": "sha256:f84f211ba5ae931585dbe802dbbca451d7ff725b3d49803c1cb807859bfa1689"
     },
     "inference.contexts.cloud-agents.single-function": {
       "key": "inference.contexts.cloud-agents.single-function",
@@ -5577,5 +5577,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:26141d1525363365723a0a31dd9e94a1700073a59810e79d75121f0159034639"
+  "catalogDigest": "sha256:13ba127b3f74a21365a202d4c48addc796c619f6f77caf29d2f6f6840fb4218d"
 }

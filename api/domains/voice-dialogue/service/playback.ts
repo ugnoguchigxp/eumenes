@@ -2,6 +2,8 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
 import type { Speech } from "./speech-state";
 import { get, update } from "../repository";
+import { getLogger } from "../../../infrastructure/logger";
+const log = getLogger("voice-dialogue");
 
 /**
  * Commit the existing player's acknowledgement before releasing an operation gate. The last clause of a finished
@@ -16,6 +18,10 @@ export async function recordPlayed(
 	clock: () => string,
 	audible = true,
 ) {
+	log.info("voice.playback_report_received", {
+		utteranceId: id,
+		chunkIndex: index,
+	});
 	const state = audio.get(id);
 	if (!state?.chunks.has(index)) return;
 	const recorded = await store.write((db) => {
@@ -63,6 +69,10 @@ export async function recordPlayed(
 	if (!audible) state.skipped++;
 	state.markPlayed(index);
 	state.wake();
+	log.info("voice.playback_report_accepted", {
+		utteranceId: id,
+		chunkIndex: index,
+	});
 	if (state.finished && !state.chunks.size) audio.delete(id);
 }
 

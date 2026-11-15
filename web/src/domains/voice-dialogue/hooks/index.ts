@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Settings } from "../../../../../api/domains/settings/contracts";
+import type { VoiceTurn } from "../../../../../api/domains/voice-dialogue/contracts";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
 import { describeError } from "../../../errorMessages";
 import {
@@ -19,6 +20,13 @@ import { requestPreview, type RecognitionCandidate } from "./preview";
 import { createSegmentUploader } from "./segment-upload";
 import { useTranscription } from "./transcription";
 import { useVoiceTurn } from "./turn";
+
+export type VoiceIssue =
+	| { notice: string }
+	| {
+			cause: unknown;
+			turn?: Pick<VoiceTurn, "utteranceId" | "sessionId" | "runId">;
+	  };
 /** `noticeQuiet` holds a reply chunk while a notice sounds on the screen (spec tts-single-lane §4.4). */
 export function useVoiceDialogue(
 	client: VoiceDialogueClient,
@@ -60,7 +68,7 @@ export function useVoiceDialogue(
 		requestPreview(client, machine, candidate, setPreviewText, wav);
 	}
 	const [turnId, setTurnId] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const [issue, setError] = useState<VoiceIssue | null>(null);
 	const [active, setActive] = useState(false);
 	const turn = useVoiceTurn(client, turnId);
 	useEffect(() => {
@@ -129,7 +137,7 @@ export function useVoiceDialogue(
 					inputEnabled.current = false;
 					setActive(false);
 					store.setState({ inputPhase: "idle" });
-					setError(describeError(error));
+					setError({ cause: error });
 				}
 			}
 			return;
@@ -212,16 +220,17 @@ export function useVoiceDialogue(
 					onLost: (reason) => {
 						if (!inputLive()) return;
 						void pause();
-						setError(describeError(reason));
+						setError({ cause: reason });
 					},
 					onNotice: (reason) => {
 						if (!live()) return;
 						if (reason === "recording_limit") {
 							suspendInput();
-							setError(
-								"録音が60秒に達したため文字起こしを保存し、マイクを停止しました。続きはマイクを再開して話してください。",
-							);
-						} else setError(describeError(reason));
+							setError({
+								notice:
+									"録音が60秒に達したため文字起こしを保存し、マイクを停止しました。続きはマイクを再開して話してください。",
+							});
+						} else setError({ cause: reason });
 					},
 				},
 			);
@@ -231,13 +240,13 @@ export function useVoiceDialogue(
 			} catch (error) {
 				if (cancelled()) return;
 				await stop();
-				setError(describeError(error));
+				setError({ cause: error });
 			}
 		} catch (error) {
 			const report = !cancelled();
 			if (report) store.setState({ inputPhase: "idle" });
 			if (live()) await stop();
-			if (report) setError(describeError(error));
+			if (report) setError({ cause: error });
 		} finally {
 			if (machine.get().startToken === startToken) {
 				setActive(
@@ -267,7 +276,7 @@ export function useVoiceDialogue(
 		await audio?.stop();
 		if (active)
 			await client.voiceStop(active.id, active.generation).catch((e) => {
-				if (machine.get().phase === "idle") setError(describeError(e));
+				if (machine.get().phase === "idle") setError({ cause: e });
 			});
 	}
 	function pause() {
@@ -315,6 +324,18 @@ export function useVoiceDialogue(
 		[client, machine, cancelPlayback],
 	);
 	const transcription = useTranscription(turn.data, recognitionId, previewText);
+	const failure =
+		issue && "cause" in issue
+			? issue
+			: !issue && turn.isError
+				? {
+						cause: turn.error,
+						turn: turn.data,
+						summary:
+							"音声処理の結果を取得できません。接続を再確認してください。",
+					}
+				: null;
+	const notice = issue && "notice" in issue ? issue.notice : null;
 	return {
 		ownsSpeech: machine.ownsSpeech,
 		start,
@@ -336,10 +357,14 @@ export function useVoiceDialogue(
 		previewText,
 		recognitionId,
 		transcription,
+		failure,
+		notice,
 		error:
-			error ??
-			(turn.isError
-				? "音声処理の結果を取得できません。接続を再確認してください。"
+			notice ??
+			(failure
+				? "summary" in failure
+					? failure.summary
+					: describeError(failure.cause)
 				: null),
 		active,
 		avatarCue,

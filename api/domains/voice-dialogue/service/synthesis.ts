@@ -1,10 +1,10 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
-import type { InferencePort, Receipt } from "../../inference";
+import type { InferencePort } from "../../inference";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import type { SpeechPreparation } from "../../delivery";
 import type { Speech } from "./speech-state";
-import { SpeechSentences } from "./sentences";
+import { createSpeechQueue } from "./speech-queue";
 import { get, update } from "../repository";
 import { getLogger } from "../../../infrastructure/logger";
 const log = getLogger("voice-dialogue");
@@ -31,235 +31,82 @@ export function createSpeechSynthesis({
 		runId: string,
 		controller: AbortController,
 		preparation: SpeechPreparation = {},
+		sequence = { generation: 0, nextIndex: 0 },
 	): Speech {
 		makeRoomForSpeech();
-		const pending: Array<{
-			text: string;
-			preparation: SpeechPreparation;
-			order: number;
-		}> = [];
-		let chunkOrder = 0;
-		const publishedOrders = new Map<number, number>();
-		const playedOrders = new Set<number>();
-		let previousAssistantChunk: string | undefined;
-		const sentences = new SpeechSentences(true);
-		const synthesisStarted = performance.now();
-		let inputDone = false,
-			spoken = false,
-			skipError: unknown,
-			index = 0;
-		const wakes = new Set<() => void>();
-		const wake = () => {
-			for (const listener of wakes) listener();
-			wakes.clear();
-		};
-		const state: Speech = {
-			createdAtMs: Date.parse(clock()),
-			skipped: 0,
-			chunks: new Map(),
-			finished: false,
-			played: [],
-			wake,
-			async waitForPlayback(signal) {
-				const through = chunkOrder;
-				if (!through) throw new Error("announcement_audio_missing");
-				const scoped = AbortSignal.any([signal, controller.signal]);
-				while (
-					Array.from({ length: through }, (_, i) => i).some(
-						(i) => !playedOrders.has(i),
+		const state = createSpeechQueue({
+			controller,
+			preparation,
+			sequence,
+			clock,
+			canSpeak: () => canSpeak(id, runId, controller.signal),
+			async synthesize(text, n, clausePreparation) {
+				const requestId = larm.captureSpeechChunkInTransaction
+					? await store.write((db) =>
+							larm.captureSpeechChunkInTransaction!(db, id, n),
+						)
+					: undefined;
+				const receipt =
+					requestId && larm.executeRequest
+						? await larm.executeRequest(
+								requestId,
+								text,
+								controller.signal,
+								clausePreparation,
+							)
+						: undefined;
+				const wav = receipt
+					? (receipt.value as Uint8Array)
+					: await larm.speak(text, controller.signal);
+				return { requestId, receipt, wav };
+			},
+			publish(_chunk, { receipt }, adopt) {
+				return store.write((db) => {
+					const turn = get(db, id);
+					if (
+						!turn ||
+						!["responding", "synthesizing", "ready"].includes(turn.status) ||
+						controller.signal.aborted
 					)
-				) {
-					scoped.throwIfAborted();
-					if (state.error || state.skipped)
-						throw new Error("announcement_audio_failed");
-					await new Promise<void>((resolve) => {
-						const finish = () => {
-							scoped.removeEventListener("abort", finish);
-							wakes.delete(finish);
-							resolve();
-						};
-						wakes.add(finish);
-						scoped.addEventListener("abort", finish, { once: true });
-						if (scoped.aborted) finish();
-					});
-				}
-				scoped.throwIfAborted();
-			},
-			markPlayed(n) {
-				const order = publishedOrders.get(n);
-				if (order === undefined) return;
-				playedOrders.add(order);
-				publishedOrders.delete(n);
-				wake();
-			},
-			work: Promise.resolve(),
-			append(text, final = false, flush = false) {
-				if (state.error || controller.signal.aborted) return;
-				for (const clause of sentences.append(text, final || flush)) {
-					const order = chunkOrder++;
-					pending.push({
-						order,
-						text: clause,
-						preparation: {
-							...preparation,
-							...(preparation.context
-								? { context: { ...preparation.context } }
-								: {}),
-							...(preparation.collection
-								? {
-										collection: {
-											...preparation.collection,
-											granularity: "chunk",
-											chunkOrder: order,
-											previousAssistantChunk,
-										},
-									}
-								: {}),
-						},
-					});
-					previousAssistantChunk = clause;
-				}
-				inputDone = final;
-				wake();
-			},
-		};
-		audio.set(id, state);
-		const discard = () => {
-			pending.length = 0;
-			state.chunks.clear();
-			publishedOrders.clear();
-			wake();
-		};
-		controller.signal.addEventListener("abort", discard, { once: true });
-		if (controller.signal.aborted) discard();
-		state.work = (async () => {
-			while (!controller.signal.aborted) {
-				if (pending.length && state.chunks.size < 3) {
-					const {
-						text,
-						preparation: clausePreparation,
-						order,
-					} = pending.shift()!;
-					if (!canSpeak(id, runId, controller.signal))
+						return false;
+					if (receipt && !larm.acceptInTransaction?.(db, receipt))
 						throw new Error("permission_revoked");
-					// A failed clause is not spoken: no retry and no other voice (spec tts-single-lane §4.6).
-					// The turn goes on with the next clause and fails only if nothing could be spoken.
-					const n = index++;
-					let synthesized: {
-						requestId?: string;
-						receipt?: Receipt;
-						wav: Uint8Array;
-					};
-					try {
-						const requestId = larm.captureSpeechChunkInTransaction
-							? await store.write((db) =>
-									larm.captureSpeechChunkInTransaction!(db, id, n),
-								)
-							: undefined;
-						const receipt =
-							requestId && larm.executeRequest
-								? await larm.executeRequest(
-										requestId,
-										text,
-										controller.signal,
-										clausePreparation,
-									)
-								: undefined;
-						const wav = receipt
-							? (receipt.value as Uint8Array)
-							: await larm.speak(text, controller.signal);
-						synthesized = { requestId, receipt, wav };
-					} catch (error) {
-						if (
-							controller.signal.aborted ||
-							(error instanceof Error && error.message === "permission_revoked")
-						)
-							throw error;
-						skipError ??= error;
-						state.skipped++;
-						wake();
-						log.warn("voice.speech_skipped", {
-							utteranceId: id,
+					if (receipt?.delivery && preparation.deliveryScope !== "chunk")
+						dialogue.recordAnswerDeliveryInTransaction?.(
+							db,
 							runId,
-							count: n,
-							reason: toErrorCode(error, "tts_failed"),
-						});
-						continue;
-					}
-					const { requestId, receipt, wav } = synthesized;
-					if (!canSpeak(id, runId, controller.signal))
-						throw new Error("permission_revoked");
-					const published = await store.write((db) => {
-						const turn = get(db, id);
-						if (
-							!turn ||
-							!["responding", "synthesizing", "ready"].includes(turn.status) ||
-							controller.signal.aborted
-						)
-							return false;
-						if (receipt && !larm.acceptInTransaction?.(db, receipt))
-							throw new Error("permission_revoked");
-						if (receipt?.delivery && preparation.deliveryScope !== "chunk")
-							dialogue.recordAnswerDeliveryInTransaction?.(
-								db,
-								runId,
-								receipt.delivery,
-							);
-						state.chunks.set(n, {
-							index: n,
-							text,
-							wav,
-							requestId,
-							...(receipt?.delivery ? { delivery: receipt.delivery } : {}),
-						});
-						publishedOrders.set(n, order);
-						return update(db, id, turn.revision, turn.status, clock());
-					});
-					if (!published) {
-						state.chunks.delete(n);
-						publishedOrders.delete(n);
-						return;
-					}
-
-					if (!spoken)
-						log.info("voice.first_chunk_ready", {
-							utteranceId: id,
-							runId,
-							inferenceId: requestId,
-							durationMs: performance.now() - synthesisStarted,
-						});
-					spoken = true;
-					log.debug("voice.chunk_ready", {
+							receipt.delivery,
+						);
+					adopt();
+					return update(db, id, turn.revision, turn.status, clock());
+				});
+			},
+			ready(chunk, first, elapsedMs) {
+				if (first)
+					log.info("voice.first_chunk_ready", {
 						utteranceId: id,
 						runId,
-						inferenceId: requestId,
-						count: n,
-						bytes: wav.length,
+						inferenceId: chunk.requestId,
+						durationMs: elapsedMs,
 					});
-					continue;
-				}
-				if (inputDone && !pending.length) {
-					if (!spoken && skipError) throw skipError;
-					state.finished = true;
-					return;
-				}
-				await new Promise<void>((resolve) => {
-					const finish = () => {
-						controller.signal.removeEventListener("abort", finish);
-						wakes.delete(finish);
-						resolve();
-					};
-					wakes.add(finish);
-					controller.signal.addEventListener("abort", finish, { once: true });
-					if (controller.signal.aborted) finish();
+				log.debug("voice.chunk_ready", {
+					utteranceId: id,
+					runId,
+					inferenceId: chunk.requestId,
+					count: chunk.index,
+					bytes: chunk.wav.length,
 				});
-			}
-		})()
-			.catch((error) => {
-				state.error = error instanceof Error ? error : new Error("tts_failed");
-				discard();
-			})
-			.finally(() => controller.signal.removeEventListener("abort", discard));
+			},
+			skipped(n, error) {
+				log.warn("voice.speech_skipped", {
+					utteranceId: id,
+					runId,
+					count: n,
+					reason: toErrorCode(error, "tts_failed"),
+				});
+			},
+		});
+		audio.set(id, state);
 		return state;
 	};
 }

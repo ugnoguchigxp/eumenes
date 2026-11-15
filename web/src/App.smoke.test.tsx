@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
+import { ApiError } from "../../client";
 import { settingsFixture } from "./domains/settings/sections/fixture";
 
 // App builds its own client; every call goes to this in-memory stand-in.
@@ -10,7 +18,7 @@ vi.mock("../../client", async (importOriginal) => ({
 }));
 import { App } from "./App";
 
-function mockClient() {
+function mockClient(overrides: Record<string, unknown> = {}) {
 	const calls: Record<string, ReturnType<typeof vi.fn>> = {};
 	const known: Record<string, unknown> = {
 		identity: "smoke",
@@ -36,6 +44,7 @@ function mockClient() {
 		larmDetails: async () => null,
 		larmProfiles: async () => [],
 		memoryStatus: async () => ({ enabled: false }),
+		...overrides,
 	};
 	return new Proxy(known, {
 		get(target, key: string) {
@@ -63,6 +72,45 @@ beforeEach(() => {
 			removeEventListener: () => {},
 		})),
 	);
+});
+test("a rejected chat submission shows a copyable diagnostic in the chat history", async () => {
+	const writeText = vi.fn(async () => {});
+	vi.stubGlobal(
+		"navigator",
+		Object.assign(Object.create(navigator), {
+			clipboard: { writeText },
+		}),
+	);
+	const requestId = crypto.randomUUID();
+	const submit = vi.fn(async () => {
+		throw new ApiError(
+			503,
+			"fixture_submit_failed",
+			requestId,
+			"private provider detail",
+		);
+	});
+	api.current = mockClient({ submit });
+	const { container } = render(<App />);
+	const textbox = await screen.findByRole("textbox", { name: "メッセージ" });
+	fireEvent.change(textbox, { target: { value: "送信内容の確認" } });
+	fireEvent.click(screen.getByRole("button", { name: "送信" }));
+	const failure = await screen.findByRole("article", { name: "会話エラー" });
+	expect(container.querySelector(".chat-history")?.contains(failure)).toBe(
+		true,
+	);
+	expect(container.querySelector(".chat-error")).toBeNull();
+	fireEvent.click(
+		within(failure).getByRole("button", { name: "エラーの詳細" }),
+	);
+	const report = await screen.findByLabelText("エラーレポート本文");
+	expect(report.textContent).toContain("エラーコード: fixture_submit_failed");
+	expect(report.textContent).toContain(`X-Request-Id: ${requestId}`);
+	expect(report.textContent).not.toMatch(
+		/private provider detail|送信内容の確認/,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "レポートをコピー" }));
+	expect(writeText).toHaveBeenCalledWith(report.textContent);
 });
 afterEach(() => {
 	cleanup();

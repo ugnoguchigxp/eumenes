@@ -1,15 +1,17 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { VoiceTurn } from "../../../../../api/domains/voice-dialogue/contracts";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
+import { ApiError } from "../../../../../client/transport";
 import type { AudioController } from "../../audio";
 import { deliveryAvatarCue, type AvatarCue } from "../../avatar";
 import { queryRoots } from "../../../queryKeys";
-import { chunkTiming, timedVoiceAudio } from "./audio-timing";
+import { chunkTiming, reportPlayed, timedVoiceAudio } from "./audio-timing";
 
 /** One turn's chunks in playback order; `lastEndedAt` is when the latest one finished. */
 export type ChunkQueue = {
 	id: string;
 	epoch: number;
+	audioGeneration?: number;
 	tail: Promise<void>;
 	lastEndedAt?: number;
 };
@@ -50,16 +52,34 @@ export function queueChunks(
 		if (deps.delivered(key)) continue;
 		deps.markDelivered(key);
 		const identity = chunkTiming(turn.utteranceId, chunk.index);
-		const audio = timedVoiceAudio(client, identity).then((bytes) => ({
-			bytes,
-			at: performance.now(),
-		}));
+		const audio = timedVoiceAudio(client, identity)
+			.then((bytes) => ({ bytes, at: performance.now() }))
+			.catch(async (error: unknown) => {
+				if (
+					error instanceof ApiError &&
+					error.message === "audio_unavailable"
+				) {
+					if (!playable()) return null;
+					// The old URL can expire before the change notification reaches the screen.
+					const current = await client
+						.voiceTurn(turn.utteranceId)
+						.catch(() => null);
+					if (
+						current &&
+						(current.audioGeneration ?? 0) !== (turn.audioGeneration ?? 0)
+					)
+						return null;
+				}
+				throw error;
+			});
 		// Awaited in turn below; a failure before then must not surface as unhandled.
 		audio.catch(() => {});
 		chunkQueue.tail = chunkQueue.tail
 			.then(async () => {
 				if (!playable()) return;
-				const { bytes, at } = await audio;
+				const fetched = await audio;
+				if (!fetched) return;
+				const { bytes, at } = fetched;
 				await deps.noticeQuiet?.();
 				if (!playable()) return;
 				const volume = deps.volume();
@@ -69,12 +89,13 @@ export function queueChunks(
 					deps.setSubtitle((s) => (s?.key === key ? null : s));
 					deps.setAvatarCue((cue) => (cue?.key === key ? null : cue));
 					if (!playable()) return;
-					void client
-						.voicePlayed(
+					void reportPlayed(identity, () =>
+						client.voicePlayed(
 							turn.utteranceId,
 							chunk.index,
 							(volume ?? 1) > 0 ? gap : { ...gap, audible: false },
-						)
+						),
+					)
 						.then(() =>
 							deps.cache.invalidateQueries({
 								queryKey: [

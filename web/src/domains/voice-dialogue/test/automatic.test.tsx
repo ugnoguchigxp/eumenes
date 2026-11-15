@@ -2,6 +2,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { Run } from "../../../../../api/domains/dialogue/contracts";
 import { useAutomaticSpeech } from "../hooks/automatic";
+import type { RunSpeechSource } from "../hooks/run-speech-source";
 
 afterEach(cleanup);
 type Message = { id: string; text: string };
@@ -39,6 +40,15 @@ function fixture(initial: Run[] = [], messages: Message[] = []) {
 		),
 		stopAutomatic: vi.fn(),
 		prepare: vi.fn(async () => undefined as never),
+		prepareStream: vi.fn(
+			(runId: string, _screenId: string): RunSpeechSource => ({
+				runId,
+				ready: new Promise(() => {}),
+				stop: vi.fn(),
+				next: async () => null,
+			}),
+		),
+		playStream: vi.fn(async (_source: RunSpeechSource) => {}),
 	};
 	const ownsSpeech = vi.fn((id: string | null) => id === "owned");
 	const claim = vi.fn(async (_sourceKey: string) => true);
@@ -49,7 +59,11 @@ function fixture(initial: Run[] = [], messages: Message[] = []) {
 				...props,
 				player,
 				ownsSpeech,
-				screen: { playbackScreen: props.playback ?? true, claim },
+				screen: {
+					screenId: "screen",
+					playbackScreen: props.playback ?? true,
+					claim,
+				},
 				speaker: props.speakerSession
 					? { id: props.speakerSession, state: "active" }
 					: null,
@@ -178,15 +192,9 @@ test("all adopted answer sources use TTS once; existing history and native playb
 	expect(player.play).toHaveBeenCalledTimes(3);
 });
 
-test("streaming or cancelled answers do not speak and adoption waits for the matching message", async () => {
+test("a completed answer waits for its matching message and a cancelled answer never replays", async () => {
 	const { hook, player } = fixture();
 	const first = answer("first");
-	hook.rerender({
-		runs: [{ ...first.run, status: "running" }],
-		messages: [first.message],
-		enabled: true,
-	});
-	expect(player.play).not.toHaveBeenCalled();
 	hook.rerender({ runs: [first.run], messages: [], enabled: true });
 	expect(player.play).not.toHaveBeenCalled();
 	hook.rerender({
@@ -430,4 +438,96 @@ test("an observed excerpt is read once while its Collaboration session is the sp
 	});
 	await act(async () => {});
 	expect(player.play).toHaveBeenCalledOnce();
+});
+
+test("running typed replies synthesize while output is blocked, play when free, and never replay on adoption", async () => {
+	const { hook, player, claim } = fixture();
+	let ready!: (value: boolean) => void;
+	const source: RunSpeechSource = {
+		runId: "live",
+		ready: new Promise((resolve) => {
+			ready = resolve;
+		}),
+		stop: vi.fn(),
+		next: async () => null,
+	};
+	player.prepareStream.mockReturnValueOnce(source);
+	const complete = answer("live");
+	const props = {
+		runs: [{ ...complete.run, status: "running" as const }],
+		messages: [],
+		enabled: true,
+		blocked: true,
+	};
+	hook.rerender(props);
+	expect(player.prepareStream).toHaveBeenCalledExactlyOnceWith(
+		"live",
+		"screen",
+	);
+	await act(async () => ready(true));
+	expect(player.playStream).not.toHaveBeenCalled();
+	hook.rerender({ ...props, blocked: false });
+	await waitFor(() =>
+		expect(player.playStream).toHaveBeenCalledExactlyOnceWith(source),
+	);
+	hook.rerender({
+		runs: [complete.run],
+		messages: [complete.message],
+		enabled: true,
+	});
+	await act(async () => {});
+	expect(player.play).not.toHaveBeenCalled();
+	expect(claim).not.toHaveBeenCalled(); // The stream claims atomically on the server.
+});
+
+test.each(["mute", "ownership", "unmount"])(
+	"%s discards a prepared source and ignores late readiness",
+	async (mode) => {
+		const { hook, player } = fixture();
+		let ready!: (value: boolean) => void;
+		const source: RunSpeechSource = {
+			runId: "live",
+			ready: new Promise((resolve) => {
+				ready = resolve;
+			}),
+			stop: vi.fn(),
+			next: async () => null,
+		};
+		player.prepareStream.mockReturnValueOnce(source);
+		const props = {
+			runs: [{ ...answer("live").run, status: "running" as const }],
+			messages: [],
+			enabled: true,
+		};
+		hook.rerender(props);
+		if (mode === "unmount") hook.unmount();
+		else
+			hook.rerender({
+				...props,
+				enabled: mode !== "mute",
+				playback: mode !== "ownership",
+			});
+		expect(source.stop).toHaveBeenCalled();
+		await act(async () => ready(true));
+		expect(player.playStream).not.toHaveBeenCalled();
+	},
+);
+
+test("history, native voice and non-speaking specialists never open a typed audio stream", () => {
+	const history = { ...answer("history").run, status: "running" as const };
+	const { hook, player } = fixture([history]);
+	hook.rerender({
+		runs: [
+			history,
+			{ ...answer("native", "voice", "owned").run, status: "running" },
+			{
+				...answer("other").run,
+				status: "running",
+				specialistSessionId: "other",
+			},
+		],
+		messages: [],
+		enabled: true,
+	});
+	expect(player.prepareStream).not.toHaveBeenCalled();
 });

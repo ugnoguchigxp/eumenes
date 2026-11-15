@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
 import { speechDeliverySchema } from "../../delivery";
 import { runViewingSchema } from "../../dialogue/contracts";
+export * from "./run-speech";
 export const voiceStartSchema = z.object({
 	sessionId: z.uuid(),
 	generation: z.number().int().positive(),
@@ -46,6 +47,8 @@ export const voiceTurnSchema = z.object({
 	runId: z.string().nullable(),
 	error: z.string().nullable(),
 	revision: z.number().int(),
+	/** Changes when the same turn replaces its queued speech. */
+	audioGeneration: z.number().int().nonnegative().optional(),
 	audioChunks: z
 		.array(
 			z.object({
@@ -83,6 +86,7 @@ export const errorStatus = {
 	speech_already_claimed: 409,
 	speech_owned_by_voice_turn: 409,
 	speech_not_speaker: 409,
+	speech_session_stale: 409,
 } as const satisfies Record<string, HttpErrorStatus>;
 /**
  * What an automatic speech or notice claims before it is played (spec tts-single-lane §4.3):

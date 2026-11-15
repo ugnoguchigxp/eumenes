@@ -45,5 +45,10 @@ export function useScreenSound(
 		() => ({ output, playback: () => playbackNow.current, claim }),
 		[output, claim],
 	);
-	return { playbackScreen: presence.playbackScreen, claim, notice };
+	return {
+		screenId: presence.screenId,
+		playbackScreen: presence.playbackScreen,
+		claim,
+		notice,
+	};
 }

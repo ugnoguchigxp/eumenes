@@ -160,8 +160,11 @@ const messages: Record<string, string> = {
 	larm_provider_host_mismatch:
 		"LARMが示した接続先が許可されていないため中止しました。",
 	permission_revoked: "接続の権限が取り消されました。",
+	memory_stale:
+		"回答に使った情報の有効性を確認できず、回答を保存できませんでした。",
 	timeout: "応答がタイムアウトしました。",
 	replay_failed: "読み上げに失敗しました。",
+	voice_failed: "音声処理に失敗しました。",
 	sample_failed: "サンプルの再生に失敗しました。",
 	mic_lost: "マイクが切断されました。音声を再開してください。",
 	saved_device_missing:
@@ -200,6 +203,22 @@ const unknownError = (text: string) =>
 		: "エラーが発生しました。";
 
 const code = (value: string) => value.replace(/^(?:\w*Error:\s*)/, "").trim();
+
+/** A diagnostic may contain the reason code, never free-form error or provider text. */
+export function diagnosticErrorCode(error: unknown): string | undefined {
+	const text = code(
+		error instanceof Error
+			? error.message
+			: typeof error === "string"
+				? error
+				: "",
+	);
+	if (
+		Object.hasOwn(messages, text) ||
+		(text.length <= 100 && SNAKE_CASE_CODE.test(text))
+	)
+		return text;
+}
 
 /** Maps any thrown value to a Japanese sentence; raw codes never reach the UI alone. */
 export function describeError(e: unknown): string {

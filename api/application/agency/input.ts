@@ -75,11 +75,16 @@ export function observationInput(
 export function referencedInput(
 	deps: AgencyHostDeps,
 	db: Database,
-	notes: readonly { id: string; refs: readonly string[] }[],
+	notes: readonly {
+		id: string;
+		refs: readonly string[];
+		inputs?: readonly string[];
+	}[],
 	refs: readonly string[],
 ): InputContext {
 	const messageIds = new Set<string>();
 	const itemIds = new Set<string>();
+	const retained: string[] = [];
 	let complete = true;
 	const seen = new Set<string>();
 	const visit = (ref: string) => {
@@ -89,19 +94,25 @@ export function referencedInput(
 		if (base.startsWith("memory:")) itemIds.add(base.slice("memory:".length));
 		else if (base.startsWith("note:")) {
 			const note = notes.find((n) => n.id === base.slice("note:".length));
-			if (note) note.refs.forEach(visit);
+			if (note?.inputs) {
+				retained.push(...note.inputs);
+				complete &&= currentInput(deps, db, {
+					sources: note.inputs,
+					complete: true,
+				});
+			} else if (note) note.refs.forEach(visit);
 			else complete = false;
 		} else if (!base.startsWith("profile:")) messageIds.add(base);
 	};
 	refs.forEach(visit);
 	if (!deps.memory.referenceInputs)
-		return { sources: [...messageIds], complete };
+		return { sources: [...new Set([...messageIds, ...retained])], complete };
 	const captured = deps.memory.referenceInputs.captureInTransaction(db, {
 		messageIds: [...messageIds],
 		itemIds: [...itemIds],
 	});
 	return {
-		sources: captured.sources,
+		sources: [...new Set([...captured.sources, ...retained])],
 		complete: complete && captured.complete,
 	};
 }

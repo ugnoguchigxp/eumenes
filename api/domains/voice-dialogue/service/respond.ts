@@ -8,6 +8,7 @@ import type { VoiceTurn } from "../contracts";
 import type { Speech } from "./speech-state";
 import { spokenPrefix, spokenText } from "./spoken-text";
 import { getLogger } from "../../../infrastructure/logger";
+import { get, update } from "../repository";
 const log = getLogger("voice-dialogue");
 export type VoiceAdvance = (
 	id: string,
@@ -50,6 +51,7 @@ export function createVoiceResponder({
 	createSpeech,
 	audio,
 	linkRunInTransaction,
+	clock,
 }: {
 	store: SqliteStore;
 	dialogue: DialogueService;
@@ -60,9 +62,11 @@ export function createVoiceResponder({
 		runId: string,
 		controller: AbortController,
 		preparation: SpeechPreparation,
+		sequence: { generation: number; nextIndex: number },
 	) => Speech;
 	audio: Map<string, Speech>;
 	linkRunInTransaction: (db: Database, id: string, runId: string) => void;
+	clock: () => string;
 }) {
 	return async (
 		turn: VoiceTurn,
@@ -100,7 +104,10 @@ export function createVoiceResponder({
 			larm.snapshotFor?.(db, turn.utteranceId),
 		);
 		const autoSpeak = !snapshot || snapshot.voice.autoSpeak;
-		const speechController = new AbortController();
+		let speechController = new AbortController();
+		const speechFailure = new AbortController();
+		const sequence = { generation: 0, nextIndex: 0 };
+		const previousSpeech: Speech[] = [];
 		const stopSpeech = () => speechController.abort(controller.signal.reason);
 		controller.signal.addEventListener("abort", stopSpeech, { once: true });
 		let speech: Speech | undefined;
@@ -109,13 +116,29 @@ export function createVoiceResponder({
 		let unsubscribeBody = () => {};
 		let detachBody = () => {};
 		let generationId: string | undefined;
-		let streamError: unknown;
 		let sourcePrefix = "";
 		let bodyPrefix = "";
 		let announcement = "";
+		const failSpeech = (error: unknown) => {
+			speechFailure.abort(error);
+			speechController.abort(error);
+			audio.delete(turn.utteranceId);
+		};
+		const startSpeech = () =>
+			createSpeech(
+				turn.utteranceId,
+				run.id,
+				speechController,
+				preparation!,
+				sequence,
+			);
 		const append = (body: string, final = false) => {
-			if (!body.startsWith(bodyPrefix))
-				throw new Error("speech_stream_diverged");
+			if (!body.startsWith(bodyPrefix)) {
+				// Adoption can rewrite display links while leaving the spoken answer intact.
+				if (!final || spokenText(body) !== spokenText(bodyPrefix))
+					throw new Error("speech_stream_diverged");
+				body = bodyPrefix;
+			}
 			sourcePrefix += body.slice(bodyPrefix.length);
 			bodyPrefix = body;
 			speech!.append(spokenPrefix(sourcePrefix, final), final);
@@ -139,28 +162,56 @@ export function createVoiceResponder({
 						turns: [],
 					},
 				};
-				speech = createSpeech(
-					turn.utteranceId,
-					run.id,
-					speechController,
-					preparation,
-				);
+				speech = startSpeech();
 				log.info("voice.synthesis_started", { runId: run.id });
 				unsubscribeBody = dialogue.subscribeAnswerStream(run.id, (body) => {
-					if (controller.signal.aborted || speechController.signal.aborted)
-						return;
+					if (controller.signal.aborted || speechFailure.signal.aborted) return;
 					try {
 						if (generationId !== body.generationId) {
 							detachBody();
+							const replacing = generationId !== undefined;
 							generationId = body.generationId;
+							if (replacing) {
+								previousSpeech.push(speech!);
+								speech = undefined;
+							}
 							// Freeze the prepared input's conversation once for this generation.
 							preparation!.context =
 								dialogue.answerContext(run.id) ?? preparation!.context;
+							if (replacing) {
+								speechController = new AbortController();
+								sequence.generation++;
+								sourcePrefix = bodyPrefix = "";
+								speech = startSpeech();
+								// Notify the browser even if the new generation takes time to speak.
+								const scoped = speechController.signal;
+								void store
+									.write((db) => {
+										const current = get(db, turn.utteranceId);
+										if (!scoped.aborted && current?.status === "responding")
+											update(
+												db,
+												turn.utteranceId,
+												current.revision,
+												current.status,
+												clock(),
+											);
+									})
+									.catch((error) => {
+										if (!scoped.aborted) failSpeech(error);
+									});
+							}
 							const revoke = () => {
-								streamError =
+								const reason =
 									body.signal.reason ?? new Error("generation_cancelled");
-								speechController.abort(streamError);
-								audio.delete(turn.utteranceId);
+								if (
+									reason instanceof Error &&
+									reason.message === "generation_replaced"
+								) {
+									// The next body is published synchronously by AnswerStreams.open.
+									speechController.abort(reason);
+									audio.delete(turn.utteranceId);
+								} else failSpeech(reason);
 							};
 							body.signal.addEventListener("abort", revoke, { once: true });
 							detachBody = () =>
@@ -173,9 +224,7 @@ export function createVoiceResponder({
 						};
 						append(body.text);
 					} catch (error) {
-						streamError = error;
-						speechController.abort(error);
-						audio.delete(turn.utteranceId);
+						failSpeech(error);
 					}
 				});
 				unsubscribe =
@@ -204,8 +253,7 @@ export function createVoiceResponder({
 							};
 							speech!.append(spokenPrefix(sourcePrefix, true), false, true);
 						} catch (error) {
-							streamError = error;
-							speechController.abort();
+							failSpeech(error);
 						}
 					}) ?? (() => {});
 			}
@@ -213,25 +261,28 @@ export function createVoiceResponder({
 				deadlineAt
 					? Math.max(0, Date.parse(deadlineAt) - Date.now()) + 10_000
 					: undefined;
+			const responseSignal = AbortSignal.any([
+				controller.signal,
+				speechFailure.signal,
+			]);
 			let final = await dialogue.waitForTerminal(run.id, {
-				signal: AbortSignal.any([controller.signal, speechController.signal]),
+				signal: responseSignal,
 				timeoutMs: waitFor(run.deadlineAt),
 			});
 			// A toolchain with its own run time moved the deadline later meanwhile: keep waiting until that one.
 			while (
-				!controller.signal.aborted &&
-				!speechController.signal.aborted &&
+				!responseSignal.aborted &&
 				final &&
 				["queued", "running"].includes(final.status) &&
 				final.deadlineAt &&
 				Date.parse(final.deadlineAt) + 10_000 > Date.now()
 			)
 				final = await dialogue.waitForTerminal(run.id, {
-					signal: AbortSignal.any([controller.signal, speechController.signal]),
+					signal: responseSignal,
 					timeoutMs: waitFor(final.deadlineAt),
 				});
 			if (controller.signal.aborted) return;
-			if (streamError) throw streamError;
+			speechFailure.signal.throwIfAborted();
 			if (final && ["queued", "running"].includes(final.status)) {
 				await dialogue.stopReply(run.id);
 				throw new Error("dialogue_wait_timeout");
@@ -325,7 +376,10 @@ export function createVoiceResponder({
 			}
 			// What was played of a run that keeps no answer is what the user heard: the chat and the record keep it once
 			// the run has ended (a stop ends it just after this turn lets go; one still answering keeps its own words).
-			const heard = (speech?.played ?? []).map((part) => part.text).join("");
+			const heard = [...previousSpeech, ...(speech ? [speech] : [])]
+				.flatMap((part) => part.played)
+				.map((part) => part.text)
+				.join("");
 			if (heard)
 				void recordUnadopted(store, dialogue, run.id, run.deadlineAt, heard);
 		}

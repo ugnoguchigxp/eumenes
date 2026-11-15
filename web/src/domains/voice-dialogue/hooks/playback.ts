@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { Settings } from "../../../../../api/domains/settings/contracts";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
-import { describeError } from "../../../errorMessages";
+import type { VoiceIssue } from "./index";
 import { queryRoots } from "../../../queryKeys";
 import { type AudioController } from "../../audio";
 import type { AvatarCue } from "../../avatar";
@@ -25,7 +25,7 @@ export function followVoicePlayback(deps: {
 	replacement: Ref<Replacement>;
 	queue: Ref<ChunkQueue | null>;
 	cancelPlayback: () => void;
-	setError: Setter<string | null>;
+	setError: Setter<VoiceIssue | null>;
 	setTurnId: Setter<string | null>;
 	setRecognitionId: Setter<string | null>;
 	setSubtitle: Setter<{ key: string; text: string } | null>;
@@ -54,9 +54,7 @@ export function followVoicePlayback(deps: {
 	if (!value) return;
 	if (value.status === "failed")
 		// Keep the failure visible when restoring a previous accepted turn.
-		setError(
-			value.error ? describeError(value.error) : "音声処理に失敗しました",
-		);
+		setError({ cause: value.error ?? "voice_failed", turn: value });
 	const pending = replacement.current;
 	if (pending?.id === value.utteranceId) {
 		if (
@@ -105,6 +103,15 @@ export function followVoicePlayback(deps: {
 			return;
 		}
 		let playback = queue.current;
+		const audioGeneration = value.audioGeneration ?? 0;
+		if (
+			playback?.id === value.utteranceId &&
+			playback.audioGeneration !== audioGeneration
+		) {
+			controller.current?.stopPlayback();
+			cancelPlayback();
+			playback = null;
+		}
 		if (playback?.id !== value.utteranceId) {
 			const installed = machine.dispatch({
 				type: "player_installed",
@@ -113,6 +120,7 @@ export function followVoicePlayback(deps: {
 			playback = {
 				id: value.utteranceId,
 				epoch: installed.player!.epoch,
+				audioGeneration,
 				tail: Promise.resolve(),
 			};
 			queue.current = playback;
@@ -132,7 +140,7 @@ export function followVoicePlayback(deps: {
 			noticeQuiet,
 			fail: (e) => {
 				if (!valid()) return;
-				setError(describeError(e));
+				setError({ cause: e, turn: value });
 				controller.current?.stopPlayback();
 				cancelPlayback();
 				machine.dispatch({ type: "turn_released" });
@@ -165,7 +173,9 @@ export function followVoicePlayback(deps: {
 									queryKey: [queryRoots.voiceDialogue, client.identity, turnId],
 								}),
 							)
-							.catch((e) => setError(describeError(e)));
+							.catch((e) => {
+								if (valid()) setError({ cause: e, turn: value });
+							});
 					},
 					{
 						waitForPrevious: options.current?.bargeIn === false,
@@ -174,6 +184,8 @@ export function followVoicePlayback(deps: {
 					},
 				);
 			})
-			.catch((e) => setError(describeError(e)));
+			.catch((e) => {
+				if (valid()) setError({ cause: e, turn: value });
+			});
 	}
 }

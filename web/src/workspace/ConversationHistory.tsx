@@ -5,6 +5,7 @@ import { ResourceChips } from "../domains/resources";
 import { formatResourceUri } from "../../../api/domains/resources/contracts";
 import { SCRATCH_RESOURCE_KIND } from "../../../api/domains/scratch/contracts";
 import { LiveMessageList } from "./LiveMessageList";
+import { ConversationFailures } from "./ConversationFailures";
 import { RunDetails, RunFailure } from "./RunDetails";
 import { ThinkingRow } from "./ThinkingRow";
 import { LiveVoicePanel } from "../domains/live-voice";
@@ -118,6 +119,7 @@ export function ConversationHistory({
 			/>
 			{activeRun && <ThinkingRow state={state} run={activeRun} />}
 			{state.live && <LiveVoicePanel live={state.live} agentName={agentName} />}
+			<ConversationFailures state={state} />
 		</div>
 	);
 }

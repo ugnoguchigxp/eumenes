@@ -125,6 +125,14 @@ export const progressSchema = z.object({
 	runId: z.string(),
 	status: runSchema.shape.status,
 	text: z.string().max(65_536),
+	/** In-memory text of the current generation; absent/null means no provisional body. */
+	provisional: z
+		.object({
+			generationId: z.string().min(1),
+			sequence: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+		})
+		.nullable()
+		.optional(),
 	announcement: z.string().max(65_536).nullable().optional(),
 	/** Machine-readable end reason of a failed run (never body text). */
 	error: z.string().nullable().optional(),

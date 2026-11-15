@@ -39,7 +39,7 @@ export function createSpeechClaims({
 	now?: () => number;
 }) {
 	const claims = new Map<string, number>();
-	function refusal(screenId: string, sourceKey: string) {
+	function refusal(screenId: string, sourceKey: string, streaming = false) {
 		if (!larm.isPlaybackScreen?.(screenId)) return "not_playback_screen";
 		const runKey = /^run:([^:]+):/.exec(sourceKey);
 		if (runKey) {
@@ -48,7 +48,12 @@ export function createSpeechClaims({
 			const announcement = sourceKey.startsWith(
 				`run:${runKey[1]}:announcement:`,
 			);
-			if (!run || (!announcement && run.status !== "completed"))
+			if (
+				!run ||
+				(!announcement &&
+					run.status !== "completed" &&
+					!(streaming && ["queued", "running"].includes(run.status)))
+			)
 				return "speech_not_speaker";
 			// A voice turn speaks its own answer in chunks on the screen that holds the microphone.
 			if (
@@ -63,20 +68,24 @@ export function createSpeechClaims({
 		if (claims.has(sourceKey)) return "speech_already_claimed";
 		return null;
 	}
+	function claim(screenId: string, sourceKey: string, streaming = false) {
+		const reason = refusal(screenId, sourceKey, streaming);
+		if (reason) {
+			log.info("voice.speech_claim_rejected", {
+				screenId,
+				subjectId: sourceKey,
+				reason,
+			});
+			throw new Error(reason);
+		}
+		if (claims.size >= MAX_CLAIMS) claims.delete(claims.keys().next().value!);
+		claims.set(sourceKey, now());
+		log.info("voice.speech_claimed", { screenId, subjectId: sourceKey });
+	}
 	return {
-		claim(screenId: string, sourceKey: string) {
-			const reason = refusal(screenId, sourceKey);
-			if (reason) {
-				log.info("voice.speech_claim_rejected", {
-					screenId,
-					subjectId: sourceKey,
-					reason,
-				});
-				throw new Error(reason);
-			}
-			if (claims.size >= MAX_CLAIMS) claims.delete(claims.keys().next().value!);
-			claims.set(sourceKey, now());
-			log.info("voice.speech_claimed", { screenId, subjectId: sourceKey });
-		},
+		claim: (screenId: string, sourceKey: string) => claim(screenId, sourceKey),
+		/** Only the run-bound audio stream may claim an answer before adoption. */
+		claimStream: (screenId: string, runId: string) =>
+			claim(screenId, `run:${runId}:answer`, true),
 	};
 }

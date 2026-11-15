@@ -100,3 +100,105 @@ test("unmount stops the retry loop", async () => {
 	});
 	expect(watchRun).toHaveBeenCalledTimes(calls);
 });
+
+test.each(["cancelled", "failed"] as const)(
+	"%s removes visible partial text and ignores late callbacks",
+	async (status) => {
+		let emit!: Parameters<DialogueClient["watchRun"]>[2];
+		const hook = setup(async (_id, _signal, onProgress) => {
+			emit = onProgress;
+			await new Promise(() => {});
+		});
+		await act(async () => emit(frame));
+		expect(hook.result.current).toBe("partial");
+		await act(async () => emit({ ...frame, status }));
+		expect(hook.result.current).toBe("");
+		await act(async () => emit({ ...frame, text: "late" }));
+		expect(hook.result.current).toBe("");
+		hook.unmount();
+	},
+);
+
+test("a dropped connection clears text during retry and callbacks from that connection cannot restore it", async () => {
+	const emits: Array<Parameters<DialogueClient["watchRun"]>[2]> = [];
+	let disconnect!: () => void;
+	const hook = setup(async (_id, _signal, onProgress) => {
+		emits.push(onProgress);
+		if (emits.length === 1)
+			await new Promise<void>((_resolve, reject) => {
+				disconnect = () => reject(new Error("disconnected"));
+			});
+		else await new Promise(() => {});
+	});
+	await act(async () => emits[0]!(frame));
+	expect(hook.result.current).toBe("partial");
+	await act(async () => disconnect());
+	expect(hook.result.current).toBe("");
+	await act(async () => {
+		emits[0]!({ ...frame, text: "late" });
+		await vi.advanceTimersByTimeAsync(250);
+	});
+	expect(hook.result.current).toBe("");
+	await act(async () => emits[1]!({ ...frame, text: "current" }));
+	expect(hook.result.current).toBe("current");
+	hook.unmount();
+});
+
+test.each([401, 403, 404])(
+	"a permanent %s after streamed text clears it and ends retries",
+	async (status) => {
+		let reject!: (error: Error) => void;
+		let emit!: Parameters<DialogueClient["watchRun"]>[2];
+		const watchRun = vi.fn(async (_id, _signal, onProgress) => {
+			emit = onProgress;
+			await new Promise<void>((_resolve, fail) => {
+				reject = fail;
+			});
+		});
+		const hook = setup(watchRun as DialogueClient["watchRun"]);
+		await act(async () => emit(frame));
+		expect(hook.result.current).toBe("partial");
+		await act(async () => {
+			reject(new ApiError(status, "unavailable"));
+			await vi.advanceTimersByTimeAsync(60_000);
+		});
+		expect(hook.result.current).toBe("");
+		expect(watchRun).toHaveBeenCalledTimes(1);
+		hook.unmount();
+	},
+);
+
+test("switching runs or connections clears drafts and rejects callbacks of the previous subscription", async () => {
+	const emits: Array<Parameters<DialogueClient["watchRun"]>[2]> = [];
+	const finishes: Array<() => void> = [];
+	const client = {
+		identity: "first",
+		watchRun: async (_id, _signal, onProgress) => {
+			emits.push(onProgress);
+			await new Promise<void>((resolve) => finishes.push(resolve));
+		},
+	} as DialogueClient;
+	const wrapper = ({ children }: PropsWithChildren) => (
+		<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+	);
+	const cache = new QueryClient();
+	const hook = renderHook(
+		({ connection, id }) => useRunProgress(connection, id),
+		{ wrapper, initialProps: { connection: client, id: "run-1" } },
+	);
+	await act(async () => emits[0]!(frame));
+	expect(hook.result.current).toBe("partial");
+	hook.rerender({ connection: { ...client, identity: "second" }, id: "run-1" });
+	expect(hook.result.current).toBe("");
+	await act(async () => emits[0]!(frame));
+	expect(hook.result.current).toBe("");
+	await act(async () => emits[1]!(frame));
+	hook.rerender({ connection: client, id: "run-2" });
+	expect(hook.result.current).toBe("");
+	hook.rerender({ connection: client, id: "run-1" });
+	expect(hook.result.current).toBe("");
+	await act(async () => emits[3]!({ ...frame, text: "current" }));
+	await act(async () => finishes[0]!());
+	expect(hook.result.current).toBe("current");
+	hook.unmount();
+});

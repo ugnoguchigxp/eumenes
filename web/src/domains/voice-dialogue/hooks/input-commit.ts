@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { VoiceTurn } from "../../../../../api/domains/voice-dialogue/contracts";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
 import type { AudioController } from "../../audio";
-import { describeError } from "../../../errorMessages";
+import type { VoiceIssue } from "./index";
 import { queryRoots } from "../../../queryKeys";
 import type { RecognitionCandidate } from "./preview";
 import { isCurrent, type VoiceMachine } from "./machine";
@@ -17,7 +17,7 @@ export function commitIdleInput(
 	candidate: RecognitionCandidate | null,
 	controller: AudioController | null,
 	inputs: InputLedger,
-	setError: (error: string) => void,
+	setError: (error: VoiceIssue) => void,
 ) {
 	const session = machine.get().session;
 	if (
@@ -51,6 +51,7 @@ export function commitIdleInput(
 		.catch((e) => {
 			// A segment that arrived meanwhile continues this input; it is sent with that one.
 			if (e instanceof Error && e.message === "voice_input_stale") return;
-			if (isCurrent(machine.get(), session.token)) setError(describeError(e));
+			if (isCurrent(machine.get(), session.token))
+				setError({ cause: e, turn: value });
 		});
 }

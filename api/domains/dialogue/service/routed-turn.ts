@@ -446,6 +446,7 @@ function createTurn(
 									!chatSignal.aborted &&
 									error instanceof Error &&
 									(error.message === "chat_output_empty" ||
+										error.message === "cloud_agent_empty_output" ||
 										(error.message === "chat_tool_calls_unexpected" &&
 											!request.tools.length))
 								)

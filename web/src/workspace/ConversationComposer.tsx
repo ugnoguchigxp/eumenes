@@ -8,7 +8,6 @@ import {
 import { useStore } from "zustand";
 import type { AudioStore } from "../domains/audio";
 import { Button, Spinner, Textarea } from "../design-system";
-import { ApiError } from "../../../client/transport";
 import { describeError } from "../errorMessages";
 import type { StewardActivity } from "../../../api/domains/steward/contracts";
 import { ErrorReportButton } from "./ErrorReportDialog";
@@ -109,7 +108,6 @@ export function ConversationComposer({
 		automaticInput,
 		submit,
 		editInput,
-		audioError,
 		edit,
 		specialist,
 	} = state;
@@ -340,14 +338,9 @@ export function ConversationComposer({
 					{live.error}
 				</p>
 			)}
-			{(submit.isError || voice.error || audioError) && (
+			{voice.notice && (
 				<p className="chat-error" role="alert">
-					{submit.isError
-						? submit.error instanceof ApiError &&
-							submit.error.message === "addressee_changed"
-							? describeError(submit.error)
-							: `送信できませんでした: ${describeError(submit.error)}`
-						: voice.error || (audioError ? describeError(audioError) : null)}
+					{voice.notice}
 				</p>
 			)}
 		</div>

@@ -6,14 +6,14 @@ import { createAnswerStreams } from "./answer-streams";
 /** Progress watchers and their commit-driven refresh. */
 export function createProgress(deps: DialogueDeps) {
 	const { store, conversation } = deps;
-	const streams = createAnswerStreams();
 	const watchers = new Map<string, Set<(value: RunProgress) => void>>();
-	const watchedStatuses = new Map<string, string>();
-	function progress(runId: string): RunProgress | null {
+	// Only persisted state is cached here; model deltas never query SQLite.
+	const watched = new Map<string, RunProgress>();
+	const streams = createAnswerStreams((runId) => emit(runId));
+	function persisted(runId: string): RunProgress | null {
 		const run = store.read((db) => byId(db, runId));
 		if (!run) return null;
-		// Persisted progress (including SSE) exposes only the adopted answer. Backend speech consumers
-		// receive provisional text through the separate, generation-scoped in-memory stream.
+		// Stored history remains adoption-only. Live progress overlays the current in-memory generation.
 		const answer =
 			run.status === "completed" && run.answerMessageId
 				? conversation
@@ -24,15 +24,33 @@ export function createProgress(deps: DialogueDeps) {
 			runId,
 			status: run.status,
 			text: answer ?? "",
+			provisional: null,
 			announcement: run.announcement ?? null,
 			error: run.status === "failed" ? run.error : null,
 		};
 	}
-	function publish(runId: string) {
-		const value = progress(runId);
-		if (!value) return;
-		// A run nobody is watching must not stay in the map for the life of the process.
-		if (watchers.has(runId)) watchedStatuses.set(runId, value.status);
+	function withStream(value: RunProgress): RunProgress {
+		const live =
+			value.status === "running" ? streams.current(value.runId) : undefined;
+		return live
+			? {
+					...value,
+					text: live.text,
+					provisional: {
+						generationId: live.generationId,
+						sequence: live.sequence,
+					},
+				}
+			: value;
+	}
+	function progress(runId: string) {
+		const value = persisted(runId);
+		return value ? withStream(value) : null;
+	}
+	function emit(runId: string) {
+		const base = watched.get(runId);
+		if (!base) return;
+		const value = withStream(base);
 		for (const listener of watchers.get(runId) ?? []) {
 			try {
 				listener(value);
@@ -41,10 +59,28 @@ export function createProgress(deps: DialogueDeps) {
 			}
 		}
 	}
+	function publish(runId: string) {
+		if (!watchers.has(runId)) return;
+		const value = persisted(runId) ?? {
+			runId,
+			status: "cancelled" as const,
+			text: "",
+			provisional: null,
+			announcement: null,
+			error: null,
+		};
+		watched.set(runId, value);
+		emit(runId);
+	}
 	const stopCommits = store.onCommit(() => {
 		for (const id of streams.runIds()) {
 			const run = store.read((db) => byId(db, id));
 			if (run?.status === "running" || run?.status === "queued") continue;
+			// Retirement notifies synchronously: expose the committed state before removing the draft.
+			if (watchers.has(id)) {
+				const value = persisted(id);
+				if (value) watched.set(id, value);
+			}
 			streams.retire(
 				id,
 				run?.status === "completed"
@@ -53,8 +89,16 @@ export function createProgress(deps: DialogueDeps) {
 			);
 		}
 		for (const id of watchers.keys()) {
-			const status = store.read((db) => byId(db, id))?.status;
-			if (status !== watchedStatuses.get(id)) publish(id);
+			const value = persisted(id);
+			const previous = watched.get(id);
+			if (
+				!value ||
+				value.status !== previous?.status ||
+				value.text !== previous.text ||
+				value.announcement !== previous.announcement ||
+				value.error !== previous.error
+			)
+				publish(id);
 		}
 	});
 	return {
@@ -69,24 +113,30 @@ export function createProgress(deps: DialogueDeps) {
 				watchers.set(runId, set);
 			}
 			set.add(listener);
-			const value = progress(runId);
-			if (value) {
-				watchedStatuses.set(runId, value.status);
-				listener(value);
-			}
-			return () => {
+			const stop = () => {
 				set!.delete(listener);
-				if (!set!.size) {
+				if (!set!.size && watchers.get(runId) === set) {
 					watchers.delete(runId);
-					watchedStatuses.delete(runId);
+					watched.delete(runId);
 				}
 			};
+			try {
+				const value = persisted(runId);
+				if (value) {
+					watched.set(runId, value);
+					listener(withStream(value));
+				}
+			} catch (error) {
+				stop();
+				throw error;
+			}
+			return stop;
 		},
 		close() {
 			stopCommits();
 			streams.close();
 			watchers.clear();
-			watchedStatuses.clear();
+			watched.clear();
 		},
 	};
 }

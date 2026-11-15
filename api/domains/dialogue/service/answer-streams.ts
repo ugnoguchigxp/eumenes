@@ -1,12 +1,15 @@
-/** A live generation's body, for backend consumers only; it is never a persisted answer. */
+/** A live generation's body; it is never a persisted answer. */
 export type AnswerStream = {
 	generationId: string;
+	sequence: number;
 	text: string;
 	signal: AbortSignal;
 };
 
 /** In-memory transport: delivering a model delta never reads or writes the database. */
-export function createAnswerStreams() {
+export function createAnswerStreams(
+	changed: (runId: string) => void = () => {},
+) {
 	const active = new Map<
 		string,
 		{ value: AnswerStream; controller: AbortController; detach: () => void }
@@ -27,15 +30,27 @@ export function createAnswerStreams() {
 		active.delete(runId);
 		entry.detach();
 		if (reason) entry.controller.abort(reason);
+		changed(runId);
 	}
 	return {
 		runIds: () => active.keys(),
+		current: (runId: string) => {
+			const entry = active.get(runId);
+			return entry && !entry.value.signal.aborted
+				? { ...entry.value }
+				: undefined;
+		},
 		retire,
 		open(runId: string, generationId: string, signal: AbortSignal) {
 			retire(runId, new Error("generation_replaced"));
 			const controller = new AbortController();
 			const scoped = AbortSignal.any([signal, controller.signal]);
-			const value: AnswerStream = { generationId, text: "", signal: scoped };
+			const value: AnswerStream = {
+				generationId,
+				sequence: 0,
+				text: "",
+				signal: scoped,
+			};
 			const onAbort = () => {
 				if (active.get(runId)?.value === value) retire(runId);
 			};
@@ -46,12 +61,17 @@ export function createAnswerStreams() {
 				detach: () => scoped.removeEventListener("abort", onAbort),
 			});
 			if (scoped.aborted) onAbort();
-			else notify(runId, { ...value });
+			else {
+				notify(runId, { ...value });
+				changed(runId);
+			}
 			return (text: string) => {
 				scoped.throwIfAborted();
 				if (active.get(runId)?.value !== value) return;
 				value.text = text;
+				value.sequence++;
 				notify(runId, { ...value });
+				changed(runId);
 			};
 		},
 		subscribe(runId: string, listener: (value: AnswerStream) => void) {

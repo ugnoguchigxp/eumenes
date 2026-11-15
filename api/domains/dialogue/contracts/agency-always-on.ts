@@ -38,6 +38,8 @@ export type AgendaNote = {
 	refs: string[];
 	/** The work it came from (the ticket id of the start). */
 	ticketId: string;
+	/** The verified source versions of that work, retained even when a parent note leaves the list. */
+	inputs?: string[];
 };
 
 /**
@@ -101,6 +103,7 @@ const snapshotSchema = z.strictObject({
 			at: z.number(),
 			refs: strings,
 			ticketId: z.string(),
+			inputs: strings.optional(),
 		}),
 	),
 });
@@ -118,7 +121,10 @@ export function agendaSources(value: AgendaHostSnapshot): string[] {
 		...new Set([
 			...value.agent.items.flatMap((i) => i.refs.map(baseRef)),
 			...value.tickets.flatMap((t) => [...t.refs.map(baseRef), ...t.inputs]),
-			...value.notes.flatMap((n) => n.refs.map(baseRef)),
+			...value.notes.flatMap((n) => [
+				...n.refs.map(baseRef),
+				...(n.inputs ?? []),
+			]),
 			...(value.profile?.passes.flatMap((p) => p.sources) ?? []),
 		]),
 	];
@@ -161,7 +167,9 @@ export function forgetAgenda(
 	const gone = (list: readonly string[]) =>
 		list.some((ref) => refs.has(ref) || refs.has(baseRef(ref)));
 	const lost = new Set(
-		value.notes.filter((n) => gone(n.refs)).map((n) => `note:${n.id}`),
+		value.notes
+			.filter((n) => gone([...n.refs, ...(n.inputs ?? [])]))
+			.map((n) => `note:${n.id}`),
 	);
 	const items = value.agent.items.filter(
 		(i) => !gone(i.refs) && !i.refs.some((r) => lost.has(r)),
@@ -174,7 +182,7 @@ export function forgetAgenda(
 			(t) =>
 				!gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lost.has(r)),
 		),
-		notes: value.notes.filter((n) => !gone(n.refs)),
+		notes: value.notes.filter((n) => !lost.has(`note:${n.id}`)),
 		...(value.profile
 			? { profile: forgetProfile(value.profile, refs) as AgendaProfile }
 			: {}),

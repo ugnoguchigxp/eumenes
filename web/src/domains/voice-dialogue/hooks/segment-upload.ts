@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
-import { describeError } from "../../../errorMessages";
+import type { VoiceIssue } from "./index";
 import { queryRoots } from "../../../queryKeys";
 import { type CreateAudio } from "../../audio";
 import { createInputLedger } from "./input-timing";
@@ -23,7 +23,7 @@ export function createSegmentUploader(deps: {
 	setRecognitionId: Setter<string | null>;
 	setPreviewText: Setter<string | null>;
 	setTurnId: Setter<string | null>;
-	setError: Setter<string | null>;
+	setError: Setter<VoiceIssue | null>;
 	suspendInput: () => void;
 	cancelPlayback: () => void;
 	live: () => boolean;
@@ -105,7 +105,10 @@ export function createSegmentUploader(deps: {
 			})
 			.catch((e) => {
 				if (!live()) return;
-				setError(describeError(e));
+				setError({
+					cause: e,
+					turn: { utteranceId: id, sessionId: active.id, runId: null },
+				});
 				// The failed upload also drops any unsent segments behind it.
 				candidate.current?.controller?.abort();
 				candidate.current = null;
@@ -130,9 +133,10 @@ export function createSegmentUploader(deps: {
 		if (pauseAfterUpload) {
 			// Retain this final segment, then prevent more recording from piling up.
 			suspendInput();
-			setError(
-				"録音を送信待ちに追加しました。送信が進んだらマイクを再開してください。",
-			);
+			setError({
+				notice:
+					"録音を送信待ちに追加しました。送信が進んだらマイクを再開してください。",
+			});
 		}
 	};
 }

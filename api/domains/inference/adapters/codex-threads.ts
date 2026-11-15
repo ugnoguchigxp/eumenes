@@ -1,3 +1,4 @@
+import { AsyncResource } from "node:async_hooks";
 import { getLogger } from "../../../infrastructure/logger";
 import { fail } from "./cloud-agent-shared";
 import type { CodexRpc, ThreadChannel, ThreadHandler } from "./codex-transport";
@@ -248,7 +249,12 @@ export function createCodexThreads(options: {
 				baseline: entry.totals,
 				channel: entry.channel!,
 				listen(handler) {
-					entry.handler = handler;
+					// The shared process emits in its first caller's async context. Bind each
+					// lease, including reused threads, to the current run for deltas and usage.
+					entry.handler = {
+						notify: AsyncResource.bind(handler.notify),
+						fail: AsyncResource.bind(handler.fail),
+					};
 				},
 				turnStarted(turnId) {
 					entry.firstTurnId ??= turnId;

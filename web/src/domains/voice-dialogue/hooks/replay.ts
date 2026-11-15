@@ -9,6 +9,12 @@ import {
 import type { AvatarCue } from "../../avatar";
 import { describeError } from "../../../errorMessages";
 
+import {
+	createRunSpeechSource,
+	type RunSpeechSource,
+} from "./run-speech-source";
+import { playClause } from "./play-clause";
+
 type Run = { abort: AbortController; automatic: boolean };
 export type ReplayAudioSettings = {
 	outputVolume?: number;
@@ -140,54 +146,43 @@ export function useReplay(
 					let cut = false;
 					// A notice that is sounding finishes before the clause (spec tts-single-lane §4.4).
 					await output.noticeQuiet(signal);
-					await new Promise<void>((resolve, reject) => {
-						let started = false;
-						const finish = () => {
-							signal.removeEventListener("abort", finish);
+					const played = await playClause(
+						target,
+						speech.wav,
+						signal,
+						{
+							assistantSpeech: true,
+							timing: { runId: runId ?? undefined, chunkIndex: i },
+							volume,
+							shouldPlay: valid,
+							onStarted: () => {
+								if (!valid()) return;
+								spoken = true;
+								sounding.current = target;
+								setSubtitle(sentences[i] ?? null);
+								if (volume > 0 || speech.emotion)
+									setAvatarCue({
+										key,
+										motion: speech.motion,
+										...(speech.emotion ? { emotion: speech.emotion } : {}),
+										gestureKey: mine.automatic ? `message:${id}` : playbackKey,
+										speaking: volume > 0,
+									});
+								else setAvatarCue(null);
+							},
+						},
+						() => {
 							if (sounding.current === target) sounding.current = null;
-							if (started && valid()) {
+							if (valid()) {
 								setSubtitle(null);
 								setAvatarCue((cue) =>
 									cue?.key === key ? { ...cue, speaking: false } : cue,
 								);
 							}
-							resolve();
-						};
-						signal.addEventListener("abort", finish, { once: true });
-						target
-							.play(speech.wav, finish, {
-								assistantSpeech: true,
-								timing: { runId: runId ?? undefined, chunkIndex: i },
-								volume,
-								shouldPlay: valid,
-								onInterrupted: () => {
-									cut = true;
-									finish();
-								},
-								onStarted: () => {
-									if (!valid()) return;
-									started = true;
-									spoken = true;
-									sounding.current = target;
-									setSubtitle(sentences[i] ?? null);
-									if (volume > 0 || speech.emotion)
-										setAvatarCue({
-											key,
-											motion: speech.motion,
-											...(speech.emotion ? { emotion: speech.emotion } : {}),
-											gestureKey: mine.automatic
-												? `message:${id}`
-												: playbackKey,
-											speaking: volume > 0,
-										});
-									else setAvatarCue(null);
-								},
-							})
-							.then(() => {
-								// Discarded before it began (superseded): nothing will end it.
-								if (!started) finish();
-							}, reject);
-					});
+						},
+						() => sounding.current === target,
+					);
+					cut = played.interrupted;
 					// Interrupted by something else: stop reading the rest.
 					if (!valid() || cut) return;
 				}
@@ -210,12 +205,107 @@ export function useReplay(
 		},
 		[client, stop, prepare, ownOutput],
 	);
+	const prepareStream = useCallback(
+		(runId: string, screenId: string) =>
+			createRunSpeechSource(client, runId, screenId),
+		[client],
+	);
+	const playStream = useCallback(
+		async (source: RunSpeechSource) => {
+			stop();
+			setError(null);
+			const mine: Run = { abort: new AbortController(), automatic: true };
+			run.current = mine;
+			setPlayingId(`run:${source.runId}`);
+			const valid = () => run.current === mine && !mine.abort.signal.aborted;
+			mine.abort.signal.addEventListener("abort", source.stop, { once: true });
+			let release = () => {};
+			try {
+				const target = await prepare();
+				if (!valid()) return;
+				const output = latest.current.deps.output ?? ownOutput;
+				release = output.beginSpeech();
+				for (;;) {
+					const chunk = await source.next();
+					if (!chunk || !valid()) return;
+					if (chunk.signal.aborted) continue;
+					const signal = AbortSignal.any([mine.abort.signal, chunk.signal]);
+					const current = () => valid() && !signal.aborted;
+					await output.noticeQuiet(mine.abort.signal);
+					if (!current()) continue;
+					const volume = Math.min(
+						1,
+						Math.max(0, latest.current.settings.outputVolume ?? 1),
+					);
+					const key = `stream:${source.runId}:${chunk.index}`;
+					const played = await playClause(
+						target,
+						chunk.wav,
+						signal,
+						{
+							assistantSpeech: true,
+							volume,
+							shouldPlay: current,
+							timing: { runId: source.runId, chunkIndex: chunk.index },
+							onStarted: () => {
+								if (!current()) return;
+								sounding.current = target;
+								setSubtitle(chunk.text);
+								if (volume > 0 || chunk.emotion)
+									setAvatarCue({
+										key,
+										motion: chunk.motion,
+										...(chunk.emotion ? { emotion: chunk.emotion } : {}),
+										gestureKey: `run:${source.runId}`,
+										speaking: volume > 0,
+									});
+							},
+						},
+						() => {
+							if (sounding.current === target) sounding.current = null;
+							if (valid()) {
+								setSubtitle(null);
+								setAvatarCue((cue) => (cue?.key === key ? null : cue));
+							}
+						},
+						() => sounding.current === target,
+					);
+					if (!valid()) return;
+					if (chunk.signal.aborted) continue;
+					if (played.interrupted || !played.started) return;
+					// A receipt frees a server slot; its network round trip must not delay ready audio.
+					void chunk.played(volume > 0).catch((error) => {
+						if (!chunk.signal.aborted && valid()) {
+							setError(describeError(error));
+							source.stop();
+						}
+					});
+				}
+			} catch (error) {
+				if (valid()) setError(describeError(error));
+			} finally {
+				release();
+				source.stop();
+				mine.abort.signal.removeEventListener("abort", source.stop);
+				if (run.current === mine) {
+					run.current = null;
+					setPlayingId(null);
+					setSubtitle(null);
+					setAvatarCue(null);
+				}
+			}
+		},
+		[stop, prepare, ownOutput],
+	);
+
 	return {
 		playingId,
 		error,
 		subtitle,
 		avatarCue,
 		play,
+		prepareStream,
+		playStream,
 		stop,
 		stopAutomatic,
 		prepare,

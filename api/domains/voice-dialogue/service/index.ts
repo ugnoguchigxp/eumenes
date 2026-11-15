@@ -12,6 +12,7 @@ import { cancelHeard, recordPlayed } from "./playback";
 import { createReplaySpeech, replaySentences } from "./replay-playback";
 import { createSpeechClaims } from "./speech-claims";
 import { connectAnnouncementDelivery } from "./announcement-delivery";
+import { createRunSpeech } from "./run-speech";
 
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { DialogueService } from "../../dialogue";
@@ -184,15 +185,27 @@ export function createVoiceDialogue(
 			createSpeech,
 			audio,
 			linkRunInTransaction,
+			clock,
 		}),
 		clock,
 	});
 	const speechClaims = createSpeechClaims({ store, dialogue, larm });
+	const runSpeech = createRunSpeech({
+		store,
+		dialogue,
+		larm,
+		clock,
+		externalActive,
+		claim: speechClaims.claimStream,
+	});
 	return {
 		available: () => !externalActive(),
 		/** Claims an automatic speech or notice for this screen; throws the refusal code. */
 		claimSpeech: speechClaims.claim,
+		openRunSpeech: runSpeech.open,
+		runSpeechPlayed: runSpeech.played,
 		pauseAll() {
+			runSpeech.close();
 			return pauseLegacy(sessions, this.stop, controllers, warming, audio);
 		},
 		commit: input.commit,
@@ -294,6 +307,7 @@ export function createVoiceDialogue(
 			const state = audio.get(id);
 			return {
 				...turn,
+				audioGeneration: state?.generation,
 				audioChunks: [...(state?.chunks.values() ?? [])].map((c) => ({
 					index: c.index,
 					text: c.text,
@@ -359,6 +373,7 @@ export function createVoiceDialogue(
 			});
 		},
 		async close() {
+			runSpeech.close();
 			disconnectAnnouncementDelivery?.();
 			for (const c of controllers.values()) c.abort();
 			controllers.clear();

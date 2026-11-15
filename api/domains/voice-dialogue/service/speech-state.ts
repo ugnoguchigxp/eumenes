@@ -1,5 +1,5 @@
 import type { SpeechDelivery } from "../../delivery";
-type Chunk = {
+export type SpeechChunk = {
 	index: number;
 	text: string;
 	wav: Uint8Array;
@@ -8,9 +8,10 @@ type Chunk = {
 };
 export type Speech = {
 	createdAtMs: number;
+	generation: number;
 	/** Clauses given up on after retries. */
 	skipped: number;
-	chunks: Map<number, Chunk>;
+	chunks: Map<number, SpeechChunk>;
 	finished: boolean;
 	append: (text: string, final?: boolean, flush?: boolean) => void;
 	work: Promise<void>;

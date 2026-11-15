@@ -190,7 +190,10 @@ test("streamed cloud text starts speech before adoption and cancellation discard
 	const runId = h.voice.get(id)!.runId!;
 	await until(() => !!h.voice.get(id)?.audioChunks.length);
 	expect(h.dialogue.get(runId)?.status).toBe("running");
-	expect(h.dialogue.progress(runId)?.text).toBe("");
+	expect(h.dialogue.progress(runId)).toMatchObject({
+		text: "先にお届けします。",
+		provisional: { generationId: expect.any(String), sequence: 1 },
+	});
 	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"質問",
 	]);
@@ -200,7 +203,11 @@ test("streamed cloud text starts speech before adoption and cancellation discard
 	await h.voice.cancel(id);
 	expect(h.voice.get(id)?.audioChunks).toEqual([]);
 	expect(h.voice.takeAudio(id, 0)).toBeNull();
-	expect(h.dialogue.progress(runId)?.text).toBe("");
+	expect(h.dialogue.progress(runId)).toMatchObject({
+		status: "cancelled",
+		text: "",
+		provisional: null,
+	});
 	try {
 		sink.enqueue(new TextEncoder().encode("data: [DONE]\n\n"));
 		sink.close();

@@ -132,7 +132,11 @@ export function createVoiceAccess({
 			preparation?: SpeechPreparation,
 		) => {
 			const receipt = await synthesize(text, signal, undefined, preparation);
-			return { wav: receipt.value as Uint8Array, delivery: receipt.delivery };
+			return {
+				wav: receipt.value as Uint8Array,
+				delivery: receipt.delivery,
+				requestId: receipt.requestId,
+			};
 		},
 	};
 }

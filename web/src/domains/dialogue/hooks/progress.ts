@@ -1,12 +1,17 @@
 import { browserTiming } from "../../../performance";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DialogueClient } from "../../../../../client/dialogue";
 import type { RunProgress } from "../../../../../api/domains/dialogue/contracts";
 import { ApiError } from "../../../../../client/transport";
 import { invalidateDialogueViews } from "./index";
 export function useRunProgress(client: DialogueClient, runId?: string) {
-	const [value, setValue] = useState<RunProgress | null>(null);
+	const subscription = useMemo(() => ({ client, runId }), [client, runId]);
+	const [state, setState] = useState<{
+		subscription: typeof subscription;
+		value: RunProgress;
+	} | null>(null);
+	const value = state?.subscription === subscription ? state.value : null;
 	const cache = useQueryClient();
 	const timing = useRef<{ id: string; received?: number; committed?: boolean }>(
 		{ id: "" },
@@ -33,9 +38,16 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 			let terminal = false;
 			let announcement: string | null = null;
 			while (!controller.signal.aborted && !terminal) {
+				let watching = true;
 				try {
 					await client.watchRun(runId, controller.signal, (next) => {
-						if (controller.signal.aborted) return;
+						if (
+							!watching ||
+							controller.signal.aborted ||
+							terminal ||
+							next.runId !== runId
+						)
+							return;
 						attempt = 0;
 						if (
 							next.status === "completed" ||
@@ -56,12 +68,16 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 							announcement = next.announcement;
 							invalidateDialogueViews(cache, client.identity, "main");
 						}
-						setValue(next);
+						setState({ subscription, value: next });
 					});
+					if (controller.signal.aborted) return;
+					if (!terminal) setState(null);
 					invalidateDialogueViews(cache, client.identity, "main");
 					return;
 				} catch (error) {
 					if (controller.signal.aborted) return;
+					watching = false;
+					if (!terminal) setState(null);
 					invalidateDialogueViews(cache, client.identity, "main");
 					// The run is gone or access is denied: retrying cannot help.
 					if (
@@ -85,11 +101,13 @@ export function useRunProgress(client: DialogueClient, runId?: string) {
 						controller.signal.addEventListener("abort", finish, { once: true });
 					});
 					attempt++;
+				} finally {
+					watching = false;
 				}
 			}
 		})();
 		return () => controller.abort();
-	}, [client, runId, cache]);
+	}, [client, runId, cache, subscription]);
 	return value &&
 		value.runId === runId &&
 		(value.status === "completed" || value.status === "running")

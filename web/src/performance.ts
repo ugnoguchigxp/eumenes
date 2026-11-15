@@ -7,6 +7,7 @@ type Phase =
 	| "text_received"
 	| "text_committed"
 	| "audio_fetch"
+	| "playback_report"
 	| "audio_decode"
 	| "playback_scheduled"
 	| "vad_answer";

@@ -44,7 +44,9 @@ export function createAgendaCheckpoints(input: {
 			...view.items.flatMap((i) => i.refs),
 		].filter((ref) => set.has(baseRef(ref)));
 		// A note the list let go is forgotten with the words it read, as one it holds.
-		const lost = citableNotes(c).filter((n) => gone(n.refs));
+		const lost = citableNotes(c).filter((n) =>
+			gone([...n.refs, ...(n.inputs ?? [])]),
+		);
 		const lostRefs = new Set(lost.map((n) => `note:${n.id}`));
 		c.agent.forget([...set, ...aliases, ...lostRefs]);
 		// The note goes back to before the words it read; a writer pass in flight is not kept.

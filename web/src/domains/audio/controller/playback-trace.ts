@@ -13,6 +13,7 @@ export function createPlaybackTrace() {
 						controllerId,
 						playbackId,
 						stage,
+						at: Date.now(),
 						runId: identity.runId,
 						utteranceId: identity.utteranceId,
 						chunkIndex: identity.chunkIndex,

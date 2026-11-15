@@ -97,6 +97,7 @@ export function noteFromResult(input: {
 		at: input.at,
 		refs: [...input.ticket.refs],
 		ticketId: input.ticket.id,
+		inputs: [...input.ticket.inputs],
 	};
 }
 

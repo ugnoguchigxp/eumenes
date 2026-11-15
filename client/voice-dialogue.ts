@@ -4,7 +4,9 @@ import {
 	voiceTurnSchema,
 	type InputTiming,
 	type ChunkGap,
+	type RunSpeechPlayed,
 } from "../api/domains/voice-dialogue/contracts";
+import { watchRunSpeech } from "./run-speech";
 import {
 	avatarMotionSchema,
 	deliveryEmotionSchema,
@@ -27,6 +29,24 @@ const speechClaimedSchema = z.object({ claimed: z.literal(true) });
 export function voiceDialogueClient(transport: Transport) {
 	return {
 		identity: transport.identity,
+		watchRunSpeech: (
+			runId: string,
+			screenId: string,
+			signal: AbortSignal,
+			receive: Parameters<typeof watchRunSpeech>[4],
+		) => watchRunSpeech(transport, runId, screenId, signal, receive),
+		runSpeechPlayed: (
+			runId: string,
+			sessionId: string,
+			input: RunSpeechPlayed,
+			signal?: AbortSignal,
+		) =>
+			callJson(
+				transport,
+				z.object({ ok: z.literal(true) }),
+				`/api/voice/runs/${encodeURIComponent(runId)}/speech/${encodeURIComponent(sessionId)}/played`,
+				{ ...json(input), signal },
+			),
 		voiceStart: (sessionId: string, generation: number) =>
 			callJson(
 				transport,

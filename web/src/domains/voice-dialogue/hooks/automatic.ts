@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Run } from "../../../../../api/domains/dialogue/contracts";
 import type { useReplay } from "./replay";
+import type { RunSpeechSource } from "./run-speech-source";
 
 /** Proactive utterances of the agency host: runless assistant messages with this id prefix. */
 const AGENCY_MESSAGE_PREFIX = "agency:";
@@ -13,6 +14,7 @@ type Pending = {
 	runId: string | null;
 	/** The claim's key (spec tts-single-lane §4.3). */
 	sourceKey: string;
+	stream?: RunSpeechSource;
 };
 
 /**
@@ -37,12 +39,13 @@ export function useAutomaticSpeech({
 	enabled: boolean | undefined;
 	player: Pick<
 		ReturnType<typeof useReplay>,
-		"play" | "stopAutomatic" | "prepare"
+		"play" | "stopAutomatic" | "prepare" | "prepareStream" | "playStream"
 	>;
 	ownsSpeech: (utteranceId: string | null) => boolean;
 	/** Wait until the shared voice controller finishes its existing answer. */
 	blocked?: boolean;
 	screen: {
+		screenId: string;
 		/** This screen is the one that plays sound. */
 		playbackScreen: boolean;
 		/** Claims the speech for this screen; false means another screen or nobody reads it. */
@@ -51,13 +54,16 @@ export function useAutomaticSpeech({
 	/** The conversation's specialist session; it speaks only while active (switched to). */
 	speaker: { id: string; state: string } | null | undefined;
 }) {
-	const { playbackScreen: playback, claim } = screen;
+	const { playbackScreen: playback, claim, screenId } = screen;
 	const speakerSession = speaker?.state === "active" ? speaker.id : null;
 	const seen = useRef<Set<string> | null>(null);
 	/** The light message (announcement) text already read or passed over, per run. It only grows. */
 	const seenAnnouncements = useRef<Map<string, string> | null>(null);
 	const seenUtterances = useRef<Set<string> | null>(null);
 	const pending = useRef<Pending[]>([]);
+	const liveSeen = useRef<Set<string> | null>(null);
+	const streams = useRef(new Map<string, RunSpeechSource>());
+	const [readyRevision, setReadyRevision] = useState(0);
 	const epoch = useRef(0);
 	const busy = useRef(false);
 	const audible = !!enabled && playback;
@@ -66,6 +72,8 @@ export function useAutomaticSpeech({
 		latest.current = { audible, player, blocked, claim };
 	}, [audible, player, blocked, claim]);
 	const clearQueue = useCallback(() => {
+		for (const source of streams.current.values()) source.stop();
+		streams.current.clear();
 		pending.current = [];
 		epoch.current++;
 		busy.current = false;
@@ -86,9 +94,43 @@ export function useAutomaticSpeech({
 			seenUtterances.current = new Set(
 				messages.filter(isAgencyUtterance).map((message) => message.id),
 			);
+			liveSeen.current = new Set(runs.map((run) => run.id));
 			return;
 		}
 		for (const run of runs) {
+			if (
+				["queued", "running"].includes(run.status) &&
+				!liveSeen.current!.has(run.id)
+			) {
+				liveSeen.current!.add(run.id);
+				if (
+					audible &&
+					!run.utteranceId &&
+					!ownsSpeech(run.utteranceId) &&
+					(!run.specialistSessionId ||
+						run.specialistSessionId === speakerSession)
+				) {
+					seen.current.add(run.id);
+					const mine = epoch.current;
+					const source = player.prepareStream(run.id, screenId);
+					streams.current.set(run.id, source);
+					void source.ready.then((ready) => {
+						if (!ready || mine !== epoch.current || !latest.current.audible) {
+							source.stop();
+							streams.current.delete(run.id);
+							return;
+						}
+						pending.current.push({
+							id: `run:${run.id}`,
+							text: "",
+							runId: run.id,
+							sourceKey: `run:${run.id}:answer`,
+							stream: source,
+						});
+						setReadyRevision((value) => value + 1);
+					});
+				}
+			}
 			// A light message is read as soon as it appears, while its task is still going; only the part
 			// that is new since the last read is spoken. One that ended in failure is not read after the fact.
 			const announcement = run.announcement;
@@ -182,6 +224,15 @@ export function useAutomaticSpeech({
 				while (current()) {
 					const answer = pending.current.shift();
 					if (!answer) break;
+					if (answer.stream) {
+						try {
+							await latest.current.player.playStream(answer.stream);
+						} finally {
+							answer.stream.stop();
+							streams.current.delete(answer.stream.runId);
+						}
+						continue;
+					}
 					const claimed = await latest.current
 						.claim(answer.sourceKey)
 						.catch(() => false);
@@ -206,6 +257,8 @@ export function useAutomaticSpeech({
 		ownsSpeech,
 		blocked,
 		speakerSession,
+		screenId,
+		readyRevision,
 		clearQueue,
 	]);
 	useEffect(() => {

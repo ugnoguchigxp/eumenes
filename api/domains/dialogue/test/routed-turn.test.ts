@@ -68,18 +68,43 @@ test("a talk cut before a word gets the host's words", async () => {
 	);
 });
 
-test("a talk that tells the user who spoke nothing gets the host's words; each call of the turn ends only itself", async () => {
-	h = await setup();
-	h.state.steps.push(choice({ choice: "none" }), { fail: "chat_output_empty" });
-	const run = await h.say("こんにちは");
-	expect(run.status).toBe("completed");
-	expect(h.dialogue.answerText(run.id)).toBe(
-		"うまく答えられませんでした。もう一度言ってもらえますか。",
-	);
-	expect(h.state.calls.map((call) => call.session?.retainRequest)).toEqual([
-		true,
-	]);
-});
+test.each(["chat_output_empty", "cloud_agent_empty_output"])(
+	"a talk that tells the user who spoke nothing gets the host's words (%s)",
+	async (fail) => {
+		h = await setup();
+		h.state.steps.push(choice({ choice: "none" }), { fail });
+		const run = await h.say("こんにちは");
+		expect(run.status).toBe("completed");
+		expect(h.dialogue.answerText(run.id)).toBe(
+			"うまく答えられませんでした。もう一度言ってもらえますか。",
+		);
+		expect(h.state.calls.map((call) => call.session?.retainRequest)).toEqual([
+			true,
+		]);
+	},
+);
+
+test.each(["chat_output_empty", "cloud_agent_empty_output"])(
+	"a completed silent continuation keeps the tool preamble without a failure reply (%s)",
+	async (fail) => {
+		h = await setup();
+		h.state.steps.push(
+			choice({ choice: "none" }),
+			{
+				text: "記録を確認します。",
+				calls: [{ name: "read_history", args: {} }],
+			},
+			{ fail },
+		);
+		const run = await h.say("これまでの記録を見てください");
+		expect(run.status).toBe("completed");
+		expect(h.dialogue.answerText(run.id)).toBe("記録を確認します。");
+		expect(h.state.calls).toHaveLength(2);
+		expect(
+			h.state.calls[1]!.messages.map((message) => String(message.role)),
+		).toContain("tool");
+	},
+);
 
 test("a pipeline uses the request branch and has no legacy template input contract", async () => {
 	const pipeline: ToolchainCard = {

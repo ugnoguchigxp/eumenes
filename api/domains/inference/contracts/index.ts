@@ -292,6 +292,8 @@ export interface InferencePort {
 		error?: string;
 	};
 	connect?(): Promise<void>;
+	/** Settings, provider status and playback-screen ownership changes. */
+	onChange?(listener: () => void): () => void;
 	prepareVoice?(signal: AbortSignal): Promise<void>;
 	answerStream?(
 		messages: Messages,
@@ -318,7 +320,11 @@ export interface InferencePort {
 		text: string,
 		signal: AbortSignal,
 		preparation?: SpeechPreparation,
-	): Promise<{ wav: Uint8Array; delivery?: SpeechDelivery }>;
+	): Promise<{
+		wav: Uint8Array;
+		delivery?: SpeechDelivery;
+		requestId?: string;
+	}>;
 	close(): Promise<void>;
 	captureInTransaction?(
 		db: Database,

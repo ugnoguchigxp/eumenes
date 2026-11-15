@@ -229,14 +229,19 @@ export function createInputCollector({
 				)
 					.catch(async (error) => {
 						if (controller.signal.aborted) return;
+						const reason = toErrorCode(error, "voice_failed");
+						const runId = store.read((db) => get(db, id)?.runId);
 						log.warn("voice.input_response_failed", {
-							reason: toErrorCode(error, "voice_failed"),
+							utteranceId: id,
+							sessionId: turn.sessionId,
+							runId: runId ?? undefined,
+							reason,
 						});
 						await store.write((db) => {
 							const current = get(db, id);
 							if (current)
 								update(db, id, current.revision, "failed", clock(), {
-									error: toErrorCode(error, "voice_failed"),
+									error: reason,
 								});
 						});
 					})

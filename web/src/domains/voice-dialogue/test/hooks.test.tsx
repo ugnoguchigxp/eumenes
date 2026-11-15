@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { expect, test, vi } from "vitest";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
+import { ApiError } from "../../../../../client";
 import {
 	createAudioController,
 	type CreateAudio,
@@ -109,7 +110,10 @@ for (const recognized of [false, true, "failed"])
 				);
 				expect(voiceCancel).not.toHaveBeenCalled();
 				if (recognized === "failed")
-					expect(hook.result.current.error).toContain("larm_timeout");
+					expect(hook.result.current.failure).toMatchObject({
+						cause: "larm_timeout",
+						turn: { utteranceId: ids[1], runId: "run" },
+					});
 				states.set(ids[0]!, { status: "ready", text: "受け付けた依頼" });
 				await act(async () => {
 					await query.invalidateQueries();
@@ -121,6 +125,79 @@ for (const recognized of [false, true, "failed"])
 			query.clear();
 		}
 	});
+
+test("a replaced audio queue drops old chunks and keeps the turn available for the new generation", async () => {
+	const query = new QueryClient();
+	const wrapper = ({ children }: PropsWithChildren) => (
+		<QueryClientProvider client={query}>{children}</QueryClientProvider>
+	);
+	let segment = (_wav: Uint8Array) => {};
+	let sessionId = "";
+	let audioGeneration = 0;
+	let rejectOld!: (error: Error) => void;
+	const oldFetch = new Promise<Uint8Array>((_resolve, reject) => {
+		rejectOld = reject;
+	});
+	const play = vi.fn(async () => {});
+	const stopPlayback = vi.fn();
+	const voiceCancel = vi.fn(async () => {});
+	const voiceAudio = vi.fn(async (_id: string, index: number) =>
+		index === 0 ? oldFetch : new Uint8Array(44),
+	);
+	const client = {
+		identity: "generation-change",
+		voiceStart: async (id: string) => {
+			sessionId = id;
+		},
+		voiceStop: async () => {},
+		voiceSend: async () => {},
+		voiceCancel,
+		voiceTurn: async (utteranceId: string) => ({
+			utteranceId,
+			sessionId,
+			generation: 1,
+			sequence: 1,
+			runId: "run",
+			status: "responding",
+			text: "依頼",
+			error: null,
+			revision: audioGeneration,
+			audioGeneration,
+			audioChunks: [{ index: audioGeneration, text: "回答" }],
+		}),
+		voiceAudio,
+	} as unknown as VoiceDialogueClient;
+	const createAudio: CreateAudio = (_store, _onSpeech, onSegment) => {
+		segment = onSegment;
+		return { start: async () => {}, stop: async () => {}, stopPlayback, play };
+	};
+	const store = createAudioStore();
+	const hook = renderHook(() => useVoiceDialogue(client, store, createAudio), {
+		wrapper,
+	});
+	try {
+		await act(async () => hook.result.current.start());
+		act(() => segment(new Uint8Array(44)));
+		await waitFor(() => expect(voiceAudio).toHaveBeenCalledTimes(1));
+		audioGeneration = 1;
+		// The old URL may fail before the browser sees the change notification.
+		await act(async () => {
+			rejectOld(new ApiError(404, "audio_unavailable"));
+		});
+		expect(voiceCancel).not.toHaveBeenCalled();
+		await act(async () => {
+			await query.invalidateQueries();
+		});
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+		expect(stopPlayback).toHaveBeenCalledTimes(1);
+		expect(voiceAudio).toHaveBeenLastCalledWith(expect.any(String), 1);
+		expect(hook.result.current.failure).toBeNull();
+		expect(voiceCancel).not.toHaveBeenCalled();
+	} finally {
+		hook.unmount();
+		query.clear();
+	}
+});
 
 test("microphone pause preserves pending generation and playback, and resumes the same session", async () => {
 	const query = new QueryClient({

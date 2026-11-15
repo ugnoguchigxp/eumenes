@@ -20,6 +20,9 @@ export function LiveMessageList({
 	followLatestIfPinned: () => void;
 }) {
 	const streaming = useRunProgress(client, activeRunId);
+	const adopted = list.conversation?.messages.some(
+		(message) => message.role === "assistant" && message.runId === activeRunId,
+	);
 	const messageCount = list.conversation?.messages.length ?? 0;
 	const lastThought = list.thoughts?.at(-1)?.id;
 	useEffect(() => {
@@ -32,5 +35,11 @@ export function LiveMessageList({
 		streaming,
 		followLatestIfPinned,
 	]);
-	return <MessageList client={client} streaming={streaming} {...list} />;
+	return (
+		<MessageList
+			client={client}
+			streaming={adopted ? "" : streaming}
+			{...list}
+		/>
+	);
 }

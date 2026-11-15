@@ -25,9 +25,33 @@ export function RunFailureNotice({
 	agentName?: string;
 }) {
 	return (
+		<FailureNotice
+			label="回答エラー"
+			heading={RUN_FAILURE_HEADING}
+			summary={summary}
+			agentName={agentName}
+			load={(signal) => client.runErrorReport(runId, signal)}
+		/>
+	);
+}
+
+export function FailureNotice({
+	label,
+	heading,
+	summary,
+	agentName,
+	load,
+}: {
+	label: string;
+	heading: string;
+	summary: string;
+	agentName?: string;
+	load: (signal: AbortSignal) => Promise<{ text: string }>;
+}) {
+	return (
 		<article
 			className="message message-assistant message-error"
-			aria-label="回答エラー"
+			aria-label={label}
 		>
 			<small className="message-author">{agentName || "Eumenes"}</small>
 			<div className="message-error-head">
@@ -45,14 +69,12 @@ export function RunFailureNotice({
 					<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
 					<path d="M12 9v4M12 17h.01" />
 				</svg>
-				<strong>{RUN_FAILURE_HEADING}</strong>
+				<strong>{heading}</strong>
 			</div>
-			<p className="message-error-summary">{summary}</p>
-			<ErrorReportButton
-				load={(signal) => client.runErrorReport(runId, signal)}
-				heading={RUN_FAILURE_HEADING}
-				summary={summary}
-			/>
+			<p className="message-error-summary" role="alert">
+				{summary}
+			</p>
+			<ErrorReportButton load={load} heading={heading} summary={summary} />
 		</article>
 	);
 }
