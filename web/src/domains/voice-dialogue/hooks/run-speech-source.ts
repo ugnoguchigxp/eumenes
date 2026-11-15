@@ -20,9 +20,11 @@ export function createRunSpeechSource(
 	screenId: string,
 ) {
 	const lifetime = new AbortController();
+	const receipts = new AbortController();
 	let generation = new AbortController();
 	const chunks: StreamedSpeechChunk[] = [];
-	let ended = false,
+	let finished = false,
+		ended = false,
 		error: unknown;
 	let notify = () => {};
 	let ready!: (value: boolean) => void;
@@ -31,6 +33,9 @@ export function createRunSpeechSource(
 	});
 	const stop = () => {
 		lifetime.abort();
+		// The final receipt may still be receiving its HTTP response when the
+		// server's finished event arrives. It already accepted all played clauses.
+		if (!finished) receipts.abort();
 		generation.abort();
 		chunks.length = 0;
 		ended = true;
@@ -38,7 +43,7 @@ export function createRunSpeechSource(
 		notify();
 	};
 	const receive = (event: RunSpeechEvent) => {
-		if (lifetime.signal.aborted) return;
+		if (lifetime.signal.aborted || finished) return;
 		if (event.type === "generation") {
 			generation.abort();
 			generation = new AbortController();
@@ -70,13 +75,14 @@ export function createRunSpeechSource(
 								index: event.index,
 								audible,
 							},
-							lifetime.signal,
+							receipts.signal,
 						),
 					),
 			});
 			ready(true);
 			notify();
 		} else if (event.type === "finished") {
+			finished = true;
 			ended = true;
 			ready(false);
 			notify();

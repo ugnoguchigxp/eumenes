@@ -175,3 +175,63 @@ test("stopping synthesis before the first result discards late audio without ope
 	expect(await f.source.next()).toBeNull();
 	expect(f.output.startOutput).not.toHaveBeenCalled();
 });
+
+test("finished before the last receipt response does not abort an accepted report", async () => {
+	const f = fixture();
+	let complete!: () => void;
+	let receiptSignal: AbortSignal | undefined;
+	vi.mocked(f.client.runSpeechPlayed).mockImplementationOnce(
+		(_run, _session, _value, signal) => {
+			receiptSignal = signal;
+			return new Promise((resolve) => {
+				complete = () => resolve({ ok: true });
+			});
+		},
+	);
+	f.audio(0);
+	let done!: Promise<void>;
+	act(() => {
+		done = f.hook.result.current.playStream(f.source);
+	});
+	await waitFor(() => expect(f.playing).toHaveLength(1));
+	act(() => f.playing[0]!.ended());
+	await waitFor(() => expect(f.client.runSpeechPlayed).toHaveBeenCalledOnce());
+	await act(async () => {
+		f.finish();
+		await done;
+	});
+	expect(f.signal().aborted).toBe(true);
+	expect(receiptSignal?.aborted).toBe(false);
+	expect(f.hook.result.current.playingId).toBeNull();
+	complete();
+});
+
+test("cancellation aborts an outstanding playback report", async () => {
+	const f = fixture();
+	let receiptSignal: AbortSignal | undefined;
+	vi.mocked(f.client.runSpeechPlayed).mockImplementationOnce(
+		(_run, _session, _value, signal) => {
+			receiptSignal = signal;
+			return new Promise((_resolve, reject) =>
+				signal?.addEventListener(
+					"abort",
+					() => reject(new Error("cancelled")),
+					{ once: true },
+				),
+			);
+		},
+	);
+	f.audio(0);
+	let done!: Promise<void>;
+	act(() => {
+		done = f.hook.result.current.playStream(f.source);
+	});
+	await waitFor(() => expect(f.playing).toHaveLength(1));
+	act(() => f.playing[0]!.ended());
+	await waitFor(() => expect(f.client.runSpeechPlayed).toHaveBeenCalledOnce());
+	await act(async () => {
+		f.hook.result.current.stopAutomatic();
+		await done;
+	});
+	expect(receiptSignal?.aborted).toBe(true);
+});

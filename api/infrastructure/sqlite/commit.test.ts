@@ -4,6 +4,52 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openStore } from "./index";
 
+test("queued writes yield to I/O without changing FIFO or commit visibility", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-writer-fairness-"));
+	const store = openStore(join(dir, "db.sqlite3"), [
+		"CREATE TABLE items(n INTEGER)",
+	]);
+	const observed: number[] = [];
+	store.onCommit(() => {
+		observed.push(
+			store.read(
+				(db) =>
+					(db.query("SELECT count(*) AS n FROM items").get() as { n: number })
+						.n,
+			),
+		);
+	});
+	let countAtTick = -1;
+	const tick = new Promise<void>((resolve) =>
+		setTimeout(() => {
+			countAtTick = observed.length;
+			resolve();
+		}, 0),
+	);
+	try {
+		await Promise.all(
+			Array.from({ length: 24 }, (_, i) =>
+				store.write((db) => {
+					const until = performance.now() + 2;
+					while (performance.now() < until) {
+						/* Representative synchronous work. */
+					}
+					db.query("INSERT INTO items VALUES(?)").run(i);
+				}),
+			),
+		);
+		await tick;
+		expect(countAtTick).toBeLessThan(24);
+		expect(observed).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
+		expect(
+			store.read((db) => db.query("SELECT n FROM items ORDER BY rowid").all()),
+		).toEqual(Array.from({ length: 24 }, (_, n) => ({ n })));
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 test("commit notifications see persisted state, exclude idle scans/rollback, and cannot fail writes", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-commit-"));
 	const store = openStore(join(dir, "db.sqlite3"), [

@@ -12,9 +12,11 @@ import {
 	statSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { setImmediate as yieldToIo } from "node:timers/promises";
 import { flock, LOCK_EX_NB, LOCK_UN } from "../flock";
 import { getLogger } from "../logger";
 import { backupBeforeMigration } from "./pre-migration-backup";
+import { measureStoreStep } from "./timing";
 
 const log = getLogger("sqlite");
 
@@ -234,8 +236,9 @@ export function openStore(
 	const r = reader;
 	let tail: Promise<unknown> = Promise.resolve();
 	let pending = 0;
+	let batchStarted = 0;
 	let closing = false;
-	const listeners = new Set<() => void>();
+	const listeners = new Map<() => void, () => void>();
 	const changes = w.query<{ count: number }, []>(
 		"SELECT total_changes() AS count",
 	);
@@ -246,8 +249,17 @@ export function openStore(
 			WRITER_PENDING_LIMIT + (reserved ? WRITER_RESERVED_SLOTS : 0)
 		)
 			return Promise.reject(new WriterBusyError());
+		if (pending === 0) batchStarted = performance.now();
 		pending++;
-		const task = tail.then(operation);
+		const task = tail.then(async () => {
+			// Commit observers can enqueue more writes. Yield between transactions so a
+			// continuous Promise chain cannot starve incoming audio reports or timers.
+			if (performance.now() - batchStarted >= 8) {
+				await yieldToIo();
+				batchStarted = performance.now();
+			}
+			return operation();
+		});
 		tail = task
 			.catch(() => {})
 			.finally(() => {
@@ -258,33 +270,37 @@ export function openStore(
 	return {
 		read: (operation) => {
 			if (closing) throw new Error("database_closing");
-			return operation(r);
+			return measureStoreStep("read", () => operation(r));
 		},
 		readSnapshot: (operation) => {
 			if (closing) throw new Error("database_closing");
-			return r.transaction(() => {
-				const value = operation(r);
-				if (isThenable(value)) {
-					void Promise.resolve(value).catch(() => {});
-					throw new Error("async_snapshot_callback");
-				}
-				return value;
-			})();
+			return measureStoreStep("snapshot", () =>
+				r.transaction(() => {
+					const value = operation(r);
+					if (isThenable(value)) {
+						void Promise.resolve(value).catch(() => {});
+						throw new Error("async_snapshot_callback");
+					}
+					return value;
+				})(),
+			);
 		},
 		write: (operation, options) => {
 			return serialized(() => {
 				const before = changes.get()?.count;
-				const result = w.transaction(() => {
-					const value = operation(w);
-					if (isThenable(value)) {
-						void Promise.resolve(value).catch(() => {});
-						throw new Error("async_write_callback");
-					}
-					return value;
-				})();
+				const result = measureStoreStep("write", () =>
+					w.transaction(() => {
+						const value = operation(w);
+						if (isThenable(value)) {
+							void Promise.resolve(value).catch(() => {});
+							throw new Error("async_write_callback");
+						}
+						return value;
+					})(),
+				);
 				// Only committed mutations notify. Idle worker scans and rollbacks do not.
 				if (changes.get()?.count !== before)
-					for (const listener of listeners) {
+					for (const listener of listeners.values()) {
 						try {
 							listener();
 						} catch {
@@ -305,7 +321,10 @@ export function openStore(
 			}),
 		onCommit(listener) {
 			if (closing) throw new Error("database_closing");
-			listeners.add(listener);
+			const location = new Error();
+			const observed = () =>
+				measureStoreStep("commit_listener", listener, location);
+			if (!listeners.has(listener)) listeners.set(listener, observed);
 			return () => {
 				listeners.delete(listener);
 			};
