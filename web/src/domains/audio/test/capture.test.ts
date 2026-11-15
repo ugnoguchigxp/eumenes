@@ -364,19 +364,13 @@ test("a model that fails while listening is reported and loaded again on the nex
 	}
 });
 
-test("previews start 1.8 s after confirmation, never for a short reply or in the trailing silence", async () => {
+test("speech is acknowledged immediately and each recording is handed off once", async () => {
 	const mic = recorder();
-	const partial = vi.fn();
+	const speech = vi.fn();
 	const segment = vi.fn();
-	const audio = createAudioController(
-		() => {},
-		() => {},
-		segment,
-		{
-			silenceMs: 1500,
-			onPartial: partial,
-		},
-	);
+	const audio = createAudioController(() => {}, speech, segment, {
+		silenceMs: 1500,
+	});
 	try {
 		await audio.start();
 		// A short reply after a second of room tone (the pre-roll is not counted).
@@ -384,13 +378,12 @@ test("previews start 1.8 s after confirmation, never for a short reply or in the
 		mic.feed(true, 3);
 		mic.feed(false, 16);
 		expect(segment).toHaveBeenCalledTimes(1);
-		expect(partial).not.toHaveBeenCalled();
-		// A long question (confirmed 0.2 s in): one preview once 1.8 s have passed since then.
+		expect(speech).toHaveBeenCalledTimes(1);
+		// Capture is acknowledged before recognition; no cumulative requests during speech.
 		mic.feed(true, 24);
-		expect(partial).toHaveBeenCalledTimes(1);
-		const during = partial.mock.calls.length;
+		expect(speech).toHaveBeenCalledTimes(2);
+		expect(segment).toHaveBeenCalledTimes(1);
 		mic.feed(false, 18);
-		expect(partial).toHaveBeenCalledTimes(during);
 		expect(segment).toHaveBeenCalledTimes(2);
 	} finally {
 		await audio.stop();

@@ -16,7 +16,11 @@ import { commitIdleInput } from "./input-commit";
 import { createInputLedger } from "./input-timing";
 import { createVoiceMachine, isCurrent } from "./machine";
 import { followVoicePlayback } from "./playback";
-import { requestPreview, type RecognitionCandidate } from "./preview";
+import {
+	AUTOMATIC_INPUT_MS,
+	createInputSession,
+	type RecognitionCandidate,
+} from "./input-session";
 import { createSegmentUploader } from "./segment-upload";
 import { useTranscription } from "./transcription";
 import { useVoiceTurn } from "./turn";
@@ -40,6 +44,7 @@ export function useVoiceDialogue(
 	options.current = settings;
 	const controller = useRef<AudioController | null>(null);
 	const inputEnabled = useRef(false);
+	const draftCleanup = useRef<Promise<void> | null>(null);
 	const replacement = useRef<{ id: string; previous: string | null } | null>(
 		null,
 	);
@@ -50,8 +55,12 @@ export function useVoiceDialogue(
 	const queue = useRef<ChunkQueue | null>(null);
 	const candidate = useRef<RecognitionCandidate | null>(null);
 	const inputs = useRef(createInputLedger());
+	const [inputSession] = useState(createInputSession);
+	const inputDeadline = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
 	const [inputVersion, setInputVersion] = useState(0);
-	const [previewText, setPreviewText] = useState<string | null>(null);
+
 	const [avatarCue, setAvatarCue] = useState<AvatarCue | null>(null);
 	const [subtitle, setSubtitle] = useState<{
 		key: string;
@@ -64,13 +73,23 @@ export function useVoiceDialogue(
 		setSubtitle(null);
 		setAvatarCue(null);
 	}, [machine]);
-	function partial(wav: Uint8Array) {
-		requestPreview(client, machine, candidate, setPreviewText, wav);
-	}
 	const [turnId, setTurnId] = useState<string | null>(null);
 	const [issue, setError] = useState<VoiceIssue | null>(null);
 	const [active, setActive] = useState(false);
-	const turn = useVoiceTurn(client, turnId);
+	const onInputDisconnect = useCallback(() => {
+		inputSession.hold("disconnected");
+		setInputVersion((v) => v + 1);
+	}, [inputSession]);
+	const turn = useVoiceTurn(client, turnId, onInputDisconnect);
+	function submitted(id: string) {
+		inputSession.end(id);
+		clearTimeout(inputDeadline.current);
+		inputDeadline.current = setTimeout(() => {
+			inputSession.expire();
+			setInputVersion((v) => v + 1);
+		}, AUTOMATIC_INPUT_MS);
+	}
+
 	useEffect(() => {
 		followVoicePlayback({
 			value: turn.data,
@@ -94,12 +113,15 @@ export function useVoiceDialogue(
 
 	useEffect(() => {
 		const value = turn.data;
+		if (value && value.status !== "recognizing")
+			inputSession.receive(value.utteranceId);
 		if (
 			!value ||
 			value.utteranceId !== recognitionId ||
 			value.status !== "input_ready"
 		)
 			return;
+		if (!inputSession.canCommit(value.utteranceId)) return;
 		commitIdleInput(
 			value,
 			client,
@@ -111,8 +133,22 @@ export function useVoiceDialogue(
 			inputs.current,
 			setError,
 		);
-	}, [turn.data, recognitionId, inputVersion, turnId, client, cache, machine]);
+	}, [
+		turn.data,
+		recognitionId,
+		inputVersion,
+		turnId,
+		client,
+		cache,
+		machine,
+		inputSession,
+	]);
 	async function start() {
+		if (draftCleanup.current) {
+			const token = machine.get().session?.token;
+			await draftCleanup.current;
+			if (machine.get().session?.token !== token) return;
+		}
 		if (machine.get().phase === "active" && machine.get().session?.failed) {
 			await stop();
 			return start();
@@ -124,6 +160,7 @@ export function useVoiceDialogue(
 				!active &&
 				controller.current?.pauseInput
 			) {
+				if (inputSession.reason() === "edited") inputSession.reset();
 				inputEnabled.current = true;
 				store.setState({ inputPhase: "starting" });
 				setActive(true);
@@ -145,9 +182,10 @@ export function useVoiceDialogue(
 		inputEnabled.current = true;
 		replacement.current = null;
 		inputs.current.committing.clear();
+		inputSession.reset();
+		clearTimeout(inputDeadline.current);
 		setError(null);
 		setRecognitionId(null);
-		setPreviewText(null);
 		setTurnId(null);
 		const startToken = ++tokens.current;
 		machine.dispatch({ type: "start_requested", token: startToken });
@@ -177,17 +215,14 @@ export function useVoiceDialogue(
 				},
 				() => {
 					if (!inputLive() || machine.get().session?.failed) return;
-					candidate.current?.controller?.abort();
 					const nextCandidate = {
 						id: crypto.randomUUID(),
-						finalized: false,
-						busy: false,
 					};
 					candidate.current = nextCandidate;
+					inputSession.begin(nextCandidate.id);
 					setError(null);
 					setInputVersion((v) => v + 1);
 					setRecognitionId(nextCandidate.id);
-					setPreviewText(null);
 					// Energy alone cannot distinguish speech from noise. Keep the answer
 					// until the replacement has a nonempty accepted transcript.
 				},
@@ -201,7 +236,7 @@ export function useVoiceDialogue(
 					replacement,
 					setInputVersion,
 					setRecognitionId,
-					setPreviewText,
+					submitted,
 					setTurnId,
 					setError,
 					suspendInput,
@@ -212,8 +247,11 @@ export function useVoiceDialogue(
 				}),
 				{
 					...options.current,
-					onPartial: (wav) => {
-						if (inputLive()) partial(wav);
+					onDiscard: () => {
+						if (!inputLive() || !candidate.current) return;
+						candidate.current = null;
+						setRecognitionId(inputSession.discardCapture());
+						setInputVersion((v) => v + 1);
 					},
 					// Without barge-in nothing may interrupt a reply, so it must not be heard either.
 					halfDuplex: () => options.current?.bargeIn === false,
@@ -261,9 +299,9 @@ export function useVoiceDialogue(
 		replacement.current = null;
 		setActive(false);
 		setRecognitionId(null);
-		candidate.current?.controller?.abort();
+		inputSession.reset();
+		clearTimeout(inputDeadline.current);
 		candidate.current = null;
-		setPreviewText(null);
 		cancelPlayback();
 		const active = machine.get().session;
 		// Also cancels a start in flight: its token no longer matches.
@@ -286,7 +324,6 @@ export function useVoiceDialogue(
 		audio.pauseInput();
 		inputEnabled.current = false;
 		setActive(false);
-		candidate.current?.controller?.abort();
 		candidate.current = null;
 	}
 	// Used only after a final segment or failure. Keep the accepted reply alive,
@@ -295,9 +332,7 @@ export function useVoiceDialogue(
 		inputEnabled.current = false;
 		setActive(false);
 		controller.current?.pauseInput?.();
-		candidate.current?.controller?.abort();
 		candidate.current = null;
-		setPreviewText(null);
 	}
 	useEffect(() => {
 		// Muting takes effect now: drop what is playing and release the turn.
@@ -312,8 +347,8 @@ export function useVoiceDialogue(
 	}, [settings?.autoSpeak, client, machine, cancelPlayback]);
 	useEffect(
 		() => () => {
+			clearTimeout(inputDeadline.current);
 			void controller.current?.stop();
-			candidate.current?.controller?.abort();
 			cancelPlayback();
 			const active = machine.get().session;
 			if (active)
@@ -323,7 +358,13 @@ export function useVoiceDialogue(
 		},
 		[client, machine, cancelPlayback],
 	);
-	const transcription = useTranscription(turn.data, recognitionId, previewText);
+	const transcription = useTranscription(turn.data, recognitionId);
+	const currentInput =
+		turn.data?.utteranceId === recognitionId ? turn.data : undefined;
+	const recognizing =
+		inputSession.isRecognizing() &&
+		!!recognitionId &&
+		(!currentInput || currentInput.status === "recognizing");
 	const failure =
 		issue && "cause" in issue
 			? issue
@@ -354,7 +395,39 @@ export function useVoiceDialogue(
 		},
 		subtitle: subtitle?.text ?? null,
 		turn: turn.data,
-		previewText,
+		inputHold: inputSession.reason(),
+		inputStatus:
+			active && inputSession.isCapturing()
+				? ("capturing" as const)
+				: recognizing
+					? ("recognizing" as const)
+					: currentInput?.status === "input_ready"
+						? ("ready" as const)
+						: turn.data?.runId || turn.data?.status === "responding"
+							? ("sent" as const)
+							: ("idle" as const),
+		takeInputOwnership: () => {
+			if (!active && !recognitionId) return;
+			pause();
+			// pause may submit a last segment or discard a recording that is too short.
+			const id = inputSession.submittedId();
+			inputSession.hold("edited");
+			setRecognitionId(null);
+			setInputVersion((v) => v + 1);
+			// Wait for an upload already accepted locally, then retire only the unsent input.
+			// A reply being spoken keeps its output controller and authority.
+			const cleanup = (upload.current?.tail ?? Promise.resolve())
+				.then(async () => {
+					if (!id) return;
+					const value = await client.voiceTurn(id);
+					if (!value.runId) await client.voiceCancel(id);
+				})
+				.catch((cause) => setError({ cause }))
+				.finally(() => {
+					if (draftCleanup.current === cleanup) draftCleanup.current = null;
+				});
+			draftCleanup.current = cleanup;
+		},
 		recognitionId,
 		transcription,
 		failure,

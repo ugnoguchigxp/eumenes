@@ -34,6 +34,7 @@ export type ExecutionStatus =
 	| "deciding"
 	| "waiting_child"
 	| "waiting_user"
+	| "stopping"
 	| "completed"
 	| "partial"
 	| "failed"
@@ -113,6 +114,12 @@ export type ExecutionView = {
 		inputSchema: Record<string, unknown>;
 	} | null;
 	result: ExecutionResult | null;
+	progress?: {
+		summary: string;
+		observedAt: number;
+	};
+	conversationSummary?: "on_read" | "next_turn";
+	stop?: "requested" | "confirmed" | "unconfirmed";
 	/** A task pipeline's run: its fixed steps answer for the request as one step of it. */
 	pipeline?: true;
 };

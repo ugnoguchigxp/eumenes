@@ -63,6 +63,7 @@ export function noticeOf(
 	links: readonly WorkLink[],
 	toolchainTitle: string | undefined,
 	artifactId: string | undefined,
+	observation?: string,
 ): TodoNotice {
 	const names = new Map(links.map((link) => [link.uri, link.label]));
 	return {
@@ -72,8 +73,9 @@ export function noticeOf(
 		...(toolchainTitle ? { toolchainTitle } : {}),
 		...(artifactId ? { artifactId } : {}),
 		outcome: row.outcome as TodoNotice["outcome"],
-		summary:
-			resultLine(row.result, (uri) => names.get(uri) ?? "リソース") ?? null,
+		summary: observation
+			? oneLine(observation, NOTICE_RESULT_CHARS)
+			: (resultLine(row.result, (uri) => names.get(uri) ?? "リソース") ?? null),
 		links: links.map(({ uri, label, kind }) => ({ uri, label, kind })),
 		read: row.noticeReadAt !== null,
 		createdAt: row.archivedAt!,

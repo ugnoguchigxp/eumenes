@@ -1,7 +1,10 @@
 export {};
 
 const port = Number(process.env.LARM_FIXTURE_PORT ?? 9822);
-const claimed = new Map<string, { profile: string; providers: string[] }>();
+const claimed = new Map<
+	string,
+	{ profile: string; providers: string[]; contextTokens: number }
+>();
 let holdNext = false;
 const releaseStreams = new Set<() => void>();
 const ttsInputs: string[] = [];
@@ -110,6 +113,17 @@ const server = Bun.serve({
 	hostname: "127.0.0.1",
 	port,
 	async fetch(request) {
+		// Production LARM accepts compressed JSON and multipart audio requests.
+		if (request.headers.get("content-encoding") === "gzip") {
+			const headers = new Headers(request.headers);
+			headers.delete("content-encoding");
+			headers.delete("content-length");
+			request = new Request(request, {
+				method: request.method,
+				headers,
+				body: new Uint8Array(Bun.gunzipSync(await request.arrayBuffer())),
+			});
+		}
 		const url = new URL(request.url);
 		const path = url.pathname;
 		if (
@@ -241,11 +255,18 @@ const server = Bun.serve({
 			const body = (await request.json()) as {
 				profile: string;
 				providers?: string[];
+				contextTokens?: number;
 			};
 			const selected = body.profile;
 			const id = crypto.randomUUID();
 			const requested = body.providers ?? [...names];
-			claimed.set(id, { profile: selected, providers: requested });
+			const contextTokens =
+				body.contextTokens ?? Math.min(131072, binding(selected).maxTokens);
+			claimed.set(id, {
+				profile: selected,
+				providers: requested,
+				contextTokens,
+			});
 			return Response.json(
 				{
 					id,
@@ -260,6 +281,15 @@ const server = Bun.serve({
 						model: model(name, selected),
 						readiness: "ready",
 						claimable: true,
+						...(name === "llm"
+							? {
+									contextWindow: {
+										maxTokens: contextTokens,
+										outputReserveTokens: 4096,
+										safetyMarginTokens: 1976,
+									},
+								}
+							: {}),
 					})),
 					expiresAt: new Date(Date.now() + 900000).toISOString(),
 				},
@@ -273,7 +303,11 @@ const server = Bun.serve({
 			const connection = claimed.get(id);
 			if (!connection)
 				return Response.json({ error: "missing" }, { status: 404 });
-			const { profile: selected, providers: requested } = connection;
+			const {
+				profile: selected,
+				providers: requested,
+				contextTokens,
+			} = connection;
 			if (request.method === "DELETE") {
 				claimed.delete(id);
 				return new Response(null, { status: 204 });
@@ -284,6 +318,23 @@ const server = Bun.serve({
 					profile: selected,
 					agentProfile: binding(selected).agentProfile,
 					status: "ready",
+					providers: requested.map((name) => ({
+						name,
+						protocol: protocol[name as keyof typeof protocol],
+						endpoint: endpoint[name as keyof typeof endpoint],
+						model: model(name, selected),
+						readiness: "ready",
+						claimable: true,
+						...(name === "llm"
+							? {
+									contextWindow: {
+										maxTokens: contextTokens,
+										outputReserveTokens: 4096,
+										safetyMarginTokens: 1976,
+									},
+								}
+							: {}),
+					})),
 					expiresAt: new Date(Date.now() + 900000).toISOString(),
 				});
 			if (path.endsWith("/claim"))
@@ -313,7 +364,7 @@ const server = Bun.serve({
 						contextWindow:
 							name === "llm"
 								? {
-										maxTokens: binding(selected).maxTokens,
+										maxTokens: contextTokens,
 										outputReserveTokens: 4096,
 										safetyMarginTokens: 1976,
 									}

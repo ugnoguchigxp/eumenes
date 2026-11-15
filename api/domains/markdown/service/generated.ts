@@ -80,6 +80,13 @@ export function createGeneratedDocuments(
 			const { title, markdown } = generatedValue(r);
 			return { title, markdown };
 		},
+		/** The frozen input retained by this owner, not a claim that external saving succeeded. */
+		originalInTransaction(db: Database, id: string) {
+			const r = generatedRow(db, id);
+			if (!r || r.state === "cancelled") return null;
+			const { title, markdown } = generatedValue(r);
+			return { title, markdown };
+		},
 		startInTransaction(db: Database, raw: unknown): GeneratedReceipt {
 			const input = generatedInput.parse(raw);
 			if (Buffer.byteLength(input.markdown) > 1_048_576)

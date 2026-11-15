@@ -1,3 +1,4 @@
+export { normalizeImage } from "./service/normalize-image";
 export { routingExportUtterance } from "./service/routing-export";
 export { imageReferenceText } from "./service/image-context";
 export type { ImageAnswerTrace } from "./contracts/history";

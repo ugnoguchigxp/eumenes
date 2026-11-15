@@ -1,3 +1,4 @@
+import { claudeWorkspace } from "../work/claude-code-task-adapter";
 import { pipelineContract } from "../pipelines/pipeline-contract";
 import { adoptTaskResources } from "./task-execution-resources";
 import { autonomousActionSource } from "../../domains/dialogue";
@@ -32,6 +33,7 @@ import { reference, result, total } from "./task-execution-values";
 
 export type TaskExecutionHost = {
 	webNote?: import("../../domains/web-note").WebNoteService;
+	claudeCode?: import("../../domains/claude-code").ClaudeCodeService;
 	settings?: Pick<
 		import("../../domains/settings").SettingsService,
 		"inTransaction"
@@ -148,6 +150,38 @@ function configureWebNote(
 		},
 	});
 }
+function configureClaudeCode(
+	host: TaskExecutionHost,
+	port: ToolchainExecutionPort,
+) {
+	const claude = host.claudeCode;
+	claude?.configure({
+		workspace: claudeWorkspace("eumenes"),
+		controlSourceInTransaction: port.controlSourceInTransaction,
+		validReferenceInTransaction: port.validReferenceInTransaction,
+		validSourceInTransaction: port.validSourceInTransaction,
+		revokeInTransaction(db, eventId) {
+			host.dialogue.revokeExecutionNoticeInTransaction(db, eventId);
+		},
+		deliverInTransaction(db, view, eventId) {
+			return sendExecutionNotice(
+				{
+					dialogue: host.dialogue,
+					agents: {
+						executions: {
+							sourceRunInTransaction: claude.sourceRunInTransaction,
+						},
+					},
+				},
+				db,
+				view,
+				eventId,
+				"reference",
+			);
+		},
+	});
+}
+
 /** Composition of public operations. Only execution types dispatch here; the model chooses the purpose. */
 export function configureTaskExecution(host: TaskExecutionHost) {
 	const {
@@ -399,6 +433,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 	};
 	agents.executions.configure(port);
 	configureWebNote(host, port);
+	configureClaudeCode(host, port);
 	configureCollaboration(host, port);
 	host.browser?.setTaskExecutionSource((db, frozen) => {
 		const child = (frozen as { execution?: ChildExecution } | null)?.execution;

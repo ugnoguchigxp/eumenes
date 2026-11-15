@@ -1,0 +1,260 @@
+{
+	"formatVersion": 1,
+	"bundleId": "claude-code-task",
+	"pins": [],
+	"definitions": [
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"kind": "profile",
+			"id": "claude-code.supervisor",
+			"revision": 1,
+			"title": "Claude Code専任担当",
+			"summary": "Claude Codeの作業を検証まで管理する",
+			"body": "利用者の目的と権限を保ち、Claude Codeへまとまった作業を依頼してください。応答終了の後に証跡を確認し、必要な場合だけ追加作業を依頼してください。作業結果は依頼の達成、確認した根拠、残った事項に分けて返してください。"
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"kind": "skill",
+			"id": "claude-code.managed",
+			"revision": 1,
+			"title": "Claude Codeの作業手順",
+			"summary": "実行、観測、質問、終了の手順",
+			"body": "元依頼と途中の条件を保持してください。観測が不足している場合は、必要な検証だけを同じ仕事へ追加してください。利用者の判断が必要な場合は、対象と選択肢が分かる一問を返してください。権限に含まれない公開、送信、commit、pushは行いません。"
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:claude-code.supervisor@1",
+				"skill:claude-code.managed@1"
+			],
+			"kind": "package",
+			"id": "claude-code.managed",
+			"revision": 1,
+			"title": "Claude Code",
+			"summary": "Claude Codeの作業を管理する",
+			"backend": "claude-code",
+			"schemaKey": "emptyInput",
+			"profileRevisionId": "profile:claude-code.supervisor@1",
+			"requiredSkillRevisionIds": ["skill:claude-code.managed@1"],
+			"toolRevisionIds": []
+		},
+		{
+			"kind": "toolchain",
+			"id": "claude-code.request",
+			"revision": 5,
+			"title": "Claude Code",
+			"summary": "Claude Codeへ開発作業を依頼し、進捗・確認事項・検証結果を受け取る",
+			"aliases": ["Claude Code", "クロードコード"],
+			"tags": [],
+			"useWhen": [
+				"コードの実装・修正・調査・テストを Claude Code に頼みたい",
+				"Claude Code を開いて作業を始めさせたい"
+			],
+			"avoidWhen": [
+				"プログラミングの一般的な質問に答えるだけ",
+				"Claude Code の使い方や料金を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.managed@1"],
+			"examples": [
+				"Claude Code でログイン画面のバグを直して",
+				"README のセットアップ手順を最新にするよう Claude Code に頼んで",
+				"Claude Code で設定画面に項目を足して",
+				"別のセッションの Claude Code で依存パッケージを更新して"
+			],
+			"packageRevisionId": "package:claude-code.managed@1",
+			"functionName": "claude_code",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.managed@1",
+			"minImpact": "modify_existing"
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"kind": "skill",
+			"id": "claude-code.repair-managed",
+			"revision": 1,
+			"title": "エラー修正の作業手順",
+			"summary": "実行、観測、質問、終了の手順",
+			"body": "元依頼と途中の条件を保持してください。観測が不足している場合は、必要な検証だけを同じ仕事へ追加してください。利用者の判断が必要な場合は、対象と選択肢が分かる一問を返してください。権限に含まれない公開、送信、commit、pushは行いません。 最初の仕事は分析のみです。対象の診断や観測を確認し、再現結果、原因、改善案、完了条件を報告してください。承認された改善案の実装は利用者が別の仕事として依頼します。"
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:claude-code.supervisor@1",
+				"skill:claude-code.repair-managed@1"
+			],
+			"kind": "package",
+			"id": "claude-code.repair-managed",
+			"revision": 1,
+			"title": "エラー修正",
+			"summary": "Claude Codeの作業を管理する",
+			"backend": "claude-code",
+			"schemaKey": "emptyInput",
+			"profileRevisionId": "profile:claude-code.supervisor@1",
+			"requiredSkillRevisionIds": ["skill:claude-code.repair-managed@1"],
+			"toolRevisionIds": []
+		},
+		{
+			"kind": "toolchain",
+			"id": "claude-code.repair",
+			"revision": 4,
+			"title": "エラー修正",
+			"summary": "Claude Codeが障害を分析し、原因と変更案を報告する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"発生したエラーの原因調査と修正を頼みたい",
+				"失敗した実行を調べて直してほしい",
+				"Eumenes の機能を確認した結果を根拠に、Claude Code に原因を調べさせたい"
+			],
+			"avoidWhen": [
+				"エラーが起きていない作業を頼みたい",
+				"エラーの意味や一般的な説明を聞いているだけ",
+				"Claude Code の使い方を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.repair-managed@1"],
+			"examples": [
+				"このエラーを調べて修正して",
+				"さっき失敗した実行の原因を調べて直して",
+				"エラーが出たので、調べて修正を頼みたい"
+			],
+			"packageRevisionId": "package:claude-code.repair-managed@1",
+			"functionName": "repair_error",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.repair-managed@1",
+			"minImpact": "modify_existing"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "claude-code.managed",
+			"revision": 1,
+			"execution": "task",
+			"adapterRef": "adapter:claude-code-task@1",
+			"availabilityRef": "availability:claude-code-task@1",
+			"tools": [],
+			"inputSchemaRef": "schema:claude-code.managed-request@1",
+			"outputSchemaRef": "schema:claude-code.managed-result@1",
+			"conversationSummary": "next_turn",
+			"timeLimits": {
+				"runMs": 1800000,
+				"turnMs": 120000,
+				"inferenceMs": 120000
+			},
+			"limits": {
+				"parentCalls": 24,
+				"childCalls": 8,
+				"searches": 1,
+				"modelCalls": 24
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "claude-code.repair-managed",
+			"revision": 1,
+			"execution": "task",
+			"adapterRef": "adapter:claude-code-task@1",
+			"availabilityRef": "availability:claude-code-task@1",
+			"tools": [],
+			"inputSchemaRef": "schema:claude-code.managed-request@1",
+			"outputSchemaRef": "schema:claude-code.managed-result@1",
+			"conversationSummary": "next_turn",
+			"timeLimits": {
+				"runMs": 1800000,
+				"turnMs": 120000,
+				"inferenceMs": 120000
+			},
+			"limits": {
+				"parentCalls": 24,
+				"childCalls": 8,
+				"searches": 1,
+				"modelCalls": 24
+			}
+		}
+	],
+	"artifacts": [],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "claude-code.managed-request",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"properties": {
+					"request": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 8000
+					}
+				},
+				"required": ["request"],
+				"additionalProperties": false
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "claude-code.managed-result",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"properties": {
+					"status": {
+						"type": "string",
+						"enum": [
+							"completed",
+							"partial",
+							"failed",
+							"cancelled",
+							"interrupted"
+						]
+					},
+					"summary": {
+						"type": "string",
+						"maxLength": 320
+					},
+					"fulfilled": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"maxItems": 12
+					},
+					"missing": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"maxItems": 12
+					},
+					"refs": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						},
+						"maxItems": 12
+					}
+				},
+				"required": ["status", "summary", "fulfilled", "missing", "refs"],
+				"additionalProperties": false
+			}
+		}
+	]
+}

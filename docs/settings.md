@@ -36,6 +36,12 @@ World画面は最初に「資料」を開き、取り込んだ原資料を総件
 
 クラウドはOpenAI互換のChat Completions、multipart音声認識、WAV音声合成に対応します。ベースURLは、ループバック・プライベートLAN（10/172.16-31/192.168）・`.local`・リンクローカル以外では `https` が必要です。環境変数名で指定できるのは `EUMENES_CLOUD_` で始まる名前、主要プロバイダの標準キー名（`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`GEMINI_API_KEY`、`GOOGLE_API_KEY`、`AZURE_OPENAI_API_KEY`、`GROQ_API_KEY`、`MISTRAL_API_KEY`、`DEEPSEEK_API_KEY`）、およびbackendの `EUMENES_ENV_REF_ALLOWLIST`（カンマ区切り）に載せた名前だけです。それ以外を指す既存設定は保存したままですが、利用時に `env_ref_not_allowed` で失敗します。接続名、ベースURL、モデルとAPIキーまたは環境変数名を登録し、用途に割り当てて「設定の変更をすべて保存」を押します。一つの接続に複数の用途のモデルを追加できます。接続確認と少量の生成テストは保存済み設定を使い、サービスの利用が発生します。
 
+### OpenAI APIの聞き取り
+
+チャット欄上部の「ASRモデル」から「ASRモデルを登録…」を選ぶと、「AIと接続」の設定が開きます。「登録した接続」で「OpenAI互換API」を選び、ベースURLに `https://api.openai.com/v1`、認証にOpenAI APIキーまたは `OPENAI_API_KEY` を指定します。「モデル」でその接続を選び、用途を「聞き取り」、モデル名を契約先で利用できる文字起こしモデルのIDにして保存します。
+
+保存後、チャット欄上部の「ASRモデル」に接続名とモデル名が表示されます。選択すると次の録音区間の文字起こしにそのモデルを使います。「利用するAI」の「聞き取りの利用先」からも切り替えられます。会話モデルと読み上げの設定は別です。録音区間を送る既存の文字起こし接続を使います。
+
 ### Cloudflare Workers AIの音声接続
 
 「AIと接続」の既存画面から登録します。

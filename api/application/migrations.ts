@@ -2,6 +2,7 @@ import { migrations as knowledgeMigrations } from "eumenes-skill-smith/sqlite";
 import { migrations as appDevelopmentMigrations } from "../domains/app-development";
 import { migrations as googleAccountsMigrations } from "../domains/google-accounts";
 import { migrations as pursuitMigrations } from "../domains/pursuit";
+import { migrations as claudeCodeMigrations } from "../domains/claude-code";
 import { migrations as webNoteMigrations } from "../domains/web-note";
 import { migrations as ocrMigrations } from "../domains/ocr";
 import { migrations as computeMigrations } from "../domains/compute";
@@ -176,6 +177,7 @@ import { migrations as liveVoiceMigrations } from "../domains/live-voice";
 const catalog: readonly Migration[] = [
 	...pursuitMigrations,
 	...webNoteMigrations,
+	...claudeCodeMigrations,
 	...liveVoiceMigrations,
 	retiredContinuityMigration,
 	...conversationMigrations,

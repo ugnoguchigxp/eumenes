@@ -64,10 +64,6 @@ export const voiceTurnSchema = z.object({
 });
 export type VoiceTurn = z.infer<typeof voiceTurnSchema>;
 
-export const previewResultSchema = z.object({
-	utteranceId: z.string(),
-	text: z.string(),
-});
 export const replaySentencesSchema = z.object({
 	sentences: z.array(z.string()),
 });
@@ -76,11 +72,11 @@ export const replaySentencesSchema = z.object({
 export const errorStatus = {
 	voice_sequence_out_of_order: 409,
 	voice_utterance_conflict: 409,
-	voice_preview_busy: 409,
 	voice_sequence_invalid: 400,
 	voice_turn_inactive: 409,
 	voice_input_stale: 409,
 	voice_input_not_ready: 409,
+	voice_input_busy: 409,
 	voice_audio_capacity: 503,
 	not_playback_screen: 409,
 	speech_already_claimed: 409,

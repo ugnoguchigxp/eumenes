@@ -8,12 +8,16 @@ import {
 import type { useSpeechModels } from "../domains/settings/useSpeechModels";
 import { shortModelName } from "./model-name";
 
+const registerAsr = "settings.ai-connections";
+
 export function SpeechModelSelect({
 	models,
 	disabled,
+	openAsrSettings,
 }: {
 	models: ReturnType<typeof useSpeechModels>;
 	disabled: boolean;
+	openAsrSettings: () => void;
 }) {
 	return (["asr", "tts"] as const).map((purpose) => {
 		const model = models[purpose];
@@ -25,7 +29,10 @@ export function SpeechModelSelect({
 			<Select
 				key={purpose}
 				value={model.selected}
-				onValueChange={(id) => void models.select(purpose, id)}
+				onValueChange={(id) => {
+					if (purpose === "asr" && id === registerAsr) openAsrSettings();
+					else void models.select(purpose, id);
+				}}
 				disabled={!models.ready || models.busy || disabled}
 			>
 				<SelectTrigger
@@ -45,6 +52,9 @@ export function SpeechModelSelect({
 							{option.label}
 						</SelectItem>
 					))}
+					{purpose === "asr" && (
+						<SelectItem value={registerAsr}>ASRモデルを登録…</SelectItem>
+					)}
 				</SelectContent>
 			</Select>
 		);

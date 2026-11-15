@@ -4,6 +4,12 @@ import {
 	type WebNoteDeps,
 	type WebNoteService,
 } from "../../domains/web-note";
+import {
+	createClaudeCode,
+	type ClaudeCodeService,
+	type Runner as ClaudeRunner,
+} from "../../domains/claude-code";
+import { createClaudeCodeTaskAdapter } from "../work/claude-code-task-adapter";
 import { createWebNoteAdapter } from "../web-note/web-note-adapter";
 import { createMarkdownAdapter } from "../markdown/markdown-adapter";
 import { createArchiveResearchAdapter } from "../markdown/archive-research-adapter";
@@ -146,6 +152,7 @@ type ToolchainOptions = {
 	 * not offered.
 	 */
 	webNote?: Pick<WebNoteDeps, "turn" | "record">;
+	claudeRunner?: ClaudeRunner;
 	conversation?: import("../../domains/conversation").ConversationService;
 	timers?: import("../../domains/timers").TimersService;
 	schedules?: SchedulerAdapterPorts;
@@ -281,6 +288,27 @@ function enabledBackends(options: ToolchainOptions) {
 	]);
 }
 
+async function seedToolchainCapabilities(
+	store: SqliteStore,
+	registry: ReturnType<typeof createAdapterRegistry>,
+	options: ToolchainOptions,
+) {
+	const capabilities = createCapabilities(store, enabledBackends(options), {
+		bundleHost: () =>
+			bundleHostOf(
+				registry
+					.all()
+					.filter(
+						(adapter) =>
+							adapter.ref !== "adapter:claude-code-task@1" ||
+							options.claudeRunner?.ready(),
+					),
+			),
+	});
+	await capabilities.seed();
+	return capabilities;
+}
+
 export async function createToolchain(
 	store: SqliteStore,
 	queue: QueueService,
@@ -289,6 +317,7 @@ export async function createToolchain(
 	options: ToolchainOptions = {},
 ) {
 	let webNoteRuntime: WebNoteService | undefined;
+	let claudeCode: ClaudeCodeService | undefined;
 	let taskRuntime:
 		import("../../domains/agent-runtime").AgentRuntime | undefined;
 	const shared =
@@ -317,6 +346,7 @@ export async function createToolchain(
 		...(options.canvasAdapter ? [options.canvasAdapter] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
 		createWebNoteAdapter(() => webNoteRuntime, !!options.webNote?.turn),
+		createClaudeCodeTaskAdapter(() => claudeCode),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk
 			? [
@@ -426,15 +456,17 @@ export async function createToolchain(
 			? [createServiceTestsAdapter(options.serviceTests)]
 			: []),
 	]);
-	const capabilities = createCapabilities(store, enabledBackends(options), {
-		bundleHost: () => bundleHostOf(registry),
-	});
-	await capabilities.seed();
-	webNoteRuntime = createWebNote({
+	const capabilities = await seedToolchainCapabilities(
 		store,
-		queue,
-		capabilities,
-		...options.webNote,
+		registry,
+		options,
+	);
+	const taskDeps = { store, queue, capabilities };
+	webNoteRuntime = createWebNote({ ...taskDeps, ...options.webNote });
+	claudeCode = createClaudeCode({
+		...taskDeps,
+		inference,
+		runner: options.claudeRunner,
 	});
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(
@@ -538,6 +570,7 @@ export async function createToolchain(
 	return {
 		capabilities,
 		webNote: webNoteRuntime,
+		claudeCode,
 		collaboration,
 		childOperations: children,
 		registry,

@@ -3,6 +3,7 @@ import type { ConversationState, Utterance } from "../../conversation";
 import type { Run } from "../contracts";
 import { liveSession, markReported, unreportedEnded } from "../repository";
 import type { DialogueDeps } from "./context";
+import { taskForWork } from "./task-work";
 import { workContextCurrent } from "./work-context-input";
 import type { DocumentRefs, TodoItem } from "./work-items";
 import { INPUT_HEADINGS, gapText, jstNowLine, lineText } from "./input-text";
@@ -142,8 +143,34 @@ export function stateLinesInTransaction(
 	).filter((todo) =>
 		workContextCurrent(deps, tx, input.conversationId, todo.id),
 	);
+	let briefs = 0;
+	const showTodo = (todo: TodoItem, archived: boolean) => {
+		const line = todoLine(todo, refs, archived);
+		if (
+			!input.run ||
+			!["manual", "voice"].includes(input.run.sourceKind) ||
+			briefs >= 5 ||
+			!ledger
+		)
+			return line;
+		const row = ledger.workInTransaction(tx, todo.id);
+		const view =
+			row?.execution === "task" && row.sourceRef
+				? taskForWork(deps, tx, row)?.viewInTransaction(tx, row.sourceRef)
+				: null;
+		if (view?.conversationSummary !== "next_turn" || !view.progress)
+			return line;
+		briefs++;
+		const { summary, observedAt } = view.progress;
+		return `${line} ${JSON.stringify({
+			status: view.status,
+			revision: view.revision,
+			observedAt,
+			summary: lineText(summary).slice(0, 320),
+		})}`;
+	};
 	const work = [
-		...open.map((todo) => todoLine(todo, refs, false)),
+		...open.slice(0, STATE_LIMITS.work).map((todo) => showTodo(todo, false)),
 		...(
 			ledger?.pendingConfirmationsInTransaction(tx, input.conversationId) ?? []
 		).map(
@@ -171,7 +198,7 @@ export function stateLinesInTransaction(
 				.filter((todo) =>
 					workContextCurrent(deps, tx, input.conversationId, todo.id),
 				)
-				.map((todo) => todoLine(todo, refs, true)),
+				.map((todo) => showTodo(todo, true)),
 		);
 	if (work.length) lines.push("仕事:", ...work.slice(0, STATE_LIMITS.work));
 

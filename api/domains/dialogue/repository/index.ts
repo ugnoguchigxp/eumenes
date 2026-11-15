@@ -1,3 +1,4 @@
+import { generatedImagesMigration } from "./generated-images";
 import {
 	agencyMigration,
 	dispatchClockMigration,
@@ -486,6 +487,7 @@ export const migrations: readonly Migration[] = [
 CREATE UNIQUE INDEX dialogue_specialist_live ON dialogue_specialist_sessions(conversation_id) WHERE state='active';
 CREATE INDEX dialogue_specialist_conversation ON dialogue_specialist_sessions(conversation_id,state,updated_at);`,
 	},
+	generatedImagesMigration,
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

@@ -5,10 +5,31 @@ import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
 import type { LarmPlayground } from "../../larm";
 import type { ImageRecord } from "../contracts";
-import { row, byRun, record, patch, list, activity } from "../repository";
+import {
+	row,
+	byRun,
+	record,
+	patch,
+	list,
+	activity,
+	generatedVersion,
+} from "../repository";
 import { registerImageHandlers } from "./handlers";
 import { createImageUpload } from "./imports";
+import { generatedImageVersion } from "./version";
 import type { ChildExecution } from "../../tool-runtime";
+async function readContent(
+	gateway: LarmPlayground,
+	id: string,
+	signal: AbortSignal,
+) {
+	const a = await gateway.images.get(id, signal);
+	if (a.id !== id) throw new Error("image_version_unavailable");
+	return gateway.artifact(
+		{ id: a.id, path: a.contentUrl, mime: a.mimeType, actualModel: a.model },
+		signal,
+	);
+}
 /** Read-only source for the registered image screen; the image domain owns this query. */
 export const imageListInTransaction = (db: Database, conversationId: string) =>
 	list(db, conversationId);
@@ -77,17 +98,39 @@ export function createImage(deps: {
 	return {
 		imports: createImageUpload(deps),
 		library: () => deps.gateway().images,
-		content: async (id: string, signal: AbortSignal) => {
-			const a = await deps.gateway().images.get(id, signal);
-			return deps.gateway().artifact(
-				{
-					id: a.id,
-					path: a.contentUrl,
-					mime: a.mimeType,
-					actualModel: a.model,
-				},
-				signal,
+		content: (id: string, signal: AbortSignal) =>
+			readContent(deps.gateway(), id, signal),
+		generatedVersionInTransaction(
+			db: Database,
+			query: {
+				runId: string;
+				conversationId: string;
+				artifactId: string;
+			},
+		) {
+			return generatedVersion(
+				db,
+				query.runId,
+				query.conversationId,
+				query.artifactId,
 			);
+		},
+		isGeneratedConnectionCurrent(version: string) {
+			return version.startsWith(`${deps.gateway().mediaBinding}:`);
+		},
+		async generatedContent(id: string, version: string, signal: AbortSignal) {
+			const gateway = deps.gateway();
+			if (!version.startsWith(`${gateway.mediaBinding}:`))
+				throw new Error("image_version_unavailable");
+			const content = await readContent(gateway, id, signal);
+			if (!content.bytes || content.bytes.length > 32 * 1024 * 1024)
+				throw new Error("image_content_too_large");
+			if (
+				generatedImageVersion(deps.gateway().mediaBinding, content.bytes) !==
+				version
+			)
+				throw new Error("image_version_unavailable");
+			return content;
 		},
 		startInTransaction(
 			db: Database,

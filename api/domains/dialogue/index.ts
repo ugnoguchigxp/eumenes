@@ -1,3 +1,4 @@
+export type { GeneratedImagePort } from "./service/generated-images";
 export {
 	routingExportRuns,
 	routingExportFixedCards,

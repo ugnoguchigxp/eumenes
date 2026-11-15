@@ -84,6 +84,7 @@ export type HarnessOptions = {
 	embed?: import("./toolchain-vectors").Embed;
 	musicGateway?: () => LarmPlayground;
 	imageGateway?: () => LarmPlayground;
+	observeGeneratedImages?: boolean;
 	appDevelopment?: {
 		git: ReturnType<
 			typeof import("../../domains/git-observation").createGitObservation

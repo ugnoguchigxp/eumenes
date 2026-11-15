@@ -35,7 +35,8 @@ export function executionChildView(view: ExecutionView): ChildView {
 	const status =
 		view.status === "queued" ||
 		view.status === "deciding" ||
-		view.status === "waiting_child"
+		view.status === "waiting_child" ||
+		view.status === "stopping"
 			? "running"
 			: view.status === "waiting_user"
 				? "waiting_user"

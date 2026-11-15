@@ -134,6 +134,34 @@ test("empty final ASR creates no dialogue", async () => {
 	expect(h.dialogue.list("main")).toHaveLength(0);
 });
 
+test.each([
+	{ response: { text: "" }, status: "completed", error: null },
+	{ response: { text: " \n" }, status: "completed", error: null },
+	{
+		response: { text: null },
+		status: "failed",
+		error: "invalid_response_text",
+	},
+	{ response: {}, status: "failed", error: "invalid_response_text" },
+])(
+	"cloud ASR handles transcript response $response",
+	async ({ response, status, error }) => {
+		const h = await setup(async (url) => {
+			expect(String(url)).toEndWith("/audio/transcriptions");
+			return Response.json(response);
+		});
+		const session = crypto.randomUUID(),
+			id = crypto.randomUUID();
+		h.voice.start(session, 1);
+		await h.voice.accept(session, 1, 1, id, wav());
+		await until(() =>
+			["completed", "failed"].includes(h.voice.get(id)?.status ?? ""),
+		);
+		expect(h.voice.get(id)).toMatchObject({ status, error });
+		expect(h.dialogue.list("main")).toHaveLength(0);
+	},
+);
+
 test("ASR permission revocation after staging rejects commit", async () => {
 	const h = await setup();
 	const session = crypto.randomUUID(),

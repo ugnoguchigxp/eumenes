@@ -196,6 +196,13 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "workflow_recovery", recover: () => s.workflow.recover() },
 		{ name: "web_note_recovery", recover: () => s.toolchain.webNote.recover() },
 		{
+			name: "claude_code_recovery",
+			recover: async () => {
+				await s.toolchain.claudeCode?.recover();
+				s.toolchain.claudeCode?.start();
+			},
+		},
+		{
 			name: "visual_analysis_recovery",
 			recover: async () => {
 				await s.ocr.analyses?.recover();
@@ -301,6 +308,12 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
 		{ name: "web_note", close: () => s.toolchain.webNote.close() },
+		{
+			name: "claude_code_task",
+			close: async () => {
+				await s.toolchain.claudeCode?.close();
+			},
+		},
 		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },
 		{ name: "shell", close: () => s.toolchain.shell.closeAll() },
 		{ name: "terminals", close: () => s.toolchain.terminals.closeAll() },

@@ -224,6 +224,7 @@ export type DialogueDeps = {
 	music?: MusicPort;
 	excalidraw?: ImagePort;
 	image?: ImagePort;
+	generatedImages?: import("./generated-images").GeneratedImagePort;
 	objectRecognition?: ObjectRecognitionPort;
 	toolchains?: import("../contracts/toolchains").ToolchainRoutingPort;
 	worldContext?: WorldContextPort;

@@ -208,6 +208,10 @@ export function createFixture() {
 			keys: [],
 		});
 		await client.connectLarm();
+		// Catalog connection is intentionally idle until a consumer requests a provider.
+		// Warm ASR through the public voice lifecycle before asserting readiness.
+		const warmSession = crypto.randomUUID();
+		await client.voiceStart(warmSession, 1);
 		await waitUntil(
 			async () => {
 				const response = await fetch(`http://127.0.0.1:${apiPort}/api/status`, {
@@ -218,6 +222,7 @@ export function createFixture() {
 			},
 			{ attempts: 150, message: "larm_not_ready" },
 		);
+		await client.voiceStop(warmSession, 1);
 		await launchWeb({
 			webPort,
 			apiPort,

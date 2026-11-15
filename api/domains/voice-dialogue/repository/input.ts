@@ -67,3 +67,17 @@ export function previousInputId(
 		)?.id ?? null
 	);
 }
+
+/** Bound the in-memory audio behind the serialized recognizer before accepting another recording. */
+export function canQueueInput(
+	db: Database,
+	sessionId: string,
+	generation: number,
+) {
+	const counts = db
+		.query(
+			"SELECT COUNT(*) AS total, COALESCE(SUM(session_id=? AND generation=?),0) AS session FROM voice_turns WHERE status='recognizing'",
+		)
+		.get(sessionId, generation) as { total: number; session: number };
+	return counts.total < 16 && counts.session < 3;
+}

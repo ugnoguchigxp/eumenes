@@ -114,14 +114,24 @@ export async function agendaFixture(
 	/** The Markdown domain's side of a shown note, in memory: saved after `noteSavingPolls` looks, then linked. */
 	const documents = {
 		started: [] as Array<{ id: string; title: string; markdown: string }>,
+		originals: new Map<string, { title: string; markdown: string }>(),
 		links: [] as Array<{ messageId: string; uri: string; label: string }>,
 		forgotten: [] as string[],
 		polls: new Map<string, number>(),
 		failing: null as string | null,
 	};
 	const noteDocuments: NoteDocumentPort = {
+		readInTransaction(_db, id) {
+			return documents.forgotten.includes(id.replace(/^doc-/u, ""))
+				? null
+				: (documents.originals.get(id) ?? null);
+		},
 		startInTransaction(_db, note) {
 			const id = `doc-${note.noteId}`;
+			documents.originals.set(id, {
+				title: note.title,
+				markdown: note.markdown,
+			});
 			if (!documents.started.some((d) => d.id === id)) {
 				documents.started.push({
 					id,

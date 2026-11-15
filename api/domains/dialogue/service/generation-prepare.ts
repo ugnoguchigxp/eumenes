@@ -1,3 +1,5 @@
+import { workContextInput } from "./work-context-input";
+import { generatedImageLines } from "./generated-image-text";
 import { backgroundInput } from "./background-input";
 import type { Database } from "bun:sqlite";
 import { recentDiagnostics } from "./diagnostic-evidence";
@@ -315,6 +317,47 @@ function routedInputInTransaction(
 	};
 }
 
+function recordPromptSources(
+	deps: DialogueDeps,
+	tx: Database,
+	{
+		runId,
+		conversationId,
+		prefix,
+		pendingIds,
+		media,
+	}: {
+		runId: string;
+		conversationId: string;
+		prefix: ConversationPrefix;
+		pendingIds: ReadonlySet<string>;
+		media: ReadonlyArray<{ workId: string }>;
+	},
+) {
+	const memory = deps.memory;
+	if (!memory?.referenceInputs) return;
+	const context = backgroundInput(deps, tx, conversationId, prefix);
+	const pendingInput = memory.referenceInputs.captureInTransaction(tx, {
+		messageIds: [...pendingIds],
+	});
+	const mediaInputs = media.map(({ workId }) =>
+		workContextInput(deps, tx, workId),
+	);
+	memory.referenceInputs.recordRunInTransaction(tx, runId, {
+		sources: [
+			...new Set([
+				...context.sources,
+				...pendingInput.sources,
+				...mediaInputs.flatMap((entry) => entry?.sources ?? []),
+			]),
+		],
+		complete:
+			context.complete &&
+			pendingInput.complete &&
+			mediaInputs.every((entry) => entry?.complete),
+	});
+}
+
 /**
  * The claim-time half of a generation (the conversation input specification, sections 3 to 8): the pending
  * utterances it handles, the cut of the recent conversation, and the messages (the system part, `## Memory`, the
@@ -439,16 +482,16 @@ export function createPrepare(
 			pending: pendingIds,
 		});
 		const { texts, final, attachments } = pendingInput(deps, tx, pending);
-		if (memory?.referenceInputs) {
-			const context = backgroundInput(deps, tx, conversationId, prefix);
-			const pendingInput = memory.referenceInputs.captureInTransaction(tx, {
-				messageIds: [...pendingIds],
-			});
-			memory.referenceInputs.recordRunInTransaction(tx, run.id, {
-				sources: [...new Set([...context.sources, ...pendingInput.sources])],
-				complete: context.complete && pendingInput.complete,
-			});
-		}
+		const media = notice
+			? []
+			: generatedImageLines(deps, tx, conversationId, prefix.since);
+		recordPromptSources(deps, tx, {
+			runId: run.id,
+			conversationId,
+			prefix,
+			pendingIds,
+			media,
+		});
 		const noticeText = notice
 			? (conversation.messageInTransaction(tx, run.inputMessageId)?.message
 					.text ?? null)
@@ -522,11 +565,15 @@ export function createPrepare(
 			? []
 			: recentDiagnostics(deps, tx, conversationId);
 		const diagnosticLines = diagnostics.map(({ line }) => line);
-		stateLines.push(...diagnosticLines);
+		const mediaLines = media.length
+			? ["受領した生成画像:", ...media.map(({ line }) => line)]
+			: [];
+		stateLines.push(...mediaLines, ...diagnosticLines);
 		const state = stateText([
 			...stateLines.slice(0, 1),
 			...(screenLines.length ? ["提示中:", ...screenLines] : []),
 			...agencyStateLines(deps, tx, conversationId),
+			...mediaLines,
 			...diagnosticLines,
 		]);
 		const messages = withLastMessage(

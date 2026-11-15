@@ -155,3 +155,14 @@ test("a refused edit keeps the edit state and says why", async () => {
 	);
 	expect(h.hook.result.current.editing?.id).toBe("b");
 });
+
+test("typing keeps the edit action stable and cancelling restores the latest draft", () => {
+	const h = setup([message("b")], [run("b")]);
+	const start = h.hook.result.current.start;
+	h.setInput({ text: "更新した下書き", dictated: false });
+	h.hook.rerender();
+	expect(h.hook.result.current.start).toBe(start);
+	act(() => start());
+	act(() => h.hook.result.current.stop());
+	expect(h.input().text).toBe("更新した下書き");
+});

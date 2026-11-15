@@ -526,6 +526,20 @@ export const domains = {
 			test: [],
 		},
 	},
+	"claude-code": {
+		tier: 3,
+		integrationTests: [
+			"api/application/work/claude-code-task-integration.test.ts",
+		],
+		backend: "api/domains/claude-code",
+		web: null,
+		components: null,
+		depends: {
+			api: ["capabilities", "coding", "inference", "queue", "tool-runtime"],
+			web: [],
+			test: [],
+		},
+	},
 	"web-note": {
 		tier: 3,
 		integrationTests: [

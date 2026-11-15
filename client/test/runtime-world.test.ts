@@ -257,14 +257,6 @@ contracts("voice-dialogue client", [
 		response: turn,
 	},
 	{
-		name: "voicePreview",
-		call: (c) =>
-			c.voicePreview(uuid2, 1, uuid, wav, new AbortController().signal),
-		method: "POST",
-		path: "/api/voice/preview",
-		response: { utteranceId: uuid, text: "hel" },
-	},
-	{
 		name: "voiceTurn",
 		call: (c) => c.voiceTurn("u/1"),
 		method: "GET",

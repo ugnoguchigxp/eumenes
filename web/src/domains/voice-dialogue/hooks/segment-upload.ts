@@ -1,3 +1,4 @@
+import type { VoiceTurn } from "../../../../../api/domains/voice-dialogue/contracts";
 import type { QueryClient } from "@tanstack/react-query";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
@@ -6,7 +7,7 @@ import { queryRoots } from "../../../queryKeys";
 import { type CreateAudio } from "../../audio";
 import { createInputLedger } from "./input-timing";
 import { createVoiceMachine } from "./machine";
-import { type RecognitionCandidate } from "./preview";
+import { type RecognitionCandidate } from "./input-session";
 type Setter<T> = Dispatch<SetStateAction<T>>;
 type Ref<T> = MutableRefObject<T>;
 type Replacement = { id: string; previous: string | null } | null;
@@ -21,7 +22,7 @@ export function createSegmentUploader(deps: {
 	replacement: Ref<Replacement>;
 	setInputVersion: Setter<number>;
 	setRecognitionId: Setter<string | null>;
-	setPreviewText: Setter<string | null>;
+	submitted: (id: string) => void;
 	setTurnId: Setter<string | null>;
 	setError: Setter<VoiceIssue | null>;
 	suspendInput: () => void;
@@ -40,7 +41,7 @@ export function createSegmentUploader(deps: {
 		replacement,
 		setInputVersion,
 		setRecognitionId,
-		setPreviewText,
+		submitted,
 		setTurnId,
 		setError,
 		suspendInput,
@@ -55,15 +56,11 @@ export function createSegmentUploader(deps: {
 		const pauseAfterUpload = active.pending >= 2;
 		const old = machine.get().current;
 		const pending = candidate.current;
-		if (pending) {
-			pending.finalized = true;
-			pending.controller?.abort();
-			pending.latest = undefined;
-		}
 		candidate.current = null;
 		setInputVersion((v) => v + 1);
 		const id = pending?.id ?? crypto.randomUUID();
 		setRecognitionId(id);
+		submitted(id);
 		// Also becomes the current turn and drops the previous turn's delivered chunks.
 		const sequence = machine.dispatch({
 			type: "segment_accepted",
@@ -75,8 +72,9 @@ export function createSegmentUploader(deps: {
 		uploads.tail = uploads.tail
 			.then(async () => {
 				if (!live() || machine.get().session?.failed) return;
+				let accepted: VoiceTurn;
 				try {
-					await client.voiceSend(
+					accepted = await client.voiceSend(
 						active.id,
 						active.generation,
 						sequence,
@@ -87,7 +85,7 @@ export function createSegmentUploader(deps: {
 					if (!(error instanceof TypeError) || !live()) throw error;
 					await new Promise((resolve) => setTimeout(resolve, 250));
 					if (!live()) return;
-					await client.voiceSend(
+					accepted = await client.voiceSend(
 						active.id,
 						active.generation,
 						sequence,
@@ -98,10 +96,11 @@ export function createSegmentUploader(deps: {
 				if (!live()) return;
 				inputs.current.uploaded(id, timing);
 				replacement.current = { id, previous: old };
+				cache.setQueryData(
+					[queryRoots.voiceDialogue, client.identity, id],
+					accepted,
+				);
 				setTurnId(id);
-				await cache.invalidateQueries({
-					queryKey: [queryRoots.voiceDialogue, client.identity, id],
-				});
 			})
 			.catch((e) => {
 				if (!live()) return;
@@ -110,9 +109,7 @@ export function createSegmentUploader(deps: {
 					turn: { utteranceId: id, sessionId: active.id, runId: null },
 				});
 				// The failed upload also drops any unsent segments behind it.
-				candidate.current?.controller?.abort();
 				candidate.current = null;
-				setPreviewText(null);
 				machine.dispatch({
 					type: "upload_failed",
 					sessionToken,

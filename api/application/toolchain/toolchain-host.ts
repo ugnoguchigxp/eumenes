@@ -158,6 +158,7 @@ export async function createHostToolchain(
 		inference: InferencePort &
 			Parameters<typeof createToolchainHostLinks>[0]["inference"];
 		webResearch: WebResearchService;
+		claudeRunner?: import("../../domains/claude-code").Runner;
 		/** The research note task's Codex turn and its ledger record (absent: the task is not offered). */
 		webNote?: Pick<
 			import("../../domains/web-note").WebNoteDeps,
@@ -226,6 +227,7 @@ export async function createHostToolchain(
 			terminals,
 			kanban,
 			kanbanSdk: sdkHost,
+			claudeRunner: s.claudeRunner,
 			webResearch: s.webResearchEnabled,
 			...(s.webNote ? { webNote: s.webNote } : {}),
 			weather: {},

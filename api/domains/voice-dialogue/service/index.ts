@@ -1,3 +1,4 @@
+import { inputEvents } from "./input-events";
 import { linkVoiceRun, pauseLegacy } from "./exclusive";
 import { createSpeechSynthesis } from "./synthesis";
 import { createVoiceIntake } from "./intake";
@@ -45,10 +46,6 @@ export function createVoiceDialogue(
 		larm,
 		audio,
 	);
-	const previews = new Map<
-		string,
-		{ sessionId: string; controller: AbortController }
-	>();
 	const warming = new Map<string, AbortController>();
 	const sessionUsed = new Map<string, number>();
 	const MAX_AUDIO = 8;
@@ -259,48 +256,15 @@ export function createVoiceDialogue(
 			touchSession,
 			clock,
 			dispatch: (turn, wav) => {
-				previews.get(turn.utteranceId)?.controller.abort();
 				const controller = new AbortController();
 				controllers.set(turn.utteranceId, controller);
 				input.accept(turn, wav, controller);
 			},
 		}),
 
-		async preview(
-			sessionId: string,
-			generation: number,
-			id: string,
-			wav: Uint8Array,
-		) {
-			touchSession(sessionId);
-			if (sessions.get(sessionId) !== generation)
-				throw new Error("voice_session_inactive");
-			if (store.read((db) => get(db, id)))
-				throw new Error("stale_voice_preview");
-			if (
-				[...previews.values()].some((p) => p.sessionId === sessionId) ||
-				previews.size >= 32
-			)
-				throw new Error("voice_preview_busy");
-			const controller = new AbortController();
-			previews.set(id, { sessionId, controller });
-			try {
-				const text = await larm.transcribe(wav, controller.signal);
-				controller.signal.throwIfAborted();
+		inputEvents: (id: string, signal: AbortSignal) =>
+			inputEvents(store, id, signal),
 
-				if (
-					sessions.get(sessionId) !== generation ||
-					store.read((db) => get(db, id))
-				)
-					throw new Error("stale_voice_preview");
-				return { utteranceId: id, text };
-			} catch (error) {
-				if (controller.signal.aborted) return { utteranceId: id, text: "" };
-				throw error;
-			} finally {
-				if (previews.get(id)?.controller === controller) previews.delete(id);
-			}
-		},
 		get(id: string) {
 			const turn = store.read((db) => get(db, id));
 			if (!turn) return null;
@@ -344,7 +308,6 @@ export function createVoiceDialogue(
 			return this.get(id);
 		},
 		async cancel(id: string) {
-			previews.get(id)?.controller.abort();
 			const cancel = () =>
 				advance(id, "cancelled", { error: "cancel_requested" });
 			if (!(await cancelHeard(store, dialogue, audio, id, cancel))) return null;
@@ -362,8 +325,6 @@ export function createVoiceDialogue(
 			sessions.delete(sessionId);
 			sessionUsed.delete(sessionId);
 			warming.get(sessionId)?.abort();
-			for (const p of previews.values())
-				if (p.sessionId === sessionId) p.controller.abort();
 			const ids = store.read((db) => activeIds(db, sessionId, generation));
 			await Promise.all(ids.map((id) => this.cancel(id)));
 			log.info("voice.session_stopped", {
@@ -377,8 +338,6 @@ export function createVoiceDialogue(
 			disconnectAnnouncementDelivery?.();
 			for (const c of controllers.values()) c.abort();
 			controllers.clear();
-			for (const p of previews.values()) p.controller.abort();
-			previews.clear();
 			for (const c of warming.values()) c.abort();
 			warming.clear();
 			for (const a of audio.values()) a.wake();

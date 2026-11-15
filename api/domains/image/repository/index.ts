@@ -34,7 +34,42 @@ ALTER TABLE image_generations_next RENAME TO image_generations;
 CREATE INDEX image_conversation ON image_generations(conversation_id);
 CREATE UNIQUE INDEX image_source_once ON image_generations(run_id) WHERE json_extract(request_json,'$.execution') IS NULL;`,
 	},
+	{
+		id: "image/0004-generated-version",
+		after: ["image/0003-execution-calls"],
+		sql: "ALTER TABLE image_generations ADD COLUMN generated_version TEXT",
+	},
 ];
+export function stampGeneratedVersion(
+	db: Database,
+	id: string,
+	version: string,
+) {
+	db.query("UPDATE image_generations SET generated_version=? WHERE id=?").run(
+		version,
+		id,
+	);
+}
+export function generatedVersion(
+	db: Database,
+	runId: string,
+	conversationId: string,
+	artifactId: string,
+): string | null {
+	const found = db
+		.query(
+			`
+		SELECT generated_version FROM image_generations
+		WHERE run_id=? AND conversation_id=? AND json_extract(record_json,'$.artifactId')=?
+			AND json_extract(record_json,'$.state')='completed'
+			AND json_extract(request_json,'$.execution.erased') IS NULL
+		ORDER BY rowid DESC LIMIT 1`,
+		)
+		.get(runId, conversationId, artifactId) as {
+		generated_version: string | null;
+	} | null;
+	return found?.generated_version ?? null;
+}
 export type Row = {
 	id: string;
 	run_id: string;

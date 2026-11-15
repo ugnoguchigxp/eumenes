@@ -27,7 +27,6 @@ function observe(previous: Snapshot | null, turn: VoiceTurn | undefined) {
 export function useTranscription(
 	turn: VoiceTurn | undefined,
 	recognitionId: string | null,
-	preview: string | null,
 ) {
 	const [saved, setSaved] = useState<Snapshot | null>(null);
 	useEffect(() => {
@@ -38,10 +37,15 @@ export function useTranscription(
 	if (!recognitionId) return null;
 	const snapshot = observe(saved, turn);
 	const current = snapshot?.turn.utteranceId === recognitionId;
+	if (
+		current &&
+		["failed", "cancelled", "interrupted"].includes(snapshot.turn.status)
+	)
+		return null;
 	const text = current
 		? snapshot.turn.status === "recognizing"
-			? join(snapshot.prefix, snapshot.turn.text || preview)
+			? join(snapshot.prefix, snapshot.turn.text)
 			: snapshot.turn.text
-		: join(pendingText(snapshot), preview);
+		: pendingText(snapshot);
 	return text ? { id: recognitionId, text } : null;
 }

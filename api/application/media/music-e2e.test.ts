@@ -419,3 +419,46 @@ test("LARM's free-memory refusal puts the music into a wait: one POST, run kept 
 		await h.close();
 	}
 });
+
+test("the generated Ogg Opus track is delivered once to its originating conversation", async () => {
+	const f = musicFixture("success");
+	const h = await harness({
+		model: f.model,
+		musicGateway: f.gateway,
+		resources: true,
+	});
+	try {
+		const request = {
+			requestId: crypto.randomUUID(),
+			conversationId: "music-origin",
+			text: musicQuestion,
+		};
+		const submit = async () =>
+			(await (await h.request("/api/runs", request)).json()).id;
+		const id = await submit();
+		expect(await submit()).toBe(id);
+		expect(
+			(await h.dialogue.waitForTerminal(id, { timeoutMs: 5000 }))?.status,
+		).toBe("completed");
+		const { notices } = await (await h.request("/api/todo-notices")).json();
+		expect(notices).toMatchObject([
+			{
+				conversationId: request.conversationId,
+				outcome: "succeeded",
+				links: [{ kind: "music.track", uri: "eumenes://music.track/track" }],
+			},
+		]);
+		const unrelated = await (
+			await h.request("/api/conversations/main/resources")
+		).json();
+		expect(unrelated.resources).toEqual([]);
+		const audio = await h.request(
+			`/api/music/${h.music!.list(request.conversationId)[0]!.id}/audio`,
+		);
+		expect(audio.headers.get("content-type")).toBe("audio/ogg");
+		expect(new Uint8Array(await audio.arrayBuffer())).toEqual(f.audio);
+		expect(f.stages).toEqual(["route", "plan"]);
+	} finally {
+		await h.close();
+	}
+});

@@ -104,6 +104,8 @@ const messages: Record<string, string> = {
 	stale_voice_preview: "試聴の内容が古くなりました。もう一度お試しください。",
 	voice_input_stale: "発話の続きが届いたため、文字起こしをまとめ直しています。",
 	voice_input_not_ready: "文字起こしがまだ確定していません。",
+	voice_input_busy:
+		"文字起こしが混み合っています。現在の結果を確認してからマイクを再開してください。",
 	voice_input_capacity:
 		"文字起こしが長くなりました。マイクを停止して、内容を確認して送信してください。",
 	audio_too_large: "音声が長すぎます。短く区切って話してください。",

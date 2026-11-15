@@ -80,16 +80,6 @@ export function createIncrementalEncoder(rate: number) {
 	};
 }
 type IncrementalEncoder = ReturnType<typeof createIncrementalEncoder>;
-/**
- * Seconds between partial results grows with the utterance so total work stays near-linear. The first
- * comes 1.8 s after confirmation (not counting the pre-roll), so a short reply ends before any preview,
- * and none is sent in the trailing silence: the final upload follows and would cancel it.
- */
-export const partialInterval = (seconds: number) =>
-	Math.min(2, 0.6 + 0.1 * seconds);
-
-/** Samples per frame handed to the voice detector. */
-
 // 16 kHz PCM stays below the API's 4 MB limit without splitting a question.
 const MAX_RECORDING_SECONDS = 60;
 /** Audio kept before speech is confirmed: confirmation lags the onset by the voiced span needed. */
@@ -133,7 +123,6 @@ export function createAudioController(
 	let sampleCount = 0;
 	let lastLevel = 0;
 	const clock = createSegmentClock();
-	let nextPartialAt = 0;
 	let lastEmit = 0;
 	let wasGated = false;
 	let releaseWatchers: () => void = () => {};
@@ -179,9 +168,9 @@ export function createAudioController(
 				? clock.take(sampleCount, state.context.sampleRate, encodeFrames)
 				: undefined;
 		resetRecording();
-		nextPartialAt = 0;
 		// A consumer may pause capture synchronously when its upload queue fills.
 		if (segment) onSegment(segment.wav, segment.timing);
+		else options.onDiscard?.();
 	}
 	function pauseInput() {
 		// Include samples received since the last complete detector frame.
@@ -299,11 +288,13 @@ export function createAudioController(
 						// Drop anything heard so far; the reply must not become input.
 						frame.fill(0);
 						if (!wasGated) {
+							const discarded = speaking;
 							speaking = false;
 							resetRecording();
 							candidateFrames = [];
 							candidateSamples = 0;
 							detector?.restart();
+							if (discarded) options.onDiscard?.();
 						}
 					}
 					wasGated = gated;
@@ -331,7 +322,6 @@ export function createAudioController(
 							resetRecording();
 							for (const candidate of candidateFrames) pushFrame(candidate);
 							clock.confirmed(sampleCount);
-							nextPartialAt = sampleCount + state.context.sampleRate * 1.8;
 							candidateFrames = [];
 							candidateSamples = 0;
 							onSpeech();
@@ -341,18 +331,6 @@ export function createAudioController(
 						if (!observation?.hasSpeech || lastFrame !== frame)
 							pushFrame(frame);
 						if (detector?.hearing) clock.heard(sampleCount);
-						if (
-							options.onPartial &&
-							!observation?.shouldFinalize &&
-							detector?.hearing &&
-							sampleCount >= nextPartialAt
-						) {
-							nextPartialAt =
-								sampleCount +
-								state.context.sampleRate *
-									partialInterval(sampleCount / state.context.sampleRate);
-							options.onPartial(encodeFrames());
-						}
 						if (
 							sampleCount >=
 							state.context.sampleRate * MAX_RECORDING_SECONDS

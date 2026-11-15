@@ -1,5 +1,6 @@
 import { taskForWork } from "./task-work";
 import { jstSeconds } from "../../../infrastructure/jst-time";
+import type { WorkLink } from "../contracts/resources";
 import type { Database } from "bun:sqlite";
 import type { ToolchainCard } from "../../capabilities";
 import type { DialogueDeps } from "./context";
@@ -183,7 +184,7 @@ function recordReportLinks(
 		report.status === "done" &&
 		(report.outcome === "succeeded" || report.outcome === "partial")
 	)
-		recordWorkLinksInTransaction(
+		return recordWorkLinksInTransaction(
 			deps,
 			db,
 			row,
@@ -191,6 +192,7 @@ function recordReportLinks(
 			{ conversationId: row.conversationId, runId: row.runId, workId: row.id },
 			report.links,
 		);
+	return [];
 }
 
 /** The settled notification is also factual context for an external voice frontend. */
@@ -216,8 +218,17 @@ function reportExternalWork(
 		});
 }
 
+type GeneratedImagesForWork = {
+	reserve(db: Database, row: WorkRow, links: readonly WorkLink[]): void;
+	text(db: Database, workId: string): string | undefined;
+	forget(db: Database, workId: string): void;
+};
+
 /** What `## State`, the TODO screen and the notices read of finished (archived) work. */
-function finishedViews(deps: Pick<DialogueDeps, "clock" | "toolchains">) {
+function finishedViews(
+	deps: Pick<DialogueDeps, "clock" | "toolchains">,
+	images?: GeneratedImagesForWork,
+) {
 	return {
 		/** The TODOs archived since `since` (an ISO time), with their links: what `## State` names as notified. */
 		recentlyArchivedInTransaction(
@@ -249,6 +260,7 @@ function finishedViews(deps: Pick<DialogueDeps, "clock" | "toolchains">) {
 						links.get(row.id) ?? [],
 						toolchainTitleOf(deps.toolchains, db, row),
 						screens.get(row.toolchainId),
+						images?.text(db, row.id),
 					),
 				),
 				unread,
@@ -364,6 +376,7 @@ export function createWorkLedger(
 		| "resourceLedger"
 		| "externalOutput"
 	>,
+	images?: GeneratedImagesForWork,
 ) {
 	const { clock, id, continuity } = deps;
 	/** A question or result the owner reported joins the log once per revision (the ContextWindow layout specification). */
@@ -400,7 +413,7 @@ export function createWorkLedger(
 		todosInTransaction(db: Database, conversationId: string): TodoItem[] {
 			return itemsOf(db, openWork(db, conversationId));
 		},
-		...finishedViews(deps),
+		...finishedViews(deps, images),
 		/** The unarchived TODOs' revisions: what the work tool checks an operation against. */
 		todoRevisionsInTransaction: (db: Database, conversationId: string) =>
 			openWork(db, conversationId).map((row) => ({
@@ -506,9 +519,10 @@ export function createWorkLedger(
 				archiveWork(db, workId, clock());
 				return workById(db, workId)!;
 			}
-			recordReportLinks(deps, db, workById(db, workId)!, report);
+			const links = recordReportLinks(deps, db, workById(db, workId)!, report);
 			if (report.status === "done") archiveWork(db, workId, clock());
 			const next = workById(db, workId)!;
+			images?.reserve(db, next, links);
 			logResult(db, next);
 			if (
 				next.status === "done" &&
@@ -578,6 +592,7 @@ export function createWorkLedger(
 		forgetInTransaction(db: Database, messageIds: readonly string[]) {
 			const forgotten = forgetWork(db, messageIds, clock());
 			for (const item of forgotten) {
+				images?.forget(db, item.id);
 				const row = workById(db, item.id);
 				if (row?.sourceRef)
 					taskForWork(deps, db, row)?.forgetInTransaction?.(db, row.sourceRef);
@@ -588,7 +603,9 @@ export function createWorkLedger(
 		},
 		/** A run's results deleted at their owner: the TODOs it fed keep no copy, in the TODO or in the log. */
 		dropRunResultsInTransaction(db: Database, runId: string) {
-			clearResults(db, dropRunResults(db, runId, clock()));
+			const dropped = dropRunResults(db, runId, clock());
+			for (const { id } of dropped) images?.forget(db, id);
+			clearResults(db, dropped);
 		},
 		/** The toolchains used most recently, with their one-line summary and the last request (section 6.2). */
 		retainedInTransaction(

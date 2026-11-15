@@ -851,7 +851,7 @@ test("output preparation resumes an existing context that is waiting for a gestu
 	expect(close).toHaveBeenCalledOnce();
 });
 
-import { createIncrementalEncoder, partialInterval } from "../controller";
+import { createIncrementalEncoder } from "../controller";
 
 function toneFrames(lengths: number[]): Float32Array[] {
 	let n = 0;
@@ -907,10 +907,4 @@ test("resampling to 16 kHz keeps speech and removes what would alias", () => {
 		expect(toneRms(1000, rate)).toBeGreaterThan(0.69);
 		expect(toneRms(11000, rate)).toBeLessThan(0.01);
 	}
-});
-
-test("partial interval grows with utterance length and is capped", () => {
-	expect(partialInterval(0)).toBe(0.6);
-	expect(partialInterval(10)).toBeCloseTo(1.6);
-	expect(partialInterval(60)).toBe(2);
 });

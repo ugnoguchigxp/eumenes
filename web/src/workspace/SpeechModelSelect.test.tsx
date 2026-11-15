@@ -31,6 +31,7 @@ test("both labelled selects dispatch the purpose and chosen resource", async () 
 				select,
 			}}
 			disabled={false}
+			openAsrSettings={vi.fn()}
 		/>,
 	);
 	for (const purpose of ["ASR", "TTS"]) {
@@ -57,8 +58,36 @@ test("controls are locked while voice or saving is active", () => {
 				select: vi.fn(),
 			}}
 			disabled
+			openAsrSettings={vi.fn()}
 		/>,
 	);
 	for (const control of screen.getAllByRole("combobox"))
 		expect(control.hasAttribute("disabled")).toBe(true);
+});
+
+test("opens ASR setup from the chat without selecting or saving a model", async () => {
+	const select = vi.fn();
+	const openAsrSettings = vi.fn();
+	render(
+		<SpeechModelSelect
+			models={{
+				ready: true,
+				busy: false,
+				error: null,
+				asr: model,
+				tts: model,
+				select,
+			}}
+			disabled={false}
+			openAsrSettings={openAsrSettings}
+		/>,
+	);
+	const asr = screen.getByRole("combobox", { name: "ASRモデル" });
+	fireEvent.keyDown(asr, { key: "ArrowDown" });
+	fireEvent.click(
+		await screen.findByRole("option", { name: "ASRモデルを登録…" }),
+	);
+	expect(openAsrSettings).toHaveBeenCalledOnce();
+	expect(select).not.toHaveBeenCalled();
+	expect(asr.textContent).toContain("LARM");
 });

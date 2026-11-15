@@ -3,8 +3,20 @@ import { chmodSync, existsSync, lstatSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { SdkService } from "./sdk-service";
 
-export async function serveSdk(service: SdkService) {
-	const socket = join(service.config.root, "sdk.sock");
+export const serveSdk = (service: SdkService) =>
+	servePrivateRunner(
+		join(service.config.root, "sdk.sock"),
+		"/sdk",
+		service,
+		"sdk",
+	);
+
+export async function servePrivateRunner<T>(
+	socket: string,
+	endpoint: string,
+	service: { request(input: T): unknown; close(): Promise<void> },
+	namespace: "sdk" | "claude",
+) {
 	if (existsSync(socket)) {
 		const s = lstatSync(socket);
 		if (!s.isSocket() || s.uid !== process.getuid?.())
@@ -13,8 +25,10 @@ export async function serveSdk(service: SdkService) {
 	}
 	const server = createServer(async (req, res) => {
 		res.setHeader("content-type", "application/json");
-		if (req.method !== "POST" || req.url !== "/sdk") {
-			res.writeHead(404).end('{"code":"sdk_endpoint_missing"}');
+		if (req.method !== "POST" || req.url !== endpoint) {
+			res
+				.writeHead(404)
+				.end(JSON.stringify({ code: `${namespace}_endpoint_missing` }));
 			return;
 		}
 		try {
@@ -22,14 +36,16 @@ export async function serveSdk(service: SdkService) {
 			for await (const chunk of req) {
 				body += chunk.toString();
 				if (Buffer.byteLength(body) > 512 * 1024)
-					throw new Error("sdk_request_limit");
+					throw new Error(`${namespace}_request_limit`);
 			}
 			res.end(JSON.stringify(service.request(JSON.parse(body))));
 		} catch (error) {
 			const code =
-				error instanceof Error && /^sdk_[a-z_]+$/.test(error.message)
+				error instanceof Error &&
+				error.message.startsWith(`${namespace}_`) &&
+				/^[a-z_]+$/.test(error.message)
 					? error.message
-					: "sdk_request_invalid";
+					: `${namespace}_request_invalid`;
 			res.writeHead(400).end(JSON.stringify({ code }));
 		}
 	});

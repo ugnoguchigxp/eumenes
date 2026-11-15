@@ -250,6 +250,18 @@ select:focus-visible {
 		28px;
 	scrollbar-color: var(--border) transparent;
 }
+.chat-history[data-following-latest="true"] {
+	overflow-anchor: none;
+}
+.chat-history-content {
+	min-height: 100%;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+}
+.chat-history-content > .messages {
+	min-height: 0;
+}
 .messages {
 	display: flex;
 	flex-direction: column;

@@ -256,13 +256,7 @@ export function keepNote(
 		.write((db) => {
 			// Forgotten meanwhile: no document is made of it.
 			if (!citableNotes(c).some((n) => n.id === note.id)) return;
-			documents.startInTransaction(db, {
-				conversationId: c.id,
-				noteId: note.id,
-				title: note.title,
-				markdown: note.markdown,
-				at: note.at,
-			});
+			startNoteDocument(deps, db, c.id, note);
 		})
 		.catch((error: unknown) => {
 			log.warn("agency.note_document_failed", {
@@ -270,6 +264,28 @@ export function keepNote(
 				reason: toErrorCode(error, "note_document_failed"),
 			});
 		});
+}
+
+/** Reattaching a saved note must use its original, never its checkpoint preview. */
+export function startNoteDocument(
+	deps: AgencyHostDeps,
+	db: Database,
+	conversationId: string,
+	note: AgendaNote,
+) {
+	const documents = deps.noteDocuments;
+	if (!documents) throw new Error("agency_note_documents_unavailable");
+	const original = note.documentId
+		? documents.readInTransaction(db, note.documentId)
+		: note;
+	if (!original) throw new Error("markdown_not_found");
+	return documents.startInTransaction(db, {
+		conversationId,
+		noteId: note.id,
+		title: original.title,
+		markdown: original.markdown,
+		at: note.at,
+	});
 }
 
 /** How long the saving of a note's document is waited for (the Markdown domain gives its job 200 s). */
@@ -310,13 +326,7 @@ export async function showNote(
 	const id = await deps.store.write((db) => {
 		if (shown(db)) return null;
 		origin(db);
-		return documents.startInTransaction(db, {
-			conversationId: c.id,
-			noteId: note.id,
-			title: note.title,
-			markdown: note.markdown,
-			at: note.at,
-		});
+		return startNoteDocument(deps, db, c.id, note);
 	});
 	if (id === null) return;
 	// The scope's end (the host closes, the conversation goes) ends the wait.

@@ -1,3 +1,4 @@
+import { inputClientFixture } from "./input-client.fixture";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
@@ -11,120 +12,6 @@ import {
 	type AudioController,
 } from "../../audio";
 import { useVoiceDialogue } from "..";
-
-for (const recognized of [false, true, "failed"])
-	test(`replacement cancels the accepted answer only after confirmed speech: ${recognized}`, async () => {
-		const query = new QueryClient({
-			defaultOptions: { queries: { retry: false } },
-		});
-		const wrapper = ({ children }: PropsWithChildren) => (
-			<QueryClientProvider client={query}>{children}</QueryClientProvider>
-		);
-		let sessionId = "",
-			segment = (_wav: Uint8Array) => {},
-			speech = () => {};
-		const ids: string[] = [];
-		const states = new Map<string, { status: string; text: string | null }>();
-		const voiceCancel = vi.fn(async () => ({})),
-			play = vi.fn(async () => {});
-		const client = {
-			identity: "replacement-test",
-			voiceStart: async (id: string) => {
-				sessionId = id;
-			},
-			voiceStop: async () => ({}),
-			voiceSend: async (
-				_session: string,
-				_generation: number,
-				_sequence: number,
-				id: string,
-			) => {
-				ids.push(id);
-				states.set(
-					id,
-					ids.length === 1
-						? { status: "responding", text: "受け付けた依頼" }
-						: { status: "recognizing", text: null },
-				);
-				return { utteranceId: id };
-			},
-			voiceTurn: async (id: string) => ({
-				utteranceId: id,
-				sessionId,
-				generation: 1,
-				sequence: ids.indexOf(id) + 1,
-				...states.get(id),
-				runId: "run",
-				error: states.get(id)?.status === "failed" ? "larm_timeout" : null,
-				revision: 1,
-			}),
-			voiceAudio: async () => new Uint8Array(44),
-			voicePlayed: async () => ({}),
-			voiceCancel,
-		} as unknown as VoiceDialogueClient;
-		const createAudio: CreateAudio = (_state, onSpeech, onSegment) => {
-			speech = onSpeech;
-			segment = onSegment;
-			return {
-				start: async () => {},
-				stop: async () => {},
-				stopPlayback: () => {},
-				play,
-			};
-		};
-		const hook = renderHook(
-			() => useVoiceDialogue(client, createAudioStore(), createAudio),
-			{ wrapper },
-		);
-		try {
-			await act(async () => hook.result.current.start());
-			act(() => segment(new Uint8Array(44)));
-			await waitFor(() =>
-				expect(hook.result.current.turn?.text).toBe("受け付けた依頼"),
-			);
-			act(() => {
-				speech();
-				segment(new Uint8Array(44));
-			});
-			await waitFor(() =>
-				expect(hook.result.current.turn?.status).toBe("recognizing"),
-			);
-			expect(voiceCancel).not.toHaveBeenCalled();
-			states.set(
-				ids[1]!,
-				recognized === "failed"
-					? { status: "failed", text: "" }
-					: recognized
-						? { status: "responding", text: "新しい依頼" }
-						: { status: "completed", text: "" },
-			);
-			await act(async () => {
-				await query.invalidateQueries();
-			});
-			if (recognized === true) {
-				await waitFor(() => expect(voiceCancel).toHaveBeenCalledWith(ids[0]));
-				expect(voiceCancel).toHaveBeenCalledTimes(1);
-			} else {
-				await waitFor(() =>
-					expect(hook.result.current.turn?.utteranceId).toBe(ids[0]),
-				);
-				expect(voiceCancel).not.toHaveBeenCalled();
-				if (recognized === "failed")
-					expect(hook.result.current.failure).toMatchObject({
-						cause: "larm_timeout",
-						turn: { utteranceId: ids[1], runId: "run" },
-					});
-				states.set(ids[0]!, { status: "ready", text: "受け付けた依頼" });
-				await act(async () => {
-					await query.invalidateQueries();
-				});
-				await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
-			}
-		} finally {
-			hook.unmount();
-			query.clear();
-		}
-	});
 
 test("a replaced audio queue drops old chunks and keeps the turn available for the new generation", async () => {
 	const query = new QueryClient();
@@ -144,7 +31,7 @@ test("a replaced audio queue drops old chunks and keeps the turn available for t
 	const voiceAudio = vi.fn(async (_id: string, index: number) =>
 		index === 0 ? oldFetch : new Uint8Array(44),
 	);
-	const client = {
+	const client = inputClientFixture({
 		identity: "generation-change",
 		voiceStart: async (id: string) => {
 			sessionId = id;
@@ -166,7 +53,7 @@ test("a replaced audio queue drops old chunks and keeps the turn available for t
 			audioChunks: [{ index: audioGeneration, text: "回答" }],
 		}),
 		voiceAudio,
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const createAudio: CreateAudio = (_store, _onSpeech, onSegment) => {
 		segment = onSegment;
 		return { start: async () => {}, stop: async () => {}, stopPlayback, play };
@@ -224,7 +111,7 @@ test("microphone pause preserves pending generation and playback, and resumes th
 	const start = vi.fn(async () => {}),
 		pauseInput = vi.fn(() => {}),
 		play = vi.fn(async () => {});
-	const client = {
+	const client = inputClientFixture({
 		identity: "pause-test",
 		voiceStart,
 		voiceStop,
@@ -243,7 +130,7 @@ test("microphone pause preserves pending generation and playback, and resumes th
 		}),
 		voiceAudio: async () => new Uint8Array(44),
 		voicePlayed: async () => ({}),
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const createAudio: CreateAudio = (_state, _speech, onSegment) => {
 		segment = onSegment;
 		return {
@@ -321,7 +208,7 @@ test("an unrecognized energy candidate preserves playback of an accepted answer"
 				resolveAudio = resolve;
 			}),
 	);
-	const client = {
+	const client = inputClientFixture({
 		identity: "http://127.0.0.1:8787",
 		voiceStart: async (id: string) => {
 			sessionId = id;
@@ -351,7 +238,7 @@ test("an unrecognized energy candidate preserves playback of an accepted answer"
 		voiceAudio,
 		voicePlayed: async () => ({}),
 		voiceCancel: async () => ({}),
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const store = createAudioStore();
 	const hook = renderHook(() => useVoiceDialogue(client, store, createAudio), {
 		wrapper,
@@ -382,11 +269,11 @@ test("stopping during session creation prevents a late microphone start", async 
 			}),
 	);
 	const voiceStop = vi.fn(async () => ({ stopped: true }));
-	const client = {
+	const client = inputClientFixture({
 		identity: "http://127.0.0.1:8787",
 		voiceStart,
 		voiceStop,
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const createAudio = vi.fn(() => ({
 		start: async () => {},
 		stop: async () => {},
@@ -436,7 +323,7 @@ test("failure to read an accepted voice turn is shown instead of leaving silent 
 			play: async () => {},
 		};
 	};
-	const client = {
+	const client = inputClientFixture({
 		identity: "http://127.0.0.1:8787",
 		voiceStart: async (id: string) => ({ sessionId: id, generation: 1 }),
 		voiceStop: async () => ({ stopped: true }),
@@ -444,7 +331,7 @@ test("failure to read an accepted voice turn is shown instead of leaving silent 
 		voiceTurn: async () => {
 			throw new Error("unavailable");
 		},
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const hook = renderHook(
 		() => useVoiceDialogue(client, createAudioStore(), createAudio),
 		{ wrapper },
@@ -515,7 +402,7 @@ for (const status of ["responding", "ready"] as const)
 		);
 		const voicePlayed = vi.fn(async (_id: string, _index?: number) => ({})),
 			voiceCancel = vi.fn(async (_id: string) => ({}));
-		const client = {
+		const client = inputClientFixture({
 			identity: "http://127.0.0.1:8787",
 			voiceStart: async (id: string) => {
 				sessionId = id;
@@ -548,7 +435,7 @@ for (const status of ["responding", "ready"] as const)
 				],
 				audioComplete: status === "ready",
 			}),
-		} as unknown as VoiceDialogueClient;
+		} as unknown as VoiceDialogueClient);
 		const store = createAudioStore();
 		const hook = renderHook(
 			() => useVoiceDialogue(client, store, createAudio),
@@ -652,7 +539,7 @@ test("an unfinalized speech candidate neither cancels nor hides an accepted reco
 		audioChunks: [],
 		audioComplete: false,
 	}));
-	const client = {
+	const client = inputClientFixture({
 		identity: "http://127.0.0.1:8787",
 		voiceSend,
 		voiceCancel,
@@ -662,7 +549,7 @@ test("an unfinalized speech candidate neither cancels nor hides an accepted reco
 			return {};
 		},
 		voiceStop: async () => ({}),
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const hook = renderHook(
 		() => useVoiceDialogue(client, createAudioStore(), createAudio),
 		{ wrapper },
@@ -723,7 +610,7 @@ test("muting stops playback at once and releases the running turn", async () => 
 		return { start: async () => {}, stop: async () => {}, stopPlayback, play };
 	};
 	const voiceCancel = vi.fn(async (_id: string) => ({}));
-	const client = {
+	const client = inputClientFixture({
 		identity: "http://127.0.0.1:8787",
 		voiceStart: async (id: string) => {
 			sessionId = id;
@@ -747,7 +634,7 @@ test("muting stops playback at once and releases the running turn", async () => 
 			audioChunks: [{ index: 0, text: "先。" }],
 			audioComplete: true,
 		}),
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const store = createAudioStore();
 	const voice = (autoSpeak: boolean) =>
 		({ autoSpeak, outputVolume: 1, bargeIn: true }) as never;
@@ -777,10 +664,9 @@ test("callbacks and upload failures from a stopped microphone cannot affect a ne
 	const microphones: Array<{
 		speech: () => void;
 		segment: (wav: Uint8Array) => void;
-		partial?: (wav: Uint8Array) => void;
 	}> = [];
-	const createAudio: CreateAudio = (_state, speech, segment, options) => {
-		microphones.push({ speech, segment, partial: options?.onPartial });
+	const createAudio: CreateAudio = (_state, speech, segment) => {
+		microphones.push({ speech, segment });
 		return {
 			start: async () => {},
 			stop: async () => {},
@@ -795,14 +681,12 @@ test("callbacks and upload failures from a stopped microphone cannot affect a ne
 				rejectOld = reject;
 			}),
 	);
-	const voicePreview = vi.fn(async () => ({ text: "古い入力" }));
-	const client = {
+	const client = inputClientFixture({
 		identity: "stale-microphone",
 		voiceStart: async () => ({}),
 		voiceStop: async () => ({}),
 		voiceSend,
-		voicePreview,
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const hook = renderHook(
 		() => useVoiceDialogue(client, createAudioStore(), createAudio),
 		{ wrapper },
@@ -818,14 +702,12 @@ test("callbacks and upload failures from a stopped microphone cannot affect a ne
 		await act(async () => hook.result.current.start());
 		await act(async () => {
 			microphones[0]!.speech();
-			microphones[0]!.partial?.(new Uint8Array(44));
 			microphones[0]!.segment(new Uint8Array(44));
 			rejectOld(new Error("old_upload_failed"));
 		});
 		expect(hook.result.current.recognitionId).toBeNull();
 		expect(hook.result.current.error).toBeNull();
 		expect(hook.result.current.active).toBe(true);
-		expect(voicePreview).not.toHaveBeenCalled();
 		expect(voiceSend).toHaveBeenCalledTimes(1);
 	} finally {
 		hook.unmount();
@@ -854,7 +736,7 @@ test("a rejected next upload does not cancel the previous accepted answer", asyn
 		};
 	};
 	const voiceCancel = vi.fn(async () => ({}));
-	const client = {
+	const client = inputClientFixture({
 		identity: "rejected-next-upload",
 		voiceStart: async (id: string) => {
 			sessionId = id;
@@ -884,7 +766,7 @@ test("a rejected next upload does not cancel the previous accepted answer", asyn
 			audioChunks: ready ? [{ index: 0, text: "回答" }] : [],
 			audioComplete: ready,
 		}),
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const hook = renderHook(
 		() => useVoiceDialogue(client, createAudioStore(), createAudio),
 		{ wrapper },
@@ -934,12 +816,12 @@ test("stopping during the upload retry delay prevents a stale retry", async () =
 	const voiceSend = vi.fn(async () => {
 		throw new TypeError("offline");
 	});
-	const client = {
+	const client = inputClientFixture({
 		identity: "stopped-retry",
 		voiceStart: async () => ({}),
 		voiceStop: async () => ({}),
 		voiceSend,
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const hook = renderHook(
 		() => useVoiceDialogue(client, createAudioStore(), createAudio),
 		{ wrapper },
@@ -991,7 +873,7 @@ test("a delayed stop cannot clear a new turn or reset the new microphone state",
 		};
 	};
 	let sessionId = "";
-	const client = {
+	const client = inputClientFixture({
 		identity: "delayed-stop",
 		voiceStart: async (id: string) => {
 			sessionId = id;
@@ -1012,7 +894,7 @@ test("a delayed stop cannot clear a new turn or reset the new microphone state",
 			audioChunks: [],
 			audioComplete: false,
 		}),
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const store = createAudioStore();
 	const hook = renderHook(() => useVoiceDialogue(client, store, createAudio), {
 		wrapper,

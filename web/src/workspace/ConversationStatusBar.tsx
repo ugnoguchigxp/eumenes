@@ -68,6 +68,7 @@ export function ConversationStatusBar({
 				) : (
 					<SpeechModelSelect
 						models={speechModels}
+						openAsrSettings={state.openAsrSettings}
 						disabled={
 							!!activeRun ||
 							model.busy ||

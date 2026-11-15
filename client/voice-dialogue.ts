@@ -1,5 +1,5 @@
+import { watchVoiceInput } from "./voice-input";
 import {
-	previewResultSchema,
 	replaySentencesSchema,
 	voiceTurnSchema,
 	type InputTiming,
@@ -81,26 +81,11 @@ export function voiceDialogueClient(transport: Transport) {
 				body: new Uint8Array(wav),
 			});
 		},
-		voicePreview: async (
-			sessionId: string,
-			generation: number,
+		watchVoiceInput: (
 			id: string,
-			wav: Uint8Array,
 			signal: AbortSignal,
-		) => {
-			return callJson(transport, previewResultSchema, "/api/voice/preview", {
-				method: "POST",
-				signal,
-				headers: {
-					"Content-Type": "audio/wav",
-					"X-Session-Id": sessionId,
-					"X-Generation": String(generation),
-					"X-Sequence": "1",
-					"X-Utterance-Id": id,
-				},
-				body: new Uint8Array(wav),
-			});
-		},
+			receive: Parameters<typeof watchVoiceInput>[3],
+		) => watchVoiceInput(transport, id, signal, receive),
 		voiceCommit: async (
 			id: string,
 			revision: number,

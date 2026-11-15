@@ -546,15 +546,15 @@ export function createLarmPlayground(config: {
 			};
 		});
 	}
+	const mediaBinding = sha256Hex(
+		`${configuredBase?.origin ?? ""}\n${config.token ?? ""}`,
+	);
 	return {
+		mediaBinding,
 		musicProviders,
 		library: createMusicLibrary(control, publicUrl),
 		images: createImageLibrary(control, publicUrl),
-		imageImports: createImageImports(
-			control,
-			publicUrl,
-			sha256Hex(`${configuredBase?.origin ?? ""}\n${config.token ?? ""}`),
-		),
+		imageImports: createImageImports(control, publicUrl, mediaBinding),
 		meshes: createMeshLibrary(control, publicUrl),
 		embed,
 		catalog,

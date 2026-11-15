@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/prefer-tag-over-role -- This labelled scroll region needs focus for keyboard history navigation. */
 import { useCallback } from "react";
 import type { EumenesClient } from "../../../client";
 import type { Message } from "../../../api/domains/conversation/contracts";
@@ -33,6 +34,9 @@ export function ConversationHistory({
 		runs,
 		settings,
 		historyRef,
+		contentRef,
+		showLatest,
+		followLatestIfPinned,
 		onHistoryScroll,
 	} = state;
 	const { openResource } = resources;
@@ -96,30 +100,40 @@ export function ConversationHistory({
 		<div
 			className="chat-history"
 			ref={historyRef}
+			data-following-latest={!showLatest}
+			role="region"
+			tabIndex={0}
+			aria-label="会話履歴"
 			onScroll={(event) => onHistoryScroll(event.currentTarget)}
 		>
-			<LiveMessageList
-				client={client}
-				activeRunId={activeRun?.id}
-				announcement={activeRun?.announcement}
-				followLatestIfPinned={state.followLatestIfPinned}
-				conversation={conversation.data}
-				thoughts={state.thoughts.data}
-				onOpenResource={onOpenResource}
-				renderInsideMessage={renderInsideMessage}
-				renderFollowingMessage={renderFollowingMessage}
-				renderHiddenMessage={renderHiddenMessage}
-				editableId={edit.editing ? undefined : edit.target?.message.id}
-				editingId={edit.editing?.id}
-				editedIds={edit.editedIds}
-				onEdit={edit.start}
-				agentName={agentName}
-				replayingId={playingId}
-				onReplay={onReplay}
-			/>
-			{activeRun && <ThinkingRow state={state} run={activeRun} />}
-			{state.live && <LiveVoicePanel live={state.live} agentName={agentName} />}
-			<ConversationFailures state={state} />
+			<div className="chat-history-content" ref={contentRef}>
+				<LiveMessageList
+					client={client}
+					activeRunId={activeRun?.id}
+					announcement={activeRun?.announcement}
+					followLatestIfPinned={followLatestIfPinned}
+					historyRef={historyRef}
+					followLatest={!showLatest}
+					conversation={conversation.data}
+					thoughts={state.thoughts.data}
+					onOpenResource={onOpenResource}
+					renderInsideMessage={renderInsideMessage}
+					renderFollowingMessage={renderFollowingMessage}
+					renderHiddenMessage={renderHiddenMessage}
+					editableId={edit.editing ? undefined : edit.target?.message.id}
+					editingId={edit.editing?.id}
+					editedIds={edit.editedIds}
+					onEdit={edit.start}
+					agentName={agentName}
+					replayingId={playingId}
+					onReplay={onReplay}
+				/>
+				{activeRun && <ThinkingRow state={state} run={activeRun} />}
+				{state.live && (
+					<LiveVoicePanel live={state.live} agentName={agentName} />
+				)}
+				<ConversationFailures state={state} />
+			</div>
 		</div>
 	);
 }

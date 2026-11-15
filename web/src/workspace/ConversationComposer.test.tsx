@@ -47,6 +47,48 @@ test("preparing is visible and cancellable until microphone frames arrive", () =
 	).toBeNull();
 	expect(screen.getByText("話しかけてください")).toBeTruthy();
 	expect(screen.getByText("マイク").classList.contains("active")).toBe(true);
+	for (const [inputStatus, label] of [
+		["capturing", "聞き取り中です"],
+		["recognizing", "文字起こし中です"],
+		["sent", "送信済みです。続けて話せます"],
+	] as const) {
+		view.rerender(
+			<ConversationComposer
+				state={{ ...state, voice: { ...state.voice, inputStatus } }}
+				store={store}
+			/>,
+		);
+		expect(screen.getByText(label)).toBeTruthy();
+		expect(screen.queryByText("話しかけてください")).toBeNull();
+	}
+	view.rerender(
+		<ConversationComposer
+			state={{
+				...state,
+				voice: { ...state.voice, inputStatus: "ready", inputHold: "delayed" },
+			}}
+			store={store}
+		/>,
+	);
+	expect(
+		screen.getByText(
+			"文字起こしを下書きに残しました。確認して送信してください。",
+		),
+	).toBeTruthy();
+	for (const inputStatus of ["capturing", "idle"] as const) {
+		view.rerender(
+			<ConversationComposer
+				state={{
+					...state,
+					voice: { ...state.voice, inputStatus, inputHold: "delayed" },
+				}}
+				store={store}
+			/>,
+		);
+		expect(screen.queryByText(/文字起こしを下書きに残しました/)).toBeNull();
+		if (inputStatus === "capturing")
+			expect(screen.getByText("聞き取り中です")).toBeTruthy();
+	}
 	view.rerender(
 		<ConversationComposer
 			state={{ ...state, voice: { ...state.voice, active: false } }}

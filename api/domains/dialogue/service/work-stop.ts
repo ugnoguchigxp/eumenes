@@ -61,6 +61,11 @@ export function archiveByUserInTransaction(
 		if (!executions.cancelInTransaction)
 			throw new Error("task_cancellation_unavailable");
 		executions.cancelInTransaction(tx, row.conversationId, row.sourceRef);
+		const updated = executions.viewInTransaction(tx, row.sourceRef);
+		if (updated?.status === "stopping") {
+			ledger.reportInTransaction(tx, row.id, { status: "todo" });
+			return { row: ledger.workInTransaction(tx, row.id)!, jobs: [] };
+		}
 	} else job = stopWaitingRunInTransaction(deps, tx, row);
 	ledger.reportInTransaction(tx, row.id, {
 		status: "done",

@@ -139,6 +139,80 @@ test("cancellation during cloud ASR cannot create a dialogue run even with late 
 	expect(h.dialogue.list("main")).toHaveLength(0);
 	expect(h.conversation.get("main").messages).toHaveLength(0);
 });
+
+test("selecting a saved ASR model sends the next recording to its API and returning to LARM uses local ASR", async () => {
+	const recognition: Array<{
+		path: string;
+		model: FormDataEntryValue | null;
+		mime: string;
+	}> = [];
+	let localCalls = 0;
+	const h = await setup(
+		async (input, init) => {
+			const form = init?.body;
+			if (!(form instanceof FormData))
+				throw new Error("expected_transcription_form");
+			const file = form.get("file");
+			if (!(file instanceof Blob))
+				throw new Error("expected_transcription_audio");
+			recognition.push({
+				path: new URL(String(input)).pathname,
+				model: form.get("model"),
+				mime: file.type,
+			});
+			return Response.json({ text: "クラウドで文字起こし" });
+		},
+		{
+			transcribe: async () => {
+				localCalls++;
+				return "ローカルで文字起こし";
+			},
+		},
+	);
+	const before = h.settings.get();
+	const select = async (mode: "larm-preferred" | "cloud-only") => {
+		const settings = h.settings.get();
+		settings.routes.asr.mode = mode;
+		settings.routes.asr.cloudAllowed = true;
+		return h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys: [],
+		});
+	};
+	const record = async () => {
+		const id = crypto.randomUUID();
+		const session = crypto.randomUUID();
+		h.voice.start(session, 1);
+		await h.voice.accept(session, 1, 1, id, wav());
+		await until(() => h.voice.get(id)?.status !== "recognizing");
+		return h.voice.get(id);
+	};
+	await select("cloud-only");
+	expect(await record()).toMatchObject({
+		status: "input_ready",
+		text: "クラウドで文字起こし",
+	});
+	expect(localCalls).toBe(0);
+	expect(recognition).toEqual([
+		{
+			path: "/v1/audio/transcriptions",
+			model: "fixture-asr",
+			mime: "audio/wav",
+		},
+	]);
+
+	await select("larm-preferred");
+	expect(await record()).toMatchObject({
+		status: "input_ready",
+		text: "ローカルで文字起こし",
+	});
+	expect(localCalls).toBe(1);
+	expect(recognition).toHaveLength(1);
+	expect(h.settings.get().routes.llm).toEqual(before.routes.llm);
+	expect(h.settings.get().routes.tts).toEqual(before.routes.tts);
+});
 test("queued snapshots survive recovery without re-running an attempted provider", async () => {
 	const h = await setup();
 	const id = await h.store.write((db) =>
@@ -318,38 +392,67 @@ test("concurrent playback acknowledgements finish a turn without leaving it read
 	expect(h.voice.get(id)?.audioChunks).toEqual([]);
 });
 
-test("final recognition preempts a slow prefix and never submits a late hypothesis", async () => {
-	let first = true,
-		started = false,
-		release: () => void = () => {};
+test("one recognition publishes its accepted result directly and a late subscriber sees the same result", async () => {
+	let calls = 0;
+	let release!: () => void;
 	const h = await setup(async (url) => {
 		if (String(url).endsWith("audio/transcriptions")) {
-			if (first) {
-				first = false;
-				started = true;
-				await new Promise<void>((resolve) => {
-					release = resolve;
-				});
-				return Response.json({ text: "古い仮説" });
-			}
-			return Response.json({ text: "確定" });
+			calls++;
+			await new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			return Response.json({ text: "確定した入力" });
 		}
-		if (String(url).endsWith("audio/speech")) return new Response(wav());
-		return Response.json(completion("回答"));
+		throw new Error("unexpected_inference");
 	});
 	const session = crypto.randomUUID(),
 		id = crypto.randomUUID();
 	h.voice.start(session, 1);
-	const prefix = h.voice.preview(session, 1, id, wav());
-	await until(() => started);
-	await say(h, session, id);
-	expect((await prefix).text).toBe("");
+	await h.voice.accept(session, 1, 1, id, wav());
+	const stream = new Response(
+		h.voice.inputEvents(id, new AbortController().signal),
+	).text();
+	await until(() => calls === 1);
 	release();
-	await until(() => h.voice.get(id)?.status === "ready");
-	expect(h.conversation.get("main").messages.map((m) => m.text)).toEqual([
-		"確定",
-		"回答",
-	]);
+	const events = (await stream)
+		.split("\n\n")
+		.filter(Boolean)
+		.map((s) => JSON.parse(s.slice(6)));
+	expect(events.map((e) => e.status)).toEqual(["recognizing", "input_ready"]);
+	expect(events[1].text).toBe("確定した入力");
+	expect(calls).toBe(1);
+	expect(h.dialogue.list("main")).toHaveLength(0);
+	const later = await new Response(
+		h.voice.inputEvents(id, new AbortController().signal),
+	).text();
+	expect(JSON.parse(later.slice(6)).text).toBe("確定した入力");
+});
+
+test("recognition queue bounds memory while duplicate upload remains idempotent", async () => {
+	const h = await setup(
+		async (_url, init) =>
+			new Promise((_resolve, reject) => {
+				init!.signal!.addEventListener(
+					"abort",
+					() => reject(new Error("cancelled")),
+					{ once: true },
+				);
+			}),
+	);
+	const session = crypto.randomUUID();
+	const ids = Array.from({ length: 4 }, () => crypto.randomUUID());
+	h.voice.start(session, 1);
+	for (let i = 0; i < 3; i++)
+		await h.voice.accept(session, 1, i + 1, ids[i]!, wav());
+	await expect(h.voice.accept(session, 1, 4, ids[3]!, wav())).rejects.toThrow(
+		"voice_input_busy",
+	);
+	expect(
+		(await h.voice.accept(session, 1, 1, ids[0]!, wav())).utteranceId,
+	).toBe(ids[0]!);
+	expect(h.voice.get(ids[3]!)).toBeNull();
+	await h.voice.stop(session, 1);
+	expect(h.dialogue.list("main")).toHaveLength(0);
 });
 
 test("accepted audio chunks publish Laya delivery and cancellation removes the plan with the audio", async () => {

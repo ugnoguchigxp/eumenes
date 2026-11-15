@@ -15,7 +15,14 @@ import {
 } from "../../larm";
 import { MEDIA_GENERATION_TIMEOUT_MS } from "../../capabilities";
 import type { ImageRecord } from "../contracts";
-import { row, record, patch, type Row } from "../repository";
+import { generatedImageVersion } from "./version";
+import {
+	row,
+	record,
+	patch,
+	stampGeneratedVersion,
+	type Row,
+} from "../repository";
 import { imageContext } from "./context";
 import type { createImage } from "./index";
 const payload = z.object({ id: z.string() });
@@ -214,7 +221,7 @@ export function registerImageHandlers(
 	const generateHandler: HandlerDefinition<
 		{ id: string },
 		GenerateInput,
-		TestOutput | CapacityWait
+		{ output: TestOutput; version: string } | CapacityWait
 	> = {
 		kind: "image.generate",
 		payloadVersions: [1],
@@ -298,7 +305,10 @@ export function registerImageHandlers(
 				// Bound image reads; persistent media remains owned by LARM.
 				if (output.bytes.length > 32 * 1024 * 1024)
 					throw new Error("image_content_too_large");
-				return output;
+				return {
+					output,
+					version: generatedImageVersion(gateway.mediaBinding, output.bytes),
+				};
 			} catch (e) {
 				if (isCapacityBusy(e)) return { capacityWait: e.retryAfterMs };
 				throw new Error(safeError(e));
@@ -346,7 +356,9 @@ export function registerImageHandlers(
 				fail(db, r.id, "deadline_exceeded");
 				return "applied";
 			}
-			const output = outcome.result as TestOutput;
+			if ("capacityWait" in outcome.result) return "stale";
+			const { output, version } = outcome.result;
+			stampGeneratedVersion(db, r.id, version);
 			patch(db, r.id, {
 				state: "completed",
 				phase: "completed",

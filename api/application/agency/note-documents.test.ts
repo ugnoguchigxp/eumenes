@@ -13,8 +13,7 @@ const NOTE = {
 	conversationId: "main",
 	noteId: "n1a2b3c4",
 	title: "鎌倉の天気",
-	markdown:
-		"# 鎌倉の天気\n\n2026-11-12 は晴れ。\n\n- [出典](https://example.com/weather)",
+	markdown: `# 鎌倉の天気\n\n2026-11-12 は晴れ。\n\n${"長文の調査内容。".repeat(1400)}\n\n末尾の留保は未確認。\n\n- [出典](https://example.com/weather)`,
 	// 01:30 on 2026-11-12 in Japan: the day the document is filed under is the user's, not UTC's.
 	at: Date.parse("2026-11-11T16:30:00Z"),
 };
@@ -71,6 +70,9 @@ for (const online of [true, false]) {
 			});
 			const id = await h.store.write((db) =>
 				documents.startInTransaction(db, NOTE),
+			);
+			expect(h.store.read((db) => documents.readInTransaction(db, id))).toEqual(
+				{ title: NOTE.title, markdown: NOTE.markdown },
 			);
 			// The same note is the same document: nothing is saved twice.
 			expect(
@@ -152,6 +154,9 @@ for (const online of [true, false]) {
 				).status,
 			).toBe(404);
 			expect(saved.size).toBe(online ? 1 : 0);
+			expect(
+				h.store.read((db) => documents.readInTransaction(db, id)),
+			).toBeNull();
 		} finally {
 			await h.close();
 			scratch.close();

@@ -173,6 +173,7 @@ test("confirming a transcript from the chat microphone sends its capture timing"
 	};
 	const voiceCommit = vi.fn(async () => ready);
 	api.current = mockClient({
+		watchVoiceInput: async () => new Promise<void>(() => {}),
 		voiceStart: async () => {},
 		voiceSend: async () => {},
 		voiceStop: async () => {},

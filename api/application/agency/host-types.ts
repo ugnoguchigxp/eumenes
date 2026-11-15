@@ -40,6 +40,11 @@ export type NoteDocumentPort = {
 			at: number;
 		},
 	): string;
+	/** Reads the original accepted body, including while its external save is pending. */
+	readInTransaction(
+		db: Database,
+		id: string,
+	): { title: string; markdown: string } | null;
 	/** `pending` while it is saved; then the document's resource, or why there is none. */
 	stateInTransaction(
 		db: Database,

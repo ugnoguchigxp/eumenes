@@ -19,6 +19,7 @@ export function chatSend(
 	viewing: () => RunViewing | undefined = () => undefined,
 	/** The addressee the user saw when sending; the host refuses if it changed since. */
 	addressee: () => Addressee | undefined = () => undefined,
+	claimDraft: () => void = () => {},
 ) {
 	return (event: FormEvent) => {
 		event.preventDefault();
@@ -33,6 +34,7 @@ export function chatSend(
 			files.busy
 		)
 			return;
+		claimDraft();
 		const snapshot = [...images.items];
 		const fileSnapshot = [...files.items];
 		// What is on screen now is what the message refers to, not what is shown after the upload.

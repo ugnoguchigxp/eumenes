@@ -2,6 +2,7 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { InferencePort } from "../../inference";
 import type { VoiceTurn } from "../contracts";
 import { get, insert, lastSequence } from "../repository";
+import { canQueueInput } from "../repository/input";
 export function createVoiceIntake({
 	store,
 	larm,
@@ -51,6 +52,8 @@ export function createVoiceIntake({
 			}
 			if (sequence !== lastSequence(db, sessionId, generation) + 1)
 				throw new Error("voice_sequence_out_of_order");
+			if (!canQueueInput(db, sessionId, generation))
+				throw new Error("voice_input_busy");
 			const turn: VoiceTurn = {
 				utteranceId,
 				sessionId,

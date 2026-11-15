@@ -210,6 +210,7 @@ export const taskBindingV1 = z.strictObject({
 	tools: z.array(bindingTool).max(0),
 	inputSchemaRef: schemaRef,
 	outputSchemaRef: schemaRef,
+	conversationSummary: z.enum(["on_read", "next_turn"]).optional(),
 	timeLimits: timeLimitsV1,
 	limits: z.strictObject({
 		parentCalls: z.number().int().min(2).max(120),

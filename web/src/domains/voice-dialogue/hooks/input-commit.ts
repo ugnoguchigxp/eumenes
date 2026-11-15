@@ -4,7 +4,7 @@ import type { VoiceDialogueClient } from "../../../../../client/voice-dialogue";
 import type { AudioController } from "../../audio";
 import type { VoiceIssue } from "./index";
 import { queryRoots } from "../../../queryKeys";
-import type { RecognitionCandidate } from "./preview";
+import type { RecognitionCandidate } from "./input-session";
 import { isCurrent, type VoiceMachine } from "./machine";
 import type { InputLedger } from "./input-timing";
 
@@ -38,15 +38,12 @@ export function commitIdleInput(
 			undefined,
 			inputs.shown(value.utteranceId),
 		)
-		.then(() => {
+		.then((accepted) => {
 			if (isCurrent(machine.get(), session.token))
-				return cache.invalidateQueries({
-					queryKey: [
-						queryRoots.voiceDialogue,
-						client.identity,
-						value.utteranceId,
-					],
-				});
+				cache.setQueryData(
+					[queryRoots.voiceDialogue, client.identity, value.utteranceId],
+					accepted,
+				);
 		})
 		.catch((e) => {
 			// A segment that arrived meanwhile continues this input; it is sent with that one.

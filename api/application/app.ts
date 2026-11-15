@@ -25,7 +25,6 @@ const streamBoundedRoutes = new Set([
 	"/api/object-recognition",
 	"/api/ocr",
 	"/api/voice/turns",
-	"/api/voice/preview",
 	"/api/service-tests/uploads",
 	"/api/images/imports",
 ]);

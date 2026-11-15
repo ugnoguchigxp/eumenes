@@ -9,13 +9,17 @@ import { toErrorCode } from "../../infrastructure/error-code";
 import { currentInput, fixedInput } from "./input";
 import {
 	deliverSpeak,
-	keepNote,
+	startNoteDocument,
 	speechId,
 	SPEECH_BUSY,
 	startResearch,
 } from "./always-on-flow";
 import type { AgendaHearing } from "./always-on-heard";
-import { keepNotes, noteFromResult } from "./always-on-memory";
+import {
+	keepNotes,
+	noteFromResult,
+	withNoteDocument,
+} from "./always-on-memory";
 import { holdNote, noteRef, type AgendaScope } from "./always-on-scope";
 import { researchThought, stepThoughts, think } from "./always-on-thoughts";
 import type { ScopePatch } from "./always-on-checkpoint";
@@ -317,7 +321,7 @@ export async function collectAgendaResults(host: ResultHost) {
 			const done =
 				taken && (r.workStatus === "succeeded" || r.workStatus === "partial");
 			// A result with nothing usable in it is a failure, not "done".
-			const note = done
+			let note = done
 				? noteFromResult({
 						id: `n${crypto.randomUUID().slice(0, 8)}`,
 						ticket,
@@ -325,6 +329,9 @@ export async function collectAgendaResults(host: ResultHost) {
 						at: now(),
 					})
 				: null;
+			// Freeze the full body in the same transaction as adoption, before bounding the checkpoint preview.
+			if (note && deps.noteDocuments)
+				note = withNoteDocument(note, startNoteDocument(deps, db, c.id, note));
 			const good = note !== null;
 			const p = patchOf();
 			p.tickets = p.tickets.filter((t) => t.id !== ticket.id);
@@ -341,12 +348,10 @@ export async function collectAgendaResults(host: ResultHost) {
 		if (patch.size) saveInTransaction(db, patch);
 	});
 	// Committed: the volatile state follows (a rolled-back write above leaves the scopes as they were).
-	const kept: Promise<void>[] = [];
 	for (const a of adopted) {
 		a.c.tickets = a.c.tickets.filter((t) => t.id !== a.ticketId);
 		if (a.note) {
 			holdNote(a.c, keepNotes([...a.c.notes, a.note]));
-			kept.push(keepNote(deps, a.c, a.note));
 		}
 		const at = now();
 		think(
@@ -373,6 +378,4 @@ export async function collectAgendaResults(host: ResultHost) {
 		a.c.kick();
 	}
 	collected();
-	// Each note is kept as a Markdown document from here on.
-	await Promise.all(kept);
 }

@@ -34,6 +34,8 @@ export type AgendaNote = {
 	title: string;
 	summary: string;
 	markdown: string;
+	/** The generated document holds the full body; markdown above is only a checkpoint preview when present. */
+	documentId?: string;
 	at: number;
 	refs: string[];
 	/** The work it came from (the ticket id of the start). */
@@ -100,6 +102,7 @@ const snapshotSchema = z.strictObject({
 			title: z.string(),
 			summary: z.string(),
 			markdown: z.string(),
+			documentId: z.string().min(1).optional(),
 			at: z.number(),
 			refs: strings,
 			ticketId: z.string(),

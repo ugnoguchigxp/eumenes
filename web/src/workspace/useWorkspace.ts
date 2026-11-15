@@ -1,3 +1,6 @@
+import { useVoiceSettingsRevocation } from "./useVoiceSettingsRevocation";
+import { useConversationScroll } from "./useConversationScroll";
+import { useVoiceDraft } from "./useVoiceDraft";
 import { useNotificationAudio } from "./useNotificationAudio";
 import { useAgencyAttention, useTyping } from "./useAgencyAttention";
 import { useScreenSound } from "./useScreenSound";
@@ -55,7 +58,6 @@ export function useWorkspace({
 	const [input, setInput] = useState({ text: "", dictated: false });
 	const draft = input.text;
 	const attachments = useChatAttachments(client, "main");
-	const editedRecognition = useRef<string | null>(null);
 	const artifacts = useArtifactWorkspace();
 	// Music generation and playback each own a stable screen, independent of record IDs.
 	const openDrawing = useOpenDrawing(artifacts.open);
@@ -111,9 +113,7 @@ export function useWorkspace({
 		(u) => u.purpose === "llm" && u.accepted,
 	);
 	useDocumentTheme(settings.data?.general.theme);
-	const historyRef = useRef<HTMLDivElement>(null);
-	const followLatest = useRef(true);
-	const [showLatest, setShowLatest] = useState(false);
+	const historyScroll = useConversationScroll();
 	const conversation = useConversation(client, "main");
 	// The agenda's thoughts, shown between the messages (display only; none while the agenda does not run).
 	const thoughts = useQuery({
@@ -176,39 +176,13 @@ export function useWorkspace({
 		playing: speaking || live.playing,
 	});
 	const mute = useVoiceMute(client);
-	const automaticInput = input.dictated && voice.active;
-	const recognitionId = voice.recognitionId;
-	const recognitionText = voice.transcription?.text;
-	useEffect(() => {
-		if (
-			!recognitionId ||
-			!recognitionText ||
-			editedRecognition.current === recognitionId
-		)
-			return;
-		// This is the external ASR result; manual edits take ownership for this utterance.
-		// eslint-disable-next-line react/set-state-in-effect
-		setInput({ text: recognitionText, dictated: true });
-	}, [recognitionId, recognitionText]);
-	const previousSettings = useRef(settings.data);
-	useEffect(() => {
-		const old = previousSettings.current;
-		const next = settings.data;
-		previousSettings.current = next;
-		if (!old || !next || old.revision === next.revision) return;
-		const revoked =
-			(["llm", "asr", "tts"] as const).some(
-				(p) => old.routes[p].epoch !== next.routes[p].epoch,
-			) ||
-			old.connections.some((c) => {
-				const n = next.connections.find((n) => n.id === c.id);
-				return !n || n.epoch !== c.epoch || (c.enabled && !n.enabled);
-			});
-		if (revoked) {
-			replay.stop();
-			void voice.stop();
-		}
-	}, [settings.data, voice, replay]);
+	const { automaticInput, editInput } = useVoiceDraft(
+		input,
+		setInput,
+		voice,
+		watchTimerRun,
+	);
+	useVoiceSettingsRevocation(settings.data, voice.stop, replay.stop);
 	const phase = useStore(store, (state) => state.phase);
 	const audioError = useStore(store, (state) => state.error);
 	const cache = useQueryClient();
@@ -251,27 +225,6 @@ export function useWorkspace({
 		?.slice()
 		.reverse()
 		.find((run) => run.status === "queued" || run.status === "running");
-	// Streamed tokens are subscribed by the message list alone, so they never re-render the workspace.
-	const followLatestIfPinned = useCallback(() => {
-		if (followLatest.current && historyRef.current)
-			historyRef.current.scrollTop = historyRef.current.scrollHeight;
-	}, []);
-	function scrollLatest() {
-		const history = historyRef.current;
-		if (!history) return;
-		history.scrollTop = history.scrollHeight;
-		followLatest.current = true;
-		setShowLatest(false);
-	}
-	function onHistoryScroll(target: HTMLDivElement) {
-		followLatest.current =
-			target.scrollHeight - target.scrollTop - target.clientHeight < 80;
-		setShowLatest(!followLatest.current);
-	}
-	function editInput(text: string) {
-		editedRecognition.current = recognitionId ?? null;
-		setInput({ text, dictated: false });
-	}
 	const specialist = useSpecialistWorkspace({
 		client,
 		artifacts,
@@ -306,6 +259,7 @@ export function useWorkspace({
 		watchTimerRun,
 		currentViewing,
 		specialist.addresseeNow,
+		voice.takeInputOwnership,
 	);
 	const edit = usePromptEdit({
 		client,
@@ -317,14 +271,12 @@ export function useWorkspace({
 		setInput,
 		watchRun: watchTimerRun,
 	});
-	useEffect(() => {
-		if (voice.turn?.runId) watchTimerRun(voice.turn.runId);
-	}, [voice.turn?.runId, watchTimerRun]);
 	return {
 		attachments,
 		live,
 		playbackScreen: sound.playbackScreen,
 		openLiveSettings: () => void openById("settings.live"),
+		openAsrSettings: () => void openById("settings.ai-connections"),
 		draft,
 		artifacts,
 		openDrawing,
@@ -334,8 +286,7 @@ export function useWorkspace({
 		activeTimers,
 		settings,
 		actualModel,
-		historyRef,
-		showLatest,
+		...historyScroll,
 		conversation,
 		thoughts,
 		runs,
@@ -354,9 +305,6 @@ export function useWorkspace({
 		connectionError,
 		connectionState,
 		activeRun,
-		followLatestIfPinned,
-		scrollLatest,
-		onHistoryScroll,
 		editInput,
 		send: edit.editing ? edit.send : send,
 		edit,

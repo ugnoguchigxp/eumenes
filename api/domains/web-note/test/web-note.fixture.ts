@@ -104,13 +104,20 @@ export async function fixture(
 				},
 				request: text,
 				references: [],
-				toolchainRevisionId: "toolchain:web.note@3",
-				bindingRevisionId: "binding:web.note@1",
+				toolchainRevisionId: "toolchain:web.note@4",
+				bindingRevisionId: "binding:web.note@2",
 				...extra,
 			}),
 		);
 	return {
 		dir,
+		instructions: store.read((db) => {
+			const set = capabilities.toolchainSetInTransaction(
+				db,
+				"toolchain:web.note@4",
+			);
+			return [set.profile, ...set.skills].join("\n");
+		}),
 		request,
 		calls,
 		attempts,

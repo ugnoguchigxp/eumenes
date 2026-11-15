@@ -132,7 +132,9 @@ export function ConversationComposer({
 		{
 			id: "asr",
 			label: live?.active ? "ASR: OFF" : "音声認識",
-			active: !live?.active && !!voice.turn && !voice.turn.text,
+			active:
+				!live?.active &&
+				["capturing", "recognizing"].includes(voice.inputStatus),
 		},
 		{ id: "llm", label: "回答", active: !!activeRun },
 		{
@@ -187,6 +189,22 @@ export function ConversationComposer({
 						<Spinner size="xs" aria-hidden="true" />{" "}
 						音声入力を準備中です。少しお待ちください。
 					</small>
+				) : voice.inputStatus === "capturing" ? (
+					<small>聞き取り中です</small>
+				) : (voice.inputHold === "delayed" ||
+						voice.inputHold === "disconnected") &&
+				  ["recognizing", "ready"].includes(voice.inputStatus) ? (
+					<small>
+						{voice.inputStatus === "recognizing"
+							? "文字起こしを待っています。結果は自動送信せず、下書きに残します。"
+							: "文字起こしを下書きに残しました。確認して送信してください。"}
+					</small>
+				) : voice.inputStatus === "recognizing" ? (
+					<small>
+						<Spinner size="xs" aria-hidden="true" /> 文字起こし中です
+					</small>
+				) : voice.inputStatus === "sent" ? (
+					<small>送信済みです{voice.active ? "。続けて話せます" : ""}</small>
 				) : voice.active && inputPhase === "ready" && phase === "listening" ? (
 					<small>話しかけてください</small>
 				) : null}

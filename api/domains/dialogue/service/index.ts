@@ -1,3 +1,10 @@
+import {
+	forgetGeneratedImages,
+	registerGeneratedImageObservation,
+	reserveGeneratedImages,
+	type GeneratedImagePort,
+} from "./generated-images";
+import { imageObservationText } from "./generated-image-text";
 import { createToolchainCommandHandler } from "./toolchain-command";
 import { backgroundDiagnostic } from "./diagnostic-evidence";
 import { createSpecialistOps } from "./specialist-commands";
@@ -168,6 +175,7 @@ interface DialogueServiceOptions {
 	music?: MusicPort;
 	excalidraw?: ImagePort;
 	image?: ImagePort;
+	generatedImages?: GeneratedImagePort;
 	objectRecognition?: ObjectRecognitionPort;
 	worldContext?: WorldContextPort;
 	diagnostics?: DialogueDeps["diagnostics"];
@@ -245,10 +253,21 @@ export function createDialogueService({
 	);
 	deps.interactions = interactions;
 	if (resources) deps.resourceLedger = createResourceLedger(deps);
-	deps.work = createWorkLedger(deps);
+	deps.work = createWorkLedger(
+		deps,
+		deps.generatedImages
+			? {
+					reserve: (db, work, links) =>
+						reserveGeneratedImages(deps, db, work, links),
+					text: (db, workId) => imageObservationText(deps, db, workId),
+					forget: (db, workId) => forgetGeneratedImages(deps, db, workId),
+				}
+			: undefined,
+	);
 	const keeper = startKeeper(deps, keeperOptions);
 	registerChangeHooks(deps, deps.work);
 	registerHandlers(deps, progress);
+	registerGeneratedImageObservation(deps);
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
 	const errorReport = createErrorReport({

@@ -1,8 +1,6 @@
 import type { AgendaNote, AgendaResearchTicket } from "../../domains/dialogue";
 import { NOTES_KEPT } from "./always-on-scope";
 
-/** A note's body is bounded: it is read by the reply and shown, never a store of whole pages. */
-const MARKDOWN_MAX = 8000;
 const SUMMARY_MAX = 240;
 
 type Result = {
@@ -93,11 +91,28 @@ export function noteFromResult(input: {
 		)
 			.replace(/\s+/gu, " ")
 			.slice(0, SUMMARY_MAX),
-		markdown: `# ${title}\n\n${readable}`.slice(0, MARKDOWN_MAX),
+		markdown: `# ${title}\n\n${readable}`,
 		at: input.at,
 		refs: [...input.ticket.refs],
 		ticketId: input.ticket.id,
 		inputs: [...input.ticket.inputs],
+	};
+}
+
+/** The document keeps the original; the checkpoint needs only a bounded preview. */
+export function withNoteDocument(
+	note: AgendaNote,
+	documentId: string,
+): AgendaNote {
+	const limit = 8000;
+	const omission = "\n\n（全文は保存文書にあります。）";
+	return {
+		...note,
+		documentId,
+		markdown:
+			note.markdown.length <= limit
+				? note.markdown
+				: note.markdown.slice(0, limit - omission.length) + omission,
 	};
 }
 

@@ -578,3 +578,34 @@ test("a streamed token does not redraw the settled rows", () => {
 	expect(inside).toHaveBeenCalledTimes(2);
 	expect(following).toHaveBeenCalledTimes(2);
 });
+
+test("streamed text reuses the unchanged history selection and thought placement", () => {
+	let reads = 0;
+	const messages = Array.from({ length: 1000 }, (_, i) => ({
+		...base,
+		id: `history-${i}`,
+		text: `発言${i}`,
+		get role(): "user" {
+			reads++;
+			return "user";
+		},
+		get presentation(): "conversation" {
+			reads++;
+			return "conversation";
+		},
+		get createdAt() {
+			reads++;
+			return base.createdAt;
+		},
+	}));
+	const conversation = { id: "main", revision: 1, messages };
+	const view = render(
+		<MessageList conversation={conversation} streaming="回答" />,
+	);
+	reads = 0;
+	for (let i = 0; i < 10; i++)
+		view.rerender(
+			<MessageList conversation={conversation} streaming={`回答 ${i}`} />,
+		);
+	expect(reads).toBe(0);
+});

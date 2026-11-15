@@ -75,7 +75,10 @@ export function createNoteDocuments(options: {
 	return {
 		startInTransaction(db, note) {
 			const id = documentId(note.conversationId, note.noteId);
+			started.add(id);
+			forgotten.delete(id);
 			const old = generated.currentInTransaction(db, id);
+			const original = generated.originalInTransaction(db, id);
 			if (old) {
 				const usable =
 					old.state === "pending" ||
@@ -86,20 +89,20 @@ export function createNoteDocuments(options: {
 				if (usable || old.archive.state !== "unsaved") return id;
 				generated.cancelInTransaction(db, id, true);
 			}
-			started.add(id);
-			forgotten.delete(id);
 			generated.startInTransaction(db, {
 				id,
 				ownerRef: `${OWNER}:${note.conversationId}:${note.noteId}`,
 				sourceRunId: `${OWNER}:${note.noteId}`,
 				conversationId: note.conversationId,
-				title: note.title,
-				markdown: note.markdown,
+				title: original?.title ?? note.title,
+				markdown: original?.markdown ?? note.markdown,
 				namespace: "eumenes",
 				path: `notes/${dayOf(note.at)}_${documentName(note.title) || "調べもののメモ"}_${note.noteId}.md`,
 			});
 			return id;
 		},
+		readInTransaction: (db, id) =>
+			forgotten.has(id) ? null : generated.originalInTransaction(db, id),
 		stateInTransaction(db, id) {
 			const receipt = generated.currentInTransaction(db, id);
 			if (!receipt) return { code: "markdown_not_found" };

@@ -1,3 +1,5 @@
+import { inputClientFixture } from "./input-client.fixture";
+import type { VoiceTurn } from "../../../../../api/domains/voice-dialogue/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
@@ -18,13 +20,22 @@ for (const pause of [false, true])
 			segment = (_wav: Uint8Array) => {},
 			sessionId = "";
 		const ids: string[] = [];
+		const receivers = new Map<string, (value: VoiceTurn) => void>();
 		const status = new Map<string, string>();
 		const voiceCommit = vi.fn(async (id: string) => {
 			status.set(id, "responding");
 			return {};
 		});
-		const client = {
+		const client = inputClientFixture({
 			identity: "input-test",
+			watchVoiceInput: (
+				id: string,
+				_signal: AbortSignal,
+				receive: (value: VoiceTurn) => void,
+			) => {
+				receivers.set(id, receive);
+				return new Promise<void>(() => {});
+			},
 			voiceStart: async (id: string) => {
 				sessionId = id;
 			},
@@ -51,7 +62,7 @@ for (const pause of [false, true])
 				runId: null,
 			}),
 			voiceCommit,
-		} as unknown as VoiceDialogueClient;
+		} as unknown as VoiceDialogueClient);
 		const createAudio: CreateAudio = (_state, onSpeech, onSegment) => {
 			speech = onSpeech;
 			segment = onSegment;
@@ -67,7 +78,10 @@ for (const pause of [false, true])
 			() => useVoiceDialogue(client, createAudioStore(), createAudio),
 			{ wrapper },
 		);
-		const refresh = () => cache.invalidateQueries();
+		const refresh = async () => {
+			for (const [id, receive] of receivers)
+				receive(await client.voiceTurn(id));
+		};
 		try {
 			await act(async () => hook.result.current.start());
 			act(() => {

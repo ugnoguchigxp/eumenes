@@ -11,7 +11,8 @@ export type AudioOptions = {
 	echoCancellation?: boolean;
 	noiseSuppression?: boolean;
 	autoGainControl?: boolean;
-	onPartial?: (wav: Uint8Array) => void;
+	/** Capture was discarded (for example while output becomes half duplex), with no segment to send. */
+	onDiscard?: () => void;
 	/**
 	 * Half duplex: while our own speech plays (and briefly after, for output
 	 * latency such as Bluetooth) the microphone is treated as silent, so the

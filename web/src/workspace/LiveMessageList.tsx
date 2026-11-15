@@ -1,4 +1,4 @@
-import { useEffect, type ComponentProps } from "react";
+import { memo, useEffect, useMemo, type ComponentProps } from "react";
 import type { EumenesClient } from "../../../client";
 import { MessageList } from "../components/domains/conversation/MessageList";
 import { useRunProgress } from "../domains/dialogue";
@@ -7,7 +7,7 @@ import { useRunProgress } from "../domains/dialogue";
  * Owns the streamed-token subscription: each token re-renders only this list,
  * not the workspace that holds the rest of the conversation screen.
  */
-export function LiveMessageList({
+export const LiveMessageList = memo(function LiveMessageList({
 	client,
 	activeRunId,
 	announcement,
@@ -20,8 +20,14 @@ export function LiveMessageList({
 	followLatestIfPinned: () => void;
 }) {
 	const streaming = useRunProgress(client, activeRunId);
-	const adopted = list.conversation?.messages.some(
-		(message) => message.role === "assistant" && message.runId === activeRunId,
+	const messages = list.conversation?.messages;
+	const adopted = useMemo(
+		() =>
+			messages?.some(
+				(message) =>
+					message.role === "assistant" && message.runId === activeRunId,
+			),
+		[messages, activeRunId],
 	);
 	const messageCount = list.conversation?.messages.length ?? 0;
 	const lastThought = list.thoughts?.at(-1)?.id;
@@ -42,4 +48,4 @@ export function LiveMessageList({
 			{...list}
 		/>
 	);
-}
+});

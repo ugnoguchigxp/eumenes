@@ -1,3 +1,4 @@
+import { SSE_HEADERS } from "../../../infrastructure/sse";
 import { readBounded } from "../../../infrastructure/bounded-read";
 import type { Hono, Context } from "hono";
 import type { VoiceDialogueService } from "..";
@@ -66,7 +67,7 @@ export function registerVoiceDialogue(
 		await service.stop(parsed.data.sessionId, parsed.data.generation);
 		return c.json({ stopped: true });
 	});
-	const receive = (preview: boolean) => async (c: Context) => {
+	const receive = async (c: Context) => {
 		const sessionId = c.req.header("x-session-id") ?? "";
 		const generation = Number(c.req.header("x-generation"));
 		const sequence = Number(c.req.header("x-sequence"));
@@ -96,10 +97,6 @@ export function registerVoiceDialogue(
 					: "audio_incomplete";
 			return c.json({ error: code }, code === "audio_too_large" ? 413 : 400);
 		}
-		if (preview)
-			return c.json(
-				await service.preview(sessionId, generation, utteranceId, wav),
-			);
 		return c.json(
 			await service.accept(sessionId, generation, sequence, utteranceId, wav),
 			202,
@@ -187,8 +184,14 @@ export function registerVoiceDialogue(
 			return c.json({ error: code.length <= 64 ? code : "sample_failed" }, 502);
 		}
 	});
-	app.post("/api/voice/turns", receive(false));
-	app.post("/api/voice/preview", receive(true));
+	app.post("/api/voice/turns", receive);
+	app.get("/api/voice/turns/:id/input-events", (c) =>
+		c.body(
+			service.inputEvents(c.req.param("id"), c.req.raw.signal),
+			200,
+			SSE_HEADERS,
+		),
+	);
 	app.get("/api/voice/turns/:id", (c) => {
 		const turn = service.get(c.req.param("id"));
 		return turn ? c.json(turn) : c.json({ error: "not_found" }, 404);

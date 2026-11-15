@@ -381,13 +381,6 @@ export async function cloudRequest(
 			input as string | Uint8Array,
 			signal,
 		);
-		if (
-			row.purpose === "asr" &&
-			typeof value === "string" &&
-			!value.trim() &&
-			!row.subject.startsWith("probe:")
-		)
-			throw new Error("invalid_response_text");
 		await recordUsage(env, attemptId, connection, {});
 		return value;
 	}
@@ -503,28 +496,16 @@ export async function cloudRequest(
 			throw new Error("invalid_tts_audio");
 		return bytes;
 	}
-	let json: Record<string, unknown>;
+	let json: { text?: unknown; usage?: unknown } | null;
 	try {
-		json = JSON.parse(new TextDecoder().decode(bytes)) as Record<
-			string,
-			unknown
-		>;
+		json = JSON.parse(new TextDecoder().decode(bytes));
 	} catch {
 		throw new Error("invalid_response_json");
 	}
-	const value =
-		row.purpose === "asr"
-			? json.text
-			: (
-					json.choices as Array<{ message?: { content?: unknown } }> | undefined
-				)?.[0]?.message?.content;
-	if (
-		typeof value !== "string" ||
-		(!value.trim() &&
-			!(row.purpose === "asr" && row.subject.startsWith("probe:")))
-	)
-		throw new Error("invalid_response_text");
+	// The voice input service handles a successful transcription with no words.
+	const value = json?.text;
+	if (typeof value !== "string") throw new Error("invalid_response_text");
 	signal.throwIfAborted();
-	await recordUsage(env, attemptId, connection, chatUsage(json.usage));
+	await recordUsage(env, attemptId, connection, chatUsage(json?.usage));
 	return value;
 }

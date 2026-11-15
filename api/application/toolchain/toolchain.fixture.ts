@@ -1,3 +1,4 @@
+import { generatedImageInput } from "../media/generated-image-input";
 import { createVideo } from "../../domains/video";
 import { createAppDevelopmentRuntime } from "../app-development/runtime";
 import { collaborationScript } from "./collaboration-script.fixture";
@@ -799,6 +800,10 @@ export async function harness(options: HarnessOptions = {}) {
 		conversationAgent: options.conversationAgent ?? testConversationAgent,
 		excalidraw: drawingOperations,
 		objectRecognition: objectRecognition?.port(CONVERSATION_DEFAULT_PRINCIPAL),
+		generatedImages:
+			options.observeGeneratedImages && image
+				? generatedImageInput(image)
+				: undefined,
 		image,
 		music,
 		store,

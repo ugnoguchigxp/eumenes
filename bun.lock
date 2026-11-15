@@ -78,6 +78,7 @@
       "name": "@eumenes/coding-runner",
       "version": "0.1.0",
       "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "0.3.289",
         "@modelcontextprotocol/sdk": "1.31.0",
         "@openai/codex-sdk": "0.160.0",
         "zod": "4.4.3",

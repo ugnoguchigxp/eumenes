@@ -1,3 +1,4 @@
+import { generatedImageInput } from "./media/generated-image-input";
 import { createConversationLookup } from "../domains/web-note";
 import { createSteeringInbox } from "eumenes-steer";
 import {
@@ -41,6 +42,7 @@ import { createUiCompositions } from "../domains/ui-compositions";
 import type { Capabilities } from "../domains/capabilities";
 import { getLogger } from "../infrastructure/logger";
 import type { Config } from "../infrastructure/config";
+import { claudeRunnerClient } from "../domains/coding";
 import { createSavedEmbedder } from "./world/larm-embedder";
 import {
 	createMonitoring,
@@ -232,6 +234,11 @@ export async function buildServices(
 		config.researchCodexExecutable,
 		inference,
 	);
+	const claudeSocket = config.env.EUMENES_CLAUDE_WORK_RUNNER_SOCKET;
+	const claudeRunner = claudeSocket
+		? claudeRunnerClient(claudeSocket, process.cwd())
+		: undefined;
+	if (claudeRunner) await claudeRunner.probe();
 	const { toolchain, links } = await createHostToolchain({
 		resources: lateResources,
 		canvasAdapter:
@@ -276,6 +283,7 @@ export async function buildServices(
 		history: config.historyToolsEnabled,
 		webResearchEnabled: config.webResearchToolsEnabled,
 		webNote,
+		claudeRunner,
 		embed: embedder,
 		terminalHooks: {
 			baseUrl: `http://${config.host}:${config.port}`,
@@ -367,6 +375,7 @@ export async function buildServices(
 			: undefined,
 		music: enabled ? media.music : undefined,
 		image: enabled ? media.image : undefined,
+		generatedImages: enabled ? generatedImageInput(media.image) : undefined,
 		excalidraw: enabled ? media.drawingOperations : undefined,
 		store,
 		conversation,
@@ -402,6 +411,7 @@ export async function buildServices(
 			settings,
 			...workflowPorts,
 			webNote: toolchain.webNote,
+			claudeCode: toolchain.claudeCode,
 			collaboration: toolchain.collaboration,
 			interact: browser.interact,
 			queue,

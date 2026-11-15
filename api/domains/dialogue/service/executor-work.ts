@@ -82,6 +82,13 @@ export async function work(
 			};
 			if (args.operation === "check") {
 				const checked = ledger.checkInTransaction(tx, row.id)!;
+				const execution =
+					checked.sourceRef && ["task", "pipeline"].includes(checked.execution)
+						? taskForWork(deps, tx, checked)?.viewInTransaction(
+								tx,
+								checked.sourceRef,
+							)
+						: null;
 				record({});
 				x.state.todoRevisions.set(checked.id, checked.revision);
 				// What the check read is what a reply may report now (its sources may be linked).
@@ -107,6 +114,19 @@ export async function work(
 							},
 							CHECK_MAX_TOKENS,
 						).text
+					}${
+						execution
+							? "\n" +
+								JSON.stringify({
+									executionStatus: execution.status,
+									stop: execution.stop,
+									progress: execution.progress && {
+										summary: execution.progress.summary.slice(0, 320),
+										observedAt: execution.progress.observedAt,
+									},
+									inputSchema: execution.question?.inputSchema,
+								})
+							: ""
 					}`,
 				};
 			}
@@ -203,8 +223,9 @@ export function controlExecution(
 				},
 			};
 	}
+	let updated;
 	try {
-		executions.controlInTransaction(
+		updated = executions.controlInTransaction(
 			tx,
 			run.conversationId,
 			{
@@ -238,12 +259,19 @@ export function controlExecution(
 			: deps.work!.reportInTransaction(
 					tx,
 					row.id,
-					action === "cancel"
+					action === "cancel" && updated.status === "cancelled"
 						? { status: "done", outcome: "cancelled", result: null }
 						: { status: "todo" },
 				);
 	record({});
-	return { result: { ok: true, ...state(next ?? row) } };
+	return {
+		result: {
+			ok: true,
+			...state(next ?? row),
+			executionStatus: updated.status,
+			...(updated.stop ? { stop: updated.stop } : {}),
+		},
+	};
 }
 
 /**

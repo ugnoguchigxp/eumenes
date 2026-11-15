@@ -1,4 +1,11 @@
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import {
+	useCallback,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+	type FormEvent,
+} from "react";
 import type { Message } from "../../../api/domains/conversation/contracts";
 import type { Run } from "../../../api/domains/dialogue/contracts";
 import type { DialogueClient } from "../../../client/dialogue";
@@ -46,6 +53,10 @@ export function usePromptEdit({
 	const resubmit = useResubmit(client, conversationId);
 	const [editing, setEditing] = useState<Message | null>(null);
 	const saved = useRef<ChatDraft>({ text: "", dictated: false });
+	const currentInput = useRef(input);
+	useLayoutEffect(() => {
+		currentInput.current = input;
+	}, [input]);
 	const target = useMemo(() => {
 		const latest = messages?.filter((m) => m.role === "user").at(-1);
 		if (!latest || (latest.presentation ?? "conversation") !== "conversation")
@@ -75,13 +86,14 @@ export function usePromptEdit({
 			else seen.add(run.inputMessageId);
 		return edited;
 	}, [runs]);
-	function start() {
+	const reset = resubmit.reset;
+	const start = useCallback(() => {
 		if (!target || editing) return;
-		saved.current = input;
-		resubmit.reset();
+		saved.current = currentInput.current;
+		reset();
 		setEditing(target.message);
 		setInput({ text: target.message.text, dictated: false });
-	}
+	}, [target, editing, reset, setInput]);
 	function stop() {
 		if (!editing) return;
 		setEditing(null);

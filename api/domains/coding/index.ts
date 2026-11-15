@@ -18,3 +18,9 @@ export { sdkDaemonClient } from "../../../packages/coding-runner/src/client";
 
 export { registeredSdkGitRemotes } from "../../../packages/coding-runner/src/client";
 export type { SdkGitRemote } from "../../../packages/coding-runner/src/contracts";
+
+export type {
+	ClaudeObservation,
+	ClaudeStart,
+} from "../../../packages/coding-runner/src/claude-contracts";
+export { claudeRunnerClient } from "../../../packages/coding-runner/src/claude-client";

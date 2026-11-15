@@ -1,3 +1,4 @@
+import { inputClientFixture } from "./input-client.fixture";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
@@ -31,7 +32,7 @@ function harness(send: (...args: unknown[]) => Promise<unknown>) {
 		};
 	};
 	const voiceSend = vi.fn(send);
-	const client = {
+	const client = inputClientFixture({
 		identity: "capture-regression",
 		voiceStart,
 		voiceStop,
@@ -43,7 +44,7 @@ function harness(send: (...args: unknown[]) => Promise<unknown>) {
 			error: null,
 		}),
 		voiceCancel: async () => ({}),
-	} as unknown as VoiceDialogueClient;
+	} as unknown as VoiceDialogueClient);
 	const store = createAudioStore();
 	const hook = renderHook(() => useVoiceDialogue(client, store, createAudio), {
 		wrapper,

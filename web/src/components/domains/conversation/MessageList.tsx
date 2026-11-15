@@ -17,10 +17,12 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	type RefObject,
 } from "react";
 import { emotionEmoji } from "./emotionEmoji";
 import { renderSafeMarkdown } from "./markdownRenderer";
-const PAGE_SIZE = 20;
+import { useMessageWindow } from "./useMessageWindow";
+const NO_THOUGHTS: readonly AgencyThought[] = [];
 const ANNOUNCE_LIMIT = 500;
 
 /** A settled answer is announced in full; a very long one is cut with a pointer back to the text. */
@@ -102,6 +104,8 @@ export const MessageList = memo(function MessageList({
 	editedIds,
 	onEdit,
 	onOpenResource,
+	historyRef,
+	followLatest,
 }: {
 	conversation: Conversation | undefined;
 	/** The agent's thoughts, shown as plain lines between the messages by time (not bubbles, not read aloud). */
@@ -124,13 +128,18 @@ export const MessageList = memo(function MessageList({
 	onEdit?: () => void;
 	/** A link to a resource (`eumenes://`) in an answer; such a link opens the resource, it never navigates. */
 	onOpenResource?: (uri: string) => void;
+	historyRef?: RefObject<HTMLDivElement | null>;
+	/** Undefined preserves standalone manual pagination. */
+	followLatest?: boolean;
 }) {
 	const assistantLabel = agentName || "Eumenes";
 	// Streaming text is not announced; a settled answer is, once per message id.
 	// Messages present on first load are history and stay silent.
-	const lastAssistant = conversation?.messages
-		.filter((message) => message.role === "assistant")
-		.at(-1);
+	const messages = conversation?.messages;
+	const lastAssistant = useMemo(
+		() => messages?.findLast((message) => message.role === "assistant"),
+		[messages],
+	);
 	const lastAssistantId = lastAssistant?.id ?? null;
 	const lastAssistantText = lastAssistant?.text ?? "";
 	const announced = useRef<string | null | undefined>(undefined);
@@ -152,20 +161,19 @@ export const MessageList = memo(function MessageList({
 			text: completionAnnouncement(lastAssistantText),
 		});
 	}, [conversation, lastAssistantId, lastAssistantText, streaming]);
-	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-	const messages = conversation?.messages ?? [];
-	const all = messages.filter((message) => message.presentation !== "artifact");
-	const hidden = Math.max(0, all.length + (streaming ? 1 : 0) - visibleCount);
-	const firstVisible = hidden ? all[hidden] : all[0];
-	// Inputs that are not displayed keep their place, so what is shown for them stays in order.
-	const rows = !hidden
-		? messages
-		: firstVisible
-			? messages.slice(messages.indexOf(firstVisible))
-			: [];
-	const placed = placeThoughts(rows, thoughts ?? [], hidden > 0);
+	const { all, rows, hidden, showOlder, listRef } = useMessageWindow(
+		conversation?.id,
+		messages,
+		!!streaming,
+		historyRef,
+		followLatest,
+	);
+	const placed = useMemo(
+		() => placeThoughts(rows, thoughts ?? NO_THOUGHTS, hidden > 0),
+		[rows, thoughts, hidden],
+	);
 	return (
-		<div className="messages">
+		<div className="messages" ref={listRef}>
 			<output
 				key={announcement?.id}
 				className="visually-hidden"
@@ -174,11 +182,7 @@ export const MessageList = memo(function MessageList({
 				{announcement?.text}
 			</output>
 			{hidden > 0 && (
-				<button
-					type="button"
-					className="messages-older"
-					onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-				>
+				<button type="button" className="messages-older" onClick={showOlder}>
 					さらに20件表示
 				</button>
 			)}
