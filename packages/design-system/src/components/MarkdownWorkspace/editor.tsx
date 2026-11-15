@@ -54,18 +54,46 @@ function Element(props: PlateElementProps) {
 				? element.listStyleType
 				: undefined,
 	};
-	if (type === "a")
+	if (type === "a") {
+		const href = safeUrl(element.url);
 		return (
 			<PlateElement {...props} attributes={attributes} as="span">
 				<a
-					href={safeUrl(element.url)}
+					href={href}
+					tabIndex={href ? 0 : undefined}
 					target="_blank"
 					rel="noopener noreferrer"
+					onClick={(event) => {
+						const link = event.currentTarget;
+						if (!href || !link.isContentEditable || event.defaultPrevented)
+							return;
+						// Chromium suppresses native link navigation inside editable content.
+						event.preventDefault();
+						if (
+							event.detail === 0 ||
+							link.ownerDocument.getSelection()?.isCollapsed !== false
+						)
+							window.open(link.href, "_blank", "noopener,noreferrer");
+					}}
+					onKeyDown={(event) => {
+						const link = event.currentTarget;
+						if (
+							href &&
+							link.isContentEditable &&
+							link.ownerDocument.activeElement === link &&
+							event.key === "Enter"
+						) {
+							event.preventDefault();
+							event.stopPropagation();
+							link.click();
+						}
+					}}
 				>
 					{children}
 				</a>
 			</PlateElement>
 		);
+	}
 	if (type === "img")
 		return (
 			<PlateElement {...props} attributes={attributes}>

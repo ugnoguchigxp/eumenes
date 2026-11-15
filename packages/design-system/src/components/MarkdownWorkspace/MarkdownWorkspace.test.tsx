@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -7,6 +8,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { MarkdownWorkspace } from "./MarkdownWorkspace";
+import { importMarkdown } from "./editor";
 import type { MarkdownWorkspaceProps, MarkdownCurrent } from "./types";
 
 afterEach(() => {
@@ -89,6 +91,27 @@ test("a temporary document renders Markdown through Plate in read-only mode", ()
 	expect(
 		screen.getByLabelText("文書本文").getAttribute("contenteditable"),
 	).toBe("false");
+	expect(p.onDraft).not.toHaveBeenCalled();
+});
+test("a link in the saved document editor opens by click and Enter", async () => {
+	const markdown = "## 出典\n\n- [参照資料](https://example.com/source)";
+	const open = vi.spyOn(window, "open").mockImplementation(() => null);
+	const p = props({
+		...current(),
+		markdown,
+		document: importMarkdown(markdown),
+	});
+	render(<MarkdownWorkspace {...p} />);
+	const link = screen.getByRole("link", { name: "参照資料" });
+	// jsdom does not compute whether an element inherits contenteditable.
+	Object.defineProperty(link, "isContentEditable", { value: true });
+	fireEvent.click(link, { detail: 1 });
+	await act(async () => link.focus());
+	fireEvent.keyDown(link, { key: "Enter" });
+	expect(open.mock.calls).toEqual([
+		["https://example.com/source", "_blank", "noopener,noreferrer"],
+		["https://example.com/source", "_blank", "noopener,noreferrer"],
+	]);
 	expect(p.onDraft).not.toHaveBeenCalled();
 });
 test("header download exports the current unsaved title and body as Markdown without saving", async () => {

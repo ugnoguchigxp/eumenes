@@ -114,6 +114,15 @@
 .ds-markdown-content [data-slate-node="element"] {
 	position: relative;
 }
+.ds-markdown-content a[href] {
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 0.15em;
+}
+.ds-markdown-content a[href]:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
+}
 .ds-markdown-content h1 {
 	font-size: 2em;
 	font-weight: 700;
