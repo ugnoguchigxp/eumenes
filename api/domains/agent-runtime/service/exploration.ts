@@ -45,7 +45,12 @@ export const operationLimits = (p: Prepared | undefined) =>
 						reads: 6,
 					}
 				: returnsSearchResults(p)
-					? SEARCH_BUDGET
+					? {
+							...SEARCH_BUDGET,
+							searches:
+								packageRuntimeOf(p?.package.id ?? "")?.searches ??
+								SEARCH_BUDGET.searches,
+						}
 					: RESEARCH_BUDGET;
 /** Model calls kept back for the one repair of a research report's verification. */
 const repairReserve = 1;
@@ -66,7 +71,7 @@ export const isSearch = (meta: ToolRuntimeMeta | undefined) =>
 	meta?.operation === "search";
 /** A read of a URL-addressed page: the only reads that use the per-task read limit. */
 export const isPageRead = (meta: ToolRuntimeMeta | undefined) =>
-	meta?.operation === "read" && !!meta.urlScope;
+	meta?.operation === "read" && !!(meta.urlScope || meta.pagedRead);
 export function workerDeadline(
 	parentDeadline: number,
 	now: number,

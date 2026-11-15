@@ -29,6 +29,7 @@ function fixture(
 		init: RequestInit,
 		url: URL,
 	) => Response | Promise<Response> | undefined,
+	includeReranker = false,
 ) {
 	const calls: {
 		path: string;
@@ -45,6 +46,13 @@ function fixture(
 		model: `model-${name}`,
 		capability: name,
 	}));
+	if (includeReranker)
+		providers.push({
+			...providers.at(-1)!,
+			name: "context-ranking",
+			model: "fixture-ranking-model",
+			capability: "decision.context",
+		});
 	const service = (kind: "image" | "music") => ({
 		name: kind,
 		description: "Synchronous image or asynchronous music generation",
@@ -259,6 +267,19 @@ test("catalog merges selector-only cold services without starting anything", asy
 	expect(c.errors).toEqual([]);
 	expect(h.calls.every((c) => c.method === "GET")).toBe(true);
 	expect(JSON.stringify(c)).not.toContain("control-secret");
+});
+test("the retired routing provider cannot run a connection test", async () => {
+	const h = fixture(undefined, true);
+	const signal = AbortSignal.timeout(1000);
+	const { targets } = await h.gateway.catalog(signal);
+	const reranker = targets.find((t) => t.capability === "decision.context")!;
+	expect(reranker.kind).toBe("unsupported");
+	expect(targets.find((t) => t.name === "system-one")?.kind).toBe("decision");
+	const callCount = h.calls.length;
+	await expect(
+		h.gateway.execute(reranker, { text: "こんにちは" }, signal, async () => {}),
+	).rejects.toThrow("invalid_unsupported_service");
+	expect(h.calls).toHaveLength(callCount);
 });
 test("services missing from the unselected catalog are fetched again by profile id", async () => {
 	const h = fixture();

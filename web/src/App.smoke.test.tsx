@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -8,6 +9,11 @@ import {
 	within,
 } from "@testing-library/react";
 import { ApiError } from "../../client";
+import {
+	post,
+	stubWorkletNode,
+	workletModule,
+} from "./domains/audio/test/worklet-fake";
 import { settingsFixture } from "./domains/settings/sections/fixture";
 
 // App builds its own client; every call goes to this in-memory stand-in.
@@ -73,6 +79,7 @@ beforeEach(() => {
 		})),
 	);
 });
+
 test("a rejected chat submission shows a copyable diagnostic in the chat history", async () => {
 	const writeText = vi.fn(async () => {});
 	vi.stubGlobal(
@@ -136,4 +143,64 @@ test("A01 boot: the conversation screen renders without a settings button", asyn
 	);
 
 	expect(screen.queryByRole("button", { name: "設定" })).toBeNull();
+});
+
+test("confirming a transcript from the chat microphone sends its capture timing", async () => {
+	const nodes = stubWorkletNode();
+	vi.stubGlobal("navigator", {
+		mediaDevices: {
+			getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }),
+		},
+	});
+	vi.stubGlobal(
+		"AudioContext",
+		class {
+			sampleRate = 16_000;
+			audioWorklet = workletModule;
+			destination = {};
+			async resume() {}
+			async close() {}
+			createMediaStreamSource() {
+				return { connect() {}, disconnect() {} };
+			}
+		},
+	);
+	const transcript = "音声入力の計測を確認します。";
+	const ready = {
+		status: "input_ready",
+		text: transcript,
+		revision: 1,
+	};
+	const voiceCommit = vi.fn(async () => ready);
+	api.current = mockClient({
+		voiceStart: async () => {},
+		voiceSend: async () => {},
+		voiceStop: async () => {},
+		voiceTurn: async (utteranceId: string) => ({ ...ready, utteranceId }),
+		voiceCommit,
+	});
+	render(<App />);
+	fireEvent.click(await screen.findByRole("button", { name: "音声を開始" }));
+	await waitFor(() => expect(nodes).toHaveLength(1));
+	act(() => {
+		const speech = Float32Array.from({ length: 2048 }, (_, i) =>
+			i % 16 < 8 ? 0.05 : -0.05,
+		);
+		for (let i = 0; i < 3; i++) post(nodes[0], speech);
+		const silence = new Float32Array(2048);
+		for (let i = 0; i < 16; i++) post(nodes[0], silence);
+	});
+	const message = screen.getByRole<HTMLTextAreaElement>("textbox", {
+		name: "メッセージ",
+	});
+	await waitFor(() => expect(message.value).toBe(transcript));
+	expect(voiceCommit).toHaveBeenCalledExactlyOnceWith(
+		expect.any(String),
+		1,
+		undefined,
+		expect.objectContaining({
+			audioMs: expect.any(Number),
+			uploadToShownMs: expect.any(Number),
+		}),
+	);
 });

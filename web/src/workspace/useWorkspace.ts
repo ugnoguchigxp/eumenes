@@ -128,11 +128,16 @@ export function useWorkspace({
 	const cancel = useCancel(client, "main");
 	// Filled once the screens are known below; a spoken message refers to what is shown, like a typed one.
 	const viewingNow = useRef<() => RunViewing | undefined>(() => undefined);
-	const voiceClient = useMemo(
+	const voiceClient = useMemo<EumenesClient>(
 		() => ({
 			...client,
-			voiceCommit: (id: string, revision: number) =>
-				client.voiceCommit(id, revision, viewingNow.current()),
+			voiceCommit: (id, revision, viewing, timing) =>
+				client.voiceCommit(
+					id,
+					revision,
+					viewing ?? viewingNow.current(),
+					timing,
+				),
 		}),
 		[client],
 	);

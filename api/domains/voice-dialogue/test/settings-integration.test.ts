@@ -8,6 +8,55 @@ import {
 } from "./settings-voice.fixture";
 const { setup } = createSettingsVoiceFixture();
 
+test("voice replies and replay synthesize saved readings for case variants and final s", async () => {
+	const spoken: Array<[string, string | undefined]> = [];
+	const answer = "Open the api settings for WINDOWS.";
+	const h = await setup(undefined, {
+		transcribe: async () => "設定はどこですか？",
+		answer: async () => answer,
+		speak: async (text, _signal, options) => {
+			spoken.push([text, options?.speechLanguage]);
+			return wav();
+		},
+	});
+	const value = h.settings.get();
+	value.larm.englishSpeechEnabled = true;
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: value.revision,
+		settings: value,
+		keys: [],
+	});
+	await h.store.write((db) =>
+		h.dictionary.saveInTransaction(db, {
+			original: null,
+			entry: { written: "API", spoken: "エーピーアイ" },
+			expected: { spoken: null },
+		}),
+	);
+	await h.store.write((db) =>
+		h.dictionary.saveInTransaction(db, {
+			original: null,
+			entry: { written: "Window", spoken: "ウィンドウ" },
+			expected: { spoken: null },
+		}),
+	);
+	const session = crypto.randomUUID(),
+		id = crypto.randomUUID();
+	h.voice.start(session, 1);
+	await say(h, session, id);
+	await until(() => h.voice.get(id)?.status === "ready");
+	const runId = h.voice.get(id)!.runId!;
+	expect(h.dialogue.answerText(runId)).toBe(answer);
+	const [clause] = h.voice.replaySentences(answer);
+	expect(clause).toBe(answer);
+	await h.voice.replaySpeech(clause!, new AbortController().signal, runId);
+	expect(spoken).toEqual([
+		["Open the エーピーアイ settings for ウィンドウズ.", "ja"],
+		["Open the エーピーアイ settings for ウィンドウズ.", "ja"],
+	]);
+});
+
 test("one voice turn uses the cloud in all three stages, adopts one answer, and does not repeat duplicate upload", async () => {
 	const h = await setup();
 	const session = crypto.randomUUID(),

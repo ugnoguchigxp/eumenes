@@ -115,8 +115,30 @@ export const resourceViewingSchema = z
 	.object({ resource: resourceUriSchema })
 	.strict();
 
-/** What a submit may carry as the screen's context: a specialist's saved item, or a resource. */
-export const runViewingSchema = z.union([viewingSchema, resourceViewingSchema]);
+/** Only public, bounded state. The host supplies the title and resolves any saved target. */
+export const screenObservationSchema = z.strictObject({
+	artifactRevisionId: z.string().min(1).max(200),
+	variantId: z.string().min(1).max(80).optional(),
+	sessionId: z.uuid(),
+	sequence: z.number().int().positive(),
+	observedAt: z.iso.datetime(),
+	phase: z.enum(["loading", "ready", "blocked", "error"]),
+	selection: z.enum(["none", "selected", "loading", "error"]).optional(),
+	activity: z
+		.enum(["pending", "running", "completed", "failed", "cancelled"])
+		.optional(),
+	contentRevision: z.number().int().nonnegative().optional(),
+	dirty: z.boolean().optional(),
+});
+export type ScreenObservation = z.infer<typeof screenObservationSchema>;
+
+const screenField = { screen: screenObservationSchema.optional() };
+/** Legacy callers can still send a target or resource on its own. */
+export const runViewingSchema = z.union([
+	viewingSchema.extend(screenField),
+	resourceViewingSchema.extend(screenField),
+	z.strictObject({ screen: screenObservationSchema }),
+]);
 export type RunViewing = z.infer<typeof runViewingSchema>;
 
 /**

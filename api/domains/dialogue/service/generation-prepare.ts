@@ -52,6 +52,7 @@ import {
 	stateText,
 } from "./state-text";
 import { ASK_STEP } from "./tool-exchange";
+import { screenLinesInTransaction } from "./resource-context";
 
 const log = getLogger("dialogue");
 
@@ -498,9 +499,11 @@ export function createPrepare(
 		];
 		const lastAgent =
 			[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null;
+		const screenLines = screenLinesInTransaction(deps, tx, current);
 		const stateLines = stateLinesInTransaction(deps, tx, {
 			conversationId,
 			run: current,
+			screenLines,
 			nowMs,
 			lastAt: prefix.lastAt,
 			since: prefix.since,
@@ -514,7 +517,7 @@ export function createPrepare(
 				: {}),
 			refs,
 		});
-		// A routed turn talks on the time alone; its choice calls read the work and what is presented.
+		// Normal talk receives the current input's screen, without the rest of the routing state.
 		const diagnostics = notice
 			? []
 			: recentDiagnostics(deps, tx, conversationId);
@@ -522,6 +525,7 @@ export function createPrepare(
 		stateLines.push(...diagnosticLines);
 		const state = stateText([
 			...stateLines.slice(0, 1),
+			...(screenLines.length ? ["提示中:", ...screenLines] : []),
 			...agencyStateLines(deps, tx, conversationId),
 			...diagnosticLines,
 		]);

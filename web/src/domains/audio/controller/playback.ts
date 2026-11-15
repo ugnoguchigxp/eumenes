@@ -17,6 +17,7 @@ export function createAudioPlayback(deps: {
 	const { state, options, outputWatch, emit } = deps;
 	let releaseOutput: (() => void) | undefined;
 	let playback: AudioBufferSourceNode | undefined;
+	let playbackAudible = false;
 	let keepAliveSource: AudioBufferSourceNode | undefined;
 	let playbackEpoch = 0;
 	let playbackDone: Promise<void> = Promise.resolve();
@@ -51,6 +52,9 @@ export function createAudioPlayback(deps: {
 	return {
 		get playing() {
 			return !!playback;
+		},
+		get audible() {
+			return playbackAudible;
 		},
 		get listenAfter() {
 			return listenAfter;
@@ -143,7 +147,9 @@ export function createAudioPlayback(deps: {
 				playOptions.assistantSpeech ?? false,
 			);
 			playback = next;
-			playbackSuppressInput = playOptions.suppressInput ?? false;
+			playbackAudible = volume > 0;
+			playbackSuppressInput =
+				playbackAudible && (playOptions.suppressInput ?? false);
 			interruptedPlayback = playOptions.onInterrupted;
 			playbackDone = new Promise<void>((resolve) => {
 				finishPlayback = resolve;
@@ -153,9 +159,10 @@ export function createAudioPlayback(deps: {
 					interruptedPlayback = undefined;
 					releaseOutput?.();
 					releaseOutput = undefined;
-					listenAfter = performance.now() + OUTPUT_TAIL_MS;
+					if (playbackAudible) listenAfter = performance.now() + OUTPUT_TAIL_MS;
 					if (playbackSuppressInput) forcedInputGateUntil = listenAfter;
 					playbackSuppressInput = false;
+					playbackAudible = false;
 					playback = undefined;
 					finishPlayback();
 					emit("listening");
@@ -175,6 +182,7 @@ export function createAudioPlayback(deps: {
 			if (playbackSuppressInput)
 				forcedInputGateUntil = performance.now() + OUTPUT_TAIL_MS;
 			playbackSuppressInput = false;
+			playbackAudible = false;
 			const old = playback;
 			const interrupted = interruptedPlayback;
 			interruptedPlayback = undefined;

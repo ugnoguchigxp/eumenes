@@ -36,11 +36,13 @@ export class SpeechDetector {
 	/** Windows sent and the next one to apply; results may arrive out of turn. */
 	private sent = 0;
 	private applied = 0;
-	private readonly results = new Map<number, { p: number; rms: number }>();
+	private readonly results = new Map<
+		number,
+		{ p: number; rms: number; strict: boolean }
+	>();
 	/** Bumped by restart so late answers for the previous stream are dropped. */
 	private stream = 0;
 	private failure = false;
-	private strict = false;
 	private voiced = false;
 	private speechMs = 0;
 	private candidateSilenceMs = 0;
@@ -86,12 +88,11 @@ export class SpeechDetector {
 
 	/** `strict` while our own reply is audible: it takes clearer, longer speech to start. */
 	observe(frame: Float32Array, { strict = false } = {}): SpeechObservation {
-		this.strict = strict;
 		const rms = calculateRms(frame);
 		for (const sample of this.resampler.push(frame)) {
 			this.window[this.filled++] = sample;
 			if (this.filled === SPEECH_WINDOW) {
-				this.submit(this.window.slice());
+				this.submit(this.window.slice(), strict);
 				this.filled = 0;
 			}
 		}
@@ -117,18 +118,18 @@ export class SpeechDetector {
 		this.finalizedNow = false;
 	}
 
-	private submit(window: Float32Array) {
+	private submit(window: Float32Array, strict: boolean) {
 		const id = this.sent++;
 		const rms = calculateRms(window);
 		const stream = this.stream;
 		const answer = this.classifier.classify(window);
 		if (typeof answer === "number") {
-			this.results.set(id, { p: answer, rms });
+			this.results.set(id, { p: answer, rms, strict });
 			return;
 		}
 		answer.then(
 			(p) => {
-				if (stream === this.stream) this.results.set(id, { p, rms });
+				if (stream === this.stream) this.results.set(id, { p, rms, strict });
 			},
 			() => {
 				if (stream === this.stream) this.failure = true;
@@ -143,14 +144,13 @@ export class SpeechDetector {
 			result = this.results.get(this.applied)
 		) {
 			this.results.delete(this.applied++);
-			this.apply(result.p, result.rms);
+			this.apply(result.p, result.rms, result.strict);
 		}
 	}
 
-	private apply(p: number, rms: number) {
+	private apply(p: number, rms: number, strict: boolean) {
 		if (this.finalized) return;
-		const on =
-			this.strict && !this.speechDetected ? STRICT_SPEECH_ON : SPEECH_ON;
+		const on = strict && !this.speechDetected ? STRICT_SPEECH_ON : SPEECH_ON;
 		// Voice starts only above the loudness floor (distant talk, a TV in another room is too
 		// faint), then lasts while the model hears it: a word's fading end stays speech.
 		if (p < SPEECH_OFF) this.voiced = false;
@@ -159,7 +159,7 @@ export class SpeechDetector {
 			if (this.voiced) {
 				this.speechMs += WINDOW_MS;
 				this.candidateSilenceMs = 0;
-				const required = this.strict
+				const required = strict
 					? STRICT_REQUIRED_SPEECH_MS
 					: REQUIRED_SPEECH_MS;
 				if (this.speechMs >= required) {

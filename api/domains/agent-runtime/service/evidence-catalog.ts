@@ -130,6 +130,7 @@ export class EvidenceCatalog {
 					: {}),
 				createdAt: source.createdAt,
 				origin: source.origin,
+				revision: source.archive?.revision,
 				truncated: source.truncated,
 				acquisitionTruncated: source.acquisitionTruncated,
 				previewTruncated: source.previewTruncated,

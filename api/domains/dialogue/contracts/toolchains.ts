@@ -33,6 +33,16 @@ export type ToolchainRoute = {
  * narrows the offer; the conversation model chooses, and the toolchain's sub-agent executes.
  */
 export interface ToolchainRoutingPort {
+	/** The published definition of the screen, independent of any browser-provided title. */
+	screenInTransaction?(
+		db: Database,
+		revisionId: string,
+	): {
+		title: string;
+		variants: readonly string[];
+		defaultVariant: string;
+		adapterRefs: readonly string[];
+	} | null;
 	/** A bound task uses its registered owner, rather than a second generic planner. */
 	taskInTransaction?(
 		db: Database,

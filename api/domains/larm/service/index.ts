@@ -16,7 +16,6 @@ import { createConversationYield } from "./conversation-yield";
 import { createHelperConnections } from "./helper-connections";
 import { createProviderLeases as createLeaseManager } from "./provider-leases";
 import { fetchCatalog } from "./connect";
-import { routePort } from "./route";
 import { leasePort } from "./lease-port";
 import { type Fetcher, type Provider } from "./profiles";
 import { localEndpoint, readJson, record, untilAborted } from "./guards";
@@ -65,16 +64,6 @@ type LarmConfig = {
 	keepAlive?: boolean;
 	/** Records attitude judge outcomes for monitoring; the judge has no attempt record of its own. */
 	judgeActivity?: ActivityRecorder;
-	/**
-	 * The router's port: its connection selects the decision provider of `decisionCapability` of the saved router
-	 * profile and nothing else. It answers `route` only; the conversation's port answers the attitude `judge` only.
-	 */
-	decisionOnly?: boolean;
-	/**
-	 * With `decisionOnly`: the decision provider's capability (absent: `decision.system-one`). The router's port asks
-	 * for `decision.context` (spec router-package-integration 2026-11-04 §1 #4).
-	 */
-	decisionCapability?: string;
 };
 
 function assertSpeechSettings(config: LarmConfig) {
@@ -159,10 +148,6 @@ export function createLarm(config: LarmConfig): LarmPort {
 		hostsFor,
 		control,
 		lifetime,
-		decisionOnly: config.decisionOnly,
-		...(config.decisionCapability
-			? { decisionCapability: config.decisionCapability }
-			: {}),
 		connectionRole: config.connectionRole,
 		llmConnection: config.llmConnection,
 	});
@@ -312,17 +297,10 @@ export function createLarm(config: LarmConfig): LarmPort {
 		...leasePort(leases),
 		retain: leases.retain,
 		async judge(state, questions, signal) {
-			if (config.decisionOnly) throw new Error("larm_attitude_port_required");
 			if (judging) throw new Error("larm_decision_busy");
 			const call = () => judgeOnce(state, questions, signal);
 			return config.judgeActivity?.track(call, signal) ?? call();
 		},
-		...routePort(
-			config.decisionOnly,
-			lifetime.signal,
-			withProvider,
-			judgeInfer,
-		),
 		async voices(signal, language) {
 			return withProvider(
 				language === "en" ? "tts-english" : "tts",
@@ -335,11 +313,7 @@ export function createLarm(config: LarmConfig): LarmPort {
 				await fetchCatalog(control, profile, ["llm"]);
 				return;
 			}
-			await connect(
-				[config.decisionOnly ? "system-one" : "llm"],
-				undefined,
-				true,
-			);
+			await connect(["llm"], undefined, true);
 		},
 		async conversationProfiles(signal) {
 			// The unselected catalog lists every profile; only the generally selectable ones with an llm provider

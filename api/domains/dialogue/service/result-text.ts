@@ -40,7 +40,13 @@ type ReportSource = {
 	origin?: string;
 	speaker?: string;
 	createdAt?: string;
+	revision?: string;
+	start?: number;
+	end?: number;
 };
+export function archiveSourceLabel(source: ReportSource, titleLimit = 200) {
+	return `保存文書「${lineText(source.title ?? "").slice(0, titleLimit)}」版 ${lineText(source.revision ?? "")}、原文位置 ${source.start}–${source.end}`;
+}
 type Report = {
 	answer?: string;
 	assurance?: string;
@@ -69,6 +75,8 @@ const isReport = (value: unknown): value is Report =>
 /** Where a claim came from, in words: a link for a page, the record's kind for the others. */
 function sourceLabel(source: ReportSource): string | null {
 	switch (source.kind) {
+		case "archive_document":
+			return archiveSourceLabel(source);
 		case "world_claim":
 			return source.origin === "model_hypothesis"
 				? "World の記録（仮説）"
@@ -227,14 +235,15 @@ export function resultText(
 		source.result,
 		(uri) => source.resource(uri) ?? "リソース",
 	);
-	if (isReport(result)) {
-		const head = `${name}の調査が終わりました（${REPORT_OUTCOMES[result.outcome ?? (result.coverage === "partial" || outcome === "partial" ? "partial" : "answered")] ?? "確認できました"}）。`;
+	const report = (result as { report?: unknown } | null)?.report ?? result;
+	if (isReport(report)) {
+		const head = `${name}の調査が終わりました（${REPORT_OUTCOMES[report.outcome ?? (report.coverage === "partial" || outcome === "partial" ? "partial" : "answered")] ?? "確認できました"}）。`;
 		return {
 			text: [
 				head,
-				...fitLines(reportLines(result), maxTokens, source.ref),
+				...fitLines(reportLines(report), maxTokens, source.ref),
 			].join("\n"),
-			items: result.claims.filter((claim) => !!claim.text).length,
+			items: report.claims.filter((claim) => !!claim.text).length,
 		};
 	}
 	const head = `${name}が終わりました（${OUTCOMES[outcome] ?? outcome}）。`;

@@ -404,6 +404,74 @@ test("the resource on screen is shown in the state by its number and joins the l
 	expect(last).not.toContain("eumenes://");
 });
 
+test("a registered screen reaches normal talk through the public submit without an extra model call", async () => {
+	const resources = fakeResources();
+	const revision = "artifact:test.images@1";
+	h = await setup({
+		resources: resources.access,
+		screenInTransaction: (_db, id) =>
+			id === revision
+				? {
+						title: "画像一覧",
+						variants: ["gallery"],
+						defaultVariant: "gallery",
+						adapterRefs: ["image"],
+					}
+				: null,
+	});
+	const uri = resources.make("image", "first", "最初の画像");
+	const hono = new Hono();
+	registerDialogue(hono, h.dialogue);
+	const screen = {
+		artifactRevisionId: revision,
+		sessionId: crypto.randomUUID(),
+		sequence: 1,
+		observedAt: new Date().toISOString(),
+		phase: "ready",
+		selection: "selected",
+	};
+	async function submit(viewing?: unknown) {
+		const response = await hono.request("/api/runs", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				requestId: crypto.randomUUID(),
+				conversationId: "main",
+				text: "いま何が見えている？",
+				viewing,
+			}),
+		});
+		expect(response.status).toBe(202);
+		const { id } = (await response.json()) as { id: string };
+		await waitFor(() => h!.dialogue.get(id)?.status === "completed");
+	}
+	h.state.steps.push(
+		{ text: "画面を確認しました。" },
+		{ text: "はい。" },
+		{ text: "はい。" },
+	);
+	await submit({ screen, resource: uri });
+	expect(h.state.calls).toHaveLength(1);
+	const modelInput = h.state.calls[0]!.messages.at(-1)!.content;
+	expect(modelInput).toContain("送信時の画面「画像一覧」");
+	expect(modelInput).toContain("対象選択済み");
+	expect(modelInput).toContain("a1 画像「最初の画像」");
+	expect(modelInput).not.toContain(uri);
+	await submit({ screen: { ...screen, variantId: "unknown" }, resource: uri });
+	expect(h.state.calls).toHaveLength(2);
+	expect(h.state.calls[1]!.messages.at(-1)!.content).not.toContain(
+		"送信時の画面",
+	);
+	expect(h.state.calls[1]!.messages.at(-1)!.content).not.toContain(
+		"最初の画像",
+	);
+	await submit();
+	expect(h.state.calls).toHaveLength(3);
+	expect(h.state.calls[2]!.messages.at(-1)!.content).not.toContain(
+		"送信時の画面",
+	);
+});
+
 test("the candidates tell what a toolchain makes, in the kinds' display names", async () => {
 	const resources = fakeResources();
 	h = await setup({

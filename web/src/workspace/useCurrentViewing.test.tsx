@@ -8,6 +8,7 @@ import {
 } from "../domains/toolchain-artifacts/registry";
 import { queryRoots } from "../queryKeys";
 import { useCurrentViewing, useViewingUri } from "./useCurrentViewing";
+import { useScreenObservation } from "../domains/toolchain-artifacts/screen-observation";
 
 afterEach(cleanup);
 
@@ -144,4 +145,35 @@ test("a document adapter exposes its current target to collaborator handover, wh
 		resource: "eumenes://image/image-1",
 	});
 	cache.clear();
+});
+
+test("sending reads the visible render once and disabling the screen removes its observation", () => {
+	const cache = new QueryClient();
+	const tab = toolchainTab("artifact:test.screen@1");
+	const wrapper = ({ children }: PropsWithChildren) => (
+		<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+	);
+	const initialProps: { visible: boolean; phase: "loading" | "ready" } = {
+		visible: true,
+		phase: "loading",
+	};
+	const view = renderHook(
+		({ visible, phase }) => {
+			useScreenObservation(tab.id, visible, {
+				artifactRevisionId: tab.artifactRevisionId,
+				phase,
+			});
+			return useCurrentViewing(() => undefined, visible ? tab : null, adapters);
+		},
+		{ wrapper, initialProps },
+	);
+	const sent = view.result.current();
+	expect(sent).toMatchObject({ screen: { phase: "loading", sequence: 1 } });
+	view.rerender({ visible: true, phase: "ready" });
+	expect(view.result.current()).toMatchObject({
+		screen: { phase: "ready", sequence: 2 },
+	});
+	expect(sent?.screen?.phase).toBe("loading");
+	view.rerender({ visible: false, phase: "ready" });
+	expect(view.result.current()).toBeUndefined();
 });

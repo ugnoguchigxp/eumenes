@@ -15,6 +15,7 @@ import type { ChangeKind } from "../../../client/events";
 import { ToolchainArtifactHost } from "../domains/toolchain-artifacts/ToolchainArtifactHost";
 import { createWebAdapterRegistry } from "../domains/toolchain-artifacts/registry";
 import { schedulerWebAdapter } from "../domains/scheduler/toolchain-adapter";
+import { readScreenState } from "../domains/toolchain-artifacts/screen-observation";
 
 afterEach(cleanup);
 
@@ -61,6 +62,10 @@ test("the agenda updates from empty and distinguishes single, recurring and paus
 		</QueryClientProvider>,
 	);
 	await screen.findByText("予約はまだありません");
+	expect(readScreenState("scheduler-1", artifactRevisionId)).toMatchObject({
+		phase: "ready",
+		variantId: artifact.defaultVariant,
+	});
 	items.push(
 		{
 			id: "later",
@@ -131,5 +136,6 @@ test("the agenda updates from empty and distinguishes single, recurring and paus
 	expect(screen.getByRole("listitem").textContent).toContain("週次メモ");
 	expect(list.queryByText("今後3回の予定")).toBeNull();
 	unmount();
+	expect(readScreenState("scheduler-1", artifactRevisionId)).toBeUndefined();
 	expect(listeners.size).toBe(0);
 });

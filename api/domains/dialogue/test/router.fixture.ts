@@ -1,11 +1,11 @@
 import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
-import type { RouteAnswer, RouteInput } from "../../inference/contracts";
 import type { ToolchainCard } from "../../capabilities";
 import {
 	IMAGE,
 	INSTANT,
 	fixtureSelection,
 	setup,
+	type ChoiceInput,
 	type SetupOptions,
 } from "./generation.fixture";
 import { settings, type Snapshot } from "./harness.fixture";
@@ -27,35 +27,19 @@ export const ROUTER = {
 	feedbackWeight: 2,
 };
 export type Script = (
-	input: RouteInput,
+	input: ChoiceInput,
 	signal: AbortSignal,
-) => Promise<RouteAnswer>;
+) => Promise<string[]>;
 
 /** Ordered fixture preferences for the otherwise scripted decision API. */
 export const weigh =
 	(scores: Record<string, number>): Script =>
-	async (input) => {
-		const names = input.criteria.map((c) => c.name);
-		const given = Object.fromEntries(
-			names.map((name) => [name, scores[name] ?? 0]),
-		);
-		const total = Object.values(given).reduce((a, b) => a + b, 0);
-		const probabilities = Object.fromEntries(
-			names.map((name) => [
-				name,
-				total ? given[name]! / total : 1 / names.length,
-			]),
-		);
-		const best = names.reduce((a, b) => (given[b]! > given[a]! ? b : a));
-		return {
-			choice: best,
-			probabilities,
-			scores: given,
-			model: "router-fixture-model",
-			headRevision: "head-1",
-			calibrationRevision: "cal-1",
-		};
-	};
+	async ({ criteria }) =>
+		criteria
+			.map(({ name }) => ({ name, priority: scores[name] ?? 0 }))
+			.filter(({ priority }) => priority > 0)
+			.sort((a, b) => b.priority - a.priority)
+			.map(({ name }) => name);
 
 /** One call of the structure model, as the router made it. */
 export type StructureCall = {
@@ -78,7 +62,7 @@ export async function startRouter(
 		} as unknown as Snapshot,
 		...options,
 	});
-	const routes: RouteInput[] = [];
+	const routes: ChoiceInput[] = [];
 	const scripts: Script[] = [];
 	const structures: Array<string | Error | (() => Promise<string>)> = [];
 	const structureCalls: StructureCall[] = [];
@@ -90,7 +74,7 @@ export async function startRouter(
 		) => {
 			const next = scripts.shift();
 			if (!next) return [];
-			const received: RouteInput = {
+			const received: ChoiceInput = {
 				text,
 				criteria,
 				previousAgent,
@@ -110,11 +94,7 @@ export async function startRouter(
 						: []),
 				],
 			};
-			const picked = await next(adapterInput, signal);
-			return Object.entries(picked.scores ?? {})
-				.filter(([, score]) => score > 0)
-				.sort((a, b) => b[1] - a[1])
-				.map(([id]) => id);
+			return next(adapterInput, signal);
 		},
 	);
 	Object.assign(h.larm, {
@@ -165,4 +145,4 @@ export const traceOf = (h: { state: { traces: unknown[] } }, index = 0) =>
 		row: number;
 		error: string | null;
 	};
-export const names = (input: RouteInput) => input.criteria.map((c) => c.name);
+export const names = (input: ChoiceInput) => input.criteria.map((c) => c.name);

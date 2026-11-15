@@ -14,6 +14,7 @@ import type { ToolchainArtifactEntry } from "../../../../client/toolchain-action
 import type { DocumentAccess, RegisteredField } from "./documents";
 import type { DraftView } from "./drafts";
 import { genericWebAdapter } from "./generic-adapter";
+import type { PublicScreenState } from "./screen-observation";
 
 /** An open question of the artifact's chain, as the host read it from the interactions API. */
 export type OpenQuestion = {
@@ -71,6 +72,8 @@ export type AnswerInput =
  */
 export type AdapterState = {
 	phase: AdapterPhase;
+	/** Public facts about the rendered source, with no source text, URLs or form values. */
+	screenState?: PublicScreenState;
 	/** A resource per source in `artifact.sourceBindings` (the question source is the host's). */
 	snapshot: Snapshot;
 	/** Domain-owned binary input; the returned opaque id can be sent in a registered form. */

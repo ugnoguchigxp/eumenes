@@ -1,8 +1,6 @@
 import { expect, test } from "bun:test";
 import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
-import type { RouteInput } from "../../domains/larm";
-import { weigh } from "../../domains/dialogue/test/router.fixture";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 
 // Real seed, dialogue, package, scheduler, queue, child adoption, TODO and notices; model outputs alone are scripted.
@@ -82,13 +80,6 @@ test("B sends ordered steps to the imported planner and two actual commands comp
 			}),
 	});
 	try {
-		Object.assign(h.inference, {
-			route: (input: RouteInput, signal: AbortSignal) =>
-				weigh({ "timers.manage": input.text === request ? 0.45 : 0.95 })(
-					input,
-					signal,
-				),
-		});
 		const source = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
@@ -218,7 +209,6 @@ for (const operation of ["answer", "cancel"] as const) {
 				execution: "pipeline",
 				status: "waiting",
 			});
-			Object.assign(h.inference, { route: weigh({ "timers.manage": 0.45 }) });
 			const answered = await h.dialogue.submit({
 				requestId: crypto.randomUUID(),
 				conversationId: "main",

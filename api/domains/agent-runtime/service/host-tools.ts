@@ -1,5 +1,9 @@
 import type { Database } from "bun:sqlite";
-import { scratchWrite, type Prepared } from "../../capabilities";
+import {
+	packageRuntimeOf,
+	scratchWrite,
+	type Prepared,
+} from "../../capabilities";
 import { parseResourceUri } from "../../resources";
 import type { ChildExecution, ToolRuntime } from "../../tool-runtime";
 import { safeCode } from "./control-output";
@@ -25,7 +29,11 @@ export function hostBindings(
 	prepared: Prepared,
 	execution: ChildExecution | undefined,
 ): ReturnType<ToolRuntime["bind"]> {
-	if (guidedWeb(prepared)) return [];
+	if (
+		guidedWeb(prepared) ||
+		packageRuntimeOf(prepared.package.id)?.hostTools === "none"
+	)
+		return [];
 	const listed = new Set(prepared.package.toolRevisionIds ?? []);
 	const own = new Set(
 		prepared.dependencies

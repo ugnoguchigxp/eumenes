@@ -51,7 +51,7 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				...(input.execution ? { execution: input.execution } : {}),
 			} as {
 				execution?: ChildExecution;
-				kind?: "web" | "history" | "world" | "action";
+				kind?: "web" | "history" | "world" | "action" | "registered_worker";
 				autonomous?: boolean;
 				question: string;
 				originalRequest?: string;
@@ -116,7 +116,9 @@ export function createStartTask(ctx: RuntimeContext, ops: TaskOps) {
 				question: request.question,
 				detail: "normal",
 				// History and World readings stay inside the host: no URL reaches their worker.
-				...(request.kind !== "history" && request.kind !== "world"
+				...(request.kind !== "history" &&
+				request.kind !== "world" &&
+				request.kind !== "registered_worker"
 					? {
 							urls: requestUrls(
 								request.originalRequest ?? request.question,

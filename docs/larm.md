@@ -162,13 +162,15 @@ music domainのプレイリストは会話/run・検索条件・曲IDを保存�
 
 読み上げ本文を句読点の句に分け、さらに日本語とラテン文字の境界で区間に分ける（`delivery` の `speechSegments`）。各区間の言語は文字種と語の形だけで決め、LARM の分類器・単語辞書は使わない。日本語を含む句ではラテン文字の通常語が2語以上続く部分を `en` とし、略語（`API`）、コード・アドレス形（`example.com`）、語中に大文字を含む語（`iPhone`）は語数に数えない。全語が大文字始まりの部分は固有名詞として `ja` に残す。日本語を含まない句は通常語が1語以上あれば `en`。規則と評価表は [計画](../spec/.archived/regex-speech-language-routing-plan-2026-10-16.md) と `api/domains/delivery/test/speech-language.test.ts`。
 
-合成要求ごとに inference が本文から `speechLanguage` を再計算する（区間は再計算しても同じ言語になる）。`en` は catalog の `speech.tts.english` capability を持つ Provider へ、`ja` は既存の日本語TTSへ渡す。区間に分かれていない混在本文（設定画面の試聴など）は `ja`。合成は最大3区間まで先行させ、再生は前の区間終了後に進める。回答LLMの出力形式は変更しない。
+合成要求ごとに inference が読み方辞書を適用し、置換後の本文から `speechLanguage` を計算する。辞書の見出しは大文字・小文字を区別せずに照合する。同じ長さで表記の大文字・小文字だけが異なる登録が複数ある場合は、元の表記に完全一致する読みを優先し、完全一致がなければ見出しの文字コード順で最初の読みを使う。`en` は catalog の `speech.tts.english` capability を持つ Provider へ、`ja` は既存の日本語TTSへ渡す。区間に分かれていない混在本文（設定画面の試聴など）は `ja`。合成は最大3区間まで先行させ、再生は前の区間終了後に進める。回答LLMの出力形式は変更しない。
+
+英字で終わる見出しは、単語の末尾に `s` または `S` が付いた表記にも一致する。複数形自体に登録があればその読みを優先し、基本形だけに登録がある場合、日本語の読みには「ズ」を付ける。英字で終わる読みには元の `s` または `S` を付け、空の読みはそのまま省略する。
 
 [全体コンセプト](https://chatgpt.com/space/page_9fab9c53bce8819181c9c8256a3b303a)の原則に従い、公開Profileを正本とする。英語TTSは独立したProviderの認証を使い、確保・claim・renew後の再claim・解放を共通機構で扱う。
 
-接続の内部設定は `larm.englishSpeechEnabled`（省略時無効）。旧 `sentenceLanguageEnabled` は保存文書の移行で引き継ぎ、`sentenceLanguageProvider` は削除する。英語の声は日本語の公開 `voice_presentation` が女性・中性ならRosie、男性ならJasperへ固定し、速度は常に1.0。旧 `englishVoice` / `englishMasculineVoice` / `englishSpeed` は保存文書の互換読取り用に受理するが実行には使わない。`en` 区間には日本語の声・style・pitch・intonation・速度・読み辞書を使わない。逐次音声の表情は英語区間も句ごとに判定するが、日本語向けの抑揚パラメーターは英語TTSへ渡さない。英語TTSの到達確認は `/api/inference/voices?language=en`。言語の任意指定は合成APIに公開しない。
+接続の内部設定は `larm.englishSpeechEnabled`（省略時無効）。旧 `sentenceLanguageEnabled` は保存文書の移行で引き継ぎ、`sentenceLanguageProvider` は削除する。英語の声は日本語の公開 `voice_presentation` が女性・中性ならRosie、男性ならJasperへ固定し、速度は常に1.0。旧 `englishVoice` / `englishMasculineVoice` / `englishSpeed` は保存文書の互換読取り用に受理するが実行には使わない。`en` 区間には日本語の声・style・pitch・intonation・速度を使わない。逐次音声の表情は英語区間も句ごとに判定するが、日本語向けの抑揚パラメーターは英語TTSへ渡さない。英語TTSの到達確認は `/api/inference/voices?language=en`。言語の任意指定は合成APIに公開しない。
 
-英語TTSを確保できない場合（`speech_tts_target_unavailable`）は、その区間を `ja` として日本語TTSで合成し、読み辞書と話し方判定を適用する（`inference.english_speech_fallback` を warn で記録）。英語TTSの合成エラーは日本語TTSへ転送しない。TTSにはクラウドへの代替がない。読み上げの経路は「LARMのみ」か「クラウドのみ」で、LARMの合成が失敗（429を含む）した句は発話せず、再試行もしない（[設計](../spec/tts-single-lane-design-2026-11-01.md) §4.6）。クラウドのみの経路（Cloudflare Workers AI など）では言語判定を行わず、日本語読み辞書を適用する。
+英語TTSを確保できない場合（`speech_tts_target_unavailable`）は、辞書適用後の同じ本文を `ja` として話し方を判定し、日本語TTSで合成する（`inference.english_speech_fallback` を warn で記録）。英語TTSの合成エラーは日本語TTSへ転送しない。TTSにはクラウドへの代替がない。読み上げの経路は「LARMのみ」か「クラウドのみ」で、LARMの合成が失敗（429を含む）した句は発話せず、再試行もしない（[設計](../spec/tts-single-lane-design-2026-11-01.md) §4.6）。クラウドのみの経路（Cloudflare Workers AI など）では言語判定を行わず、日本語読み辞書を適用する。
 
 TTSの合成は backend 全体で同時に1件。音声対話の句・読み上げ直し・自動読み上げ・通知の読み上げ・試聴が先着順に並び、待つ間に取り消された要求は LARM へ送らない。まだ生成していない同じ入力（文・設定revision・声の上書き・話し方の準備）の読み上げ直し・通知・試聴は1回の合成にまとめ、合流した全員が取り消したときだけ止める。生成済みの音声は再利用しない。待ちは `inference.speech_lane_waited`（`durationMs`・`count`）、統合は `inference.speech_joined`、発話しなかった句は `voice.speech_skipped` で記録する。
 
@@ -176,28 +178,14 @@ TTSの合成は backend 全体で同時に1件。音声対話の句・読み上�
 
 ## Router（担当の振り分け）
 
-担当の振り分けは `eumenes_router` パッケージが決める（[組み込みの設計](../spec/router-package-integration-2026-11-04.md)）。LARM はその reranker で、保存済みの router profile の catalog から capability `decision.context`（protocol `larm.system-one.v1`、endpoint `/v1/systemone`）の provider を探し、その provider だけの接続を作って、claim の `endpoint`・credential・model で呼ぶ（provider 名・model・network はコードにも設定にも持たない。catalog と claim の値を使う）。接続は表情判定・会話とは別で、client は再起動しても変わらず、profile が空の間は接続を作らない（Router もなく、発言の回は会話の回になる）。profile・LARM の接続先が変わると接続を作り直し、終了時に解放する。
+担当の振り分けは `eumenes_router` の `routeWithSelection` を使います。LARM は候補検索の埋め込みを提供し、発言の構造判断と担当選択はクラウド LLM が行います。旧ルーター用の `decision.context` 接続は廃止済みで、LARM の接続テストでも実行対象外です。音声の発話態度判定は `decision.system-one` を使います。[選択方式への切替](../spec/router-package-integration-2026-11-04.md#2026-11-14-選択方式への切替)を参照してください。
 
-| 口 | 内容 |
-| --- | --- |
-| `route` | `questions.route`（choice）に、パッケージが offer した criteria（名前と説明、渡した順）を送り、選ばれた1件・全 criteria の確率（合計1）・`scores`（criteria ごとの独立の点数。パッケージは必須とする）・`head_revision`／`calibration_revision` を読む。`state` は最新の発言の `text` だけ（文脈判定の契約は履歴を受けない）で、先頭400字。criteria は1〜128件、名前は英字で始まる ASCII（最大96字）、説明は最大4096字。上限はパッケージの `ROUTE_LIMITS` |
-
-要求が上限を破る場合は送らず（`larm_invalid_route_request`）、応答が形に合わない場合（criteria の外の選択・欠けた確率・範囲外の値）は `larm_invalid_route_response`、`truncated: true` または `criteria_dropped` がある場合は `larm_route_truncated` で失敗し、部分の答えは使わない。router の接続でない口（`decisionOnly` でない）は `larm_route_port_required`。呼び手は採点呼出しの時間を `timeoutMs` で区切る。直接 `route` の失敗・時間切れは既存の会話経路へ戻る。`routeStructured` は構造・部分の採点に失敗しても直接経路へ戻さず、依頼全体を未実施として扱う。欄の抽出（旧 `routeFields`）はない。欄の要る担当は会話のモデルの1候補の欄埋めで埋める。
-
-設定は SQLite の設定文書の `router`（表情判定の設定とは別）。`profile` は保存するまで空（保存すると発言の回をすべてパッケージが決める。意図判定はない）、`entry`（`route`・`routeStructured`、初期 `route`）、`structureResourceId`（構造の判断のクラウド LLM 資源、初期 null。現在発言の全文、直前の返答、有効な保留質問と取消候補の有限参照をパッケージの指示文とともに送る）、`structureTimeoutMs`（初期 8000）、`timeoutMs`（LARM の1呼出しの待ち、初期 2000）、決定表の閾値 `accept`（τ採用 0.6）・`low`（τ低 0.3）・`margin`（δ 0.15）・`approve`（τ承認 0.85）・`multi`（τ多 0.5）、訂正の記憶の `feedbackNear`（0.95）・`feedbackWeight`（0 で訂正の補正なし、初期 2）。best-v2 の記憶は設定ではなくパッケージの表に入れる（発言から作ったので Git にない）。取込みは今の LARM の埋め込みの空間に結び付けるので、同じ埋め込みモデル（catalog の `embeddingSpace`）で作った記憶だけを入れる。
-
-構造解析ではpackageの閉じたJSON Schemaを既存background controlの `structuredOutput:true` とともに渡す。回答・取消の本文は現在発言の全文、参照は提示集合に限定する。モデルが意味と対象を選び、packageとhostが形式・参照・会話・revision・状態・権限を検査する。解析失敗時は部分実行や自動再試行を行わない。[実装と受入記録](../spec/project-issues-first-batch-2026-11-06.md)を参照。
+設定は `GET /api/settings/router` と `PATCH /api/settings/router` で確認・変更できます。`structureResourceId` を省略すると保存済みの会話用クラウドリソースを使います。判断期限は `structureTimeoutMs`、訂正の検索と補正は `feedbackNear` と `feedbackWeight` で設定します。
 
 ```sh
-bun run cli -- router import-memory <best-v2 の記憶の JSON>
 bun run cli -- router status
-bun run cli -- router set profile <decision.context を持つ Agent Profile>
-bun run cli -- router set entry routeStructured
 bun run cli -- router set structureResource <資源 ID|none>
-bun run cli -- router clear-profile
 ```
-
-API は `GET /api/settings/router` と `PATCH /api/settings/router`（変える項目だけを送る。`profile` に `null` で削除）、記憶の取込みは `POST /api/router/memory`（今の埋め込みの空間に入れる）。
 
 ## チャットの画像入力
 

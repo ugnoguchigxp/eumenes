@@ -36,7 +36,13 @@ export function taskChildContext(host: TaskExecutionHost) {
 		});
 	}
 	function resolve(db: Database, child: ChildExecution) {
+		const ownWorker =
+			child.selectedWorker &&
+			routing.cardInTransaction(db, child.chainRevisionId)?.execution ===
+				"task" &&
+			routing.taskInTransaction?.(db, child.chainRevisionId)?.selectedWorker;
 		if (
+			!ownWorker &&
 			!available(db, child.source.runId).some(
 				(e) => e.revisionId === child.chainRevisionId,
 			)
@@ -110,9 +116,12 @@ export function taskChildContext(host: TaskExecutionHost) {
 				),
 				question: body.clarification,
 			};
+		const report = body?.verification === "evidence_linked" ? body : undefined;
 		return {
 			...result(
-				"completed",
+				child.selectedWorker && report?.coverage === "partial"
+					? "partial"
+					: "completed",
 				ref,
 				typeof body?.summary === "string"
 					? body.summary
@@ -120,6 +129,7 @@ export function taskChildContext(host: TaskExecutionHost) {
 				total(child, calls + current.calls),
 			),
 			output: body,
+			...(report ? { report } : {}),
 			...(current.links.length ? { links: current.links } : {}),
 		};
 	}

@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import type { RouterCard } from "eumenes_router/sqlite";
-import type { RouteInput } from "../../inference/contracts";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
@@ -211,10 +210,13 @@ export function idsOfChoice(
 }
 
 type Selector = NonNullable<InferencePort["selectRouter"]>;
-export type ChoiceInput = Pick<
-	RouteInput,
-	"text" | "criteria" | "previousUser" | "previousAgent" | "instructions"
->;
+export type ChoiceInput = {
+	text: string;
+	criteria: readonly { name: string; description: string }[];
+	previousUser: string | null;
+	previousAgent: string | null;
+	instructions: string;
+};
 type Reference = {
 	ref: string;
 	title?: string;
@@ -302,7 +304,7 @@ export function fixtureSelection(
 	};
 }
 
-export function selectionBySteps(steps: Step[], routes?: RouteInput[]) {
+export function selectionBySteps(steps: Step[], routes?: ChoiceInput[]) {
 	return fixtureSelection(async ({ text, criteria }) => {
 		const picked = pickedBy(steps[0]);
 		routes?.push({
@@ -367,6 +369,7 @@ export function routerCards(cards: readonly ToolchainCard[]): RouterCard[] {
 }
 
 export type SetupOptions = {
+	screenInTransaction?: ToolchainRoutingPort["screenInTransaction"];
 	externalOutput?: Parameters<
 		typeof createDialogueService
 	>[0]["externalOutput"];
@@ -447,7 +450,7 @@ export async function setup(options: SetupOptions = {}) {
 		/** The ids each offer of the catalog was asked for (absent: the choice call's own search). */
 		searchSlots: [] as Array<readonly string[] | undefined>,
 		/** What the router's context judgment was asked, turn by turn. */
-		routerAsked: [] as RouteInput[],
+		routerAsked: [] as ChoiceInput[],
 		/** The texts the router package embedded; a failure of the embedding with this code. */
 		routerEmbeds: [] as string[],
 		routerEmbedFails: null as string | null,
@@ -568,6 +571,7 @@ export async function setup(options: SetupOptions = {}) {
 	const runtimeOf = (revisionId: string): ToolchainRuntimeMeta =>
 		({ execution: cardOf(revisionId)?.execution }) as ToolchainRuntimeMeta;
 	const toolchains = {
+		screenInTransaction: options.screenInTransaction,
 		embedQuery: async () => state.vector,
 		routeInTransaction: (_db: unknown, input: { ids?: readonly string[] }) => {
 			state.searchSlots.push(input.ids);

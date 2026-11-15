@@ -88,11 +88,15 @@ export function createPlaygroundCatalog({
 						p[mode === "provider" ? "providers" : "services"] ?? [],
 					)) {
 						const protocol = str(item.protocol),
+							capability = str(item.capability),
 							endpoint = str(item.endpoint),
 							model = str(item.model),
 							name = str(item.name),
 							profile = str(p.id);
-						const kind = kinds[protocol] ?? "unsupported";
+						const kind =
+							capability === "decision.context"
+								? "unsupported"
+								: (kinds[protocol] ?? "unsupported");
 						const id = createHash("sha256")
 							.update(
 								JSON.stringify([
@@ -116,7 +120,7 @@ export function createPlaygroundCatalog({
 									? item.description
 									: undefined,
 							model,
-							capability: str(item.capability),
+							capability,
 							protocol,
 							kind: paths[kind] === endpoint ? kind : "unsupported",
 							mode,

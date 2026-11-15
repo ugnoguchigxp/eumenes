@@ -6,6 +6,7 @@ import {
 	type ChunkGap,
 	type RunSpeechPlayed,
 } from "../api/domains/voice-dialogue/contracts";
+import type { RunViewing } from "../api/domains/dialogue/contracts";
 import { watchRunSpeech } from "./run-speech";
 import {
 	avatarMotionSchema,
@@ -103,9 +104,7 @@ export function voiceDialogueClient(transport: Transport) {
 		voiceCommit: async (
 			id: string,
 			revision: number,
-			viewing?:
-				| { artifactRevisionId: string; targetRef: string }
-				| { resource: string },
+			viewing?: RunViewing,
 			timing?: InputTiming,
 		) =>
 			callJson(

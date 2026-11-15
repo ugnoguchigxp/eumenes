@@ -307,9 +307,11 @@ export function createIntake(deps: DialogueDeps) {
 			}
 			patchSession(db, addressee.id, { expiresAt: expiryAfter(now) }, now);
 		}
-		if (input.viewing && "resource" in input.viewing)
-			setRunViewingResource(db, runId, input.viewing.resource);
-		else if (input.viewing) setRunViewing(db, runId, input.viewing);
+		const viewing = input.viewing;
+		if (viewing && "resource" in viewing) {
+			setRunViewingResource(db, runId, viewing.resource);
+			if (viewing.screen) setRunViewing(db, runId, { screen: viewing.screen });
+		} else if (viewing) setRunViewing(db, runId, viewing);
 		recordInputInTransaction(deps, db, input, messageId, now, !!addressee);
 		if (input.sharedUris?.length)
 			enterSharedInTransaction(

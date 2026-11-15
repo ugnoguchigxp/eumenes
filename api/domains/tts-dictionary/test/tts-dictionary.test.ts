@@ -91,12 +91,41 @@ const add = (d: ReturnType<typeof setup>, written: string, spoken: string) =>
 		entry: { written, spoken },
 		expected: { spoken: null },
 	});
-test("Latin headwords match whole words only; surrogate pairs and CJK still match", async () => {
+test("Latin headwords ignore case and match whole words only; surrogate pairs still match", async () => {
 	const d = setup();
 	await add(d, "AI", "エーアイ");
 	await add(d, "😀", "えがお");
-	expect(d.apply("MAIN と AI と AIs")).toBe("MAIN と エーアイ と AIs");
+	expect(d.apply("MAIN と AI と ai と Ai と AIs")).toBe(
+		"MAIN と エーアイ と エーアイ と エーアイ と エーアイズ",
+	);
 	expect(d.apply("a😀b")).toBe("aえがおb");
+});
+test("a final s or S uses the registered base unless the full form has a reading", async () => {
+	const d = setup();
+	await add(d, "Window", "ウィンドウ");
+	expect(
+		d.apply("Window、windows、WINDOWS、Windowsill、XWindows、Windows10"),
+	).toBe(
+		"ウィンドウ、ウィンドウズ、ウィンドウズ、Windowsill、XWindows、Windows10",
+	);
+	await add(d, "Windows", "専用の読み");
+	expect(d.apply("WINDOWS と Window")).toBe("専用の読み と ウィンドウ");
+});
+test("a final s keeps Latin readings Latin and preserves silent readings", async () => {
+	const d = setup();
+	await add(d, "X", "tool");
+	await add(d, "Draft", "");
+	expect(d.apply("Xs と Drafts")).toBe("tools と ");
+});
+test("longer headwords win across case variants and exact variants retain their readings", async () => {
+	const d = setup();
+	await add(d, "Acme", "アクメ");
+	await add(d, "ACME", "エーシーエムイー");
+	await add(d, "Acme Studio", "アクメスタジオ");
+	expect(d.apply("Acme ACME acme studio")).toBe(
+		"アクメ エーシーエムイー アクメスタジオ",
+	);
+	expect(d.apply("acme")).toBe("エーシーエムイー");
 });
 test("a reading that would empty or inflate the chunk keeps the original text", async () => {
 	const d = setup();

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useEffectEvent,
+	useMemo,
+	useState,
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type {
@@ -99,21 +105,28 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 			openedGenerated?.documentId === selected
 				? openedGenerated?.targetRef
 				: undefined;
+		const showOpenedGenerated = useEffectEvent(
+			(ref: string, documentId: string) => {
+				setOpenedGenerated({ targetRef: ref, documentId });
+				setTargetRef(documentId);
+			},
+		);
+		const notifyOpenFailed = useEffectEvent(() =>
+			notify("Doclingの調査文書を開けませんでした。"),
+		);
+		const openSourceId = data?.openSourceId;
 		useEffect(() => {
-			if (
-				!visible ||
-				!data?.openSourceId ||
-				!targetRef?.startsWith("generated-")
-			)
+			if (!visible || !openSourceId || !targetRef?.startsWith("generated-"))
 				return;
 			const controller = new AbortController();
 			void (async () => {
 				const signal = controller.signal;
-				const remote = await client.markdownPreview(data.openSourceId!, signal);
+				const remote = await client.markdownPreview(openSourceId, signal);
 				let stageId: string | undefined;
 				if (remote.document === null) {
 					const { importMarkdown } =
 						await import("@eumenes/design-system/markdown");
+					signal.throwIfAborted();
 					stageId = (
 						await client.markdownStage(
 							{
@@ -124,20 +137,17 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 						)
 					).id;
 				}
-				const document = await client.markdownOpen(data.openSourceId!, signal, {
+				signal.throwIfAborted();
+				const document = await client.markdownOpen(openSourceId, signal, {
 					stageId,
 					expectedEtag: remote.entry.revision,
 				});
-				if (!signal.aborted) {
-					setOpenedGenerated({ targetRef, documentId: document.id });
-					setTargetRef(document.id);
-				}
+				if (!signal.aborted) showOpenedGenerated(targetRef, document.id);
 			})().catch(() => {
-				if (!controller.signal.aborted)
-					notify("Doclingの調査文書を開けませんでした。");
+				if (!controller.signal.aborted) notifyOpenFailed();
 			});
 			return () => controller.abort();
-		}, [visible, data?.openSourceId, targetRef, client, setTargetRef, notify]);
+		}, [visible, openSourceId, targetRef, client]);
 
 		const management = useLibraryManagement({
 			client,
@@ -210,6 +220,12 @@ export const markdownWebAdapter: WebArtifactAdapter = {
 			return { status: "accepted" as const, message: "" };
 		}
 		return {
+			screenState: {
+				selection: displayedId ? "selected" : "none",
+				activity: session?.busy ? "running" : undefined,
+				dirty: data?.preview ? undefined : data?.current?.dirty,
+				contentRevision: data?.preview ? undefined : data?.current?.revision,
+			},
 			phase:
 				query.isError || (query.data && !parsed.success)
 					? { kind: "error", message: "文書を読み込めません。" }

@@ -37,11 +37,6 @@ export type ProfileRequest = {
 	fullProfile: boolean;
 	/** The Providers a partial connection selects (absent: the LLM alone). */
 	providers?: string[];
-	/**
-	 * The capability of the decision provider a decision-only connection carries (absent: `decision.system-one`): the
-	 * router's is `decision.context` (spec router-package-integration 2026-11-04 §1 #4). Found in the catalog by it.
-	 */
-	decisionCapability?: string;
 	catalogRevision: string;
 };
 
@@ -252,10 +247,6 @@ export async function claimProviders(
 		required: Capability[];
 		catalogProviders: Rec[];
 		fullProfile: boolean;
-		/** The decision provider is claimed on its own (a connection that carries it alone). */
-		decision?: boolean;
-		/** The decision provider's capability (absent: `decision.system-one`). */
-		decisionCapability?: string;
 		claimNames?: string[];
 		connectionRole?: "main" | "sub";
 		hosts: ProviderHosts;
@@ -319,15 +310,10 @@ export async function claimProviders(
 			throw new Error("chat_input_contract_unavailable");
 		providers.set(name, speechProvider(name, info, hosts));
 	}
-	const decision = decisionProvider(
-		claimed,
-		created,
-		catalogProviders,
-		hosts,
-		input.decisionCapability,
-	);
-	if ((input.fullProfile || input.decision) && decision)
-		providers.set("system-one", decision);
+	const decision = input.fullProfile
+		? decisionProvider(claimed, created, catalogProviders, hosts)
+		: undefined;
+	if (decision) providers.set("system-one", decision);
 	const english = input.fullProfile
 		? englishSpeechProvider(claimed, created, catalogProviders, hosts)
 		: undefined;
@@ -401,18 +387,18 @@ function claimedEndpoint(
 }
 
 /**
- * The decision provider of the capability (the speaking-attitude judge's `decision.system-one`, or the router's
- * `decision.context`), found in the catalog by it and kept under the decision role with its catalog name. Optional
- * decisions never make the speech providers unusable.
+ * Find the optional speaking-attitude provider by capability and keep it under
+ * the decision role with its catalog name.
  */
 function decisionProvider(
 	claimed: Rec,
 	created: Rec,
 	catalogProviders: Rec[],
 	hosts: ProviderHosts,
-	capability = "decision.system-one",
 ): Provider | undefined {
-	const declared = catalogProviders.find((p) => p.capability === capability);
+	const declared = catalogProviders.find(
+		(p) => p.capability === "decision.system-one",
+	);
 	if (
 		!declared ||
 		declared.protocol !== protocols["system-one"] ||

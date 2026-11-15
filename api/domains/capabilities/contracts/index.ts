@@ -314,6 +314,14 @@ export const validators = {
 	historySearch,
 	historyRead,
 	research: researchInput,
+	archiveSearch: z.strictObject({
+		terms: z.array(z.string().trim().min(1).max(120)).max(5),
+		pageRef: z.uuid().optional(),
+	}),
+	archiveRead: z.strictObject({
+		documentRef: z.uuid(),
+		offset: z.number().int().nonnegative().max(10_000_000),
+	}),
 	guidedResearch: guidedResearchInput,
 	guidedCandidates: guidedResearchInput,
 	readCandidate: z

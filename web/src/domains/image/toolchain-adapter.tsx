@@ -59,6 +59,10 @@ export const imageScreenWebAdapter: WebArtifactAdapter = {
 		});
 		useEffect(() => live.attach({ read: () => latest.current }), []);
 		return {
+			screenState: {
+				selection: resource.selectedId ? "selected" : "none",
+				activity: resource.status,
+			},
 			phase: error
 				? { kind: "error", message: "画像の情報を取得できませんでした。" }
 				: loading

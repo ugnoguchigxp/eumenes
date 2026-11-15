@@ -89,6 +89,15 @@ test("a session toolchain's runtime says session and its set carries the binding
 				},
 			});
 			const set = routing.sessionSetInTransaction!(db, SESSION_REVISION);
+			const published = routing.screenInTransaction!(
+				db,
+				"artifact:timers.workspace@3",
+			);
+			expect(published?.adapterRefs).toContain("adapter:timers@1");
+			expect(published?.variants).toContain(published?.defaultVariant);
+			expect(
+				routing.screenInTransaction!(db, "artifact:timers.workspace@999"),
+			).toBeNull();
 			expect(set).toMatchObject({
 				toolchainId: "timers.manage",
 				toolchainRevisionId: SESSION_REVISION,

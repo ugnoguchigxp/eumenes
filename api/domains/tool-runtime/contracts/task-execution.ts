@@ -78,6 +78,26 @@ export type ExecutionResult = {
 	limitations?: string[];
 	assurance?: "model";
 	stopReason?: string;
+	report?: ExecutionEvidenceReport;
+};
+export type ExecutionEvidenceReport = {
+	summary: string;
+	outcome?: string;
+	coverage: "complete" | "partial";
+	verification: "evidence_linked";
+	claims: Array<{ text: string; sourceIds: string[] }>;
+	limitations: string[];
+	sources: Array<{
+		sourceId: string;
+		kind?: string;
+		title?: string;
+		url?: string;
+		revision?: string;
+		start?: number;
+		end?: number;
+		documentId?: string;
+		fetchedAt?: string;
+	}>;
 };
 export type ExecutionView = {
 	id: string;
@@ -135,6 +155,8 @@ export type ExecutionSource = {
 };
 /** A registered task owner. Dialogue owns the TODO; this port owns the actual work. */
 export interface TaskLifecyclePort {
+	/** This registered owner runs its own selected package as a research worker. */
+	selectedWorker?: true;
 	startInTransaction(
 		db: Database,
 		input: {
@@ -157,6 +179,7 @@ export interface TaskLifecyclePort {
 	forgetInTransaction?(db: Database, id: string): void;
 }
 export type ChildExecution = {
+	selectedWorker?: true;
 	id: string;
 	dispatchId?: string;
 	usedModelCalls?: number;
@@ -196,6 +219,7 @@ export type ChildResult = {
 	questionSchema?: Record<string, unknown>;
 	questionDeadline?: number;
 	output?: unknown;
+	report?: ExecutionEvidenceReport;
 	code?: string;
 	modelCalls: number;
 	references: ExecutionReference[];

@@ -164,6 +164,14 @@ test("a committed utterance carries the saved item on screen to its run, like a 
 	const viewing = {
 		artifactRevisionId: "artifact:object-recognition.workspace@2",
 		targetRef: crypto.randomUUID(),
+		screen: {
+			artifactRevisionId: "artifact:object-recognition.workspace@2",
+			sessionId: session,
+			sequence: 1,
+			observedAt: new Date().toISOString(),
+			phase: "ready" as const,
+			selection: "selected" as const,
+		},
 	};
 	await h.voice.commit(id, h.voice.get(id)!.revision, viewing);
 	await until(() => !!h.voice.get(id)!.runId);

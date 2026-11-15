@@ -35,8 +35,7 @@ export async function acquireProvider(
 		name === "tts-english"
 			? p.capability === "speech.tts.english"
 			: name === "system-one"
-				? p.capability ===
-					(current.request.decisionCapability ?? "decision.system-one")
+				? p.capability === "decision.system-one"
 				: p.name === name,
 	);
 	if (!declared && name === "tts-english" && !withoutEnglish.has(current)) {
@@ -135,10 +134,6 @@ export async function acquireProvider(
 						: [],
 				catalogProviders: catalog,
 				fullProfile: current.request.fullProfile,
-				decision: name === "system-one",
-				...(current.request.decisionCapability
-					? { decisionCapability: current.request.decisionCapability }
-					: {}),
 				claimNames: [externalName],
 				hosts,
 			});

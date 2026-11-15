@@ -124,9 +124,7 @@ export type LarmStatus = {
 	error?: string;
 };
 import type { TtsVoices } from "./voices";
-import type { RouteAnswer, RouteInput } from "./route";
 export { ttsVoicesSchema, type TtsVoices } from "./voices";
-export * from "./route";
 export interface LarmPort {
 	/** An explicitly ended task releases only its sub-agent connections, after active borrowers finish. */
 	releaseTaskSession?(taskId: string): Promise<void>;
@@ -145,11 +143,6 @@ export interface LarmPort {
 		>,
 		signal: AbortSignal,
 	): Promise<unknown>;
-	/**
-	 * The router's reranker over a turn's criteria (a router port, `decisionOnly` on `decision.context`, only; spec
-	 * router-package-integration 2026-11-04 §1 #4).
-	 */
-	route?(input: RouteInput, signal: AbortSignal): Promise<RouteAnswer>;
 	voices?(signal: AbortSignal, language?: SpeechLanguage): Promise<TtsVoices>;
 	status(): LarmStatus;
 	onChange?(listener: () => void): () => void;

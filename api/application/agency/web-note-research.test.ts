@@ -8,7 +8,8 @@ const NOTE = [
 	"要約: 11月12日の日の出は6時12分ごろ。",
 	"---",
 	"## 日の出",
-	"2026年11月11日時点では、11月12日の日の出は6:12です。",
+	"[気象庁](https://www.jma.go.jp/sunrise)によると、2026年11月11日時点では、11月12日の日の出は6:12です。",
+	"",
 	"## 出典",
 	"- [気象庁](https://www.jma.go.jp/sunrise)",
 ].join("\n");
@@ -69,7 +70,7 @@ test("the agenda's research ticket starts the web note task, and its note reache
 			db.query("SELECT toolchain_revision_id FROM dialogue_agency_work").all(),
 		) as Array<{ toolchain_revision_id: string }>;
 		expect(works.map((w) => w.toolchain_revision_id)).toEqual([
-			"toolchain:web.note@2",
+			"toolchain:web.note@3",
 		]);
 		expect(prompts).toHaveLength(1);
 		expect(prompts[0]).toContain("依頼:\n明日の七里ヶ浜の日の出時刻");
@@ -79,10 +80,9 @@ test("the agenda's research ticket starts the web note task, and its note reache
 			summary: "11月12日の日の出は6時12分ごろ。",
 			ticketId: expect.any(String),
 		});
-		expect(note!.markdown).toContain("# 七里ヶ浜の日の出");
-		expect(note!.markdown).toContain("11月12日の日の出は6:12");
-		// The source is in the body once, not listed again.
-		expect(note!.markdown.match(/jma\.go\.jp/g)).toHaveLength(1);
+		expect(note!.markdown).toBe(
+			`# 七里ヶ浜の日の出\n\n${NOTE.split("\n").slice(3).join("\n")}`,
+		);
 		expect(attempts).toHaveLength(1);
 		expect(attempts[0]).toMatchObject({ status: "succeeded" });
 	} finally {

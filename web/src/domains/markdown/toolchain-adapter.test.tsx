@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useCallback, useState, type PropsWithChildren } from "react";
+import { useState, type PropsWithChildren } from "react";
 import type { AdapterHostContext } from "../toolchain-artifacts/registry";
 import { markdownWebAdapter } from "./toolchain-adapter";
 
@@ -80,7 +80,9 @@ function mount(empty = false, generated?: "remote" | "local") {
 			recovery: empty ? "" : JSON.stringify(document),
 			document: empty ? null : document,
 		})),
-		markdownStage: vi.fn(async () => ({ id: "import-stage" })),
+		markdownStage: vi.fn(async (_content: unknown, _signal?: AbortSignal) => ({
+			id: "import-stage",
+		})),
 		markdownOpen: vi.fn(async () => ({ id: localId })),
 		markdownLibrary: vi.fn(async (_signal?: AbortSignal, cursor?: string) => ({
 			items: [
@@ -101,10 +103,10 @@ function mount(empty = false, generated?: "remote" | "local") {
 			const [targetRef, setTarget] = useState(
 				generated ? generatedId : undefined,
 			);
-			const show = useCallback((id: string) => {
+			const show = (id: string) => {
 				setTargetRef(id);
 				setTarget(id);
-			}, []);
+			};
 			return markdownWebAdapter.useArtifact({
 				client,
 				visible: true,
@@ -191,6 +193,22 @@ test("opening a generated research document imports its Markdown without switchi
 		expect.any(AbortSignal),
 		{ stageId: "import-stage", expectedEtag: entry.revision },
 	);
+});
+
+test("workspace renders during a generated document import do not cancel or repeat it", async () => {
+	const h = mount(true, "remote");
+	const staging = Promise.withResolvers<{ id: string }>();
+	h.client.markdownStage.mockReturnValueOnce(staging.promise);
+	await waitFor(() => expect(h.client.markdownStage).toHaveBeenCalledTimes(1));
+	const signal = h.client.markdownStage.mock.calls[0]?.[1];
+	for (let i = 0; i < 3; i++) h.hook.rerender();
+	expect(signal).toBeInstanceOf(AbortSignal);
+	expect(signal?.aborted).toBe(false);
+	staging.resolve({ id: "import-stage" });
+	await waitFor(() => expect(h.setTargetRef).toHaveBeenCalledWith(localId));
+	expect(h.client.markdownPreview).toHaveBeenCalledTimes(1);
+	expect(h.client.markdownStage).toHaveBeenCalledTimes(1);
+	expect(h.client.markdownOpen).toHaveBeenCalledTimes(1);
 });
 
 test("a temporary research result focuses the Plate preview without importing a work document", async () => {

@@ -12,12 +12,12 @@ import type {
 	ToolchainRoutingPort,
 } from "../contracts/toolchains";
 import { COMMAND_KIND, type ChatMessage } from "../service/context";
-import type { RouteInput } from "../../inference/contracts";
 import {
 	FIXTURE_ROUTER,
 	ROUTER_SPACE,
 	selectionBySteps,
 	routerCards,
+	type ChoiceInput,
 } from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
@@ -115,8 +115,8 @@ export async function setup(
 		modelGate: null as Promise<void> | null,
 		/** The conversation model's scripted calls. */
 		steps: [] as Step[],
-		/** What the router's context judgment was asked, turn by turn. */
-		routerAsked: [] as RouteInput[],
+		/** What the router was asked to select, turn by turn. */
+		routerAsked: [] as ChoiceInput[],
 		/** The command sub-agent's replies, consumed in order. */
 		commands: [] as Command[],
 		/** Host-issued choices per question schema ref. */

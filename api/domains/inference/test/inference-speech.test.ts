@@ -408,18 +408,19 @@ test("a host delivery holds for a single clause without a judge call; a judged c
 	expect(calls).toBe(1);
 	expect(judged.delivery?.source).not.toBe("host");
 });
-test("each clause routes by its own text; English bypasses the Japanese dictionary; disabling routing keeps the Japanese voice", async () => {
+test("each clause routes by the spoken text after dictionary replacement", async () => {
 	const spoken: Array<[string, string | undefined]> = [];
 	const h = await setup({
-		speechText: (text) => text.replace("API", "エーピーアイ"),
+		speechText: (text) => text.replace(/\bAPI\b/gi, "エーピーアイ"),
 		localSpeech: async (text, _signal, options) => {
 			spoken.push([text, options?.speechLanguage]);
 			return wav();
 		},
 	});
 	await enableEnglishSpeech(h);
-	await h.inference.speakWithDelivery("Open the API settings.", freshSignal());
+	await h.inference.speakWithDelivery("Open the api settings.", freshSignal());
 	await h.inference.speakWithDelivery("APIを確認します。", freshSignal());
+	await h.inference.speak("Open the settings.", freshSignal());
 	await h.inference.speak(
 		"ここで Open the settings を押します。",
 		freshSignal(),
@@ -434,20 +435,21 @@ test("each clause routes by its own text; English bypasses the Japanese dictiona
 	});
 	await h.inference.speak("Open the settings.", freshSignal());
 	expect(spoken).toEqual([
-		["Open the API settings.", "en"],
+		["Open the エーピーアイ settings.", "ja"],
 		["エーピーアイを確認します。", "ja"],
+		["Open the settings.", "en"],
 		// A mixed request that was not split is spoken by the Japanese voice.
 		["ここで Open the settings を押します。", "ja"],
 		["Open the settings.", undefined],
 	]);
 	expect(
 		h.inference.usage().filter((r) => r.purpose === "tts" && r.accepted).length,
-	).toBe(4);
+	).toBe(5);
 });
-test("without an English voice an English clause is spoken by the Japanese voice with its dictionary", async () => {
+test("without an English voice an English clause keeps its dictionary replacement on the Japanese voice", async () => {
 	const spoken: Array<[string, string | undefined]> = [];
 	const h = await setup({
-		speechText: (text) => `辞書${text}`,
+		speechText: (text) => text.replace("waiting", "your patience"),
 		localSpeech: async (text, _signal, options) => {
 			if (options?.speechLanguage === "en")
 				throw new Error("speech_tts_target_unavailable");
@@ -459,7 +461,7 @@ test("without an English voice an English clause is spoken by the Japanese voice
 	expect(
 		await h.inference.speak("Thank you for waiting.", freshSignal()),
 	).toEqual(wav());
-	expect(spoken).toEqual([["辞書Thank you for waiting.", "ja"]]);
+	expect(spoken).toEqual([["Thank you for your patience.", "ja"]]);
 	expect(h.calls).toEqual([]);
 	expect(
 		h.inference.usage().filter((r) => r.purpose === "tts" && r.accepted).length,

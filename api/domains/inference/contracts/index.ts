@@ -4,7 +4,6 @@ import type { Database } from "bun:sqlite";
 import type { Settings, Purpose } from "../../settings/contracts";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
 export type { ChatImage } from "../../larm";
-export type { RouteAnswer, RouteInput } from "../../larm";
 export type Messages = ChatMessage[];
 /** How much a model thinks before it answers (`off`: not at all). */
 export type ReasoningLevel = "off" | "low" | "medium" | "high";

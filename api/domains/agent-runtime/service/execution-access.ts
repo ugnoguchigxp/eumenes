@@ -3,6 +3,7 @@ import { hash } from "../../capabilities";
 import {
 	executionReference,
 	type ExecutionReference,
+	type ExecutionView,
 } from "../../tool-runtime";
 import {
 	eraseExecutionBodies,
@@ -37,6 +38,39 @@ function purge(ctx: ExecutionContext, db: Database, row: ExecutionRow) {
 		ctx.port().revokeDeliveryInTransaction?.(db, event.id);
 	ctx.port().purgeSourcesInTransaction?.(db, executionSource(row), children);
 	eraseExecutionBodies(db, row, now());
+}
+
+/** The registered worker's completion notice still has to stand on its adopted result. */
+function selectedView(
+	ctx: ExecutionContext,
+	db: Database,
+	row: ExecutionRow,
+): ExecutionView {
+	const view = executionView(row);
+	if (!view.result?.report) return view;
+	const state = executionState(row);
+	const refs = state.refs.filter((ref) => view.result!.refs.includes(ref.ref));
+	if (
+		row.source_json &&
+		refs.length > 0 &&
+		refs.every((ref) =>
+			ctx.port().validReferenceInTransaction(db, executionSource(row), ref),
+		)
+	)
+		return view;
+	const code = "evidence_invalidated";
+	return {
+		...view,
+		status: "failed",
+		result: {
+			status: "failed",
+			code,
+			summary: code,
+			fulfilled: [],
+			missing: [code],
+			refs: [],
+		},
+	};
 }
 
 export function executionAccess(
@@ -216,8 +250,9 @@ export function executionAccess(
 				) as import("../../tool-runtime").ChildResult,
 			};
 		},
-		viewInTransaction: (db: Database, id: string) => {
+		viewInTransaction: (db: Database, id: string, validateEvidence = false) => {
 			const row = table(db) ? executionRow(db, id) : null;
+			if (row && validateEvidence) return selectedView(ctx, db, row);
 			return row ? executionView(row) : null;
 		},
 		continuationInTransaction(

@@ -373,6 +373,7 @@ function childLauncher(
 			return fail(db, row, state, "execution_budget_exceeded");
 		const child = {
 			...input,
+			...(state.single ? { selectedWorker: true as const } : {}),
 			id,
 			executionId: row.id,
 			revision: row.request_revision,
@@ -419,6 +420,7 @@ function selectedResult(row: ExecutionRow, result: ChildResult, ref: string) {
 		fulfilled: result.state === "completed" ? [row.request] : [],
 		missing: result.state === "completed" ? [] : [result.code ?? result.state],
 		refs: [ref],
+		...(result.report ? { report: result.report } : {}),
 		...(result.code ? { code: result.code } : {}),
 	};
 }

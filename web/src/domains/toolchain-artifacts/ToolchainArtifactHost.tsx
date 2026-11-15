@@ -28,6 +28,7 @@ import { toolchainArtifactsQuery } from "./launcher";
 import { useAnswer, useOpenQuestion } from "./questions";
 import { useScreenDispatch } from "./screen-dispatch";
 import { SecretNotice, useSecretNotice } from "./secret-notice";
+import { useScreenObservation } from "./screen-observation";
 import type {
 	AdapterState,
 	WebAdapterRegistry,
@@ -98,6 +99,15 @@ export function ToolchainArtifactHost(props: ToolchainArtifactHostProps) {
 			client.toolchainArtifact(artifactRevisionId, signal),
 		staleTime: Number.POSITIVE_INFINITY,
 	});
+	useScreenObservation(
+		props.artifactId,
+		props.visible !== false && !detail.isSuccess,
+		{
+			artifactRevisionId,
+			variantId: props.variantId,
+			phase: detail.isError ? "error" : "loading",
+		},
+	);
 	if (detail.isPending) return <Message>画面を読み込んでいます</Message>;
 	if (detail.isError)
 		return (
@@ -309,6 +319,13 @@ function AdapterScreen({
 	const variant = artifact.variants.find(
 		(v) => v.id === (variantId ?? artifact.defaultVariant),
 	);
+	useScreenObservation(artifactId, visible, {
+		artifactRevisionId,
+		adapterRef: adapter.adapterRef,
+		variantId: variant?.id,
+		phase: variant ? state.phase.kind : "error",
+		...(variant && state.phase.kind === "ready" ? own.screenState : {}),
+	});
 	const definition = useMemo(
 		() =>
 			variant

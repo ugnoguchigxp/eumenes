@@ -104,6 +104,20 @@ describe("speech detector", () => {
 		expect(d.observe(new Float32Array(0)).hasSpeech).toBe(false);
 	});
 
+	it.each([false, true])(
+		"uses playback state from the captured audio when classification finishes later (strict=%s)",
+		async (strict) => {
+			const d = detector({
+				classify: async () => 0.65,
+				reset() {},
+				close() {},
+			});
+			for (let i = 0; i < 3; i++) d.observe(loud(), { strict });
+			await Promise.resolve();
+			expect(d.observe(loud(), { strict: !strict }).hasSpeech).toBe(!strict);
+		},
+	);
+
 	it("restarts the model stream for each utterance", () => {
 		const { classifier, resets } = scripted([0.9]);
 		const d = detector(classifier);

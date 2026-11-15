@@ -41,6 +41,15 @@ export const model3dWebAdapter: WebArtifactAdapter = {
 		});
 		useEffect(() => live.attach({ read: () => latest.current }), []);
 		return {
+			screenState: {
+				selection: screen.failedId
+					? "error"
+					: screen.loadedId
+						? "selected"
+						: screen.requestedId
+							? "loading"
+							: "none",
+			},
 			phase: error
 				? { kind: "error", message: "3Dモデルの情報を取得できませんでした。" }
 				: loading

@@ -35,7 +35,11 @@ import {
 
 const log = getLogger("inference");
 
-async function attempt(r: Request, source: Source): Promise<Receipt> {
+async function attempt(
+	r: Request,
+	source: Source,
+	speech?: { text: string; language?: SpeechLanguage },
+): Promise<Receipt> {
 	const { env, row } = r;
 	if (r.signal.aborted) throw new Error("cancelled");
 	const connection = source === "cloud" ? r.selected?.connection : undefined;
@@ -99,25 +103,16 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			}
 		: undefined;
 	try {
-		let language: SpeechLanguage | undefined;
-		if (
-			row.purpose === "tts" &&
-			source === "larm" &&
-			row.snapshot.larm.englishSpeechEnabled
-		) {
-			language = speechLanguage(r.input as string);
+		let language = source === "larm" ? speech?.language : undefined;
+		if (language) {
 			callOptions.speechLanguage = language;
 			log.info("inference.speech_language_selected", {
 				...logFields,
 				kind: language,
 			});
 		}
+		const sent = speech?.text ?? r.input;
 		const prepare = async () => {
-			// English speech preserves the original words rather than applying a Japanese reading dictionary.
-			const sent =
-				row.purpose === "tts" && language !== "en" && env.options.speechText
-					? env.options.speechText(r.input as string)
-					: r.input;
 			let delivery: SpeechDelivery | undefined =
 				row.purpose === "tts" &&
 				r.preparation?.delivery?.version === 2 &&
@@ -138,9 +133,9 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 					attemptSignal,
 					connection,
 				});
-			return { sent, delivery };
+			return delivery;
 		};
-		let { sent, delivery } = await prepare();
+		let delivery = await prepare();
 		log.info("inference.prepared", {
 			...logFields,
 			durationMs: performance.now() - started,
@@ -181,7 +176,7 @@ async function attempt(r: Request, source: Source): Promise<Receipt> {
 			});
 			language = "ja";
 			callOptions.speechLanguage = language;
-			({ sent, delivery } = await prepare());
+			delivery = await prepare();
 			value = await provide();
 		}
 		if (
@@ -288,9 +283,14 @@ function cloudAnswerAllowed(
 }
 
 /** Runs the request: larm first (unless cloud-only), then the cloud fallback when allowed. */
-async function runAttempts(r: Request, key: string): Promise<Receipt> {
-	const { env, row } = r;
-	const mode = route(r).mode;
+async function runAttempts(r: Request): Promise<Receipt> {
+	const { env, row, selected } = r;
+	const { mode } = route(r);
+	// Rewrite speech once, when it reaches the lane, and route by what will actually be spoken.
+	const speech =
+		row.purpose === "tts" ? prepareSpeech(r, mode !== "cloud-only") : undefined;
+	// The two LARM voices have separate cooldowns.
+	const key = `${row.purpose}:${JSON.stringify({ larm: row.snapshot.larm, route: row.snapshot.routes[row.purpose], resource: selected?.resource, connection: selected?.connection, voice: speech?.language })}`;
 	const cloudTarget = r.session?.target === "cloud";
 	if (cloudTarget && mode !== "cloud-only") r.reason = "cloud_requested";
 	if (mode !== "cloud-only" && !cloudTarget) {
@@ -304,7 +304,7 @@ async function runAttempts(r: Request, key: string): Promise<Receipt> {
 			r.reason = "local_cooldown";
 		else
 			try {
-				const result = await attempt(r, "larm");
+				const result = await attempt(r, "larm", speech);
 				env.cooldown.delete(key);
 				return result;
 			} catch (error) {
@@ -326,7 +326,19 @@ async function runAttempts(r: Request, key: string): Promise<Receipt> {
 		purpose: row.purpose,
 		reason: r.reason ?? "cloud_only",
 	});
-	return await attempt(r, "cloud");
+	return await attempt(r, "cloud", speech);
+}
+
+function prepareSpeech(r: Request, local: boolean) {
+	const original = r.input as string;
+	const text = r.env.options.speechText?.(original) ?? original;
+	return {
+		text,
+		language:
+			local && r.row.snapshot.larm.englishSpeechEnabled
+				? speechLanguage(text)
+				: undefined,
+	};
 }
 
 export async function executeRequest(
@@ -452,18 +464,11 @@ export async function executeRequest(
 		published: false,
 		deltaRefused: false,
 	};
-	const routeConfig = row.snapshot.routes[row.purpose];
-	// English and Japanese clauses use separate LARM voices; one voice's outage must not cool down the other.
-	const voice =
-		row.purpose === "tts" && row.snapshot.larm.englishSpeechEnabled
-			? speechLanguage(request.input as string)
-			: undefined;
-	const key = `${row.purpose}:${JSON.stringify({ larm: row.snapshot.larm, route: routeConfig, resource: selected?.resource, connection: selected?.connection, voice })}`;
 	try {
-		if (row.purpose !== "tts") return await runAttempts(request, key);
+		if (row.purpose !== "tts") return await runAttempts(request);
 		return await env.speechLane.run(
 			signal,
-			() => runAttempts(request, key),
+			() => runAttempts(request),
 			(waited, ahead) => {
 				if (ahead)
 					log.info("inference.speech_lane_waited", {

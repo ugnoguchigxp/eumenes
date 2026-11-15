@@ -6,8 +6,7 @@ import type { DialogueDeps } from "./context";
 import { workContextCurrent } from "./work-context-input";
 import type { DocumentRefs, TodoItem } from "./work-items";
 import { INPUT_HEADINGS, gapText, jstNowLine, lineText } from "./input-text";
-import { viewingLineInTransaction } from "./resource-context";
-import { viewedSpecialistTarget } from "./specialist-context";
+import { screenLinesInTransaction } from "./resource-context";
 import {
 	attachedLinesInTransaction,
 	SHARED_LINES,
@@ -105,6 +104,8 @@ export type StateInput = {
 	conversationId: string;
 	/** The run being prepared; absent for a background call, which shows no screen and consumes nothing. */
 	run?: Run;
+	/** The same frozen screen projection that normal talk receives. */
+	screenLines?: readonly string[];
 	nowMs: number;
 	/** When the newest utterance before this input was said. */
 	lastAt: number | null;
@@ -224,17 +225,13 @@ function presentedLines(
 	const { refs } = input;
 	const lines: string[] = [];
 	if (input.run) {
-		// The input's own attachments and long paste, before what is on screen (§8.1).
+		lines.push(
+			...(input.screenLines ?? screenLinesInTransaction(deps, tx, input.run)),
+		);
+		// The input's own attachments and long paste (§8.1).
 		lines.push(
 			...attachedLinesInTransaction(deps, tx, input.run.inputMessageId, shown),
 		);
-		const viewing = viewingLineInTransaction(deps, tx, input.run);
-		if (viewing) lines.push(`- ${lineText(viewing)}（画面に表示中）`);
-		const target = viewedSpecialistTarget(deps, tx, input.run);
-		if (target)
-			lines.push(
-				`- ${lineText(target.specialist)}「${lineText(target.label)}」（画面に表示中、target ${target.ref}）`,
-			);
 	}
 	const message = input.lastAgent?.messageId
 		? deps.conversation.messageInTransaction(tx, input.lastAgent.messageId)

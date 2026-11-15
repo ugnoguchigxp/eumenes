@@ -289,11 +289,12 @@ export function createAudioController(
 						!state.context
 					)
 						return;
+					const now = performance.now();
+					const mayHearOutput = output.audible || now < output.listenAfter;
 					const gated =
-						(!!options.halfDuplex?.() &&
-							(!!output.playing || performance.now() < output.listenAfter)) ||
-						(!!output.playing && output.suppressInput) ||
-						performance.now() < output.forcedGateUntil;
+						(!!options.halfDuplex?.() && mayHearOutput) ||
+						output.suppressInput ||
+						now < output.forcedGateUntil;
 					if (gated) {
 						// Drop anything heard so far; the reply must not become input.
 						frame.fill(0);
@@ -308,7 +309,7 @@ export function createAudioController(
 					wasGated = gated;
 					// Our own reply (and its output tail) may reach the microphone while barge-in is on.
 					const observation = detector?.observe(frame, {
-						strict: !!output.playing || performance.now() < output.listenAfter,
+						strict: mayHearOutput,
 					});
 					if (detector?.failed) {
 						classifier = release(classifier);

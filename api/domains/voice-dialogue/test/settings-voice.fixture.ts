@@ -27,6 +27,10 @@ import {
 	createSettings,
 	migrations as settingsMigrations,
 } from "../../settings";
+import {
+	createTtsDictionary,
+	migrations as dictionaryMigrations,
+} from "../../tts-dictionary";
 import { testConversationAgent } from "./conversation-agent.fixture";
 /** A chat completion that says `text` (a conversation reply is plain text; no call closes it). */
 export function completion(text: string) {
@@ -81,6 +85,7 @@ async function setup(
 			...voiceMigrations,
 			...settingsMigrations,
 			...inferenceMigrations,
+			...dictionaryMigrations,
 		]),
 	);
 	const settings = await createSettings(store, { dbPath, env: {} });
@@ -123,7 +128,9 @@ async function setup(
 				? new Response(wav())
 				: Response.json(completion("fixture answer"));
 	};
+	const dictionary = createTtsDictionary(store);
 	const inference = createInference(store, settings, {
+		speechText: dictionary.apply,
 		fetch: (input, init) => (fetcher ?? defaultFetch)(input, init),
 		larmFactory: () => ({
 			status: () => ({ state: "unconfigured", capabilities: [] }),
@@ -166,6 +173,7 @@ async function setup(
 	return {
 		store,
 		settings,
+		dictionary,
 		inference,
 		conversation,
 		dialogue,

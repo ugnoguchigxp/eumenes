@@ -104,7 +104,7 @@ export async function fixture(
 				},
 				request: text,
 				references: [],
-				toolchainRevisionId: "toolchain:web.note@2",
+				toolchainRevisionId: "toolchain:web.note@3",
 				bindingRevisionId: "binding:web.note@1",
 				...extra,
 			}),

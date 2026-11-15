@@ -64,9 +64,9 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 
 候補の提示: 依頼の検索・選択は Router（次の段落）が行います。仕事の実行（委任された仕事が担当を探す `find`）は、ツールチェーンの`title: summary`・`useWhen`の各行・`examples`の各文をLARMのembedding（担当の文はpassage、依頼はquery）で埋め込み、担当ごとに一番近い1文の内積で並べ、種類ごとの枠（専用の担当の上位3件と、1位との差が0.05以内のパイプライン・汎用の担当を各2件まで。[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §3）で候補にします。
 
-Router（担当の振り分け）: `eumenes_router` パッケージ（`vendor/router/` のtarball）が判断します。設定 `router`（CLIの `router status|import-memory <file>|set <項目> <値>|clear-profile`、`GET`/`PATCH /api/settings/router`）にprofileを保存すると有効になり、未保存の間は会話の回だけです。`route`は発言全体を検索・採点します。`routeStructured`は保存済みの構造解析資源（未指定なら会話の経路）へ一回問い合わせ、現在の発言と有効な保留質問から回答・依頼・会話・確認を区別します。解析や引継ぎの失敗では依頼全体を未実施として止め、全文の単独振り分けへ戻しません。通常会話の受入と残課題は[現行の実施記録](../spec/project-issues-first-batch-2026-11-06.md)を参照してください。
+Router（担当の振り分け）: `eumenes_router` パッケージ（`vendor/router/` のtarball）の `routeWithSelection` を使います。カードの全文検索、LARM の埋め込み、過去の訂正から候補を探し、クラウド LLM が担当を選びます。会話前の判定は発言の構造を判断し、最大5件の担当候補から選びます。会話エージェントが `find_toolchain` を呼ぶ場合は、会話から組み立てた依頼をツール専用の選択に渡します。判定先と期限は `GET`／`PATCH /api/settings/router` または CLI の `router status`／`router set` で確認・変更できます。[選択方式への切替](../spec/router-package-integration-2026-11-04.md#2026-11-14-選択方式への切替)を参照してください。
 
-検索は同期したカードの全文検索とLARMの埋め込み（passage）、採点は保存profileの文脈判定（`decision.context`）、best-v2、訂正の補正と決定表を使います。best-v2の記憶は `router import-memory` で取り込み、Gitにはありません。hostは実在する仕事・承認・質問・切替待ちと進行中の担当を候補へ加えます。選択した担当は `find_toolchain` のofferと既存の権限・影響・承認・TODO・Queueを通して実行します。複数作業の決定は登録済みPipelineへ元依頼全体を渡し、利用できない場合に先頭の仕事だけを代わりに実行しません。
+ホストは実在する仕事・承認・質問・切替待ちと進行中の担当を候補へ加えます。選択した担当は `find_toolchain` の候補提示と既存の権限・影響・承認・TODO・Queueを通して実行します。複数作業の決定は登録済みPipelineへ元依頼全体を渡し、利用できない場合に先頭の仕事だけを代わりに実行しません。
 
 Routerが会話に決めた回では、agendaが返事を担う会話に限り、返事が `find_toolchain`（検索）と `delegate`（その返事で見つけた担当への依頼）を使えます。引き渡しは上と同じ権限・影響・承認・TODO・Queueを通ります（[agency.md](agency.md)の「会話の返事から担当に頼む」）。
 

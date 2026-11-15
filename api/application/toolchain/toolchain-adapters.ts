@@ -15,6 +15,10 @@ import {
 } from "../markdown/markdown-adapter";
 import { describeWebNoteAdapter } from "../web-note/web-note-adapter";
 import {
+	ARCHIVE_RESEARCH_ADAPTER,
+	describeArchiveResearchAdapter,
+} from "../markdown/archive-research-adapter";
+import {
 	DOCLING_ADAPTER_REF,
 	describeDoclingAdapter,
 	doclingDomainSchemas,
@@ -255,6 +259,7 @@ export const hostAdapterDescriptions: Array<
 	{ ref: SHELL_ADAPTER_REF, describe: describeShellAdapter },
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
 	{ ref: "adapter:web-note@1", describe: describeWebNoteAdapter },
+	{ ref: ARCHIVE_RESEARCH_ADAPTER, describe: describeArchiveResearchAdapter },
 	{ ref: PIPELINES_ADAPTER_REF, describe: describePipelinesAdapter },
 	{ ref: TIMER_ADAPTER_REF, describe: describeTimerAdapter },
 	{ ref: SCHEDULER_ADAPTER_REF, describe: describeSchedulerAdapter },

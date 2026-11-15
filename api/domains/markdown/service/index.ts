@@ -12,6 +12,7 @@ import { view, create, apply, replay, sessionAdapter } from "./workspace";
 import { createArchiveSave } from "./archive-save";
 import { createArchiveRecovery } from "./archive-recovery";
 import { createArchiveLibrary } from "./archive-library";
+import { createArchiveResearch } from "./archive-research";
 import { createLibraryManagement } from "./library-management";
 import { createGeneratedDocuments } from "./generated";
 import { staged, stageDocument } from "./inputs";
@@ -29,6 +30,7 @@ export function createMarkdown(deps: {
 		generated: createGeneratedDocuments(store, queue, archive, deps.publish),
 		...createLibraryManagement(store, archive, deps.publish),
 		available: archive.available,
+		research: createArchiveResearch(archive),
 		stage: stageDocument(store),
 		listInTransaction: list,
 		viewInTransaction: view,

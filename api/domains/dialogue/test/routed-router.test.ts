@@ -371,7 +371,7 @@ test("a single request masks the resource for retrieval and retains the original
 	r.scripts.push(weigh({ [IMAGE.id]: 0.95 }));
 	const waiting = await h!.say("この音楽に合う画像を作って", "queued");
 	expect(waiting.announcement).toBe("「画像」に頼みます。");
-	// The reranker read the request with its reference masked; the toolchain got the user's words.
+	// The selector saw the masked reference; the toolchain got the user's words.
 	expect(h!.state.routerEmbeds).toEqual(["これに合う画像を作って"]);
 	expect(h!.state.selections.at(-1)).toMatchObject({
 		request: "この音楽に合う画像を作って",

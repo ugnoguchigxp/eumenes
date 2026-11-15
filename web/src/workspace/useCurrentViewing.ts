@@ -1,5 +1,5 @@
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import type { ToolchainArtifactEntry } from "../../../client/toolchain-actions";
 import type {
 	RunViewing,
@@ -17,6 +17,7 @@ import {
 	type WebArtifactAdapter,
 } from "../domains/toolchain-artifacts/registry";
 import { queryRoots } from "../queryKeys";
+import { readScreenState } from "../domains/toolchain-artifacts/screen-observation";
 import { toolchainWebAdapters } from "./toolchain-adapters";
 
 type ActiveTab = ReturnType<typeof useArtifactWorkspace>["active"];
@@ -67,7 +68,7 @@ export function useViewingUri(
 ) {
 	const cache = useQueryClient();
 	const tab = useRef(active);
-	useEffect(() => {
+	useLayoutEffect(() => {
 		tab.current = active;
 	}, [active]);
 	return useCallback(
@@ -87,22 +88,40 @@ export function useCurrentViewing(
 ): () => RunViewing | undefined {
 	const cache = useQueryClient();
 	const tab = useRef(active);
-	useEffect(() => {
+	useLayoutEffect(() => {
 		tab.current = active;
 	}, [active]);
-	const viewingUri = useViewingUri(active, adapters);
+	const observation = useRef<{ sessionId: string; sequence: number } | null>(
+		null,
+	);
 	return useCallback(() => {
-		const viewing = specialistViewing() ?? recognitionViewing(tab.current);
-		if (viewing) return viewing;
 		const current = tab.current;
+		const entries = catalogEntries(cache);
+		let viewing = specialistViewing() ?? recognitionViewing(current);
 		if (current?.kind === "toolchain") {
-			const entry = catalogEntries(cache).find(
+			const entry = entries.find(
 				(e) => e.artifactRevisionId === current.artifactRevisionId,
 			);
-			const target = entry && adapters.get(entry.adapterRef)?.viewingTarget?.();
-			if (target) return target;
+			const state = readScreenState(current.id, current.artifactRevisionId);
+			const ref = state?.adapterRef ?? entry?.adapterRef;
+			const adapter = ref ? adapters.get(ref) : undefined;
+			viewing ??= adapter?.viewingTarget?.() ?? undefined;
+			if (state) {
+				observation.current ??= { sessionId: crypto.randomUUID(), sequence: 0 };
+				const { adapterRef: _adapterRef, ...publicState } = state;
+				const screen = {
+					...publicState,
+					sessionId: observation.current.sessionId,
+					sequence: ++observation.current.sequence,
+					observedAt: new Date().toISOString(),
+				};
+				if (viewing) return { ...viewing, screen };
+				const uri = state.phase === "ready" ? adapter?.viewing?.() : null;
+				return uri ? { resource: uri, screen } : { screen };
+			}
 		}
-		const uri = viewingUri();
+		if (viewing) return viewing;
+		const uri = viewingUriOf(current, entries, adapters);
 		return uri ? { resource: uri } : undefined;
-	}, [specialistViewing, viewingUri, cache, adapters]);
+	}, [specialistViewing, cache, adapters]);
 }

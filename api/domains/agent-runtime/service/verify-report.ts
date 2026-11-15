@@ -68,7 +68,8 @@ export function verifyReport(
 				quote:
 					source.kind === "conversation_source" ||
 					source.kind === "world_claim" ||
-					source.kind === "world_document"
+					source.kind === "world_document" ||
+					source.kind === "archive_document"
 						? ""
 						: quote,
 				...(viewId ? { viewId } : {}),
@@ -139,28 +140,39 @@ export function parentProjection(report: Report) {
 		coverage: report.coverage,
 		verification: report.verification,
 		sources: report.sources.map((s) =>
-			s.kind === "world_claim" || s.kind === "world_document"
+			s.kind === "archive_document" && s.archive
 				? {
 						sourceId: s.sourceId,
 						kind: s.kind,
-						origin: s.origin,
-						...(s.kind === "world_document" ? { title: s.title } : {}),
+						title: s.title,
+						documentId: s.archive.documentId,
+						revision: s.archive.revision,
+						start: s.start,
+						end: s.end,
+						fetchedAt: s.fetchedAt,
 					}
-				: s.kind === "conversation_source"
+				: s.kind === "world_claim" || s.kind === "world_document"
 					? {
 							sourceId: s.sourceId,
 							kind: s.kind,
-							messageId: s.messageId,
-							speaker: s.speaker,
-							createdAt: s.createdAt,
-							revision: s.revision,
+							origin: s.origin,
+							...(s.kind === "world_document" ? { title: s.title } : {}),
 						}
-					: {
-							sourceId: s.sourceId,
-							url: s.url,
-							basis: s.basis,
-							fetchedAt: s.fetchedAt,
-						},
+					: s.kind === "conversation_source"
+						? {
+								sourceId: s.sourceId,
+								kind: s.kind,
+								messageId: s.messageId,
+								speaker: s.speaker,
+								createdAt: s.createdAt,
+								revision: s.revision,
+							}
+						: {
+								sourceId: s.sourceId,
+								url: s.url,
+								basis: s.basis,
+								fetchedAt: s.fetchedAt,
+							},
 		),
 	};
 }

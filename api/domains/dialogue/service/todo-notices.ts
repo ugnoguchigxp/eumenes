@@ -2,6 +2,8 @@ import type { TodoNotice } from "../contracts/todo-notices";
 import type { WorkLink } from "../contracts/resources";
 import type { WorkRow } from "../repository/work";
 import { replaceResourceUrisIn } from "./resource-text";
+import { archiveSourceLabel } from "./result-text";
+import type { ExecutionResult } from "../../tool-runtime";
 
 /** Characters of a notice's result line. */
 export const NOTICE_RESULT_CHARS = 200;
@@ -27,6 +29,18 @@ export function resultLine(
 		return oneLine(result, NOTICE_RESULT_CHARS) || undefined;
 	if (typeof result === "object" && !Array.isArray(result)) {
 		const record = result as Record<string, unknown>;
+		const sources = (result as ExecutionResult).report?.sources;
+		const source = Array.isArray(sources)
+			? sources.find((item) => item?.kind === "archive_document")
+			: undefined;
+		if (source && typeof record.summary === "string") {
+			const citation = archiveSourceLabel(source, 40);
+			const room = Math.max(16, NOTICE_RESULT_CHARS - citation.length - 2);
+			return oneLine(
+				`${oneLine(record.summary, room)}（${citation}）`,
+				NOTICE_RESULT_CHARS,
+			);
+		}
 		for (const key of TEXT_FIELDS)
 			if (typeof record[key] === "string" && record[key].trim())
 				return oneLine(record[key], NOTICE_RESULT_CHARS);

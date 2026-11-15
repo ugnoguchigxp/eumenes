@@ -6,6 +6,11 @@ import {
 } from "../../domains/web-note";
 import { createWebNoteAdapter } from "../web-note/web-note-adapter";
 import { createMarkdownAdapter } from "../markdown/markdown-adapter";
+import { createArchiveResearchAdapter } from "../markdown/archive-research-adapter";
+import {
+	createArchiveResearchTools,
+	isArchiveResearchOperation,
+} from "../markdown/archive-research-tools";
 import { createDoclingAdapter } from "../docling/docling-adapter";
 import { createDotsMessagingAdapter } from "../work/dots-messaging-adapter";
 import { createDotsDelegationAdapter } from "../work/dots-delegation-adapter";
@@ -305,6 +310,9 @@ export async function createToolchain(
 	const registry = createAdapterRegistry([
 		...collaboration.adapters,
 		...(options.markdown ? [createMarkdownAdapter(options.markdown)] : []),
+		...(options.markdown
+			? [createArchiveResearchAdapter(options.markdown, () => taskRuntime)]
+			: []),
 		...(options.docling ? [createDoclingAdapter(options.docling)] : []),
 		...(options.canvasAdapter ? [options.canvasAdapter] : []),
 		createTaskAdapter(() => taskRuntime, options.todos),
@@ -481,6 +489,9 @@ export async function createToolchain(
 	configureResearchReview(options.browser, web);
 
 	const adapter = researchToolAdapter({
+		archive:
+			options.markdown &&
+			createArchiveResearchTools(queue, options.markdown.research),
 		reads,
 		world,
 		worldPorts,
@@ -565,6 +576,7 @@ export async function createToolchain(
 }
 
 function researchToolAdapter(deps: {
+	archive?: ReturnType<typeof createArchiveResearchTools>;
 	reads: ReturnType<typeof createReadPorts>;
 	world: ReturnType<NonNullable<ToolchainOptions["worldResearch"]>> | undefined;
 	worldPorts: () => ReturnType<NonNullable<ToolchainOptions["worldResearch"]>>;
@@ -580,12 +592,21 @@ function researchToolAdapter(deps: {
 	>["source"];
 	tools: () => ReturnType<typeof createToolRuntime>;
 }): ToolAdapter {
-	const { reads, world, worldPorts, web, options, children, researchSource } =
-		deps;
+	const {
+		reads,
+		world,
+		worldPorts,
+		web,
+		options,
+		children,
+		researchSource,
+		archive,
+	} = deps;
 	return {
 		...reads,
 		releaseTask(id) {
 			reads.releaseTask?.(id);
+			archive?.releaseTask(id);
 			options.browser?.service.releaseResearchOwner(id);
 		},
 		operationFingerprintInTransaction(db, r) {
@@ -603,14 +624,20 @@ function researchToolAdapter(deps: {
 			const readings = sources.filter(
 				(s) => s.kind !== "world_claim" && s.kind !== "world_document",
 			);
+			const archived = readings.filter((s) => s.kind === "archive_document");
 			return (
 				reads.validateEvidenceInTransaction!(db, owner, readings, proofs) &&
+				(!archived.length || !!archive?.validate(archived)) &&
 				(readings.length === sources.length ||
 					(world?.validateEvidenceInTransaction?.(db, owner, sources, []) ??
 						false))
 			);
 		},
 		startInTransaction(db, r) {
+			if (r.tool.backend === "markdown") {
+				if (!archive) throw new Error("markdown_archive_unavailable");
+				return archive.startInTransaction(db, r);
+			}
 			if (r.tool.id === "browser.research") {
 				if (!children) throw new Error("capability_unavailable");
 				const args = r.arguments as { request: string; url?: string };
@@ -648,6 +675,7 @@ function researchToolAdapter(deps: {
 			return { operationId: op.runId, jobId: op.jobId };
 		},
 		get(id) {
+			if (isArchiveResearchOperation(id)) return archive?.get(id) ?? null;
 			if (id.startsWith("browser-child:")) return children?.get(id) ?? null;
 			const run = web.get(id);
 			if (!run) return null;
@@ -665,9 +693,11 @@ function researchToolAdapter(deps: {
 			};
 		},
 		cancelInTransaction: (db, id) =>
-			id.startsWith("browser-child:")
-				? (children?.cancelInTransaction(db, id) ?? [])
-				: web.cancelInTransaction(db, id, "cancel_requested"),
+			isArchiveResearchOperation(id)
+				? (archive?.cancelInTransaction(db, id) ?? [])
+				: id.startsWith("browser-child:")
+					? (children?.cancelInTransaction(db, id) ?? [])
+					: web.cancelInTransaction(db, id, "cancel_requested"),
 	};
 }
 

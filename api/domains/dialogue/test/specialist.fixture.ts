@@ -21,7 +21,6 @@ import type {
 import type { ImagePort } from "../contracts/image";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { ChatMessage } from "../service/context";
-import type { RouteInput } from "../../inference/contracts";
 import {
 	FIXTURE_ROUTER,
 	IMAGE,
@@ -30,6 +29,7 @@ import {
 	routerCards,
 	sectionLines,
 	type Call,
+	type ChoiceInput,
 	type Step,
 } from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
@@ -148,8 +148,8 @@ export async function setup(options: Options = {}) {
 		endWorkFails: false,
 		/** The toolchains a search finds, by id; null: every card. */
 		found: null as string[] | null,
-		/** What the router's context judgment was asked, turn by turn. */
-		routerAsked: [] as RouteInput[],
+		/** What the router was asked to select, turn by turn. */
+		routerAsked: [] as ChoiceInput[],
 		/** Saved items deleted since: no longer offered, and opening one is refused. */
 		gone: new Set<string>(),
 		/** A safe code the next operations are refused with. */

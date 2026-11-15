@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import {
 	READ_TOOLS,
+	artifactDefinitionV1,
 	toolchainRuntimeOf,
 	type AgentV1,
 	type BindingV1,
@@ -49,6 +50,70 @@ function perPass<T>(compute: (db: Database) => T) {
 			if (cache.get(db)?.value === value) cache.delete(db);
 		});
 		return value;
+	};
+}
+
+function createBoundCommandPort(
+	capabilities: Capabilities,
+	registry: AdapterRegistry,
+	schemas: SchemaProvider,
+): BoundCommandPort {
+	function adapterOf(db: Database, bindingRevisionId: string) {
+		const doc = capabilities.documentInTransaction(db, bindingRevisionId);
+		const ref =
+			doc && (doc.document as { kind?: string }).kind === "binding"
+				? (doc.document as { adapterRef: string }).adapterRef
+				: undefined;
+		const adapter = ref ? registry.get(ref) : undefined;
+		if (!adapter || !adapter.availableInTransaction(db))
+			throw new Error("adapter_unavailable");
+		return adapter;
+	}
+	return {
+		snapshotInTransaction: (db, bindingRevisionId, context) =>
+			adapterOf(db, bindingRevisionId).snapshotInTransaction(db, context),
+		parseInvocation(set, toolId, args) {
+			const tool = set.tools.find((t) => t.id === toolId);
+			if (!tool) return { ok: false, code: "toolchain_command_tool_unknown" };
+			const schema = schemas.get(tool.inputSchemaRef);
+			if (!schema) return { ok: false, code: "unsupported_schema" };
+			const parsed = schema.safeParse(args ?? {});
+			return parsed.success
+				? {
+						ok: true,
+						toolRevisionId: tool.toolRevisionId,
+						operationName: tool.operationName,
+						input: parsed.data as Record<string, unknown>,
+					}
+				: { ok: false, code: "toolchain_command_invalid_arguments" };
+		},
+		questionChoicesInTransaction: (db, bindingRevisionId, inputSchemaRef) =>
+			adapterOf(db, bindingRevisionId).choicesInTransaction?.(
+				db,
+				inputSchemaRef,
+			) ?? [],
+		answerSchema(inputSchemaRef) {
+			const schema = schemas.get(inputSchemaRef);
+			return schema ? z.toJSONSchema(schema) : null;
+		},
+		parseAnswer(inputSchemaRef, input) {
+			const schema = schemas.get(inputSchemaRef);
+			if (!schema) return { ok: false, code: "unsupported_schema" };
+			const parsed = schema.safeParse(input);
+			return parsed.success
+				? { ok: true, value: parsed.data }
+				: { ok: false, code: "invalid_answer" };
+		},
+		prepareInTransaction(db, runId, set, invocation) {
+			adapterOf(db, set.bindingRevisionId);
+			return capabilities.prepareBoundInTransaction(
+				db,
+				{ rootRunId: runId, taskId: runId, cancelEpoch: 0 },
+				set.packageRevisionId,
+				invocation.toolRevisionId,
+				invocation.input,
+			);
+		},
 	};
 }
 
@@ -130,17 +195,6 @@ export function createToolchainRouting(
 				: [];
 		}),
 	);
-	function adapterOf(db: Database, bindingRevisionId: string) {
-		const doc = capabilities.documentInTransaction(db, bindingRevisionId);
-		const ref =
-			doc && (doc.document as { kind?: string }).kind === "binding"
-				? (doc.document as { adapterRef: string }).adapterRef
-				: undefined;
-		const adapter = ref ? registry.get(ref) : undefined;
-		if (!adapter || !adapter.availableInTransaction(db))
-			throw new Error("adapter_unavailable");
-		return adapter;
-	}
 	const instant = createInstantRouting({
 		capabilities,
 		registry,
@@ -153,52 +207,7 @@ export function createToolchainRouting(
 	/** The card with the instant execution's typed arguments. */
 	const enrich = (db: Database, card: Parameters<typeof instant.card>[1]) =>
 		instant.card(db, card);
-	const bound: BoundCommandPort = {
-		snapshotInTransaction: (db, bindingRevisionId, context) =>
-			adapterOf(db, bindingRevisionId).snapshotInTransaction(db, context),
-		parseInvocation(set, toolId, args) {
-			const tool = set.tools.find((t) => t.id === toolId);
-			if (!tool) return { ok: false, code: "toolchain_command_tool_unknown" };
-			const schema = schemas.get(tool.inputSchemaRef);
-			if (!schema) return { ok: false, code: "unsupported_schema" };
-			const parsed = schema.safeParse(args ?? {});
-			return parsed.success
-				? {
-						ok: true,
-						toolRevisionId: tool.toolRevisionId,
-						operationName: tool.operationName,
-						input: parsed.data as Record<string, unknown>,
-					}
-				: { ok: false, code: "toolchain_command_invalid_arguments" };
-		},
-		questionChoicesInTransaction: (db, bindingRevisionId, inputSchemaRef) =>
-			adapterOf(db, bindingRevisionId).choicesInTransaction?.(
-				db,
-				inputSchemaRef,
-			) ?? [],
-		answerSchema(inputSchemaRef) {
-			const schema = schemas.get(inputSchemaRef);
-			return schema ? z.toJSONSchema(schema) : null;
-		},
-		parseAnswer(inputSchemaRef, input) {
-			const schema = schemas.get(inputSchemaRef);
-			if (!schema) return { ok: false, code: "unsupported_schema" };
-			const parsed = schema.safeParse(input);
-			return parsed.success
-				? { ok: true, value: parsed.data }
-				: { ok: false, code: "invalid_answer" };
-		},
-		prepareInTransaction(db, runId, set, invocation) {
-			adapterOf(db, set.bindingRevisionId);
-			return capabilities.prepareBoundInTransaction(
-				db,
-				{ rootRunId: runId, taskId: runId, cancelEpoch: 0 },
-				set.packageRevisionId,
-				invocation.toolRevisionId,
-				invocation.input,
-			);
-		},
-	};
+	const bound = createBoundCommandPort(capabilities, registry, schemas);
 	return {
 		embedQuery,
 		taskInTransaction: (db, revisionId) =>
@@ -271,6 +280,24 @@ export function createToolchainRouting(
 			};
 		},
 		catalogInTransaction: (db) => [...catalog(db)],
+		screenInTransaction(db, revisionId) {
+			const entry = capabilities
+				.artifactsInTransaction(db)
+				.find((item) => item.artifactRevisionId === revisionId);
+			if (!entry) return null;
+			const stored = capabilities.documentInTransaction(
+				db,
+				revisionId,
+			)?.document;
+			const parsed = artifactDefinitionV1.safeParse(stored);
+			if (!parsed.success) return null;
+			return {
+				title: entry.title,
+				variants: parsed.data.variants.map((variant) => variant.id),
+				defaultVariant: parsed.data.defaultVariant,
+				adapterRefs: entry.adapterRefs,
+			};
+		},
 		resolveInTransaction(db, revisionId) {
 			const resolved = capabilities.resolveToolchainInTransaction(
 				db,
@@ -449,8 +476,9 @@ function registeredTask(
 	const boundTask = capabilities.toolchainBindingInTransaction(db, revisionId, {
 		retained: true,
 	});
-	if (boundTask?.binding.document.execution !== "task") return undefined;
-	const adapter = registry.get(boundTask.binding.document.adapterRef);
+	const binding = boundTask?.binding.document;
+	if (binding?.execution !== "task") return undefined;
+	const adapter = registry.get(binding.adapterRef);
 	const task = adapter?.task;
 	if (!task) throw new Error("task_lifecycle_unavailable");
 	return {
@@ -460,8 +488,16 @@ function registeredTask(
 				throw new Error("adapter_unavailable");
 			return task.startInTransaction(tx, {
 				...input,
+				...(task.selectedWorker
+					? {
+							deadline: Math.min(
+								input.deadline ?? Infinity,
+								Date.now() + binding.timeLimits.runMs,
+							),
+						}
+					: {}),
 				toolchainRevisionId: revisionId,
-				bindingRevisionId: boundTask.binding.revisionId,
+				bindingRevisionId: boundTask!.binding.revisionId,
 			});
 		},
 	};

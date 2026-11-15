@@ -5,7 +5,6 @@ export type {
 	LarmCallOptions,
 	LarmStatus,
 } from "./contracts";
-export type { RouteAnswer, RouteInput } from "./contracts/route";
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
 export { createAgentLarm } from "./service/agent-connections";

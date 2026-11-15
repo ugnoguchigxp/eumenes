@@ -60,19 +60,26 @@ export function taskExecutionDispatch(
 					arguments: parsed.value,
 				} as const;
 			}
-			if (kind === "research") {
+			if (
+				kind === "research" ||
+				(kind === "task" &&
+					child.selectedWorker &&
+					routing.taskInTransaction?.(db, child.chainRevisionId)
+						?.selectedWorker)
+			) {
 				agents.startInTransaction(db, {
 					rootRunId: child.source.runId,
 					deadline: child.deadline,
 					execution: child,
 					input: {
-						kind: resolved.runtime.route,
+						kind:
+							kind === "task" ? "registered_worker" : resolved.runtime.route,
 						question: child.request,
 						originalRequest: child.source.request,
 						packageRevisionId: resolved.packageRevisionId,
 					},
 				});
-				return { kind, result: research(db, child) } as const;
+				return { kind: "research", result: research(db, child) } as const;
 			}
 			if (kind === "session")
 				return {

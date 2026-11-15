@@ -25,6 +25,8 @@ export type ToolRuntimeMeta = {
 	 * Tools with a scope are page reads: they use the per-task read budget, other reads allow one call.
 	 */
 	urlScope?: "request_or_observed";
+	/** A paged non-URL read. Its adapter enforces the issued reference. */
+	pagedRead?: true;
 	/** Only offered once an earlier result left a saved body to read. */
 	requiresSavedBody?: boolean;
 	/** Cursor-paged search: repeated stale cursors end the task instead of retrying. */
@@ -39,6 +41,10 @@ export type PackageRuntimeMeta = {
 	 * No generic route policy is added, and the bodies are not repeated as data.
 	 */
 	context?: "set";
+	/** A package with its own tools only, such as a read-only archive worker. */
+	hostTools?: "none";
+	/** Optional override for packages using the source-linked search report. */
+	searches?: number;
 	/**
 	 * The time this package's research worker is given (ms), instead of the research default. A run that hands work to
 	 * it, and whose deadline is not fixed from outside, is given that time and the parent's margin.
@@ -54,6 +60,8 @@ const tools: Readonly<Record<string, ToolRuntimeMeta>> = {
 	"web.read_saved": { operation: "saved_read", requiresSavedBody: true },
 	"history.search": { operation: "history", cursorPaging: true },
 	"history.read": { operation: "history" },
+	"archive.search": { operation: "search" },
+	"archive.read": { operation: "read", pagedRead: true },
 	"world.find": { operation: "world" },
 	"world.documents": { operation: "world" },
 	"world.query": { operation: "world" },
@@ -69,6 +77,12 @@ const packages: Readonly<Record<string, PackageRuntimeMeta>> = {
 		researchMs: 330000,
 	},
 	"world.query": { report: "search", context: "set" },
+	"resource.research": {
+		report: "search",
+		context: "set",
+		hostTools: "none",
+		searches: 2,
+	},
 	// Reaches back over old conversations (spec conversation-read-tools-design 2026-10-31 §8).
 	"history.research": { researchMs: 300000 },
 };

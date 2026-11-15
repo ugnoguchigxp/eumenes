@@ -29,7 +29,13 @@ export type ToolResult = {
 };
 export type Source = {
 	kind?:
-		"web_source" | "conversation_source" | "world_claim" | "world_document";
+		| "web_source"
+		| "conversation_source"
+		| "world_claim"
+		| "world_document"
+		| "archive_document";
+	/** The backend binding is required for adoption and is never projected into the conversation. */
+	archive?: { binding: string; documentId: string; revision: string };
 	sourceRef?: string;
 	sourceRevision?: string;
 	viewId?: string;
@@ -62,7 +68,7 @@ export type Source = {
 	sourceId: string;
 	url?: string;
 	title: string;
-	basis: "page" | "snippet" | "conversation" | "world";
+	basis: "page" | "snippet" | "conversation" | "world" | "archive";
 	/** world_claim: where the claim came from (`user_report`, `model_hypothesis`, ...). */
 	origin?: string;
 	fetchedAt: string;
