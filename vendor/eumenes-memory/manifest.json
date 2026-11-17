@@ -1,17 +1,17 @@
 {
 	"package": "eumenes-memory",
 	"version": "0.0.4",
-	"artifact": "eumenes-memory-0.0.4-30721f30aa19.tgz",
-	"sha256": "30721f30aa19d1eb3c64b92a604a499afd53f53038ad071c747adf07e5f34f01",
-	"sourceGitCommit": "13f6f47f02203cd392c1c9fbc994e068ea81343d",
-	"sourceHash": "0b0f9e5557b7d3ce2fb6fd2acce87dab0186dfd2988808f32d80f986dfffd95f",
+	"artifact": "eumenes-memory-0.0.4-8ad114dda9a1.tgz",
+	"sha256": "8ad114dda9a162822cbb73c8de3fb514312ad7b57cc3b04f453adfd7b251076d",
+	"sourceGitCommit": "1439bfd9c5b171e2da19a445816688e1e3943651",
+	"sourceHash": "375a6bfce4ddd08aaba412372a3a8b1419cce3d8a6ec0fa55faee9ef1957f65e",
 	"sourceTreeState": "clean committed source",
-	"verifiedWith": "source verify and distribution gates; installed Eumenes acceptance recorded in spec/verification/memory-package-adoption-2026-11-07/summary.json",
+	"verifiedWith": "Vendored artifact checks, Eumenes memory integration, and schema 8 to 9 cutover and rollback fixture.",
 	"contractVersions": {
 		"records": 1,
 		"state": 1,
 		"lifecycle": 2,
 		"external": 1
 	},
-	"dbSchemaVersion": 8
+	"dbSchemaVersion": 9
 }

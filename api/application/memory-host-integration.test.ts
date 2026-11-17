@@ -224,8 +224,10 @@ test("installed Eumenes, memory CLI and two MCP processes share curation, correc
 			"memory_operation",
 			"memory_plan",
 			"memory_read",
+			"memory_search",
 			"memory_source",
 			"memory_status",
+			"memory_use",
 		]);
 		await expect(
 			a.callTool({ name: "memory_missing", arguments: {} }),
@@ -249,6 +251,11 @@ test("installed Eumenes, memory CLI and two MCP processes share curation, correc
 				(x) => x.itemId === appItem.id,
 			),
 		).toBe(true);
+		const appSearch = await tool(b, "search", { query: "折り紙" });
+		expect(appSearch).toMatchObject({
+			status: "found",
+			items: [{ itemId: appItem.id, evidenceStatus: "current" }],
+		});
 		const appRead = await tool(b, "read", {
 			snapshotId: appView["snapshotId"],
 			itemId: appItem.id,
@@ -426,6 +433,10 @@ test("installed Eumenes, memory CLI and two MCP processes share curation, correc
 		const restored = await connect(profile);
 		clients.push(restored);
 		expect(host.epoch).not.toBe(oldEpoch);
+		expect(await tool(restored, "search", { query: "折り紙" })).toMatchObject({
+			status: "found",
+			items: [],
+		});
 		expect((await tool(restored, "context"))["items"]).toEqual([]);
 		expect(
 			(

@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import agencyPkg from "eumenes-agency/package.json";
 import { HOST_RULES_VERSION, INSTRUCTION_VERSION } from "eumenes-agency";
 import pkg from "eumenes-memory/package.json";
@@ -258,7 +259,8 @@ test("the installed memory host matches its vendored artifact and the adopted co
 	for (const [path, sha] of Object.entries(release.files)) {
 		if (typeof path !== "string" || typeof sha !== "string")
 			throw new Error("Invalid host release checksum");
-		const bytes = readFileSync(new URL(path, hostUrl));
+		// Distribution paths are literal filenames, including "%2F" in scoped package notices.
+		const bytes = readFileSync(join(fileURLToPath(hostUrl), path));
 		expect(createHash("sha256").update(bytes).digest("hex")).toBe(sha);
 		if (path.startsWith("dist/core/") && path.endsWith(".js"))
 			expect(bytes).toEqual(

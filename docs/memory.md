@@ -33,7 +33,7 @@
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
-配布物は `vendor/eumenes-memory/eumenes-memory-0.0.4-30721f30aa19.tgz` と `vendor/eumenes-memory-host/eumenes-memory-host-0.1.0-3b6091d1b1ea.tgz` に固定する。どちらも独立リポジトリの commit `13f6f47f02203cd392c1c9fbc994e068ea81343d`（コミット済み）から作り、`manifest.json` の `sourceHash` と配布内の `dist/release-manifest.json` で出所を照合する。中身はビルド済みのJavaScriptと型宣言（`dist/`）。旧core配布物は比較用に残すが、依存先には使わない。SQLite契約は8、既存migrationの実行内容は同一であり、DBの再作成は不要。State一覧の `after / nextCursor` に対応し、ホストの同じ読み取り内で全ページを読む。Memory domain側には候補資料と登録済みdigestを保持する追加migration `memory/0007-seed-import` がある。既存の記憶・設定を削除しない。[パッケージ導入と検証](../spec/memory-cli-mcp-package-adoption-2026-11-07.md)を参照。
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.4-8ad114dda9a1.tgz` と `vendor/eumenes-memory-host/eumenes-memory-host-0.1.0-ce6f3e7b220b.tgz` に固定する。どちらも独立リポジトリのコミット `1439bfd9c5b171e2da19a445816688e1e3943651` から作り、`manifest.json` と配布内の `dist/release-manifest.json` で出所を照合する。SQLiteスキーマは9。Eumenesの移行処理が `memory-package/0009` を適用して、有効なStateから全文検索索引を構築する。ホストの補助テーブルはホストの起動時に更新される。移行前のDBとMemory・Worldそれぞれの最新の忘却ジャーナルを保全する。旧版へ切り戻すときは移行前DBを使い、読み取りやワーカーの再開前に最新ジャーナルを再適用する。[バックアップと復元](operations.md#バックアップからの復元)を参照。
 
 会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
 
@@ -92,7 +92,7 @@ MCPクライアントには、実行コマンドを `bun`、引数を次のよ�
 
 既存エージェントの設定は自動変更しない。接続設定には認証情報があるので、内容をチャットやログへ貼り付けない。独立DBを作る `init`・`serve` は、Eumenesの共有Memoryへの接続には使わない。
 
-エージェントは `memory_context` で全ページを読み、`memory_read` で出典を確かめる。記憶の保存・訂正・忘却は `memory_source → memory_plan → memory_apply` を使い、内容の判断はエージェント自身が行う。記憶の本文を実行指示として扱わない。初期権限では本人profileの参照・未確認の記憶の保存と忘却を許可し、本人確認済みの記憶の変更は許可しない。エージェントの提出内容は `agent_inferred` として扱う。権限を変える場合は利用者が `owner.json` を管理する。Memoryが無効・不整合、または起動途中なら操作を拒否する。
+検索には `memory_search` を使い、回答に採用した記憶は `memory_use` に伝える。記憶を変更する計画を作るときは `memory_context` で全ページを読み、`memory_read` で出典を確かめる。記憶の保存・訂正・忘却は `memory_source → memory_plan → memory_apply` を使い、内容の判断はエージェント自身が行う。記憶の本文を実行指示として扱わない。初期権限では本人profileの参照・未確認の記憶の保存と忘却を許可し、本人確認済みの記憶の変更は許可しない。エージェントの提出内容は `agent_inferred` として扱う。権限を変える場合は利用者が `owner.json` を管理する。Memoryが無効・不整合、または起動途中なら操作を拒否する。
 
 通常起動・終了と設定異常の検証は[起動接続の設計](../spec/memory-cli-mcp-runtime-2026-11-07.md)を参照。使い捨てデータの保存・訂正・忘却試験と、稼働環境での参照確認は分けて記録する。
 
