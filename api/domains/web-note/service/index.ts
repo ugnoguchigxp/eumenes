@@ -155,8 +155,11 @@ export function createWebNote(deps: WebNoteDeps) {
 	function flush() {
 		ctx.queue.flushCancellations([...ctx.abortJobs]);
 		ctx.abortJobs.clear();
-		ctx.queue.wake();
 	}
+	// Task controls and erasure run inside the caller's transaction. Abort only after the queue record commits.
+	const stopCommits = ctx.store.onCommit(() => {
+		if (ctx.abortJobs.size) flush();
+	});
 	async function maintain() {
 		if (closed || !source) return;
 		await ctx.store.write((db: Database) => reconcile(ctx, db));
@@ -189,6 +192,7 @@ export function createWebNote(deps: WebNoteDeps) {
 			),
 		close() {
 			closed = true;
+			stopCommits();
 			flush();
 		},
 	};

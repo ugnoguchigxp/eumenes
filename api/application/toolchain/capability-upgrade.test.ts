@@ -24,6 +24,58 @@ const bundle = (name: string) =>
 		),
 	);
 
+test("seed publishes the selectable source inspection task from an existing hidden revision", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-source-upgrade-"));
+	const store = openStore(join(dir, "db"), migrations);
+	const caps = createCapabilities(store, new Set(["inspect-source"]), {
+		bundleHost: offlineBundleHost,
+	});
+	try {
+		const previous = bundle("inspect-source");
+		previous.definitions = previous.definitions.filter(
+			(d) => !(d.kind === "toolchain" && d.revision === 4),
+		);
+		await store.write((db) => {
+			expect(
+				caps.importBundleInTransaction(db, previous, offlineBundleHost())
+					.issues,
+			).toEqual([]);
+		});
+		const offered = () =>
+			store.read((db) =>
+				caps
+					.routerCardsInTransaction(db)
+					.find(({ id }) => id === "inspect.source"),
+			);
+		const archived = () =>
+			store.read((db) =>
+				caps.getDefinitionInTransaction(db, "toolchain:inspect.source@3"),
+			);
+		const before = archived();
+		expect(before?.revisionId).toBe("toolchain:inspect.source@3");
+		expect(
+			store.read((db) =>
+				caps.toolchainsInTransaction(db).find((d) => d.id === "inspect.source"),
+			),
+		).toMatchObject({
+			revisionId: "toolchain:inspect.source@3",
+			selectable: false,
+		});
+		expect(offered()).toBeUndefined();
+		await caps.seed();
+		expect(offered()?.revision).toBe("4");
+		expect(
+			store.read((db) =>
+				caps.toolchainSetInTransaction(db, "toolchain:inspect.source@4"),
+			).binding?.document,
+		).toMatchObject({ execution: "task" });
+		expect(archived()).toEqual(before);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 test("seed upgrades the deployed board and terminal schemas without replacing archived definitions", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-catalog-upgrade-"));
 	const store = openStore(join(dir, "db"), migrations);

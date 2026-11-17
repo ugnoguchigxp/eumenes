@@ -49,7 +49,6 @@ async function conversation(
 	question = request,
 	voice = false,
 ) {
-	const entered = Promise.withResolvers<void>();
 	const release = Promise.withResolvers<void>();
 	let calls = 0;
 	const options: HarnessOptions = {
@@ -60,9 +59,11 @@ async function conversation(
 				...source,
 				async inspect(input) {
 					calls++;
-					entered.resolve();
-					await release.promise;
-					return source.inspect(input);
+					const [result] = await Promise.all([
+						source.inspect(input),
+						release.promise,
+					]);
+					return result;
 				},
 			},
 		},
@@ -107,7 +108,6 @@ async function conversation(
 			await h.dialogue.waitForTerminal(runId, { timeoutMs: 5000 }),
 		).toMatchObject({ status: "completed", announcement: expect.any(String) });
 		await waitFor(() => calls > 0, { timeout: 10_000 });
-		await entered.promise;
 		if (session) {
 			options.voiceText = followUp;
 			const next = await submitVoice(h, session, 2);
@@ -129,6 +129,7 @@ async function conversation(
 		release.resolve();
 		await waitFor(async () => (await answers()).length > 0, {
 			timeout: 90_000,
+			interval: 50,
 		});
 		await h.toolchain.webNote.recover();
 		const messages = await answers();

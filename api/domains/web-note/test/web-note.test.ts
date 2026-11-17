@@ -226,11 +226,18 @@ test("cancelling a run stops its Codex turn and ends it cancelled, without a not
 		const view = await f.start();
 		f.run();
 		await running;
+		await expect(
+			f.store.write((db) => {
+				f.service.task.cancelInTransaction!(db, "main", view.id);
+				throw new Error("rollback");
+			}),
+		).rejects.toThrow("rollback");
+		expect(f.view(view.id)?.status).toBe("deciding");
+		expect(aborted).toBe(false);
 		await f.store.write((db) =>
 			f.service.task.cancelInTransaction!(db, "main", view.id),
 		);
-		f.service.flush();
-		await waitFor(() => aborted);
+		await waitFor(() => aborted, { timeout: 1000 });
 		const ended = f.view(view.id)!;
 		expect(ended.status).toBe("cancelled");
 		expect(ended.result).toMatchObject({
