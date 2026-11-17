@@ -612,17 +612,19 @@ test("cancelling a turn while structure is running prevents a reply and ignores 
 
 test("a candidate returned under a different request index does not start work", async () => {
 	const r = await start({}, { cards: [IMAGE, MUSIC] });
-	const request = "猫の絵を描いて、曲も作って";
+	// Each part shares trigrams with only one card, so the two candidate lists differ.
+	const request = "絵を描いて、曲を作って";
 	r.structures.push(
 		JSON.stringify({
 			requests: [
-				{ text: "猫の絵を描いて", target: "猫の絵", inputs: [], after: [] },
-				{ text: "曲も作って", target: "曲", inputs: [], after: [] },
+				{ text: "絵を描いて", target: "絵", inputs: [], after: [] },
+				{ text: "曲を作って", target: "曲", inputs: [], after: [] },
 			],
 		}),
 	);
 	const port = h!.larm.selectRouter!;
 	let selections = 0;
+	let offers: Array<{ index: string; ids: string[] }> = [];
 	h!.larm.selectRouter = async (prompt, signal) => {
 		if (prompt.version === TURN_STRUCTURE_PROMPT.version)
 			return port(prompt, signal);
@@ -630,19 +632,21 @@ test("a candidate returned under a different request index does not start work",
 		const asked = JSON.parse(prompt.user) as {
 			requests: Array<{ index: string; candidates: Array<{ id: string }> }>;
 		};
-		const [first, second] = asked.requests;
-		expect(first?.candidates.length).toBeGreaterThan(0);
-		expect(second?.candidates.length).toBeGreaterThan(0);
-		expect(second?.index).not.toBe(first?.index);
-		const foreign = first!.candidates.find(
+		const [first, second] = asked.requests ?? [];
+		offers = (asked.requests ?? []).map((item) => ({
+			index: item.index,
+			ids: item.candidates.map((candidate) => candidate.id),
+		}));
+		const foreign = first?.candidates.find(
 			(candidate) =>
-				!second!.candidates.some((item) => item.id === candidate.id),
+				!second?.candidates.some((item) => item.id === candidate.id),
 		);
-		expect(foreign?.id).toBeTruthy();
+		if (!first || !second || first.index === second.index || !foreign)
+			return JSON.stringify({ selections: {} });
 		return JSON.stringify({
 			selections: {
-				[first!.index]: { kind: "candidate", id: foreign!.id },
-				[second!.index]: { kind: "candidate", id: foreign!.id },
+				[first.index]: { kind: "candidate", id: foreign.id },
+				[second.index]: { kind: "candidate", id: foreign.id },
 			},
 		});
 	};
@@ -650,6 +654,10 @@ test("a candidate returned under a different request index does not start work",
 	const run = await h!.say(request);
 	expect(h!.dialogue.answerText(run.id)).toBe("まだ頼んでいません。");
 	expect(selections).toBe(1);
+	expect(offers).toEqual([
+		{ index: "0", ids: [IMAGE.id] },
+		{ index: "1", ids: [MUSIC.id] },
+	]);
 	expect(trace()).toMatchObject({
 		decided: null,
 		error: "route_selection_invalid_response",

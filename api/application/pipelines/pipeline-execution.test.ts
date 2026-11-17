@@ -113,14 +113,10 @@ test("B sends ordered steps to the imported planner and two actual commands comp
 			"一つ目のタイマー\n期待する結果: 保存済みタイマー",
 			"二つ目のタイマー\n期待する結果: 保存済みタイマー",
 		]);
-		expect(packets[1]!.references).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({
-					kind: "result",
-					preview: expect.stringContaining("pipeline timer 1"),
-				}),
-			]),
-		);
+		const prior = (
+			packets[1]!.references as Array<{ ref: string; text: string }>
+		).find((item) => item.ref.startsWith("result:"));
+		expect(prior?.text).toContain('"label":"pipeline timer 1"');
 		expect(h.toolchain.agents.executions.list("main")).toHaveLength(1);
 		await waitFor(() => h.reported().length > 0, { timeout: 5000 });
 		expect(h.reported()).toContain("completed");
