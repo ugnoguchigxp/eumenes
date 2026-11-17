@@ -22,7 +22,7 @@ README の「検証」の詳細です。
 
 1. 基準commitと未コミットの対象ソースを固定します。製品のDB、鍵、`.env`、ログ、既存の検証生成物は複製しません。新branchや稼働中サーバーの操作は不要です。基準commitを解決できる独立した検証用metadataを持たせ、元checkoutのindexや生成物を更新しないようにします。
 2. ルートだけでなく、各workspaceの依存も解決します。第三者依存への読み取り用リンクを使う場合も、`@eumenes/*` 等のworkspace依存はコピー側のpackageを指すようにします。DesignSystem等の出力先はコピー内の実ディレクトリにし、元の `dist` へリンクしません。
-3. コピー内で部分・結合・対象domainの順に確認します。Bunの試験ファイルは `./path/to/file.test.ts` と明示します。`./`を省いた検索指定では、無関係なartifacts内の旧コピーまで実行される場合があります。
+3. コピー内で部分・結合・対象domainの順に確認します。Bunの試験ファイルは `./path/to/file.test.ts` と明示します。`./`を省いた検索指定では、Bun自身が無関係なartifacts内の旧コピーまで実行する場合があります。棚卸しの走査は、`packages/` 以外で `package.json` と `api` と `web` を持つディレクトリを製品ツリーに含めません。その外に置いた新しい試験ファイルは対象のままです。
 4. reportの基準commit、入力hash/終了hash、integrityErrors、対象・利用側domainを保存します。原本へ結果を対応付けるときは対象ソースもhashで照合します。検証後に別作業の変更が増えた場合、その変更まで検証済みとはしません。
 
 [実施結果と入力照合](../spec/verification/project-issues-first-batch-2026-11-06/README.md)を参照してください。fixtureの成功はliveや実機器の受入を代替しません。
@@ -31,7 +31,7 @@ README の「検証」の詳細です。
 
 `bun run test:inventory` はrunner/projectごとの試験・生成元・別実行経路をJSONで出力します。`verify:all` には自然言語受入のjudge・frozen・tester-parser・runnerの4本を追加しています。runnerはfakeDriverを注入する試験です。Chromiumを起動するdriverは `bun test tests/acceptance/nl/driver.test.ts` の明示実行に残します。DSの `unit` は全件検証と所有domainの選択実行に含め、storiesから生成する `storybook` projectは初回CIから除外します。別途実行する場合はブラウザを準備し、`cd packages/design-system && bun x vitest run --project storybook src/components/GoogleAccounts/GoogleAccounts.stories.tsx` のようにstoryを明示してください。独立したOAuth試験の `.test.mjs` も棚卸しに含め、従来のBun全件実行範囲を維持します。runner設定や生成元のpatternを変えるときは棚卸しも更新します。
 
-`bun run verify:metrics` は実行レポートから成功時間、失敗・割り込み・無効化の件数を集計し、直近60コミットの所有パスの参考値も出力します。全件合格の記録があれば、同じ必須検証をstatic・backend・Web/client・DS・Web buildに分けた場合の理想的な下限時間とrunner時間合計を計算します。各jobでDS buildを繰り返す費用は含みますが、install/postinstall・待ち時間・artifact転送・集約の費用は含まないため、CIの実測値とは区別します。CIの準備時間は `preparation.json` に保存します。履歴の所有率は現在の対応表による参考値であり、速度改善率でも変更影響の選択率でもありません。初回は `--affected` を導入せず、CIは各push/PRで全件を継続します。
+`bun run verify:metrics` は実行レポートから成功時間、失敗・割り込み・無効化の件数を集計し、直近60コミットの所有パスの参考値も出力します。全件合格の記録があれば、同じ必須検証をstatic・backend・Web/client・DS・Web buildに分けた場合の理想的な下限時間とrunner時間合計を計算します。各jobでDS buildを繰り返す費用は含みますが、install/postinstall・待ち時間・artifact転送・集約の費用は含まないため、CIの実測値とは区別します。CIの準備時間は `preparation.json` に保存します。履歴の所有率は現在の対応表による参考値であり、速度改善率でも変更影響の選択率でもありません。初回は `--affected` を導入せず、手動で起動したCIは全件を実行します。pushとPRでは起動しません（`.github/workflows/verify.yml` は `workflow_dispatch` のみ。2026-11-17、基準 `204280c675cc67809ddf1cd1ab623e4243d06a5e`）。
 
 ブラウザE2Eは、対象domainの試験ファイルを明示して個別に実行します。たとえばExcalidrawは `bunx playwright test tests/browser/excalidraw.spec.ts` です。複数domainに関係する変更は、影響のあるdomainのファイルを選びます。試験ファイルを指定しない全件実行は通常の検証手順に含めません。`CI=1` で実行する場合は `--fail-on-flaky-tests` も指定し、再試行でのみ成功した試験を合格にしません。
 

@@ -611,8 +611,32 @@ test("cancelling a turn while structure is running prevents a reply and ignores 
 });
 
 test("a candidate returned under a different request index does not start work", async () => {
-	const r = await start({}, { cards: [IMAGE, MUSIC] });
-	// Each part shares trigrams with only one card, so the two candidate lists differ.
+	// Equal vectors tie by id. Four earlier ids plus the winning card fill each top five,
+	// so the picture id is offered only for the picture and the music id only for the music.
+	const fillers = ["a", "b", "c", "d"].map((name) => ({
+		...IMAGE,
+		id: `fake.${name}`,
+		revisionId: `toolchain:fake.${name}@1`,
+		functionName: `fake_${name}`,
+		title: name,
+		summary: name,
+		useWhen: [],
+	}));
+	const r = await start(
+		{},
+		{
+			cards: [...fillers, IMAGE, MUSIC],
+			music: true,
+			lexical: (text) =>
+				new Map(
+					text.includes("絵")
+						? [[IMAGE.id, 10]]
+						: text.includes("曲")
+							? [[MUSIC.id, 10]]
+							: [],
+				),
+		},
+	);
 	const request = "絵を描いて、曲を作って";
 	r.structures.push(
 		JSON.stringify({
@@ -654,9 +678,10 @@ test("a candidate returned under a different request index does not start work",
 	const run = await h!.say(request);
 	expect(h!.dialogue.answerText(run.id)).toBe("まだ頼んでいません。");
 	expect(selections).toBe(1);
+	const shared = ["fake.a", "fake.b", "fake.c", "fake.d"];
 	expect(offers).toEqual([
-		{ index: "0", ids: [IMAGE.id] },
-		{ index: "1", ids: [MUSIC.id] },
+		{ index: "0", ids: [IMAGE.id, ...shared] },
+		{ index: "1", ids: [MUSIC.id, ...shared] },
 	]);
 	expect(trace()).toMatchObject({
 		decided: null,

@@ -60,6 +60,23 @@ test("reports each foreign table access once per domain", () => {
 	]);
 });
 
+test("legacy Core tables belong to Pursuit without changing their migration IDs", () => {
+	const legacy = tableOwners([
+		{
+			id: "pursuit-core/0001",
+			sql: "CREATE TABLE pursuit_pursuit (id TEXT); CREATE TABLE pursuit_operation (id TEXT)",
+		},
+	]);
+	const query = () =>
+		'db.query("SELECT * FROM pursuit_pursuit JOIN pursuit_operation");';
+	expect(legacy.get("pursuit_pursuit")).toBe("pursuit");
+	expect(findViolations(legacy, [["pursuit", "forget.ts"]], query)).toEqual([]);
+	expect(findViolations(legacy, [["dialogue", "other.ts"]], query)).toEqual([
+		{ domain: "dialogue", table: "pursuit_operation" },
+		{ domain: "dialogue", table: "pursuit_pursuit" },
+	]);
+});
+
 test("only accesses missing from the allow list fail", () => {
 	const violations = [
 		{ domain: "tasks", table: "queue_jobs" },

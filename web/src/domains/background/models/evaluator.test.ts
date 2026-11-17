@@ -6,8 +6,9 @@ import { healthColors, standbyColor } from "../options";
 import { statusColor } from "../status";
 import { scatterPositionGLSL } from "./diffusion";
 
-test("all roles keep fixed geometry/size, health priority and at most ten percent activity uplift", () => {
-	for (const model of particleModelIds) {
+test.each(particleModelIds)(
+	"%s keeps fixed geometry/size, health priority and at most ten percent activity uplift",
+	(model) => {
 		const bytes = readFileSync(
 				`web/src/domains/background/models/assets/${model}.bin`,
 			),
@@ -62,8 +63,8 @@ test("all roles keep fixed geometry/size, health priority and at most ten percen
 					}
 				}
 		expect(data).toEqual(before);
-	}
-});
+	},
+);
 
 function cpuColors() {
 	const bytes = readFileSync(

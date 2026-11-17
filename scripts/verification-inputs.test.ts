@@ -29,6 +29,9 @@ test("generated reports and builds do not invalidate verification; prompts, asse
 			"test-results/run/result.json",
 		])
 			put(path, "generated");
+		put("artifacts/parked/package.json", '{"name":"eumenes"}');
+		put("artifacts/parked/api/test.ts", "parked input");
+		put("artifacts/parked/web/index.html", "parked input");
 		expect(verificationRevision(root)).toBe(baseline);
 		for (const path of [
 			"api/domain/prompts/policy.md",

@@ -88,6 +88,7 @@
 		"@types/three": "0.186.0",
 		"@typescript/typescript6": "6.0.2",
 		"@vitejs/plugin-react": "6.0.2",
+		"eumenes-memory-schema8": "file:vendor/eumenes-memory/eumenes-memory-0.0.4-30721f30aa19.tgz",
 		"jsdom": "29.1.1",
 		"knip": "6.38.0",
 		"oxlint": "1.86.0",

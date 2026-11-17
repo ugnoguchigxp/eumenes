@@ -1,11 +1,11 @@
 /* eslint-disable jsx-a11y/no-noninteractive-tabindex, jsx-a11y/prefer-tag-over-role -- This labelled scroll region needs focus for keyboard history navigation. */
-import { DebugDiagnostic } from "./DebugDiagnostic";
-import { useCallback } from "react";
+import { lazy, Suspense, useCallback } from "react";
 import type { EumenesClient } from "../../../client";
 import type { Message } from "../../../api/domains/conversation/contracts";
 import { ResourceChips } from "../domains/resources";
 import { formatResourceUri } from "../../../api/domains/resources/contracts";
 import { SCRATCH_RESOURCE_KIND } from "../../../api/domains/scratch/contracts";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { LiveMessageList } from "./LiveMessageList";
 import { ConversationFailures } from "./ConversationFailures";
 import { RunDetails, RunFailure } from "./RunDetails";
@@ -14,6 +14,12 @@ import { LiveVoicePanel } from "../domains/live-voice";
 import type { usePanelResources } from "./usePanelResources";
 import type { WorkspaceState } from "./useWorkspace";
 import { Button } from "../design-system";
+
+const DebugDiagnostic = lazy(() =>
+	import("./DebugDiagnostic").then(({ DebugDiagnostic }) => ({
+		default: DebugDiagnostic,
+	})),
+);
 
 /**
  * The scrolling history. The render callbacks keep their identity while their data is unchanged, so the rows of the list
@@ -115,12 +121,15 @@ export function ConversationHistory({
 							),
 						)
 						.map((entry) => (
-							<DebugDiagnostic
-								key={entry.id}
-								client={client}
-								entry={entry}
-								conversationId={message.conversationId}
-							/>
+							<ErrorBoundary key={entry.id} label="実行診断">
+								<Suspense fallback={null}>
+									<DebugDiagnostic
+										client={client}
+										entry={entry}
+										conversationId={message.conversationId}
+									/>
+								</Suspense>
+							</ErrorBoundary>
 						))}
 			</>
 		),

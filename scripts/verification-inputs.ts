@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const generated = new Set([
@@ -13,6 +13,35 @@ const generated = new Set([
 const sourceExtension =
 	/\.(?:[cm]?[jt]sx?|css|jsonc?|md|mdx|html|ya?ml|toml|py|sh|svg|png|jpe?g|webp|gif|woff2?|ttf|glb|wav|tgz)$/;
 
+/** Exclude another Eumenes checkout from the product's tests and input hash. */
+export function isParkedCheckout(root: string, directory: string): boolean {
+	if (
+		!directory ||
+		directory === "packages" ||
+		directory.startsWith("packages/")
+	)
+		return false;
+	const dir = join(root, directory);
+	if (
+		!statSync(join(dir, "api"), { throwIfNoEntry: false })?.isDirectory() ||
+		!statSync(join(dir, "web"), { throwIfNoEntry: false })?.isDirectory()
+	)
+		return false;
+	try {
+		const manifest = JSON.parse(
+			readFileSync(join(dir, "package.json"), "utf8"),
+		);
+		return manifest?.name === "eumenes";
+	} catch (error) {
+		if (
+			error instanceof SyntaxError ||
+			(error as NodeJS.ErrnoException).code === "ENOENT"
+		)
+			return false;
+		throw error;
+	}
+}
+
 /** Hash editable inputs and runtime assets, never reports or build outputs. */
 export function verificationRevision(root: string) {
 	const inputs: string[] = [];
@@ -24,7 +53,8 @@ export function verificationRevision(root: string) {
 			if (entry.isDirectory()) {
 				if (
 					!["node_modules", ".git", ".serena"].includes(entry.name) &&
-					!generated.has(path)
+					!generated.has(path) &&
+					!isParkedCheckout(root, path)
 				)
 					walk(path);
 			} else if (

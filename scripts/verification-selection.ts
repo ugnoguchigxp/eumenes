@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { applicationDomainEntries } from "./boundaries";
 import { type Domain, domains, ownedPaths } from "./domains";
+import { isParkedCheckout } from "./verification-inputs";
 
 export function parseSelection(raw: string[], legacy = false) {
 	const args = raw.filter((arg) => arg !== "--");
@@ -61,7 +62,10 @@ export function sourceFiles(root: string, directory: string): string[] {
 			)
 				return [];
 			const path = directory ? `${directory}/${entry.name}` : entry.name;
-			if (entry.isDirectory()) return sourceFiles(root, path);
+			if (entry.isDirectory()) {
+				if (isParkedCheckout(root, path)) return [];
+				return sourceFiles(root, path);
+			}
 			return entry.isFile() ? [path] : [];
 		})
 		.sort();

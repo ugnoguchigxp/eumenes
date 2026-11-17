@@ -8,7 +8,6 @@ import {
 	acceptedEmotion,
 	type SpeechDelivery,
 } from "../../../../../api/domains/delivery/contracts";
-import type { AgencyThought } from "../../../../../api/domains/dialogue/contracts/agency-status";
 import {
 	Fragment,
 	type ReactNode,
@@ -22,7 +21,15 @@ import {
 import { emotionEmoji } from "./emotionEmoji";
 import { renderSafeMarkdown } from "./markdownRenderer";
 import { useMessageWindow } from "./useMessageWindow";
-const NO_THOUGHTS: readonly AgencyThought[] = [];
+
+/** A thought line the conversation column draws. The agenda owns the values; this list only places them. */
+type ThoughtLine = {
+	id: string;
+	at: number;
+	kind: string;
+	text: string;
+};
+const NO_THOUGHTS: readonly ThoughtLine[] = [];
 const ANNOUNCE_LIMIT = 500;
 
 /** A settled answer is announced in full; a very long one is cut with a pointer back to the text. */
@@ -32,7 +39,7 @@ function completionAnnouncement(text: string) {
 		: `回答が完了しました。${text.slice(0, ANNOUNCE_LIMIT)}…続きは会話欄で確認できます。`;
 }
 
-const THOUGHT_MARK: Record<AgencyThought["kind"], string> = {
+const THOUGHT_MARK: Record<string, string> = {
 	plan: "💭",
 	drop: "💭",
 	check: "💭",
@@ -44,7 +51,7 @@ const THOUGHT_MARK: Record<AgencyThought["kind"], string> = {
 	quiet: "🤫",
 	error: "⚠",
 };
-const THOUGHT_PREFIX: Partial<Record<AgencyThought["kind"], string>> = {
+const THOUGHT_PREFIX: Record<string, string> = {
 	plan: "+ ",
 	drop: "- ",
 };
@@ -55,11 +62,11 @@ const THOUGHT_PREFIX: Partial<Record<AgencyThought["kind"], string>> = {
  */
 export function placeThoughts(
 	rows: readonly Pick<Message, "createdAt">[],
-	thoughts: readonly AgencyThought[],
+	thoughts: readonly ThoughtLine[],
 	folded: boolean,
 ) {
-	const before: AgencyThought[][] = rows.map(() => []);
-	const after: AgencyThought[] = [];
+	const before: ThoughtLine[][] = rows.map(() => []);
+	const after: ThoughtLine[] = [];
 	const times = rows.map((m) => Date.parse(m.createdAt));
 	for (const thought of thoughts) {
 		const index = times.findIndex((t) => t > thought.at);
@@ -73,7 +80,7 @@ export function placeThoughts(
 const ThoughtRow = memo(function ThoughtRow({
 	thought,
 }: {
-	thought: AgencyThought;
+	thought: ThoughtLine;
 }) {
 	return (
 		<p
@@ -81,7 +88,7 @@ const ThoughtRow = memo(function ThoughtRow({
 			data-kind={thought.kind}
 			title={new Date(thought.at).toLocaleTimeString("ja-JP")}
 		>
-			<span aria-hidden="true">{THOUGHT_MARK[thought.kind]}</span>{" "}
+			<span aria-hidden="true">{THOUGHT_MARK[thought.kind] ?? "💭"}</span>{" "}
 			{THOUGHT_PREFIX[thought.kind] ?? ""}
 			{thought.text}
 		</p>
@@ -109,7 +116,7 @@ export const MessageList = memo(function MessageList({
 }: {
 	conversation: Conversation | undefined;
 	/** The agent's thoughts, shown as plain lines between the messages by time (not bubbles, not read aloud). */
-	thoughts?: readonly AgencyThought[];
+	thoughts?: readonly ThoughtLine[];
 	client?: EumenesClient;
 	streaming?: string;
 	replayingId?: string | null;

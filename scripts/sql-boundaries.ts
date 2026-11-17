@@ -37,7 +37,9 @@ function walk(path: string): string[] {
 
 /** `domain/0001-init` -> `domain`; a package's `memory-package/0001` belongs to `memory`. */
 export function migrationOwner(id: string): string {
-	return (id.split("/")[0] ?? id).replace(/-package$/, "");
+	const owner = (id.split("/")[0] ?? id).replace(/-package$/, "");
+	// The retired Core's migrations keep their deployed IDs. Pursuit owns their remaining data.
+	return owner === "pursuit-core" ? "pursuit" : owner;
 }
 
 const createTable =

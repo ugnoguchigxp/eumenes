@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 export {
 	agencyStatusSchema,
 	agencyThoughtsSchema,
+	type AgencyActivity,
 	type AgencyThought,
 } from "./agency-status";
 import { z } from "zod";

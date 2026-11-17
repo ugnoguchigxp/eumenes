@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import type { Settings } from "../../api/domains/settings/contracts";
 import { contracts, newClient, stubFetch } from "./harness";
 
 const t0 = "2026-10-10T00:00:00.000Z";
@@ -6,16 +7,36 @@ const uuid = "11111111-1111-4111-8111-111111111111";
 const uuid2 = "22222222-2222-4222-8222-222222222222";
 
 const route = {
-	mode: "larm-preferred",
+	mode: "larm-preferred" as const,
 	cloudAllowed: false,
 	fallbackId: null,
 	epoch: 0,
 };
-const settings = {
+const settings: Settings = {
 	revision: 1,
-	agency: { emotion: true, idleSec: 20, interests: [], maxUnanswered: 1 },
+	agency: {
+		emotion: true,
+		idleSec: 20,
+		interests: [],
+		maxUnanswered: 1,
+		actions: { enabled: true, dailyLimit: 3, maxConcurrent: 1 },
+	},
+	live: {
+		enabled: false,
+		cloudAllowed: false,
+		connectionId: "",
+		model: "",
+		voice: "",
+		startWithMicrophone: true,
+		instructions: "",
+	},
+	router: {
+		feedbackNear: 0.95,
+		feedbackWeight: 2,
+		structureResourceId: null,
+		structureTimeoutMs: 8000,
+	},
 	world: { enabled: false, curationResourceId: null },
-	intent: { mode: "shadow", timeoutMs: 1500, searchScore: 0.6 },
 	larm: {
 		baseUrl: "http://127.0.0.1:9000",
 		profile: "default",
@@ -88,7 +109,7 @@ contracts("settings client", [
 				expectedRevision: 1,
 				settings,
 				keys: [],
-			} as never),
+			}),
 		method: "POST",
 		path: "/api/settings/apply",
 		body: { requestId: uuid, expectedRevision: 1, settings, keys: [] },

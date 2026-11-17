@@ -8,6 +8,7 @@ import {
 	verifyStateSearchIndex,
 	type ForgetJournalEntry,
 } from "eumenes-memory/sqlite";
+import * as previous from "eumenes-memory-schema8/sqlite";
 import {
 	appendJournal,
 	readJournal,
@@ -199,10 +200,6 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-cutover-"));
 	const path = join(dir, "db.sqlite3");
 	const journalPath = join(dir, "memory-forget-journal.jsonl");
-	const oldArchive = new URL(
-		"../../vendor/eumenes-memory/eumenes-memory-0.0.4-30721f30aa19.tgz",
-		import.meta.url,
-	);
 	const scopeKey = "profile:owner";
 	const access = {
 		principal: "local:owner",
@@ -214,18 +211,6 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 	const migrationId = "memory-package/0009";
 	let store: ReturnType<typeof openStore> | undefined;
 	try {
-		const unpack = Bun.spawnSync([
-			"tar",
-			"-xzf",
-			oldArchive.pathname,
-			"-C",
-			dir,
-		]);
-		expect(unpack.exitCode).toBe(0);
-		// The extracted previous package has no static module path. This import is limited to that copy.
-		const previous = (await import(
-			join(dir, "package/dist/sqlite.js")
-		)) as typeof import("eumenes-memory/sqlite");
 		expect(previous.MEMORY_DB_SCHEMA_VERSION).toBe(8);
 		const previousMigrations = migrations
 			.filter((migration) => migration.id !== migrationId)

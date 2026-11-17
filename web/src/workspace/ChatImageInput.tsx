@@ -1,9 +1,16 @@
-import { useRef, useState, type ReactNode } from "react";
-import { DropdownMenu, ImagePicker } from "@eumenes/design-system";
+import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
+import { DropdownMenu } from "@eumenes/design-system";
 import { attachmentLimits } from "../../../api/domains/conversation/contracts";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Button, Modal } from "../design-system";
 import type { WorkspaceState } from "./useWorkspace";
 import { CHAT_FILE_ACCEPT, fileSizeText } from "./useChatFiles";
+
+const ImagePicker = lazy(() =>
+	import("@eumenes/design-system").then(({ ImagePicker }) => ({
+		default: ImagePicker,
+	})),
+);
 
 /** A short hint that the image carries detections (sent to the model as reference data). */
 function annotationLabel(data: Record<string, unknown>) {
@@ -168,24 +175,29 @@ export function ChatImageInput({ state }: { state: WorkspaceState }) {
 					</output>
 				)}
 				{libraryOpen && remaining > 0 && (
-					<ImagePicker
-						savedOnly
-						multiple
-						maxSelected={remaining}
-						images={choices}
-						loading={library.loading}
-						error={library.error}
-						onRefresh={library.refresh}
-						onCancel={() => setLibraryOpen(false)}
-						onConfirm={(ids) => {
-							setLibraryOpen(false);
-							images.addLibrary(
-								ids.flatMap(
-									(id) => library.images.find((image) => image.id === id) ?? [],
-								),
-							);
-						}}
-					/>
+					<ErrorBoundary label="画像一覧" onReset={() => setLibraryOpen(false)}>
+						<Suspense fallback={<output>画像一覧を読み込んでいます</output>}>
+							<ImagePicker
+								savedOnly
+								multiple
+								maxSelected={remaining}
+								images={choices}
+								loading={library.loading}
+								error={library.error}
+								onRefresh={library.refresh}
+								onCancel={() => setLibraryOpen(false)}
+								onConfirm={(ids) => {
+									setLibraryOpen(false);
+									images.addLibrary(
+										ids.flatMap(
+											(id) =>
+												library.images.find((image) => image.id === id) ?? [],
+										),
+									);
+								}}
+							/>
+						</Suspense>
+					</ErrorBoundary>
 				)}
 			</Modal>
 		</>

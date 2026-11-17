@@ -29,10 +29,16 @@ export const domains = {
 		web: "web/src/domains/collaboration",
 		components: null,
 		integrationTests: [
+			"api/application/collaboration/collaboration-brave-image.test.ts",
+			"api/application/collaboration/collaboration-brave.test.ts",
 			"api/application/collaboration/collaboration-close.test.ts",
+			"api/application/collaboration/collaboration-interact.test.ts",
+			"api/application/collaboration/collaboration-pipeline.test.ts",
+			"api/application/collaboration/collaboration-repair.test.ts",
 			"api/application/collaboration/collaboration-review.test.ts",
+			"api/application/collaboration/collaboration-task.test.ts",
 		],
-		depends: { api: [], web: [], test: [] },
+		depends: { api: ["queue"], web: [], test: [] },
 	},
 	usage: {
 		tier: 4,
@@ -608,7 +614,7 @@ export const domains = {
 		depends: {
 			api: ["delivery", "dialogue", "inference"],
 			web: ["audio", "avatar", "dialogue", "settings"],
-			test: [],
+			test: ["tts-dictionary"],
 		},
 	},
 } as const;

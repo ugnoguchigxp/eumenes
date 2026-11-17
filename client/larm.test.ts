@@ -7,14 +7,16 @@ afterEach(() => vi.unstubAllGlobals());
 test("screen notification keeps the existing API authentication and supports delivery while leaving", async () => {
 	const request = vi.fn(
 		async (_input: RequestInfo | URL, _init?: RequestInit) =>
-			new Response(null, { status: 204 }),
+			Response.json({ playbackScreen: false }),
 	);
 	vi.stubGlobal("fetch", request);
 	const client = larmClient(
 		createTransport("http://localhost:3000", "existing-backend-token"),
 	);
 	const id = crypto.randomUUID();
-	await client.screenPresence(id, 4, false, 100);
+	await expect(client.screenPresence(id, 4, false, 100)).resolves.toEqual({
+		playbackScreen: false,
+	});
 	const [url, init] = request.mock.calls[0]!;
 	expect(String(url)).toBe(`http://localhost:3000/api/inference/screen/${id}`);
 	expect(init?.method).toBe("PUT");

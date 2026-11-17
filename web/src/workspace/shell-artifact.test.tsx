@@ -13,8 +13,10 @@ import type { TerminalsResource } from "@eumenes/artifact-ui";
 import { createClient } from "../../../client";
 import bundle from "../../../api/domains/capabilities/bundles/cli.bundle.json";
 import { artifactDefinitionV1 } from "../../../api/domains/capabilities/contracts";
-import { shellWebAdapter } from "../domains/shell/toolchain-adapter";
-import { toolchainWebAdapters } from "./toolchain-adapters";
+import {
+	loadToolchainAdapter,
+	toolchainWebAdapters,
+} from "./toolchain-adapters";
 
 afterEach(() => {
 	cleanup();
@@ -77,6 +79,9 @@ test("CLI uses the common terminal renderer, own labels and auto-start action", 
 
 test("registered shell adapter reads sources, keeps reconnect state and calls shell API for local start", async () => {
 	const artifact = artifactDefinitionV1.parse(bundle.artifacts[0]);
+	const adapterRef = artifact.sourceBindings[0]!.adapterRef;
+	const shellWebAdapter = await loadToolchainAdapter(adapterRef);
+	if (!shellWebAdapter) throw new Error(`screen_not_registered:${adapterRef}`);
 	const calls: string[] = [];
 	vi.stubGlobal(
 		"fetch",
@@ -86,7 +91,13 @@ test("registered shell adapter reads sources, keeps reconnect state and calls sh
 			if (url.includes("/sources/"))
 				return Response.json({
 					revision: 1,
-					data: { available: true, revision: 1, limit: 4, sessions: [] },
+					data: {
+						available: true,
+						revision: 1,
+						limit: 4,
+						sessions: [],
+						approvals: [],
+					},
 				});
 			if (url.endsWith("/api/shell/sessions"))
 				return Response.json({

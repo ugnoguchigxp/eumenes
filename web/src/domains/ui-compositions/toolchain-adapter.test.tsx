@@ -303,6 +303,13 @@ test("a viewed saved work reads its form; nothing is read for the draft", async 
 		"ui-studio",
 		"a",
 		expect.any(AbortSignal),
+		undefined,
+	);
+	expect(saved.client.toolchainArtifactSource).toHaveBeenCalledWith(
+		"artifact:ui.studio@1",
+		"composition-form",
+		"a",
+		expect.any(AbortSignal),
 	);
 	saved.cache.clear();
 });

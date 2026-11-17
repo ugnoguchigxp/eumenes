@@ -3,6 +3,7 @@ import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
 import { ArtifactLauncher } from "../components/domains/artifact/ArtifactLauncher";
 import { ResizableWorkspace } from "../components/domains/artifact/ResizableWorkspace";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { TimerNotifications } from "../components/domains/timers/TimerNotifications";
 import type { TodoNotifications } from "../components/domains/timers/NotificationCenter";
 import { useResourceNotice, useResourceOpener } from "../domains/resources";
@@ -13,10 +14,7 @@ import { SpecialistCloseConfirm } from "./SpecialistCloseConfirm";
 import { SpecialistBridgeContext } from "../domains/toolchain-artifacts/specialist-bridge";
 import { useWorkspace } from "./useWorkspace";
 import { Button } from "../design-system";
-import {
-	ConversationContextPanel,
-	type ContextSelection,
-} from "./ConversationContextPanel";
+import type { ContextSelection } from "./ConversationContextPanel";
 import {
 	artifactIdOf,
 	entryLabel,
@@ -24,6 +22,11 @@ import {
 } from "../domains/toolchain-artifacts";
 
 const WorkspaceArtifacts = lazy(() => import("./WorkspaceArtifacts"));
+const ConversationContextPanel = lazy(() =>
+	import("./ConversationContextPanel").then((module) => ({
+		default: module.ConversationContextPanel,
+	})),
+);
 
 export function Workspace({
 	client,
@@ -50,7 +53,7 @@ export function Workspace({
 	} = state;
 	// A finished TODO's notice opens what the work made or its toolchain's screen and reads the notice; a refusal
 	// clears itself.
-	const launcher = useWorkspaceLauncher(client, state);
+	const launcher = useWorkspaceLauncher(state);
 	const openNotice = useResourceNotice();
 	const openResource = useResourceOpener({
 		client,
@@ -209,16 +212,20 @@ export function Workspace({
 				/>
 			</ResizableWorkspace>
 			{contextSelection && (
-				<ConversationContextPanel
-					key={client.identity}
-					client={client}
-					selection={contextSelection}
-					latestRunId={latestContextRun}
-					answer={inspectedAnswer}
-					disconnected={state.changesState === "failed"}
-					onSelect={selectContext}
-					onClose={closeContext}
-				/>
+				<ErrorBoundary label="会話の入力" onReset={closeContext}>
+					<Suspense fallback={<output>会話の入力を読み込んでいます</output>}>
+						<ConversationContextPanel
+							key={client.identity}
+							client={client}
+							selection={contextSelection}
+							latestRunId={latestContextRun}
+							answer={inspectedAnswer}
+							disconnected={state.changesState === "failed"}
+							onSelect={selectContext}
+							onClose={closeContext}
+						/>
+					</Suspense>
+				</ErrorBoundary>
 			)}
 			<SpecialistCloseConfirm confirm={specialist.confirm} />
 		</main>

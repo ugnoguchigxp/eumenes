@@ -15,6 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => {
 	cleanup();
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
 const images = [
@@ -63,8 +64,11 @@ test("the attach button offers device files and the image library", async () => 
 	expect(screen.getByRole("dialog", { name: "画像一覧から添付" })).toBeTruthy();
 	// The saved image already in the draft cannot be chosen twice.
 	expect(
-		screen.getByRole<HTMLButtonElement>("button", { name: "画像Cを選ぶ" })
-			.disabled,
+		(
+			await screen.findByRole<HTMLButtonElement>("button", {
+				name: "画像Cを選ぶ",
+			})
+		).disabled,
 	).toBe(true);
 	expect(screen.getByText("添付済み")).toBeTruthy();
 	fireEvent.click(screen.getByRole("button", { name: "画像Bを選ぶ" }));
@@ -75,7 +79,6 @@ test("the attach button offers device files and the image library", async () => 
 		images[0],
 	]);
 	expect(screen.queryByRole("dialog")).toBeNull();
-	click.mockRestore();
 });
 
 test("a full draft explains the limit instead of offering more images", async () => {
@@ -107,7 +110,6 @@ test("the attach menu also picks other files, which the draft lists and can drop
 	const file = new File(["# 仕様"], "仕様.md");
 	fireEvent.change(picker, { target: { files: [file] } });
 	expect(s.attachments.files.add).toHaveBeenCalledWith([file]);
-	click.mockRestore();
 	cleanup();
 	const remove = vi.fn();
 	render(

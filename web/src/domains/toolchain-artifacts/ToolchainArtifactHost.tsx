@@ -95,7 +95,7 @@ function Message({ children, alert }: { children: string; alert?: boolean }) {
  * through the outbox to `POST /api/toolchain-actions`.
  */
 export function ToolchainArtifactHost(props: ToolchainArtifactHostProps) {
-	const { client, artifactRevisionId } = props;
+	const { client, artifactRevisionId, adapters, prepareAdapter } = props;
 	const detail = useQuery({
 		queryKey: [
 			queryRoots.toolchainArtifacts,
@@ -113,46 +113,49 @@ export function ToolchainArtifactHost(props: ToolchainArtifactHostProps) {
 		result: "ready" | "generic" | "unavailable";
 	} | null>(null);
 	useEffect(() => {
-		if (!adapterRef || !props.prepareAdapter) return;
-		if (props.adapters.get(adapterRef)) return;
+		if (!adapterRef || !prepareAdapter || props.visible === false) return;
+		if (adapters.get(adapterRef)) return;
 		let cancel = false;
-		void props.prepareAdapter(adapterRef).then((result) => {
-			if (!cancel) setPrepared({ ref: adapterRef, result });
-		});
+		void prepareAdapter(adapterRef)
+			.catch(() => "unavailable" as const)
+			.then((result) => {
+				if (!cancel) setPrepared({ ref: adapterRef, result });
+			});
 		return () => {
 			cancel = true;
 		};
-	}, [adapterRef, props.adapters, props.prepareAdapter]);
+	}, [adapterRef, adapters, prepareAdapter, props.visible]);
+	const preparation =
+		prepared?.ref === adapterRef ? prepared?.result : undefined;
+	// The first source's adapter drives the screen; sources of other adapters are only read.
+	const adapter =
+		(adapterRef ? adapters.get(adapterRef) : undefined) ??
+		(preparation === "generic" ? genericWebAdapter : undefined);
+	const loading =
+		detail.isPending ||
+		(detail.isSuccess &&
+			!!adapterRef &&
+			!!prepareAdapter &&
+			!adapter &&
+			!preparation);
 	useScreenObservation(
 		props.artifactId,
-		props.visible !== false && !detail.isSuccess,
+		props.visible !== false && (!detail.isSuccess || !adapter),
 		{
 			artifactRevisionId,
 			variantId: props.variantId,
-			phase: detail.isError ? "error" : "loading",
+			adapterRef,
+			phase: loading ? "loading" : "error",
 		},
 	);
-	if (detail.isPending) return <Message>画面を読み込んでいます</Message>;
+	if (loading) return <Message>画面を読み込んでいます</Message>;
 	if (detail.isError)
 		return (
 			<Message alert>
 				画面の定義を取得できません。接続を確認してください。
 			</Message>
 		);
-	const immediate = adapterRef ? props.adapters.get(adapterRef) : undefined;
-	const preparation =
-		prepared?.ref === adapterRef ? prepared.result : undefined;
-	if (!immediate && props.prepareAdapter && adapterRef && !preparation)
-		return <Message>画面を読み込んでいます</Message>;
-	const adapter =
-		immediate ??
-		(preparation === "generic"
-			? genericWebAdapter
-			: preparation === "ready" && adapterRef
-				? props.adapters.get(adapterRef)
-				: undefined);
-	// The first source's adapter drives the screen; sources of other adapters are only read.
-	if (!adapter)
+	if (!adapter || !detail.isSuccess)
 		return <Message alert>この画面はこのアプリでは表示できません。</Message>;
 	return (
 		<AdapterScreen

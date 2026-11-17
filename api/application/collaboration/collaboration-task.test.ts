@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { waitFor } from "../../infrastructure/wait-for";
-import timersBundle from "../../domains/capabilities/bundles/timers.bundle.json";
+import { bundleFiles, capabilityBundleV1 } from "../../domains/capabilities";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { bundleHostOf } from "../toolchain/toolchain-adapters";
 import { harness } from "../toolchain/toolchain.fixture";
@@ -113,6 +113,9 @@ test("a conversation switches in place, then Collaboration searches a published 
 		const owner = h.dialogue.specialistSession(main)!;
 		expect(owner.toolchainId).toBe(task);
 		expect(h.timers!.list().items).toHaveLength(0);
+		const timersBundle = capabilityBundleV1.parse(
+			bundleFiles().find((file) => file.name === "timers.bundle.json")?.raw,
+		);
 		const installed = await h.store.write((db) =>
 			h.toolchain.capabilities.importBundleInTransaction(
 				db,

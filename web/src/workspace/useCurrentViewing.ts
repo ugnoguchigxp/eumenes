@@ -19,7 +19,7 @@ import {
 import { queryRoots } from "../queryKeys";
 import { readScreenState } from "../domains/toolchain-artifacts/screen-observation";
 import {
-	loadToolchainAdapter,
+	prepareToolchainAdapter,
 	toolchainWebAdapters,
 } from "./toolchain-adapters";
 
@@ -99,7 +99,7 @@ export function useCurrentViewing(
 		const entry = catalogEntries(cache).find(
 			(item) => item.artifactRevisionId === active.artifactRevisionId,
 		);
-		if (entry) void loadToolchainAdapter(entry.adapterRef);
+		if (entry) void prepareToolchainAdapter(entry.adapterRef);
 	}, [active, cache]);
 	const observation = useRef<{ sessionId: string; sequence: number } | null>(
 		null,

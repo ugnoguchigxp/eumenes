@@ -247,6 +247,11 @@ test("unexpired closing work retries an actual busy refusal, then ends once its 
 			close_blocked_reason: null,
 		});
 		expect(workOf(h, session.workRef)).not.toBeNull();
+		expect(h.dialogue.specialistSession("temporary-close")).toMatchObject({
+			id: session.id,
+			state: "closing",
+			dirty: true,
+		});
 		await h.store.write((db) => {
 			db.query(
 				"UPDATE collaboration_works SET busy_run_id=NULL WHERE id=?",

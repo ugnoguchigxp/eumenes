@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import type { DebugDiagnosticDetail } from "../../../api/domains/dialogue/contracts";
 import { ErrorReportButton } from "./ErrorReportDialog";
@@ -12,14 +12,20 @@ export function DebugDiagnostic({
 	entry: Omit<DebugDiagnosticDetail, "observation">;
 	conversationId: string;
 }) {
-	const [expired, setExpired] = useState(entry.expiresAt <= Date.now());
-	useEffect(() => {
-		const timer = setTimeout(
-			() => setExpired(true),
-			Math.max(0, entry.expiresAt - Date.now()),
-		);
+	const key = `${entry.id}:${entry.expiresAt}`;
+	const [hidden, setHidden] = useState<string | null>(null);
+	const expired = hidden === key;
+	useLayoutEffect(() => {
+		const remaining = entry.expiresAt - Date.now();
+		if (remaining <= 0) {
+			// The expiry is an external clock. Apply it before paint so an already-expired diagnostic is not shown.
+			// eslint-disable-next-line react/set-state-in-effect
+			setHidden(key);
+			return;
+		}
+		const timer = setTimeout(() => setHidden(key), remaining);
 		return () => clearTimeout(timer);
-	}, [entry.expiresAt]);
+	}, [key, entry.expiresAt]);
 	if (expired) return null;
 	const heading = "デバッグ診断";
 	const summary = entry.summary ?? "診断を生成できませんでした。";

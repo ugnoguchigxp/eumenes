@@ -9,7 +9,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `scratch` | 1 | `api/domains/scratch/index.ts` | なし | なし | `resources` | なし | なし |
 | `markdown` | 1 | `api/domains/markdown/index.ts` | `web/src/domains/markdown/` | `packages/design-system/src/components/MarkdownWorkspace/` | `queue`、`resources` | `resources` | なし |
-| `collaboration` | 3 | `api/domains/collaboration/index.ts` | `web/src/domains/collaboration/` | なし | なし | なし | なし |
+| `collaboration` | 3 | `api/domains/collaboration/index.ts` | `web/src/domains/collaboration/` | なし | `queue` | なし | なし |
 | `usage` | 4 | `api/domains/usage/index.ts` | `web/src/domains/usage/` | `packages/design-system/src/components/UsageDashboard/index.tsx` | なし | なし | なし |
 | `docling` | 1 | `api/domains/docling/index.ts` | `web/src/domains/docling/` | `packages/design-system/src/components/ExternalAppLauncher/index.ts` | `larm` | なし | なし |
 | `google-accounts` | 0 | `api/domains/google-accounts/index.ts` | `web/src/domains/google-accounts/` | `packages/design-system/src/components/GoogleAccounts/index.tsx` | なし | なし | なし |
@@ -63,9 +63,10 @@
 | `scheduler` | 1 | `api/domains/scheduler/index.ts` | `web/src/domains/scheduler/` | なし | `queue` | なし | なし |
 | `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | `resources` | なし |
 | `pursuit` | 3 | `api/domains/pursuit/index.ts` | なし | なし | `capabilities`、`resources`、`tool-runtime` | なし | なし |
+| `claude-code` | 3 | `api/domains/claude-code/index.ts` | なし | なし | `capabilities`、`coding`、`inference`、`queue`、`tool-runtime` | なし | なし |
 | `web-note` | 3 | `api/domains/web-note/index.ts` | なし | なし | `capabilities`、`queue`、`tool-runtime` | なし | なし |
 | `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`continuity`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`resources`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `goals` |
-| `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference` | `audio`、`avatar`、`dialogue`、`settings` | なし |
+| `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference` | `audio`、`avatar`、`dialogue`、`settings` | `tts-dictionary` |
 <!-- domains:end -->
 
 ## 試験と関連文書

@@ -13,10 +13,11 @@
 
 | ファイル | SHA-256 |
 | --- | --- |
-| `api/application/toolchain/router.fixture.ts` | `5f383569b89ca0e93ec8862664ed96b7b744fd00dbfb28864d2d272e0f5c6f0c` |
+| `api/application/toolchain/router.fixture.ts` | `3c3381d4c680fed988b755a311b0e50ce9c5f4faaf72cc639775755b403c288d` |
 | `api/application/toolchain/toolchain.fixture.ts` | `22e6ae128b93b66e9dc4f87d78317b83148e9be0556c19c0071a9dd8106550dc` |
-| `api/application/pipelines/pipeline-execution.test.ts` | `5a3262e4da448d2f0575be33bfd417c840aba3ed4615030ff499f56aa44456b0` |
-| `api/domains/dialogue/test/routed-router.test.ts` | `d926a349c1c64f003dab8ac27c114916e2db61c4a157f2a012e7cbe4c709ac8c` |
+| `api/application/pipelines/pipeline-execution.test.ts` | `14660ab5c5c947ae77c4c03dea41a57b1279440db23dc7f120c60d5ac80098eb` |
+| `api/domains/dialogue/test/routed-router.test.ts` | `1d6eb0904f42eeab83141d3ec13be1d65ec18057143c4a40cdfb4959d8918da5` |
+| `api/domains/dialogue/test/generation.fixture.ts` | `a5533ba777180ff4a263d51c668f82dfe054820564d6468b87877bb98437016f` |
 
 ## 修正前
 
@@ -32,24 +33,24 @@
 
 ## 1-01　結合fixtureの構造判定
 
-`fixtureRouting` は、`options.structure` があるとき `selectRouter` の版が `turn-structure-v8` ならその関数の戻りを `{ decision }` として返す。後段の候補選択は、構造判定が埋めないキャッシュを読まず、各依頼の候補に対する既存の pick を使う。`liveRouting` と、`options.structure` を渡さない既存 fixture は変えていない。
+`attachFixtureRouter` は、`options.structure` があるとき、版が `turn-structure-v8` で利用者ペイロードに `text` があり `requests` が無い呼び出しへ、その関数の戻りを `{ decision }` として返す。後段の候補選択は、構造判定が埋めないキャッシュを読まず、各依頼の候補に対する既存の pick を使う。`liveRouting` と、`options.structure` を渡さない既存 fixture は変えていない。
 
 回答・取消の試験は発話が2回ある。現行 Router は毎回構造を尋ねる。初回は pending も controls も空なので、試験は依頼全文を1件の requests として返し、構造判定の件数には数えない。件数と pending・controls の期待は、返信の構造プロンプトに残している。
 
-修正後の同じコマンドは 4 pass / 0 fail（失敗試験を含む）。
+修正後の同じコマンドは 4 pass / 0 fail（失敗試験を含む）。レビュー後は `routed-router.test.ts` と `pipeline-execution.test.ts` を合わせて 30 pass / 0 fail。
 
 | 試験 | 終端 | 件数 |
 | --- | --- | --- |
 | 二段タイマー | 親 completed、案内は「「パイプライン」に頼みます。」 | 構造1、計画2、子コマンド2、タイマー2、実行一覧1 |
 | 回答 | 同じ親が completed、TODOは元の1件 | 構造1、計画2、子コマンド1 |
 | 取消 | 同じ親が cancelled、TODOは元の1件 | 構造1、計画1、子コマンド0 |
-| 前段失敗 | 親 partial | 実行一覧1、子コマンド1、タイマー0 |
+| 前段失敗 | 親 partial、`toolchain_command_tool_unknown`、fulfilled は空 | 実行一覧1、子の台帳1（一つ目の依頼だけ）、子コマンド1、タイマー0 |
 
-境界は、既存の `routed-router.test.ts` が不正な構造、期限後の選択、取消後の構造を台帳0件で通している。今回の新規修正は重ねていない。異なる番号の候補は、選択応答のキーを別の依頼番号にした試験を追加した。選択口は1回、trace の error は `route_selection_invalid_response`、TODO と archived は0、toolchain の採用は0、delegate は返信のツールに含まれない。
+境界は、既存の `routed-router.test.ts` が不正な構造、期限後の選択、取消後の構造を台帳0件で通している。異なる番号の候補は、両方の依頼番号へ選択を返し、片方にしか出ていない候補 id をもう一方へ置いた。候補一覧が一致するとその id は有効になるため、検索の単語点だけを試験から渡し、絵の依頼の上位5件と曲の依頼の上位5件を分けている。選択口は1回、trace の error は `route_selection_invalid_response`、TODO と archived は0、toolchain の採用は0、返信のツールは `read_` だけである。単語点を渡さない既存試験の並びは変えていない。
 
 ## 1-02　依存工程
 
-二段タイマーの2件目の command 入力 `references` に、1件目の確定ラベル `pipeline timer 1` が含まれる。依頼文の組み立ては変更していない。前段を未知のツールで失敗させると、依存先の command は呼ばれず、タイマーは0件のまま親は partial になる。
+二段タイマーの子依頼は、順に `一つ目のタイマー` と `二つ目のタイマー` に期待結果を足した文である。2件目の command 入力にある `result:` 参照の `text` に、1件目の確定ラベル `pipeline timer 1` が含まれる。依頼文の組み立ては変更していない。前段を未知のツールで失敗させると、子の台帳は一つ目だけで、依存先の command は呼ばれず、タイマーは0件のまま親は partial になる。
 
 ## 計画3へ渡す試験登録
 

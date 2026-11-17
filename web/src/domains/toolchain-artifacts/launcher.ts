@@ -87,7 +87,9 @@ export function useToolchainArtifacts(
 				.fetchQuery(toolchainArtifactsQuery(client))
 				.catch(() => []);
 			const entry = entries.find((e) => e.adapterRef === adapterRef);
-			if (entry) openEntry(entry, targetRef);
+			if (!entry) return false;
+			openEntry(entry, targetRef);
+			return true;
 		},
 		[cache, client, openEntry],
 	);

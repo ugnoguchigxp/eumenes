@@ -385,6 +385,8 @@ export type SetupOptions = {
 	extraMigrations?: import("../../../infrastructure/sqlite").Migration[];
 	/** Cards the catalog lists (default: image and instant). */
 	cards?: ToolchainCard[];
+	/** Word scores for one router search. Absent: none, so equal vectors tie by id. */
+	lexical?: (text: string) => ReadonlyMap<string, number>;
 	selectRouter?: InferencePort["selectRouter"];
 	beforeRouterEmbed?: (
 		texts: readonly string[],
@@ -624,7 +626,8 @@ export async function setup(options: SetupOptions = {}) {
 			return { space: ROUTER_SPACE, vectors: texts.map(() => [1, 0]) };
 		},
 		routerCardsInTransaction: () => routerCards(cards),
-		routerLexicalInTransaction: () => new Map(),
+		routerLexicalInTransaction: (_db: unknown, text: string) =>
+			options.lexical?.(text) ?? new Map(),
 		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
 			new Map(
 				cards.filter((c) => ids.includes(c.id)).map((c) => [c.id, c.title]),

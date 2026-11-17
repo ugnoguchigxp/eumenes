@@ -5,14 +5,18 @@ import type { WebArtifactAdapter } from "../domains/toolchain-artifacts/registry
  * and `get` returns an adapter only after its module has loaded. A ref with no loader is
  * drawn by the host's generic screen.
  */
-type LoadedAdapter = WebArtifactAdapter | readonly WebArtifactAdapter[];
 type AdapterLoader = {
 	match: (ref: string) => boolean;
-	load: () => Promise<LoadedAdapter>;
+	load: () => Promise<readonly WebArtifactAdapter[]>;
 };
+const collaborationRefs = new Set(
+	["pipeline", "interact", "brave", "task"].map(
+		(kind) => `adapter:collaboration.${kind}@1`,
+	),
+);
 const loaders: readonly AdapterLoader[] = [
 	{
-		match: (ref) => ref.startsWith("adapter:collaboration."),
+		match: (ref) => collaborationRefs.has(ref),
 		load: async () =>
 			(await import("../domains/collaboration/toolchain-adapter"))
 				.collaborationWebAdapters,
@@ -199,14 +203,7 @@ const loaders: readonly AdapterLoader[] = [
 const byRef = new Map<string, WebArtifactAdapter>();
 const inflight = new Map<number, Promise<void>>();
 const failed = new Set<number>();
-const listeners = new Set<() => void>();
 
-function notify() {
-	for (const listener of listeners) listener();
-}
-function adaptersOf(loaded: LoadedAdapter): readonly WebArtifactAdapter[] {
-	return Array.isArray(loaded) ? loaded : [loaded];
-}
 function loaderIndex(ref: string) {
 	return loaders.findIndex((loader) => loader.match(ref));
 }
@@ -223,11 +220,6 @@ export function toolchainAdapterPhase(ref: string): ToolchainAdapterPhase {
 	return "pending";
 }
 
-export function subscribeToolchainAdapters(listener: () => void) {
-	listeners.add(listener);
-	return () => listeners.delete(listener);
-}
-
 /** Load the module for the screen the user opened. A ref with no domain screen resolves without one. */
 export function loadToolchainAdapter(
 	ref: string,
@@ -240,19 +232,19 @@ export function loadToolchainAdapter(
 	if (!pending) {
 		pending = loaders[index]!.load()
 			.then((loaded) => {
-				failed.delete(index);
-				for (const adapter of adaptersOf(loaded)) {
+				for (const adapter of loaded) {
 					const previous = byRef.get(adapter.adapterRef);
 					if (previous && previous !== adapter)
 						throw new Error("duplicate_web_adapter");
+				}
+				for (const adapter of loaded) {
 					byRef.set(adapter.adapterRef, adapter);
 				}
-				notify();
+				failed.delete(index);
 			})
 			.catch((error: unknown) => {
 				inflight.delete(index);
 				failed.add(index);
-				notify();
 				throw error;
 			});
 		inflight.set(index, pending);

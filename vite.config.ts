@@ -169,9 +169,9 @@ export default defineConfig(({ command, mode }) => {
 						if (!id.includes("node_modules")) return undefined;
 						if (/node_modules\/(react|react-dom|scheduler)\//.test(id))
 							return "react";
-						if (id.includes("/@tanstack/")) return "query";
-						if (/node_modules\/zod\//.test(id)) return "zod";
-						if (id.includes("/@radix-ui/")) return "radix";
+						// Table widgets and other optional UI packages follow their own import graph.
+						if (/node_modules\/@tanstack\/(query-core|react-query)\//.test(id))
+							return "query";
 						return undefined;
 					},
 				},

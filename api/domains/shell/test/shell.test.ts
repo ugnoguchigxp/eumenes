@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { createShell, registerShell } from "..";
 import { APPROVAL_MS } from "../contracts";
-import { childEnv } from "../../../infrastructure/pty";
+import { bunSpawnPty, childEnv } from "../../../infrastructure/pty";
 import { waitFor } from "../../../infrastructure/wait-for";
 import { createOutput } from "../service/output";
 import { fakePty, harness, request } from "./shell.fixture";
@@ -204,7 +204,17 @@ test("bounded plain output preserves head and tail and child environment exclude
 });
 
 test("real PTY executes a command and exposes the same output through the screen", async () => {
-	const h = make({ spawn: undefined });
+	const launch = bunSpawnPty(undefined);
+	const h = make({
+		spawn: (input) => {
+			// Verify login mode is requested, then run the fixture without the host's profile.
+			expect(input.command[1]).toBe("-l");
+			return launch({
+				...input,
+				command: [input.command[0]!, ...input.command.slice(2)],
+			});
+		},
+	});
 	await h.shell.recover();
 	const a = request({ command: "printf 'actual-pty\\n'; exit 3" });
 	await h.enqueue(a);

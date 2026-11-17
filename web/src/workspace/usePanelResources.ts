@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { SCRATCH_ADAPTER_REF } from "../../../api/domains/scratch/contracts";
 import type { EumenesClient } from "../../../client";
@@ -16,9 +15,8 @@ import {
 	DRAWING_ADAPTER_REF,
 	drawingScreen,
 } from "../domains/excalidraw/resource-screen";
-import { toolchainArtifactsQuery } from "../domains/toolchain-artifacts/launcher";
 import {
-	loadToolchainAdapter,
+	prepareToolchainAdapter,
 	toolchainWebAdapters,
 } from "./toolchain-adapters";
 import type { WorkspaceState } from "./useWorkspace";
@@ -32,11 +30,9 @@ const NO_VIEWER = () => {};
  * shared-file viewer.
  */
 export function useWorkspaceLauncher(
-	client: EumenesClient,
 	state: Pick<WorkspaceState, "toolchain" | "openPlaylist" | "openDrawing">,
 	openScratch: (id: string) => void = NO_VIEWER,
 ): ResourceLauncher {
-	const cache = useQueryClient();
 	const { openByAdapter } = state.toolchain;
 	const { openPlaylist, openDrawing } = state;
 	return useMemo<ResourceLauncher>(
@@ -54,14 +50,8 @@ export function useWorkspaceLauncher(
 					openDrawing();
 					return true;
 				}
-				const entries = await cache
-					.fetchQuery(toolchainArtifactsQuery(client))
-					.catch(() => []);
-				if (!entries.some((entry) => entry.adapterRef === adapterRef))
-					return false;
-				await openByAdapter(adapterRef, targetRef);
-				await loadToolchainAdapter(adapterRef);
-				return true;
+				if (!(await openByAdapter(adapterRef, targetRef))) return false;
+				return (await prepareToolchainAdapter(adapterRef)) !== "unavailable";
 			},
 			screen: (adapterRef) =>
 				adapterRef === MUSIC_PLAYLIST_ADAPTER_REF
@@ -70,7 +60,7 @@ export function useWorkspaceLauncher(
 						? drawingScreen
 						: toolchainWebAdapters.get(adapterRef),
 		}),
-		[cache, client, openByAdapter, openPlaylist, openDrawing, openScratch],
+		[openByAdapter, openPlaylist, openDrawing, openScratch],
 	);
 }
 
@@ -80,7 +70,7 @@ export function usePanelResources(
 	state: WorkspaceState,
 ) {
 	const [scratchId, setScratchId] = useState<string | null>(null);
-	const launcher = useWorkspaceLauncher(client, state, setScratchId);
+	const launcher = useWorkspaceLauncher(state, setScratchId);
 	const notice = useResourceNotice();
 	const openResource = useResourceOpener({
 		client,

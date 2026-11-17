@@ -133,7 +133,9 @@ export function sessionView(
 	tx: Database,
 	record: SessionRecord,
 ): SpecialistSession {
-	const work = record.closeBlockedReason
+	const workReadable =
+		record.state !== "closing" && !sessionExpired(record, deps.clock());
+	const work = !workReadable
 		? null
 		: deps.specialist?.workStateInTransaction(
 				tx,
@@ -155,8 +157,9 @@ export function sessionView(
 		revision: record.revision,
 		epoch: record.epoch,
 		activeRunId: record.activeRunId,
-		// A stopped close cannot confirm whether the retained work is saved.
-		dirty: !!record.closeBlockedReason || (work?.dirty ?? false),
+		// A closing or expired session cannot confirm whether the retained work is saved.
+		dirty:
+			(!workReadable && record.state !== "ended") || (work?.dirty ?? false),
 		busy: work?.busy ?? false,
 		label: work?.label ?? record.label,
 		expiresAt: record.expiresAt,

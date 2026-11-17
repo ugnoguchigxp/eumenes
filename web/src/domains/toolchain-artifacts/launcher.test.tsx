@@ -100,9 +100,21 @@ test("a target change inside a hidden tab never steals focus", async () => {
 
 test("a conversation result finds the registered artifact by its adapter", async () => {
 	const { hook } = setup();
-	await act(() =>
-		hook.result.current.toolchain.openByAdapter("adapter:timers@1", "timer-3"),
-	);
+	await act(async () => {
+		expect(
+			await hook.result.current.toolchain.openByAdapter(
+				"adapter:timers@1",
+				"timer-3",
+			),
+		).toBe(true);
+		expect(
+			await hook.result.current.toolchain.openByAdapter(
+				"adapter:unregistered@1",
+				"target",
+			),
+		).toBe(false);
+	});
+	expect(hook.result.current.workspace.tabs).toHaveLength(1);
 	expect(hook.result.current.workspace.tabs[0]).toMatchObject({
 		targetRef: "timer-3",
 	});
