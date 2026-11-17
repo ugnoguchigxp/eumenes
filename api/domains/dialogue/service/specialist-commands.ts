@@ -12,11 +12,11 @@ import {
 	liveSession,
 	patchSession,
 	receiptById,
+	recoveryCandidates,
 	sessionById,
 	sweepCandidates,
 	suspendedSessions,
 	unfinishedSessionRuns,
-	unfinishedSessions,
 	type SessionRecord,
 } from "../repository";
 import type { DialogueDeps } from "./context";
@@ -74,7 +74,7 @@ function recoverSessions(deps: DialogueDeps, db: Database): Cancelled {
 	const { clock } = deps;
 	const cancelled = none();
 	if (!deps.specialist) return cancelled;
-	for (const record of unfinishedSessions(db)) {
+	for (const record of recoveryCandidates(db)) {
 		let durable = false;
 		try {
 			durable = !!deps.specialist.setInTransaction(
@@ -106,7 +106,11 @@ function recoverSessions(deps: DialogueDeps, db: Database): Cancelled {
 				},
 				clock(),
 			);
-		} else absorb(cancelled, endOrMarkClosing(deps, db, record, "restarted"));
+		} else
+			absorb(
+				cancelled,
+				endOrMarkClosing(deps, db, record, record.closingReason ?? "restarted"),
+			);
 	}
 	return cancelled;
 }

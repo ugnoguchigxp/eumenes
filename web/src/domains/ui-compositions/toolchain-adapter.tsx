@@ -19,8 +19,7 @@ import {
 } from "../toolchain-artifacts/specialist-bridge";
 
 const UI_COMPOSITIONS_ADAPTER_REF = "adapter:ui-compositions@1";
-/** The studio's artifact id, as a launcher or a navigation names it. */
-export const UI_STUDIO_ARTIFACT_ID = "ui.studio";
+export { UI_STUDIO_ARTIFACT_ID } from "./artifact-id";
 
 /** What the mounted studio shows, read through the latest render. */
 type StudioScreen = {

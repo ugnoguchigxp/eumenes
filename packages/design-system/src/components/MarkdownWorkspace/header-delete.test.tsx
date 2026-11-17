@@ -93,7 +93,7 @@ function fixture(): MarkdownWorkspaceProps {
 		onReturn: vi.fn(),
 		onResume: vi.fn(),
 		onFiles: vi.fn(),
-		onManage: vi.fn(async () => true),
+		onManage: vi.fn(async () => ({ status: "accepted" as const, message: "" })),
 		onReload: vi.fn(async () => true),
 	};
 }

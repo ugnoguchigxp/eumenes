@@ -14,6 +14,23 @@ export const json = (text: string | null): unknown =>
 export const terminal = (view: ChildView) =>
 	view.status !== "running" && view.status !== "waiting_user";
 
+export const workLabel = (row: WorkRow) =>
+	row.title ||
+	{
+		pipeline: "手順の共同編集",
+		interact: "ブラウザの共同作業",
+		brave: "Braveの共同作業",
+		task: "Collaboration",
+		schedule: "実行予約",
+	}[row.kind];
+
+export const workDirty = (row: WorkRow, child: ChildView | null) =>
+	row.document_json
+		? child?.status !== "completed"
+		: !!row.child_id &&
+			!row.child_borrowed &&
+			(!child || !terminal(child) || child.status === "indeterminate");
+
 export function createWorkContext(
 	host: () => Ports,
 	now: () => number,
@@ -30,6 +47,14 @@ export function createWorkContext(
 			source.specialistSessionId !== ref.specialistSessionId
 		)
 			return fail("collaboration_source_invalid");
+		checkContributions(db, row, source.conversationId);
+		return source;
+	}
+	function checkContributions(
+		db: Database,
+		row: WorkRow,
+		conversationId: string,
+	) {
 		for (const used of sources(db, row.id)) {
 			const actual = host().source(db, used.run_id);
 			if (
@@ -37,17 +62,16 @@ export function createWorkContext(
 					actual.messageId !== used.message_id ||
 					actual.digest !== used.digest ||
 					actual.specialistSessionId !== row.session_id ||
-					actual.conversationId !== source.conversationId) &&
+					actual.conversationId !== conversationId) &&
 				!host().contributingSource?.(db, {
 					runId: used.run_id,
 					messageId: used.message_id,
 					digest: used.digest,
-					conversationId: source.conversationId,
+					conversationId,
 				})
 			)
 				fail("collaboration_source_invalid");
 		}
-		return source;
 	}
 	const live = (db: Database, id: string) => {
 		const row = work(db, id);
@@ -60,14 +84,18 @@ export function createWorkContext(
 		current(db, row);
 		return row;
 	}
-	function state(db: Database, row: WorkRow) {
-		const source = row.source_json ? current(db, row) : null;
+	function childState(db: Database, row: WorkRow, source: Source | null) {
 		const child =
 			source && row.child_id && row.kind !== "schedule"
 				? host().view(db, row.kind, source, row.child_id)
 				: null;
 		if (child && !withinJsonLimits(child))
 			fail("collaboration_result_capacity");
+		return child;
+	}
+	function state(db: Database, row: WorkRow) {
+		const source = row.source_json ? current(db, row) : null;
+		const child = childState(db, row, source);
 		const available =
 			source && row.kind !== "schedule"
 				? host().context(db, row.kind, source)
@@ -75,22 +103,10 @@ export function createWorkContext(
 		return {
 			workRef: row.id,
 			savedRef: null,
-			dirty: row.document_json
-				? child?.status !== "completed"
-				: !!row.child_id &&
-					!row.child_borrowed &&
-					(!child || !terminal(child) || child.status === "indeterminate"),
+			dirty: workDirty(row, child),
 			busy: !!row.busy_run_id,
 			revision: row.revision,
-			label:
-				row.title ||
-				{
-					pipeline: "手順の共同編集",
-					interact: "ブラウザの共同作業",
-					brave: "Braveの共同作業",
-					task: "Collaboration",
-					schedule: "実行予約",
-				}[row.kind],
+			label: workLabel(row),
 			current: {
 				kind: row.kind,
 				revision: row.revision,
@@ -178,6 +194,8 @@ export function createWorkContext(
 		host,
 		now,
 		current,
+		checkContributions,
+		childState,
 		live,
 		held,
 		state,

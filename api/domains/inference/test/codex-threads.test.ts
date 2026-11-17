@@ -5,6 +5,7 @@ import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { configureLogging } from "../../../infrastructure/logger";
 import { waitFor } from "../../../infrastructure/wait-for";
+import type { ModelInput } from "../../../infrastructure/model-input";
 import { revokeAgentAttempts } from "../service/agent-revoke";
 import {
 	assistant,
@@ -36,17 +37,27 @@ test("a call starts a new thread, appends to one it continues, or reverts one to
 	const codex = await fakeCodex();
 	try {
 		const agents = codex.agents(codex.host());
+		const observed: ModelInput[] = [];
+		const observeInput = (input: ModelInput) => {
+			observed.push(input);
+		};
 		await agents.run(
-			codexCall([user("question one")], { attemptId: "attempt-1" }),
+			codexCall([user("question one")], {
+				attemptId: "attempt-1",
+				observeInput,
+			}),
 		);
 		await agents.run(
-			codexCall([
-				user("question one"),
-				assistant("calling a tool"),
-				toolResult("tool says"),
-			]),
+			codexCall(
+				[
+					user("question one"),
+					assistant("calling a tool"),
+					toolResult("tool says"),
+				],
+				{ observeInput },
+			),
 		);
-		await agents.run(codexCall([user("question two")]));
+		await agents.run(codexCall([user("question two")], { observeInput }));
 		expect(
 			events("inference.codex_thread").map((e) => [e.mode, e.count]),
 		).toEqual([
@@ -56,6 +67,16 @@ test("a call starts a new thread, appends to one it continues, or reverts one to
 		]);
 		expect(events("inference.codex_thread")[0]!.attemptId).toBe("attempt-1");
 		const turns = await codex.of("turn/start");
+		expect(observed.map(({ sdk }) => sdk?.prompt)).toEqual(turns.map(sentText));
+		expect(observed.map(({ sdk }) => sdk?.mode)).toEqual([
+			"new",
+			"append",
+			"reset",
+		]);
+		expect(observed[1]?.sdk?.carried).toBe(2);
+		expect(observed[1]?.messages.map(({ content }) => content)).toContain(
+			"question one",
+		);
 		// One thread throughout; durable, so that it can be reverted.
 		expect(new Set(turns.map((t) => t.params.threadId)).size).toBe(1);
 		expect(await codex.of("thread/start")).toHaveLength(1);

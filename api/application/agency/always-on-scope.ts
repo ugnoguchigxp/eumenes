@@ -3,14 +3,13 @@ import {
 	createAgendaAgent,
 	defaultPersona,
 	speechIntervals,
-	type AgendaAddedWords,
 	type AgendaAgent,
 	type NoteRef,
 	type ReplyCall,
 	type SpeechIntervalSec,
 } from "eumenes-agency/agenda";
 import type { InputContext, LlmPort, LlmRequest } from "eumenes-agency";
-import { createAgendaSteering } from "./agenda-steer";
+import { createAgendaSteering, type AgendaSteering } from "./agenda-steer";
 import {
 	conversationPersona,
 	isAgendaSnapshot,
@@ -62,7 +61,7 @@ export type AgendaScope = {
 	revision: number;
 	agent: AgendaAgent;
 	/** Absent when the server made no steering inbox: words sent meanwhile wait for a reply of their own. */
-	steering: AgendaAddedWords | null;
+	steering: AgendaSteering | null;
 	tickets: AgendaResearchTicket[];
 	notes: AgendaNote[];
 	/**

@@ -3,20 +3,15 @@ import {
 	libraryPage,
 	operationView,
 	manageInput,
+	type LibraryFilesQuery,
 } from "../api/domains/markdown/contracts";
-import { callJson, json, type Transport } from "./transport";
+import { callJson, json, withQuery, type Transport } from "./transport";
 export function markdownLibraryClient(t: Transport) {
 	return {
-		markdownFiles: (
-			input: { namespace: string; path: string; cursor?: string },
-			signal?: AbortSignal,
-		) =>
-			callJson(
-				t,
-				libraryPage,
-				`/api/markdown/files?${new URLSearchParams(input)}`,
-				{ signal },
-			),
+		markdownFiles: (input: LibraryFilesQuery, signal?: AbortSignal) =>
+			callJson(t, libraryPage, withQuery("/api/markdown/files", input), {
+				signal,
+			}),
 		markdownOperations: (signal?: AbortSignal) =>
 			callJson(t, z.array(operationView), "/api/markdown/management", {
 				signal,

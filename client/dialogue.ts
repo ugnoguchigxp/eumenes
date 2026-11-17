@@ -1,8 +1,10 @@
 import { z } from "zod";
 import {
+	contextCaptureSchema,
 	debugDiagnosticDetailSchema,
 	debugDiagnosticsSchema,
 	errorReportSchema,
+	runContextSchema,
 	runSchema,
 	specialistSessionResponseSchema,
 	todoNoticesSchema,
@@ -69,6 +71,20 @@ export function dialogueClient(transport: Transport) {
 			callJson(transport, runSchema, `/api/runs/${encodeURIComponent(id)}`, {
 				signal,
 			}),
+		runContext: (id: string, signal?: AbortSignal) =>
+			callJson(
+				transport,
+				runContextSchema,
+				`/api/runs/${encodeURIComponent(id)}/context`,
+				{ signal },
+			),
+		contextCapture: (runId: string, id: string, signal?: AbortSignal) =>
+			callJson(
+				transport,
+				contextCaptureSchema,
+				`/api/runs/${encodeURIComponent(runId)}/context/${encodeURIComponent(id)}`,
+				{ signal },
+			),
 		/** The diagnostic text of a failed run; 404 when it is unknown, 409 when the run did not fail. */
 		runErrorReport: async (id: string, signal?: AbortSignal) =>
 			callJson(

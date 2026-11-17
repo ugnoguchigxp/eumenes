@@ -488,6 +488,15 @@ CREATE UNIQUE INDEX dialogue_specialist_live ON dialogue_specialist_sessions(con
 CREATE INDEX dialogue_specialist_conversation ON dialogue_specialist_sessions(conversation_id,state,updated_at);`,
 	},
 	generatedImagesMigration,
+	{
+		id: "dialogue/0042-specialist-close-block",
+		after: ["dialogue/0041-generated-images"],
+		sql: `ALTER TABLE dialogue_specialist_sessions ADD COLUMN close_blocked_reason TEXT
+ CHECK(close_blocked_reason IS NULL OR close_blocked_reason = 'source_session_expired');
+ALTER TABLE dialogue_specialist_sessions ADD COLUMN close_blocked_at TEXT
+ CHECK((close_blocked_reason IS NULL AND close_blocked_at IS NULL)
+    OR (close_blocked_reason IS NOT NULL AND close_blocked_at IS NOT NULL AND state = 'closing'));`,
+	},
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

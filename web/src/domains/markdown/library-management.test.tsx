@@ -3,8 +3,12 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode, type PropsWithChildren } from "react";
 import type { EumenesClient } from "../../../../client";
-import type { LibraryFeatures } from "../../../../api/domains/markdown/contracts";
-import { ApiError } from "../../../../client/transport";
+import type {
+	LibraryFeatures,
+	LibraryFilesQuery,
+	LibraryPage,
+} from "../../../../api/domains/markdown/contracts";
+import { ApiConnectionError, ApiError } from "../../../../client/transport";
 import { useLibraryManagement, managementMessage } from "./library-management";
 afterEach(() => {
 	cleanup();
@@ -29,8 +33,9 @@ function mount(
 	enabled = true,
 	initialNamespaces = ["eumenes"],
 	strict = false,
+	updatedDesc = false,
 ) {
-	const page = {
+	const page: LibraryPage = {
 		namespace: "eumenes",
 		path: "",
 		etag: '"' + "a".repeat(64) + '"',
@@ -47,10 +52,7 @@ function mount(
 	const client = {
 			identity: crypto.randomUUID(),
 			markdownFiles: vi.fn(
-				async (
-					_input: { namespace: string; path: string },
-					_signal?: AbortSignal,
-				) => page,
+				async (_input: LibraryFilesQuery, _signal?: AbortSignal) => page,
 			),
 			markdownOperations: vi.fn(async () => [result]),
 			markdownManage: vi.fn(async () => result),
@@ -63,7 +65,7 @@ function mount(
 		(namespaces) =>
 			useLibraryManagement({
 				client: client as unknown as EumenesClient,
-				features: enabled ? features : undefined,
+				features: enabled ? { ...features, updatedDesc } : undefined,
 				namespaces,
 				visible: true,
 				selected: "local",
@@ -147,13 +149,107 @@ test("changing page ETags invalidates the assembled selection instead of mixing 
 	expect(h.result.current.files).toBeUndefined();
 	expect(h.result.current.filesError).toContain("取得中に一覧が更新");
 });
+test("server-sorted pages retain opaque cursors and append in the received order", async () => {
+	const h = mount(true, [], false, true);
+	const entries = Array.from({ length: 205 }, (_, i) => ({
+		kind: "folder" as const,
+		namespace: "eumenes",
+		name: String(i),
+		path: `記録/${i}`,
+		id: `folder-${i.toString(16).padStart(32, "0")}`,
+		etag: h.page.etag,
+		documentCount: 0,
+		folderCount: 0,
+		hasUnsupportedEntries: false,
+		updatedAt: new Date(Date.UTC(2026, 10, 17) - i * 1000).toISOString(),
+	}));
+	const values = { namespace: "eumenes", path: "記録" };
+	const first = { ...h.page, ...values };
+	h.client.markdownFiles
+		.mockResolvedValueOnce({
+			...first,
+			entries: entries.slice(0, 100),
+			nextCursor: "次/+=",
+		})
+		.mockResolvedValueOnce({
+			...first,
+			entries: entries.slice(100, 200),
+			nextCursor: "続き/+=",
+		})
+		.mockResolvedValueOnce({
+			...first,
+			entries: entries.slice(200),
+			nextCursor: null,
+		});
+	for (const cursor of [undefined, "次/+=", "続き/+="]) {
+		await act(() =>
+			h.result.current.local(
+				event("markdown-files", { ...values, ...(cursor ? { cursor } : {}) }),
+			),
+		);
+	}
+	expect(h.client.markdownFiles.mock.calls.map(([query]) => query)).toEqual(
+		[undefined, "次/+=", "続き/+="].map((cursor) => ({
+			...values,
+			sort: "updated-desc",
+			cursor,
+		})),
+	);
+	expect(h.result.current.files?.entries).toEqual(entries);
+});
+test.each(["etag", "invalid_cursor", "invalid_pagination"])(
+	"a sorted continuation resets to page one on %s",
+	async (reason) => {
+		const h = mount(true, [], false, true);
+		const values = { namespace: "eumenes", path: "記録" };
+		const first = { ...h.page, ...values };
+		const renewed = {
+			...first,
+			etag: '"' + "b".repeat(64) + '"',
+			nextCursor: "new",
+		};
+		h.client.markdownFiles.mockResolvedValueOnce(first);
+		if (reason === "etag")
+			h.client.markdownFiles.mockResolvedValueOnce({
+				...renewed,
+				nextCursor: "discard",
+			});
+		else
+			h.client.markdownFiles.mockRejectedValueOnce(
+				new ApiError(400, `markdown_${reason}`),
+			);
+		h.client.markdownFiles.mockResolvedValueOnce(renewed);
+		await act(() => h.result.current.local(event("markdown-files", values)));
+		await act(() =>
+			h.result.current.local(
+				event("markdown-files", { ...values, cursor: "next" }),
+			),
+		);
+		expect(h.result.current.files).toEqual({
+			...renewed,
+			sort: "updated-desc",
+		});
+		expect(h.result.current.filesError).toBeUndefined();
+		expect(h.client.markdownFiles.mock.calls.map(([query]) => query)).toEqual(
+			[undefined, "next", undefined].map((cursor) => ({
+				...values,
+				sort: "updated-desc",
+				cursor,
+			})),
+		);
+	},
+);
 test("unknown receipt retains draft and target; explicit read-only confirmation clears only deleted work", async () => {
 	const h = mount();
 	await waitFor(() => expect(h.result.current.files).toBeDefined());
 	localStorage.setItem("eumenes:markdown:draft:local", "draft");
-	await act(() =>
-		h.result.current.local(event("markdown-manage", { stageId: "stage" })),
-	);
+	await act(async () => {
+		expect(
+			await h.result.current.local(
+				event("markdown-manage", { stageId: "stage" }),
+			),
+		).toMatchObject({ status: "indeterminate" });
+	});
 	expect(h.client.markdownManage).toHaveBeenCalledTimes(1);
 	expect(h.client.markdownManage).toHaveBeenCalledWith({ stageId: "stage" });
 	expect(localStorage.getItem("eumenes:markdown:draft:local")).toBe("draft");
@@ -169,6 +265,51 @@ test("unknown receipt retains draft and target; explicit read-only confirmation 
 	expect(h.client.markdownManage).toHaveBeenCalledTimes(1);
 	expect(h.setTargetRef).toHaveBeenCalledWith(undefined);
 	expect(localStorage.getItem("eumenes:markdown:draft:local")).toBeNull();
+});
+test("a deletion refused with 409 returns the refusal reason without discarding input", async () => {
+	const h = mount();
+	await waitFor(() => expect(h.result.current.files).toBeDefined());
+	localStorage.setItem("eumenes:markdown:draft:local", "draft");
+	h.client.markdownManage.mockRejectedValueOnce(new ApiError(409, "work_busy"));
+	await act(async () => {
+		expect(
+			await h.result.current.local(
+				event("markdown-manage", { stageId: "stage" }),
+			),
+		).toMatchObject({
+			status: "rejected",
+			message: expect.stringContaining("共同編集中"),
+		});
+	});
+	expect(h.client.markdownManage).toHaveBeenCalledTimes(1);
+	expect(h.client.markdownCheck).not.toHaveBeenCalled();
+	expect(localStorage.getItem("eumenes:markdown:draft:local")).toBe("draft");
+});
+test("a missing operation record during a read-only check does not settle an interrupted deletion", async () => {
+	const h = mount();
+	await waitFor(() => expect(h.result.current.files).toBeDefined());
+	h.client.markdownManage.mockRejectedValueOnce(new ApiConnectionError());
+	h.client.markdownCheck.mockRejectedValueOnce(
+		new ApiError(404, "markdown_not_found"),
+	);
+	await act(async () => {
+		expect(
+			await h.result.current.local(
+				event("markdown-manage", { stageId: "stage" }),
+			),
+		).toMatchObject({ status: "indeterminate" });
+		expect(
+			await h.result.current.local(
+				event("markdown-check", { id: h.outcome.id }),
+			),
+		).toMatchObject({
+			status: "indeterminate",
+			message: expect.stringContaining("操作記録が見つかりません"),
+		});
+	});
+	expect(h.client.markdownManage).toHaveBeenCalledTimes(1);
+	expect(h.client.markdownCheck).toHaveBeenCalledExactlyOnceWith(h.outcome.id);
+	expect(h.setTargetRef).not.toHaveBeenCalled();
 });
 test("known rejection messages keep conflict, unsupported items, limits and permissions distinct", () => {
 	expect(

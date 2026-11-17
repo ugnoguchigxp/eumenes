@@ -1,4 +1,3 @@
-export { createWebAdapterRegistry } from "./registry";
 export {
 	artifactIdOf,
 	entryLabel,

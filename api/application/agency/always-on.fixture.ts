@@ -1,4 +1,4 @@
-import type { LlmPort, LlmRequest } from "eumenes-agency";
+import type { LlmPort, LlmRequest, ToolDefinition } from "eumenes-agency";
 import { createSteeringInbox } from "eumenes-steer";
 import { SET_QUIET, START_PREPARATION } from "eumenes-agency/agenda";
 import { createAgencyStatePort } from "../../domains/dialogue";
@@ -348,7 +348,7 @@ export async function replyWith(
 ) {
 	let call = 0;
 	const seen: Array<{ role: string; content: string }[]> = [];
-	const offered: string[][] = [];
+	const toolDefinitions: ReadonlyArray<ToolDefinition>[] = [];
 	const reply = await (options.host ?? f.host).conversationAgent.respond({
 		run: {
 			conversationId: "ao",
@@ -362,7 +362,7 @@ export async function replyWith(
 		chat: {
 			async complete(request) {
 				seen.push(request.messages.map((m) => ({ ...m })));
-				offered.push(request.tools.map((t) => t.name));
+				toolDefinitions.push(request.tools);
 				call++;
 				return call === 1 && tools.length
 					? {
@@ -384,7 +384,12 @@ export async function replyWith(
 		onDelta: () => {},
 		maxToolCalls: 0,
 	});
-	return { reply, seen, offered };
+	return {
+		reply,
+		seen,
+		offered: toolDefinitions.map((tools) => tools.map((tool) => tool.name)),
+		toolDefinitions,
+	};
 }
 
 export const promiseResearch = [

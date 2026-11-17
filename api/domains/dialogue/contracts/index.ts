@@ -311,6 +311,7 @@ export interface ConversationAgentPort {
 			messageIds: readonly string[];
 		};
 		messages: AgentMessage[];
+		traceInput?: true;
 		/** Only read tools may be offered or run, including tools supplied by the agent itself. */
 		readOnly?: boolean;
 		chat: {
@@ -385,3 +386,9 @@ export {
 } from "./agency-always-on";
 
 export * from "./debug-diagnostics";
+export { contextCaptureSchema, runContextSchema } from "./context-input";
+export type {
+	ContextCapture,
+	ContextCaptureSummary,
+	RunContext,
+} from "./context-input";

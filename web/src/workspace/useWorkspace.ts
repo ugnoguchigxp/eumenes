@@ -26,9 +26,9 @@ import type { EumenesClient } from "../../../client";
 import { useImageArtifacts } from "../domains/image";
 import { useMusicArtifacts, usePlaylistArtifacts } from "../domains/music";
 import { activeTimersQuery } from "../domains/timers/queries";
-import { TIMER_ADAPTER_REF } from "../domains/timers/toolchain-adapter";
+import { TIMER_ADAPTER_REF } from "../domains/timers/adapter-ref";
 import { useTimerArtifacts } from "../domains/timers/useTimerArtifacts";
-import { useToolchainArtifacts } from "../domains/toolchain-artifacts";
+import { useToolchainArtifacts } from "../domains/toolchain-artifacts/launcher";
 import { createScreenOutput, type AudioStore } from "../domains/audio";
 import { useArtifactWorkspace } from "../domains/artifact";
 import { useConversation } from "../domains/conversation";
@@ -45,7 +45,7 @@ import { useSettings, useVoiceMute } from "../domains/settings";
 import { useWorkspaceLive } from "./useWorkspaceLive";
 import { useKanbanNotices } from "../domains/kanban/useKanbanNotices";
 import { useTodoNotices } from "../domains/dialogue";
-import { useClaudeCodeArtifacts } from "../domains/terminals";
+import { useClaudeCodeArtifacts } from "../domains/terminals/useClaudeCodeArtifacts";
 import { changeRoots, invalidateAllButLive, queryRoots } from "../queryKeys";
 
 export function useWorkspace({

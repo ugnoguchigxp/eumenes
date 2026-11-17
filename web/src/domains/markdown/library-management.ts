@@ -3,10 +3,23 @@ import { useQuery } from "@tanstack/react-query";
 import type { EumenesClient } from "../../../../client";
 import type {
 	LibraryFeatures,
+	LibraryFilesQuery,
 	LibraryPage,
 } from "../../../../api/domains/markdown/contracts";
 import { ApiError } from "../../../../client/transport";
 import type { ArtifactEvent } from "@eumenes/artifact-ui/contracts";
+type LoadedPage = LibraryPage & Pick<LibraryFilesQuery, "sort">;
+
+function invalidCursor(error: unknown) {
+	return (
+		error instanceof ApiError &&
+		error.status === 400 &&
+		["markdown_invalid_cursor", "markdown_invalid_pagination"].includes(
+			error.message,
+		)
+	);
+}
+
 const errors: Record<string, string> = {
 	overlapping_selection: "親フォルダーと配下を重ねずに選択してください。",
 	etag_mismatch:
@@ -15,6 +28,9 @@ const errors: Record<string, string> = {
 		"対象に未保存の変更があります。編集を開き、保存するか変更を破棄してください。",
 	markdown_management_pending:
 		"結果不明の操作があります。先に結果を確認してください。",
+	markdown_library_unsupported: "保存先がこの操作に対応していません。",
+	markdown_not_found:
+		"対象または操作の入力が見つかりません。一覧を更新して再確認してください。",
 	markdown_save_in_progress:
 		"保存中または保存結果が不明です。保存状態を確認してください。",
 	work_busy: "共同編集中の文書です。共同編集を終了してから操作してください。",
@@ -26,7 +42,9 @@ const errors: Record<string, string> = {
 	forbidden: "この操作の権限がありません。",
 	payload_too_large: "容量または対象件数の上限を超えています。",
 	revision_conflict: "一覧または編集が更新されました。再確認してください。",
+	request_conflict: "操作の入力が一致しません。対象を選び直してください。",
 };
+const unknownResult = "操作の結果は未確認です。";
 export function managementMessage(e: unknown): string {
 	if (e instanceof ApiError)
 		return (
@@ -52,7 +70,8 @@ export function useLibraryManagement(input: {
 	setTargetRef(id: string | undefined): void;
 }) {
 	const { client, features } = input;
-	const [files, setFiles] = useState<LibraryPage | undefined>(),
+	const sort = features?.updatedDesc ? "updated-desc" : undefined;
+	const [files, setFiles] = useState<LoadedPage>(),
 		[knownFolders, setKnownFolders] = useState<
 			Extract<LibraryPage["entries"][number], { kind: "folder" }>[]
 		>([]),
@@ -60,10 +79,7 @@ export function useLibraryManagement(input: {
 		[error, setError] = useState<string>();
 	const sequence = useRef(0),
 		controller = useRef<AbortController | null>(null),
-		latest = useRef(files);
-	useEffect(() => {
-		latest.current = files;
-	}, [files]);
+		latest = useRef<LoadedPage | undefined>(undefined);
 	const operations = useQuery({
 		queryKey: ["markdown-management", client.identity],
 		enabled: input.visible && !!features?.library,
@@ -80,32 +96,46 @@ export function useLibraryManagement(input: {
 			controller.current = c;
 			setLoading(true);
 			setError(undefined);
+			const readPage = (cursor?: string) =>
+				client.markdownFiles({ namespace, path, sort, cursor }, c.signal);
 			try {
-				const page = await client.markdownFiles(
-					{ namespace, path, ...(cursor ? { cursor } : {}) },
-					c.signal,
-				);
-				if (n !== sequence.current || c.signal.aborted) return;
-				const prior = latest.current;
-				if (
+				const previous = latest.current;
+				let prior =
 					cursor &&
-					(!prior ||
-						prior.etag !== page.etag ||
-						prior.namespace !== namespace ||
-						prior.path !== path)
-				) {
-					setError(
-						"取得中に一覧が更新されました。一覧を更新してから操作してください。",
-					);
+					previous?.namespace === namespace &&
+					previous.path === path &&
+					previous.sort === sort &&
+					previous.nextCursor === cursor
+						? previous
+						: undefined;
+				let page =
+					cursor && !prior
+						? undefined
+						: await readPage(cursor).catch((error: unknown) => {
+								if (sort && cursor && invalidCursor(error)) return undefined;
+								throw error;
+							});
+				if (n !== sequence.current || c.signal.aborted) return;
+				if (!page || (prior && prior.etag !== page.etag)) {
+					latest.current = undefined;
 					setFiles(undefined);
-					return;
+					if (!sort) {
+						setError(
+							"取得中に一覧が更新されました。一覧を更新してから操作してください。",
+						);
+						return;
+					}
+					prior = undefined;
+					page = await readPage();
+					if (n !== sequence.current || c.signal.aborted) return;
 				}
-				const merged = {
+				const merged: LoadedPage = {
 					...page,
-					entries: cursor
+					...(sort ? { sort } : {}),
+					entries: prior
 						? [
 								...new Map(
-									[...prior!.entries, ...page.entries].map((e) => [e.id, e]),
+									[...prior.entries, ...page.entries].map((e) => [e.id, e]),
 								).values(),
 							]
 						: page.entries,
@@ -129,7 +159,7 @@ export function useLibraryManagement(input: {
 				}
 			}
 		},
-		[client, features?.library],
+		[client, features?.library, sort],
 	);
 	const firstNamespace = input.namespaces[0];
 	useEffect(() => {
@@ -156,6 +186,8 @@ export function useLibraryManagement(input: {
 				await load(latest.current.namespace, latest.current.path);
 		}
 		await operations.refetch();
+		if (result.state === "unknown")
+			return { status: "indeterminate" as const, message: unknownResult };
 		return {
 			status:
 				result.state === "applied" || result.state === "confirmed"
@@ -166,13 +198,11 @@ export function useLibraryManagement(input: {
 					? "現在の状態が要求と一致することを確認しました。"
 					: result.state === "applied"
 						? ""
-						: result.state === "unknown"
-							? "結果不明です。変更を再送せず「結果を確認」を使ってください。"
-							: result.state === "conflict"
-								? errors.etag_mismatch!
-								: (errors[result.code ?? ""] ??
-									errors[result.code?.replace(/^markdown_/, "") ?? ""] ??
-									"操作できませんでした。入力は保持しています。"),
+						: result.state === "conflict"
+							? errors.etag_mismatch!
+							: (errors[result.code ?? ""] ??
+								errors[result.code?.replace(/^markdown_/, "") ?? ""] ??
+								"操作できませんでした。入力は保持しています。"),
 		};
 	}
 	async function local(event: ArtifactEvent) {
@@ -185,15 +215,31 @@ export function useLibraryManagement(input: {
 				);
 				return { status: "accepted" as const, message: "" };
 			}
-			if (event.action === "markdown-check")
-				return adopt(await client.markdownCheck(String(event.values.id)));
-			const result = await client.markdownManage({
-				stageId: String(event.values.stageId),
-			});
-			return adopt(result);
+			const result =
+				event.action === "markdown-check"
+					? await client.markdownCheck(String(event.values.id))
+					: await client.markdownManage({
+							stageId: String(event.values.stageId),
+						});
+			return await adopt(result);
 		} catch (e) {
 			await operations.refetch();
-			return { status: "rejected" as const, message: managementMessage(e) };
+			if (event.action === "markdown-check")
+				return {
+					status: "indeterminate" as const,
+					message:
+						e instanceof ApiError && e.status === 404
+							? "操作記録が見つかりません。ファイル一覧を更新して現在の状態を確認してください。"
+							: "現在の状態を確認できません。時間をおいて再確認してください。",
+				};
+			if (
+				e instanceof ApiError &&
+				e.status >= 400 &&
+				e.status < 500 &&
+				e.status !== 408
+			)
+				return { status: "rejected" as const, message: managementMessage(e) };
+			return { status: "indeterminate" as const, message: unknownResult };
 		}
 	}
 	return {

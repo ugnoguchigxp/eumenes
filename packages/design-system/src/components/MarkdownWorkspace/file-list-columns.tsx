@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 
 type Column = "name" | "kind" | "updatedAt";
+type FileOrder = { column: Column; descending: boolean };
 type RowFields = { name: string; kind: string; updatedAt?: string | number };
 const names = new Intl.Collator("ja", { numeric: true });
 const dates = new Intl.DateTimeFormat("ja-JP", {
@@ -11,19 +12,22 @@ const dates = new Intl.DateTimeFormat("ja-JP", {
 	day: "2-digit",
 });
 
-export function useFileSort() {
-	const [state, setState] = useState<{ column: Column; descending: boolean }>();
+export function useFileSort(defaultOrder?: FileOrder) {
+	const [order, setOrder] = useState<FileOrder>();
 	return {
-		state,
+		state: order ?? defaultOrder,
 		select(column: Column) {
-			setState((previous) => ({
-				column,
-				descending: previous?.column === column && !previous.descending,
-			}));
+			setOrder((previous) => {
+				const active = previous ?? defaultOrder;
+				return {
+					column,
+					descending: active?.column === column && !active.descending,
+				};
+			});
 		},
 		rows<T>(items: T[], fields: (item: T) => RowFields) {
-			if (!state) return items;
-			const { column, descending } = state;
+			if (!order) return items;
+			const { column, descending } = order;
 			return [...items].sort((left, right) => {
 				const a = fields(left),
 					b = fields(right);

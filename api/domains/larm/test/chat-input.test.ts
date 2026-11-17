@@ -4,6 +4,11 @@ import type { ChatMessage } from "../contracts";
 import { chatRequest } from "../service/chat-request";
 import { operationSchema } from "../service/operation-schema";
 import { waitFor } from "../../../infrastructure/wait-for";
+import {
+	markInput,
+	modelMessages,
+	type ModelInput,
+} from "../../../infrastructure/model-input";
 
 const messages: ChatMessage[] = [
 	{ role: "system", content: "画像を説明" },
@@ -150,12 +155,24 @@ test("image wire conversion preserves assistant tool_calls and ordinary string m
 test("formal counting uses the complete identical request, images, tools, output and stream; bytes are not tokens", async () => {
 	const f = imageLarmFixture();
 	const deltas: string[] = [];
+	const observed: ModelInput[] = [];
+	const traced = modelMessages(
+		structuredClone([
+			markInput(
+				{ ...messages[0]! },
+				{ kind: "system", id: "instruction-source" },
+			),
+			messages[1]!,
+		]),
+	);
+	expect(Object.keys(traced[0]!)).toEqual(["role", "content"]);
 	try {
 		await f.p.answerStream!(
-			messages,
+			traced,
 			AbortSignal.timeout(5000),
 			(x) => deltas.push(x),
 			{
+				observeInput: (input) => observed.push(input),
 				maxOutputTokens: 128,
 				jsonOutput: true,
 				jsonSchema: {
@@ -181,6 +198,27 @@ test("formal counting uses the complete identical request, images, tools, output
 		expect(f.requests[0]!.body).toBe(f.requests[1]!.body);
 		expect(f.requests[0]!.token).toBe("Bearer claim-1");
 		const sent = JSON.parse(f.requests[1]!.body);
+		expect(observed).toHaveLength(1);
+		expect(observed[0]).toMatchObject({
+			boundary: "larm",
+			messages: [
+				{
+					role: "system",
+					content: sent.messages[0].content,
+					origins: [expect.objectContaining({ id: "instruction-source" })],
+				},
+				{
+					role: "user",
+					content: "",
+					images: [{ mime: "image/png", bytes: 180000, width: 20, height: 20 }],
+				},
+			],
+			tools: sent.tools,
+			format: sent.response_format,
+			maxOutputTokens: sent.max_tokens,
+		});
+		expect(JSON.stringify(observed)).not.toContain("base64");
+		expect(f.requests[1]!.body).not.toContain("instruction-source");
 		expect(sent.messages[1].content[0].type).toBe("image_url");
 		expect(sent.messages[1].content[0].image_url.url).toStartWith(
 			"data:image/png;base64,",
@@ -215,10 +253,16 @@ for (const [label, options, error] of [
 ] as const)
 	test(`${label} prevents inference without dropping images`, async () => {
 		const f = imageLarmFixture(options);
+		let observed = 0;
 		try {
 			await expect(
-				f.p.answer(messages, AbortSignal.timeout(5000)),
+				f.p.answer(messages, AbortSignal.timeout(5000), {
+					observeInput: () => {
+						observed++;
+					},
+				}),
 			).rejects.toThrow(error);
+			expect(observed).toBe(0);
 			expect(f.requests.filter((r) => r.operation === "generate")).toHaveLength(
 				0,
 			);

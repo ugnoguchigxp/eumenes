@@ -3,6 +3,7 @@ import type { SpeechPreparation } from "../../delivery";
 import type { RoutedPipelineStep } from "../../tool-runtime";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
+import { markInput } from "../../../infrastructure/model-input";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { z } from "zod";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
@@ -206,7 +207,13 @@ function turnModelCall(
 				onDelta,
 				onDelta ? options.preparation : undefined,
 				tools,
-				{ ...session, ...extra },
+				{
+					...session,
+					...extra,
+					...(onDelta && input.observeInput
+						? { observeInput: input.observeInput }
+						: {}),
+				},
 			),
 		);
 	};
@@ -383,10 +390,7 @@ function createTurn(
 		): Promise<void> {
 			signal.throwIfAborted();
 			let talkImageAnswer: GenerationOutcome["imageAnswer"];
-			const prepared = notice
-				? withNotice(input.messages, notice)
-				: input.messages;
-			const messages = readOnly ? withRouterFailure(prepared) : prepared;
+			const messages = talkMessages(input, notice, readOnly);
 			const system =
 				input.harness.gates.systemCopy && messages[0]?.role === "system"
 					? messages[0].content
@@ -415,6 +419,7 @@ function createTurn(
 			>;
 			try {
 				reply = await deps.conversationAgent.respond({
+					...(input.observeInput ? { traceInput: true } : {}),
 					// Every reply of a run is the agency's to serve (notices and work reports too), not only the user's words.
 					run: {
 						conversationId: input.conversationId,
@@ -687,25 +692,35 @@ function conversationToolPort(
 	};
 }
 
-/** The prepared input with what the host found added to its last message, as a notice to tell. */
-function withNotice(messages: ChatMessage[], notice: string): ChatMessage[] {
-	const copy = messages.map((message) => ({ ...message }));
-	const last = copy.at(-1)!;
-	last.content = `${last.content}\n\n${INPUT_HEADINGS.notice}\n${notice}`;
-	return copy;
-}
-
-function withRouterFailure(messages: ChatMessage[]): ChatMessage[] {
+/** Apply the host's last observations to the reply's input before the agent prepares its own call. */
+function talkMessages(
+	input: GenerateInput,
+	notice: string | undefined,
+	readOnly: boolean,
+): ChatMessage[] {
+	const messages = notice
+		? input.messages.map((message) => ({ ...message }))
+		: input.messages;
+	if (notice) {
+		const last = messages.at(-1)!;
+		const from = last.content.length + 2;
+		last.content = `${last.content}\n\n${INPUT_HEADINGS.notice}\n${notice}`;
+		if (input.observeInput) markInput(last, { kind: "notice" }, from);
+	}
+	if (!readOnly) return messages;
 	const [system, ...rest] = messages;
 	if (system?.role !== "system") return messages;
 	const instruction = systemContext(
 		"dialogue.contexts.local.router-unperformed",
 		{},
 	);
-	return [
-		{ ...system, content: `${system.content}\n\n${instruction}` },
-		...rest,
-	];
+	const qualified = {
+		...system,
+		content: `${system.content}\n\n${instruction}`,
+	};
+	if (input.observeInput)
+		markInput(qualified, { kind: "system" }, system.content.length + 2);
+	return [qualified, ...rest];
 }
 
 function debugRunRequested(args: object) {

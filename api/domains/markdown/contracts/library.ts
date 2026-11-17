@@ -169,6 +169,7 @@ export type LibraryCommand = z.infer<typeof libraryCommand>;
 
 export const libraryFeaturesSchema = z.object({
 	library: z.boolean(),
+	updatedDesc: z.boolean().optional(),
 	folders: z.boolean(),
 	folderCopy: z.boolean().optional(),
 	patch: z.boolean(),
@@ -182,9 +183,16 @@ export const libraryFeaturesSchema = z.object({
 	maxCopyBytes: z.number(),
 });
 export type LibraryFeatures = z.infer<typeof libraryFeaturesSchema>;
+export const libraryFilesQuery = z.object({
+	namespace: z.string().min(1),
+	path: z.string().default(""),
+	cursor: z.string().optional(),
+	sort: z.literal("updated-desc").optional(),
+});
+export type LibraryFilesQuery = z.infer<typeof libraryFilesQuery>;
 export type ManagementPort = {
 	listLibrary(
-		input: { namespace: string; path: string; cursor?: string },
+		input: LibraryFilesQuery,
 		signal: AbortSignal,
 	): Promise<LibraryPage>;
 	getEntry(

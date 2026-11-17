@@ -2,8 +2,54 @@ import type { Database } from "bun:sqlite";
 import { hash } from "../../capabilities";
 import type { ExecutionResponse, ExecutionSource } from "../../tool-runtime";
 import { byId, sessionById } from "../repository";
+import type { Run } from "../contracts";
 import type { DialogueDeps } from "./context";
 import { sessionExpired } from "./specialist-core";
+
+function specialistInput(
+	deps: DialogueDeps,
+	db: Database,
+	run: Run,
+	conversationId: string,
+) {
+	const message = deps.conversation.messageInTransaction(
+		db,
+		run.inputMessageId,
+	)?.message;
+	return message?.role === "user" &&
+		message.conversationId === conversationId &&
+		!deps.memory?.isSourceRevokedInTransaction(db, message.id)
+		? message
+		: null;
+}
+
+/** Recheck only the stored provenance for an automatic close. It grants no execution source. */
+export function specialistClosingSource(
+	deps: DialogueDeps,
+	db: Database,
+	input: Pick<ExecutionSource, "runId" | "conversationId" | "digest"> & {
+		messageId: string;
+		sessionId: string;
+		workRef: string;
+	},
+): "valid" | "expired" | "invalid" {
+	const session = sessionById(db, input.sessionId);
+	const run = byId(db, input.runId);
+	if (
+		!session ||
+		session.state === "ended" ||
+		session.workRef !== input.workRef ||
+		session.conversationId !== input.conversationId ||
+		run?.specialistSessionId !== session.id ||
+		run.conversationId !== session.conversationId ||
+		run.inputMessageId !== input.messageId ||
+		!["manual", "voice"].includes(run.sourceKind)
+	)
+		return "invalid";
+	const message = specialistInput(deps, db, run, session.conversationId);
+	if (!message || hash(message.text) !== input.digest) return "invalid";
+	return sessionExpired(session, deps.clock()) ? "expired" : "valid";
+}
 
 /** Revalidate a response already accepted by the owner of an inherited execution. */
 export function specialistExecutionResponse(
@@ -87,17 +133,8 @@ export function specialistExecutionSource(
 		(expectedEpoch !== undefined && session.epoch !== expectedEpoch)
 	)
 		return null;
-	const found = deps.conversation.messageInTransaction(
-		db,
-		run.inputMessageId,
-	)?.message;
-	if (
-		!found ||
-		found.role !== "user" ||
-		found.conversationId !== session.conversationId ||
-		deps.memory?.isSourceRevokedInTransaction(db, found.id)
-	)
-		return null;
+	const found = specialistInput(deps, db, run, session.conversationId);
+	if (!found) return null;
 	return {
 		conversationId: session.conversationId,
 		messageId: found.id,

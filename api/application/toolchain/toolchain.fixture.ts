@@ -67,7 +67,6 @@ import { createApp } from "../app";
 import { appModules } from "../app-modules";
 import type { LarmPort } from "../../domains/larm";
 import { fixtureRouting } from "./router.fixture";
-import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { researchAcquisition } from "./research-acquisition.fixture";
 export { forbidden } from "./research-acquisition.fixture";
 import {
@@ -401,8 +400,6 @@ export async function harness(options: HarnessOptions = {}) {
 				]);
 				return "";
 			}
-			if (options.structure && system === TURN_STRUCTURE_PROMPT.system)
-				return JSON.stringify({ decision: options.structure(messages) });
 			if (options.compose && !callOptions?.tools?.length) {
 				const packet = JSON.parse(question);
 				if (Array.isArray(packet.cards) && "providedMaterials" in packet)

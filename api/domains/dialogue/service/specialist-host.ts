@@ -3,6 +3,7 @@ import type { Database } from "bun:sqlite";
 import type { DialogueDeps } from "./context";
 import {
 	hasSpecialistContribution,
+	specialistClosingSource,
 	specialistExecutionResponse,
 	specialistExecutionSource,
 } from "./specialist-source";
@@ -26,6 +27,10 @@ export function createSpecialistHost(deps: DialogueDeps) {
 			db: Database,
 			input: Parameters<typeof hasSpecialistContribution>[2],
 		) => hasSpecialistContribution(deps, db, input),
+		specialistClosingSourceInTransaction: (
+			db: Database,
+			input: Parameters<typeof specialistClosingSource>[2],
+		) => specialistClosingSource(deps, db, input),
 		specialistExecutionResponseInTransaction: (
 			db: Database,
 			conversationId: string,

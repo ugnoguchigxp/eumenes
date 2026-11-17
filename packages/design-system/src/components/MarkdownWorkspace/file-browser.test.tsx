@@ -262,7 +262,7 @@ function managedProps() {
 		...props(item),
 		capabilities: managedCapabilities,
 		onFiles: vi.fn(),
-		onManage: vi.fn(async () => true),
+		onManage: vi.fn(async () => ({ status: "accepted" as const, message: "" })),
 		files: {
 			namespace: "eumenes",
 			path: "",

@@ -84,7 +84,14 @@ export function callOptionsFor(
 		!controlReasoning &&
 		source === "larm" &&
 		r.row.purpose === "llm";
+	const observe = r.session?.observeInput;
 	return {
+		...(observe
+			? {
+					observeInput: (input) =>
+						observe({ input, inferenceId: r.row.id, attemptId }),
+				}
+			: {}),
 		...(r.voiceOverride ? { speechOverride: r.voiceOverride } : {}),
 		// A decision call names its choices in the output schema: no native tools field, no tool calls back.
 		...(r.tools?.length && !r.session?.outputSchema

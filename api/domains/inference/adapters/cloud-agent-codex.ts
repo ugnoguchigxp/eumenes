@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
+import {
+	inputImages,
+	inputMessages,
+	observeModelInput,
+} from "../../../infrastructure/model-input";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { Messages } from "../contracts";
 import {
@@ -163,6 +168,17 @@ export async function runCodex(
 ): Promise<CloudAgentResult> {
 	const { system, prompt, images, turn: body } = promptParts(call.messages);
 	const tools = call.tools?.length ? call.tools : undefined;
+	const instructions =
+		system +
+		(tools
+			? codexFunctions(tools)
+			: call.outputSchema
+				? systemContext(
+						"inference.contexts.cloud-agents.structured-completion",
+						{},
+					)
+				: "");
+	const outputSchema = tools ? codexChoiceSchema(tools) : call.outputSchema;
 	let streamed = "";
 	const result = await host.run(
 		// Without a key the CLI keeps its own login; a key binds the saved API host.
@@ -171,30 +187,36 @@ export async function runCodex(
 			...(call.attemptId ? { attemptId: call.attemptId } : {}),
 			...(call.connectionId ? { connectionId: call.connectionId } : {}),
 			model: call.model,
-			instructions:
-				system +
-				(tools
-					? codexFunctions(tools)
-					: call.outputSchema
-						? systemContext(
-								"inference.contexts.cloud-agents.structured-completion",
-								{},
-							)
-						: ""),
+			instructions,
 			messages: body.map((message) => ({
 				digest: messageDigest(message),
 				assistant: message.role === "assistant",
 			})),
 			input: (from) =>
 				from === 0 ? { prompt, images } : appendParts(body.slice(from)),
+			...(call.observeInput
+				? {
+						onSend: (mode, carried, sent) =>
+							observeModelInput(call.observeInput, () => ({
+								boundary: "codex-sdk",
+								messages: inputMessages(call.messages),
+								tools,
+								format: outputSchema,
+								omittedMessages: call.omittedMessages,
+								sdk: {
+									mode,
+									carried,
+									instructions,
+									prompt: sent.prompt,
+									images: inputImages(sent.images),
+								},
+							})),
+					}
+				: {}),
 			nativeWebSearch: call.nativeWebSearch,
 			// A call that names none still thinks as hard as before the Codex home was Eumenes' own.
 			reasoningEffort: call.reasoningEffort ?? "high",
-			...(tools
-				? { outputSchema: codexChoiceSchema(tools) }
-				: call.outputSchema
-					? { outputSchema: call.outputSchema }
-					: {}),
+			...(outputSchema ? { outputSchema } : {}),
 			signal: call.signal,
 			onUsage: call.onUsage,
 			// A function call is answered by the host in a call that continues this one.

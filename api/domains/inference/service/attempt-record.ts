@@ -7,6 +7,7 @@ import type { RequestRow } from "../repository";
 
 /** A call's resolved session lifetime (LLM calls only). */
 export type CallSessionRole = {
+	observeInput?: CallSession["observeInput"];
 	independent?: true;
 	agentSession?: CallSession["agentSession"];
 	sessionRole: "main" | "subagent" | "auxiliary";
@@ -150,6 +151,7 @@ export function resolveSession(
 		throw new Error("invalid_session_context");
 	return {
 		sessionRole,
+		...(given?.observeInput ? { observeInput: given.observeInput } : {}),
 		...(given?.independent ? { independent: true as const } : {}),
 		...(given?.agentSession ? { agentSession: { ...given.agentSession } } : {}),
 		...(given?.taskId ? { taskId: given.taskId } : {}),

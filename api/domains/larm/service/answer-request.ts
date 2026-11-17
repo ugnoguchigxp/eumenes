@@ -4,6 +4,10 @@ import type { Fetcher, Provider } from "./profiles";
 import { startLlmTiming } from "./llm-timing";
 import { countChatBody, validatedChatBody } from "./chat-input";
 import { forwardToolCalls } from "../../../infrastructure/chat-stream";
+import {
+	inputMessages,
+	observeModelInput,
+} from "../../../infrastructure/model-input";
 
 /** Complete one claim-bound count and inference exchange, with unchanged stream/tool handling. */
 export async function answerRequest(
@@ -42,6 +46,14 @@ export async function answerRequest(
 		);
 		if (!deps.sameClaim()) throw new Error("chat_input_contract_unavailable");
 		signal.throwIfAborted();
+		observeModelInput(options?.observeInput, () => ({
+			boundary: "larm",
+			messages: inputMessages(timing.selected),
+			tools: body.tools,
+			format: body.response_format,
+			maxOutputTokens: body.max_tokens,
+			omittedMessages: messages.length - timing.selected.length,
+		}));
 		timing.sent();
 		const response = await deps.send({
 			method: "POST",

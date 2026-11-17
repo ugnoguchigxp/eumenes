@@ -83,6 +83,13 @@ bun run logs -- --id <run-id> --json
 
 runのJSONにはrequestId・jobId・状態・期限もあります。必要ならjobIdや`API request ID`でもログを絞ります。会話runの`completed`はその発言の処理完了を意味します。担当へ依頼を渡した場合、制作物の完成まで保証する値ではありません。後続の仕事と完了通知は、会話や既存の担当別APIで確認します。詳しい追跡は[ログの確認](logging.md)を参照してください。
 
+会話設定のデバッグモードを有効にして再現すると、モデルの送信入力も確認できます。通常は採用された回答の入力を返し、`--call` を指定するとツールの前後や再試行時の入力を選べます。返答時に採取された本文を扱うので、通常の運用ログとは別に扱ってください。サーバーの一時保持は採取から最大30分です。[ContextWindowの閲覧設計](../spec/context-window-inspector-design-2026-11-17.md)
+
+```sh
+bun run cli -- run <run-id> --context --json
+bun run cli -- run <run-id> --context --call 2 --json
+```
+
 送信が不明な場合は、同じ会話ID・本文・request IDで照会・再試行します。複数行の本文を一度の発言として扱いたい場合も`send`を使います。
 
 ```sh

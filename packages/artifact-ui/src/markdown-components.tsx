@@ -9,7 +9,7 @@ import {
 } from "@eumenes/design-system/markdown";
 import { useArtifactRuntime } from "./runtime";
 import { useAction, Feedback } from "./action";
-import type { ArtifactRequest } from "./contracts";
+import type { ArtifactEvent, ArtifactRequest } from "./contracts";
 
 export type MarkdownResource = {
 	kind: "markdown-workspace";
@@ -117,6 +117,19 @@ export function MarkdownWorkspaceView({
 	}
 	const local = (name: "markdown-select" | "markdown-open", id: string) =>
 		action.send(name, { id });
+	async function sendManagement(
+		name: "markdown-manage" | "markdown-check",
+		values: ArtifactEvent["values"],
+	) {
+		const { status, message } = await action.sendReceipt(name, values);
+		return {
+			status:
+				status === "accepted" || status === "indeterminate"
+					? status
+					: ("rejected" as const),
+			message,
+		};
+	}
 	return (
 		<>
 			<MarkdownWorkspace
@@ -192,14 +205,16 @@ export function MarkdownWorkspaceView({
 						),
 						{ purpose: "markdown-management" },
 					);
-					return (
-						receipt?.status === "accepted" &&
-						!!receipt.value &&
-						action.send("markdown-manage", { stageId: receipt.value })
-					);
+					if (receipt?.status !== "accepted" || !receipt.value)
+						return {
+							status: "rejected",
+							message:
+								receipt?.message ||
+								"管理操作を受け付けられませんでした。入力は保持しています。",
+						};
+					return sendManagement("markdown-manage", { stageId: receipt.value });
 				}}
-
-				onCheck={(id) => void action.send("markdown-check", { id })}
+				onCheck={(id) => sendManagement("markdown-check", { id })}
 				onSelect={(id) => local("markdown-select", id)}
 				onOpen={(id) => local("markdown-open", id)}
 				onReconcile={(id) => void action.send("markdown-reconcile", { id })}

@@ -144,6 +144,7 @@ export function collaborationBackends(deps: {
 			dialogue.specialistResultTextInTransaction(db, sessionId, childId),
 		source: (db, runId) =>
 			dialogue.specialistExecutionSourceInTransaction(db, runId),
+		closingSource: dialogue.specialistClosingSourceInTransaction,
 		contributingSource: dialogue.specialistContributionInTransaction,
 		authority: dialogue.specialistAuthorityInTransaction,
 		continuation: task.continuation,

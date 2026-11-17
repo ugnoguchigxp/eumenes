@@ -9,6 +9,7 @@ import {
 	within,
 } from "@testing-library/react";
 import { ApiError } from "../../client";
+import type { ContextCapture, Run } from "../../api/domains/dialogue/contracts";
 import {
 	post,
 	stubWorkletNode,
@@ -143,6 +144,114 @@ test("A01 boot: the conversation screen renders without a settings button", asyn
 	);
 
 	expect(screen.queryByRole("button", { name: "設定" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "コンテキスト" })).toBeNull();
+});
+
+test("the debug button follows the latest run and a saved reply opens its own input", async () => {
+	const changes = new Set<(kind: "change") => void>();
+	const settings = settingsFixture();
+	settings.agency.debugMode = true;
+	const at = Date.now();
+	const createdAt = new Date(at).toISOString();
+	const turns = ["過去", "最新"].map((label, index) => {
+		const id = `turn-${index}`;
+		const run: Run = {
+			id,
+			conversationId: "main",
+			inputMessageId: `${id}-user`,
+			answerMessageId: `${id}-reply`,
+			requestId: id,
+			utteranceId: null,
+			status: "completed",
+			revision: 1,
+			error: null,
+			jobId: null,
+			deadlineAt: null,
+			sourceKind: "manual",
+			scheduleId: null,
+			occurrenceId: null,
+			specialistSessionId: null,
+			createdAt,
+			updatedAt: createdAt,
+		};
+		const capture: ContextCapture = {
+			summary: {
+				id: `${id}-capture`,
+				runId: id,
+				number: 1,
+				at,
+				expiresAt: at + 60_000,
+				inferenceId: id,
+				attemptId: id,
+				boundary: "larm",
+				status: "succeeded",
+				accepted: true,
+				available: true,
+			},
+			input: {
+				boundary: "larm",
+				messages: [
+					{ role: "user", content: `${label}の送信入力`, origins: [] },
+				],
+			},
+			cut: null,
+			previous: null,
+		};
+		const message = {
+			id: run.answerMessageId,
+			role: "assistant",
+			text: `${label}の返答`,
+			conversationId: "main",
+			runId: id,
+			createdAt,
+		};
+		return { run, capture, message };
+	});
+	const captureFor = (id: string) =>
+		turns.find(({ run }) => run.id === id)!.capture;
+	api.current = mockClient({
+		settings: async () => structuredClone(settings),
+		runs: async () => turns.map(({ run }) => run),
+		conversation: async () => ({
+			id: "main",
+			revision: 1,
+			messages: turns.map(({ message }) => message),
+		}),
+		debugDiagnostics: async () => ({ entries: [], omitted: 0 }),
+		subscribeChanges: (notify: (kind: "change") => void) => {
+			changes.add(notify);
+			return () => changes.delete(notify);
+		},
+		runContext: async (runId: string) => {
+			const { summary } = captureFor(runId);
+			return {
+				runId,
+				conversationId: "main",
+				status: "completed",
+				captures: [summary],
+				preferredId: summary.id,
+				empty: "unavailable",
+			};
+		},
+		contextCapture: async (runId: string) => captureFor(runId),
+	});
+	render(<App />);
+	fireEvent.click(await screen.findByRole("button", { name: "コンテキスト" }));
+	expect(await screen.findByText("最新の送信入力")).toBeTruthy();
+	const earlier = (await screen.findByText("過去の返答")).closest("article")!;
+	fireEvent.click(
+		within(earlier).getByRole("button", { name: "この返答の入力を見る" }),
+	);
+	expect(await screen.findByText("過去の送信入力")).toBeTruthy();
+	expect(screen.queryByText("最新の送信入力")).toBeNull();
+	expect(screen.getByRole("textbox", { name: "メッセージ" })).toBeTruthy();
+
+	settings.agency.debugMode = false;
+	act(() => {
+		for (const notify of changes) notify("change");
+	});
+	await waitFor(() => expect(screen.queryByText("過去の送信入力")).toBeNull());
+	expect(screen.queryByRole("button", { name: "コンテキスト" })).toBeNull();
 });
 
 test("confirming a transcript from the chat microphone sends its capture timing", async () => {

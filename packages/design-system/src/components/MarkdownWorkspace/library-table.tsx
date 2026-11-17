@@ -35,7 +35,11 @@ export function ManagedLibraryTable(
 		limit,
 		changeFolder,
 	} = props;
-	const sort = useFileSort();
+	const sort = useFileSort(
+		!work && props.files?.sort === "updated-desc"
+			? { column: "updatedAt", descending: true }
+			: undefined,
+	);
 	const items = sort.rows(visible, (e) => ({
 		name: e.path.split("/").at(-1) ?? e.path,
 		kind: e.kind === "folder" ? "フォルダー" : "md",

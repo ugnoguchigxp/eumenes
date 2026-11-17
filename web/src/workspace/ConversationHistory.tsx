@@ -13,6 +13,7 @@ import { ThinkingRow } from "./ThinkingRow";
 import { LiveVoicePanel } from "../domains/live-voice";
 import type { usePanelResources } from "./usePanelResources";
 import type { WorkspaceState } from "./useWorkspace";
+import { Button } from "../design-system";
 
 /**
  * The scrolling history. The render callbacks keep their identity while their data is unchanged, so the rows of the list
@@ -22,10 +23,12 @@ export function ConversationHistory({
 	client,
 	state,
 	resources,
+	onInspectContext,
 }: {
 	client: EumenesClient;
 	state: WorkspaceState;
 	resources: ReturnType<typeof usePanelResources>;
+	onInspectContext?(runId: string, trigger: HTMLButtonElement): void;
 }) {
 	const {
 		activeRun,
@@ -54,21 +57,41 @@ export function ConversationHistory({
 	const renderInsideMessage = useCallback(
 		(message: Message) =>
 			message.role === "assistant" || message.role === "user" ? (
-				<ResourceChips
-					messageId={message.id}
-					data={resourceData}
-					onOpen={(uri, action) => void openResource(uri, action)}
-					// A user's image is shown as the image itself; its other files and long paste are chips.
-					exclude={
-						new Set(
-							(message.attachments ?? []).map((a) =>
-								formatResourceUri(SCRATCH_RESOURCE_KIND, a.id),
-							),
-						)
-					}
-				/>
+				<>
+					<ResourceChips
+						messageId={message.id}
+						data={resourceData}
+						onOpen={(uri, action) => void openResource(uri, action)}
+						// A user's image is shown as the image itself; its other files and long paste are chips.
+						exclude={
+							new Set(
+								(message.attachments ?? []).map((a) =>
+									formatResourceUri(SCRATCH_RESOURCE_KIND, a.id),
+								),
+							)
+						}
+					/>
+					{onInspectContext &&
+						message.role === "assistant" &&
+						message.runId &&
+						runList?.some(
+							(run) =>
+								run.id === message.runId && run.answerMessageId === message.id,
+						) && (
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={(event) =>
+									onInspectContext(message.runId!, event.currentTarget)
+								}
+							>
+								この返答の入力を見る
+							</Button>
+						)}
+				</>
 			) : null,
-		[resourceData, openResource],
+		[resourceData, openResource, onInspectContext, runList],
 	);
 	const debugEntries =
 		debugMode && !debugDiagnostics.isError

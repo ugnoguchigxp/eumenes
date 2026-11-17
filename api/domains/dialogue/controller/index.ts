@@ -117,6 +117,19 @@ export function registerDialogue(app: Hono, service: DialogueService) {
 		const run = service.get(c.req.param("id"));
 		return run ? c.json(run) : c.json({ error: "not_found" }, 404);
 	});
+	app.get("/api/runs/:id/context", (c) => {
+		c.header("Cache-Control", "no-store");
+		const result = service.contextInputs?.list(c.req.param("id"));
+		return result ? c.json(result) : c.json({ error: "not_found" }, 404);
+	});
+	app.get("/api/runs/:id/context/:captureId", (c) => {
+		c.header("Cache-Control", "no-store");
+		const result = service.contextInputs?.detail(
+			c.req.param("id"),
+			c.req.param("captureId"),
+		);
+		return result ? c.json(result) : c.json({ error: "not_found" }, 404);
+	});
 	app.get("/api/runs/:id/error-report", async (c) => {
 		const report = await service.errorReport(c.req.param("id"));
 		if (report.ok) return c.json({ runId: report.runId, text: report.text });

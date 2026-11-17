@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Hono, Context } from "hono";
 import { parseJsonBody, parseQuery } from "../../../infrastructure/http";
 import { ArchiveFailure, errorStatus } from "../contracts";
-import { manageInput } from "../contracts/library";
+import { libraryFilesQuery, manageInput } from "../contracts/library";
 import type { MarkdownService } from "../service";
 const signal = (c: Context) =>
 	AbortSignal.any([c.req.raw.signal, AbortSignal.timeout(190000)]);
@@ -42,15 +42,7 @@ export function registerLibraryManagement(app: Hono, service: MarkdownService) {
 	});
 
 	app.get("/api/markdown/files", async (c) => {
-		const q = parseQuery(
-			c,
-			z.object({
-				namespace: z.string().min(1),
-				path: z.string().default(""),
-				cursor: z.string().optional(),
-			}),
-			{ code: "invalid_request" },
-		);
+		const q = parseQuery(c, libraryFilesQuery, { code: "invalid_request" });
 		if (!q.ok) return q.response;
 		try {
 			return c.json(await service.files(q.data, signal(c)), 200, {

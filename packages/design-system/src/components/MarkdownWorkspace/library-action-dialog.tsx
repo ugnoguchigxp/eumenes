@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Modal } from "../Modal";
 import { Button } from "../Button";
-import type { LibraryItem, LibraryActionScope } from "./library-types";
+import type {
+	LibraryItem,
+	LibraryActionScope,
+	LibraryActionResult,
+} from "./library-types";
 import type { MarkdownWorkspaceProps } from "./types";
 import {
 	actionLabels,
@@ -34,7 +38,7 @@ export function LibraryActionDialog(
 		[title, setTitle] = useState(one?.title ?? ""),
 		[recursive, setRecursive] = useState(false),
 		[pending, setPending] = useState(false),
-		[attempted, setAttempted] = useState(false);
+		[result, setResult] = useState<LibraryActionResult>();
 	const [ids] = useState(() =>
 		Object.fromEntries([
 			["root", newLibraryId("folder")],
@@ -52,33 +56,39 @@ export function LibraryActionDialog(
 	const [discarded, setDiscarded] = useState(false);
 	const blocked =
 		!!affected && !discarded && (props.localInput || props.current?.dirty);
+	const needsCheck = result?.status === "indeterminate";
+	const { onManage, onCheck } = props;
 	const change = () => {
 		setRequestId(crypto.randomUUID());
-		setAttempted(false);
+		setResult(undefined);
 	};
-	async function submit() {
+	async function run(action: () => Promise<LibraryActionResult>) {
 		setPending(true);
-		setAttempted(true);
 		try {
-			if (
-				await props.onManage?.(
-					makeLibraryCommand({
-						action: props.action,
-						items: props.items,
-						namespace: props.files.namespace,
-						etag: props.files.etag,
-						path,
-						title,
-						recursive,
-						ids,
-					}),
-					requestId,
-				)
-			)
-				props.onClose();
+			const receipt = await action();
+			if (receipt.status === "accepted") props.onClose();
+			else setResult(receipt);
 		} finally {
 			setPending(false);
 		}
+	}
+	function submit() {
+		if (!onManage) return;
+		void run(() =>
+			onManage(
+				makeLibraryCommand({
+					action: props.action,
+					items: props.items,
+					namespace: props.files.namespace,
+					etag: props.files.etag,
+					path,
+					title,
+					recursive,
+					ids,
+				}),
+				requestId,
+			),
+		);
 	}
 	return (
 		<Modal
@@ -102,8 +112,8 @@ export function LibraryActionDialog(
 						<Button
 							variant={props.action === "delete" ? "destructive" : "default"}
 							loading={pending}
-							disabled={attempted || !props.onManage}
-							onClick={() => void submit()}
+							disabled={!!result || !onManage}
+							onClick={submit}
 						>
 							{props.action === "delete"
 								? "削除する"
@@ -168,7 +178,7 @@ export function LibraryActionDialog(
 										setPath(e.target.value);
 										change();
 									}}
-									disabled={pending}
+									disabled={pending || needsCheck}
 								/>
 							</label>
 						)}
@@ -182,7 +192,7 @@ export function LibraryActionDialog(
 										setTitle(e.target.value);
 										change();
 									}}
-									disabled={pending}
+									disabled={pending || needsCheck}
 								/>
 							</label>
 						)}
@@ -193,7 +203,9 @@ export function LibraryActionDialog(
 									<input
 										type="checkbox"
 										disabled={
-											pending || !props.capabilities?.features?.recursiveDelete
+											pending ||
+											needsCheck ||
+											!props.capabilities?.features?.recursiveDelete
 										}
 										checked={recursive}
 										onChange={(e) => {
@@ -209,17 +221,17 @@ export function LibraryActionDialog(
 						)}
 					</>
 				)}
-				{attempted && props.message && <p role="alert">{props.message}</p>}
-				{attempted && !pending && (
-					<>
-						<p>結果を確認してください。変更要求は再送しません。</p>
-						<Button
-							disabled={props.pending}
-							onClick={() => props.onCheck?.(requestId)}
-						>
-							結果を確認
-						</Button>
-					</>
+				{result?.message && (
+					<p role={needsCheck ? "status" : "alert"}>{result.message}</p>
+				)}
+				{needsCheck && onCheck && (
+					<Button
+						loading={pending}
+						disabled={props.pending}
+						onClick={() => void run(() => onCheck(requestId))}
+					>
+						結果を確認
+					</Button>
 				)}
 			</div>
 		</Modal>

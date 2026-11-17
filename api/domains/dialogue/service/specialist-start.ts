@@ -222,6 +222,7 @@ function start(
 		return { ok: true } as const;
 	};
 	let live = liveSession(tx, run.conversationId);
+	if (live?.closeBlockedReason) return refuse("specialist_closing");
 	if (live && sessionExpired(live, now)) {
 		const ended = endOrMarkClosing(deps, tx, live, "expired");
 		deferFlush(deps, ended);
@@ -345,6 +346,8 @@ export function openSessionInTransaction(
 		state: "active",
 		endReason: null,
 		closingReason: null,
+		closeBlockedReason: null,
+		closeBlockedAt: null,
 		closeFailures: 0,
 		revision: 0,
 		epoch: 1,

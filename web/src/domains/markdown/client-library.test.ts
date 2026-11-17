@@ -39,10 +39,12 @@ test("the typed client preserves folder IDs, library ETags and opaque query valu
 			namespace: "eumenes",
 			path: "",
 			cursor: "次/+= ",
+			sort: "updated-desc",
 		}),
 	).toEqual(page);
 	const url = new URL(call.mock.calls[0]![0] as string, "http://localhost");
 	expect(url.searchParams.get("cursor")).toBe("次/+= ");
+	expect(url.searchParams.get("sort")).toBe("updated-desc");
 	expect(call).toHaveBeenCalledTimes(1);
 });
 test("management staging carries fixed request and copy IDs without an extra write", async () => {

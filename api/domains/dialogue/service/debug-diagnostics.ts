@@ -59,6 +59,7 @@ export function createDebugDiagnostics(
 		const next = store.read(options.enabled);
 		if (next === enabled) return;
 		enabled = next;
+		deps.contextInputs?.setEnabled(next);
 		epoch = crypto.randomUUID();
 		active?.abort();
 		cache.clear();

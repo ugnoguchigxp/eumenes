@@ -17,9 +17,62 @@ import {
 	work,
 	type WorkRow,
 } from "../repository";
-import { createWorkContext, fail, json, terminal } from "./work-context";
+import {
+	createWorkContext,
+	fail,
+	json,
+	terminal,
+	workDirty,
+	workLabel,
+	type WorkContext,
+} from "./work-context";
 import { createChildOperations } from "./work-children";
 import { createWorkReviews } from "./work-reviews";
+
+function endAutomatically(
+	context: WorkContext,
+	db: Database,
+	input: { sessionId: string; workRef: string; mode: "discard" | "close" },
+	releaseTurns: () => void,
+) {
+	const row = work(db, input.workRef);
+	if (!row || row.ended) {
+		releaseTurns();
+		return {};
+	}
+	if (row.session_id !== input.sessionId) fail("collaboration_source_invalid");
+	const ref = sourceRef(row);
+	if (ref) {
+		if (ref.specialistSessionId !== row.session_id)
+			fail("collaboration_source_invalid");
+		const validity = context.host().closingSource?.(db, {
+			runId: ref.runId,
+			messageId: ref.messageId,
+			conversationId: ref.conversationId,
+			digest: ref.digest,
+			sessionId: row.session_id,
+			workRef: row.id,
+		});
+		if (validity === "expired")
+			return { blocked: "source_session_expired" as const };
+		if (validity !== "valid") fail("collaboration_source_invalid");
+		context.checkContributions(db, row, ref.conversationId);
+	}
+	releaseTurns();
+	const released = context.live(db, row.id);
+	if (released.busy_run_id) fail("work_busy");
+	const child = context.childState(
+		db,
+		released,
+		ref && { ...ref, request: "" },
+	);
+	if (released.child_id && released.kind !== "schedule" && !child)
+		fail("collaboration_child_not_found");
+	if (input.mode === "close" && workDirty(released, child))
+		fail("work_unsaved");
+	context.purge(db, released);
+	return { label: workLabel(released) };
+}
 
 /** Canonical work only. Dialogue owns sessions; existing execution domains own child work. */
 export function createCollaborationWorks(
@@ -180,6 +233,7 @@ export function createCollaborationWorks(
 			if (mode === "close" && state(db, row).dirty) fail("work_unsaved");
 			purge(db, row);
 		},
+		endAutomatically: endAutomatically.bind(null, context),
 		document(db: Database, id: string) {
 			const row = work(db, id);
 			return row && !row.ended

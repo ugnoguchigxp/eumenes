@@ -9,12 +9,13 @@ import type {
 	AdapterState,
 	WebArtifactAdapter,
 } from "../toolchain-artifacts/registry";
+import { TIMER_ADAPTER_REF } from "./adapter-ref";
 import { bindServerClock } from "./clock";
 import { useClockWorkspace, withClockControls } from "./clock-runtime";
 import { useDeadline } from "./deadline";
 import { setupResource, timerResource, type TimerView } from "./timer-resource";
 
-export const TIMER_ADAPTER_REF = "adapter:timers@1";
+export { TIMER_ADAPTER_REF };
 const SETUP_QUERY = "query:timers.setup@1";
 const CURRENT_QUERY = "query:timers.current@1";
 

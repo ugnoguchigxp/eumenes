@@ -95,8 +95,8 @@ function fixture() {
 		onReturn: vi.fn(),
 		onResume: vi.fn(),
 		onFiles: vi.fn(),
-		onManage: vi.fn(async () => true),
-		onCheck: vi.fn(),
+		onManage: vi.fn(async () => ({ status: "accepted" as const, message: "" })),
+		onCheck: vi.fn(async () => ({ status: "accepted" as const, message: "" })),
 		onEditLocal: vi.fn(),
 		onEditRemote: vi.fn(),
 	};
@@ -247,6 +247,46 @@ test("table sorts visible rows by name, type and JST update date, retaining chec
 		).getByRole("button", { name: "ルート" }),
 	);
 	expect(p.onFiles).toHaveBeenLastCalledWith("eumenes", "");
+});
+
+test("a server-sorted folder opens newest first, with dates shown in JST", async () => {
+	const p = fixture();
+	const [folder, document] = p.files!.entries;
+	const files = {
+		...p.files!,
+		sort: "updated-desc" as const,
+		entries: [
+			{ ...document!, path: "Z.md", updatedAt: "2026-11-16T15:00:00Z" },
+			{
+				...document!,
+				id: "wiki-" + "2".repeat(32),
+				path: "A.md",
+				updatedAt: "2026-11-16T14:59:00Z",
+			},
+			folder!,
+		],
+	};
+	const view = render(<ManagedLibrary {...p} files={files} />);
+	const names = () =>
+		within(screen.getByRole("table"))
+			.getAllByRole("row")
+			.slice(1)
+			.map((row) => within(row).getByRole("button").textContent);
+	const updated = () =>
+		screen.getByRole("columnheader", { name: "最終更新日" });
+	const serverOrder = ["Z.md", "A.md", "空"];
+	expect(updated()).toHaveAttribute("aria-sort", "descending");
+	expect(names()).toEqual(serverOrder);
+	expect(screen.getByRole("cell", { name: "2026/11/17" })).toBeInTheDocument();
+	expect(screen.getByRole("cell", { name: "—" })).toBeInTheDocument();
+	await userEvent.click(within(updated()).getByRole("button"));
+	expect(updated()).toHaveAttribute("aria-sort", "ascending");
+	expect(names()).toEqual(["A.md", "Z.md", "空"]);
+	view.rerender(
+		<ManagedLibrary {...p} files={{ ...files, path: "別のフォルダー" }} />,
+	);
+	expect(updated()).toHaveAttribute("aria-sort", "descending");
+	expect(names()).toEqual(serverOrder);
 });
 
 test("tree drops exclude another namespace, the source folder and its descendants", async () => {
@@ -490,9 +530,31 @@ test("the current empty folder remains in the hierarchy after its last child is 
 		screen.getByText("このフォルダーには項目がありません。"),
 	).toBeInTheDocument();
 });
+test("a refused deletion shows the reason and offers no result check", async () => {
+	const p = fixture();
+	p.onManage = vi.fn(async () => ({
+		status: "rejected" as const,
+		message: "共同編集中の文書です。共同編集を終了してから操作してください。",
+	}));
+	render(<ManagedLibrary {...p} />);
+	await userEvent.click(
+		screen.getByRole("checkbox", { name: "文書.mdを選択" }),
+	);
+	await userEvent.click(screen.getByRole("button", { name: "削除" }));
+	const dialog = within(screen.getByRole("dialog"));
+	await userEvent.click(dialog.getByRole("button", { name: "削除する" }));
+	expect(dialog.getByRole("alert")).toHaveTextContent("共同編集中の文書です");
+	expect(dialog.queryByRole("button", { name: "結果を確認" })).toBeNull();
+	expect(dialog.getByRole("button", { name: "削除する" })).toBeDisabled();
+	expect(p.onManage).toHaveBeenCalledTimes(1);
+	expect(p.onCheck).not.toHaveBeenCalled();
+});
 test("an interrupted receipt keeps its request ID for result checking without another change request", async () => {
 	const p = fixture(),
-		perform = vi.fn(async (_command: unknown, _requestId: string) => false);
+		perform = vi.fn(async (_command: unknown, _requestId: string) => ({
+			status: "indeterminate" as const,
+			message: "操作の結果は未確認です。",
+		}));
 	p.onManage = perform;
 	render(<ManagedLibrary {...p} />);
 	await userEvent.click(
@@ -509,6 +571,7 @@ test("an interrupted receipt keeps its request ID for result checking without an
 	);
 	expect(p.onCheck).toHaveBeenCalledWith(requestId);
 	expect(perform).toHaveBeenCalledTimes(1);
+	expect(screen.queryByRole("dialog")).toBeNull();
 });
 test("recursive deletion stays disabled when only empty-folder deletion is advertised", async () => {
 	const p = fixture();

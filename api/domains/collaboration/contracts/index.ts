@@ -98,6 +98,16 @@ export type Ports = {
 		request: string,
 	): ChildView;
 	source(db: Database, runId: string): Source | null;
+	closingSource?(
+		db: Database,
+		input: Pick<
+			SourceRef,
+			"runId" | "messageId" | "conversationId" | "digest"
+		> & {
+			sessionId: string;
+			workRef: string;
+		},
+	): "valid" | "expired" | "invalid";
 	/** Recheck a contribution already registered to the work, even if the utterance was handed over. */
 	contributingSource?(
 		db: Database,

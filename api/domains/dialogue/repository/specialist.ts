@@ -143,6 +143,8 @@ export type SessionRecord = {
 	endReason: SpecialistEndReason | null;
 	/** The reason the session ends with once its work was ended (set while `closing`). */
 	closingReason: SpecialistEndReason | null;
+	closeBlockedReason: "source_session_expired" | null;
+	closeBlockedAt: string | null;
 	closeFailures: number;
 	revision: number;
 	epoch: number;
@@ -175,6 +177,9 @@ function map(row: Record<string, unknown>): SessionRecord {
 		state: row.state as SpecialistState,
 		endReason: row.end_reason as SpecialistEndReason | null,
 		closingReason: row.closing_reason as SpecialistEndReason | null,
+		closeBlockedReason:
+			row.close_blocked_reason as SessionRecord["closeBlockedReason"],
+		closeBlockedAt: row.close_blocked_at as string | null,
 		closeFailures: row.close_failures as number,
 		revision: row.revision as number,
 		epoch: row.epoch as number,
@@ -253,12 +258,12 @@ export function parkedSessions(
 			.all(conversationId, toolchainId) as Record<string, unknown>[]
 	).map(map);
 }
-/** Sessions the sweep looks at: past their expiry or closing; the caller adds the clean-suspended ones. */
+/** Expired sessions and closing sessions still eligible for retry. */
 export function sweepCandidates(db: Database, now: string): SessionRecord[] {
 	return (
 		db
 			.query(
-				"SELECT * FROM dialogue_specialist_sessions WHERE state = 'closing' OR (state IN ('active','suspended') AND expires_at <= ?) ORDER BY created_at",
+				"SELECT * FROM dialogue_specialist_sessions WHERE (state = 'closing' AND close_blocked_reason IS NULL) OR (state IN ('active','suspended') AND expires_at <= ?) ORDER BY created_at",
 			)
 			.all(now) as Record<string, unknown>[]
 	).map(map);
@@ -272,11 +277,11 @@ export function suspendedSessions(db: Database): SessionRecord[] {
 			.all() as Record<string, unknown>[]
 	).map(map);
 }
-export function unfinishedSessions(db: Database): SessionRecord[] {
+export function recoveryCandidates(db: Database): SessionRecord[] {
 	return (
 		db
 			.query(
-				"SELECT * FROM dialogue_specialist_sessions WHERE state <> 'ended' ORDER BY created_at",
+				"SELECT * FROM dialogue_specialist_sessions WHERE state <> 'ended' AND close_blocked_reason IS NULL ORDER BY created_at",
 			)
 			.all() as Record<string, unknown>[]
 	).map(map);
@@ -287,6 +292,8 @@ type Patch = Partial<
 		| "state"
 		| "endReason"
 		| "closingReason"
+		| "closeBlockedReason"
+		| "closeBlockedAt"
 		| "closeFailures"
 		| "epoch"
 		| "activeRunId"
@@ -302,6 +309,8 @@ const COLUMN = {
 	state: "state",
 	endReason: "end_reason",
 	closingReason: "closing_reason",
+	closeBlockedReason: "close_blocked_reason",
+	closeBlockedAt: "close_blocked_at",
 	closeFailures: "close_failures",
 	epoch: "epoch",
 	activeRunId: "active_run_id",

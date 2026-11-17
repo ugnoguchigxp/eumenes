@@ -117,6 +117,11 @@ function fixture() {
 					{ status, headers: { ETag: etag } },
 				);
 			}
+			if (url.searchParams.get("cursor") === "invalid")
+				return Response.json(
+					{ error: { code: "invalid_cursor" } },
+					{ status: 400 },
+				);
 			if (url.pathname.endsWith("library"))
 				return Response.json({
 					namespace: "eumenes",
@@ -183,7 +188,57 @@ test("hierarchy uses server folder ids, library ETag and an opaque cursor", asyn
 	expect(r.entries[0]?.updatedAt).toBeUndefined();
 	expect(r.entries[1]?.updatedAt).toBe("2026-11-08T15:00:00Z");
 	expect(h.calls.at(-1)?.url.searchParams.get("cursor")).toBe("次/+= ");
+	expect(h.calls.at(-1)?.url.searchParams.has("sort")).toBe(false);
 	expect((await h.port.getFolder(folder, signal())).etag).toBe(etag);
+});
+test("updated-desc requires both capabilities and keeps its sort across pages", async () => {
+	const h = fixture();
+	const query = {
+		namespace: "eumenes",
+		path: "元",
+		sort: "updated-desc" as const,
+	};
+	for (const advertised of [
+		{},
+		{ updatedAt: true },
+		{ librarySort: ["updated-desc"] },
+	]) {
+		h.setCaps({ ...extended, ...advertised });
+		h.advance();
+		expect(
+			libraryFeatures(await h.port.capabilities(signal())).updatedDesc,
+		).toBe(false);
+		await expect(h.port.listLibrary(query, signal())).rejects.toThrow(
+			"library_unsupported",
+		);
+		expect(h.calls.at(-1)?.url.pathname).toBe("/v1/docling/capabilities");
+	}
+	h.setCaps({
+		...extended,
+		updatedAt: true,
+		librarySort: ["id-asc", "updated-desc"],
+	});
+	h.advance();
+	expect(libraryFeatures(await h.port.capabilities(signal())).updatedDesc).toBe(
+		true,
+	);
+	const start = await h.port.listLibrary(query, signal());
+	const cursor = start.nextCursor!;
+	const next = await h.port.listLibrary({ ...query, cursor }, signal());
+	expect(next.entries).toEqual(start.entries);
+	const calls = h.calls.filter(
+		({ url }) => url.pathname === "/v1/docling/library",
+	);
+	expect(calls.map(({ url }) => Object.fromEntries(url.searchParams))).toEqual([
+		{ ...query, limit: "100" },
+		{ ...query, limit: "100", cursor },
+	]);
+	await expect(
+		h.port.listLibrary({ ...query, cursor: "invalid" }, signal()),
+	).rejects.toMatchObject({
+		code: "invalid_cursor",
+		status: 400,
+	});
 });
 const cases: {
 	command: LibraryCommand;

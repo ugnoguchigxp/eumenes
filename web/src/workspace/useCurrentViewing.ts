@@ -1,5 +1,5 @@
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useCallback, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { ToolchainArtifactEntry } from "../../../client/toolchain-actions";
 import type {
 	RunViewing,
@@ -18,7 +18,10 @@ import {
 } from "../domains/toolchain-artifacts/registry";
 import { queryRoots } from "../queryKeys";
 import { readScreenState } from "../domains/toolchain-artifacts/screen-observation";
-import { toolchainWebAdapters } from "./toolchain-adapters";
+import {
+	loadToolchainAdapter,
+	toolchainWebAdapters,
+} from "./toolchain-adapters";
 
 type ActiveTab = ReturnType<typeof useArtifactWorkspace>["active"];
 
@@ -91,6 +94,13 @@ export function useCurrentViewing(
 	useLayoutEffect(() => {
 		tab.current = active;
 	}, [active]);
+	useEffect(() => {
+		if (active?.kind !== "toolchain") return;
+		const entry = catalogEntries(cache).find(
+			(item) => item.artifactRevisionId === active.artifactRevisionId,
+		);
+		if (entry) void loadToolchainAdapter(entry.adapterRef);
+	}, [active, cache]);
 	const observation = useRef<{ sessionId: string; sequence: number } | null>(
 		null,
 	);

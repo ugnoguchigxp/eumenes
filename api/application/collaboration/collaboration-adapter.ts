@@ -331,6 +331,7 @@ export function createCollaborationAdapter(
 			openInTransaction: (db, input) =>
 				works.open(db, kind, input.sessionId, input.targetRef),
 			stateInTransaction: works.state,
+			endAutomaticallyInTransaction: works.endAutomatically,
 			hasTargetInTransaction: () => false,
 			beginTurnInTransaction: works.begin,
 			endTurnInTransaction: works.release,

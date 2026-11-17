@@ -8,7 +8,10 @@ import {
 	verifyStateSearchIndex,
 	type ForgetJournalEntry,
 } from "eumenes-memory/sqlite";
-import { appendJournal, readJournal } from "../domains/memory/service/journal";
+import {
+	appendJournal,
+	readJournal,
+} from "../domains/memory/test/journal.fixture";
 import {
 	copyFileSync,
 	existsSync,
@@ -219,6 +222,7 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 			dir,
 		]);
 		expect(unpack.exitCode).toBe(0);
+		// The extracted previous package has no static module path. This import is limited to that copy.
 		const previous = (await import(
 			join(dir, "package/dist/sqlite.js")
 		)) as typeof import("eumenes-memory/sqlite");
@@ -229,7 +233,9 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 				const prefix = "memory-package/";
 				if (!migration.id.startsWith(prefix)) return migration;
 				const index = Number(migration.id.slice(prefix.length)) - 1;
-				return { ...migration, sql: previous.migrations[index]! };
+				const sql = previous.migrations[index];
+				if (sql === undefined) throw new Error("fixture migration missing");
+				return { ...migration, sql };
 			});
 		store = openStore(path, previousMigrations);
 		const texts = [
@@ -237,7 +243,7 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 			"先に忘却する試験記憶",
 			"切替後に忘却する試験記憶",
 		];
-		const [kept, earlyForget, lateForget] = await store.write((db) =>
+		const seeded = await store.write((db) =>
 			texts.map((text, index) => {
 				const digest = createHash("sha256").update(text).digest("hex");
 				const ref = {
@@ -282,6 +288,15 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 				return saved.item.itemId;
 			}),
 		);
+		const [kept, earlyForget, lateForget] = seeded;
+		if (
+			seeded.length !== 3 ||
+			new Set(seeded).size !== 3 ||
+			typeof kept !== "string" ||
+			typeof earlyForget !== "string" ||
+			typeof lateForget !== "string"
+		)
+			throw new Error("fixture seed failed");
 		const forget = (
 			owner: ReturnType<typeof openStore>,
 			itemId: string,
@@ -306,7 +321,7 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 					clock,
 				});
 			});
-		expect((await forget(store, earlyForget!, previous)).completed).toBe(true);
+		expect((await forget(store, earlyForget, previous)).completed).toBe(true);
 		await store.close();
 		store = undefined;
 
@@ -345,7 +360,7 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 		expect(search(store, texts[1]!)).toEqual([]);
 		expect(search(store, texts[2]!)).toEqual([lateForget]);
 		expect(
-			(await forget(store, lateForget!, { planForget, applyForget })).completed,
+			(await forget(store, lateForget, { planForget, applyForget })).completed,
 		).toBe(true);
 		expect(search(store, texts[2]!)).toEqual([]);
 		expect(store.read(readForgetJournalHead).seq).toBe(2);

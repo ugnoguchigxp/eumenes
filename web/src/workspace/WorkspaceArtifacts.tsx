@@ -6,7 +6,10 @@ import { ArtifactPanel } from "../components/domains/artifact/ArtifactPanel";
 import { MusicArtifact } from "../components/domains/music/MusicArtifact";
 import { ToolchainArtifactHost } from "../domains/toolchain-artifacts/ToolchainArtifactHost";
 import { useToolchainArtifacts } from "../domains/toolchain-artifacts";
-import { toolchainWebAdapters } from "./toolchain-adapters";
+import {
+	prepareToolchainAdapter,
+	toolchainWebAdapters,
+} from "./toolchain-adapters";
 
 export default function WorkspaceArtifacts({
 	client,
@@ -37,6 +40,7 @@ export default function WorkspaceArtifacts({
 						visible={visible}
 						onTargetChange={(ref) => artifacts.setTarget(tab.id, ref)}
 						onNavigate={openById}
+						prepareAdapter={prepareToolchainAdapter}
 					/>
 				)}
 				renderOpenUI={(definition) => (

@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { fixtureDiscovery } from "./discovery.fixture";
 import { createToolchainRouting } from "./toolchain-routing";
 import type { HarnessOptions } from "./toolchain-harness-options.fixture";
@@ -25,6 +26,23 @@ export type AskChoice = (
 	signal: AbortSignal,
 ) => Promise<string>;
 
+/**
+ * The package structure call, told apart by its prompt version and the user payload.
+ * A selection call carries `requests`; a structure call carries the utterance and does not.
+ */
+function isStructurePrompt(prompt: { version: string; user: string }): boolean {
+	if (prompt.version !== TURN_STRUCTURE_PROMPT.version) return false;
+	try {
+		const data = JSON.parse(prompt.user) as {
+			text?: unknown;
+			requests?: unknown;
+		};
+		return typeof data.text === "string" && !Array.isArray(data.requests);
+	} catch {
+		return false;
+	}
+}
+
 /** Adapt the application fixture's scripted answers to the router's structured selection calls. */
 export async function attachFixtureRouter(input: {
 	store: SqliteStore;
@@ -34,6 +52,8 @@ export async function attachFixtureRouter(input: {
 	ask: AskChoice;
 	/** The function the test's fixed embedding finds first for a text: the router's search finds it too. */
 	discovery?: (text: string) => string;
+	/** Scripted structure judgment. Selection then picks each request from its own candidates. */
+	structure?: HarnessOptions["structure"];
 }) {
 	const selectRouter = fixtureSelection(async (route, signal) => {
 		const names = route.criteria.map((c) => c.name);
@@ -97,8 +117,25 @@ export async function attachFixtureRouter(input: {
 			picked = await pick("pending");
 		return idsOfChoice(picked);
 	});
+	const structure = input.structure;
 	Object.assign(input.inference, {
-		selectRouter,
+		// The scripted judgment never fills the selector's cache, so each later request is picked
+		// from the candidates offered for that request.
+		selectRouter: structure
+			? async (
+					prompt: Parameters<NonNullable<InferencePort["selectRouter"]>>[0],
+					signal: AbortSignal,
+				) => {
+					if (!isStructurePrompt(prompt))
+						return selectRouter(prompt, signal, true);
+					return JSON.stringify({
+						decision: structure([
+							{ role: "system", content: prompt.system },
+							{ role: "user", content: prompt.user },
+						]),
+					});
+				}
+			: selectRouter,
 		routerSelectionAvailable: () => true,
 	});
 	Object.assign(input.routing, {
@@ -240,6 +277,7 @@ export async function fixtureRouting(input: {
 			capabilities: toolchain.capabilities,
 			...(options.embed ? {} : { discovery }),
 			ask: options.model ? askModel(options.model) : ask,
+			...(options.structure ? { structure: options.structure } : {}),
 		});
 	}
 	return routing;

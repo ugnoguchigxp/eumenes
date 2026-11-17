@@ -23,12 +23,14 @@ export function ConversationPanel({
 	store,
 	state,
 	chatHidden = false,
+	onInspectContext,
 }: {
 	client: EumenesClient;
 	store: AudioStore;
 	state: WorkspaceState;
 	/** Background mode: the chat stays mounted but hidden, and the background takes input. */
 	chatHidden?: boolean;
+	onInspectContext?(runId: string, trigger: HTMLButtonElement): void;
 }) {
 	const resources = usePanelResources(client, state);
 	const admission = useVideoAdmission(client).data?.state;
@@ -100,6 +102,7 @@ export function ConversationPanel({
 				client={client}
 				state={state}
 				resources={resources}
+				onInspectContext={onInspectContext}
 			/>
 			{showLatest && (
 				<button className="latest-button" type="button" onClick={scrollLatest}>

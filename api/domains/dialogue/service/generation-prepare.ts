@@ -1,4 +1,6 @@
 import { workContextInput } from "./work-context-input";
+import type { InputOrigin } from "../../../infrastructure/model-input";
+import { answerMessages } from "./answer-input";
 import { generatedImageLines } from "./generated-image-text";
 import { backgroundInput } from "./background-input";
 import type { Database } from "bun:sqlite";
@@ -8,7 +10,6 @@ import { getLogger } from "../../../infrastructure/logger";
 import type { ConversationEvent } from "../../continuity";
 import {
 	REFERENCE_WINDOW_TOKENS,
-	estimateMessageTokens,
 	estimateTextTokens,
 	planWindow,
 } from "../../inference";
@@ -32,11 +33,11 @@ import {
 	conversationPrefixFrom,
 	conversationSystem,
 	placeCutInTransaction,
-	withLastMessage,
+	inputMessageRevision,
 	type ConversationPrefix,
 } from "./conversation-input";
 import { localHarness, routeConversation } from "./harness";
-import { INPUT_HEADINGS, dataText, lineText, section } from "./input-text";
+import { dataText, lineText } from "./input-text";
 import {
 	consumeAnswer,
 	answerTicketInTransaction,
@@ -78,14 +79,17 @@ function pendingInput(
 	deps: DialogueDeps,
 	tx: Database,
 	pending: readonly ConversationEvent[],
+	traceInput?: boolean,
 ): {
 	texts: string[];
 	final: FinalMessage;
 	attachments: Pick<ChatMessage, "attachments" | "sourceMessageId">;
+	origins?: InputOrigin[];
 } {
 	if (pending.length === 0)
 		return { texts: [], final: { kind: "fixed" }, attachments: {} };
 	const texts: string[] = [];
+	const origins: InputOrigin[] | undefined = traceInput ? [] : undefined;
 	let attachments: Pick<ChatMessage, "attachments" | "sourceMessageId"> = {};
 	for (const event of pending) {
 		const messageId = event.messageIds[0];
@@ -96,6 +100,12 @@ function pendingInput(
 		texts.push(
 			withAttachmentNotes(found.message.text, found.message.attachments),
 		);
+		origins?.push({
+			kind: "user",
+			id: found.message.id,
+			at: found.message.createdAt,
+			...inputMessageRevision(deps, tx, found.message.id),
+		});
 		// One message's images go with the input (the newest that has any).
 		if (found.message.attachments?.length)
 			attachments = {
@@ -112,6 +122,7 @@ function pendingInput(
 			messageIds: pending.flatMap((event) => event.messageIds),
 		},
 		attachments,
+		origins,
 	};
 }
 
@@ -482,8 +493,14 @@ export function createPrepare(
 			system,
 			window,
 			pending: pendingIds,
+			traceInput: deps.contextInputs?.enabled(),
 		});
-		const { texts, final, attachments } = pendingInput(deps, tx, pending);
+		const { texts, final, attachments, origins } = pendingInput(
+			deps,
+			tx,
+			pending,
+			deps.contextInputs?.enabled(),
+		);
 		const media = notice
 			? []
 			: generatedImageLines(deps, tx, conversationId, prefix.since);
@@ -494,6 +511,7 @@ export function createPrepare(
 			pendingIds,
 			media,
 		});
+		const observeInput = deps.contextInputs?.begin(tx, current, placed.reason);
 		const noticeText = notice
 			? (conversation.messageInTransaction(tx, run.inputMessageId)?.message
 					.text ?? null)
@@ -566,32 +584,18 @@ export function createPrepare(
 		const diagnostics = notice
 			? []
 			: recentDiagnostics(deps, tx, conversationId);
-		const diagnosticLines = diagnostics.map(({ line }) => line);
-		const mediaLines = media.length
-			? ["受領した生成画像:", ...media.map(({ line }) => line)]
-			: [];
-		stateLines.push(...mediaLines, ...diagnosticLines);
-		const state = stateText([
-			...stateLines.slice(0, 1),
-			...(screenLines.length ? ["提示中:", ...screenLines] : []),
-			...agencyStateLines(deps, tx, conversationId),
-			...mediaLines,
-			...diagnosticLines,
-		]);
-		const messages = withLastMessage(
-			prefix,
-			[
-				state,
-				section(INPUT_HEADINGS.notice, noticeBody),
-				texts.length
-					? `${INPUT_HEADINGS.user}\n${texts.map(dataText).join("\n")}`
-					: null,
-			],
+		const messages = answerMessages(prefix, {
+			stateLines,
+			screenLines,
+			agencyLines: agencyStateLines(deps, tx, conversationId),
+			media,
+			diagnostics,
+			notice: noticeBody,
+			texts,
 			attachments,
-		);
-		log.debug("dialogue.context_measured", {
-			kind: "estimated_tokens",
-			count: estimateMessageTokens(messages),
+			trace: observeInput
+				? { nowMs, noticeId: notice ? run.inputMessageId : undefined, origins }
+				: undefined,
 		});
 		return {
 			status: "ready",
@@ -605,6 +609,7 @@ export function createPrepare(
 				...(requestId ? { requestId } : {}),
 				harness,
 				messages,
+				...(observeInput ? { observeInput } : {}),
 				utterances: texts,
 				// Scheduled prompts can receive an answer but carry no authority to start work.
 				...(final.kind === "utterances" && !isSystemPrompt(current.sourceKind)

@@ -4,6 +4,7 @@ import {
 	estimateMessageTokens,
 } from "../../../infrastructure/context-budget";
 import { getLogger } from "../../../infrastructure/logger";
+import { modelMessages } from "../../../infrastructure/model-input";
 import { speechLanguage, type SpeechLanguage } from "../../delivery";
 import type {
 	SpeechDelivery,
@@ -380,6 +381,7 @@ export async function executeRequest(
 			};
 	}
 	if (row.purpose === "llm" && Array.isArray(input)) {
+		input = modelMessages(input);
 		log.debug("inference.input_measured", {
 			requestId,
 			kind: "estimated_tokens",

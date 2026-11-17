@@ -16,6 +16,7 @@ export type {
 	WorldContextPort,
 } from "./contracts";
 export { migrations } from "./repository";
+export { researchSourceIds } from "./repository/work";
 export { INPUT_HEADINGS } from "./service/input-text";
 export { localHarness } from "./service/harness";
 

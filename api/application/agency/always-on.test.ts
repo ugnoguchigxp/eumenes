@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ADDED_WORDS_MARK } from "eumenes-agency/agenda";
+import { ADDED_WORDS_MARK, START_PREPARATION } from "eumenes-agency/agenda";
 import {
 	agendaFixture,
 	composeSay,
@@ -382,6 +382,26 @@ test("the reply's system holds the package's rules for the agenda, with the tool
 		);
 		// Eumenes' own persona and emotion rules stay outside the package's span.
 		expect(base).not.toContain("【気持ちの絵文字】");
+		await f.start();
+		await f.user("user-a");
+		const { toolDefinitions } = await replyWith(f, []);
+		const preparation = toolDefinitions[0]!.filter(
+			(tool) => tool.name === START_PREPARATION,
+		);
+		expect(preparation).toHaveLength(1);
+		expect(preparation[0]?.parameters).toMatchObject({
+			type: "object",
+			additionalProperties: false,
+			required: ["request", "askedByUser"],
+			properties: {
+				request: {
+					type: "string",
+					description:
+						expect.stringContaining("利用者が今回、明示的に引き継いだ条件"),
+				},
+				askedByUser: { type: "boolean" },
+			},
+		});
 	} finally {
 		await f.close();
 	}

@@ -29,11 +29,11 @@ export function useAction(request: ArtifactRequest) {
 		(last.revision !== here.revision || last.epoch !== here.epoch)
 			? { status: "accepted", message: "" }
 			: last.receipt;
-	async function send(
+	async function sendReceipt(
 		action: ArtifactEvent["action"],
 		values: ArtifactEvent["values"],
-	): Promise<boolean> {
-		if (lock.current) return false;
+	): Promise<Receipt> {
+		if (lock.current) return { status: "rejected", message: "処理中です" };
 		lock.current = true;
 		setPending(true);
 		try {
@@ -45,23 +45,25 @@ export function useAction(request: ArtifactRequest) {
 				values,
 			});
 			setLast({ receipt, ...here });
-			return receipt.status === "accepted";
+			return receipt;
 		} catch {
-			setLast({
-				receipt: {
-					status: "rejected",
-					message: "操作に失敗しました。もう一度お試しください",
-				},
-				...here,
-			});
-			return false;
+			const receipt: Receipt = {
+				status: "rejected",
+				message: "操作に失敗しました。もう一度お試しください",
+			};
+			setLast({ receipt, ...here });
+			return receipt;
 		} finally {
 			lock.current = false;
 			setPending(false);
 		}
 	}
 	return {
-		send,
+		send: async (
+			action: ArtifactEvent["action"],
+			values: ArtifactEvent["values"],
+		) => (await sendReceipt(action, values)).status === "accepted",
+		sendReceipt,
 		pending,
 		message: pending ? "処理中です" : result.message,
 		/** The last receipt's status; `pending` while a dispatch is in flight. */

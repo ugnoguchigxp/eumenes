@@ -47,7 +47,9 @@ export function markdownUploads(
 				status: "rejected",
 				message: cache
 					? "cacheへ一時保存できませんでした。入力は画面に保持しています。"
-					: "文書の下書きを受け付けられませんでした。内容は画面に保持しています。",
+					: context?.purpose === "markdown-management"
+						? "管理操作を受け付けられませんでした。入力は保持しています。"
+						: "文書の下書きを受け付けられませんでした。内容は画面に保持しています。",
 			};
 		}
 	};

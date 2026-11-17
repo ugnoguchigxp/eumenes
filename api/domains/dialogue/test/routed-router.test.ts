@@ -610,6 +610,64 @@ test("cancelling a turn while structure is running prevents a reply and ignores 
 	expect(h!.todos()).toEqual([]);
 });
 
+test("a candidate returned under a different request index does not start work", async () => {
+	const r = await start({}, { cards: [IMAGE, MUSIC] });
+	const request = "猫の絵を描いて、曲も作って";
+	r.structures.push(
+		JSON.stringify({
+			requests: [
+				{ text: "猫の絵を描いて", target: "猫の絵", inputs: [], after: [] },
+				{ text: "曲も作って", target: "曲", inputs: [], after: [] },
+			],
+		}),
+	);
+	const port = h!.larm.selectRouter!;
+	let selections = 0;
+	h!.larm.selectRouter = async (prompt, signal) => {
+		if (prompt.version === TURN_STRUCTURE_PROMPT.version)
+			return port(prompt, signal);
+		selections++;
+		const asked = JSON.parse(prompt.user) as {
+			requests: Array<{ index: string; candidates: Array<{ id: string }> }>;
+		};
+		const [first, second] = asked.requests;
+		expect(first?.candidates.length).toBeGreaterThan(0);
+		expect(second?.candidates.length).toBeGreaterThan(0);
+		expect(second?.index).not.toBe(first?.index);
+		const foreign = first!.candidates.find(
+			(candidate) =>
+				!second!.candidates.some((item) => item.id === candidate.id),
+		);
+		expect(foreign?.id).toBeTruthy();
+		return JSON.stringify({
+			selections: {
+				[first!.index]: { kind: "candidate", id: foreign!.id },
+				[second!.index]: { kind: "candidate", id: foreign!.id },
+			},
+		});
+	};
+	h!.state.steps.push({ text: "まだ頼んでいません。" });
+	const run = await h!.say(request);
+	expect(h!.dialogue.answerText(run.id)).toBe("まだ頼んでいません。");
+	expect(selections).toBe(1);
+	expect(trace()).toMatchObject({
+		decided: null,
+		error: "route_selection_invalid_response",
+	});
+	expect(h!.todos()).toEqual([]);
+	expect(h!.archived()).toEqual([]);
+	expect(h!.state.selections.every((selection) => !selection.toolchainId)).toBe(
+		true,
+	);
+	expect(h!.state.stewardRequests).toEqual([]);
+	expect(h!.state.images.size).toBe(0);
+	expect(h!.state.calls).toHaveLength(1);
+	expect(
+		h!.state.calls[0]!.tools.every((name) => name.startsWith("read_")),
+	).toBe(true);
+	expect(h!.state.calls[0]!.tools.length).toBeGreaterThan(0);
+});
+
 test("an unavailable candidate selected by the model cannot execute, and the reply only gets reads", async () => {
 	const cards = [IMAGE, INSTANT];
 	const r = await start({}, { cards });

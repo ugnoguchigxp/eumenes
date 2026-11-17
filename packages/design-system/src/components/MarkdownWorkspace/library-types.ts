@@ -39,6 +39,7 @@ export type LibraryFeatures = {
 export type LibraryFiles = {
 	namespace: string;
 	path: string;
+	sort?: "updated-desc";
 	etag: string;
 	entries: LibraryItem[];
 	nextCursor: string | null;
@@ -49,4 +50,8 @@ export type LibraryOperation = {
 	code: string | null;
 	command: unknown;
 	removedWorkspaceIds: string[];
+};
+export type LibraryActionResult = {
+	status: "accepted" | "rejected" | "indeterminate";
+	message: string;
 };

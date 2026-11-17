@@ -14,6 +14,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
+import {
+	inputImages,
+	inputMessages,
+	observeModelInput,
+} from "../../../infrastructure/model-input";
 import { getLogger } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { AgentAuth } from "../../settings/contracts";
@@ -179,10 +184,12 @@ export async function startGatedQuery(
 	prompt: SDKUserMessage["message"]["content"] | null,
 	options: Options,
 	connectionId?: string,
+	onSend?: () => void,
 ): Promise<GatedQuery> {
 	const gate = Promise.withResolvers<boolean>();
 	async function* messages() {
 		if (!(await gate.promise) || prompt === null) return;
+		onSend?.();
 		yield {
 			type: "user" as const,
 			message: { role: "user" as const, content: prompt },
@@ -347,6 +354,24 @@ export async function runClaudeAgent(
 						: { persistSession: false }),
 				},
 				call.connectionId,
+				call.observeInput &&
+					(() => {
+						if (call.signal.aborted) return;
+						observeModelInput(call.observeInput, () => ({
+							boundary: "claude-agent-sdk",
+							messages: inputMessages(call.messages),
+							tools: call.tools,
+							format: tools.length ? undefined : call.outputSchema,
+							omittedMessages: call.omittedMessages,
+							sdk: {
+								mode: session && history.length ? "resume" : "new",
+								carried: session ? history.length : 0,
+								instructions: systemPrompt,
+								prompt,
+								images: inputImages(images),
+							},
+						}));
+					}),
 			);
 			gated.release();
 			try {

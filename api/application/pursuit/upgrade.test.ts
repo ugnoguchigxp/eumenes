@@ -1,4 +1,5 @@
-import { forgetPursuitReports } from "../../domains/pursuit";
+import { researchSourceIds } from "../../domains/dialogue";
+import { forgetRetiredResearch } from "./forget-research";
 import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -69,9 +70,25 @@ INSERT INTO pursuit_documents(run_id,epoch,id,url,title,text,fetched_at,truncate
 INSERT INTO pursuit_web_operations(id,run_id,epoch,attempt_id,external_id,job_id)
  VALUES('op','report',0,'attempt','source','job');
 INSERT INTO pursuit_notices(id,run_id,epoch,ordinal,state) VALUES('notice','report',0,1,'delivered');
+INSERT INTO pursuit_runs(id,conversation_id,state,epoch,revision,deadline,step,data_json,created_at,updated_at)
+ VALUES('kept','main','completed',0,0,0,1,'{}',1,1);
+INSERT INTO pursuit_documents(run_id,epoch,id,url,title,text,fetched_at,truncated)
+ VALUES('kept',0,'kept-doc','https://example.com/kept','kept','independent','date',0);
+INSERT INTO pursuit_runs(id,conversation_id,state,epoch,revision,deadline,step,data_json,created_at,updated_at)
+ VALUES('other','main','completed',0,0,0,1,'{}',1,1);
+INSERT INTO pursuit_runs(id,conversation_id,state,epoch,revision,deadline,step,data_json,created_at,updated_at)
+ VALUES('note-run','main','completed',0,0,0,1,'{}',1,1);
 INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
- VALUES('todo','main','run','web.research','toolchain:web.research@1','task','old request','title','done',1,'report','key','date','date','["message"]');`);
-			forgetPursuitReports(
+ VALUES('todo','main','run','web.research','toolchain:web.research@1','task','old request','title','done',1,'report','key','date','date','["message"]');
+INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
+ VALUES('kept-todo','main','kept-run','web.research','toolchain:web.research@1','task','kept request','kept','done',1,'kept','kept-key','date','date','["other-message"]');
+INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
+ VALUES('other-todo','main','other-run','other.toolchain','toolchain:other@1','task','other request','other','done',1,'other','other-key','date','date','["message"]');
+INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
+ VALUES('note-todo','main','note-run','web.note','toolchain:web.note@1','task','note request','note','done',1,'note-run','note-key','date','date','["message"]');
+INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revision_id,execution,request,title,status,revision,source_ref,dedupe_key,created_at,updated_at,message_ids_json)
+ VALUES('blank-todo','main','blank-run','web.research','toolchain:web.research@1','task','blank request','blank','done',1,'','blank-key','date','date','["message"]');`);
+			forgetRetiredResearch(
 				db,
 				["unrelated"],
 				1,
@@ -79,7 +96,12 @@ INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revis
 				(id) => notices.push(id),
 			);
 			expect(removed).toEqual([]);
-			forgetPursuitReports(
+			// Forget clears the TODO's words. The hook still has to see source_ref.
+			db.query(
+				"UPDATE dialogue_work SET request='', title='', question=NULL, result_json=NULL WHERE id='todo'",
+			).run();
+			expect(researchSourceIds(db, ["message"])).toEqual(["report"]);
+			forgetRetiredResearch(
 				db,
 				["message"],
 				2,
@@ -91,13 +113,37 @@ INSERT INTO dialogue_work(id,conversation_id,run_id,toolchain_id,toolchain_revis
 			expect(
 				db.query("SELECT goal, forgotten_at FROM pursuit_pursuit").get(),
 			).toEqual({ goal: "", forgotten_at: 2 });
-			expect(db.query("SELECT data_json FROM pursuit_runs").get()).toEqual({
+			expect(
+				db.query("SELECT data_json FROM pursuit_runs WHERE id='report'").get(),
+			).toEqual({
 				data_json: null,
 			});
 			expect(
-				db.query("SELECT count(*) AS n FROM pursuit_documents").get(),
+				db
+					.query(
+						"SELECT count(*) AS n FROM pursuit_documents WHERE run_id='report'",
+					)
+					.get(),
 			).toEqual({ n: 0 });
-			forgetPursuitReports(
+			expect(
+				db.query("SELECT data_json FROM pursuit_runs WHERE id='kept'").get(),
+			).toEqual({ data_json: "{}" });
+			expect(
+				db
+					.query(
+						"SELECT count(*) AS n FROM pursuit_documents WHERE run_id='kept'",
+					)
+					.get(),
+			).toEqual({ n: 1 });
+			expect(
+				db.query("SELECT data_json FROM pursuit_runs WHERE id='other'").get(),
+			).toEqual({ data_json: "{}" });
+			expect(
+				db
+					.query("SELECT data_json FROM pursuit_runs WHERE id='note-run'")
+					.get(),
+			).toEqual({ data_json: "{}" });
+			forgetRetiredResearch(
 				db,
 				["message"],
 				3,

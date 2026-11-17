@@ -165,6 +165,11 @@ export function libraryFeatures(c: DocumentCapabilities) {
 		folders = library && c.foldersPath === "/v1/docling/folders";
 	return {
 		library,
+		updatedDesc:
+			library &&
+			c.updatedAt === true &&
+			Array.isArray(c.librarySort) &&
+			c.librarySort.includes("updated-desc"),
 		folders,
 		patch: method("PATCH") && ops.includes("rename") && ops.includes("move"),
 		copy: method("POST") && ops.includes("copy"),

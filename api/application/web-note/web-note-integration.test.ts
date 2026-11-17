@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { conversationSchema } from "../../domains/conversation/contracts";
 import { harness } from "../toolchain/toolchain.fixture";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -42,37 +43,70 @@ test("a single lookup from the conversation is handed to the web note task, neve
 	try {
 		const source = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
-			conversationId: "main",
+			conversationId: "research-request",
 			text: request,
 		});
 		await waitFor(() => h.dialogue.get(source.id)?.status === "completed");
-		await waitFor(() => h.reported().includes("PETGフィラメントの保管"), {
-			timeout: 10000,
-		});
+		await waitFor(
+			() => h.reported("research-request").includes("PETGフィラメントの保管"),
+			{
+				timeout: 10000,
+			},
+		);
 		expect(offered).toContain("web.note");
 		expect(offered).not.toContain("web.search");
 		expect(prompts).toHaveLength(1);
 		expect(prompts[0]).toContain(`依頼:\n${request}`);
-		expect(JSON.parse(h.reported())).toMatchObject({
+		expect(JSON.parse(h.reported("research-request"))).toMatchObject({
 			status: "completed",
 			title: "PETGフィラメントの保管",
 			summary: expect.stringContaining("乾燥剤"),
-			answer: expect.stringContaining("65℃前後"),
+			answer: "防湿容器に乾燥剤と一緒に入れて保管し、湿ったら乾燥機で乾かす。",
 			sources: [{ url: "https://example.com/petg", title: "メーカーの案内" }],
 		});
 		// The notice was sent; the conversation's run for it acknowledges it, which recovery records.
 		const runs = () =>
 			h.store.read((db) =>
-				db.query("SELECT state,notice FROM web_note_runs").all(),
+				db
+					.query<{ id: string; state: string; notice: string }, []>(
+						"SELECT id,state,notice FROM web_note_runs",
+					)
+					.all(),
 			);
-		expect(runs()).toEqual([{ state: "completed", notice: "accepted" }]);
+		expect(runs()).toEqual([
+			{ id: expect.any(String), state: "completed", notice: "accepted" },
+		]);
+		const noteId = runs()[0]!.id;
+		const saved = h.store.read((db) =>
+			h.toolchain.webNote.task.viewInTransaction(db, noteId),
+		);
+		expect(saved?.result?.answer).toContain("65℃前後");
 		await waitFor(async () => {
 			await h.toolchain.webNote.recover();
-			return (runs() as Array<{ notice: string }>)[0]!.notice === "delivered";
+			return runs()[0]?.notice === "delivered";
 		});
 		// A lookup is answered in the conversation, not announced as a finished external work.
 		const notices = await (await h.request("/api/todo-notices")).json();
 		expect(notices).toEqual({ notices: [], unread: 0 });
+		const conversation = conversationSchema.parse(
+			await (await h.request("/api/conversations/research-request")).json(),
+		);
+		const replies = conversation.messages.filter(
+			(message) =>
+				message.role === "assistant" &&
+				message.displayText?.includes("PETGフィラメントの保管"),
+		);
+		expect(replies).toEqual([
+			expect.objectContaining({
+				text: "防湿容器に乾燥剤と一緒に入れて保管し、湿ったら乾燥機で乾かす。",
+				displayText: expect.stringContaining(
+					"[メーカーの案内](https://example.com/petg)",
+				),
+			}),
+		]);
+		expect(replies[0]?.displayText).toContain("65℃前後");
+		const main = await (await h.request("/api/conversations/main")).json();
+		expect(main.messages).toEqual([]);
 	} finally {
 		await h.close();
 	}

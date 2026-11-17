@@ -259,12 +259,20 @@ export function ManagedLibrary(
 				{uncertain.map((o) => (
 					<div key={o.id} className="ds-markdown-file-error" role="status">
 						管理操作の結果が未確認です。変更要求は再送していません。
-						<button disabled={pending} onClick={() => props.onCheck?.(o.id)}>
+						<button
+							disabled={pending}
+							onClick={() => void props.onCheck?.(o.id)}
+						>
 							結果を確認
 						</button>
 					</div>
 				))}
 				<ManagedLibraryTable
+					key={
+						files?.sort === "updated-desc"
+							? JSON.stringify([files.namespace, files.path])
+							: undefined
+					}
 					{...props}
 					work={work}
 					query={query}

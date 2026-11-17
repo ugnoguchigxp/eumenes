@@ -24,6 +24,8 @@ const codes = new Set([
 	"unauthorized",
 	"forbidden",
 	"invalid_request",
+	"invalid_cursor",
+	"invalid_pagination",
 	"payload_too_large",
 	"unavailable",
 	"wiki_api_retired",

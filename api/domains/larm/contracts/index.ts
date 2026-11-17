@@ -38,7 +38,9 @@ import type {
 	NativeTool,
 	NativeToolCall,
 } from "../../../infrastructure/chat-stream";
+import type { ObserveModelInput } from "../../../infrastructure/model-input";
 export type LarmCallOptions = {
+	observeInput?: ObserveModelInput;
 	/** Host-owned independent control; separate connection/lane, no cross-agent preemption. */
 	independent?: true;
 	/** Host agent identity, independent of LARM connection ids and Provider credentials. */

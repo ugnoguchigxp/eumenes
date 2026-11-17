@@ -70,6 +70,7 @@ import {
 } from "./conversation-input";
 import { createContextKeeper, type KeeperInference } from "./context-keeper";
 import { revokeExecutionNotice } from "./execution-notices";
+import { createContextInputs } from "./context-inputs";
 import type { MusicPort } from "../contracts/music";
 import type { ImagePort } from "../contracts/image";
 import type { ObjectRecognitionPort } from "../contracts/object-recognition";
@@ -81,6 +82,7 @@ function registerCorrectionHook(deps: DialogueDeps) {
 		const found = deps.conversation.messageInTransaction(db, messageId);
 		if (!found) return;
 		const { message } = found;
+		deps.contextInputs?.invalidate();
 		const text =
 			message.role === "user"
 				? withAttachmentNotes(message.text, message.attachments)
@@ -128,6 +130,7 @@ function registerChangeHooks(
 		work.dropRunResultsInTransaction(db, runId),
 	);
 	registerCorrectionHook(deps);
+	deps.conversation.addRetractHook?.(() => deps.contextInputs?.invalidate());
 	registerForgetHook(deps);
 }
 
@@ -138,6 +141,7 @@ function registerChangeHooks(
  */
 function registerForgetHook(deps: DialogueDeps) {
 	deps.memory?.registerForgetPurge?.((db, purge) => {
+		deps.contextInputs?.invalidate();
 		forgetCollaborationState(db, purge.messageIds);
 		forgetObservations(db, purge.messageIds);
 		const changed = new Set(
@@ -251,8 +255,10 @@ export function createDialogueService({
 		store,
 		toolchains,
 	} = deps;
-	if (debugDiagnostics)
+	if (debugDiagnostics) {
+		deps.contextInputs = createContextInputs(deps, debugDiagnostics);
 		deps.debugDiagnostics = createDebugDiagnostics(deps, debugDiagnostics);
+	}
 	const progress = createProgress(deps);
 	const intake = createIntake(deps);
 	// Handlers read `deps.interactions`, so it exists before any is registered.
@@ -336,6 +342,7 @@ export function createDialogueService({
 		/** The diagnostic text of a failed run (`GET /api/runs/:id/error-report`). */
 		errorReport,
 		debugDiagnostics: deps.debugDiagnostics,
+		contextInputs: deps.contextInputs,
 		promptTarget: intake.promptTarget,
 		progress: progress.progress,
 		subscribeProgress: progress.subscribeProgress,
@@ -515,6 +522,7 @@ export function createDialogueService({
 		/** Runs are stopped by the queue's own shutdown; nothing is owned here. */
 		async close() {
 			deps.debugDiagnostics?.close();
+			deps.contextInputs?.close();
 			keeper?.close();
 			await agentSync.close();
 			progress.close();

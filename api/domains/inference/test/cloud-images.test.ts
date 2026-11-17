@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import sharp from "sharp";
+import type { ModelInput } from "../../../infrastructure/model-input";
 import { cloudRequest, type CloudEnv } from "../service/cloud";
 import { cloudImages } from "../service/cloud-images";
 import { inputImages } from "./image-input.fixture";
@@ -49,6 +50,7 @@ const row = { purpose: "llm", contextPolicy: "exact" } as RequestRow;
 
 test("cloud HTTP sends ordered native image parts, converts BMP pixels, and omits internal fields", async () => {
 	const messages = await input();
+	const captures: ModelInput[] = [];
 	let sent:
 		{ messages: Array<{ content: unknown; images?: unknown }> } | undefined;
 	const env = {
@@ -72,12 +74,28 @@ test("cloud HTTP sends ordered native image parts, converts BMP pixels, and omit
 			resource,
 			AbortSignal.timeout(5000),
 			"a",
+			undefined,
+			{ observeInput: (input) => captures.push(input) },
 		),
 	).toBe("answer");
 	const content = sent!.messages[1]!.content as Array<{
 		type: string;
 		image_url?: { url: string };
 	}>;
+	expect(captures[0]).toMatchObject({
+		boundary: "cloud-http",
+		omittedMessages: 0,
+		messages: [
+			{ role: "system", content: sent!.messages[0]!.content },
+			{ role: "user", content: "compare" },
+		],
+	});
+	expect(captures[0]?.messages[1]?.images?.map(({ mime }) => mime)).toEqual([
+		"image/jpeg",
+		"image/png",
+		"image/png",
+	]);
+	expect(JSON.stringify(captures)).not.toMatch(/base64|fixture-key/);
 	expect(content.map((p) => p.type)).toEqual([
 		"text",
 		"image_url",

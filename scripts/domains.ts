@@ -29,6 +29,7 @@ export const domains = {
 		web: "web/src/domains/collaboration",
 		components: null,
 		integrationTests: [
+			"api/application/collaboration/collaboration-close.test.ts",
 			"api/application/collaboration/collaboration-review.test.ts",
 		],
 		depends: { api: [], web: [], test: [] },

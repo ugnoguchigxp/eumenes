@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { Hono } from "hono";
 import { createChatSession } from "../../cli/chat-session";
 import { conversationClient } from "../../client/conversation";
 import { dialogueClient } from "../../client/dialogue";
@@ -6,6 +7,13 @@ import { eventsClient } from "../../client/events";
 import type { Transport } from "../../client/transport";
 import { harness } from "./toolchain/toolchain.fixture";
 import { waitFor } from "../infrastructure/wait-for";
+import { run as runCommand } from "../../cli/commands/run";
+import type { CliArgs, CliIo } from "../../cli/commands/types";
+import { registerDialogue } from "../domains/dialogue";
+import {
+	choice,
+	setup as dialogueFixture,
+} from "../domains/dialogue/test/generation.fixture";
 
 function connect(app: Awaited<ReturnType<typeof harness>>["app"]) {
 	const transport: Transport = {
@@ -32,6 +40,50 @@ function connect(app: Awaited<ReturnType<typeof harness>>["app"]) {
 		...eventsClient(transport),
 	};
 }
+
+test("CLI run --context and Web read the same selected input over the run API", async () => {
+	const fixture = await dialogueFixture({
+		debugDiagnostics: { enabled: () => true },
+	});
+	try {
+		fixture.state.steps.push(
+			choice({ choice: "none" }),
+			{ calls: [{ name: "read_history", args: { query: "fixture" } }] },
+			{ text: "完了しました。" },
+		);
+		const run = await fixture.say("履歴を確認してください。");
+		const app = new Hono();
+		registerDialogue(app, fixture.dialogue);
+		const client = connect(app);
+		const online = await client.runContext(run.id);
+		const seen: unknown[] = [];
+		const args = {
+			command: "run",
+			positional: [run.id],
+			context: true,
+			json: true,
+		} as CliArgs;
+		const io: CliIo = {
+			client: client as CliIo["client"],
+			show: (value) => {
+				seen.push(value);
+			},
+			error: () => {},
+		};
+		expect(await runCommand(args, io)).toBe(0);
+		expect(seen[0]).toEqual({
+			...online,
+			capture: await client.contextCapture(run.id, online.preferredId!),
+		});
+		expect(await runCommand({ ...args, contextCall: 1 }, io)).toBe(0);
+		expect(seen[1]).toEqual({
+			...online,
+			capture: await client.contextCapture(run.id, online.captures[0]!.id),
+		});
+	} finally {
+		await fixture.close();
+	}
+});
 
 // Exercise real HTTP handlers and SSE streams in memory: no listener or product server is started.
 test("CLI and Web read the same persisted utterances and full answers through the existing APIs and change stream", async () => {

@@ -95,6 +95,12 @@ export interface BackgroundControl {
  * `auxiliary` (default): a one-shot call.
  */
 export type CallSession = {
+	/** Diagnostic only: observes the input at the adapter's send boundary. */
+	observeInput?: (record: {
+		inferenceId: string;
+		attemptId: string;
+		input: import("../../../infrastructure/model-input").ModelInput;
+	}) => void;
 	/** Host control on its own connection and admission lane; neither yields nor preempts other agents. */
 	independent?: true;
 	/** Logical owner of the LARM session. A new history branch has a different branchId. */

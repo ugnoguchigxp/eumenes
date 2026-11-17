@@ -31,6 +31,8 @@ const fresh = args.includes("--fresh");
 const stable = args.includes("--stable");
 const readPages = args.includes("--read-pages");
 const errorReport = args.includes("--error-report");
+const context = args.includes("--context");
+let contextCall: number | undefined;
 let explicitRequestId: string | undefined;
 let conversationId = "main";
 let toolchainId: string | undefined;
@@ -45,6 +47,14 @@ let historyAfter: number | undefined;
 const positional: string[] = [];
 for (let i = 0; i < args.length; i++) {
 	const value = args[i];
+	if (value === "--call") {
+		contextCall = Number(args[++i]);
+		if (!Number.isSafeInteger(contextCall) || contextCall < 1) {
+			console.error("--call requires a positive input number");
+			process.exit(2);
+		}
+		continue;
+	}
 	if (value === "--with-embeddings") {
 		withEmbeddings = true;
 		continue;
@@ -75,6 +85,7 @@ for (let i = 0; i < args.length; i++) {
 			"--stable",
 			"--read-pages",
 			"--error-report",
+			"--context",
 		].includes(value ?? "")
 	)
 		continue;
@@ -183,6 +194,13 @@ if (errorReport && command !== "run") {
 	console.error("--error-report is an option of run");
 	process.exit(2);
 }
+if (
+	(context && (command !== "run" || errorReport)) ||
+	(contextCall !== undefined && !context)
+) {
+	console.error("Use run <id> --context [--call <number>] [--json]");
+	process.exit(2);
+}
 const url = process.env.EUMENES_URL ?? "http://127.0.0.1:8787";
 let client: ReturnType<typeof createClient>;
 try {
@@ -232,6 +250,8 @@ async function main(): Promise<number> {
 		stable,
 		readPages,
 		errorReport,
+		context,
+		contextCall,
 		explicitRequestId,
 		conversationId,
 		toolchainId,

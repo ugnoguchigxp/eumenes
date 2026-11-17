@@ -31,7 +31,7 @@ import { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
 import { createSchedulerDiagnostics } from "./scheduler/scheduler-diagnostics";
 import { configureTaskExecution } from "./toolchain/task-execution-port";
-import { forgetPursuitReports } from "../domains/pursuit";
+import { forgetRetiredResearch } from "./pursuit/forget-research";
 import { toolchainForgetPurge } from "./toolchain/toolchain-forget";
 import { createSearchCheck } from "./toolchain/toolchain-search-check";
 import { taskMediaPorts } from "./toolchain/task-media-execution";
@@ -450,7 +450,7 @@ export async function buildServices(
 	stewardAssembly.attachDialogue(dialogue);
 	memory.registerForgetPurge(toolchainForgetPurge(toolchain));
 	memory.registerForgetPurge((db, purge) => {
-		forgetPursuitReports(
+		forgetRetiredResearch(
 			db,
 			purge.messageIds,
 			Date.now(),

@@ -9,7 +9,7 @@ import { Model3dViewer } from "../model3d/Model3dViewer";
 import { Model3dThumbnail } from "../model3d/Model3dThumbnail";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteLibraryImage } from "../../media/use-image-library";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ArtifactDefinitionV1 } from "../../../../api/domains/capabilities/contracts";
 import type { EumenesClient } from "../../../../client";
 import { queryRoots } from "../../queryKeys";
@@ -24,6 +24,7 @@ import {
 	useDraftViews,
 } from "./document-hooks";
 import { dirtyEntries } from "./documents";
+import { genericWebAdapter } from "./generic-adapter";
 import { toolchainArtifactsQuery } from "./launcher";
 import { useAnswer, useOpenQuestion } from "./questions";
 import { useScreenDispatch } from "./screen-dispatch";
@@ -52,6 +53,13 @@ export type ToolchainArtifactHostProps = {
 	/** Opens the registered artifact with this id (a navigate binding); false when unknown. */
 	onNavigate?: (artifactId: string) => Promise<boolean> | boolean;
 	conversationId?: string;
+	/**
+	 * Loads the domain screen for this artifact. Absent when `adapters.get` already
+	 * returns the screen, including the generic one.
+	 */
+	prepareAdapter?: (
+		ref: string,
+	) => Promise<"ready" | "generic" | "unavailable">;
 };
 
 const noop = () => {};
@@ -99,6 +107,22 @@ export function ToolchainArtifactHost(props: ToolchainArtifactHostProps) {
 			client.toolchainArtifact(artifactRevisionId, signal),
 		staleTime: Number.POSITIVE_INFINITY,
 	});
+	const adapterRef = detail.data?.artifact.sourceBindings[0]?.adapterRef;
+	const [prepared, setPrepared] = useState<{
+		ref: string;
+		result: "ready" | "generic" | "unavailable";
+	} | null>(null);
+	useEffect(() => {
+		if (!adapterRef || !props.prepareAdapter) return;
+		if (props.adapters.get(adapterRef)) return;
+		let cancel = false;
+		void props.prepareAdapter(adapterRef).then((result) => {
+			if (!cancel) setPrepared({ ref: adapterRef, result });
+		});
+		return () => {
+			cancel = true;
+		};
+	}, [adapterRef, props.adapters, props.prepareAdapter]);
 	useScreenObservation(
 		props.artifactId,
 		props.visible !== false && !detail.isSuccess,
@@ -115,8 +139,18 @@ export function ToolchainArtifactHost(props: ToolchainArtifactHostProps) {
 				画面の定義を取得できません。接続を確認してください。
 			</Message>
 		);
-	const adapterRef = detail.data.artifact.sourceBindings[0]?.adapterRef;
-	const adapter = adapterRef ? props.adapters.get(adapterRef) : undefined;
+	const immediate = adapterRef ? props.adapters.get(adapterRef) : undefined;
+	const preparation =
+		prepared?.ref === adapterRef ? prepared.result : undefined;
+	if (!immediate && props.prepareAdapter && adapterRef && !preparation)
+		return <Message>画面を読み込んでいます</Message>;
+	const adapter =
+		immediate ??
+		(preparation === "generic"
+			? genericWebAdapter
+			: preparation === "ready" && adapterRef
+				? props.adapters.get(adapterRef)
+				: undefined);
 	// The first source's adapter drives the screen; sources of other adapters are only read.
 	if (!adapter)
 		return <Message alert>この画面はこのアプリでは表示できません。</Message>;

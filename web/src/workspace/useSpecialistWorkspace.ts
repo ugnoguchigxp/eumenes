@@ -14,7 +14,7 @@ import {
 	useSpecialistSession,
 } from "../domains/dialogue";
 import { describeError } from "../errorMessages";
-import { UI_STUDIO_ARTIFACT_ID } from "../domains/ui-compositions/toolchain-adapter";
+import { UI_STUDIO_ARTIFACT_ID } from "../domains/ui-compositions/artifact-id";
 import {
 	artifactIdOf,
 	useToolchainArtifacts,

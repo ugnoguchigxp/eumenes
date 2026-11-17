@@ -109,10 +109,111 @@ test("B sends ordered steps to the imported planner and two actual commands comp
 			JSON.parse(JSON.parse(c).at(-1).content),
 		);
 		expect(packets.every((p) => p.originalRequest === request)).toBe(true);
+		expect(packets.map((p) => p.request)).toEqual([
+			"一つ目のタイマー\n期待する結果: 保存済みタイマー",
+			"二つ目のタイマー\n期待する結果: 保存済みタイマー",
+		]);
+		expect(packets[1]!.references).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					kind: "result",
+					preview: expect.stringContaining("pipeline timer 1"),
+				}),
+			]),
+		);
+		expect(h.toolchain.agents.executions.list("main")).toHaveLength(1);
 		await waitFor(() => h.reported().length > 0, { timeout: 5000 });
 		expect(h.reported()).toContain("completed");
 		expect((await h.request("/api/pipelines/publish", {})).status).toBe(404);
 		expect((await h.request("/api/pipelines")).status).toBe(404);
+	} finally {
+		await h.close();
+	}
+});
+
+test("a failed first pipeline step does not run the dependent step", async () => {
+	const first = "一つ目のタイマーを作って";
+	const second = "二つ目のタイマーを作って";
+	const request = `${first}、終わったら${second}`;
+	let commands = 0;
+	const h = await harness({
+		pipelines: true,
+		timers: true,
+		discoveryTarget: () => "execute_pipeline",
+		structure: () => ({
+			requests: [
+				{ text: first, target: "一つ目のタイマー", inputs: [], after: [] },
+				{ text: second, target: "二つ目のタイマー", inputs: [], after: [0] },
+			],
+		}),
+		compose: (messages) => {
+			const packet = JSON.parse(messages.at(-1)!.content);
+			return {
+				status: "ready",
+				definition: {
+					request: packet.request,
+					steps: [
+						{
+							id: "first",
+							bundle: "timers.manage",
+							task: "一つ目のタイマー",
+							from: ["request"],
+							result: "保存済みタイマー",
+						},
+						{
+							id: "second",
+							bundle: "timers.manage",
+							task: "二つ目のタイマー",
+							from: ["first"],
+							result: "保存済みタイマー",
+						},
+					],
+					output: { from: ["second"], deliver: "結果を表示" },
+				},
+			};
+		},
+		command: () => {
+			commands++;
+			return JSON.stringify({
+				action: "invoke",
+				tool: "timer.missing",
+				arguments: {},
+			});
+		},
+	});
+	try {
+		const source = await h.dialogue.submit({
+			requestId: crypto.randomUUID(),
+			conversationId: "main",
+			text: request,
+		});
+		await waitFor(() => h.dialogue.get(source.id)?.status === "completed", {
+			timeout: 5000,
+		});
+		await waitFor(
+			() => h.toolchain.agents.executions.list("main")[0]?.status === "partial",
+			{ timeout: 5000 },
+		);
+		const parent = h.toolchain.agents.executions.list("main");
+		expect(parent).toHaveLength(1);
+		expect(parent[0]).toMatchObject({
+			status: "partial",
+			result: {
+				status: "partial",
+				code: "toolchain_command_tool_unknown",
+				fulfilled: [],
+			},
+		});
+		expect(commands).toBe(1);
+		expect(h.commandContexts).toHaveLength(1);
+		const steps = h.store.read((db) =>
+			db.query("SELECT input_json FROM agent_execution_steps").all(),
+		) as Array<{ input_json: string }>;
+		expect(steps.map((row) => JSON.parse(row.input_json).request)).toEqual([
+			"一つ目のタイマー\n期待する結果: 保存済みタイマー",
+		]);
+		const timers = await (await h.request("/api/timers")).json();
+		expect(timers.items).toEqual([]);
 	} finally {
 		await h.close();
 	}
@@ -130,8 +231,18 @@ for (const operation of ["answer", "cancel"] as const) {
 			timers: true,
 			discoveryTarget: () => "execute_pipeline",
 			structure: (messages) => {
-				structures++;
 				const packet = JSON.parse(messages.at(-1)!.content);
+				// The opening turn has no pending question. Its judgment stays one request; the
+				// counted call is the reply, identified by the prompt's pending and controls.
+				if (!packet.pending?.length && !packet.controls?.length) {
+					expect(packet.text).toBe(request);
+					return {
+						requests: [
+							{ text: packet.text, target: null, inputs: [], after: [] },
+						],
+					};
+				}
+				structures++;
 				expect(packet.text).toBe(reply);
 				expect(packet.pending).toEqual([
 					{ ref: "t1.answer", title: request, question: "何秒にしますか？" },

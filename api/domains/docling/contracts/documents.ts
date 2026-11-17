@@ -16,6 +16,8 @@ export const documentCapabilities = z.object({
 		.refine((v) => v.includes("GET") && v.includes("PUT")),
 	delete: z.unknown().optional(),
 	libraryPath: z.unknown().optional(),
+	updatedAt: z.unknown().optional(),
+	librarySort: z.unknown().optional(),
 	foldersPath: z.unknown().optional(),
 	operationsPath: z.unknown().optional(),
 	libraryOperations: z.unknown().optional(),

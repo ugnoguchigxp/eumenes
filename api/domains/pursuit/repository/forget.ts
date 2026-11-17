@@ -1,24 +1,20 @@
 import type { Database } from "bun:sqlite";
 
-/** Erases retired research when the message that produced it is forgotten. */
+/** Erases the retired research runs Dialogue named. A second call finds nothing left to erase. */
 export function forgetPursuitReports(
 	db: Database,
-	messageIds: readonly string[],
+	runIds: readonly string[],
 	now: number,
 	forgetWeb: (id: string) => void,
 	revokeNotice: (id: string) => void,
 ) {
-	if (!messageIds.length) return;
+	if (!runIds.length) return;
 	const parents = db
 		.query<{ id: string; core_id: string | null }, [string]>(
-			`SELECT DISTINCT p.id, p.core_id FROM pursuit_runs p
-		JOIN dialogue_work w ON w.source_ref=p.id AND w.toolchain_id='web.research'
-		WHERE p.data_json IS NOT NULL AND EXISTS (
-			SELECT 1 FROM json_each(w.message_ids_json) m
-			WHERE m.value IN (SELECT value FROM json_each(?))
-		)`,
+			`SELECT id, core_id FROM pursuit_runs
+			WHERE data_json IS NOT NULL AND id IN (SELECT value FROM json_each(?))`,
 		)
-		.all(JSON.stringify(messageIds));
+		.all(JSON.stringify(runIds));
 	for (const parent of parents) {
 		const cores = db
 			.query<{ pursuit_id: string | null }, [string, string | null]>(

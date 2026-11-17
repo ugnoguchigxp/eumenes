@@ -1,6 +1,12 @@
 import { backgroundInput } from "./background-input";
 import type { Database } from "bun:sqlite";
 import { systemContext } from "../../../infrastructure/system-context";
+import {
+	copyInputOrigins,
+	markInput,
+	prependInput,
+	type InputOrigin,
+} from "../../../infrastructure/model-input";
 import { systemCopyCheck } from "./conversation-output";
 import {
 	estimateTextTokens,
@@ -133,6 +139,7 @@ export function recentMessages(
 	imageNotes: ReadonlyMap<string, string> = new Map(),
 	/** The agency serves the replies: the tools a reply called and what they answered stay in the history. */
 	withCalls = false,
+	originOf?: (utterance: Utterance) => InputOrigin,
 ): ChatMessage[] {
 	const messages: ChatMessage[] = [];
 	for (const u of utterances) {
@@ -144,6 +151,7 @@ export function recentMessages(
 				.join("\n"),
 		);
 		const calls = withCalls && role === "assistant" ? agendaCalls(u) : [];
+		const origin = originOf?.(u);
 		if (calls.length) {
 			// The reply's own tool calls come back as its history: it sees what it did (the package's rule).
 			const ids = calls.map((_, k) =>
@@ -166,7 +174,8 @@ export function recentMessages(
 					tool_call_id: ids[k]!,
 				} as unknown as ChatMessage),
 			);
-			messages.push({ role, content: text });
+			const words: ChatMessage = { role, content: text };
+			messages.push(origin ? markInput(words, origin) : words);
 			continue;
 		}
 		const last = messages.at(-1);
@@ -174,9 +183,14 @@ export function recentMessages(
 			last &&
 			last.role === role &&
 			!(last as { tool_calls?: unknown }).tool_calls
-		)
+		) {
+			const from = last.content.length + 1;
 			last.content += `\n${text}`;
-		else messages.push({ role, content: text });
+			if (origin) markInput(last, origin, from);
+		} else {
+			const words: ChatMessage = { role, content: text };
+			messages.push(origin ? markInput(words, origin) : words);
+		}
 	}
 	return messages;
 }
@@ -355,6 +369,7 @@ export type ConversationPrefix = {
 	messages: ChatMessage[];
 	/** `## Memory` when no recent conversation follows it: the last message starts with it instead. */
 	carry: string | null;
+	carryInput?: ChatMessage;
 	cut: ConversationCut | null;
 	recent: Utterance[];
 	/** When the newest utterance not waiting for an answer was said, behind the cut too (the gap `## State` names). */
@@ -387,6 +402,7 @@ export function conversationPrefixFrom(
 		window: WindowSnapshot | null;
 		pending: ReadonlySet<string>;
 		requireProvenance?: boolean;
+		traceInput?: boolean;
 	},
 ): ConversationPrefix {
 	const store = deps.conversation.input;
@@ -457,20 +473,15 @@ export function conversationPrefixFrom(
 		(u) =>
 			u.speaker === "user" && !(u.messageId && input.pending.has(u.messageId)),
 	);
-	const { lines, ids } = memoryLines(
-		(input.window?.profile.items ?? []).filter((item) => {
-			if (!deps.agency?.isCurrentInputInTransaction) return true;
-			const source = deps.memory?.referenceInputs.captureInTransaction(tx, {
-				itemIds: [item.id],
-				itemRevisions: { [item.id]: item.revision },
-			}) ?? { sources: [`memory:${item.id}`], complete: false };
-			return deps.agency.isCurrentInputInTransaction(
-				tx,
-				source,
-				conversationId,
-			);
-		}),
-	);
+	const profile = (input.window?.profile.items ?? []).filter((item) => {
+		if (!deps.agency?.isCurrentInputInTransaction) return true;
+		const source = deps.memory?.referenceInputs.captureInTransaction(tx, {
+			itemIds: [item.id],
+			itemRevisions: { [item.id]: item.revision },
+		}) ?? { sources: [`memory:${item.id}`], complete: false };
+		return deps.agency.isCurrentInputInTransaction(tx, source, conversationId);
+	});
+	const { lines, ids } = memoryLines(profile);
 	// Always there before a recent conversation, so the conversation never opens with the agent's message.
 	const memory = section(
 		INPUT_HEADINGS.memory,
@@ -487,16 +498,48 @@ export function conversationPrefixFrom(
 		if (references.length)
 			imageNotes.set(utterance.messageId, imageReferenceText(references));
 	}
-	const conversation = recentMessages(recent, imageNotes, serves);
+	const conversation = recentMessages(
+		recent,
+		imageNotes,
+		serves,
+		input.traceInput
+			? (u) => ({
+					kind: "history",
+					at: u.at,
+					id: u.messageId ?? undefined,
+					...(u.messageId ? inputMessageRevision(deps, tx, u.messageId) : {}),
+				})
+			: undefined,
+	);
 	const messages: ChatMessage[] = [{ role: "system", content: input.system }];
+	const memoryFrame: ChatMessage = { role: "user", content: memory ?? "" };
+	if (input.traceInput) {
+		markInput(messages[0]!, { kind: "system" });
+		let from = INPUT_HEADINGS.memory.length + 1;
+		for (const [index, line] of lines.entries()) {
+			const item = profile.find((entry) => entry.id === ids[index]);
+			markInput(
+				memoryFrame,
+				{
+					kind: "memory",
+					id: item?.id,
+					revision: item ? String(item.revision) : undefined,
+				},
+				from,
+				from + line.length,
+			);
+			from += line.length + 1;
+		}
+		if (!lines.length) markInput(memoryFrame, { kind: "memory" });
+	}
 	if (memory && conversation.length) {
 		// A conversation that opens with the user's words carries `## Memory` in that first message.
-		if (conversation[0]!.role === "user")
-			conversation[0] = {
-				...conversation[0]!,
-				content: `${memory}\n\n${conversation[0]!.content}`,
-			};
-		else messages.push({ role: "user", content: memory });
+		if (conversation[0]!.role === "user") {
+			const first = conversation[0]!;
+			conversation[0] = input.traceInput
+				? prependInput(first, memoryFrame)
+				: { ...first, content: `${memory}\n\n${first.content}` };
+		} else messages.push(memoryFrame);
 	}
 	messages.push(...conversation);
 	// A conversation resumed after a gap keeps nothing before it, but the gap is still the time since the last words.
@@ -514,6 +557,9 @@ export function conversationPrefixFrom(
 	return {
 		messages,
 		carry: conversation.length || !lines.length ? null : memory,
+		...(input.traceInput && !conversation.length && lines.length
+			? { carryInput: memoryFrame }
+			: {}),
 		cut,
 		recent,
 		lastAt: last ? Date.parse(last.at) : null,
@@ -546,11 +592,24 @@ export function withLastMessage(
 	const messages = prefix.messages.map((message) => ({ ...message }));
 	const last = messages.at(-1);
 	if (last && last.role === "user" && messages.length > 1) {
+		const from = last.content.length + 2;
 		last.content = `${last.content}\n\n${content}`;
 		Object.assign(last, extra);
+		if (prefix.carryInput) copyInputOrigins(last, prefix.carryInput, from);
 		return messages;
 	}
-	return [...messages, { role: "user", content, ...extra }];
+	const added: ChatMessage = { role: "user", content, ...extra };
+	if (prefix.carryInput) copyInputOrigins(added, prefix.carryInput, 0);
+	return [...messages, added];
+}
+
+export function inputMessageRevision(
+	deps: DialogueDeps,
+	db: Database,
+	id: string,
+) {
+	const source = deps.conversation.sourceInTransaction(db, id);
+	return source.state === "available" ? { revision: source.revision } : {};
 }
 
 /** The pending user messages, by id: what `## User` shows and the recent conversation leaves out. */

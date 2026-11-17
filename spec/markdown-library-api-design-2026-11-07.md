@@ -51,3 +51,9 @@
 実装済み。文書画面40件（追加5件）、Web接続16件、Docling契約・Markdown/Artifact結合48件が成功。旧・拡張capabilitiesの機能判定、正確なETag、本文・復元データの保持、競合・結果不明の試験を再実行した。型、対象lint・書式・サイズ、DesignSystem/Webビルドも成功。対象domain verifyは既存の保管試験の登録問題でinventory停止。[検査結果](../verification-reports/runs/2026-11-09T00-31-05-141Z-fca3df7a-6486-41e7-bdfe-07046f1a1415/report.json)
 
 11月9日9時26分（JST）の実接続はGET/PUTのみ。文書一覧9件と1件の読込み・digestをGETで確認し、Doclingは前後とも停止状態だった。画面変更の反映後、LARMの機能再取得で拡張一覧・移動が有効になる。実環境での移動受入は配備後に、検証専用文書で単件・一括の移動、一覧への反映、移動後のID・本文・復元データの一致を確認する。
+
+## 更新日時順の一覧（2026-11-17）
+
+LARMの本番契約 `larm.docling-files.v1` で `updatedAt === true` かつ `librarySort` に `updated-desc` があるとき、Markdownのフォルダー表示は `sort=updated-desc` を指定する。LARMは更新日時の降順、同日時はID昇順、日時なしは最後にID昇順で並べてからページ分割する。画面は初期表示と続きの読み込みでこの順序を使う。日時は既存の日本時間表示を使う。列見出しで選んだ表示順は読み込み済みの行に適用する。
+
+続きは同じnamespace・path・sortと返されたcursorで取得する。ページのETagが変わった場合やcursorが拒否された場合は、先頭ページを読み直して一覧を置き換える。旧環境ではsortを省略し、従来の一覧を使う。検証は旧・新capabilities、APIの引数とcursorエラー、ページの継続・再取得、日時と順序の画面表示、本番で100件を超えるフォルダーの読み取りを対象とする。

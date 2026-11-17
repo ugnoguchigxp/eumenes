@@ -4,6 +4,7 @@ import type { RouterCard } from "eumenes_router/sqlite";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
+import { inputMessages } from "../../../infrastructure/model-input";
 import type { ToolchainCard, ToolchainRuntimeMeta } from "../../capabilities";
 import {
 	createContinuityService,
@@ -483,6 +484,8 @@ export async function setup(options: SetupOptions = {}) {
 	};
 	const captured = new Map<string, unknown>();
 	const accepted = new Set<string>();
+	const acceptedAttempts = new Set<string>();
+	const finishedAttempts = new Map<string, "succeeded" | "failed">();
 	const clock = () => new Date(Date.now() + state.offsetMs).toISOString();
 	const receipt = (requestId: string, step: Step): Receipt => ({
 		requestId,
@@ -545,7 +548,17 @@ export async function setup(options: SetupOptions = {}) {
 			state.policies.push(`${requestId}:${policy}`);
 		},
 		validateReceiptInTransaction: () => state.receiptAllowed,
-		acceptInTransaction: () => state.acceptAllowed,
+		acceptInTransaction: (_db: unknown, result: Receipt) => {
+			if (state.acceptAllowed && options.debugDiagnostics)
+				acceptedAttempts.add(result.attemptId);
+			return state.acceptAllowed;
+		},
+		usageOfInTransaction: (_db: unknown, result: Receipt) => {
+			const status = finishedAttempts.get(result.attemptId);
+			return status
+				? { status, accepted: acceptedAttempts.has(result.attemptId) ? 1 : 0 }
+				: null;
+		},
 		answer: async () => {
 			throw new Error("unexpected_answer");
 		},
@@ -568,11 +581,22 @@ export async function setup(options: SetupOptions = {}) {
 			// The model's answer is fixed when the call is made; the gate only holds its delivery.
 			const step = state.steps.shift();
 			if (!step) throw new Error("fixture_step_missing");
+			const result = receipt(requestId, step);
+			session?.observeInput?.({
+				inferenceId: requestId,
+				attemptId: result.attemptId,
+				input: { boundary: "larm", messages: inputMessages(messages), tools },
+			});
 			if (state.gate) await state.gate;
 			signal.throwIfAborted();
+			if (session?.observeInput)
+				finishedAttempts.set(
+					result.attemptId,
+					step.fail ? "failed" : "succeeded",
+				);
 			if (step.fail) throw new Error(step.fail);
 			if (step.text) delta?.(step.text);
-			return receipt(requestId, step);
+			return result;
 		},
 		...options.debugInference,
 	} as unknown as InferencePort;

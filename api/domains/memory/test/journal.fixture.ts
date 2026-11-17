@@ -1,2 +1,2 @@
-/** Integration tests use the production appender without making it a product API. */
-export { appendJournal } from "../service/journal";
+/** Integration tests use the production journal without making it a product API. */
+export { appendJournal, readJournal } from "../service/journal";

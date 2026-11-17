@@ -10,6 +10,7 @@ import {
 	byId,
 	extendRunDeadline,
 	patchSession,
+	sessionById,
 	unfinishedSessionRuns,
 	type SessionRecord,
 } from "../repository";
@@ -132,11 +133,13 @@ export function sessionView(
 	tx: Database,
 	record: SessionRecord,
 ): SpecialistSession {
-	const work = deps.specialist?.workStateInTransaction(
-		tx,
-		record.adapterRef,
-		record.workRef,
-	);
+	const work = record.closeBlockedReason
+		? null
+		: deps.specialist?.workStateInTransaction(
+				tx,
+				record.adapterRef,
+				record.workRef,
+			);
 	return {
 		id: record.id,
 		conversationId: record.conversationId,
@@ -152,7 +155,8 @@ export function sessionView(
 		revision: record.revision,
 		epoch: record.epoch,
 		activeRunId: record.activeRunId,
-		dirty: work?.dirty ?? false,
+		// A stopped close cannot confirm whether the retained work is saved.
+		dirty: !!record.closeBlockedReason || (work?.dirty ?? false),
 		busy: work?.busy ?? false,
 		label: work?.label ?? record.label,
 		expiresAt: record.expiresAt,
@@ -165,6 +169,7 @@ export function sessionView(
 /** Whether ending with this reason requires the work to be clean (it was handed back or closed, not dropped). */
 const keepsSaved = (reason: SpecialistEndReason) =>
 	reason === "closed" || reason === "returned";
+const expiredCloseSource = new Error("source_session_expired");
 
 /**
  * End a session in the caller's transaction: stop the turn still going, end the domain's work and mark the
@@ -176,25 +181,41 @@ export function endSessionInTransaction(
 	record: SessionRecord,
 	reason: SpecialistEndReason,
 	except?: string,
+	automatic = false,
 ): { flush: string[]; runs: string[] } {
 	const port = deps.specialist!;
 	const flush: string[] = [];
 	const runs: string[] = [];
-	const cancelled = cancelSessionRuns(deps, tx, record.id, except);
-	flush.push(...cancelled.flush);
-	runs.push(...cancelled.runs);
-	const work = port.workStateInTransaction(
-		tx,
-		record.adapterRef,
-		record.workRef,
-	);
-	if (work)
-		port.endWorkInTransaction(
+	const releaseTurns = () => {
+		const cancelled = cancelSessionRuns(deps, tx, record.id, except);
+		flush.push(...cancelled.flush);
+		runs.push(...cancelled.runs);
+	};
+	const mode = keepsSaved(reason) ? "close" : "discard";
+	const ownedEnd =
+		automatic &&
+		(record.state === "closing" || sessionExpired(record, deps.clock()))
+			? port.endWorkAutomaticallyInTransaction?.(
+					tx,
+					record.adapterRef,
+					{ sessionId: record.id, workRef: record.workRef, mode },
+					releaseTurns,
+				)
+			: undefined;
+	if (ownedEnd && "blocked" in ownedEnd) throw expiredCloseSource;
+	let label = ownedEnd?.label ?? record.label;
+	if (!ownedEnd) {
+		releaseTurns();
+		const work = port.workStateInTransaction(
 			tx,
 			record.adapterRef,
 			record.workRef,
-			keepsSaved(reason) ? "close" : "discard",
 		);
+		if (work) {
+			port.endWorkInTransaction(tx, record.adapterRef, record.workRef, mode);
+			label = work.label;
+		}
+	}
 	patchSession(
 		tx,
 		record.id,
@@ -202,9 +223,11 @@ export function endSessionInTransaction(
 			state: "ended",
 			endReason: reason,
 			closingReason: null,
+			closeBlockedReason: null,
+			closeBlockedAt: null,
 			activeRunId: null,
 			pendingSwitch: null,
-			label: work?.label ?? record.label,
+			label,
 			bump: true,
 		},
 		deps.clock(),
@@ -224,32 +247,57 @@ export function endOrMarkClosing(
 	reason: SpecialistEndReason,
 	except?: string,
 ): { state: "ended" | "closing"; flush: string[]; runs: string[] } {
+	if (record.closeBlockedReason)
+		return { state: "closing", flush: [], runs: [] };
 	const savepoint = "dialogue_specialist_end";
 	tx.exec(`SAVEPOINT ${savepoint}`);
 	try {
-		const done = endSessionInTransaction(deps, tx, record, reason, except);
+		const done = endSessionInTransaction(
+			deps,
+			tx,
+			record,
+			reason,
+			except,
+			true,
+		);
 		tx.exec(`RELEASE ${savepoint}`);
 		return { state: "ended", ...done };
 	} catch (error) {
 		tx.exec(`ROLLBACK TO ${savepoint}`);
 		tx.exec(`RELEASE ${savepoint}`);
-		const code = safeCode(error, "close_failed");
-		log.warn("dialogue.specialist_close_failed", {
-			sessionId: record.id,
-			reason: code,
-			attempt: record.closeFailures + 1,
-		});
+		const stopped = error === expiredCloseSource;
+		const now = deps.clock();
+		const attempt = record.closeFailures + 1;
 		patchSession(
 			tx,
 			record.id,
 			{
 				state: "closing",
 				closingReason: reason,
-				closeFailures: record.closeFailures + 1,
-				bump: record.state !== "closing",
+				closeBlockedReason: stopped ? "source_session_expired" : null,
+				closeBlockedAt: stopped ? now : null,
+				closeFailures: attempt,
+				bump: stopped || record.state !== "closing",
 			},
-			deps.clock(),
+			now,
 		);
+		if (stopped) {
+			// The writer callback is synchronous. Verify the committed row after any outer rollback.
+			queueMicrotask(() => {
+				const saved = deps.store.read((db) => sessionById(db, record.id));
+				if (saved?.closeBlockedAt === now && saved.closeFailures === attempt)
+					log.warn("dialogue.specialist_close_retry_stopped", {
+						sessionId: record.id,
+						reason: "source_session_expired",
+						attempt,
+					});
+			});
+		} else
+			log.warn("dialogue.specialist_close_failed", {
+				sessionId: record.id,
+				reason: safeCode(error, "close_failed"),
+				attempt,
+			});
 		return { state: "closing", flush: [], runs: [] };
 	}
 }

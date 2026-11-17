@@ -157,6 +157,9 @@ export interface WorkDocumentAdapter {
  * its expiry and the conversation's addressee; the domain owns the draft and its history. Every
  * call runs inside the caller's writer transaction and is idempotent where noted.
  */
+export type SessionWorkEnd =
+	{ label?: string } | { blocked: "source_session_expired" };
+
 export interface SessionWorkAdapter {
 	/** Display name of the agent that takes over the conversation. */
 	agentLabel?: string;
@@ -170,6 +173,12 @@ export interface SessionWorkAdapter {
 	): SessionWorkState;
 	/** The work's current state, or null when it was ended. */
 	stateInTransaction(tx: Database, workRef: string): SessionWorkState | null;
+	/** Validate ownership before releasing turns, then finish work with lifecycle-only authority. */
+	endAutomaticallyInTransaction?(
+		tx: Database,
+		input: { sessionId: string; workRef: string; mode: "discard" | "close" },
+		releaseTurns: () => void,
+	): SessionWorkEnd;
 	/**
 	 * Whether `targetRef` names a saved item a session may start from now (the same set
 	 * `choicesInTransaction` draws from, without its 20-item cut).

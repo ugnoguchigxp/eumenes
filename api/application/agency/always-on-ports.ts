@@ -1,5 +1,7 @@
 import type { Database } from "bun:sqlite";
+import { markInput } from "../../infrastructure/model-input";
 import { runRespond, emotionName } from "eumenes-agency";
+import { z } from "zod";
 import {
 	agendaReplyMessages,
 	asData,
@@ -45,6 +47,11 @@ const AGENDA_TOOL_NAMES: ReadonlySet<string> = new Set([
 ]);
 /** Tool calls a reply may add for the agenda's own tools (the host's read tools keep theirs). */
 const AGENDA_TOOL_CALLS = 3;
+const preparationParameters = z.looseObject({
+	properties: z.looseObject({
+		request: z.looseObject({ type: z.literal("string") }),
+	}),
+});
 /** What a reply left for the pump (its tool calls, the messages a model call took) is kept this many replies. */
 const KEPT_REPLIES = 32;
 
@@ -141,12 +148,16 @@ export function createAgendaPorts(input: {
 		const state = built.find(
 			(m) => m.role === "user" && m.content.startsWith("<あなたの今の状態"),
 		);
-		const messages: AgentMessage[] = state
-			? [
-					...args.messages.slice(0, -1),
-					{ role: "user", content: state.content },
-					...args.messages.slice(-1),
-				]
+		const agencyState: AgentMessage | null = state
+			? { role: "user", content: state.content }
+			: null;
+		if (agencyState && args.traceInput)
+			markInput(agencyState, {
+				kind: "agency",
+				at: new Date(at).toISOString(),
+			});
+		const messages: AgentMessage[] = agencyState
+			? [...args.messages.slice(0, -1), agencyState, ...args.messages.slice(-1)]
 			: args.messages;
 		// What this reply is given rests in its input: the memory, the notes, and what the state cites.
 		remember(c.given, run.runId, [
@@ -162,14 +173,37 @@ export function createAgendaPorts(input: {
 		};
 		const own = createAgendaReplyTools(toolInput);
 		const hostNames = new Set(args.tools.tools.map((t) => t.name));
-		const offered = own.tools.filter(
-			(t) => !hostNames.has(t.name) && (!args.readOnly || t.name === READ_NOTE),
-		);
+		const offered = own.tools
+			.filter(
+				(t) =>
+					!hostNames.has(t.name) && (!args.readOnly || t.name === READ_NOTE),
+			)
+			.map((tool) => {
+				if (tool.name !== START_PREPARATION) return tool;
+				const parsed = preparationParameters.safeParse(tool.parameters);
+				if (!parsed.success) return tool;
+				const { properties } = parsed.data;
+				return {
+					...tool,
+					parameters: {
+						...parsed.data,
+						properties: {
+							...properties,
+							request: {
+								...properties.request,
+								description:
+									"利用者からの依頼は、今回の発言にある調査部分を対象・URL・条件ごと写す。指示語が指す対象と、利用者が今回、明示的に引き継いだ条件だけを過去の発言から補う。別件の目的や自分の仮説は足さない。自発的な調査は、調べる内容を具体的に書く。",
+							},
+						},
+					},
+				};
+			});
 		const offeredNames = new Set(offered.map((t) => t.name));
 		c.reply = { runId: run.runId, included: new Set(run.messageIds) };
 		let steer: ReturnType<AgendaAddedWords["begin"]> | null = null;
 		try {
-			if (!args.readOnly) steer = c.steering?.begin(run.runId) ?? null;
+			if (!args.readOnly)
+				steer = c.steering?.begin(run.runId, args.traceInput) ?? null;
 		} catch (error) {
 			// No steer for this reply: words sent meanwhile get a reply of their own.
 			log.warn("agency.steer_unavailable", {

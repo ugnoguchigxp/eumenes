@@ -1,4 +1,5 @@
 import type { Value } from "platejs";
+import type { LibraryActionResult } from "./library-types";
 export type MarkdownDocument = {
 	formatVersion: 1;
 	nodes: Value;
@@ -53,8 +54,8 @@ export type MarkdownWorkspaceProps = {
 	filesError?: string;
 	operations?: import("./library-types").LibraryOperation[];
 	onFiles?(namespace: string, path: string, cursor?: string): void;
-	onManage?(command: unknown, requestId: string): Promise<boolean>;
-	onCheck?(id: string): void;
+	onManage?(command: unknown, requestId: string): Promise<LibraryActionResult>;
+	onCheck?(id: string): Promise<LibraryActionResult>;
 	current: MarkdownCurrent | null;
 	documents: { id: string; title: string; updated_at?: number }[];
 	library: MarkdownLibraryEntry[];

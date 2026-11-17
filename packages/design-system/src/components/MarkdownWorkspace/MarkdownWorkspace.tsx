@@ -81,6 +81,7 @@ function EditableWorkspace(props: MarkdownWorkspaceProps) {
 	const selectionScope = JSON.stringify([
 		props.files?.namespace,
 		props.files?.path,
+		props.files?.sort,
 		props.files?.etag,
 	]);
 	const [fileSelection, setFileSelection] = useState({

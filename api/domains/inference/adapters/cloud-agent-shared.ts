@@ -30,6 +30,8 @@ export type AgentSessionCall = {
 	drop(): Promise<void>;
 };
 export type CloudAgentCall = {
+	observeInput?: import("../../../infrastructure/model-input").ObserveModelInput;
+	omittedMessages?: number;
 	onUsage?: (usage: import("./codex-usage").CodexUsage) => void;
 	kind: CloudAgentKind;
 	/** The saved connection and the attempt this call belongs to (log correlation only). */

@@ -16,6 +16,14 @@
 import type { SteeringInbox, SteeringTarget } from "eumenes-steer";
 import type { ReplyMessage, ReplyPort } from "eumenes-agency";
 import { addedWordsLine, type AgendaAddedWords } from "eumenes-agency/agenda";
+import { markInput } from "../../infrastructure/model-input";
+
+export type AgendaSteering = Omit<AgendaAddedWords, "begin"> & {
+	begin(
+		replyId: string,
+		traceInput?: true,
+	): ReturnType<AgendaAddedWords["begin"]>;
+};
 
 /** One conversation's steering: its replies run one at a time; `send` goes to the reply open now. */
 export function createAgendaSteering(input: {
@@ -26,14 +34,14 @@ export function createAgendaSteering(input: {
 	readonly now: () => number;
 	/** Target ids are `<prefix><replyId>`: the server's inbox serves every conversation. */
 	readonly targetPrefix: string;
-}): AgendaAddedWords {
+}): AgendaSteering {
 	let open: {
 		readonly target: SteeringTarget;
 		readonly taken: Set<string>;
 	} | null = null;
 
 	return {
-		begin(replyId) {
+		begin(replyId, traceInput) {
 			if (open) throw new Error("steer: a reply is open already");
 			const targetId = `${input.targetPrefix}${replyId}`;
 			const opened = input.inbox.open(targetId, "1");
@@ -56,9 +64,15 @@ export function createAgendaSteering(input: {
 									if (e.expiresAt <= input.now()) continue;
 									const text = input.read(e.sourceRef);
 									if (text === null) continue;
+									const message: ReplyMessage = {
+										role: "user",
+										content: addedWordsLine(text),
+									};
+									if (traceInput)
+										markInput(message, { kind: "user", id: e.sourceRef });
 									fresh.push({
 										id: e.sourceRef,
-										message: { role: "user", content: addedWordsLine(text) },
+										message,
 									});
 								}
 							const at = request.messages.length;

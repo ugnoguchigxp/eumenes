@@ -8,6 +8,8 @@ import {
 	cloudSpeech,
 } from "./inference.fixture";
 import { settle, waitFor } from "../../../infrastructure/wait-for";
+import { inputMessages, markInput } from "../../../infrastructure/model-input";
+import type { CallSession } from "../contracts";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -39,6 +41,51 @@ test("answers and transcripts fall back once, speech never does; adapters preser
 	expect(usage.filter((u) => u.accepted)).toHaveLength(3);
 	expect(usage.filter((u) => u.source === "larm")).toHaveLength(3);
 	expect(usage.some((u) => u.inputTokens === 7)).toBe(true);
+});
+
+test("answer input observation follows both attempts of a fallback and leaves the provider JSON unchanged", async () => {
+	const h = await setup({
+		local: async (messages, _signal, options) => {
+			options?.observeInput?.({
+				boundary: "larm",
+				messages: inputMessages(messages),
+			});
+			throw new Error("larm_unconfigured");
+		},
+	});
+	const requestId = await h.store.write((db) =>
+		h.inference.captureInTransaction(
+			db,
+			"context-run",
+			"llm",
+			Date.now() + 10_000,
+		),
+	);
+	const observed: Parameters<NonNullable<CallSession["observeInput"]>>[0][] =
+		[];
+	const result = await h.inference.executeRequest(
+		requestId,
+		[
+			messages[0]!,
+			markInput({ ...messages[1]! }, { kind: "user", id: "fixture-origin" }),
+		],
+		AbortSignal.timeout(5000),
+		undefined,
+		{ sessionRole: "main", observeInput: (record) => observed.push(record) },
+	);
+	expect(result.value).toBe("cloud-answer");
+	expect(observed.map(({ inferenceId }) => inferenceId)).toEqual([
+		requestId,
+		requestId,
+	]);
+	expect(new Set(observed.map(({ attemptId }) => attemptId)).size).toBe(2);
+	expect(observed.at(-1)?.attemptId).toBe(result.attemptId);
+	expect(observed.map(({ input }) => input.boundary)).toEqual([
+		"larm",
+		"cloud-http",
+	]);
+	expect(observed[1]?.input.messages[1]?.origins[0]?.id).toBe("fixture-origin");
+	expect(JSON.parse(h.payloads[0] as string).messages).toEqual(messages);
 });
 test("service tests pin a cloud resource without changing routes or falling back", async () => {
 	let localCalls = 0;

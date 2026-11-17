@@ -131,6 +131,10 @@ export function createSpecialistPort(deps: {
 		workStateInTransaction: (db, adapterRef, workRef) =>
 			registry.get(adapterRef)?.session?.stateInTransaction(db, workRef) ??
 			null,
+		endWorkAutomaticallyInTransaction: (db, adapterRef, input, releaseTurns) =>
+			registry
+				.get(adapterRef)
+				?.session?.endAutomaticallyInTransaction?.(db, input, releaseTurns),
 		beginTurnInTransaction: (db, adapterRef, workRef, runId) =>
 			sessionOf(adapterRef).beginTurnInTransaction(db, workRef, runId),
 		// Ending a turn must never fail a run's end: with no adapter there is nothing to release.

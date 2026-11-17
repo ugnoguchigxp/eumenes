@@ -1,4 +1,8 @@
 import { imageMessageParts } from "../../../infrastructure/chat-image-parts";
+import {
+	inputMessages,
+	observeModelInput,
+} from "../../../infrastructure/model-input";
 import { cloudImages, checkImageRequest } from "./cloud-images";
 import type { ConnectionModelsService } from "./connection-models";
 import { workersSpeechRequest } from "../adapters/workers-ai-speech";
@@ -279,6 +283,12 @@ async function agentRequest(
 			auth: connection.auth,
 			nativeWebSearch,
 			messages: fitted.messages,
+			...(options?.observeInput
+				? {
+						observeInput: options.observeInput,
+						omittedMessages: input.length - fitted.messages.length,
+					}
+				: {}),
 			tools:
 				options?.toolOutputFormat === "json-schema"
 					? undefined
@@ -410,6 +420,7 @@ export async function cloudRequest(
 		redirect: "error",
 		headers: { Authorization: `Bearer ${credential}` },
 	};
+	let observeHttp: (() => void) | undefined;
 	if (row.purpose === "asr") {
 		const form = new FormData();
 		form.append(
@@ -438,7 +449,7 @@ export async function cloudRequest(
 				input as Messages,
 				role?.context,
 			);
-			body = {
+			const request = {
 				model: resource.model,
 				messages: messages.map(imageMessageParts),
 				...(options?.tools?.length && options.toolOutputFormat !== "json-schema"
@@ -466,6 +477,17 @@ export async function cloudRequest(
 				...(onDelta ? { stream_options: { include_usage: true } } : {}),
 				max_tokens: reserve,
 			};
+			body = request;
+			if (options?.observeInput)
+				observeHttp = () =>
+					observeModelInput(options.observeInput, () => ({
+						boundary: "cloud-http",
+						messages: inputMessages(messages),
+						tools: request.tools,
+						format: request.response_format,
+						maxOutputTokens: request.max_tokens,
+						omittedMessages: (input as Messages).length - messages.length,
+					}));
 		}
 		init.headers = { ...init.headers, "Content-Type": "application/json" };
 		if (
@@ -481,7 +503,9 @@ export async function cloudRequest(
 			: row.purpose === "asr"
 				? "audio/transcriptions"
 				: "audio/speech";
-	const response = await (env.fetch ?? fetch)(new URL(path, base), init);
+	const url = new URL(path, base);
+	if (!signal.aborted) observeHttp?.();
+	const response = await (env.fetch ?? fetch)(url, init);
 	if (!response.ok) {
 		await response.body?.cancel();
 		throw new Error(`cloud_http_${response.status}`);

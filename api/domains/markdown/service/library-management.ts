@@ -5,6 +5,7 @@ import {
 	manageInput,
 	libraryCommand,
 	type LibraryCommand,
+	type LibraryFilesQuery,
 	type OperationView,
 	type LibraryEntry,
 } from "../contracts/library";
@@ -137,10 +138,7 @@ export function createLibraryManagement(
 			if (!input) throw new Error("markdown_not_found");
 			return manageInput.parse(JSON.parse(input.content_json));
 		},
-		files: async (
-			input: { namespace: string; path: string; cursor?: string },
-			signal: AbortSignal,
-		) => {
+		files: async (input: LibraryFilesQuery, signal: AbortSignal) => {
 			if (!archive.management) throw new Error("markdown_library_unsupported");
 			return archive.management.listLibrary(input, signal);
 		},

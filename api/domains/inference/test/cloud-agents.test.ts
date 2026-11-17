@@ -2,6 +2,7 @@ import type { AccountInfo, query } from "@anthropic-ai/claude-agent-sdk";
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
+import type { ModelInput } from "../../../infrastructure/model-input";
 import { defaults } from "../../settings";
 import { settingsSchema, type Connection } from "../../settings/contracts";
 import { codexReplyPrefix } from "../adapters/cloud-agent-codex";
@@ -473,8 +474,10 @@ test("a main call resumes from the host's history: instructions in the system pr
 
 test("a history ending on an unanswered user turn resumes without it and sends it before this turn's input", async () => {
 	const { claudeQuery, seen } = fakeClaude(apiKeyAccount);
+	const observed: ModelInput[] = [];
 	await createCloudAgents(ambient, { claudeQuery }).run(
 		claudeCall({
+			observeInput: (input) => observed.push(input),
 			messages: [
 				{ role: "system" as const, content: "base" },
 				{ role: "user" as const, content: "u1" },
@@ -500,6 +503,11 @@ test("a history ending on an unanswered user turn resumes without it and sends i
 		.content;
 	expect(sent.indexOf("unanswered")).toBeGreaterThan(-1);
 	expect(sent.indexOf("unanswered")).toBeLessThan(sent.indexOf("now"));
+	expect(observed[0]?.sdk).toMatchObject({
+		mode: "resume",
+		carried: loaded.length,
+		prompt: sent,
+	});
 });
 
 test("a single user message after the history is sent as it is", async () => {
@@ -608,19 +616,30 @@ test("Claude image blocks remain withheld until authentication and reach the SDK
 		{ ...apiKeyAccount, apiProvider: "gateway" as const },
 	]) {
 		const { claudeQuery, seen } = fakeClaude(account);
+		const observed: ModelInput[] = [];
 		const running = createCloudAgents(ambient, { claudeQuery }).run(
 			claudeCall({
 				messages: [{ role: "user", content: "compare", images: [image] }],
+				observeInput: (input) => observed.push(input),
 			}),
 		);
 		if (account.apiProvider === "gateway") {
 			await expect(running).rejects.toThrow("cloud_agent_auth_mismatch");
 			expect(seen.yielded).toEqual([]);
+			expect(observed).toEqual([]);
 		} else {
 			await running;
 			const message = seen.yielded[0] as {
-				message: { content: Array<{ type: string; source?: unknown }> };
+				message: {
+					content: Array<{ type: string; text?: string; source?: unknown }>;
+				};
 			};
+			expect(observed[0]?.sdk).toMatchObject({
+				mode: "new",
+				prompt: message.message.content[0]!.text,
+				images: [{ mime: "image/png", bytes: 3 }],
+			});
+			expect(JSON.stringify(observed)).not.toContain("AQID");
 			expect(message.message.content.map((p) => p.type)).toEqual([
 				"text",
 				"image",

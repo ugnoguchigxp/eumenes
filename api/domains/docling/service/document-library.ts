@@ -37,16 +37,26 @@ export function createDocumentLibrary(io: {
 	const read = async (path: string, signal: AbortSignal) =>
 		io.request(io.access(), path, signal, 4 * 1024 * 1024);
 	async function list(
-		input: { namespace: string; path: string; cursor?: string },
+		input: {
+			namespace: string;
+			path: string;
+			cursor?: string;
+			sort?: "updated-desc";
+		},
 		signal: AbortSignal,
 	) {
-		const c = await io.capabilities(signal);
-		if (!libraryFeatures(c).library)
+		const c = await io.capabilities(signal),
+			features = libraryFeatures(c);
+		if (!features.library || (input.sort && !features.updatedDesc))
 			throw new DocumentFileError("library_unsupported", 409);
-		const { response, value } = await read(
-				`${c.libraryPath}?${new URLSearchParams({ ...input, limit: String(c.maxPageSize) })}`,
-				signal,
-			),
+		const query = new URLSearchParams({
+			namespace: input.namespace,
+			path: input.path,
+			limit: String(c.maxPageSize),
+		});
+		if (input.sort) query.set("sort", input.sort);
+		if (input.cursor !== undefined) query.set("cursor", input.cursor);
+		const { response, value } = await read(`${c.libraryPath}?${query}`, signal),
 			p = libraryPage.safeParse(value);
 		if (
 			!p.success ||

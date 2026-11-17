@@ -5,6 +5,38 @@ import { active, rowOf, save, stateOf, type RunRow } from "../repository";
 import type { Context } from "./context";
 import { failedResult } from "./note";
 
+// The conversation message contract limits visual replies to 32,768 characters.
+const DISPLAY_LIMIT = 32_768;
+
+function conversationResult(state: HostState): ExecutionResult | null {
+	const { result, source } = state;
+	if (
+		state.inspection ||
+		source.origin ||
+		!source.messageId ||
+		result?.status !== "completed" ||
+		!result.answer
+	)
+		return result;
+
+	const markdown = `## ${result.title}\n\n${result.answer}`;
+	if (markdown.length <= DISPLAY_LIMIT)
+		return { ...result, replyInConversation: true, displayAnswer: markdown };
+
+	const sources = (result.sources ?? [])
+		.map(({ url }) => `- <${url}>`)
+		.join("\n");
+	const summary = `## ${result.title}\n\n${result.summary}\n\n全文は調査記録に保存しました。`;
+	const withSources = sources
+		? `${summary}\n\n### 出典\n\n${sources}`
+		: summary;
+	return {
+		...result,
+		replyInConversation: true,
+		displayAnswer: withSources.length <= DISPLAY_LIMIT ? withSources : summary,
+	};
+}
+
 export const viewOf = (row: RunRow, state: HostState): ExecutionView => ({
 	id: row.id,
 	conversationId: row.conversation_id,
@@ -13,7 +45,7 @@ export const viewOf = (row: RunRow, state: HostState): ExecutionView => ({
 	status: row.state,
 	deadline: row.deadline,
 	question: null,
-	result: state.result,
+	result: conversationResult(state),
 });
 export function viewInTransaction(
 	db: Database,

@@ -102,6 +102,28 @@ export function forgetWork(
 	return rows;
 }
 
+/**
+ * Pursuit run ids named by research TODOs from these messages.
+ * Forgetting clears the TODO text and leaves `source_ref`. Blank ids and other toolchains,
+ * including `web.note`, are not pursuit runs.
+ */
+export function researchSourceIds(
+	db: Database,
+	messageIds: readonly string[],
+): string[] {
+	if (messageIds.length === 0) return [];
+	return (
+		db
+			.query(
+				`SELECT DISTINCT source_ref AS id FROM dialogue_work
+				WHERE toolchain_id = 'web.research' AND source_ref IS NOT NULL AND source_ref <> ''
+				AND ${fromMessages("dialogue_work", messageIds.length)}
+				ORDER BY source_ref`,
+			)
+			.all(...messageIds) as Array<{ id: string }>
+	).map((row) => row.id);
+}
+
 /** A run's results deleted at their owner (a report deleted or expired): the TODOs it fed keep no copy. */
 export function dropRunResults(
 	db: Database,

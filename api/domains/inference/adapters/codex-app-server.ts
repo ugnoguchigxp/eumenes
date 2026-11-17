@@ -29,6 +29,11 @@ export type CodexTurn = {
 		prompt: string;
 		images: import("../../../infrastructure/chat-image-parts").MessageImage[];
 	};
+	onSend?: (
+		mode: "new" | "append" | "reset",
+		from: number,
+		input: ReturnType<CodexTurn["input"]>,
+	) => void;
 	outputSchema?: unknown;
 	nativeWebSearch?: true;
 	reasoningEffort: "low" | "medium" | "high";
@@ -209,6 +214,7 @@ export async function runCodexTurn(
 				...params,
 			});
 		lease.channel.beginTurn(Buffer.byteLength(JSON.stringify(params)));
+		if (!turn.signal.aborted) turn.onSend?.(lease.mode, lease.sendFrom, input);
 		started = rpc.request("turn/start", params, (result) => {
 			turnId = (result as { turn?: { id?: string } })?.turn?.id;
 			if (turnId) lease.turnStarted(turnId);

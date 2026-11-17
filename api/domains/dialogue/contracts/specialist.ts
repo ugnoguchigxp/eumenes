@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import { resourceUriSchema } from "../../resources";
+import type { SessionWorkEnd } from "../../tool-runtime";
 
 /**
  * Specialist sessions (spec toolchain-specialist-dialogue 2026-10-17 §4). After the conversation
@@ -345,6 +346,12 @@ export interface SpecialistPort {
 		adapterRef: string,
 		workRef: string,
 	): SpecialistWorkState | null;
+	endWorkAutomaticallyInTransaction?(
+		db: Database,
+		adapterRef: string,
+		input: { sessionId: string; workRef: string; mode: "discard" | "close" },
+		releaseTurns: () => void,
+	): SessionWorkEnd | undefined;
 	beginTurnInTransaction(
 		db: Database,
 		adapterRef: string,

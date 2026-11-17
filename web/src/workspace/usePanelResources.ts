@@ -17,7 +17,10 @@ import {
 	drawingScreen,
 } from "../domains/excalidraw/resource-screen";
 import { toolchainArtifactsQuery } from "../domains/toolchain-artifacts/launcher";
-import { toolchainWebAdapters } from "./toolchain-adapters";
+import {
+	loadToolchainAdapter,
+	toolchainWebAdapters,
+} from "./toolchain-adapters";
 import type { WorkspaceState } from "./useWorkspace";
 import { useShownNotes } from "./useShownNotes";
 
@@ -57,6 +60,7 @@ export function useWorkspaceLauncher(
 				if (!entries.some((entry) => entry.adapterRef === adapterRef))
 					return false;
 				await openByAdapter(adapterRef, targetRef);
+				await loadToolchainAdapter(adapterRef);
 				return true;
 			},
 			screen: (adapterRef) =>

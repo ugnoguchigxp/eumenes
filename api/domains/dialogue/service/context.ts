@@ -117,6 +117,8 @@ export type RoutedInput = {
 };
 
 export interface GenerateInput {
+	/** Passed only to the model calls that produce this reply. */
+	observeInput?: import("../../inference/contracts").CallSession["observeInput"];
 	runId: string;
 	/** The run's own input message (the user's request a later generation of the run still acts for). */
 	inputMessageId: string;
@@ -230,6 +232,9 @@ export type DialogueDeps = {
 	worldContext?: WorldContextPort;
 	debugDiagnostics?: ReturnType<
 		typeof import("./debug-diagnostics").createDebugDiagnostics
+	>;
+	contextInputs?: ReturnType<
+		typeof import("./context-inputs").createContextInputs
 	>;
 	diagnostics?: import("../contracts/diagnostics").DiagnosticsPort;
 	/** The operational log file (`config.logFile`) the read tool `read_runs` reads warnings from; absent: none read. */

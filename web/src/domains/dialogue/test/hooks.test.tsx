@@ -27,6 +27,12 @@ function setup() {
 		runs: async () => [...accepted.values()],
 		watchRun: async () => {},
 		run: async (id) => accepted.get(id)!,
+		runContext: async () => {
+			throw new Error("not_used");
+		},
+		contextCapture: async () => {
+			throw new Error("not_used");
+		},
 		cancel: async (id) => accepted.get(id)!,
 		clearRecent: async () => ({ ok: true as const }),
 		runErrorReport: async (id) => ({ runId: id, text: "" }),
