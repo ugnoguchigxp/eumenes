@@ -339,6 +339,8 @@ export interface ConversationAgentPort {
 		emotion?: DeliveryEmotion;
 		/** A tool handed the work over and ended the reply. */
 		ended: boolean;
+		/** Prepares user-visible output for a reply with no words. The write returns true when the output is published. */
+		prepareSilentOutput?(): Promise<((db: Database) => boolean) | undefined>;
 		/** The agency's own tool calls of the reply and what they answered: kept in the history of its replies. */
 		calls?: ReadonlyArray<{ name: string; arguments: string; content: string }>;
 	}>;

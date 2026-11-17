@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import type { CallSession, Receipt } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
 import type { RoutedPipelineStep } from "../../tool-runtime";
@@ -137,10 +138,24 @@ export async function runRoutedTurn(
 	}
 	log.info("dialogue.turn_routed", { kind, count: turn.calls() });
 	options.signal.throwIfAborted();
-	const { receipt, emotion, imageAnswer, displayText } = turn.result();
+	const { receipt, emotion, imageAnswer, displayText, writeOutput } =
+		turn.result();
 	return {
 		text: turn.said().trim(),
 		...(displayText !== undefined ? { displayText } : {}),
+		...(writeOutput
+			? {
+					finishSilentReplyInTransaction(db: Database) {
+						if (writeOutput(db)) return "";
+						log.warn("dialogue.turn_failed", {
+							runId: input.runId,
+							kind,
+							reason: "chat_output_empty",
+						});
+						return SAID_FAILED;
+					},
+				}
+			: {}),
 		...debug,
 		...(turn.lookupSources.length ? { lookupSources: turn.lookupSources } : {}),
 		...(receipt ? { receipt } : {}),
@@ -234,6 +249,7 @@ function createTurn(
 	let receipt: Receipt | undefined;
 	let imageAnswer: GenerationOutcome["imageAnswer"];
 	let displayText: string | undefined;
+	let writeOutput: ((db: Database) => boolean) | undefined;
 	let said = "";
 	let emotion: GenerationOutcome["emotion"];
 	let calls = 0;
@@ -309,7 +325,7 @@ function createTurn(
 		calls: () => calls,
 		said: () => said,
 		published: () => published,
-		result: () => ({ receipt, emotion, imageAnswer, displayText }),
+		result: () => ({ receipt, emotion, imageAnswer, displayText, writeOutput }),
 		debug,
 
 		/** The host's own words: spoken as they are, and part of the answer. */
@@ -493,15 +509,16 @@ function createTurn(
 				this.speak(SAID_FAILED);
 				return;
 			}
-			// The user spoke and was told nothing: a failed reply, not silence (a notice may go unanswered). A reply a
-			// hand-over ended says nothing itself: the host's announcement is the answer.
+			// A user turn needs a reply, a handover announcement, or visible output that can be published at adoption.
 			if (
 				!reply.ended &&
 				!reply.text.trim() &&
 				!said.trim() &&
 				input.final.kind === "utterances"
-			)
-				throw new Error("chat_output_empty");
+			) {
+				writeOutput = await reply.prepareSilentOutput?.();
+				if (!writeOutput) throw new Error("chat_output_empty");
+			}
 			if (debug.debugTarget) return;
 			emotion = reply.emotion;
 			// The agency's own tools: the exchange keeps them with the reply (later replies see what it did).

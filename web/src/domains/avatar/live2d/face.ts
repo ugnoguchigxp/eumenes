@@ -58,8 +58,7 @@ export function createBlink(random = Math.random) {
 	};
 }
 
-export function createFace(random = Math.random) {
-	const blink = createBlink(random);
+export function createFace() {
 	const current = { ...neutral };
 	return (
 		time: number,
@@ -93,10 +92,9 @@ export function createFace(random = Math.random) {
 			const target = neutral[key] + (preset[key] - neutral[key]) * strength;
 			current[key] += (target - current[key]) * weight;
 		}
-		const open = current.eyes * (1 - blink(time));
 		return {
-			ParamEyeLOpen: open,
-			ParamEyeROpen: open,
+			ParamEyeLOpen: current.eyes,
+			ParamEyeROpen: current.eyes,
 			ParamEyeLSmile: current.smile,
 			ParamEyeRSmile: current.smile,
 			ParamBrowLY: current.brow + current.browTilt,

@@ -45,6 +45,7 @@ function fixture(initial: Run[] = [], messages: Message[] = []) {
 				runId,
 				ready: new Promise(() => {}),
 				stop: vi.fn(),
+				hasBufferedChunk: () => false,
 				next: async () => null,
 			}),
 		),
@@ -449,6 +450,7 @@ test("running typed replies synthesize while output is blocked, play when free, 
 			ready = resolve;
 		}),
 		stop: vi.fn(),
+		hasBufferedChunk: () => false,
 		next: async () => null,
 	};
 	player.prepareStream.mockReturnValueOnce(source);
@@ -491,6 +493,7 @@ test.each(["mute", "ownership", "unmount"])(
 				ready = resolve;
 			}),
 			stop: vi.fn(),
+			hasBufferedChunk: () => false,
 			next: async () => null,
 		};
 		player.prepareStream.mockReturnValueOnce(source);

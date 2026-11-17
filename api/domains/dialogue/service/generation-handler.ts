@@ -132,7 +132,10 @@ export function createGenerationHandler(
 						if (generated.text.length > 65536)
 							throw new Error("chat_output_too_large");
 						// Saying nothing completes the run (the system allows it); it is kept countable.
-						if (!generated.text.trim())
+						if (
+							!generated.text.trim() &&
+							!generated.finishSilentReplyInTransaction
+						)
 							log.info("dialogue.no_answer", {
 								kind: input.final.kind,
 								// Calls run before saying nothing (a search with no hand-over, for one).
@@ -142,6 +145,12 @@ export function createGenerationHandler(
 						return {
 							...(generated.displayText !== undefined
 								? { displayText: generated.displayText }
+								: {}),
+							...(generated.finishSilentReplyInTransaction
+								? {
+										finishSilentReplyInTransaction:
+											generated.finishSilentReplyInTransaction,
+									}
 								: {}),
 							text: reportedLinks(
 								deps,

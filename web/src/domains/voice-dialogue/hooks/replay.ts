@@ -220,6 +220,7 @@ export function useReplay(
 			const valid = () => run.current === mine && !mine.abort.signal.aborted;
 			mine.abort.signal.addEventListener("abort", source.stop, { once: true });
 			let release = () => {};
+			let gap: AbortController | undefined;
 			try {
 				const target = await prepare();
 				if (!valid()) return;
@@ -249,6 +250,7 @@ export function useReplay(
 							timing: { runId: source.runId, chunkIndex: chunk.index },
 							onStarted: () => {
 								if (!current()) return;
+								gap?.abort();
 								sounding.current = target;
 								setSubtitle(chunk.text);
 								if (volume > 0 || chunk.emotion)
@@ -259,13 +261,27 @@ export function useReplay(
 										gestureKey: `run:${source.runId}`,
 										speaking: volume > 0,
 									});
+								else setAvatarCue(null);
 							},
 						},
 						() => {
 							if (sounding.current === target) sounding.current = null;
 							if (valid()) {
 								setSubtitle(null);
-								setAvatarCue((cue) => (cue?.key === key ? null : cue));
+								const continues = current() && source.hasBufferedChunk();
+								setAvatarCue((cue) => {
+									if (cue?.key !== key) return cue;
+									return continues ? { ...cue, speaking: false } : null;
+								});
+								if (continues) {
+									gap = new AbortController();
+									chunk.signal.addEventListener(
+										"abort",
+										() =>
+											setAvatarCue((cue) => (cue?.key === key ? null : cue)),
+										{ once: true, signal: gap.signal },
+									);
+								}
 							}
 						},
 						() => sounding.current === target,
@@ -285,6 +301,7 @@ export function useReplay(
 				if (valid()) setError(describeError(error));
 			} finally {
 				release();
+				gap?.abort();
 				source.stop();
 				mine.abort.signal.removeEventListener("abort", source.stop);
 				if (run.current === mine) {

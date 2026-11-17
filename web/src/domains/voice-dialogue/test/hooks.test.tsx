@@ -472,6 +472,10 @@ for (const status of ["responding", "ready"] as const)
 			endings[1]?.();
 		});
 		await waitFor(() => expect(starts).toHaveLength(3));
+		expect(hook.result.current.avatarCue).toEqual({
+			...newCue,
+			speaking: false,
+		});
 		act(() => starts[2]?.());
 		expect(hook.result.current.avatarCue).toMatchObject({
 			motion: status === "responding" ? "listening" : "neutral",

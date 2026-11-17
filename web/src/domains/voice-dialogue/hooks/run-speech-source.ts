@@ -104,6 +104,7 @@ export function createRunSpeechSource(
 		runId,
 		ready: readyPromise,
 		stop,
+		hasBufferedChunk: () => chunks.length > 0,
 		async next(): Promise<StreamedSpeechChunk | null> {
 			for (;;) {
 				if (error) throw error;

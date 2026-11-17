@@ -610,7 +610,10 @@ export const domains = {
 		backend: "api/domains/voice-dialogue",
 		web: "web/src/domains/voice-dialogue",
 		components: null,
-		integrationTests: ["api/application/agency/router-failure-voice.test.ts"],
+		integrationTests: [
+			"api/application/agency/note-display-voice.test.ts",
+			"api/application/agency/router-failure-voice.test.ts",
+		],
 		depends: {
 			api: ["delivery", "dialogue", "inference"],
 			web: ["audio", "avatar", "dialogue", "settings"],

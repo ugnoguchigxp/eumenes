@@ -3,8 +3,11 @@ export type Id = object;
 export interface Model {
 	getCanvasWidth(): number;
 	getCanvasHeight(): number;
+	getParameterCount(): number;
 	getParameterIndex(id: Id): number;
+	getParameterValueByIndex(index: number): number;
 	getParameterValueById(id: Id): number;
+	setParameterValueByIndex(index: number, value: number, weight?: number): void;
 	setParameterValueById(id: Id, value: number, weight?: number): void;
 	loadParameters(): void;
 	saveParameters(): void;
@@ -57,6 +60,7 @@ export class CubismPhysics {
 export class CubismPose {
 	static create(bytes: ArrayBuffer, size: number): CubismPose;
 	static delete(pose: CubismPose): void;
+	reset(model: Model): void;
 	updateParameters(model: Model, delta: number): void;
 }
 
@@ -78,9 +82,7 @@ export class CubismMotion {
 
 export class CubismMotionManager {
 	startMotion(motion: CubismMotion, autoDelete: boolean): object;
-	getCubismMotionQueueEntry(
-		handle: object,
-	): { setFadeOut(seconds: number): void } | null;
+	isFinished(): boolean;
 	updateMotion(model: Model, delta: number): boolean;
 	stopAllMotions(): void;
 	release(): void;

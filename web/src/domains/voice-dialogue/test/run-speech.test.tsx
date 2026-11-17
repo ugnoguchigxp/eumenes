@@ -94,6 +94,11 @@ test("audio arrives while the first clause plays; the next starts only at ended 
 	expect(f.playing).toHaveLength(1);
 	expect(f.client.runSpeechPlayed).not.toHaveBeenCalled();
 	act(() => f.playing[0]!.ended());
+	expect(f.hook.result.current.avatarCue).toMatchObject({
+		key: "stream:run:0",
+		gestureKey: "run:run",
+		speaking: false,
+	});
 	await waitFor(() => expect(f.playing).toHaveLength(2));
 	expect(f.client.runSpeechPlayed).toHaveBeenCalledTimes(1);
 	expect(f.playing.map((p) => p.options.waitForPrevious)).toEqual([true, true]);
@@ -106,6 +111,28 @@ test("audio arrives while the first clause plays; the next starts only at ended 
 	});
 	expect(f.client.runSpeechPlayed).toHaveBeenCalledTimes(2);
 	expect(f.hook.result.current.playingId).toBeNull();
+	expect(f.hook.result.current.avatarCue).toBeNull();
+});
+
+test("generation replacement clears a gesture held while a buffered clause waits to start", async () => {
+	const f = fixture();
+	f.audio(0);
+	f.audio(1);
+	let done!: Promise<void>;
+	act(() => {
+		done = f.hook.result.current.playStream(f.source);
+	});
+	await waitFor(() => expect(f.playing).toHaveLength(1));
+	f.output.play.mockImplementationOnce(() => new Promise(() => {}));
+	act(() => f.playing[0]!.ended());
+	await waitFor(() => expect(f.output.play).toHaveBeenCalledTimes(2));
+	expect(f.hook.result.current.avatarCue?.speaking).toBe(false);
+	act(() => f.generation("replacement"));
+	expect(f.hook.result.current.avatarCue).toBeNull();
+	await act(async () => {
+		f.finish();
+		await done;
+	});
 });
 
 test("generation replacement interrupts old playback, discards queued audio and only acknowledges the new generation", async () => {

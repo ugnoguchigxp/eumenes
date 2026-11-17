@@ -16,7 +16,7 @@ import {
 	type GenerateInput,
 	type GeneratePayload,
 } from "./context";
-import type { Handover } from "./executor-context";
+import type { GenerationOutcome, Handover } from "./executor-context";
 import { eventFields, SIDE_EFFECTS } from "./event-fields";
 import { generationStale } from "./generation-stream";
 import { adoptMemoryWindow } from "./memory-window";
@@ -28,6 +28,7 @@ const log = getLogger("dialogue");
 
 export type GenerationResult = {
 	displayText?: string;
+	finishSilentReplyInTransaction?: GenerationOutcome["finishSilentReplyInTransaction"];
 	debugTarget?: string;
 	debugRouterFailure?: true;
 	imageAnswer?: ImageAnswerTrace;
@@ -270,7 +271,10 @@ export function createGenerationSettlement(
 				handleSteered(deps, tx, run);
 			}
 			// A task or a pipeline runs on its own: its announcement is the answer of this run.
-			const text = result.handover?.announcement ?? result.text;
+			const text =
+				result.handover?.announcement ??
+				result.finishSilentReplyInTransaction?.(tx) ??
+				result.text;
 			let messageId: string | null = null;
 			const external =
 				result.displayText === undefined &&

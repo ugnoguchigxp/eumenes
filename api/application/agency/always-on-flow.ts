@@ -293,26 +293,27 @@ const NOTE_DOCUMENT_WAIT_MS = 210_000;
 const NOTE_DOCUMENT_POLL_MS = 500;
 
 /**
- * Shows a note to the user, once the reply that showed it is adopted (the reply's show_note tool): the note is a
- * document of the Markdown domain (`keepNote`; made here when it is not there yet), and a message of the
- * conversation carries the document, which the screen opens in the Markdown view. The note's text is not put
- * into the conversation. Not an `agency:` message (the web reads those aloud) and not part of what the model is told
- * later: the document is made of web pages, never the agent's own words, so it is neither recorded as spoken nor
- * learned from. One message per reply and note.
+ * Waits for the Markdown document, then returns the write that puts its chip on a message of the adopted reply.
+ * The message carries the title and summary and is kept out of speech, the model's history and Memory learning.
+ * Each reply can publish a given note once.
  */
-export async function showNote(
+export async function prepareNoteDisplay(
 	deps: AgencyHostDeps,
-	c: AgendaScope,
-	note: AgendaNote,
-	runId: string,
 	host: {
 		now(): number;
 		setTimer(fn: () => void, ms: number): unknown;
 		clearTimer(handle: unknown): void;
 	},
-): Promise<void> {
+	c: AgendaScope,
+	note: AgendaNote,
+	runId: string,
+	replySignal?: AbortSignal,
+): Promise<(db: Database) => void> {
 	const documents = deps.noteDocuments;
 	if (!documents) throw new Error("agency_note_documents_unavailable");
+	const signal = replySignal
+		? AbortSignal.any([c.profileAbort.signal, replySignal])
+		: c.profileAbort.signal;
 	const messageId = `agency-note:${c.scope}:${runId}:${note.id}`;
 	const shown = (db: Database) =>
 		deps.conversation.sourceInTransaction(db, messageId).state === "available";
@@ -324,13 +325,12 @@ export async function showNote(
 		return context;
 	};
 	const id = await deps.store.write((db) => {
+		signal.throwIfAborted();
 		if (shown(db)) return null;
 		origin(db);
 		return startNoteDocument(deps, db, c.id, note);
 	});
-	if (id === null) return;
-	// The scope's end (the host closes, the conversation goes) ends the wait.
-	const { signal } = c.profileAbort;
+	if (id === null) return () => {};
 	const until = host.now() + NOTE_DOCUMENT_WAIT_MS;
 	let state = deps.store.read((db) => documents.stateInTransaction(db, id));
 	while (state === "pending") {
@@ -348,10 +348,13 @@ export async function showNote(
 		state = deps.store.read((db) => documents.stateInTransaction(db, id));
 	}
 	if ("code" in state) throw new Error(state.code);
-	const document = state;
-	await deps.store.write((db) => {
+	return (db) => {
+		signal.throwIfAborted();
 		if (shown(db)) return;
 		const context = origin(db);
+		const document = documents.stateInTransaction(db, id);
+		if (document === "pending") throw new Error("agency_note_document_pending");
+		if ("code" in document) throw new Error(document.code);
 		deps.conversation.appendInTransaction(db, {
 			id: messageId,
 			conversationId: c.id,
@@ -376,5 +379,12 @@ export async function showNote(
 			uri: document.uri,
 			label: document.label,
 		});
+	};
+}
+
+export function logNoteDisplayFailure(conversationId: string, error: unknown) {
+	log.warn("agency.show_note_failed", {
+		subjectId: conversationId,
+		reason: toErrorCode(error, "show_note_failed"),
 	});
 }

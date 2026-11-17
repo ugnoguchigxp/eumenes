@@ -55,7 +55,7 @@ export function createHiyoriMotions(
 	const signal = AbortSignal.any([parent, abort.signal]);
 	const clips = new Map<
 		string,
-		{ motion: Cubism.CubismMotion; fadeOut: number }
+		{ motion: Cubism.CubismMotion; fadeIn: number; fadeOut: number }
 	>();
 	const unique = new Map<string, MotionRef>();
 	for (const ref of Object.values(references ?? {}).flat()) {
@@ -77,44 +77,45 @@ export function createHiyoriMotions(
 			if (!motion) return;
 			// These clips animate eye parameters directly. Web Audio owns mouth opening.
 			motion.setEffectIds([], []);
-			const fadeOut = ref.FadeOutTime ?? 0.5;
-			motion.setFadeInTime(ref.FadeInTime ?? 0.5);
-			motion.setFadeOutTime(fadeOut);
+			// Sample the authored pose. The renderer fades the completed pose once.
+			motion.setFadeInTime(0);
+			motion.setFadeOutTime(0);
 			motion.setLoop(false);
-			motion.setWeight(0.8);
-			clips.set(ref.File, { motion, fadeOut });
+			clips.set(ref.File, {
+				motion,
+				fadeIn: ref.FadeInTime ?? 0.5,
+				fadeOut: ref.FadeOutTime ?? 0.5,
+			});
 		})().catch(() => {}); // Missing clips leave the face presets available.
 	}
 
 	let lastSelection: string | undefined;
-	let active: { handle: object; key: string; fadeOut: number } | undefined;
+	let active: { key: string; fadeOut: number } | undefined;
 	return {
 		update(dt: number, cue?: AvatarCue | null) {
-			const emotion = cue?.emotion;
-			const clip =
-				emotion && emotion !== "none"
-					? emotionClips[emotion]
-					: cue && motionClips[cue.motion];
+			const emotion = cue?.emotion === "none" ? undefined : cue?.emotion;
+			const clip = emotion
+				? emotionClips[emotion]
+				: cue && motionClips[cue.motion];
 			const key =
 				cue && clip
 					? `${cue.gestureKey ?? cue.key}:${emotion ?? cue.motion}`
 					: undefined;
-			if (active && active.key !== key) {
-				manager
-					.getCubismMotionQueueEntry(active.handle)
-					?.setFadeOut(active.fadeOut);
+			const loaded = clip && clips.get(clipPath(clip));
+			let fade: number | undefined;
+			if (loaded && key && key !== lastSelection) {
+				manager.stopAllMotions();
+				manager.startMotion(loaded.motion, false);
+				lastSelection = key;
+				active = { key, fadeOut: loaded.fadeOut };
+				fade = loaded.fadeIn;
+			} else if (active && (active.key !== key || manager.isFinished())) {
+				manager.stopAllMotions();
+				fade = active.fadeOut;
 				active = undefined;
 			}
-			const loaded = clip && clips.get(clipPath(clip));
-			if (loaded && key && key !== lastSelection) {
-				lastSelection = key;
-				active = {
-					key,
-					handle: manager.startMotion(loaded.motion, false),
-					fadeOut: loaded.fadeOut,
-				};
-			}
-			manager.updateMotion(model, dt);
+			if (active) manager.updateMotion(model, dt);
+			return { playing: active !== undefined, fade };
 		},
 		stop() {
 			manager.stopAllMotions();

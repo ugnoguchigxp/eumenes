@@ -11,7 +11,11 @@ import { isAgendaSnapshot, type AgencyRecord } from "../../domains/dialogue";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { fixedInput } from "./input";
-import { keepNote, showNote } from "./always-on-flow";
+import {
+	keepNote,
+	logNoteDisplayFailure,
+	prepareNoteDisplay,
+} from "./always-on-flow";
 import { writeProfile } from "./always-on-profile";
 import {
 	createAgendaScope,
@@ -41,6 +45,11 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	const clearTimer =
 		deps.clearTimer ??
 		((id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>));
+	const prepareDisplay = prepareNoteDisplay.bind(null, deps, {
+		now,
+		setTimer,
+		clearTimer,
+	});
 	const convs = new Map<string, AgendaScope>();
 	const persisted = new Map<string, number>();
 	const recovering = new Set<string>();
@@ -269,16 +278,9 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 								const note = scope.notes.find((n) => n.id === id);
 								if (note)
 									void track(
-										showNote(deps, scope, note, runId, {
-											now,
-											setTimer,
-											clearTimer,
-										}).catch((error) =>
-											log.warn("agency.show_note_failed", {
-												subjectId: scope.id,
-												reason: toErrorCode(error, "show_note_failed"),
-											}),
-										),
+										prepareDisplay(scope, note, runId)
+											.then((publish) => deps.store.write(publish))
+											.catch((error) => logNoteDisplayFailure(scope.id, error)),
 									);
 							}
 						},
@@ -306,6 +308,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	const { dialoguePort, conversationAgent, status } = createAgendaPorts({
 		deps,
 		convs,
+		prepareDisplay,
 		serving: (id) => {
 			if (!on()) return null;
 			try {

@@ -2,8 +2,9 @@ import { loadCubismCore } from "./load";
 import type { AvatarMotion } from "../../../../../api/domains/delivery/contracts";
 import type { AvatarCue } from "../controller";
 import { createHiyoriMotions, type HiyoriMotionReferences } from "./motion";
-import { createFace } from "./face";
+import { createBlink, createFace } from "./face";
 import { idleParameters } from "./idle";
+import { createPoseTransition } from "./pose-transition";
 import { defaultAvatarView, type AvatarView } from "../view";
 
 const contexts = new Set<WebGLRenderingContext>();
@@ -128,6 +129,8 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 			signal,
 		);
 		let face = createFace();
+		let blink = createBlink();
+		const transition = createPoseTransition(model);
 		const ids = new Map<
 			string,
 			import("../../../../../vendor/live2d/framework.js").Id
@@ -137,8 +140,16 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 				ids.set(key, sdk.CubismFramework.getIdManager().getId(key));
 			return ids.get(key)!;
 		};
-		const set = (key: string, value: number) =>
-			model.setParameterValueById(id(key), value);
+		const set = (key: string, value: number, weight?: number) =>
+			model.setParameterValueById(id(key), value, weight);
+		const groups = (
+			JSON.parse(new TextDecoder().decode(poseBytes)) as {
+				Groups: { Id: string }[][];
+			}
+		).Groups;
+		const idleParts = groups.flatMap((group) =>
+			group.map((part, index) => [id(part.Id), index === 0 ? 1 : 0] as const),
+		);
 		const matrix = new sdk.CubismModelMatrix(
 			model.getCanvasWidth(),
 			model.getCanvasHeight(),
@@ -167,12 +178,23 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 			) {
 				if (disposed) return;
 				const dt = Math.min(0.1, Math.max(0, time - last));
-				if (time === 0 && last > 0) face = createFace();
+				if (time === 0) {
+					if (last > 0) {
+						face = createFace();
+						blink = createBlink();
+					}
+					transition.reset();
+					motions?.stop();
+					pose.reset(model);
+				}
 				last = time;
 				model.loadParameters();
+				// Cubism stores the selectors for part opacity outside loadParameters().
+				for (const [selector, selected] of idleParts)
+					model.setParameterValueById(selector, selected);
 				for (const [key, value] of Object.entries(idleParameters(time)))
 					set(key, value);
-				const values = face(
+				const { ParamMouthOpenY, ...expression } = face(
 					time,
 					dt,
 					motion,
@@ -180,14 +202,27 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 					intensity,
 					cue?.emotion,
 				);
-				for (const [key, value] of Object.entries(values)) set(key, value);
-				if (time === 0) motions?.stop();
-				else motions?.update(dt, cue);
+				const parameters = Object.entries(expression);
+				for (const [key, value] of parameters) set(key, value);
+				const motionFrame = time === 0 ? undefined : motions?.update(dt, cue);
+				if (motionFrame?.playing) {
+					// Preserve the preset's contribution to the face when clips are shared.
+					for (const [key, value] of parameters) set(key, value, 0.2);
+				}
+				transition.apply(dt, motionFrame?.fade);
 				physics.evaluate(model, dt);
-				mouth = values.ParamMouthOpenY;
+				const eyeWeight = 1 - blink(time);
+				for (const eye of ["ParamEyeLOpen", "ParamEyeROpen"]) {
+					const eyeId = id(eye);
+					model.setParameterValueById(
+						eyeId,
+						model.getParameterValueById(eyeId) * eyeWeight,
+					);
+				}
+				mouth = ParamMouthOpenY;
 				// The clips have authored mouth curves. Keep their shapes and use audio for opening.
 				set("ParamMouthOpenY", mouth);
-				pose.updateParameters(model, dt);
+				pose.updateParameters(model, motionFrame?.fade === undefined ? dt : 0);
 				model.update();
 				gl.viewport(0, 0, canvas.width, canvas.height);
 				gl.clearColor(0, 0, 0, 0);

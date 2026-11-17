@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type {} from "./avatar-control.fixture";
 import type {} from "./avatar-replay.fixture";
+import type {} from "./avatar-transition.fixture";
+import type { AvatarCue } from "../../web/src/domains/avatar";
 import sharp from "sharp";
 let directory: string;
 test.beforeAll(() => {
@@ -16,7 +18,7 @@ test.beforeAll(() => {
 			`
  const worklet = await Bun.build({entrypoints:["web/src/domains/audio/worklet/recorder.worklet.ts"],outdir:${JSON.stringify(directory)},target:"browser"});if(!worklet.success)throw new Error(worklet.logs.join("\\n"));
  const source = await Bun.file(${JSON.stringify(directory)}+"/recorder.worklet.js").text();
- const result = await Bun.build({entrypoints:["tests/browser/avatar-control.fixture.ts", "tests/browser/avatar-lifecycle.fixture.tsx", "tests/browser/avatar-replay.fixture.tsx"],outdir:${JSON.stringify(directory)},target:"browser",format:"iife",define:{"process.env.NODE_ENV":JSON.stringify("production")},plugins:[{name:"worklet-url",setup(b){
+ const result = await Bun.build({entrypoints:["tests/browser/avatar-control.fixture.ts", "tests/browser/avatar-lifecycle.fixture.tsx", "tests/browser/avatar-replay.fixture.tsx", "tests/browser/avatar-transition.fixture.ts"],outdir:${JSON.stringify(directory)},target:"browser",format:"iife",define:{"process.env.NODE_ENV":JSON.stringify("production")},plugins:[{name:"worklet-url",setup(b){
  b.onResolve({filter:/recorder.worklet.ts\\?worker&url$/},()=>({path:"recorder-url",namespace:"worklet-url"}));
  b.onResolve({filter:/vad.worker.ts\\?worker$/},()=>({path:"vad-worker",namespace:"vad-worker"}));
  b.onLoad({filter:/.*/,namespace:"vad-worker"},()=>({contents:'export default class extends Worker { constructor(){super("/unused-vad.js");} }',loader:"js"}));
@@ -29,6 +31,158 @@ test.beforeAll(() => {
 });
 test.afterAll(() => {
 	if (directory) rmSync(directory, { recursive: true, force: true });
+});
+
+test("real Hiyori blends the displayed pose at start, return and interruption", async ({
+	playwright,
+}, testInfo) => {
+	const motionFiles = ["Hiyori_m07.motion3.json", "Hiyori_m08.motion3.json"];
+	const modelFiles = [
+		"Hiyori.moc3",
+		...motionFiles.map((file) => "motions/" + file),
+	];
+	test.skip(
+		modelFiles.some((file) => !existsSync("web/public/live2d/hiyori/" + file)),
+		"Install the local Hiyori model and its official motion files.",
+	);
+	const browser = await playwright.chromium.launch({
+		args: [
+			"--mute-audio",
+			"--use-gl=angle",
+			"--use-angle=swiftshader",
+			"--enable-unsafe-swiftshader",
+		],
+	});
+	const page = await browser.newPage({ viewport: { width: 480, height: 500 } });
+	const errors: string[] = [];
+	page.on("pageerror", (error) => errors.push(error.message));
+	try {
+		await page.addInitScript(() => {
+			Math.random = () => 0;
+		});
+		await page.route("http://127.0.0.1/**", (route) => {
+			const path = new URL(route.request().url()).pathname;
+			if (
+				path.includes("/motions/") &&
+				!motionFiles.some((file) => path.endsWith("/" + file))
+			)
+				return route.fulfill({ status: 404 });
+			if (path.startsWith("/live2d/"))
+				return route.fulfill({ path: resolve("web/public", "." + path) });
+			if (path === "/fixture.js")
+				return route.fulfill({
+					contentType: "text/javascript",
+					path: join(directory, "avatar-transition.fixture.js"),
+				});
+			return route.fulfill({
+				contentType: "text/html",
+				body: '<body style="margin:0;background:#182030"><div id="avatar" style="width:480px;height:500px"></div><script src="/fixture.js"></script></body>',
+			});
+		});
+		await page.goto("http://127.0.0.1/__hiyori_transition__");
+		await expect
+			.poll(() => page.evaluate(() => window.hiyoriTransitionTest?.loaded()))
+			.toBe(2);
+		const trace = await page.evaluate(() => {
+			const { render } = window.hiyoriTransitionTest;
+			const scene = (
+				end: number,
+				cue: (frame: number) => AvatarCue | null,
+				mouth = 0,
+			) =>
+				Array.from({ length: end + 1 }, (_, frame) =>
+					render(frame / 24, cue(frame), mouth),
+				);
+			const joy = (key: string): AvatarCue => ({
+				key,
+				motion: "joyful",
+				emotion: "joy",
+			});
+			const surprise = (key: string): AvatarCue => ({
+				key,
+				motion: "surprised",
+				emotion: "surprise",
+			});
+			const early = scene(92, (frame) => (frame >= 24 ? joy("early") : null));
+			const late = scene(110, (frame) => (frame >= 78 ? joy("late") : null));
+			const switched = scene(66, (frame) => {
+				if (frame >= 42) return surprise("switch");
+				return frame >= 24 ? joy("before-switch") : null;
+			});
+			const stopped = scene(54, (frame) =>
+				frame >= 24 && frame < 32 ? joy("stop") : null,
+			);
+			const stillBefore = scene(42, (frame) =>
+				frame >= 24 ? joy("before-still") : null,
+			).at(-1)!;
+			const still = render(0, null);
+			const idle = scene(92, () => null);
+			const blinking = scene(
+				78,
+				(frame) => (frame >= 60 ? surprise("blink") : null),
+				0.35,
+			);
+			const fallback = scene(42, (frame) =>
+				frame >= 24
+					? { key: "no-clip", motion: "greeting", emotion: "admiration" }
+					: null,
+			);
+			return {
+				early,
+				late,
+				switched,
+				stopped,
+				stillBefore,
+				still,
+				idle,
+				blinking,
+				fallback,
+			};
+		});
+		await testInfo.attach("hiyori-frame-parameters", {
+			body: JSON.stringify(trace),
+			contentType: "application/json",
+		});
+
+		expect(trace.early[24]!.pose).toEqual(trace.early[23]!.pose);
+		expect(trace.early[24]!.arms).toEqual([1, 0]);
+		expect(trace.early[42]!.arms).toEqual([0, 1]);
+		expect(trace.early[42]!.smile).toBeGreaterThan(0.25);
+		for (let age = 14; age <= 32; age++)
+			trace.early[24 + age]!.pose.forEach((value, index) =>
+				expect(value).toBeCloseTo(trace.late[78 + age]!.pose[index]!, 4),
+			);
+
+		// The 2.1-second joy clip ends before its text cue expires.
+		expect(trace.early[76]!.pose).toEqual(trace.early[75]!.pose);
+		expect(trace.early[76]!.arms).toEqual([0, 1]);
+		expect(trace.early[92]!.pose).toEqual(trace.idle[92]!.pose);
+		expect(trace.early[92]!.arms).toEqual([1, 0]);
+		expect(trace.switched[42]!.pose).toEqual(trace.switched[41]!.pose);
+		expect(trace.switched[42]!.arms).toEqual(trace.switched[41]!.arms);
+		expect(trace.switched[55]!.arms).toEqual([1, 0]);
+		expect(
+			Math.max(
+				...trace.switched
+					.slice(42, 55)
+					.map((frame) => Math.abs(frame.pose[0]!)),
+			),
+		).toBeLessThan(0.01);
+		expect(trace.stopped[32]!.pose).toEqual(trace.stopped[31]!.pose);
+		expect(trace.stopped[31]!.arms[1]).toBeGreaterThan(0);
+		expect(trace.stopped[54]!.pose).toEqual(trace.idle[54]!.pose);
+		expect(trace.stopped[54]!.arms).toEqual([1, 0]);
+		expect(trace.stillBefore.arms).toEqual([0, 1]);
+		expect(trace.still.arms).toEqual([1, 0]);
+		expect(trace.blinking[74]!.eye).toBeLessThan(0.02);
+		expect(trace.blinking[74]!.mouth).toBeCloseTo(0.35, 4);
+		expect(trace.fallback[42]!.pose).toEqual(trace.idle[42]!.pose);
+		expect(trace.fallback[42]!.smile).toBeGreaterThan(0.4);
+		expect(trace.fallback[42]!.arms).toEqual([1, 0]);
+		expect(errors).toEqual([]);
+	} finally {
+		await browser.close();
+	}
 });
 
 test("new messages and replay drive the real face and mouth, then return to the conversation phase", async ({

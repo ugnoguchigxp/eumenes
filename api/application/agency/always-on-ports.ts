@@ -23,6 +23,7 @@ import type {
 } from "../../domains/dialogue/contracts";
 import { getLogger } from "../../infrastructure/logger";
 import { currentInput, referencedInput } from "./input";
+import { logNoteDisplayFailure } from "./always-on-flow";
 import { agencyReplyParts } from "./system-context";
 import { deliveryEmotionOf } from "./speech";
 import {
@@ -63,9 +64,57 @@ const remember = <T>(map: Map<string, T>, key: string, value: T) => {
 	}
 };
 
+type PrepareDisplay = (
+	scope: AgendaScope,
+	note: AgendaScope["notes"][number],
+	runId: string,
+	signal: AbortSignal,
+) => Promise<(db: Database) => void>;
+
+function silentNoteOutput(
+	prepareDisplay: PrepareDisplay,
+	c: AgendaScope,
+	runId: string,
+	signal: AbortSignal,
+) {
+	const noteIds = c.shows.get(runId);
+	if (!noteIds?.length) return undefined;
+	return async () => {
+		// Publish at adoption, without a separate assistant message to trigger the feed.
+		c.shows.delete(runId);
+		const notes = noteIds
+			.map((id) => c.notes.find((note) => note.id === id))
+			.filter((note) => note !== undefined);
+		const prepared = await Promise.allSettled(
+			notes.map((note) => prepareDisplay(c, note, runId, signal)),
+		);
+		signal.throwIfAborted();
+		const publications = prepared.flatMap((result) => {
+			if (result.status === "fulfilled") return [result.value];
+			logNoteDisplayFailure(c.id, result.reason);
+			return [];
+		});
+		if (!publications.length) return undefined;
+		return (db: Database) => {
+			let published = false;
+			for (const publish of publications) {
+				try {
+					// Roll back a partial note write while preserving other notes and the reply's fallback.
+					db.transaction(publish)(db);
+					published = true;
+				} catch (error) {
+					logNoteDisplayFailure(c.id, error);
+				}
+			}
+			return published;
+		};
+	};
+}
+
 export function createAgendaPorts(input: {
 	deps: AgencyHostDeps;
 	convs: Map<string, AgendaScope>;
+	prepareDisplay: PrepareDisplay;
 	/** The scope of a conversation the agenda serves now, or null (off, or not ready). */
 	serving(id: string): AgendaScope | null;
 	active(): string | null;
@@ -125,6 +174,7 @@ export function createAgendaPorts(input: {
 	) {
 		catchUp();
 		input.heard(c);
+		c.shows.delete(run.runId);
 		const at = now();
 		const userIds = new Set(
 			c.agent
@@ -171,7 +221,16 @@ export function createAgendaPorts(input: {
 			read: (id: string) => noteText(c, id),
 			now,
 		};
-		const own = createAgendaReplyTools(toolInput);
+		const own = createAgendaReplyTools({
+			...toolInput,
+			events: {
+				onShow(note) {
+					remember(c.shows, run.runId, [
+						...new Set([...(c.shows.get(run.runId) ?? []), note.id]),
+					]);
+				},
+			},
+		});
 		const hostNames = new Set(args.tools.tools.map((t) => t.name));
 		const offered = own.tools
 			.filter(
@@ -242,23 +301,6 @@ export function createAgendaPorts(input: {
 									}
 								: result;
 						}
-						if (call.name === SHOW_NOTE) {
-							let id = "";
-							try {
-								const parsed = JSON.parse(call.arguments) as { id?: unknown };
-								id = typeof parsed.id === "string" ? parsed.id : "";
-							} catch {
-								id = "";
-							}
-							const note = c.notes.find(
-								(n) => n.id === id.replace(/^note:/u, ""),
-							);
-							// Shown once the reply is adopted (its message appears), never for a reply that is not.
-							if (note)
-								remember(c.shows, run.runId, [
-									...new Set([...(c.shows.get(run.runId) ?? []), note.id]),
-								]);
-						}
 						return own.call(call, signal);
 					},
 				},
@@ -298,24 +340,30 @@ export function createAgendaPorts(input: {
 		// The same condition as the agenda's rules in the system: they say how to look for a toolchain and hand over.
 		handsWork: () => agendaReady(deps),
 		async respond(args) {
-			const c = args.run ? serving(args.run.conversationId) : null;
+			const { run, signal } = args;
+			const c = run ? serving(run.conversationId) : null;
 			const reply =
-				c && args.run
-					? await agendaReply(c, args.run, args)
+				c && run
+					? await agendaReply(c, run, args)
 					: await runRespond({
 							...args,
 							emotion: deps.settings.get().agency.emotion,
 						});
+			const prepareSilentOutput =
+				c && run
+					? silentNoteOutput(input.prepareDisplay, c, run.runId, signal)
+					: undefined;
 			return {
 				text: reply.text,
 				ended: reply.ended,
-				...(c && args.run
+				...(c && run
 					? {
 							calls: reply.calls.filter((call) =>
 								AGENDA_TOOL_NAMES.has(call.name),
 							),
 						}
 					: {}),
+				...(prepareSilentOutput ? { prepareSilentOutput } : {}),
 				...(reply.emotion
 					? { emotion: deliveryEmotionOf(emotionName(reply.emotion)) }
 					: {}),

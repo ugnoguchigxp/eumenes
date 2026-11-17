@@ -74,7 +74,7 @@ export function queueChunks(
 			});
 		// Awaited in turn below; a failure before then must not surface as unhandled.
 		audio.catch(() => {});
-		chunkQueue.tail = chunkQueue.tail
+		const scheduled = chunkQueue.tail
 			.then(async () => {
 				if (!playable()) return;
 				const fetched = await audio;
@@ -87,7 +87,11 @@ export function queueChunks(
 				const ended = () => {
 					chunkQueue.lastEndedAt = performance.now();
 					deps.setSubtitle((s) => (s?.key === key ? null : s));
-					deps.setAvatarCue((cue) => (cue?.key === key ? null : cue));
+					const continues = playable() && chunkQueue.tail !== scheduled;
+					deps.setAvatarCue((cue) => {
+						if (cue?.key !== key) return cue;
+						return continues ? { ...cue, speaking: false } : null;
+					});
 					if (!playable()) return;
 					void reportPlayed(identity, () =>
 						client.voicePlayed(
@@ -129,11 +133,13 @@ export function queueChunks(
 								gestureKey: `voice:${turn.utteranceId}`,
 								speaking: audible,
 							}));
+						else deps.setAvatarCue(() => null);
 					},
 				});
 				if (playable() && chunk.text.trim())
 					deps.setSubtitle(() => ({ key, text: chunk.text.trim() }));
 			})
 			.catch(fail);
+		chunkQueue.tail = scheduled;
 	}
 }

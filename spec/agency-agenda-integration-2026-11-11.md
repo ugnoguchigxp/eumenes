@@ -19,7 +19,7 @@
 ## 継ぎ目と決定
 
 - **発話間隔**: 設定は 10/60/600 秒、agenda は 10/60/300 秒。600 は 300 として読む（設定契約は変更しない）。台帳の `claimDispatch` は epoch の栅としてだけ使い、間隔は 0 にした。間隔は agent 自身の規則で、調べものの開始が発話を遅らせない。
-- **メモの出どころ**: 会話ごとのドキュメント一覧 API はない。台帳が返した結果（実行結果の `answer` / `summary` / `claims` / `sources` / `document.title`）を、調べものを頼んだ ticket の `refs` つきのメモにして checkpoint に持つ（最新30件、本文は最大8000字）。`read_note` はこれを読む。`show_note` は、その返事が採用されて assistant メッセージが現れた後に、メモを Markdown ドメインの文書にして、その文書を付けた `agency-note:<scope>:<runId>:<noteId>` のメッセージを会話に出す（返事と調べものにつき1件。`agency:` ではないので自動音声で読み上げない。本文は題と要約だけで、メモの本文は会話に入れない）。Web 由来の文書なので、モデルへ渡す履歴には入れず（`recordSpoke` しない）、Memory はブロックして学習しない。採用されなかった返事は表示しない。詳細は下記「メモは Markdown 文書として表示する」。
+- **メモの出どころ**: 会話ごとのドキュメント一覧 API はない。台帳が返した結果（実行結果の `answer` / `summary` / `claims` / `sources` / `document.title`）を、調べものを頼んだ ticket の `refs` つきのメモにして checkpoint に持つ（最新30件、本文は最大8000字）。`read_note` はこれを読む。`show_note` は返事の採用を条件に、Markdown 文書を付けた `agency-note:<scope>:<runId>:<noteId>` のメッセージを会話に出す（返事と調べものにつき1件。題と要約を表示し、読み上げは省く）。文書はモデルへ渡す履歴と Memory の学習から除外する。詳細は下記「メモは Markdown 文書として表示する」。
 - **調べものの機能選択**: `toolchain:web.note@…` だけ（承認不要のもの。Codex の検索による調べもの、[web-note-codex-search-2026-11-11](web-note-codex-search-2026-11-11.md)）。`web.research`（Pursuit の深い調査）や他の機能には回さない（2026-11-11 までは `web.research`）。結果は題・要約・Markdown 本文・出典を持ち、そのままメモになる。なければ、承認が要る・予算超過と同じく「できなかった」として agent に返す（10秒ごとの再試行にしない）。サーバーからの個別指定は不要（既定がこの選択）。研究 ticket は checkpoint の保存が他の変更で競合しても、すぐ取り直して開始する。
 - **LLM**: purpose は think。agent の呼び出しには `input` が無いので、旧の入力ガードの代わりに世代（利用者の言葉・訂正・忘却で増える）と中止信号で古さを判定する。reasoning は設定がなければ low（出力 400〜1500 トークンを使い切らせない）。出力上限 2400 は agent の要求（最大 1500）以内。
 - **返事**: system には Eumenes の人格・感情規則の外側に、パッケージの `agendaReplySystem` の「仕組み」〜「返事の仕方」の範囲を加える（`always-on-system.ts`）。状態（記憶・メモ・調査記録・静かな時間・`askIfFits`）は `agendaReplyMessages` が作る状態メッセージを、利用者の最後のメッセージの前に差し込む（プロンプト先頭は変わらない）。返事はどのターン（通知・作業報告・引き渡しも）でも agenda の道具と状態を持つ。agenda が使えない間（runtime が always-on でない、Memory が不健全、台帳なし）は system からも agenda の規則を外す（`agencyReplyParts(settings, agenda)`）。道具は `start_preparation` `read_note` `show_note` `set_quiet`。`find_toolchain` / `delegate` は配布物のもの（`delegatedTo` の調べもの）ではなく host の道具で、利用者の発言に答える会話の返事に渡す（2026-11-12 改訂。[Router の設計](router-package-integration-2026-11-04.md)の「会話の返事から担当に頼む道」。返事の規則は配布物の `toolchains: true` の範囲）。呼び出し上限は host の道具の上限に3を足す。返事の道具呼び出しは次の返事の履歴として agent の `said` に入る。
@@ -140,14 +140,14 @@ agency の配布物には steer を含めない（利用者、2026-11-11）。ag
 | いつ | 調べものが返ってメモになったとき（2026-11-12 改訂。下の「メモを Markdown に蓄積する」）。`show_note` はその文書を会話に出す |
 | 文書 | `markdown.generated` の所有者 `agency-note`。題はメモの題、本文はメモの Markdown そのまま。ローカルは scratch の `<題>.md`、Docling がつながっていれば `eumenes` の `notes/<日付>_<題>_<noteId>.md` へ新規保存（既存の Queue・PUT 1回・GET 照合を共用） |
 | 同じメモ | 会話とメモから決まる固定の文書 id。何度表示しても文書は1つ。再起動でローカルが失効し、Docling へ未送信だった文書だけ作り直す（送信結果が不明のものは作り直さない） |
-| 会話 | 保存の終端を待ってから（最長 210 秒）、文書を資源として会話に登録し、`agency-note:` のメッセージのチップにする。本文は題と要約 |
+| 会話 | 保存の終端を待ってから（最長 210 秒）、文書を資源として会話に登録し、`agency-note:` のメッセージのチップにする。本文は題と要約。通常は返事の保存後に追加する。利用者への返事が空の場合は会話の期限内で保存を待ち、返事の採用と同じトランザクションでリンクを登録できたときに読み上げなしで完了する |
 | 画面 | メッセージが届いたら、その文書を Markdown の画面で開く（Docling 保存済みなら既存の Plate 編集、ローカルだけなら読み取り専用の Plate 表示）。画面を開いたときに既にあったメッセージは自動では開かず、チップから開く（`web/src/workspace/useShownNotes.ts`） |
-| 失敗 | scratch も Docling も使えない・保存の期限切れは、メッセージを出さず `agency.show_note_failed` を記録する |
+| 失敗 | scratch も Docling も使えない、保存の期限切れなどで表示できないときは、`agency.show_note_failed` を記録する。会話の期限内に表示失敗が確定し、返事も空だった利用者ターンは通常の聞き直しに進む |
 | 忘却 | メモが忘却されたら、ローカルのファイルと生成文書の記録を消し、保存待ちは止める。Docling へ確定保存された文書は利用者の文書として残す（調査報告と同じ） |
 
-- 場所: `api/application/agency/note-documents.ts`（`NoteDocumentPort` の実装、`server-services.ts` で接続）、`always-on-flow.ts` の `showNote`。
+- 実装は `api/application/agency/note-documents.ts`（`NoteDocumentPort`）、`always-on-flow.ts` の `prepareNoteDisplay`、`dialogue/service/generation-settle.ts` の採用処理。
 - 保存待ちはサーバーのメモリー上で行う。待っている間に再起動すると、そのメッセージは出ない（文書は Markdown の一覧に残る）。
-- 試験: `api/application/agency/note-documents.test.ts`（Docling あり・なし）、`always-on.test.ts`、`web/src/workspace/useShownNotes.test.tsx`。
+- 試験は `api/application/agency/note-documents.test.ts`（Docling あり・なし）、`always-on.test.ts`、`note-display-voice.test.ts`（空の返事での表示・失敗・取消）、`web/src/workspace/useShownNotes.test.tsx`。
 
 
 ## agency の調べものは会話のルーターの候補にしない（2026-11-12）
