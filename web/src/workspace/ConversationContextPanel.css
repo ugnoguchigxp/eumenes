@@ -1,37 +1,19 @@
-.conversation-context-trigger {
-	position: fixed;
-	z-index: 11;
-	top: calc(12px + env(safe-area-inset-top, 0px));
-	right: calc(148px + env(safe-area-inset-right, 0px));
-	height: 36px;
-	padding-inline: 12px;
-	border: 1px solid var(--border);
-	border-radius: 999px;
-	color: var(--foreground);
-	background: var(--card);
-}
-
-.app-shell[data-context-available] .conversation-status {
-	max-width: calc(
-		100% - 260px - env(safe-area-inset-left, 0px) -
-			env(safe-area-inset-right, 0px)
-	);
-}
-
 .app-shell[data-context-open] {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) clamp(300px, 36vw, 540px);
+	grid-template-columns: minmax(0, 1fr) clamp(320px, 39vw, 640px);
 	grid-template-rows: minmax(0, 1fr);
 }
 
 .conversation-context {
+	--context-surface: color-mix(in srgb, var(--card) 88%, var(--background));
+	--context-selection: color-mix(in srgb, var(--primary) 16%, var(--card));
 	min-width: 0;
 	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	padding-top: calc(60px + env(safe-area-inset-top, 0px));
 	border-inline-start: 1px solid var(--border);
-	background: var(--card);
+	background: var(--context-surface);
 	color: var(--foreground);
 }
 
@@ -40,46 +22,142 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-	padding: 0 16px 10px;
+	padding: 0 20px 12px;
 	border-bottom: 1px solid var(--border);
 }
 
 .conversation-context h2 {
 	margin: 0;
-	font-size: 16px;
+	font-size: 20px;
+	font-weight: 650;
+	line-height: 1.25;
+}
+
+.context-close {
+	flex: none;
+	width: 32px;
+	height: 32px;
 }
 
 .conversation-context-body {
 	overflow: auto;
 	min-height: 0;
-	padding: 14px 16px 24px;
+	padding: 16px 20px 24px;
 	overflow-wrap: anywhere;
-	font-size: 13px;
+	font-size: 0.875rem;
+	line-height: 1.5;
+	scrollbar-gutter: stable;
 }
 
 .conversation-context-body > output {
 	display: block;
-	margin-block: 0.75em;
+	margin-block: 14px;
+	padding: 12px;
+	border-radius: 8px;
+	background: var(--muted);
+	color: var(--muted-foreground);
+}
+
+.context-inspector-controls {
+	display: grid;
+	gap: 8px;
+	margin-bottom: 12px;
+	padding: 10px 12px;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: var(--card);
+}
+
+.context-follow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 10px;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.context-follow button {
+	gap: 7px;
+	min-height: 32px;
+	padding-inline: 6px;
+}
+
+.context-follow small {
+	color: var(--muted-foreground);
+}
+
+.context-follow-dot {
+	flex: 0 0 8px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--muted-foreground);
+}
+
+.context-follow-dot[data-live="true"] {
+	background: var(--primary);
+}
+
+.context-view-switch {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 3px;
+	min-inline-size: 0;
+	margin: 0 0 14px;
+	padding: 3px;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--card);
+}
+
+.context-view-switch button {
+	border-radius: 999px;
+}
+
+.context-view-switch button[aria-pressed="true"] {
+	background: var(--context-selection);
+	font-weight: 650;
 }
 
 .context-input-select {
 	display: grid;
-	gap: 4px;
-	margin-block: 14px 10px;
+	gap: 5px;
+	color: var(--muted-foreground);
+	font-size: 0.75rem;
+	font-weight: 600;
 }
 
 .context-input-select select {
 	width: 100%;
-	padding: 6px;
+	min-width: 0;
+	min-height: 36px;
+	padding: 5px 9px;
 	border: 1px solid var(--border);
-	border-radius: 6px;
-	background: var(--background);
+	border-radius: 8px;
+	background: var(--context-surface);
 	color: var(--foreground);
+	font-size: 0.8125rem;
+	font-weight: 500;
 }
 
-.context-input-messages,
+.context-input-messages {
+	display: grid;
+	gap: 8px;
+	margin-block: 12px;
+	padding: 0;
+	list-style: none;
+}
+
 .context-input-origins {
-	padding-inline-start: 24px;
+	margin: 12px 12px 0;
+	padding: 9px 0 0 16px;
+	border-top: 1px solid var(--border);
+	color: var(--muted-foreground);
+	font-size: 0.75rem;
+}
+
+.context-input-origins li + li {
+	margin-top: 4px;
 }
 
 .context-input-origins small {
@@ -87,39 +165,130 @@
 }
 
 .conversation-context details {
-	margin-block: 6px;
-	padding: 7px;
+	margin-block: 8px;
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: 10px;
+	background: var(--card);
+}
+
+.context-input-messages li > details {
+	margin: 0;
+}
+
+.conversation-context details[open] {
+	padding-bottom: 10px;
 }
 
 .conversation-context summary {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 40px;
+	padding: 8px 12px;
+	border-radius: 9px;
+	font-weight: 600;
 	cursor: pointer;
+	list-style: none;
+}
+
+.conversation-context summary::-webkit-details-marker {
+	display: none;
+}
+
+.conversation-context summary::after {
+	content: "";
+	flex: 0 0 7px;
+	width: 7px;
+	height: 7px;
+	margin-inline-start: auto;
+	border-right: 1.5px solid var(--muted-foreground);
+	border-bottom: 1.5px solid var(--muted-foreground);
+	transform: translateY(-2px) rotate(45deg);
+}
+
+.conversation-context details[open] > summary::after {
+	transform: translateY(2px) rotate(225deg);
+}
+
+.conversation-context summary:hover {
+	background: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.conversation-context summary:focus-visible,
+.context-input-select select:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+
+.context-message-role {
+	flex: none;
+	padding: 2px 7px;
+	border-radius: 6px;
+	background: var(--muted);
+	color: var(--foreground);
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.context-message-role[data-role="system"] {
+	background: var(--context-selection);
+}
+
+.context-message-role[data-role="user"] {
+	background: color-mix(in srgb, var(--success) 16%, var(--card));
+}
+
+.context-message-role[data-role="tool"] {
+	background: color-mix(in srgb, var(--warning) 20%, var(--card));
+}
+
+.conversation-context p {
+	margin-block: 8px;
+	color: var(--muted-foreground);
+}
+
+.conversation-context details > p {
+	margin-inline: 12px;
 }
 
 .conversation-context pre {
-	margin: 8px 0;
-	padding: 8px;
-	background: var(--muted);
+	margin: 2px 12px 0;
+	padding: 10px 12px;
+	border-radius: 7px;
+	background: color-mix(in srgb, var(--muted) 48%, var(--card));
+	color: var(--foreground);
+	font-family: "IBM Plex Mono", ui-monospace, monospace;
+	font-size: 0.8125rem;
+	line-height: 1.55;
+	tab-size: 2;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
 
 .context-input-diff [data-change="added"] {
 	border-inline-start: 3px solid var(--success);
+	background: color-mix(in srgb, var(--success) 10%, var(--card));
 }
 .context-input-diff [data-change="removed"] {
 	border-inline-start: 3px solid var(--destructive);
+	background: color-mix(in srgb, var(--destructive) 10%, var(--card));
 }
 
 @media (max-width: 700px) {
 	.app-shell[data-context-open] {
 		grid-template-columns: minmax(0, 1fr);
-		grid-template-rows: minmax(0, 6fr) minmax(0, 4fr);
+		grid-template-rows: minmax(0, 5fr) minmax(0, 5fr);
 	}
 	.conversation-context {
 		padding-top: 8px;
 		border-inline-start: 0;
 		border-top: 1px solid var(--border);
+	}
+	.conversation-context > header,
+	.conversation-context-body {
+		padding-inline: 12px;
+	}
+	.conversation-context h2 {
+		font-size: 17px;
 	}
 }

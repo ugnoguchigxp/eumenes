@@ -170,6 +170,33 @@
 			],
 			"redirects": [],
 			"selectable": false
+		},
+		{
+			"kind": "toolchain",
+			"id": "inspect.source",
+			"revision": 4,
+			"title": "Eumenes のソース調査",
+			"summary": "Eumenes のソースコードを閲覧し、概要、ソースファイルと変更前後の差分やコードの抜粋を会話に返す。小・中・大で表示範囲を選べる。",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"Eumenes 自身のソースで設定や処理の実装箇所を確かめたい",
+				"Eumenes の操作に関わるコードの呼出し順や設計との差を説明してほしい"
+			],
+			"avoidWhen": [
+				"公開 Web の情報を調べたい",
+				"編集・パッチ適用・試験実行を依頼したい"
+			],
+			"dependencies": ["package:inspect.source@2"],
+			"functionName": "inspect_source",
+			"packageRevisionId": "package:inspect.source@2",
+			"bindingRevisionId": "binding:inspect.source@2",
+			"examples": [
+				"Eumenes の取消は会話から実行側までどう伝わる？ ソースの行番号を添えて",
+				"会話のツールチェーン登録はどのファイルで読み込まれる？",
+				"このリポジトリでは、調べものの結果がどこから会話に返る？"
+			],
+			"redirects": []
 		}
 	],
 	"bindings": [

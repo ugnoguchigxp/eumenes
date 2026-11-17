@@ -143,9 +143,6 @@ export function createGenerationHandler(
 							});
 						log.info("dialogue.generation_completed");
 						return {
-							...(generated.displayText !== undefined
-								? { displayText: generated.displayText }
-								: {}),
 							...(generated.finishSilentReplyInTransaction
 								? {
 										finishSilentReplyInTransaction:

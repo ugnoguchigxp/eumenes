@@ -250,10 +250,6 @@ export type DialogueDeps = {
 		text: string;
 		sources: Array<{ url: string; title: string }>;
 	}>;
-	sourceLookup?: (
-		query: string,
-		signal: AbortSignal,
-	) => Promise<{ text: string; displayText?: string }>;
 	/** Session toolchains and their domain work; without it no specialist session exists. */
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */

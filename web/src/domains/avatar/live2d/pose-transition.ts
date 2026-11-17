@@ -37,6 +37,7 @@ export function createPoseTransition(
 				if (weight !== 1) model.setParameterValueByIndex(index, value);
 			}
 			initialized = true;
+			return weight;
 		},
 		reset() {
 			initialized = false;

@@ -43,7 +43,6 @@ export type ToolExecutor = (
 ) => Promise<ToolOutcome>;
 
 export type GenerationOutcome = {
-	displayText?: string;
 	/** Publishes visible output, or returns the host's spoken fallback when the write fails. */
 	finishSilentReplyInTransaction?: (db: Database) => string;
 	debugTarget?: string;

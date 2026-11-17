@@ -142,14 +142,15 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 		};
 		const set = (key: string, value: number, weight?: number) =>
 			model.setParameterValueById(id(key), value, weight);
-		const groups = (
-			JSON.parse(new TextDecoder().decode(poseBytes)) as {
-				Groups: { Id: string }[][];
-			}
-		).Groups;
-		const idleParts = groups.flatMap((group) =>
+		const poseDefinition = JSON.parse(new TextDecoder().decode(poseBytes)) as {
+			FadeInTime?: number;
+			Groups?: { Id: string }[][];
+		};
+		const idleParts = (poseDefinition.Groups ?? []).flatMap((group) =>
 			group.map((part, index) => [id(part.Id), index === 0 ? 1 : 0] as const),
 		);
+		const partFadeTime = poseDefinition.FadeInTime ?? 0.5;
+		const partStepSeconds = partFadeTime < 0 ? 0.5 : partFadeTime;
 		const matrix = new sdk.CubismModelMatrix(
 			model.getCanvasWidth(),
 			model.getCanvasHeight(),
@@ -209,7 +210,7 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 					// Preserve the preset's contribution to the face when clips are shared.
 					for (const [key, value] of parameters) set(key, value, 0.2);
 				}
-				transition.apply(dt, motionFrame?.fade);
+				const poseWeight = transition.apply(dt, motionFrame?.fade);
 				physics.evaluate(model, dt);
 				const eyeWeight = 1 - blink(time);
 				for (const eye of ["ParamEyeLOpen", "ParamEyeROpen"]) {
@@ -222,7 +223,9 @@ export async function createHiyori(host: HTMLElement, signal: AbortSignal) {
 				mouth = ParamMouthOpenY;
 				// The clips have authored mouth curves. Keep their shapes and use audio for opening.
 				set("ParamMouthOpenY", mouth);
-				pose.updateParameters(model, motionFrame?.fade === undefined ? dt : 0);
+				// Keep the previous arm set through the first half of the pose blend.
+				// Complete the SDK's part fade before drawing the new set.
+				if (poseWeight >= 0.5) pose.updateParameters(model, partStepSeconds);
 				model.update();
 				gl.viewport(0, 0, canvas.width, canvas.height);
 				gl.clearColor(0, 0, 0, 0);

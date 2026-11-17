@@ -32,7 +32,7 @@ const originLabel: Record<Origin["kind"], string> = {
 };
 
 export function ContextInputDetail({ capture }: { capture: ContextCapture }) {
-	const { summary, input, cut } = capture;
+	const { input, cut } = capture;
 	const firstTurn = input.messages.findIndex(
 		(message) => message.role !== "system",
 	);
@@ -42,10 +42,6 @@ export function ContextInputDetail({ capture }: { capture: ContextCapture }) {
 		(input.boundary === "codex-sdk" ? (input.sdk?.carried ?? 0) : 0);
 	return (
 		<section aria-label="送信時点の入力" className="context-input-detail">
-			<p>
-				送信 {summary.number} · {inputTime(summary.at)} ·{" "}
-				{inputBoundary[input.boundary]}
-			</p>
 			{cut && (
 				<p>
 					履歴の区切り <code>{cut}</code>
@@ -83,13 +79,16 @@ export function ContextInputDetail({ capture }: { capture: ContextCapture }) {
 						<details
 							open={
 								i === input.messages.length - 1 ||
+								message.role === "tool" ||
 								message.origins.some(({ kind }) => kind === "agency")
 									? true
 									: undefined
 							}
 						>
 							<summary>
-								<code>{message.role}</code>{" "}
+								<code className="context-message-role" data-role={message.role}>
+									{message.role}
+								</code>{" "}
 								{Array.from(
 									new Set(message.origins.map(({ kind }) => originLabel[kind])),
 								).join("・") || "出典未特定"}

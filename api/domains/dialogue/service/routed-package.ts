@@ -298,14 +298,6 @@ export async function routeByEntry(
 							...(turn.deps.lookup
 								? [systemContext(LOOKUP_STRUCTURE, {})]
 								: []),
-							...(turn.deps.sourceLookup
-								? [
-										systemContext(
-											"dialogue.contexts.local.router-source-lookup",
-											{},
-										),
-									]
-								: []),
 						].join("\n\n"),
 					},
 					signal,

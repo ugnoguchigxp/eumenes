@@ -3,7 +3,7 @@
   "artifactVersion": 2,
   "compilerVersion": "0.1.2",
   "releaseProfile": "application",
-  "policyDigest": "sha256:57dea49d4230201a542769863408733f80873452a9c0681b0ae1ff58c8a19afb",
+  "policyDigest": "sha256:088bd958e4f99f326a25c2affbb1b2602859266f5ce847e5f32a74dd81d2adb0",
   "createdFrom": {
     "configPath": "s11tnext.config.toml",
     "sourceFiles": [
@@ -46,7 +46,6 @@
       "api/domains/dialogue/contexts/agency/reply.context.toml",
       "api/domains/dialogue/contexts/agency/select-emotion.context.toml",
       "api/domains/dialogue/contexts/agency/select.context.toml",
-      "api/domains/dialogue/contexts/agency/source-lookup.context.toml",
       "api/domains/dialogue/contexts/agency/spoken.context.toml",
       "api/domains/dialogue/contexts/agency/talk-facts.context.toml",
       "api/domains/dialogue/contexts/agency/think.context.toml",
@@ -100,7 +99,6 @@
       "api/domains/dialogue/contexts/local/router-redirect-kept.context.toml",
       "api/domains/dialogue/contexts/local/router-redirect.context.toml",
       "api/domains/dialogue/contexts/local/router-request.context.toml",
-      "api/domains/dialogue/contexts/local/router-source-lookup.context.toml",
       "api/domains/dialogue/contexts/local/router-structure-handoff.context.toml",
       "api/domains/dialogue/contexts/local/router-switch-ask.context.toml",
       "api/domains/dialogue/contexts/local/router-unperformed.context.toml",
@@ -1549,39 +1547,6 @@
       },
       "definitionHash": "sha256:67e4027bf56d0f8a5afa7b294a0fbaa44a8819c2a882e1d7a5187c11b0037dff",
       "releaseDigest": "sha256:b8d4535362224b8db459c2b0f82c2ab51f5d27060a98d48e2087cabda3461924"
-    },
-    "dialogue.contexts.agency.source-lookup": {
-      "key": "dialogue.contexts.agency.source-lookup",
-      "owner": "unowned",
-      "contentKind": "text",
-      "messageRole": "system",
-      "sourceLocale": "ja-JP",
-      "requiredLocales": [
-        "ja-JP"
-      ],
-      "variables": {},
-      "locales": {
-        "ja-JP": {
-          "sections": [
-            {
-              "id": "context.text",
-              "kind": "instruction",
-              "severity": "must",
-              "optimizable": false,
-              "omitIfEmpty": false,
-              "segments": [
-                {
-                  "type": "literal",
-                  "value": "Eumenes 自身のソースコード、ファイルや差分を閲覧し、結果をこの会話に返す。query に質問の対象、確認したい箇所、表示の深さを含める。閲覧だけの依頼では応答や担当への委任を先に告げずに、この道具を呼ぶ。結果の表示と読み上げはホストが担当する。"
-                }
-              ]
-            }
-          ],
-          "artifactHash": "sha256:1db93109b994925adf139b00abaf50166333d281b20af7f18b1b4a58e6887fee"
-        }
-      },
-      "definitionHash": "sha256:77bec047bfb93251374256afe72ce3339e3c2b6bdc1fde759051ac612b4c7bb5",
-      "releaseDigest": "sha256:498b1dd9e770a31530f97b306e8a70d5169839fb1cf85dacad982a39f02d68c4"
     },
     "dialogue.contexts.agency.spoken": {
       "key": "dialogue.contexts.agency.spoken",
@@ -4006,39 +3971,6 @@
       "definitionHash": "sha256:5cf160e2836166ffef2c05bafbb8eb00a3b227583f93fdc52a873568b595f0ab",
       "releaseDigest": "sha256:31a8620dbcde40b359b575208e337be5b6efa9180466c581f78a185fa453a1e4"
     },
-    "dialogue.contexts.local.router-source-lookup": {
-      "key": "dialogue.contexts.local.router-source-lookup",
-      "owner": "unowned",
-      "contentKind": "text",
-      "messageRole": "system",
-      "sourceLocale": "ja-JP",
-      "requiredLocales": [
-        "ja-JP"
-      ],
-      "variables": {},
-      "locales": {
-        "ja-JP": {
-          "sections": [
-            {
-              "id": "context.text",
-              "kind": "instruction",
-              "severity": "must",
-              "optimizable": false,
-              "omitIfEmpty": false,
-              "segments": [
-                {
-                  "type": "literal",
-                  "value": "会話エージェントは Eumenes 自身のソースコードを閲覧して、この会話に概要と抜粋を返せます。コード、設定の実装や差分を確認して答えるだけの依頼は requests:[] とし、会話へ渡します。実装や編集の依頼には通常の委任経路を使います。"
-                }
-              ]
-            }
-          ],
-          "artifactHash": "sha256:ab141e44221a5e944d5e6bc22cd00e84c26630639bb823980496e4ceaaad071e"
-        }
-      },
-      "definitionHash": "sha256:2a7e8859c308cf0efc2febb3bb15737e6d3abc76ad4b692e63b77b463cb3d77a",
-      "releaseDigest": "sha256:a1f7e6e9a570d9b5bfd049e13e1f80612f76f03fdbdf56f9b5e009be620c63c7"
-    },
     "dialogue.contexts.local.router-structure-handoff": {
       "key": "dialogue.contexts.local.router-structure-handoff",
       "owner": "unowned",
@@ -5713,5 +5645,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:c9a2142f028be26e417f288ec3be8f2e7ccffc0311a908e4f903117102c88c23"
+  "catalogDigest": "sha256:981eb8fd4c4dc8165c3a13703c9658c8f9aacf7c6b349c5b94b22f4e66abfb3b"
 }

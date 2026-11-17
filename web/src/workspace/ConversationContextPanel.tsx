@@ -121,7 +121,8 @@ export function ConversationContextPanel({
 	const selected = view?.captures.find((entry) => entry.id === selectedId);
 	const detail = useContextCapture(client, selected);
 	const snapshot = detail.data;
-	const previous = showDiff ? snapshot?.previous : null;
+	const viewingDiff = showDiff && !!snapshot?.previous;
+	const previous = viewingDiff ? snapshot?.previous : null;
 	const other = useContextList(
 		client,
 		previous && previous.runId !== runId ? previous.runId : undefined,
@@ -169,59 +170,76 @@ export function ConversationContextPanel({
 					type="button"
 					ref={close}
 					variant="ghost"
-					size="sm"
+					size="icon"
+					className="context-close"
+					aria-label="閉じる"
+					title="閉じる"
 					onClick={onClose}
 				>
-					閉じる
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="1.8"
+						strokeLinecap="round"
+						aria-hidden="true"
+					>
+						<path d="M6 6l12 12M18 6L6 18" />
+					</svg>
 				</Button>
 			</header>
 			<div className="conversation-context-body">
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					aria-pressed={live}
-					onClick={() => onSelect({ mode: "latest" })}
-				>
-					最新を追う
-				</Button>
-				{!live && <small> この返答に固定中</small>}
-				{answer && (
-					<details>
-						<summary>対応する返答</summary>
-						<pre>{answer}</pre>
-					</details>
-				)}
+				<div className="context-inspector-controls">
+					<div className="context-follow">
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							aria-pressed={live}
+							onClick={() => onSelect({ mode: "latest" })}
+						>
+							<span
+								className="context-follow-dot"
+								data-live={live && !disconnected}
+								aria-hidden="true"
+							/>
+							最新を追う
+						</Button>
+						{!live && <small>この返答に固定中</small>}
+					</div>
+					{view?.captures.length ? (
+						<label className="context-input-select">
+							送信した入力
+							<select
+								value={selected?.id ?? ""}
+								onChange={(event) =>
+									runId &&
+									onSelect({
+										mode: "fixed",
+										runId,
+										captureId: event.target.value,
+									})
+								}
+							>
+								{!selected && <option value="">取得できる入力を選択</option>}
+								{view.captures.map((entry) => (
+									<option key={entry.id} value={entry.id}>
+										送信 {entry.number} · {inputTime(entry.at)} ·{" "}
+										{inputBoundary[entry.boundary]}
+										{entry.accepted
+											? " · 採用"
+											: ` · ${inputStatus[entry.status] ?? entry.status}`}
+									</option>
+								))}
+							</select>
+						</label>
+					) : null}
+				</div>
 				{disconnected && (
 					<output>更新が止まっています。再接続を待っています。</output>
 				)}
-				{view?.captures.length ? (
-					<label className="context-input-select">
-						送信した入力
-						<select
-							value={selected?.id ?? ""}
-							onChange={(event) =>
-								runId &&
-								onSelect({
-									mode: "fixed",
-									runId,
-									captureId: event.target.value,
-								})
-							}
-						>
-							{!selected && <option value="">取得できる入力を選択</option>}
-							{view.captures.map((entry) => (
-								<option key={entry.id} value={entry.id}>
-									送信 {entry.number} · {inputTime(entry.at)} ·{" "}
-									{inputBoundary[entry.boundary]}
-									{entry.accepted
-										? " · 採用"
-										: ` · ${inputStatus[entry.status] ?? entry.status}`}
-								</option>
-							))}
-						</select>
-					</label>
-				) : null}
 				{!disconnected && !runId && <output>会話の入力を待っています。</output>}
 				{!disconnected && runId && list.isPending && (
 					<output>入力の一覧を取得中</output>
@@ -248,19 +266,30 @@ export function ConversationContextPanel({
 				)}
 				{snapshot && (
 					<>
-						{snapshot.previous && (
+						<fieldset className="context-view-switch" aria-label="表示内容">
 							<Button
 								type="button"
-								variant="outline"
+								variant="ghost"
 								size="sm"
-								aria-pressed={showDiff}
-								onClick={() => setShowDiff(!showDiff)}
+								aria-pressed={!viewingDiff}
+								onClick={() => setShowDiff(false)}
 							>
-								前の入力との差分
+								入力
 							</Button>
-						)}
-						{previous &&
-							(prior.data ? (
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								aria-label="前の入力との差分"
+								aria-pressed={viewingDiff}
+								disabled={!snapshot.previous}
+								onClick={() => setShowDiff(true)}
+							>
+								差分
+							</Button>
+						</fieldset>
+						{viewingDiff ? (
+							prior.data ? (
 								<ContextInputDiff previous={prior.data} current={snapshot} />
 							) : (
 								<output>
@@ -268,9 +297,17 @@ export function ConversationContextPanel({
 										? "比較元の入力を確認中"
 										: "比較元の記録がありません。"}
 								</output>
-							))}
-						<ContextInputDetail capture={snapshot} />
+							)
+						) : (
+							<ContextInputDetail capture={snapshot} />
+						)}
 					</>
+				)}
+				{answer && (
+					<details>
+						<summary>対応する返答</summary>
+						<pre>{answer}</pre>
+					</details>
 				)}
 			</div>
 		</aside>

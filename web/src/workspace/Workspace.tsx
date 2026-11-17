@@ -121,30 +121,46 @@ export function Workspace({
 			data-context-open={contextOpen || undefined}
 			data-context-available={contextAvailable || undefined}
 		>
-			{contextAvailable && (
-				<Button
-					type="button"
-					variant="secondary"
-					size="sm"
-					className="conversation-context-trigger"
-					aria-expanded={contextOpen}
-					aria-controls={contextOpen ? "conversation-context" : undefined}
-					onClick={(event) => {
-						if (contextOpen) closeContext();
-						else {
-							contextTrigger.current = event.currentTarget;
-							selectContext({ mode: "latest" });
-						}
-					}}
-				>
-					コンテキスト
-				</Button>
-			)}
 			{!fullscreen && (
-				<ChatVisibilityToggle
-					hidden={chatHidden}
-					onToggle={() => setChatHidden((hidden) => !hidden)}
-				/>
+				<div className="conversation-view-controls">
+					{contextAvailable && (
+						<Button
+							type="button"
+							variant="secondary"
+							size="icon"
+							className="conversation-context-trigger"
+							title="コンテキスト"
+							aria-label="コンテキスト"
+							aria-expanded={contextOpen}
+							aria-controls={contextOpen ? "conversation-context" : undefined}
+							onClick={(event) => {
+								if (contextOpen) closeContext();
+								else {
+									contextTrigger.current = event.currentTarget;
+									selectContext({ mode: "latest" });
+								}
+							}}
+						>
+							<svg
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="1.7"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								aria-hidden="true"
+							>
+								<path d="M12 5.5a3.5 3.5 0 0 0-7 0A4 4 0 0 0 3.5 12 4 4 0 0 0 5 18.5a3.5 3.5 0 0 0 7 0m0-13a3.5 3.5 0 0 1 7 0 4 4 0 0 1 1.5 6.5 4 4 0 0 1-1.5 6.5 3.5 3.5 0 0 1-7 0m0-13v13M5 5.5c0 1.5.5 2.5 2 3m12-3c0 1.5-.5 2.5-2 3M5 18.5c0-1.5.5-2.5 2-3m12 3c0-1.5-.5-2.5-2-3" />
+							</svg>
+						</Button>
+					)}
+					<ChatVisibilityToggle
+						hidden={chatHidden}
+						onToggle={() => setChatHidden((hidden) => !hidden)}
+					/>
+				</div>
 			)}
 			<ArtifactLauncher
 				entries={[

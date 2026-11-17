@@ -9,6 +9,8 @@ import { IDLE_MS } from "../adapters/codex-threads";
 /** What the fake app-server does with the next turn. Read again at every `turn/start`. */
 export type FakeBehavior = {
 	text?: string;
+	/** `turn/start` receives no RPC reply. */
+	ignoreStart?: boolean;
 	/** The turn never ends by itself; `turn/interrupt` ends it. */
 	hang?: boolean;
 	/** `turn/interrupt` is answered but the turn does not end. */
@@ -100,6 +102,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 		}
 	} else if (m.method === "turn/start") {
 		const b = behave();
+		if (b.ignoreStart) return;
 		const t = threads.get(m.params.threadId);
 		const turnId = "turn-" + ++n;
 		t.turns.push(turnId);

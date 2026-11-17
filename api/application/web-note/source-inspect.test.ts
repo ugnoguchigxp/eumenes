@@ -10,6 +10,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { harness } from "../toolchain/toolchain.fixture";
+import type { HarnessOptions } from "../toolchain/toolchain-harness-options.fixture";
+import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 import { copySourceSnapshot, resolveSourceCommit } from "./source-snapshot";
 import { sourceResult } from "./source-report";
@@ -18,10 +20,29 @@ import { copySourceWorktree } from "./source-worktree";
 import { sourceExcerpt } from "./source-excerpt";
 import { spokenText } from "../../domains/delivery";
 import { createContinuityService } from "../../domains/continuity";
+import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
 
 const request =
 	"Eumenes の初期化はどのファイルからどの関数へ進みますか。行番号を添えてください。";
 const signal = () => AbortSignal.timeout(30_000);
+const followUp = "もう一つ、こんにちは。";
+const followUpAnswer = "こんにちは。";
+
+async function submitVoice(
+	h: Awaited<ReturnType<typeof harness>>,
+	session: string,
+	sequence: number,
+) {
+	const utterance = crypto.randomUUID();
+	const wav = new Uint8Array(48);
+	wav.set(new TextEncoder().encode("RIFF"));
+	wav.set(new TextEncoder().encode("WAVE"), 8);
+	await h.voice.accept(session, 1, sequence, utterance, wav);
+	await waitFor(() => h.voice.get(utterance)?.status === "input_ready");
+	await h.voice.commit(utterance, h.voice.get(utterance)!.revision);
+	await waitFor(() => Boolean(h.voice.get(utterance)?.runId));
+	return { utterance, runId: h.voice.get(utterance)!.runId! };
+}
 
 async function conversation(
 	source: NonNullable<Awaited<ReturnType<typeof createCodexSourceInspect>>>,
@@ -31,8 +52,9 @@ async function conversation(
 	const entered = Promise.withResolvers<void>();
 	const release = Promise.withResolvers<void>();
 	let calls = 0;
-	const h = await harness({
+	const options: HarnessOptions = {
 		voiceText: question,
+		conversationAgent: { ...testConversationAgent, handsWork: () => true },
 		webNote: {
 			inspectSource: {
 				...source,
@@ -44,73 +66,75 @@ async function conversation(
 				},
 			},
 		},
-		firstRound: (tools) =>
-			tools.some((tool) => tool.function.name === "inspect_source")
-				? { calls: [{ name: "inspect_source", args: { query: question } }] }
-				: undefined,
-	});
+		discoveryTarget: (text) =>
+			text.includes(question) ? "inspect_source" : "service_search",
+		firstRound: (_tools, asked, messages) => {
+			if (asked === followUp) return { text: followUpAnswer };
+			if (asked !== question) return;
+			return searchThenDelegate(
+				(candidate) => candidate.id === "inspect.source",
+				question,
+				{ impact: "none" },
+			)(messages);
+		},
+	};
+	const h = await harness(options);
 	try {
-		const utterance = voice ? crypto.randomUUID() : null;
-		let runId: string;
-		if (utterance) {
-			const session = crypto.randomUUID();
-			const wav = new Uint8Array(48);
-			wav.set(new TextEncoder().encode("RIFF"));
-			wav.set(new TextEncoder().encode("WAVE"), 8);
-			h.voice.start(session, 1);
-			await h.voice.accept(session, 1, 1, utterance, wav);
-			await waitFor(() => h.voice.get(utterance)?.status === "input_ready");
-			await h.voice.commit(utterance, h.voice.get(utterance)!.revision);
-			await waitFor(() => Boolean(h.voice.get(utterance)?.runId));
-			runId = h.voice.get(utterance)!.runId!;
-		} else {
-			runId = (
+		const session = voice ? crypto.randomUUID() : null;
+		if (session) h.voice.start(session, 1);
+		const initial = session ? await submitVoice(h, session, 1) : null;
+		const runId =
+			initial?.runId ??
+			(
 				await h.dialogue.submit({
 					requestId: crypto.randomUUID(),
 					conversationId: "main",
 					text: question,
 				})
 			).id;
+		if (initial) {
+			// An existing voice handover waits for the browser to acknowledge the announcement.
+			await waitFor(
+				() => !!h.voice.get(initial.utterance)?.audioChunks?.length,
+			);
+			expect(calls).toBe(0);
+			await h.voice.played(
+				initial.utterance,
+				h.voice.get(initial.utterance)!.audioChunks![0]!.index,
+			);
 		}
+		expect(
+			await h.dialogue.waitForTerminal(runId, { timeoutMs: 5000 }),
+		).toMatchObject({ status: "completed", announcement: expect.any(String) });
 		await waitFor(() => calls > 0, { timeout: 10_000 });
 		await entered.promise;
-		expect(h.dialogue.get(runId)?.status).toBe("running");
-		expect(
-			h.store.read((db) =>
-				h.dialogue.conversationHasActiveRunInTransaction(db, "main"),
-			),
-		).toBe(true);
-		expect(h.dialogue.get(runId)?.announcement).toBeFalsy();
-		expect(h.spoken).toEqual([]);
-		expect(
-			h.conversation
-				.get("main")
-				.messages.filter((message) => message.role === "assistant"),
-		).toHaveLength(0);
-		release.resolve();
-		await waitFor(() => h.dialogue.get(runId)?.status === "completed", {
-			timeout: 90_000,
-		});
-		const history = (await (
-			await h.request("/api/conversations/main")
-		).json()) as ReturnType<typeof h.conversation.get>;
-		const answers = history.messages.filter(
-			(message) => message.role === "assistant",
-		);
-		expect(calls).toBe(1);
-		expect(answers).toHaveLength(1);
-		const answer = answers[0]!;
-		expect(answer.runId).toBe(runId);
-		expect(h.dialogue.answerText(runId)).toBe(answer.text);
-		if (utterance) {
+		if (session) {
+			options.voiceText = followUp;
+			const next = await submitVoice(h, session, 2);
+			await waitFor(() => h.dialogue.get(next.runId)?.status === "completed");
+			expect(h.dialogue.answerText(next.runId)).toBe(followUpAnswer);
 			await waitFor(
-				() => (h.voice.get(utterance)?.audioChunks?.length ?? 0) > 0,
-			);
-			expect(h.spoken.map((chunk) => chunk.trim()).join("")).toBe(
-				answer.text.replace(/\s/gu, ""),
+				() => (h.voice.get(next.utterance)?.audioChunks?.length ?? 0) > 0,
 			);
 		}
-		expect(h.reported()).toBe("");
+		const answers = async () => {
+			const history = (await (
+				await h.request("/api/conversations/main")
+			).json()) as ReturnType<typeof h.conversation.get>;
+			return history.messages.filter(
+				(message) => message.role === "assistant" && message.displayText,
+			);
+		};
+		expect(await answers()).toEqual([]);
+		release.resolve();
+		await waitFor(async () => (await answers()).length > 0, {
+			timeout: 90_000,
+		});
+		await h.toolchain.webNote.recover();
+		const messages = await answers();
+		expect(calls).toBe(1);
+		expect(messages).toHaveLength(1);
+		const answer = messages[0]!;
 		expect(
 			(await (await h.request("/api/todo-notices")).json()).notices,
 		).toEqual([]);
@@ -122,11 +146,14 @@ async function conversation(
 		// Steward reads the said event and its backing message, without the display payload.
 		const { events } = createContinuityService();
 		h.store.read((db) => {
-			const said = events.ofMessageInTransaction(db, answer.id).find(
-				(event) => event.type === "said",
-			);
+			const said = events
+				.ofMessageInTransaction(db, answer.id)
+				.find((event) => event.type === "said");
 			expect(JSON.parse(said!.text!)).toMatchObject({ text: answer.text });
-			const message = h.conversation.messageInTransaction(db, answer.id)!.message;
+			const message = h.conversation.messageInTransaction(
+				db,
+				answer.id,
+			)!.message;
 			expect(message.text).toBe(answer.text);
 			expect(message.displayText).toBeUndefined();
 		});
@@ -137,7 +164,7 @@ async function conversation(
 	}
 }
 
-test("voice waits for the lookup and speaks the final summary exactly once", async () => {
+test("a second voice turn gets a reply while source inspection is pending", async () => {
 	const answer = await conversation(
 		{
 			resolveCommit: async () => "a".repeat(40),
@@ -146,6 +173,8 @@ test("voice waits for the lookup and speaks the final summary exactly once", asy
 				result: {
 					status: "completed",
 					summary: "初期化を確認しました。",
+					answer: "初期化を確認しました。",
+					replyInConversation: true,
 					fulfilled: [],
 					missing: [],
 					refs: [],
@@ -158,7 +187,7 @@ test("voice waits for the lookup and speaks the final summary exactly once", asy
 		true,
 	);
 	expect(answer.displayText).toContain("api/start.ts");
-});
+}, 20_000);
 
 test("diff excerpts are limited to authorized snapshots and stay out of memory input and playback", async () => {
 	const root = await mkdtemp(join(tmpdir(), "eumenes-inspect-fixture-"));
@@ -336,7 +365,7 @@ test.skipIf(!process.env.EUMENES_LIVE_SOURCE_INSPECTION)(
 			process.cwd(),
 		);
 		expect(source).toBeDefined();
-		const answer = await conversation(source!);
+		const answer = await conversation(source!, request, true);
 		expect(answer.displayText).toMatch(/ソース：.*api\//u);
 	},
 	100_000,

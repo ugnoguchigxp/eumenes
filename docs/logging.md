@@ -170,6 +170,8 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 | `inference.codex_process` | `outcome` | `started`（ハンドシェイクまで終わった）・`exited` |
 | | `count` | その時点で生きているプロセス数 |
 | | `exitCode`・`processSignal` | `exited` のとき、分かる場合だけ |
+| `performance.stage` | `phase=codex_turn_start` | `turn/start` の送信後、開始応答または先に届いた完了を待つ時間 |
+| `performance.stage` | `phase=codex_turn_completion` | 開始待ちの後、ターンの結果を受け取るまでの時間 |
 
 会話本文・指示文・出力 schema・認証情報・Codex の生応答は出しません。見分けに使うハッシュも出しません。
 

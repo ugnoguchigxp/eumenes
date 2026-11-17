@@ -236,7 +236,12 @@ test("the debug button follows the latest run and a saved reply opens its own in
 		contextCapture: async (runId: string) => captureFor(runId),
 	});
 	render(<App />);
-	fireEvent.click(await screen.findByRole("button", { name: "コンテキスト" }));
+	const context = await screen.findByRole("button", { name: "コンテキスト" });
+	expect(context.textContent).toBe("");
+	expect(context.nextElementSibling).toBe(
+		screen.getByRole("button", { name: "チャットを隠す" }),
+	);
+	fireEvent.click(context);
 	expect(await screen.findByText("最新の送信入力")).toBeTruthy();
 	const earlier = (await screen.findByText("過去の返答")).closest("article")!;
 	fireEvent.click(

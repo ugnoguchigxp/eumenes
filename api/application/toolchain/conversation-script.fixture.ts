@@ -189,9 +189,7 @@ export function isUtteranceRound(
 		options?.toolChoice !== "none" &&
 		!!options?.tools?.some(
 			({ function: { name } }) =>
-				name === "find_toolchain" ||
-				name === "read_note" ||
-				name === "inspect_source",
+				name === "find_toolchain" || name === "read_note",
 		)
 	);
 }

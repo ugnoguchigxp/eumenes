@@ -13,7 +13,4 @@ export type {
 	WebNoteTurn,
 } from "./contracts";
 export { parseNote, today } from "./service/note";
-export {
-	createConversationLookup,
-	createConversationSourceLookup,
-} from "./service/lookup";
+export { createConversationLookup } from "./service/lookup";

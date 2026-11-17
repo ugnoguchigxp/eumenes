@@ -32,6 +32,53 @@ const records = async (home: string) =>
 		.filter((name) => name.endsWith(".jsonl"));
 const sentText = (turn: FakeRequest) => turn.params.input[0].text as string;
 
+test.each([
+	["completion", false],
+	["start", true],
+] as const)(
+	"Codex measures the phase that was cancelled while waiting for %s",
+	async (_phase, ignoreStart) => {
+		const events = capture();
+		const codex = await fakeCodex();
+		const controller = new AbortController();
+		try {
+			const agents = codex.agents(codex.host());
+			await codex.behave({ hang: true, ignoreStart });
+			const phases = () =>
+				events("performance.stage").map(({ phase, outcome, attemptId }) => [
+					phase,
+					outcome,
+					attemptId,
+				]);
+			const running = agents.run(
+				codexCall([user("fixture input")], {
+					attemptId: "command-attempt",
+					reasoningEffort: "low",
+					signal: controller.signal,
+				}),
+			);
+			running.catch(() => {});
+			await waitFor(async () => (await codex.of("turn/start")).length === 1);
+			expect((await codex.of("turn/start"))[0]!.params.effort).toBe("low");
+			if (!ignoreStart)
+				await waitFor(() => phases().length === 1, { timeout: 1000 });
+			controller.abort(new Error("stopped_by_user"));
+			await expect(running).rejects.toThrow("stopped_by_user");
+			expect(phases()).toEqual(
+				ignoreStart
+					? [["codex_turn_start", "error", "command-attempt"]]
+					: [
+							["codex_turn_start", "ok", "command-attempt"],
+							["codex_turn_completion", "error", "command-attempt"],
+						],
+			);
+		} finally {
+			controller.abort();
+			await codex.cleanup();
+		}
+	},
+);
+
 test("a call starts a new thread, appends to one it continues, or reverts one to its head; the mode is logged", async () => {
 	const events = capture();
 	const codex = await fakeCodex();

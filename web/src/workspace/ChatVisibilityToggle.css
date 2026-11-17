@@ -1,8 +1,15 @@
-.chat-visibility-trigger {
+.conversation-view-controls {
 	position: fixed;
 	z-index: 11;
 	top: calc(12px + env(safe-area-inset-top, 0px));
 	right: calc(104px + env(safe-area-inset-right, 0px));
+	display: flex;
+	gap: 8px;
+}
+
+.conversation-context-trigger,
+.chat-visibility-trigger {
+	position: relative;
 	width: 36px;
 	height: 36px;
 	padding: 0;
@@ -13,8 +20,19 @@
 	box-shadow: none;
 	overflow: visible;
 }
-.chat-visibility-trigger:hover {
+.chat-visibility-trigger:hover,
+.conversation-context-trigger:hover {
 	background: var(--accent);
+}
+.conversation-context-trigger[aria-expanded="true"] {
+	border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+	background: color-mix(in srgb, var(--primary) 16%, var(--card));
+}
+.app-shell[data-context-available] .conversation-status {
+	max-width: calc(
+		100% - 208px - env(safe-area-inset-left, 0px) -
+			env(safe-area-inset-right, 0px)
+	);
 }
 /* A warning inside the hidden chat (connection failures and the like) marks the button. */
 .app-shell:has(.chat-panel[data-chat-hidden] [role="alert"])

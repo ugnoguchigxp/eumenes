@@ -138,11 +138,9 @@ export async function runRoutedTurn(
 	}
 	log.info("dialogue.turn_routed", { kind, count: turn.calls() });
 	options.signal.throwIfAborted();
-	const { receipt, emotion, imageAnswer, displayText, writeOutput } =
-		turn.result();
+	const { receipt, emotion, imageAnswer, writeOutput } = turn.result();
 	return {
 		text: turn.said().trim(),
-		...(displayText !== undefined ? { displayText } : {}),
 		...(writeOutput
 			? {
 					finishSilentReplyInTransaction(db: Database) {
@@ -248,7 +246,6 @@ function createTurn(
 	const lookupSources: NonNullable<GenerationOutcome["lookupSources"]> = [];
 	let receipt: Receipt | undefined;
 	let imageAnswer: GenerationOutcome["imageAnswer"];
-	let displayText: string | undefined;
 	let writeOutput: ((db: Database) => boolean) | undefined;
 	let said = "";
 	let emotion: GenerationOutcome["emotion"];
@@ -325,7 +322,7 @@ function createTurn(
 		calls: () => calls,
 		said: () => said,
 		published: () => published,
-		result: () => ({ receipt, emotion, imageAnswer, displayText, writeOutput }),
+		result: () => ({ receipt, emotion, imageAnswer, writeOutput }),
 		debug,
 
 		/** The host's own words: spoken as they are, and part of the answer. */
@@ -343,10 +340,9 @@ function createTurn(
 		 * The host's words that end a turn whose calls failed before a word: the answer, not streamed, so it is spoken
 		 * once the run's answer is accepted (speech while the run is running stands on a model call of it).
 		 */
-		answer(text: string, visual?: string) {
+		answer(text: string) {
 			imageAnswer = undefined;
 			said = text.trim();
-			displayText = visual;
 		},
 
 		/**
@@ -528,7 +524,6 @@ function createTurn(
 					arguments: call.arguments,
 					result: call.content,
 				});
-			if (displayText !== undefined) return;
 			imageAnswer = talkImageAnswer;
 			// The host's words said inside a tool (a confirmation, a question back) came after what the reply had said.
 			const hosted = said.slice(saidBefore.length).trim();
@@ -542,7 +537,6 @@ function createTurn(
  * require the routed input and an agent whose reply may hand work over.
  */
 const LOOKUP_TOOL = "lookup_public_information";
-const SOURCE_LOOKUP_TOOL = "inspect_source";
 
 function conversationToolPort(
 	turn: Turn,
@@ -589,7 +583,6 @@ function conversationToolPort(
 			: []),
 	];
 	const lookup = acts && !readOnly ? deps.lookup : undefined;
-	const sourceLookup = acts && !readOnly ? deps.sourceLookup : undefined;
 	const tools = [...readTools, ...(work?.tools ?? [])];
 	if (lookup)
 		tools.push({
@@ -605,24 +598,10 @@ function conversationToolPort(
 				properties: { query: { type: "string" } },
 			},
 		});
-	if (sourceLookup)
-		tools.push({
-			name: SOURCE_LOOKUP_TOOL,
-			description: systemContext("dialogue.contexts.agency.source-lookup", {}),
-			parameters: {
-				type: "object",
-				additionalProperties: false,
-				required: ["query"],
-				properties: { query: { type: "string" } },
-			},
-		});
 	return {
 		tools,
 		maxToolCalls:
-			(readTools.length ? 1 : 0) +
-			(work?.tools.length ?? 0) +
-			(lookup ? 1 : 0) +
-			(sourceLookup ? 1 : 0),
+			(readTools.length ? 1 : 0) + (work?.tools.length ?? 0) + (lookup ? 1 : 0),
 		async call(toolCall: AgentToolCall) {
 			let args: unknown;
 			try {
@@ -660,16 +639,6 @@ function conversationToolPort(
 						}),
 					};
 				onDebugTarget(target);
-				return { content: "", end: true };
-			}
-			if (sourceLookup && toolCall.name === SOURCE_LOOKUP_TOOL) {
-				const { query } = args as { query?: unknown };
-				if (typeof query !== "string" || !query.trim() || query.length > 8000)
-					return { content: JSON.stringify({ code: "lookup_query_invalid" }) };
-				const result = await sourceLookup(query.trim(), turn.signal);
-				turn.signal.throwIfAborted();
-				turn.answer(result.text, result.displayText ?? result.text);
-				log.info("dialogue.source_lookup_completed");
 				return { content: "", end: true };
 			}
 			if (lookup && toolCall.name === LOOKUP_TOOL) {

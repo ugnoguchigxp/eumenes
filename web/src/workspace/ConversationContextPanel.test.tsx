@@ -124,6 +124,10 @@ test("a change notice loads the next capture, tool changes are visible, and an o
 		fireEvent.click(screen.getByRole("button", { name: "前の入力との差分" }));
 		expect(await screen.findByText("追加 · 0 → 1件")).toBeTruthy();
 		expect(screen.getByText("出力上限の変更")).toBeTruthy();
+		expect(screen.queryByRole("region", { name: "送信時点の入力" })).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "入力", exact: true }));
+		expect(screen.getByRole("region", { name: "送信時点の入力" })).toBeTruthy();
+		expect(screen.queryByRole("region", { name: "入力の差分" })).toBeNull();
 		fireEvent.change(screen.getByRole("combobox", { name: "送信した入力" }), {
 			target: { value: first.summary.id },
 		});

@@ -1,8 +1,5 @@
 import { generatedImageInput } from "./media/generated-image-input";
-import {
-	createConversationLookup,
-	createConversationSourceLookup,
-} from "../domains/web-note";
+import { createConversationLookup } from "../domains/web-note";
 import { createSteeringInbox } from "eumenes-steer";
 import {
 	configuredContextStill,
@@ -375,9 +372,6 @@ export async function buildServices(
 		agency: agency.dialoguePort,
 		conversationAgent: agency.conversationAgent,
 		lookup: createConversationLookup(webNote),
-		sourceLookup: enabled
-			? createConversationSourceLookup(webNote, store, toolchain.capabilities)
-			: undefined,
 		logFile: () => config.logFile,
 		// The context keeper is off for now (2026-10-29 user instruction, the review fixes design C5): no State of its
 		// own reaches the input, and the recent conversation is cut by the host's fixed rules alone.

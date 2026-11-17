@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { measureStage } from "../../../infrastructure/performance";
 import { checkImageRequest } from "../service/cloud-images";
 import { readCodexModels } from "./codex-models";
 import { disabledFeatures } from "./codex-sdk";
@@ -215,14 +216,29 @@ export async function runCodexTurn(
 			});
 		lease.channel.beginTurn(Buffer.byteLength(JSON.stringify(params)));
 		if (!turn.signal.aborted) turn.onSend?.(lease.mode, lease.sendFrom, input);
-		started = rpc.request("turn/start", params, (result) => {
+		const startResponse = rpc.request("turn/start", params, (result) => {
 			turnId = (result as { turn?: { id?: string } })?.turn?.id;
 			if (turnId) lease.turnStarted(turnId);
 		});
-		started.catch(() => {});
+		started = startResponse;
+		startResponse.catch(() => {});
 		turn.signal.throwIfAborted();
-		await Promise.race([started, done.promise, aborted.promise]);
-		const result = await Promise.race([done.promise, aborted.promise]);
+		const fields = {
+			...(turn.attemptId ? { attemptId: turn.attemptId } : {}),
+			...(turn.connectionId ? { connectionId: turn.connectionId } : {}),
+		};
+		await measureStage(
+			"inference",
+			"codex_turn_start",
+			() => Promise.race([startResponse, done.promise, aborted.promise]),
+			fields,
+		);
+		const result = await measureStage(
+			"inference",
+			"codex_turn_completion",
+			() => Promise.race([done.promise, aborted.promise]),
+			fields,
+		);
 		lease.done(totals, turn.awaitsMore?.(result.text) ?? false);
 		return result;
 	} catch (error) {

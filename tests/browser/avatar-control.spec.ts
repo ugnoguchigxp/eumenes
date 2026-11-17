@@ -110,7 +110,10 @@ test("real Hiyori blends the displayed pose at start, return and interruption", 
 				return frame >= 24 ? joy("before-switch") : null;
 			});
 			const stopped = scene(54, (frame) =>
-				frame >= 24 && frame < 32 ? joy("stop") : null,
+				frame >= 24 && frame < 33 ? joy("stop") : null,
+			);
+			const stoppedBeforeSwitch = scene(54, (frame) =>
+				frame >= 24 && frame < 26 ? joy("stop-before-switch") : null,
 			);
 			const stillBefore = scene(42, (frame) =>
 				frame >= 24 ? joy("before-still") : null,
@@ -132,6 +135,7 @@ test("real Hiyori blends the displayed pose at start, return and interruption", 
 				late,
 				switched,
 				stopped,
+				stoppedBeforeSwitch,
 				stillBefore,
 				still,
 				idle,
@@ -143,9 +147,17 @@ test("real Hiyori blends the displayed pose at start, return and interruption", 
 			body: JSON.stringify(trace),
 			contentType: "application/json",
 		});
+		const isArms = (arms: number[], a: number, b: number) =>
+			arms[0] === a && arms[1] === b;
+		const invalidArmFrame = Object.values(trace)
+			.flat()
+			.find(({ arms }) => !isArms(arms, 1, 0) && !isArms(arms, 0, 1));
+		expect(invalidArmFrame?.arms).toBeUndefined();
 
 		expect(trace.early[24]!.pose).toEqual(trace.early[23]!.pose);
 		expect(trace.early[24]!.arms).toEqual([1, 0]);
+		expect(trace.early[28]!.arms).toEqual([1, 0]);
+		expect(trace.early[32]!.arms).toEqual([0, 1]);
 		expect(trace.early[42]!.arms).toEqual([0, 1]);
 		expect(trace.early[42]!.smile).toBeGreaterThan(0.25);
 		for (let age = 14; age <= 32; age++)
@@ -168,10 +180,14 @@ test("real Hiyori blends the displayed pose at start, return and interruption", 
 					.map((frame) => Math.abs(frame.pose[0]!)),
 			),
 		).toBeLessThan(0.01);
-		expect(trace.stopped[32]!.pose).toEqual(trace.stopped[31]!.pose);
-		expect(trace.stopped[31]!.arms[1]).toBeGreaterThan(0);
+		expect(trace.stopped[33]!.pose).toEqual(trace.stopped[32]!.pose);
+		expect(trace.stopped[32]!.arms).toEqual([0, 1]);
+		expect(trace.stopped[33]!.arms).toEqual([0, 1]);
 		expect(trace.stopped[54]!.pose).toEqual(trace.idle[54]!.pose);
 		expect(trace.stopped[54]!.arms).toEqual([1, 0]);
+		expect(
+			trace.stoppedBeforeSwitch.every(({ arms }) => isArms(arms, 1, 0)),
+		).toBe(true);
 		expect(trace.stillBefore.arms).toEqual([0, 1]);
 		expect(trace.still.arms).toEqual([1, 0]);
 		expect(trace.blinking[74]!.eye).toBeLessThan(0.02);

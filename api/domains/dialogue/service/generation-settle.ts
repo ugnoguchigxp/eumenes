@@ -27,7 +27,6 @@ import { carriedToolCalls, type ExchangeStep } from "./tool-exchange";
 const log = getLogger("dialogue");
 
 export type GenerationResult = {
-	displayText?: string;
 	finishSilentReplyInTransaction?: GenerationOutcome["finishSilentReplyInTransaction"];
 	debugTarget?: string;
 	debugRouterFailure?: true;
@@ -277,9 +276,8 @@ export function createGenerationSettlement(
 				result.text;
 			let messageId: string | null = null;
 			const external =
-				result.displayText === undefined &&
-				(deps.externalOutput?.offer(tx, run, text, !!result.confirmation) ??
-					false);
+				deps.externalOutput?.offer(tx, run, text, !!result.confirmation) ??
+				false;
 			if (external && result.confirmation) {
 				events.appendInTransaction(tx, {
 					conversationId: run.conversationId,
@@ -298,7 +296,6 @@ export function createGenerationSettlement(
 					conversationId: run.conversationId,
 					role: "assistant",
 					text,
-					displayText: result.displayText,
 					createdAt: clock(),
 					runId: run.id,
 				});
