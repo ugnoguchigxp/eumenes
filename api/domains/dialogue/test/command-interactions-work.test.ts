@@ -54,7 +54,8 @@ test("the pending choice's answer is accepted once and the same run resumes the 
 	// The accepted answer handed the work back to the command sub-agent with no model call (the router decided the
 	// answer), and the result is the conversation agent's to report on its own opportunity.
 	expect(h.state.steps).toEqual([]);
-	expect(h.calls).toHaveLength(0);
+	expect(h.calls).toHaveLength(3);
+	expect(h.calls.at(-1)!.tools).toContain("work");
 	await until(() => h!.interaction()?.status === "completed");
 	expect(h.interaction()).toMatchObject({
 		status: "completed",
@@ -115,10 +116,7 @@ test("a second answer to the same question is refused: the TODO no longer waits 
 	const starts = h.started.length;
 	const jobs = resumedJobs(h).length;
 	const again = await h.say("2分");
-	const offered = h.state.routerAsked.at(-1)!.criteria.map((c) => c.name);
-	expect(offered).toContain(`t${done!.ref}.check`);
-	expect(offered).not.toContain(`t${done!.ref}.answer`);
-	expect(offered).not.toContain(`t${done!.ref}.amend`);
+	expect(h.calls.at(-1)!.messages.at(-1)!.content).not.toContain("質問待ち");
 	expect(h.dialogue.answerText(again.id)).toBe("もう終わっています。");
 	expect(h.started).toHaveLength(starts);
 	expect(resumedJobs(h)).toHaveLength(jobs);
@@ -131,7 +129,7 @@ test("an answer to a question whose chain has since been replaced is refused and
 	const [todo] = h.todos();
 	// The catalog now offers a newer revision: the question's exact revision can no longer be rebuilt.
 	h.state.activeRevision = "toolchain:fake.manage@2";
-	h.state.steps.push(answerChoice(todo!, { text: "3分" }));
+	h.state.steps.push(answerChoice(todo!, { text: "3分" }), { text: FAILED });
 	const run = await h.say("3分");
 	expect(h.dialogue.answerText(run.id)).toBe(FAILED);
 	expect(h.started).toHaveLength(0);

@@ -1,13 +1,10 @@
 import type { Database } from "bun:sqlite";
 import { sha256Hex } from "../../../infrastructure/digest";
-import {
-	dot,
-	unpackVector,
-	vectorSpaceKey,
-} from "../../../infrastructure/vector";
+import { dot, unpackVector } from "../../../infrastructure/vector";
 import type { ConversationService } from "../../conversation";
 import type { MemoryVectorSpace, TurnRecall } from "../contracts";
 import { isBlocked, latestTurnVectors } from "../repository";
+import { turnSpaceKey } from "./agent-vectors";
 
 /**
  * Exchanges and similarity of a search. Embeddings of unrelated texts often score high (multilingual-e5 dot
@@ -50,14 +47,24 @@ export function recallTurns(
 	for (const row of latestTurnVectors(
 		db,
 		input.conversationId,
-		vectorSpaceKey(input.space),
+		turnSpaceKey(input.space),
 	)) {
 		// Left-out messages are skipped here so they do not use up the attempts.
 		if (skipped.has(row.messageId)) continue;
 		const vector = unpackVector(row.vector);
-		if (vector.length !== dimension || input.vector.length !== dimension)
+		if (
+			!vector.length ||
+			vector.length % dimension !== 0 ||
+			input.vector.length !== dimension ||
+			(!input.space.embeddingSpace && vector.length !== dimension)
+		)
 			continue;
-		const score = dot(vector, input.vector);
+		let score = -Infinity;
+		for (let offset = 0; offset < vector.length; offset += dimension)
+			score = Math.max(
+				score,
+				dot(vector.subarray(offset, offset + dimension), input.vector),
+			);
 		if (score >= input.minScore)
 			scored.push({ messageId: row.messageId, digest: row.digest, score });
 	}

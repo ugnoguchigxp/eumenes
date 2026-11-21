@@ -9,11 +9,11 @@ type AdapterLoader = {
 	match: (ref: string) => boolean;
 	load: () => Promise<readonly WebArtifactAdapter[]>;
 };
-const collaborationRefs = new Set(
-	["pipeline", "interact", "brave", "task"].map(
-		(kind) => `adapter:collaboration.${kind}@1`,
-	),
-);
+const collaborationRefs = new Set([
+	"adapter:collaboration.pipeline@1",
+	"adapter:collaboration.interact@1",
+	"adapter:collaboration.brave@1",
+]);
 const loaders: readonly AdapterLoader[] = [
 	{
 		match: (ref) => collaborationRefs.has(ref),

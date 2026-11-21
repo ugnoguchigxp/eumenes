@@ -12,6 +12,7 @@ import {
 	claimedSpeechProvider,
 } from "./speech-providers";
 import { providerEndpoint, readJson, record, string } from "./guards";
+import { EMBEDDING_SELECTOR } from "./embedding-contract";
 import {
 	endpoints,
 	protocols,
@@ -37,6 +38,7 @@ export type ProfileRequest = {
 	fullProfile: boolean;
 	/** The Providers a partial connection selects (absent: the LLM alone). */
 	providers?: string[];
+	ttlSeconds?: number;
 	catalogRevision: string;
 };
 
@@ -108,7 +110,7 @@ export async function createConnection(
 				profile: input.profile,
 				client: input.client,
 				audience: input.audience,
-				ttlSeconds: 900,
+				ttlSeconds: input.ttlSeconds ?? 900,
 				allowFallback: false,
 				deploymentPolicy: "existing-only",
 				...(input.providers
@@ -211,6 +213,7 @@ export async function awaitReady(
 				assertAgentCapacity(p, input.connectionRole);
 			return (
 				p.readiness === "ready" &&
+				(input.profile !== EMBEDDING_SELECTOR || created.status === "ready") &&
 				(!input.connectionRole ||
 					(created.status === "ready" && p.claimable === true))
 			);

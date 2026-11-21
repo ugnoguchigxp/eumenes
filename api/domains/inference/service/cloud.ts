@@ -276,6 +276,7 @@ async function agentRequest(
 			kind: connection.kind as CloudAgentKind,
 			connectionId: connection.id,
 			attemptId,
+			requestId: row.id,
 			...(session ? { session } : {}),
 			model: resource.model,
 			baseUrl: connection.baseUrl,

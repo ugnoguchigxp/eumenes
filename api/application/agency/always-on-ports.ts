@@ -337,8 +337,7 @@ export function createAgendaPorts(input: {
 	const conversationAgent: ConversationAgentPort = {
 		system: () =>
 			agencyReplyParts(deps.settings.get().agency, agendaReady(deps)),
-		// The same condition as the agenda's rules in the system: they say how to look for a toolchain and hand over.
-		handsWork: () => agendaReady(deps),
+		handsWork: () => true,
 		async respond(args) {
 			const { run, signal } = args;
 			const c = run ? serving(run.conversationId) : null;

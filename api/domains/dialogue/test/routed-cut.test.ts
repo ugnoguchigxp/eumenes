@@ -33,11 +33,11 @@ test("a fill cut at the output limit passes to talk and keeps its log, with none
 	const run = await h.say("東京は今何時？");
 	expect(run.status).toBe("completed");
 	expect(h.dialogue.answerText(run.id)).toBe("決めきれませんでした。");
-	expect(h.state.calls).toHaveLength(2);
-	expect(h.state.calls[0]!.session?.outputSchema).toBeDefined();
+	expect(h.state.calls).toHaveLength(4);
+	expect(h.state.calls[2]!.session?.outputSchema).toBeDefined();
 	const talk = h.state.calls.at(-1)!;
 	expect(talk.session?.outputSchema).toBeUndefined();
-	expect(talk.tools).toEqual(["read_history", "read_runs"]);
+	expect(talk.tools).toContain("delegate");
 	const fills = records.filter(
 		(record) => record.event === "dialogue.choice_made",
 	);

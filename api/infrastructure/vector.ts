@@ -1,4 +1,4 @@
-import { sha256Hex } from "./digest";
+import { canonicalJson, sha256Hex } from "./digest";
 
 /** The vector space a stored embedding belongs to (the shape every domain that stores vectors shares). */
 export type VectorSpaceShape = {
@@ -6,10 +6,24 @@ export type VectorSpaceShape = {
 	revision: string;
 	artifactDigest: string;
 	dimension: number;
+	/** Complete discovery metadata. Absent on legacy spaces. */
+	embeddingSpace?: Readonly<Record<string, unknown>>;
 };
 
 /** Stable key of a vector space; vectors of different spaces are never compared. */
-export function vectorSpaceKey(space: VectorSpaceShape): string {
+export function vectorSpaceKey(
+	space: VectorSpaceShape,
+	textVersion = "toolchain-passages/v1",
+): string {
+	if (space.embeddingSpace)
+		return canonicalJson(
+			{
+				embeddingSpace: space.embeddingSpace,
+				textVersion,
+				chunkVersion: "utf16-1600/v1",
+			},
+			{ omitUndefined: true, keyOrder: "codeUnit" },
+		);
 	return sha256Hex(
 		JSON.stringify([
 			space.modelId,

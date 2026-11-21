@@ -255,8 +255,8 @@ test("a question of a task is reported into its TODO, ordinary chat keeps it wai
 			text: "二番目で続けて",
 		});
 		await h.dialogue.waitForTerminal(answer.id, { timeoutMs: 5000 });
-		// The pending turn took the words as the answer to the work's question; the host says it passed them on.
-		expect(h.dialogue.answerText(answer.id)).toBe("伝えました。");
+		// The conversation responds after passing the answer to the waiting work.
+		expect(h.dialogue.answerText(answer.id)).toBe("二番目で続けます。");
 		await waitFor(
 			() =>
 				h.toolchain.agents.executions.get(work.id)?.status === "completed" &&
@@ -337,8 +337,7 @@ test("an instant child keeps the registered arguments and reports the provider f
 			text: request,
 		});
 		await waitFor(
-			() =>
-				h.toolchain.agents.executions.list("main")[0]?.status === "partial",
+			() => h.toolchain.agents.executions.list("main")[0]?.status === "partial",
 			{ timeout: 5000 },
 		);
 		expect(steps).toBe(4);

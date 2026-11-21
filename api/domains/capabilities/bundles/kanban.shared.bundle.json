@@ -220,6 +220,35 @@
 			"redirects": [],
 			"bindingRevisionId": "binding:kanban.manage@4",
 			"artifactRevisionId": "artifact:kanban.board@4"
+		},
+		{
+			"kind": "toolchain",
+			"id": "kanban.manage",
+			"revision": 5,
+			"title": "タスクボード",
+			"summary": "共通タスクボードのカードを登録・編集・整理し、実行キューへの登録や担当ごとの進捗確認を行う。",
+			"aliases": ["タスクボード", "カンバン", "タスク"],
+			"tags": [],
+			"useWhen": [
+				"タスクボードに作業をカードとして記録する、または既存のカードを整理・編集したい",
+				"タスクボードのカードを実行キューに入れる、進み具合を見る、追加の依頼を出したい"
+			],
+			"avoidWhen": [
+				"Codexを明示した新規依頼（codex_tasksを使う）",
+				"ボードに保存しない直接作業"
+			],
+			"dependencies": ["package:kanban.manage@2"],
+			"examples": [
+				"タスクボードに新しい作業カードを登録して",
+				"カンバンのこのカードを実行キューに入れて",
+				"タスクボードで担当ごとの進捗を確認したい",
+				"タスクボードのカードに検証の追加作業を依頼して"
+			],
+			"packageRevisionId": "package:kanban.manage@2",
+			"functionName": "kanban",
+			"redirects": [],
+			"bindingRevisionId": "binding:kanban.manage@4",
+			"artifactRevisionId": "artifact:kanban.board@4"
 		}
 	],
 	"bindings": [

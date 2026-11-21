@@ -37,6 +37,8 @@ export type CloudAgentCall = {
 	/** The saved connection and the attempt this call belongs to (log correlation only). */
 	connectionId?: string;
 	attemptId?: string;
+	/** The captured inference request that owns this call and any of its tool follow-ups. */
+	requestId?: string;
 	session?: AgentSessionCall;
 	model: string;
 	baseUrl: string;

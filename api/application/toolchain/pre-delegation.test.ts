@@ -1,18 +1,63 @@
 import { expect, test } from "bun:test";
-import { harness } from "./toolchain.fixture";
+import { harness, workerPacket } from "./toolchain.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
 
-/** The host's notice of a hand-over the router decided (spec router-package-integration 2026-11-04). */
-const NOTICE = "「Web検索」に頼みます。";
+const NOTICE = "「会話履歴の調査」に頼みます。";
+const REQUEST = "先月話した京都旅行の行き先を会話履歴から調べて";
+const DESTINATION = "東福寺";
+
+async function researchHarness(
+	options: { voiceText?: string; speechFailure?: boolean } = {},
+) {
+	const h = await harness({
+		...options,
+		history: true,
+		control(messages) {
+			const data = workerPacket(messages);
+			if (!data.operations.length)
+				return JSON.stringify({
+					action: "invoke",
+					tool: "history.search",
+					arguments: { query: "京都旅行", limit: 5 },
+				});
+			const excerpt = data.observations
+				.flatMap(
+					(observation: {
+						excerpts: Array<{ quote: string; reference: string }>;
+					}) => observation.excerpts,
+				)
+				.find(({ quote }: { quote: string }) => quote.includes(DESTINATION));
+			expect(excerpt).toBeDefined();
+			return JSON.stringify({
+				action: "finish",
+				report: {
+					outcome: "answered",
+					summary: `京都旅行の行き先は${DESTINATION}です。`,
+					claims: [{ text: excerpt.quote, evidence: [excerpt.reference] }],
+					limitations: [],
+				},
+			});
+		},
+	});
+	await h.conversation.append({
+		id: crypto.randomUUID(),
+		conversationId: "main",
+		role: "user",
+		text: `京都旅行の行き先は${DESTINATION}に決めました。`,
+		createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+		runId: null,
+	});
+	return h;
+}
 
 test("research announces before the worker, retains the notice over API reads, then finishes without a reply of its own", async () => {
-	const h = await harness();
+	const h = await researchHarness();
 	let stop = () => {};
 	try {
 		const run = await h.dialogue.submit({
 			requestId: crypto.randomUUID(),
 			conversationId: "main",
-			text: "今日の東京の天気を調べて",
+			text: REQUEST,
 		});
 		const observations: number[] = [];
 		stop = h.dialogue.subscribeProgress(run.id, (p) => {
@@ -26,8 +71,10 @@ test("research announces before the worker, retains the notice over API reads, t
 		expect(final.announcement).toBe(NOTICE);
 		// The agency reports the finished research; the run has no reply.
 		expect(h.dialogue.answerText(run.id)).toBeNull();
-		expect(h.reported()).toContain("晴れ");
-		expect(h.conversation.get("main").messages).toHaveLength(1);
+		expect(h.reported()).toContain(DESTINATION);
+		expect(
+			h.conversation.get("main").messages.map((message) => message.role),
+		).toEqual(["user", "user"]);
 		expect(h.workerContexts.length).toBeGreaterThan(0);
 	} finally {
 		stop();
@@ -35,8 +82,8 @@ test("research announces before the worker, retains the notice over API reads, t
 	}
 });
 
-test("voice waits for the playback of the host's notice, which the router decided with no model call", async () => {
-	const h = await harness({ voiceText: "東京の天気を調べて" });
+test("voice waits for playback of the host's notice before executing the conversation's delegation", async () => {
+	const h = await researchHarness({ voiceText: REQUEST });
 	try {
 		const session = crypto.randomUUID(),
 			utterance = crypto.randomUUID();
@@ -53,7 +100,6 @@ test("voice waits for the playback of the host's notice, which the router decide
 		await h.voice.commit(utterance, h.voice.get(utterance)!.revision);
 		await waitFor(() => !!h.voice.get(utterance)?.audioChunks?.length);
 		expect(h.workerContexts).toHaveLength(0);
-		expect(h.acquisitions).toBe(0);
 		expect(h.voice.get(utterance)?.audioChunks?.[0]?.text).toBe(NOTICE);
 		await h.voice.played(
 			utterance,
@@ -75,14 +121,14 @@ test("voice waits for the playback of the host's notice, which the router decide
 		// The notice is the only speech of the turn; the finished research is the agency's to report.
 		expect(h.spoken).toEqual([NOTICE]);
 		expect(h.dialogue.answerText(turn.runId!)).toBeNull();
-		expect(h.reported()).toContain("晴れ");
+		expect(h.reported()).toContain(DESTINATION);
 	} finally {
 		await h.close();
 	}
 });
 
 test("cancelling during the spoken notice never starts the research worker", async () => {
-	const h = await harness({ voiceText: "鎌倉の天気を調べて" });
+	const h = await researchHarness({ voiceText: REQUEST });
 	try {
 		const session = crypto.randomUUID(),
 			id = crypto.randomUUID();
@@ -99,14 +145,17 @@ test("cancelling during the spoken notice never starts the research worker", asy
 		const runId = h.voice.get(id)!.runId!;
 		expect((await h.dialogue.waitForTerminal(runId))?.status).toBe("cancelled");
 		expect(h.workerContexts).toHaveLength(0);
-		expect(h.acquisitions).toBe(0);
+		expect(h.reported()).toBe("");
 	} finally {
 		await h.close();
 	}
 });
 
 test("an unspoken notice cannot authorize the research worker", async () => {
-	const h = await harness({ voiceText: "天気を調べて", speechFailure: true });
+	const h = await researchHarness({
+		voiceText: REQUEST,
+		speechFailure: true,
+	});
 	try {
 		const session = crypto.randomUUID(),
 			id = crypto.randomUUID();
@@ -119,7 +168,7 @@ test("an unspoken notice cannot authorize the research worker", async () => {
 		await h.voice.commit(id, h.voice.get(id)!.revision);
 		await waitFor(() => h.voice.get(id)?.status === "failed");
 		expect(h.workerContexts).toHaveLength(0);
-		expect(h.acquisitions).toBe(0);
+		expect(h.reported()).toBe("");
 		expect(h.voice.get(id)?.audioChunks).toEqual([]);
 	} finally {
 		await h.close();

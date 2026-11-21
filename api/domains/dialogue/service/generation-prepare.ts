@@ -220,22 +220,19 @@ function retainedInTransaction(
 		: retained;
 }
 
-/** The agent's last words a choice call reads, at most; and each of the user's earlier utterances. */
+/** The excerpts shown to argument extraction from the agent's reply and earlier user utterances. */
 const PREVIOUS_REPLY_CHARS = 200;
 
-/**
- * What a routed turn's choice calls read of the host's records (the local harness rebuild plan, 4.3–4.4): with the
- * talk turn's `## Memory` and the user's words of its window, so a request carries what it points to (the review
- * intake plan, section 5).
- */
+/** The host records needed by the conversation tools and argument extraction. */
 function routedInputInTransaction(
 	deps: DialogueDeps,
 	tx: Database,
 	input: {
 		conversationId: string;
 		nowMs: number;
-		/** The lines of `## State` the choice calls read. */
 		state: readonly string[];
+		media: readonly { line: string }[];
+		diagnostics: readonly { line: string; ref: string }[];
 		lastAgent: {
 			text: string;
 			at: string;
@@ -261,8 +258,7 @@ function routedInputInTransaction(
 			?.todosInTransaction(tx, input.conversationId)
 			.filter((todo) => todo.status !== "done") ?? [];
 	// The finished work `## State` lists may be checked, as it shows them (a forgotten one has no title).
-	// The agency's own research is the agent's work, not work the user handed over: the router is not offered it, so
-	// nothing the user says is taken as its check, correction or cancellation (its result is the agent's note).
+	// The agency reports its own research in notes and keeps it outside the user's work controls.
 	const own = (row: { runId: string } | null | undefined) =>
 		!!row && !!agencyWork(tx, row.runId);
 	const finished = namedTodos(input.state).flatMap((ref) => {
@@ -282,7 +278,12 @@ function routedInputInTransaction(
 		earlier: input.prefix.earlier
 			.map((said) => lineText(said).slice(0, PREVIOUS_REPLY_CHARS))
 			.filter((said) => said.trim()),
-		state: stateText(input.state),
+		state: stateText([
+			...input.state,
+			...input.media.map(({ line }) => line),
+			...input.diagnostics.map(({ line }) => line),
+		]),
+		diagnosticRefs: input.diagnostics.map(({ ref }) => ref),
 		previousReply: lastAgent
 			? lineText(lastAgent.text).slice(0, PREVIOUS_REPLY_CHARS)
 			: null,
@@ -576,6 +577,7 @@ export function createPrepare(
 			conversationId,
 			run: current,
 			screenLines,
+			agencyLines: [],
 			nowMs,
 			lastAt: prefix.lastAt,
 			since: prefix.since,
@@ -589,13 +591,30 @@ export function createPrepare(
 				: {}),
 			refs,
 		});
-		// Normal talk receives the current input's screen, without the rest of the routing state.
 		const diagnostics = notice
 			? []
 			: recentDiagnostics(deps, tx, conversationId);
+		// Scheduled prompts can receive an answer but carry no authority to control or start work.
+		const routed =
+			final.kind === "utterances" && !isSystemPrompt(current.sourceKind)
+				? routedInputInTransaction(deps, tx, {
+						conversationId,
+						nowMs,
+						state: stateLines,
+						media,
+						diagnostics,
+						lastAgent,
+						prefix,
+					})
+				: undefined;
 		const messages = answerMessages(prefix, {
-			stateLines,
-			screenLines,
+			stateLines: routed
+				? stateLines
+				: [
+						...stateLines.slice(0, 1),
+						...(screenLines.length ? ["提示中:", ...screenLines] : []),
+					],
+			askedRequest: routed?.asked?.request,
 			agencyLines: agencyStateLines(deps, tx, conversationId),
 			media,
 			diagnostics,
@@ -620,21 +639,7 @@ export function createPrepare(
 				messages,
 				...(observeInput ? { observeInput } : {}),
 				utterances: texts,
-				// Scheduled prompts can receive an answer but carry no authority to start work.
-				...(final.kind === "utterances" && !isSystemPrompt(current.sourceKind)
-					? {
-							routed: {
-								...routedInputInTransaction(deps, tx, {
-									conversationId,
-									nowMs,
-									state: stateLines,
-									lastAgent,
-									prefix,
-								}),
-								diagnosticRefs: diagnostics.map(({ ref }) => ref),
-							},
-						}
-					: {}),
+				...(routed ? { routed } : {}),
 				final,
 				trigger: triggerOf(
 					current,

@@ -8,7 +8,7 @@ import {
 	routeConversation,
 	type ConversationHarness,
 } from "../service/harness";
-import { runRoutedTurn } from "../service/routed-turn";
+import { runConversationTurn } from "../service/routed-turn";
 import { OTHER, RESOURCE, settings, type Snapshot } from "./harness.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
 import { setup, type Harness } from "./generation.fixture";
@@ -117,7 +117,7 @@ test("an answer that copies the system part fails only while the harness's gate 
 	const system = "## Role\n曲を生成します。: 完成と名前を短く伝えます。";
 	const copied = "曲を生成します。: 完成と名前を短く伝えます。";
 	const generate = (harness: ConversationHarness) =>
-		runRoutedTurn(
+		runConversationTurn(
 			{
 				larm: { answer: async () => copied },
 				conversationAgent: testConversationAgent,

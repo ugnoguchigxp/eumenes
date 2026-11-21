@@ -4,12 +4,6 @@ import { REPAIR_TOOLCHAIN } from "./diagnostic-evidence";
 import { INPUT_HEADINGS, dataText, lineText } from "./input-text";
 import { toolResultText } from "./result-text";
 
-/**
- * The choice calls of a routed turn (the local harness rebuild plan, sections 4.3 and 4.4): the input they read and
- * the JSON schema their one answer is held to. The schema is built from this turn's candidates, so a choice names
- * one of them and fills only that one's fields.
- */
-
 /** A candidate as the toolchain search returns it (`candidateOf`). */
 export type ChoiceCandidate = {
 	id: string;
@@ -33,21 +27,12 @@ export const MEMORY_KINDS = [
 
 type Schema = Record<string, unknown>;
 const SAY: Schema = { type: "string", minLength: 1, maxLength: 80 };
-/** A request text a choice may write: within one call's output beside the thinking (the harness's limit). */
-const REQUEST_CHARS = 800;
-const text = (maxLength: number): Schema => ({
-	type: "string",
-	minLength: 1,
-	maxLength,
-});
 const only = (value: string): Schema => ({ type: "string", enum: [value] });
 const oneOf = (values: readonly string[]): Schema => ({
 	type: "string",
 	enum: [...values],
 });
 const ANY_OBJECT: Schema = { type: "object" };
-/** The memory request as a candidate of the router's fill. */
-export const MEMORY_REQUEST = "memory.request";
 /**
  * The target a choice names for a request that makes something new: a candidate with saved items has its target
  * always filled, so a new piece is chosen as such and never left to an item the model happened to fill in.
@@ -67,29 +52,18 @@ function branch(
 	};
 }
 
-/**
- * The branch of one candidate: an instant answer takes its inputs, any other work its request (or inputs) and `say`,
- * the resources it works on from those `## State` names, and, for a toolchain with saved items, which item it
- * changes or `new`.
- */
+/** The fields specific to the selected toolchain and its available references. */
 function candidateBranch(
 	candidate: ChoiceCandidate,
 	resources: readonly string[],
-	switching: string | null,
-	/** The branch has `say`: false when the host says its own words (the router's fill). */
-	withSay = true,
 	diagnosticRefs: readonly string[] = [],
 ): Schema {
 	const choice = only(candidate.id);
-	const say: Record<string, Schema> = withSay ? { say: SAY } : {};
-	// An instant answer and a read tool both take their inputs alone.
 	if (candidate.execution === "instant" || candidate.execution === "read")
 		return branch({ choice, inputs: candidate.inputs ?? ANY_OBJECT });
 	return branch(
 		{
 			choice,
-			...say,
-			request: text(REQUEST_CHARS),
 			...(candidate.targets?.length
 				? {
 						target: oneOf([
@@ -101,10 +75,6 @@ function candidateBranch(
 			...(resources.length
 				? { refs: { type: "array", maxItems: 8, items: oneOf(resources) } }
 				: {}),
-			// The user's word that the suspended unsaved work may go: the switch this hand-over waits for.
-			...(candidate.id === switching
-				? { resolveUnsaved: only("discard") }
-				: {}),
 			...(candidate.id === REPAIR_TOOLCHAIN && diagnosticRefs.length
 				? {
 						diagnosticRef: {
@@ -115,55 +85,23 @@ function candidateBranch(
 					}
 				: {}),
 		},
-		["refs", "resolveUnsaved", "diagnosticRef"],
+		["refs", "diagnosticRef"],
 	);
 }
 
-/** The memory request's branch: its kind, what it is about, and a detail when there is one. */
-function memoryBranch(withSay = true): Schema {
-	return branch(
-		{
-			choice: only("memory.request"),
-			kind: oneOf(MEMORY_KINDS),
-			what: text(500),
-			detail: text(1000),
-			...(withSay ? { say: SAY } : {}),
-		},
-		["detail"],
-	);
-}
-
-/**
- * The router's fill of one candidate's fields (spec toolchain-router-redesign §3.4): none, a question back, and the
- * one branch the router decided on (without `say`: the host says its own words).
- */
+/** A filled argument set, a question for the user, or no match for the selected toolchain. */
 export function fillSchema(
-	candidate: ChoiceCandidate | ChoiceCandidate[] | typeof MEMORY_REQUEST,
+	candidate: ChoiceCandidate,
 	{
 		resources,
-		switching,
 		diagnosticRefs,
-	}: Pick<RoutedInput, "resources" | "switching" | "diagnosticRefs">,
+	}: Pick<RoutedInput, "resources" | "diagnosticRefs">,
 ): Schema {
 	return {
 		anyOf: [
 			branch({ choice: only("none") }),
 			branch({ choice: only("ask"), say: SAY }),
-			...(Array.isArray(candidate)
-				? candidate.map((item) =>
-						candidateBranch(item, resources, switching, false, diagnosticRefs),
-					)
-				: [
-						candidate === MEMORY_REQUEST
-							? memoryBranch(false)
-							: candidateBranch(
-									candidate,
-									resources,
-									switching,
-									false,
-									diagnosticRefs,
-								),
-					]),
+			candidateBranch(candidate, resources, diagnosticRefs),
 		],
 	};
 }
@@ -173,12 +111,11 @@ function previousLine(routed: RoutedInput): string[] {
 	return routed.previousReply ? [`直前の返事: ${routed.previousReply}`] : [];
 }
 
-/** The router's fill input: the records, the one candidate the router decided on, and the words. */
+/** Give argument extraction the selected toolchain, the conversation's request and relevant records. */
 export function fillMessages(input: {
 	style: string;
 	routed: RoutedInput;
-	candidate: ChoiceCandidate | ChoiceCandidate[] | typeof MEMORY_REQUEST;
-	components?: readonly ChoiceCandidate[];
+	candidate: ChoiceCandidate;
 	utterance: string;
 }): ChatMessage[] {
 	const { routed } = input;
@@ -193,42 +130,21 @@ export function fillMessages(input: {
 			? [`聞き返した依頼: ${lineText(routed.asked.request)}`]
 			: []),
 		INPUT_HEADINGS.candidates,
-		input.candidate === MEMORY_REQUEST
-			? `- memory.request: ${systemContext("dialogue.contexts.local.memory-request", {})}`
-			: toolResultText("find_toolchain", {
-					candidates: Array.isArray(input.candidate)
-						? input.candidate
-						: [input.candidate],
-				}),
-		...(input.components?.length
-			? [
-					"## Related candidates",
-					toolResultText("find_toolchain", { candidates: input.components }),
-				]
-			: []),
+		toolResultText("find_toolchain", { candidates: [input.candidate] }),
 		`${INPUT_HEADINGS.user}\n${dataText(input.utterance)}`,
 	];
 	return [
 		{
 			role: "system",
-			content: systemContext(
-				Array.isArray(input.candidate)
-					? "dialogue.contexts.local.router-work"
-					: "dialogue.contexts.local.router-fill",
-				{
-					style: input.style,
-				},
-			),
+			content: systemContext("dialogue.contexts.local.toolchain-arguments", {
+				style: input.style,
+			}),
 		},
 		{ role: "user", content: lines.join("\n") },
 	];
 }
 
-/**
- * The fill of an answer to a work's question that asks for a structured answer (its input schema is not a plain
- * string): none, or the answer in that shape. The router decides that the words answer the question; the shape is
- * the conversation model's to write, as it wrote it before the router.
- */
+/** The selected work question can require an answer with typed fields. */
 export function answerSchema(inputSchema: Record<string, unknown>): Schema {
 	return {
 		anyOf: [
@@ -249,7 +165,10 @@ export function answerMessages(input: {
 	return [
 		{
 			role: "system",
-			content: systemContext("dialogue.contexts.local.router-answer-fill", {}),
+			content: systemContext(
+				"dialogue.contexts.local.work-answer-arguments",
+				{},
+			),
 		},
 		{
 			role: "user",

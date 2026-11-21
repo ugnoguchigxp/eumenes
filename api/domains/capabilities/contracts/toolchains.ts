@@ -118,12 +118,8 @@ export type ToolchainCard = {
 };
 
 /** The vector space a stored embedding belongs to. */
-export type VectorSpace = {
-	modelId: string;
-	revision: string;
-	artifactDigest: string;
-	dimension: number;
-};
+export type VectorSpace =
+	import("../../../infrastructure/vector").VectorSpaceShape;
 
 /** The longest description a router criterion carries (the LARM request prompt §2.2). */
 export const ROUTER_PASSAGE_CHARS = 300;

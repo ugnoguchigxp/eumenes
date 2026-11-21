@@ -1,4 +1,3 @@
-import { createRouterSelection } from "./router-selection";
 import { createRequestOperations } from "./request-operations";
 import { connectionAccess } from "./connection-access";
 import { createProbes } from "./probes";
@@ -244,6 +243,14 @@ export function createInference(
 			});
 		},
 		...connectionAccess(settings, port, options.connectionModels),
+		async embed(
+			...args: Parameters<NonNullable<ReturnType<typeof port>["embed"]>>
+		) {
+			if (closed) throw new Error("larm_closed");
+			const embed = port(settings.get()).embed;
+			if (!embed) throw new Error("embedding_unavailable");
+			return embed(...args);
+		},
 		...screenOperations(screen),
 		onChange(listener: () => void) {
 			listeners.add(listener);
@@ -290,7 +297,6 @@ export function createInference(
 			// Task sessions nobody released and a crashed host's temporary directories, now and then hourly.
 			await sweeper.start();
 		},
-		...createRouterSelection(settings, options.fetch),
 		async close() {
 			screen.close();
 			unsubscribeCollection();

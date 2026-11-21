@@ -9,6 +9,7 @@
 
 import { isReadToolName } from "../../domains/capabilities";
 import { INPUT_HEADINGS } from "../../domains/dialogue";
+import type { LarmPort } from "../../domains/larm";
 
 /** A message as the generation loop keeps it: assistant tool calls and their tool results. */
 export type ConversationMessage = {
@@ -98,6 +99,21 @@ export function candidatesOf(
 ): Candidate[] | undefined {
 	const search = toolResults(afterUtterance(messages), "find_toolchain")[0];
 	if (search === undefined) return undefined;
+	if (search.startsWith("{")) {
+		const { candidates } = JSON.parse(search) as {
+			candidates?: Array<{
+				id: string;
+				title?: string;
+				summary?: string;
+				execution?: string;
+			}>;
+		};
+		return (candidates ?? []).map(({ id, title, summary, execution }) => ({
+			id,
+			text: [title, summary].filter(Boolean).join(" "),
+			...(execution ? { execution } : {}),
+		}));
+	}
 	return search.split("\n").flatMap((line) => {
 		const match = /^- (\S+): (.*)$/.exec(line);
 		if (!match || SEARCH_FIELDS.has(match[1]!)) return [];
@@ -153,6 +169,16 @@ export const UNAVAILABLE_TEXT = "その依頼は、今の担当ではできま�
  */
 export function handedStep(messages: ConversationMessage[]): Step | undefined {
 	const handed = toolResults(afterUtterance(messages), "delegate")[0];
+	if (handed?.startsWith("{")) {
+		const result = JSON.parse(handed);
+		if (typeof result.answered === "boolean" || result.delegated === false)
+			return {
+				text:
+					result.answered && typeof result.answer === "string"
+						? result.answer
+						: UNAVAILABLE_TEXT,
+			};
+	}
 	// A refused call (the host closes a call that was rejected with `- refused: true`) is no result to answer from.
 	if (handed === undefined || resultField(handed, "answered") === undefined)
 		return undefined;
@@ -344,23 +370,24 @@ export async function answerByScript(
 	}
 }
 
-/**
- * The routed turn's choice when this call is one (it carries a schema and the choice's sections), made from the
- * step a loop script takes; undefined for any other call.
- */
-export function routedChoice<M>(
-	options: { jsonSchema?: unknown } | undefined,
+/** Answer the conversation's tool loop or the argument fill for its selected toolchain. */
+export function conversationByScript<M>(
+	options: Parameters<LarmPort["answer"]>[2],
 	messages: readonly M[],
 	step: (loop: M[]) => Promise<Step> | Step,
 ): Promise<string> | undefined {
-	// The loop messages a script reads are the conversation's own shape, whatever type the caller holds them as.
 	const conversation = messages as unknown as ConversationMessage[];
 	const round = options?.jsonSchema ? choiceRound(conversation) : null;
-	return round
-		? choiceByScript(conversation, round, (loop) =>
-				step(loop as unknown as M[]),
-			)
-		: undefined;
+	if (round)
+		return choiceByScript(conversation, round, (loop) =>
+			step(loop as unknown as M[]),
+		);
+	if (!isUtteranceRound(options) || isNoticeRound(conversation)) return;
+	return Promise.resolve(step([...messages])).then((reply) => {
+		if (reply.calls?.length)
+			options?.onToolCalls?.(callsOf(reply, () => crypto.randomUUID()));
+		return reply.text ?? "";
+	});
 }
 
 /** A loop call as the routed turn's choice; null when the round has no such choice. */
@@ -413,9 +440,22 @@ export const CONVERSATION_WINDOW_TOKENS = 262144;
 
 /** The ids of the calls the step makes, as the model's tool calls (the receipt's shape). */
 export function callsOf(step: Step, id: () => string) {
-	return (step.calls ?? []).map((call) => ({
-		id: id(),
-		name: call.name,
-		arguments: JSON.stringify(call.args),
-	}));
+	return (step.calls ?? []).map(({ name, args }) => {
+		if (name === "delegate" && args.mode === "approve")
+			return {
+				id: id(),
+				name: "approve_confirmation",
+				arguments: JSON.stringify({ confirmation: args.confirmation }),
+			};
+		if (name === "work")
+			return {
+				id: id(),
+				name,
+				arguments: JSON.stringify({
+					todo: args.todo,
+					operation: args.operation,
+				}),
+			};
+		return { id: id(), name, arguments: JSON.stringify(args) };
+	});
 }

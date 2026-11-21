@@ -184,6 +184,36 @@
 			"bindingRevisionId": "binding:scheduler.collaborator@2",
 			"artifactRevisionId": "artifact:scheduler.pending@2",
 			"minImpact": "create"
+		},
+		{
+			"kind": "toolchain",
+			"id": "scheduler.manage",
+			"revision": 4,
+			"title": "実行予約",
+			"summary": "これから先の日時を指定して、リマインダー、声かけ、文章での回答をこの会話に届ける予約を登録する。単発と固定間隔の繰り返しに対応する。",
+			"aliases": [],
+			"tags": ["予約", "定期実行", "リマインド"],
+			"useWhen": [
+				"今後の日時にお知らせや回答を届けるよう、新しい実行予約を入れたい",
+				"曜日や時刻を決めて、リマインダーや定期的な回答を自動で届けてほしい"
+			],
+			"avoidWhen": [
+				"経過時間を計るタイマーやストップウォッチを使いたい",
+				"保存済みワークフローの予約を有効にしたい",
+				"時刻を指定せず今すぐ回答が欲しい"
+			],
+			"dependencies": ["package:scheduler.collaborator@2"],
+			"packageRevisionId": "package:scheduler.collaborator@2",
+			"functionName": "schedule_conversation",
+			"examples": [
+				"明日の夕方に洗濯物を取り込むよう通知を予約して",
+				"毎晩21時に一日の振り返りを促すお知らせを予約して",
+				"来週の月曜の昼に、次の読書会のテーマ案をこの会話に出して"
+			],
+			"redirects": [],
+			"bindingRevisionId": "binding:scheduler.collaborator@2",
+			"artifactRevisionId": "artifact:scheduler.pending@2",
+			"minImpact": "create"
 		}
 	],
 	"bindings": [

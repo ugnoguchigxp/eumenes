@@ -22,18 +22,14 @@ import type { ImagePort } from "../contracts/image";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
 import type { ChatMessage } from "../service/context";
 import {
-	FIXTURE_ROUTER,
 	IMAGE,
-	ROUTER_SPACE,
-	selectionBySteps,
-	routerCards,
 	sectionLines,
 	type Call,
-	type ChoiceInput,
 	type Step,
 } from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
+import { conversationSteps } from "./conversation-steps.fixture";
 
 export { IMAGE, type Call, type Step };
 
@@ -148,8 +144,6 @@ export async function setup(options: Options = {}) {
 		endWorkFails: false,
 		/** The toolchains a search finds, by id; null: every card. */
 		found: null as string[] | null,
-		/** What the router was asked to select, turn by turn. */
-		routerAsked: [] as ChoiceInput[],
 		/** Saved items deleted since: no longer offered, and opening one is refused. */
 		gone: new Set<string>(),
 		/** A safe code the next operations are refused with. */
@@ -178,14 +172,12 @@ export async function setup(options: Options = {}) {
 			if (signal?.aborted) reject(new Error("aborted"));
 			signal?.addEventListener("abort", () => reject(new Error("aborted")));
 		});
+	const cards: ToolchainCard[] = [STUDIO, OTHER, IMAGE];
+	const nextModelStep = conversationSteps(state.steps, cards);
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		// The router decides every utterance turn: its context judgment reads the scripted steps.
-		routerSelectionAvailable: () => true,
-		selectRouter: selectionBySteps(state.steps, state.routerAsked),
 		snapshotInTransaction: () => ({
 			general: { agentName: "", userName: "", persona: "butler" },
-			router: FIXTURE_ROUTER,
 		}),
 		captureInTransaction: () => {},
 		captureControlInTransaction: (
@@ -249,7 +241,7 @@ export async function setup(options: Options = {}) {
 				tools: (tools ?? []).map((t) => t.function.name),
 				...(session ? { session } : {}),
 			});
-			const step = state.steps.shift();
+			const step = nextModelStep(requestId, messages, !!session?.outputSchema);
 			if (!step) throw new Error("fixture_step_missing");
 			signal.throwIfAborted();
 			if (step.text) delta?.(step.text);
@@ -477,7 +469,6 @@ export async function setup(options: Options = {}) {
 					},
 	};
 
-	const cards: ToolchainCard[] = [STUDIO, OTHER, IMAGE];
 	const cardOf = (revisionId: string) =>
 		cards.find((c) => c.revisionId === revisionId);
 	const sessionRuntime = (revisionId: string): ToolchainRuntimeMeta => {
@@ -498,17 +489,6 @@ export async function setup(options: Options = {}) {
 			: ({ execution: "image", requires: "image" } as ToolchainRuntimeMeta);
 	const toolchains = {
 		embedQuery: async () => undefined,
-		// The router package's ports (spec router-package-integration 2026-11-04), as generation.fixture fakes them.
-		embedRouter: async (texts: readonly string[]) => ({
-			space: ROUTER_SPACE,
-			vectors: texts.map(() => [1, 0]),
-		}),
-		routerCardsInTransaction: () => routerCards(cards),
-		routerLexicalInTransaction: () => new Map(),
-		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
-			new Map(
-				cards.filter((c) => ids.includes(c.id)).map((c) => [c.id, c.title]),
-			),
 		routeInTransaction: () => ({
 			cards: state.found
 				? cards.filter((card) => state.found!.includes(card.id))

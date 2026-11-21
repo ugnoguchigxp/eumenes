@@ -4,6 +4,7 @@ import type { SettingsService } from "../../settings";
 
 import {
 	activeStatuses,
+	LIVE_INPUT_PCM_MAX_BYTES,
 	type ConnectLive,
 	type LiveConversationPort,
 	type LiveEvent,
@@ -165,12 +166,16 @@ export function createLiveVoice({
 		)
 			return value;
 		try {
+			const closing = await store.write(
+				(db) =>
+					db
+						.query(
+							"UPDATE live_voice_sessions SET status='closing' WHERE id=? AND status IN ('connecting','active')",
+						)
+						.run(id).changes > 0,
+			);
+			if (!closing) return state(id);
 			send(id, { type: "session.close" });
-			await store.write((db) => {
-				db.query(
-					"UPDATE live_voice_sessions SET status='closing' WHERE id=?",
-				).run(id);
-			});
 			const rt = runtimes.get(id);
 			if (rt)
 				rt.closeTimer = setTimeout(
@@ -238,7 +243,8 @@ export function createLiveVoice({
 			if (sequence === rt.lastInput && audio === rt.lastAudio) return;
 			if (sequence !== rt.lastInput + 1) throw new Error("live_audio_sequence");
 			const bytes = Buffer.from(audio, "base64");
-			if (!validPcm(audio, 24000)) throw new Error("live_audio_invalid");
+			if (!validPcm(audio, LIVE_INPUT_PCM_MAX_BYTES))
+				throw new Error("live_audio_invalid");
 			send(id, {
 				type: "session.input_audio.append",
 				audio: value.muted

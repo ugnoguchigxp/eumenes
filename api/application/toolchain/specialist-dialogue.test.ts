@@ -2,7 +2,9 @@ import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
 import { collaborationScript } from "./collaboration-script.fixture";
 import {
-	routedChoice,
+	candidatesOf,
+	conversationByScript,
+	stepIndex,
 	searchThenDelegate,
 } from "./conversation-script.fixture";
 import { harness } from "./toolchain.fixture";
@@ -94,7 +96,7 @@ async function rig() {
 		specialist: [] as SpecialistStep[],
 	};
 	const mainPrompts: Prompt[] = [];
-	let routeCalls = 0;
+	let mainRuns = 0;
 	const specialistPrompts: Prompt[] = [];
 	const model: LarmPort = {
 		status: () => ({ state: "ready", capabilities: ["llm", "asr", "tts"] }),
@@ -126,11 +128,13 @@ async function rig() {
 				return collaborationScript(value, messages);
 			}
 			mainPrompts.push(messages.map((m) => ({ ...m })));
-			// The conversation's choice for a user's utterance (the local harness's routed turn): the script decides
-			// whether the request is handed over (a scripted tool) or answered by the talk turn with the scripted reply.
-			const routed = routedChoice(options, messages, (loop) => {
+			const conversation = conversationByScript(options, messages, (loop) => {
+				if (!options?.jsonSchema && stepIndex(loop) === 0) mainRuns++;
 				const head = script.main[0];
-				if (typeof head !== "object") return {};
+				if (typeof head !== "object") {
+					if (typeof head === "string") script.main.shift();
+					return { text: head ?? "かしこまりました。" };
+				}
 				const { announcement, ...request } = head.args as Record<
 					string,
 					unknown
@@ -147,13 +151,7 @@ async function rig() {
 				)(loop);
 				return step;
 			});
-			if (routed) {
-				routeCalls++;
-				return routed;
-			}
-			const step = script.main.shift() ?? "かしこまりました。";
-			if (typeof step !== "string") throw new Error("script_tool_after_route");
-			return step;
+			return conversation ?? "かしこまりました。";
 		},
 	};
 	const h = await harness({ uiCompositions: true, model });
@@ -289,7 +287,7 @@ async function rig() {
 		mainPrompts,
 		/** How many runs the main agent took (each starts with the request analysis). */
 		get mainRuns() {
-			return routeCalls;
+			return mainRuns;
 		},
 		specialistPrompts,
 		say,
@@ -304,20 +302,17 @@ async function rig() {
 }
 
 const text = (prompt: Prompt) => prompt.map((m) => m.content).join("\n");
-/** The newest of the main agent's prompts that was a choice (it lists the candidates). */
-const choiceOf = (prompts: Prompt[]) =>
-	[...prompts]
-		.reverse()
-		.find((prompt) => text(prompt).includes("## Candidates"))!;
-
 test("ui_create opens the work and the same run continues as the specialist's turn, which drafts and replies", async () => {
 	const r = await rig();
 	const first = await r.start();
 	expect(first.status).toBe("completed");
 	// The main agent decided, then selected the toolchain; the specialist answered the run.
 	expect(r.mainRuns).toBe(1);
-	// The host searched and the main agent made one choice, the hand-over; the specialist then answers the run.
-	expect(r.mainPrompts).toHaveLength(1);
+	// The conversation searches before choosing the specialist that answers the same run.
+	expect(r.mainPrompts).toHaveLength(2);
+	expect(candidatesOf(r.mainPrompts[1]!)).toContainEqual(
+		expect.objectContaining({ id: "ui.compose" }),
+	);
 	expect(r.h.dialogue.answerText(first.id)).toBe("初稿です。");
 	expect(r.h.dialogue.get(first.id)!.specialistSessionId).toBe(
 		(await r.session())!.id,
@@ -608,11 +603,9 @@ test("return with unsaved work suspends the session, the main agent answers, and
 	const next = await r.sayAndWait("こんにちは");
 	expect(r.mainRuns).toBe(mainBefore + 1);
 	expect(r.h.dialogue.answerText(next.id)).toBe("ご用件をどうぞ。");
-	// The router decided before the talk (spec router-package-integration 2026-11-04): the suspended work's toolchain
-	// is among its candidates, and nothing of the draft's definition reaches it. The talk turn reads the time alone;
-	// the work's `## State` line is read by a fill call only.
-	const judged = text(choiceOf(r.mainPrompts));
-	expect(judged).toContain("- ui.compose: ");
+	// The conversation gets the suspended work's state and the draft stays with the specialist.
+	const judged = text(r.mainPrompts.at(-1)!);
+	expect(judged).toContain("保留中（未保存");
 	expect(judged).not.toContain("ご感想をお聞かせください");
 	// Starting the same toolchain again resumes the suspended work; no second work or session.
 	r.script.main.push(toolCall("続きを直したいです"));

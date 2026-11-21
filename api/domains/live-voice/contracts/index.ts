@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { Database } from "bun:sqlite";
 import type { Settings } from "../../settings";
 
+export const LIVE_INPUT_PCM_MAX_BYTES = 24_000;
+
 export const liveStartSchema = z
 	.object({
 		requestId: z.uuid(),

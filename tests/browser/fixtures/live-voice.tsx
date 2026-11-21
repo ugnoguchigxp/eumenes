@@ -111,7 +111,7 @@ function Fixture() {
 		settings: { data: { live: { enabled: true, model: "fixture-voice" } } },
 		voice: { active: false },
 		phase: "idle",
-		attachments: { items: [], busy: false },
+		attachments: { items: [], busy: false, files: { items: [], busy: false } },
 		status: {},
 		specialist: { addressee: { kind: "normal", label: "会話" } },
 		mute: { muted: false, ready: true, busy: false },

@@ -69,9 +69,9 @@ test("a hand-over's search and delegation are kept with its announcement, the ne
 		})),
 	).toEqual([
 		{
-			// The host offered what the router ranked, for the user's words.
+			// The conversation asked the existing search for candidates.
 			name: "find_toolchain",
-			args: { query: "猫の絵を描いて", ids: [INSTANT.id, IMAGE.id] },
+			args: { query: "猫の絵を描いて" },
 			result: JSON.stringify(FOUND),
 		},
 		{

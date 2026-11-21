@@ -65,7 +65,7 @@ test("a Codex tool preamble reaches the user before the tool and remains in the 
 			chat: {
 				async complete(request, onDelta, signal) {
 					const result = await agents.run({
-						...codexCall([], { signal, onDelta }),
+						...codexCall([], { signal, onDelta, requestId: "reply-request" }),
 						messages: request.messages.map((message) => ({
 							...message,
 							tool_calls: message.tool_calls?.map((call) => ({ ...call })),
@@ -102,6 +102,11 @@ test("a Codex tool preamble reaches the user before the tool and remains in the 
 		expect(events).toEqual([preamble, "tool", answer]);
 		expect(reply.text).toBe(preamble + answer);
 		expect(reply.calls).toHaveLength(1);
+		const turns = await codex.of("turn/start");
+		expect(turns).toHaveLength(2);
+		expect(turns[1]!.params.threadId).toBe(turns[0]!.params.threadId);
+		expect(turns[1]!.params.input[0].text).toContain("pending");
+		expect(turns[1]!.params.input[0].text).not.toContain(preamble);
 	} finally {
 		await codex.cleanup();
 	}

@@ -3,7 +3,7 @@ import { measureStage } from "../../../infrastructure/performance";
 import { checkImageRequest } from "../service/cloud-images";
 import { readCodexModels } from "./codex-models";
 import { disabledFeatures } from "./codex-sdk";
-import type { CodexThreads, ThreadMessage } from "./codex-threads";
+import type { CodexThreads, ThreadReply } from "./codex-threads";
 import type { CodexRpc } from "./codex-transport";
 import {
 	codexTotals,
@@ -21,10 +21,11 @@ const INTERRUPT_MS = 2000;
 export type CodexTurn = {
 	attemptId?: string;
 	connectionId?: string;
+	requestId?: string;
 	model: string;
 	instructions: string;
-	/** The call's messages past the instructions: what the thread already holds is a front of these. */
-	messages: ThreadMessage[];
+	/** Hashes of the messages past the instructions, in order. */
+	messages: readonly string[];
 	/** The text and images that send the messages from `from` on (0: all of them, in the full format). */
 	input(from: number): {
 		prompt: string;
@@ -39,8 +40,8 @@ export type CodexTurn = {
 	nativeWebSearch?: true;
 	reasoningEffort: "low" | "medium" | "high";
 	signal: AbortSignal;
-	/** Whether the turn's final text asks for something the caller will answer in a call that continues this one. */
-	awaitsMore?: (text: string) => boolean;
+	/** Describes the response the host will use, before another call can take this thread. */
+	completedReply?: (text: string) => ThreadReply | undefined;
 	/** The current agent message so far (cumulative), on every delta. */
 	onMessage?: (text: string) => void;
 	onUsage?: (usage: CodexUsage) => void;
@@ -85,6 +86,7 @@ export async function runCodexTurn(
 		rpc,
 		identity: threadIdentity(turn),
 		messages: turn.messages,
+		requestId: turn.requestId,
 		start: {
 			model: turn.model,
 			cwd: deps.cwd,
@@ -239,7 +241,7 @@ export async function runCodexTurn(
 			() => Promise.race([done.promise, aborted.promise]),
 			fields,
 		);
-		lease.done(totals, turn.awaitsMore?.(result.text) ?? false);
+		lease.done(totals, turn.completedReply?.(result.text));
 		return result;
 	} catch (error) {
 		if (turn.signal.aborted && (await interrupt())) lease.interrupted();

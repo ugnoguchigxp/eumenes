@@ -7,6 +7,7 @@ export type {
 } from "./contracts";
 export { registerLarmStatus } from "./controller";
 export { createLarm } from "./service";
+export type { Embed } from "./service/embedding-contract";
 export { createAgentLarm } from "./service/agent-connections";
 export { createGenerationLanes } from "./service/generation-lanes";
 export { createActivityRecorder } from "./service/activity";

@@ -117,16 +117,17 @@ for (const [width, theme] of [
 		await expect(
 			page.getByRole("region", { name: "設定の保存" }),
 		).toBeVisible();
+		const save = page
+			.getByRole("region", { name: "設定の保存" })
+			.getByRole("button", { name: "設定の変更をすべて保存", exact: true });
 		if (width >= 900) {
 			const header = page.locator(".aui-settings-heading");
 			const title = await header
 				.locator(".aui-composition-title")
 				.boundingBox();
-			const bar = await header
-				.getByRole("region", { name: "設定の保存" })
-				.boundingBox();
+			const button = await save.boundingBox();
 			expect(
-				Math.abs(title!.y + title!.height / 2 - bar!.y - bar!.height / 2),
+				Math.abs(title!.y + title!.height / 2 - button!.y - button!.height / 2),
 			).toBeLessThan(3);
 		}
 		await expect(
@@ -188,10 +189,7 @@ for (const [width, theme] of [
 			if (width >= 900 && row.hintHeight)
 				expect(row.hintHeight).toBeLessThan(65);
 		}
-		const saveButton = await page
-			.getByRole("region", { name: "設定の保存" })
-			.getByRole("button", { name: "設定の変更をすべて保存", exact: true })
-			.boundingBox();
+		const saveButton = await save.boundingBox();
 		expect(saveButton!.x + saveButton!.width).toBeLessThanOrEqual(width);
 		expect(
 			await page

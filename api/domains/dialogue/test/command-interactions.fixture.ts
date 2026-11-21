@@ -12,15 +12,9 @@ import type {
 	ToolchainRoutingPort,
 } from "../contracts/toolchains";
 import { COMMAND_KIND, type ChatMessage } from "../service/context";
-import {
-	FIXTURE_ROUTER,
-	ROUTER_SPACE,
-	selectionBySteps,
-	routerCards,
-	type ChoiceInput,
-} from "./generation.fixture";
 import { openDialogueStore } from "./store.fixture";
 import { testConversationAgent } from "./conversation-agent.fixture";
+import { conversationSteps } from "./conversation-steps.fixture";
 
 export const REVISION = "toolchain:fake.manage@1";
 export const BINDING = "binding:fake.command@1";
@@ -67,7 +61,7 @@ export const card: ToolchainCard = {
 export const until = (check: () => boolean, ms = 4000) =>
 	waitFor(check, { timeout: ms });
 export type Command = Record<string, unknown>;
-type Step = { text?: string };
+type Step = import("./generation.fixture").Step;
 /** A routed turn's choice, as the model answers it (a talk call takes `{ text }` as it is). */
 export const choice = (value: Record<string, unknown>): Step => ({
 	text: JSON.stringify(value),
@@ -115,8 +109,6 @@ export async function setup(
 		modelGate: null as Promise<void> | null,
 		/** The conversation model's scripted calls. */
 		steps: [] as Step[],
-		/** What the router was asked to select, turn by turn. */
-		routerAsked: [] as ChoiceInput[],
 		/** The command sub-agent's replies, consumed in order. */
 		commands: [] as Command[],
 		/** Host-issued choices per question schema ref. */
@@ -139,14 +131,11 @@ export async function setup(
 	const selections: Array<Record<string, any>> = [];
 	const settled: Array<{ outcome: string; code?: string | null }> = [];
 	const clock = () => new Date(Date.now() + state.offset).toISOString();
+	const nextModelStep = conversationSteps(state.steps, [card]);
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		// The router decides every utterance turn: its context judgment reads the scripted steps.
-		routerSelectionAvailable: () => true,
-		selectRouter: selectionBySteps(state.steps, state.routerAsked),
 		snapshotInTransaction: () => ({
 			general: { agentName: "", userName: "", persona: "butler" },
-			router: FIXTURE_ROUTER,
 		}),
 		requestFor: (_db: unknown, runId: string) => `req:${runId}`,
 		llmContextWindowInTransaction: () => undefined,
@@ -198,7 +187,7 @@ export async function setup(
 				tools: (tools ?? []).map((t) => t.function.name),
 				...(session ? { session } : {}),
 			});
-			const step = state.steps.shift();
+			const step = nextModelStep(requestId, messages, !!session?.outputSchema);
 			if (!step) throw new Error("fixture_step_missing");
 			// Held after the call is recorded and its step taken: the state the call showed is fixed meanwhile.
 			if (state.modelGate) await state.modelGate;
@@ -208,6 +197,11 @@ export async function setup(
 				requestId,
 				attemptId: crypto.randomUUID(),
 				value: step.text ?? "",
+				toolCalls: (step.calls ?? []).map(({ name, args }) => ({
+					id: crypto.randomUUID(),
+					name,
+					arguments: JSON.stringify(args),
+				})),
 			} as Receipt;
 		},
 	} as unknown as InferencePort;
@@ -320,25 +314,6 @@ export async function setup(
 	const current = () => ({ ...card, revisionId: state.activeRevision });
 	const toolchains = {
 		embedQuery: async () => undefined,
-		// The router package's ports (spec router-package-integration 2026-11-04), as generation.fixture fakes them.
-		embedRouter: async (texts: readonly string[]) => ({
-			space: ROUTER_SPACE,
-			vectors: texts.map(() => [1, 0]),
-		}),
-		routerCardsInTransaction: () =>
-			routerCards([
-				current(),
-				{
-					...current(),
-					id: "research.web",
-					revisionId: "toolchain:research.web@1",
-					title: "調べもの",
-					execution: "research",
-				},
-			]),
-		routerLexicalInTransaction: () => new Map(),
-		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
-			new Map(ids.includes(card.id) ? [[card.id, card.title]] : []),
 		routeInTransaction: (
 			_db: unknown,
 			input: { available: ReadonlySet<string> },

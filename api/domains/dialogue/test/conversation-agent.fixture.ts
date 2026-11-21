@@ -7,6 +7,7 @@ import type { ConversationAgentPort } from "../contracts";
  */
 export const testConversationAgent: ConversationAgentPort = {
 	system: () => ({ base: "" }),
+	handsWork: () => true,
 	async respond(input) {
 		const reply = await runRespond({ ...input, emotion: false });
 		return { text: reply.text, ended: reply.ended };

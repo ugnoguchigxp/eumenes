@@ -46,7 +46,6 @@ export type GenerationOutcome = {
 	/** Publishes visible output, or returns the host's spoken fallback when the write fails. */
 	finishSilentReplyInTransaction?: (db: Database) => string;
 	debugTarget?: string;
-	debugRouterFailure?: true;
 	lookupSources?: Array<{ url: string; title: string }>;
 	imageAnswer?: ImageAnswerTrace;
 	/** The speech the generation ends with ("" when it said nothing). */

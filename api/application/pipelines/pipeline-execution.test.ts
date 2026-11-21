@@ -1,41 +1,28 @@
 import { expect, test } from "bun:test";
 import { waitFor } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
-import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
+import {
+	searchThenDelegate,
+	toolResults,
+} from "../toolchain/conversation-script.fixture";
 
 // Real seed, dialogue, package, scheduler, queue, child adoption, TODO and notices; model outputs alone are scripted.
-test("B sends ordered steps to the imported planner and two actual commands complete under one pipeline TODO", async () => {
+test("the conversation sends the whole request to the planner and two ordered commands complete under one pipeline TODO", async () => {
 	const first = "一つ目のタイマーを作って";
 	const second = "二つ目のタイマーを作って";
 	const request = `${first}、終わったら${second}`;
 	let translations = 0,
-		plans = 0,
-		structures = 0;
+		plans = 0;
 	const h = await harness({
 		pipelines: true,
 		timers: true,
 		discoveryTarget: () => "execute_pipeline",
-		structure: (messages) => {
-			structures++;
-			expect(JSON.parse(messages.at(-1)!.content).text).toBe(request);
-			return {
-				requests: [
-					{ text: first, target: "一つ目のタイマー", inputs: [], after: [] },
-					{ text: second, target: "二つ目のタイマー", inputs: [], after: [0] },
-				],
-			};
-		},
+		routeTool: "execute_pipeline",
 		compose: (messages) => {
 			plans++;
 			const packet = JSON.parse(messages.at(-1)!.content);
 			expect(packet.request).toBe(request);
-			expect(packet.routedSteps).toEqual([
-				{ text: first, entry: "timers.manage", after: [] },
-				{ text: second, entry: "timers.manage", after: [0] },
-			]);
 			expect(translations).toBe(0);
-			if (plans === 2)
-				expect(packet.contractErrors).toContain("routed_steps_mismatch");
 			expect(
 				packet.cards.some((c: any) => c.entry === "pipeline.execute"),
 			).toBe(false);
@@ -61,7 +48,7 @@ test("B sends ordered steps to the imported planner and two actual commands comp
 							id: "second",
 							bundle: "timers.manage",
 							task: "二つ目のタイマー",
-							from: plans === 1 ? ["request"] : ["first"],
+							from: ["first"],
 							result: "保存済みタイマー",
 						},
 					],
@@ -96,8 +83,7 @@ test("B sends ordered steps to the imported planner and two actual commands comp
 				h.toolchain.agents.executions.list("main")[0]?.status === "completed",
 			{ timeout: 5000 },
 		);
-		expect(structures).toBe(1);
-		expect(plans).toBe(2);
+		expect(plans).toBe(1);
 		expect(translations).toBe(2);
 		const timers = await (await h.request("/api/timers")).json();
 		expect(timers.items.map((t: any) => t.label).sort()).toEqual([
@@ -136,12 +122,7 @@ test("a failed first pipeline step does not run the dependent step", async () =>
 		pipelines: true,
 		timers: true,
 		discoveryTarget: () => "execute_pipeline",
-		structure: () => ({
-			requests: [
-				{ text: first, target: "一つ目のタイマー", inputs: [], after: [] },
-				{ text: second, target: "二つ目のタイマー", inputs: [], after: [0] },
-			],
-		}),
+		routeTool: "execute_pipeline",
 		compose: (messages) => {
 			const packet = JSON.parse(messages.at(-1)!.content);
 			return {
@@ -216,49 +197,37 @@ test("a failed first pipeline step does not run the dependent step", async () =>
 });
 
 for (const operation of ["answer", "cancel"] as const) {
-	test(`B ${operation} reaches the waiting pipeline owner without creating replacement work`, async () => {
+	test(`conversation ${operation} reaches the waiting pipeline owner without creating replacement work`, async () => {
 		const request = "必要な時間を聞いてからタイマーを作って";
 		const reply = operation === "answer" ? "15秒です" : "その作業を取り消して";
 		let plans = 0,
 			commands = 0,
-			structures = 0;
+			workCalls = 0;
 		const h = await harness({
 			pipelines: true,
 			timers: true,
 			discoveryTarget: () => "execute_pipeline",
-			structure: (messages) => {
-				const packet = JSON.parse(messages.at(-1)!.content);
-				// The opening turn has no pending question. Its judgment stays one request; the
-				// counted call is the reply, identified by the prompt's pending and controls.
-				if (!packet.pending?.length && !packet.controls?.length) {
-					expect(packet.text).toBe(request);
-					return {
-						requests: [
-							{ text: packet.text, target: null, inputs: [], after: [] },
-						],
-					};
-				}
-				structures++;
-				expect(packet.text).toBe(reply);
-				expect(packet.pending).toEqual([
-					{ ref: "t1.answer", title: request, question: "何秒にしますか？" },
-				]);
-				expect(packet.controls).toEqual([{ ref: "t1.cancel", title: request }]);
-				return operation === "answer"
-					? { answer: { ref: "t1.answer", text: reply } }
-					: { control: { ref: "t1.cancel", text: reply } };
-			},
-			firstRound: (_tools, question, messages) =>
-				question === reply
-					? {
-							calls: [
-								{ name: "work", args: { todo: "t1", operation, text: reply } },
-							],
-						}
-					: searchThenDelegate((c) => c.id === "pipeline.execute", request, {
+			firstRound: (tools, question, messages) => {
+				if (question !== reply)
+					return searchThenDelegate(
+						(c) => c.id === "pipeline.execute",
+						request,
+						{
 							announcement: "順に進めます。",
 							impact: "create",
-						})(messages),
+						},
+					)(messages);
+				if (toolResults(messages, "work").length)
+					return {
+						text:
+							operation === "answer"
+								? "回答を伝えました。"
+								: "取り消しました。",
+					};
+				expect(tools.map(({ function: fn }) => fn.name)).toContain("work");
+				workCalls++;
+				return { calls: [{ name: "work", args: { todo: "t1", operation } }] };
+			},
 			compose: (messages) => {
 				const packet = JSON.parse(messages.at(-1)!.content);
 				if (++plans === 1)
@@ -335,7 +304,7 @@ for (const operation of ["answer", "cancel"] as const) {
 			expect(
 				[...page("active"), ...page("archived")].map((row) => row.id),
 			).toEqual([before.id]);
-			expect(structures).toBe(1);
+			expect(workCalls).toBe(1);
 			expect(commands).toBe(operation === "answer" ? 1 : 0);
 			expect(plans).toBe(operation === "answer" ? 2 : 1);
 		} finally {

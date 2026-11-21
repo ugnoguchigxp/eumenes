@@ -452,7 +452,9 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 	expect(h.stateOf(0)).toContain(
 		"- 制作担当「古い項目」（画面に表示中、target item-old）",
 	);
-	const found = h.state.calls[0]!.messages.at(-1)!
+	const found = h.state.calls
+		.find((call) => call.session?.outputSchema)!
+		.messages.at(-1)!
 		.content.split("\n")
 		.find((line) => line.startsWith(`- ${STUDIO.id}: `))!;
 	expect(found).toContain("item-old「");
@@ -467,7 +469,7 @@ test("a saved item older than the recent choices is offered, accepted and shown 
 	// The fill names an item that was not issued: the host refuses it and says it could not ask.
 	const refused = await other.ask("直して");
 	expect(other.answerText(refused.id)).toBe(
-		"うまく頼めませんでした。もう一度言ってもらえますか。",
+		"その依頼は今の担当で実行できません。",
 	);
 	expect(other.work()).toHaveLength(0);
 	expect(await other.session()).toBeNull();

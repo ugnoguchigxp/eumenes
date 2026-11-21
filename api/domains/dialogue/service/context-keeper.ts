@@ -300,9 +300,10 @@ function prepareKeeper(
 	// A cut starts at an agent's utterance and keeps the newest few.
 	const points = new Map<string, number>();
 	const pointLines: string[] = [];
+	const firstAgent = recent.find((u) => u.speaker === "agent");
 	const room = recent.slice(0, Math.max(0, recent.length - KEEPER.keepAtCut));
 	for (const u of room) {
-		if (u.speaker !== "agent" || u === recent[0]) continue;
+		if (u.speaker !== "agent" || u === firstAgent) continue;
 		const id = `k${points.size + 1}`;
 		points.set(id, u.seq - 1);
 		pointLines.push(`- ${id}${quote(u)}の前で区切れる`);

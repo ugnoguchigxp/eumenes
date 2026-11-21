@@ -1,6 +1,4 @@
 import { afterEach, expect, test } from "bun:test";
-import type { InferencePort } from "../../inference/contracts";
-import { ROUTER } from "./router.fixture";
 import { OTHER_REVISION, setup, type Harness } from "./specialist.fixture";
 
 const open: Harness[] = [];
@@ -34,44 +32,23 @@ test("ambiguous permission holds unsaved work and explicit permission switches t
 	expect((await h.session())!.pendingSwitch).toMatchObject({
 		toolchainId: "fake.other",
 	});
-	// From here the router decides.
-	const seen: Array<{ ref: string; description: string }> = [];
-	let approve = false;
-	const selectRouter: NonNullable<InferencePort["selectRouter"]> = async (
-		prompt,
-	) => {
-		const { hostActions, latest } = JSON.parse(prompt.user);
-		seen.push(...hostActions);
-		return JSON.stringify({
-			decision: approve
-				? { hostAction: { ref: "switch.discard", text: latest } }
-				: {
-						clarify: {
-							question: "未保存の作業を破棄してよいですか？",
-							unhandled: [latest],
-						},
-					},
-		});
-	};
-	Object.assign(h.larm, {
-		snapshotInTransaction: () => ({
-			general: { agentName: "", userName: "", persona: "butler" },
-			router: ROUTER,
-		}),
-		selectRouter,
-	});
 	h.state.found = [];
+	h.state.steps.push({ text: "未保存の作業を破棄してよいですか？" });
 	const unsure = await h.ask("うーん、いいよ");
 	expect(h.answerText(unsure.id)).toContain(
 		"未保存の作業を破棄してよいですか？",
 	);
-	expect(seen.at(-1)).toEqual({
-		ref: "switch.discard",
-		description: "未保存の作業を捨てて、「別の担当」に切り替える。",
-	});
+	expect(h.state.calls.at(-1)?.tools).toContain("discard_for_pending_switch");
 	expect((await h.session())!.id).toBe(suspended.id);
 	expect(h.state.calledPort).not.toContain("end:discard");
-	approve = true;
+	h.state.steps.push({
+		calls: [
+			{
+				name: "discard_for_pending_switch",
+				args: { request: "別のものを作ってください" },
+			},
+		],
+	});
 	h.state.specialist.push({ action: "reply", text: "別の担当です" });
 	const switched = await h.ask("はい破棄して");
 	expect(switched.status).toBe("completed");

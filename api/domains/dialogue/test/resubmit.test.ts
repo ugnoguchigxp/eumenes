@@ -184,29 +184,20 @@ test("a repeated requestId is one edit and one run", async () => {
 });
 
 test("finding a toolchain commits nothing: the utterance is still edited, and its exchange moves to the new run", async () => {
-	h = await setup({
-		async selectRouter(prompt) {
-			if (!prompt.version.startsWith("route-selection"))
-				return JSON.stringify({
-					decision: {
-						requests: [
-							{
-								text: JSON.parse(prompt.user).text,
-								target: null,
-								inputs: [],
-								after: [],
-							},
-						],
-					},
-				});
-			return '{"selections":{"0":{"kind":"conversation"}}}';
-		},
-	});
+	h = await setup({});
 	let release!: () => void;
-	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push({ text: "犬です。" });
+	const held = new Promise<void>((resolve) => (release = resolve));
+	const execute = h.larm.executeStream!;
+	h.larm.executeStream = (...args) => {
+		if (h!.state.calls.length === 1) h!.state.gate = held;
+		return execute(...args);
+	};
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "犬の絵" } }] },
+		{ text: "犬です。" },
+	);
 	const run = await submit("犬の絵");
-	await waitFor(() => h!.state.calls.length === 1);
+	await waitFor(() => h!.state.calls.length === 2);
 	expect(h.log().some((e) => h!.fields(e).action === "find_toolchain")).toBe(
 		true,
 	);
@@ -214,6 +205,7 @@ test("finding a toolchain commits nothing: the utterance is still edited, and it
 	if (!result.ok) throw new Error(result.code);
 	expect(h.conversation.message(run.inputMessageId)?.runId).toBe(result.run.id);
 	h.state.steps.push({ text: "猫です。" });
+	h.state.gate = null;
 	release();
 	await waitFor(() => h!.dialogue.get(result.run.id)?.status === "completed");
 	expect(

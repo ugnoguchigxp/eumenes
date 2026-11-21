@@ -1,4 +1,3 @@
-import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { afterEach, expect, test } from "bun:test";
 import {
 	setup,
@@ -13,27 +12,17 @@ afterEach(async () => {
 	h = undefined;
 });
 
-function structure(raw: string) {
-	const original = h!.larm.selectRouter!;
-	const prompts: string[] = [];
-	Object.assign(h!.larm, {
-		selectRouter: async (...args: Parameters<typeof original>) => {
-			if (args[0].version !== TURN_STRUCTURE_PROMPT.version)
-				return original(...args);
-			prompts.push(args[0].user);
-			return JSON.stringify({ decision: JSON.parse(raw) });
-		},
-	});
-	return prompts;
-}
+const work = (todo: string, operation: "answer" | "cancel") => ({
+	calls: [{ name: "work", args: { todo, operation } }],
+});
 
-test("a structured answer resumes the same question and work once, without a new routing score", async () => {
+test("a conversation answer resumes the same question and work once", async () => {
 	h = await setup({ questions: [] });
 	await h.asked("何秒ですか", "builtin:answerText");
 	const before = h.interaction()!;
 	const todoId = h.todos()[0]!.id;
-	const scores = h.state.routerAsked.length;
-	const prompts = structure('{"answer":{"ref":"t1.answer","text":"15秒です"}}');
+	const beforeAnswer = h.calls.length;
+	h.state.steps.push(work("t1", "answer"));
 	h.state.commands.push({
 		action: "invoke",
 		tool: "fake.start",
@@ -50,10 +39,8 @@ test("a structured answer resumes the same question and work once, without a new
 	expect(h.interaction()!.id).toBe(before.id);
 	expect(h.archived().map((todo) => todo.id)).toEqual([todoId]);
 	expect(h.started).toHaveLength(1);
-	expect(h.state.routerAsked).toHaveLength(scores);
-	expect(JSON.parse(prompts[0]!).pending).toEqual([
-		{ ref: "t1.answer", title: h.archived()[0]!.title, question: "何秒ですか" },
-	]);
+	expect(h.calls[beforeAnswer]!.tools).toContain("work");
+	expect(h.calls[beforeAnswer]!.messages.at(-1)!.content).toContain("質問待ち");
 	expect(JSON.stringify(h.commandPrompts.at(-1))).toContain("15秒です");
 });
 
@@ -61,9 +48,9 @@ test("a mixed reply asks about the whole unperformed scope and leaves the existi
 	h = await setup({ questions: [] });
 	await h.asked("何秒ですか", "builtin:answerText");
 	const before = h.interaction()!;
-	structure(
-		'{"clarify":{"question":"回答と新しい依頼を順に進めてよいですか？","unhandled":["15秒です","天気も調べて"]}}',
-	);
+	h.state.steps.push({
+		text: "タイマーの15秒と天気の調査がまだ実施していない依頼です。天気も調べてよいですか？",
+	});
 	const run = await h.say("15秒です。天気も調べて");
 	expect(h.dialogue.answerText(run.id)).toContain("まだ実施していない依頼");
 	expect(h.dialogue.answerText(run.id)).toContain("天気も調べて");
@@ -83,8 +70,9 @@ test("an invented question reference fails before answering or starting a replac
 	h = await setup({ questions: [] });
 	await h.asked("何秒ですか", "builtin:answerText");
 	const before = h.interaction()!;
-	structure('{"answer":{"ref":"t9.answer","text":"15秒です"}}');
-	h.state.steps.push({ text: "回答はまだ作業に送っていません。" });
+	h.state.steps.push(work("t9", "answer"), {
+		text: "回答はまだ作業に送っていません。",
+	});
 	const run = await h.say("15秒です");
 	expect(h.dialogue.answerText(run.id)).toBe(
 		"回答はまだ作業に送っていません。",
@@ -103,10 +91,7 @@ test("structured cancellation reaches the same command and rejects a later answe
 	await h.asked("何秒ですか", "builtin:answerText");
 	const todo = h.todos()[0]!;
 	const interaction = h.interaction()!;
-	const scores = h.state.routerAsked.length;
-	const prompts = structure(
-		'{"control":{"ref":"t1.cancel","text":"その作業を取り消してください"}}',
-	);
+	h.state.steps.push(work("t1", "cancel"), { text: "作業を取り消しました。" });
 	await h.say("その作業を取り消してください");
 	expect(h.todos()).toHaveLength(0);
 	expect(h.archived()).toMatchObject([{ id: todo.id, outcome: "cancelled" }]);
@@ -119,45 +104,32 @@ test("structured cancellation reaches the same command and rejects a later answe
 			input: "15秒です",
 		}),
 	).rejects.toThrow("interaction_closed");
-	expect(h.state.routerAsked).toHaveLength(scores);
-	expect(JSON.parse(prompts[0]!).controls).toEqual([
-		{ ref: "t1.cancel", title: todo.title },
-	]);
-	const after = structure('{"answer":{"ref":"t1.answer","text":"15秒です"}}');
-	h.state.steps.push({ text: "回答はまだ作業に送っていません。" });
+	h.state.steps.push(work("t1", "answer"), {
+		text: "回答はまだ作業に送っていません。",
+	});
 	await h.say("15秒です");
-	expect(JSON.parse(after[0]!).pending).toEqual([]);
-	expect(JSON.parse(after[0]!).controls).toEqual([]);
+	expect(h.calls.at(-1)!.messages.at(-1)!.content).toContain(
+		"work_operation_unavailable",
+	);
 	expect(h.archived()).toHaveLength(1);
 	expect(h.started).toHaveLength(0);
 });
 
-test("a model's partial answer or cancellation cannot omit the rest of the utterance", async () => {
+test("the first conversation call sees the complete mixed request", async () => {
 	h = await setup({ questions: [] });
 	await h.asked("何秒ですか", "builtin:answerText");
 	const before = h.interaction()!;
-	const scores = h.state.routerAsked.length;
-	for (const [text, raw] of [
-		[
-			"15秒です。それとは別に天気を調べてください。",
-			'{"answer":{"ref":"t1.answer","text":"15秒です"}}',
-		],
-		[
-			"その話は後にして、少し話を聞いてください。",
-			'{"control":{"ref":"t1.cancel","text":"その話は後にして"}}',
-		],
-	]) {
-		structure(raw!);
-		h.state.steps.push({ text: "作業はまだ実施していません。" });
-		const run = await h.say(text!);
-		expect(h.dialogue.answerText(run.id)).toBe("作業はまだ実施していません。");
-		expect(h.interaction()).toMatchObject({
-			id: before.id,
-			status: "waiting_input",
-			revision: before.revision,
-		});
-	}
-	expect(h.todos()).toHaveLength(1);
+	const text = "15秒です。それとは別に天気を調べてください。";
+	h.state.steps.push({ text: "どちらから実行しますか？" });
+	await h.say(text);
+	expect(h.calls.at(-1)!.messages.at(-1)!.content).toContain(text);
+	expect(h.calls.at(-1)!.messages[0]!.content).toContain(
+		"独立した実行依頼が混ざる",
+	);
+	expect(h.interaction()).toMatchObject({
+		id: before.id,
+		status: "waiting_input",
+		revision: before.revision,
+	});
 	expect(h.started).toHaveLength(0);
-	expect(h.state.routerAsked).toHaveLength(scores);
 });

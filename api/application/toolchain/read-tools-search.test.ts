@@ -20,7 +20,8 @@ const backends = new Set([
 	"music",
 	"dots",
 	"image",
-	"ui-compositions",
+	"app-development",
+	"markdown",
 	"excalidraw",
 	"object-recognition",
 	"ocr",
@@ -114,7 +115,7 @@ test("a read tool's card carries execution read and the JSON Schema of its argum
 	expect(card).toMatchObject({
 		id: "read_history",
 		functionName: "read_history",
-		revisionId: "host:read_history@1",
+		revisionId: "host:read_history@2",
 		execution: "read",
 	});
 	expect(

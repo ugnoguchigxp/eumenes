@@ -1,16 +1,10 @@
-import type { Database } from "bun:sqlite";
-import type { Card } from "eumenes_router";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import { getLogger } from "../../infrastructure/logger";
 import type { Capabilities, VectorSpace } from "../../domains/capabilities";
-import type { ToolchainHistory } from "../../domains/toolchain-history";
+import { vectorSpaceKey } from "../../infrastructure/vector";
+import type { Embed } from "../../domains/larm";
 
-/** The LARM embedding provider, as the application binds it to the saved connection. */
-export type Embed = (
-	texts: string[],
-	type: "query" | "passage",
-	signal: AbortSignal,
-) => Promise<{ vectors: number[][]; space: VectorSpace }>;
+export type { Embed };
 
 const log = getLogger("toolchain");
 const BATCH = 32;
@@ -25,26 +19,19 @@ const PASSAGE_TIMEOUT_MS = 30_000;
 export function createVectorRefresh(
 	store: SqliteStore,
 	capabilities: Capabilities,
-	history: ToolchainHistory,
 	embed?: Embed,
-	/** The router package's cards (spec router-package-integration 2026-11-04 §1 #7), synced on every refresh. */
-	routerCards?: (db: Database) => Card[],
 ) {
-	let running: Promise<void> | null = null;
+	let running: Promise<VectorSpace | undefined> | null = null;
 	let lastWarnAt = 0;
 	function warn(event: string, error: unknown) {
 		if (Date.now() - lastWarnAt < 60_000) return;
 		lastWarnAt = Date.now();
-		log.warn(
-			event,
-			{
-				reason:
-					error instanceof Error && /^[a-z0-9_]+$/.test(error.message)
-						? error.message
-						: "embedding_failed",
-			},
-			error,
-		);
+		log.warn(event, {
+			reason:
+				error instanceof Error && /^[a-z0-9_]+$/.test(error.message)
+					? error.message
+					: "embedding_failed",
+		});
 	}
 	async function passages(texts: string[]) {
 		const out: number[][] = [];
@@ -55,6 +42,10 @@ export function createVectorRefresh(
 				"passage",
 				AbortSignal.timeout(PASSAGE_TIMEOUT_MS),
 			);
+			if (space && vectorSpaceKey(space) !== vectorSpaceKey(r.space))
+				throw new Error("embedding_space_changed");
+			if (r.vectors.length !== Math.min(BATCH, texts.length - i))
+				throw new Error("invalid_embedding_result");
 			space = r.space;
 			out.push(...r.vectors);
 		}
@@ -74,39 +65,30 @@ export function createVectorRefresh(
 		);
 		if (toolchains.length) {
 			const r = await passages(toolchains.map((t) => t.text));
-			await store.write((db) =>
+			if (vectorSpaceKey(r.space) !== vectorSpaceKey(space))
+				throw new Error("embedding_space_changed");
+			await store.write((db) => {
 				capabilities.saveToolchainVectorsInTransaction(
 					db,
-					r.space,
+					space,
 					toolchains.map((t, i) => ({ ...t, vector: r.vectors[i]! })),
-				),
-			);
-		}
-		// The router package's cards, and the vectors of their passages it misses in this space.
-		const cards = routerCards ? store.read((db) => routerCards(db)) : [];
-		const pending = cards.length
-			? await store.write((db) =>
-					history.syncRouterCardsInTransaction(db, cards, space),
-				)
-			: [];
-		if (pending.length) {
-			const r = await passages(pending.map((p) => p.text));
-			await store.write((db) =>
-				history.saveRouterVectorsInTransaction(
-					db,
-					r.space,
-					pending.map((p, i) => ({ ...p, vector: r.vectors[i]! })),
-				),
-			);
-		}
-		if (toolchains.length || pending.length)
-			log.info("toolchain.vectors_refreshed", {
-				count: toolchains.length + pending.length,
+				);
+				if (capabilities.pendingToolchainVectorsInTransaction(db, space).length)
+					throw new Error("embedding_index_sources_changed");
 			});
+		}
+		if (toolchains.length)
+			log.info("toolchain.vectors_refreshed", {
+				count: toolchains.length,
+			});
+		return space;
 	}
 	function refresh() {
 		running ??= run()
-			.catch((error) => warn("toolchain.vectors_refresh_failed", error))
+			.catch((error) => {
+				warn("toolchain.vectors_refresh_failed", error);
+				return undefined;
+			})
 			.finally(() => {
 				running = null;
 			});
@@ -114,27 +96,10 @@ export function createVectorRefresh(
 	}
 	return {
 		refresh,
-		/**
-		 * The router's embedding of the texts it routes (the eumenes_router package's `embed`): passages, as its cards'
-		 * and its memory's were made. A failure is thrown: the turn goes on without the router.
-		 */
-		async embedRouter(texts: readonly string[], signal: AbortSignal) {
-			if (!embed) throw new Error("embedding_unavailable");
-			return embed(
-				texts.map((text) => text.slice(0, 2000)),
-				"passage",
-				AbortSignal.any([signal, AbortSignal.timeout(QUERY_TIMEOUT_MS)]),
-			);
-		},
 		/** Passages embedded now, for a trial of a draft that is not in the index (undefined without a provider). */
 		async embedPassages(texts: string[]) {
-			if (!embed) return undefined;
-			try {
-				return await passages(texts);
-			} catch (error) {
-				warn("toolchain.passage_embedding_failed", error);
-				return undefined;
-			}
+			if (!embed || !texts.length) return undefined;
+			return passages(texts);
 		},
 		async embedQuery(
 			text: string,
@@ -143,7 +108,7 @@ export function createVectorRefresh(
 			if (!embed || !text.trim()) return undefined;
 			try {
 				const r = await embed(
-					[text.slice(0, 2000)],
+					[text],
 					"query",
 					AbortSignal.any([signal, AbortSignal.timeout(QUERY_TIMEOUT_MS)]),
 				);
@@ -151,7 +116,7 @@ export function createVectorRefresh(
 			} catch (error) {
 				signal.throwIfAborted();
 				warn("toolchain.query_embedding_failed", error);
-				return undefined;
+				throw error;
 			}
 		},
 	};

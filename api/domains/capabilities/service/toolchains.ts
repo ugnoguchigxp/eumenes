@@ -19,6 +19,7 @@ import {
 	unpackVector,
 	vectorSpaceKey,
 } from "../../../infrastructure/vector";
+import { textChunks } from "../../../infrastructure/text-chunks";
 import {
 	hash,
 	readToolParameters,
@@ -35,7 +36,11 @@ import {
 export { dot, packVector, unpackVector, vectorSpaceKey };
 /** The passages a toolchain is found by: its purpose, use cases and example requests. */
 export function toolchainPassages(d: FixedDefinition) {
-	return [`${d.title}: ${d.summary}`, ...d.useWhen, ...(d.examples ?? [])];
+	return [
+		`${d.title}: ${d.summary}`,
+		...d.useWhen,
+		...(d.examples ?? []),
+	].flatMap(textChunks);
 }
 
 /**
@@ -193,7 +198,10 @@ function similaritiesOf(
 		if (!active.has(row.revisionId) || row.values.length !== values.length)
 			continue;
 		const score = dot(row.values, values);
-		if (score > (similarity.get(row.revisionId) ?? -Infinity))
+		if (
+			Number.isFinite(score) &&
+			score > (similarity.get(row.revisionId) ?? -Infinity)
+		)
 			similarity.set(row.revisionId, score);
 	}
 	return similarity;

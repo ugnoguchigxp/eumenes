@@ -12,6 +12,7 @@ import { answerRequest } from "./answer-request";
 import { assertAttitudeQuestions } from "./context";
 import { createControl } from "./control";
 import { createInfer } from "./infer";
+import { createEmbedding } from "./embedding";
 import { createConversationYield } from "./conversation-yield";
 import { createHelperConnections } from "./helper-connections";
 import { createProviderLeases as createLeaseManager } from "./provider-leases";
@@ -295,6 +296,11 @@ export function createLarm(config: LarmConfig): LarmPort {
 
 	return {
 		...leasePort(leases),
+		embed: createEmbedding({
+			request,
+			withProvider,
+			lifetime: lifetime.signal,
+		}),
 		retain: leases.retain,
 		async judge(state, questions, signal) {
 			if (judging) throw new Error("larm_decision_busy");

@@ -108,6 +108,26 @@ test("audio is ordered, a repeated sequence is not sent twice, mute sends silenc
 		audio,
 	});
 });
+
+test("stopping fences microphone input before sending the provider close event", async () => {
+	h = await setup();
+	const id = await h.start();
+	const close = Promise.all([h.service.stop(id), h.service.stop(id)]);
+	await h.service
+		.audio(id, 1, "AAA=")
+		.catch((error: unknown) =>
+			expect(error).toMatchObject({ message: "live_session_inactive" }),
+		);
+	await close;
+	await expect(h.service.audio(id, 2, "AAA=")).rejects.toThrow(
+		"live_session_inactive",
+	);
+	const types = h.peer.sent.map((event) => event.type);
+	expect(types.filter((type) => type === "session.close")).toHaveLength(1);
+	expect(types.slice(types.indexOf("session.close") + 1)).not.toContain(
+		"session.input_audio.append",
+	);
+});
 test("test sessions never publish conversation messages or execute delegated work", async () => {
 	h = await setup();
 	const id = await h.start(true);

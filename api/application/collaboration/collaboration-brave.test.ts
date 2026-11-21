@@ -25,7 +25,7 @@ import {
 } from "../browser/browser-task.fixture";
 import { createTaskRunner } from "../browser/browser-task-runner";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
-import { harness } from "../toolchain/toolchain.fixture";
+import { legacyTaskHarness as harness } from "./legacy-task.fixture";
 
 const origin = "https://example.com";
 const excerpt = "準備ができたら、設定画面で接続先を保存します。";

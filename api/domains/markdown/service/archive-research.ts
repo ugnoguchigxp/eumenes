@@ -1,7 +1,10 @@
 import type { ArchivePort } from "../contracts";
+import {
+	lowSurrogate,
+	textChunkEnd,
+} from "../../../infrastructure/text-chunks";
 
 const MAX_MATCHES = 6;
-const CHUNK = 1600;
 const normalize = (text: string) => text.normalize("NFKC").toLowerCase();
 
 /** Bounded reads of the original Markdown. This path never opens a workspace. */
@@ -66,8 +69,7 @@ export function createArchiveResearch(archive: ArchivePort) {
 				lowSurrogate(markdown.charCodeAt(start))
 			)
 				throw new Error("markdown_range_invalid");
-			let end = Math.min(start + CHUNK, markdown.length);
-			if (lowSurrogate(markdown.charCodeAt(end))) end--;
+			const end = textChunkEnd(markdown, start);
 			return {
 				title: document.entry.title,
 				body: markdown.slice(start, end),
@@ -78,5 +80,3 @@ export function createArchiveResearch(archive: ArchivePort) {
 		},
 	};
 }
-
-const lowSurrogate = (code: number) => code >= 0xdc00 && code <= 0xdfff;

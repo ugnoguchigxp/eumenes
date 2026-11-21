@@ -110,17 +110,22 @@ export function createWithProvider({
 					}
 				}
 				// Some gateway versions return unauthorized after an idle profile switch.
-				// Confirm the old connection is terminal; a ready connection's 401 stays an error.
+				// Check state before reclaiming an embedding credential or replacing a released lease.
 				if (
 					!signal.aborted &&
 					error instanceof LarmInferenceError &&
 					error.status === 401 &&
-					error.code === "unauthorized"
+					(error.code === "unauthorized" || name === "embedding")
 				) {
 					try {
 						unusable = await isReleased(current, signal);
 					} catch {
 						signal.throwIfAborted();
+					}
+					if (!unusable && name === "embedding" && !attempt) {
+						if (current.providers.get(name) === selected)
+							current.providers.delete(name);
+						continue;
 					}
 				}
 				if (unusable) {

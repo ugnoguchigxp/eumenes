@@ -1,7 +1,6 @@
-import { isReadToolName } from "../../domains/capabilities";
 import { afterEach, expect, test } from "bun:test";
 import { harness } from "./toolchain.fixture";
-import { utteranceOf } from "../toolchain/conversation-script.fixture";
+import { isUtteranceRound, utteranceOf } from "./conversation-script.fixture";
 import { musicFixture } from "../media/music.fixture";
 import type { LarmPort } from "../../domains/larm";
 import { configureLogging } from "../../infrastructure/logger";
@@ -27,7 +26,7 @@ test("voice does not display, persist or speak text-only control output: a reply
 	const f = musicFixture();
 	const spoken: string[] = [],
 		visible: string[] = [];
-	let routes = 0,
+	let replies = 0,
 		waiting = false,
 		release!: () => void;
 	const pause = new Promise<void>((resolve) => {
@@ -48,21 +47,12 @@ test("voice does not display, persist or speak text-only control output: a reply
 						languages: ["ja"],
 						confidence: 0.99,
 					})
-				: // The routed turn's choice: nothing fits, so the talk turn answers.
-					options?.jsonSchema
-					? JSON.stringify({ choice: "none" })
-					: f.model.answer(messages, signal, options),
+				: f.model.answer(messages, signal, options),
 		answerStream: async (messages, signal, delta, options) => {
-			// The routed turn's talk call: the conversation's input, offering the read tools only.
-			const talk =
-				(options?.tools ?? []).every((tool) =>
-					isReadToolName(tool.function.name),
-				) &&
-				!options?.jsonSchema &&
-				utteranceOf(messages) !== "";
+			const talk = isUtteranceRound(options) && utteranceOf(messages) !== "";
 			if (talk) {
 				// Control text beside no tool call: it is dropped, and the reply is the text before it (nothing here).
-				routes++;
+				replies++;
 				for (const character of control) delta(character);
 				waiting = true;
 				await pause;
@@ -93,7 +83,7 @@ test("voice does not display, persist or speak text-only control output: a reply
 		// The reply told the user nothing: the run completes with the host's words, which the turn speaks.
 		await until(() => h.dialogue.get(runId)?.status === "completed");
 		await until(() => h.voice.get(id)?.status === "ready");
-		expect(routes).toBe(1);
+		expect(replies).toBe(1);
 		expect(
 			visible.every(
 				(text) => !text.includes("create_music") && !text.includes("<|"),

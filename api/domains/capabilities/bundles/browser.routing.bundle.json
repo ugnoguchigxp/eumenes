@@ -97,6 +97,42 @@
 			"functionName": "browser_capture",
 			"bindingRevisionId": "binding:browser.capture@6",
 			"artifactRevisionId": "artifact:browser.workspace@6"
+		},
+		{
+			"aliases": ["スクリーンショット", "画面キャプチャ", "画面撮影"],
+			"tags": [],
+			"useWhen": [
+				"既に表示中のブラウザーのタブやEumenesの画面をスクリーンショットとして保存したい",
+				"表示中のWebページの一部や、スクロール先を含む全体を撮影したい",
+				"依頼済みのブラウザー撮影の結果を確認したい、または撮影を中止したい"
+			],
+			"avoidWhen": [
+				"指定のURLをブラウザに表示する、タブを開く・移動する・切り替える",
+				"新しい絵や写真を作りたい",
+				"公開情報の検索や本文の取得だけで足りる"
+			],
+			"dependencies": ["package:browser.capture@1"],
+			"kind": "toolchain",
+			"id": "browser.capture",
+			"revision": 9,
+			"title": "ブラウザの撮影",
+			"summary": "表示中のブラウザーのタブやEumenesの画面を撮り、スクリーンショット画像として保存する。表示範囲、ページ全体、指定箇所を撮影できる。",
+			"examples": [
+				"Braveで表示中のタブをスクリーンショットに残して",
+				"ブラウザーのページ全体をスクリーンショットで保存して",
+				"Eumenesの画面をスクリーンショットにして",
+				"先ほど頼んだブラウザーの撮影を中止して"
+			],
+			"redirects": [
+				{
+					"when": "新しい絵や写真を作る依頼",
+					"toolchainId": "image.create"
+				}
+			],
+			"packageRevisionId": "package:browser.capture@1",
+			"functionName": "browser_capture",
+			"bindingRevisionId": "binding:browser.capture@6",
+			"artifactRevisionId": "artifact:browser.workspace@6"
 		}
 	],
 	"bindings": [],

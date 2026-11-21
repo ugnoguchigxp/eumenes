@@ -8,7 +8,7 @@ import { createGenerationExecutor } from "./generation-executor";
 import type { GenerationOutcome } from "./executor-context";
 import { TOOL_NAMES } from "./generation-tools";
 import { createPrepare } from "./generation-prepare";
-import { runRoutedTurn } from "./routed-turn";
+import { runConversationTurn } from "./routed-turn";
 import {
 	createGenerationSettlement,
 	type GenerationHandler,
@@ -116,7 +116,7 @@ export function createGenerationHandler(
 							execute: executor.execute,
 							decline: executor.decline,
 						};
-						const generated = await runRoutedTurn(deps, input, turn);
+						const generated = await runConversationTurn(deps, input, turn);
 						const handover = executor.handover();
 						if (handover) {
 							log.info("dialogue.generation_handed_over", {
@@ -164,9 +164,6 @@ export function createGenerationHandler(
 							exchange: generated.exchange,
 							...(generated.debugTarget
 								? { debugTarget: generated.debugTarget }
-								: {}),
-							...(generated.debugRouterFailure
-								? { debugRouterFailure: true as const }
 								: {}),
 							...(generated.receipt ? { receipt: generated.receipt } : {}),
 							...(generated.emotion ? { emotion: generated.emotion } : {}),

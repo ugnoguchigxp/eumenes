@@ -1,6 +1,4 @@
 import { join } from "node:path";
-import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
-import type { RouterCard } from "eumenes_router/sqlite";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
@@ -27,27 +25,12 @@ import type {
 	QueryVector,
 	ToolchainRoutingPort,
 } from "../contracts/toolchains";
-import type { NearFeedback, RouterTraceRecord } from "../../toolchain-history";
 import type { ChatMessage } from "../service/context";
 import type { ResourceAccess } from "../service/resource-ledger";
 import { testConversationAgent } from "./conversation-agent.fixture";
 import { openDialogueStore } from "./store.fixture";
-
-/**
- * The lines of one `## ` section of a message (`## State`, `## User`, `## Memory`…), without its heading; empty when
- * the message has none.
- */
-export function sectionLines(content: string, heading: string): string[] {
-	const open = `## ${heading}\n`;
-	const at = content.startsWith(open) ? 0 : content.indexOf(`\n${open}`);
-	if (at < 0) return [];
-	const start = content.indexOf(open, at) + open.length;
-	const next = content.indexOf("\n\n## ", start);
-	return content
-		.slice(start, next < 0 ? undefined : next)
-		.split("\n")
-		.filter((line) => line !== "");
-}
+import { conversationSteps, sectionLines } from "./conversation-steps.fixture";
+export { sectionLines } from "./conversation-steps.fixture";
 
 /** The user's words the last message of a call answers (its `## User` section). */
 export const userOf = (call: Call) =>
@@ -142,234 +125,6 @@ export const INSTANT: ToolchainCard = {
 
 const DEFAULT_CARDS = [IMAGE, INSTANT];
 
-/** The router package's embedding space in the fixture: every text and passage is the same vector. */
-export const ROUTER_SPACE = {
-	modelId: "m",
-	revision: "1",
-	artifactDigest: "d",
-	dimension: 2,
-};
-export const FIXTURE_ROUTER = {
-	structureResourceId: null,
-	structureTimeoutMs: 8000,
-	feedbackNear: 0.95,
-	feedbackWeight: 2,
-};
-
-/**
- * The criteria a scripted step names as the model's choice used to (`choice({...})`), and the step the fill call
- * answers with when the choice carried fields. A step that is no choice names nothing.
- */
-function pickedBy(step: Step | undefined): {
-	ids: string[];
-	next?: Step;
-} | null {
-	if (!step?.text || step.fail || step.calls) return null;
-	let v: Record<string, unknown>;
-	try {
-		v = JSON.parse(step.text) as Record<string, unknown>;
-	} catch {
-		return null;
-	}
-	if (!v || typeof v !== "object" || typeof v.choice !== "string") return null;
-	const { choice } = v;
-	if (choice === "ask")
-		return {
-			ids: [],
-			...(typeof v.say === "string" ? { next: { text: v.say } } : {}),
-		};
-	const ids = idsOfChoice(v as Record<string, unknown> & { choice: string });
-	const { say: _say, ...fields } = v;
-	return {
-		ids,
-		// The fields the choice carried are the fill's answer (a memory request, inputs, a saved target).
-		...(ids.length === 1 &&
-		ids[0] === choice &&
-		(choice === "memory.request" || "inputs" in v || "target" in v)
-			? { next: { text: JSON.stringify(fields) } }
-			: {}),
-	};
-}
-
-/**
- * The router's criteria a choice the model used to make names (`choice({...})` of the old choice call): a toolchain,
- * a read tool or a memory request by its id, a confirmation's yes or no, a question's answer, an operation on a work,
- * the word that lets unsaved work go. `none` and `ask` name nothing.
- */
-export function idsOfChoice(
-	v: Record<string, unknown> & { choice: string },
-): string[] {
-	const { choice } = v;
-	if (choice === "none" || choice === "ask") return [];
-	if (choice === "approve" || choice === "decline")
-		return [`${String(v.confirmation)}.${choice}`];
-	if (choice === "answer") return [`${String(v.todo)}.answer`];
-	if (/^t\d+$/.test(choice) && typeof v.operation === "string")
-		return [`${choice}.${v.operation}`];
-	// The user's word that the unsaved work may go is the host's own candidate now.
-	if (v.resolveUnsaved === "discard") return ["switch.discard"];
-	return [choice];
-}
-
-type Selector = NonNullable<InferencePort["selectRouter"]>;
-export type ChoiceInput = {
-	text: string;
-	criteria: readonly { name: string; description: string }[];
-	previousUser: string | null;
-	previousAgent: string | null;
-	instructions: string;
-};
-type Reference = {
-	ref: string;
-	title?: string;
-	question?: string;
-	description?: string;
-};
-
-export function fixtureSelection(
-	pick: (input: ChoiceInput, signal: AbortSignal) => Promise<string[]>,
-) {
-	let intended: string[] = [];
-	return async (
-		prompt: Parameters<Selector>[0],
-		signal: AbortSignal,
-		explicit = false,
-	): Promise<string> => {
-		const data = JSON.parse(prompt.user);
-		const { text } = data as { text: string };
-		const context = {
-			previousUser: data.previousUser ?? null,
-			previousAgent: data.previousAgent ?? null,
-			instructions: prompt.system,
-		};
-		if (prompt.version === TURN_STRUCTURE_PROMPT.version) {
-			const pending: Reference[] = data.pending ?? [];
-			const controls: Reference[] = data.controls ?? [];
-			const host: Reference[] = data.hostActions ?? [];
-			const refs = [...pending, ...controls, ...host];
-			intended = await pick(
-				{
-					...context,
-					text,
-					criteria: refs.map((r) => ({
-						name: r.ref,
-						description: r.description ?? r.question ?? r.title ?? "",
-					})),
-				},
-				signal,
-			);
-			const ref = intended[0];
-			const key = pending.some((r) => r.ref === ref)
-				? "answer"
-				: controls.some((r) => r.ref === ref)
-					? "control"
-					: host.some((r) => r.ref === ref)
-						? "hostAction"
-						: null;
-			if (key)
-				return JSON.stringify({
-					decision: {
-						[key]: { ref, text: key === "hostAction" ? data.latest : text },
-					},
-				});
-			return JSON.stringify({
-				decision: {
-					requests: intended.length
-						? [{ text, target: null, inputs: [], after: [] }]
-						: [],
-				},
-			});
-		}
-		const choices: Record<string, unknown> = {};
-		for (const request of data.requests as Array<{
-			index: string;
-			text: string;
-			candidates: Array<{ id: string; description: string }>;
-		}>) {
-			const criteria = request.candidates.map(({ id, description }) => ({
-				name: id,
-				description,
-			}));
-			const choice =
-				!explicit && prompt.system.includes("場合は conversation")
-					? intended
-					: await pick({ ...context, text: request.text, criteria }, signal);
-			const id = choice.find((id) =>
-				criteria.some((criterion) => criterion.name === id),
-			);
-			choices[request.index] = id
-				? { kind: "candidate", id }
-				: { kind: "no_match" };
-		}
-		intended = [];
-		return JSON.stringify({ selections: choices });
-	};
-}
-
-export function selectionBySteps(steps: Step[], routes?: ChoiceInput[]) {
-	return fixtureSelection(async ({ text, criteria }) => {
-		const picked = pickedBy(steps[0]);
-		routes?.push({
-			text,
-			criteria,
-			previousAgent: "",
-			previousUser: "",
-			instructions: "",
-		});
-		if (picked) {
-			steps.shift();
-			if (picked.next) steps.unshift(picked.next);
-			return picked.ids;
-		}
-		const delegate = steps[0]?.calls?.find((call) => call.name === "delegate");
-		return typeof delegate?.args.toolchain === "string"
-			? [delegate.args.toolchain]
-			: [];
-	});
-}
-
-/** The fixture's toolchains as the router package's synced cards, with the conversation's and a memory request's. */
-export function routerCards(cards: readonly ToolchainCard[]): RouterCard[] {
-	const card = (
-		id: string,
-		kind: RouterCard["kind"],
-		title: string,
-		summary: string,
-		useWhen: readonly string[] = [],
-		impact: RouterCard["impact"] = "none",
-	): RouterCard => ({
-		id,
-		revision: "1",
-		kind,
-		title,
-		summary,
-		useWhen: [...useWhen],
-		examples: [],
-		impact,
-		passages: [new Float32Array([1, 0])],
-	});
-	return [
-		card("conversation.respond", "general", "conversation.respond", "会話"),
-		card("memory.request", "general", "memory.request", "記憶の依頼"),
-		...cards.map((c) =>
-			card(
-				c.id,
-				c.execution === "read"
-					? "read"
-					: c.execution === "pipeline"
-						? "pipeline"
-						: c.general
-							? "general"
-							: "dedicated",
-				c.title,
-				c.summary,
-				c.useWhen,
-				c.minImpact ?? "none",
-			),
-		),
-	];
-}
-
 export type SetupOptions = {
 	debugDiagnostics?: Parameters<
 		typeof createDialogueService
@@ -385,13 +140,6 @@ export type SetupOptions = {
 	extraMigrations?: import("../../../infrastructure/sqlite").Migration[];
 	/** Cards the catalog lists (default: image and instant). */
 	cards?: ToolchainCard[];
-	/** Word scores for one router search. Absent: none, so equal vectors tie by id. */
-	lexical?: (text: string) => ReadonlyMap<string, number>;
-	selectRouter?: InferencePort["selectRouter"];
-	beforeRouterEmbed?: (
-		texts: readonly string[],
-		signal: AbortSignal,
-	) => Promise<void>;
 	/** Offer the music port (the music toolchain is then available). */
 	music?: boolean;
 	/** Real memory service (its journal in the test directory). */
@@ -460,23 +208,6 @@ export async function setup(options: SetupOptions = {}) {
 		vector: undefined as QueryVector | undefined,
 		/** The ids each offer of the catalog was asked for (absent: the choice call's own search). */
 		searchSlots: [] as Array<readonly string[] | undefined>,
-		/** What the router's context judgment was asked, turn by turn. */
-		routerAsked: [] as ChoiceInput[],
-		/** The texts the router package embedded; a failure of the embedding with this code. */
-		routerEmbeds: [] as string[],
-		routerEmbedFails: null as string | null,
-		/** Whether the router can use the selection provider. */
-		routerAvailable: true,
-		/** The router's traces as the store was asked to keep them, and the work each was linked to. */
-		traces: [] as RouterTraceRecord[],
-		traceModes: [] as string[],
-		/** The corrections the user made (the store's active rows); the nearest are read by their similarity. */
-		corrections: [] as NearFeedback[],
-		feedback: [] as Array<Record<string, unknown>>,
-		/** The states the store was asked to put corrections in (a conflict found while routing). */
-		feedbackStates: [] as Array<{ id: string; state: string }>,
-		/** The router's read of the previous trace fails. */
-		failRouterRead: false,
 		/** The settings each run captured, by purpose, as the run took them. */
 		captures: [] as Array<{
 			subject: string;
@@ -499,18 +230,14 @@ export async function setup(options: SetupOptions = {}) {
 			arguments: JSON.stringify(call.args),
 		})),
 	});
+	const nextModelStep = conversationSteps(state.steps, cards);
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
-		// The router decides every utterance turn: its context judgment reads the scripted steps.
-		routerSelectionAvailable: () => state.routerAvailable,
-		selectRouter:
-			options.selectRouter ?? selectionBySteps(state.steps, state.routerAsked),
 		requestFor: (_db: unknown, runId: string) =>
 			options.settings && !captured.has(runId) ? null : `req:${runId}`,
 		...(options.settings
 			? {
 					snapshotInTransaction: () => ({
-						router: FIXTURE_ROUTER,
 						...structuredClone(options.settings as object),
 					}),
 					captureInTransaction: (
@@ -535,10 +262,9 @@ export async function setup(options: SetupOptions = {}) {
 						captured.get(subject) ?? null,
 				}
 			: {
-					// Without saved settings the fixture still has the router (and the persona's defaults).
+					// Without saved settings use the persona defaults.
 					snapshotInTransaction: () => ({
 						general: { agentName: "", userName: "", persona: "butler" },
-						router: FIXTURE_ROUTER,
 					}),
 				}),
 		llmContextWindowInTransaction: () => options.window,
@@ -581,7 +307,7 @@ export async function setup(options: SetupOptions = {}) {
 				...(session ? { session } : {}),
 			});
 			// The model's answer is fixed when the call is made; the gate only holds its delivery.
-			const step = state.steps.shift();
+			const step = nextModelStep(requestId, messages, !!session?.outputSchema);
 			if (!step) throw new Error("fixture_step_missing");
 			const result = receipt(requestId, step);
 			session?.observeInput?.({
@@ -619,87 +345,6 @@ export async function setup(options: SetupOptions = {}) {
 				retrieval: "fts",
 			};
 		},
-		embedRouter: async (texts: readonly string[], signal: AbortSignal) => {
-			state.routerEmbeds.push(...texts);
-			await options.beforeRouterEmbed?.(texts, signal);
-			if (state.routerEmbedFails) throw new Error(state.routerEmbedFails);
-			return { space: ROUTER_SPACE, vectors: texts.map(() => [1, 0]) };
-		},
-		routerCardsInTransaction: () => routerCards(cards),
-		routerLexicalInTransaction: (_db: unknown, text: string) =>
-			options.lexical?.(text) ?? new Map(),
-		titlesInTransaction: (_db: unknown, ids: readonly string[]) =>
-			new Map(
-				cards.filter((c) => ids.includes(c.id)).map((c) => [c.id, c.title]),
-			),
-		recordRouterTraceInTransaction: (
-			_db: unknown,
-			input: Parameters<
-				NonNullable<ToolchainRoutingPort["recordRouterTraceInTransaction"]>
-			>[1],
-		) => {
-			state.traceModes.push(input.trace.mode);
-			const prior = state.traces.find((t) => t.runId === input.runId);
-			state.traces = state.traces.filter((t) => t.runId !== input.runId);
-			state.traces.push({
-				runId: input.runId,
-				conversationId: input.conversationId,
-				messageId: input.messageId,
-				messageIds: [...input.messageIds],
-				text: input.text,
-				query: input.query,
-				decided: input.trace.decided,
-				workId: prior?.workId ?? null,
-				set: input.trace.set,
-				createdAt: Date.now() + state.offsetMs,
-				row: input.trace.row,
-				mode: input.trace.mode,
-				// What the fake keeps of the trace beyond the record: the failure.
-				...({ error: input.trace.error } as object),
-			});
-		},
-		linkRouterWorkInTransaction: (
-			_db: unknown,
-			runId: string,
-			workId: string,
-		) => {
-			const trace = state.traces.find((t) => t.runId === runId);
-			if (trace) trace.workId = workId;
-		},
-		latestRouterTraceInTransaction: (
-			_db: unknown,
-			input: { conversationId: string; since: number },
-		) => {
-			if (state.failRouterRead) throw new Error("fixture_router_read_failed");
-			return (
-				[...state.traces]
-					.reverse()
-					.find(
-						(t) =>
-							t.conversationId === input.conversationId &&
-							t.createdAt >= input.since,
-					) ?? null
-			);
-		},
-		setRouterFeedbackStateInTransaction: (
-			_db: unknown,
-			id: string,
-			state_: string,
-		) => {
-			state.feedbackStates.push({ id, state: state_ });
-			return true;
-		},
-		recordRouterFeedbackInTransaction: (
-			_db: unknown,
-			input: Record<string, unknown>,
-		) => {
-			state.feedback.push(input);
-			return "feedback";
-		},
-		nearRouterFeedbackInTransaction: (
-			_db: unknown,
-			input: { threshold: number },
-		) => state.corrections.filter((row) => row.similarity >= input.threshold),
 		cardInTransaction: (_db: unknown, revisionId: string) =>
 			options.unbuildable?.includes(revisionId)
 				? undefined

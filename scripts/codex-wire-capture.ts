@@ -112,25 +112,32 @@ try {
 	// The model is whichever the Codex catalog lists first: its head depends on the model, and none is named here.
 	const [model] = await host.models(login, AbortSignal.timeout(30_000));
 	if (!model) throw new Error("the Codex catalog lists no model");
-	const call = (texts: string[], from: (n: number) => string) =>
+	const call = (
+		requestId: string,
+		texts: string[],
+		from: (n: number) => string,
+	) =>
 		host.run(login, {
 			model: model.id,
 			instructions: "HOST-INSTRUCTIONS",
-			messages: texts.map((digest) => ({
-				digest,
-				assistant: digest.startsWith("assistant"),
-			})),
+			requestId,
+			messages: texts,
+			completedReply: (text) => ({ digest: text, awaitsMore: false }),
 			input: (n) => ({ prompt: from(n), images: [] }),
 			reasoningEffort: "high",
 			signal: AbortSignal.timeout(90_000),
 		});
 	const steps: Array<[string, () => Promise<unknown>]> = [
-		["first call (new)", () => call(["user-1"], () => "A-TURN-1")],
+		["first call (new)", () => call("request-1", ["user-1"], () => "A-TURN-1")],
 		[
 			"append (the thread holds user-1; the model's answer is not sent again)",
-			() => call(["user-1", "assistant-1", "tool-1"], () => "A-TURN-2"),
+			() =>
+				call("request-1", ["user-1", "answer 1", "tool-1"], () => "A-TURN-2"),
 		],
-		["reset (another conversation)", () => call(["user-2"], () => "A-TURN-3")],
+		[
+			"reset (another conversation)",
+			() => call("request-2", ["user-2"], () => "A-TURN-3"),
+		],
 	];
 	const results: Array<{ inputTokens: number | null }> = [];
 	for (const [label, run] of steps) {

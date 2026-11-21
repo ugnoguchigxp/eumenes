@@ -176,16 +176,11 @@ TTSの合成は backend 全体で同時に1件。音声対話の句・読み上�
 
 再確認は `bun scripts/mixed-speech-live.ts --run`。隔離backendに保存済みLARM設定を保存し、固定の日英混在回答を区間化して、区間ごとに日本語・英語TTSのどちらで合成されたか（attemptのmodel）とWAV取得を `verification-reports/mixed-speech-live/`（ローカルの検証記録。リポジトリには含めない）に記録する。合成音声の取得はスピーカー再生の実機器受入に数えない。旧Ruri分類の接続記録は [検証記録](../spec/verification/ruri-sentence-language-2026-10-12/README.md) に残す。
 
-## Router（担当の振り分け）
+## 会話から担当を選ぶ
 
-担当の振り分けは `eumenes_router` の `routeWithSelection` を使います。LARM は候補検索の埋め込みを提供し、発言の構造判断と担当選択はクラウド LLM が行います。旧ルーター用の `decision.context` 接続は廃止済みで、LARM の接続テストでも実行対象外です。音声の発話態度判定は `decision.system-one` を使います。[選択方式への切替](../spec/router-package-integration-2026-11-04.md#2026-11-14-選択方式への切替)を参照してください。
+会話モデルが直近のやり取りを踏まえて発言と依頼内容を解釈します。依頼した作業を特定した後で `find_toolchain` を呼び、既存の Toolchain 検索が返した候補から担当を選びます。検索の埋め込みには保存済みの LARM 接続設定を使います。[会話の解釈から担当の選択まで](../spec/conversation-first-toolchain-2026-11-21.md)
 
-設定は `GET /api/settings/router` と `PATCH /api/settings/router` で確認・変更できます。`structureResourceId` を省略すると保存済みの会話用クラウドリソースを使います。判断期限は `structureTimeoutMs`、訂正の検索と補正は `feedbackNear` と `feedbackWeight` で設定します。
-
-```sh
-bun run cli -- router status
-bun run cli -- router set structureResource <資源 ID|none>
-```
+音声の発話態度判定は `decision.system-one` を使います。
 
 ## チャットの画像入力
 

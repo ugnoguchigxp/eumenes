@@ -32,7 +32,12 @@ export async function find(
 	if (!toolchains) return { result: { candidates: [] } };
 	// The router's offer is not searched, but its record keeps the query's vector as a search's does (the procedures
 	// and the past choices are found by it). The talk turn's reply searches by it.
-	const vector = await toolchains.embedQuery(query, signal);
+	let embeddingFailed = false;
+	const vector = await toolchains.embedQuery(query, signal).catch(() => {
+		signal.throwIfAborted();
+		embeddingFailed = true;
+		return undefined;
+	});
 	signal.throwIfAborted();
 	return store.write((tx) => {
 		const run = current(tx);
@@ -71,6 +76,9 @@ export async function find(
 		});
 		return {
 			result: {
+				...(embeddingFailed
+					? { code: "embedding_unavailable", retrieval: route.retrieval }
+					: {}),
 				candidates: route.cards.map((card) =>
 					candidateOf(
 						card,

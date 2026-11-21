@@ -479,9 +479,10 @@ test("the candidates tell what a toolchain makes, in the kinds' display names", 
 		cards: [{ ...INSTANT, produces: ["image"] }],
 	});
 	await askTime();
-	const candidates = h.state.calls[0]!.messages.at(-1)!.content;
-	expect(candidates).toContain(`- ${INSTANT.id}: `);
-	expect(candidates).toContain("作るもの: 画像");
+	const candidates = JSON.parse(h.state.calls[1]!.messages.at(-1)!.content);
+	expect(candidates.candidates).toMatchObject([
+		{ id: INSTANT.id, produces: ["画像"] },
+	]);
 });
 
 test("forgetting the messages a TODO came from empties its links and hides the resources it made", async () => {

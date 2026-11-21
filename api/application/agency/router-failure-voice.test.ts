@@ -1,9 +1,8 @@
 import { expect, test } from "bun:test";
-import { TURN_STRUCTURE_PROMPT } from "eumenes_router";
 import { waitFor } from "../../infrastructure/wait-for";
 import { agendaFixture, planNothing } from "./always-on.fixture";
 
-test("an invalid route still lets the voice reply read a saved note without starting work", async () => {
+test("a voice request reads a saved note and replies without starting work", async () => {
 	const title = "コーディングエージェントのハーネス設計実証研究";
 	const passage = "4つのモデルを使い、176の設定を比較しました。";
 	const request = `では、${title}という項目を読み上げてみてください。`;
@@ -15,7 +14,6 @@ test("an invalid route still lets the voice reply read a saved note without star
 	}> = [];
 	let noteId: string;
 	let planned = false;
-	let routeCalls = 0;
 	const f = await agendaFixture({
 		script(kind) {
 			if (kind !== "plan") return;
@@ -53,13 +51,7 @@ test("an invalid route still lets the voice reply read a saved note without star
 				modelInputs.push({ question, system: messages[0]!.content, results });
 				if (!results.length) {
 					return {
-						calls: [
-							{ name: "read_note", args: { id: noteId } },
-							{
-								name: "start_preparation",
-								args: { request: "新規調査", askedByUser: true },
-							},
-						],
+						calls: [{ name: "read_note", args: { id: noteId } }],
 					};
 				}
 				return { text: passage };
@@ -75,14 +67,6 @@ test("an invalid route still lets the voice reply read a saved note without star
 			return f.host.inspect("main")!.snapshot.notes.length === 1;
 		});
 		noteId = f.host.inspect("main")!.snapshot.notes[0]!.id;
-		const select = f.h.inference.selectRouter!;
-		f.h.inference.selectRouter = (prompt, signal) => {
-			if (prompt.version !== TURN_STRUCTURE_PROMPT.version)
-				return select(prompt, signal);
-			routeCalls++;
-			return Promise.resolve('{"decision":{}}');
-		};
-
 		const sessionId = crypto.randomUUID();
 		const utteranceId = crypto.randomUUID();
 		const wav = new Uint8Array(48);
@@ -99,15 +83,11 @@ test("an invalid route still lets the voice reply read a saved note without star
 		});
 
 		const turn = voice.get(utteranceId)!;
-		expect(routeCalls).toBe(1);
 		expect(turn.error).toBeNull();
 		expect(offered).toHaveLength(2);
 		expect(offered[0]).toContain("read_note");
-		expect(offered.flat().every((name) => name.startsWith("read_"))).toBe(true);
 		expect(modelInputs[0]!.question).toBe(request);
-		expect(modelInputs[0]!.system).toContain("担当を見つけられませんでした");
 		expect(modelInputs[1]!.results[0]).toContain(passage);
-		expect(modelInputs[1]!.results[1]).toContain("invalid_tool_call");
 		expect(f.h.dialogue.answerText(turn.runId!)).toBe(passage);
 		expect(f.h.spoken.join("")).toBe(passage);
 		for (const chunk of turn.audioChunks) {

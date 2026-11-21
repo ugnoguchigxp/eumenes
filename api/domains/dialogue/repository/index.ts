@@ -497,6 +497,15 @@ ALTER TABLE dialogue_specialist_sessions ADD COLUMN close_blocked_at TEXT
  CHECK((close_blocked_reason IS NULL AND close_blocked_at IS NULL)
     OR (close_blocked_reason IS NOT NULL AND close_blocked_at IS NOT NULL AND state = 'closing'));`,
 	},
+	{
+		id: "dialogue/0043-retire-collaboration-task",
+		after: ["dialogue/0042-specialist-close-block"],
+		sql: `UPDATE dialogue_specialist_sessions
+SET state='ended', end_reason='revoked', closing_reason=NULL, close_failures=0,
+    close_blocked_reason=NULL, close_blocked_at=NULL, active_run_id=NULL, pending_switch_json=NULL,
+    revision=revision+1, epoch=epoch+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+WHERE toolchain_id='collaboration.task' AND state<>'ended';`,
+	},
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

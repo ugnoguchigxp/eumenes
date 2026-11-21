@@ -33,10 +33,6 @@ export type HarnessOptions = {
 	compose?: (
 		messages: import("../../domains/inference/contracts").Messages,
 	) => unknown;
-	/** Script the package's structural judgment independently from planning and command execution. */
-	structure?: (
-		messages: import("../../domains/inference/contracts").Messages,
-	) => unknown;
 	computePort?: ComputePort;
 	videoPort?: VideoClient;
 	dots?: boolean;

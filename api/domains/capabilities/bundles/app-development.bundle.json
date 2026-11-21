@@ -200,6 +200,35 @@
 			"packageRevisionId": "package:app-development.studio@8",
 			"bindingRevisionId": "binding:app-development.studio@9",
 			"artifactRevisionId": "artifact:app-development.studio@2"
+		},
+		{
+			"kind": "toolchain",
+			"id": "app.develop",
+			"revision": 10,
+			"title": "Webアプリ開発",
+			"summary": "ブラウザーで繰り返し使うWebアプリを新しく作る、または保存済みのアプリを修正する。操作画面（UI）、フォームで入力するデータ、実行手順を確認して保存できる。",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"フォームや一覧など、入力や閲覧に使うWebアプリの操作画面を作りたい",
+				"保存したアプリの画面を開き、ボタンや入力項目、表示内容や配置を変更したい",
+				"アプリでデータを記録・更新する処理や、繰り返し動かす集計・レポートの手順を作成または修正したい"
+			],
+			"avoidWhen": [
+				"依頼が一回限りの情報確認で、アプリや定期処理の制作を求めていない"
+			],
+			"dependencies": ["package:app-development.studio@8"],
+			"functionName": "develop_app",
+			"examples": [
+				"練習日とタイムを入力フォームから記録し、一覧で振り返れるWebアプリを作って",
+				"前に作ったチェックリストの画面を開いて、選択欄と登録ボタンの配置を変えて",
+				"入力した金額から割り勘を計算する画面を作って",
+				"GitHubプロジェクトの変更を毎日読み取り、開発日誌に保存するアプリを作って"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:app-development.studio@8",
+			"bindingRevisionId": "binding:app-development.studio@9",
+			"artifactRevisionId": "artifact:app-development.studio@2"
 		}
 	],
 	"bindings": [

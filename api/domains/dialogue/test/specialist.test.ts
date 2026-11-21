@@ -116,11 +116,11 @@ test("a session starts from the conversation's delegate, then talks directly: no
 	expect(h.work()[0]!.holder).toBeNull();
 });
 
-test("a hand-over to a session toolchain ends the generation: the model is called for the one choice only (the host searches itself)", async () => {
+test("a hand-over to a session toolchain ends the conversation after search, selection and typed argument fill", async () => {
 	const h = await harness();
 	await startDirty(h);
-	expect(h.state.calls).toHaveLength(1);
-	expect(h.state.calls[0]!.session?.outputSchema).toBeDefined();
+	expect(h.state.calls).toHaveLength(3);
+	expect(h.state.calls[2]!.session?.outputSchema).toBeDefined();
 });
 
 test("an utterance handed to the specialist is logged as said by the user, to the specialist, and is not pending for the conversation agent", async () => {
@@ -288,9 +288,11 @@ test("a hand-over to another toolchain while unsaved work stands waits for the u
 	h.state.steps.push({ text: "もう一度確認します" });
 	await h.ask("破棄していいよ");
 	// The word that the unsaved work may go is the host's own candidate, offered beside the router's search.
-	expect(h.state.routerAsked.at(-1)!.criteria.map((c) => c.name)).toContain(
-		"switch.discard",
-	);
+	expect(
+		h.state.calls.some(({ tools }) =>
+			tools.includes("discard_for_pending_switch"),
+		),
+	).toBe(true);
 	expect((await h.session())!.id).toBe(suspended.id);
 	expect((await h.session())!.pendingSwitch!.workRevision).toBe(
 		h.work()[0]!.revision,
@@ -391,17 +393,16 @@ test("a change of a saved item is confirmed naming the item, and the approval op
 	);
 	const asked = await h.ask("保存済み2の見出しを直して");
 	expect(h.answerText(asked.id)).toBe(
-		"制作担当に、保存済み2について「保存済み2の見出しを直して」を頼みます。今あるものを変えます。よろしいですか？",
+		"制作担当に、保存済み2について「見出しを直す」を頼みます。今あるものを変えます。よろしいですか？",
 	);
 	expect(await h.session()).toBeNull();
 	h.state.steps.push(approve());
 	h.state.specialist.push(reply("開きました"));
 	await h.ask("お願い");
-	// The router was offered the yes to the confirmation, naming its item.
-	expect(
-		h.state.routerAsked.at(-1)!.criteria.find((c) => c.name === "c1.approve")!
-			.description,
-	).toContain("保存済み2");
+	const approving = h.state.calls.findLast(({ tools }) =>
+		tools.includes("approve_confirmation"),
+	)!;
+	expect(approving.messages.at(-1)!.content).toContain("対象「保存済み2」");
 	expect(await h.session()).toMatchObject({ label: "保存済み item-2" });
 	expect(h.work()[0]!.savedRef).toBe("item-2");
 });
@@ -451,13 +452,15 @@ test("a confirmation keeps its target: the same request on two items stays two c
 	h.state.steps.push(approve(2));
 	h.state.specialist.push(reply("開きました"));
 	await h.ask("2つ目をお願い");
-	// The open confirmations name their items: the router tells the two apart.
-	const offered = h.state.routerAsked.at(-1)!.criteria;
-	expect(offered.find((c) => c.name === "c1.approve")!.description).toContain(
-		"保存済み1",
+	const approving = h.state.calls.findLast(({ tools }) =>
+		tools.includes("approve_confirmation"),
+	)!;
+	const prompts = approving.messages.at(-1)!.content;
+	expect(prompts).toContain(
+		"c1 確認待ち fake.studio「見出しを直す」 対象「保存済み1」",
 	);
-	expect(offered.find((c) => c.name === "c2.approve")!.description).toContain(
-		"保存済み2",
+	expect(prompts).toContain(
+		"c2 確認待ち fake.studio「見出しを直す」 対象「保存済み2」",
 	);
 	expect(await h.session()).toMatchObject({ label: "保存済み item-2" });
 	expect(h.work()[0]!.savedRef).toBe("item-2");
@@ -468,9 +471,7 @@ test("an item that is gone is refused when confirmed, and a confirmation whose i
 	// A fill that names an item the host never issued is refused: nothing is confirmed, the host says it could not.
 	h.state.steps.push(confirmOn("item-9"));
 	const refused = await h.ask("見出しを直して");
-	expect(h.answerText(refused.id)).toBe(
-		"うまく頼めませんでした。もう一度言ってもらえますか。",
-	);
+	expect(h.answerText(refused.id)).toBe("その依頼は今の担当で実行できません。");
 	expect(h.rows("SELECT ref FROM dialogue_confirmations")).toEqual([]);
 	h.state.steps.push(confirmOn("item-2"));
 	await h.ask("保存済み2の見出しを直して");

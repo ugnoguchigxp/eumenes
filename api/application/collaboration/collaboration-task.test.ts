@@ -3,7 +3,7 @@ import { waitFor } from "../../infrastructure/wait-for";
 import { bundleFiles, capabilityBundleV1 } from "../../domains/capabilities";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { bundleHostOf } from "../toolchain/toolchain-adapters";
-import { harness } from "../toolchain/toolchain.fixture";
+import { legacyTaskHarness as harness } from "./legacy-task.fixture";
 
 type Host = Awaited<ReturnType<typeof harness>>;
 type Messages = { content: string }[];

@@ -218,7 +218,7 @@ test("seed upgrades the deployed board and terminal schemas without replacing ar
 		expect(published()).toEqual({
 			toolchains: [
 				"toolchain:claude-code.request@4",
-				"toolchain:kanban.manage@4",
+				"toolchain:kanban.manage@5",
 			],
 			board: ["artifact:kanban.board@4"],
 		});

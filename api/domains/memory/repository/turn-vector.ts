@@ -12,6 +12,33 @@ export interface TurnVectorRow {
 	digest: string;
 	createdAt: string;
 }
+
+export function outdatedTurnVectors(
+	db: Database,
+	space: string,
+	limit: number,
+) {
+	return db
+		.query<
+			Pick<TurnVectorRow, "messageId" | "conversationId" | "digest" | "space">,
+			[string, number]
+		>(
+			`SELECT message_id AS messageId, conversation_id AS conversationId, digest, space
+		 FROM memory_turn_vector WHERE space <> ? ORDER BY message_id LIMIT ?`,
+		)
+		.all(space, limit);
+}
+
+export function turnVectorStillCurrent(
+	db: Database,
+	row: Pick<TurnVectorRow, "messageId" | "digest" | "space">,
+) {
+	return !!db
+		.query(
+			"SELECT 1 FROM memory_turn_vector WHERE message_id=? AND digest=? AND space=?",
+		)
+		.get(row.messageId, row.digest, row.space);
+}
 /** One message's vector; a later one for the same message replaces it. */
 export function putTurnVector(db: Database, row: TurnVectorRow) {
 	db.query(

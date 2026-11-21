@@ -108,7 +108,6 @@ import {
 import { createReadPorts } from "./research-history-ports";
 import { createToolchainHistory } from "../../domains/toolchain-history";
 import { createVectorRefresh, type Embed } from "./toolchain-vectors";
-import { routerFixedCards } from "../../domains/dialogue";
 type ToolchainOptions = {
 	canvasAdapter?: import("../../domains/tool-runtime").DomainAdapter;
 	docling?: import("../../domains/docling").DoclingService;
@@ -557,17 +556,7 @@ export async function createToolchain(
 		...(options.sharedWrite ? { sharedWrite: options.sharedWrite } : {}),
 	});
 	taskRuntime = agents;
-	const vectors = createVectorRefresh(
-		store,
-		capabilities,
-		history,
-		options.embed,
-		// The router package's cards: the toolchains and read tools, and the conversation's own two.
-		(db) => [
-			...capabilities.routerCardsInTransaction(db),
-			...routerFixedCards(),
-		],
-	);
+	const vectors = createVectorRefresh(store, capabilities, options.embed);
 	return {
 		capabilities,
 		webNote: webNoteRuntime,
@@ -602,10 +591,8 @@ export async function createToolchain(
 		refreshVectors: vectors.refresh,
 		/** Embed passages outside the index (a draft's trial); undefined when embedding is unavailable. */
 		embedPassages: vectors.embedPassages,
-		/** Embed one request for retrieval; undefined when embedding is unavailable or slow. */
+		/** Embed one request for retrieval; undefined when embedding is disabled. */
 		embedQuery: vectors.embedQuery,
-		/** The router package's embedding of what it routes (passages); throws when unavailable. */
-		embedRouter: vectors.embedRouter,
 	};
 }
 

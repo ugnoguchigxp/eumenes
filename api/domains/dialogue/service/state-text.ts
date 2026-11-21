@@ -107,6 +107,8 @@ export type StateInput = {
 	run?: Run;
 	/** The same frozen screen projection that normal talk receives. */
 	screenLines?: readonly string[];
+	/** Use an empty list when the caller appends the agency section with its own provenance. */
+	agencyLines?: readonly string[];
 	nowMs: number;
 	/** When the newest utterance before this input was said. */
 	lastAt: number | null;
@@ -136,7 +138,9 @@ export function stateLinesInTransaction(
 			: "";
 	lines.push(`今: ${jstNowLine(input.nowMs)}${gap}`);
 
-	lines.push(...agencyStateLines(deps, tx, input.conversationId));
+	lines.push(
+		...(input.agencyLines ?? agencyStateLines(deps, tx, input.conversationId)),
+	);
 	const ledger = deps.work;
 	const open = (
 		ledger?.todosInTransaction(tx, input.conversationId) ?? []

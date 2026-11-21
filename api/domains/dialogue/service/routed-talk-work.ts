@@ -1,33 +1,21 @@
-import { availableToolchainsInTransaction } from "./delegate-conversation";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { AgentToolDefinition } from "../contracts";
-import { reasonOf, routeByEntry } from "./routed-package";
 import { TOOL_NAMES } from "./generation-tools";
 import { lineText } from "./input-text";
 import { handWith, type Fields } from "./routed-actions";
 import type { ChoiceCandidate } from "./routed-choice";
 import { fieldsOf } from "./routed-fields";
-import type { RouteCandidate } from "./routed-route";
-import { announcement, titleOf } from "./routed-router";
+import { createWorkControls } from "./talk-work-controls";
 import type { Turn } from "./routed-turn";
 import { ASK_STEP } from "./tool-exchange";
 
-/**
- * The talk turn's way to a toolchain (spec router-package-integration, 2026-11-12): when the router left the turn to
- * the conversation, the reply itself may look for a toolchain and hand it the work. Looking ranks up to five candidates and asks the decision model to select one;
- * handing over runs the router's own hand-over (the same fields fill, the same host operations, the host's
- * announcement), so a request reaches a toolchain by one code path whoever chose it.
- */
-
-/** The resources `## State` presents that go with a request, at most (as the router's hand-over). */
+/** The resources `## State` presents that go with a request, at most. */
 const RESOURCE_REFS = 8;
 /** What a search's query and a hand-over's request keep of the reply's words. */
 const QUERY_CHARS = 2000;
 const REQUEST_CHARS = 8000;
 /** The TODO's title, taken from the request the reply wrote (`## State` shows it in every later turn). */
 const TITLE_CHARS = 120;
-const CONFIRMATION_PREVIEW_CHARS = 240;
-const DECLINE_CONFIRMATION = "decline_confirmation";
 
 /** The reply's two tools; what they do is the host's text, when to use them the agent's rules. */
 export const TALK_WORK_TOOLS: readonly AgentToolDefinition[] = [
@@ -64,7 +52,6 @@ export const TALK_WORK_TOOLS: readonly AgentToolDefinition[] = [
 	},
 ];
 
-type Found = Extract<RouteCandidate, { kind: "toolchain" }>;
 type Answer = { content: string; end?: boolean };
 
 const answer = (value: Record<string, unknown>, end = false): Answer => ({
@@ -74,98 +61,16 @@ const answer = (value: Record<string, unknown>, end = false): Answer => ({
 
 /** The talk turn's hand-over tools for one reply: `delegate` takes only a toolchain this reply found. */
 export function createTalkWork(turn: Turn) {
-	const found = new Map<string, Found>();
-	const pending = new Map(
-		turn.routed!.pending.confirmations.map((item) => [`c${item.ref}`, item]),
-	);
-	const tools: AgentToolDefinition[] = [...TALK_WORK_TOOLS];
-	if (pending.size)
-		tools.push({
-			name: DECLINE_CONFIRMATION,
-			description: systemContext(
-				"dialogue.contexts.local.talk-decline-confirmation",
-				{},
-			),
-			parameters: {
-				type: "object",
-				additionalProperties: false,
-				required: ["confirmation"],
-				properties: {
-					confirmation: {
-						type: "string",
-						enum: [...pending.keys()],
-						description: JSON.stringify(
-							Array.from(
-								pending,
-								([confirmation, { toolchain, request, target }]) => ({
-									confirmation,
-									toolchain,
-									request: lineText(request).slice(
-										0,
-										CONFIRMATION_PREVIEW_CHARS,
-									),
-									target: target && lineText(target).slice(0, TITLE_CHARS),
-								}),
-							),
-						),
-					},
-				},
-			},
-		});
+	const found = new Map<string, ChoiceCandidate>();
+	const controls = createWorkControls(turn);
+	const tools = [...TALK_WORK_TOOLS, ...controls.tools];
 
 	async function find(args: Record<string, unknown>): Promise<Answer> {
 		const query = typeof args.query === "string" ? args.query.trim() : "";
-		if (!query) return answer({ candidates: [], code: "invalid_arguments" });
-		const router = turn.router;
-		if (!router)
-			return answer({ candidates: [], code: "router_selection_unavailable" });
-		const text = Array.from(query).slice(0, QUERY_CHARS).join("");
-		let selected;
-		try {
-			const available = turn.deps.store.read((db) => {
-				const ready = availableToolchainsInTransaction(turn.deps, db);
-				return new Set(
-					turn.deps
-						.toolchains!.catalogInTransaction(db)
-						.filter(
-							({ id, runtime, selectable }) =>
-								ready.has(id) &&
-								selectable !== false &&
-								runtime.execution !== "pipeline" &&
-								runtime.execution !== "read",
-						)
-						.map(({ id }) => id),
-				);
-			});
-			selected = await routeByEntry(
-				turn,
-				router,
-				{
-					state: { text, previousAgent: null, previousUser: null },
-					available: (id) => available.has(id),
-				},
-				new Map(),
-				"tools-only",
-			);
-		} catch (cause) {
-			if (turn.signal.aborted) throw cause;
-			return answer({ candidates: [], code: reasonOf(cause) });
-		}
-		if (selected.decision.to !== "run")
-			return answer({
-				candidates: [],
-				code: selected.decision.to === "clarify" ? "clarify" : "no_candidate",
-				...(selected.decision.to === "clarify"
-					? { question: selected.decision.question }
-					: {}),
-			});
-		const selectedId = selected.decision.candidate.id;
-		const rank = selected.parts[0]?.candidates.find(
-			({ candidate }) => candidate.id === selectedId,
-		);
+		if (!query || query.length > QUERY_CHARS)
+			return answer({ candidates: [], code: "invalid_arguments" });
 		const searched = await turn.act(TOOL_NAMES.search, {
-			query: text,
-			ids: [selectedId],
+			query,
 		});
 		if ("refused" in searched)
 			return answer({ candidates: [], code: searched.refused.message });
@@ -175,25 +80,17 @@ export function createTalkWork(turn: Turn) {
 		};
 		const shown: Record<string, unknown>[] = [];
 		for (const card of searched.outcome.search?.cards ?? []) {
-			// The reply has the read tools itself, and a pipeline is the router's to plan.
-			if (card.id !== selectedId || card.read || card.execution === "pipeline")
-				continue;
+			if (card.read) continue;
 			const choice = result.candidates?.find((c) => c.id === card.id);
 			if (!choice) continue;
-			found.set(card.id, {
-				id: card.id,
-				kind: "toolchain",
-				passage: card.summary,
-				card,
-				choice,
-			});
+			found.set(card.id, choice);
 			shown.push({
 				id: card.id,
 				title: card.title,
 				summary: card.summary,
 				useWhen: card.useWhen,
-				searchRank: rank?.searchRank ?? null,
-				matchScore: rank?.matchScore ?? null,
+				execution: choice.execution,
+				minImpact: choice.minImpact,
 				...(choice.produces?.length ? { produces: choice.produces } : {}),
 			});
 		}
@@ -211,42 +108,39 @@ export function createTalkWork(turn: Turn) {
 			...(!shown.length
 				? {
 						code:
-							typeof result.code === "string"
-								? result.code
-								: "router_candidate_unavailable",
+							typeof result.code === "string" ? result.code : "no_candidate",
 					}
 				: {}),
 		});
 	}
 
 	async function delegate(args: Record<string, unknown>): Promise<Answer> {
-		const request =
-			typeof args.request === "string"
-				? args.request.trim().slice(0, REQUEST_CHARS)
-				: "";
-		if (!request || typeof args.toolchain !== "string")
+		const request = typeof args.request === "string" ? args.request.trim() : "";
+		if (
+			!request ||
+			request.length > REQUEST_CHARS ||
+			typeof args.toolchain !== "string"
+		)
 			return answer({ delegated: false, code: "invalid_arguments" });
-		const c = found.get(args.toolchain);
-		if (!c) return answer({ delegated: false, code: "unknown_toolchain" });
-		// The reply wrote the request; what the toolchain takes besides it is filled as for the router's hand-over.
+		const choice = found.get(args.toolchain);
+		if (!choice) return answer({ delegated: false, code: "unknown_toolchain" });
+		// The reply owns the request. The fill supplies arguments specific to the selected toolchain.
 		const said = turn.said();
 		const filled = await fieldsOf(
 			turn,
 			request,
-			c,
+			choice,
 			request,
 			typeof args.diagnosticRef === "string",
 		);
 		if ("step" in filled) {
 			if (filled.step !== "done")
 				return answer({ delegated: false, code: "request_unclear" });
-			// The fill asked the user back: the host said the question, and the next turn's router takes the answer
-			// with the request the reply wrote. A question with no words asked nothing.
+			// The host asks and records the request so the next conversation turn can use the reply.
 			if (turn.said() !== said) return answer({ asked: true }, true);
 			if (turn.exchange.at(-1)?.name === ASK_STEP) turn.exchange.pop();
 			return answer({ delegated: false, code: "request_unclear" });
 		}
-		const { choice } = c;
 		if (choice.execution === "instant") {
 			const answered = await turn.act(TOOL_NAMES.delegate, {
 				mode: "execute",
@@ -273,7 +167,7 @@ export function createTalkWork(turn: Turn) {
 					});
 		}
 		const resources = turn.routed!.resources.slice(0, RESOURCE_REFS);
-		// Unsaved work goes only on the user's own word (the router's `switch.discard`), never on what the reply wrote.
+		// The pending-switch control is the only path here that can request discard of unsaved work.
 		const { resolveUnsaved: _unsaved, ...given } = filled.fields;
 		const fields: Fields = {
 			...(resources.length ? { refs: resources } : {}),
@@ -281,8 +175,7 @@ export function createTalkWork(turn: Turn) {
 			...(typeof args.diagnosticRef === "string"
 				? { diagnosticRef: args.diagnosticRef }
 				: {}),
-			request: typeof given.request === "string" ? given.request : request,
-			// The user's own words may be a bare yes: the TODO is titled by the request the reply wrote.
+			request,
 			words: lineText(request).slice(0, TITLE_CHARS),
 		};
 		const before = turn.executed.length;
@@ -290,7 +183,9 @@ export function createTalkWork(turn: Turn) {
 			turn,
 			choice,
 			fields,
-			announcement("fixed", titleOf(c)),
+			systemContext("dialogue.contexts.local.router-announce", {
+				title: lineText(choice.title).slice(0, 30),
+			}),
 			request,
 		);
 		if (step !== "done")
@@ -311,25 +206,13 @@ export function createTalkWork(turn: Turn) {
 		);
 	}
 
-	async function decline(args: Record<string, unknown>): Promise<Answer> {
-		const confirmation =
-			typeof args.confirmation === "string"
-				? pending.get(args.confirmation)
-				: undefined;
-		if (!confirmation || Object.keys(args).length !== 1)
-			return answer({ declined: false, code: "unknown_confirmation" });
-		return (await turn.decline(confirmation.ref))
-			? answer({ declined: true })
-			: answer({ declined: false, code: "confirmation_not_open" });
-	}
-
 	return {
 		tools,
 		handles: (name: string) => tools.some((tool) => tool.name === name),
 		call(name: string, args: Record<string, unknown>) {
 			if (name === TOOL_NAMES.search) return find(args);
-			if (name === DECLINE_CONFIRMATION) return decline(args);
-			return delegate(args);
+			if (name === TOOL_NAMES.delegate) return delegate(args);
+			return controls.call(name, args);
 		},
 	};
 }

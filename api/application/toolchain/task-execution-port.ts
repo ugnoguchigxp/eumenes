@@ -212,7 +212,11 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		...taskExecutionSources(host, context),
 		cardInTransaction: routing.cardInTransaction,
 		async find(query, source, signal, options) {
-			const vector = await routing.embedQuery(query, signal);
+			const vector = await routing.embedQuery(query, signal).catch((error) => {
+				signal.throwIfAborted();
+				if (!options?.lexicalFallback) throw error;
+				return undefined;
+			});
 			if (!vector && !options?.lexicalFallback)
 				throw new Error("embedding_unavailable");
 			return store.read(

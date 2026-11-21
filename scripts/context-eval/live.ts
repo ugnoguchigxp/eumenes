@@ -1,6 +1,6 @@
 /**
  * The live lane: the saved LARM connection (createLiveLarm, in this process; no server is started) answers through
- * the product's routed turn (`runRoutedTurn`: a talk call, or one silent choice held to a schema). Run through
+ * the product's conversation turn. Run through
  * `cli.ts run --live`; it is outside verify. Every call is an independent session; nothing here names a model or a
  * profile.
  */

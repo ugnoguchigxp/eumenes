@@ -265,6 +265,7 @@ export function createMemoryService(
 	});
 	const vectors = createAgentVectors({
 		conversation,
+		store,
 		atMs,
 		embed: options.embed,
 	});

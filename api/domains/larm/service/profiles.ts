@@ -2,7 +2,10 @@ import type { Capability } from "../contracts";
 import type { ProfileRequest } from "./connect";
 
 import type { ChatInput } from "../contracts/chat-input";
-export type ProviderName = Capability | "system-one" | "tts-english";
+import type { VectorSpaceShape } from "../../../infrastructure/vector";
+import { EMBEDDING_PROTOCOL } from "./embedding-contract";
+export type ProviderName =
+	Capability | "system-one" | "tts-english" | "embedding";
 export type Provider = {
 	/** External catalog name, retained across renewal when the internal role differs. */
 	claimName?: string;
@@ -17,6 +20,7 @@ export type Provider = {
 	endpoint?: string;
 	model: string;
 	protocol: string;
+	embeddingSpace?: VectorSpaceShape;
 	token: string;
 	contextWindow?: {
 		maxTokens: number;
@@ -56,6 +60,7 @@ export const protocols: Record<ProviderName, string> = {
 	tts: "openai.audio-speech.v1",
 	"system-one": "larm.system-one.v1",
 	"tts-english": "openai.audio-speech.v1",
+	embedding: EMBEDDING_PROTOCOL,
 };
 export const endpoints: Record<ProviderName, string> = {
 	llm: "/v1/chat/completions",
@@ -63,6 +68,7 @@ export const endpoints: Record<ProviderName, string> = {
 	tts: "/v1/audio/speech",
 	"system-one": "/v1/systemone",
 	"tts-english": "/v1/audio/speech",
+	embedding: "/v1/embed",
 };
 export type Fetcher = (
 	input: RequestInfo | URL,

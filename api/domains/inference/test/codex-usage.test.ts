@@ -3,7 +3,6 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createCodexHost } from "../adapters/codex-host";
-import type { ThreadMessage } from "../adapters/codex-threads";
 import { codexUsage } from "../adapters/codex-usage";
 import { codexCall, fakeCodex, user } from "./codex.fixture";
 import { cloudRequest, type CloudEnv } from "../service/cloud";
@@ -43,7 +42,7 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"comple
 		{ executable: command, home: join(dir, "home") },
 	)!;
 	try {
-		const run = async (messages: ThreadMessage[]) => {
+		const run = async (messages: string[]) => {
 			const observations: unknown[] = [];
 			const result = await host.run(
 				{ credential: null, baseUrl: "https://example.test" },
@@ -51,6 +50,8 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"comple
 					model: "fixture-a",
 					instructions: "",
 					messages,
+					requestId: "usage-request",
+					completedReply: (text) => ({ digest: text, awaitsMore: false }),
 					input: () => ({ prompt: "p", images: [] }),
 					reasoningEffort: "high",
 					signal: AbortSignal.timeout(5000),
@@ -59,7 +60,7 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"comple
 			);
 			return { result, observations };
 		};
-		const first = await run([{ digest: "a", assistant: false }]);
+		const first = await run(["a"]);
 		expect(first.result).toMatchObject({
 			text: "ok",
 			inputTokens: 250,
@@ -70,11 +71,7 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"comple
 		});
 		expect(first.observations).not.toHaveLength(0);
 		// The same thread continued: the total began this turn at 250 / 25 / 125 / 10 and the turn added the rest.
-		const second = await run([
-			{ digest: "a", assistant: false },
-			{ digest: "b", assistant: true },
-			{ digest: "c", assistant: false },
-		]);
+		const second = await run(["a", first.result.text, "c"]);
 		expect(second.result).toMatchObject({
 			inputTokens: 1250 - 250,
 			outputTokens: 125 - 25,
@@ -116,6 +113,7 @@ test("usage writes drain even when the SDK turn fails after reporting cumulative
 		settings: { credential: () => null },
 		agents: {
 			async run(call) {
+				expect(call.requestId).toBe("request");
 				call.onUsage?.({
 					inputTokens: 1000,
 					outputTokens: 100,
@@ -148,7 +146,7 @@ test("usage writes drain even when the SDK turn fails after reporting cumulative
 	await expect(
 		cloudRequest(
 			env,
-			{ purpose: "llm", contextPolicy: "exact" } as RequestRow,
+			{ id: "request", purpose: "llm", contextPolicy: "exact" } as RequestRow,
 			[{ role: "user", content: "go" }],
 			connection,
 			resource,

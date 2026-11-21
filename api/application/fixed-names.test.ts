@@ -40,10 +40,12 @@ const persistedValueFiles = new Set([
 	"api/domains/inference/repository/index.ts",
 ]);
 /**
- * The one model the user fixed by decision, in its one file: the web note's research model (Codex SDK), used whatever
- * LLM the conversation is set to (user, 2026-11-11). No other file may name it.
+ * User-pinned model contracts. Each decision is represented in one policy file.
  */
-const decidedModelFiles = new Set(["api/domains/web-note/service/policy.json"]);
+const decidedModelFiles = new Set([
+	"api/domains/web-note/service/policy.json",
+	"api/domains/larm/service/embedding-policy.json",
+]);
 /** Files that are records of a dated verification, not procedure. */
 const datedRecordFiles = new Set(["docs/ruri-verification.md"]);
 /** A line starting with a date is a dated record inside a procedure document. */
@@ -73,13 +75,12 @@ test("product code has no profile or model name literal", () => {
 	const paths = files(codeGlobs);
 	expect(paths.length).toBeGreaterThan(100);
 	expect(hits(paths, () => false)).toEqual([]);
-	// The decided file names exactly one model, on one line: the exception does not grow.
-	const decided = [...decidedModelFiles].flatMap((path) =>
-		readFileSync(join(root, path), "utf8")
+	for (const path of decidedModelFiles) {
+		const decided = readFileSync(join(root, path), "utf8")
 			.split("\n")
-			.filter((line) => names.some((pattern) => pattern.test(line))),
-	);
-	expect(decided).toHaveLength(1);
+			.filter((line) => names.some((pattern) => pattern.test(line)));
+		expect(decided).toHaveLength(1);
+	}
 });
 
 test("product code file names carry no profile or model name", () => {

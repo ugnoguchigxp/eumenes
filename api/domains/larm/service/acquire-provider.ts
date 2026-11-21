@@ -12,6 +12,7 @@ import {
 	type ProviderHosts,
 } from "./connect";
 import { readJson, record, wait } from "./guards";
+import { claimEmbedding } from "./embedding-contract";
 import {
 	protocols,
 	endpoints,
@@ -125,29 +126,36 @@ export async function acquireProvider(
 			else if (pendingRenewal(current))
 				await renewLifetime(current, control, signal);
 			const generation = credentialGeneration(current);
-			const claimed = await claimProviders(scoped, {
-				id: current.id,
-				created: state,
-				required:
-					name === "llm" || name === "asr" || name === "tts"
-						? [name as Capability]
-						: [],
-				catalogProviders: catalog,
-				fullProfile: current.request.fullProfile,
-				claimNames: [externalName],
-				hosts,
-			});
+			const embedding =
+				name === "embedding"
+					? await claimEmbedding(scoped, current.id, declared, hosts, signal)
+					: undefined;
+			const claimed =
+				embedding ??
+				(await claimProviders(scoped, {
+					id: current.id,
+					created: state,
+					required:
+						name === "llm" || name === "asr" || name === "tts"
+							? [name as Capability]
+							: [],
+					catalogProviders: catalog,
+					fullProfile: current.request.fullProfile,
+					claimNames: [externalName],
+					hosts,
+				}));
 			signal.throwIfAborted();
 			if (generation !== credentialGeneration(current)) continue;
 			if (current.closing) throw new Error("larm_connection_released");
-			const p = claimed.providers.get(name);
+			const p =
+				"provider" in claimed ? claimed.provider : claimed.providers.get(name);
 			if (!p)
 				throw new Error(
 					name === "tts-english"
 						? "speech_tts_target_unavailable"
 						: "larm_system_one_unavailable",
 				);
-			p.expiresAt = claimed.expiresAt;
+			if (name !== "embedding") p.expiresAt = claimed.expiresAt;
 			p.startedAt = current.startedAt;
 			current.providers.set(name, p);
 			current.expiresAt = claimed.expiresAt;

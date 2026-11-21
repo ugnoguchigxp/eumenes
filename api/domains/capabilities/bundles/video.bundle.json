@@ -128,6 +128,31 @@
 			"functionName": "video_studio",
 			"bindingRevisionId": "binding:video.command@2",
 			"artifactRevisionId": "artifact:video.workspace@2"
+		},
+		{
+			"kind": "toolchain",
+			"id": "video.studio",
+			"revision": 3,
+			"title": "動画生成",
+			"summary": "文章で指定された場面を、音声付きの短い映像（MP4）にする。動画の生成状況と生成済みの映像を確認できる。",
+			"aliases": ["動画制作"],
+			"tags": [],
+			"useWhen": [
+				"描写した人物や風景が動く場面を短い動画にしたい",
+				"動画の生成を確認する、または生成済みの映像（MP4）の一覧を見たい"
+			],
+			"avoidWhen": ["既存の動画を分析したい", "静止画だけが必要"],
+			"dependencies": ["package:video.studio@1"],
+			"examples": [
+				"海辺を歩く犬の短い動画を作って",
+				"動画生成の進み具合を見たい",
+				"生成済みのMP4動画を一覧で確認したい"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:video.studio@1",
+			"functionName": "video_studio",
+			"bindingRevisionId": "binding:video.command@2",
+			"artifactRevisionId": "artifact:video.workspace@2"
 		}
 	],
 	"bindings": [

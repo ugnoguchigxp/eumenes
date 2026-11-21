@@ -149,7 +149,6 @@ test("without vectors every available toolchain is offered; with vectors the top
 			"collaboration.brave",
 			"collaboration.interact",
 			"collaboration.pipeline",
-			"collaboration.task",
 			"pipeline.execute",
 			// The dots delegation bundle (backend `dots`, offered by this setup).
 			"dots.delegate",

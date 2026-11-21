@@ -715,6 +715,7 @@ export function createAgencyHost(deps: AgencyHostDeps) {
 	 */
 	const conversationAgent: ConversationAgentPort = {
 		system: () => agencyReplyParts(cfg),
+		handsWork: () => true,
 		async respond(input) {
 			const reply = await runRespond({ ...input, emotion: cfg.emotion });
 			return {

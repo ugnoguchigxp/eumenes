@@ -40,6 +40,13 @@ CREATE TABLE collaboration_receipts (
 		sql: `ALTER TABLE collaboration_works ADD COLUMN child_borrowed INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE collaboration_works ADD COLUMN offer_json TEXT;`,
 	},
+	{
+		id: "collaboration/0005-retire-task-works",
+		after: ["collaboration/0004-task-continuation"],
+		// Finished work stays available for source-based forgetting and stops receiving follow-ups.
+		sql: `UPDATE collaboration_works SET ended=1, busy_run_id=NULL
+WHERE kind='task' AND ended=0;`,
+	},
 ];
 export type ReviewRow = {
 	id: string;

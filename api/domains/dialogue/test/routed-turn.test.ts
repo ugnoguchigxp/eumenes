@@ -4,12 +4,6 @@ import { IMAGE, INSTANT, setup, type Harness } from "./generation.fixture";
 import { saveItem } from "./memory-seed";
 import { fillSchema } from "../service/routed-choice";
 
-/**
- * The local harness's routed turn (spec router-package-integration 2026-11-04): the router (the eumenes_router package;
- * the fixture's context judgment reads a scripted choice as its top) decides; a toolchain with fields is filled by one
- * silent call held to that candidate's schema; the host carries it out and says its own words, or the talk turn
- * answers.
- */
 let h: Harness | undefined;
 afterEach(async () => {
 	await h?.close();
@@ -27,13 +21,13 @@ const offered = (schema: unknown) =>
 			anyOf: Array<{ properties: { choice: { enum: string[] } } }>;
 		}
 	).anyOf.flatMap((branch) => branch.properties.choice.enum);
-test("an instant toolchain the router decided answers from the inputs of the one fill call: the host says its answer", async () => {
+test("an instant toolchain fills the selected candidate’s arguments and returns its answer to the conversation", async () => {
 	h = await setup();
 	h.state.steps.push(choice({ choice: INSTANT.id, inputs: { city: "東京" } }));
 	const run = await h.say("東京は今何時？");
 	expect(h.dialogue.answerText(run.id)).toBe("東京は12時です。");
-	expect(h.state.calls).toHaveLength(1);
-	const [fill] = h.state.calls;
+	expect(h.state.calls).toHaveLength(4);
+	const fill = h.state.calls[2];
 	expect(fill!.session).toMatchObject({
 		sessionRole: "main",
 		agentSession: { conversationId: "main", agentId: "main" },
@@ -51,7 +45,7 @@ test("an instant toolchain the router decided answers from the inputs of the one
 	expect(input).not.toContain(`- ${IMAGE.id}: `);
 	expect(input).toEndWith("## User\n東京は今何時？");
 	expect(fill!.messages[0]!.content).toContain(
-		"振り分けが決めた「## Candidates」の1件に頼むための欄を",
+		"会話エージェントが選んだ「## Candidates」の1件について",
 	);
 	expect(h.state.selections.at(-1)).toMatchObject({ decision: "toolchain" });
 });
@@ -106,7 +100,7 @@ test.each(["chat_output_empty", "cloud_agent_empty_output"])(
 	},
 );
 
-test("a pipeline uses the request branch and has no legacy template input contract", async () => {
+test("a pipeline keeps the conversation's request and needs no extra call to fill arguments", async () => {
 	const pipeline: ToolchainCard = {
 		...IMAGE,
 		revisionId: "toolchain:fake.pipeline@1",
@@ -124,28 +118,34 @@ test("a pipeline uses the request branch and has no legacy template input contra
 		}),
 	);
 	const run = await h.say("雨の曲の手順を進めて");
-	expect(h.state.calls).toHaveLength(0);
-	const schema = fillSchema(pipeline, { resources: [], switching: null }) as {
+	expect(h.state.calls).toHaveLength(3);
+	const schema = fillSchema(pipeline, { resources: [] }) as {
 		anyOf: Array<{ properties: Record<string, { enum?: string[] }> }>;
 	};
 	const branch = schema.anyOf.find(
 		(b) => b.properties.choice?.enum?.[0] === pipeline.id,
 	)!;
-	expect(Object.keys(branch.properties)).toContain("request");
-	expect(Object.keys(branch.properties)).not.toContain("inputs");
+	expect(Object.keys(branch.properties)).toEqual(["choice"]);
+	expect(h.state.calls.every((call) => !call.session?.outputSchema)).toBe(true);
 	expect(h.dialogue.answerText(run.id)).toBe(
-		"うまく頼めませんでした。もう一度言ってもらえますか。",
+		"その依頼は今の担当で実行できません。",
 	);
 });
 
-test("no candidate fits: the talk turn answers with only the read tools, on a system that names no toolchain and the time alone of the state", async () => {
+test("a plain exchange can answer without calling its offered tools", async () => {
 	h = await setup();
 	h.state.steps.push(choice({ choice: "none" }), { text: "こんにちは。" });
 	const run = await h.say("こんにちは");
 	expect(h.dialogue.answerText(run.id)).toBe("こんにちは。");
 	const talk = h.state.calls.at(-1)!;
 	// The read tools this host has (spec conversation-read-tools-design 2026-10-31): no memory or agents here.
-	expect(talk.tools).toEqual(["read_history", "read_runs"]);
+	expect(talk.tools).toEqual([
+		"read_history",
+		"read_runs",
+		"memory",
+		"find_toolchain",
+		"delegate",
+	]);
 	expect(talk.session?.outputSchema).toBeUndefined();
 	const system = talk.messages[0]!.content;
 	for (const word of [
@@ -156,14 +156,9 @@ test("no candidate fits: the talk turn answers with only the read tools, on a sy
 	])
 		expect(system).not.toContain(word);
 	expect(system).toContain("渡された読む道具で、記録");
-	expect(system).toContain("受付は反映完了ではありません。");
-	expect(system).toContain(
-		"その他の作業を始めること、Webで調べること、外部を操作することはできず",
-	);
-	// Nor does it write what a toolchain makes: a page or a text it is asked for goes to a toolchain.
-	expect(system).toContain(
-		"文章・ページ・画面・コードなどの制作物は、この返事では書きません。",
-	);
+	expect(system).toContain("受付、実行中、完了を区別");
+	expect(system).toContain("今実行を頼まれていることを見極めます");
+	expect(h.state.searchSlots).toEqual([]);
 	const last = talk.messages.at(-1)!.content;
 	expect(last).toMatch(/^## State\n今: [^\n]+\n\n## User\nこんにちは$/);
 });
@@ -212,36 +207,39 @@ test("finished work State still lists may be checked, never corrected: the check
 	});
 	const run = await h.say("猫の絵はどうなった？");
 	expect(h.dialogue.answerText(run.id)).toBe("猫の絵はできあがっています。");
-	// Finished work is offered to the router for a check only.
-	const work = h.state.routerAsked
-		.at(-1)!
-		.criteria.map((c) => c.name)
-		.filter((name) => name.startsWith("t1."));
-	expect(work).toEqual(["t1.check"]);
 	const talked = h.state.calls.at(-1)!;
-	expect(talked.messages.at(-1)!.content).toContain(
-		"仕事の記録を確かめた結果です",
-	);
+	expect(talked.tools).toContain("work");
 	expect(talked.messages.at(-1)!.content).toContain(
 		"t1「猫の絵を描いて」が終わりました（成功）。",
 	);
 	expect(h.todos()).toEqual([]);
 });
 
-test("the fill reads the user's earlier words of the talk window: its fields carry the condition they point to", async () => {
+test("the conversation resolves a past reference before the selected toolchain fills its arguments", async () => {
 	h = await setup();
 	h.state.steps.push(choice({ choice: "none" }), { text: "承知しました。" });
 	await h.say("好きな都市は東京です。");
-	h.state.steps.push(choice({ choice: INSTANT.id, inputs: { city: "東京" } }));
-	await h.say("好きな都市の時刻を教えて");
-	const fill = h.state.calls.at(-1)!;
-	expect(fill.session?.outputSchema).toBeDefined();
+	const request = "東京の現在時刻を教えて";
+	const first = h.state.calls.length;
+	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: request } }] },
+		{ calls: [{ name: "delegate", args: { toolchain: INSTANT.id, request } }] },
+		choice({ choice: INSTANT.id, inputs: { city: "東京" } }),
+		{ text: "東京は12時です。" },
+	);
+	const run = await h.say("好きな都市の時刻を教えて");
+	expect(
+		h.state.calls[first]!.messages.some(
+			({ role, content }) =>
+				role === "user" && content.includes("好きな都市は東京です。"),
+		),
+	).toBe(true);
+	const fill = h.state.calls.findLast((call) => call.session?.outputSchema)!;
 	const input = fill.messages.at(-1)!.content;
 	expect(input).toContain("## Earlier\n- 好きな都市は東京です。\n## State\n");
 	expect(input).toContain("直前の返事: 承知しました。");
-	expect(fill.messages[0]!.content).toContain(
-		"今の発言が「## Earlier」の発言や「## Memory」の項目を指しているときは、指された中身を request に書き写します。",
-	);
+	expect(input).toEndWith(`## User\n${request}`);
+	expect(h.dialogue.answerText(run.id)).toBe("東京は12時です。");
 });
 
 test("the fill reads `## Memory` as the talk turn shows it", async () => {
@@ -261,7 +259,9 @@ test("the fill reads `## Memory` as the talk turn shows it", async () => {
 	);
 	h.state.steps.push(choice({ choice: INSTANT.id, inputs: { city: "東京" } }));
 	await h.say("好きな色の街の時刻を教えて");
-	const input = h.state.calls.at(-1)!.messages.at(-1)!.content;
+	const input = h.state.calls
+		.findLast((call) => call.session?.outputSchema)!
+		.messages.at(-1)!.content;
 	expect(input).toStartWith("## Memory\n");
 	expect(input).toContain(`- ${saved.text}`);
 	expect(input.indexOf("## Memory")).toBeLessThan(input.indexOf("## State"));

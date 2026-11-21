@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { createAgentLarm } from "..";
 import { capacityFixture, messages, owner } from "./agent-capacity.fixture";
 import { fixture } from "./larm.fixture";
+import { embeddingProvider } from "./embedding.fixture";
 
 function combinedFixture() {
 	const llm = capacityFixture();
@@ -28,6 +29,7 @@ function combinedFixture() {
 				...catalog.profiles[0].providers.filter(
 					(p: { name: string }) => p.name !== "llm",
 				),
+				embeddingProvider,
 			];
 			return Response.json(catalog);
 		}
@@ -49,6 +51,19 @@ function combinedFixture() {
 						voice_presentation: "feminine",
 					},
 				],
+			});
+		}
+		if (path === "/shared-provider/v1/embed") {
+			expect(new Headers(init?.headers).get("authorization")).toBe(
+				"Bearer shared-embedding-token",
+			);
+			const { type } = JSON.parse(String(init?.body));
+			nativeCalls.push("embedding");
+			return Response.json({
+				type,
+				count: 1,
+				dimension: 512,
+				embeddings: [[1, ...Array(511).fill(0)]],
 			});
 		}
 		if (
@@ -77,6 +92,28 @@ function combinedFixture() {
 		if (path.startsWith("/v1/agent-connections") && response.status !== 204) {
 			const body = await response.json();
 			body.agentProfile = "fixture-agent-profile";
+			const claim = path.endsWith("/claim") && JSON.parse(String(init?.body));
+			if (claim && claim.format === "larm-embedding-provider-v1") {
+				expect(claim.providers).toEqual(["embedding"]);
+				expect(new Headers(init?.headers).has("idempotency-key")).toBe(false);
+				body.providers = [
+					{
+						...embeddingProvider,
+						endpoint: "/shared-provider/v1/embed",
+						credential: {
+							type: "bearer",
+							token: "shared-embedding-token",
+							expiresAt: body.expiresAt,
+						},
+					},
+				];
+			} else if (body.providers) {
+				body.providers = body.providers.map((provider: { name: string }) =>
+					provider.name === "embedding"
+						? { ...provider, ...embeddingProvider }
+						: provider,
+				);
+			}
 			return Response.json(body, { status: response.status });
 		}
 		return response;
@@ -90,7 +127,7 @@ function combinedFixture() {
 	};
 }
 
-test("managed 200k main and default sub keep ASR, both TTS providers and attitude decisions in a separate non-LLM scope", async () => {
+test("managed LLMs coexist with ASR, TTS, attitude and embedding in the shared non-LLM scope", async () => {
 	const f = combinedFixture(),
 		p = createAgentLarm(f.config);
 	const signal = AbortSignal.timeout(5000);
@@ -99,6 +136,9 @@ test("managed 200k main and default sub keep ASR, both TTS providers and attitud
 		await p.answer(messages, signal, owner("main"));
 		await p.answerStream!(messages, signal, () => {}, owner("subagent"));
 		await p.prepareVoice!(signal);
+		expect((await p.embed!(["検索"], "query", signal)).space.dimension).toBe(
+			512,
+		);
 		expect(await p.transcribe(f.wav, signal)).toBe("こんにちは");
 		expect(await p.speak("確認", signal)).toHaveLength(44);
 		expect(
@@ -123,9 +163,16 @@ test("managed 200k main and default sub keep ASR, both TTS providers and attitud
 			"system-one",
 			"tts-english",
 			"language-fixture",
+			"embedding",
 		]);
 		expect(f.audio.requests[0]).not.toHaveProperty("contextTokens");
-		expect(f.nativeCalls).toEqual(["asr", "tts", "tts-english", "system-one"]);
+		expect(f.nativeCalls).toEqual([
+			"embedding",
+			"asr",
+			"tts",
+			"tts-english",
+			"system-one",
+		]);
 		expect(f.llm.creates).toHaveLength(2);
 		expect(f.llm.creates[0]!.body.contextTokens).toBe(200000);
 		expect(f.llm.creates[1]!.body).not.toHaveProperty("contextTokens");

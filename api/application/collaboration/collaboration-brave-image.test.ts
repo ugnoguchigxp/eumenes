@@ -29,7 +29,7 @@ import {
 } from "../browser/browser-task.fixture";
 import { createTaskRunner } from "../browser/browser-task-runner";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
-import { harness } from "../toolchain/toolchain.fixture";
+import { legacyTaskHarness as harness } from "./legacy-task.fixture";
 
 test("Collaboration rereads a corrected region and takes a fresh image only when asked", async () => {
 	const url = "https://example.com/diagram";

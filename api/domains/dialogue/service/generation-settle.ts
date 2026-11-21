@@ -29,7 +29,6 @@ const log = getLogger("dialogue");
 export type GenerationResult = {
 	finishSilentReplyInTransaction?: GenerationOutcome["finishSilentReplyInTransaction"];
 	debugTarget?: string;
-	debugRouterFailure?: true;
 	imageAnswer?: ImageAnswerTrace;
 	/** The speech the generation ends with ("" for silence or a handover). */
 	text: string;
@@ -365,15 +364,6 @@ export function createGenerationSettlement(
 					result.debugTarget,
 					run.id,
 					true,
-				);
-			if (done && result.debugRouterFailure)
-				deps.debugDiagnostics?.enqueue(
-					tx,
-					run.conversationId,
-					run.id,
-					run.id,
-					false,
-					"router",
 				);
 			return done ? "applied" : "stale";
 		}

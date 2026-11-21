@@ -373,10 +373,21 @@ async function findCandidates(
 
 async function beforeInfer(prepared: PreparedUnit, ctx: ExecuteContext) {
 	const context = prepared.context as CurateContext;
-	const turnVectors = ctx.deps.memory.vectors.embedTurns(
-		context.turns,
-		ctx.signal,
+	const { store, conversation, memory } = ctx.deps;
+	const turns = store.read((db) =>
+		context.turns.flatMap(({ messageId }) => {
+			const source = conversation.sourceInTransaction(db, messageId);
+			if (
+				source.state !== "available" ||
+				source.digest !== context.digests[messageId] ||
+				memory.blockedMessageIdsInTransaction(db, [messageId]).size
+			)
+				return [];
+			const found = conversation.messageInTransaction(db, messageId);
+			return found ? [{ messageId, text: found.message.text }] : [];
+		}),
 	);
+	const turnVectors = ctx.deps.memory.vectors.embedTurns(turns, ctx.signal);
 	const { views, map, texts } = await findCandidates(prepared, ctx);
 	const extras: CurateExtras = {
 		turnVectors,

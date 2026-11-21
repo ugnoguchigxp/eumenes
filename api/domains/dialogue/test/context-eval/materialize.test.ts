@@ -27,9 +27,6 @@ const lastOf = (m: Materialized): string => m.input.messages.at(-1)!.content;
 /** The lines of one `## ` section of the last message. */
 const sect = (m: Materialized, heading: string) =>
 	sectionLines(lastOf(m), heading);
-/** The `## State` lines the choice calls read: the work by its numbers (only a generation of utterances has them). */
-const choiceState = (m: Materialized) =>
-	sectionLines(m.input.routed?.state ?? "", "State");
 /** The `## Memory` lines (its own message, or the head of the last one). */
 const memoryOf = (m: Materialized) =>
 	m.input.messages.flatMap((message) =>
@@ -191,17 +188,13 @@ test("the recent conversation is what reached the user: a partial delivery as he
 	expect(all).not.toContain("いま話しているところ");
 	expect(all).not.toContain("メモの保存に失敗しました");
 	expect(all).not.toContain("web_research「");
-	// The first user utterance came before any of the agent's: the recent conversation starts with the agent.
-	expect(recent.some((message) => message.content === "宿を調べて")).toBe(
-		false,
-	);
+	// The opening request is in the first history message that also carries Memory.
+	expect(m.input.messages[1]!.content).toEndWith("## Earlier\n\n宿を調べて");
 });
 
 test("TODOs and confirmations come from the work ledger as lines of `## State`", async () => {
 	const m = await prepared(fullCase);
-	// The talk turn reads the time alone of `## State`; the choice calls read the work.
-	expect(sect(m, "State")).toHaveLength(1);
-	const state = choiceState(m);
+	const state = sect(m, "State");
 	// Finished work is archived as it finishes: the state names it as notified.
 	expect(state).toContain("- t1 宿の候補を調べる 通知済み");
 	expect(state).toContain(

@@ -16,7 +16,7 @@ export function answerMessages(
 	prefix: ConversationPrefix,
 	input: {
 		stateLines: string[];
-		screenLines: string[];
+		askedRequest?: string;
 		agencyLines: string[];
 		media: readonly { line: string }[];
 		diagnostics: readonly { line: string }[];
@@ -26,20 +26,18 @@ export function answerMessages(
 		trace?: { nowMs: number; noticeId?: string; origins?: InputOrigin[] };
 	},
 ) {
-	const { agencyLines, diagnostics, media, screenLines, stateLines, trace } =
-		input;
+	const { agencyLines, diagnostics, media, trace } = input;
+	const stateLines = [...input.stateLines];
+	if (input.askedRequest)
+		stateLines.push(
+			`- 直前の質問が確認している依頼 ${dataText(input.askedRequest)}`,
+		);
 	const mediaLines = media.length
 		? ["受領した生成画像:", ...media.map(({ line }) => line)]
 		: [];
 	const diagnosticLines = diagnostics.map(({ line }) => line);
-	// Routing reads the same additional diagnostics and media as the reply.
-	stateLines.push(...mediaLines, ...diagnosticLines);
-	const shownState = [
-		...stateLines.slice(0, 1),
-		...(screenLines.length ? ["提示中:", ...screenLines] : []),
-	];
 	const state = stateText([
-		...shownState,
+		...stateLines,
 		...agencyLines,
 		...mediaLines,
 		...diagnosticLines,
@@ -64,7 +62,7 @@ export function answerMessages(
 					from +
 					INPUT_HEADINGS.state.length +
 					1 +
-					shownState.reduce((n, line) => n + line.length + 1, 0);
+					stateLines.reduce((n, line) => n + line.length + 1, 0);
 				markInput(
 					last,
 					{ kind: "agency" },

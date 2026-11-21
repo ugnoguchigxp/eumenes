@@ -166,6 +166,20 @@ DELETE FROM capability_items WHERE origin='builtin' AND key IN (
 	'skill:web.recipe','skill:web.research','skill:web.search','tool:web.forecast','tool:web.quote'
 );`,
 	},
+	{
+		id: "capabilities/0013-retire-collaboration-task",
+		after: ["capabilities/0012-retire-older-web-packages"],
+		// Keep immutable revisions for history, but remove the generic session's public entries.
+		sql: `DELETE FROM capability_toolchain_vectors WHERE revision_id IN (
+	SELECT id FROM capability_revisions WHERE item_key='toolchain:collaboration.task');
+DELETE FROM capability_search WHERE key IN (
+	'toolchain:collaboration.task','package:collaboration.task','skill:collaboration.task','tool:collaboration.brave.image'
+) OR key GLOB 'tool:collaboration.task.*';
+DELETE FROM capability_items WHERE key IN (
+	'toolchain:collaboration.task','package:collaboration.task','skill:collaboration.task','tool:collaboration.brave.image'
+) OR key GLOB 'tool:collaboration.task.*';
+DELETE FROM capability_artifact_pointers WHERE artifact_id='collaboration.task';`,
+	},
 ];
 
 export type DocumentKind = "binding" | "artifact" | "schema";

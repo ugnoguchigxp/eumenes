@@ -9,7 +9,7 @@ import {
 import { namedResources, namedTodos } from "../service/state-text";
 
 /**
- * The one-candidate fill of the toolchain the router decided (spec router-package-integration 2026-11-04 §1 #14): a
+ * Argument extraction for the toolchain the conversation chose: a
  * hand-over refers only to the resources `## State` names (the schema offers those `a<n>` and no other text, and a
  * turn that names none has no `refs` to fill), names its target, and reaches a cloud provider in strict form.
  */
@@ -43,16 +43,12 @@ test("the resources State names are its references, not the words of their label
 });
 
 test("a hand-over's refs are the named resources; with none named the branch has no refs", () => {
-	expect(
-		refsOf(fillSchema(MUSIC, { resources: ["a3", "a4"], switching: null })),
-	).toEqual({
+	expect(refsOf(fillSchema(MUSIC, { resources: ["a3", "a4"] }))).toEqual({
 		type: "array",
 		maxItems: 8,
 		items: { type: "string", enum: ["a3", "a4"] },
 	});
-	expect(
-		refsOf(fillSchema(MUSIC, { resources: [], switching: null })),
-	).toBeUndefined();
+	expect(refsOf(fillSchema(MUSIC, { resources: [] }))).toBeUndefined();
 });
 
 test("the work State lists is read by its lines' heads: a title that holds a number is not work", () => {
@@ -94,7 +90,7 @@ test("a toolchain with saved items always names its target: new first, then the 
 		"target は、新しく作る依頼なら new を選びます。今の発言が保存済みの作品を直す・続けると言っているときだけ、その作品を選びます。",
 	);
 	const branch = (
-		fillSchema(studio, { resources: [], switching: null }).anyOf as Array<{
+		fillSchema(studio, { resources: [] }).anyOf as Array<{
 			required: string[];
 			properties: Record<string, { enum?: string[] }>;
 		}>
@@ -146,9 +142,7 @@ test("a cloud provider gets the fill in strict form: one object, every field req
 			required: ["place"],
 		},
 	};
-	const strict = strictChoiceSchema(
-		fillSchema(weather, { resources: ["a2"], switching: "studio" }),
-	);
+	const strict = strictChoiceSchema(fillSchema(weather, { resources: ["a2"] }));
 	expect(strict.anyOf).toBeUndefined();
 	expect(strictBreaks(strict)).toEqual([]);
 	const properties = strict.properties as Record<
@@ -172,13 +166,6 @@ test("a cloud provider gets the fill in strict form: one object, every field req
 			{ type: "null" },
 		],
 	});
-	expect(
-		strictBreaks(
-			strictChoiceSchema(
-				fillSchema("memory.request", { resources: [], switching: null }),
-			),
-		),
-	).toEqual([]);
 	// The answer fills every field: the nulls are dropped and the inputs read back into their object.
 	expect(
 		parseChoice(
@@ -186,8 +173,6 @@ test("a cloud provider gets the fill in strict form: one object, every field req
 				choice: "weather",
 				inputs: JSON.stringify({ place: "鎌倉" }),
 				say: null,
-				request: null,
-				target: null,
 			}),
 		),
 	).toEqual({ choice: "weather", inputs: { place: "鎌倉" } });
@@ -214,9 +199,7 @@ test("strict inputs: a field the answer may leave out is required and nullable, 
 			additionalProperties: false,
 		},
 	};
-	const strict = strictChoiceSchema(
-		fillSchema(history, { resources: [], switching: null }),
-	);
+	const strict = strictChoiceSchema(fillSchema(history, { resources: [] }));
 	expect(strictBreaks(strict)).toEqual([]);
 	const inputs = (
 		strict.properties as Record<
@@ -249,7 +232,7 @@ test("strict inputs: a field the answer may leave out is required and nullable, 
 		execution: "instant",
 	};
 	const text = (
-		strictChoiceSchema(fillSchema(open, { resources: [], switching: null }))
+		strictChoiceSchema(fillSchema(open, { resources: [] }))
 			.properties as Record<string, Record<string, unknown>>
 	).inputs!;
 	expect(text.type).toEqual(["string", "null"]);

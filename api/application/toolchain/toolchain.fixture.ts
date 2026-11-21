@@ -65,7 +65,7 @@ import { createTimerAnnouncements } from "../timers/timer-announcements";
 import { createApp } from "../app";
 import { appModules } from "../app-modules";
 import type { LarmPort } from "../../domains/larm";
-import { fixtureRouting } from "./router.fixture";
+import { fixtureRouting } from "./toolchain-search.fixture";
 import { researchAcquisition } from "./research-acquisition.fixture";
 export { forbidden } from "./research-acquisition.fixture";
 import {
@@ -88,7 +88,7 @@ import {
 /** The conversation agent's fixed tools, as a script reads what it may call. */
 /** The system of the router's fill of a structured answer (spec router-package-integration 2026-11-04). */
 const ANSWER_FILL = systemContext(
-	"dialogue.contexts.local.router-answer-fill",
+	"dialogue.contexts.local.work-answer-arguments",
 	{},
 );
 const CONVERSATION_TOOLS = ["memory", "find_toolchain", "delegate", "work"].map(
@@ -240,9 +240,13 @@ export async function harness(options: HarnessOptions = {}) {
 			? "conversation_history"
 			: options.routeTool
 				? options.routeTool
-				: options.timers && /タイマー/.test(question)
-					? "timer"
-					: "service_search";
+				: options.weather && /天気/.test(question)
+					? "weather_forecast"
+					: options.stock && /株価/.test(question)
+						? "stock_quote"
+						: options.timers && /タイマー/.test(question)
+							? "timer"
+							: "service_search";
 		const wanted = store.read(
 			(db) =>
 				toolchain.capabilities
@@ -754,16 +758,6 @@ export async function harness(options: HarnessOptions = {}) {
 		options,
 		toolchain,
 		store,
-		inference,
-		ask: (messages, round) =>
-			choiceByScript(messages as never, round, (loop) =>
-				utteranceStep(
-					loop as never,
-					utteranceOf(messages as never),
-					CONVERSATION_TOOLS,
-					true,
-				),
-			),
 	});
 	const continuity = createContinuityService();
 	const memory = options.memory

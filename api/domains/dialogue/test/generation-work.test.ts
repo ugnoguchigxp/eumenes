@@ -389,7 +389,7 @@ test("cancel of a waiting TODO from a later utterance ends the run it waits on, 
 		}),
 	);
 	const cancelling = await h.say("やっぱりやめて");
-	expect(h.dialogue.answerText(cancelling.id)).toBe("承知しました。");
+	expect(h.dialogue.answerText(cancelling.id)).toBe("取り消しました。");
 	expect(h.dialogue.get(waiting.id)?.status).toBe("cancelled");
 	// Cancelled work is not reported back: the TODO is archived at once.
 	expect(h.todos()).toEqual([]);
@@ -416,9 +416,8 @@ test("the TODO screen's page shows the whole request, the newest finished first,
 	const archived = page("archived");
 	expect(archived.total).toBe(2);
 	expect(archived.counts).toEqual({ todo: 0, archived: 2 });
-	// The ledger's title is cut for the model's state; the screen reads the request itself (the user's words, then the
-	// utterance before them that the router hands over with them).
-	expect(archived.rows[0]!.request).toStartWith(`${long}\n直前の発言`);
+	// The screen reads the full saved request; the title is only a preview.
+	expect(archived.rows[0]!.request).toBe(long);
 	expect(archived.rows[1]!.request).toBe("猫の絵");
 	expect(archived.rows[0]!.title.length).toBeLessThan(long.length);
 	expect(page("active").rows).toEqual([]);
@@ -436,10 +435,10 @@ test("a finished TODO can still be checked: its result is read again, with room 
 	expect(talked.messages.at(-1)!.content).toContain(
 		`t${todo.ref}「猫の絵」が終わりました`,
 	);
-	// The finished work is still offered to the router, for a check.
-	expect(h.state.routerAsked.at(-1)!.criteria.map((c) => c.name)).toContain(
-		`t${todo.ref}.check`,
-	);
+	expect(talked.tools).toContain("work");
+	expect(
+		h.log().some((event) => h!.fields(event).action === "work.check"),
+	).toBe(true);
 });
 
 test("a spoken reply takes its place when adopted and keeps only what was heard; one not heard at all leaves the input", async () => {

@@ -1,11 +1,8 @@
 import { createContinuityService } from "../../domains/continuity";
 import {
-	callsOf,
 	candidatesOf,
-	isNoticeRound,
+	conversationByScript,
 	utteranceOf,
-	isUtteranceRound,
-	routedChoice,
 	searchThenDelegate,
 } from "../toolchain/conversation-script.fixture";
 import { afterEach } from "bun:test";
@@ -37,7 +34,6 @@ import { migrations } from "../migrations";
 import { createToolchain } from "../toolchain/toolchain";
 import { createToolchainHostLinks } from "../toolchain/toolchain-host";
 import { createToolchainRouting } from "../toolchain/toolchain-routing";
-import { askModel, attachFixtureRouter } from "../toolchain/router.fixture";
 import { fixtureDiscovery } from "../toolchain/discovery.fixture";
 import {
 	createWorldAssembly,
@@ -212,8 +208,7 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					languages: ["ja"],
 					confidence: 0.99,
 				});
-			// The conversation's round: search for the World query toolchain, then hand the question over (the local
-			// harness's routed turn makes it one silent choice from the same step).
+			// The conversation finds the World query toolchain and hands over the question.
 			const conversationStep = (loop: typeof messages) => {
 				const candidates = candidatesOf(loop);
 				if (candidates) offered.push(JSON.stringify(candidates));
@@ -223,16 +218,12 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 					{ announcement: "照会します。", impact: "none" },
 				)(loop);
 			};
-			const routed = routedChoice(callOptions, messages, conversationStep);
-			if (routed) return routed;
-			if (isUtteranceRound(callOptions) && !isNoticeRound(messages)) {
-				const step = conversationStep(messages);
-				if (step.calls?.length)
-					callOptions!.onToolCalls!(
-						callsOf(step, () => crypto.randomUUID()) as never,
-					);
-				return step.text ?? "";
-			}
+			const conversation = conversationByScript(
+				callOptions,
+				messages,
+				conversationStep,
+			);
+			if (conversation) return conversation;
 			if (system.includes("TOOLS=")) {
 				workerMessages.push(JSON.stringify(messages));
 				const packet = workerPacket(messages);
@@ -434,14 +425,6 @@ export async function boot(steps: Step[], options: BootOptions = {}) {
 		toolchain.schemas,
 		toolchain.worldAvailable,
 	);
-	// Adapt the fixture model to the router's selection contract.
-	await attachFixtureRouter({
-		store,
-		inference,
-		routing,
-		capabilities: toolchain.capabilities,
-		ask: askModel(model),
-	});
 	const dialogue = createDialogueService({
 		conversationAgent: testConversationAgent,
 		store,

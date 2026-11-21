@@ -18,18 +18,16 @@ const minutes = (n: number) => n * 60 * 1000;
 const call = (n: number) => h!.state.calls[n]!;
 const last = (n: number) => call(n).messages.at(-1)!.content;
 
-test("the recent conversation is native messages from the agent's first utterance; the last message is State, then the user's words", async () => {
+test("the recent conversation keeps the opening user utterance and the last message carries the current input", async () => {
 	h = await setup();
 	h.state.steps.push(...reply("ansA"), ...reply("ansB"), ...reply("ansC"));
 	await h.say("A");
 	await h.say("B");
 	await h.say("C");
-	// The third turn's talk call (the router makes no model call).
 	const third = call(2);
 	expect(third.messages.map((m) => [m.role, m.content])).toEqual([
 		["system", third.messages[0]!.content],
-		// `## Memory` leads the recent conversation, even with nothing in it.
-		["user", "## Memory\n- なし"],
+		["user", "## Memory\n- なし\n\n## Earlier\n\nA"],
 		["assistant", "ansA"],
 		["user", "B"],
 		["assistant", "ansB"],
@@ -144,7 +142,7 @@ test("clearing the recent conversation leaves the earlier words out of the next 
 		call(2)
 			.messages.slice(1, -1)
 			.map((m) => m.content),
-	).toEqual(["## Memory\n- なし", "ansB"]);
+	).toEqual(["## Memory\n- なし\n\n## Earlier\n\nB", "ansB"]);
 	// The record itself stays.
 	expect(h.log().filter((e) => e.type === "said")).toHaveLength(6);
 });

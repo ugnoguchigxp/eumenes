@@ -12,8 +12,8 @@ export const IDLE_MS = 10 * 60_000;
 export const MAX_AGE_MS = 30 * 60_000;
 
 export type ThreadMode = "new" | "append" | "reset";
-/** One message of the call, past the instructions: its content hash and whether the model wrote it. */
-export type ThreadMessage = { digest: string; assistant: boolean };
+/** The last response in the host's message format, hashed before the thread is released. */
+export type ThreadReply = { digest: string; awaitsMore: boolean };
 export type ThreadLease = {
 	threadId: string;
 	mode: ThreadMode;
@@ -26,10 +26,9 @@ export type ThreadLease = {
 	listen(handler: ThreadHandler): void;
 	turnStarted(turnId: string): void;
 	/**
-	 * The turn ended well: the thread now holds the call's messages and the model's answer. `awaitsMore` says the
-	 * answer asked for something (a function call), so a call that continues this thread is expected.
+	 * The turn ended well. If the host can describe the answer it will use, a later call can prove it continues this turn.
 	 */
-	done(totals: CodexTotals | null, awaitsMore: boolean): void;
+	done(totals: CodexTotals | null, reply?: ThreadReply): void;
 	/** No turn was started: the thread is as it was leased. */
 	untouched(): void;
 	/** The turn was interrupted and ended: the thread stays, to be reverted before it is used again. */
@@ -38,17 +37,21 @@ export type ThreadLease = {
 	discard(): Promise<void>;
 };
 
+type Continuation = {
+	requestId: string;
+	covered: string[];
+	awaitsMore: boolean;
+};
+
 type Entry = {
 	id: string;
 	rpc: CodexRpc;
 	identity: string;
-	covered: string[];
+	continuation?: Continuation;
 	busy: boolean;
-	dirty: boolean;
 	gone: boolean;
 	/** Something was forgotten while the thread ran a turn: it is deleted when that turn ends. */
 	doomed: boolean;
-	awaitsMore: boolean;
 	created: number;
 	firstTurnId: string | null;
 	totals: CodexTotals;
@@ -58,12 +61,16 @@ type Entry = {
 	handler: ThreadHandler | null;
 };
 
-/** The thread a call continues: everything it holds is the front of this call, then the model's own answer, then more. */
-function continues(covered: readonly string[], messages: ThreadMessage[]) {
+/** One request may append when its input starts with exactly what the thread holds, including the answer. */
+function continues(
+	previous: Continuation,
+	requestId: string | undefined,
+	messages: readonly string[],
+) {
 	return (
-		messages.length >= covered.length + 2 &&
-		messages[covered.length]!.assistant &&
-		covered.every((digest, i) => messages[i]!.digest === digest)
+		previous.requestId === requestId &&
+		messages.length > previous.covered.length &&
+		previous.covered.every((digest, i) => messages[i] === digest)
 	);
 }
 
@@ -153,7 +160,8 @@ export function createCodexThreads(options: {
 		async acquire(input: {
 			rpc: CodexRpc;
 			identity: string;
-			messages: ThreadMessage[];
+			messages: readonly string[];
+			requestId?: string;
 			/** `thread/start` parameters of a new thread. */
 			start: Record<string, unknown>;
 			attemptId?: string;
@@ -167,16 +175,24 @@ export function createCodexThreads(options: {
 					!e.gone,
 			);
 			const candidates = idle
-				.filter((e) => !e.dirty && continues(e.covered, input.messages))
-				.sort((a, b) => b.covered.length - a.covered.length);
-			// Two threads that hold the same front gave two answers; which one the call continues can not be told.
+				.filter(
+					(e): e is Entry & { continuation: Continuation } =>
+						!!e.continuation &&
+						continues(e.continuation, input.requestId, input.messages),
+				)
+				.sort(
+					(a, b) =>
+						b.continuation.covered.length - a.continuation.covered.length,
+				);
+			// Equal matches leave the previous turn ambiguous.
 			const following =
-				candidates[1]?.covered.length === candidates[0]?.covered.length
+				candidates[1]?.continuation.covered.length ===
+				candidates[0]?.continuation.covered.length
 					? undefined
 					: candidates[0];
 			// A thread whose answer asked for something is left for the call that continues it, while there is room.
 			const free = idle
-				.filter((e) => !e.awaitsMore)
+				.filter((e) => !e.continuation?.awaitsMore)
 				.sort((a, b) => b.idleSince - a.idleSince)[0];
 			const reusable =
 				following ??
@@ -193,12 +209,9 @@ export function createCodexThreads(options: {
 				id: "",
 				rpc: input.rpc,
 				identity: input.identity,
-				covered: [],
 				busy: true,
-				dirty: false,
 				gone: false,
 				doomed: false,
-				awaitsMore: false,
 				created: now(),
 				firstTurnId: null,
 				totals: emptyTotals,
@@ -227,9 +240,7 @@ export function createCodexThreads(options: {
 							beforeTurnId: entry.firstTurnId,
 						});
 					entry.firstTurnId = null;
-					entry.covered = [];
-					entry.dirty = false;
-					entry.awaitsMore = false;
+					entry.continuation = undefined;
 					entry.totals = emptyTotals;
 				}
 			} catch (error) {
@@ -245,7 +256,7 @@ export function createCodexThreads(options: {
 			return {
 				threadId: entry.id,
 				mode,
-				sendFrom: mode === "append" ? entry.covered.length + 1 : 0,
+				sendFrom: following?.continuation.covered.length ?? 0,
 				baseline: entry.totals,
 				channel: entry.channel!,
 				listen(handler) {
@@ -259,11 +270,17 @@ export function createCodexThreads(options: {
 				turnStarted(turnId) {
 					entry.firstTurnId ??= turnId;
 				},
-				done(totals, awaitsMore) {
+				done(totals, reply) {
 					if (entry.gone) return;
-					entry.covered = input.messages.map((m) => m.digest);
+					entry.continuation =
+						input.requestId && reply
+							? {
+									requestId: input.requestId,
+									covered: [...input.messages, reply.digest],
+									awaitsMore: reply.awaitsMore,
+								}
+							: undefined;
 					entry.totals = totals ?? entry.totals;
-					entry.awaitsMore = awaitsMore;
 					release(entry);
 				},
 				untouched() {
@@ -271,8 +288,7 @@ export function createCodexThreads(options: {
 				},
 				interrupted() {
 					if (entry.gone) return;
-					entry.dirty = true;
-					entry.awaitsMore = false;
+					entry.continuation = undefined;
 					release(entry);
 				},
 				discard: () => retire(entry),

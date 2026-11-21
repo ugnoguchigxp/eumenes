@@ -176,6 +176,110 @@ test("the actual hook sequences raw audio, plays output, shares status with sett
 	expect(fake.close).toHaveBeenCalled();
 	expect(h.result.current.settings.active).toBe(false);
 });
+
+test("stopping cancels queued microphone sends and waits for the final state", async () => {
+	const f = fixture();
+	const upload = Promise.withResolvers<void>();
+	const stop = Promise.withResolvers<LiveSnapshot>();
+	f.methods.liveAudio.mockImplementationOnce(() => upload.promise);
+	f.methods.liveStop.mockImplementationOnce(() => stop.promise);
+	const h = renderHook(() => useLiveVoice(f.client, f.settings), {
+		wrapper: f.wrapper,
+	});
+	await act(() => h.result.current.start());
+	await act(() => f.state({ status: "active" }));
+	await act(() => {
+		f.audio().onInput("AAA=");
+		f.audio().onInput("AQA=");
+	});
+	await waitFor(() => expect(f.methods.liveAudio).toHaveBeenCalledOnce());
+	const signal = f.methods.liveAudio.mock.calls[0]![3];
+
+	let stopping: Promise<void> | undefined;
+	await act(() => {
+		stopping = h.result.current.stop();
+	});
+	await act(async () => {
+		upload.reject(new Error("live_session_inactive"));
+		await upload.promise.catch(() => {});
+	});
+	expect(f.methods.liveAudio).toHaveBeenCalledOnce();
+	expect(signal?.aborted).toBe(true);
+	expect(f.methods.liveStop).toHaveBeenCalledOnce();
+	expect(h.result.current.error).toBeNull();
+	await act(() => f.state({ status: "closing" }));
+	await waitFor(() => expect(h.result.current.session?.status).toBe("closing"));
+	await act(() => f.state({ status: "closed", usageConfirmed: true }));
+	await waitFor(() => expect(h.result.current.session?.status).toBe("closed"));
+	await act(async () => {
+		stop.resolve({ ...snapshot, status: "closing" });
+		await stopping;
+	});
+	expect(h.result.current.session?.usageConfirmed).toBe(true);
+	expect(h.result.current.active).toBe(false);
+});
+
+test("a brief upload delay drains waiting PCM in order without stopping the session", async () => {
+	const f = fixture();
+	const first = Promise.withResolvers<void>();
+	const second = Promise.withResolvers<void>();
+	f.methods.liveAudio
+		.mockImplementationOnce(() => first.promise)
+		.mockImplementationOnce(() => second.promise);
+	const h = renderHook(() => useLiveVoice(f.client, f.settings), {
+		wrapper: f.wrapper,
+	});
+	await act(() => h.result.current.start());
+	await act(() => f.state({ status: "active" }));
+	const frames = Array.from({ length: 30 }, (_, i) =>
+		String.fromCharCode(i, 0),
+	);
+	const submit = (from: number, to: number) => {
+		for (const frame of frames.slice(from, to)) f.audio().onInput(btoa(frame));
+	};
+	await act(() => submit(0, 20));
+	await waitFor(() => expect(f.methods.liveAudio).toHaveBeenCalledOnce());
+	await act(async () => first.resolve());
+	await waitFor(() => expect(f.methods.liveAudio).toHaveBeenCalledTimes(2));
+	await act(() => submit(20, 30));
+	expect(f.methods.liveStop).not.toHaveBeenCalled();
+	expect(h.result.current.error).toBeNull();
+	expect(atob(f.methods.liveAudio.mock.calls[1]![2])).toBe(
+		frames.slice(1, 20).join(""),
+	);
+	await act(async () => second.resolve());
+	await waitFor(() => expect(f.methods.liveAudio).toHaveBeenCalledTimes(3));
+	expect(atob(f.methods.liveAudio.mock.calls[2]![2])).toBe(
+		frames.slice(20).join(""),
+	);
+	expect(f.methods.liveAudio.mock.calls.map((call) => call[1])).toEqual([
+		1, 2, 3,
+	]);
+});
+
+test("waiting PCM is sent in packets within the backend limit", async () => {
+	const f = fixture();
+	const first = Promise.withResolvers<void>();
+	f.methods.liveAudio.mockImplementationOnce(() => first.promise);
+	const h = renderHook(() => useLiveVoice(f.client, f.settings), {
+		wrapper: f.wrapper,
+	});
+	await act(() => h.result.current.start());
+	await act(() => f.state({ status: "active" }));
+	const frames = [1, 2, 3].map((sample) =>
+		String.fromCharCode(sample, 0).repeat(6000),
+	);
+	await act(() => {
+		f.audio().onInput("AAA=");
+		for (const frame of frames) f.audio().onInput(btoa(frame));
+	});
+	await waitFor(() => expect(f.methods.liveAudio).toHaveBeenCalledOnce());
+	await act(async () => first.resolve());
+	await waitFor(() => expect(f.methods.liveAudio).toHaveBeenCalledTimes(3));
+	expect(
+		f.methods.liveAudio.mock.calls.slice(1).map((call) => atob(call[2])),
+	).toEqual([frames[0]! + frames[1]!, frames[2]]);
+});
 test("a session refused by the provider closes the already granted microphone", async () => {
 	const f = fixture();
 	f.methods.liveStart.mockResolvedValueOnce({

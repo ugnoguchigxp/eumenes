@@ -1,11 +1,13 @@
 import { untilAborted } from "./guards";
 
 /** Generation admission, independent of the number of live LARM connections. */
-function lane(limit: number) {
+export function lane(limit: number, waitingLimit = Infinity) {
 	let active = 0;
 	const waiting: Array<() => void> = [];
 	return async <T>(signal: AbortSignal, use: () => Promise<T>): Promise<T> => {
 		signal.throwIfAborted();
+		if (active >= limit && waiting.length >= waitingLimit)
+			throw new Error("larm_queue_full");
 		let admitted = false;
 		let wake!: () => void;
 		const turn = new Promise<void>((resolve) => {

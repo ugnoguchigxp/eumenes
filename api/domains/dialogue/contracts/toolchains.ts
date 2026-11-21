@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import type { RouterCard } from "eumenes_router/sqlite";
 import type {
 	FixedDefinition,
 	ToolchainCard,
@@ -12,11 +11,6 @@ import type {
 	SelectionCandidate,
 	SelectionDecision,
 	SelectionOutcome,
-	NearFeedback,
-	RouterFeedbackSource,
-	RouterFeedbackState,
-	RouterTrace,
-	RouterTraceRecord,
 } from "../../toolchain-history";
 
 export type QueryVector = { space: VectorSpace; vector: number[] };
@@ -48,7 +42,7 @@ export interface ToolchainRoutingPort {
 		db: Database,
 		revisionId: string,
 	): import("../../tool-runtime").TaskLifecyclePort | undefined;
-	/** A query embedding of the request, or undefined when the provider is unavailable or slow. */
+	/** A query embedding of the request, or undefined when embedding is disabled. */
 	embedQuery(
 		text: string,
 		signal: AbortSignal,
@@ -127,80 +121,6 @@ export interface ToolchainRoutingPort {
 		db: Database,
 		toolchainRevisionId: string,
 	): import("./specialist").SpecialistSet;
-	/** The router's trace of one request turn (spec toolchain-router-redesign §5.3); a later write of the run replaces it. */
-	recordRouterTraceInTransaction?(
-		db: Database,
-		input: {
-			runId: string;
-			conversationId: string;
-			messageId: string;
-			/** Every message the text was made from (the turn's own, an asked request's): a forget of any removes it. */
-			messageIds: readonly string[];
-			text: string;
-			query: QueryVector | null;
-			trace: RouterTrace;
-		},
-	): void;
-	/** The work (TODO) the routed turn handed over, for a correction of it in the next turn. */
-	linkRouterWorkInTransaction?(
-		db: Database,
-		runId: string,
-		workId: string,
-	): void;
-	/** The conversation's newest trace, made at `since` or later, whatever it decided (a question back decided nothing). */
-	latestRouterTraceInTransaction?(
-		db: Database,
-		input: { conversationId: string; since: number },
-	): RouterTraceRecord | null;
-	/** A user's correction (§5.2): for an utterance like `text`, `rightId` and not `wrongId`. */
-	recordRouterFeedbackInTransaction?(
-		db: Database,
-		input: {
-			conversationId: string;
-			messageId: string;
-			/** The messages of the traced utterance (its record's `messageIds`). */
-			messageIds: readonly string[];
-			runId: string;
-			source: RouterFeedbackSource;
-			text: string;
-			query: QueryVector;
-			wrongId: string | null;
-			rightId: string;
-		},
-	): string;
-	/** A correction's state (a conflict found while routing takes it out of use and onto the review list). */
-	setRouterFeedbackStateInTransaction?(
-		db: Database,
-		id: string,
-		state: RouterFeedbackState,
-	): boolean;
-	/** The active corrections at least `threshold` similar to the vector, nearest first. */
-	nearRouterFeedbackInTransaction?(
-		db: Database,
-		input: QueryVector & { threshold: number; limit?: number },
-	): NearFeedback[];
-	/**
-	 * The router package (spec router-package-integration 2026-11-04 §1): its embedding of what it routes (passages,
-	 * as its cards and memory were made; a failure is thrown), its synced cards with their vectors in a space, its
-	 * lexical index, and best-v2 with the memory of a space (null until the memory is imported).
-	 */
-	embedRouter?(
-		texts: readonly string[],
-		signal: AbortSignal,
-	): Promise<{ space: VectorSpace; vectors: number[][] }>;
-	routerCardsInTransaction?(
-		db: Database,
-		input: { space: VectorSpace; available: (id: string) => boolean },
-	): RouterCard[];
-	routerLexicalInTransaction?(
-		db: Database,
-		text: string,
-	): ReadonlyMap<string, number>;
-	/** The titles of these toolchains and read tools (those that are active), by id. */
-	titlesInTransaction?(
-		db: Database,
-		ids: readonly string[],
-	): ReadonlyMap<string, string>;
 	recordSelectionInTransaction(
 		db: Database,
 		input: {

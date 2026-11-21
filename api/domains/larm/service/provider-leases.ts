@@ -16,6 +16,7 @@ import { acquireProvider } from "./acquire-provider";
 import { createProfileRetention, repeatProfile } from "./profile-retention";
 import { createWithProvider } from "./with-provider";
 import { callerAborted, untilAborted } from "./guards";
+import { EMBEDDING_SELECTOR } from "./embedding-contract";
 const log = getLogger("larm");
 
 type Options = {
@@ -31,6 +32,7 @@ type Options = {
 	hostsFor: () => ProviderHosts;
 	control: Control;
 	lifetime: AbortController;
+	embeddingOnly?: boolean;
 };
 
 /** LARM identifies different Provider scopes as different Connections, even for the same client. */
@@ -40,6 +42,7 @@ export function createProviderLeases(options: Options) {
 		keepAlive: options.llmConnection === false ? false : options.keepAlive,
 	});
 	let voice: ReturnType<typeof createScope> | undefined;
+	let embedding: ReturnType<typeof createScope> | undefined;
 	let retained = false;
 	let closed = false;
 	const status = (): LarmStatus => {
@@ -100,6 +103,32 @@ export function createProviderLeases(options: Options) {
 		) {
 			if (name === "llm" && options.llmConnection === false)
 				throw new Error("larm_agent_identity_required");
+			if (name === "embedding") {
+				if (closed) throw new Error("larm_closed");
+				const shared = voice?.current();
+				if (
+					shared?.catalogProviders?.some((p) => p.name === name) &&
+					(!shared.request.providers || shared.request.providers.includes(name))
+				) {
+					try {
+						return await voice!.withProvider(name, signal, use);
+					} catch (error) {
+						if (
+							!(error instanceof Error) ||
+							error.message !== "embedding_scope_unavailable"
+						)
+							throw error;
+					}
+				}
+				embedding ??= createScope({
+					...options,
+					profile: EMBEDDING_SELECTOR,
+					client: `eumenes-embedding-${crypto.randomUUID()}`,
+					keepAlive: false,
+					embeddingOnly: true,
+				});
+				return embedding.withProvider(name, signal, use);
+			}
 			return (name === "llm" ? main : speech()).withProvider(name, signal, use);
 		},
 		current(name?: ProviderName) {
@@ -121,6 +150,7 @@ export function createProviderLeases(options: Options) {
 			await Promise.all([
 				main.close(beforeRelease, keepConnection),
 				voice?.close(async () => {}, keepConnection),
+				embedding?.close(async () => {}),
 			]);
 			changes.close();
 		},
@@ -140,6 +170,7 @@ function createScope({
 	control,
 	lifetime,
 	llmConnection,
+	embeddingOnly,
 }: Options) {
 	let lease: Lease | undefined;
 	let creating: Promise<Lease> | undefined;
@@ -184,8 +215,10 @@ function createScope({
 		if (retained) return;
 		current.idleTimer = setTimeout(
 			() => {
-				if (lease === current && !current.useCount && !pending.size)
-					discard(current);
+				if (lease === current && !current.useCount && !pending.size) {
+					if (embeddingOnly) void release(current);
+					else discard(current);
+				}
 			},
 			Math.max(0, current.idleAt - Date.now()),
 		);
@@ -226,6 +259,7 @@ function createScope({
 					audience,
 					idleTimeoutMs,
 					excludeLlm: llmConnection === false,
+					embeddingOnly,
 					lifetime: lifetime.signal,
 				},
 				crypto.randomUUID(),
@@ -269,6 +303,13 @@ function createScope({
 			discard(lease);
 		const work = (async () => {
 			for (let attempt = 0; ; attempt++) {
+				if (
+					required.length === 1 &&
+					required[0] === "embedding" &&
+					!embeddingOnly &&
+					(!lease || lease.closing)
+				)
+					throw new Error("embedding_scope_unavailable");
 				const current = await getLease(signal);
 				try {
 					for (const name of required) {

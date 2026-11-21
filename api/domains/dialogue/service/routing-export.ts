@@ -1,7 +1,6 @@
 import type { Database } from "bun:sqlite";
-import { cardDigest, type Card } from "eumenes_router";
+import { CONVERSATION_ID, MEMORY_ID } from "eumenes_router";
 import { systemContext } from "../../../infrastructure/system-context";
-import { CONVERSATION_ID, MEMORY_ID } from "./routed-route";
 
 /** The kinds of what a run refers to: the resource it was viewing and the resources its message carries. */
 function resourceKindsOf(
@@ -23,26 +22,6 @@ function resourceKindsOf(
 				run.input_message_id,
 			) as Array<{ kind: string }>
 	).map((row) => row.kind);
-}
-
-/**
- * The kind of the resource a run's utterance refers to, as the router package's evaluation data gave it (the first of
- * the run's resource kinds); null when it refers to none.
- */
-export function referencedKindInTransaction(
-	db: Database,
-	runId: string,
-): string | null {
-	const run = db
-		.query(
-			"SELECT conversation_id,input_message_id,viewing_resource FROM dialogue_runs WHERE id=?",
-		)
-		.get(runId) as {
-		conversation_id: string;
-		input_message_id: string;
-		viewing_resource: string | null;
-	} | null;
-	return run ? (resourceKindsOf(db, run)[0] ?? null) : null;
 }
 
 export function routingExportRuns(db: Database, since: number) {
@@ -95,30 +74,4 @@ export function routingExportFixedCards() {
 		embeddingPassages: null,
 		routerText: text,
 	}));
-}
-
-/**
- * The conversation's and a memory request's cards for the router package (spec router-package-integration 2026-11-04
- * §1 #7), as its evaluation data had them: named by their id, described by the router's sentences.
- */
-export function routerFixedCards(): Card[] {
-	return [
-		[CONVERSATION_ID, "dialogue.contexts.local.router-conversation"],
-		[MEMORY_ID, "dialogue.contexts.local.memory-request"],
-	].map(([id, key]) => {
-		const body = {
-			id: id!,
-			revision: "1",
-			kind: "general" as const,
-			title: id!,
-			summary: systemContext(
-				key as "dialogue.contexts.local.memory-request",
-				{},
-			),
-			useWhen: [],
-			examples: [],
-			impact: "none" as const,
-		};
-		return { ...body, digest: cardDigest(body) };
-	});
 }

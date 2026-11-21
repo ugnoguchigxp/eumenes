@@ -180,18 +180,23 @@ export async function runCodex(
 				: "");
 	const outputSchema = tools ? codexChoiceSchema(tools) : call.outputSchema;
 	let streamed = "";
+	let completed: CloudAgentResult | undefined;
+	const replyFor = (text: string) => {
+		if (completed) return completed;
+		const final = checkedText(text);
+		completed = tools ? codexChoice(final, tools) : { text: final };
+		return completed;
+	};
 	const result = await host.run(
 		// Without a key the CLI keeps its own login; a key binds the saved API host.
 		{ credential: call.credential, baseUrl: call.baseUrl },
 		{
 			...(call.attemptId ? { attemptId: call.attemptId } : {}),
 			...(call.connectionId ? { connectionId: call.connectionId } : {}),
+			requestId: call.requestId,
 			model: call.model,
 			instructions,
-			messages: body.map((message) => ({
-				digest: messageDigest(message),
-				assistant: message.role === "assistant",
-			})),
+			messages: body.map(messageDigest),
 			input: (from) =>
 				from === 0 ? { prompt, images } : appendParts(body.slice(from)),
 			...(call.observeInput
@@ -219,14 +224,28 @@ export async function runCodex(
 			...(outputSchema ? { outputSchema } : {}),
 			signal: call.signal,
 			onUsage: call.onUsage,
-			// A function call is answered by the host in a call that continues this one.
-			...(tools
+			...(call.requestId
 				? {
-						awaitsMore: (text: string) => {
+						completedReply: (text: string) => {
 							try {
-								return Boolean(codexChoice(text, tools).toolCalls);
+								const reply = replyFor(text);
+								if (!reply.toolCalls && !reply.text.trim()) return;
+								// Use the reply's actual call IDs, including those generated for Codex's JSON choice.
+								return {
+									digest: messageDigest({
+										role: "assistant",
+										content: reply.text,
+										tool_calls: reply.toolCalls?.map((tool) => ({
+											id: tool.id,
+											type: "function" as const,
+											function: { name: tool.name, arguments: tool.arguments },
+										})),
+									}),
+									awaitsMore: !!reply.toolCalls,
+								};
 							} catch {
-								return false;
+								// Invalid output is reported below and cannot justify appending to this thread.
+								return;
 							}
 						},
 					}
@@ -242,8 +261,7 @@ export async function runCodex(
 		},
 	);
 	call.signal.throwIfAborted();
-	const final = checkedText(result.text);
-	const choice = tools ? codexChoice(final, tools) : { text: final };
+	const choice = replyFor(result.text);
 	if (!choice.toolCalls && !choice.text.trim()) throw fail("empty_output");
 	// Deliver whatever the stream did not cover (no deltas, or a final tail).
 	if (

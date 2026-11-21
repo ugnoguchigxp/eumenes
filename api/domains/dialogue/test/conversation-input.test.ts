@@ -39,7 +39,7 @@ const said = (
 	notice: null,
 });
 
-test("the recent conversation starts with the agent, leaves out what waits for an answer, and joins a side's run", () => {
+test("the recent conversation keeps its opening, excludes pending input, and joins a side's run", () => {
 	seq = 0;
 	const all = [
 		said("user", "最初"),
@@ -50,15 +50,19 @@ test("the recent conversation starts with the agent, leaves out what waits for a
 	];
 	const recent = recentUtterances(all, new Set(["pending"]));
 	expect(recent.map((u) => u.text)).toEqual([
+		"最初",
 		"作りますね",
 		"できました",
 		"はい",
 	]);
 	expect(recentMessages(recent)).toEqual([
+		{ role: "user", content: "最初" },
 		{ role: "assistant", content: "作りますね\nできました" },
 		{ role: "user", content: "はい" },
 	]);
-	expect(recentUtterances([said("user", "だけ")], new Set())).toEqual([]);
+	expect(
+		recentUtterances([said("user", "だけ")], new Set()).map((u) => u.text),
+	).toEqual(["だけ"]);
 });
 
 test("an utterance is cut at its bound, and its data can not open a heading", () => {

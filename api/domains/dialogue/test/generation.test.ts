@@ -28,7 +28,13 @@ test("an utterance is answered with plain text: the said events, a full delivery
 	expect(call.messages[1]!.content).toStartWith("## State\n今: ");
 	expect(call.messages[1]!.content).toEndWith("\n\n## User\nやあ");
 	// The talk turn offers only the read tools this host has (no memory or agents here).
-	expect(call.tools).toEqual(["read_history", "read_runs"]);
+	expect(call.tools).toEqual([
+		"read_history",
+		"read_runs",
+		"memory",
+		"find_toolchain",
+		"delegate",
+	]);
 	const log = h.log();
 	expect(log.map((e) => [e.type, e.by, h!.fields(e).action ?? null])).toEqual([
 		["said", "user", null],
@@ -52,17 +58,29 @@ test("a model call that fails fails the run; its utterance joins the log unanswe
 	h.state.steps.push(...reply("こんばんは。"));
 	const run = await h.say("今日は寒いね");
 	expect(h.dialogue.answerText(run.id)).toBe("こんばんは。");
-	// Only the new utterance is the user's; the failed one was handled unanswered and is no longer asked again.
+	// The failed turn remains in history and only the new utterance is the current request.
 	const last = h.state.calls.at(-1)!.messages;
 	expect(last.at(-1)!.content).toEndWith("## User\n今日は寒いね");
-	expect(last.at(-1)!.content).not.toContain("こんばんは\n");
+	expect(last.at(-1)!.content).toContain(
+		"## Earlier\n\nこんばんは\n\n## State",
+	);
+	expect(h.state.searchSlots).toHaveLength(0);
 });
 
-test("choices the host cannot carry out twice leave the host's words and a rejected selection; nothing is handed over", async () => {
+test("invalid instant arguments leave a rejected selection without handing work over", async () => {
 	h = await setup();
 	h.state.steps.push(
+		{ calls: [{ name: "find_toolchain", args: { query: "東京の時刻" } }] },
+		{
+			calls: [
+				{
+					name: "delegate",
+					args: { toolchain: INSTANT.id, request: "東京の時刻" },
+				},
+			],
+		},
 		choice({ choice: INSTANT.id, inputs: {} }),
-		choice({ choice: INSTANT.id, inputs: {} }),
+		{ text: "うまく頼めませんでした。もう一度言ってもらえますか。" },
 	);
 	const run = await h.say("東京は今何時？");
 	expect(run.status).toBe("completed");
@@ -97,8 +115,8 @@ test("a delegation is announced, opens a TODO and hands the run over; the finish
 	const waiting = await h.say("猫の絵を描いて", "queued");
 	expect(waiting.announcement).toBe("「画像」に頼みます。");
 	const [todo] = h.todos();
-	// The work is titled by the user's words (the router hands those over, not a model's request).
-	expect(todo).toMatchObject({ status: "todo", title: "猫の絵を描いて" });
+	// The work keeps the request the conversation agent wrote.
+	expect(todo).toMatchObject({ status: "todo", title: "猫の絵" });
 	const types = h
 		.log()
 		.map((e) => [
@@ -204,13 +222,12 @@ test("a change needs a confirmation first; the approval executes the saved reque
 	expect(h.todos()).toEqual([]);
 	h.state.steps.push(choice({ choice: "approve", confirmation: "c1" }));
 	const approved = await h.say("お願い", "queued");
-	// The router was offered the open confirmation under the number the approval names, and no model was called.
-	expect(h.state.routerAsked.at(-1)!.criteria.map((c) => c.name)).toEqual(
-		expect.arrayContaining(["c1.approve", "c1.decline"]),
+	expect(h.state.calls.at(-1)!.tools).toEqual(
+		expect.arrayContaining(["approve_confirmation", "decline_confirmation"]),
 	);
 	expect(approved.announcement).toBeTruthy();
 	expect(h.todos()[0]).toMatchObject({
-		title: "壁紙を差し替えて",
+		title: "壁紙を差し替える",
 		status: "todo",
 	});
 	// A confirmation is used once.
@@ -235,7 +252,7 @@ test("a memory request goes to the steward with the user's message as its source
 		}),
 	);
 	const run = await h.say("辛い物が好きって覚えて");
-	expect(h.dialogue.answerText(run.id)).toBe("承知しました。");
+	expect(h.dialogue.answerText(run.id)).toBe("覚えておきます。");
 	expect(h.state.stewardRequests).toEqual([
 		expect.objectContaining({
 			kind: "remember",

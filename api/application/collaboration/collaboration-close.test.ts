@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { configureLogging } from "../../infrastructure/logger";
 import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
-import { harness } from "../toolchain/toolchain.fixture";
+import { legacyTaskHarness as harness } from "./legacy-task.fixture";
 
 type Host = Awaited<ReturnType<typeof harness>>;
 const draftRequest = "タイマーの手順を一緒に組み立てて";

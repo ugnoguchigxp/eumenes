@@ -9,7 +9,7 @@ let h: Harness | undefined;
 
 /** A reply that repeats a line of the talk turn's system part (its Facts rule), after words of its own. */
 const COPIED =
-	"曲を生成します。: 文章・ページ・画面・コードなどの制作物は、この返事では書きません。";
+	"曲を生成します。: 制作や外部操作の依頼は、必要な道具が提示されていれば担当へ引き継ぎます。";
 
 afterEach(async () => {
 	await h?.close();

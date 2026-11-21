@@ -42,7 +42,7 @@ afterEach(async () => {
 });
 
 const noRequests = { userMessageInTransaction: () => null };
-const REVISION = "toolchain:browser.capture@8";
+const REVISION = "toolchain:browser.capture@9";
 const BINDING = "binding:browser.capture@6";
 const conversation: AdapterOrigin = {
 	kind: "conversation",
@@ -213,7 +213,7 @@ test("the active router descriptions distinguish opening a link from taking a sc
 	const operate = cards.find((card) => card.id === "browser.operate")!;
 	const capture = cards.find((card) => card.id === "browser.capture")!;
 	expect(operate.revision).toBe("12");
-	expect(capture.revision).toBe("8");
+	expect(capture.revision).toBe("9");
 	expect(cardPassages(operate).join("\n")).toContain("このURLを開いて");
 	expect(cardPassages(operate).join("\n")).toContain(
 		"このリンクをブラウザで開いて",

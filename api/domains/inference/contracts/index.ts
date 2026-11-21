@@ -306,15 +306,6 @@ export interface InferencePort {
 		onDelta: (text: string) => void,
 	): Promise<string>;
 	answer(messages: Messages, signal: AbortSignal): Promise<string>;
-	/**
-	 * The router of the saved router profile, on its own LARM connection (spec toolchain-router-redesign §3.2): it
-	 * throws when the router is off or unconfigured or failed, and the caller keeps the turn going without it.
-	 */
-	routerSelectionAvailable?(): boolean;
-	selectRouter?(
-		prompt: Parameters<import("eumenes_router").Analyze>[0],
-		signal: AbortSignal,
-	): Promise<string>;
 	transcribe(wav: Uint8Array, signal: AbortSignal): Promise<string>;
 	speak(
 		text: string,

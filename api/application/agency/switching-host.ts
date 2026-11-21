@@ -66,8 +66,7 @@ export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
 		conversationAgent: {
 			system: () =>
 				agencyReplyParts(deps.settings.get().agency, agendaReady(deps)),
-			// As the agenda's rules in the system above: they say how to look for a toolchain and hand work over.
-			handsWork: () => agendaReady(deps),
+			handsWork: () => current.conversationAgent.handsWork?.() ?? false,
 			respond: (
 				...args: Parameters<typeof current.conversationAgent.respond>
 			) => current.conversationAgent.respond(...args),

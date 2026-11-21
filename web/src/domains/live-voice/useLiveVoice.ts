@@ -10,6 +10,39 @@ import {
 import type { Settings } from "../../../../api/domains/settings/contracts";
 import { createLivePcm } from "../audio";
 import { describeError } from "../../errorMessages";
+import { createLiveAudioUpload } from "./audio-upload";
+
+type LiveRuntime = {
+	id: string;
+	ready: boolean;
+	stopping: boolean;
+	controller: AbortController;
+	audio: Awaited<ReturnType<typeof createLivePcm>>;
+	upload: ReturnType<typeof createLiveAudioUpload>;
+	output: number;
+};
+
+function stopMedia(runtime: LiveRuntime) {
+	if (runtime.stopping) return;
+	runtime.stopping = true;
+	runtime.ready = false;
+	runtime.upload.stop();
+	runtime.audio.close();
+}
+
+function keepTerminalState(
+	previous: LiveSnapshot | null | undefined,
+	next: LiveSnapshot | null,
+) {
+	if (
+		previous &&
+		next?.id === previous.id &&
+		!activeStatuses.includes(previous.status) &&
+		activeStatuses.includes(next.status)
+	)
+		return previous;
+	return next;
+}
 
 export function useLiveVoice(
 	client: EumenesClient,
@@ -21,7 +54,13 @@ export function useLiveVoice(
 	const queryKey = ["live-voice", client.identity, "main"];
 	const current = useQuery({
 		queryKey,
-		queryFn: () => client.liveCurrent("main"),
+		queryFn: async () => {
+			const latest = await client.liveCurrent("main");
+			return keepTerminalState(
+				cache.getQueryData<LiveSnapshot | null>(queryKey),
+				latest,
+			);
+		},
 		enabled,
 		retry: false,
 		staleTime: Infinity,
@@ -34,47 +73,39 @@ export function useLiveVoice(
 	const session = current.data ?? null;
 	const setSession = useCallback(
 		(value: LiveSnapshot | null) =>
-			cache.setQueryData(["live-voice", client.identity, "main"], value),
+			cache.setQueryData<LiveSnapshot | null>(
+				["live-voice", client.identity, "main"],
+				(previous) => keepTerminalState(previous, value),
+			),
 		[cache, client.identity],
 	);
 	const [error, setError] = useState<string | null>(null);
 	const [playing, setPlaying] = useState(false);
 	const [busy, setBusy] = useState(false);
-	const runtime = useRef<{
-		id: string;
-		ready: boolean;
-		controller: AbortController;
-		audio: Awaited<ReturnType<typeof createLivePcm>>;
-		tail: Promise<void>;
-		pending: number;
-		sequence: number;
-		output: number;
-	} | null>(null);
+	const runtime = useRef<LiveRuntime | null>(null);
 	const stopRef = useRef<() => Promise<void>>(async () => {});
 	useEffect(
 		() => () => {
 			const old = runtime.current;
 			runtime.current = null;
-			old?.audio.close();
-			old?.controller.abort();
-			if (old)
+			if (old) {
+				stopMedia(old);
+				old.controller.abort();
 				void client
 					.liveStop(old.id)
 					.then((value) => {
 						if (value) setSession(value);
 					})
 					.catch(() => {});
+			}
 		},
 		[client, setSession],
 	);
 	const stop = useCallback(async () => {
 		const old = runtime.current;
 		const id = old?.id ?? session?.id;
-		if (old) {
-			old.ready = false;
-			old.audio.close();
-		}
-		if (!id) return;
+		if (!id || old?.stopping || session?.status === "closing") return;
+		if (old) stopMedia(old);
 		setBusy(true);
 		try {
 			const value = await client.liveStop(id);
@@ -120,31 +151,13 @@ export function useLiveVoice(
 					muted: !settings.live.startWithMicrophone,
 					onPlaying: setPlaying,
 					onError: () => {
+						if (runtime.current?.stopping) return;
 						setError("マイクの接続が切れました。");
 						void stopRef.current();
 					},
 					onInput: (chunk) => {
 						const rt = runtime.current;
-						if (!rt || !rt.ready || rt.controller.signal.aborted) return;
-						if (++rt.pending > 25) {
-							setError("音声の送信が追いつかないため停止します。");
-							void stopRef.current();
-							return;
-						}
-						const sequence = ++rt.sequence;
-						rt.tail = rt.tail
-							.then(() =>
-								client.liveAudio(rt.id, sequence, chunk, rt.controller.signal),
-							)
-							.catch(() => {
-								if (!rt.controller.signal.aborted) {
-									setError("音声の接続が切れました。");
-									void stopRef.current();
-								}
-							})
-							.finally(() => {
-								rt.pending--;
-							});
+						if (rt?.ready) rt.upload.push(chunk);
 					},
 				});
 				const created = await client.liveStart(
@@ -156,14 +169,25 @@ export function useLiveVoice(
 				setSession(created);
 				if (!activeStatuses.includes(created.status))
 					throw new Error(created.error ?? "live_connect_failed");
-				const rt = {
+				const rt: LiveRuntime = {
 					id: created.id,
 					ready: false,
+					stopping: false,
 					audio,
 					controller: new AbortController(),
-					tail: Promise.resolve(),
-					pending: 0,
-					sequence: 0,
+					upload: createLiveAudioUpload(
+						(sequence, chunk, signal) =>
+							client.liveAudio(created.id, sequence, chunk, signal),
+						(reason) => {
+							if (runtime.current !== rt || rt.stopping) return;
+							setError(
+								reason === "backpressure"
+									? "音声の送信が追いつかないため停止します。"
+									: "音声の接続が切れました。",
+							);
+							void stopRef.current();
+						},
+					),
 					output: 0,
 				};
 				runtime.current = rt;
@@ -173,40 +197,44 @@ export function useLiveVoice(
 					maxFrame: 1_000_000,
 					connectMs: 10000,
 					onEvent: (event) => {
+						if (runtime.current !== rt) return true;
 						if (!event.data) return;
 						const value = parseLiveEvent(JSON.parse(event.data));
 						if (value.type === "audio") {
-							if (value.sequence <= rt.output) return;
+							if (rt.stopping || value.sequence <= rt.output) return;
 							rt.output = value.sequence;
 							rt.audio.play(value.audio);
 							return;
 						}
 						setSession(value.state);
-						rt.ready = value.state.status === "active";
-						rt.audio.mute(value.state.muted || value.state.status !== "active");
 						if (value.state.error) setError(describeError(value.state.error));
 						if (!activeStatuses.includes(value.state.status)) {
-							rt.audio.close();
+							stopMedia(rt);
 							runtime.current = null;
 							return true;
 						}
+						if (value.state.status === "closing") {
+							stopMedia(rt);
+						} else if (!rt.stopping) {
+							rt.ready = value.state.status === "active";
+							rt.audio.mute(value.state.muted || !rt.ready);
+						}
 					},
 				})
-					.catch(() => {
-						if (!rt.controller.signal.aborted)
-							setError("音声会話の接続が切れました。");
-					})
+					.catch(() => {})
 					.finally(() => {
-						rt.audio.close();
-						if (runtime.current === rt) {
-							runtime.current = null;
-							void client
-								.liveStop(rt.id)
-								.then((v) => {
-									if (v) setSession(v);
-								})
-								.catch(() => {});
-						}
+						if (runtime.current !== rt) return;
+						const disconnected = !rt.stopping && !rt.controller.signal.aborted;
+						stopMedia(rt);
+						runtime.current = null;
+						if (!disconnected) return;
+						setError("音声会話の接続が切れました。");
+						void client
+							.liveStop(rt.id)
+							.then((v) => {
+								if (v) setSession(v);
+							})
+							.catch(() => {});
 					});
 			} catch (e) {
 				audio?.close();

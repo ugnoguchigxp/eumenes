@@ -1,7 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import {
-	READ_TOOLS,
 	artifactDefinitionV1,
 	toolchainRuntimeOf,
 	type AgentV1,
@@ -132,8 +131,6 @@ export function createToolchainRouting(
 	schemas: SchemaProvider,
 	/** World is usable now; without it the World investigation is never offered. */
 	worldAvailable?: (db: Database) => boolean,
-	/** The router package's embedding of what it routes (spec router-package-integration 2026-11-04 §1 #5). */
-	embedRouter?: ToolchainRoutingPort["embedRouter"],
 ): ToolchainRoutingPort {
 	/** An adapter's availability does not depend on the toolchain bound to it: asked once per adapter in a pass. */
 	const adapterAvailability = perPass(() => new Map<string, boolean>());
@@ -365,30 +362,6 @@ export function createToolchainRouting(
 		bound,
 		instantInTransaction: instant.run,
 		recordSelectionInTransaction: history.recordSelectionInTransaction,
-		// The router's traces and the user's corrections (spec toolchain-router-redesign 2026-11-01 §5.3).
-		recordRouterTraceInTransaction: history.recordRouterTraceInTransaction,
-		linkRouterWorkInTransaction: history.linkRouterWorkInTransaction,
-		latestRouterTraceInTransaction: history.latestRouterTraceInTransaction,
-		recordRouterFeedbackInTransaction:
-			history.recordRouterFeedbackInTransaction,
-		nearRouterFeedbackInTransaction: history.nearRouterFeedbackInTransaction,
-		setRouterFeedbackStateInTransaction:
-			history.setRouterFeedbackStateInTransaction,
-		// The router package's tables and its embedding (spec router-package-integration 2026-11-04 §1).
-		...(embedRouter ? { embedRouter } : {}),
-		routerCardsInTransaction: history.routerCardsInTransaction,
-		routerLexicalInTransaction: history.routerLexicalInTransaction,
-		titlesInTransaction(db, ids) {
-			const wanted = new Set(ids);
-			return new Map(
-				[
-					...capabilities
-						.toolchainsInTransaction(db)
-						.map((d) => [d.id, d.title] as const),
-					...READ_TOOLS.map((tool) => [tool.name, tool.title] as const),
-				].filter(([id]) => wanted.has(id)),
-			);
-		},
 		linkTaskInTransaction: history.linkTaskInTransaction,
 		settleSelectionInTransaction: history.settleSelectionInTransaction,
 		requestOfRunInTransaction: history.requestOfRunInTransaction,

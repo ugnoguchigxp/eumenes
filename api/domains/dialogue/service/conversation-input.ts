@@ -105,29 +105,22 @@ export function memoryLines(items: readonly ProfileItem[]): {
 const tokensOf = (utterances: readonly Utterance[]) =>
 	utterances.reduce((sum, u) => sum + estimateTextTokens(u.text), 0);
 
-/** The utterances the recent conversation shows: from the agent's first one, those not waiting for an answer. */
+/** The recent utterances in the configured window, excluding pending user input. */
 export function recentUtterances(
 	after: readonly Utterance[],
 	pending: ReadonlySet<string>,
 	users?: number,
-	/** The conversation's opening words are kept even when they are the user's (the agency serves the replies). */
-	keepOpening = false,
 ): Utterance[] {
 	const shown = after.filter(
 		(u) => !(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
 	);
-	// A harness that keeps the last few of the user's utterances starts after the one before them: at the agent's
-	// reply to it, so the recent conversation still opens with the agent's words and `## Memory` stays a message of
-	// its own, the same from turn to turn (the cached prefix).
+	// A bounded window starts after the user utterance preceding the ones it retains.
 	let from = 0;
 	if (users !== undefined) {
 		const asked = shown.flatMap((u, i) => (u.speaker === "user" ? [i] : []));
 		if (asked.length > users) from = asked[asked.length - users - 1]! + 1;
 	}
-	const kept = shown.slice(from);
-	if (keepOpening && from === 0 && kept.length) return kept;
-	const start = kept.findIndex((u) => u.speaker === "agent");
-	return start < 0 ? [] : kept.slice(start);
+	return shown.slice(from);
 }
 
 /**
@@ -380,10 +373,7 @@ export type ConversationPrefix = {
 	memoryItemIds: string[];
 	/** `## Memory` as this prefix shows it, when it shows any item (a routed turn's choice reads the same). */
 	memory: string | null;
-	/**
-	 * The user's words before the pending ones, after the cut, as many as the window keeps (`history.users`): the
-	 * window opens at an agent's words and may leave the first of them out, a routed turn's choice reads them all.
-	 */
+	/** The user utterances from the window for argument extraction. */
 	earlier: string[];
 };
 
@@ -462,17 +452,7 @@ export function conversationPrefixFrom(
 		});
 	const serves =
 		deps.agency?.servesRepliesInTransaction?.(tx, conversationId) ?? false;
-	// A cut that moved starts at the agent's words as before; the opening of a conversation keeps its first words.
-	const recent = recentUtterances(
-		after,
-		input.pending,
-		history.users,
-		serves && (cut?.seq ?? 0) === 0,
-	);
-	const said = after.filter(
-		(u) =>
-			u.speaker === "user" && !(u.messageId && input.pending.has(u.messageId)),
-	);
+	const recent = recentUtterances(after, input.pending, history.users);
 	const profile = (input.window?.profile.items ?? []).filter((item) => {
 		if (!deps.agency?.isCurrentInputInTransaction) return true;
 		const source = deps.memory?.referenceInputs.captureInTransaction(tx, {
@@ -533,12 +513,12 @@ export function conversationPrefixFrom(
 		if (!lines.length) markInput(memoryFrame, { kind: "memory" });
 	}
 	if (memory && conversation.length) {
-		// A conversation that opens with the user's words carries `## Memory` in that first message.
+		// Keep Memory separate from the opening history inside the same user message.
 		if (conversation[0]!.role === "user") {
-			const first = conversation[0]!;
-			conversation[0] = input.traceInput
-				? prependInput(first, memoryFrame)
-				: { ...first, content: `${memory}\n\n${first.content}` };
+			const earlier = prependInput(conversation[0]!, {
+				content: INPUT_HEADINGS.earlier,
+			});
+			conversation[0] = prependInput(earlier, memoryFrame);
 		} else messages.push(memoryFrame);
 	}
 	messages.push(...conversation);
@@ -571,10 +551,7 @@ export function conversationPrefixFrom(
 				: null,
 		memoryItemIds: ids,
 		memory: lines.length ? memory : null,
-		earlier: (history.users === undefined
-			? said
-			: said.slice(-history.users)
-		).map((u) => u.text),
+		earlier: recent.filter((u) => u.speaker === "user").map((u) => u.text),
 	};
 }
 

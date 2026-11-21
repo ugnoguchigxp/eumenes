@@ -2,7 +2,6 @@ export type { GeneratedImagePort } from "./service/generated-images";
 export {
 	routingExportRuns,
 	routingExportFixedCards,
-	routerFixedCards,
 } from "./service/routing-export";
 export { registerDialogue, registerCommandInteractions } from "./controller";
 export { /** @public */ migration } from "./repository";

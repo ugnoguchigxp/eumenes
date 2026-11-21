@@ -15,7 +15,7 @@ const vectorOf = (text: string) =>
 		: text.includes("北海道")
 			? [0, 1, 0]
 			: [0, 0, 1];
-function fakeEmbed() {
+function fakeEmbed(space = SPACE) {
 	const state = {
 		calls: [] as Array<{ texts: string[]; type: "query" | "passage" }>,
 		mode: "ok" as "ok" | "throw" | "short",
@@ -26,7 +26,7 @@ function fakeEmbed() {
 		const vectors = texts.map(vectorOf);
 		return {
 			vectors: state.mode === "short" ? vectors.slice(1) : vectors,
-			space: SPACE,
+			space,
 		};
 	};
 	return { state, embed };
@@ -34,6 +34,42 @@ function fakeEmbed() {
 const open: MemoryHarness[] = [];
 afterEach(async () => {
 	for (const h of open.splice(0)) await h.close();
+});
+
+test("rebuilds a legacy vector from the whole message and recalls its tail only in the new space", async () => {
+	const space = { ...SPACE, embeddingSpace: { tokenizerDigest: "current" } };
+	const e = fakeEmbed(space);
+	const h = await setup(e.embed);
+	const text = "あ".repeat(1600) + "京都で待ち合わせ";
+	const messageId = await h.say("user", text);
+	await h.store.write((db) =>
+		h.memory.vectors.saveTurnVectors(
+			db,
+			{
+				conversationId: "c1",
+				digests: { [messageId]: sha256Hex(text) },
+			},
+			{ space: SPACE, items: [{ messageId, vector: [0, 0, 1] }] },
+		),
+	);
+	const recall = (current: MemoryVectorSpace) =>
+		h.store.read((db) =>
+			h.memory.recallTurnsInRead(db, {
+				conversationId: "c1",
+				vector: [1, 0, 0],
+				space: current,
+				limit: 1,
+				minScore: 0.8,
+			}),
+		);
+	expect(recall(space)).toBeNull();
+	expect(await h.memory.vectors.refreshTurns(space, signal())).toBe(1);
+	expect(e.state.calls[0]?.texts.join("")).toBe(text);
+	expect(recall(space)?.pins.map((pin) => pin.messageId)).toEqual([messageId]);
+	expect(
+		recall({ ...space, embeddingSpace: { tokenizerDigest: "other" } }),
+	).toBeNull();
+	expect(await h.memory.vectors.refreshTurns(space, signal())).toBe(0);
 });
 async function setup(embed?: MemoryEmbed) {
 	const h = await setupMemory(embed ? { embed } : {});
@@ -51,7 +87,7 @@ const rows = (h: MemoryHarness) =>
 				.all() as Array<{ messageId: string; digest: string }>,
 	);
 
-test("turns are embedded as passages, the query as a query; failures and a missing embedder cost only the vectors", async () => {
+test("turns are embedded as passages and failed query embeddings are reported", async () => {
 	const e = fakeEmbed();
 	const h = await setup(e.embed);
 	const turns = [
@@ -71,7 +107,9 @@ test("turns are embedded as passages, the query as a query; failures and a missi
 	for (const mode of ["throw", "short"] as const) {
 		e.state.mode = mode;
 		expect(await h.memory.vectors.embedTurns(turns, signal())).toBeNull();
-		expect(await h.memory.vectors.embedQuery("京都", signal())).toBeNull();
+		await expect(h.memory.vectors.embedQuery("京都", signal())).rejects.toThrow(
+			"embedding_",
+		);
 	}
 	const none = await setup();
 	expect(await none.memory.vectors.embedTurns(turns, signal())).toBeNull();

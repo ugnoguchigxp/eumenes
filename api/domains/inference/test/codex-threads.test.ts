@@ -33,6 +33,89 @@ const records = async (home: string) =>
 const sentText = (turn: FakeRequest) => turn.params.input[0].text as string;
 
 test.each([
+	["another answer in the same request", "request-1", "revised answer"],
+	["the same answer in another request", "request-2", "first answer"],
+	["the same answer in an unbound call", undefined, "first answer"],
+])("sends the full input for %s", async (_case, requestId, reply) => {
+	const codex = await fakeCodex();
+	try {
+		const agents = codex.agents(codex.host());
+		const question = user("same initial question");
+		await codex.behave({ text: "first answer" });
+		await agents.run(codexCall([question], { requestId: "request-1" }));
+		const observed: ModelInput[] = [];
+		await agents.run(
+			codexCall([question, assistant(reply), user("follow-up")], {
+				observeInput: (input) => void observed.push(input),
+				requestId,
+			}),
+		);
+		const sent = sentText((await codex.of("turn/start"))[1]!);
+		expect(sent).toContain(question.content);
+		expect(sent).toContain(reply);
+		expect(observed[0]?.sdk).toMatchObject({ mode: "reset", carried: 0 });
+	} finally {
+		await codex.cleanup();
+	}
+});
+
+test("sends changed tool arguments in full with the same reply text and request", async () => {
+	const codex = await fakeCodex();
+	try {
+		const agents = codex.agents(codex.host());
+		const options = {
+			requestId: "tool-request",
+			tools: [
+				{
+					type: "function" as const,
+					function: {
+						name: "lookup",
+						description: "Look up a record",
+						parameters: {},
+					},
+				},
+			],
+		};
+		const question = user("check the record");
+		await codex.behave({
+			text: JSON.stringify({
+				reply: "Checking.",
+				tool: { name: "lookup", arguments: '{"record":"first"}' },
+			}),
+		});
+		const first = await agents.run(codexCall([question], options));
+		const call = first.toolCalls![0]!;
+		await codex.behave({
+			text: JSON.stringify({ reply: "Done.", tool: null }),
+		});
+		await agents.run(
+			codexCall(
+				[
+					question,
+					{
+						...assistant(first.text),
+						tool_calls: [
+							{
+								id: call.id,
+								type: "function",
+								function: { name: call.name, arguments: '{"record":"second"}' },
+							},
+						],
+					},
+					toolResult("found", call.id),
+				],
+				options,
+			),
+		);
+		const turns = await codex.of("turn/start");
+		expect(sentText(turns[1]!)).toContain("second");
+		expect(turns[1]!.params.threadId).not.toBe(turns[0]!.params.threadId);
+	} finally {
+		await codex.cleanup();
+	}
+});
+
+test.each([
 	["completion", false],
 	["start", true],
 ] as const)(
@@ -88,20 +171,18 @@ test("a call starts a new thread, appends to one it continues, or reverts one to
 		const observeInput = (input: ModelInput) => {
 			observed.push(input);
 		};
-		await agents.run(
+		const requestId = "request-1";
+		const first = await agents.run(
 			codexCall([user("question one")], {
+				requestId,
 				attemptId: "attempt-1",
 				observeInput,
 			}),
 		);
 		await agents.run(
 			codexCall(
-				[
-					user("question one"),
-					assistant("calling a tool"),
-					toolResult("tool says"),
-				],
-				{ observeInput },
+				[user("question one"), assistant(first.text), user("more please")],
+				{ observeInput, requestId },
 			),
 		);
 		await agents.run(codexCall([user("question two")], { observeInput }));
@@ -135,9 +216,9 @@ test("a call starts a new thread, appends to one it continues, or reverts one to
 		expect(sentText(turns[0]!)).toBe("question one");
 		expect(sentText(turns[2]!)).toBe("question two");
 		expect(sentText(turns[1]!)).toContain("The context of this turn");
-		expect(sentText(turns[1]!)).toContain("tool says");
+		expect(sentText(turns[1]!)).toContain("more please");
 		expect(sentText(turns[1]!)).not.toContain("question one");
-		expect(sentText(turns[1]!)).not.toContain("calling a tool");
+		expect(sentText(turns[1]!)).not.toContain(first.text);
 	} finally {
 		await codex.cleanup();
 	}
@@ -148,30 +229,38 @@ test("a call continues a thread only when it begins with what the thread holds, 
 	const codex = await fakeCodex();
 	try {
 		const agents = codex.agents(codex.host());
-		const prime = () => agents.run(codexCall([user("question")]));
+		const requestId = "request-1";
+		const prime = () =>
+			agents.run(codexCall([user("question")], { requestId }));
 		const modes = () => events("inference.codex_thread").map((e) => e.mode);
 		await prime();
 		// A different front.
 		await agents.run(
-			codexCall([user("another"), assistant("reply"), toolResult("more")]),
+			codexCall([user("another"), assistant("answer"), user("more")], {
+				requestId,
+			}),
 		);
 		await prime();
 		// The next message is not the model's.
 		await agents.run(
-			codexCall([user("question"), user("again"), toolResult("more")]),
+			codexCall([user("question"), user("answer"), user("more")], {
+				requestId,
+			}),
 		);
 		await prime();
 		// Nothing after the model's message: it is the thread's own output, never sent.
-		await agents.run(codexCall([user("question"), assistant("reply")]));
+		await agents.run(
+			codexCall([user("question"), assistant("answer")], { requestId }),
+		);
 		await prime();
 		// A different head (the instructions) is a thread of its own.
 		await agents.run({
-			...codexCall([user("question"), assistant("reply"), toolResult("more")]),
+			...codexCall([], { requestId }),
 			messages: [
 				{ role: "system", content: "OTHER" },
 				user("question"),
-				assistant("reply"),
-				toolResult("more"),
+				assistant("answer"),
+				user("more"),
 			],
 		});
 		expect(modes()).toEqual([
@@ -375,16 +464,19 @@ test("usage is what the turn added to the thread total; a reverted thread counts
 			cacheReadTokens?: number | null;
 			outputTokens?: number | null;
 		}) => [r.inputTokens, r.cacheReadTokens, r.outputTokens];
+		const requestId = "request-1";
 		await codex.behave({ input: 1000, cached: 0, output: 10 });
-		expect(usage(await agents.run(codexCall([user("question")])))).toEqual([
-			1000, 0, 10,
-		]);
+		const first = await agents.run(
+			codexCall([user("question")], { requestId }),
+		);
+		expect(usage(first)).toEqual([1000, 0, 10]);
 		await codex.behave({ input: 1100, cached: 900, output: 20 });
 		const observed: Array<number | null> = [];
 		expect(
 			usage(
 				await agents.run(
-					codexCall([user("question"), assistant("r"), toolResult("more")], {
+					codexCall([user("question"), assistant(first.text), user("more")], {
+						requestId,
 						onUsage: (u) => observed.push(u.inputTokens),
 					}),
 				),
@@ -448,7 +540,7 @@ test("forgetting deletes idle threads at once, lets a running turn end, then sto
 	}
 });
 
-test("a thread whose answer asked for a function is left for the call that continues it; two that hold the same front are not appended to", async () => {
+test("a thread waiting for a function result is held for its matching continuation", async () => {
 	const events = capture();
 	const codex = await fakeCodex();
 	try {
@@ -466,12 +558,34 @@ test("a thread whose answer asked for a function is left for the call that conti
 				tool: { name: "look", arguments: "{}" },
 			}),
 		});
-		await agents.run(codexCall([user("one")], { tools }));
+		const requestId = "request-1";
+		const first = await agents.run(
+			codexCall([user("one")], { tools, requestId }),
+		);
+		const [call] = first.toolCalls!;
 		// Another conversation does not take the thread that waits for its function result.
-		await agents.run(codexCall([user("other")], { tools }));
+		await agents.run(
+			codexCall([user("other")], { tools, requestId: "request-2" }),
+		);
 		await codex.behave({ text: JSON.stringify({ reply: "done", tool: null }) });
 		await agents.run(
-			codexCall([user("one"), assistant(""), toolResult("found")], { tools }),
+			codexCall(
+				[
+					user("one"),
+					{
+						...assistant(first.text),
+						tool_calls: [
+							{
+								id: call!.id,
+								type: "function",
+								function: { name: call!.name, arguments: call!.arguments },
+							},
+						],
+					},
+					toolResult("found", call!.id),
+				],
+				{ tools, requestId },
+			),
 		);
 		expect(modes()).toEqual(["new", "new", "append"]);
 		// The first thread's answer asked for nothing more: the next call reverts that one, not the one still waiting.
@@ -560,6 +674,16 @@ test("the output limit is a turn's, not the process's", async () => {
 			expect(
 				(await agents.run(codexCall([user(`question ${i}`)]))).text,
 			).toHaveLength(250_000);
+		// Keep a second thread on this process. Losing the last thread legitimately stops the process.
+		await codex.behave({});
+		await agents.run(
+			codexCall([], {
+				messages: [
+					{ role: "system", content: "OTHER" },
+					user("other conversation"),
+				],
+			}),
+		);
 		await codex.behave({ deltas: 20, bytes: 250_000 });
 		await expect(agents.run(codexCall([user("question")]))).rejects.toThrow(
 			"cloud_agent_output_limit",
@@ -570,6 +694,10 @@ test("the output limit is a turn's, not the process's", async () => {
 		);
 		// One process throughout.
 		expect(await codex.of("spawn")).toHaveLength(1);
+		const turns = await codex.of("turn/start");
+		expect(
+			(await codex.of("thread/delete")).map((r) => r.params.threadId),
+		).toEqual([turns[4]!.params.threadId]);
 	} finally {
 		await codex.cleanup();
 	}

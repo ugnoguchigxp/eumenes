@@ -19,39 +19,27 @@ afterEach(async () => {
 test("the offer comes from the catalog: bound chains by adapter availability, the rest by host capability", async () => {
 	const offered = async (available: boolean) => {
 		h = await setup({ available });
-		// The selection request contains only tools available to this conversation.
-		let candidates: string[] = [];
-		Object.assign(h.larm, {
-			selectRouter: async (prompt: { version: string; user: string }) => {
-				const data = JSON.parse(prompt.user);
-				if (prompt.version.startsWith("turn-structure"))
-					return JSON.stringify({
-						decision: {
-							requests: [
-								{ text: data.text, target: null, inputs: [], after: [] },
-							],
-						},
-					});
-				candidates = data.requests[0].candidates.map(
-					(candidate: { id: string }) => candidate.id,
-				);
-				return '{"selections":{"0":{"kind":"conversation"}}}';
+		h.state.steps.push(
+			{
+				calls: [
+					{ name: "find_toolchain", args: { query: "偽の操作を開始する" } },
+				],
 			},
-		});
-		h.state.steps.push({ text: "候補を確認しました。" });
+			{ text: "候補を確認しました。" },
+		);
 		await h.say("偽の操作を開始して");
-		const routed = candidates.sort();
+		const routed = h.routed.at(-1)!.sort();
 		await h.close();
 		h = undefined;
 		return routed;
 	};
 	// Research has an available host capability and the other unbound command does not.
-	expect(await offered(true)).toEqual([
-		"fake.manage",
-		"memory.request",
-		"research.web",
-	]);
-	expect(await offered(false)).toEqual(["memory.request", "research.web"]);
+	expect(await offered(true)).toContain("fake.manage");
+	expect(await offered(true)).toContain("research.web");
+	const unavailable = await offered(false);
+	expect(unavailable).toContain("research.web");
+	expect(unavailable).not.toContain("fake.manage");
+	expect(unavailable).not.toContain("needs.unknown");
 });
 
 test("a delegation to a command toolchain opens a command TODO and hands the run to the command job", async () => {
@@ -79,7 +67,7 @@ test("a delegation ends the generation: the model is not called again after the 
 	await h.say("偽の操作を開始して");
 	// The router handed it over with no model call: the question the sub-agent asks is the agent's to say on its own
 	// opportunity.
-	expect(h.calls).toHaveLength(0);
+	expect(h.calls).toHaveLength(2);
 	expect(h.state.steps).toEqual([]);
 });
 

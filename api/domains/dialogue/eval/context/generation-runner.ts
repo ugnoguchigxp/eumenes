@@ -1,15 +1,13 @@
 /**
- * Runs one prepared generation through the product's routed turn (`runRoutedTurn`). The lane has no router (the
- * eumenes_router package decides hand-overs in the product, and is measured in its own bench), so every turn is the
- * talk turn: the model is whatever `inference` is (the live LARM connection, or the scripted model of the fixture
- * lane), and the host side of the operations it may read is an offline stand-in that changes nothing.
+ * Runs one prepared generation through `runConversationTurn` with the fixture or live inference port.
+ * The evaluation substitutes read-only host operations for the application's execution ports.
  */
 import type { InferencePort } from "../../../inference";
 import type { DialogueDeps, GenerateInput } from "../../service/context";
 import { TOOL_NAMES, toolRejection } from "../../service/generation-tools";
 import {
 	type RoutedTurnOptions,
-	runRoutedTurn,
+	runConversationTurn,
 } from "../../service/routed-turn";
 import { evalConversationAgent } from "./conversation-agent";
 import type { Answer, ToolCallRecord } from "./checks";
@@ -194,7 +192,7 @@ export async function runConversation(options: {
 		},
 		conversationAgent: evalConversationAgent,
 	} as unknown as DialogueDeps;
-	const generated = await runRoutedTurn(deps, input, {
+	const generated = await runConversationTurn(deps, input, {
 		signal: options.signal,
 		delta: () => {},
 		execute,

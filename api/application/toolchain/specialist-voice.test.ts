@@ -1,8 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import type { LarmPort } from "../../domains/larm";
+import { collaborationScript } from "./collaboration-script.fixture";
 import {
 	searchThenDelegate,
-	routedChoice,
+	conversationByScript,
 	utteranceOf,
 } from "./conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
@@ -58,27 +59,29 @@ function model(): LarmPort {
 						messages.map((m) => m.content).join("\n"),
 					)?.[1] ?? 0,
 				);
-				return JSON.stringify({
-					action: "invoke",
-					tool: "doc.write",
-					arguments: {
-						baseRevision: revision,
-						title: spoken,
-						content: definition(spoken),
+				return collaborationScript(
+					{
+						action: "invoke",
+						tool: "doc.write",
+						arguments: {
+							baseRevision: revision,
+							title: spoken,
+							content: definition(spoken),
+						},
+						text: replies[spoken],
 					},
-					text: replies[spoken],
-				});
+					messages,
+				);
 			}
-			// The conversation's choice (the local harness's routed turn) hands the request to the studio.
-			const routed = routedChoice(options, messages, (loop) =>
+			// The conversation finds the studio and hands it the request.
+			const conversation = conversationByScript(options, messages, (loop) =>
 				searchThenDelegate(
 					(candidate) => candidate.id === "ui.compose",
 					utteranceOf(loop),
 					{ announcement: "制作担当に引き継ぎます。", impact: "create" },
 				)(loop),
 			);
-			if (routed) return routed;
-			return "かしこまりました。";
+			return conversation ?? "かしこまりました。";
 		},
 	};
 }

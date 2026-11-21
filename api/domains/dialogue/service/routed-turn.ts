@@ -4,7 +4,6 @@ import type { SpeechPreparation } from "../../delivery";
 import type { RoutedPipelineStep } from "../../tool-runtime";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
-import { markInput } from "../../../infrastructure/model-input";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
 import { z } from "zod";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
@@ -23,12 +22,8 @@ import type {
 	ToolOutcome,
 } from "./executor-context";
 import { memoryArgs, parseCall, TOOL_NAMES } from "./generation-tools";
-import { INPUT_HEADINGS } from "./input-text";
 import { refusalText, toolResultText } from "./result-text";
 import { parseChoice, strictChoiceSchema } from "./routed-choice";
-import type { Step } from "./routed-actions";
-import { activeRouter } from "./routed-package";
-import { routerTurn } from "./routed-router";
 import { createTalkWork } from "./routed-talk-work";
 import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 
@@ -101,42 +96,24 @@ function completedTalk(
 	};
 }
 
-/** Route a new utterance, then let the conversation agent reply or carry out the selected action. */
-export async function runRoutedTurn(
+/** Let the conversation agent understand the turn and act through its offered tools. */
+export async function runConversationTurn(
 	deps: DialogueDeps,
 	input: GenerateInput,
 	options: RoutedTurnOptions,
 ): Promise<GenerationOutcome> {
-	const debug: Pick<GenerationOutcome, "debugTarget" | "debugRouterFailure"> =
-		{};
+	const debug: Pick<GenerationOutcome, "debugTarget"> = {};
 	const turn = createTurn(deps, input, options, debug);
-	const { routed } = turn;
-	let kind: "talk" | "request" | "pending" = "talk";
 	try {
-		let step: Step = "talk";
-		// A hand-over may need the fill call on the run's request; without it the turn only talks.
-		if (
-			input.final.kind === "utterances" &&
-			routed &&
-			turn.canChoose &&
-			turn.router
-		) {
-			const pending =
-				routed.pending.confirmations.length > 0 ||
-				routed.pending.questions.length > 0 ||
-				routed.switching !== null;
-			kind = pending ? "pending" : "request";
-			step = await routerTurn(turn, turn.router);
-		}
-		if (step === "talk") await turn.talk();
+		await turn.talk();
 	} catch (error) {
 		const code = error instanceof Error ? error.message : "";
 		if (options.signal.aborted || turn.published() || !callFailed(code))
 			throw error;
-		log.warn("dialogue.turn_failed", { kind, reason: code });
+		log.warn("dialogue.turn_failed", { kind: "talk", reason: code });
 		turn.answer(SAID_FAILED);
 	}
-	log.info("dialogue.turn_routed", { kind, count: turn.calls() });
+	log.info("dialogue.turn_routed", { kind: "talk", count: turn.calls() });
 	options.signal.throwIfAborted();
 	const { receipt, emotion, imageAnswer, writeOutput } = turn.result();
 	return {
@@ -147,7 +124,7 @@ export async function runRoutedTurn(
 						if (writeOutput(db)) return "";
 						log.warn("dialogue.turn_failed", {
 							runId: input.runId,
-							kind,
+							kind: "talk",
 							reason: "chat_output_empty",
 						});
 						return SAID_FAILED;
@@ -232,13 +209,11 @@ function turnModelCall(
 	};
 }
 
-type TalkOptions = { tools?: boolean; readOnly?: boolean };
-
 function createTurn(
 	deps: DialogueDeps,
 	input: GenerateInput,
 	options: RoutedTurnOptions,
-	debug: Pick<GenerationOutcome, "debugTarget" | "debugRouterFailure">,
+	debug: Pick<GenerationOutcome, "debugTarget">,
 ) {
 	const { signal } = options;
 	const executed: GenerationOutcome["executed"] = [];
@@ -313,8 +288,6 @@ function createTurn(
 		signal,
 		routed: input.routed,
 		canChoose: !!(input.requestId && deps.larm.executeStream),
-		/** The saved router, when it is on and the ports it needs are there (spec router-package-integration 2026-11-04). */
-		router: activeRouter(deps),
 		utterance: input.utterances.join("\n"),
 		executed,
 		exchange,
@@ -323,7 +296,6 @@ function createTurn(
 		said: () => said,
 		published: () => published,
 		result: () => ({ receipt, emotion, imageAnswer, writeOutput }),
-		debug,
 
 		/** The host's own words: spoken as they are, and part of the answer. */
 		speak(text: string) {
@@ -390,26 +362,16 @@ function createTurn(
 				: toolResultText("refused", { refused: true, issues: error.issues });
 		},
 
-		/**
-		 * The talk turn: one streamed call; `notice` adds what the host found for it to tell. On the user's words it may
-		 * call one read tool, and a second call answers with what was read (spec conversation-read-tools-design
-		 * 2026-10-31 §2); `tools: false` when the host has read for it already. An agent whose reply hands work over
-		 * may also look for a toolchain and hand the work to it (spec router-package-integration, 2026-11-12).
-		 */
-		async talk(
-			notice?: string,
-			{ tools = true, readOnly = false }: TalkOptions = {},
-		): Promise<void> {
+		async talk(): Promise<void> {
 			signal.throwIfAborted();
 			let talkImageAnswer: GenerationOutcome["imageAnswer"];
-			const messages = talkMessages(input, notice, readOnly);
+			const { messages } = input;
 			const system =
 				input.harness.gates.systemCopy && messages[0]?.role === "system"
 					? messages[0].content
 					: undefined;
 			// Tool calls come back on the streamed call only; a port without it answers in one piece.
 			const acts = !!(
-				tools &&
 				input.final.kind === "utterances" &&
 				input.requestId &&
 				deps.larm.executeStream
@@ -420,7 +382,7 @@ function createTurn(
 			const saidBefore = said;
 			const toolPort = conversationToolPort(
 				this,
-				{ acts, readOnly },
+				acts,
 				() => {
 					toolMade = true;
 				},
@@ -440,7 +402,6 @@ function createTurn(
 							input.final.kind === "utterances" ? input.final.messageIds : [],
 					},
 					messages: messages as AgentMessage[],
-					...(readOnly ? { readOnly } : {}),
 					chat: {
 						async complete(request, onDelta, chatSignal) {
 							const output = conversationOutput(onDelta, system);
@@ -540,7 +501,7 @@ const LOOKUP_TOOL = "lookup_public_information";
 
 function conversationToolPort(
 	turn: Turn,
-	{ acts, readOnly }: { acts: boolean; readOnly: boolean },
+	acts: boolean,
 	onCall: () => void,
 	onDebugTarget: (target: string) => void,
 ) {
@@ -550,7 +511,6 @@ function conversationToolPort(
 		: [];
 	const work =
 		acts &&
-		!readOnly &&
 		input.routed &&
 		deps.toolchains &&
 		deps.work &&
@@ -578,11 +538,9 @@ function conversationToolPort(
 					}
 				: tool,
 		),
-		...(!readOnly && reads.includes("read_memory") && deps.steward
-			? [MEMORY_REQUEST_TOOL]
-			: []),
+		...(acts && input.routed && deps.steward ? [MEMORY_REQUEST_TOOL] : []),
 	];
-	const lookup = acts && !readOnly ? deps.lookup : undefined;
+	const lookup = acts ? deps.lookup : undefined;
 	const tools = [...readTools, ...(work?.tools ?? [])];
 	if (lookup)
 		tools.push({
@@ -676,37 +634,6 @@ function conversationToolPort(
 			};
 		},
 	};
-}
-
-/** Apply the host's last observations to the reply's input before the agent prepares its own call. */
-function talkMessages(
-	input: GenerateInput,
-	notice: string | undefined,
-	readOnly: boolean,
-): ChatMessage[] {
-	const messages = notice
-		? input.messages.map((message) => ({ ...message }))
-		: input.messages;
-	if (notice) {
-		const last = messages.at(-1)!;
-		const from = last.content.length + 2;
-		last.content = `${last.content}\n\n${INPUT_HEADINGS.notice}\n${notice}`;
-		if (input.observeInput) markInput(last, { kind: "notice" }, from);
-	}
-	if (!readOnly) return messages;
-	const [system, ...rest] = messages;
-	if (system?.role !== "system") return messages;
-	const instruction = systemContext(
-		"dialogue.contexts.local.router-unperformed",
-		{},
-	);
-	const qualified = {
-		...system,
-		content: `${system.content}\n\n${instruction}`,
-	};
-	if (input.observeInput)
-		markInput(qualified, { kind: "system" }, system.content.length + 2);
-	return [qualified, ...rest];
 }
 
 function debugRunRequested(args: object) {

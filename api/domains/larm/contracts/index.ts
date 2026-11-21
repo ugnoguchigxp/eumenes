@@ -128,6 +128,7 @@ export type LarmStatus = {
 import type { TtsVoices } from "./voices";
 export { ttsVoicesSchema, type TtsVoices } from "./voices";
 export interface LarmPort {
+	embed?: import("../service/embedding-contract").Embed;
 	/** An explicitly ended task releases only its sub-agent connections, after active borrowers finish. */
 	releaseTaskSession?(taskId: string): Promise<void>;
 	decisionModel?(): string | null;

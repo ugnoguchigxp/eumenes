@@ -9,13 +9,30 @@ const log = getLogger("server");
 
 /** The interval workers of the process; `createLifecycles` starts, stops and drains them in its own order. */
 function createIntervalWorkers(s: Services) {
-	// Toolchain and procedure passages are embedded in the background; retrieval falls back
-	// to full-text search while a vector is missing.
+	// Rebuild the toolchain and turn indexes in the provider's current space.
 	const googleMaintenance = intervalLifecycle("google_accounts", 60_000, () =>
 		s.googleAccounts.maintain(),
 	);
-	const vectorRefresh = intervalLifecycle("toolchain_vectors", 600_000, () =>
-		s.toolchain.refreshVectors(),
+	const refreshVectors = async () => {
+		const space = await s.toolchain.refreshVectors();
+		const memory = s.memory.status();
+		if (!space || !memory.enabled || !memory.healthy) return;
+		const signal = AbortSignal.timeout(30_000);
+		try {
+			while (
+				!signal.aborted &&
+				(await s.memory.vectors.refreshTurns(space, signal))
+			) {}
+		} catch {
+			log.warn("memory.turn_vectors_refresh_failed", {
+				reason: "embedding_failed",
+			});
+		}
+	};
+	const vectorRefresh = intervalLifecycle(
+		"toolchain_vectors",
+		600_000,
+		refreshVectors,
 	);
 	const reportDelivery = intervalLifecycle("task_report_delivery", 1000, () =>
 		s.store.write(s.deliverTaskReports),
@@ -107,6 +124,7 @@ function createIntervalWorkers(s: Services) {
 	return {
 		googleMaintenance,
 		vectorRefresh,
+		refreshVectors,
 		reportDelivery,
 		taskMaintenance,
 		storeRetention,
@@ -133,6 +151,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 	const {
 		googleMaintenance,
 		vectorRefresh,
+		refreshVectors,
 		reportDelivery,
 		taskMaintenance,
 		storeRetention,
@@ -230,7 +249,7 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "toolchain_vectors_start",
 			start: () => {
 				vectorRefresh.start?.();
-				void s.toolchain.refreshVectors();
+				void refreshVectors();
 			},
 		},
 		{

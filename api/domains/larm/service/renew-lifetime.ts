@@ -36,7 +36,9 @@ export async function renewLifetime(
 						"content-type": "application/json",
 						"Idempotency-Key": crypto.randomUUID(),
 					},
-					body: JSON.stringify({ ttlSeconds: 900 }),
+					body: JSON.stringify({
+						ttlSeconds: current.request.ttlSeconds ?? 900,
+					}),
 				},
 				[200, 201],
 			);

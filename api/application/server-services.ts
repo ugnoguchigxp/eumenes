@@ -43,7 +43,6 @@ import type { Capabilities } from "../domains/capabilities";
 import { getLogger } from "../infrastructure/logger";
 import type { Config } from "../infrastructure/config";
 import { claudeRunnerClient } from "../domains/coding";
-import { createSavedEmbedder } from "./world/larm-embedder";
 import {
 	createMonitoring,
 	createLarmCollector,
@@ -122,11 +121,8 @@ export async function buildServices(
 	});
 	const { delegated } = tasks;
 	// One embedder on the saved LARM connection serves both the toolchain routing and the memory turn vectors.
-	const embedder = createSavedEmbedder(
-		config,
-		settings,
-		core.activity.embedding,
-	);
+	const embedder: typeof inference.embed = (...args) =>
+		core.activity.embedding.track(() => inference.embed(...args), args[2]);
 	const continuity = createContinuityService();
 	const dotsMessages = createDotsMessages({
 		store,
@@ -321,7 +317,6 @@ export async function buildServices(
 				toolchain.registry,
 				toolchain.schemas,
 				toolchain.worldAvailable,
-				toolchain.embedRouter,
 			)
 		: undefined;
 	const liveBridge = createLiveBridge();

@@ -56,6 +56,7 @@ export function messageIssues(input: GenerateInput): string[] {
 	const headings = [...body.matchAll(/^## (.+)$/gm)].map((m) => `## ${m[1]}`);
 	const own = new Set<string>([
 		INPUT_HEADINGS.memory,
+		INPUT_HEADINGS.earlier,
 		INPUT_HEADINGS.state,
 		INPUT_HEADINGS.notice,
 		INPUT_HEADINGS.user,
@@ -73,12 +74,16 @@ export function messageIssues(input: GenerateInput): string[] {
 		[/^e\d+ \d\d:\d\d /m, "event_number_line"],
 	] as const)
 		if (pattern.test(all)) issues.push(issue);
-	// Its own message before the recent conversation, or the head of the last message when none follows it.
+	// Memory may share a user message with the opening history or current state.
 	const memory = rest
 		.slice(0, -1)
 		.find((m) => m.content.startsWith(`${INPUT_HEADINGS.memory}\n`));
-	const memoryText = memory?.content ?? sectionOf(body, INPUT_HEADINGS.memory);
-	if (memoryText && estimateTextTokens(memoryText) > MEMORY_TOKENS)
+	const memoryText = sectionOf(memory?.content ?? body, INPUT_HEADINGS.memory);
+	if (
+		memoryText &&
+		estimateTextTokens(`${INPUT_HEADINGS.memory}\n${memoryText}`) >
+			MEMORY_TOKENS
+	)
 		issues.push("section_over_limit:memory");
 	if (state && estimateTextTokens(state) > STATE_TOKENS)
 		issues.push("section_over_limit:state");

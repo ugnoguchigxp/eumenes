@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
 	capabilityBundleV1,
 	createCapabilities,
+	dormantBundleFile,
 	toolchainBuiltins,
 } from "../../domains/capabilities";
 import { loadConfig } from "../../infrastructure/config";
@@ -240,6 +241,123 @@ test("reopening and seeding preserves disabled toolchains and explicitly publish
 	}
 });
 
+test("upgrading retires the generic Collaboration entry and preserves its saved work", async () => {
+	const retirement = new Set([
+		"capabilities/0013-retire-collaboration-task",
+		"dialogue/0043-retire-collaboration-task",
+		"collaboration/0005-retire-task-works",
+	]);
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-collaboration-retire-"));
+	const path = join(dir, "db");
+	const revision = "toolchain:collaboration.task@5";
+	const artifact = "artifact:collaboration.task@1";
+	const time = "2026-11-21T06:10:57.000Z";
+	let store = openStore(
+		path,
+		migrations.filter(({ id }) => !retirement.has(id)),
+	);
+	try {
+		const legacy = create(store);
+		await legacy.seed();
+		await store.write((db) => {
+			const result = legacy.importBundleInTransaction(
+				db,
+				dormantBundleFile("collaboration.task"),
+				offlineBundleHost(),
+			);
+			expect(result.issues).toEqual([]);
+			expect(
+				legacy.resolveToolchainInTransaction(db, revision).toolchain.id,
+			).toBe("collaboration.task");
+			expect(
+				legacy
+					.artifactsInTransaction(db)
+					.map((entry) => entry.artifactRevisionId),
+			).toContain(artifact);
+			db.query(
+				`INSERT INTO dialogue_specialist_sessions (
+					id,conversation_id,toolchain_id,toolchain_revision_id,title,binding_revision_id,
+					package_revision_id,artifact_revision_id,adapter_ref,work_ref,state,revision,epoch,active_run_id,
+					expires_at,created_at,updated_at
+				) VALUES ('legacy','main','collaboration.task',?,'Collaboration','binding:collaboration.task@3',
+					'package:collaboration.task@4',?,'adapter:collaboration.task@1','work','active',3,1,'run',?,?,?)`,
+			).run(revision, artifact, time, time, time);
+			db.query(
+				`INSERT INTO collaboration_works (
+					id,session_id,kind,busy_run_id,child_id,child_json,created_at,updated_at
+				) VALUES ('work','legacy','task','run','child','{"status":"completed"}',1,1)`,
+			).run();
+			db.query(
+				"INSERT INTO capability_toolchain_vectors VALUES(?,?,?,?,?)",
+			).run(revision, 0, "space", "digest", new Uint8Array([1]));
+		});
+		await store.close();
+		store = openStore(path, migrations);
+		const caps = create(store);
+		await caps.seed();
+		store.read((db) => {
+			expect(() => caps.resolveToolchainInTransaction(db, revision)).toThrow(
+				"toolchain_unavailable",
+			);
+			const ids = caps
+				.toolchainExamplesInTransaction(db)
+				.map((entry) => entry.id);
+			expect(ids).not.toContain("collaboration.task");
+			expect(ids).toContain("collaboration.pipeline");
+			expect(
+				caps
+					.artifactsInTransaction(db)
+					.map((entry) => entry.artifactRevisionId),
+			).not.toContain(artifact);
+			expect(
+				caps.toolchainBindingInTransaction(db, revision, { retained: true })
+					?.artifact?.revisionId,
+			).toBe(artifact);
+			expect(
+				db
+					.query("SELECT key FROM capability_search WHERE key LIKE ? OR key=?")
+					.all("%:collaboration.task%", "tool:collaboration.brave.image"),
+			).toEqual([]);
+			expect(
+				db
+					.query(
+						"SELECT revision_id FROM capability_toolchain_vectors WHERE revision_id=?",
+					)
+					.get(revision),
+			).toBeNull();
+			expect(
+				db
+					.query(
+						"SELECT state,end_reason,revision,epoch,active_run_id,work_ref FROM dialogue_specialist_sessions WHERE id='legacy'",
+					)
+					.get(),
+			).toEqual({
+				state: "ended",
+				end_reason: "revoked",
+				revision: 4,
+				epoch: 2,
+				active_run_id: null,
+				work_ref: "work",
+			});
+			expect(
+				db
+					.query(
+						"SELECT ended,busy_run_id,child_id,child_json FROM collaboration_works WHERE id='work'",
+					)
+					.get(),
+			).toEqual({
+				ended: 1,
+				busy_run_id: null,
+				child_id: "child",
+				child_json: '{"status":"completed"}',
+			});
+		});
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 test("normal server assembly seeds toolchains and launchers without a separate import", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-seed-startup-"));
 	try {
@@ -268,6 +386,7 @@ test("normal server assembly seeds toolchains and launchers without a separate i
 			);
 			expect(ids).toContain("timers.manage");
 			expect(ids).not.toContain("web.search");
+			expect(ids).not.toContain("collaboration.task");
 			const artifacts = services.store.read((db) =>
 				caps.artifactsInTransaction(db).map((a) => a.artifactId),
 			);
@@ -275,6 +394,14 @@ test("normal server assembly seeds toolchains and launchers without a separate i
 			expect(artifacts).toContain("settings.hub");
 			// Exercise the public read path too: adapter availability may require a snapshot.
 			const entries = services.toolchain.actionRequests!.artifacts();
+			expect(entries.map((entry) => entry.artifactId)).not.toContain(
+				"collaboration.task",
+			);
+			expect(() =>
+				services.toolchain.actionRequests!.artifact(
+					"artifact:collaboration.task@1",
+				),
+			).toThrow("artifact_not_found");
 			expect(
 				entries.some((a) =>
 					a.artifactRevisionId.startsWith("artifact:settings.hub@"),

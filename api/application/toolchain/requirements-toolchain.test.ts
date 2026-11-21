@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
-	routedChoice,
+	conversationByScript,
 	searchThenDelegate,
 } from "./conversation-script.fixture";
 import { workerPacket } from "./toolchain.fixture";
@@ -29,15 +29,14 @@ for (const c of cases)
 				speak: async () => new Uint8Array(),
 				answer: async (messages, _signal, options) => {
 					calls++;
-					// The conversation's choice (the local harness's routed turn): hand the request to the source's toolchain.
-					const routed = routedChoice(options, messages, (loop) =>
+					const conversation = conversationByScript(options, messages, (loop) =>
 						searchThenDelegate(
 							(candidate) => candidate.id === "history.research",
 							c.request,
 							{ announcement: "お調べします。", impact: "none" },
 						)(loop),
 					);
-					if (routed) return routed;
+					if (conversation) return conversation;
 					if (messages[0]!.content.includes("TOOLS=")) {
 						const data = workerPacket(messages);
 						if (data.draftReport)
@@ -99,8 +98,8 @@ for (const c of cases)
 			const result = await evaluateRequirements(c, profiles, model, true);
 			expect(result.structureMatched).toBe(true);
 			expect(result.counts.worker).toBe(3);
-			// One choice (the host searched) and the sub-agent's three calls; the finished work is reported by the agency.
-			expect(calls).toBe(4);
+			// The conversation searches and delegates, then the sub-agent finishes in three calls.
+			expect(calls).toBe(5);
 			expect(result.semanticChecks.every((v) => v.status === "unchecked")).toBe(
 				true,
 			);
