@@ -8,6 +8,7 @@ import type { PendingConfirmation, TodoItem } from "./work-items";
 import { forgetWorkResources, workLinksOf } from "../repository/resources";
 import { recordWorkLinksInTransaction } from "./work-links";
 import { noticeOf } from "./todo-notices";
+import { eventFields } from "./event-fields";
 import { resultText } from "./result-text";
 import type { TodoNotice } from "../contracts/todo-notices";
 import {
@@ -314,9 +315,26 @@ function hostTodo(
 function confirmationLedger(
 	clock: DialogueDeps["clock"],
 	id: DialogueDeps["id"],
+	continuity: DialogueDeps["continuity"],
 ) {
+	function statementFor(db: Database, row: ConfirmationRow) {
+		const statement = continuity.events.deliveredUtteranceInTransaction(
+			db,
+			row.conversationId,
+			row.statementDeliveryKey,
+		);
+		if (!statement || statement.forgotten) return null;
+		const { origin, confirmation } = eventFields(statement);
+		// Legacy statements have the origin marker but no confirmation id.
+		return origin === "confirmation" &&
+			(confirmation === undefined || confirmation === row.id)
+			? statement
+			: null;
+	}
+
 	return {
 		confirmationByRefInTransaction: confirmationByRef,
+		confirmationStatementInTransaction: statementFor,
 		issueConfirmationInTransaction(
 			db: Database,
 			input: ConfirmationInput,
@@ -348,15 +366,17 @@ function confirmationLedger(
 			db: Database,
 			conversationId: string,
 		): PendingConfirmation[] {
-			return openConfirmations(db, conversationId, clock()).map((row) => ({
-				id: row.id,
-				ref: row.ref,
-				toolchain: row.toolchainId,
-				// What the user said, not the request the agent reads (which may carry the utterance before it).
-				request: row.words ?? row.request,
-				impact: row.impact,
-				target: row.targetLabel,
-			}));
+			return openConfirmations(db, conversationId, clock())
+				.filter((row) => statementFor(db, row))
+				.map((row) => ({
+					id: row.id,
+					ref: row.ref,
+					toolchain: row.toolchainId,
+					// What the user said, not the request the agent reads (which may carry the utterance before it).
+					request: row.words ?? row.request,
+					impact: row.impact,
+					target: row.targetLabel,
+				}));
 		},
 	};
 }
@@ -645,7 +665,7 @@ export function createWorkLedger(
 				},
 			);
 		},
-		...confirmationLedger(clock, id),
+		...confirmationLedger(clock, id, continuity),
 	};
 }
 export type WorkLedger = ReturnType<typeof createWorkLedger>;

@@ -136,7 +136,7 @@ function createEvalExecutor(
 				if (args.mode === "confirm")
 					return {
 						result: { confirmation: "eval-confirmation", expiresAt: "eval" },
-						confirmation: true,
+						confirmationId: "eval-confirmation",
 					};
 				// A request that names a saved item changes something that exists: it is confirmed first.
 				if (args.target)

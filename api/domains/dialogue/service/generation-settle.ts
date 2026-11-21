@@ -38,8 +38,8 @@ export type GenerationResult = {
 	emotion?: DeliveryEmotion;
 	/** A delegation ended the generation: the announcement was delivered and the work handed over. */
 	handover?: Handover;
-	/** The generation issued a confirmation: its speech is the confirmation statement (section 6.7). */
-	confirmation?: true;
+	/** The confirmation whose statement the generation speaks (section 6.7). */
+	confirmationId?: string;
 	/** Its searches and hand-overs: kept with the agent's utterance that ends the turn. */
 	exchange?: ExchangeStep[];
 	/** The trace of an utterance generation that answered without handing work over. */
@@ -224,10 +224,23 @@ export function createGenerationSettlement(
 					? "applied"
 					: fail(deps, tx, run, stale, input);
 			// What the agency gave the reply is gone (forgotten meanwhile): it is written again, not adopted.
-			if (!result.handover && !recordAgencyInput(deps, tx, run))
-				return retryNotAdopted(deps, tx, run, input, claim.payload, true)
-					? "applied"
-					: fail(deps, tx, run, "memory_stale", input);
+			if (!result.handover && !recordAgencyInput(deps, tx, run)) {
+				const retried = retryNotAdopted(
+					deps,
+					tx,
+					run,
+					input,
+					claim.payload,
+					true,
+				);
+				log.warn("dialogue.adoption_rejected", {
+					runId: run.id,
+					phase: "agency_input",
+					reason: "memory_stale",
+					status: retried ? "queued" : "failed",
+				});
+				return retried ? "applied" : fail(deps, tx, run, "memory_stale", input);
+			}
 			// The answer spoke of a report whose evidence changed since (H4/R8): it is not adopted, nor is the report.
 			if (
 				input.agent &&
@@ -276,15 +289,19 @@ export function createGenerationSettlement(
 				result.text;
 			let messageId: string | null = null;
 			const external =
-				deps.externalOutput?.offer(tx, run, text, !!result.confirmation) ??
+				deps.externalOutput?.offer(tx, run, text, !!result.confirmationId) ??
 				false;
-			if (external && result.confirmation) {
+			if (external && result.confirmationId) {
 				events.appendInTransaction(tx, {
 					conversationId: run.conversationId,
 					at: jstSeconds(Date.parse(clock())),
 					type: "said",
 					by: "agent",
-					fields: { text, origin: "confirmation" },
+					fields: {
+						text,
+						origin: "confirmation",
+						confirmation: result.confirmationId,
+					},
 					messageIds: [run.inputMessageId],
 					deliveryKey: `run:${run.id}`,
 				});
@@ -468,7 +485,9 @@ function said(
 		by: "agent",
 		fields: {
 			text,
-			...(result.confirmation ? { origin: "confirmation" } : {}),
+			...(result.confirmationId
+				? { origin: "confirmation", confirmation: result.confirmationId }
+				: {}),
 		},
 		messageIds: [messageId],
 		deliveryKey: `run:${run.id}`,

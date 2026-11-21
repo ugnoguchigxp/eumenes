@@ -531,7 +531,7 @@ function handedOver(turn: Turn) {
 		const { call, outcome } = turn.executed[i]!;
 		if (
 			call.name === TOOL_NAMES.delegate &&
-			(outcome.end || outcome.confirmation)
+			(outcome.end || outcome.confirmationId)
 		)
 			return outcome;
 	}

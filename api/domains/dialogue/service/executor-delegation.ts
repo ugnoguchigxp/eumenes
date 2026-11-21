@@ -334,7 +334,7 @@ export function confirm(
 		});
 		return {
 			result: { confirmation: `c${row.ref}` },
-			confirmation: true,
+			confirmationId: row.id,
 		};
 	});
 }
@@ -497,11 +497,7 @@ export function approval(
 		return { ok: false, code: "confirmation_expired" };
 	if (input.final.kind !== "utterances")
 		return { ok: false, code: "approval_missing" };
-	const statement = events.deliveredUtteranceInTransaction(
-		db,
-		input.conversationId,
-		row.statementDeliveryKey,
-	);
+	const statement = deps.work!.confirmationStatementInTransaction(db, row);
 	const pending = events.pendingInTransaction(db, input.conversationId);
 	if (
 		!statement ||

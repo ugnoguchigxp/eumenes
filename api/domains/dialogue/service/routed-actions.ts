@@ -274,7 +274,7 @@ export async function handWith(
 			...request,
 		});
 		if ("refused" in issued) return { retry: turn.reasonOf(issued.refused) };
-		if (!issued.outcome.confirmation)
+		if (!issued.outcome.confirmationId)
 			return {
 				retry: String(
 					(issued.outcome.result as { code?: unknown }).code ??

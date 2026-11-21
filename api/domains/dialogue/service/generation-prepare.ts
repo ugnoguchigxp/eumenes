@@ -46,7 +46,7 @@ import {
 import { resultText } from "./result-text";
 import { acceptRunAnswer, endRun } from "./run-end";
 import { finishReportedWork } from "./generation-settle";
-import type { WorkRow } from "../repository/work";
+import { workOfRun, type WorkRow } from "../repository/work";
 import {
 	madeOf,
 	namedResources,
@@ -338,12 +338,14 @@ function recordPromptSources(
 		prefix,
 		pendingIds,
 		media,
+		notAdopted,
 	}: {
 		runId: string;
 		conversationId: string;
 		prefix: ConversationPrefix;
 		pendingIds: ReadonlySet<string>;
 		media: ReadonlyArray<{ workId: string }>;
+		notAdopted: boolean;
 	},
 ) {
 	const memory = deps.memory;
@@ -355,19 +357,25 @@ function recordPromptSources(
 	const mediaInputs = media.map(({ workId }) =>
 		workContextInput(deps, tx, workId),
 	);
-	memory.referenceInputs.recordRunInTransaction(tx, runId, {
-		sources: [
-			...new Set([
-				...context.sources,
-				...pendingInput.sources,
-				...mediaInputs.flatMap((entry) => entry?.sources ?? []),
-			]),
-		],
-		complete:
-			context.complete &&
-			pendingInput.complete &&
-			mediaInputs.every((entry) => entry?.complete),
-	});
+	memory.referenceInputs.recordRunInTransaction(
+		tx,
+		runId,
+		{
+			sources: [
+				...new Set([
+					...context.sources,
+					...pendingInput.sources,
+					...mediaInputs.flatMap((entry) => entry?.sources ?? []),
+				]),
+			],
+			complete:
+				context.complete &&
+				pendingInput.complete &&
+				mediaInputs.every((entry) => entry?.complete),
+		},
+		// An already committed work item still inherits the sources of the attempt that created it.
+		{ replace: notAdopted && workOfRun(tx, runId).length === 0 },
+	);
 }
 
 /**
@@ -510,6 +518,7 @@ export function createPrepare(
 			prefix,
 			pendingIds,
 			media,
+			notAdopted,
 		});
 		const observeInput = deps.contextInputs?.begin(tx, current, placed.reason);
 		const noticeText = notice

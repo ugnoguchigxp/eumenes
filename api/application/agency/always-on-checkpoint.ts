@@ -104,7 +104,13 @@ export function createAgendaCheckpoints(input: {
 
 	async function refresh(c: AgendaScope) {
 		const stale = deps.store.read((db) => {
-			const sources = agendaSources(agendaEnvelope(c, now()));
+			// Replies can see live items whose status excludes them from the checkpoint.
+			const sources = [
+				...new Set([
+					...agendaSources(agendaEnvelope(c, now())),
+					...c.agent.view().items.flatMap((item) => item.refs),
+				]),
+			];
 			return [
 				...staleInputSources(deps, db, sources),
 				...staleMemoryRefs(deps, db, sources),

@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { registerDialogue } from "..";
 import { waitFor } from "../../../infrastructure/wait-for";
+import { createWorkLedger } from "../service/work-ledger";
 import {
 	IMAGE,
 	choice,
@@ -77,6 +78,39 @@ test("an approval is refused when the confirmation statement was not heard at al
 	expect(h.dialogue.answerText(approval.id)).toBe(
 		"うまく頼めませんでした。もう一度言ってもらえますか。",
 	);
+	expect(h.todos()).toEqual([]);
+});
+
+test("a confirmation from a rejected attempt is absent after a plain reply is adopted on retry", async () => {
+	let settlements = 0;
+	h = await setup({
+		cards: [{ ...IMAGE, minImpact: "modify_existing" }],
+		agency: {
+			workChangedInTransaction: () => {},
+			replyInputInTransaction: () => ({
+				sources: [],
+				complete: ++settlements !== 1,
+			}),
+		},
+	});
+	h.state.steps.push(
+		choice({ choice: IMAGE.id, request: "壁紙を差し替える" }),
+		{ text: "壁紙についてお話ししましょう。" },
+	);
+	const run = await h.say("壁紙を差し替えて");
+	expect(h.dialogue.answerText(run.id)).toBe("壁紙についてお話ししましょう。");
+	expect(h.log().some((event) => h!.fields(event).action === "confirm")).toBe(
+		true,
+	);
+
+	const ledger = createWorkLedger({
+		clock: () => new Date().toISOString(),
+		id: () => crypto.randomUUID(),
+		continuity: h.continuity,
+	});
+	expect(
+		h.store.read((db) => ledger.pendingConfirmationsInTransaction(db, "main")),
+	).toEqual([]);
 	expect(h.todos()).toEqual([]);
 });
 

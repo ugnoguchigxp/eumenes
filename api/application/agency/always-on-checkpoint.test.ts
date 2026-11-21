@@ -4,6 +4,7 @@ import { createAgendaScope } from "./always-on-scope";
 import { createAgendaCheckpoints } from "./always-on-checkpoint";
 import { settle } from "../../infrastructure/wait-for";
 import { isAgendaSnapshot } from "../../domains/dialogue";
+import { saveItem } from "../../domains/memory/test/memory.fixture";
 
 test("a queued checkpoint rejects a changed capture and saves all latest scopes with the feed", async () => {
 	const f = await agendaFixture();
@@ -179,6 +180,74 @@ test("forgetting reaches a saved record no agent holds", async () => {
 		);
 		await f.restart();
 		expect(f.host.inspect("ao")!.snapshot.agent.items).toHaveLength(0);
+	} finally {
+		await f.close();
+	}
+});
+
+test("superseded memory is removed from live agenda items before the next reply", async () => {
+	let memoryRef: string;
+	const f = await agendaFixture({
+		script(kind) {
+			if (kind !== "plan") return undefined;
+			return {
+				add: [
+					{
+						kind: "talk",
+						text: "fixture topic",
+						refs: ["source", memoryRef],
+						value: 5,
+						reason: "fixture",
+						topic: "fixture",
+					},
+				],
+				drop: [],
+				focus: "fixture",
+			};
+		},
+	});
+	try {
+		await f.user("source", "ao", "I used to prefer pencil and now prefer pen.");
+		const write = (value: string) =>
+			saveItem(f.h.store, f.h.memory!, {
+				conversationId: "ao",
+				messageId: "source",
+				kind: "preference",
+				semanticKey: "writing-instrument",
+				text: value,
+			});
+		memoryRef = `memory:${(await write("Prefers pencil")).id}`;
+		const c = createAgendaScope({
+			deps: f.deps,
+			id: "ao",
+			epoch: 0,
+			now: () => f.now,
+			text: () => null,
+			kick: () => {},
+		});
+		c.agent.observe({ id: "source", who: "user", text: "fixture", at: f.now });
+		await c.agent.step(
+			f.now + 15_000,
+			() => ({ busy: false }),
+			new AbortController().signal,
+		);
+		expect(c.agent.view().items.map((item) => item.refs)).toEqual([
+			["source", memoryRef],
+		]);
+		expect(c.agent.snapshot(f.now).items).toEqual([]);
+
+		await write("Prefers pen");
+		const checkpoints = createAgendaCheckpoints({
+			deps: f.deps,
+			convs: new Map([[c.id, c]]),
+			now: () => f.now,
+			hostDigest: "fixture",
+			invalidate: () => {},
+			feed: () => ({ cursor: 0, activeId: null }),
+			saved: () => {},
+		});
+		await checkpoints.refresh(c);
+		expect(c.agent.view().items).toEqual([]);
 	} finally {
 		await f.close();
 	}

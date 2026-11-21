@@ -93,6 +93,30 @@ test("a reply whose given input is whole is adopted", async () => {
 	expect(h.dialogue.answerText(run.id)).toBe("お答えします。");
 });
 
+test("an adopted retry records the retry's sources instead of inheriting rejected input", async () => {
+	let prepared = 0;
+	h = await setup({
+		memory: true,
+		agency: {
+			workChangedInTransaction: () => {},
+			replyInputInTransaction: () =>
+				++prepared === 1
+					? { sources: ["rejected-source"], complete: false }
+					: { sources: ["accepted-source"], complete: true },
+		},
+	});
+	h.state.steps.push(...reply("一度目。"), ...reply("書き直した返事。"));
+	const run = await h.say("こんにちは");
+	expect(h.dialogue.answerText(run.id)).toBe("書き直した返事。");
+	const input = h.store.read((db) =>
+		h!.memory!.referenceInputs.readRunInTransaction(db, run.id),
+	);
+	expect(input?.complete).toBe(true);
+	expect(input?.sources).toContain(run.inputMessageId);
+	expect(input?.sources).toContain("accepted-source");
+	expect(input?.sources).not.toContain("rejected-source");
+});
+
 test("the non-streaming call answers over the call's own messages (steered words and the agency's state)", async () => {
 	const seen: string[] = [];
 	h = await setup({

@@ -22,8 +22,8 @@ import { consumeAnswer } from "./result-intake";
 export type ToolOutcome = {
 	/** The tool's result. */
 	result: unknown;
-	/** A confirmation was issued (section 6.7): the reply is its question. */
-	confirmation?: true;
+	/** The issued confirmation whose statement this reply carries (section 6.7). */
+	confirmationId?: string;
 	/** The work was handed over (the run now waits for it): the generation ends here, without speech of its own. */
 	end?: true;
 	/** A search's cards as it found them, and the vector of its query (what the router scores and corrects by). */

@@ -9,6 +9,7 @@
  * names and the agency's interests. Offline evaluation only.
  */
 import type { WorkOutcome } from "../../repository/work";
+import { jstSeconds } from "../../../../infrastructure/jst-time";
 import type { Seed, SeedEvent } from "./case-schema";
 import {
 	conversationSystem,
@@ -140,7 +141,7 @@ export function createSession(
 		) => {
 			wiring.setNow(at);
 			return store.write((db) => {
-				work.issueConfirmationInTransaction(
+				const row = work.issueConfirmationInTransaction(
 					db,
 					{
 						conversationId: CONVERSATION_ID,
@@ -156,6 +157,18 @@ export function createSession(
 					},
 					[],
 				);
+				ctx.deps.continuity.events.appendInTransaction(db, {
+					conversationId: CONVERSATION_ID,
+					at: jstSeconds(Date.parse(at)),
+					type: "said",
+					by: "agent",
+					fields: {
+						text: seed.request,
+						origin: "confirmation",
+						confirmation: row.id,
+					},
+					deliveryKey: row.statementDeliveryKey,
+				});
 			});
 		},
 

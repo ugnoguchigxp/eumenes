@@ -303,7 +303,7 @@ export function createTalkWork(turn: Turn) {
 			.slice(before)
 			.some(
 				({ call, outcome }) =>
-					call.name === TOOL_NAMES.delegate && outcome.confirmation,
+					call.name === TOOL_NAMES.delegate && outcome.confirmationId,
 			);
 		return answer(
 			confirmed ? { confirmation: true } : { delegated: true },

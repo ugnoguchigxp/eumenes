@@ -7,8 +7,13 @@ export function readHostInput(db: Database, id: string): HostInput | null {
 		.get(id) as { input_json: string } | null;
 	return row ? (JSON.parse(row.input_json) as HostInput) : null;
 }
-export function writeHostInput(db: Database, id: string, input: HostInput) {
-	const previous = readHostInput(db, id);
+export function writeHostInput(
+	db: Database,
+	id: string,
+	input: HostInput,
+	options: { replace?: boolean } = {},
+) {
+	const previous = options.replace ? null : readHostInput(db, id);
 	const value = {
 		sources: [...new Set([...(previous?.sources ?? []), ...input.sources])],
 		complete: input.complete && (previous?.complete ?? true),

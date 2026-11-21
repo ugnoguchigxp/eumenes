@@ -142,6 +142,9 @@ export function createGenerationHandler(
 								count: generated.executed.length,
 							});
 						log.info("dialogue.generation_completed");
+						const confirmationId = generated.executed.find(
+							({ outcome }) => outcome.confirmationId,
+						)?.outcome.confirmationId;
 						return {
 							...(generated.finishSilentReplyInTransaction
 								? {
@@ -167,9 +170,7 @@ export function createGenerationHandler(
 								: {}),
 							...(generated.receipt ? { receipt: generated.receipt } : {}),
 							...(generated.emotion ? { emotion: generated.emotion } : {}),
-							...(generated.executed.some((entry) => entry.outcome.confirmation)
-								? { confirmation: true as const }
-								: {}),
+							...(confirmationId ? { confirmationId } : {}),
 							...(input.final.kind === "utterances"
 								? {
 										selection: executor.answered(delegationRefused(generated)),
