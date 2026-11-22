@@ -1,90 +1,41 @@
-import { generatedImageInput } from "./media/generated-image-input";
-import { createConversationLookup } from "../domains/web-note";
+import { dirname, resolve } from "node:path";
 import { createSteeringInbox } from "eumenes-steer";
-import {
-	createAgendaGoalStore,
-	forgetGoalDocuments,
-} from "./agency/goal-agenda";
-import {
-	configuredContextStill,
-	createKnowledge,
-	permitsSpecialistContextSearch,
-} from "./knowledge/service";
-import { createAppDevelopmentRuntime } from "./app-development/runtime";
-import { createGitObservation } from "../domains/git-observation";
-import { createMemoryHostConnection } from "./memory-host";
-import type { ToolchainExecutionPort } from "../domains/tool-runtime";
-import { buildAnalysisFactory } from "./media/visual-perception";
-import { createLiveBridge } from "./media/live-bridge";
-import { createLateResources } from "./resources/late";
-import { buildResources } from "./resources/wiring";
-import { buildMarkdown } from "./markdown/markdown-composition";
-import { createCanvasRuntime, canvasPreviewOrigin } from "./canvas/runtime";
-import { createCanvasJobs } from "./canvas/jobs";
-import { createCanvasAdapter } from "./canvas/adapter";
-import { buildDocling } from "./docling/docling-composition";
-import { createDotsMessages } from "./work/dots-messages";
-import { createDotsWork } from "./work/dots-work";
-import { dirname, join, resolve } from "node:path";
-import type { GoogleProvider } from "../domains/google-accounts";
-import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
+import type { Capabilities } from "../domains/capabilities";
 import { createContinuityService } from "../domains/continuity";
-import { createDialogueService } from "../domains/dialogue";
-import { createSchedulerDiagnostics } from "./scheduler/scheduler-diagnostics";
-import { configureDevelopmentSupervision } from "./work/development-supervision-host";
-import { configureTaskExecution } from "./toolchain/task-execution-port";
-import { forgetRetiredResearch } from "./pursuit/forget-research";
-import { toolchainForgetPurge } from "./toolchain/toolchain-forget";
-import { createSearchCheck } from "./toolchain/toolchain-search-check";
-import { taskMediaPorts } from "./toolchain/task-media-execution";
-import { taskLegacyPorts } from "./toolchain/task-legacy-execution";
+import type { GoogleProvider } from "../domains/google-accounts";
 import { REFERENCE_WINDOW_TOKENS, planWindow } from "../domains/inference";
 import { NOMINAL_FIXED_TOKENS, createMemoryService } from "../domains/memory";
-import { createOcr } from "../domains/ocr";
 import { createScheduler } from "../domains/scheduler";
 import { createTimers } from "../domains/timers";
-import { createUiCompositions } from "../domains/ui-compositions";
-import type { Capabilities } from "../domains/capabilities";
-import { getLogger } from "../infrastructure/logger";
+import type { ToolchainExecutionPort } from "../domains/tool-runtime";
 import type { Config } from "../infrastructure/config";
-import { claudeRunnerClient } from "../domains/coding";
-import {
-	createMonitoring,
-	createLarmCollector,
-	createLarmRepository,
-} from "../domains/monitoring";
+import { getLogger } from "../infrastructure/logger";
+import { assembleAgency } from "./agency/assembly";
+import { createAgendaGoalStore } from "./agency/goal-agenda";
+import { createNoteDocuments } from "./agency/note-documents";
+import { createLiveBridge } from "./media/live-bridge";
+import { createMemoryHostConnection } from "./memory-host";
+import { createLateResources } from "./resources/late";
+import { buildResources } from "./resources/wiring";
 import { buildCore, buildWebResearch } from "./server-core";
-import { buildCompute } from "./compute/compute-composition";
-import { buildVideo, buildMedia, buildModel3d } from "./server-media";
+import { buildMedia } from "./server-media";
 import { buildTasks } from "./server-tasks";
+import {
+	buildDialogueService,
+	buildHostToolchainService,
+	buildKnowledgeService,
+	buildMonitoringService,
+	buildWorkspaceServices,
+	registerForgetPurges,
+	wireToolchainExecution,
+} from "./server-wiring";
 import { assembleCuration } from "./server-world";
 import { createTimerAnnouncements } from "./timers/timer-announcements";
-import { createSpecialistPort } from "./toolchain/specialist-port";
-import { buildBrowser } from "./browser/browser-composition";
 import { createToolchainRouting } from "./toolchain/toolchain-routing";
-import { createHostToolchain } from "./toolchain/toolchain-host";
-import { createCodexInspection } from "./web-note/codex-web-note";
-import { assembleAgency } from "./agency/assembly";
-import { createNoteDocuments } from "./agency/note-documents";
+import { createSearchCheck } from "./toolchain/toolchain-search-check";
+import { createDotsMessages } from "./work/dots-messages";
 
 const log = getLogger("server");
-
-function buildKnowledge(
-	core: Awaited<ReturnType<typeof buildCore>>,
-	config: Config,
-) {
-	const { store, queue, inference } = core;
-	return createKnowledge({
-		store,
-		queue,
-		control: inference,
-		selectionResourceId: config.knowledgeSelectionResourceId,
-		source: configuredContextStill(config.contextStill ?? {}),
-		specialistContextSearch: permitsSpecialistContextSearch(
-			config.contextStill?.url,
-		),
-	});
-}
 
 /**
  * Constructs every service. Nothing is recovered, started or listening yet, and
@@ -107,7 +58,7 @@ export async function buildServices(
 		serviceTests,
 		queue,
 	} = core;
-	const knowledge = buildKnowledge(core, config);
+	const knowledge = buildKnowledgeService(core, config);
 	const webResearch = buildWebResearch(config, core);
 	const scheduler = createScheduler(store, queue);
 	const timers = createTimers(
@@ -123,7 +74,6 @@ export async function buildServices(
 		scheduler,
 		capabilities: () => toolchain.capabilities,
 	});
-	const { delegated } = tasks;
 	// One embedder on the saved LARM connection serves both the toolchain routing and the memory turn vectors.
 	const embedder: typeof inference.embed = (...args) =>
 		core.activity.embedding.track(() => inference.embed(...args), args[2]);
@@ -159,143 +109,52 @@ export async function buildServices(
 		memoryJournalPath,
 		worldResourceId: () => settings.get().world.curationResourceId,
 	});
-	const docling = buildDocling(settings, config.larmToken);
-	const markdown = buildMarkdown(store, queue, docling, () =>
-		changes.publish(),
-	);
-	const uiCompositions = createUiCompositions();
-	const workflow = createAppDevelopmentRuntime({
-		store,
-		queue,
+	let toolchainCapabilities: Capabilities | null = null;
+	const workspace = buildWorkspaceServices(config, {
+		core,
 		scheduler,
-		markdown,
-		scratch: core.scratch,
-		web: webResearch,
-		inference,
-		git: createGitObservation(resolve(dirname(dbPath), "workflow-git")),
-		storageRoot: resolve(dirname(dbPath), "app-storage"),
-		storageChanged: () => changes.publish(),
-		destination: () =>
-			docling.documents.available()
-				? {
-						namespace: "eumenes",
-						path: "開発日誌",
-						binding: docling.documents.binding(),
-					}
-				: null,
+		webResearch,
+		getCapabilities: () => toolchainCapabilities,
+		getToolchain: () => toolchain,
 	});
-	let ocrCapabilities: Capabilities | null = null;
-	const ocr = createOcr({
-		analyses: buildAnalysisFactory(config, settings, store, queue),
-		store,
-		queue,
-		connection: () => settings.ocrCredentials(),
-		inference,
-		capabilities: () => ocrCapabilities,
-	});
-	const model3d = buildModel3d(config, { core, conversation });
-	const video = buildVideo(config, core);
-	const compute = buildCompute(config, {
-		core,
-		conversation,
-		validChild: (db, child) =>
-			toolchain.agents.executions.authorizeChildInTransaction(db, child),
-	});
-	let browserCapabilities: Capabilities | null = null;
-	const browser = buildBrowser(config, {
-		core,
-		settings,
-		conversation,
-		inference,
-		capabilities: () => browserCapabilities,
-	});
-	// The toolchain's `resources` tool and `resource.read` reach the registry and ledger once they exist.
-	const lateResources = createLateResources(store);
-	const previewOrigin = config.toolchainEnabled
-		? canvasPreviewOrigin(config.origin, config.env.EUMENES_CANVAS_PREVIEW_PORT)
-		: null;
-	const canvasRuntime = previewOrigin
-		? createCanvasRuntime({
-				hostOrigin: config.origin,
-				previewOrigin,
-				dataDir: join(dirname(dbPath), "canvas"),
-				store,
-				inference,
-			})
-		: null;
-	const canvas = canvasRuntime
-		? {
-				runtime: canvasRuntime,
-				jobs: createCanvasJobs(queue, canvasRuntime, store, conversation),
-			}
-		: undefined;
-	const webNote = await createCodexInspection(
-		config.env,
-		config.researchCodexExecutable,
-		inference,
-	);
-	const claudeSocket = config.env.EUMENES_CLAUDE_WORK_RUNNER_SOCKET;
-	const claudeRunner = claudeSocket
-		? claudeRunnerClient(claudeSocket, process.cwd())
-		: undefined;
-	if (claudeRunner) await claudeRunner.probe();
-	const { toolchain, links } = await createHostToolchain({
-		resources: lateResources,
-		canvasAdapter:
-			canvas && createCanvasAdapter(canvas.runtime, canvas.jobs, conversation),
-		scratch: core.scratch,
+	const {
 		docling,
-		dotsWork: createDotsWork({
-			tasks: delegated.tasks,
-			reports: tasks.taskReports,
-			conversation,
-			capabilities: () => toolchain.capabilities,
-		}),
-		dotsConfiguration: tasks.dots.config,
-		dotsMessages,
-		dbPath,
-		store,
-		queue,
-		appDevelopmentAdapter: workflow.adapter,
 		markdown,
+		uiCompositions,
+		workflow,
 		ocr,
 		model3d,
 		video,
 		compute,
 		browser,
-		inference,
-		webResearch,
-		settings,
-		conversation,
-		googleAccounts,
-		ttsDictionary,
-		memory,
-		steward,
-		world,
-		goals: goals.goals,
-		serviceTests,
-		timers,
-		schedules: {
+		canvas,
+	} = workspace;
+	// The toolchain's `resources` tool and `resource.read` reach the registry and ledger once they exist.
+	const lateResources = createLateResources(store);
+	const { toolchain, links, webNote } = await buildHostToolchainService(
+		config,
+		{
+			core,
+			workspace,
+			lateResources,
+			tasks,
+			dotsMessages,
+			webResearch,
+			memory,
+			steward,
+			world,
+			goals,
 			scheduler,
-			workflowTitle: (db, id) => workflow.apps.app(db, id)?.title,
+			timers,
+			embedder,
+			log,
 		},
-		log,
-		history: config.historyToolsEnabled,
-		webResearchEnabled: config.webResearchToolsEnabled,
-		webNote,
-		claudeRunner,
-		embed: embedder,
-		terminalHooks: {
-			baseUrl: `http://${config.host}:${config.port}`,
-			publish: () => changes.publish(),
-		},
-	});
+	);
 	const workflowPorts = workflow.attach({
 		capabilities: toolchain.capabilities,
 		agents: toolchain.agents.executions,
 	});
-	ocrCapabilities = toolchain.capabilities;
-	browserCapabilities = toolchain.capabilities;
+	toolchainCapabilities = toolchain.capabilities;
 	const enabled = config.toolchainEnabled;
 	const media = buildMedia(config, {
 		core,
@@ -341,15 +200,6 @@ export async function buildServices(
 		dirname(resolve(dbPath)),
 	);
 	const agendaGoalStore = createAgendaGoalStore(store, goals.goals);
-	memory.registerForgetPurge((db, purge) =>
-		forgetGoalDocuments(
-			db,
-			agendaGoalStore,
-			noteDocuments,
-			memory.referenceInputs,
-			purge,
-		),
-	);
 	const agency = assembleAgency(
 		{
 			...core,
@@ -375,157 +225,79 @@ export async function buildServices(
 		},
 		() => dialogue,
 	);
-	const dialogue = createDialogueService({
-		debugDiagnostics: {
-			enabled: (tx) => settings.inTransaction(tx).agency.debugMode === true,
-			onChange: settings.onChange,
-			publish: () => changes.publish(),
-		},
-		diagnostics: createSchedulerDiagnostics({
-			scheduler,
-			queue,
-			apps: workflow.apps,
-		}),
-		externalOutput: liveBridge.externalOutput,
-		resources: resources.dialogue,
-		agency: agency.dialoguePort,
-		conversationAgent: agency.conversationAgent,
-		lookup: createConversationLookup(webNote),
-		logFile: () => config.logFile,
-		objectRecognition: enabled
-			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
-			: undefined,
-		music: enabled ? media.music : undefined,
-		image: enabled ? media.image : undefined,
-		generatedImages: enabled ? generatedImageInput(media.image) : undefined,
-		excalidraw: enabled ? media.drawingOperations : undefined,
+	const dialogue = buildDialogueService(config, {
 		store,
+		settings,
+		changes,
 		conversation,
-		larm: inference,
+		inference,
 		queue,
+		scheduler,
+		workflow,
+		liveBridge,
+		resources,
+		agency,
+		webNote,
+		media,
 		continuity,
 		memory,
 		steward,
-		agents: enabled ? toolchain.agents : undefined,
-		...(world ? { worldContext: world.context } : {}),
-		...(toolchains
-			? {
-					toolchains,
-					specialist: createSpecialistPort({
-						routing: toolchains,
-						registry: toolchain.registry,
-						schemas: toolchain.schemas,
-						knowledge,
-						clock: () => new Date().toISOString(),
-					}),
-				}
-			: {}),
+		world,
+		toolchain,
+		toolchains,
+		knowledge,
 	});
-	memory.registerForgetPurge(
-		agency.forgetInTransaction,
-		agency.planForgetInTransaction,
-	);
 	workflow.attachDialogue(dialogue);
 	links.attachDialogue(dialogue);
 	knowledge.attachDialogue(dialogue);
 	if (enabled && toolchains) {
-		agencyExecution = configureTaskExecution({
+		agencyExecution = wireToolchainExecution({
+			toolchain,
+			toolchains,
+			workflowPorts,
 			settings,
-			...workflowPorts,
-			webNote: toolchain.webNote,
-			claudeCode: toolchain.claudeCode,
-			developmentSupervision: toolchain.developmentSupervision,
-			collaboration: toolchain.collaboration,
-			interact: browser.interact,
+			browser,
 			queue,
-			childOperations: toolchain.childOperations,
 			store,
-			capabilities: toolchain.capabilities,
-			agents: toolchain.agents,
-			routing: toolchains,
-			registry: toolchain.registry,
 			dialogue,
 			conversation,
 			memory,
 			inference,
-			browser: browser.service,
-			media: taskMediaPorts({
-				image: media.image,
-				music: media.music,
-				excalidraw: media.drawingOperations,
-			}),
-			legacy: taskLegacyPorts(dialogue),
-			resources: resources.access.registry,
-		});
-		configureDevelopmentSupervision({
-			supervisor: toolchain.developmentSupervision,
-			store,
-			inference,
-			execution: agencyExecution,
-			capabilities: toolchain.capabilities,
-			note: toolchain.webNote,
-			claude: toolchain.claudeCode,
+			media,
+			resources,
 			markdown,
-			dialogue,
 			knowledge,
-			checkout: process.cwd(),
-			context: {
-				memory,
-				goals: goals.goals,
-				...(world
-					? {
-							world: {
-								store,
-								service: world.service,
-								documents: world.documents,
-							},
-						}
-					: {}),
-			},
+			goals,
+			world,
 		});
 	}
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
-	memory.registerForgetPurge(toolchainForgetPurge(toolchain));
-	memory.registerForgetPurge((db, purge) =>
-		knowledge.forgetSupervisionSourcesInTransaction(db, purge.messageIds),
-	);
-	memory.registerForgetPurge((db, purge) => {
-		forgetRetiredResearch(
-			db,
-			purge.messageIds,
-			Date.now(),
-			(id) => webResearch.forgetInTransaction(db, id),
-			(id) => dialogue.revokeExecutionNoticeInTransaction(db, id),
-		);
+	registerForgetPurges({
+		memory,
+		agency,
+		agendaGoalStore,
+		noteDocuments,
+		toolchain,
+		knowledge,
+		webResearch,
+		dialogue,
 	});
-	const audioDeps = {
+	const { voice, liveVoice, prewarm } = liveBridge.attach({
 		...core,
 		conversation,
 		continuity,
 		dialogue,
 		memory,
 		agency: agency.dialoguePort,
-	};
-	const { voice, liveVoice, prewarm } = liveBridge.attach(audioDeps);
-	const monitoring = createMonitoring({
-		remote: createLarmCollector({
-			config: () => ({
-				baseUrl: settings.get().larm.baseUrl,
-				token: config.larmToken,
-			}),
-			onChange: settings.onChange,
-			repository: createLarmRepository(store),
-		}),
+	});
+	const monitoring = buildMonitoringService(config, {
+		store,
 		settings,
-		larmStatus: () => inference.status(),
-		attempts: inference.attemptActivity,
-		image: media.image.activity,
-		music: media.music.activity,
-		embedding: core.activity.embedding,
-		judge: core.activity.judge,
+		inference,
 		queue,
-		dataDir: dirname(resolve(dbPath)),
+		activity: core.activity,
+		media,
 	});
 	scheduler.registerTarget(dialogue.promptTarget);
 	const searchCheck = toolchains

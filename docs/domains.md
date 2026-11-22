@@ -68,6 +68,7 @@
 | `web-note` | 3 | `api/domains/web-note/index.ts` | なし | なし | `capabilities`、`queue`、`tool-runtime` | なし | なし |
 | `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`continuity`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`resources`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `goals` |
 | `voice-dialogue` | 6 | `api/domains/voice-dialogue/index.ts` | `web/src/domains/voice-dialogue/index.ts` | なし | `delivery`、`dialogue`、`inference` | `audio`、`avatar`、`dialogue`、`settings` | `tts-dictionary` |
+| `application` | 7 | なし | なし | なし | なし | なし | なし |
 <!-- domains:end -->
 
 ## 試験と関連文書

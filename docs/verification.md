@@ -6,7 +6,9 @@ README の「検証」の詳細です。
 
 `verify` は対象 domain と型依存閉包を表示し、静的検査と domain 試験を実行します。静的検査（境界、system-context、サイズ、SQL境界、domain表、format、lint、型）は domain を指定しても常にリポジトリ全体に対して実行します（2026-10-27）。選んだ domain の所有パス・domain に属する違反は失敗にします。それ以外（他の domain、`api/application`・`web/src/workspace`・`client`・`cli`・`scripts` などどの domain にも属さない共有ファイル、生成物）の違反は失敗にせず、段階ごとに件数と先頭10件を警告として表示し、全件を report の `steps[].warnings` に残します。並行作業の途中の違反で他の検証を止めないためです。`verify:all` ではすべての違反が失敗です。各ツールが出す件数（型の `Found N errors`、lint の `N problems`、format の件数）と読み取れた違反の数が合わない場合、差の分はリポジトリ全体の違反として失敗にし、読み取れない失敗を見落としません。変更したdomainと影響のある利用側domainを選んで確認します。横断変更を理由に `verify:all` を必須とはしません。`verify:all` は全体の境界・文書整合・型・単体／API結合試験、DesignSystem、Web buildを実行し、ブラウザE2Eを含みません。検証結果と入力 hash は `verification-reports/runs/<runId>/report.json` に保存し、`verification-reports/latest.json` から直近の結果を参照できます。
 
-`verification-reports/` はローカルの作業記録で、リポジトリに入れません。残す証跡は `spec/verification/` に置きます。
+`verification-reports/` はローカルの作業記録で、リポジトリに入れません。残す証跡は `spec/verification/` に置きます。今後 `spec/` へ新規追加する画像は WebP や最適化 PNG（目安 250 KB 以下）とし、大容量動画や生キャプチャは git 外に保管して Markdown と構造化 JSON サマリだけを残します（確認は `bun run repo:hygiene`）。`verification-reports/` の容量内訳と個別調査ディレクトリの整理は `bun run verify:prune`（既定 dry-run、削除は `--apply`）を使います。環境診断は `bun run doctor`、テスト本体を除いた静的ガードレールの一括確認は `bun run check:guards`（並行作業時は `--domain <name>` 指定）を使います。
+
+`scripts/size-budget.json` は既存ラチェットの引き下げ専用です。`bun scripts/size-budget.ts --write` は既存エントリの縮小・解消・削除済み除去だけを反映し、新規超過や増加は登録しません。新しい超過は責務分割で解消します。
 
 会話backendをAIから再現するときは、[CLI対話モードのデバッグ手順](cli-chat.md#aiによる再現デバッグ)を使えます。検証用の会話IDへ複数行を順に送り、JSONLのrunIdから実行状態・エラーレポート・ログを追います。CLIの単体・API/SSE結合・エラー・実プロセス試験のうち、domain の公開入口を直接 import しているものは、その domain の verify と test:domain に含まれます。公開入口を import していないものは、domainの明示した結合試験に登録するか、同ページの対象ファイルを明示して実行します。画面の描画や操作、音声入力・再生の受入は別に行います。
 

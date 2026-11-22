@@ -19,6 +19,37 @@ import {
 import type { ExecutionContext } from "./execution-context";
 
 import type { ExecutionOps } from "./execution-store";
+
+function initialParentState(
+	control: {
+		revisionId: string;
+		instructions: string;
+		limits: ParentState["limits"];
+	},
+	refs: ExecutionReference[],
+): ParentState {
+	return {
+		version: 1,
+		planRequired: true,
+		bindingRevisionId: control.revisionId,
+		instructions: control.instructions,
+		calls: 0,
+		consumed: 0,
+		searches: 0,
+		children: 0,
+		ordinal: 0,
+		questions: 0,
+		selecting: false,
+		offered: [],
+		retained: [],
+		refs,
+		notes: [],
+		pending: null,
+		question: null,
+		limits: control.limits,
+	};
+}
+
 export function executionCommands(
 	ctx: ExecutionContext,
 	ops: ExecutionOps,
@@ -74,26 +105,7 @@ export function executionCommands(
 			throw new Error("execution_capacity");
 		const control = ctx.port().controlInTransaction(db)!;
 		const id = crypto.randomUUID();
-		const state: ParentState = {
-			version: 1,
-			planRequired: true,
-			bindingRevisionId: control.revisionId,
-			instructions: control.instructions,
-			calls: 0,
-			consumed: 0,
-			searches: 0,
-			children: 0,
-			ordinal: 0,
-			questions: 0,
-			selecting: false,
-			offered: [],
-			retained: [],
-			refs,
-			notes: [],
-			pending: null,
-			question: null,
-			limits: control.limits,
-		};
+		const state = initialParentState(control, refs);
 		db.query(
 			"INSERT INTO agent_executions(id,start_key,input_digest,conversation_id,source_json,request,state,state_json,deadline,created_at,updated_at) VALUES(?,?,?,?,?,?,'queued',?,?,?,?)",
 		).run(

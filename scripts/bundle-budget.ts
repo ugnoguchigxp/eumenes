@@ -59,6 +59,15 @@ export function measure(distDir = dist): Measure {
 }
 
 export type Verdict = { failures: string[]; notices: string[] };
+export function formatTopChunks(
+	files: Record<string, number>,
+	limit = 5,
+): string[] {
+	return Object.entries(files)
+		.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+		.slice(0, limit)
+		.map(([file, bytes]) => `  ${bytes} B  ${file}`);
+}
 export function compare(current: Budget, baseline: Budget): Verdict {
 	const failures: string[] = [];
 	const notices: string[] = [];
@@ -95,6 +104,11 @@ if (import.meta.main) {
 		if (failures.length) {
 			for (const failure of failures)
 				console.error(`bundle-budget: ${failure}`);
+			const top = formatTopChunks(current.files, 5);
+			if (top.length) {
+				console.error("bundle-budget: top initial chunks (gzip):");
+				for (const line of top) console.error(line);
+			}
 			process.exit(1);
 		}
 		console.log(

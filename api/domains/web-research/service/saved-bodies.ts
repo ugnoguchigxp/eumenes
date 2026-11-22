@@ -72,6 +72,52 @@ function normalizedPositions(text: string) {
 	}
 	return { text: parts.join(""), positions, ends };
 }
+
+function collectFindMatches(
+	points: readonly string[],
+	normalized: ReturnType<typeof normalizedPositions>,
+	query: string,
+	startAt: number,
+	makeReadCursor: (pos: number) => string,
+) {
+	let at = startAt;
+	const matches: Array<{
+		text: string;
+		start: number;
+		end: number;
+		cursor: string;
+	}> = [];
+	while (matches.length < 5) {
+		const found = normalized.text.indexOf(query, at);
+		if (found < 0) {
+			at = normalized.text.length;
+			break;
+		}
+		const start = normalized.positions[found]!,
+			end = normalized.ends[found + query.length - 1]!;
+		const match = {
+			text: points
+				.slice(
+					Math.max(0, start - 40),
+					Math.min(points.length, end + 40, start + 240),
+				)
+				.join(""),
+			start,
+			end,
+			cursor: makeReadCursor(Math.max(0, start - 80)),
+		};
+		if (
+			Buffer.byteLength(JSON.stringify({ matches: [...matches, match] })) > 7600
+		) {
+			at = found;
+			break;
+		}
+		matches.push(match);
+		at = found + query.length;
+	}
+	return { matches, at };
+}
+
 export function createSavedBodies(
 	now = Date.now,
 	limits = { perTask: 1048576, total: 16777216, count: 64 },
@@ -276,47 +322,19 @@ export function createSavedBodies(
 				throw new Error("source_cursor_invalid");
 			at = p.position;
 		}
-		const matches: Array<{
-			text: string;
-			start: number;
-			end: number;
-			cursor: string;
-		}> = [];
-		while (matches.length < 5) {
-			const found = normalized.text.indexOf(query, at);
-			if (found < 0) {
-				at = normalized.text.length;
-				break;
-			}
-			const start = normalized.positions[found]!,
-				end = normalized.ends[found + query.length - 1]!;
-			const match = {
-				text: b.points
-					.slice(
-						Math.max(0, start - 40),
-						Math.min(b.points.length, end + 40, start + 240),
-					)
-					.join(""),
-				start,
-				end,
-				cursor: cursor(input.sourceRef, Math.max(0, start - 80), "read"),
-			};
-			if (
-				Buffer.byteLength(JSON.stringify({ matches: [...matches, match] })) >
-				7600
-			) {
-				at = found;
-				break;
-			}
-			matches.push(match);
-			at = found + query.length;
-		}
-		const hasMore = normalized.text.indexOf(query, at) >= 0;
+		const { matches, at: nextAt } = collectFindMatches(
+			b.points,
+			normalized,
+			query,
+			at,
+			(pos) => cursor(input.sourceRef, pos, "read"),
+		);
+		const hasMore = normalized.text.indexOf(query, nextAt) >= 0;
 		return {
 			sourceRef: input.sourceRef,
 			matches,
 			hasMore,
-			cursor: hasMore ? cursor(input.sourceRef, at, "find", query) : null,
+			cursor: hasMore ? cursor(input.sourceRef, nextAt, "find", query) : null,
 			acquisitionTruncated: b.acquisitionTruncated,
 		};
 	}

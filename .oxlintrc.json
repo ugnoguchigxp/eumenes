@@ -10,6 +10,8 @@
 	"ignorePatterns": [
 		"node_modules/**",
 		"vendor/live2d/framework.js",
+		"vendor/canvas/workbench/**",
+		"spec/verification/**",
 		"web/public/live2d/**",
 		"dist/**",
 		"dist-web/**",

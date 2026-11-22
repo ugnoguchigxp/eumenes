@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test";
-import { type Budget, compare, FUNCTION_LIMIT, measure } from "./size-budget";
+import {
+	type Budget,
+	compare,
+	FUNCTION_LIMIT,
+	measure,
+	notices,
+	ratchetBudget,
+} from "./size-budget";
 
 const body = (n: number) => "\tconsole.log(1);\n".repeat(n);
 
@@ -75,4 +82,62 @@ test("ratchet fails on growth and new offenders, not on shrinkage", () => {
 	expect(fresh[0]).toContain("new file over 800 lines: b.ts");
 	expect(fresh[1]).toContain("new function over 300 lines: b.ts#g");
 	expect(fresh[2]).toContain("new test file over 1000 lines: b.test.ts");
+});
+
+test("ratchetBudget records only shrinkage and removals, never new offenders or growth", () => {
+	const recorded: Budget = {
+		files: { "a.ts": 900, "gone.ts": 850 },
+		functions: { "a.ts#shrink": 420, "a.ts#grow": 350, "a.ts#fixed": 310 },
+		testFiles: { "a.test.ts": 1200 },
+	};
+	const current: Budget = {
+		files: { "a.ts": 860, "new-big.ts": 910 },
+		functions: {
+			"a.ts#shrink": 360,
+			"a.ts#grow": 410,
+			"new-big.ts#huge": 380,
+		},
+		testFiles: { "a.test.ts": 1250, "new.test.ts": 1050 },
+	};
+	const result = ratchetBudget(current, recorded);
+	expect(result.next).toEqual({
+		files: { "a.ts": 860 },
+		functions: { "a.ts#shrink": 360, "a.ts#grow": 350 },
+		testFiles: { "a.test.ts": 1200 },
+	});
+	expect(result.reduced).toEqual([
+		"a.ts: 900 -> 860",
+		"a.ts#shrink: 420 -> 360",
+	]);
+	expect(result.removed).toEqual(["gone.ts (was 850)", "a.ts#fixed (was 310)"]);
+	expect(result.blocked).toHaveLength(5);
+	expect(result.blocked.some((line) => line.includes("new-big.ts"))).toBe(true);
+	expect(result.blocked.some((line) => line.includes("a.ts#grow grew"))).toBe(
+		true,
+	);
+	expect(result.blocked.some((line) => line.includes("new.test.ts"))).toBe(
+		true,
+	);
+});
+
+test("notices report meaningful shrinkage and resolved entries without triggering size-budget error prefix", () => {
+	const recorded: Budget = {
+		files: { "gone.ts": 850 },
+		functions: { "a.ts#big": 400, "a.ts#tiny-drop": 350 },
+		testFiles: {},
+	};
+	const current: Budget = {
+		files: {},
+		functions: { "a.ts#big": 350, "a.ts#tiny-drop": 345 },
+		testFiles: {},
+	};
+	const found = notices(current, recorded);
+	expect(found).toHaveLength(2);
+	expect(found.every((line) => line.startsWith("size-budget-notice: "))).toBe(
+		true,
+	);
+	expect(found.some((line) => line.includes("gone.ts"))).toBe(true);
+	expect(
+		found.some((line) => line.includes("a.ts#big shrank 400 -> 350")),
+	).toBe(true);
 });

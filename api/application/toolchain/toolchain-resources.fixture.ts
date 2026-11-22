@@ -15,36 +15,35 @@ export function fixtureResources(
 	image: unknown,
 	music: unknown,
 ) {
-	const resources =
-		options.resources
-			? createResourceAccess({
-					store,
-					kinds: () =>
-						store.read((db) =>
-							capabilities.resourceKindsInTransaction(db),
-						) as ResourceKind[],
-					adapters: [
-						createPursuitReportResourceAdapter(store),
-						...(options.markdown
-							? [
-									createMarkdownResourceAdapter(
-										store,
-										(id) => !!options.scratch?.get(id),
-									),
-								]
-							: []),
-						...(options.scratch
-							? [createScratchResourceAdapter(options.scratch)]
-							: []),
-						...(image ? [createImageResourceAdapter({ store })] : []),
-						...(music
-							? createMusicResourceAdapters({
+	const resources = options.resources
+		? createResourceAccess({
+				store,
+				kinds: () =>
+					store.read((db) =>
+						capabilities.resourceKindsInTransaction(db),
+					) as ResourceKind[],
+				adapters: [
+					createPursuitReportResourceAdapter(store),
+					...(options.markdown
+						? [
+								createMarkdownResourceAdapter(
 									store,
-									gateway: options.musicGateway!,
-								})
-							: []),
-					],
-				})
-			: undefined;
+									(id) => !!options.scratch?.get(id),
+								),
+							]
+						: []),
+					...(options.scratch
+						? [createScratchResourceAdapter(options.scratch)]
+						: []),
+					...(image ? [createImageResourceAdapter({ store })] : []),
+					...(music
+						? createMusicResourceAdapters({
+								store,
+								gateway: options.musicGateway!,
+							})
+						: []),
+				],
+			})
+		: undefined;
 	return resources;
 }

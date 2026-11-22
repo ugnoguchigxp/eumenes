@@ -12,10 +12,18 @@ import ts from "@typescript/typescript6";
 export const FILE_LIMIT = 800;
 export const FUNCTION_LIMIT = 300;
 export const TEST_FILE_LIMIT = 1000;
+export const RATCHET_RATIO = 0.1;
+export const RATCHET_LINES = 30;
 export type Budget = {
 	files: Record<string, number>;
 	functions: Record<string, number>;
 	testFiles: Record<string, number>;
+};
+export type RatchetResult = {
+	next: Budget;
+	reduced: string[];
+	removed: string[];
+	blocked: string[];
 };
 
 const root = resolve(import.meta.dir, "..");
@@ -199,6 +207,56 @@ export function compare(current: Budget, recorded: Budget): string[] {
 	return errors;
 }
 
+/**
+ * Downward-only ratchet update: keeps only shrinkage, resolution below limit, and
+ * removal of deleted entries. New over-limit entries and growth are never recorded.
+ */
+export function ratchetBudget(
+	current: Budget,
+	recorded: Budget,
+): RatchetResult {
+	const next: Budget = { files: {}, functions: {}, testFiles: {} };
+	const reduced: string[] = [];
+	const removed: string[] = [];
+	for (const kind of ["files", "functions", "testFiles"] as const) {
+		for (const [name, before] of Object.entries(recorded[kind])) {
+			const now = current[kind][name];
+			if (now === undefined) {
+				removed.push(`${name} (was ${before})`);
+			} else if (now < before) {
+				next[kind][name] = now;
+				reduced.push(`${name}: ${before} -> ${now}`);
+			} else {
+				next[kind][name] = before;
+			}
+		}
+	}
+	return { next, reduced, removed, blocked: compare(current, recorded) };
+}
+
+/** Notices for recorded entries that shrank meaningfully or are now resolved/deleted. */
+export function notices(current: Budget, recorded: Budget): string[] {
+	const out: string[] = [];
+	for (const kind of ["files", "functions", "testFiles"] as const) {
+		for (const [name, before] of Object.entries(recorded[kind])) {
+			const now = current[kind][name];
+			if (now === undefined) {
+				out.push(
+					`size-budget-notice: resolved or deleted entry ${name} (was ${before}); run \`bun scripts/size-budget.ts --write\` to ratchet`,
+				);
+			} else if (
+				before - now >= RATCHET_LINES ||
+				(before > 0 && (before - now) / before >= RATCHET_RATIO)
+			) {
+				out.push(
+					`size-budget-notice: ${name} shrank ${before} -> ${now}; run \`bun scripts/size-budget.ts --write\` to ratchet`,
+				);
+			}
+		}
+	}
+	return out;
+}
+
 function readBudget(): Budget {
 	try {
 		const parsed = JSON.parse(
@@ -221,22 +279,30 @@ const sorted = (record: Record<string, number>) =>
 if (import.meta.main) {
 	const args = process.argv.slice(2).filter((arg) => arg !== "--");
 	if (args.includes("--write")) {
-		const budget = measureAll();
+		const recorded = readBudget();
+		const current = measureAll();
+		const result = ratchetBudget(current, recorded);
 		writeFileSync(
 			budgetPath,
 			`${JSON.stringify(
 				{
-					files: sorted(budget.files),
-					functions: sorted(budget.functions),
-					testFiles: sorted(budget.testFiles),
+					files: sorted(result.next.files),
+					functions: sorted(result.next.functions),
+					testFiles: sorted(result.next.testFiles),
 				},
 				null,
 				"\t",
 			)}\n`,
 		);
 		console.log(
-			`size-budget: wrote ${Object.keys(budget.files).length} files, ${Object.keys(budget.functions).length} functions, ${Object.keys(budget.testFiles).length} test files`,
+			`size-budget: ratcheted ${Object.keys(result.next.files).length} files, ${Object.keys(result.next.functions).length} functions, ${Object.keys(result.next.testFiles).length} test files (reduced ${result.reduced.length}, removed ${result.removed.length})`,
 		);
+		if (result.blocked.length) {
+			console.error(
+				`size-budget-notice: ${result.blocked.length} new or grown violation(s) were NOT recorded:\n${result.blocked.join("\n")}`,
+			);
+			process.exit(1);
+		}
 	} else {
 		const scope = args.map((arg) => arg.replace(/\/+$/, ""));
 		const paths = sourceFiles().filter(
@@ -249,7 +315,12 @@ if (import.meta.main) {
 				scope.length === 0 ||
 				scope.some((dir) => file === dir || file.startsWith(`${dir}/`)),
 		);
-		const errors = compare(measureAll(paths, testPaths), readBudget());
+		const current = measureAll(paths, testPaths);
+		const recorded = readBudget();
+		const errors = compare(current, recorded);
+		if (scope.length === 0) {
+			for (const note of notices(current, recorded)) console.log(note);
+		}
 		if (errors.length) {
 			console.error(errors.join("\n"));
 			process.exit(1);

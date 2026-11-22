@@ -18,7 +18,7 @@ import {
 	insertAgencyWork,
 	returnAgencyWork,
 	revokeAgencyWork,
-} from "../../domains/dialogue/repository/agency";
+} from "../../domains/dialogue/test/agency-work.fixture";
 
 async function fixture() {
 	const f = await agendaFixture();

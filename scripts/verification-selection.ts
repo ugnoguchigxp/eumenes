@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { applicationDomainEntries } from "./boundaries";
-import { type Domain, domains, ownedPaths } from "./domains";
+import { type Domain, domains, ownedPaths, verificationPaths } from "./domains";
 import { isParkedCheckout } from "./verification-inputs";
 
 export function parseSelection(raw: string[], legacy = false) {
@@ -104,6 +104,11 @@ export function selectionPaths(selected: Domain[], sub?: string) {
 				.map((path) => (sub ? `${path}/subdomains/${sub}` : path)),
 		),
 	];
+}
+
+/** Paths governed by static checks for the selected domains, including explicit `applicationPaths` (G1). */
+export function staticSelectionPaths(selected: Domain[]) {
+	return [...new Set(selected.flatMap(verificationPaths))];
 }
 
 export const acceptanceFiles = [

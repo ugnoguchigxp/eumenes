@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import {
 	compare,
+	formatTopChunks,
 	initialScripts,
 	RATCHET_NOTICE,
 	TOLERANCE,
@@ -55,4 +56,16 @@ test("a build that shrinks well below the baseline asks to ratchet", () => {
 	);
 	expect(shrunk.failures).toEqual([]);
 	expect(shrunk.notices).toHaveLength(1);
+});
+
+test("formatTopChunks lists the largest initial chunks first up to the limit", () => {
+	const top = formatTopChunks(
+		{
+			"assets/a.js": 10_000,
+			"assets/b.js": 50_000,
+			"assets/c.js": 25_000,
+		},
+		2,
+	);
+	expect(top).toEqual(["  50000 B  assets/b.js", "  25000 B  assets/c.js"]);
 });

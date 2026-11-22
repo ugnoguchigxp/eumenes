@@ -84,7 +84,7 @@ test("app memory host recovers first, gates requests until start, and reuses the
 });
 
 test("app memory host keeps its profile across restarts and enforces current credential grants", async () => {
-	const { h, owner, close } = await setup();
+	const { owner, close } = await setup();
 	try {
 		await owner.recover();
 		await owner.listen();

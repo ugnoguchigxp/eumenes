@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Depends, domains } from "./domains";
+import { applicationPaths, type Depends, domains } from "./domains";
 
 /**
  * Generates the domain table in docs/domains.md from scripts/domains.ts.
@@ -73,18 +73,54 @@ export function generate(doc: string): string {
 	return replaceBlock(doc, renderDomainTable());
 }
 
+function listApplicationTsFiles(
+	base: string,
+	rel = "api/application",
+): string[] {
+	const dir = join(base, rel);
+	if (!existsSync(dir)) return [];
+	const out: string[] = [];
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		const next = `${rel}/${entry.name}`;
+		if (entry.isDirectory()) out.push(...listApplicationTsFiles(base, next));
+		else if (entry.isFile() && /\.tsx?$/.test(entry.name)) out.push(next);
+	}
+	return out.sort();
+}
+
+/** Returns any `api/application/**` TS/TSX file not owned by any domain's `applicationPaths`. */
+export function unownedApplicationFiles(
+	base = root,
+	ownership: Partial<Record<string, readonly string[]>> = applicationPaths,
+): string[] {
+	const owned = Object.values(ownership).flatMap((list) => list ?? []);
+	return listApplicationTsFiles(base).filter(
+		(file) =>
+			!owned.some((entry) => file === entry || file.startsWith(`${entry}/`)),
+	);
+}
+
 if (import.meta.main) {
 	const file = join(root, "docs/domains.md");
 	const current = readFileSync(file, "utf8");
 	const next = generate(current);
 	if (process.argv.includes("--check")) {
+		const unowned = unownedApplicationFiles(root);
+		let failed = false;
 		if (next !== current) {
 			console.error(
 				"docs/domains.md の domain 表が scripts/domains.ts と一致しません。`bun scripts/domain-docs.ts` で更新してください。",
 			);
-			process.exit(1);
+			failed = true;
 		}
-		console.log("docs/domains.md: domain 表は最新です");
+		if (unowned.length) {
+			console.error(
+				`api/application に未所有のファイルがあります (scripts/domains.ts の applicationPaths に追加してください):\n${unowned.map((p) => `  ${p}`).join("\n")}`,
+			);
+			failed = true;
+		}
+		if (failed) process.exit(1);
+		console.log("docs/domains.md: domain 表と application 所有は最新です");
 	} else if (next !== current) {
 		writeFileSync(file, next);
 		console.log("docs/domains.md: domain 表を更新しました");

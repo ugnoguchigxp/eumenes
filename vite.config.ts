@@ -91,6 +91,13 @@ export default defineConfig(({ command, mode }) => {
 			},
 		],
 		root: "web",
+		...(command === "build"
+			? {
+					resolve: {
+						dedupe: ["zod"],
+					},
+				}
+			: {}),
 		// Fixture servers must not replace the running developer server's dependencies.
 		cacheDir:
 			env.EUMENES_VITE_CACHE_DIR ?? resolve("node_modules/.vite/development"),

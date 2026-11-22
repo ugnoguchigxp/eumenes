@@ -51,7 +51,10 @@ test("image screen bundle seeds one registered screen and reads the image domain
 		expect(
 			(
 				artifact.variants[0]!.definition as {
-					creationOptions?: { defaults?: { model?: unknown }; models?: unknown };
+					creationOptions?: {
+						defaults?: { model?: unknown };
+						models?: unknown;
+					};
 				}
 			).creationOptions?.defaults?.model,
 		).toBeUndefined();

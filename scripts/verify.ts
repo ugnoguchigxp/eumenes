@@ -28,6 +28,7 @@ import {
 	integrationTestFiles,
 	selectionPaths,
 	sourceFiles,
+	staticSelectionPaths,
 	testCommand,
 	testPattern,
 	type TestRunner,
@@ -55,7 +56,12 @@ export function verificationPlan(
 		all ? ["--all"] : selected.flatMap((domain) => ["--domain", domain]),
 	);
 	const paths = selectionPaths(selection.selected);
-	const scope: StaticScope = { all, domains: selection.selected, paths };
+	const staticPaths = staticSelectionPaths(selection.selected);
+	const scope: StaticScope = {
+		all,
+		domains: selection.selected,
+		paths: staticPaths,
+	};
 	const plan: VerificationStep[] = [];
 	const command = (name: string, args: string[]) =>
 		plan.push({ name, command: [process.execPath, ...args] });
@@ -266,6 +272,15 @@ if (import.meta.main) {
 			];
 		}
 		process.exitCode = await executeVerification(root, reports, report, plan);
+		const outsideWarnings = report.steps.reduce(
+			(sum, step) => sum + (step.warnings?.length ?? 0),
+			0,
+		);
+		if (outsideWarnings > 0) {
+			console.log(
+				`[verify] outside-scope warnings: ${outsideWarnings} (see verification-reports/runs/${report.runId}/report.json)`,
+			);
+		}
 	} catch (error) {
 		console.error(error);
 		process.exitCode = 1;

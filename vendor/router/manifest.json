@@ -18,10 +18,7 @@
 	"dbSchemaVersion": 1,
 	"entries": {
 		"routeWithSelection": {
-			"modes": [
-				"conversation",
-				"tools-only"
-			],
+			"modes": ["conversation", "tools-only"],
 			"defaultMode": "conversation",
 			"ports": [
 				"embed",

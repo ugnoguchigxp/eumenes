@@ -379,7 +379,10 @@ export const domains = {
 		backend: "api/domains/settings",
 		web: "web/src/domains/settings",
 		components: null,
-		integrationTests: ["api/application/backup-restore.test.ts"],
+		integrationTests: [
+			"api/application/backup-restore.test.ts",
+			"api/application/fixed-input-size.test.ts",
+		],
 		depends: {
 			api: [],
 			web: [],
@@ -484,6 +487,7 @@ export const domains = {
 		backend: "api/domains/steward",
 		web: null,
 		components: null,
+		integrationTests: ["api/application/fixed-input-size.test.ts"],
 		depends: {
 			api: ["continuity", "conversation", "goals", "memory", "world"],
 			web: [],
@@ -619,6 +623,7 @@ export const domains = {
 			"api/application/agency/note-input.test.ts",
 			"api/application/agency/research-note-persistence.test.ts",
 			"api/application/agency/schema.test.ts",
+			"api/application/fixed-input-size.test.ts",
 		],
 		depends: {
 			api: [
@@ -653,6 +658,25 @@ export const domains = {
 			web: ["audio", "avatar", "dialogue", "settings"],
 			test: ["tts-dictionary"],
 		},
+	},
+	application: {
+		tier: 7,
+		backend: null,
+		web: null,
+		components: null,
+		integrationTests: [
+			"api/application/app.test.ts",
+			"api/application/error-status.test.ts",
+			"api/application/events.test.ts",
+			"api/application/events-client.test.ts",
+			"api/application/fixed-names.test.ts",
+			"api/application/lifecycle.test.ts",
+			"api/application/logging.test.ts",
+			"api/application/migrations.test.ts",
+			"api/application/server.test.ts",
+			"api/application/vendor.test.ts",
+		],
+		depends: { api: [], web: [], test: [] },
 	},
 } as const;
 export type Domain = keyof typeof domains;
@@ -701,5 +725,116 @@ export function ownedPaths(domain: Domain): string[] {
 		...(domain === "coding"
 			? ["packages/coding-runner/src", "packages/coding-runner/test"]
 			: []),
+	];
+}
+
+/**
+ * Explicit ownership of `api/application/**` paths for static verification scoping (G1).
+ * Kept separate from `ownedPaths` so `boundaries.ts` continues to apply application-layer
+ * rules (not domain-internal rules) to `api/application/**`.
+ */
+export const applicationPaths: Partial<Record<Domain, readonly string[]>> = {
+	"agent-runtime": [
+		"api/application/agent-attempt-purge.test.ts",
+		"api/application/task-purge.test.ts",
+	],
+	"app-development": ["api/application/app-development"],
+	artifact: ["api/application/canvas"],
+	browser: ["api/application/browser"],
+	capabilities: ["api/application/toolchain"],
+	collaboration: ["api/application/collaboration"],
+	compute: ["api/application/compute"],
+	dialogue: [
+		"api/application/agency",
+		"api/application/knowledge",
+		"api/application/review",
+		"api/application/stock",
+		"api/application/weather",
+		"api/application/conversation-prewarm.ts",
+		"api/application/conversation-prewarm.test.ts",
+		"api/application/history-cli.test.ts",
+		"api/application/router-forget-purge.test.ts",
+	],
+	docling: ["api/application/docling"],
+	larm: [
+		"api/application/larm-agent-capacity.test.ts",
+		"api/application/larm-prewarm-reuse.test.ts",
+	],
+	markdown: ["api/application/markdown"],
+	memory: [
+		"api/application/backup-restore.test.ts",
+		"api/application/memory-host.ts",
+		"api/application/memory-host.test.ts",
+		"api/application/memory-host-integration.test.ts",
+		"api/application/memory-package-integration.test.ts",
+	],
+	pipelines: ["api/application/pipelines"],
+	pursuit: ["api/application/pursuit"],
+	resources: ["api/application/resources"],
+	scheduler: ["api/application/scheduler"],
+	scratch: ["api/application/scratch"],
+	settings: ["api/application/settings"],
+	shell: ["api/application/shell"],
+	steward: ["api/application/steward-migration.test.ts"],
+	tasks: ["api/application/work"],
+	timers: ["api/application/timers"],
+	usage: ["api/application/usage"],
+	"web-note": ["api/application/web-note"],
+	world: ["api/application/world"],
+	application: [
+		"api/application/media",
+		"api/application/evaluator",
+		"api/application/app.ts",
+		"api/application/app.test.ts",
+		"api/application/app-modules.ts",
+		"api/application/cli.test.ts",
+		"api/application/cli-chat.fixture.ts",
+		"api/application/cli-chat.test.ts",
+		"api/application/cli-chat-errors.test.ts",
+		"api/application/cli-chat-integration.test.ts",
+		"api/application/cli-error-report.test.ts",
+		"api/application/cli-failure.test.ts",
+		"api/application/control-logging.test.ts",
+		"api/application/db-backup.ts",
+		"api/application/dev.test.ts",
+		"api/application/error-status.ts",
+		"api/application/error-status.test.ts",
+		"api/application/events.ts",
+		"api/application/events.test.ts",
+		"api/application/events-client.test.ts",
+		"api/application/fixed-input-size.test.ts",
+		"api/application/fixed-names.test.ts",
+		"api/application/lifecycle.ts",
+		"api/application/lifecycle.test.ts",
+		"api/application/logging.test.ts",
+		"api/application/migrations.ts",
+		"api/application/migrations.test.ts",
+		"api/application/monitoring.test.ts",
+		"api/application/retired-migrations.ts",
+		"api/application/screen-presence.test.ts",
+		"api/application/server.ts",
+		"api/application/server.test.ts",
+		"api/application/server-app-services.ts",
+		"api/application/server-core.ts",
+		"api/application/server-lifecycles.ts",
+		"api/application/server-media.ts",
+		"api/application/server-services.ts",
+		"api/application/server-tasks.ts",
+		"api/application/server-wiring.ts",
+		"api/application/server-world.ts",
+		"api/application/vendor.test.ts",
+		"docs",
+		"AGENTS.md",
+		"README.md",
+	],
+};
+
+export function applicationOwnedPaths(domain: Domain): string[] {
+	return [...(applicationPaths[domain] ?? [])];
+}
+
+export function verificationPaths(domain: Domain): string[] {
+	return [
+		...new Set([...ownedPaths(domain), ...applicationOwnedPaths(domain)]),
 	];
 }

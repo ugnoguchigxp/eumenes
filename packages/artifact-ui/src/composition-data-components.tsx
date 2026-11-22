@@ -141,7 +141,11 @@ export function DataTableView({ request }: { request: ArtifactRequest }) {
 				if (typeof cell === "object" && cell !== null && "icon" in cell) {
 					const Icon = tableIcons[cell.icon];
 					return (
-						<span className="aui-table-icon-cell" data-icon={cell.icon}>
+						<span
+							key={`${column.header}-${index}`}
+							className="aui-table-icon-cell"
+							data-icon={cell.icon}
+						>
 							<Icon aria-hidden="true" size={20} strokeWidth={1.75} />
 							<span>{cell.text}</span>
 						</span>

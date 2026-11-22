@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import agencyPkg from "eumenes-agency/package.json";
@@ -267,4 +267,136 @@ test("the installed memory host matches its vendored artifact and the adopted co
 				readFileSync(new URL(path.replace("dist/core/", "./dist/"), coreUrl)),
 			);
 	}
+});
+
+const additionalTarballVendors = [
+	{
+		dir: "canvas",
+		metaFile: "provenance.json",
+		artifactKey: "archive",
+		shaKey: "archiveSha256",
+	},
+	{
+		dir: "collaboration",
+		metaFile: "provenance.json",
+		artifactKey: "archive",
+		shaKey: "archiveSha256",
+	},
+	{
+		dir: "interact",
+		metaFile: "provenance.json",
+		artifactKey: "archive",
+		shaKey: "archiveSha256",
+	},
+	{
+		dir: "llm-fetch",
+		metaFile: "manifest.json",
+		artifactKey: "artifact",
+		shaKey: "sha256",
+	},
+	{
+		dir: "pipeline",
+		metaFile: "manifest.json",
+		artifactKey: "artifact",
+		shaKey: "sha256",
+	},
+	{
+		dir: "skill-smith",
+		metaFile: "manifest.json",
+		artifactKey: "artifact",
+		shaKey: "sha256",
+	},
+] as const;
+
+test("all additional vendored npm tarballs match their metadata, package.json, lockfile and installed version", () => {
+	const rootPkg = JSON.parse(read("package.json").toString()) as {
+		dependencies: Record<string, string>;
+		devDependencies?: Record<string, string>;
+	};
+	const lock = read("bun.lock").toString();
+	for (const entry of additionalTarballVendors) {
+		const meta = JSON.parse(
+			read(`vendor/${entry.dir}/${entry.metaFile}`).toString(),
+		) as Record<string, unknown>;
+		const pkgName = meta.package as string;
+		const version = meta.version as string;
+		const artifactName = meta[entry.artifactKey] as string;
+		const expectedSha = meta[entry.shaKey] as string;
+		const relPath = `vendor/${entry.dir}/${artifactName}`;
+		const bytes = read(relPath);
+		expect(createHash("sha256").update(bytes).digest("hex")).toBe(expectedSha);
+		const shaFile = join(root, `${relPath}.sha256`);
+		if (existsSync(shaFile)) {
+			expect(readFileSync(shaFile, "utf8").split(/\s+/)[0]).toBe(expectedSha);
+		}
+		const depSpec =
+			rootPkg.dependencies[pkgName] ?? rootPkg.devDependencies?.[pkgName];
+		expect(depSpec === `file:${relPath}` || depSpec === `./${relPath}`).toBe(
+			true,
+		);
+		const installed = JSON.parse(
+			read(`node_modules/${pkgName}/package.json`).toString(),
+		) as { version: string };
+		expect(installed.version).toBe(version);
+		const integrity = `sha512-${createHash("sha512").update(bytes).digest("base64")}`;
+		expect(
+			lock.includes(`${pkgName}@${relPath}`) ||
+				lock.includes(`${pkgName}@./${relPath}`),
+		).toBe(true);
+		expect(lock).toContain(integrity);
+	}
+});
+
+test("live2d vendor assets match assets.json sha256 (tracked files required, gitignored model optional)", () => {
+	const assets = JSON.parse(read("vendor/live2d/assets.json").toString()) as {
+		sdk: string;
+		sha256: Record<string, string>;
+	};
+	expect(assets.sdk).toBeTruthy();
+	for (const [relPath, expectedSha] of Object.entries(assets.sha256)) {
+		const full = join(root, relPath);
+		const isGitignoredModel = relPath.startsWith("web/public/live2d/hiyori/");
+		if (isGitignoredModel && !existsSync(full)) continue;
+		expect(existsSync(full)).toBe(true);
+		const actual = createHash("sha256")
+			.update(readFileSync(full))
+			.digest("hex");
+		expect(actual).toBe(expectedSha);
+	}
+});
+
+test("vendor/ contains no unreferenced tarballs outside package.json and manifest derivedFrom provenance", () => {
+	const rootPkg = JSON.parse(read("package.json").toString()) as {
+		dependencies?: Record<string, string>;
+		devDependencies?: Record<string, string>;
+	};
+	const allowed = new Set<string>();
+	for (const section of [rootPkg.dependencies, rootPkg.devDependencies]) {
+		for (const spec of Object.values(section ?? {})) {
+			if (spec.includes("vendor/")) {
+				allowed.add(spec.replace(/^file:/, "").replace(/^\.\//, ""));
+			}
+		}
+	}
+	const vendorRoot = join(root, "vendor");
+	const unreferenced: string[] = [];
+	for (const dir of readdirSync(vendorRoot, { withFileTypes: true })) {
+		if (!dir.isDirectory()) continue;
+		const sub = join(vendorRoot, dir.name);
+		const manifestPath = join(sub, "manifest.json");
+		if (existsSync(manifestPath)) {
+			const meta = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+				derivedFrom?: unknown;
+			};
+			if (typeof meta.derivedFrom === "string" && meta.derivedFrom) {
+				allowed.add(`vendor/${dir.name}/${meta.derivedFrom}`);
+			}
+		}
+		for (const file of readdirSync(sub)) {
+			if (!file.endsWith(".tgz")) continue;
+			const rel = `vendor/${dir.name}/${file}`;
+			if (!allowed.has(rel)) unreferenced.push(rel);
+		}
+	}
+	expect(unreferenced).toEqual([]);
 });

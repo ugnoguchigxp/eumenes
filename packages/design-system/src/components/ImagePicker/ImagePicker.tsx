@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Download, Trash2 } from "lucide-react";
 import { Button } from "../Button";
 import { ImageFrame } from "../ImageViewer/ImageFrame";
 import { Modal } from "../Modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../Tabs";
 import { ImageGrid, type ImageGridItem } from "./ImageGrid";
+import { useImagePicker } from "./useImagePicker";
 
 type ImagePickerBaseProps = {
 	images: readonly ImageGridItem[];
@@ -43,113 +44,42 @@ export type ImagePickerUploadResult =
 export function ImagePicker(props: ImagePickerProps) {
 	const {
 		images,
-		selectedId,
 		loading,
 		error,
 		pending,
 		onRefresh,
-		onCancel,
 		onDelete,
 		onUpload,
 		savedOnly = false,
 		renderGooglePhotos,
 	} = props;
-	const max = props.multiple ? props.maxSelected : 1;
-	const [draftIds, setDraftIds] = useState<string[]>(
-		selectedId ? [selectedId] : [],
-	);
-	/**
-	 * Adds a choice; a single picker replaces it, a full multiple picker keeps its choices.
-	 * Choices no longer offered (refreshed away or disabled) do not count toward the limit.
-	 */
-	const pick = (id: string, deselect = false) =>
-		setDraftIds((ids) => {
-			if (!props.multiple) return [id];
-			// Decided on the latest choices, so quick repeated clicks toggle correctly.
-			if (deselect && ids.includes(id))
-				return ids.filter((value) => value !== id);
-			const kept = ids.filter((value) =>
-				candidates.some((image) => image.id === value && !image.disabledReason),
-			);
-			return kept.includes(id) || kept.length >= max ? kept : [...kept, id];
-		});
-	const toggle = (id: string) => pick(id, true);
-	const [previewId, setPreviewId] = useState<string>();
-	const [deleteId, setDeleteId] = useState<string>();
-	const [deleting, setDeleting] = useState(false);
-	const [deleteError, setDeleteError] = useState("");
-	const [gridRevision, setGridRevision] = useState(0);
-	const [provider, setProvider] = useState("larm");
-	const [file, setFile] = useState<{
-		name: string;
-		url: string;
-		value: File;
-		requestId: string;
-	}>();
-	const [uploading, setUploading] = useState(false);
-	const [uploadResult, setUploadResult] = useState<ImagePickerUploadResult>();
-	const [uploaded, setUploaded] = useState<ImageGridItem>();
-	const current = useRef<AbortController | undefined>(undefined);
-	const cancelUpload = () => {
-		current.current?.abort();
-		current.current = undefined;
-		setUploading(false);
-	};
-	useEffect(() => () => current.current?.abort(), []);
-	const fileInput = useRef<HTMLInputElement>(null);
-	useEffect(() => {
-		return () => {
-			if (file) URL.revokeObjectURL(file.url);
-		};
-	}, [file]);
-	const candidates =
-		uploaded && !images.some((i) => i.id === uploaded.id)
-			? [uploaded, ...images]
-			: images;
-	const selected = draftIds.flatMap(
-		(id) =>
-			candidates.find((image) => image.id === id && !image.disabledReason) ??
-			[],
-	);
-	const preview = images.find((image) => image.id === previewId);
-	const deleteTarget = candidates.find((image) => image.id === deleteId);
-	async function upload(newAttempt = false) {
-		if (!file || !onUpload) return;
-		cancelUpload();
-		const controller = new AbortController();
-		current.current = controller;
-		const requestId = newAttempt ? crypto.randomUUID() : file.requestId;
-		if (newAttempt) setFile({ ...file, requestId });
-		setUploading(true);
-		setUploadResult(undefined);
-		try {
-			const result = await onUpload(file.value, requestId, controller.signal);
-			if (controller.signal.aborted || current.current !== controller) return;
-			setUploadResult(result);
-			if (result.status === "succeeded") {
-				setUploaded(result.image);
-				pick(result.image.id);
-				setFile(undefined);
-				onRefresh?.();
-			}
-		} catch {
-			if (!controller.signal.aborted && current.current === controller)
-				setUploadResult({
-					status: "pending",
-					message:
-						"アップロード結果を確認できません。同じ受付番号で再確認してください。",
-				});
-		} finally {
-			if (current.current === controller) {
-				current.current = undefined;
-				setUploading(false);
-			}
-		}
-	}
-	const leave = () => {
-		cancelUpload();
-		onCancel();
-	};
+	const {
+		max,
+		fileInput,
+		candidates,
+		selected,
+		preview,
+		deleteTarget,
+		deleting,
+		deleteError,
+		gridRevision,
+		provider,
+		file,
+		uploading,
+		uploadResult,
+		setPreviewId,
+		setDeleteId,
+		setDeleteError,
+		setGridRevision,
+		setProvider,
+		upload,
+		confirmDelete,
+		leave,
+		chooseFile,
+		clearFile,
+		selectFromGrid,
+		selectFromGoogle,
+	} = useImagePicker(props);
 	return (
 		<section className="image-picker" aria-label="画像を選ぶ">
 			<header className="image-picker-heading">
@@ -192,16 +122,7 @@ export function ImagePicker(props: ImagePickerProps) {
 								onChange={(event) => {
 									const picked = event.target.files?.[0];
 									event.target.value = "";
-									if (!picked) return;
-									cancelUpload();
-									setUploadResult(undefined);
-									setFile({
-										name: picked.name,
-										url: URL.createObjectURL(picked),
-										value: picked,
-										requestId: crypto.randomUUID(),
-									});
-									setDraftIds([]);
+									if (picked) chooseFile(picked);
 								}}
 							/>
 						</div>
@@ -252,15 +173,7 @@ export function ImagePicker(props: ImagePickerProps) {
 						{uploadResult && uploadResult.status !== "succeeded" && (
 							<p role="status">{uploadResult.message}</p>
 						)}
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => {
-								cancelUpload();
-								setFile(undefined);
-								setUploadResult(undefined);
-							}}
-						>
+						<Button type="button" variant="outline" onClick={clearFile}>
 							ファイル選択を解除
 						</Button>
 					</div>
@@ -304,12 +217,7 @@ export function ImagePicker(props: ImagePickerProps) {
 							images={candidates}
 							selectedIds={selected.map((image) => image.id)}
 							disabled={pending}
-							onSelect={(id) => {
-								cancelUpload();
-								setUploadResult(undefined);
-								toggle(id);
-								setFile(undefined);
-							}}
+							onSelect={selectFromGrid}
 							onPreview={setPreviewId}
 							renderActions={(image) => (
 								<>
@@ -346,15 +254,7 @@ export function ImagePicker(props: ImagePickerProps) {
 						{renderGooglePhotos ? (
 							<GooglePhotosPane
 								render={renderGooglePhotos}
-								onSelect={(image) => {
-									cancelUpload();
-									setFile(undefined);
-									setUploadResult(undefined);
-									setUploaded(image);
-									pick(image.id);
-									setProvider("larm");
-									onRefresh?.();
-								}}
+								onSelect={selectFromGoogle}
 							/>
 						) : (
 							<p role="status">
@@ -411,29 +311,7 @@ export function ImagePicker(props: ImagePickerProps) {
 						type="button"
 						variant="destructive"
 						disabled={deleting || pending || !deleteTarget}
-						onClick={async () => {
-							if (!deleteTarget || !onDelete || deleting) return;
-							const id = deleteTarget.id;
-							setDeleting(true);
-							try {
-								if (await onDelete(id)) {
-									setDraftIds((ids) => ids.filter((value) => value !== id));
-									setUploaded((currentImage) =>
-										currentImage?.id === id ? undefined : currentImage,
-									);
-									setDeleteId(undefined);
-								} else
-									setDeleteError(
-										"削除結果を確認できませんでした。一覧を更新してください。",
-									);
-							} catch {
-								setDeleteError(
-									"削除結果を確認できませんでした。一覧を更新してください。",
-								);
-							} finally {
-								setDeleting(false);
-							}
-						}}
+						onClick={() => void confirmDelete()}
 					>
 						削除する
 					</Button>

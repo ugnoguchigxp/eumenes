@@ -1,32 +1,24 @@
 {
 	"files": {},
 	"functions": {
-		"api/application/server-services.ts#buildServices": 348,
-		"api/domains/attitude-dataset/service/index.ts#createAttitudeDataset": 618,
-		"api/domains/excalidraw/service/index.ts#createExcalidraw": 305,
-		"api/domains/inference/service/index.ts#createInference": 520,
-		"api/domains/larm/service/index.ts#createLarm": 344,
-		"api/domains/larm/service/playground.ts#createLarmPlayground": 522,
-		"api/domains/memory/service/index.ts#createMemoryService": 530,
-		"api/domains/queue/service/runner.ts#createRunner": 578,
-		"api/domains/scheduler/service/index.ts#createScheduler": 432,
-		"api/domains/service-tests/service/index.ts#createServiceTests": 467,
+		"api/application/server-services.ts#buildServices": 320,
+		"api/domains/excalidraw/service/index.ts#createExcalidraw": 301,
+		"api/domains/larm/service/index.ts#createLarm": 318,
+		"api/domains/larm/service/playground.ts#createLarmPlayground": 511,
+		"api/domains/memory/service/index.ts#createMemoryService": 414,
+		"api/domains/queue/service/runner.ts#createRunner": 574,
+		"api/domains/scheduler/service/index.ts#createScheduler": 424,
+		"api/domains/service-tests/service/index.ts#createServiceTests": 457,
 		"api/domains/tool-runtime/service/index.ts#createToolRuntime": 456,
-		"api/domains/voice-dialogue/service/index.ts#createVoiceDialogue": 403,
-		"api/domains/web-research/service/index.ts#createWebResearch": 507,
-		"api/domains/web-research/service/saved-bodies.ts#createSavedBodies": 306,
+		"api/domains/voice-dialogue/service/index.ts#createVoiceDialogue": 318,
+		"api/domains/web-research/service/index.ts#createWebResearch": 448,
 		"api/domains/world/service/world-query.ts#createWorldQuery": 388,
-		"api/domains/world/service/world-service.ts#createWorldService": 326,
-		"packages/design-system/src/components/ImagePicker/ImagePicker.tsx#ImagePicker": 376,
-		"web/src/components/domains/timers/TimerNotifications.tsx#TimerNotifications": 312,
-		"web/src/domains/audio/controller/index.ts#createAudioController": 540,
-		"web/src/domains/excalidraw/useDrawingEditor.ts#useDrawingEditor": 354,
+		"api/domains/world/service/world-service.ts#createWorldService": 311,
+		"web/src/components/domains/timers/TimerNotifications.tsx#TimerNotifications": 310,
+		"web/src/domains/audio/controller/index.ts#createAudioController": 332,
+		"web/src/domains/excalidraw/useDrawingEditor.ts#useDrawingEditor": 348,
 		"web/src/domains/object-recognition/use-recognition-runtime.ts#useRecognitionRuntime": 306,
-		"web/src/domains/voice-dialogue/hooks/index.ts#useVoiceDialogue": 506
+		"web/src/domains/voice-dialogue/hooks/index.ts#useVoiceDialogue": 411
 	},
-	"testFiles": {
-		"api/application/settings/settings-adapter.test.ts": 1649,
-		"api/domains/voice-dialogue/test/settings-integration.test.ts": 1001,
-		"web/src/domains/settings-data/settings.fixture.tsx": 1135
-	}
+	"testFiles": {}
 }
