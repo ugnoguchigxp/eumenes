@@ -140,15 +140,15 @@ test("an operation without an interaction carries no frozen stamp", async () => 
 	expect(h.started[0]!.input.command).not.toHaveProperty("stamp");
 });
 
-test("the command sub-agent uses one call with low cloud reasoning and releases its session", async () => {
+test("the command sub-agent uses one call that names no thinking level and releases its session", async () => {
 	h = await setup({ autoStart: false });
 	const executeControl = spyOn(h.larm, "executeControl");
 	h.state.commands.push({ action: "clarify", question: "どれ" });
 	const first = await h.commandRun();
 	await until(() => h!.commandSessions.length === 1);
-	expect(executeControl.mock.calls[0]?.[3]).toMatchObject({
-		reasoningEffort: "low",
-	});
+	expect(executeControl.mock.calls[0]?.[3]).not.toHaveProperty(
+		"reasoningEffort",
+	);
 	expect(h.commandSessions[0]).toEqual({
 		sessionRole: "subagent",
 		taskId: first.id,

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { CodexHost } from "./codex-host";
 import { fail } from "./cloud-agent-shared";
 import type { Connection } from "../../settings";
+import { reasoningEffortSchema } from "../../settings/contracts";
 import type { ConnectionModels } from "../contracts";
 
 const pageSchema = z.object({
@@ -10,6 +11,10 @@ const pageSchema = z.object({
 			model: z.string(),
 			displayName: z.string(),
 			inputModalities: z.array(z.string()).optional(),
+			supportedReasoningEfforts: z
+				.array(z.object({ reasoningEffort: reasoningEffortSchema }))
+				.optional(),
+			defaultReasoningEffort: reasoningEffortSchema.optional(),
 		}),
 	),
 	nextCursor: z.string().nullable(),
@@ -52,6 +57,17 @@ export async function readCodexModels(
 				id: row.model,
 				displayName: row.displayName,
 				contextWindow: null,
+				// The catalog's own levels and default, as `model/list` returns them.
+				...(row.supportedReasoningEfforts
+					? {
+							reasoning: {
+								efforts: row.supportedReasoningEfforts.map(
+									(e) => e.reasoningEffort,
+								),
+								default: row.defaultReasoningEffort ?? null,
+							},
+						}
+					: {}),
 				...(row.inputModalities
 					? {
 							inputModalities: row.inputModalities.filter(

@@ -16,8 +16,6 @@ export type ConversationHarness = {
 		users?: number;
 	};
 	call: {
-		reasoning: "off" | "low" | "medium" | "high";
-		cloudReasoning: "off" | "low" | "medium" | "high";
 		/** Tokens of one model call, the reasoning included. */
 		outputLimit: number;
 	};
@@ -31,13 +29,12 @@ export type ConversationHarness = {
  * The harness of the conversation (the local harness rebuild plan, the single harness plan): the host routes each
  * turn, the talk turn reads a talk-only system and the last two of the user's utterances, and no call carries tool
  * definitions. The background calls on the conversation reuse its history under their own system (the agency
- * SystemContext integration). LARM keeps `low` (one refused `none` with 400, 2026-10-29). Cloud conversation calls
- * use `high`: live read-tool selection failed at low/medium but selected the host function at high (Memory
- * integration acceptance, 2026-11-06). The limit holds the thinking and the answer.
+ * SystemContext integration). The thinking level is not part of the harness: every call thinks at the one saved level
+ * (`general.reasoningEffort`, chosen on the chat screen). The limit holds the thinking and the answer.
  */
 export const localHarness: ConversationHarness = {
 	history: { copyFilter: true, users: 2 },
-	call: { reasoning: "low", cloudReasoning: "high", outputLimit: 4096 },
+	call: { outputLimit: 4096 },
 	gates: { systemCopy: true },
 };
 

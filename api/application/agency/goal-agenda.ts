@@ -178,7 +178,6 @@ export function createGoalAgenda(input: {
 			conversationId: scope.id,
 			independent: true,
 			...(cfg.thinkResourceId ? { resourceId: cfg.thinkResourceId } : {}),
-			reasoning: cfg.thinkReasoning ?? "low",
 		};
 	});
 	let host: Awaited<ReturnType<typeof openAgendaGoals>> | undefined;

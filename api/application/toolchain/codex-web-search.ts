@@ -63,7 +63,6 @@ export function createCodexWebSearch(
 					{
 						instructions,
 						outputSchema,
-						reasoningEffort: "low",
 						nativeWebSearch: true,
 					},
 					{ sessionRole: "auxiliary" },

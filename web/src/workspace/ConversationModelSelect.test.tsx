@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
 import type { Settings } from "../../../api/domains/settings/contracts";
 import { useConversationModel } from "../domains/settings";
+import { ReasoningSelect } from "./ReasoningSelect";
 import { settingsFixture } from "../domains/settings/sections/fixture";
 import { ConversationModelSelect } from "./ConversationModelSelect";
 
@@ -29,9 +30,14 @@ afterEach(cleanup);
 const connectionId = crypto.randomUUID();
 const resourceId = crypto.randomUUID();
 
-function makeClient() {
+/** The catalog's levels of the cloud model (`model-a`); `null` leaves the model without a `reasoning` entry. */
+function makeClient(
+	cloudEfforts: string[] | null = ["low", "xhigh"],
+	savedEffort = "low",
+) {
 	const saved: Settings = {
 		...settingsFixture(),
+		general: { ...settingsFixture().general, reasoningEffort: savedEffort },
 		larm: { ...settingsFixture().larm, profile: "profile-x" },
 		connections: [
 			{
@@ -62,6 +68,19 @@ function makeClient() {
 		larmProfiles: vi.fn(async () => [
 			{ profile: "profile-x", model: "larm-m" },
 		]),
+		connectionModels: vi.fn(async () => ({
+			models: [
+				{
+					id: "model-a",
+					displayName: "model-a",
+					contextWindow: null,
+					...(cloudEfforts
+						? { reasoning: { efforts: cloudEfforts, default: "low" } }
+						: {}),
+				},
+			],
+			account: { auth: "subscription" as const, subscriptionType: null },
+		})),
 		applySettings: vi.fn(async (input: { settings: Settings }) => ({
 			...input.settings,
 			revision: saved.revision + 1,
@@ -80,16 +99,22 @@ function View({
 }) {
 	const model = useConversationModel(client as never);
 	return (
-		<ConversationModelSelect
-			model={model}
-			running={running}
-			actualModel={{ source: "cloud", model: "model-a", billingPath }}
-		/>
+		<>
+			<ConversationModelSelect
+				model={model}
+				running={running}
+				actualModel={{ source: "cloud", model: "model-a", billingPath }}
+			/>
+			<ReasoningSelect model={model} running={running} />
+		</>
 	);
 }
 
-function renderView(running = false, billingPath?: string | null) {
-	const client = makeClient();
+function renderView(
+	running = false,
+	billingPath?: string | null,
+	client = makeClient(),
+) {
 	const view = (r: boolean) => (
 		<QueryClientProvider client={queries}>
 			<View client={client} running={r} billingPath={billingPath} />
@@ -153,4 +178,109 @@ test("picking an item calls applySettings and shows the next-utterance hint", as
 	// The hint ends once the next utterance starts.
 	result.rerender(view(true));
 	expect(screen.queryByRole("status")).toBeNull();
+});
+
+const effortTrigger = () =>
+	screen.findByRole("combobox", {
+		name: "思考レベル",
+	}) as Promise<HTMLButtonElement>;
+const optionNames = () =>
+	screen.getAllByRole("option").map((option) => option.textContent);
+
+test("the thinking level beside the model offers LARM's declared levels and saves the chosen one", async () => {
+	const { client } = renderView();
+	const trigger = await effortTrigger();
+	await waitFor(() => expect(trigger.textContent).toContain("low"));
+	expect(trigger.disabled).toBe(false);
+	fireEvent.keyDown(trigger, { key: "Enter" });
+	// `off` is not a level LARM accepts; nothing beyond the declared ones is offered.
+	expect(optionNames()).toEqual(["low", "medium", "high"]);
+	fireEvent.click(screen.getByRole("option", { name: "medium" }));
+	await waitFor(() => expect(client.applySettings).toHaveBeenCalledTimes(1));
+	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
+	expect(sent.general.reasoningEffort).toBe("medium");
+	// The model route is untouched by a level change.
+	expect(sent.routes.llm.fallbackId).toBeNull();
+});
+
+test("on a cloud model the levels are the catalog's, up to its highest, and a saved level outside them is not shown as chosen", async () => {
+	const client = makeClient(["low", "medium", "high", "xhigh", "max"], "xhigh");
+	const saved = await client.settings();
+	client.settings.mockResolvedValue({
+		...saved,
+		routes: {
+			...saved.routes,
+			llm: { ...saved.routes.llm, mode: "cloud-only", fallbackId: resourceId },
+		},
+	});
+	renderView(false, null, client);
+	const trigger = await effortTrigger();
+	await waitFor(() => expect(trigger.textContent).toContain("xhigh"));
+	fireEvent.keyDown(trigger, { key: "Enter" });
+	expect(optionNames()).toEqual(["low", "medium", "high", "xhigh", "max"]);
+	fireEvent.click(screen.getByRole("option", { name: "max" }));
+	await waitFor(() => expect(client.applySettings).toHaveBeenCalledTimes(1));
+	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
+	expect(sent.general.reasoningEffort).toBe("max");
+});
+
+test("switching to a model that does not accept the saved level saves the model's default in the same save", async () => {
+	const { client } = renderView(
+		false,
+		null,
+		makeClient(["low", "xhigh"], "medium"),
+	);
+	const model = await screen.findByRole("combobox", {
+		name: "会話エージェント",
+	});
+	// Wait for the catalog: the cloud option knows its levels once the list is read.
+	await waitFor(() => expect(client.connectionModels).toHaveBeenCalled());
+	fireEvent.keyDown(model, { key: "Enter" });
+	fireEvent.click(await screen.findByRole("option", { name: "model-a" }));
+	await waitFor(() => expect(client.applySettings).toHaveBeenCalledTimes(1));
+	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
+	expect(sent.routes.llm.fallbackId).toBe(resourceId);
+	expect(sent.general.reasoningEffort).toBe("low");
+});
+
+test("switching to a model that accepts the saved level keeps it", async () => {
+	const { client } = renderView(
+		false,
+		null,
+		makeClient(["low", "medium", "xhigh"], "medium"),
+	);
+	const model = await screen.findByRole("combobox", {
+		name: "会話エージェント",
+	});
+	await waitFor(() => expect(client.connectionModels).toHaveBeenCalled());
+	fireEvent.keyDown(model, { key: "Enter" });
+	fireEvent.click(await screen.findByRole("option", { name: "model-a" }));
+	await waitFor(() => expect(client.applySettings).toHaveBeenCalledTimes(1));
+	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
+	expect(sent.general.reasoningEffort).toBe("medium");
+});
+
+test("a model with no level to choose, or an unread catalog, leaves the level locked", async () => {
+	// The saved route is the cloud model: no `reasoning` in its catalog entry means the levels are not known.
+	const client = makeClient(null);
+	const saved = await client.settings();
+	client.settings.mockResolvedValue({
+		...saved,
+		routes: {
+			...saved.routes,
+			llm: { ...saved.routes.llm, mode: "cloud-only", fallbackId: resourceId },
+		},
+	});
+	renderView(false, null, client);
+	const trigger = await effortTrigger();
+	await waitFor(() => expect(client.connectionModels).toHaveBeenCalled());
+	expect(trigger.disabled).toBe(true);
+	expect(trigger.getAttribute("title")).toContain(
+		"選べる思考レベルがありません",
+	);
+});
+
+test("the thinking level is locked while an answer is running", async () => {
+	renderView(true);
+	expect((await effortTrigger()).disabled).toBe(true);
 });

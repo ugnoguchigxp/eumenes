@@ -39,7 +39,6 @@ export function createWebReview(
 				{
 					instructions: messages[0]!.content,
 					outputSchema: contentReviewSchema,
-					reasoningEffort: "low",
 				},
 				{ sessionRole: "auxiliary" },
 			);

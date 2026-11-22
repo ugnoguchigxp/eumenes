@@ -90,6 +90,33 @@ Claude Agent SDK の認証方式は接続ごとに選び、課金経路が分か
 
 接続で使えるモデルは保存済みの資格情報で実行時に取得します（`GET /api/inference/connections/:id/models`。接続確認を兼ねます）。会話画面左上のモデル選択は接続ごとに課金経路を示してグループ化し、選択は次の発言から適用されます。サブエージェント（研究worker・操作担当など）が使う接続は「サブエージェントの接続」で1つ選び、未選択ならLARMを使います。
 
+### 思考レベル（`general.reasoningEffort`）
+
+すべてのLLM呼出し（会話の返事、Agencyの背景、記憶担当、専門担当、補助の判定）は、保存済みの思考レベル1つで考えます。呼出しごとの定数や上書きはありません。既定は `low` で、設定に値が無い環境（旧版の保存値を含む）も `low` として読みます。旧版の `agency.thinkReasoning`（背景だけの思考レベル）は廃止し、読み込み時に捨てます。Webの調べもの（`web.note`）だけは、モデルを固定する例外と同じく `policy.json` の値のままです。
+
+会話画面左上のモデル選択の隣にある「思考レベル」の選択で変えます。保存は設定APIで行い、次の発言から効きます。回答の実行中はモデル選択と同じく操作できません。選べるのは、選択中のモデルが受け付ける値だけです。
+
+| 接続 | 選べる値の出どころ | 既定値の出どころ |
+| --- | --- | --- |
+| Codex SDK | `model/list` のモデルごとの `supportedReasoningEfforts`（`GET /api/inference/connections/:id/models` の `models[].reasoning.efforts`） | モデルの `defaultReasoningEffort`（`reasoning.default`） |
+| Claude Agent SDK（サブスクリプション） | モデル情報の `supportedEffortLevels`。`supportsEffort` が false のモデルは選択肢なし | catalog に無い（`reasoning.default` は null） |
+| Claude Agent SDK（APIキー） | モデルの `capabilities.effort` で `supported` の値 | catalog に無い（null） |
+| LARM | catalog は宣言しないため、接続の種類として `low`・`medium`・`high` をコードで宣言（`off` は拒否するモデルの記録があるため含めない） | `low` |
+| OpenAI互換API | 思考レベルを送らないため選択肢なし | なし |
+
+モデルを切り替えたとき、保存済みの思考レベルが新しいモデルで選べない値なら、同じ保存でそのモデルの既定値（catalog に既定値が無いときは選べる先頭の値）に変わります。選べる値が分からない（catalog が未取得）間は変えず、思考レベルの選択は操作できません。送信時に別の値へ黙って落とす処理はありません。
+
+送信時（試行の開始時）に、呼出しのモデルが保存済みの値を受け付けないと分かる場合は、その試行を `reasoning_effort_unsupported` で失敗させ、`inference.reasoning_effort_unsupported`（`source`・`connectionId`・`kind`＝値）を警告で記録します。LARMへの代替もしません。Agencyと記憶担当の呼出しは会話と同じ経路で動くので、会話のモデルが受け付ける値なら足ります。会話と別の接続・モデルへ向かう経路は次のとおりで、保存済みの値をそのモデルが受け付けないとこのエラーになります。
+
+| 経路 | 向かう先 |
+| --- | --- |
+| `agency.thinkResourceId`（Agencyの専用リソース） | その資源のモデル。代替なし |
+| `world.curationResourceId`（Worldの記憶整理） | その資源のモデル。使えないときは会話の経路。課金経路が違うときはLARMだけ |
+| 経路を指定しない呼出し（OCRの補正など） | LARMだけ（`low`・`medium`・`high` のみ） |
+| `larm-preferred` の会話でLARMが失敗した試行 | クラウドの代替先のモデル |
+
+catalog が読めない、catalog にモデルが無い場合は、判断できないので保存済みの値をそのまま送り、提供元の応答に任せます。選べる値が空のモデルには何も送りません。
+
 関数の実行はどの種類でもEumenesが行い、エージェント側では実行しません。会話担当（`main`）のClaude Agent SDKセッションは、接続×認証方式×モデルごとに1つのセッションIDを使い続け、切り替えて戻せば以前のIDで再開します。履歴は毎回、会話台帳に保存された発言と採用回答から組み立てて渡し、SDKが書く記録は保存しません。忘却・取り下げ・要約は次の発言の履歴に反映され、忘却対象を参照して実行中の試行は中止されます。Claude Code の自動要約は無効化しており、文脈の予算は会話のWindowが管理します。サブエージェントはタスクごとに新しいセッションを使い、履歴を持ち越しません。それ以外の経路では、先頭のsystemメッセージを指示、残りを履歴として渡します。
 
 LARMのURL・Profile・audience・voiceは初回起動時に環境変数から取り込み、以降は設定画面に保存した値を使います。Profileは未保存でも起動でき、保存するまでLARMには接続しません（`larm_profile_missing`）。選択肢は、保存済みの接続先のcatalogで `llm` Providerを持つProfileです。URLが空欄の間は未設定扱いで、LARMには接続しません。LARM認証とクラウドキーの環境変数はbackendだけで読みます。環境変数を変更した場合はbackendを再起動してください。

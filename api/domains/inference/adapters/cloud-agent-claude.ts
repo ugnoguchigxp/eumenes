@@ -5,6 +5,7 @@ import {
 	query,
 	tool,
 	type AccountInfo,
+	type EffortLevel,
 	type Options,
 	type Query,
 	type SDKResultMessage,
@@ -39,6 +40,16 @@ import {
 	type CloudAgentResult,
 } from "./cloud-agent-shared";
 const log = getLogger("inference");
+const effortLevels: readonly EffortLevel[] = [
+	"low",
+	"medium",
+	"high",
+	"xhigh",
+	"max",
+];
+const isEffortLevel = (value: string): value is EffortLevel =>
+	(effortLevels as readonly string[]).includes(value);
+
 function zodShape(parameters: Record<string, unknown>): z.ZodRawShape {
 	const properties = (parameters.properties ?? {}) as Record<string, unknown>;
 	const required = new Set(
@@ -263,6 +274,13 @@ export async function runClaudeAgent(
 			schema: call.outputSchema,
 		});
 
+	// The saved level, as the SDK names it; a name it does not know never reaches the CLI.
+	let effort: EffortLevel | undefined;
+	if (call.reasoningEffort) {
+		if (!isEffortLevel(call.reasoningEffort))
+			throw fail("reasoning_effort_unsupported");
+		effort = call.reasoningEffort;
+	}
 	let captured: NativeToolCall | undefined;
 	const abortController = new AbortController();
 	// A function call ends the turn: the host, not the agent, executes it.
@@ -314,6 +332,7 @@ export async function runClaudeAgent(
 						...(session ? { projectDirName: `eumenes-${session.role}` } : {}),
 					}),
 					model: call.model,
+					...(effort ? { effort } : {}),
 					systemPrompt,
 					settings: { autoCompactEnabled: false },
 					tools: [],

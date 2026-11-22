@@ -17,7 +17,6 @@ import {
 	createCodexHost,
 	createConnectionModels,
 } from "../domains/inference";
-import { localHarness } from "../domains/dialogue";
 import { createQueue } from "../domains/queue";
 import { createActivityRecorder } from "../domains/larm";
 import { createTtsDictionary } from "../domains/tts-dictionary";
@@ -86,7 +85,6 @@ export async function buildCore(
 		token: config.larmToken,
 		providerHosts: config.larmProviderHosts,
 		keepLarmConnection: true,
-		conversationReasoning: localHarness.call.reasoning,
 		speechText: ttsDictionary.apply,
 		attitudeDataset,
 		judgeActivity: activity.judge,

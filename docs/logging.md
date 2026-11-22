@@ -152,6 +152,11 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 
 送信前検証でSDKが報告した資格情報の種類が接続の認証方式と一致しない場合、`inference.cloud_agent_auth_mismatch` に `connectionId`・`auth` と、SDKが返した列挙値 `apiProvider`・`apiKeySource`・`tokenSource` を記録し、メッセージを送らずに失敗します。資格情報そのものは記録しません。専用リソースが使えず会話経路へ戻すと課金経路が変わる場合は、`inference.route_billing_mismatch` に `taskId`・専用リソースの `connectionId` と `billingPath`、戻せなかった会話経路の課金経路（`source`）を記録してLARMだけで実行します。attemptには `session_role`・`task_id`・`billing_path`・`agent_session_id` とキャッシュ使用量・費用を保存し、実行記録APIから辿れます。忘却で失効した試行は `revoked` になり採用されません。
 
+保存済みの思考レベル（`general.reasoningEffort`）を、呼出しのモデルが受け付けないと分かる試行は、プロバイダーを呼ぶ前に失敗させ、`inference.reasoning_effort_unsupported`（`warn`）を記録します。続けて同じ試行の `inference.attempt_failed` に `reason: "reasoning_effort_unsupported"` が出ます（Claude Agent SDK が知らない名前のときは `cloud_agent_reasoning_effort_unsupported`）。出す項目は `inferenceId`・`source`（`larm` か `cloud`）・`connectionId`（クラウドのとき）・`kind`（保存済みの値）・`count`（そのモデルが受け付ける値の数）です。受け付ける値の一覧と会話本文は出しません。出るのは次のときです。
+- LARM の試行で、値が `low`・`medium`・`high` のどれでもない。たとえば会話にクラウドのモデルの `xhigh` を選んだまま、LARMだけで動く背景の呼出し（OCRの補正など、経路を指定しない制御）が走った。
+- クラウドの試行で、接続の catalog（Codex の `model/list`、Claude の `supportedEffortLevels`）にそのモデルの一覧があり、値がその中にない。たとえば Agency の専用リソース（`agency.thinkResourceId`）のモデルが、会話のモデルより狭い一覧を持つ。
+値を別のものに変えて送ることはなく、LARMとクラウドの間の代替もしません。catalog が読めない、または catalog にそのモデルが無いときは判断できないので、このログは出ず値をそのまま送ります。確認は `bun run logs -- --event inference.reasoning_effort_unsupported`、直すのは画面の思考レベルの選択です（[思考レベル](settings.md#思考レベルgeneralreasoningeffort)）。
+
 ## Codex SDKによる調査の失敗
 
 
@@ -178,7 +183,7 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 | | `providerPromptTokens`・`providerCachedTokens`・`providerOutputTokens` | Codexが直近のモデル応答について報告した計数 |
 | | `modelContextWindow` | Codexが報告した実効コンテキスト長 |
 
-会話本文・指示文・出力 schema・認証情報・Codex の生応答は出しません。見分けに使うハッシュも出しません。
+会話本文・指示文・出力 schema・認証情報・Codex の生応答は出しません。このイベント群（`inference.codex_thread` など、この節の行）は、見分けに使うハッシュも出しません。入力の区画ごとの短いハッシュを出すのは、次の節の `inference.input_sections` だけです。
 
 読み方:
 
@@ -193,6 +198,25 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 スレッドを捨てた後も、Codex 自身の SQLite（`logs_*`・`thread_history_*` の WAL）に本文が残ることがあります。これらはホームごと、最後のプロセスの終了時（10分の空きの後、または忘却の後）と backend の起動時に消えます。
 
 入力の中身は `bun scripts/codex-wire-capture.ts` で確認できます。実 Codex CLI を一時ホームで起動し、通信なしの受け口へ向けて、最初の呼出し・`append`・`reset` の `input` の並びと `prompt_cache_key` を表示します。モデルは呼びません。
+
+## 入力の区画とキャッシュの切れ目（2026-11-22追加）
+
+LLM呼出しの試行ごとに、`inference.attempt_started` の直後に `inference.input_sections` を1行記録します（`info`）。同じ種別の連続する呼出しで、入力の先頭から何トークン目までが前回と同じだったか、最初に分かれた区画はどれかを、あとから集計するための記録です（[集計](performance.md#保存済みログから会話の基準値を取る)）。
+
+| 項目 | 内容 |
+| --- | --- |
+| `attemptId`・`inferenceId`・`subjectId`・`purpose`・`source` | `inference.attempt_started` と同じ。`runId` などはログの文脈から付く |
+| `conversationId` | 呼出しに `agentSession.conversationId` があるときだけ。不透明なIDで、題名や本文は出さない |
+| `count` | 区画の数（省略された分も含む実数） |
+| `sections` | 区画を送信順に `role:label:tokens:hash` とし、`\|` でつないだ1つの文字列 |
+
+区画は次の順です。ツール定義があれば1区画（`tools:tools:…`）、出力スキーマがあれば1区画（`schema:schema:…`）、その後に各メッセージ。実際の送信順（Codex は instructions とツール、他経路はツール配列が先頭側）に合わせています。
+
+- `role` は `system`・`user`・`assistant`・`tool`、またはツール定義・スキーマを示す `tools`・`schema`。
+- `label` は固定の語だけです。本文の先頭行が、製品が入力に書く見出し（`## Memory`・`## Earlier`・`## State`・`## User`・`## Host notice`・`## Candidates`・`## Pending`・`## Retry`・`## Points`・`## Task`）と完全に一致するときだけ、その見出し名（`## ` を除く）。`<あなたの今の状態` で始まるものは `agency-state`。それ以外は、利用者や道具が `## ` で始まる文を書いた場合も含めて `system`・`text`・`tool-calls`・`tool-result` の固定語で、本文の一部は出ません。
+- `tokens` は推定トークン数（`estimateTextTokens` / `estimateJsonTokens` / メッセージ枠の見積り）で、課金や利用量の値ではありません。
+- `hash` は区画の本文（メッセージは本文・ツール呼出し・画像枚数、ツール定義・スキーマは JSON 化したもの）の HMAC-SHA256 の先頭12桁です。鍵は起動のたびに乱数で作り、メモリだけに置いて保存も出力もしません。短い発話でも、鍵がないと候補を試して本文を割り出せません。同じ値かどうかの比較にだけ使い、**同じ起動の中でしか比べられません**（再起動をまたぐと一致しません）。同じ行の `bootId` が起動の区別です。
+- `sections` は4096文字までです（他の文字列項目は256文字まで）。超える場合は、区画を途中で切らず先頭から入るだけ入れ、最後に省略した区画数を `|…+N` で示します。
 
 ## LLM生成JSONの補正と拒否
 

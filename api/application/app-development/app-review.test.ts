@@ -1,3 +1,4 @@
+import { REASONING_ALLOWANCE_TOKENS } from "../../domains/inference/service/attempt-work";
 import { expect, test } from "bun:test";
 import { createGitObservation } from "../../domains/git-observation";
 import { fixture, movies } from "./app-development.fixture";
@@ -36,8 +37,9 @@ test("app development can request a read-only review of its current draft with t
 		async reviewSubagent(messages, _signal, options) {
 			calls++;
 			expect(options).toMatchObject({
-				reasoning: "off",
-				maxOutputTokens: 4096,
+				// The saved level (the default), not a level of the review's own; its thinking gets room on the limit.
+				reasoning: "low",
+				maxOutputTokens: 4096 + REASONING_ALLOWANCE_TOKENS,
 				jsonOutput: true,
 			});
 			expect(options?.jsonSchema).toBeUndefined();

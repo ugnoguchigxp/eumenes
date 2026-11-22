@@ -434,7 +434,6 @@ function agentOf(
 		...(agent?.collaborationState
 			? { collaborationState: agent.collaborationState }
 			: {}),
-		...(agent?.larmReasoning ? { larmReasoning: agent.larmReasoning } : {}),
 		...(agent?.turn?.maxModelCalls !== undefined
 			? { maxModelCalls: agent.turn.maxModelCalls }
 			: {}),

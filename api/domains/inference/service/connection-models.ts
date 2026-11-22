@@ -2,6 +2,7 @@ import { codexModels } from "../adapters/codex-models";
 import type { CodexHost } from "../adapters/codex-host";
 import { workersModels } from "./workers-ai-models";
 import Anthropic from "@anthropic-ai/sdk";
+import type { EffortCapability } from "@anthropic-ai/sdk/resources/models";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { SettingsService } from "../../settings";
@@ -29,11 +30,36 @@ export type ConnectionModelsService = {
 		signal: AbortSignal,
 		refresh?: boolean,
 	): Promise<ConnectionModels | null>;
+	/**
+	 * The last list of the connection as it is saved now, however old (the models a call is already running on do not
+	 * change by the minute); null when none was read since the connection last changed.
+	 */
+	known?(connectionId: string): ConnectionModels | null;
 };
 
 const ttlMs = 60_000;
 const maxModels = 500;
 const maxEntries = 32;
+
+/** The levels an API-key model accepts: the supported ones among the capability's flags, lowest first. */
+function apiKeyReasoning(
+	effort: EffortCapability,
+): NonNullable<ConnectionModels["models"][number]["reasoning"]> {
+	const levels = [
+		["low", effort.low],
+		["medium", effort.medium],
+		["high", effort.high],
+		["xhigh", effort.xhigh],
+		["max", effort.max],
+	] as const;
+	return {
+		efforts: effort.supported
+			? levels.filter(([, flag]) => flag?.supported).map(([name]) => name)
+			: [],
+		// The API names no level a model runs at when none is given.
+		default: null,
+	};
+}
 
 async function apiKeyModels(
 	connection: Connection,
@@ -66,6 +92,9 @@ async function apiKeyModels(
 				model.max_input_tokens! > 0
 					? model.max_input_tokens
 					: null,
+			...(model.capabilities?.effort
+				? { reasoning: apiKeyReasoning(model.capabilities.effort) }
+				: {}),
 		});
 		if (models.length >= maxModels) break;
 	}
@@ -117,6 +146,17 @@ async function subscriptionModels(
 						id: m.value,
 						displayName: m.displayName || m.value,
 						contextWindow: null,
+						// `supportsEffort: false` leaves nothing to choose; levels are listed only when the SDK lists them.
+						...(m.supportsEffort === false
+							? { reasoning: { efforts: [], default: null } }
+							: m.supportedEffortLevels
+								? {
+										reasoning: {
+											efforts: m.supportedEffortLevels,
+											default: null,
+										},
+									}
+								: {}),
 					})),
 					account: {
 						auth: "subscription" as const,
@@ -151,6 +191,7 @@ export function createConnectionModels(
 ): ConnectionModelsService {
 	const listed = createListing(settings, environment, options);
 	return {
+		known: (connectionId) => listed.known?.(connectionId) ?? null,
 		async list(connectionId, signal, refresh) {
 			const value = await listed.list(connectionId, signal, refresh);
 			const auth = settings
@@ -181,7 +222,27 @@ function createListing(
 ): ConnectionModelsService {
 	const now = options.now ?? Date.now;
 	const cache = new Map<string, { at: number; value: ConnectionModels }>();
+	// The last list of each connection, kept past the cache's time limit while the connection stays as it was.
+	const last = new Map<string, { key: string; value: ConnectionModels }>();
+	const keyOf = (connection: Connection) =>
+		JSON.stringify([
+			connection.id,
+			connection.epoch,
+			connection.auth ?? "api-key",
+			connection.baseUrl,
+			connection.accountId,
+			connection.kind,
+		]);
 	return {
+		known(connectionId) {
+			const connection = settings
+				.get()
+				.connections.find((c) => c.id === connectionId);
+			const entry = last.get(connectionId);
+			return connection && entry?.key === keyOf(connection)
+				? entry.value
+				: null;
+		},
 		async list(connectionId, signal, refresh = false) {
 			const connection = settings
 				.get()
@@ -199,14 +260,7 @@ function createListing(
 			const credential = settings.credential(connection);
 			if (!credential && connection.kind !== "codex-sdk")
 				throw new Error("cloud_credential_unavailable");
-			const key = JSON.stringify([
-				connection.id,
-				connection.epoch,
-				auth,
-				connection.baseUrl,
-				connection.accountId,
-				connection.kind,
-			]);
+			const key = keyOf(connection);
 			const hit = cache.get(key);
 			if (!refresh && hit && now() - hit.at < ttlMs) {
 				signal.throwIfAborted();
@@ -268,6 +322,7 @@ function createListing(
 				if (now() - entry.at >= ttlMs) cache.delete(k);
 			if (cache.size >= maxEntries) cache.delete(cache.keys().next().value!);
 			cache.set(key, { at: now(), value });
+			last.set(connection.id, { key, value });
 			return value;
 		},
 	};

@@ -50,11 +50,11 @@ test("web assessment uses the conversation route in one isolated exact control t
 		string,
 		{ role: string }[],
 		AbortSignal,
-		{ reasoningEffort: string },
+		Record<string, unknown>,
 		unknown,
 	];
 	expect(execution[1].map((m) => m.role)).toEqual(["system", "user"]);
-	expect(execution[3].reasoningEffort).toBe("low");
+	expect(execution[3]).not.toHaveProperty("reasoningEffort");
 	expect(execution[4]).toEqual({ sessionRole: "auxiliary" });
 	expect(h.accept).toHaveBeenCalledTimes(1);
 	expect(h.cancel).toHaveBeenCalledTimes(1);

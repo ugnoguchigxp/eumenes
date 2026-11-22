@@ -247,6 +247,8 @@ export async function fixture(input: {
 				? () => input.live!.destination!
 				: undefined,
 			control: (messages, signal, options) => {
+				// A transcription or journal call names no level of its own: it thinks at the saved one (the default).
+				expect(options?.reasoning).toBe("low");
 				if (input.webFixture)
 					return input.webFixture.control(messages, signal, options);
 				const packet = JSON.parse(messages.at(-1)!.content);

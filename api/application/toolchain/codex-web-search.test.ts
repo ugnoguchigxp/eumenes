@@ -87,8 +87,8 @@ test("the Codex background lookup returns guarded candidates to the existing acq
 		});
 		expect(h.execute.mock.calls[0]?.[3]).toMatchObject({
 			nativeWebSearch: true,
-			reasoningEffort: "low",
 		});
+		expect(h.execute.mock.calls[0]?.[3]).not.toHaveProperty("reasoningEffort");
 		expect(h.accept).toHaveBeenCalledTimes(1);
 	} finally {
 		await acquisition.close();

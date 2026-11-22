@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { agendaFixture, promiseResearch, replyWith } from "./always-on.fixture";
 import { createAgendaScope } from "./always-on-scope";
 import { createAgendaCheckpoints } from "./always-on-checkpoint";
+import { recoverAgendaScope } from "./always-on-recovery";
 import { settle } from "../../infrastructure/wait-for";
 import { isAgendaSnapshot } from "../../domains/dialogue";
 import { saveItem } from "../../domains/memory/test/memory.fixture";
@@ -39,6 +40,7 @@ test("a queued checkpoint rejects a changed capture and saves all latest scopes 
 		hostDigest: "fixture",
 		invalidate: () => {},
 		feed: () => ({ cursor, activeId: "ao" }),
+		persisted: new Map(),
 		saved(_rows, value) {
 			savedCursor = value;
 		},
@@ -244,10 +246,262 @@ test("superseded memory is removed from live agenda items before the next reply"
 			hostDigest: "fixture",
 			invalidate: () => {},
 			feed: () => ({ cursor: 0, activeId: null }),
+			persisted: new Map(),
 			saved: () => {},
 		});
 		await checkpoints.refresh(c);
 		expect(c.agent.view().items).toEqual([]);
+	} finally {
+		await f.close();
+	}
+});
+
+/** Two scopes of one store, a checkpoint over them, and counters of what the checkpoint wrote and read. */
+async function twoScopes() {
+	const f = await agendaFixture();
+	const counts = { saved: [] as string[], feeds: 0, reads: 0 };
+	const state = {
+		...f.deps.state,
+		saveInTransaction: (
+			...args: Parameters<typeof f.deps.state.saveInTransaction>
+		) => {
+			counts.saved.push(args[1].conversationId);
+			return f.deps.state.saveInTransaction(...args);
+		},
+		saveFeedInTransaction: (
+			...args: Parameters<typeof f.deps.state.saveFeedInTransaction>
+		) => {
+			counts.feeds++;
+			return f.deps.state.saveFeedInTransaction(...args);
+		},
+	};
+	const deps = {
+		...f.deps,
+		state,
+		store: {
+			...f.deps.store,
+			read: <T>(operation: Parameters<typeof f.deps.store.read<T>>[0]) => {
+				counts.reads++;
+				return f.deps.store.read(operation);
+			},
+		},
+	};
+	const scope = (id: string) =>
+		createAgendaScope({
+			deps,
+			id,
+			epoch: 0,
+			now: Date.now,
+			text: () => null,
+			kick: () => {},
+		});
+	const a = scope("a"),
+		b = scope("b");
+	const convs = new Map([
+		[a.id, a],
+		[b.id, b],
+	]);
+	const persisted = new Map<string, number>();
+	let cursor = 1;
+	const checkpoints = createAgendaCheckpoints({
+		deps,
+		convs,
+		now: Date.now,
+		hostDigest: "fixture",
+		invalidate: () => {},
+		feed: () => ({ cursor, activeId: null }),
+		persisted,
+		saved(rows) {
+			for (const row of rows) persisted.set(row.id, row.revision);
+		},
+	});
+	const reset = () => {
+		counts.saved = [];
+		counts.feeds = 0;
+		counts.reads = 0;
+	};
+	return {
+		f,
+		a,
+		b,
+		convs,
+		persisted,
+		counts,
+		checkpoints,
+		reset,
+		setCursor: (value: number) => (cursor = value),
+	};
+}
+
+test("a checkpoint writes only the scopes whose revision differs from the saved one, and the feed alone when none does", async () => {
+	const t = await twoScopes();
+	try {
+		expect(await t.checkpoints.save()).toBe(true);
+		expect(t.counts.saved.sort()).toEqual(["a", "b"]);
+		expect(t.persisted.get("a")).toBe(t.a.revision);
+		t.reset();
+		// One scope changes: the other is not written.
+		t.a.revision++;
+		expect(await t.checkpoints.save()).toBe(true);
+		expect(t.counts.saved).toEqual(["a"]);
+		expect(t.counts.feeds).toBe(1);
+		expect(t.persisted.get("a")).toBe(t.a.revision);
+		t.reset();
+		// Only the feed moved: no scope is written, the feed is.
+		t.setCursor(5);
+		expect(await t.checkpoints.save()).toBe(true);
+		expect(t.counts.saved).toEqual([]);
+		expect(t.counts.feeds).toBe(1);
+		expect(t.f.h.store.read((db) => t.f.port.feedInTransaction(db))).toEqual({
+			cursor: 5,
+			activeId: null,
+		});
+		// Nothing was lost by skipping: both records hold what the scopes hold.
+		const records = t.f.h.store.read((db) => t.f.port.recordsInTransaction(db));
+		expect(records.map((r) => r.conversationId).sort()).toEqual(["a", "b"]);
+	} finally {
+		await t.f.close();
+	}
+});
+
+test("a checkpoint called from the pump reuses the refresh before it, and any other call refreshes every scope", async () => {
+	const t = await twoScopes();
+	try {
+		await t.checkpoints.save();
+		t.reset();
+		await t.checkpoints.save();
+		// One read of the stale sources per scope, none in the transaction.
+		expect(t.counts.reads).toBe(2);
+		t.reset();
+		await t.checkpoints.save({ refreshed: true });
+		expect(t.counts.reads).toBe(0);
+	} finally {
+		await t.f.close();
+	}
+});
+
+test("a scope whose epoch moved is still refused when it is not the dirty one", async () => {
+	const t = await twoScopes();
+	try {
+		await t.checkpoints.save();
+		t.a.revision++;
+		t.reset();
+		// The record of b is revoked (its epoch moves) while the scope b holds the old one.
+		await t.f.h.store.write((db) => t.f.port.revokeInTransaction(db, "b"));
+		expect(await t.checkpoints.save({ refreshed: true })).toBe(false);
+		expect(t.counts.saved).toEqual([]);
+		expect(t.persisted.get("a")).not.toBe(t.a.revision);
+	} finally {
+		await t.f.close();
+	}
+});
+
+test("forgetting in one scope writes that scope back and no other, and the saved record no longer holds it", async () => {
+	const t = await twoScopes();
+	try {
+		for (const c of [t.a, t.b]) {
+			c.agent.observe({ id: `${c.id}-1`, who: "user", text: "x", at: 1 });
+			c.revision++;
+		}
+		await t.checkpoints.save();
+		t.reset();
+		t.checkpoints.forgetRefs(t.a, ["a-1"]);
+		expect(await t.checkpoints.save()).toBe(true);
+		expect(t.counts.saved).toEqual(["a"]);
+		expect(t.persisted.get("a")).toBe(t.a.revision);
+		expect(t.persisted.get("b")).toBe(t.b.revision);
+	} finally {
+		await t.f.close();
+	}
+});
+
+test("an epoch change and a recovery that drop a ticket make the scope dirty, so the next checkpoint writes it back", async () => {
+	const t = await twoScopes();
+	try {
+		await t.checkpoints.save();
+		// A recovery finds the ticket's work gone: the ticket is dropped and the scope is written.
+		t.a.tickets = [
+			{
+				id: "t1",
+				itemId: "i1",
+				agentTicketId: "t1",
+				revisionId: "r",
+				question: "q",
+				at: 1,
+				refs: [],
+				inputs: [],
+			},
+		];
+		t.persisted.set("a", t.a.revision);
+		recoverAgendaScope(t.f.deps, t.a, Date.now());
+		expect(t.a.tickets).toHaveLength(0);
+		t.reset();
+		expect(await t.checkpoints.save()).toBe(true);
+		expect(t.counts.saved).toEqual(["a"]);
+		// A purge reaches a scope that cites the words: it is invalidated (its revision moves) and written back.
+		t.b.agent.observe({ id: "b-1", who: "user", text: "x", at: 1 });
+		t.b.revision++;
+		await t.checkpoints.save();
+		const invalidated: string[] = [];
+		const invalidating = createAgendaCheckpoints({
+			deps: t.f.deps,
+			convs: t.convs,
+			now: Date.now,
+			hostDigest: "fixture",
+			invalidate: (c) => {
+				invalidated.push(c.id);
+				c.revision++;
+			},
+			feed: () => ({ cursor: 1, activeId: null }),
+			persisted: t.persisted,
+			saved: () => {},
+		});
+		const before = t.persisted.get("b");
+		await t.f.h.store.write((db) =>
+			invalidating.forgetInTransaction(db, {
+				messageIds: ["b-1"],
+				itemIds: [],
+			}),
+		);
+		// Only the scope that cites the words is invalidated; its revision now differs from the saved one.
+		expect(invalidated).toEqual(["b"]);
+		expect(t.b.revision).not.toBe(before);
+		t.reset();
+		expect(await t.checkpoints.save()).toBe(true);
+		expect(t.counts.saved).toEqual(["b"]);
+		expect(t.persisted.get("b")).toBe(t.b.revision);
+	} finally {
+		await t.f.close();
+	}
+});
+
+test("a write unrelated to the conversation makes the host pump without writing a checkpoint", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		await settle();
+		let saves = 0,
+			feeds = 0;
+		const save = f.deps.state.saveInTransaction;
+		const saveFeed = f.deps.state.saveFeedInTransaction;
+		f.deps.state.saveInTransaction = (...args) => {
+			saves++;
+			return save(...args);
+		};
+		f.deps.state.saveFeedInTransaction = (...args) => {
+			feeds++;
+			return saveFeed(...args);
+		};
+		for (let i = 0; i < 3; i++) {
+			await f.h.store.write((db) => {
+				db.exec("CREATE TABLE IF NOT EXISTS unrelated_probe(x)");
+				db.query("INSERT INTO unrelated_probe(x) VALUES(?)").run(i);
+			});
+			await settle();
+		}
+		expect(saves).toBe(0);
+		expect(feeds).toBe(0);
 	} finally {
 		await f.close();
 	}

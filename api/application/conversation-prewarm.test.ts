@@ -3,15 +3,19 @@ import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../infrastructure/sqlite";
 import { createConversationPrewarm } from "./conversation-prewarm";
 
-function harness(latest: string | null) {
+function harness(latest: string | null, usesLarm = true) {
 	const shown = new Set<() => void>();
 	const calls: Array<{ messages: unknown; session: unknown; subject: string }> =
 		[];
 	const rejected: string[] = [];
+	const writes = { count: 0, captures: 0 };
 	let subject = "";
 	const store = {
 		read: (fn: (db: Database) => unknown) => fn({} as Database),
-		write: async (fn: (db: Database) => unknown) => fn({} as Database),
+		write: async (fn: (db: Database) => unknown) => {
+			writes.count++;
+			return fn({} as Database);
+		},
 	} as unknown as SqliteStore;
 	const prefix = {
 		messages: [
@@ -26,6 +30,7 @@ function harness(latest: string | null) {
 				_db: Database,
 				input: { subject: string; maxOutputTokens: number },
 			) => {
+				writes.captures++;
 				subject = input.subject;
 				expect(input.maxOutputTokens).toBe(1);
 				return "req-1";
@@ -57,6 +62,7 @@ function harness(latest: string | null) {
 			typeof createConversationPrewarm
 		>[0]["inference"],
 		latestConversationIdInTransaction: () => latest,
+		usesLarm: () => usesLarm,
 		task: (_db, conversationId, task) =>
 			conversationId === "main"
 				? {
@@ -64,7 +70,7 @@ function harness(latest: string | null) {
 					}
 				: null,
 	});
-	return { prewarm, calls, rejected, shown, prefix };
+	return { prewarm, calls, rejected, shown, prefix, writes };
 }
 
 test("the latest conversation's prefix is read by a one-token background call on its connection, and the answer is dropped", async () => {
@@ -102,6 +108,34 @@ test("without a conversation there is nothing to read", async () => {
 		h.prewarm.start();
 		await Bun.sleep(0);
 		expect(h.calls).toEqual([]);
+	} finally {
+		h.prewarm.close();
+	}
+});
+
+test("a conversation on a cloud model sends no request: nothing is captured, written or executed", async () => {
+	const h = harness("main", false);
+	try {
+		h.prewarm.start();
+		await Bun.sleep(0);
+		for (const listener of h.shown) listener();
+		await Bun.sleep(0);
+		expect(h.calls).toEqual([]);
+		expect(h.writes).toEqual({ count: 0, captures: 0 });
+		expect(h.rejected).toEqual([]);
+	} finally {
+		h.prewarm.close();
+	}
+});
+
+test("a conversation served by LARM is read as before", async () => {
+	const h = harness("main", true);
+	try {
+		h.prewarm.start();
+		await Bun.sleep(0);
+		expect(h.calls).toHaveLength(1);
+		expect(h.writes.captures).toBe(1);
+		expect(h.writes.count).toBe(2);
 	} finally {
 		h.prewarm.close();
 	}

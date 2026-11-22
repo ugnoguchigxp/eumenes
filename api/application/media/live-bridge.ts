@@ -1,6 +1,9 @@
 import { createConversationPrewarm } from "../conversation-prewarm";
 import type { Core } from "../server-core";
-import type { DialogueService } from "../../domains/dialogue";
+import {
+	routeConversation,
+	type DialogueService,
+} from "../../domains/dialogue";
 import type { ContinuityService } from "../../domains/continuity";
 import type { MemoryService } from "../../domains/memory";
 import type { ExternalOutputPort } from "../../domains/dialogue/contracts/external-output";
@@ -63,6 +66,12 @@ export function createLiveBridge() {
 				inference,
 				latestConversationIdInTransaction:
 					dialogue.latestConversationIdInTransaction,
+				// The conversation's own route judgement, on a copy: it is a prompt LARM keeps only when LARM serves it.
+				usesLarm: (db) => {
+					const snapshot = structuredClone(inference.snapshotInTransaction(db));
+					routeConversation(snapshot);
+					return snapshot.routes.llm.mode !== "cloud-only";
+				},
 				task: dialogue.conversationTaskInTransaction,
 			});
 

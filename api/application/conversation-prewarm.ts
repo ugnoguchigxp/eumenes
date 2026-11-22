@@ -15,7 +15,8 @@ type Prompt = { messages: Messages };
 
 /**
  * The cold-start prewarm (the ContextWindow layout specification, section 8.3): the latest conversation's prefix
- * is read on its connection by a one-token call, so its first answer does not wait for it. It runs when the
+ * is read on its connection by a one-token call, so its first answer does not wait for it. A conversation on a cloud
+ * model has no LARM prompt to keep, so it does nothing then. It runs when the
  * conversation screen is shown and when the screen has stayed shown for `PREWARM_IDLE_MS` without a call; after the
  * conversation's own calls (and the background work on its prompt) nothing is needed. The call yields to the
  * conversation and its output is discarded; the conversation and its log are never touched.
@@ -32,6 +33,8 @@ export function createConversationPrewarm(deps: {
 		| "onActivity"
 	>;
 	latestConversationIdInTransaction(db: Database): string | null;
+	/** Whether the conversation's model is served by LARM (the conversation's own route judgement). */
+	usesLarm(db: Database): boolean;
 	task(db: Database, conversationId: string, task: string): Prompt | null;
 }) {
 	const { store, inference } = deps;
@@ -44,6 +47,8 @@ export function createConversationPrewarm(deps: {
 		running = true;
 		try {
 			const prepared = store.read((db) => {
+				// A conversation on a cloud model holds no LARM prompt: nothing is read and nothing is recorded.
+				if (!deps.usesLarm(db)) return null;
 				const conversationId = deps.latestConversationIdInTransaction(db);
 				const prompt = conversationId
 					? deps.task(db, conversationId, PREWARM_TASK)

@@ -1267,3 +1267,22 @@ test("the switching host forwards what a reply was given and that the agency ser
 		await f.close();
 	}
 });
+
+test("a reply reads the memory once: the prompt's memory and the memory recorded as given are one reading", async () => {
+	const f = await agendaFixture();
+	try {
+		await f.start();
+		await f.user("user-a");
+		const memory = f.deps.memory;
+		const list = memory.list.bind(memory);
+		let reads = 0;
+		memory.list = (...args: Parameters<typeof memory.list>) => {
+			reads++;
+			return list(...args);
+		};
+		await replyWith(f, [], { runId: "run-once", messageIds: ["user-a"] });
+		expect(reads).toBe(1);
+	} finally {
+		await f.close();
+	}
+});

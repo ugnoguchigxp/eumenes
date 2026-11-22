@@ -12,7 +12,10 @@ export { registerSettings } from "./controller";
 export type { Settings, Purpose, Connection, Resource } from "./contracts";
 export { isAgentConnection } from "./contracts";
 export { migrations } from "./repository";
-export { readStoredLarm } from "./repository/stored-larm";
+export {
+	readStoredLarm,
+	readStoredReasoningEffort,
+} from "./repository/stored-larm";
 
 export { readStoredObjectRecognitionConnection } from "./repository/stored-object-recognition";
 export { readStoredExcalidrawAvailability } from "./repository/stored-larm";

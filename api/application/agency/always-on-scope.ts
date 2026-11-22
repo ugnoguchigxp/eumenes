@@ -243,7 +243,7 @@ export function createAgendaScope(input: {
 			? input.previous.snapshot
 			: undefined;
 	let c: AgendaScope;
-	// The agenda's calls are short structured outputs: reasoning must not eat their output budget.
+	// The agenda's calls are short structured outputs; their thinking level is the saved one, like every call's.
 	const inner = deps.createLlm(() => ({
 		decisionId: crypto.randomUUID(),
 		generation: c.generation,
@@ -252,7 +252,6 @@ export function createAgendaScope(input: {
 		...(cfg.agency.thinkResourceId
 			? { resourceId: cfg.agency.thinkResourceId }
 			: {}),
-		reasoning: cfg.agency.thinkReasoning ?? "low",
 	}));
 	// A call that began before the user's words, a correction or a forget is stale when it returns.
 	const llm: LlmPort = {

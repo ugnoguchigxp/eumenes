@@ -167,10 +167,6 @@ function callSession(
 		// so a choice can be made again, the talk turn follow it, or the host answer.
 		retainRequest: true,
 		outputLimit: input.harness.call.outputLimit,
-		reasoning: {
-			larm: input.harness.call.reasoning,
-			cloud: input.harness.call.cloudReasoning,
-		},
 		...(options.session?.context ? { context: options.session.context } : {}),
 		...(options.session?.refs ? { refs: options.session.refs } : {}),
 	};

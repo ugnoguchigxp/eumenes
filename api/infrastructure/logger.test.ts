@@ -385,3 +385,33 @@ process.exit(0);`,
 	});
 	expect(numbers).toEqual([1, 2, 3, 4, 5, 6]);
 });
+
+test("sections keeps whole sections within 4096 characters and marks how many were left out", () => {
+	const output = capture();
+	const log = getLogger("inference");
+	const section = (n: number) => `user:text:${n}:${"a".repeat(12)}`;
+	const short = [section(1), section(2)].join("|");
+	log.info("inference.input_sections", {
+		sections: short,
+		conversationId: "c1",
+	});
+	const parts = Array.from({ length: 400 }, (_, i) => section(i));
+	log.info("inference.input_sections", { sections: parts.join("|") });
+	log.info("inference.attempt_started", { reason: "x".repeat(257) });
+	const [a, b, c] = output.entries();
+	expect(a.sections).toBe(short);
+	expect(a.conversationId).toBe("c1");
+	const kept = (b.sections as string).split("|");
+	const marker = kept.pop()!;
+	expect((b.sections as string).length).toBeLessThanOrEqual(4096);
+	expect(kept.every((part, i) => part === parts[i])).toBe(true);
+	expect(marker).toBe(`…+${parts.length - kept.length}`);
+	// One more section would not have fit.
+	expect(
+		[...kept, parts[kept.length]!, `…+${parts.length - kept.length - 1}`].join(
+			"|",
+		).length,
+	).toBeGreaterThan(4096);
+	// Other strings keep their 256-character limit.
+	expect(c.reason).toBeUndefined();
+});

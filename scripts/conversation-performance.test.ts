@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { encodeSections } from "../api/domains/inference/service/input-sections";
 import type { LogEntry } from "../api/infrastructure/log-reader";
 import {
 	conversationPerformance,
@@ -268,4 +269,182 @@ test("reads the published usage dashboard pages and rejects a changed result set
 	await expect(readCodexUsage(client, start, end, signal)).rejects.toThrow(
 		"codex_usage_changed_during_read",
 	);
+});
+
+test("call kinds count outcomes and name the section where the prefix broke", () => {
+	const section = (
+		role: string,
+		label: string,
+		tokens: number,
+		hash: string,
+	) => ({
+		role,
+		label,
+		tokens,
+		hash,
+	});
+	const system = section("system", "system", 1000, "s1");
+	const memory = (hash: string) => section("user", "Memory", 300, hash);
+	const state = (hash: string) => section("user", "State", 50, hash);
+	const call = (
+		at: number,
+		attemptId: string,
+		fields: LogEntry,
+		sections: ReturnType<typeof section>[],
+		end: "inference.attempt_succeeded" | "inference.attempt_failed" | null,
+		reason?: string,
+		bootId = "boot-1",
+	) => {
+		const base = { attemptId, purpose: "llm", source: "larm", ...fields };
+		return [
+			event(at, "inference.attempt_started", base),
+			event(at + 1, "inference.input_sections", {
+				...base,
+				bootId,
+				conversationId: "conv-1",
+				count: sections.length,
+				sections: encodeSections(sections),
+			}),
+			...(end ? [event(at + 50, end, { ...base, reason })] : []),
+		];
+	};
+	const replyOf = (n: number) => ({
+		runId: `run-${n}`,
+		jobId: `job-${n}`,
+		phase: "generation",
+	});
+	const logs = [
+		...[1, 2, 3, 4].map((n) =>
+			event(n * 1000, "dialogue.accepted", {
+				runId: `run-${n}`,
+				jobId: `job-${n}`,
+			}),
+		),
+		...call(
+			1000,
+			"r1",
+			replyOf(1),
+			[system, memory("m1"), state("t1")],
+			"inference.attempt_succeeded",
+		),
+		// The state changed: the prefix matches through Memory.
+		...call(
+			2000,
+			"r2",
+			replyOf(2),
+			[system, memory("m1"), state("t2")],
+			"inference.attempt_succeeded",
+		),
+		// The memory changed: only the system section matches.
+		...call(
+			3000,
+			"r3",
+			replyOf(3),
+			[system, memory("m2"), state("t3")],
+			"inference.attempt_failed",
+			"network_unavailable",
+		),
+		...call(
+			4000,
+			"r4",
+			replyOf(4),
+			[system, memory("m2"), state("t3"), section("user", "text", 20, "u1")],
+			"inference.attempt_failed",
+			"cancelled",
+		),
+		...call(
+			5000,
+			"b1",
+			{ subjectId: "background:warm:1763700000000" },
+			[system, memory("m1")],
+			"inference.attempt_succeeded",
+		),
+		...call(
+			6000,
+			"b2",
+			{ subjectId: "background:warm:1763700006000" },
+			[system, memory("m1")],
+			"inference.attempt_succeeded",
+		),
+		// Another process hashes with its own key: it is not compared with the calls above.
+		...call(
+			6500,
+			"b4",
+			{ subjectId: "background:warm:1763700006500" },
+			[system, memory("m1")],
+			"inference.attempt_succeeded",
+			undefined,
+			"boot-2",
+		),
+		...call(
+			6800,
+			"b5",
+			{ subjectId: "background:warm:1763700006800" },
+			[system, memory("m1")],
+			null,
+		),
+		...call(
+			7000,
+			"b3",
+			{ subjectId: "background:prewarm:1763700007000" },
+			[system],
+			"inference.attempt_succeeded",
+		),
+	];
+	const report = conversationPerformance(logs, start, end, [
+		usage("r1", 1000, 600),
+		usage("r2", 1000, 900),
+	]);
+	const kinds = Object.fromEntries(report.callKinds.map((k) => [k.kind, k]));
+	expect(Object.keys(kinds).sort()).toEqual([
+		"background:prewarm",
+		"background:warm",
+		"reply",
+	]);
+	expect(kinds.reply).toMatchObject({
+		calls: 4,
+		succeeded: 2,
+		failed: 1,
+		interrupted: 1,
+		unfinished: 0,
+		usage: {
+			calls: 2,
+			inputTokens: 2000,
+			cacheReadTokens: 1500,
+			uncachedInputTokens: 500,
+		},
+		inputSections: { observed: 4, meanEstimatedInputTokens: 1355 },
+	});
+	// Only succeeded calls are compared (r1, r2): the failed r3 and the withdrawn r4 are left out.
+	expect(kinds.reply!.prefix).toEqual({
+		pairs: 1,
+		breaks: [
+			{
+				label: "State",
+				count: 1,
+				meanMatchedTokens: 1300,
+				meanInputTokens: 1350,
+			},
+		],
+	});
+	expect(kinds["background:warm"]).toMatchObject({
+		calls: 4,
+		succeeded: 3,
+		unfinished: 1,
+		usage: { calls: 0 },
+	});
+	expect(kinds["background:warm"]!.prefix.breaks).toEqual([
+		{
+			label: "(identical)",
+			count: 1,
+			meanMatchedTokens: 1300,
+			meanInputTokens: 1300,
+		},
+	]);
+	// A single call has nothing to be compared with.
+	expect(kinds["background:prewarm"]!.prefix).toEqual({ pairs: 0, breaks: [] });
+	// Without usage the token side is absent, not zero.
+	expect(
+		conversationPerformance(logs, start, end).callKinds[0]!.usage,
+	).toBeNull();
 });

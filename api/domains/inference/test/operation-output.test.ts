@@ -1,5 +1,4 @@
 import { afterEach, expect, test } from "bun:test";
-import { REASONING_ALLOWANCE_TOKENS } from "../service/attempt-work";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import type { ControlContract } from "../contracts";
 import { cleanup, messages, setup } from "./inference.fixture";
@@ -189,6 +188,7 @@ test("a spoken call's session reaches the provider: speech sampling, a required 
 	);
 	expect(seen).toMatchObject({
 		toolChoice: "required",
-		maxOutputTokens: 1024 + REASONING_ALLOWANCE_TOKENS,
+		// The conversation's own call: its limit already holds the thinking.
+		maxOutputTokens: 1024,
 	});
 });

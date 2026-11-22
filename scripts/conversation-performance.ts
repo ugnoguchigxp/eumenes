@@ -11,11 +11,12 @@ import {
 	logGenerations,
 	logTimeMs,
 } from "../api/infrastructure/log-reader";
+import { decodeSections } from "../api/domains/inference/service/input-sections";
 import { createClient } from "../client";
 import { median } from "./verification-metrics";
 
 const events =
-	/dialogue\.(accepted|generation_started|router_selection|first_delta)|voice\.first_chunk_ready|queue\.settled|inference\.(attempt_(started|succeeded|failed)|codex_thread|codex_usage_updated|prepared|router_usage)|performance\.stage|larm\.llm_timing/;
+	/dialogue\.(accepted|generation_started|router_selection|first_delta)|voice\.first_chunk_ready|queue\.settled|inference\.(attempt_(started|succeeded|failed)|input_sections|codex_thread|codex_usage_updated|prepared|router_usage)|performance\.stage|larm\.llm_timing/;
 const attemptEvents = new Set([
 	"inference.attempt_started",
 	"inference.attempt_succeeded",
@@ -102,6 +103,169 @@ function tokens(
 		outputTokens: sumReported(rows.map((r) => r.outputTokens)),
 		reasoningTokens: sumReported(rows.map((r) => r.reasoningTokens)),
 	};
+}
+
+/** Attempts that ended because the call was withdrawn, not because the provider failed. */
+const interruptedReasons = new Set([
+	"cancelled",
+	"permission_revoked",
+	"larm_preempted",
+]);
+
+/**
+ * The kind of a background call from its subject (`background:<name>[:<id>...]`): the segments that look like an
+ * ID or a time (any digit, or 16+ characters) are left out, the first two others name the kind.
+ */
+export function backgroundKind(subjectId: string) {
+	const names = subjectId
+		.split(":")
+		.slice(1)
+		.filter((part) => part && !/\d/.test(part) && part.length < 16);
+	return names.length
+		? `background:${names.slice(0, 2).join(":")}`
+		: "background";
+}
+
+type CallAttempt = {
+	kind: string;
+	source: string | null;
+	outcome: "succeeded" | "failed" | "interrupted" | "unfinished";
+	conversationId: string | null;
+	/** The process that wrote the hashes: they are keyed per process, so only one process's calls are compared. */
+	bootId: string | null;
+	sections: ReturnType<typeof decodeSections> | null;
+};
+
+const mean = (values: number[]) =>
+	values.length
+		? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+		: null;
+
+/**
+ * Where a call's input first differs from the previous succeeded call of the same kind, session and process, and
+ * what matched.
+ */
+function prefixBreaks(calls: CallAttempt[]) {
+	const sequences = new Map<string, NonNullable<CallAttempt["sections"]>[]>();
+	for (const call of calls) {
+		// Only succeeded calls are compared: a failed or withdrawn one may not have filled the provider's cache.
+		if (!call.sections || call.outcome !== "succeeded") continue;
+		const key = JSON.stringify([call.source, call.conversationId, call.bootId]);
+		sequences.set(key, [...(sequences.get(key) ?? []), call.sections]);
+	}
+	const bins = new Map<string, { matched: number[]; total: number[] }>();
+	let pairs = 0;
+	for (const sequence of sequences.values())
+		for (let i = 1; i < sequence.length; i++) {
+			const before = sequence[i - 1]!;
+			const now = sequence[i]!;
+			let at = 0;
+			while (
+				at < before.length &&
+				at < now.length &&
+				before[at]!.hash === now[at]!.hash
+			)
+				at++;
+			const label =
+				at === now.length && at === before.length
+					? "(identical)"
+					: at === before.length
+						? "(appended)"
+						: at === now.length
+							? "(shortened)"
+							: now[at]!.label;
+			const bin = bins.get(label) ?? { matched: [], total: [] };
+			bin.matched.push(now.slice(0, at).reduce((n, x) => n + x.tokens, 0));
+			bin.total.push(now.reduce((n, x) => n + x.tokens, 0));
+			bins.set(label, bin);
+			pairs++;
+		}
+	return {
+		pairs,
+		breaks: [...bins]
+			.map(([label, bin]) => ({
+				label,
+				count: bin.matched.length,
+				meanMatchedTokens: mean(bin.matched),
+				meanInputTokens: mean(bin.total),
+			}))
+			.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
+	};
+}
+
+/** Per call kind (the conversation's reply, or a background name): counts, usage and where the prefix broke. */
+function callKinds(
+	entries: LogEntry[],
+	attempts: ReadonlyMap<string, Stage | "excluded">,
+	usage: readonly Usage[],
+	hasUsage: boolean,
+) {
+	const calls = new Map<string, CallAttempt>();
+	for (const entry of entries) {
+		const id = entry.attemptId;
+		if (typeof id !== "string" || entry.purpose !== "llm") continue;
+		const stage = attempts.get(id);
+		if (!stage || stage === "excluded") continue;
+		const text = (value: unknown) => (typeof value === "string" ? value : null);
+		const call = calls.get(id) ?? {
+			kind:
+				stage === "reply"
+					? "reply"
+					: stage === "background"
+						? backgroundKind(text(entry.subjectId) ?? "")
+						: "unlinked",
+			source: null,
+			outcome: "unfinished" as const,
+			conversationId: null,
+			bootId: null,
+			sections: null,
+		};
+		call.source ??= text(entry.source);
+		if (entry.event === "inference.attempt_succeeded")
+			call.outcome = "succeeded";
+		if (entry.event === "inference.attempt_failed")
+			call.outcome = interruptedReasons.has(String(entry.reason))
+				? "interrupted"
+				: "failed";
+		if (entry.event === "inference.input_sections") {
+			call.conversationId = text(entry.conversationId);
+			call.bootId = text(entry.bootId);
+			call.sections = decodeSections(text(entry.sections) ?? "");
+		}
+		calls.set(id, call);
+	}
+	const kinds = new Map<string, [string, CallAttempt][]>();
+	for (const item of calls) {
+		const group = kinds.get(item[1].kind) ?? [];
+		group.push(item);
+		kinds.set(item[1].kind, group);
+	}
+	return [...kinds]
+		.map(([kind, group]) => {
+			const rows = usage.filter((row) => calls.get(row.id)?.kind === kind);
+			const count = (outcome: CallAttempt["outcome"]) =>
+				group.filter(([, c]) => c.outcome === outcome).length;
+			const observed = group.flatMap(([, c]) =>
+				c.sections ? [c.sections] : [],
+			);
+			return {
+				kind,
+				calls: group.length,
+				succeeded: count("succeeded"),
+				failed: count("failed"),
+				interrupted: count("interrupted"),
+				unfinished: count("unfinished"),
+				usage: hasUsage ? { calls: rows.length, ...tokens(rows) } : null,
+				inputSections: {
+					observed: observed.length,
+					meanEstimatedInputTokens: mean(
+						observed.map((s) => s.reduce((n, x) => n + x.tokens, 0)),
+					),
+				},
+				prefix: prefixBreaks(group.map(([, c]) => c)),
+			};
+		})
+		.sort((a, b) => b.calls - a.calls || a.kind.localeCompare(b.kind));
 }
 
 function dialogueRuns(entries: LogEntry[], runIds?: ReadonlySet<string>) {
@@ -317,6 +481,12 @@ export function conversationPerformance(
 				larmTiming.map((e) => duration(e.providerDecodeMs)),
 			),
 		},
+		callKinds: callKinds(
+			entries,
+			attempts,
+			[...savedUsage.values()],
+			usage !== undefined,
+		),
 		attempts: Object.fromEntries(
 			stages.map((stage) => [
 				stage,

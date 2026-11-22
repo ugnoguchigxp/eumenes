@@ -340,7 +340,7 @@ test("a cloud fallback attempt records the role and the connection's billing pat
 			.map((u) => u.billingPath),
 	).toEqual(["openai-compatible"]);
 });
-test("a main call's reasoning reaches the LARM stream call, a call without one thinks at low, and any other role is rejected", async () => {
+test("every LARM stream call thinks at the one saved level, whatever its role names", async () => {
 	const seen: Array<unknown> = [];
 	const h = await setup({
 		localStream: async (_messages, _signal, onDelta, options) => {
@@ -354,48 +354,21 @@ test("a main call's reasoning reaches the LARM stream call, a call without one t
 			h.inference.captureInTransaction(db, subject, "llm", Date.now() + 30000),
 		);
 	const signal = new AbortController().signal;
-	await h.inference.executeStream(
-		await capture("with-reasoning"),
-		messages,
-		signal,
-		() => {},
-		undefined,
-		undefined,
-		{ sessionRole: "main", reasoning: { larm: "high", cloud: "low" } },
-	);
-	await h.inference.executeStream(
-		await capture("without-reasoning"),
-		messages,
-		signal,
-		() => {},
-		undefined,
-		undefined,
-		{ sessionRole: "main" },
-	);
-	expect(seen).toEqual(["high", "low"]);
-	for (const session of [
-		{ reasoning: { larm: "low", cloud: "low" } as const },
-		{
-			sessionRole: "auxiliary" as const,
-			reasoning: { larm: "low", cloud: "low" } as const,
-		},
-		{
-			sessionRole: "subagent" as const,
-			taskId: "t",
-			reasoning: { larm: "low", cloud: "low" } as const,
-		},
-	])
-		await expect(
-			h.inference.executeStream(
-				await capture(`rejected-${session.sessionRole ?? "default"}`),
-				messages,
-				signal,
-				() => {},
-				undefined,
-				undefined,
-				session,
-			),
-		).rejects.toThrow("invalid_session_role");
+	for (const [subject, session] of [
+		["main", { sessionRole: "main" as const }],
+		["auxiliary", { sessionRole: "auxiliary" as const }],
+		["none", undefined],
+	] as const)
+		await h.inference.executeStream(
+			await capture(subject),
+			messages,
+			signal,
+			() => {},
+			undefined,
+			undefined,
+			session,
+		);
+	expect(seen).toEqual(["low", "low", "low"]);
 });
 
 test("native auxiliary control schemas keep the answer and subagent role restrictions", async () => {

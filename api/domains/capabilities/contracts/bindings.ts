@@ -133,6 +133,10 @@ const agentV1 = z.strictObject({
 	collaborationState: z
 		.union([z.literal(true), z.literal("host-bound")])
 		.optional(),
+	/**
+	 * Read from stored binding revisions only (those that carried it stay valid, byte for byte) and ignored: the
+	 * thinking level is the one saved level, never a binding's. New revisions do not name it.
+	 */
 	larmReasoning: z.literal("off").optional(),
 	workspace: z
 		.strictObject({

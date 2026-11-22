@@ -18,14 +18,10 @@ import { waitFor } from "../../../infrastructure/wait-for";
  * The conversation harness (the conversation harness design, sections 4.1 to 4.3; the single harness plan): its
  * one value, the model's route chosen from the saved settings, and what each part of the value changes.
  */
-test("the harness: the last two utterances with local low and cloud high within 4,096 tokens", () => {
+test("the harness: the last two utterances within 4,096 tokens, and no thinking level of its own", () => {
 	expect(localHarness.gates).toEqual({ systemCopy: true });
 	expect(localHarness.history).toEqual({ copyFilter: true, users: 2 });
-	expect(localHarness.call).toEqual({
-		reasoning: "low",
-		cloudReasoning: "high",
-		outputLimit: 4096,
-	});
+	expect(localHarness.call).toEqual({ outputLimit: 4096 });
 });
 
 test("the llm route is LARM only unless the saved route picks a usable cloud model", () => {
@@ -152,11 +148,6 @@ afterEach(async () => {
 });
 
 const lastCall = () => h!.state.calls.at(-1)!;
-/** Every call carries the harness's independently specified levels for LARM and cloud. */
-const BOTH = {
-	larm: localHarness.call.reasoning,
-	cloud: localHarness.call.cloudReasoning,
-};
 
 /** A routed turn with no judgement: the request turn chooses nothing, then the talk turn says `text`. */
 const talked = (text: string) => [
@@ -164,15 +155,15 @@ const talked = (text: string) => [
 	{ text },
 ];
 
-test("a run is the routed turn: its calls carry the harness's limit and reasoning", async () => {
+test("a run is the routed turn: its calls carry the harness's limit and name no thinking level", async () => {
 	h = await setup();
 	h.state.steps.push(...talked("はい"));
 	await h.say("こんにちは");
 	expect(lastCall().session).toMatchObject({
 		sessionRole: "main",
 		outputLimit: 4096,
-		reasoning: BOTH,
 	});
+	expect(lastCall().session).not.toHaveProperty("reasoning");
 });
 
 test("a run takes the saved cloud model's route and runs the same routed turn: the same limit and the same talk system", async () => {
@@ -202,7 +193,7 @@ test("a run takes the saved cloud model's route and runs the same routed turn: t
 	});
 	expect(h.state.calls.map((c) => c.session)).toEqual(
 		Array.from({ length: 2 }, () =>
-			expect.objectContaining({ outputLimit: 4096, reasoning: BOTH }),
+			expect.objectContaining({ outputLimit: 4096 }),
 		),
 	);
 	const cloudTalk = h.state.calls.at(-1)!.messages[0]!.content;
@@ -220,10 +211,7 @@ test("a saved cloud model that can not be used falls back to LARM", async () => 
 		mode: "larm-only",
 		cloudAllowed: false,
 	});
-	expect(lastCall().session).toMatchObject({
-		outputLimit: 4096,
-		reasoning: BOTH,
-	});
+	expect(lastCall().session).toMatchObject({ outputLimit: 4096 });
 });
 
 test("a run accepted keeps the saved route as it is: a LARM-preferred one stays so", async () => {
@@ -235,10 +223,7 @@ test("a run accepted keeps the saved route as it is: a LARM-preferred one stays 
 		mode: "larm-preferred",
 		cloudAllowed: true,
 	});
-	expect(lastCall().session).toMatchObject({
-		outputLimit: 4096,
-		reasoning: BOTH,
-	});
+	expect(lastCall().session).toMatchObject({ outputLimit: 4096 });
 });
 
 test("a run captured at prepare pins speech to LARM and routes the llm as the saved route picks", async () => {
@@ -253,10 +238,7 @@ test("a run captured at prepare pins speech to LARM and routes the llm as the sa
 	expect(routes.llm).toMatchObject({ mode: "cloud-only", cloudAllowed: true });
 	for (const p of ["asr", "tts"] as const)
 		expect(routes[p]).toMatchObject({ mode: "larm-only", cloudAllowed: false });
-	expect(lastCall().session).toMatchObject({
-		outputLimit: 4096,
-		reasoning: BOTH,
-	});
+	expect(lastCall().session).toMatchObject({ outputLimit: 4096 });
 });
 
 test("a resubmitted utterance is captured with the saved route as it is", async () => {

@@ -71,7 +71,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 	note({ method: m.method, params: m.params ?? {} });
 	const sessions = () => join(process.env.CODEX_HOME, "sessions");
 	if (m.method === "initialize") out({ id: m.id, result: {} });
-	else if (m.method === "model/list") out({ id: m.id, result: { data: [{ model: "fixture-model", displayName: "fixture", inputModalities: ["text", "image"] }], nextCursor: null } });
+	else if (m.method === "model/list") out({ id: m.id, result: { data: [{ model: "fixture-model", displayName: "fixture", inputModalities: ["text", "image"], supportedReasoningEfforts: [{ reasoningEffort: "low", description: "" }, { reasoningEffort: "high", description: "" }, { reasoningEffort: "xhigh", description: "" }], defaultReasoningEffort: "high" }], nextCursor: null } });
 	else if (m.method === "thread/start") {
 		const id = "thread-" + process.pid + "-" + ++n;
 		threads.set(id, { turns: [], total: { input: 0, output: 0, cached: 0 }, ephemeral: m.params.ephemeral !== false });

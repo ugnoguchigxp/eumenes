@@ -18,6 +18,7 @@ import {
 } from "../contracts";
 import { get, type RequestRow } from "../repository";
 import { recordAttemptStart, resolveSession } from "./attempt-record";
+import { encodeSections, inputSections } from "./input-sections";
 import { fallbackErrors, safeError } from "./errors";
 import { operationOutputMessages } from "../contracts/operation-output";
 
@@ -71,6 +72,28 @@ async function attempt(
 		...logFields,
 		reason: r.reason ?? undefined,
 	});
+	if (row.purpose === "llm" && Array.isArray(r.input)) {
+		// Where the cached prefix of two calls breaks is read from these: labels, tokens and hashes, never text.
+		// A measurement never changes the call: whatever it throws on, nothing is logged and the call goes on.
+		try {
+			const sections = inputSections({
+				messages: r.input,
+				tools: r.tools,
+				outputSchema:
+					r.outputContract?.outputSchema ??
+					r.session?.outputSchema ??
+					r.control?.outputSchema,
+			});
+			log.info("inference.input_sections", {
+				...logFields,
+				conversationId: r.session?.agentSession?.conversationId ?? undefined,
+				count: sections.length,
+				sections: encodeSections(sections),
+			});
+		} catch {
+			// Nothing is logged for an input that could not be measured.
+		}
+	}
 	const callOptions = callOptionsFor(r, attemptId, source);
 	const abort = new AbortController();
 	const timer = setTimeout(

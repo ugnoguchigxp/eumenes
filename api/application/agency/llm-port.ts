@@ -35,7 +35,6 @@ export type AgencyAttemptUsage = {
 export type AgencyCallIdentity = {
 	independent?: true;
 	resourceId?: string;
-	reasoning?: "off" | "low" | "medium" | "high";
 	decisionId: string;
 	/** The host's execution generation (positive); bumped when input invalidates background work. */
 	generation: number;
@@ -168,10 +167,6 @@ export function createAgencyLlmPort(deps: AgencyLlmPortDeps): LlmPort {
 								agentSession: {
 									conversationId: conversationId ?? null,
 									agentId: `agency:${conversationId ?? identity.decisionId}`,
-								},
-								reasoning: {
-									larm: identity.reasoning ?? "high",
-									cloud: identity.reasoning ?? "high",
 								},
 							}
 						: prefix && conversationId

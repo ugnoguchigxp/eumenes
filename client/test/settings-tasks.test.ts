@@ -59,6 +59,7 @@ const settings: Settings = {
 		autoGainControl: true,
 	},
 	general: {
+		reasoningEffort: "low",
 		agentName: "",
 		asrLanguages: ["ja", "en"],
 		userName: "",

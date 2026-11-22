@@ -1,7 +1,7 @@
 # 会話エージェントのトークン効率改善と技術的負債解消 実装計画書
 
 - 日付: 2026-11-22
-- 状態: 第2稿（2026-11-22、レビュー反映。合意前。製品コード・DB・設定・依存は未変更）
+- 状態: 第3稿（2026-11-22、利用者の決定を反映。方針は合意済みで、決定の一覧は §5。製品コード・DB・設定・依存は未変更。計測で決める項目と着手前の確認事項が残る）
 - 対象領域: `dialogue`、`inference`、`steward`、`memory`、`capabilities`、`voice-dialogue`、`api/application/agency`、`api/application/conversation-prewarm.ts`（一部、外部パッケージ `eumenes-agency` の改修案を含む）
 - 位置付け: [会話エージェントの性能改善計画](conversation-agent-performance-improvement-plan-2026-11-21.md)（2026-11-21）の工程0〜4および [作業場所・担当・承認の引き継ぎ](conversation-delegation-continuity-2026-11-22.md)（2026-11-22）で顕在化した課題を、コード全体の精査と定量実測に基づいて**トークン効率改善**と**技術的負債解消**の両面から具体化した実装計画書。
 
@@ -20,6 +20,7 @@
 | 事実確認を着手条件にした | `A2-前半`、`C6`、`D2` | 前提がコードだけでは確かめられない、または漏れると別の不具合になる |
 | 追加した | `E1`、`E2`、項目ごとの単独採用（§4.3） | 効果を項目別に測れるようにし、削った入力が後から戻るのを防ぐ |
 | 追加し、取り下げた（利用者の提案、2026-11-22） | `F1` を追加、`C3` を取り下げ | 思考レベルを全体設定の 1 つにまとめ、チャット画面で選ぶ。呼出しごとの上書きである `C3` は両立しない |
+| 決定を反映した（第3稿、2026-11-22） | §5 | 合意で確認したい論点を、利用者の決定・計測で決めること・着手前に調べることの 3 つの表に置き換えた |
 | 順序を変えた | `D4` を背景・会話本体の改修より前へ | 旧系統を先に外すと、以降の変更の検証対象が `always-on` だけになる |
 
 ---
@@ -98,7 +99,7 @@
 | 第2部　事実確認のうえ着手する調整 | `A2-前半`、`C6`、`D2` | 各項目の「着手条件」を満たしたとき。満たさなければ見送る |
 | 第3部　設計変更 | `F1`、`D4`、`A1`、`A2-後半`、`A3`、`A4`、`A5`、`A6`、`B1`、`B2`、`B3`、`B4`、`C4`、`C5`（`C3` は取り下げ） | 項目ごとの合意と、[E1] の計測で効果が見込めること |
 
-第3部の件数・秒数・削減量は、第1稿の値を例として残している。確定値は [E1] の計測から決める。
+第3部の件数・秒数・削減量は、第1稿の値を例として残している。確定値は [E1] の計測から決める。各項目に対する利用者の決定は §5 の表を正とする。
 
 ---
 
@@ -204,7 +205,11 @@
   4. 最上位（very high）まで選べるようにする。現在の型は `"low" | "medium" | "high"`（`cloud-agent-shared.ts:53`、`codex-app-server.ts:44`）なので、型と送信値を広げる。
   5. 画面は Select を 1 つ足すだけとし、回答の実行中はモデル選択と同じく操作を止める。
 - **モデル名の扱い**: 「既定は luna の low、Astra の very high まで」のうち、思考レベルの既定 `low` はコードに書ける。モデル名は作業規則でコード・既定値に書けないため、既定のモデルは保存済みの設定で決める（コードには入れない）。選べるモデルの一覧は現状どおり設定と catalog から得る。
+- **利用者の決定（2026-11-22）**:
+  - 既定は `low` とする。会話のクラウド側を `high` にした 2026-11-06 の受入は当時のモデルでの結果で、現在のモデルは違う。`low` で閲覧ツールを選べるかは現在のモデルで確かめ直す。
+  - モデルの一覧は Codex が返すものをそのまま表示する。使わない古いモデルが並んでも、名前で除外する処理は作らない（モデル名をコードに書かない規則とも合う）。現状 `codex-models.ts` は `model/list` を `includeHidden: true` で呼んでおり、Codex 自身が隠しているモデルも取得している。古いモデルが隠し扱いのものなら、この指定を外すだけで一覧から消える（未確認）。
 - **着手前に確かめること**:
+  - `model/list` の応答がモデルごとの思考レベルの可否と既定値を返すか。現状の `codex-models.ts` は `model`・`displayName`・`inputModalities` だけを読んでいる。返すなら、選べる値はここから得る。
   - 各接続（Codex SDK、Claude Agent SDK、LARM）が受け付ける思考レベルの値と、最上位の値の名前。SDK の型と文書で確認する。モデルごとの可否を catalog から得られるかも確認する。得られない場合の持ち方（接続種別ごとの宣言など）は別途決める。
   - 会話のクラウド側を `high` にした理由。`harness.ts` のコメントは「low / medium では閲覧ツールの選択に失敗し、high で成功した（記憶統合の受入、2026-11-06）」としている。既定を `low` にすると会話もこの値で動く。[B3] の (3a) で記憶を閲覧ツールで読む方針にしたため、`low` で `read_memory` を選べるかは現在のモデルで確かめ直す。選べない場合は、既定値を上げるか、利用者が画面で上げて使うかを決める。
 - **他の項目への影響**:
@@ -478,15 +483,83 @@ flowchart LR
 
 ---
 
-## 5. 合意で確認したい論点
+## 5. 利用者の決定と、残っている確認事項（2026-11-22）
 
-1. **`A1`　Steward の相乗りをどの経路でやめるか**: Codex 経路では `threadIdentity` が会話と一致しないため、相乗りの利点がない。LARM 経路は会話と同じ prefix の KV キャッシュを共有できる可能性があり、[E1] の計測で相乗りと独立実行を比べてから決める。経路で方式が分かれることを許すか、片方に統一するか。
-2. **`A3`　記憶担当の起動のまとめ方**: 思考レベルは全体設定に従うと決定済み（2026-11-22、[F1]）。残るのはバッチ化で、11-12 の「背景の回数と時期は変えない」を変えてよいか。
-3. **`B3`　`## Memory` を残すか**: Agency 状態から記憶を外し、閲覧ツールで読む方針は決定済み（2026-11-22）。300 tok の `## Memory` まで外すかは、(3a) の後の比較で決めることでよいか。背景の呼出しに載る記憶（[A4]）の扱いは別に決める。
-4. **`B4`　enum を外すか残すか**: 参照の enum を外すとツール定義は固定されるが、無効な参照が出うる。enum だけ残して `description` の埋め込みを外す案でも、定義は確認・TODO の増減で変わる。計測の結果を見て選ぶことでよいか。
-5. **`C4`　絵文字で感情が決まった返事の judge**: スキップしてよいか。ツール呼出しと並ぶ返事の judge は現状維持とした。
-6. **`C5`　Claude 経路の resume**: 有効にすることは決定済み（2026-11-22、会話エージェントの返答生成だけが対象）。残るのは、忘却・訂正後のセッションの扱いと、画像を含む履歴の扱いの設計。
-7. **`D4`　旧系統の撤去**: 旧 F host、休止中の `context-keeper.ts`、旧 Router の未使用経路を削除してよいか。`agency.runtime` 未設定は `always-on` として扱う。
-8. **`eumenes-agency` パッケージの改修（`A5` の 3・4、`A6`）**: 本体側の項目の効果を測った後に判断することでよいか。
-9. **`E1`・`E2`　計測と記録の追加**: 区画名・位置・トークン数だけを記録する計測と、固定入力の大きさを照合する試験を入れてよいか。
-10. **`F1`　思考レベルの一本化**: 方針は利用者の提案（2026-11-22）。確認したいのは、(a) 既定を `low` にすると会話のクラウド側が `high` から下がること（閲覧ツールの選択を確かめ直す）、(b) `agency.thinkReasoning` を廃止して全体設定に寄せること、(c) Web の調べものは `policy.json` の値のまま残すこと、(d) 既定のモデルはコードではなく保存済みの設定で決めること。
+### 5.1 決定
+
+| # | 項目 | 決定 |
+| --- | --- | --- |
+| 1 | `D4` | 旧 F host、休止中の `context-keeper.ts`、旧 Router の未使用経路を削除する。`agency.runtime` 未設定は `always-on` として扱う。`always-on` 側から使われているファイルは残す |
+| 2 | `A3` | 記憶担当の起動をまとめるかは、[E1] の計測で重複を確認してから決める。忘却・訂正などの明示の依頼は即時のままにする |
+| 3 | `F1` | 思考レベルは全体設定の 1 項目にまとめ、チャット画面のモデル選択の隣の Select で選ぶ。既定は `low`。`agency.thinkReasoning` は廃止する |
+| 4 | `F1` | Web の調べものの思考レベルは `policy.json` のまま残す（モデル固定の例外と同じ扱い） |
+| 5 | `F1` | モデルの一覧は Codex が返すものをそのまま表示する。名前で除外する処理は作らない。既定のモデルはコードではなく保存済みの設定で決める |
+| 6 | `B3` | 会話の返事では、Agency 状態から記憶を外し、閲覧ツール（`read_memory`）で読む。300 tok の `## Memory` を外すかは、その後に比べて決める |
+| 7 | `A1` | 記憶担当の相乗りは Codex 経路で先にやめる。LARM 経路は計測で相乗りと独立実行を比べて決める |
+| 8 | `B4` | 確認・TODO の参照の enum を外すか残すかは、無効な参照の発生率を測ってから選ぶ |
+| 9 | `C4` | 絵文字で感情が決まった返事の judge は、結果がどこにも使われていないことを確認できたらスキップする。ツール呼出しと並ぶ返事の judge は現状のまま |
+| 10 | `C5` | Claude Agent SDK の resume を有効にする。対象は会話エージェントの返答生成だけ |
+| 11 | `A5`・`A6` | `eumenes-agency` パッケージ側の改修は、本体側の項目の効果を測った後に判断する |
+| 12 | `E1`・`E2` | 呼出し種別ごとの計測と、固定入力の大きさを照合する試験を入れる |
+| 13 | `C1`・`C2`・`C3` | 実施しない（`C1`・`C2` は「本計画から外した項目」、`C3` は `F1` と両立しないため取り下げ） |
+
+### 5.2 計測の結果で決めること
+
+| 項目 | 決めること | 判断に使う数字 |
+| --- | --- | --- |
+| `A3` | 起動をまとめる条件（件数・静穏の秒数）、まとめるかどうか | 同じ状態に対して重なった呼出しの数 |
+| `A1` | LARM 経路の方式 | 相乗りと独立実行の入力・所要時間、採用結果の一致 |
+| `A4` | 背景の呼出しに載せる記憶の上限 | 記憶の件数とトークンの実分布 |
+| `A5` | まとめる対象と条件 | 種別ごとの回数、書いて捨てた `compose` の数 |
+| `B3` | `## Memory` を外すか | 読みに行く率、追加の往復の時間 |
+| `B4` | enum を外すか | 無効な参照の発生率、再試行の回数 |
+| 全体 | 目標値（背景の削減率、会話入力の中央値） | `F1` 採用後に測り直した基準値 |
+
+### 5.3 着手前に調べること
+
+| 項目 | 調べること |
+| --- | --- |
+| `F1` | 各接続（Codex SDK、Claude Agent SDK、LARM）が受け付ける思考レベルの値と、最上位の正式な名前。`model/list` がモデルごとの可否と既定値を返すか |
+| `F1` | 現在のモデルが `low` で閲覧ツール（`read_memory`）を選べるか |
+| `F1` | `model/list` の `includeHidden: true` を外すと、使わない古いモデルが一覧から消えるか |
+| `C5` | 忘却・訂正の後、resume 先のセッションに古い発話が残らない設計。画像を含む履歴の扱い |
+| `C6` | `cloud-only` の環境で、prewarm が実際に LARM へ要求を出しているか（既存ログで確認） |
+| `A2-前半` | 記憶担当の出力スキーマが、経路ごとに厳密に強制されているか |
+| `D4` | 削除対象のうち `always-on` 側から使われているファイル（`work.ts` は使用中）。行数の再計算 |
+| `C4` | 絵文字で感情を採用した返事で、judge の結果が音声・動作・収集のどこにも使われていないこと |
+
+### 5.4 調査の結果（2026-11-22、コードと SDK の型を読んだ範囲）
+
+| 項目 | 結果 | 根拠 |
+| --- | --- | --- |
+| `F1` Codex | `model/list` はモデルごとに `supportedReasoningEfforts`（値と説明の組）、`defaultReasoningEffort`、`hidden`、`upgrade`（後継モデルの ID）を返す。選べる値と既定値は catalog から得られる。手元の版で取りうる値は `minimal`・`low`・`medium`・`high`・`xhigh`・`max`・`ultra`・`persistent`（プロトコル上は文字列） | `codex app-server generate-ts`（codex-cli 0.162.1）の `v2/Model.ts`、`@openai/codex-sdk` 0.160.0 の `ModelReasoningEffort`。現状の `codex-models.ts` はこれらを読み捨てている |
+| `F1` Claude Agent SDK | モデル情報が `supportsEffort` と `supportedEffortLevels` を返す。値は `low`・`medium`・`high`・`xhigh`・`max`。現状の `cloud-agent-claude.ts` は思考レベルを送っていない | `@anthropic-ai/claude-agent-sdk` の `sdk.d.ts`（`EffortLevel`、モデル情報） |
+| `F1` LARM | 送れる値は `off`・`low`・`medium`・`high`（`off` は `reasoning_effort: "none"` として送る）。catalog がモデルごとの可否を返すかは未確認 | `larm/contracts/index.ts:83`、`larm/service/chat-request.ts:60-69` |
+| `F1` 古いモデルの表示 | 未確認。`hidden` が付いていれば `includeHidden` を外すだけで消える。付いていなくても、名前で除外しない決定（§5.1 の 5）のとおり表示する | 実際の一覧の取得は、Codex の常駐プロセスを使うため行っていない |
+| `C4` | 未確定。絵文字で感情を採用した返事は、保存される配信値が `hostDelivery(result.emotion)` になり judge の結果は使われない（`generation-settle.ts:337-340`）。一方、`voice-dialogue/service/synthesis.ts:74` は chunk 以外の読み上げで `receipt.delivery` を使い、態度データの収集（`attempt-work.ts:219` の `attitudeDataset`）も judge の結果を読む。この 2 経路で絵文字のときに使われるかを確かめるまで着手しない | 左記の各行 |
+
+## 6. 実装と検証の記録
+
+### 6.1 Phase 0・Phase 1（2026-11-22、未コミット）
+
+| 項目 | 状態 | 内容 |
+| --- | --- | --- |
+| `D5` | 実装済み | 計画書の記録は古かった。`codex-transport.ts` は関数長の上限内（`createCodexProcesses` 約 100 行、最大の `spawnProcess` 約 250 行）で、分割は不要。計画書が挙げた既存の失敗 4 件は既に解消済み。今回の失敗は別の 2 件で、`api/application/steward-migration.test.ts`（後から追加された world の migration を除外し損ねていた）と `web/src/workspace/ConversationContextPanel.test.tsx`（`getByRole` の options に無い `exact` による型エラー）を直した |
+| `D1` | 実装済み（改修設計の 1・2） | `always-on-checkpoint.ts` の `save()` は、保存済み revision と違う会話だけを persist する。採用条件（全会話の revision・epoch・feed cursor の照合）は維持。pump からの呼出しは直前の refresh を再利用する（`save({ refreshed: true })`）。他の呼出し元は従来どおり refresh する。忘却・無効化・復旧の後に書き戻されること、無関係な書込みで checkpoint を書かないことを `always-on-checkpoint.test.ts` で固定した。3（`onCommit` の事前判定）は未着手 |
+| `D3` | 実装済み | 返答 1 回の `knownOf` を 1 回の評価にし、載せた記憶と `c.given` の記録を同じ読み取り結果にした。`READ_NOTE` ごとのツール再生成をやめた（挙動は不変） |
+| `E1` | 実装済み | 新しいログ `inference.input_sections` が、LLM 呼出しの入力を区画ごとに `role:label:tokens:hash`で記録する。本文は出さない。label は製品が生成する固定の見出し（`input-text.ts` の 10 個）に一致したときだけ見出し名で、それ以外は固定語。hash は起動ごとの乱数の鍵（メモリのみ）による HMAC-SHA256 の先頭 12 桁で、比較は同じ起動（`bootId`）の中だけ。区画の計算が例外を投げても推論は続く。`api/infrastructure/logger.ts` の許可リストに `sections`（上限 4096 文字。超えたら区画単位で省略し `|…+N`）と `conversationId` を追加した。`scripts/conversation-performance.ts` の出力に `callKinds` を追加した（種別ごとの回数・成否・利用量と、成功した呼出しどうしを連続で比べて最初に区画が分かれた位置）。説明は `docs/logging.md` と `docs/performance.md`。利用量（入力・キャッシュ読取）は既存の `--with-usage` からだけ取れる。記録の追加より前のログには区画が無い |
+| `E2` | 実装済み | `api/application/fixed-input-size.test.ts` が、§1.2 の各要素と個別ツール、`memory` ツール、記憶担当が実際に送る system 全体（`steward.curateMemory.systemSent`）の文字数・推定トークンを `api/application/fixed-input-size.json` と照合する。書き直しは `bun run fixed-input-size -- --write`。`--domain dialogue`・`steward`・`settings` の verify で走る |
+
+§1.2 の表との差（E2 の記録値。2026-11-22 の作業ツリー）: Agenda tools は `start_preparation` の説明の上書きを含めて 1,851 字 / ~1,131 tok。Agency の `checkSystem` は 1,039 字 / ~860 tok、`askCheckSystem` は 964 字 / ~784 tok で、パッケージの更新により表より大きい。他はほぼ一致した。
+
+検証（fixture）: `bun run verify -- --domain dialogue --domain inference --domain steward --domain settings` が合格（bun 1,161 pass・2 skip・0 fail、Web 40 pass）。live と実機器での確認は未実施。既存の別件として、`api/application/fixed-names.test.ts` が 2 件失敗する（コミット済みの `image-screen.bundle.json`・`docs/images.md`・`docs/larm.md` にモデル名の語がある）。今回の変更とは無関係。
+
+独立レビュー（1 回）: always-on の変更（D1・D3）には指摘なし（忘却・無効化後に dirty から漏れる経路は無く、採用条件も緩んでいない）。E1 に 4 件の指摘があり、すべて直した（利用者の発話や外部資料が `## ` で始まると見出しとして本文の一行がログに出る → 許可リスト方式に、区画の計算の例外が推論を止める → 握りつぶして継続、短い発話のハッシュが辞書で引ける → HMAC に、失敗した呼出しを比較に含める → 成功どうしだけに）。種別名の正規化が将来の命名で分裂しうる点（要確認）は、現在の命名では起きないため直していない。修正後の `bun run verify -- --domain inference` は合格（bun 288 pass）。
+
+### 6.2 Phase 1b・Phase 2（2026-11-22、未コミット）
+
+| 項目 | 状態 | 内容 |
+| --- | --- | --- |
+| `C6` | 実装済み | 着手条件を既存ログで確認した: 2026-11-21 以降の LLM 呼出しは返答・agency・steward ともクラウドで、`background:prewarm` だけが LARM に 28 回成功していた。`conversation-prewarm.ts` は依存 `usesLarm(db)` が false なら要求の作成も DB 書込みもしない。判定は dialogue の `routeConversation`（公開窓口から再 export、複製なし）を、配線側の `api/application/media/live-bridge.ts` が inference の snapshot の複製に対して呼ぶ。cloud-only で推論 0 回・書込み 0 回、LARM を使う経路は従来どおりを試験で固定 |
+| `A2-前半` | 実装後に取り消し（未採用） | 4 経路（LARM、OpenAI 互換クラウド、Codex、Claude Agent SDK）とも出力スキーマはプロバイダ側で strict に渡ることを確認した（`control-schema.test.ts` が固定）。外すと記憶担当の system は 6,909 字 / ~4,195 tok から 4,513 字 / ~3,596 tok になる。ただし [記憶担当の入力の重複削減](steward-input-dedup-2026-11-08.md) で同種の削減が、12 件中 1 件の訂正の失敗で不採用になっている。意味判断に影響しうるため、同じ採用条件（新規の意味の失敗 0、旧版以上の合格数）の live 比較を通すまで採用しない。比較は利用者の開始の指示を待つ |
+| `F1` | 実装中（統合待ち） | 思考レベルは保存済みの設定 `general.reasoningEffort`（既定 `low`）だけで決まる。選べる値は Codex・Claude は catalog、LARM は `low`・`medium`・`high` の宣言。チャット画面のモデル選択の隣に `ReasoningSelect`。受け付けない値は送信時に `reasoning_effort_unsupported` で失敗する。`agency.thinkReasoning`、`harness.ts` の定数、Codex の既定 `high`、書き起こし用の `larmReasoning: "off"` を撤去（書き起こし・日誌・評価の呼出しは `low` で思考するようになる）。残り: 廃止した `agency.thinkReasoning` が適用済み bundle の revision 3 件（`settings.conversation@9`・`@11`・`@12`）に残り、bundle の検証で落ちる。扱いは利用者の判断待ち |

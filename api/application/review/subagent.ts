@@ -183,16 +183,13 @@ export function createReviewSubagent(
 		);
 		if (skill?.kind !== "skill" || !skill.body)
 			throw new Error("review_skill_unavailable");
-		const control = {
-			...agentControl({
-				profile: systemContext("agent-runtime.contexts.review.mission", {}),
-				skills: [skill.body],
-				rules: systemContext("agent-runtime.contexts.review.rules", {}),
-				tools: [],
-				outputSchema,
-			}),
-			larmReasoning: "off" as const,
-		};
+		const control = agentControl({
+			profile: systemContext("agent-runtime.contexts.review.mission", {}),
+			skills: [skill.body],
+			rules: systemContext("agent-runtime.contexts.review.rules", {}),
+			tools: [],
+			outputSchema,
+		});
 		const messages: Messages = [
 			agentSystemMessage(control),
 			{ role: "user", content: JSON.stringify(input) },

@@ -121,9 +121,8 @@ async function run(
 	);
 	const session: CallSession = {
 		sessionRole: role,
-		...(role === "subagent"
-			? { taskId: agentId }
-			: { reasoning: { larm: "off", cloud: "off" } }),
+		// The thinking level is the saved one; a call does not name its own.
+		...(role === "subagent" ? { taskId: agentId } : {}),
 		agentSession: { conversationId, agentId },
 		outputLimit: 64,
 	};

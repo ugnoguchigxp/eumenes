@@ -48,6 +48,7 @@ test("the real idle prewarm, foreground SSE and task lifecycle reuse their manag
 			},
 		},
 		latestConversationIdInTransaction: () => "conversation-a",
+		usesLarm: () => true,
 		task: () => ({ messages }),
 	});
 	const foreground = async (role: "main" | "subagent") => {

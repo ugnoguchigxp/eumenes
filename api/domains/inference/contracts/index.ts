@@ -1,21 +1,20 @@
 import { z } from "zod";
 import { jstIso } from "../../../infrastructure/jst-time";
 import type { Database } from "bun:sqlite";
-import type { Settings, Purpose } from "../../settings/contracts";
+import {
+	reasoningEffortSchema,
+	type Settings,
+	type Purpose,
+} from "../../settings/contracts";
 import type { SpeechDelivery, SpeechPreparation } from "../../delivery";
 export type { ChatImage } from "../../larm";
 export type Messages = ChatMessage[];
-/** How much a model thinks before it answers (`off`: not at all). */
-export type ReasoningLevel = "off" | "low" | "medium" | "high";
 /** Instruction body excludes the output schema, which is rendered from its value. */
 export type ControlContract = {
 	instructions: string;
 	outputSchema: unknown;
-	reasoningEffort?: "low";
 	/** Host opt-in for the isolated public search worker. */
 	nativeWebSearch?: true;
-	/** For a bounded transcription control on a LARM provider that accepts thinking disabled. */
-	larmReasoning?: "off";
 };
 export function controlInstructions(control: ControlContract) {
 	const examples = (control.outputSchema as { examples?: unknown[] } | null)
@@ -132,14 +131,6 @@ export type CallSession = {
 	 * ends there is its normal end.
 	 */
 	readAhead?: true;
-	/**
-	 * `main` only: how much the model thinks before it answers, one level per target (the conversation harness's
-	 * setting; a call may fall back from LARM to the cloud, and the harness follows). An attempt on LARM uses `larm`
-	 * (the chat template's thinking switch and the reasoning effort), one on the cloud uses `cloud` (Codex SDK: the
-	 * turn's effort). `off` turns thinking off on LARM and sends no effort to the cloud. Its thinking spends the
-	 * output bound, so the call's `outputLimit` must leave room for it.
-	 */
-	reasoning?: { larm: ReasoningLevel; cloud: ReasoningLevel };
 	/**
 	 * A main answer, auxiliary control or subagent control bound to a parent request: one JSON value of this
 	 * strict schema, without appending to the system.
@@ -466,6 +457,17 @@ export const connectionModelsSchema = z.object({
 				.optional(),
 			/** Input context window; null when the provider does not report one (subscription: learned after the first turn). */
 			contextWindow: z.number().int().positive().nullable(),
+			/**
+			 * The thinking levels this model accepts, in the provider's order, and the level it runs at when none is
+			 * named (null when the catalog gives none). Absent: the catalog says nothing about thinking levels.
+			 * An empty `efforts` list: the model has no level to choose.
+			 */
+			reasoning: z
+				.object({
+					efforts: z.array(reasoningEffortSchema),
+					default: reasoningEffortSchema.nullable(),
+				})
+				.optional(),
 		}),
 	),
 	/** What the connection's credential resolved to; doubles as the connection test. */

@@ -188,7 +188,6 @@ export type SpecialistSet = {
 		conversationHandoff?: true;
 		/** Opt-in source-backed state, extracted in the same control call. Frozen in a new binding revision. */
 		collaborationState?: true | "host-bound";
-		larmReasoning?: "off";
 		document: {
 			ref: string;
 			path: string;

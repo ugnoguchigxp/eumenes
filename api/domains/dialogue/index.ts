@@ -17,7 +17,7 @@ export type {
 export { migrations } from "./repository";
 export { researchSourceIds } from "./repository/work";
 export { INPUT_HEADINGS } from "./service/input-text";
-export { localHarness } from "./service/harness";
+export { localHarness, routeConversation } from "./service/harness";
 
 export {
 	/** @public */ INTERACTION_POLICY,

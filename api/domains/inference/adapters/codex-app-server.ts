@@ -41,7 +41,8 @@ export type CodexTurn = {
 	) => void;
 	outputSchema?: unknown;
 	nativeWebSearch?: true;
-	reasoningEffort: "low" | "medium" | "high";
+	/** Absent: the model's own default. */
+	reasoningEffort?: string;
 	signal: AbortSignal;
 	/** Describes the response the host will use, before another call can take this thread. */
 	completedReply?: (text: string) => ThreadReply | undefined;

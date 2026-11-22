@@ -11,11 +11,16 @@ import { runConversation } from "../../api/domains/dialogue/eval/context/generat
 import type { ConversationRunner } from "../../api/domains/dialogue/eval/context/generation-runner";
 import type { JudgeFn } from "../../api/domains/dialogue/eval/context/judge";
 import { canonicalJson } from "../../api/domains/dialogue/eval/context/prefix-stability";
+import { readStoredReasoningEffort } from "../../api/domains/settings";
 import { createLiveLarm, liveLarmSettings } from "../live-larm";
 
 export async function createLiveLane(catalog: readonly EvalCard[]) {
 	const live = createLiveLarm();
 	await live.connect();
+	// Like every call of the product, the lane thinks at the one saved level; no call names its own.
+	const reasoning = readStoredReasoningEffort(
+		process.env.EUMENES_DB || "./data/eumenes.sqlite3",
+	);
 	/** The turn's model calls: a talk call streams words; a choice call is strict JSON held to its schema. */
 	const inference: Pick<InferencePort, "answer" | "executeStream"> = {
 		answer: (messages, signal) => live.answer(messages, signal),
@@ -38,7 +43,7 @@ export async function createLiveLane(catalog: readonly EvalCard[]) {
 					...(session?.outputLimit
 						? { maxOutputTokens: session.outputLimit }
 						: {}),
-					...(session?.reasoning ? { reasoning: session.reasoning.larm } : {}),
+					reasoning,
 					...(session?.outputSchema
 						? {
 								jsonOutput: true,

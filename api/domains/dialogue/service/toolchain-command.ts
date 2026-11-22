@@ -74,8 +74,6 @@ export function commandPrompt(
 	nowMs: number,
 ) {
 	const control: ControlContract = {
-		// This call translates the delegated request into one operation or question.
-		reasoningEffort: "low",
 		instructions:
 			delegatedTaskRules +
 			"\n" +

@@ -452,7 +452,7 @@ test("the registered settings bundle applies a draft through the action ledger a
 			eventCreatedAt: new Date(now).toISOString(),
 			eventExpiresAt: new Date(now + 60_000).toISOString(),
 			artifactId: "tab-1",
-			artifactRevisionId: "artifact:settings.conversation@12",
+			artifactRevisionId: "artifact:settings.conversation@13",
 			source,
 			sourceRevision: revision,
 			actionId: "apply",
@@ -466,7 +466,6 @@ test("the registered settings bundle applies a draft through the action ledger a
 		{ fieldId: "agency.runtime", value: "always-on" },
 		{ fieldId: "agency.debug-mode", value: "true" },
 		{ fieldId: "agency.speech-interval", value: "60" },
-		{ fieldId: "agency.think-reasoning", value: "high" },
 		{ fieldId: "conversation.persona", value: "maid" },
 	]);
 	expect(accepted.request.status).toBe("accepted");
@@ -479,7 +478,6 @@ test("the registered settings bundle applies a draft through the action ledger a
 		runtime: "always-on",
 		debugMode: true,
 		speechIntervalSec: 60,
-		thinkReasoning: "high",
 	});
 	// The same draft against the old revision is a conflict the screen can show.
 	const stale = await send(revision, [

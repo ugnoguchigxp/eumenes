@@ -229,6 +229,35 @@
 			"packageRevisionId": "package:app-development.studio@8",
 			"bindingRevisionId": "binding:app-development.studio@9",
 			"artifactRevisionId": "artifact:app-development.studio@2"
+		},
+		{
+			"kind": "toolchain",
+			"id": "app.develop",
+			"revision": 11,
+			"title": "Webアプリ開発",
+			"summary": "ブラウザーで繰り返し使うWebアプリを新しく作る、または保存済みのアプリを修正する。操作画面（UI）、フォームで入力するデータ、実行手順を確認して保存できる。",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"フォームや一覧など、入力や閲覧に使うWebアプリの操作画面を作りたい",
+				"保存したアプリの画面を開き、ボタンや入力項目、表示内容や配置を変更したい",
+				"アプリでデータを記録・更新する処理や、繰り返し動かす集計・レポートの手順を作成または修正したい"
+			],
+			"avoidWhen": [
+				"依頼が一回限りの情報確認で、アプリや定期処理の制作を求めていない"
+			],
+			"dependencies": ["package:app-development.studio@8"],
+			"functionName": "develop_app",
+			"examples": [
+				"練習日とタイムを入力フォームから記録し、一覧で振り返れるWebアプリを作って",
+				"前に作ったチェックリストの画面を開いて、選択欄と登録ボタンの配置を変えて",
+				"入力した金額から割り勘を計算する画面を作って",
+				"GitHubプロジェクトの変更を毎日読み取り、開発日誌に保存するアプリを作って"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:app-development.studio@8",
+			"bindingRevisionId": "binding:app-development.studio@10",
+			"artifactRevisionId": "artifact:app-development.studio@2"
 		}
 	],
 	"bindings": [
@@ -344,6 +373,51 @@
 				},
 				"collaborationState": "host-bound",
 				"larmReasoning": "off",
+				"sharedTools": [
+					{
+						"toolchainId": "knowledge.guidance",
+						"as": "get_guidance"
+					}
+				]
+			}
+		},
+		{
+			"kind": "binding",
+			"id": "app-development.studio",
+			"revision": 10,
+			"execution": "session",
+			"adapterRef": "adapter:app-development@1",
+			"availabilityRef": "availability:app-development@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:app-development.review@1",
+					"operationId": "app-development.review",
+					"inputSchemaRef": "builtin:appReview"
+				}
+			],
+			"artifactRevisionId": "artifact:app-development.studio@2",
+			"session": {
+				"targetSchemaRef": "builtin:uiTargetRef"
+			},
+			"timeLimits": {
+				"runMs": 1200000,
+				"turnMs": 900000,
+				"inferenceMs": 600000
+			},
+			"agent": {
+				"workspace": {
+					"documentRef": "workspace:app-development.definition@1",
+					"inlineBytes": 32768
+				},
+				"turn": {
+					"maxModelCalls": 4,
+					"retries": {
+						"doc.edit": 1,
+						"doc.write": 1
+					},
+					"maxOutputTokens": 6144
+				},
+				"collaborationState": "host-bound",
 				"sharedTools": [
 					{
 						"toolchainId": "knowledge.guidance",

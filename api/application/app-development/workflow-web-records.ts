@@ -131,7 +131,6 @@ async function discover({
 	request,
 	showtimes,
 	signal,
-	larmReasoning,
 }: {
 	ask: WorkflowModel["ask"];
 	acquisition: ReturnType<typeof createWebAccess>["acquisition"];
@@ -140,7 +139,6 @@ async function discover({
 	request: { input: Record<string, unknown>; task?: string };
 	showtimes: boolean;
 	signal: AbortSignal;
-	larmReasoning: "off" | undefined;
 }) {
 	const plan = await ask(
 		prep,
@@ -149,7 +147,6 @@ async function discover({
 		request,
 		requestPlan,
 		signal,
-		larmReasoning,
 	);
 	const lookup = await acquisition(
 		{
@@ -180,7 +177,6 @@ async function discover({
 		{ ...request, hits: candidates },
 		sourcesPlan,
 		signal,
-		larmReasoning,
 	);
 	const urls = [
 		...new Set(
@@ -274,7 +270,6 @@ export function createWebRecords(
 			const stamps: Stamp[] = [];
 			const params = input.request;
 			const request = { input: params, task: input.task };
-			const larmReasoning = showtimes ? "off" : undefined;
 			const configured = httpUrl.safeParse(params.sourceUrl);
 
 			async function remember(route: Route, url: string) {
@@ -333,7 +328,6 @@ export function createWebRecords(
 					},
 					envelope,
 					signal,
-					larmReasoning,
 				);
 				if (!showtimes || result.data === null) return result;
 				const decoded = showtimesGroupsForClockLines(
@@ -372,7 +366,6 @@ export function createWebRecords(
 								.nullable(),
 						}),
 						signal,
-						larmReasoning,
 					);
 					if (dateLinkNumber !== null)
 						return { data: null, follow: [dateLinks[dateLinkNumber - 1]!.url] };
@@ -410,7 +403,6 @@ export function createWebRecords(
 						request,
 						showtimes,
 						signal,
-						larmReasoning,
 					});
 					sources = await readSources(urls, prep.child, signal);
 					const source = sources[0];

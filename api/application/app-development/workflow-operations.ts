@@ -385,7 +385,6 @@ export function createWorkflowOperations(deps: Dependencies) {
 				},
 				markdownDraft,
 				signal,
-				"off",
 			);
 			const omitted = new Set(
 				units.filter((unit) => !unit.candidate).map((unit) => unit.unitId),
@@ -463,15 +462,12 @@ function createWorkflowModel(inference: InferencePort) {
 		input: unknown,
 		result: z.ZodType<T>,
 		signal: AbortSignal,
-		larmReasoning?: "off",
 	) {
 		const id = prep.ids[stamps.length];
 		if (!id) throw new Error("workflow_model_budget");
 		const control = {
 			instructions,
 			outputSchema: z.toJSONSchema(result),
-			reasoningEffort: "low" as const,
-			larmReasoning,
 		};
 		const receipt = await inference.executeControl!(
 			id,

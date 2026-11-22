@@ -104,7 +104,7 @@ export function specialistControl(
 	const rules = tools.some(({ id }) => id === "get_guidance")
 		? RULES + "\n" + GUIDANCE_RULES
 		: RULES;
-	const control = agentControl({
+	return agentControl({
 		profile: set.profile,
 		skills: set.skills,
 		rules:
@@ -120,7 +120,6 @@ export function specialistControl(
 		tools,
 		outputSchema,
 	});
-	return { ...control, larmReasoning: set.agent.larmReasoning };
 }
 
 /** Rejected output remains reference data, followed by the shared repair instruction. */

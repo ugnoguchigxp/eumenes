@@ -16,6 +16,8 @@ const isObject = (v: unknown): v is Json =>
  * - The removed dedicated LLM selections (`subagent`, `agency.resourceId`, and `agency.searchResourceId`: the research
  *   model is fixed, user 2026-11-11) and the agency ON/OFF (`agency.enabled`: spontaneous speech is always on) are dropped: every inference
  *   other than World curation runs on the one LLM configured for the conversation.
+ * - The removed `agency.thinkReasoning` (the background's own thinking level) is dropped: every call thinks at the one
+ *   level `general.reasoningEffort` saves (absent: the default).
  * - The removed `codingSupervision` section (instruction approval for the retired CLI runner) is dropped.
  * - Speech has no fallback: a `larm-preferred` speech route becomes `larm-only`.
  * - The router decides every utterance turn (spec router-package-integration 2026-11-04 §1 #12): its `mode` and the
@@ -33,6 +35,7 @@ export function migrateStoredSettings(
 				resourceId: _resourceId,
 				searchResourceId: _searchResourceId,
 				enabled: _enabled,
+				thinkReasoning: _thinkReasoning,
 				...agency
 			} = rest.agency;
 			rest.agency = agency;

@@ -224,7 +224,7 @@ for (const scenario of [
 				)(messages),
 			knowledgeSource: mcp.source,
 			async knowledgeBuild(messages, options) {
-				expect(options?.reasoningEffort).toBe("low");
+				expect(options).not.toHaveProperty("reasoningEffort");
 				const data = JSON.parse(
 					messages.find((message) => message.role === "user")!.content,
 				);

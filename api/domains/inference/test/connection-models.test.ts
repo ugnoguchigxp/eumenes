@@ -100,6 +100,76 @@ test("an api-key connection lists every page of the saved endpoint with only the
 	}
 });
 
+test("an api-key model's effort capability becomes its levels, lowest first; a model without it claims none", async () => {
+	const flag = (supported: boolean) => ({ supported });
+	const send = (async () =>
+		Response.json({
+			data: [
+				{
+					...modelRow("model-a", null),
+					capabilities: {
+						effort: {
+							supported: true,
+							low: flag(true),
+							medium: flag(false),
+							high: flag(true),
+							xhigh: flag(true),
+							max: flag(true),
+						},
+					},
+				},
+				{
+					...modelRow("model-b", null),
+					capabilities: {
+						effort: {
+							supported: false,
+							low: flag(false),
+							medium: flag(false),
+							high: flag(false),
+							xhigh: null,
+							max: flag(false),
+						},
+					},
+				},
+				modelRow("model-c", null),
+			],
+			has_more: false,
+			first_id: "model-a",
+			last_id: "model-c",
+		})) as unknown as typeof fetch;
+	const service = createConnectionModels(settingsWith(), {}, { fetch: send });
+	const { models } = (await service.list(
+		apiKeyId,
+		new AbortController().signal,
+	))!;
+	expect(models.map((m) => m.reasoning)).toEqual([
+		{ efforts: ["low", "high", "xhigh", "max"], default: null },
+		{ efforts: [], default: null },
+		undefined,
+	]);
+});
+
+test("the last list of a connection stays known past the time limit, until the connection changes", async () => {
+	const { send } = fakeModelsFetch();
+	let clock = 0;
+	const state = { connections };
+	const service = createConnectionModels(
+		{ get: () => state as never, credential: () => "secret" },
+		{},
+		{ fetch: send, now: () => clock },
+	);
+	expect(service.known!(apiKeyId)).toBeNull();
+	const listed = await service.list(apiKeyId, new AbortController().signal);
+	clock = 10 * 60_000;
+	expect(service.known!(apiKeyId)).toMatchObject({
+		models: listed!.models.map(({ id }) => expect.objectContaining({ id })),
+	});
+	state.connections = connections.map((c) =>
+		c.id === apiKeyId ? { ...c, epoch: c.epoch + 1 } : c,
+	);
+	expect(service.known!(apiKeyId)).toBeNull();
+});
+
 test("model lists are cached briefly and read again after the TTL or a new credential generation", async () => {
 	const { send, requests } = fakeModelsFetch();
 	let clock = 0;
@@ -169,8 +239,20 @@ function fakeClaude(account: AccountInfo) {
 		return {
 			accountInfo: async () => account,
 			supportedModels: async () => [
-				{ value: "alias-a", displayName: "Alias A", description: "" },
+				{
+					value: "alias-a",
+					displayName: "Alias A",
+					description: "",
+					supportsEffort: true,
+					supportedEffortLevels: ["low", "high", "max"],
+				},
 				{ value: "model-b", displayName: "", description: "" },
+				{
+					value: "model-c",
+					displayName: "",
+					description: "",
+					supportsEffort: false,
+				},
 			],
 			close: () => {
 				seen.closed = true;
@@ -199,8 +281,21 @@ test("a subscription connection reads models and account without sending a turn"
 	);
 	expect(result).toEqual({
 		models: [
-			{ id: "alias-a", displayName: "Alias A", contextWindow: null },
+			{
+				id: "alias-a",
+				displayName: "Alias A",
+				contextWindow: null,
+				reasoning: { efforts: ["low", "high", "max"], default: null },
+			},
+			// Nothing said about thinking levels: nothing is claimed.
 			{ id: "model-b", displayName: "model-b", contextWindow: null },
+			// `supportsEffort: false`: no level to choose.
+			{
+				id: "model-c",
+				displayName: "model-c",
+				contextWindow: null,
+				reasoning: { efforts: [], default: null },
+			},
 		],
 		account: { auth: "subscription", subscriptionType: "max" },
 	});

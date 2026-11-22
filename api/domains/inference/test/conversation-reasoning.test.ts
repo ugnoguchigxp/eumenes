@@ -25,6 +25,7 @@ import type { Settings } from "../../settings/contracts";
 import type { CloudAgentCall } from "../adapters/cloud-agent-shared";
 import type { CloudAgents } from "../adapters/cloud-agents";
 import { REASONING_ALLOWANCE_TOKENS } from "../service/attempt-work";
+import type { ConnectionModelsService } from "../service/connection-models";
 
 type CloudAgentResult = Awaited<ReturnType<CloudAgents["run"]>>;
 
@@ -57,8 +58,10 @@ async function setup(
 		localStream?: LarmPort["answerStream"];
 		/** Changes the saved settings before they are applied. */
 		edit?: (s: Settings) => void;
-		/** The LARM level of the conversation, for the calls on it. */
-		conversationReasoning?: "off" | "low" | "medium" | "high";
+		/** The saved thinking level (default: the settings' own default). */
+		effort?: string;
+		/** The catalog of the cloud connection. */
+		models?: ConnectionModelsService;
 	} = {},
 ) {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-conversation-reasoning-"));
@@ -98,6 +101,7 @@ async function setup(
 	s.routes.llm.mode = route.mode ?? "cloud-only";
 	s.routes.llm.cloudAllowed = true;
 	s.routes.llm.fallbackId = resourceId;
+	if (route.effort) s.general.reasoningEffort = route.effort;
 	route.edit?.(s);
 	await settings.apply({
 		requestId: crypto.randomUUID(),
@@ -123,9 +127,7 @@ async function setup(
 	};
 	const inference = createInference(store, settings, {
 		larmFactory: () => port,
-		...(route.conversationReasoning
-			? { conversationReasoning: route.conversationReasoning }
-			: {}),
+		...(route.models ? { connectionModels: route.models } : {}),
 		cloudAgents: {
 			run: async (call) => {
 				calls.push(call);
@@ -153,23 +155,46 @@ async function setup(
 	return { inference, calls, request, store };
 }
 
-test("a main streamed call on a cloud-only Codex SDK route passes the reasoning as the effort, and gets its tool calls back", async () => {
-	const h = await setup({
-		text: "",
-		toolCalls: [{ id: "c1", name: "fixture_tool", arguments: "{}" }],
-	});
-	const signal = new AbortController().signal;
-	for (const reasoning of ["low", "medium", "high"] as const) {
+/** A catalog that lists one model with the given levels (and `default`). */
+const catalog = (
+	efforts: string[] | undefined,
+	options: { known?: true } = {},
+): ConnectionModelsService => {
+	const value = {
+		models: [
+			{
+				id: "fixture-model",
+				displayName: "fixture",
+				contextWindow: null,
+				...(efforts ? { reasoning: { efforts, default: "low" } } : {}),
+			},
+		],
+		account: { auth: "api-key" as const, subscriptionType: null },
+	};
+	return {
+		list: async () => value,
+		...(options.known ? { known: () => value } : {}),
+	};
+};
+
+test("a main streamed call on a cloud-only Codex SDK route passes the saved level as the effort, and gets its tool calls back", async () => {
+	for (const effort of ["low", "medium", "high", "xhigh"]) {
+		const h = await setup(
+			{
+				text: "",
+				toolCalls: [{ id: "c1", name: "fixture_tool", arguments: "{}" }],
+			},
+			{ effort },
+		);
 		const receipt = await h.inference.executeStream(
 			await h.request(),
 			messages,
-			signal,
+			new AbortController().signal,
 			() => {},
 			undefined,
 			tools,
 			{
 				sessionRole: "main",
-				reasoning: { larm: "off", cloud: reasoning },
 				context: { instructionCount: 1, historyCount: 2 },
 			},
 		);
@@ -179,43 +204,38 @@ test("a main streamed call on a cloud-only Codex SDK route passes the reasoning 
 		expect(h.calls.at(-1)).toMatchObject({
 			kind: "codex-sdk",
 			model: "fixture-model",
-			reasoningEffort: reasoning,
+			reasoningEffort: effort,
 			tools,
 		});
 	}
 });
 
-test("off sends no effort, and a main call without reasoning sends none either", async () => {
+test("a cloud call of any role thinks at the saved level, the settings' default when none was chosen", async () => {
 	const h = await setup({ text: "answer" });
-	const signal = new AbortController().signal;
-	await h.inference.executeStream(
-		await h.request(),
-		messages,
-		signal,
-		() => {},
+	for (const session of [
 		undefined,
-		undefined,
-		{ sessionRole: "main", reasoning: { larm: "high", cloud: "off" } },
-	);
-	await h.inference.executeStream(
-		await h.request(),
-		messages,
-		signal,
-		() => {},
-		undefined,
-		undefined,
-		{ sessionRole: "main" },
-	);
-	expect(h.calls).toHaveLength(2);
-	for (const call of h.calls) expect(call.reasoningEffort).toBeUndefined();
+		{ sessionRole: "auxiliary" as const },
+		{ sessionRole: "main" as const },
+	])
+		await h.inference.executeStream(
+			await h.request(),
+			messages,
+			new AbortController().signal,
+			() => {},
+			undefined,
+			undefined,
+			session,
+		);
+	expect(h.calls.map((c) => c.reasoningEffort)).toEqual(["low", "low", "low"]);
 });
 
-test("a fallback from LARM to the cloud inside one call gives each attempt the level of its own side", async () => {
+test("a fallback from LARM to the cloud inside one call sends the saved level on both attempts", async () => {
 	const larm: unknown[] = [];
 	const h = await setup(
 		{ text: "answer" },
 		{
 			mode: "larm-preferred",
+			effort: "medium",
 			localStream: async (_messages, _signal, _onDelta, options) => {
 				larm.push(options?.reasoning);
 				throw new Error("larm_provider_failed");
@@ -229,12 +249,102 @@ test("a fallback from LARM to the cloud inside one call gives each attempt the l
 		() => {},
 		undefined,
 		undefined,
-		{ sessionRole: "main", reasoning: { larm: "off", cloud: "medium" } },
+		{ sessionRole: "main" },
 	);
 	expect(receipt.value).toBe("answer");
-	expect(larm).toEqual(["off"]);
+	expect(larm).toEqual(["medium"]);
 	expect(h.calls).toHaveLength(1);
 	expect(h.calls[0]!.reasoningEffort).toBe("medium");
+});
+
+test("a level the call's model does not accept fails the attempt with an explicit code, is logged, and is never changed", async () => {
+	const lines: Array<Record<string, unknown>> = [];
+	configureLogging({
+		level: "info",
+		destination: { write: (line) => void lines.push(JSON.parse(line)) },
+	});
+	try {
+		// The cloud model's catalog lists no `xhigh`: the call fails before the SDK is reached.
+		const cloud = await setup(
+			{ text: "answer" },
+			{ effort: "xhigh", models: catalog(["low", "medium", "high"]) },
+		);
+		const id = await cloud.request();
+		await expect(
+			cloud.inference.executeStream(
+				id,
+				messages,
+				new AbortController().signal,
+				() => {},
+			),
+		).rejects.toThrow("reasoning_effort_unsupported");
+		expect(cloud.calls).toHaveLength(0);
+		expect(status(cloud, id)).toBe("failed");
+		expect(await attempts(cloud, id)).toEqual([
+			{ source: "cloud", status: "failed" },
+		]);
+		// LARM declares low, medium and high only; the saved level is not sent in their place, and the route does not fall back.
+		const larm = larmCalls("hello");
+		const local = await setup(
+			{ text: "cloud" },
+			{
+				mode: "larm-preferred",
+				effort: "xhigh",
+				localStream: larm.localStream,
+			},
+		);
+		await expect(
+			local.inference.executeStream(
+				await local.request(),
+				messages,
+				new AbortController().signal,
+				() => {},
+			),
+		).rejects.toThrow("reasoning_effort_unsupported");
+		expect(larm.options).toHaveLength(0);
+		expect(local.calls).toHaveLength(0);
+		const refusals = lines.filter(
+			(l) => l.event === "inference.reasoning_effort_unsupported",
+		);
+		expect(refusals).toMatchObject([
+			{ level: "warn", source: "cloud", kind: "xhigh" },
+			{ level: "warn", source: "larm", kind: "xhigh" },
+		]);
+	} finally {
+		configureLogging({ level: "silent" });
+	}
+});
+
+test("the catalog decides what is sent: an accepted level goes as it is, a model with no level to choose gets none, an unknown catalog sends the saved level", async () => {
+	for (const [models, expected] of [
+		[catalog(["low", "xhigh"]), "xhigh"],
+		[catalog([]), undefined],
+		[catalog(undefined), "xhigh"],
+		// The last list of the connection answers without a new read.
+		[
+			{ ...catalog(["xhigh"], { known: true }), list: undefined as never },
+			"xhigh",
+		],
+		// A catalog that can not be read says nothing: the saved level goes out and the provider answers.
+		[
+			{
+				list: async () => {
+					throw new Error("cloud_credential_unavailable");
+				},
+			},
+			"xhigh",
+		],
+	] as const) {
+		const h = await setup({ text: "answer" }, { effort: "xhigh", models });
+		await h.inference.executeStream(
+			await h.request(),
+			messages,
+			new AbortController().signal,
+			() => {},
+		);
+		expect(h.calls).toHaveLength(1);
+		expect(h.calls[0]!.reasoningEffort).toBe(expected);
+	}
 });
 
 const schema = {
@@ -310,11 +420,11 @@ test("a main call with an output schema on the cloud passes it as the output sch
 	expect(h.calls[0]!.tools).toBeUndefined();
 });
 
-test("target cloud on a larm-preferred route skips LARM and runs the cloud with the cloud level", async () => {
+test("target cloud on a larm-preferred route skips LARM and runs the cloud with the saved level", async () => {
 	const larm = larmCalls();
 	const h = await setup(
 		{ text: "answer" },
-		{ mode: "larm-preferred", localStream: larm.localStream },
+		{ mode: "larm-preferred", effort: "high", localStream: larm.localStream },
 	);
 	const receipt = await h.inference.executeStream(
 		await h.request(),
@@ -323,11 +433,7 @@ test("target cloud on a larm-preferred route skips LARM and runs the cloud with 
 		() => {},
 		undefined,
 		undefined,
-		{
-			sessionRole: "main",
-			target: "cloud",
-			reasoning: { larm: "off", cloud: "high" },
-		},
+		{ sessionRole: "main", target: "cloud" },
 	);
 	expect(receipt.value).toBe("answer");
 	expect(larm.options).toHaveLength(0);
@@ -366,26 +472,18 @@ test("target cloud without a usable cloud answer fails before any attempt", asyn
 	}
 });
 
-test("a LARM call that names no reasoning thinks at low; a call on the conversation takes the conversation's level; a named level is sent as it is", async () => {
-	for (const conversationReasoning of [undefined, "medium"] as const) {
+test("every LARM chat call thinks at the saved level, a call on the conversation too", async () => {
+	for (const effort of ["low", "medium"]) {
 		const larm = larmCalls("hello");
 		const h = await setup(
 			{ text: "cloud" },
-			{
-				mode: "larm-preferred",
-				localStream: larm.localStream,
-				conversationReasoning,
-			},
+			{ mode: "larm-preferred", localStream: larm.localStream, effort },
 		);
 		for (const session of [
 			undefined,
 			{ sessionRole: "auxiliary" as const },
 			{ sessionRole: "auxiliary" as const, onConversation: true },
 			{ sessionRole: "main" as const },
-			{
-				sessionRole: "main" as const,
-				reasoning: { larm: "high", cloud: "low" },
-			},
 		] as const)
 			await h.inference.executeStream(
 				await h.request(),
@@ -397,17 +495,16 @@ test("a LARM call that names no reasoning thinks at low; a call on the conversat
 				session,
 			);
 		expect(larm.options.map((o) => o?.reasoning)).toEqual([
-			"low",
-			"low",
-			conversationReasoning ?? "low",
-			"low",
-			"high",
+			effort,
+			effort,
+			effort,
+			effort,
 		]);
 		expect(h.calls).toHaveLength(0);
 	}
 });
 
-test("a call this domain makes think gets room for the thinking on its output limit; a call that names its level, or a read-ahead, does not", async () => {
+test("a call this domain makes think gets room for the thinking on its output limit; the conversation's own call, or a read-ahead, does not", async () => {
 	const larm = larmCalls("hello");
 	const h = await setup(
 		{ text: "cloud" },
@@ -415,11 +512,7 @@ test("a call this domain makes think gets room for the thinking on its output li
 	);
 	for (const session of [
 		{ sessionRole: "auxiliary" as const, outputLimit: 1200 },
-		{
-			sessionRole: "main" as const,
-			outputLimit: 4096,
-			reasoning: { larm: "low", cloud: "low" },
-		},
+		{ sessionRole: "main" as const, outputLimit: 4096 },
 		// The prewarm: it reads the conversation's prompt and stops at its one token.
 		{
 			sessionRole: "auxiliary" as const,

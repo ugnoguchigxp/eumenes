@@ -15,7 +15,6 @@ test("old settings retain F implicitly and explicit always-on settings survive r
 		runtime: "always-on",
 		thinkResourceId: crypto.randomUUID(),
 		speechIntervalSec: 60,
-		thinkReasoning: "high",
 	});
 	await h.settings.apply({
 		requestId: crypto.randomUUID(),
@@ -31,6 +30,45 @@ test("old settings retain F implicitly and explicit always-on settings survive r
 			settingsSchema.safeParse({
 				...settings,
 				agency: { ...settings.agency, speechIntervalSec },
+			}).success,
+		).toBe(false);
+});
+
+test("the saved thinking level defaults to low, survives reopening, and an old document's agency.thinkReasoning is dropped on read", async () => {
+	const h = await setup();
+	expect(h.settings.get().general.reasoningEffort).toBe("low");
+	const settings = structuredClone(h.settings.get());
+	settings.general.reasoningEffort = "xhigh";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: settings.revision,
+		settings,
+		keys: [],
+	});
+	expect(
+		(await createSettings(h.store, { dbPath: h.dbPath, env: {} })).get().general
+			.reasoningEffort,
+	).toBe("xhigh");
+	// A document saved before the level existed carries the removed background level and no general level.
+	const old = JSON.parse(JSON.stringify(h.settings.get())) as Record<
+		string,
+		any
+	>;
+	old.agency.thinkReasoning = "high";
+	delete old.general.reasoningEffort;
+	await h.store.write((db) =>
+		db
+			.query("UPDATE settings_document SET document=? WHERE id=1")
+			.run(JSON.stringify(old)),
+	);
+	const reopened = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(reopened.get().general.reasoningEffort).toBe("low");
+	expect(reopened.get().agency).not.toHaveProperty("thinkReasoning");
+	for (const bad of ["", "Low High", "x".repeat(65)])
+		expect(
+			settingsSchema.safeParse({
+				...settings,
+				general: { ...settings.general, reasoningEffort: bad },
 			}).success,
 		).toBe(false);
 });

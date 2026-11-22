@@ -8,16 +8,16 @@ import {
 	MigrationUnknownAppliedError,
 } from "../infrastructure/sqlite";
 
-const STEWARD = [
-	"world/0009-extraction-steward",
-	"world/0010-forget-origin",
-	"world/0011-documents",
-];
+/** The world migrations from the steward ones on; the later ones build on them, so all are held back together. */
+const fromSteward = (id: string) => {
+	const [domain, number] = id.split("/");
+	return domain === "world" && Number.parseInt(number ?? "", 10) >= 9;
+};
 
 test("the steward migrations keep old events and forgets, add speaker and conversation, drop the job columns, and an old binary refuses the database", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-world-upgrade-"));
 	const path = join(dir, "db.sqlite3");
-	const oldMigrations = migrations.filter((m) => !STEWARD.includes(m.id));
+	const oldMigrations = migrations.filter((m) => !fromSteward(m.id));
 	let store = openStore(path, oldMigrations);
 	try {
 		await store.write((db) => {

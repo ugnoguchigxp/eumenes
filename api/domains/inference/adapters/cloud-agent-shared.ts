@@ -50,7 +50,8 @@ export type CloudAgentCall = {
 	tools?: NativeTool[];
 	/** JSON Schema the final text must satisfy (control requests). */
 	outputSchema?: Record<string, unknown>;
-	reasoningEffort?: "low" | "medium" | "high";
+	/** The saved thinking level the call's model accepts, as its provider names it; absent: the provider's default. */
+	reasoningEffort?: string;
 	nativeWebSearch?: true;
 	signal: AbortSignal;
 	onDelta?: (text: string) => void;

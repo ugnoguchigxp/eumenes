@@ -79,8 +79,8 @@ export type LarmCallOptions = {
 	yields?: true;
 	/** With `onConversation`: a read-ahead whose output ends at its bound by design; that end is not a failure. */
 	readAhead?: true;
-	/** `main` only: how much the model thinks first (off turns the chat template's thinking off). */
-	reasoning?: "off" | "low" | "medium" | "high";
+	/** How much the model thinks first: the saved level (one of the settings contracts' `larmReasoningEfforts`). */
+	reasoning?: string;
 	/** `subagent` only: the task whose calls share one agent session. */
 	taskId?: string;
 	speechLanguage?: SpeechLanguage;
@@ -104,8 +104,6 @@ export type LarmCallOptions = {
 	jsonSchema?: Record<string, unknown>;
 	/** Logical offered functions are represented by the output schema rather than the native tools field. */
 	toolOutputFormat?: "json-schema";
-	/** Optional effort for SDK-backed control tasks; ignored by providers without this option. */
-	reasoningEffort?: "low";
 	contextPolicy?: "exact";
 	/**
 	 * `exact` only: where the adopted history sits in the host-fixed list (the first `instructionCount` messages are

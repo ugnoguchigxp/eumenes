@@ -1,0 +1,158 @@
+{
+	"conditions": {
+		"persona": "butler, agent name Eumenes, user name ユーザー",
+		"settings": "defaults (emotion on, no interests)",
+		"goal": "goal reply rules and tools added as the always-on reply adds them for a goal-enabled agenda",
+		"steward": "curate-memory step of one exchange, no requests"
+	},
+	"elements": {
+		"system.f": {
+			"chars": 4234,
+			"tokens": 3837
+		},
+		"system.alwaysOn": {
+			"chars": 8761,
+			"tokens": 7843
+		},
+		"system.alwaysOn.Role": {
+			"chars": 3501,
+			"tokens": 3162
+		},
+		"system.alwaysOn.Speaking": {
+			"chars": 352,
+			"tokens": 318
+		},
+		"system.alwaysOn.Emotion": {
+			"chars": 326,
+			"tokens": 243
+		},
+		"system.alwaysOn.Input": {
+			"chars": 1138,
+			"tokens": 1019
+		},
+		"system.alwaysOn.Facts": {
+			"chars": 3436,
+			"tokens": 3100
+		},
+		"system.alwaysOnGoal": {
+			"chars": 9466,
+			"tokens": 8359
+		},
+		"tools.read": {
+			"chars": 2225,
+			"tokens": 1118
+		},
+		"tool.read_memory": {
+			"chars": 316,
+			"tokens": 181
+		},
+		"tool.read_history": {
+			"chars": 592,
+			"tokens": 297
+		},
+		"tool.read_runs": {
+			"chars": 722,
+			"tokens": 360
+		},
+		"tool.read_agents": {
+			"chars": 259,
+			"tokens": 131
+		},
+		"tool.read_world": {
+			"chars": 330,
+			"tokens": 149
+		},
+		"tools.talkWork": {
+			"chars": 1697,
+			"tokens": 1102
+		},
+		"tool.find_toolchain": {
+			"chars": 419,
+			"tokens": 278
+		},
+		"tool.delegate": {
+			"chars": 1275,
+			"tokens": 822
+		},
+		"tools.agenda": {
+			"chars": 1851,
+			"tokens": 1131
+		},
+		"tool.start_preparation": {
+			"chars": 525,
+			"tokens": 339
+		},
+		"tool.read_note": {
+			"chars": 240,
+			"tokens": 123
+		},
+		"tool.show_note": {
+			"chars": 228,
+			"tokens": 111
+		},
+		"tool.set_quiet": {
+			"chars": 853,
+			"tokens": 556
+		},
+		"tools.goalReply": {
+			"chars": 2207,
+			"tokens": 946
+		},
+		"tool.list_goals": {
+			"chars": 207,
+			"tokens": 87
+		},
+		"tool.register_goal": {
+			"chars": 748,
+			"tokens": 344
+		},
+		"tool.update_goal": {
+			"chars": 1248,
+			"tokens": 515
+		},
+		"tool.memory": {
+			"chars": 600,
+			"tokens": 271
+		},
+		"agency.planSystem": {
+			"chars": 5103,
+			"tokens": 4243
+		},
+		"agency.composeSystem": {
+			"chars": 2202,
+			"tokens": 1900
+		},
+		"agency.profileSystem": {
+			"chars": 1026,
+			"tokens": 825
+		},
+		"agency.checkSystem": {
+			"chars": 1039,
+			"tokens": 860
+		},
+		"agency.askCheckSystem": {
+			"chars": 964,
+			"tokens": 784
+		},
+		"steward.curateMemory.instructions": {
+			"chars": 4513,
+			"tokens": 3596
+		},
+		"steward.curateMemory.schema": {
+			"chars": 2381,
+			"tokens": 820
+		},
+		"steward.curateMemory.systemSent": {
+			"chars": 6909,
+			"tokens": 4195
+		},
+		"steward.curateGoals.instructions": {
+			"chars": 1243,
+			"tokens": 960
+		},
+		"steward.curateWorld.instructions": {
+			"chars": 2043,
+			"tokens": 1488
+		}
+	}
+}

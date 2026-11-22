@@ -381,6 +381,42 @@ describe("agency LLM port on the conversation's prompt", () => {
 	});
 });
 
+test("an independent agency call names no thinking level: the saved one applies in inference", async () => {
+	const executed: unknown[] = [];
+	const port = createAgencyLlmPort({
+		store: { write: async (fn) => fn({} as Database) },
+		inference: {
+			captureBackgroundControlInTransaction: () => "req-1",
+			executeControl: async (_id, _messages, _signal, _control, session) => {
+				executed.push(session);
+				return {
+					requestId: "req-1",
+					attemptId: "att-1",
+					value: '{"pick":"a","score":1}',
+				};
+			},
+			acceptInTransaction: () => true,
+			rejectControlInTransaction: () => {},
+		},
+		next: () => ({
+			decisionId: "conv-1.opp.4",
+			generation: 7,
+			independent: true,
+			conversationId: "conv-1",
+		}),
+		nowMs: () => 1_000,
+	});
+	await port.complete(request(), AbortSignal.timeout(1000));
+	expect(executed).toEqual([
+		{
+			sessionRole: "auxiliary",
+			independent: true,
+			outputSchema: z.toJSONSchema(schema),
+			agentSession: { conversationId: "conv-1", agentId: "agency:conv-1" },
+		},
+	]);
+});
+
 test("missing host system never captures or calls inference", async () => {
 	for (const system of ["", " \n", undefined]) {
 		const h = harness();

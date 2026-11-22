@@ -36,6 +36,21 @@ bun scripts/conversation-performance.ts --since 2026-11-21T08:17:49.629 --until 
 
 Codex の `usageUpdates` は、運用ログで利用量の増加を観測した回数と試行数、同じ試行で複数回増えた件数を示す。ログを採取していない期間は `null`。個別のモデル応答の入力、キャッシュ読取、実効ウィンドウは `bun run logs -- --id <runId> --event inference.codex_usage_updated --json` で確認する。
 
+### 呼出し種別ごとの内訳とキャッシュの切れ目
+
+出力の `callKinds` は、LLM呼出しを種別ごとに集計します。種別は会話の返答 `reply`、背景の呼出し（`subjectId` の `background:` に続く語から、数字を含む語と16文字以上の語＝ID・時刻を除いた先頭2語。例 `background:warm`）、用途未確定の `unlinked`。回数の多い順です。
+
+| 項目 | 内容 |
+| --- | --- |
+| `calls` | `inference.attempt_started` を観測した試行の数 |
+| `succeeded`・`failed`・`interrupted`・`unfinished` | `inference.attempt_succeeded`、`inference.attempt_failed`、取消・権限失効・先取り（`reason` が `cancelled`・`permission_revoked`・`larm_preempted`）、期間内に終了行がないもの |
+| `usage` | `--with-usage` のときだけ。その種別の試行の入力・キャッシュ読取・未キャッシュ入力などで、`attemptId` で結んだ Codex の利用量。付けない場合と、利用量を持たない経路は `null` か件数0 |
+| `inputSections` | `inference.input_sections` を観測した試行の数と、区画の推定トークン合計の平均 |
+| `prefix.pairs` | 比較できた連続2呼出しの組の数 |
+| `prefix.breaks` | 最初に分かれた区画の `label` ごとの `count`、一致していた先頭区画の推定トークンの平均 `meanMatchedTokens`、今回の入力の推定トークンの平均 `meanInputTokens` |
+
+比較は同じ種別・同じ `source`・同じ起動（`bootId`。`hash` の鍵は起動ごとのため、起動をまたぐ組は作りません）のうち、会話は同じ `conversationId` の連続する呼出しどうしで行い、区画の `hash` を先頭から前回と突き合わせます。**成功した呼出しどうしを比べます**（失敗・取消・終了行なしの呼出しは、Provider のキャッシュを作れていない可能性があるため比較に入れません）。`label` が区画名のときは、その区画で最初に違いが出ました。`(appended)` は前回の区画がすべて一致し、今回は後ろに増えただけ、`(identical)` は完全一致、`(shortened)` は前回より短い先頭一致です。`meanMatchedTokens` が `meanInputTokens` に近いほどキャッシュが効く入力で、小さいときは `label` の区画が先頭側で毎回変わっています。トークンは推定値で、Provider の報告値ではありません。ログの `sections` が上限で省略された呼出しは、残った区画までを比べます。記録の形は[運用ログ](logging.md#入力の区画とキャッシュの切れ目2026-11-22追加)。この記録の追加前のログには区画がなく、`inputSections.observed` に数えられません。
+
 ## 扱い
 
 - 予算超過が再現する場合は、まず `bun run logs -- --level warn` から runId で対象ターンを追い、入力長・接続状態・モデル側の所要を分ける（[logging.md](logging.md)）。

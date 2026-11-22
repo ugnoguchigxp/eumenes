@@ -57,15 +57,10 @@ test("a call's reasoning becomes the chat template's thinking switch and the rea
 		model: "fixture",
 		contextWindow: { outputReserveTokens: 4096 },
 	};
-	const body = (reasoning?: "off" | "low" | "medium" | "high") =>
+	const body = (reasoning?: "low" | "medium" | "high") =>
 		chatRequest(provider, [{ role: "user", content: "fixture" }], true, {
 			reasoning,
 		});
-	const off = body("off");
-	expect(off).toMatchObject({
-		chat_template_kwargs: { enable_thinking: false },
-		reasoning_effort: "none",
-	});
 	for (const level of ["low", "medium", "high"] as const)
 		expect(body(level)).toMatchObject({
 			chat_template_kwargs: { enable_thinking: true },

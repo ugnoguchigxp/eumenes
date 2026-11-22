@@ -310,11 +310,6 @@ function createSpecialistInference(
 					deadline: Math.min(input.deadline, Date.now() + 120_000),
 					attemptMs: 90_000,
 				}),
-			executeControl: (id, messages, signal, contract) =>
-				control.executeControl(id, messages, signal, {
-					...contract,
-					reasoningEffort: "low",
-				}),
 		},
 		read,
 		write,

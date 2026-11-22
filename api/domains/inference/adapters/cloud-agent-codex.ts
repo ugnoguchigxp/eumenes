@@ -219,8 +219,9 @@ export async function runCodex(
 					}
 				: {}),
 			nativeWebSearch: call.nativeWebSearch,
-			// A call that names none still thinks as hard as before the Codex home was Eumenes' own.
-			reasoningEffort: call.reasoningEffort ?? "high",
+			...(call.reasoningEffort
+				? { reasoningEffort: call.reasoningEffort }
+				: {}),
 			...(outputSchema ? { outputSchema } : {}),
 			signal: call.signal,
 			onUsage: call.onUsage,

@@ -208,9 +208,11 @@ export function createAgendaPorts(input: {
 		// A reply to a notice or a work report asks the user nothing of its own: no question is offered.
 		const asks = !args.readOnly && run.messageIds.length > 0;
 		const goals = asks ? await input.goalAgenda?.init() : undefined;
+		// One reading of the memory: what the prompt shows is what the reply is recorded as given.
+		const known = knownOf(deps, at);
 		const built = agendaReplyMessages({
 			agent: asks ? c.agent : { ...c.agent, askForReply: () => null },
-			known: knownOf(deps, at),
+			known,
 			notes: c.notes.map(noteRef),
 			profile: c.profile.markdown,
 			clock: agendaClock(at),
@@ -232,18 +234,21 @@ export function createAgendaPorts(input: {
 			: args.messages;
 		// What this reply is given rests in its input: the memory, the notes, and what the state cites.
 		remember(c.given, run.runId, [
-			...knownOf(deps, at).map((k) => `memory:${k.id}`),
+			...known.map((k) => `memory:${k.id}`),
 			...c.notes.map((n) => `note:${n.id}`),
 			...c.profile.passes.flatMap((p) => p.sources),
 			...c.agent.view().items.flatMap((i) => i.refs.filter(citable)),
 		]);
-		const toolInput = {
-			agent: c.agent,
-			read: (id: string) => noteText(c, id),
-			now,
-		};
+		// The notes an explicit read takes (set only while that read runs: the tool reads synchronously, at its start).
+		let reading: AgendaNoteText[] | null = null;
 		const own = createAgendaReplyTools({
-			...toolInput,
+			agent: c.agent,
+			read: (id: string) => {
+				const note = noteText(c, id);
+				if (note) reading?.push(note);
+				return note;
+			},
+			now,
 			events: {
 				onShow(note) {
 					remember(c.shows, run.runId, [
@@ -328,14 +333,14 @@ export function createAgendaPorts(input: {
 						// The package's short preview cuts at 4,000 characters. Keep its validation and note-used
 						// event, but return the host's original on an explicit read, in the same escaped data boundary.
 						const read: AgendaNoteText[] = [];
-						const result = await createAgendaReplyTools({
-							...toolInput,
-							read: (id) => {
-								const note = toolInput.read(id);
-								if (note) read.push(note);
-								return note;
-							},
-						}).call(call, signal);
+						reading = read;
+						let pending: ReturnType<typeof own.call>;
+						try {
+							pending = own.call(call, signal);
+						} finally {
+							reading = null;
+						}
+						const result = await pending;
 						return read[0]
 							? {
 									...result,

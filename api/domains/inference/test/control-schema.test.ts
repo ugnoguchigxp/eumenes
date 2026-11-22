@@ -7,6 +7,7 @@ import { type CloudAgentCall } from "../adapters/cloud-agent-shared";
 import { createCloudAgents } from "../adapters/cloud-agents";
 import { fakeCodex } from "./codex.fixture";
 import type { RequestRow } from "../repository";
+import { codexModels } from "../adapters/codex-models";
 import { cloudRequest, type CloudEnv } from "../service/cloud";
 
 // The schema of a structured-output control request (the options execute.ts builds for it) reaches every route.
@@ -227,7 +228,74 @@ test("Claude Agent SDK gets outputFormat and its structured output becomes the t
 	expect(Object.keys(seen.options ?? {})).not.toContain("outputFormat");
 });
 
-test("Codex SDK passes the schema even without tools, always names the thinking level, and runs in the dedicated home", async () => {
+test("Claude Agent SDK takes the thinking level as its effort, sends none when none is named, and refuses a name it does not have", async () => {
+	const seen: Array<Record<string, unknown>> = [];
+	const claudeQuery = ((input: { options: Record<string, unknown> }) => {
+		seen.push(input.options);
+		return {
+			async *[Symbol.asyncIterator]() {
+				yield {
+					type: "result",
+					subtype: "success",
+					is_error: false,
+					result: "plain",
+					usage: { input_tokens: 1, output_tokens: 2 },
+				};
+			},
+			accountInfo: async () => ({
+				apiKeySource: "ANTHROPIC_API_KEY",
+				apiProvider: "firstParty",
+			}),
+			close() {},
+		};
+	}) as unknown as typeof query;
+	const agents = createCloudAgents({}, { claudeQuery });
+	const call = (reasoningEffort?: string) =>
+		agents.run({
+			kind: "claude-agent-sdk",
+			auth: "api-key",
+			model: "fixture-model",
+			baseUrl: "https://api.example.test",
+			credential: "sk-test",
+			messages,
+			...(reasoningEffort ? { reasoningEffort } : {}),
+			signal: new AbortController().signal,
+		});
+	for (const effort of ["low", "xhigh", "max"]) await call(effort);
+	await call();
+	expect(seen.map((options) => options.effort)).toEqual([
+		"low",
+		"xhigh",
+		"max",
+		undefined,
+	]);
+	await expect(call("ultra")).rejects.toThrow(
+		"cloud_agent_reasoning_effort_unsupported",
+	);
+	expect(seen).toHaveLength(4);
+});
+
+test("the Codex model catalog carries each model's levels and default as `model/list` returns them", async () => {
+	const codex = await fakeCodex();
+	try {
+		const { models } = await codexModels(
+			codex.host(),
+			{ baseUrl: "https://api.example.test/v1" } as Connection,
+			null,
+			AbortSignal.timeout(5000),
+		);
+		expect(models).toMatchObject([
+			{
+				id: "fixture-model",
+				reasoning: { efforts: ["low", "high", "xhigh"], default: "high" },
+			},
+		]);
+	} finally {
+		await codex.cleanup();
+	}
+});
+
+test("Codex SDK passes the schema even without tools, sends the thinking level it is given and none otherwise, and runs in the dedicated home", async () => {
 	const codex = await fakeCodex();
 	try {
 		const agents = codex.agents(codex.host());
@@ -246,8 +314,8 @@ test("Codex SDK passes the schema even without tools, always names the thinking 
 			expect(result.text).toBe('{"done":true}');
 			const turn = (await codex.of("turn/start")).at(-1)!.params;
 			expect(turn.outputSchema).toEqual(schema);
-			// A call that names none sends the level it had under the person's own Codex settings.
-			expect(turn.effort).toBe(reasoningEffort ?? "high");
+			// A call that names none sends none: the model's own default applies, not a level of this host's.
+			expect(turn.effort).toBe(reasoningEffort);
 		}
 		const [spawn] = await codex.of("spawn");
 		expect(spawn!.params.home).toBe(codex.home);

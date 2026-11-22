@@ -155,8 +155,17 @@ export interface LogFields {
 	apiProvider?: string;
 	apiKeySource?: string;
 	tokenSource?: string;
+	/** A conversation's opaque id (never its title or text). */
+	conversationId?: string;
+	/**
+	 * The sections of one model input as `role:label:tokens:hash` joined by `|`: labels, estimated tokens and
+	 * short hashes, never text. Longer than the limit, whole sections from the front and then `|…+N`.
+	 */
+	sections?: string;
 }
 const keys = new Set<keyof LogFields>([
+	"conversationId",
+	"sections",
 	"connectionId",
 	"providerOrigin",
 	"upstreamRequestId",
@@ -478,14 +487,39 @@ export function withLogContext<T>(fields: LogFields, action: () => T): T {
 	return scope.run({ ...scope.getStore(), ...fields }, action);
 }
 
+/** Longest `sections` value: far above the 256 characters of every other string. */
+const SECTIONS_MAX = 4096;
+
+/** Whole sections from the front that fit with the omission marker `|…+N`; a section is never cut. */
+function fitSections(value: string): string {
+	if (value.length <= SECTIONS_MAX) return value;
+	const parts = value.split("|");
+	let kept = 0;
+	let length = 0;
+	for (; kept < parts.length; kept++) {
+		const next = length + (kept ? 1 : 0) + parts[kept]!.length;
+		if (next + `|…+${parts.length - kept - 1}`.length > SECTIONS_MAX) break;
+		length = next;
+	}
+	const rest = parts.length - kept;
+	return kept ? `${parts.slice(0, kept).join("|")}|…+${rest}` : `…+${rest}`;
+}
+
 function metadata(fields: LogFields) {
 	return Object.fromEntries(
-		Object.entries({ ...scope.getStore(), ...fields }).filter(
-			([key, value]) =>
-				keys.has(key as keyof LogFields) &&
-				((typeof value === "string" && value.length <= 256) ||
-					(typeof value === "number" && Number.isFinite(value))),
-		),
+		Object.entries({ ...scope.getStore(), ...fields })
+			.filter(
+				([key, value]) =>
+					keys.has(key as keyof LogFields) &&
+					((typeof value === "string" &&
+						(key === "sections" || value.length <= 256)) ||
+						(typeof value === "number" && Number.isFinite(value))),
+			)
+			.map(([key, value]) =>
+				key === "sections" && typeof value === "string"
+					? [key, fitSections(value)]
+					: [key, value],
+			),
 	);
 }
 

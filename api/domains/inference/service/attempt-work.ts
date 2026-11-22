@@ -15,6 +15,7 @@ import {
 import { controlJsonOptions, type Messages } from "../contracts";
 import { cloudRequest } from "./cloud";
 import { sessionCallOptions } from "./attempt-record";
+import { reasoningToSend } from "./reasoning-effort";
 
 import type { Input, Request, Source } from "./execute-types";
 
@@ -74,16 +75,11 @@ export function callOptionsFor(
 	source: Source,
 ): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
-	const controlReasoning =
-		source === "larm" && r.row.mode === "control"
-			? r.control?.larmReasoning
-			: undefined;
-	// Only the conversation's own call names its level, and its limit already counts the thinking.
+	// The conversation's own call and an independent control (the agency's) size their output limit for the thinking.
+	const limitHoldsThinking =
+		r.session?.sessionRole === "main" || !!r.session?.independent;
 	const thinksByDefault =
-		!r.session?.reasoning &&
-		!controlReasoning &&
-		source === "larm" &&
-		r.row.purpose === "llm";
+		!limitHoldsThinking && source === "larm" && r.row.purpose === "llm";
 	const observe = r.session?.observeInput;
 	return {
 		...(observe
@@ -129,9 +125,6 @@ export function callOptionsFor(
 		...(r.outputContract || r.session?.outputSchema || r.row.structuredOutput
 			? { toolOutputFormat: "json-schema" as const }
 			: {}),
-		...(r.row.mode === "control" && r.control?.reasoningEffort
-			? { reasoningEffort: r.control.reasoningEffort }
-			: {}),
 		...(r.row.contextPolicy === "exact"
 			? { contextPolicy: "exact" as const }
 			: {}),
@@ -151,22 +144,10 @@ export function callOptionsFor(
 								}),
 				}
 			: {}),
-		// The level of the side that answers: a fallback attempt on the cloud takes the cloud's. Only the conversation's
-		// own call names one; a call on the conversation takes the conversation's LARM level (it reads the same prefix),
-		// and every other LARM chat call thinks at `low`, the least level every model accepts (one refuses `none` with
-		// 400; left out, LARM's default would think at medium).
-		...(r.session?.reasoning
-			? { reasoning: r.session.reasoning[source] }
-			: controlReasoning
-				? { reasoning: controlReasoning }
-				: thinksByDefault
-					? {
-							reasoning:
-								(r.session?.onConversation &&
-									r.env.options.conversationReasoning) ||
-								"low",
-						}
-					: {}),
+		// Every LLM call thinks at the one saved level, whichever side answers and whatever the call is.
+		...(r.row.purpose === "llm"
+			? { reasoning: r.row.snapshot.general.reasoningEffort }
+			: {}),
 		// A read-ahead only reads the prompt and stops at its own bound (one token): it gets no room for thinking.
 		...(r.row.outputLimit || r.outputLimit
 			? {
@@ -175,7 +156,6 @@ export function callOptionsFor(
 						(thinksByDefault && !r.session?.readAhead
 							? REASONING_ALLOWANCE_TOKENS
 							: r.session?.independent &&
-								  r.session.reasoning &&
 								  r.row.mode === "control" &&
 								  source === "larm"
 								? INDEPENDENT_THINKING_HEADROOM_TOKENS
@@ -304,7 +284,7 @@ export async function chooseTtsDelivery(
 }
 
 /** The provider call itself (cloud, or the larm port for the request's purpose). */
-export function startWork(
+export async function startWork(
 	r: Request,
 	args: {
 		source: Source;
@@ -316,6 +296,21 @@ export function startWork(
 	},
 ): Promise<string | Uint8Array> {
 	const { env, row } = r;
+	let { callOptions } = args;
+	if (row.purpose === "llm") {
+		// The saved level goes out only when this call's model accepts it; otherwise the attempt fails here.
+		const { reasoning: _saved, ...rest } = callOptions;
+		const reasoning = await reasoningToSend({
+			effort: callOptions.reasoning,
+			source: args.source,
+			connection: r.selected?.connection,
+			resource: r.selected?.resource,
+			models: env.options.connectionModels,
+			signal: args.attemptSignal,
+			inferenceId: row.id,
+		});
+		callOptions = reasoning === undefined ? rest : { ...rest, reasoning };
+	}
 	if (args.source === "cloud")
 		return cloudRequest(
 			{
@@ -332,7 +327,7 @@ export function startWork(
 			args.attemptSignal,
 			args.attemptId,
 			args.delta,
-			args.callOptions,
+			callOptions,
 			r.session,
 			r.control?.nativeWebSearch,
 		);
@@ -343,10 +338,10 @@ export function startWork(
 				r.input as Messages,
 				args.attemptSignal,
 				args.delta,
-				args.callOptions,
+				callOptions,
 			);
 		return p
-			.answer(r.input as Messages, args.attemptSignal, args.callOptions)
+			.answer(r.input as Messages, args.attemptSignal, callOptions)
 			.then((value) => {
 				args.delta?.(value);
 				return value;

@@ -298,13 +298,11 @@ async function agentRequest(
 					? undefined
 					: options?.tools,
 			outputSchema: options?.jsonOutput ? options.jsonSchema : undefined,
-			// The conversation's level for the cloud (`off` sends none) takes the place of a control call's effort.
-			reasoningEffort:
-				options?.reasoning !== undefined
-					? options.reasoning === "off"
-						? undefined
-						: options.reasoning
-					: options?.reasoningEffort,
+			// The saved level, checked against this model before the attempt (`reasoningToSend`); an agent SDK takes it
+			// by its own name.
+			...(options?.reasoning && options.reasoning !== "off"
+				? { reasoningEffort: options.reasoning }
+				: {}),
 			signal,
 			onDelta,
 			onUsage: (usage) => {

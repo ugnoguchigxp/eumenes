@@ -428,7 +428,6 @@ test("independent structured controls preserve ownership and reasoning without y
 			sessionRole: "auxiliary",
 			independent: true,
 			agentSession: { conversationId: "a", agentId: "think-a" },
-			reasoning: { larm: "high", cloud: "high" },
 			outputSchema: {
 				type: "object",
 				properties: {},
@@ -504,4 +503,71 @@ test("a user control can use a saved cloud resource without changing the convers
 		"user_control_resource_unavailable",
 	);
 	expect(h.calls).toHaveLength(1);
+});
+
+test("every control call (the steward's, the agency's, a specialist's) thinks at the saved level and names none of its own", async () => {
+	const seen: unknown[] = [];
+	const h = await setup({
+		local: async (_messages, _signal, options) => {
+			seen.push(options?.reasoning);
+			return "{}";
+		},
+	});
+	const settings = structuredClone(h.settings.get());
+	settings.general.reasoningEffort = "medium";
+	await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: settings.revision,
+		settings,
+		keys: [],
+	});
+	const background = (decisionId: string, route?: "conversation") =>
+		h.store.write((db) =>
+			h.inference.captureBackgroundControlInTransaction!(db, {
+				taskId: "agency",
+				decisionId,
+				authorityEpoch: 1,
+				executionGeneration: 1,
+				deadline: Date.now() + 20_000,
+				taskDeadline: Date.now() + 30_000,
+				maxOutputTokens: 512,
+				structuredOutput: true,
+				...(route ? { route } : {}),
+			}),
+		);
+	const signal = new AbortController().signal;
+	// A plain background control, one on the conversation's route (the steward), an independent one (the agency).
+	await h.inference.executeControl(await background("plain"), messages, signal);
+	await h.inference.executeControl(
+		await background("conversation", "conversation"),
+		messages,
+		signal,
+		undefined,
+		{ sessionRole: "auxiliary", yields: true },
+	);
+	await h.inference.executeControl(
+		await background("independent", "conversation"),
+		messages,
+		signal,
+		undefined,
+		{
+			sessionRole: "auxiliary",
+			independent: true,
+			agentSession: { conversationId: "a", agentId: "think-a" },
+		},
+	);
+	// A user control (a specialist's selection).
+	await h.inference.executeControl(
+		await h.store.write((db) =>
+			h.inference.captureUserControlInTransaction(db, {
+				subject: "skillsmith:selection",
+				deadline: Date.now() + 5000,
+				maxOutputTokens: 128,
+				route: "subagent",
+			}),
+		),
+		messages,
+		signal,
+	);
+	expect(seen).toEqual(["medium", "medium", "medium", "medium"]);
 });

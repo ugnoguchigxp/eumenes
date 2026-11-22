@@ -26,11 +26,14 @@ export function createAgendaCheckpoints(input: {
 	convs: Map<string, AgendaScope>;
 	now(): number;
 	hostDigest: string;
+	/** The revision of each scope as last saved (the host keeps it); a scope at another revision is dirty. */
+	persisted: ReadonlyMap<string, number>;
 	feed(): { cursor: number; activeId: string | null };
 	saved(captures: { id: string; revision: number }[], cursor: number): void;
 	invalidate(c: AgendaScope): void;
 }) {
-	const { deps, convs, now, hostDigest, feed, saved, invalidate } = input;
+	const { deps, convs, now, hostDigest, persisted, feed, saved, invalidate } =
+		input;
 
 	/** Drops what rests on `refs` from the running agent, the held tickets and the notes. */
 	function forgetRefs(c: AgendaScope, refs: Iterable<string>) {
@@ -128,14 +131,24 @@ export function createAgendaCheckpoints(input: {
 		);
 	}
 
-	async function save() {
+	/**
+	 * Saves the scopes that changed since their last save (and the feed). `refreshed`: the caller refreshed every scope
+	 * just before, so the stale sources are not looked up again. The adoption still checks every scope (its revision and
+	 * epoch), the changed or not.
+	 */
+	async function save(options: { refreshed?: boolean } = {}) {
 		if (!deps.state || !deps.memory.referenceInputs) return false;
-		for (const c of convs.values()) if (convs.get(c.id) === c) await refresh(c);
+		if (!options.refreshed)
+			for (const c of convs.values())
+				if (convs.get(c.id) === c) await refresh(c);
 		const captures = [...convs.values()].map((c) => ({
 			c,
 			revision: c.revision,
-			record: agendaRecord(c, hostDigest, now()),
 		}));
+		const dirty = captures.filter(
+			({ c, revision }) => persisted.get(c.id) !== revision,
+		);
+		const records = dirty.map(({ c }) => agendaRecord(c, hostDigest, now()));
 		const capturedFeed = feed();
 		const accepted = await deps.store.write((db) => {
 			if (
@@ -149,7 +162,7 @@ export function createAgendaCheckpoints(input: {
 				feed().activeId !== capturedFeed.activeId
 			)
 				return false;
-			for (const { record } of captures) persist(db, record);
+			for (const record of records) persist(db, record);
 			deps.state!.saveFeedInTransaction(
 				db,
 				capturedFeed.cursor,
@@ -159,7 +172,7 @@ export function createAgendaCheckpoints(input: {
 		});
 		if (accepted)
 			saved(
-				captures.map(({ c, revision }) => ({ id: c.id, revision })),
+				dirty.map(({ c, revision }) => ({ id: c.id, revision })),
 				capturedFeed.cursor,
 			);
 		return accepted;

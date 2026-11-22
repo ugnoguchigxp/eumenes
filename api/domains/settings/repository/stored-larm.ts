@@ -12,6 +12,16 @@ export function readStoredLarm(dbPath: string): Settings["larm"] {
 	}
 }
 
+/** Backend evaluation thinks at the saved level too: the one `general.reasoningEffort`, read without writes. */
+export function readStoredReasoningEffort(dbPath: string): string {
+	const db = new Database(dbPath, { readonly: true });
+	try {
+		return read(db).general.reasoningEffort;
+	} finally {
+		db.close();
+	}
+}
+
 /** Read-only deployment check, also usable before the new migration has been installed. */
 export function readStoredExcalidrawAvailability(dbPath: string) {
 	const db = new Database(dbPath, { readonly: true });

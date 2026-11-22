@@ -21,6 +21,25 @@ export {
 	excalidrawConnectionSchema,
 	type ExcalidrawConnectionInput,
 } from "./local-services";
+/**
+ * A thinking level as a provider names it (`low`, `medium`, `high`, `xhigh`, ...). The names belong to the providers
+ * and change with them, so no list is kept here: a model's catalog (or LARM's declaration) says which it accepts.
+ */
+export const reasoningEffortSchema = z
+	.string()
+	.regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/);
+export type ReasoningEffort = z.infer<typeof reasoningEffortSchema>;
+/** The saved level of an installation that has not chosen one. */
+export const defaultReasoningEffort: ReasoningEffort = "low";
+/**
+ * The thinking levels LARM accepts. Its catalog declares none per model, so this is the connection kind's own
+ * declaration: `off` is left out because a served model is on record refusing it (400).
+ */
+export const larmReasoningEfforts: readonly ReasoningEffort[] = [
+	"low",
+	"medium",
+	"high",
+];
 export const purposeSchema = z.enum(["llm", "asr", "tts"]);
 export type Purpose = z.infer<typeof purposeSchema>;
 /** The cloud protocol used by the connection. */
@@ -331,6 +350,12 @@ export const settingsSchema = z
 			.strict(),
 		general: z
 			.object({
+				/**
+				 * How much every LLM call thinks (the one saved level; the chat screen sets it beside the model). Which
+				 * values a call accepts depends on its model, so only the form is checked here: the catalog (Codex,
+				 * Claude Agent SDK) or the connection's own declaration (LARM) names the accepted ones.
+				 */
+				reasoningEffort: reasoningEffortSchema.default(defaultReasoningEffort),
 				agentName: z.string().trim().max(40).default(""),
 				userName: z.string().trim().max(40).default(""),
 				persona: z.enum(personas).default("butler"),
@@ -375,7 +400,6 @@ export const settingsSchema = z
 					.max(600)
 					.refine((n) => n === 10 || n === 60 || n === 600)
 					.optional(),
-				thinkReasoning: z.enum(["off", "low", "medium", "high"]).optional(),
 				/** Optional for older callers; absence uses the approved initial action limits. */
 				actions: z
 					.object({

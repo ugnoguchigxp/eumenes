@@ -6,6 +6,7 @@ import { useSpeechModels } from "../domains/settings/useSpeechModels";
 import { describeConnectionState, describeError } from "../errorMessages";
 import { BackgroundSelect } from "./BackgroundSelect";
 import { ConversationModelSelect } from "./ConversationModelSelect";
+import { ReasoningSelect } from "./ReasoningSelect";
 import { SpeechModelSelect } from "./SpeechModelSelect";
 import type { WorkspaceState } from "./useWorkspace";
 
@@ -55,6 +56,10 @@ export function ConversationStatusBar({
 					model={model}
 					running={!!activeRun || speechModels.busy}
 					actualModel={actualModel}
+				/>
+				<ReasoningSelect
+					model={model}
+					running={!!activeRun || speechModels.busy}
 				/>
 				{state.live?.active ? (
 					<>

@@ -18,8 +18,6 @@ export type CallSessionRole = {
 	yields?: true;
 	/** A read-ahead on the conversation's connection: its output ends at its bound by design. */
 	readAhead?: true;
-	/** `main` only: how much the model thinks before it answers, per target (see `CallSession`). */
-	reasoning?: NonNullable<CallSession["reasoning"]>;
 	/** Main answers, auxiliary controls and parent-bound subagent controls can require strict JSON. */
 	outputSchema?: NonNullable<CallSession["outputSchema"]>;
 	cloudOutputSchema?: NonNullable<CallSession["cloudOutputSchema"]>;
@@ -83,7 +81,6 @@ export function resolveSession(
 			given?.taskId ||
 			given?.context ||
 			given?.refs ||
-			given?.reasoning !== undefined ||
 			given?.outputSchema !== undefined ||
 			given?.target !== undefined ||
 			given?.retainRequest !== undefined
@@ -116,9 +113,6 @@ export function resolveSession(
 				given.yields)) ||
 		(given?.yields && sessionRole !== "auxiliary") ||
 		(given?.readAhead && !given.onConversation) ||
-		(given?.reasoning !== undefined &&
-			sessionRole !== "main" &&
-			!given.independent) ||
 		(given?.outputSchema !== undefined &&
 			sessionRole !== "main" &&
 			!controlSchemaAllowed) ||
@@ -158,14 +152,6 @@ export function resolveSession(
 		...(given?.onConversation ? { onConversation: true as const } : {}),
 		...(given?.yields ? { yields: true as const } : {}),
 		...(given?.readAhead ? { readAhead: true as const } : {}),
-		...(given?.reasoning
-			? {
-					reasoning: {
-						larm: given.reasoning.larm,
-						cloud: given.reasoning.cloud,
-					},
-				}
-			: {}),
 		...(schema ? { outputSchema: schema } : {}),
 		...(cloudSchema ? { cloudOutputSchema: cloudSchema } : {}),
 		...(given?.target ? { target: given.target } : {}),

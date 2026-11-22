@@ -284,6 +284,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			now,
 			hostDigest,
 			invalidate,
+			persisted,
 			feed: () => ({ cursor, activeId }),
 			saved(rows, value) {
 				for (const row of rows) persisted.set(row.id, row.revision);
@@ -403,7 +404,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 					cursor !== savedCursor ||
 					[...convs.values()].some((c) => persisted.get(c.id) !== c.revision)
 				)
-					await save();
+					await save({ refreshed: true });
 			},
 		});
 	function schedule() {

@@ -1,9 +1,12 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import {
 	type BackgroundKind,
 	billingPath,
+	defaultReasoningEffort,
+	isAgentConnection,
+	larmReasoningEfforts,
 	type Settings,
 } from "../../../../api/domains/settings/contracts";
 import { queryRoots } from "../../queryKeys";
@@ -28,7 +31,23 @@ export type ConversationModelOption = {
 	label: string;
 	groupId: string;
 	groupLabel: string;
+	/**
+	 * The thinking levels this model accepts, in its catalog's order. `[]`: the model has no level to choose.
+	 * `null`: not known (its catalog is not read yet, or could not be).
+	 */
+	efforts: readonly string[] | null;
+	/** The level the model runs at when none is named (its catalog's, or LARM's declared `low`); null: the catalog names none. */
+	defaultEffort: string | null;
 };
+
+/** The level a model switch saves when the saved one is not among the new model's: its default, else its first. */
+function adjustedEffort(option: ConversationModelOption, saved: string) {
+	const { efforts } = option;
+	if (!efforts?.length || efforts.includes(saved)) return saved;
+	return option.defaultEffort && efforts.includes(option.defaultEffort)
+		? option.defaultEffort
+		: efforts[0]!;
+}
 
 type Connection = Settings["connections"][number];
 
@@ -62,6 +81,24 @@ export function useConversationModel(client: EumenesClient) {
 			? [{ profile: savedProfile, model: null }]
 			: []),
 	];
+	// The thinking levels of an agent connection's models come from its catalog (the connection's model list).
+	const agentConnections = (value?.connections ?? []).filter(
+		(c) =>
+			c.enabled &&
+			isAgentConnection(c) &&
+			value!.resources.some(
+				(r) => r.purpose === "llm" && r.connectionId === c.id,
+			),
+	);
+	const catalogs = useQueries({
+		queries: agentConnections.map((c) => ({
+			queryKey: [queryRoots.connectionModels, client.identity, c.id, c.epoch],
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				client.connectionModels(c.id, signal),
+			retry: 0,
+			staleTime: 5 * 60_000,
+		})),
+	});
 	// Only registered resources are offered; a connection's full model list (aliases, unwanted tiers) stays in settings.
 	const options: ConversationModelOption[] = [];
 	if (value) {
@@ -71,13 +108,29 @@ export function useConversationModel(client: EumenesClient) {
 				label: p.model ?? p.profile,
 				groupId: larmGroup.id,
 				groupLabel: larmGroup.label,
+				efforts: larmReasoningEfforts,
+				defaultEffort: defaultReasoningEffort,
 			});
 		for (const c of value.connections) {
 			if (!c.enabled) continue;
 			const groupLabel = groupLabelOf(c);
+			const catalog =
+				catalogs[agentConnections.findIndex((a) => a.id === c.id)]?.data;
 			for (const r of value.resources)
-				if (r.purpose === "llm" && r.connectionId === c.id)
-					options.push({ id: r.id, label: r.model, groupId: c.id, groupLabel });
+				if (r.purpose === "llm" && r.connectionId === c.id) {
+					// A connection that sends no level (an OpenAI-compatible one) has none to choose.
+					const reasoning = catalog?.models.find(
+						(m) => m.id === r.model,
+					)?.reasoning;
+					options.push({
+						id: r.id,
+						label: r.model,
+						groupId: c.id,
+						groupLabel,
+						efforts: isAgentConnection(c) ? (reasoning?.efforts ?? null) : [],
+						defaultEffort: reasoning?.default ?? null,
+					});
+				}
 		}
 	}
 	const selected =
@@ -96,6 +149,13 @@ export function useConversationModel(client: EumenesClient) {
 		try {
 			const settings = structuredClone(value);
 			const llm = settings.routes.llm;
+			// The saved level moves with the model when the new one does not accept it, in the same save.
+			const next = options.find((o) => o.id === id);
+			if (next)
+				settings.general.reasoningEffort = adjustedEffort(
+					next,
+					value.general.reasoningEffort,
+				);
 			if (id.startsWith(larmPrefix)) {
 				settings.larm.profile = id.slice(larmPrefix.length);
 				if (llm.mode === "cloud-only") llm.mode = "larm-preferred";
@@ -123,7 +183,47 @@ export function useConversationModel(client: EumenesClient) {
 			setBusy(false);
 		}
 	}
-	return { ready: !!value, options, selected, busy, error, select };
+	const current = options.find((option) => option.id === selected);
+	/** Saves the thinking level: the next utterance's calls use it. Only a level the selected model accepts is saved. */
+	async function selectEffort(effort: string) {
+		if (!value || busy || !current?.efforts?.includes(effort)) return;
+		if (effort === value.general.reasoningEffort) return;
+		setBusy(true);
+		setError(null);
+		try {
+			const settings = structuredClone(value);
+			settings.general.reasoningEffort = effort;
+			const saved = await client.applySettings({
+				requestId: crypto.randomUUID(),
+				expectedRevision: value.revision,
+				settings,
+				keys: [],
+			});
+			cache.setQueryData([queryRoots.settings, client.identity], saved);
+		} catch {
+			setError("思考レベルを切り替えられませんでした");
+			void cache.invalidateQueries({
+				queryKey: [queryRoots.settings, client.identity],
+			});
+		} finally {
+			setBusy(false);
+		}
+	}
+	return {
+		ready: !!value,
+		options,
+		selected,
+		busy,
+		error,
+		select,
+		effort: {
+			/** The saved level. */
+			value: value?.general.reasoningEffort ?? "",
+			/** The levels the selected model accepts; null while they are not known. */
+			choices: current?.efforts ?? null,
+			select: selectEffort,
+		},
+	};
 }
 
 /** Toggles spoken replies without opening the settings page. */
