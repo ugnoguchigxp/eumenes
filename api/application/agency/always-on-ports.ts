@@ -4,7 +4,7 @@ import { runRespond, emotionName } from "eumenes-agency";
 import { goalReplyToolNames } from "eumenes-agency/agenda/runtime";
 import { readToolInputs } from "../../domains/capabilities";
 import { goalReplyInstructions, goalReplyTools } from "./always-on-goal-reply";
-import { goalScope, type createGoalAgenda } from "./goal-agenda";
+import { goalScope, goalSlots, type createGoalAgenda } from "./goal-agenda";
 import { z } from "zod";
 import {
 	agendaReplyMessages,
@@ -39,6 +39,7 @@ import {
 } from "./always-on-scope";
 import type { AgencyHostDeps } from "./host-types";
 import { quietThought } from "./always-on-thoughts";
+import { heldMemoryRefs } from "./always-on-recall";
 
 const log = getLogger("agency");
 /** The calls a reply keeps in its history: the agenda's own tools. */
@@ -221,6 +222,8 @@ type AgendaPortsInput = {
 	/** A reply begins: what the agent was saying counts as said now (the reply follows it). */
 	heard(c: AgendaScope): void;
 	changed(): void;
+	/** The memory excluded these records: what the scope holds on them goes (a scope that cites none is left alone). */
+	exclude(c: AgendaScope, refs: readonly string[]): void;
 };
 
 function readNoteText(
@@ -271,7 +274,6 @@ async function executeAgendaReply(
 		agent: asks ? c.agent : { ...c.agent, askForReply: () => null },
 		known: [],
 		notes: c.notes.map(noteRef),
-		profile: c.profile.markdown,
 		clock: null,
 		now: at,
 	}).find((m) => m.role === "user" && m.content.startsWith(AGENCY_STATE_OPEN));
@@ -293,10 +295,14 @@ async function executeAgendaReply(
 			? [...args.messages.slice(0, -1), prependInput(last, agencyState)]
 			: [...args.messages.slice(0, -1), agencyState, ...(last ? [last] : [])];
 	// What this reply is given rests in its input: the notes, and what the state cites (the memory it reads is added).
+	// What rests on a corrected or suppressed record is held back from the reply: it is not given, so it is not cited.
+	const held = heldMemoryRefs(deps, c);
 	remember(c.given, run.runId, [
 		...c.notes.map((n) => `note:${n.id}`),
-		...c.profile.passes.flatMap((p) => p.sources),
-		...c.agent.view().items.flatMap((i) => i.refs.filter(citable)),
+		...c.agent
+			.view()
+			.items.flatMap((i) => i.refs.filter(citable))
+			.filter((ref) => !held.has(ref)),
 	]);
 	// The notes an explicit read takes (set only while that read runs: the tool reads synchronously, at its start).
 	let reading: AgendaNoteText[] | null = null;
@@ -497,7 +503,25 @@ function buildAgendaStatus(input: AgendaPortsInput, id: string) {
 
 export function createAgendaPorts(input: AgendaPortsInput) {
 	const { deps, convs, serving, changed } = input;
-	const dialoguePort: AgencyLayerPort = {
+	const dialoguePort: AgencyLayerPort & {
+		/** The memory excluded records (a forget on its way, with a reference or without): the agency lets them go at once. */
+		memoryExcludedInTransaction(
+			db: Database,
+			input: {
+				conversationId: string;
+				itemIds: readonly string[];
+				messageIds: readonly string[];
+			},
+		): void;
+	} = {
+		memoryExcludedInTransaction: (_db, excluded) => {
+			const c = convs.get(excluded.conversationId);
+			if (c)
+				input.exclude(c, [
+					...excluded.messageIds,
+					...excluded.itemIds.map((id) => `memory:${id}`),
+				]);
+		},
 		isCurrentInputInTransaction: (db, input) => currentInput(deps, db, input),
 		// Memory keeps the input of delivered speech with the message; a line handed to Live is asked for here.
 		inputForMessageInTransaction: (_db, id) =>
@@ -506,6 +530,7 @@ export function createAgendaPorts(input: AgendaPortsInput) {
 		// What the reply knows of the agent is placed in the reply itself (see `respond`).
 		inputForContextInTransaction: () => ({ sources: [], complete: true }),
 		stateForContextInTransaction: () => [],
+		goalSlotsInTransaction: (db) => goalSlots(deps, db),
 		workChangedInTransaction: () => {
 			changed();
 		},

@@ -6,8 +6,8 @@ import { referencedInput } from "./input";
 import { persistSpeech } from "./speech";
 import {
 	citableNotes,
-	knownOf,
 	noteRef,
+	shownMemory,
 	type AgendaScope,
 } from "./always-on-scope";
 import { toErrorCode } from "../../infrastructure/error-code";
@@ -46,7 +46,7 @@ export function researchRevision(
 	)?.revisionId;
 }
 
-/** What the model calls of the agent saw: the user's recent words and the memory (conservatively). */
+/** What the model calls of the agent saw: the user's recent words and the memory its calls were given lately. */
 export function seenRefs(
 	deps: AgencyHostDeps,
 	c: AgendaScope,
@@ -57,7 +57,7 @@ export function seenRefs(
 			.view()
 			.said.filter((s) => s.who === "user")
 			.map((s) => s.id),
-		...knownOf(deps, now).map((k) => `memory:${k.id}`),
+		...shownMemory(deps, c, now),
 	];
 }
 
@@ -318,8 +318,8 @@ export async function prepareNoteDisplay(
 	const documents = deps.noteDocuments;
 	if (!documents) throw new Error("agency_note_documents_unavailable");
 	const signal = replySignal
-		? AbortSignal.any([c.profileAbort.signal, replySignal])
-		: c.profileAbort.signal;
+		? AbortSignal.any([c.closed.signal, replySignal])
+		: c.closed.signal;
 	const messageId = `agency-note:${c.scope}:${runId}:${note.id}`;
 	const shown = (db: Database) =>
 		deps.conversation.sourceInTransaction(db, messageId).state === "available";

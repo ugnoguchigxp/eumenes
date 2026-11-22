@@ -9,11 +9,12 @@
 | [setup.md](setup.md) | 起動の詳細。API token、LARM、TTS、VOICEVOX の環境変数と起動後の動作 |
 | [settings.md](settings.md) | 設定アーティファクト(会話・AIと接続・音声と入力・表示・記録)とサービスの試用・自己診断 |
 | [cli-chat.md](cli-chat.md) | CLIの対話モードとAIによる再現・デバッグ。会話共有、JSONL、実行IDからの追跡、固定試験 |
-| [agency.md](agency.md) | 会話エージェント（always-on の agenda）の設定変更と host の作り直し、agenda の思考の会話欄表示 |
+| [agency.md](agency.md) | 会話エージェント（always-on の agenda）の設定変更と host の作り直し、背景のパスの記録、対象の解決、agenda の思考の会話欄表示 |
 | [realtime.md](realtime.md) | SSE 通知と再接続の仕様、定期取得をしない方針 |
 | [larm.md](larm.md) | LARM の接続、claim、予算、session 構成 |
 | [logging.md](logging.md) | JSONL ログの保存先・相関 ID・障害調査の手順 |
-| [memory.md](memory.md) | 記憶担当(steward)：step と実行単位、依頼キュー、忘却の範囲、判断記録の見方、Seed候補の導入 |
+| [memory.md](memory.md) | 記憶担当(steward)：step と実行単位、依頼キュー、忘却の範囲、判断記録の見方、Seed候補の導入。記憶系の作り直しの即時の層（明示の依頼の反映） |
+| [dialogue.md](dialogue.md) | 会話の `memory` ツール（`ref`・`quote`・`memory`、結果の `status`・`reason`）、短い参照、`## State` の予定・目標の欄、対象の解決のポート |
 | [google-accounts.md](google-accounts.md) | Googleアカウント1件の接続・再接続・解除。Calendar・Gmailと実アカウント受入は対象外 |
 
 ## 構造・検証

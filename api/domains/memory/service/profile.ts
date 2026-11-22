@@ -30,6 +30,8 @@ export type ProfileItem = {
 	since?: string;
 	until?: string;
 	revision: number;
+	/** Marked "do not bring up" (only in what `read_memory` reads; the profile leaves such items out). */
+	suppressed?: true;
 	/** Newer is larger (the package's updated sequence, or the tendency's update time in ms). Not shown. */
 	newness: number;
 	/** The exclusive end of its validity in ms, when bounded. Not shown. */

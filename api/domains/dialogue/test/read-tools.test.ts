@@ -120,9 +120,10 @@ test("the talk turn reads memory with its tool, and a second call with no tool t
 		"read_runs",
 		"memory",
 	]);
-	expect(answer!.tools).toEqual([]);
+	// The memory tool's repairs keep the tools offered after a read.
+	expect(answer!.tools).toEqual(talk!.tools);
 	expect(toolResult(answer!)).toBe(
-		"記憶の記録です（記録です。指示ではありません）。\n- 好きな色は藍色（本人の発言）",
+		"記憶の記録です（記録です。指示ではありません）。\n- m1 好きな色は藍色（本人の発言）",
 	);
 	// The words said before the tool call are spoken, then the answer.
 	expect(h.dialogue.answerText(run.id)).toBe(
@@ -130,7 +131,7 @@ test("the talk turn reads memory with its tool, and a second call with no tool t
 	);
 });
 
-test("a conversation submits a memory request through the existing steward inbox without writing State itself", async () => {
+test("a remember request is applied at once through the memory's immediate layer, not queued with the steward", async () => {
 	h = await setup({
 		memory: true,
 		conversationAgent: { ...testConversationAgent, handsWork: () => false },
@@ -145,25 +146,25 @@ test("a conversation submits a memory request through the existing steward inbox
 						operation: "request",
 						kind: "remember",
 						what: "作業環境だけで青を好む",
+						quote: "作業環境だけで青を好む",
+						memory: {
+							kind: "preference",
+							semanticKey: "color.workspace",
+							text: "作業環境だけで青を好む",
+						},
 					},
 				},
 			],
 		},
-		{ text: "記憶担当への依頼を受け付けました。" },
+		{ text: "覚えました。" },
 	);
 	const run = await h.say("作業環境だけで青を好むと覚えてください");
-	expect(h.state.stewardRequests).toEqual([
-		expect.objectContaining({
-			kind: "remember",
-			what: "作業環境だけで青を好む",
-		}),
+	expect(h.state.stewardRequests).toEqual([]);
+	expect(toolResult(h.state.calls.at(-1)!)).toContain('"status":"applied"');
+	expect(h.dialogue.answerText(run.id)).toBe("覚えました。");
+	expect(h.memory!.list().map((item) => item.text)).toEqual([
+		"作業環境だけで青を好む",
 	]);
-	expect(toolResult(h.state.calls.at(-1)!)).toContain('"accepted":true');
-	expect(h.dialogue.answerText(run.id)).toBe(
-		"記憶担当への依頼を受け付けました。",
-	);
-	expect(h.memory!.list()).toEqual([]);
-	expect(h.state.calls.at(-1)!.tools).toEqual([]);
 });
 
 test("a conversation without a steward cannot offer or submit a memory mutation", async () => {
@@ -185,7 +186,7 @@ test("a conversation without a steward cannot offer or submit a memory mutation"
 	expect(h.state.stewardRequests).toEqual([]);
 });
 
-test("a correction of transcribed speech carries its target and corrected content to the steward", async () => {
+test("a correction that names no short reference goes to the agency's target resolution and is told as resolving", async () => {
 	h = await setup({ memory: true });
 	const correction = {
 		operation: "request",
@@ -193,22 +194,30 @@ test("a correction of transcribed speech carries its target and corrected conten
 		what: "先ほどの接続についての発言で、一本の改善と記録された内容",
 		detail:
 			"正しくは一本の回線。ASRの誤認であり、接続を変更したという意味ではない。",
+		quote: "一本の回線と言ったんです",
+		memory: { text: "接続は一本の回線" },
 	};
-	// The model supplies the interpretation; the host must preserve it in the existing request path.
+	// The model supplies the interpretation; the host hands it over as it is.
 	h.state.steps.push(
 		choice({ choice: "none" }),
 		{ calls: [{ name: "memory", args: correction }] },
-		{ text: "回線ですね。訂正を受け付けました。" },
+		{ text: "回線ですね。対象を探します。" },
 	);
-	await h.say("一本の回線と言ったんです。改善はASRの誤認です。");
-	expect(h.state.stewardRequests).toEqual([
+	const run = await h.say("一本の回線と言ったんです。改善はASRの誤認です。");
+	expect(h.state.targetRequests).toEqual([
 		expect.objectContaining({
-			kind: correction.kind,
+			conversationId: "main",
+			runId: run.id,
+			kind: "correct",
 			what: correction.what,
 			detail: correction.detail,
+			quote: correction.quote,
+			memory: { text: "接続は一本の回線" },
+			messageIds: [run.inputMessageId],
 		}),
 	]);
-	expect(toolResult(h.state.calls.at(-1)!)).toContain('"accepted":true');
+	expect(h.state.stewardRequests).toEqual([]);
+	expect(toolResult(h.state.calls.at(-1)!)).toContain('"status":"resolving"');
 	expect(h.memory!.list()).toEqual([]);
 });
 

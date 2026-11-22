@@ -16,7 +16,7 @@ afterEach(async () => {
 
 const SPICY = "辛いものが好き";
 
-/** A profile line of `<memory>`: its number (`p<n>`), kind, text and notes (the layout specification, section 4.1). */
+/** A profile line of `## Memory`: its text and notes (its short reference is left out). */
 type Profile = Array<{ text: string; notes: string }>;
 
 /** The profile the nth model call shows: the `## Memory` lines, in the order shown. */
@@ -25,7 +25,10 @@ function profileOf(call: number): Profile {
 		sectionLines(m.content, "Memory"),
 	).flatMap((line) => {
 		const match = /^- (.*)（([^（）]*)）$/.exec(line);
-		return match ? [{ text: match[1]!, notes: match[2]! }] : [];
+		// Each item leads with its short reference (`m1`...).
+		return match
+			? [{ text: match[1]!.replace(/^m\d+ /, ""), notes: match[2]! }]
+			: [];
 	});
 }
 

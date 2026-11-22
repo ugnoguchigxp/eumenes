@@ -21,7 +21,7 @@ const YIELD_CODES = ["larm_preempted"] as const;
 const LOG_LINES = 6;
 
 const SLOT_LABELS: Record<UnitSlot, string> = {
-	reflect: "記憶の反映",
+	reflect: "記憶の依頼",
 	world: "世界の記録",
 	maintenance: "記憶の整理",
 };

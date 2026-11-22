@@ -29,7 +29,8 @@ test("completed: the run's events are in the log and every request is pending", 
 		["agent", [run.answerMessageId!], false],
 	]);
 	const [unit] = h.units();
-	expect(unit).toMatchObject({ step: "curate-memory", kind: "events" });
+	// Only the requests make a unit; the exchange alone makes none.
+	expect(unit).toMatchObject({ step: "curate-memory", kind: "requests" });
 });
 
 test("failed and interrupted: only the user's event is in the log and requests go on", async () => {

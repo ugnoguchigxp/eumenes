@@ -428,10 +428,13 @@ export function refusalText(
 const MEMORY_SOURCES: Record<string, string> = {
 	user_said: "本人の発言",
 	inferred: "推測",
-	observed: "観察",
+	observed: "推定",
 };
 
-/** One long-term memory item: its text, then where it came from and since when (`- …（本人の発言、10-20から）`). */
+/**
+ * One long-term memory item: its short reference when it has one, its text, then where it came from and since when
+ * (`- m1 …（本人の発言、10-20から）`). A tendency reads as an estimate, a suppressed item as one not to bring up.
+ */
 export function memoryItemLine(item: Record<string, unknown>): string {
 	const notes = [
 		item.negated === true ? "否定" : null,
@@ -440,7 +443,9 @@ export function memoryItemLine(item: Record<string, unknown>): string {
 			: null,
 		typeof item.since === "string" ? `${item.since.slice(5, 10)}から` : null,
 		typeof item.until === "string" ? `${item.until.slice(5, 10)}まで` : null,
+		item.suppressed === true ? "話題にしない" : null,
 		item.inProfile === true ? "「## Memory」にある" : null,
 	].filter((note): note is string => !!note);
-	return `- ${lineText(String(item.text ?? ""))}${notes.length ? `（${notes.join("、")}）` : ""}`;
+	const ref = typeof item.ref === "string" ? `${item.ref} ` : "";
+	return `- ${ref}${lineText(String(item.text ?? ""))}${notes.length ? `（${notes.join("、")}）` : ""}`;
 }

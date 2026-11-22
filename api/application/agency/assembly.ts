@@ -18,6 +18,8 @@ export function assembleAgency(
 		| "conversation"
 		| "settings"
 		| "memory"
+		| "continuity"
+		| "steward"
 		| "routeSpeechInTransaction"
 		| "state"
 		| "steering"
@@ -47,7 +49,8 @@ export function assembleAgency(
 				| "backgroundDiagnosticInTransaction"
 				| "activeSpecialistAgentLabelInTransaction"
 			>
-		>,
+		> &
+		Partial<NonNullable<AgencyHostDeps["dialogueTargets"]>>,
 ) {
 	const { store, inference } = deps;
 	const state =
@@ -64,6 +67,12 @@ export function assembleAgency(
 	return createRebuildingAgencyHost({
 		...deps,
 		...(state ? { state } : {}),
+		dialogueTargets: {
+			hideExcludedInTransaction: (db, input) =>
+				dialogue().hideExcludedInTransaction?.(db, input),
+			targetsSettled: (conversationId) =>
+				dialogue().targetsSettled?.(conversationId),
+		},
 		conversationBusy: (db, conversationId) =>
 			dialogue().conversationHasActiveRunInTransaction(db, conversationId),
 		awaitingWorkConfirmation: (db, conversationId) =>

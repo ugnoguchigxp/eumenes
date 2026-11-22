@@ -216,3 +216,44 @@ test("correcting a source during inference discards the pending summary before a
 	).toBeNull();
 	expect(active(h)).toBeNull();
 });
+
+test("a delayed background claim still gets its full inference deadline", async () => {
+	let elapsed = 0;
+	let deadline = 0;
+	const h = (harness = await setup({
+		window: 32_768,
+		queue: { now: () => Date.now() + elapsed },
+		debugInference: {
+			captureInTransaction: (_, subject, _purpose, expires) => {
+				if (subject.startsWith("background:compact:")) deadline = expires;
+				return "req:" + subject;
+			},
+			executeRequest: async (requestId) => ({
+				requestId,
+				attemptId: "summary",
+				value: "まとめ",
+			}),
+		},
+	}));
+	const stop = h.store.onCommit(() => {
+		if (!elapsed && h.queue.list({ kind: COMPACT_SUMMARY_KIND }).items.length) {
+			elapsed = 35_000;
+			h.state.offsetMs += elapsed;
+		}
+	});
+	try {
+		for (let n = 0; n < 9; n++) await say(h, "予定" + n);
+		await waitFor(() =>
+			h.queue
+				.list({ kind: COMPACT_SUMMARY_KIND })
+				.items.some((j) => j.finishedAt !== null),
+		);
+		expect(staged(h)?.kind).toBe("llm");
+		const job = h.queue.list({ kind: COMPACT_SUMMARY_KIND }).items[0]!;
+		expect(deadline - Date.parse(job.createdAt)).toBeGreaterThanOrEqual(
+			65_000 - 100,
+		);
+	} finally {
+		stop();
+	}
+});

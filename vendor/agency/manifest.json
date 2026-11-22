@@ -1,21 +1,21 @@
 {
 	"package": "eumenes-agency",
-	"version": "0.1.10",
-	"artifact": "eumenes-agency-0.1.10-01f61cbac379-3b2f9d538923.tgz",
-	"sha256": "3b2f9d5389236ba12b257ba9e87f379fac9a8cf43c09eab6c1a71faf54020018",
-	"size": 252189,
+	"version": "0.1.11",
+	"artifact": "eumenes-agency-0.1.11-01f61cbac379-ba116b7042f4.tgz",
+	"sha256": "ba116b7042f4717957d0ab5597eced14d1e7ea797b47a1470c9eeaeacd4ac48b",
+	"size": 252307,
 	"INSTRUCTION_VERSION": "p0e-instructions-29",
 	"HOST_RULES_VERSION": "host-rules-26",
 	"gitSha": "01f61cbac3790146c1205042c1b309181c3948eb",
 	"dirty": true,
-	"builtAt": "2026-11-22T14:37:44.478Z",
+	"builtAt": "2026-11-22T16:35:03.655Z",
 	"adoptionSource": {
 		"baseCommit": "01f61cbac3790146c1205042c1b309181c3948eb",
-		"patchFile": "memory-redesign-adoption-source.patch",
-		"patchSha256": "3a6c8e8f36339074ac6e499392492305b15063fa1affd198ae3cdde336a7d53e",
-		"sourceHash": "58b544bb8ee971e46aa3dfa986c78e7e6e983b189e4e4d7d7bfa7c968d08025a",
+		"patchFile": "memory-review-adoption-source.patch",
+		"patchSha256": "cda4727ee7de2d1feea6f9b879f92360007a867a798c8deae3a7697d535f0b37",
+		"sourceHash": "e1e4bd02fc159a50ad359ce7e15c33cf7e0a2d17127e4f17c061cd14b18c2a8d",
 		"sourceFiles": {
-			"package.json": "57163c38be61a5e7b0a41ed7097f3f4074b5aa4196dbb6637ed6e104236c4cbb",
+			"package.json": "bda46ecc968196f03aaa0c77804ff533464b568bc1f3b31bfca641f4315427b8",
 			"runtime/agenda/agenda-goals.ts": "edfd8fb8197c131635c3119e016011cecccb371a6daabfd338d25c1b5dc46eaf",
 			"runtime/agenda/codex-goal-design.ts": "f75f4a044dc7e8341cdcb118dda6d984fcc0ca1d71cab9ea9079cbb20eb33112",
 			"runtime/agenda/docs.ts": "a255d832b4ed244b7811c059d9012d9fe0d52f2eee06a39f8157ec87a18eebe8",
@@ -34,7 +34,7 @@
 			"src/agenda/check.ts": "bf917ac2648a4c85da3d86005d75113455b269b7bb85404306bc848055efc6b8",
 			"src/agenda/compose.ts": "96690c81bb3cf23495d51fdfb00b0c0e948435a1e120306bb6853ed0bf233eeb",
 			"src/agenda/contracts.ts": "b874bb11c6d21afc9a8319bd66a738223a809bc4d44f7487483d304f5fc2df52",
-			"src/agenda/extract.ts": "5e5be8e139832a1f462881fe2445706d29e2945573f125be01f520449be0b8f0",
+			"src/agenda/extract.ts": "b16444552356439518de53c5f6eaf787f8762b94e55b364af2595b1d30b6cfe3",
 			"src/agenda/host.ts": "8380a7952c81c834fc723138155b5413c6150f76d29831d14f9715900b5919ff",
 			"src/agenda/index.ts": "99a245a5a82b0d292590ba898d2cabaa79537579b9fbd99160ed3dd8033d9284",
 			"src/agenda/marks.ts": "34bf795541e21fb5e0d94e443c39dbd78dc4428d27c5d235fbe0594f121602d4",
@@ -109,5 +109,5 @@
 	},
 	"normalizedWith": "normalize-pack.py",
 	"compiler": "typescript@5.9.3",
-	"derivedFrom": "eumenes-agency-0.1.9-01f61cbac379-6f90c2a6c6ec.tgz"
+	"derivedFrom": "eumenes-agency-0.1.10-01f61cbac379-3b2f9d538923.tgz"
 }

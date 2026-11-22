@@ -2,7 +2,13 @@ import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import { seedImportMigration } from "./seeds";
 import { hostInputsMigration } from "./host-inputs";
+import {
+	explicitRequestedMigration,
+	immediateLayerMigration,
+	tendencyRunMigration,
+} from "./immediate";
 export * from "./seeds";
+export * from "./immediate";
 export * from "./window";
 export * from "./tendency";
 export * from "./ledger";
@@ -281,5 +287,20 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0012-host-inputs",
 		after: ["memory/0011-drop-window-prefetch"],
 		sql: hostInputsMigration,
+	},
+	{
+		id: "memory/0013-immediate-layer",
+		after: ["memory/0012-host-inputs"],
+		sql: immediateLayerMigration,
+	},
+	{
+		id: "memory/0014-tendency-run",
+		after: ["memory/0013-immediate-layer"],
+		sql: tendencyRunMigration,
+	},
+	{
+		id: "memory/0015-explicit-request-requested",
+		after: ["memory/0014-tendency-run"],
+		sql: explicitRequestedMigration,
 	},
 ];

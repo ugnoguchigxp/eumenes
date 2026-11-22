@@ -2,7 +2,6 @@ import { classifyValidity, periodFromStateMs } from "eumenes-memory";
 import type { StateItem } from "eumenes-memory/sqlite";
 import { sha256Hex } from "../../../infrastructure/digest";
 import { estimateJsonTokens } from "../../../infrastructure/context-budget";
-import type { ConversationEvent } from "../../continuity";
 import { byteLength, type ClippedText, clipMessage } from "./budget";
 import type { StepEnv } from "./types";
 
@@ -16,16 +15,15 @@ export function localDay(ms: number): string {
 // ---- the memory the model is shown, with refs ----
 
 export type MemoryRef = {
-	/** Memory's own (state, tendency, note) and the shelves a forget request may also name: World's entities and claims, goals. */
-	namespace: "state" | "tendency" | "continuity" | "entity" | "claim" | "goal";
+	/** Memory's own (state, tendency) and the shelves a forget request may also name: World's entities and claims, goals. */
+	namespace: "state" | "tendency" | "entity" | "claim" | "goal";
 	id: string;
 	revision: number;
 };
 export type MemoryDescription = {
-	/** "m1", "t1", "n1" -> the item (ids and revisions never reach the model). */
+	/** "lm1", "lt1" -> the item (ids and revisions never reach the model). */
 	refs: Record<string, MemoryRef>;
 	longTerm: Array<Record<string, unknown>>;
-	shortTerm: Array<Record<string, unknown>>;
 	/** The items the long-term layer does not carry yet ("recently remembered"). */
 	recent: string[];
 	coverage: {
@@ -54,7 +52,7 @@ export function activeStateItems(env: StepEnv): StateItem[] {
 }
 
 /**
- * The long-term list (State, then tendencies) and the live notes, each with a short ref. The list is cut where
+ * The long-term list (State, then tendencies), each with a short ref. The list is cut where
  * it would outgrow the profile section of the window plan (estimated tokens), newest first.
  */
 export function describeMemory(
@@ -156,22 +154,9 @@ export function describeMemory(
 		t++;
 		refs[ref] = { namespace: "tendency", id: row.id, revision: row.revision };
 	}
-	const shortTerm: MemoryDescription["shortTerm"] = [];
-	let n = 0;
-	for (const item of deps.continuity.snapshotInTransaction(db, conversationId)
-		.items) {
-		const ref = `sn${++n}`;
-		refs[ref] = {
-			namespace: "continuity",
-			id: item.id,
-			revision: item.revision,
-		};
-		shortTerm.push({ ref, kind: item.kind, text: item.text });
-	}
 	return {
 		refs,
 		longTerm,
-		shortTerm,
 		recent,
 		coverage: {
 			stateTotal: groups.size,
@@ -202,76 +187,6 @@ export type LoadedEvent = {
 };
 export type LoadResult =
 	{ status: "ok"; event: LoadedEvent } | { status: "gone" | "blocked" };
-
-const roleOf = (by: EventBy) => (by === "user" ? "user" : "assistant");
-
-/** The fields of a frozen event text (id, time, type, actor, then the event's own). */
-function fieldsOf(event: ConversationEvent): Record<string, unknown> | null {
-	if (event.text === null) return null;
-	try {
-		const parsed: unknown = JSON.parse(event.text);
-		return isRecord(parsed) ? parsed : null;
-	} catch {
-		return null;
-	}
-}
-
-/**
- * One handled `said` event as the steward reads it: the words come from the conversation message the event shows
- * (the frozen text keeps only a head of a long utterance), or from the frozen text when no message stands behind
- * it (an announcement). `gone`: a forgotten event, a retracted message, an event with nothing to read; `blocked`:
- * a message of the block ledger (a scheduled prompt, a specialist session).
- */
-export function loadEvent(env: StepEnv, event: ConversationEvent): LoadResult {
-	const { db, deps, conversationId } = env;
-	if (event.forgotten || event.type !== "said" || event.by === "host")
-		return { status: "gone" };
-	const by: EventBy = event.by;
-	const fields = fieldsOf(event);
-	const origin = typeof fields?.origin === "string" ? fields.origin : null;
-	if (event.messageIds.length === 0) {
-		const body = typeof fields?.text === "string" ? fields.text : null;
-		if (body === null) return { status: "gone" };
-		const clipped = clipMessage(body);
-		return {
-			status: "ok",
-			event: {
-				seq: event.seq,
-				messageId: null,
-				by,
-				origin,
-				at: event.at,
-				text: clipped,
-				bytes: byteLength(clipped.text),
-				digests: {},
-			},
-		};
-	}
-	if (deps.memory.blockedMessageIdsInTransaction(db, event.messageIds).size > 0)
-		return { status: "blocked" };
-	const messageId = event.messageIds[0]!;
-	const found = deps.conversation.messageInTransaction(db, messageId);
-	if (
-		!found ||
-		found.message.role !== roleOf(by) ||
-		found.message.conversationId !== conversationId
-	)
-		return { status: "gone" };
-	const clipped = clipMessage(found.message.text);
-	return {
-		status: "ok",
-		event: {
-			seq: event.seq,
-			messageId,
-			by,
-			origin,
-			at: event.at,
-			text: clipped,
-			bytes: byteLength(clipped.text),
-			digests: { [messageId]: sha256Hex(found.message.text) },
-		},
-	};
-}
 
 /** A conversation message as context for a request (the user's message it was made in), with no event behind it. */
 export function loadMessage(env: StepEnv, messageId: string): LoadResult {

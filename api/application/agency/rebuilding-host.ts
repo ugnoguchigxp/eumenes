@@ -109,6 +109,22 @@ export function createRebuildingAgencyHost(
 					NonNullable<typeof current.dialoguePort.replyInputInTransaction>
 				>
 			) => current.dialoguePort.replyInputInTransaction?.(...args) ?? null,
+			goalSlotsInTransaction: (
+				...args: Parameters<
+					NonNullable<typeof current.dialoguePort.goalSlotsInTransaction>
+				>
+			) => current.dialoguePort.goalSlotsInTransaction?.(...args) ?? [],
+			memoryExcludedInTransaction: (
+				...args: Parameters<
+					typeof current.dialoguePort.memoryExcludedInTransaction
+				>
+			) => current.dialoguePort.memoryExcludedInTransaction(...args),
+		},
+		/** The port for a target named in words (see `always-on-target.ts`). */
+		memoryTargets: {
+			requestInTransaction: (
+				...args: Parameters<Host["memoryTargets"]["requestInTransaction"]>
+			) => current.memoryTargets.requestInTransaction(...args),
 		},
 		forgetInTransaction: (
 			db: Parameters<Host["forgetInTransaction"]>[0],

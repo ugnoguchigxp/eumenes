@@ -308,6 +308,7 @@ export function buildDialogueService(
 		externalOutput: deps.liveBridge.externalOutput,
 		resources: deps.resources.dialogue,
 		agency: deps.agency.dialoguePort,
+		memoryTargets: deps.agency.memoryTargets,
 		conversationAgent: deps.agency.conversationAgent,
 		lookup: createConversationLookup(deps.webNote),
 		logFile: () => config.logFile,

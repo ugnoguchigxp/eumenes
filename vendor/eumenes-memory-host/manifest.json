@@ -1,13 +1,13 @@
 {
 	"package": "eumenes-memory-host",
-	"version": "0.2.0",
-	"artifact": "eumenes-memory-host-0.2.0-cbca090ca596.tgz",
-	"sha256": "cbca090ca596e7d57dd55b6caf946a1bd46d748721139bcc8ba5ec1b0f73299c",
+	"version": "0.2.1",
+	"artifact": "eumenes-memory-host-0.2.1-b4c300aef6ba.tgz",
+	"sha256": "b4c300aef6bb92e5e847f64472f5efb501170ae9bbd28f8c2851923b26b4781f",
 	"sourceGitCommit": "1439bfd9c5b171e2da19a445816688e1e3943651",
-	"sourceHash": "b0657663d3708e47e443a1912fe7fdbbdb05fa49b13eb52d70413b18226b9580",
-	"sourceTreeState": "base commit plus Memory Host Agenda changes and application snapshot checks",
-	"verifiedWith": "Memory Host Agenda tests and embedded Memory archive comparison",
+	"sourceHash": "f5d08036bcef9cdfee81b3589e32217d90c23dd9043863e1630924497ea43728",
+	"sourceTreeState": "base commit plus uncommitted memory host 0.2.0 changes (packages/host), the recall-controls components of core 0.0.5 (migration 0010), the fix of two host tests (search-index T-MIG-2, agenda legacy-agenda) to roll a version 10 database back to version 9, and the host version bump to 0.2.1",
+	"verifiedWith": "verify (1134 tests passed), verify:host (host build, typecheck, host tests, archive and source-hash controls, Bun/MCP consumers), verify:package",
 	"mcpSdk": "2.4.0",
-	"corePackage": "eumenes-memory@0.0.4",
-	"coreSchemaVersion": 9
+	"corePackage": "eumenes-memory@0.0.5",
+	"coreSchemaVersion": 10
 }

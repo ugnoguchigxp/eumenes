@@ -1,7 +1,6 @@
 import type { Database } from "bun:sqlite";
 import {
 	CAPTURE_RETRY_MS,
-	FOREGROUND_DELAYS_MS,
 	INFERENCE_MS,
 	MAX_OUTPUT_TOKENS,
 	type StewardPayload,
@@ -10,13 +9,13 @@ import {
 	type UnitRow,
 	closeUnit,
 	putRequest,
-	readState,
 	readUnit,
 	setUnitPrepared,
-	writeState,
 } from "../repository";
 import type { Kick } from "./kick";
 import { buildMessages } from "./messages";
+import { anyForeground } from "./sleep/rest";
+import { isSleepStep, sleepSteps } from "./sleep/steps";
 import { steps } from "./steps";
 import type { UnitEnd } from "./unit-end";
 import type { PreparedUnit, StepEnv, StewardDeps, StewardInput } from "./types";
@@ -65,31 +64,55 @@ export function createPrepare(
 		}
 	}
 
-	/** Upkeep waits while an answer is being generated (30 s, 2 min, 10 min); the unit is made again for later. */
-	function deferForForeground(env: StepEnv, unit: UnitRow) {
-		const { db } = env;
-		const state = readState(db, unit.conversationId);
-		const delay =
-			FOREGROUND_DELAYS_MS[
-				Math.min(state.deferCount, FOREGROUND_DELAYS_MS.length - 1)
-			]!;
-		const round = state.quiet.round;
-		const nextMaintenanceAt = deps.nowMs() + delay;
-		writeState(db, {
-			...state,
-			deferCount: state.deferCount + 1,
-			nextMaintenanceAt,
-			quiet: round
-				? {
-						...state.quiet,
-						round: { ...round, count: Math.max(0, round.count - 1) },
-					}
-				: state.quiet,
+	/**
+	 * A sleep unit: the step makes its own model calls and writes while it runs, so prepare only fences it (memory
+	 * ready, no conversation run unless the unit is the closure delete of a forget) and lets the step fix its input.
+	 */
+	function prepareSleep(
+		db: Database,
+		claim: { jobId: string; generation: number; attempt: number },
+		unit: UnitRow & { step: keyof typeof sleepSteps },
+	):
+		| { status: "ready"; input: StewardInput }
+		| { status: "stale"; reason: string } {
+		const step = sleepSteps[unit.step];
+		const env: StepEnv = { db, deps, conversationId: unit.conversationId };
+		const close = (reason: string) => {
+			closeUnit(db, unit.id, "stale", deps.clock());
+			return { status: "stale" as const, reason };
+		};
+		// The closure delete works even when memory is off; the sleep layer needs it.
+		if (!step.urgent && !memory.readyInTransaction(db))
+			return close("memory_unavailable");
+		if (!step.urgent && anyForeground(db, deps))
+			return close("foreground_active");
+		const prepared = step.prepare(env, unit);
+		if (prepared.status === "stale") {
+			closeUnit(db, unit.id, "stale", deps.clock());
+			// What made the unit empty changed the ledger: the next unit follows from it.
+			kick.kickOne(db, unit.conversationId);
+			return prepared;
+		}
+		setUnitPrepared(db, unit.id, {
+			forgetSeq: memory.forgetSeqInTransaction(db),
+			targets: { ...unit.targets, ...prepared.targets },
 		});
-		closeUnit(db, unit.id, "stale", deps.clock());
-		// Nothing is enqueued for later: the timer kicks again when the wait is over.
-		wake.at(nextMaintenanceAt);
-		kick.kickOne(db, unit.conversationId);
+		return {
+			status: "ready",
+			input: {
+				kind: "sleep",
+				unitId: unit.id,
+				jobId: claim.jobId,
+				conversationId: unit.conversationId,
+				step,
+				prepared: prepared.prepared,
+				targets: readUnit(db, unit.id)!.targets,
+				forgetSeq: readUnit(db, unit.id)!.forgetSeq,
+				attempt: claim.attempt,
+				generation: claim.generation,
+				startedAt: deps.nowMs(),
+			},
+		};
 	}
 
 	function prepareInTransaction(
@@ -106,8 +129,14 @@ export function createPrepare(
 		const unit = readUnit(db, claim.payload.unitId);
 		if (!unit || unit.state !== "open")
 			return { status: "stale", reason: "unit_closed" };
+		if (isSleepStep(unit.step))
+			return prepareSleep(
+				db,
+				claim,
+				unit as UnitRow & { step: keyof typeof sleepSteps },
+			);
 		const env: StepEnv = { db, deps, conversationId: unit.conversationId };
-		const step = steps[unit.step];
+		const step = steps[unit.step as keyof typeof steps];
 		const close = (reason: string) => {
 			// A World unit that got as far as prepare has registered what its model would see: given back.
 			end.releaseWorld(db, unit);
@@ -116,19 +145,12 @@ export function createPrepare(
 		};
 		if (!memory.readyInTransaction(db)) return close("memory_unavailable");
 		// Every step starts after the conversation's run has reported: LARM infers one call at a time and the user's call
-		// comes first. The run's end kicks the steward again; upkeep also waits on its own timer.
-		if (
-			!unit.targets.urgent &&
-			deps.foregroundActive(db, unit.conversationId)
-		) {
-			if (unit.slot !== "maintenance") return close("foreground_active");
-			deferForForeground(env, unit);
-			return { status: "stale", reason: "foreground_active" };
-		}
+		// comes first. The run's end kicks the steward again.
+		if (deps.foregroundActive(db, unit.conversationId))
+			return close("foreground_active");
 		const prepared = step.prepare(env, unit);
 		if (prepared.status === "stale") {
 			closeUnit(db, unit.id, "stale", deps.clock());
-			if (unit.slot === "maintenance") end.markQuiet(db, unit);
 			if (prepared.retryLater) {
 				// Nothing can be done now (World can not be used, Memory refused): the timer makes the unit again.
 				wake.pause(
@@ -138,7 +160,7 @@ export function createPrepare(
 				);
 				return prepared;
 			}
-			// What made the unit empty changed the ledger: the next unit (or the end of the round) follows from it.
+			// What made the unit empty changed the ledger: the next unit follows from it.
 			kick.kickOne(db, unit.conversationId);
 			return prepared;
 		}
@@ -153,17 +175,13 @@ export function createPrepare(
 		putRequest(db, claim.jobId, unit.step, requestId);
 		setUnitPrepared(db, unit.id, {
 			forgetSeq: memory.forgetSeqInTransaction(db),
-			// What the step reports replaces its own keys; an upkeep unit keeps its revision and urgency.
+			// What the step reports replaces its own keys.
 			targets: { ...unit.targets, ...prepared.targets },
 		});
-		if (unit.slot === "maintenance") {
-			const state = readState(db, unit.conversationId);
-			writeState(db, { ...state, deferCount: 0, nextMaintenanceAt: null });
-		}
 		const current = readUnit(db, unit.id)!;
 		const preparedUnit: PreparedUnit = {
 			unit: current,
-			step: unit.step,
+			step: unit.step as keyof typeof steps,
 			data: prepared.data,
 			context: prepared.context,
 			targets: prepared.targets,
@@ -171,6 +189,7 @@ export function createPrepare(
 		return {
 			status: "ready",
 			input: {
+				kind: "llm",
 				unitId: unit.id,
 				jobId: claim.jobId,
 				conversationId: unit.conversationId,

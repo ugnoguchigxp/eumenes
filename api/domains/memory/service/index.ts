@@ -1,5 +1,5 @@
 import { createSharedHostPort } from "./shared-host";
-import { purgeHostInputs } from "../repository/host-inputs";
+import { purgeHostInputsOfForget } from "../repository/host-inputs";
 import { createReferenceInputs } from "./reference-input";
 import { createMemoryMaintenance } from "./maintenance";
 import type { Database } from "bun:sqlite";
@@ -42,6 +42,7 @@ import {
 import { deleteUsage, purgeUsageFor } from "../repository/usage";
 import { createAgentVectors } from "./agent-vectors";
 import { createBackfill } from "./backfill";
+import { createImmediateLayer } from "./immediate-layer";
 import {
 	createContextWindowStore,
 	type CheckedItems,
@@ -49,7 +50,6 @@ import {
 	type ReadItemsInput,
 	type WindowSnapshot,
 } from "./context-window";
-import { guardContinuity } from "./continuity-guard";
 import { createCuration } from "./curation";
 import { executionReferences } from "./execution-references";
 import { createForget } from "./forget";
@@ -133,6 +133,25 @@ export const NOMINAL_FIXED_TOKENS = 3000;
 const referencePlan = () =>
 	planWindow({ window: REFERENCE_WINDOW_TOKENS, fixed: NOMINAL_FIXED_TOKENS });
 
+/** What a run keeps of a window for the adoption check (the texts stay in its prompt). */
+function preparedWindowOf(
+	window: WindowSnapshot,
+	shownMessageIds: readonly string[] = [],
+): PreparedWindow {
+	return {
+		conversationId: window.conversationId,
+		version: window.version,
+		buildId: window.buildId,
+		immediateSeq: window.inputs.immediateSeq,
+		policyRevision: window.inputs.policyRevision,
+		manifest: [
+			...window.profile.items.map((item) => item.id),
+			...window.newMemories.map((item) => item.id),
+		],
+		shownMessageIds: [...shownMessageIds],
+	};
+}
+
 export function createMemoryService(
 	store: SqliteStore,
 	conversation: ConversationService,
@@ -181,16 +200,16 @@ export function createMemoryService(
 		db: Database,
 		includeInactive: boolean,
 		purpose = "memory.read",
+		suppressed: "mark" | "omit" = "mark",
 	): readonly StateItem[] {
 		const result = listAllState(db, {
 			...scoped(db, purpose),
 			includeInactive,
+			suppressed,
 		});
 		if (result.status !== "ok") throw new Error("memory_blocked");
 		return result.items;
 	}
-
-	guardContinuity(continuity, () => windowPlan().sections.state);
 
 	conversation.addRetractHook(dropVectorsOnRetract(conversation));
 
@@ -231,15 +250,7 @@ export function createMemoryService(
 		now: atMs,
 	});
 	const purgeHooks = referencePurgeHooks(executionRefs);
-	purgeHooks.push((db, purge) =>
-		purgeHostInputs(
-			db,
-			new Set([
-				...purge.messageIds,
-				...purge.itemIds.map((id) => `memory:${id}`),
-			]),
-		),
-	);
+	purgeHooks.push(purgeHostInputsOfForget);
 	const forgetPlans: Array<
 		NonNullable<import("./forget").ForgetDeps["planHooks"]>[number]
 	> = [];
@@ -281,6 +292,18 @@ export function createMemoryService(
 		ledger,
 		backfill,
 	});
+
+	const immediate = createImmediateLayer({
+		...curationDeps,
+		journalPath: options.journalPath,
+		access,
+		forgetter,
+		health,
+		blockedMessages: ledger.blockedMessageIdsInTransaction,
+		recover: recoverWithRetry,
+	});
+	// The requests and short references that name a forgotten item go with it.
+	purgeHooks.push(immediate.purgeInTransaction);
 
 	function setEnabledInTransaction(
 		db: Database,
@@ -353,7 +376,8 @@ export function createMemoryService(
 			db: Database,
 			includeInactive = false,
 		): readonly StateItem[] =>
-			stateItems(db, includeInactive, "memory.steward"),
+			// The steward's material for choosing what to curate: a suppressed item is not brought up.
+			stateItems(db, includeInactive, "memory.steward", "omit"),
 		/** Owner-side connection for the shared CLI/MCP; startup binds an explicit local transport. */
 		sharedHost: createSharedHostPort({
 			store,
@@ -417,6 +441,7 @@ export function createMemoryService(
 				throw new Error("memory_forget_incomplete");
 			}
 		},
+		...immediate.operations,
 		/**
 		 * Registers a purge that runs inside every forget's transaction, and again for every block journal line at
 		 * startup (so it must be idempotent). The steward deletes its decisions and inbox bodies here.
@@ -504,23 +529,7 @@ export function createMemoryService(
 			return windows.republishInTransaction(db, conversationId);
 		},
 		/** What a run keeps of a window for the adoption check (the texts stay in its prompt). */
-		preparedWindow(
-			window: WindowSnapshot,
-			shownMessageIds: readonly string[] = [],
-		): PreparedWindow {
-			return {
-				conversationId: window.conversationId,
-				version: window.version,
-				buildId: window.buildId,
-				immediateSeq: window.inputs.immediateSeq,
-				policyRevision: window.inputs.policyRevision,
-				manifest: [
-					...window.profile.items.map((item) => item.id),
-					...window.newMemories.map((item) => item.id),
-				],
-				shownMessageIds: [...shownMessageIds],
-			};
-		},
+		preparedWindow: preparedWindowOf,
 		/** The usage receipt of an adopted run: which window version it read. */
 		recordUsageInTransaction(
 			db: Database,

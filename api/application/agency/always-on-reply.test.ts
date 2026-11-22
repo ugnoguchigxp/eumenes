@@ -287,54 +287,6 @@ test("the agenda's reply facts let it start research; the host's own fact rules 
 	}
 });
 
-test("the profile is written behind the talk, kept in the checkpoint, given to the reply, and forgotten with its words", async () => {
-	const f = await agendaFixture({
-		script: (kind: CallKind) =>
-			kind === "profile"
-				? {
-						ops: [
-							{
-								op: "add",
-								section: "plans",
-								id: null,
-								text: "来月、箱根へ一泊の温泉旅行を考えている",
-								evidence: ["user-a"],
-							},
-						],
-					}
-				: undefined,
-	});
-	try {
-		await f.start();
-		await f.user("user-a", "ao", "来月、箱根に温泉旅行に行こうと思ってる");
-		await f.assistant("answer-a", "いいですね。", "ao");
-		// The writer runs behind the reply at once (see `scheduleProfile`).
-		await waitFor(() => !!f.host.inspect("ao")!.snapshot.profile?.markdown);
-		const note = () => f.host.inspect("ao")!.snapshot.profile;
-		expect(note()!.markdown).toContain("箱根へ一泊");
-		expect(f.kinds).toContain("profile");
-		// The reply is given it (plans), and its input rests on the words it was written from.
-		const { seen } = await replyWith(f, [], {
-			runId: "run-p",
-			messageIds: ["user-b"],
-		});
-		expect(seen[0]![1]!.content).toContain("箱根へ一泊");
-		await f.restart();
-		expect(note()!.markdown).toContain("箱根へ一泊");
-		// Forgetting the words takes the note back to before them.
-		await f.h.memory!.forget({
-			conversationId: "ao",
-			messageIds: ["user-a"],
-			itemIds: [],
-		});
-		expect(note()?.markdown ?? "").not.toContain("箱根へ一泊");
-		await f.restart();
-		expect(note()?.markdown ?? "").not.toContain("箱根へ一泊");
-	} finally {
-		await f.close();
-	}
-});
-
 test("a sentence said before a tool and again after is in the reply once", async () => {
 	const f = await agendaFixture();
 	try {

@@ -1,5 +1,4 @@
 import { afterEach, expect, test } from "bun:test";
-import { MAINTENANCE_QUIET_MS } from "../contracts";
 import { setupSteward, type StewardHarness } from "./steward.fixture";
 import { createFakeWorld, type FakeWorld } from "./world.fake";
 
@@ -20,14 +19,6 @@ async function setup() {
 	harnesses.push(h);
 	return { h, fake };
 }
-const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
-const judged = (world: boolean, goals = false) => ({
-	...empty,
-	route: [
-		{ event: "e1", world, goals },
-		{ event: "e2", world, goals },
-	],
-});
 const claim = {
 	op: "assert",
 	ref: null,
@@ -62,11 +53,10 @@ async function exchangeWithEvents(
 
 test("the events of one exchange become one world_events unit; settle, unit and decision are one result", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	h.inference.script("curate-world", answerWith([claim]));
 	const ex = await exchangeWithEvents(h, fake);
 	await h.drain();
-	// The feed is later than the run: the exchange has been reflected, nothing was waiting for the World.
+	// The feed is later than the run: nothing was waiting for the World.
 	expect(worldUnits(h)).toEqual([]);
 	await ex.receive();
 	await h.drain();
@@ -113,82 +103,39 @@ test("the events of one exchange become one world_events unit; settle, unit and 
 	);
 });
 
-test("World is edited only while the user leaves the conversation: between turns only the memory is curated", async () => {
+test("World is edited only while the user leaves the conversation: the interval the user chose must pass after their last words", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	h.inference.script("curate-world", answerWith([claim]));
 	const ex = await exchangeWithEvents(h, fake);
 	await ex.receive();
-	// The clock does not move: the exchange is reflected, and World waits for the quiet spell.
+	// The clock does not move: World waits for the conversation to rest, and the timer is the interval running out.
 	await h.pump(16);
-	expect(h.inference.callsOf("curate-memory")).toHaveLength(1);
 	expect(worldUnits(h)).toEqual([]);
-	expect(h.timerTimes().length).toBeGreaterThan(0);
-	// The user has left the conversation for the spell: its timer kicks, and World is edited.
-	h.time.ms += MAINTENANCE_QUIET_MS;
+	expect(h.timerTimes()).toEqual([h.time.ms + 10_000]);
+	// The user has left the conversation for the interval: the timer kicks, and World is edited.
 	await h.fireTimer();
 	await h.pump(16);
 	expect(worldUnits(h).map((u) => u.state)).toEqual(["applied"]);
 	expect(fake.events().map((e) => e.state)).toEqual(["applied", "applied"]);
 });
 
-test("an event that arrives before curate-memory judged its exchange waits; no unit is made and no model is asked", async () => {
+test("an event whose run is still going waits; no unit is made and no model is asked", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	h.inference.script("curate-world", answerWith([claim]));
 	const ex = await exchangeWithEvents(h, fake);
-	// Received before the steward's curate-memory ran.
-	await ex.receive();
-	expect(worldUnits(h)).toEqual([]);
-	expect(h.inference.callsOf("curate-world")).toHaveLength(0);
-	await h.drain();
-	expect(worldUnits(h).map((u) => u.state)).toEqual(["applied"]);
-	// The unit came after the judgment.
-	const order = h.units().map((u) => u.step);
-	expect(order.indexOf("curate-world")).toBeGreaterThan(
-		order.indexOf("curate-memory"),
-	);
-});
-
-test("an exchange judged world:false is settled empty without a model, and the decision says so", async () => {
-	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(false));
-	const ex = await exchangeWithEvents(h, fake, ["今日は眠い", "お大事に"]);
-	await h.drain();
+	h.runStates[ex.runId] = "active";
 	await ex.receive();
 	await h.drain();
 	expect(worldUnits(h)).toEqual([]);
 	expect(h.inference.callsOf("curate-world")).toHaveLength(0);
-	expect(fake.callsOf("settleEmpty")).toHaveLength(1);
-	expect(fake.events().map((e) => [e.state, e.reason])).toEqual([
-		["applied", "ROUTED_EMPTY"],
-		["applied", "ROUTED_EMPTY"],
-	]);
-	const decision = h.steward
-		.decisions("c1")
-		.find((d) => d.step === "curate-world")!;
-	expect(decision.output).toEqual({ routed: "empty" });
-});
-
-test("a corrected version of a judged message is not routed by the old judgment", async () => {
-	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(false));
-	h.inference.script("curate-world", answerWith([]));
-	const ex = await h.run({
-		user: "最初の言い方",
-		answer: "了解",
-		end: "completed",
-	});
+	// The run ends: its end kicks the steward and the window is curated.
+	h.runStates[ex.runId] = "completed";
+	await h.kick();
 	await h.drain();
-	// The same message, as another version (another digest): the judgment was made of the first version.
-	await fake.receive(ex.inputMessageId, { digest: "digest-of-the-correction" });
-	await h.drain();
-	expect(fake.callsOf("settleEmpty")).toHaveLength(0);
 	expect(worldUnits(h).map((u) => u.state)).toEqual(["applied"]);
-	expect(h.inference.callsOf("curate-world")).toHaveLength(1);
 });
 
-test("an exchange the steward never judged (cancelled run) and an exchange without a judgment both count as needing the world", async () => {
+test("a cancelled run's message and an ordinary exchange are both curated", async () => {
 	const { h, fake } = await setup();
 	h.inference.script("curate-world", answerWith([]), answerWith([]));
 	// A cancelled run registers no exchange.
@@ -196,14 +143,11 @@ test("an exchange the steward never judged (cancelled run) and an exchange witho
 	await fake.receive(cancelled.inputMessageId);
 	await h.drain();
 	expect(worldUnits(h).map((u) => u.state)).toEqual(["applied"]);
-	// The model forgot the route: needed.
-	h.inference.script("curate-memory", empty);
 	const second = await h.run({
-		user: "判定のない往復",
+		user: "普通の往復",
 		answer: "了解",
 		end: "completed",
 	});
-	await h.drain();
 	await fake.receive(second.inputMessageId);
 	await h.drain();
 	expect(worldUnits(h).map((u) => u.state)).toEqual(["applied", "applied"]);
@@ -212,7 +156,6 @@ test("an exchange the steward never judged (cancelled run) and an exchange witho
 
 test("prepare that is not ready closes the unit and the timer tries again; events World finalized are done", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	h.inference.script("curate-world", answerWith([]));
 	const ex = await exchangeWithEvents(h, fake);
 	await h.drain();
@@ -223,6 +166,7 @@ test("prepare that is not ready closes the unit and the timer tries again; event
 		return { status: "not_ready", reason: "world_unavailable", finalized: [] };
 	};
 	await ex.receive();
+	await h.fireTimer();
 	await h.pump();
 	expect(worldUnits(h).map((u) => u.state)).toEqual(["stale"]);
 	expect(h.inference.callsOf("curate-world")).toHaveLength(0);
@@ -235,7 +179,6 @@ test("prepare that is not ready closes the unit and the timer tries again; event
 
 test("a window held three times is given up and the events after it go on", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true), judged(true));
 	h.inference.script(
 		"curate-world",
 		answerWith([]),
@@ -284,7 +227,6 @@ test("a window held three times is given up and the events after it go on", asyn
 
 test("a World forget since prepare voids the answer; a memory forget does too (stale, nothing applied)", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	h.inference.script(
 		"curate-world",
 		() => {
@@ -310,7 +252,6 @@ test("a World forget since prepare voids the answer; a memory forget does too (s
 
 test("a settle that fails half way leaves nothing: events stay pending, the unit fails, the dependents are released", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	h.inference.script(
 		"curate-world",
 		answerWith([claim]),
@@ -348,7 +289,6 @@ test("a settle that fails half way leaves nothing: events stay pending, the unit
 
 test("an unusable answer counts against the events; after a restart the startup kick makes units for pending events", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	h.inference.script("curate-world", "not json", answerWith([]));
 	const ex = await exchangeWithEvents(h, fake);
 	await h.drain();
@@ -376,62 +316,15 @@ test("an unusable answer counts against the events; after a restart the startup 
 	).toHaveLength(1);
 });
 
-test("the judgment is kept per message with the version the model read, and a forget of the message removes it", async () => {
-	const { h } = await setup();
-	h.inference.script("curate-memory", judged(false, true));
-	h.inference.script("curate-goals", { goals: [] });
-	const ex = await h.run({
-		user: "今日は眠い",
-		answer: "お大事に",
-		end: "completed",
-	});
-	await h.drain();
-	const routes = () =>
-		h.store.read((db) =>
-			db
-				.query(
-					"SELECT message_id AS id, revision, digest, world, goals FROM steward_route ORDER BY message_id",
-				)
-				.all(),
-		) as Array<{
-			id: string;
-			revision: string;
-			digest: string;
-			world: number;
-			goals: number;
-		}>;
-	const found = routes();
-	expect(found.map((r) => [r.id, r.world, r.goals]).sort()).toEqual(
-		[
-			[ex.inputMessageId, 0, 1],
-			[ex.answerMessageId!, 0, 1],
-		].sort(),
-	);
-	const state = h.store.read((db) =>
-		h.conversation.sourceInTransaction(db, ex.inputMessageId),
-	);
-	if (state.state !== "available") throw new Error("source");
-	expect(found.find((r) => r.id === ex.inputMessageId)).toMatchObject({
-		revision: state.revision,
-		digest: state.digest,
-	});
-	await h.memory.forget({
-		conversationId: "c1",
-		itemIds: [],
-		messageIds: [ex.inputMessageId],
-	});
-	expect(routes()).toEqual([]);
-});
-
 const releasedIds = (fake: FakeWorld) =>
 	fake.callsOf("release").flatMap((c) => c.detail as string[]);
 
 test("a world_events unit cancelled in the queue gives back what World registered for it", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	const ex = await exchangeWithEvents(h, fake);
 	await h.drain();
 	await ex.receive();
+	await h.fireTimer();
 	const [unit] = worldUnits(h);
 	expect(unit).toMatchObject({ kind: "world_events", state: "open" });
 	const job = h.store.read(
@@ -451,7 +344,6 @@ test("a world_events unit cancelled in the queue gives back what World registere
 
 test("a retried world_events unit gives back its registration before the next try", async () => {
 	const { h, fake } = await setup();
-	h.inference.script("curate-memory", judged(true));
 	h.inference.script(
 		"curate-world",
 		new Error("network_unavailable"),

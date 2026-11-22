@@ -7,6 +7,7 @@ import { settle } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
 import type { imageFixture } from "../media/image.fixture";
 import type { AgencyHostDeps, NoteDocumentPort } from "./host-types";
+import { createContinuityService } from "../../domains/continuity";
 import { createGoalsService } from "../../domains/goals";
 import { createMemoryHostConnection } from "../memory-host";
 import { createAgendaGoalStore, forgetGoalDocuments } from "./goal-agenda";
@@ -17,7 +18,8 @@ export type CallKind =
 	| "check"
 	| "ask_check"
 	| "compose"
-	| "profile"
+	| "records"
+	| "target"
 	| "goal_mock"
 	| "goal_verify";
 
@@ -27,13 +29,24 @@ export function callKind(request: { system: string }): CallKind {
 	if (request.system.includes("調べものの重複チェック")) return "check";
 	if (request.system.includes("質問の聞き直しチェック")) return "ask_check";
 	if (request.system.includes("話す文を書く")) return "compose";
-	if (request.system.includes("メモ係")) return "profile";
+	if (request.system.includes("記録係")) return "records";
+	if (request.system.includes("整理係")) return "target";
 	if (request.system.includes("Claude Code モックです")) return "goal_mock";
 	if (request.system.includes("模擬成果物を目標と設計書に照らして検査"))
 		return "goal_verify";
 	throw new Error("fixture_unknown_call");
 }
 
+export const noRecords = (): Record<
+	"memories" | "candidates" | "plans" | "questions" | "conflicts",
+	unknown[]
+> => ({
+	memories: [],
+	candidates: [],
+	plans: [],
+	questions: [],
+	conflicts: [],
+});
 export const planNothing = () => ({ add: [], drop: [], focus: "" });
 export const composeDecline = () => ({
 	utterance: null,
@@ -57,9 +70,11 @@ const fallback = (kind: CallKind) =>
 			? { verdict: "new", coveredBy: null, request: null, reason: "fixture" }
 			: kind === "ask_check"
 				? { verdicts: [] }
-				: kind === "profile"
-					? { ops: [] }
-					: composeDecline();
+				: kind === "records"
+					? noRecords()
+					: kind === "target"
+						? { targets: [], term: null }
+						: composeDecline();
 
 export async function agendaFixture(
 	options: {
@@ -206,12 +221,15 @@ export async function agendaFixture(
 			documents.forgotten.push(...noteIds);
 		},
 	};
+	// The harness keeps its continuity service to itself: this one reads and writes the same tables.
+	const continuity = createContinuityService();
 	const deps = {
 		noteDocuments,
 		store: h.store,
 		conversation: h.conversation,
 		settings: h.settings,
 		memory: h.memory!,
+		continuity,
 		...(goalStore && memoryHost
 			? {
 					agendaGoals: {
@@ -371,6 +389,8 @@ export async function agendaFixture(
 				}
 			await settle();
 		},
+		/** Whether the main conversation holds the model now (what `setBusy` set). */
+		busy: () => foreground,
 		setBusy(value: boolean) {
 			foreground = value;
 			for (const listener of activities) listener();

@@ -72,7 +72,7 @@ async function unit(
 		insertUnit(db, {
 			id,
 			conversationId,
-			kind: input.slot === "world" ? "world_events" : "events",
+			kind: input.slot === "world" ? "world_events" : "requests",
 			step: input.step,
 			slot: input.slot,
 			targets: {},
@@ -139,14 +139,14 @@ test("a slot fails while its last closed unit failed for a reason other than a L
 	});
 	await unit(store, {
 		slot: "maintenance",
-		step: "consolidate-memory",
+		step: "shallow",
 		state: "failed",
 		code: "invalid_output",
 		at: "2026-10-25T04:10:00.000Z",
 	});
 	await unit(store, {
 		slot: "maintenance",
-		step: "consolidate-memory",
+		step: "shallow",
 		state: "applied",
 		at: "2026-10-25T04:20:00.000Z",
 	});

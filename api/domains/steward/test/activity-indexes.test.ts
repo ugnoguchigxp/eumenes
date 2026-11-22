@@ -13,7 +13,7 @@ test("activity indexes upgrade retained history and avoid sorting the history fo
 	const path = join(directory, "db.sqlite3");
 	let store = openStore(path, [
 		...conversationMigrations,
-		...migrations.filter((m) => m.id !== "steward/0006-activity-indexes"),
+		...migrations.slice(0, 5),
 	]);
 	try {
 		await store.write((db) => {
@@ -34,7 +34,10 @@ test("activity indexes upgrade retained history and avoid sorting the history fo
 		);
 		expect(before).toMatchObject([{ jobId: "job-250", errorCode: "failed" }]);
 		await store.close();
-		store = openStore(path, [...conversationMigrations, ...migrations]);
+		store = openStore(path, [
+			...conversationMigrations,
+			...migrations.slice(0, 6),
+		]);
 		store.read((db) => {
 			let sql = "";
 			const capture = new Proxy(db, {

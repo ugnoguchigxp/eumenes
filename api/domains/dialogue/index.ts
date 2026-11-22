@@ -12,6 +12,9 @@ export { readActionOriginInTransaction } from "./service/action-origin";
 export { isAdoptedAnswerInTransaction } from "./service/adopted-answer";
 export type {
 	/** @public */ ConversationAgentPort,
+	/** @public */ MemoryTargetPort,
+	/** @public */ MemoryTargetRequest,
+	/** @public */ StewardExclusion,
 	WorldContextPort,
 } from "./contracts";
 export { migrations } from "./repository";
@@ -41,11 +44,6 @@ export type {
 export {
 	isAgendaSnapshot,
 	agendaSources,
-	agendaTicketInput,
-	forgetAgenda,
-	forgetProfile,
-	PROFILE_PASSES_KEPT,
-	type AgendaProfile,
 	baseRef,
 	type AgendaHostSnapshot,
 	type AgendaNote,

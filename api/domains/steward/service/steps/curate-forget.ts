@@ -36,7 +36,15 @@ const isLimit = (error: unknown) =>
  * The World forgets are resumed after the transaction commits. A refusal (the memory limit, World unavailable, evidence that could not be read whole)
  * leaves nothing of the request behind.
  */
-export function executeForget(env: StepEnv, spec: ForgetSpec): ForgetEffect {
+export function executeForget(
+	env: StepEnv,
+	spec: ForgetSpec,
+	/**
+	 * `close`: the closure delete of what an exclusion already hid (`closeExclusionInTransaction`: no limit on the
+	 * count of items).
+	 */
+	options: { close?: boolean } = {},
+): ForgetEffect {
 	const { db, deps, conversationId } = env;
 	const { world, goals } = deps;
 	db.exec("SAVEPOINT steward_forget");
@@ -82,12 +90,16 @@ export function executeForget(env: StepEnv, spec: ForgetSpec): ForgetEffect {
 		let blockedMessageIds: string[] = [];
 		let itemIds: string[] = [];
 		if (spec.itemIds.length + messageIds.size + goalIds.length > 0) {
-			const outcome = deps.memory.forgetInTransaction(db, {
+			const input = {
 				conversationId,
 				itemIds: spec.itemIds,
 				messageIds: [...messageIds],
 				...(goalIds.length > 0 ? { derived: { goalIds } } : {}),
-			});
+			};
+			const outcome =
+				options.close === true
+					? deps.memory.closeExclusionInTransaction(db, input)
+					: deps.memory.forgetInTransaction(db, input);
 			blockedMessageIds = outcome.blockedMessageIds;
 			itemIds = outcome.forgottenItemIds;
 			if (world && blockedMessageIds.length > 0) {

@@ -44,20 +44,6 @@ export type AgendaNote = {
 	inputs?: string[];
 };
 
-/**
- * The user's plans-and-interests note (Markdown, the package's profile): written from what the user said, for what the
- * memory leaves out. `passes` keep each writer pass's result and the user's words it read, so forgetting those words
- * takes the note back to before them (`base` is the note before the oldest kept pass).
- */
-export type AgendaProfile = {
-	markdown: string;
-	base: string;
-	passes: Array<{ markdown: string; sources: string[] }>;
-};
-
-/** Writer passes kept (older ones are folded into `base`). */
-export const PROFILE_PASSES_KEPT = 12;
-
 /** Host-owned envelope of one conversation's agenda agent. */
 export type AgendaHostSnapshot = {
 	kind: "agenda";
@@ -66,7 +52,6 @@ export type AgendaHostSnapshot = {
 	agent: AgendaSnapshot;
 	tickets: AgendaResearchTicket[];
 	notes: AgendaNote[];
-	profile?: AgendaProfile;
 };
 
 const strings = z.array(z.string());
@@ -87,15 +72,8 @@ const snapshotSchema = z.strictObject({
 			inputs: strings,
 		}),
 	),
-	profile: z
-		.strictObject({
-			markdown: z.string(),
-			base: z.string(),
-			passes: z.array(
-				z.strictObject({ markdown: z.string(), sources: strings }),
-			),
-		})
-		.optional(),
+	// A checkpoint written before the plans-and-interests note was retired carries it: read and dropped.
+	profile: z.unknown().optional(),
 	notes: z.array(
 		z.strictObject({
 			id: z.string().min(1),
@@ -128,7 +106,6 @@ export function agendaSources(value: AgendaHostSnapshot): string[] {
 				...n.refs.map(baseRef),
 				...(n.inputs ?? []),
 			]),
-			...(value.profile?.passes.flatMap((p) => p.sources) ?? []),
 		]),
 	];
 }
@@ -137,26 +114,6 @@ export function agendaSources(value: AgendaHostSnapshot): string[] {
 export function agendaTicketInput(snapshot: AgendaHostSnapshot, id: string) {
 	const ticket = snapshot.tickets.find((t) => t.id === id);
 	return ticket ? { sources: ticket.inputs, complete: true } : null;
-}
-
-/**
- * The note after forgetting `refs`: back to before the first pass that read a forgotten message (what later passes
- * added is lost with it: they were written over the earlier note).
- */
-export function forgetProfile(
-	profile: AgendaProfile | undefined,
-	refs: ReadonlySet<string>,
-): AgendaProfile | undefined {
-	if (!profile) return profile;
-	const at = profile.passes.findIndex((pass) =>
-		pass.sources.some((id) => refs.has(id) || refs.has(baseRef(id))),
-	);
-	if (at < 0) return profile;
-	return {
-		markdown: at === 0 ? profile.base : profile.passes[at - 1]!.markdown,
-		base: profile.base,
-		passes: profile.passes.slice(0, at),
-	};
 }
 
 /**
@@ -177,8 +134,12 @@ export function forgetAgenda(
 	const items = value.agent.items.filter(
 		(i) => !gone(i.refs) && !i.refs.some((r) => lost.has(r)),
 	);
+	// A checkpoint written before the note was retired still holds it: it is not carried on.
+	const { profile: _retired, ...rest } = value as AgendaHostSnapshot & {
+		profile?: unknown;
+	};
 	return {
-		...value,
+		...rest,
 		revision: value.revision + 1,
 		agent: { ...value.agent, items },
 		tickets: value.tickets.filter(
@@ -186,8 +147,5 @@ export function forgetAgenda(
 				!gone([...t.refs, ...t.inputs]) && !t.refs.some((r) => lost.has(r)),
 		),
 		notes: value.notes.filter((n) => !lost.has(`note:${n.id}`)),
-		...(value.profile
-			? { profile: forgetProfile(value.profile, refs) as AgendaProfile }
-			: {}),
 	};
 }

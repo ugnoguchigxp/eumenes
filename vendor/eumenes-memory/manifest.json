@@ -1,17 +1,17 @@
 {
 	"package": "eumenes-memory",
-	"version": "0.0.4",
-	"artifact": "eumenes-memory-0.0.4-7bed1c085f00.tgz",
-	"sha256": "7bed1c085f00b3e112decabf042939a6d36fd1786b9ee33b41881e5a3952994a",
+	"version": "0.0.5",
+	"artifact": "eumenes-memory-0.0.5-8f58df0d0e59.tgz",
+	"sha256": "8f58df0d0e59b3f64efda38cb7ad8139fd1c04f88e5384402e963ef20a3fd3ff",
 	"sourceGitCommit": "1439bfd9c5b171e2da19a445816688e1e3943651",
-	"sourceHash": "b0657663d3708e47e443a1912fe7fdbbdb05fa49b13eb52d70413b18226b9580",
-	"sourceTreeState": "base commit plus Memory Host Agenda changes and application snapshot checks",
-	"verifiedWith": "Memory Host Agenda tests and embedded Memory archive comparison",
+	"sourceHash": "f5d08036bcef9cdfee81b3589e32217d90c23dd9043863e1630924497ea43728",
+	"sourceTreeState": "base commit plus uncommitted memory host 0.2.0 changes (packages/host), the recall-controls components (migration 0010), the fix of two host tests to roll a version 10 database back to version 9, and the host version bump to 0.2.1",
+	"verifiedWith": "verify (1134 tests passed), verify:package (Bun/Node consumer)",
 	"contractVersions": {
 		"records": 1,
 		"state": 1,
 		"lifecycle": 2,
 		"external": 1
 	},
-	"dbSchemaVersion": 9
+	"dbSchemaVersion": 10
 }

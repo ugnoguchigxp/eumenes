@@ -1,50 +1,5 @@
-import { migrations as memoryPackageMigrations } from "eumenes-memory/sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import {
-	migration as conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
-	outboxMigration,
-	retractionMigration,
-} from "../../conversation";
-import {
-	type ContinuityKind,
-	type ContinuityService,
-	migration as continuityMigration,
-	shortTermMigration,
-	itemSourceMigration,
-} from "../../continuity";
-import {
-	agentHardeningMigration,
-	contextWindowMigration,
-	migration as memoryMigration,
-	stewardLedgersMigration,
-	forgetClosureMigration,
-	seedImportMigration,
-	turnVectorsMigration,
-	type MemoryItemDto,
-	type MemoryService,
-} from "../../memory";
-
-/** The migrations a dialogue test with a real memory service needs, before dialogue's own. */
-export const memoryMigrations = [
-	conversationMigration,
-	avatarMotionMigration,
-	answerDeliveryMigration,
-	outboxMigration,
-	retractionMigration,
-	continuityMigration,
-	shortTermMigration,
-	itemSourceMigration,
-	memoryMigration,
-	contextWindowMigration,
-	agentHardeningMigration,
-	turnVectorsMigration,
-	stewardLedgersMigration,
-	forgetClosureMigration,
-	seedImportMigration,
-	...memoryPackageMigrations,
-];
+import type { MemoryItemDto, MemoryService } from "../../memory";
 
 export type SeedInput = {
 	conversationId: string;
@@ -86,19 +41,4 @@ export async function saveItem(
 	const item = memory.list(true).find((entry) => entry.id === result.id);
 	if (!item) throw new Error("saved item not listed");
 	return item;
-}
-
-/** Writes a short-term note the way the steward does (its source message need not exist); a refusal throws. */
-export function addNote(
-	store: SqliteStore,
-	continuity: ContinuityService,
-	conversationId: string,
-	input: { kind: ContinuityKind; text: string },
-) {
-	return store.write((db) =>
-		continuity.addByAgentInTransaction(db, conversationId, {
-			...input,
-			sourceMessageIds: ["note-source"],
-		}),
-	);
 }

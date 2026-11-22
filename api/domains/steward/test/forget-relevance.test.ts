@@ -19,6 +19,7 @@ async function setup(world = false) {
 	let fake: FakeWorld | undefined;
 	const h = await setupSteward({
 		embed: topicEmbed,
+		sleep: {},
 		...(world
 			? {
 					async world({ store, conversation, kick }) {
@@ -32,17 +33,7 @@ async function setup(world = false) {
 	harnesses.push(h);
 	return { h, fake };
 }
-const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
-const item = (key: string, text: string) => ({
-	kind: "preference",
-	key,
-	text,
-	evidence: "e1",
-	quote: null,
-	validFrom: null,
-	validUntil: null,
-	negated: false,
-});
+const empty = { resolve: [] };
 const resolve = (over: Record<string, unknown>) => ({
 	request: "r1",
 	action: "forget",
@@ -69,21 +60,37 @@ const keys = (h: StewardHarness) =>
 		.map((i) => i.semanticKey)
 		.sort();
 
-/** The two memories of the live acceptance: spicy food and the cycling hobby. */
+/** The two memories of the live acceptance: spicy food and the cycling hobby, kept by the earlier reflection. */
 async function learn(h: StewardHarness) {
-	h.inference.script("curate-memory", {
-		...empty,
-		remember: [
-			item("food.spicy", "辛いものが苦手である"),
-			item("hobby.cycling", "週末に鎌倉へ自転車で出かけるのが趣味である"),
-		],
-	});
 	const first = await h.run({
 		user: "辛いものが苦手です。週末は鎌倉へ自転車で出かけるのが趣味です。",
 		answer: "承知しました",
 		end: "completed",
 	});
-	await h.drain();
+	await h.store.write((db) =>
+		h.memory.applyCurationInTransaction(db, {
+			conversationId: "c1",
+			items: [
+				{
+					op: "remember",
+					kind: "preference",
+					key: "food.spicy",
+					text: "辛いものが苦手である",
+					messageId: first.inputMessageId,
+					quote: null,
+				},
+				{
+					op: "remember",
+					kind: "preference",
+					key: "hobby.cycling",
+					text: "週末に鎌倉へ自転車で出かけるのが趣味である",
+					messageId: first.inputMessageId,
+					quote: null,
+				},
+			],
+		}),
+	);
+	await h.rest();
 	expect(keys(h)).toEqual(["food.spicy", "hobby.cycling"]);
 	return first;
 }
@@ -244,9 +251,7 @@ test("the strict schema of curate-memory allows only the request labels of the u
 			}
 		).properties.resolve.items.properties.request.enum;
 	const calls = h.inference.callsOf("curate-memory");
-	// The first unit had no request: only the empty label, which the host drops.
-	expect(requestEnum(calls[0]!.schema)).toEqual([""]);
-	expect(requestEnum(calls[1]!.schema)).toEqual(["r1", "r2"]);
+	expect(requestEnum(calls[0]!.schema)).toEqual(["r1", "r2"]);
 });
 
 test("a World entity named in the request is forgotten", async () => {
@@ -264,25 +269,16 @@ test("a World entity named in the request is forgotten", async () => {
 		],
 		claims: [],
 	};
-	h.inference.script("curate-memory", {
-		...empty,
-		route: [
-			{ event: "e1", world: false, goals: false },
-			{ event: "e2", world: false, goals: false },
-		],
-	});
 	await h.run({
 		user: "LARM を使っています",
 		answer: "はい",
 		end: "completed",
 	});
-	await h.drain();
 
 	h.inference.script("curate-memory", {
 		...empty,
 		// The model also names the voice service, which the request does not mention.
 		resolve: [resolve({ refs: ["w1", "w2", "w3"] })],
-		route: [],
 	});
 	await h.run({
 		user: "Eumenes と larm のことは全部忘れてください。",

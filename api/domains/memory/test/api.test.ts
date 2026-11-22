@@ -51,16 +51,20 @@ test("items carry their evidence, period and who asked for them", async () => {
 	).toBeNull();
 });
 
-test("short-term notes of the named conversation only; expired notes are not listed", async () => {
+test("plans of the named conversation only; closed plans are not listed", async () => {
 	const { h } = await setup();
-	await h.note("c1", { kind: "goal", text: "Rust移行" });
-	await h.note("c2", { kind: "memo", text: "別の会話" });
-	const items = h.memory.shortTerm("c1");
+	const first = await h.plan("c1", { kind: "intent", text: "Rust移行" });
+	await h.plan("c2", { kind: "plan", text: "別の会話", dueAt: "2026-11-30" });
+	const items = h.memory.plans("c1");
 	expect(items.map((i) => i.text)).toEqual(["Rust移行"]);
-	expect(items[0]).toMatchObject({ origin: "agent", expiresAt: null });
-	await h.note("c1", { kind: "memo", text: "一週間のメモ" });
-	h.time.now = "2026-10-21T12:00:00.000Z";
-	expect(h.memory.shortTerm("c1").map((i) => i.text)).toEqual(["Rust移行"]);
+	expect(items[0]).toMatchObject({
+		kind: "intent",
+		state: "open",
+		dueAt: null,
+	});
+	await h.closePlan(first.id, first.revision);
+	expect(h.memory.plans("c1")).toEqual([]);
+	expect(h.memory.plans("c2").map((i) => i.text)).toEqual(["別の会話"]);
 });
 
 test("tendencies are listed; there is no route to read, change or delete them by hand", async () => {
@@ -106,18 +110,22 @@ test("tendencies are listed; there is no route to read, change or delete them by
 test("while the journal is inconsistent none of the reads shows a body", async () => {
 	const { h } = await setup();
 	await h.seed("コーヒーが好き", "drink.coffee");
-	await h.note("c1", { kind: "goal", text: "Rust移行" });
+	await h.plan("c1", { kind: "intent", text: "Rust移行" });
 	writeFileSync(join(h.dir, "journal.jsonl"), "not json\n");
 	expect((await h.memory.recover()).healthy).toBe(false);
-	expect(h.memory.shortTerm("c1")).toEqual([]);
+	expect(h.memory.plans("c1")).toEqual([]);
 	expect(h.memory.tendencies()).toEqual([]);
 });
 
-test("a note that expires does not change the long-term window", async () => {
+test("a plan does not change the long-term window", async () => {
 	const { h } = await setup();
-	await h.note("c1", { kind: "memo", text: "一週間のメモ" });
-	await h.note("c1", { kind: "goal", text: "Rust移行" });
 	const first = await h.window();
+	await h.plan("c1", {
+		kind: "plan",
+		text: "水曜に歯医者",
+		dueAt: "2026-10-14",
+	});
+	await h.plan("c1", { kind: "intent", text: "Rust移行" });
 	expect((await h.window()).version).toBe(first.version);
 	h.time.now = "2026-10-21T12:00:00.000Z";
 	const later = await h.window();

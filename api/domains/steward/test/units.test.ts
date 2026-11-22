@@ -11,7 +11,29 @@ async function setup() {
 	harnesses.push(h);
 	return h;
 }
-const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
+const none = {
+	resolve: [
+		{
+			request: "r1",
+			action: "none",
+			refs: [],
+			alsoIn: [],
+			text: null,
+			kind: null,
+			key: null,
+			negated: null,
+		},
+	],
+};
+/** A run that ended and left one request: the only thing that makes a unit. */
+const ask = (h: StewardHarness, conversationId = "c1") =>
+	h.run({
+		user: "こんにちは",
+		answer: "どうも",
+		end: "completed",
+		conversationId,
+		requests: [{ kind: "remember", what: "あいさつ" }],
+	});
 const jobs = (h: StewardHarness) =>
 	h.store.read(
 		(db) =>
@@ -29,8 +51,8 @@ const jobs = (h: StewardHarness) =>
 
 test("a transient failure is retried by the queue on the same job and unit", async () => {
 	const h = await setup();
-	h.inference.script("curate-memory", new Error("network_unavailable"), empty);
-	await h.exchange("こんにちは", "どうも");
+	h.inference.script("curate-memory", new Error("network_unavailable"), none);
+	await ask(h);
 	await h.drain();
 	const curate = h.units().filter((u) => u.step === "curate-memory");
 	expect(curate.map((u) => u.state)).toEqual(["applied"]);
@@ -44,8 +66,8 @@ test("a transient failure is retried by the queue on the same job and unit", asy
 
 test("after the queue ended a job, the kick makes a new unit with a new id that really runs", async () => {
 	const h = await setup();
-	h.inference.script("curate-memory", new Error("provider_rejected"), empty);
-	await h.exchange("こんにちは", "どうも");
+	h.inference.script("curate-memory", new Error("provider_rejected"), none);
+	await ask(h);
 	await h.drain();
 	const curate = h.units().filter((u) => u.step === "curate-memory");
 	expect(curate.map((u) => [u.state, u.attempt])).toEqual([
@@ -59,8 +81,8 @@ test("after the queue ended a job, the kick makes a new unit with a new id that 
 	expect(curateJobs.map((j) => j.state)).toEqual(["failed", "completed"]);
 	expect(new Set(curateJobs.map((j) => j.id)).size).toBe(2);
 	expect(h.inference.callsOf("curate-memory")).toHaveLength(2);
-	// The failed try was counted against the events (the count goes once they are handled).
-	expect(h.log().every((e) => e.curated)).toBe(true);
+	// The failed try was counted against the request.
+	expect(h.inbox()).toMatchObject([{ state: "none", failures: 1 }]);
 	const failed = h.steward.decisions("c1").find((d) => d.errorCode !== null)!;
 	expect(failed).toMatchObject({
 		step: "curate-memory",
@@ -72,7 +94,7 @@ test("after the queue ended a job, the kick makes a new unit with a new id that 
 
 test("a conversation holds one open reflecting unit however often it is kicked", async () => {
 	const h = await setup();
-	await h.exchange("a", "b");
+	await ask(h);
 	await h.kick("c1");
 	await h.kick("c1");
 	await h.kick();
@@ -83,34 +105,28 @@ test("a conversation holds one open reflecting unit however often it is kicked",
 	expect(jobs(h)).toHaveLength(1);
 });
 
-test("the startup kick (no conversation named) reaches a conversation that has only waiting events", async () => {
+test("the startup kick (no conversation named) reaches a conversation that has only a waiting request", async () => {
 	const h = await setup();
-	// Recorded in the log but never kicked: the steward has no unit, state or request for it.
-	const runId = "run-lonely";
-	const inputMessageId = await h.say("user", "こんにちは", "c2", runId);
-	const answerMessageId = await h.say("assistant", "どうも", "c2", runId);
+	// Recorded in the inbox but never kicked: the steward has no unit for it.
+	const messageId = await h.say("user", "こんにちは", "c2", "run-lonely");
 	await h.store.write((db) =>
-		h.recordSaid(db, "c2", inputMessageId, answerMessageId),
+		h.steward.requestInTransaction(db, {
+			conversationId: "c2",
+			sourceRef: messageId,
+			kind: "remember",
+			what: "あいさつ",
+		}),
 	);
 	expect(h.units()).toHaveLength(0);
 	await h.kick();
 	const [unit] = h.units();
 	expect(unit).toMatchObject({ step: "curate-memory", state: "open" });
-	expect(
-		h.store.read(
-			(db) =>
-				(
-					db.query("SELECT conversation_id AS id FROM steward_unit").get() as {
-						id: string;
-					}
-				).id,
-		),
-	).toBe("c2");
+	expect(unit!.conversationId).toBe("c2");
 });
 
 test("a unit cancelled in the queue is closed and its request is released", async () => {
 	const h = await setup();
-	await h.exchange("a", "b");
+	await ask(h);
 	const [job] = jobs(h);
 	// Prepare ran only when the job starts; cancel while it still waits.
 	await h.queue.cancel(job!.id);
@@ -122,37 +138,28 @@ test("a unit cancelled in the queue is closed and its request is released", asyn
 test("a step whose inference is not available is neither counted nor retried at once", async () => {
 	const h = await setup();
 	h.inference.state.unavailable = true;
-	await h.exchange("a", "b");
+	await ask(h);
 	await h.queue.tick();
 	await waitFor(() => h.units()[0]?.state === "stale");
 	const [unit] = h.units();
 	expect(unit!.state).toBe("stale");
-	expect(
-		h.store.read(
-			(db) =>
-				(
-					db.query("SELECT COUNT(*) AS n FROM steward_event_failure").get() as {
-						n: number;
-					}
-				).n,
-		),
-	).toBe(0);
+	expect(h.inbox()).toMatchObject([{ state: "pending", failures: 0 }]);
 	expect(h.units()).toHaveLength(1);
 	// The next kick (a run's end, or startup) tries again.
 	h.inference.state.unavailable = false;
-	h.inference.script("curate-memory", empty);
+	h.inference.script("curate-memory", none);
 	await h.kick();
 	await h.drain();
-	expect(h.log().every((e) => e.curated)).toBe(true);
+	expect(h.inbox()).toMatchObject([{ state: "none" }]);
 });
 
 test("the startup kick makes the units every conversation with work still needs", async () => {
 	const h = await setup();
-	await h.exchange("a", "b", { conversationId: "c1" });
-	await h.exchange("c", "d", { conversationId: "c2" });
+	await ask(h, "c1");
+	await ask(h, "c2");
 	for (const job of jobs(h)) await h.queue.cancel(job.id);
 	expect(h.units().every((u) => u.state === "stale")).toBe(true);
-	h.inference.script("curate-memory", empty, empty);
+	h.inference.script("curate-memory", none, none);
 	await h.kick();
 	await h.drain();
 	const done = h
@@ -161,13 +168,13 @@ test("the startup kick makes the units every conversation with work still needs"
 	expect(done).toHaveLength(2);
 });
 
-test("events whose messages were retracted are handled without asking the model", async () => {
+test("a request whose message was retracted ends without asking the model", async () => {
 	const h = await setup();
-	const { inputMessageId, answerMessageId } = await h.exchange("a", "b");
+	const { inputMessageId } = await ask(h);
 	await h.conversation.retract({ messageId: inputMessageId });
-	await h.conversation.retract({ messageId: answerMessageId! });
 	await h.drain();
 	expect(h.inference.calls).toEqual([]);
-	expect(h.log().every((e) => e.curated)).toBe(true);
-	expect(h.units().every((u) => u.state === "stale")).toBe(true);
+	expect(h.inbox()).toMatchObject([
+		{ state: "none", resultCode: "source_unavailable" },
+	]);
 });

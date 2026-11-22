@@ -61,14 +61,13 @@ test("owner preview is read-only; state pause/resume retains text, source and un
 	});
 });
 
-test("mixed stale references reject the whole operation and cannot target another conversation's note", async () => {
+test("mixed stale references reject the whole operation; plans are not part of the owner's surface", async () => {
 	const h = await setup();
 	const a = await h.seed("毎朝散歩する", "walk", "毎朝散歩する", "habit");
-	await h.note("c2", { kind: "goal", text: "別会話の目標" });
-	const note = h.memory.shortTerm("c2")[0]!;
+	const plan = await h.plan("c1", { kind: "intent", text: "家具を直す" });
 	for (const ref of [
 		{ kind: "state", id: a.id, revision: a.revision + 1 },
-		{ kind: "note", id: note.id, revision: note.revision },
+		{ kind: "tendency", id: "ghost", revision: 1 },
 	]) {
 		await expect(
 			h.memory.maintenance.apply({
@@ -78,18 +77,25 @@ test("mixed stale references reject the whole operation and cannot target anothe
 			}),
 		).rejects.toThrow("maintenance_conflict");
 		expect(h.memory.list()).toHaveLength(1);
-		expect(h.memory.shortTerm("c2")).toHaveLength(1);
 	}
+	// A plan is closed by the agent with evidence; the owner's list and refs do not know it.
+	expect(h.memory.maintenance.list().items.map((item) => item.kind)).toEqual([
+		"state",
+	]);
+	expect(() =>
+		h.memory.maintenance.apply({
+			conversationId: "c1",
+			active: false,
+			refs: [{ kind: "plan", id: plan.id, revision: plan.revision }],
+		}),
+	).toThrow();
+	expect(h.memory.plans("c1")).toHaveLength(1);
 });
 
-test("notes and tendencies can be restored without inventing completion or new evidence", async () => {
+test("tendencies can be restored without inventing new evidence", async () => {
 	const h = await setup();
 	const a = await h.seed("毎朝散歩する", "walk", "毎朝散歩する", "habit");
 	const b = await h.seed("朝に運動する", "exercise", "朝に運動する", "habit");
-	const message = await h.say("user", "家具を直したい");
-	await h.curate([
-		{ op: "note_add", kind: "goal", text: "家具を直す", messageIds: [message] },
-	]);
 	await h.curate([
 		{
 			op: "tendency_add",
@@ -101,15 +107,15 @@ test("notes and tendencies can be restored without inventing completion or new e
 		},
 	]);
 	const refs = h.memory.maintenance
-		.list("c1")
+		.list()
 		.items.filter((i) => i.kind !== "state")
 		.map(({ kind, id, revision }) => ({ kind, id, revision }));
+	expect(refs).toHaveLength(1);
 	const paused = await h.memory.maintenance.apply({
 		conversationId: "c1",
 		active: false,
 		refs,
 	});
-	expect(h.memory.shortTerm("c1")).toEqual([]);
 	expect(h.memory.tendencies()).toEqual([]);
 	await h.memory.maintenance.apply({
 		conversationId: "c1",
@@ -120,7 +126,6 @@ test("notes and tendencies can be restored without inventing completion or new e
 			revision,
 		})),
 	});
-	expect(h.memory.shortTerm("c1")[0]?.text).toBe("家具を直す");
 	expect(h.memory.tendencies()[0]?.text).toBe("朝に活動する傾向");
 });
 

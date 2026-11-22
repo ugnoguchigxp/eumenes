@@ -336,13 +336,13 @@ test("a memory read returns the long-term items that match, tells them to the ta
 		(m) => (m.role as string) === "tool",
 	)!.content;
 	// The item is already in `## Memory`: the read says so beside its text.
-	expect(notice).toContain(`- ${saved.text}（本人の発言`);
+	expect(notice).toContain(`- m1 ${saved.text}（本人の発言`);
 	expect(notice).toContain("「## Memory」にある");
 	expect(
 		last.messages.some(
 			(m) =>
 				m.content.includes("## Memory\n") &&
-				m.content.includes(`- ${saved.text}`),
+				m.content.includes(`- m1 ${saved.text}`),
 		),
 	).toBe(true);
 	expect(h.log().find((e) => h!.fields(e).action === "read")).toBeDefined();
@@ -370,7 +370,7 @@ test("a memory not yet published is read with its text and not marked as shown",
 	const notice = h.state.calls
 		.at(-1)!
 		.messages.find((m) => (m.role as string) === "tool")!.content;
-	expect(notice).toContain("- 辛いものが好き（本人の発言");
+	expect(notice).toContain("- m1 辛いものが好き（本人の発言");
 	expect(notice).not.toContain("「## Memory」にある");
 });
 

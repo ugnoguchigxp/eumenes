@@ -104,20 +104,32 @@ test("`## Memory` holds the leanings only, with source and date, within its boun
 		revision: 1,
 		newness: 1,
 	});
-	const { lines, ids } = memoryLines([
+	const profile: ProfileItem[] = [
 		item("p1", "preference", "ピアノの曲が好き"),
 		item("p2", "personal_fact", "住所は鎌倉"),
 		item("p3", "tendency", "夜は静かな曲を聴く"),
 		{ ...item("p4", "preference", "元気が出る曲を好む"), source: "inferred" },
-	]);
+	];
+	const { lines, ids } = memoryLines(profile);
 	// The user's own words only: an inference or an observation is not shown as a fact (C4).
 	expect(lines).toEqual(["- ピアノの曲が好き（本人の発言、10-20から）"]);
+	// Each item leads with the short reference the memory handed out for it (numbers go on, they are not positions).
+	expect(memoryLines(profile, new Map([["p1", "m17"]])).lines).toEqual([
+		"- m17 ピアノの曲が好き（本人の発言、10-20から）",
+	]);
 	expect(ids).toEqual(["p1"]);
 	const many = Array.from({ length: 200 }, (_, i) =>
 		item(`x${i}`, "preference", `好きなもの${i}番目の長めの説明`),
 	);
 	expect(
 		estimateTextTokens(["## Memory", ...memoryLines(many).lines].join("\n")),
+	).toBeLessThanOrEqual(MEMORY_TOKENS);
+	// The references count in the bound, whatever their numbers: the same items are kept with long ones.
+	const numbered = new Map(many.map((i, n) => [i.id, `m${10000 + n}`]));
+	const withRefs = memoryLines(many, numbered);
+	expect(withRefs.ids).toEqual(memoryLines(many).ids);
+	expect(
+		estimateTextTokens(["## Memory", ...withRefs.lines].join("\n")),
 	).toBeLessThanOrEqual(MEMORY_TOKENS);
 });
 
@@ -134,6 +146,7 @@ test("the last message joins a trailing user message and carries `## Memory` whe
 			lastAt: null,
 			since: null,
 			memoryItemIds: [],
+			refsKey: null,
 			memory: null,
 			earlier: [],
 		}) as ConversationPrefix;

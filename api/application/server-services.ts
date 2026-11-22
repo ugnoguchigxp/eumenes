@@ -11,7 +11,7 @@ import type { ToolchainExecutionPort } from "../domains/tool-runtime";
 import type { Config } from "../infrastructure/config";
 import { getLogger } from "../infrastructure/logger";
 import { assembleAgency } from "./agency/assembly";
-import { createAgendaGoalStore } from "./agency/goal-agenda";
+import { agendaGoalDeps, createAgendaGoalStore } from "./agency/goal-agenda";
 import { createNoteDocuments } from "./agency/note-documents";
 import { createLiveBridge } from "./media/live-bridge";
 import { createMemoryHostConnection } from "./memory-host";
@@ -107,7 +107,7 @@ export async function buildServices(
 		inference,
 		dbPath,
 		memoryJournalPath,
-		worldResourceId: () => settings.get().world.curationResourceId,
+		settings,
 	});
 	let toolchainCapabilities: Capabilities | null = null;
 	const workspace = buildWorkspaceServices(config, {
@@ -204,13 +204,15 @@ export async function buildServices(
 		{
 			...core,
 			memory,
+			continuity,
+			steward,
 			noteDocuments,
-			agendaGoals: {
+			agendaGoals: agendaGoalDeps({
 				store: agendaGoalStore,
+				goals: goals.goals,
 				mockDir: resolve(dirname(dbPath), "agenda-goal-mock"),
-				readMemory: memoryHost.readForGoals,
-				isGoalContextCurrent: memoryHost.isGoalContextCurrent,
-			},
+				memoryHost,
+			}),
 			research: {
 				agents: toolchain.agents,
 				toolchains,

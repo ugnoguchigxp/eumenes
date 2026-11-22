@@ -13,6 +13,7 @@ import {
 	setup as dialogueSetup,
 } from "../domains/dialogue/test/generation.fixture";
 import { defaults, type Settings } from "../domains/settings";
+import { PROMPTS, SCHEMAS } from "eumenes-consolidation";
 import type { StewardService } from "../domains/steward";
 import { setupSteward } from "../domains/steward/test/steward.fixture";
 import {
@@ -57,7 +58,8 @@ const CONDITIONS = {
 	persona: "butler, agent name Eumenes, user name ユーザー",
 	settings: "defaults (emotion on, no interests)",
 	goal: "goal reply rules and tools added as the always-on reply adds them for a goal-enabled agenda",
-	steward: "curate-memory step of one exchange, no requests",
+	steward:
+		"curate-memory step of one remember request, the instructions of the other request steps, the sleep layer's judgement prompts and schemas",
 };
 const SECTIONS = ["Role", "Speaking", "Emotion", "Input", "Facts"] as const;
 
@@ -122,7 +124,7 @@ function sectionsOf(system: string) {
 
 /** The agency's model calls, by kind, as the fixture host sent them (the system text of each). */
 async function agencyCalls() {
-	const wanted: CallKind[] = ["check", "ask_check", "profile"];
+	const wanted: CallKind[] = ["check", "ask_check", "records"];
 	let phase = 0;
 	const f = await agendaFixture({
 		media: imageFixture("success"),
@@ -185,7 +187,7 @@ async function agencyCalls() {
 		return {
 			check: systems.get("check")!,
 			askCheck: systems.get("ask_check")!,
-			profile: systems.get("profile")!,
+			records: systems.get("records")!,
 			agendaTools: toolDefinitions[0]!.map(definitionOf),
 		};
 	} finally {
@@ -193,21 +195,32 @@ async function agencyCalls() {
 	}
 }
 
-/** The steward's curate-memory call of one exchange: what it sent as system text and as output schema. */
+/** The steward's curate-memory call for one explicit request: what it sent as system text and as output schema. */
 async function curateMemoryCall() {
 	const h: { steward: StewardService } & Awaited<
 		ReturnType<typeof setupSteward>
 	> = await setupSteward();
 	try {
 		h.inference.script("curate-memory", {
-			remember: [],
-			update: [],
-			stop: [],
-			notes: [],
-			resolve: [],
-			route: [],
+			resolve: [
+				{
+					request: "r1",
+					action: "none",
+					refs: [],
+					alsoIn: [],
+					text: null,
+					kind: null,
+					key: null,
+					negated: null,
+				},
+			],
 		});
-		await h.exchange("辛いものが好きです", "覚えておきます");
+		await h.run({
+			user: "辛いものが好きです。覚えておいて",
+			answer: "覚えておきます",
+			end: "completed",
+			requests: [{ kind: "remember", what: "辛いものが好き" }],
+		});
 		await h.drain();
 		const call = h.inference.callsOf("curate-memory")[0]!;
 		return {
@@ -277,7 +290,7 @@ async function measure() {
 
 	elements["agency.planSystem"] = textSize(planSystem());
 	elements["agency.composeSystem"] = textSize(composeSystem());
-	elements["agency.profileSystem"] = textSize(agency.profile);
+	elements["agency.recordsSystem"] = textSize(agency.records);
 	elements["agency.checkSystem"] = textSize(agency.check);
 	elements["agency.askCheckSystem"] = textSize(agency.askCheck);
 
@@ -293,6 +306,11 @@ async function measure() {
 	elements["steward.curateWorld.instructions"] = textSize(
 		stewardInstructions("curate-world"),
 	);
+	// The sleep layer asks the model with the package's own prompts and schemas (the steward adds nothing).
+	for (const name of Object.keys(PROMPTS) as Array<keyof typeof PROMPTS>) {
+		elements[`steward.sleep.${name}.instructions`] = textSize(PROMPTS[name]);
+		elements[`steward.sleep.${name}.schema`] = jsonSize(SCHEMAS[name]);
+	}
 	// The instructions are the start of what the call sent (a check that the text measured is the one sent).
 	expect(steward.sent.startsWith(stewardInstructions("curate-memory"))).toBe(
 		true,

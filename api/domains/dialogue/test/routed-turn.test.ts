@@ -160,7 +160,7 @@ test("a plain exchange can answer without calling its offered tools", async () =
 	])
 		expect(system).not.toContain(word);
 	expect(system).toContain("渡された読む道具で、記録");
-	expect(system).toContain("受付、実行中、完了を区別");
+	expect(system).toContain("反映済み、対象を決めている途中、拒否を区別");
 	expect(system).toContain("今実行を頼まれていることを見極めます");
 	expect(h.state.searchSlots).toEqual([]);
 	const last = talk.messages.at(-1)!.content;
@@ -267,7 +267,7 @@ test("the fill reads `## Memory` as the talk turn shows it", async () => {
 		.findLast((call) => call.session?.outputSchema)!
 		.messages.at(-1)!.content;
 	expect(input).toStartWith("## Memory\n");
-	expect(input).toContain(`- ${saved.text}`);
+	expect(input).toContain(`- m1 ${saved.text}`);
 	expect(input.indexOf("## Memory")).toBeLessThan(input.indexOf("## State"));
 });
 

@@ -12,7 +12,9 @@ import { createGoalsAssembly, GOALS_ACCESS } from "./world/goals-assembly";
 import { createStewardAssembly } from "./world/steward-assembly";
 import type { MemoryService } from "../domains/memory";
 import { createWorldView, type StewardService } from "../domains/steward";
+import { defaultConsolidationWindow, type Settings } from "../domains/settings";
 import { WORLD_CURATE_PURPOSE } from "../domains/world";
+import { agendaInterval } from "./agency/always-on-scope";
 
 type WorldInput = Parameters<typeof createWorldAssembly>[0];
 
@@ -74,8 +76,14 @@ export function assembleServerWorld(
  */
 export function assembleCuration(
 	config: Config,
-	deps: Parameters<typeof createStewardAssembly>[0] &
-		Omit<Parameters<typeof assembleServerWorld>[1], "steward">,
+	deps: Omit<
+		Parameters<typeof createStewardAssembly>[0],
+		"worldResourceId" | "restMs" | "sleep"
+	> &
+		Omit<Parameters<typeof assembleServerWorld>[1], "steward"> & {
+			/** The saved settings the steward reads at each use: World's resource, the user's interval, the time window. */
+			settings: { get(): Settings };
+		},
 ) {
 	const goals = createGoalsAssembly();
 	// World wakes the steward after its intake, and the steward curates World: the kick is bound late.
@@ -87,6 +95,15 @@ export function assembleCuration(
 	const stewardAssembly = createStewardAssembly({
 		...deps,
 		logFile: () => config.logFile,
+		worldResourceId: () => deps.settings.get().world.curationResourceId,
+		// The conversation rests once the user's own interval between the agent's utterances is past.
+		restMs: () =>
+			agendaInterval(deps.settings.get().agency.speechIntervalSec) * 1000,
+		sleep: {
+			window: () =>
+				deps.settings.get().memory?.consolidationWindow ??
+				defaultConsolidationWindow,
+		},
 		goals: { ops: goals.goals, access: GOALS_ACCESS },
 		...(world
 			? {

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { NativeToolCall } from "../../../infrastructure/chat-stream";
 import { readToolInputs, type ReadToolName } from "../../capabilities";
+import { stateKinds } from "../../memory/contracts";
+import { MEMORY_KINDS } from "./routed-choice";
 import { diagnosticRef } from "../contracts/diagnostics";
 import {
 	ValidationFailure,
@@ -31,15 +33,52 @@ export type ToolName = (typeof TOOL_NAMES)[keyof typeof TOOL_NAMES];
 const id = z.string().trim().min(1).max(160);
 const impacts = ["none", "create", "modify_existing", "irreversible"] as const;
 
+/** The words of a record as the model gives them (remember: kind and semanticKey too; correct: the text and polarity). */
+const calendarDay = z
+	.string()
+	.trim()
+	.regex(/^\d{4}(-\d{2}(-\d{2})?)?$/u);
+const memoryRecord = z
+	.object({
+		kind: z.enum(stateKinds).optional(),
+		semanticKey: z.string().trim().min(1).max(160).optional(),
+		subject: z.literal("self").optional(),
+		text: z.string().trim().min(1).max(500),
+		polarity: z.enum(["affirmed", "negated"]).optional(),
+		validFrom: calendarDay.optional(),
+		validUntil: calendarDay.optional(),
+	})
+	.strict();
+
 export const memoryArgs = z.discriminatedUnion("operation", [
 	z
 		.object({
 			operation: z.literal("request"),
-			kind: z.enum(["forget", "remember", "correct", "goal", "withdraw"]),
+			kind: z.enum(MEMORY_KINDS),
 			what: z.string().trim().min(1).max(500),
 			detail: z.string().trim().max(1000).optional(),
+			/** The short reference (`m<n>`) of the record a correction, forget, suppression or withdrawal names. */
+			ref: z
+				.string()
+				.trim()
+				.regex(/^m\d{1,6}$/u)
+				.optional(),
+			/** A part of the user's own words in this turn, copied as they are. */
+			quote: z.string().trim().min(1).max(500).optional(),
+			memory: memoryRecord.optional(),
 		})
-		.strict(),
+		.strict()
+		.superRefine((args, ctx) => {
+			const missing = (path: string[]) =>
+				ctx.addIssue({ code: "custom", path, message: "required" });
+			if (args.kind !== "remember" && args.kind !== "correct") return;
+			if (!args.quote) missing(["quote"]);
+			if (!args.memory) return missing(["memory"]);
+			if (args.kind === "remember") {
+				if (!args.memory.kind) missing(["memory", "kind"]);
+				if (!args.memory.semanticKey) missing(["memory", "semanticKey"]);
+			}
+		}),
 ]);
 export type MemoryArgs = z.infer<typeof memoryArgs>;
 

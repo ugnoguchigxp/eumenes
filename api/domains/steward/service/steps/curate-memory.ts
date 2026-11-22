@@ -1,8 +1,7 @@
 import { RECALL_MIN_SCORE } from "../../../memory";
-import { type StepId } from "../../contracts";
+import { type RequestKind, type StepId } from "../../contracts";
 import {
 	type InboxRow,
-	deleteEventFailures,
 	readInbox,
 	resolveInbox,
 	type UnitTargets,
@@ -13,7 +12,6 @@ import {
 	type LoadedEvent,
 	describeMemory,
 	eventView,
-	loadEvent,
 	loadMessage,
 	localDay,
 } from "../context";
@@ -42,14 +40,13 @@ import {
 
 // ---- prepare ----
 
+/** A request's source message, shown to the model as the context the request was made in. */
 type Entry = {
 	loaded: LoadedEvent;
-	target: boolean;
-	reference: boolean;
 	requestIds: string[];
 	bytes: number;
 };
-/** One shown item: an event by its `seq`, a request's source message by its id. */
+/** One shown item: a request's source message by its id. */
 const keyOf = (loaded: LoadedEvent) =>
 	loaded.messageId !== null ? `m:${loaded.messageId}` : `e:${loaded.seq}`;
 const orderOf = (a: Entry, b: Entry) =>
@@ -57,7 +54,7 @@ const orderOf = (a: Entry, b: Entry) =>
 	(a.loaded.seq ?? 0) - (b.loaded.seq ?? 0);
 
 function prepare(env: StepEnv, unit: { targets: UnitTargets }) {
-	const { db, deps, conversationId } = env;
+	const { db } = env;
 	const entries = new Map<string, Entry>();
 	const dropRequest: Array<{ id: string; code: string }> = [];
 	const requests: InboxRow[] = [];
@@ -84,71 +81,25 @@ function prepare(env: StepEnv, unit: { targets: UnitTargets }) {
 		else
 			entries.set(key, {
 				loaded: loaded.event,
-				target: false,
-				reference: true,
 				requestIds: [id],
 				bytes: loaded.event.bytes,
 			});
 	}
-	// An event the reflection can never read (forgotten, retracted, blocked) is handled: it is not offered again.
-	const skipped: number[] = [];
-	for (const seq of unit.targets.seqs ?? []) {
-		const event = deps.continuity.events.eventInTransaction(
-			db,
-			conversationId,
-			seq,
-		);
-		if (!event || event.curated) continue;
-		const loaded = loadEvent(env, event);
-		if (loaded.status !== "ok") {
-			skipped.push(seq);
-			continue;
-		}
-		const key = keyOf(loaded.event);
-		const existing = entries.get(key);
-		if (existing) {
-			existing.loaded = loaded.event;
-			existing.target = true;
-			existing.reference = false;
-		} else
-			entries.set(key, {
-				loaded: loaded.event,
-				target: true,
-				reference: false,
-				requestIds: [],
-				bytes: loaded.event.bytes,
-			});
-	}
-	return { entries, requests, dropRequest, skipped };
+	return { entries, requests, dropRequest };
 }
 
 function buildPrepared(env: StepEnv, unit: PreparedUnit["unit"]) {
-	const { db, deps, conversationId } = env;
+	const { db } = env;
 	const found = prepare(env, unit);
-	if (found.skipped.length > 0) {
-		deps.continuity.events.markCuratedInTransaction(
-			db,
-			conversationId,
-			found.skipped,
-		);
-		deleteEventFailures(db, conversationId, found.skipped);
-	}
-	const now = deps.clock();
+	const now = env.deps.clock();
 	for (const { id, code } of found.dropRequest)
 		resolveInbox(db, id, "none", code, now);
-	// Requests first (their source messages are the context they need), then the events this unit marks.
-	const ordered = [...found.entries.values()].sort((a, b) => {
-		const ra = a.requestIds.length > 0 ? 0 : 1;
-		const rb = b.requestIds.length > 0 ? 0 : 1;
-		return ra - rb || orderOf(a, b);
-	});
-	const { fit } = fitEvents(ordered);
+	const { fit } = fitEvents([...found.entries.values()].sort(orderOf));
 	const kept = fit.sort(orderOf);
 	const keptRequestIds = new Set(kept.flatMap((e) => e.requestIds));
 	const requestRows = found.requests.filter((r) => keptRequestIds.has(r.id));
-	const targetEntries = kept.filter((e) => e.target);
-	if (targetEntries.length === 0 && requestRows.length === 0) return null;
-	return { kept, requestRows, targetEntries };
+	if (requestRows.length === 0) return null;
+	return { kept, requestRows };
 }
 
 /**
@@ -158,7 +109,7 @@ function buildPrepared(env: StepEnv, unit: PreparedUnit["unit"]) {
 function describeShelves(
 	env: StepEnv,
 	requestRows: readonly InboxRow[],
-	kept: ReadonlyArray<{ loaded: LoadedEvent; target: boolean }>,
+	kept: ReadonlyArray<{ loaded: LoadedEvent }>,
 ): {
 	refs: CurateContext["refs"];
 	shown: CurateContext["shown"];
@@ -208,7 +159,7 @@ function describeShelves(
 function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 	const built = buildPrepared(env, unit);
 	if (!built) return { status: "stale" as const, reason: "nothing_to_do" };
-	const { kept, requestRows, targetEntries } = built;
+	const { kept, requestRows } = built;
 	const events: LabelTable = {};
 	const labelOf = new Map<string, string>();
 	const views = kept.map((entry, i) => {
@@ -219,7 +170,7 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 			messageId: entry.loaded.messageId,
 			by: entry.loaded.by,
 		};
-		return eventView(label, entry.loaded, !entry.target);
+		return eventView(label, entry.loaded, true);
 	});
 	const requests: CurateContext["requests"] = {};
 	const requestViews = requestRows.map((row, i) => {
@@ -229,7 +180,8 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 			id: row.id,
 			what: row.what,
 			detail: row.detail,
-			kind: row.kind,
+			// A request that names its target in words is the agency's: never one of these.
+			kind: row.kind as RequestKind,
 			messageId: row.sourceRef,
 			event,
 		};
@@ -245,26 +197,11 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 		includeInactive: requestRows.some((row) => row.kind === "forget"),
 	});
 	const shelves = describeShelves(env, requestRows, kept);
-	const digests: Record<string, string> = {};
-	const turns: CurateContext["turns"] = [];
-	const sources: CurateContext["sources"] = {};
-	for (const entry of targetEntries) {
-		const id = entry.loaded.messageId;
-		if (id === null) continue;
-		const state = env.deps.conversation.sourceInTransaction(env.db, id);
-		if (state.state === "available")
-			sources[id] = { revision: state.revision, digest: state.digest };
-		Object.assign(digests, entry.loaded.digests);
-		turns.push({ messageId: id, text: entry.loaded.text.text });
-	}
 	const shownMemory: CurateContext["shown"] = {};
 	for (const entry of memory.longTerm)
 		shownMemory[String(entry.ref)] = [String(entry.text)];
 	const context: CurateContext = {
 		events,
-		targetSeqs: targetEntries
-			.map((e) => e.loaded.seq)
-			.filter((seq): seq is number => seq !== null),
 		requests,
 		refs: { ...memory.refs, ...shelves.refs },
 		shown: { ...shownMemory, ...shelves.shown },
@@ -275,10 +212,6 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 				entry.loaded.text.text,
 			]),
 		),
-		sources,
-		digests,
-		turns,
-		noteTexts: memory.shortTerm.map((note) => String(note.text)),
 	};
 	return {
 		status: "ready" as const,
@@ -288,18 +221,14 @@ function prepareStep(env: StepEnv, unit: PreparedUnit["unit"]) {
 			requests: requestViews,
 			longTerm: memory.longTerm,
 			longTermCoverage: memory.coverage,
-			shortTerm: memory.shortTerm,
 			...shelves.data,
 		},
-		targets: {
-			seqs: context.targetSeqs,
-			requests: requestRows.map((r) => r.id),
-		},
+		targets: { requests: requestRows.map((r) => r.id) },
 		context,
 	};
 }
 
-// ---- execute: turn vectors beside the inference, and the search for what a forget request touches ----
+// ---- execute: the search for what a forget request touches ----
 
 async function findCandidates(
 	prepared: PreparedUnit,
@@ -372,28 +301,8 @@ async function findCandidates(
 }
 
 async function beforeInfer(prepared: PreparedUnit, ctx: ExecuteContext) {
-	const context = prepared.context as CurateContext;
-	const { store, conversation, memory } = ctx.deps;
-	const turns = store.read((db) =>
-		context.turns.flatMap(({ messageId }) => {
-			const source = conversation.sourceInTransaction(db, messageId);
-			if (
-				source.state !== "available" ||
-				source.digest !== context.digests[messageId] ||
-				memory.blockedMessageIdsInTransaction(db, [messageId]).size
-			)
-				return [];
-			const found = conversation.messageInTransaction(db, messageId);
-			return found ? [{ messageId, text: found.message.text }] : [];
-		}),
-	);
-	const turnVectors = ctx.deps.memory.vectors.embedTurns(turns, ctx.signal);
 	const { views, map, texts } = await findCandidates(prepared, ctx);
-	const extras: CurateExtras = {
-		turnVectors,
-		candidates: map,
-		candidateTexts: texts,
-	};
+	const extras: CurateExtras = { candidates: map, candidateTexts: texts };
 	return {
 		data: {
 			...(prepared.data as object),
@@ -413,10 +322,6 @@ export const curateMemory: StepDefinition = {
 	prepare: (env, unit) => prepareStep(env, unit),
 	parse: parseCurate,
 	beforeInfer,
-	afterInfer: async (_prepared, _output, extras) => ({
-		...(extras as CurateExtras),
-		turnVectors: await (extras as CurateExtras).turnVectors,
-	}),
 	apply: (env, prepared, output, extras) =>
 		applyCurate(env, prepared, output, extras),
 };

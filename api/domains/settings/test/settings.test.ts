@@ -21,7 +21,12 @@ import {
 } from "..";
 import { defaults } from "../service";
 import type { Settings } from "../contracts";
-import { applySchema, cloudEndpoint, settingsSchema } from "../contracts";
+import {
+	applySchema,
+	cloudEndpoint,
+	defaultConsolidationWindow,
+	settingsSchema,
+} from "../contracts";
 import { cleanup, cloud, setup } from "./settings.fixture";
 afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
@@ -243,6 +248,42 @@ test("world.enabled defaults to false (also for saved documents without it), per
 		settingsSchema.safeParse({ ...s, world: { enabled: true, extra: 1 } })
 			.success,
 	).toBe(false);
+});
+test("memory.consolidationWindow is absent until saved, defaults to 3:00-5:00 when its group is given, persists through apply and refuses a malformed time", async () => {
+	const h = await setup();
+	expect(h.settings.get().memory).toBeUndefined();
+	const s = h.settings.get();
+	expect(settingsSchema.parse({ ...s, memory: {} }).memory).toEqual({
+		consolidationWindow: defaultConsolidationWindow,
+	});
+	expect(defaultConsolidationWindow).toEqual({ start: "03:00", end: "05:00" });
+	// A window that runs past midnight is a window.
+	s.memory = { consolidationWindow: { start: "22:30", end: "02:00" } };
+	const saved = await h.settings.apply({
+		requestId: crypto.randomUUID(),
+		expectedRevision: s.revision,
+		settings: s,
+		keys: [],
+	});
+	expect(saved.memory).toEqual({
+		consolidationWindow: { start: "22:30", end: "02:00" },
+	});
+	const again = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(again.get().memory?.consolidationWindow).toEqual({
+		start: "22:30",
+		end: "02:00",
+	});
+	for (const consolidationWindow of [
+		{ start: "25:00", end: "05:00" },
+		{ start: "3:00", end: "05:00" },
+		{ start: "03:00", end: "05:60" },
+		{ start: "03:00", end: "05:00", extra: 1 },
+		{ start: "03:00" },
+	])
+		expect(
+			settingsSchema.safeParse({ ...s, memory: { consolidationWindow } })
+				.success,
+		).toBe(false);
 });
 test("the settings API saves world.enabled and returns it", async () => {
 	const h = await setup();

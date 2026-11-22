@@ -7,6 +7,7 @@ import type { GoalAccess, GoalsService } from "../../goals";
 import type { MemoryService } from "../../memory";
 import type { WorldCuration } from "../../world";
 import type { DecisionRefType } from "../repository";
+import type { SleepDeps } from "./sleep/ports";
 import type { WorldViewReader } from "./world-view";
 import type {
 	ChatMessage,
@@ -14,18 +15,22 @@ import type {
 	InferencePort,
 	QueuePort,
 	RunLookup,
-	StepId,
+	LlmStepId,
+	SleepStepId,
 	UnitSlot,
 } from "../contracts";
 import type { UnitRow, UnitTargets } from "../repository";
 
-/** What the steward uses of memory: the block ledger, the save contract, the forget, the vectors and the Window. */
+/** What the steward uses of memory: the block ledger, the save contract, the forget, the vectors, the Window and the library's access policy. */
 type StewardMemory = Pick<
 	MemoryService,
 	| "readyInTransaction"
+	| "policyRevisionInTransaction"
 	| "blockedMessageIdsInTransaction"
 	| "forgetSeqInTransaction"
 	| "applyCurationInTransaction"
+	| "writeTendencyInTransaction"
+	| "closeExclusionInTransaction"
 	| "stateItemsInTransaction"
 	| "forgetInTransaction"
 	| "registerForgetPurge"
@@ -100,7 +105,7 @@ export interface StewardDeps {
 	 * on a cloud route they send their own input.
 	 */
 	conversationOnLarm(db: Database): boolean;
-	/** A conversation run is generating an answer now (upkeep waits for it); read in the caller's transaction. */
+	/** A conversation run is generating an answer now (the steward's steps wait for it); read in the caller's transaction. */
 	foregroundActive(db: Database, conversationId: string): boolean;
 	/** How a run stands (startup sorts the requests of finished runs). */
 	runStateOf(runId: string): RunLookup;
@@ -115,6 +120,14 @@ export interface StewardDeps {
 	worldResourceId?(): string | null;
 	/** Absent: no goal reflection, no goal upkeep, no goal in a forget. */
 	goals?: StewardGoals;
+	/**
+	 * How long the user's last utterance must be past for a conversation to count as resting: the interval the user
+	 * chose between the agent's own utterances (`agency.speechIntervalSec`), in milliseconds. The sleep layer and the
+	 * World curation start only in a resting conversation.
+	 */
+	restMs(): number;
+	/** Absent: the sleep layer (shallow and deep consolidation) does not start; the closure delete of a forget still runs. */
+	sleep?: SleepDeps;
 	/** The operational log file the error report reads (`config.logFile`); absent or undefined reads no log. */
 	logFile?(): string | undefined;
 }
@@ -153,12 +166,10 @@ export interface ApplyResult {
 	results: unknown;
 	refs: Array<{ type: DecisionRefType; id: string }>;
 	notices: string[];
-	/** A reflecting step changed something: the upkeep revision moves on. */
+	/** A step changed something the Window carries. */
 	changed: boolean;
 	/** The profile should be published anew. */
 	requestRepublish?: boolean;
-	/** An upkeep step found nothing to change. */
-	quiet?: boolean;
 	/** A forget ran: the decision keeps no body. */
 	redact?: boolean;
 	/** The result cannot be adopted (a conflict the step found while applying). */
@@ -169,7 +180,7 @@ export interface ApplyResult {
 
 export interface PreparedUnit {
 	unit: UnitRow;
-	step: StepId;
+	step: LlmStepId;
 	data: unknown;
 	context: unknown;
 	targets: UnitTargets;
@@ -181,7 +192,7 @@ export type ExecuteContext = {
 };
 
 export interface StepDefinition {
-	id: StepId;
+	id: LlmStepId;
 	slot: UnitSlot;
 	/** Writes long-term memory: serialized across conversations. */
 	longTerm: boolean;
@@ -211,7 +222,9 @@ export interface StepDefinition {
 	): ApplyResult;
 }
 
-export interface StewardInput {
+/** A unit that asks the model once (the explicit requests, the World curation). */
+export interface LlmInput {
+	kind: "llm";
 	unitId: string;
 	jobId: string;
 	conversationId: string;
@@ -221,11 +234,68 @@ export interface StewardInput {
 	messages: ChatMessage[];
 	startedAt: number;
 }
-export interface StewardOutput {
+/** A sleep-layer unit: it makes its own calls and writes (the library adopts in its own transactions). */
+export interface SleepInput {
+	kind: "sleep";
+	unitId: string;
+	jobId: string;
+	conversationId: string;
+	step: SleepStepDefinition;
+	/** What the step's prepare fixed (the plans it was given, the turns it embeds). */
+	prepared: unknown;
+	/** The memory's forget counter when prepare fenced the unit: a write that finds it moved writes nothing. */
+	forgetSeq: number | null;
+	/** The unit's targets as prepare left them (what the run was made for, the positions a deep run covers). */
+	targets: UnitTargets;
+	/** The job's attempt and generation: the model requests it makes are named after them. */
+	attempt: number;
+	generation: number;
+	startedAt: number;
+}
+export type StewardInput = LlmInput | SleepInput;
+export type LlmOutput = {
+	kind: "llm";
 	receipt: ControlReceipt;
 	/** null: the answer was not usable output at all. */
 	output: unknown | null;
 	extras: unknown;
 	outputTokens: number | null;
 	durationMs: number;
+};
+export type SleepOutput = {
+	kind: "sleep";
+	/** What the step's run produced (its settle adopts what is still to be written in the unit's transaction). */
+	result: unknown;
+	durationMs: number;
+};
+export type StewardOutput = LlmOutput | SleepOutput;
+
+/** What a sleep step's settle did, for the decision record. */
+export interface SleepSettle {
+	/** One entry per kind of change: counts and codes, never text. */
+	results: unknown;
+	/** The unit failed or yielded without being the targets' fault (a code), or null when it was adopted. */
+	failed?: { code: string; count: boolean };
+	/** The unit stood on ground that changed (a forget): nothing is adopted. */
+	stale?: string;
+	refs: ApplyResult["refs"];
+}
+export interface SleepStepDefinition {
+	id: SleepStepId;
+	slot: Extract<UnitSlot, "maintenance">;
+	/** The queue's concurrency key: sleep units are serialized with the long-term writers, the closure delete is not. */
+	concurrencyKey: string;
+	/** A unit that does not wait for a conversation run (the closure delete of a forget). */
+	urgent: boolean;
+	prepare(
+		env: StepEnv,
+		unit: UnitRow,
+	):
+		| { status: "ready"; prepared: unknown; targets: UnitTargets }
+		| { status: "stale"; reason: string };
+	run(
+		input: SleepInput,
+		ctx: { signal: AbortSignal; deps: StewardDeps },
+	): Promise<unknown>;
+	settle(env: StepEnv, input: SleepInput, result: unknown): SleepSettle;
 }

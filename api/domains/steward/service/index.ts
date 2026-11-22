@@ -30,6 +30,17 @@ export function createStewardService(deps: StewardDeps) {
 		kickInTransaction: kick.kickInTransaction,
 		/** The conversation agent's memory tool (dialogue calls it directly): the request waits as `pending` from the moment the action is committed. */
 		requestInTransaction: inbox.requestInTransaction,
+		/**
+		 * A forget request whose targets were excluded at once waits for the closure delete (the redesign, section 9.2):
+		 * the steward removes it whether or not a conversation run is going.
+		 */
+		excludedInTransaction: inbox.excludedInTransaction,
+		targetRequestInTransaction: inbox.targetRequestInTransaction,
+		pendingTargetsInTransaction: inbox.pendingTargetsInTransaction,
+		hasPendingForgetInTransaction: inbox.hasPendingForgetInTransaction,
+		settleTargetInTransaction: inbox.settleTargetInTransaction,
+		takeUnresolvedTargetsInTransaction:
+			inbox.takeUnresolvedTargetsInTransaction,
 		/** A run ended: the steward looks again (its requests were queued when they were committed). */
 		runEndedInTransaction: inbox.runEndedInTransaction,
 		/** Newest first. */

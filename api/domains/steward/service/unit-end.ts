@@ -8,21 +8,15 @@ import {
 } from "../contracts";
 import {
 	type UnitRow,
-	bumpEventFailure,
-	bumpGoalTodoFailure,
 	bumpInboxFailure,
 	bumpWorldEvent,
 	closeUnit,
-	deleteEventFailures,
-	deleteGoalTodos,
 	deleteWorldEvents,
 	insertDecision,
 	insertDecisionRefs,
 	pruneDecisions,
 	pruneUnits,
-	readState,
 	resolveInbox,
-	writeState,
 } from "../repository";
 import type { Kick } from "./kick";
 import { REQUEST_FAILED_NOTICE, noticeInTransaction } from "./notices";
@@ -31,7 +25,7 @@ import { type Wake, retryDelay } from "./wake";
 
 const log = getLogger("steward");
 
-/** How a unit ends: released requests, failure counts, the decision record and the upkeep control. */
+/** How a unit ends: released requests, failure counts and the decision record. */
 export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 	const { store, inference } = deps;
 	const cancelled = new Set<string>();
@@ -87,20 +81,6 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 	function countFailures(env: StepEnv, unit: UnitRow) {
 		const { db } = env;
 		const now = deps.clock();
-		const { conversationId } = unit;
-		// An event that failed three times is given up: it is marked handled, and later events are not held back.
-		if (unit.step === "curate-memory")
-			for (const seq of unit.targets.seqs ?? [])
-				if (bumpEventFailure(db, conversationId, seq) >= MAX_FAILURES) {
-					deps.continuity.events.markCuratedInTransaction(db, conversationId, [
-						seq,
-					]);
-					deleteEventFailures(db, conversationId, [seq]);
-				}
-		if (unit.step === "curate-goals")
-			for (const seq of unit.targets.seqs ?? [])
-				if (bumpGoalTodoFailure(db, conversationId, seq) >= MAX_FAILURES)
-					deleteGoalTodos(db, conversationId, [seq]);
 		const world = deps.world;
 		if (unit.kind === "world_events" && world) {
 			// An event that failed three times is given up (`STEWARD_GAVE_UP`); later events are not held back by it.
@@ -113,7 +93,10 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 			}
 		}
 		let given = 0;
-		for (const id of unit.targets.requests ?? [])
+		// A forget whose targets are excluded is never given up: its closure is tried again until it is done.
+		for (const id of unit.kind === "forget"
+			? []
+			: (unit.targets.requests ?? []))
 			if (bumpInboxFailure(db, id) >= MAX_FAILURES) {
 				resolveInbox(db, id, "none", "steward_failed", now);
 				given++;
@@ -186,42 +169,12 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 		kick.kickOne(db, unit.conversationId);
 	}
 
-	/** An upkeep step with nothing to look at stays quiet until the revision moves. */
-	function markQuiet(db: Database, unit: UnitRow) {
-		const state = readState(db, unit.conversationId);
-		const revision = unit.targets.revision ?? state.maintenanceRevision;
-		writeState(db, {
-			...state,
-			quiet: {
-				...state.quiet,
-				quiet: { ...state.quiet.quiet, [unit.step]: revision },
-			},
-		});
-	}
-
-	/** The upkeep control after an adopted step. */
-	function settleState(env: StepEnv, unit: UnitRow, applied: ApplyResult) {
-		const { db } = env;
-		const state = readState(db, unit.conversationId);
-		if (applied.changed) state.maintenanceRevision += 1;
-		if (unit.slot === "maintenance" && applied.quiet) {
-			const revision = unit.targets.revision ?? state.maintenanceRevision;
-			state.quiet = {
-				...state.quiet,
-				quiet: { ...state.quiet.quiet, [unit.step]: revision },
-			};
-		}
-		writeState(db, state);
-	}
-
 	return {
 		release,
 		releaseWorld,
 		record,
 		failUnit,
 		staleUnit,
-		markQuiet,
-		settleState,
 	};
 }
 export type UnitEnd = ReturnType<typeof createUnitEnd>;

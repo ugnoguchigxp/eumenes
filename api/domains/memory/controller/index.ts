@@ -13,9 +13,7 @@ export function registerMemory(app: Hono, service: MemoryService) {
 			onError: (c) => c.json({ error: "payload_too_large" }, 413),
 		}),
 	);
-	app.get("/api/memory/maintenance", (c) =>
-		c.json(service.maintenance.list(c.req.query("conversationId") ?? "main")),
-	);
+	app.get("/api/memory/maintenance", (c) => c.json(service.maintenance.list()));
 	for (const action of ["preview", "apply"] as const)
 		app.post(`/api/memory/maintenance/${action}`, async (c) => {
 			const parsed = await parseJsonBody(c, memoryMaintenanceInput, {

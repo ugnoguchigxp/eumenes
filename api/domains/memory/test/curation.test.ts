@@ -145,11 +145,10 @@ test("a blocked message is never evidence, even for an explicit request", async 
 	const results = await h.curate([
 		remember(id),
 		remember(id, { explicit: true, key: "k2" }),
-		{ op: "note_add", kind: "memo", text: "メモ", messageIds: [id] },
 	]);
 	expect(
 		results.map((r) => (r.status === "rejected" ? r.reason : "applied")),
-	).toEqual(["blocked_source", "blocked_source", "blocked_source"]);
+	).toEqual(["blocked_source", "blocked_source"]);
 });
 
 test("the same key replaces the active item (no ACTIVE_EXISTS); the same value is not written again", async () => {
@@ -516,84 +515,6 @@ test("merge drops blocked and tombstoned evidence and is rejected when none is l
 	});
 	expect(itemOf(h, latte.id).status).toBe("active");
 	expect(itemOf(h, tea.id).status).toBe("active");
-});
-
-test("notes: add, update and close in the conversation; the source must be a usable message", async () => {
-	const h = await setup();
-	const id = await h.say("user", "予算は3万円以内です");
-	const added = only(
-		await h.curate([
-			{
-				op: "note_add",
-				kind: "decision",
-				text: "予算は3万円以内",
-				messageIds: [id],
-			},
-		]),
-	);
-	if (added.status !== "applied") throw new Error("rejected");
-	expect(h.continuity.list("c1")[0]).toMatchObject({
-		id: added.id,
-		origin: "agent",
-		sourceMessageIds: [id],
-	});
-	const updated = only(
-		await h.curate([
-			{
-				op: "note_update",
-				noteId: added.id!,
-				revision: added.revision!,
-				text: "予算は2万円以内",
-			},
-		]),
-	);
-	if (updated.status !== "applied") throw new Error("rejected");
-	expect(
-		only(
-			await h.curate([
-				{ op: "note_update", noteId: added.id!, revision: 1, text: "x" },
-			]),
-		),
-	).toMatchObject({ status: "rejected", reason: "item_changed" });
-	expect(
-		only(
-			await h.curate([
-				{
-					op: "note_close",
-					noteId: added.id!,
-					revision: updated.revision!,
-					status: "resolved",
-				},
-			]),
-		),
-	).toMatchObject({ status: "applied" });
-	expect(h.continuity.list("c1", true)[0]?.status).toBe("resolved");
-	expect(
-		only(
-			await h.curate([
-				{ op: "note_close", noteId: "ghost", revision: 1, status: "resolved" },
-			]),
-		),
-	).toMatchObject({ status: "rejected", reason: "unknown_item" });
-	// Another conversation's message, and a note over the limit.
-	const foreign = await h.say("user", "別の話", "c2");
-	expect(
-		only(
-			await h.curate([
-				{ op: "note_add", kind: "memo", text: "x", messageIds: [foreign] },
-			]),
-		),
-	).toMatchObject({ status: "rejected", reason: "invalid_source" });
-	let limited = 0;
-	for (let i = 0; i < 40; i++) {
-		const r = only(
-			await h.curate([
-				{ op: "note_add", kind: "memo", text: `m${i}`, messageIds: [id] },
-			]),
-		);
-		if (r.status === "rejected" && r.reason === "limit_reached") limited++;
-	}
-	expect(limited).toBeGreaterThan(0);
 });
 
 test("tendencies: add, update and retire with live evidence of two distinct items", async () => {

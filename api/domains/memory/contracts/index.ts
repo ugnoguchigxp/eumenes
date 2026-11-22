@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { ContinuityKind } from "../../continuity/contracts";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../conversation/contracts";
 import type { VectorSpaceShape } from "../../../infrastructure/vector";
 /** The owner principal; defined once in conversation (the lower domain). */
@@ -181,27 +180,6 @@ export type CurationItem =
 			key?: string | null;
 			text: string;
 			negated?: boolean;
-	  }
-	| {
-			op: "note_add";
-			kind: ContinuityKind;
-			text: string;
-			/** The messages the note comes from (at least one, all of the conversation, none blocked). */
-			messageIds: string[];
-	  }
-	| {
-			op: "note_update";
-			noteId: string;
-			revision: number;
-			text: string;
-			/** Messages added to the note's sources (the union; none are removed). */
-			messageIds?: string[];
-	  }
-	| {
-			op: "note_close";
-			noteId: string;
-			revision: number;
-			status: "resolved" | "retracted";
 	  }
 	| {
 			op: "tendency_add";

@@ -177,6 +177,76 @@ export interface StewardPort {
 		db: Database,
 		input: StewardRequest,
 	): { id: string; replay: boolean };
+	/**
+	 * A pending forget whose targets the memory excluded at once (the immediate stage): the request waits as
+	 * "excluded" and the steward runs the closure delete. False when the request is not a pending forget.
+	 */
+	excludedInTransaction(
+		db: Database,
+		input: {
+			id: string;
+			conversationId: string;
+			/** What the closure delete removes: the ids the immediate stage excluded. */
+			exclusion: StewardExclusion;
+		},
+	): boolean;
+	/**
+	 * Keeps a correction, forget or suppression that names no short reference until the agency settles it (it
+	 * survives a restart). A forget's `id` is the id of its inbox request.
+	 */
+	targetRequestInTransaction(
+		db: Database,
+		input: { id: string; request: MemoryTargetRequest },
+	): void;
+	/** A forget of the conversation is not yet settled (no target decided, or none excluded yet). */
+	hasPendingForgetInTransaction(db: Database, conversationId: string): boolean;
+	/**
+	 * The requests of the conversation the agency could not settle, each once: the next generation tells the user
+	 * nothing was changed. What it returns it does not return again.
+	 */
+	takeUnresolvedTargetsInTransaction(
+		db: Database,
+		conversationId: string,
+	): ReadonlyArray<{ id: string; what: string }>;
+}
+/** The shape of the steward's `ForgetExclusion`. */
+export type StewardExclusion = {
+	itemIds: string[];
+	messageIds: string[];
+	claimIds: string[];
+	entityIds: string[];
+	goalIds: string[];
+};
+
+/**
+ * A correction, forget or suppression that names no short reference (the user described the target in words): the
+ * agency resolves the target after the run ends (the redesign, section 5.2) and applies it through the memory's
+ * immediate operations. The conversation agent is told "resolving" at once.
+ */
+export type MemoryTargetRequest = {
+	conversationId: string;
+	/** The run that asked: the change the agency makes carries it as its `sourceRunId`. */
+	runId: string;
+	kind: "correct" | "forget" | "suppress";
+	/** What the model wrote of the target, and the correct text of a correction. */
+	what: string;
+	detail?: string;
+	/** The user's messages of the run (the request stands on them), newest last. */
+	messageIds: readonly string[];
+	/** The quote and record of a correction, as the model gave them. */
+	quote?: string;
+	memory?: {
+		text: string;
+		polarity?: "affirmed" | "negated";
+		validFrom?: string;
+		validUntil?: string;
+	};
+	/** The action's key: the steward request's id for a forget (the same key twice is one request). */
+	requestId: string;
+};
+export interface MemoryTargetPort {
+	/** Records the request in the caller's transaction; the agency resolves it once the run ends. */
+	requestInTransaction(db: Database, input: MemoryTargetRequest): void;
 }
 
 /**
@@ -239,6 +309,25 @@ export interface AgencyLayerPort {
 		db: Database,
 		conversationId: string,
 	): readonly string[];
+	/**
+	 * The goals in the agenda's slots, in slot order (`## State` shows them). A goal resting on a forgotten, excluded
+	 * or suppressed source is not returned. `state` is the short Japanese word the user would use ("進行中").
+	 */
+	goalSlotsInTransaction?(
+		db: Database,
+	): ReadonlyArray<{ slot: number; text: string; state: string }>;
+	/**
+	 * A forget of a record named by its short reference excluded these records and messages (the immediate stage), in
+	 * the transaction of the run that asked: what the agent holds of them (items, plans, notes, goals) is taken out now.
+	 */
+	memoryExcludedInTransaction?(
+		db: Database,
+		input: {
+			conversationId: string;
+			itemIds: readonly string[];
+			messageIds: readonly string[];
+		},
+	): void;
 	/** A TODO of the conversation finished or asks the user something: the agent's opportunity to say so. */
 	workChangedInTransaction(db: Database, conversationId: string): void;
 	/**
@@ -374,19 +463,6 @@ export const errorStatus = {
 	interaction_capacity: 429,
 	toolchain_unavailable: 503,
 } as const satisfies Record<string, HttpErrorStatus>;
-export {
-	isAgendaSnapshot,
-	agendaSources,
-	agendaTicketInput,
-	forgetAgenda,
-	forgetProfile,
-	PROFILE_PASSES_KEPT,
-	type AgendaProfile,
-	baseRef,
-	type AgendaHostSnapshot,
-	type AgendaNote,
-	type AgendaResearchTicket,
-} from "./agency-always-on";
 
 export * from "./debug-diagnostics";
 export { contextCaptureSchema, runContextSchema } from "./context-input";

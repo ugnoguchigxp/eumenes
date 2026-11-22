@@ -2,6 +2,20 @@ import type { Database } from "bun:sqlite";
 import type { MemoryService, PreparedWindow, SettleResult } from "../../memory";
 import type { Run } from "../contracts";
 
+/**
+ * What a run keeps of the memory it read (fixed at prepare, checked at adoption): the window's versions, the messages
+ * already blocked, and the key of the short references the prompt shows.
+ */
+export type PreparedMemory = {
+	window: PreparedWindow;
+	/** A quiet window adds nothing to the prompt: it is not validated. */
+	quiet?: true;
+	/** The shown messages already blocked at prepare time; one blocked later expires the generation. */
+	blockedAtPrepare?: string[];
+	/** The window the prompt's short references (`m1`...) were handed out in. */
+	refsKey: string;
+};
+
 /** True when a message the prompt showed was blocked after prepare (forgotten while the answer was generated). */
 export function shownMessageForgotten(
 	memory: MemoryService,
@@ -25,11 +39,7 @@ export function adoptMemoryWindow(
 	memory: MemoryService,
 	tx: Database,
 	run: Run,
-	prepared: {
-		window: PreparedWindow;
-		quiet?: true;
-		blockedAtPrepare?: string[];
-	},
+	prepared: PreparedMemory,
 ): SettleResult {
 	const verdict = validateMemoryWindow(memory, tx, run.id, prepared);
 	if (verdict.ok && !prepared.quiet)
@@ -47,14 +57,11 @@ export function validateMemoryWindow(
 	memory: MemoryService,
 	tx: Database,
 	runId: string,
-	prepared: {
-		window: PreparedWindow;
-		quiet?: true;
-		blockedAtPrepare?: string[];
-	},
+	prepared: PreparedMemory,
 ): SettleResult {
 	if (shownMessageForgotten(memory, tx, prepared))
 		return { ok: false, reason: "memory_stale" };
 	if (prepared.quiet) return { ok: true };
+	// The memory's own check leaves out the changes this run made through its `memory` calls (they carry its id).
 	return memory.validateWindowInTransaction(tx, runId, prepared.window);
 }

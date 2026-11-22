@@ -535,6 +535,10 @@ export async function setup(options: Options = {}) {
 			state.runEnds.push(input);
 		},
 		requestInTransaction: () => ({ id: "request", replay: false }),
+		excludedInTransaction: () => false,
+		targetRequestInTransaction: () => undefined,
+		hasPendingForgetInTransaction: () => false,
+		takeUnresolvedTargetsInTransaction: () => [],
 	};
 	const queue = createQueue(store);
 	const dialogue = createDialogueService({

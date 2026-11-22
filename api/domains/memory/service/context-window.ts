@@ -30,6 +30,8 @@ export type ImmediateKind =
 	| "state_correct"
 	| "state_retract"
 	| "state_forget"
+	| "state_exclude"
+	| "state_suppress"
 	| "settings"
 	| "tendency_delete";
 
@@ -84,6 +86,8 @@ function latestStateChange(db: Database, policyRevision: string): number {
 		},
 		scopeKey: PROFILE_SCOPE,
 		includeInactive: true,
+		// The counter moves with every item, also an excluded one: it must never step back.
+		includeExcluded: true,
 	});
 	if (states.status !== "ok") throw new Error("memory_blocked");
 	return states.items.reduce((seq, item) => Math.max(seq, item.updatedSeq), 0);
@@ -104,7 +108,12 @@ function partialDay(date: PartialDateLike): string {
 }
 
 /** The current, valid State of the profile and the tendencies as items, and the next time validity changes. */
-function currentItems(db: Database, policyRevision: string, nowMs: number) {
+function currentItems(
+	db: Database,
+	policyRevision: string,
+	nowMs: number,
+	suppressed: "mark" | "omit" = "mark",
+) {
 	const listed = listAllState(db, {
 		contractVersion: CONTRACT_VERSION,
 		access: {
@@ -114,6 +123,7 @@ function currentItems(db: Database, policyRevision: string, nowMs: number) {
 			policyRevision,
 		},
 		scopeKey: PROFILE_SCOPE,
+		suppressed,
 	});
 	if (listed.status !== "ok") throw new Error("memory_blocked");
 	let nextBoundaryMs: number | null = null;
@@ -152,6 +162,7 @@ function currentItems(db: Database, policyRevision: string, nowMs: number) {
 					: lastTokyoDay(item.validUntilMs);
 			return {
 				id: item.itemId,
+				...(item.suppressed ? { suppressed: true as const } : {}),
 				kind: item.kind,
 				text: item.value.text.replace(/\s+/g, " ").trim(),
 				negated: item.value.polarity === "negated",
@@ -243,6 +254,30 @@ export function createContextWindowStore(deps: {
 	id: () => string;
 }) {
 	const { clock, id } = deps;
+	/** The tendencies a forget in flight holds back (set by the service once the sources are known). */
+	let withheldTendencies: ((db: Database) => ReadonlySet<string>) | undefined;
+	/** The current profile items; a tendency standing on an excluded item, candidate or message is left out. */
+	const itemsNow = (
+		db: Database,
+		policyRevision: string,
+		nowMs: number,
+		suppressed: "mark" | "omit" = "mark",
+	) => {
+		const found = currentItems(db, policyRevision, nowMs, suppressed);
+		const hidden = withheldTendencies?.(db);
+		return !hidden || hidden.size === 0
+			? found
+			: {
+					...found,
+					items: found.items.filter(
+						(item) =>
+							!(
+								item.kind === "tendency" &&
+								hidden.has(item.id.slice("tendency:".length))
+							),
+					),
+				};
+	};
 	/** A performance copy only: correctness is the (version, buildId) match against the database row. */
 	const cache = new Map<string, WindowSnapshot>();
 
@@ -309,10 +344,12 @@ export function createContextWindowStore(deps: {
 		const previous = current(db, conversationId);
 		const republish = opts.republish || !previous;
 		const inputs = readInputs(db);
-		const { items, nextBoundaryMs } = currentItems(
+		// The `## Memory` material: a suppressed item is not brought up.
+		const { items, nextBoundaryMs } = itemsNow(
 			db,
 			inputs.policyRevision,
 			Date.parse(clock()),
+			"omit",
 		);
 		let shown: ProfileItem[];
 		if (republish) {
@@ -377,6 +414,13 @@ export function createContextWindowStore(deps: {
 	}
 
 	return {
+		/**
+		 * Which tendencies a forget in flight holds back from what the conversation reads (the exclusion is only
+		 * known to the service). A held-back tendency is left out of the profile, `read_memory` and the additions.
+		 */
+		setWithheldTendencies(next: (db: Database) => ReadonlySet<string>) {
+			withheldTendencies = next;
+		},
 		/** The window last stored for the conversation, as it was built; never rebuilds (a read connection may call it). */
 		storedInTransaction: current,
 		/**
@@ -440,7 +484,7 @@ export function createContextWindowStore(deps: {
 			db: Database,
 			input: ReadItemsInput,
 		): Array<Record<string, unknown>> {
-			const { items } = currentItems(
+			const { items } = itemsNow(
 				db,
 				String(readSettings(db).revision),
 				Date.parse(clock()),
@@ -454,6 +498,7 @@ export function createContextWindowStore(deps: {
 				.map((item) => ({
 					...profileItemFields(item),
 					revision: item.revision,
+					...(item.suppressed ? { suppressed: true } : {}),
 					...(input.shown.has(item.id) ? { inProfile: true } : {}),
 				}));
 		},
@@ -466,7 +511,7 @@ export function createContextWindowStore(deps: {
 			db: Database,
 			input: CheckItemsInput,
 		): CheckedItems {
-			const { items } = currentItems(
+			const { items } = itemsNow(
 				db,
 				String(readSettings(db).revision),
 				Date.parse(clock()),
@@ -484,6 +529,8 @@ export function createContextWindowStore(deps: {
 					.slice(0, input.limit)
 					.map((item) => ({
 						...profileItemFields(item),
+						revision: item.revision,
+						...(item.suppressed ? { suppressed: true } : {}),
 						...(input.shown?.has(item.id) ? { inProfile: true } : {}),
 					})),
 			};

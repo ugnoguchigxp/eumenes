@@ -11,14 +11,17 @@ import { collectAgendaResults, runAgendaStep } from "./always-on-cycle";
 import { prepareNoteDisplay } from "./always-on-flow";
 import { createAgendaHearing } from "./always-on-heard";
 import { createAgendaPorts } from "./always-on-ports";
+import { createTargetQueue } from "./always-on-target";
 import {
 	type AgendaHostState,
 	armAgendaScope,
+	waitForIdle,
 	attendAgendaScope,
 	closeAgendaHost,
 	createAgendaPumpScheduler,
 	createAgendaScopeStore,
 	disposeAgendaScope,
+	inspectScope,
 	drainConversationOutbox,
 	invalidateAgendaScope,
 	recoverAgendaRecords,
@@ -26,11 +29,7 @@ import {
 	startAgendaHost,
 	syncAgendaBusy,
 } from "./always-on-runtime";
-import {
-	type AgendaScope,
-	agendaEnvelope,
-	agendaReady,
-} from "./always-on-scope";
+import { type AgendaScope, agendaReady } from "./always-on-scope";
 import { agendaSettingsKey } from "./always-on-settings";
 import { createGoalAgenda } from "./goal-agenda";
 import type { AgencyHostDeps } from "./host-types";
@@ -109,13 +108,15 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		void p.finally(() => inflight.delete(p)).catch(() => {});
 		return p;
 	};
-	const { make, conv } = createAgendaScopeStore({
+	const { make, conv, records } = createAgendaScopeStore({
 		deps,
 		convs,
 		persisted,
 		recovering,
 		now,
 		track,
+		changed: () => schedule(),
+		saveScope: (db, c) => saveScopeInTransaction(db, c),
 		kick: (scope) => {
 			void kickScope(scope);
 		},
@@ -142,20 +143,8 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		hearing,
 		idle,
 	});
-	function idle(c: AgendaScope) {
-		// The user's words (or a forget) make the held line stale: the wait ends, and the retry drops it.
-		const generation = c.generation;
-		return new Promise<boolean>((resolve) => {
-			const look = () => {
-				const gone = state.closed || convs.get(c.id) !== c || !on();
-				if (!gone && c.generation === generation && busy(c)) return;
-				idleWaiters.delete(look);
-				resolve(!gone);
-			};
-			idleWaiters.add(look);
-			look();
-		});
-	}
+	const idle = (c: AgendaScope) =>
+		waitForIdle({ state, convs, on, busy, idleWaiters }, c);
 	const arm = (c: AgendaScope) =>
 		armAgendaScope(
 			{
@@ -182,7 +171,24 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 				}),
 		);
 	}
-	const syncBusy = () =>
+	/** The scope of a conversation the agenda serves now (made when it has none). */
+	const serving = (id: string) => {
+		if (!on()) return undefined;
+		try {
+			return conv(id);
+		} catch {
+			return undefined;
+		}
+	};
+	const targets = createTargetQueue({
+		deps,
+		scope: serving,
+		now,
+		forget: (c, refs) => forgetRefs(c, refs),
+		track,
+	});
+	const syncBusy = () => {
+		targets.drain();
 		syncAgendaBusy({
 			state,
 			convs,
@@ -193,25 +199,35 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			busy,
 			arm,
 			schedule,
+			records,
+			foreground: () => deps.inference.foregroundBusy(),
 		});
+	};
 	const dispose = (c: AgendaScope) =>
 		disposeAgendaScope(hearing, clearTimer, c);
 	const invalidate = (c: AgendaScope) =>
 		invalidateAgendaScope(state, idleWaiters, c);
-	const { save, saveInTransaction, refresh, forgetInTransaction, forgetRefs } =
-		createAgendaCheckpoints({
-			deps,
-			convs,
-			now,
-			hostDigest,
-			invalidate,
-			persisted,
-			feed: () => ({ cursor: state.cursor, activeId: state.activeId }),
-			saved(rows, value) {
-				for (const row of rows) persisted.set(row.id, row.revision);
-				state.savedCursor = value;
-			},
-		});
+	const {
+		save,
+		saveInTransaction,
+		saveScopeInTransaction,
+		refresh,
+		forgetInTransaction,
+		forgetRefs,
+		excludeRefs,
+	} = createAgendaCheckpoints({
+		deps,
+		convs,
+		now,
+		hostDigest,
+		invalidate,
+		persisted,
+		feed: () => ({ cursor: state.cursor, activeId: state.activeId }),
+		saved(rows, value) {
+			for (const row of rows) persisted.set(row.id, row.revision);
+			state.savedCursor = value;
+		},
+	});
 	/** The outbox up to its head, into the agents. Synchronous: the cursor and the agents move together. */
 	const feedEvents = () =>
 		drainConversationOutbox({
@@ -227,6 +243,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			schedule,
 			setTimer,
 			clearTimer,
+			records,
 		});
 	const collect = () =>
 		collectAgendaResults({
@@ -262,14 +279,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		convs,
 		prepareDisplay,
 		goalAgenda,
-		serving: (id) => {
-			if (!on()) return null;
-			try {
-				return conv(id);
-			} catch {
-				return null;
-			}
-		},
+		serving: (id) => serving(id) ?? null,
 		active: () => state.activeId,
 		display: () => state.display,
 		now,
@@ -278,6 +288,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		},
 		heard: (c) => hearing.flush(c, now()),
 		changed: schedule,
+		exclude: excludeRefs,
 	});
 	return {
 		recover: () => recoverAgendaRecords(deps, goalAgenda, hostDigest),
@@ -309,6 +320,8 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 			}),
 		dialoguePort,
 		conversationAgent,
+		/** The resolution of a target named in words (see `always-on-target.ts`); the dialogue domain's port calls it. */
+		memoryTargets: targets.port,
 		forgetInTransaction,
 		planForgetInTransaction: (
 			db: Database,
@@ -322,19 +335,9 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 				report,
 			),
 		status,
-		/** What the agent of the conversation thought lately (display only). */
 		thoughts: (id: string): AgencyThought[] => [
 			...(convs.get(id)?.thoughts ?? []),
 		],
-		inspect: (id: string) => {
-			const c = convs.get(id);
-			return c
-				? {
-						snapshot: agendaEnvelope(c, now()),
-						generation: c.generation,
-						idle: status(id).idle,
-					}
-				: null;
-		},
+		inspect: (id: string) => inspectScope(convs.get(id), now, status),
 	};
 }

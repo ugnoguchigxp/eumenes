@@ -3,11 +3,11 @@ import type { AgencyHostDeps } from "./host-types";
 import {
 	agendaSources,
 	baseRef,
-	forgetProfile,
 	type AgendaNote,
 	type AgendaResearchTicket,
 } from "../../domains/dialogue";
 import { staleInputSources, staleMemoryRefs } from "./input";
+import { currentRef, reviewRefs } from "./always-on-recall";
 import {
 	agendaEnvelope,
 	agendaRecord,
@@ -52,8 +52,7 @@ export function createAgendaCheckpoints(input: {
 		);
 		const lostRefs = new Set(lost.map((n) => `note:${n.id}`));
 		c.agent.forget([...set, ...aliases, ...lostRefs]);
-		// The note goes back to before the words it read; a writer pass in flight is not kept.
-		c.profile = forgetProfile(c.profile, set) ?? c.profile;
+		// A records pass in flight is not kept (it read the words as they were).
 		c.forgetSeq++;
 		// Thoughts carry no refs: any forget takes them all off the screen.
 		if (c.thoughts.length) {
@@ -106,7 +105,19 @@ export function createAgendaCheckpoints(input: {
 	}
 
 	async function refresh(c: AgendaScope) {
+		let renames = new Map<string, string>();
 		const stale = deps.store.read((db) => {
+			// What the agent cites of a version a consolidation replaced is the version that took its place.
+			renames = new Map(
+				c.agent
+					.view()
+					.items.flatMap((i) => i.refs)
+					.filter((ref) => ref.startsWith("memory:"))
+					.flatMap((ref) => {
+						const now = currentRef(deps, db, ref);
+						return now === ref ? [] : [[ref, now] as const];
+					}),
+			);
 			// Replies can see live items whose status excludes them from the checkpoint.
 			const sources = [
 				...new Set([
@@ -114,11 +125,21 @@ export function createAgendaCheckpoints(input: {
 					...c.agent.view().items.flatMap((item) => item.refs),
 				]),
 			];
+			// What rests on a corrected record is held under review (marks), not forgotten with it.
+			const review = reviewRefs(deps, db);
 			return [
 				...staleInputSources(deps, db, sources),
-				...staleMemoryRefs(deps, db, sources),
+				...staleMemoryRefs(deps, db, sources).filter((ref) => !review.has(ref)),
 			];
 		});
+		// Saved with the new references: a restart brings the items back resting on the current version.
+		if (
+			renames.size !== c.renames.size ||
+			[...renames].some(([from, to]) => c.renames.get(from) !== to)
+		) {
+			c.renames = renames;
+			c.revision++;
+		}
 		if (!stale.length) return;
 		invalidate(c);
 		forgetRefs(c, stale);
@@ -200,5 +221,34 @@ export function createAgendaCheckpoints(input: {
 		deps.state?.forgetInTransaction(db, purge);
 	}
 
-	return { save, saveInTransaction, refresh, forgetInTransaction, forgetRefs };
+	/** Saves one scope's checkpoint in the caller's transaction (the records writer's position goes with its writes). */
+	function saveScopeInTransaction(db: Database, c: AgendaScope) {
+		persist(db, agendaRecord(c, hostDigest, now()));
+	}
+
+	/**
+	 * The memory excluded these records (a forget on its way): what the agent holds on them, its words, its notes and
+	 * its tickets go at once, as the closure delete will make them go for good. Only a scope that cites them is touched.
+	 */
+	function excludeRefs(c: AgendaScope, refs: readonly string[]) {
+		const set = new Set(refs);
+		const cited = new Set([
+			...agendaSources(agendaEnvelope(c, now())),
+			...c.agent.view().said.map((s) => baseRef(s.id)),
+			...c.agent.view().items.flatMap((i) => i.refs.map(baseRef)),
+		]);
+		if (![...set].some((ref) => cited.has(ref))) return;
+		invalidate(c);
+		forgetRefs(c, set);
+	}
+
+	return {
+		save,
+		saveInTransaction,
+		saveScopeInTransaction,
+		refresh,
+		forgetInTransaction,
+		forgetRefs,
+		excludeRefs,
+	};
 }

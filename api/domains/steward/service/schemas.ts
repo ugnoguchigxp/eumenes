@@ -30,8 +30,6 @@ function obj(properties: Record<string, Schema>): Schema {
 const list = (items: Schema): Schema => ({ type: "array", items });
 
 const stateKinds = ["preference", "personal_fact", "constraint", "habit"];
-// `activity` is not written any more: the conversation itself is in the log.
-const noteKinds = ["goal", "decision", "open_question", "memo"];
 
 /**
  * The answer of curate-memory. `resolve.request` is one of the request labels this unit gave (`r1`...): the model can
@@ -40,42 +38,6 @@ const noteKinds = ["goal", "decision", "open_question", "memo"];
  */
 export const curateSchema = (requestLabels: readonly string[]) =>
 	obj({
-		remember: list(
-			obj({
-				kind: enumOf(stateKinds),
-				key: str,
-				text: str,
-				evidence: str,
-				quote: nullableStr,
-				validFrom: nullableStr,
-				validUntil: nullableStr,
-				negated: bool,
-			}),
-		),
-		update: list(
-			obj({
-				ref: str,
-				text: str,
-				evidence: str,
-				quote: nullableStr,
-				negated: bool,
-			}),
-		),
-		stop: list(
-			obj({
-				ref: str,
-				why: enumOf(["contradicted", "outdated", "wrong", "user_asked"]),
-			}),
-		),
-		notes: list(
-			obj({
-				op: enumOf(["add", "update", "close"]),
-				ref: nullableStr,
-				kind: nullableEnum(noteKinds),
-				text: nullableStr,
-				status: nullableEnum(["resolved", "retracted"]),
-			}),
-		),
 		resolve: list(
 			obj({
 				request: enumOf(requestLabels.length > 0 ? requestLabels : [""]),
@@ -95,27 +57,7 @@ export const curateSchema = (requestLabels: readonly string[]) =>
 				negated: { type: ["boolean", "null"] },
 			}),
 		),
-		route: list(obj({ event: str, world: bool, goals: bool })),
 	});
-
-export const consolidateSchema = obj({
-	merge: list(
-		obj({ refs: strings, key: nullableStr, text: str, negated: bool }),
-	),
-	stop: list(
-		obj({ ref: str, why: enumOf(["outdated", "duplicate", "wrong"]) }),
-	),
-	tendencies: list(
-		obj({
-			op: enumOf(["add", "update", "retire"]),
-			ref: nullableStr,
-			text: nullableStr,
-			evidenceRefs: strings,
-		}),
-	),
-	republishLongTerm: bool,
-	changed: bool,
-});
 
 const priorities = ["high", "normal", "low"];
 const worldValue = obj({
@@ -161,11 +103,4 @@ export const curateGoalsSchema = obj({
 			request: nullableStr,
 		}),
 	),
-});
-
-export const consolidateGoalsSchema = obj({
-	withdraw: list(
-		obj({ ref: str, why: enumOf(["duplicate", "stale", "low_relevance"]) }),
-	),
-	changed: bool,
 });

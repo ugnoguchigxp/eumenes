@@ -28,6 +28,20 @@ import {
 	type BlockJournalEntry,
 } from "./journal";
 import type { createLedger } from "./ledger";
+/**
+ * The State items the journal forgot. An exclusion or its release (format 3, `exclusionOp`) names items too but forgets
+ * nothing: such an entry has no `hostIntent`, and its items are neither "already forgotten" nor purged.
+ */
+function forgottenItemIds(entries: readonly ForgetJournalEntry[]): string[] {
+	return entries
+		.filter((entry) => entry.exclusionOp === undefined)
+		.flatMap((entry) =>
+			entry.targets
+				.filter((target) => target.type === "state_item")
+				.map((target) => target.id),
+		);
+}
+
 /** A recovery step that must roll the recovery transaction back; `reason` is what `recover` reports. */
 class RecoveryStepFailed extends Error {
 	constructor(
@@ -136,7 +150,9 @@ export function createMemoryRecovery(deps: {
 					clock: { atMs: atMs() },
 				});
 				if (result.status !== "ok") return fail(result.reasonCode);
-				// Re-applied forgets removed values the published layer may still hold.
+				// Re-applied forgets removed values the published layer may still hold. `reapplied` and `feedResyncRequired`
+				// also count re-applied exclusions (an excluded item must leave the published layer and the feed readers
+				// resync too), which is the safe side; only entries with a `hostIntent` purge memory's derived data.
 				let republish = result.reapplied > 0;
 				// Section 6.2 step 4 again for the entries the reconciliation re-applied (a rolled-back commit, a crash,
 				// a restored older database): their purge of memory's own data went with the database, so it runs again.
@@ -157,13 +173,7 @@ export function createMemoryRecovery(deps: {
 				let completedIntents = 0;
 				let imported = 0;
 				try {
-					const journaled = new Set(
-						entries.flatMap((entry) =>
-							entry.targets
-								.filter((target) => target.type === "state_item")
-								.map((target) => target.id),
-						),
-					);
+					const journaled = new Set(forgottenItemIds(entries));
 					const stillThere = (ids: readonly string[]) =>
 						ids.filter(
 							(id) => !journaled.has(id) && forgetter.factOf(db, id) !== null,
@@ -240,11 +250,7 @@ export function createMemoryRecovery(deps: {
 				if (completedIntents > 0 || imported > 0) republish = true;
 				// Receipts of every journaled forget are purged here too: a forget that was only re-applied
 				// (rolled-back commit, crash, restored old database) never ran the purge in its own transaction.
-				const forgottenIds = entries.flatMap((entry) =>
-					entry.targets
-						.filter((target) => target.type === "state_item")
-						.map((target) => target.id),
-				);
+				const forgottenIds = forgottenItemIds(entries);
 				purgeUsageFor(db, forgottenIds);
 				// The same holds for tendencies derived from a re-applied forget's items.
 				if (deleteTendenciesByEvidence(db, "state", forgottenIds) > 0)

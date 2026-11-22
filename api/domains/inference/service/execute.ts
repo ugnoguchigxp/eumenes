@@ -11,6 +11,7 @@ import type {
 	SpeechPreparation,
 } from "../../delivery/contracts";
 import {
+	StaleAnswerInput,
 	type CallSession,
 	type ControlContract,
 	type Receipt,
@@ -530,6 +531,20 @@ export async function executeRequest(
 			error instanceof Error &&
 			error.message === "chat_output_empty";
 		if (
+			resolvedSession?.retainRequest &&
+			signal.reason instanceof StaleAnswerInput &&
+			!controller.signal.aborted &&
+			Date.now() < deadline
+		) {
+			// Keep the captured authority for the host's retry. No earlier tool-step receipt may be adopted.
+			await env.store.write((db) =>
+				db
+					.query(
+						"UPDATE inference_attempts SET status='revoked',reason='memory_stale' WHERE request_id=? AND status='succeeded' AND accepted=0",
+					)
+					.run(row.id),
+			);
+		} else if (
 			(session?.failureScope !== "call" &&
 				!resolvedSession?.retainRequest &&
 				!empty) ||

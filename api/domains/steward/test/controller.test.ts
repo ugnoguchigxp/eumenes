@@ -15,13 +15,24 @@ test("the decisions are read over HTTP", async () => {
 	registerSteward(app, h.steward);
 	app.onError((error, c) => c.json({ error: error.message }, 400));
 	h.inference.script("curate-memory", {
-		remember: [],
-		update: [],
-		stop: [],
-		notes: [],
-		resolve: [],
+		resolve: [
+			{
+				request: "r1",
+				action: "none",
+				refs: [],
+				alsoIn: [],
+				text: null,
+				kind: null,
+				key: null,
+				negated: null,
+			},
+		],
 	});
-	await h.run({ user: "やあ", end: "completed" });
+	await h.run({
+		user: "やあ",
+		end: "completed",
+		requests: [{ kind: "remember", what: "やあ" }],
+	});
 	await h.drain();
 
 	const decisions = await app.request(

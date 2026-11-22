@@ -17,7 +17,8 @@ import { sha256Hex } from "../../../infrastructure/digest";
 import type { ConversationCut, Utterance } from "../../conversation";
 import { imageReferenceText } from "../../conversation";
 import { keepOrder, type ProfileItem, type WindowSnapshot } from "../../memory";
-import { latestConversationId } from "../repository";
+import { latestConversationId, readMemoryRefs } from "../repository";
+import { assignWindowRefs, excludedOnlyIn } from "./memory-refs";
 import type { ChatMessage, DialogueDeps } from "./context";
 import { conversationHasImages, systemText } from "./context-system";
 import { conversationHasActiveRun } from "./active-run";
@@ -79,17 +80,30 @@ export const systemDigestOf = (system: string) => sha256Hex(system);
 export const memoryDigestOf = (window: WindowSnapshot | null) =>
 	sha256Hex(memoryLines(window?.profile.items ?? []).lines.join("\n"));
 
-/** The leanings of the published profile within `MEMORY_TOKENS`, in its published order, and their ids. */
-export function memoryLines(items: readonly ProfileItem[]): {
+/** What a reference is measured as while the lines are fitted: wide enough for any number the memory hands out. */
+const REF_WIDTH = "m00000";
+
+/**
+ * The leanings of the published profile within `MEMORY_TOKENS` (the short references count in it), in its published
+ * order, and the items they are. `refs` are the references the memory handed out for them (item id -> `m<n>`): a
+ * line carries its own, none without. The fit measures every line with a reference of full width, so the same
+ * items are kept whatever numbers they were given (the cut's digest and the text drawn agree).
+ */
+export function memoryLines(
+	items: readonly ProfileItem[],
+	refs?: ReadonlyMap<string, string>,
+): {
 	lines: string[];
 	ids: string[];
+	shown: ProfileItem[];
 } {
 	// The user's own words only: an inference or an observation read as a fact steers the reply (C4).
 	const leanings = items.filter(
 		(item) => MEMORY_KINDS.has(item.kind) && item.source === "user_said",
 	);
-	const line = (item: ProfileItem) =>
+	const lineOf = (item: ProfileItem, ref: string | undefined) =>
 		memoryItemLine({
+			...(ref ? { ref } : {}),
 			text: item.text,
 			negated: item.negated,
 			source: item.source,
@@ -101,14 +115,20 @@ export function memoryLines(items: readonly ProfileItem[]): {
 	const text = () =>
 		[
 			INPUT_HEADINGS.memory,
-			...leanings.filter((i) => kept.has(i.id)).map(line),
+			...leanings
+				.filter((i) => kept.has(i.id))
+				.map((i) => lineOf(i, REF_WIDTH)),
 		].join("\n");
 	for (const item of keepOrder(leanings)) {
 		kept.add(item.id);
 		if (estimateTextTokens(text()) > MEMORY_TOKENS) kept.delete(item.id);
 	}
 	const shown = leanings.filter((item) => kept.has(item.id));
-	return { lines: shown.map(line), ids: shown.map((item) => item.id) };
+	return {
+		lines: shown.map((item) => lineOf(item, refs?.get(item.id))),
+		ids: shown.map((item) => item.id),
+		shown,
+	};
 }
 
 /** The recent utterances in the configured window, excluding pending user input. */
@@ -389,6 +409,8 @@ export type ConversationPrefix = {
 	since: number | null;
 	/** The memory items `## Memory` shows. */
 	memoryItemIds: string[];
+	/** The window the short references of `## Memory` belong to; null when memory gave no window. */
+	refsKey: string | null;
 	/** `## Memory` as this prefix shows it, when it shows any item (a routed turn's choice reads the same). */
 	memory: string | null;
 	/** Compacted `## Summary` section shown below `## Memory`, if an active valid summary exists. */
@@ -402,7 +424,8 @@ export type ConversationPrefix = {
 /**
  * The conversation's prefix as it stands (sections 3, 5 and 6): the same function draws it for a generation and for
  * the background calls on the conversation, so their prefix is byte for byte the next generation's while nothing
- * changes in between. It only reads: the cut is placed by `placeCutInTransaction`.
+ * changes in between. It reads (the cut is placed by `placeCutInTransaction`), except for the short references a
+ * generation hands out (`assignRefs`).
  */
 export function conversationPrefixFrom(
 	deps: DialogueDeps,
@@ -415,6 +438,8 @@ export function conversationPrefixFrom(
 		pending: ReadonlySet<string>;
 		requireProvenance?: boolean;
 		traceInput?: boolean;
+		/** The caller is a generation's prepare (a writer): the short references of `## Memory` are handed out now. */
+		assignRefs?: boolean;
 	},
 ): ConversationPrefix {
 	const store = deps.conversation.input;
@@ -428,19 +453,29 @@ export function conversationPrefixFrom(
 		input.requireProvenance ??
 		deps.memory?.referenceInputs.afterForgettingInTransaction(tx) ??
 		false;
-	const after = store
-		.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
-		.filter(
-			(u) =>
-				!(copies && u.speaker === "agent" && copies(u.text)) &&
-				inheritedHistorySources(
-					deps,
-					tx,
-					conversationId,
-					u,
-					requireProvenance,
-				) !== null,
-		);
+	const utterances = store.utterancesAfterInTransaction(
+		tx,
+		conversationId,
+		cut?.seq ?? 0,
+	);
+	// What an immediate forget holds back from the memory leaves the recent conversation before its closure delete.
+	const withheld = excludedOnlyIn(
+		deps,
+		tx,
+		utterances.flatMap((u) => (u.messageId ? [u.messageId] : [])),
+	);
+	const after = utterances.filter(
+		(u) =>
+			!(u.messageId && withheld.has(u.messageId)) &&
+			!(copies && u.speaker === "agent" && copies(u.text)) &&
+			inheritedHistorySources(
+				deps,
+				tx,
+				conversationId,
+				u,
+				requireProvenance,
+			) !== null,
+	);
 	const serves =
 		deps.agency?.servesRepliesInTransaction?.(tx, conversationId) ?? false;
 	const recent = recentUtterances(after, input.pending, history.users);
@@ -452,7 +487,18 @@ export function conversationPrefixFrom(
 		}) ?? { sources: [`memory:${item.id}`], complete: false };
 		return deps.agency.isCurrentInputInTransaction(tx, source, conversationId);
 	});
-	const { lines, ids } = memoryLines(profile);
+	const fitted = memoryLines(profile);
+	// The memory numbers the references on and never reuses them: a generation hands them out for what it shows (and
+	// saves them), every other drawing of the same text reads them back.
+	let refs: ReadonlyMap<string, string> | undefined;
+	let refsKey: string | null = null;
+	if (deps.memory && input.window) {
+		refsKey = deps.memory.shortRefs.windowKeyOf(fitted.shown);
+		refs = input.assignRefs
+			? assignWindowRefs(deps.memory, tx, conversationId, refsKey, fitted.shown)
+			: (readMemoryRefs(tx, conversationId, refsKey) ?? undefined);
+	}
+	const { lines, ids } = memoryLines(profile, refs);
 	// Always there before a recent conversation, so the conversation never opens with the agent's message.
 	const memory = section(
 		INPUT_HEADINGS.memory,
@@ -565,6 +611,7 @@ export function conversationPrefixFrom(
 				? Date.parse(cut.at)
 				: null,
 		memoryItemIds: ids,
+		refsKey,
 		memory: lines.length ? memory : null,
 		summary: summarySection,
 		summarySourceRefs: validSummary ? validSummary.sourceRefs : [],

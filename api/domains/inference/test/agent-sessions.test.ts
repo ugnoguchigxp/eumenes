@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	StaleAnswerInput,
 	controlMigration,
 	createInference,
 	diagnosticsMigration,
@@ -445,4 +446,28 @@ test("the sweeper reclaims an expired task row that was written back after the r
 	);
 	await Bun.sleep(60);
 	expect(rows()).toBe(1);
+});
+
+test("stale host input discards earlier receipts but permits a fresh answer on the original request", async () => {
+	const abort = new AbortController();
+	let calls = 0;
+	const h = await setup(async () => {
+		if (++calls === 2) {
+			abort.abort(new StaleAnswerInput());
+			throw abort.signal.reason;
+		}
+		return { text: "answer" };
+	});
+	const id = await h.request();
+	const session = { sessionRole: "main", retainRequest: true } as const;
+	const old = await stream(h, id, abort.signal, session);
+	await expect(stream(h, id, abort.signal, session)).rejects.toThrow();
+	await h.store.write((db) => {
+		expect(h.inference.validateReceiptInTransaction(db, old)).toBe(false);
+		h.inference.setContextPolicyInTransaction(db, id, "exact");
+	});
+	const fresh = await stream(h, id, new AbortController().signal, session);
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction(db, fresh)),
+	).toBe(true);
 });

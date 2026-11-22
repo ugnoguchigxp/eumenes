@@ -23,6 +23,7 @@ export const MEMORY_KINDS = [
 	"correct",
 	"goal",
 	"withdraw",
+	"suppress",
 ] as const;
 
 type Schema = Record<string, unknown>;

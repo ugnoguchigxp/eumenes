@@ -363,77 +363,86 @@ test("one forget call takes at most five explicit items", async () => {
 	).toBe(0);
 });
 
-test("notes: several sources, a refused blocked or foreign source, sources added by an update, any source forgotten deletes the note", async () => {
+test("plans and ledger entries: any source forgotten deletes them, a memory item as source too, and the tendencies built on a plan go", async () => {
 	const h = await setup();
 	const e1 = await exchange(h, "予算は3万円です", "了解");
 	const e2 = await exchange(h, "納期は来月です", "了解");
 	const e3 = await exchange(h, "場所は東京です", "了解");
-	const foreign = await h.say("user", "別の話", "c2");
-	const [empty] = await h.curate([
-		{ op: "note_add", kind: "memo", text: "x", messageIds: [] },
-	]);
-	expect(empty).toMatchObject({ status: "rejected", reason: "invalid_source" });
-	const [other] = await h.curate([
-		{
-			op: "note_add",
-			kind: "memo",
-			text: "x",
-			messageIds: [e1.inputMessageId, foreign],
-		},
-	]);
-	expect(other).toMatchObject({ status: "rejected", reason: "invalid_source" });
-	const [added] = await h.curate([
-		{
-			op: "note_add",
-			kind: "decision",
-			text: "予算3万円、納期来月",
-			messageIds: [e1.inputMessageId, e2.inputMessageId],
-		},
-	]);
-	if (added?.status !== "applied") throw new Error("rejected");
-	expect(h.continuity.list("c1")[0]?.sourceMessageIds).toEqual([
-		e1.inputMessageId,
-		e2.inputMessageId,
-	]);
-	// Block e3 (a scheduled prompt), then try to use it as a source.
+	const kept = await exchange(h, "人数は5人です", "了解");
+	const item = await h.seed("コーヒーが好き", "drink.coffee");
+	const other = await h.seed("毎朝走る", "run", "毎朝走る", "habit");
+	const several = await h.plan("c1", {
+		kind: "decision",
+		text: "予算3万円、納期来月",
+		messageIds: [e1.inputMessageId, e2.inputMessageId],
+	});
+	const onItem = await h.plan("c1", {
+		kind: "intent",
+		text: "豆を買う",
+		messageIds: [kept.inputMessageId],
+	});
 	await h.store.write((db) =>
-		h.memory.blockMessagesInTransaction(db, {
-			conversationId: "c1",
-			messageIds: [e3.inputMessageId],
-			reason: "scheduled_prompt",
+		h.continuity.plans.updateInTransaction(db, onItem.id, {
+			text: "豆を買う",
+			evidence: { messages: [], memoryItemIds: [item.id] },
 		}),
 	);
-	const [blocked] = await h.curate([
-		{
-			op: "note_update",
-			noteId: added.id as string,
-			revision: added.revision as number,
-			text: "場所も",
-			messageIds: [e3.inputMessageId],
-		},
-	]);
-	expect(blocked).toMatchObject({
-		status: "rejected",
-		reason: "blocked_source",
+	const stays = await h.plan("c1", {
+		kind: "plan",
+		text: "人数の確認",
+		messageIds: [kept.inputMessageId],
 	});
-	// The union: a source already present is kept once.
-	const e4 = await exchange(h, "人数は5人です", "了解");
-	const [updated] = await h.curate([
+	const asked = await h.store.write((db) =>
+		h.continuity.questions.recordInTransaction(db, {
+			conversationId: "c1",
+			attribute: "開催場所",
+			state: "answered",
+			evidence: { messages: [{ messageId: e3.inputMessageId }] },
+		}),
+	);
+	const [tendency] = await h.curate([
 		{
-			op: "note_update",
-			noteId: added.id as string,
-			revision: added.revision as number,
-			text: "予算3万円、納期来月、5人",
-			messageIds: [e2.inputMessageId, e4.inputMessageId],
+			op: "tendency_add",
+			text: "予算の話をする",
+			evidence: [
+				{ namespace: "continuity", id: several.id },
+				{ namespace: "state", id: other.id },
+			],
 		},
 	]);
-	expect(updated?.status).toBe("applied");
-	expect(h.continuity.list("c1")[0]?.sourceMessageIds).toEqual([
-		e1.inputMessageId,
-		e2.inputMessageId,
-		e4.inputMessageId,
-	]);
-	// Forgetting any one of the sources deletes the note.
-	await h.forget([], [e4.inputMessageId]);
-	expect(h.continuity.list("c1", true)).toEqual([]);
+	expect(tendency?.status).toBe("applied");
+	const read = () =>
+		h.store.read((db) => ({
+			plans: h.continuity.plans
+				.listInTransaction(db, { conversationId: "c1" })
+				.map((plan) => plan.id),
+			questions: h.continuity.questions
+				.listInTransaction(db, { states: ["answered"] })
+				.map((entry) => entry.id),
+		}));
+	expect(new Set(read().plans)).toEqual(
+		new Set([several.id, onItem.id, stays.id]),
+	);
+	// Forgetting any one of a plan's sources deletes it; the tendency built on it goes too.
+	await h.forget([], [e2.inputMessageId]);
+	expect(new Set(read().plans)).toEqual(new Set([onItem.id, stays.id]));
+	expect(h.memory.tendencies()).toEqual([]);
+	// A memory item as a source: forgetting the item deletes the plan; the ledger entry goes with its message.
+	await h.forget([item.id]);
+	expect(read().plans).toEqual([stays.id]);
+	expect(read().questions).toEqual([asked.id]);
+	await h.forget([], [e3.inputMessageId]);
+	expect(read().questions).toEqual([]);
+	expect(
+		h.store.read(
+			(db) =>
+				(
+					db
+						.query(
+							"SELECT COUNT(*) AS n FROM continuity_evidence WHERE source_id IN (?, ?)",
+						)
+						.get(e2.inputMessageId, e3.inputMessageId) as { n: number }
+				).n,
+		),
+	).toBe(0);
 });

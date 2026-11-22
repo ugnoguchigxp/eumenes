@@ -272,7 +272,7 @@ test("items page, search and sort; memory content cannot be changed by hand", as
 	).toContainEqual([coffee.id, "inactive"]);
 });
 
-test("tendencies, short-term notes and the context are read", async () => {
+test("tendencies, plans and the context are read", async () => {
 	const h = await setup();
 	const a = await h.remember("コーヒーが好き", "drink.coffee");
 	const b = await h.remember("毎朝走る", "habit.run");
@@ -295,23 +295,24 @@ test("tendencies, short-term notes and the context are read", async () => {
 	expect(tendencies).toMatchObject([{ text: "朝型", revision: 1 }]);
 
 	const noteSource = await h.say("旅行に行きたい。");
-	const [added] = await h.store.write((db) =>
-		h.memory.applyCurationInTransaction(db, {
+	const added = await h.store.write((db) =>
+		h.continuity.plans.addInTransaction(db, {
 			conversationId: "main",
-			items: [
-				{
-					op: "note_add",
-					kind: "goal",
-					text: "旅行の計画",
-					messageIds: [noteSource],
-				},
-			],
+			kind: "plan",
+			text: "旅行の計画",
+			dueAt: "2026-12-01",
+			evidence: { messages: [{ messageId: noteSource }] },
 		}),
 	);
-	if (added?.status !== "applied") throw new Error("note_rejected");
 	const notes = read(h, "query:memory.short-term@1").items;
 	expect(notes).toMatchObject([
-		{ id: added.id, revision: 1, kindLabel: "目的", text: "旅行の計画" },
+		{
+			id: added.id,
+			revision: 1,
+			kindLabel: "予定",
+			text: "旅行の計画",
+			expiresAt: "2026-12-01",
+		},
 	]);
 
 	// No window has been built yet; once a run reads it, the screen shows that build.
@@ -330,7 +331,7 @@ test("tendencies, short-term notes and the context are read", async () => {
 	const built = read(h, "query:memory.context@1").items[0];
 	expect(built).toMatchObject({ version: 1, newMemories: 0 });
 	expect(built.state).toContain("組み立て済み");
-	// The published profile is shown (bounded) with its size; the short-term notes are not part of it.
+	// The published profile is shown (bounded) with its size; the plans are not part of it.
 	expect(built.profileText).toBe(
 		window!.profile.items.length === 0
 			? "（空）"
@@ -405,14 +406,14 @@ test("the steward timeline shows decisions with their proposal, result and windo
 	expect(seen).toEqual([["main", 50]]);
 	expect(rows.map((r: { id: string }) => r.id)).toEqual(["2", "1", "0"]);
 	expect(rows[0]).toMatchObject({
-		stepLabel: "記憶の判断",
+		stepLabel: "記憶の依頼",
 		proposal: "remember 2件 / notes 1件",
 		result: "適用 2件 / 却下 1件（blocked_source）",
 		windowDiff: "版 3 → 4",
 		cost: "1.5秒 / 120 tokens",
 	});
 	expect(rows[1]).toMatchObject({
-		stepLabel: "目標の反映",
+		stepLabel: "目標の依頼",
 		proposal: "goals 1件",
 		windowDiff: "版 1",
 	});

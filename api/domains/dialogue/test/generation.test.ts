@@ -245,22 +245,22 @@ test("a change needs a confirmation first; the approval executes the saved reque
 	).not.toBeNull();
 });
 
-test("a memory request goes to the steward with the user's message as its source", async () => {
+test("a goal request goes to the steward with the user's message as its source", async () => {
 	h = await setup();
 	h.state.steps.push(
 		choice({
 			choice: "memory.request",
-			kind: "remember",
-			what: "辛い物が好き",
+			kind: "goal",
+			what: "毎朝ストレッチを続ける",
 			say: "覚えておきます。",
 		}),
 	);
-	const run = await h.say("辛い物が好きって覚えて");
+	const run = await h.say("毎朝ストレッチを続けたい");
 	expect(h.dialogue.answerText(run.id)).toBe("覚えておきます。");
 	expect(h.state.stewardRequests).toEqual([
 		expect.objectContaining({
-			kind: "remember",
-			what: "辛い物が好き",
+			kind: "goal",
+			what: "毎朝ストレッチを続ける",
 			sourceRef: run.inputMessageId,
 		}),
 	]);

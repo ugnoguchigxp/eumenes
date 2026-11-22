@@ -6,6 +6,8 @@ import { imageReferenceText } from "../../domains/conversation";
 import type { AgendaHearing } from "./always-on-heard";
 import { noteRef, type AgendaScope } from "./always-on-scope";
 import { recoverAgendaScope } from "./always-on-recovery";
+import { keepPosition } from "./always-on-position";
+import { withheldIds } from "./always-on-recall";
 import type { AgencyHostDeps } from "./host-types";
 
 /** Words of the host's own (its speech, the notes it showed) are not exchanges to learn from. */
@@ -25,7 +27,7 @@ export function wordsOf(
 	if (
 		source.state !== "available" ||
 		source.message.presentation === "artifact" ||
-		deps.memory.isBlockedInTransaction?.(db, messageId)
+		withheldIds(deps, db, [messageId]).size > 0
 	)
 		return null;
 	const m = source.message;
@@ -36,7 +38,7 @@ export function wordsOf(
 		return null;
 	const images = deps.conversation
 		.imageReferencesInTransaction(db, m.id)
-		.filter((ref) => !deps.memory.isBlockedInTransaction?.(db, ref.messageId));
+		.filter((ref) => withheldIds(deps, db, [ref.messageId]).size === 0);
 	const text = [m.text, imageReferenceText(images)].filter(Boolean).join("\n");
 	return text.trim() ? { message: m, text } : null;
 }
@@ -55,7 +57,7 @@ export function feedAgenda(input: {
 	forget(c: AgendaScope, refs: readonly string[]): void;
 	/** Shows notes the adopted reply `runId` showed (after the read). */
 	show(c: AgendaScope, noteIds: readonly string[], runId: string): void;
-	/** A reply is in the conversation: the exchange is complete (the profile writer reads it, behind the talk). */
+	/** A reply is in the conversation: the exchange is complete (the records writer reads it, behind the talk). */
 	exchanged(c: AgendaScope): void;
 }) {
 	const { deps, c, event, at, hearing } = input;
@@ -152,6 +154,8 @@ export async function pumpAgendaHost(input: FeedHost) {
 			deps.store.read((db) => deps.state!.epochInTransaction(db, c.id)) !==
 			c.epoch
 		) {
+			// A new epoch is a new record; where reading the conversation stopped is carried over.
+			keepPosition(deps, c.id, c.recordsSeq);
 			input.invalidate(c);
 			input.dispose(c);
 			convs.delete(c.id);

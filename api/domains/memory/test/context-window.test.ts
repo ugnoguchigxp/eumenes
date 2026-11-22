@@ -5,14 +5,9 @@ import { join } from "node:path";
 import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
-import type { ContinuityKind } from "../../continuity";
 import { createContinuityFixture as createContinuityService } from "../../../application/world/state-services.fixture";
 import { createMemoryService } from "..";
 import { memoryTestMigrations, saveItem } from "./memory.fixture";
-import {
-	REFERENCE_WINDOW_TOKENS,
-	planWindow,
-} from "../../../infrastructure/context-budget";
 
 const cleanups: Array<() => Promise<void> | void> = [];
 afterEach(async () => {
@@ -20,7 +15,7 @@ afterEach(async () => {
 	for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 
-async function setup(stateBudget?: number) {
+async function setup() {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-window-"));
 	const store: SqliteStore = openStore(
 		join(dir, "db.sqlite3"),
@@ -39,20 +34,6 @@ async function setup(stateBudget?: number) {
 		journalPath: join(dir, "journal.jsonl"),
 		clock,
 		id: () => `id-${++counter}`,
-		...(stateBudget
-			? {
-					windowPlan: () => {
-						const plan = planWindow({
-							window: REFERENCE_WINDOW_TOKENS,
-							fixed: 0,
-						});
-						return {
-							...plan,
-							sections: { ...plan.sections, state: stateBudget },
-						};
-					},
-				}
-			: {}),
 	});
 	expect((await memory.recover()).healthy).toBe(true);
 	await conversation.append({
@@ -63,7 +44,7 @@ async function setup(stateBudget?: number) {
 		createdAt: "2026-10-01T00:00:00Z",
 		runId: null,
 	});
-	// The notes come from a message of their own, so forgetting what the items stand on leaves them.
+	// A message of its own: forgetting what the other items stand on leaves it.
 	await conversation.append({
 		id: "m-note",
 		conversationId: "c1",
@@ -100,27 +81,6 @@ async function setup(stateBudget?: number) {
 		memory.forget({ conversationId: "c1", itemIds: [id], messageIds: [] });
 	const save = (input: Parameters<typeof saveItem>[2]) =>
 		saveItem(store, memory, input);
-	/** A short-term note through the steward's save contract; a refusal throws its reason. */
-	const note = async (input: { kind: ContinuityKind; text: string }) => {
-		const [result] = await store.write((db) =>
-			memory.applyCurationInTransaction(db, {
-				conversationId: "c1",
-				items: [{ op: "note_add", ...input, messageIds: ["m-note"] }],
-			}),
-		);
-		if (result?.status !== "applied")
-			throw new Error(result?.status === "rejected" ? result.reason : "failed");
-		return { id: must(result.id), revision: must(result.revision) };
-	};
-	const closeNote = async (id: string, revision: number) => {
-		const [result] = await store.write((db) =>
-			memory.applyCurationInTransaction(db, {
-				conversationId: "c1",
-				items: [{ op: "note_close", noteId: id, revision, status: "resolved" }],
-			}),
-		);
-		return result?.status === "applied";
-	};
 	const read = (conversationId = "c1") =>
 		store.write((db) => memory.windowForRunInTransaction(db, conversationId));
 	return {
@@ -134,8 +94,6 @@ async function setup(stateBudget?: number) {
 		stop,
 		forget,
 		save,
-		note,
-		closeNote,
 		read,
 	};
 }
@@ -470,9 +428,26 @@ test("the read tool's memory read takes every current item without a query, matc
 			kind: "preference",
 			text: "コーヒーが好き",
 			source: "user_said",
+			revision: coffee.revision,
 			inProfile: true,
 		},
 	]);
+	// A suppressed item is still read (the caller says it is not to be brought up), and the mark is shown.
+	await h.store.write((db) =>
+		h.memory.suppressInTransaction(db, {
+			conversationId: "c1",
+			sourceRunId: "run-s",
+			target: { itemId: coffee.id },
+		}),
+	);
+	expect(check("コーヒー").items).toEqual([
+		expect.objectContaining({
+			id: coffee.id,
+			revision: coffee.revision,
+			suppressed: true,
+		}),
+	]);
+	expect(check("毎朝走って").items[0]).not.toHaveProperty("suppressed");
 	await h.memory.setEnabled(false);
 	expect(h.memory.check({ limit: 10 })).toBeNull();
 });
@@ -587,27 +562,6 @@ test("usage receipts: adoption records the window it read", async () => {
 		viewSchema: 3,
 	});
 	expect(receipt?.itemIds).toEqual(window.profile.items.map((item) => item.id));
-});
-
-test("the continuity guard limits the short-term notes to the state section of the window plan", async () => {
-	// A state section of 4k tokens; each note is about 500 tokens.
-	const h = await setup(4000);
-	let count = 0;
-	let error: unknown;
-	try {
-		for (; count < 30; count++)
-			await h.note({
-				kind: "goal",
-				text: `${count}`.padStart(3, "0") + "う".repeat(497),
-			});
-	} catch (caught) {
-		error = caught;
-	}
-	expect((error as Error).message).toBe("limit_reached");
-	expect(count).toBeGreaterThan(3);
-	expect(count).toBeLessThan(9);
-	// The refused addition rolled back with it.
-	expect(h.continuity.list("c1")).toHaveLength(count);
 });
 
 test("S0-3: expired items do not count toward the active-item limit", async () => {

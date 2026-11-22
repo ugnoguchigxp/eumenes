@@ -130,7 +130,6 @@ export function maybeEnqueueCompactionInTransaction(
 		return false;
 	const targetCutSeq = keepNewestCut(shown, cut.seq, limits);
 	if (targetCutSeq <= cut.seq) return false;
-	const nowMs = Date.parse(deps.clock());
 	deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
 		kind: COMPACT_SUMMARY_KIND,
@@ -149,7 +148,6 @@ export function maybeEnqueueCompactionInTransaction(
 		resourceKey: "inference.llm",
 		maxAttempts: 1,
 		concurrencyKey: `compact:${conversationId}`,
-		deadlineAtMs: nowMs + COMPACT_TIMEOUT_MS,
 	});
 	return true;
 }

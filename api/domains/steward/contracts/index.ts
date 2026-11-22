@@ -5,25 +5,31 @@ import { z } from "zod";
 export const STEWARD_KIND = "steward.step.v1";
 export const STEWARD_SCOPE = "steward";
 export const STEWARD_RESOURCE = "inference.aux";
+/** The closure delete asks no model: it holds no inference slot, a resource of its own. */
+export const FORGET_RESOURCE = "steward.forget";
 
 const stepIds = [
 	"curate-memory",
 	"curate-goals",
 	"curate-world",
-	"consolidate-memory",
-	"consolidate-goals",
+	"shallow",
+	"deep",
+	"forget-closure",
 ] as const;
 export type StepId = (typeof stepIds)[number];
-const unitKinds = [
-	"events",
-	"requests",
-	"maintenance",
-	"world_events",
-] as const;
+/** The steps that ask the model once (a unit of their own prompt), and the sleep layer's own. */
+export type SleepStepId = Extract<
+	StepId,
+	"shallow" | "deep" | "forget-closure"
+>;
+export type LlmStepId = Exclude<StepId, SleepStepId>;
+const unitKinds = ["requests", "world_events", "sleep", "forget"] as const;
 export type UnitKind = (typeof unitKinds)[number];
 /**
- * Which open unit a conversation may hold at once: reflecting steps (they read the handled events of the
- * continuity flow), upkeep steps and the World curation (the events World received).
+ * Which open unit a conversation may hold at once: the steps that answer the user's explicit requests, the World
+ * curation (the events World received), and the profile-wide upkeep (`maintenance`): the sleep layer under the
+ * `SLEEP_KEY` pseudo conversation and the closure delete of a forget under `FORGET_KEY`, so the closure never
+ * waits for a sleep unit.
  */
 export const unitSlots = ["reflect", "world", "maintenance"] as const;
 export type UnitSlot = (typeof unitSlots)[number];
@@ -41,8 +47,40 @@ export const requestKinds = [
 	"withdraw",
 ] as const;
 export type RequestKind = (typeof requestKinds)[number];
-/** A request waits as `pending` from the moment the conversation agent's action is committed. */
-export type InboxState = "pending" | "done" | "none";
+/**
+ * A correction, forget or suppression that names no short reference (the user described the target in words): the
+ * agency alone resolves the target. The shape of dialogue's `MemoryTargetRequest`, written out here because the steward
+ * does not look up at dialogue.
+ */
+export type TargetRequest = {
+	conversationId: string;
+	/** The run that asked. */
+	runId: string;
+	kind: "correct" | "forget" | "suppress";
+	what: string;
+	detail?: string;
+	/** The user's messages of the run, newest last. */
+	messageIds: readonly string[];
+	quote?: string;
+	memory?: {
+		text: string;
+		polarity?: "affirmed" | "negated";
+		validFrom?: string;
+		validUntil?: string;
+	};
+	/** The action's key: the steward request's id for a forget. */
+	requestId: string;
+};
+/** What the inbox keeps a request as: the conversation agent's kinds and the agency's `suppress`. */
+export type StoredRequestKind = RequestKind | "suppress";
+/**
+ * A request waits as `pending` from the moment the conversation agent's action is committed. `excluded` is a forget
+ * whose targets were excluded at once and wait for the closure delete (the redesign, section 9.2).
+ */
+export type InboxState = "pending" | "excluded" | "done" | "none";
+/** The conversation key the sleep layer's units, decisions and positions are kept under (it has no conversation). */
+export const SLEEP_KEY = "steward:sleep";
+export const FORGET_KEY = "steward:forget";
 /** How a conversation run ended (the dialogue tells the steward, which only takes it as a reason to look again). */
 export type RunEnd =
 	"completed" | "failed" | "interrupted" | "cancelled" | "stale";
@@ -64,7 +102,7 @@ export type StewardPayload = z.infer<typeof payloadSchema>;
 
 // ---- limits (section 2.3, 2.4) ----
 
-/** Events one step reads, and the input bytes they and the requests' source messages may fill together. */
+/** Messages one step reads (the requests' source messages and their context), and the bytes they may fill together. */
 export const EVENTS_PER_UNIT = 8;
 export const UNIT_INPUT_BYTES = 16 * 1024;
 export const REQUESTS_PER_UNIT = 8;
@@ -75,15 +113,10 @@ export const MESSAGE_MAX_BYTES = MESSAGE_HEAD_BYTES + MESSAGE_TAIL_BYTES;
 /** Failed units over the same target after which the target is given up (section 2.3). */
 export const MAX_FAILURES = 3;
 export const DECISIONS_PER_CONVERSATION = 1000;
-/** Closed units kept per conversation (the failure counts of upkeep read the recent ones). */
+/** Closed units kept per conversation. */
 export const UNITS_PER_CONVERSATION = 300;
-/** Upkeep: most steps in one round, and the waits while a foreground run is active. */
-export const MAINTENANCE_STEPS_PER_ROUND = 3;
 /** A step the conversation took its connection from waits this long before it is made again (it is not a failure). */
 export const PREEMPTED_WAIT_MS = 15_000;
-/** Upkeep runs only after this long without a conversation event: it never competes with the conversation. */
-export const MAINTENANCE_QUIET_MS = 10 * 60 * 1000;
-export const FOREGROUND_DELAYS_MS = [30_000, 120_000, 600_000] as const;
 /** Waits before a failed target is tried again (indexed by earlier failures). */
 export const RETRY_DELAYS_MS = [0, 15_000, 60_000] as const;
 /** The wait before the first retry of a step whose inference request could not be taken, and its ceiling (it doubles). */
@@ -99,6 +132,8 @@ export const MAX_OUTPUT_TOKENS = 1200;
 export const MAX_OUTPUT_BYTES = 32 * 1024;
 /** The queue deadline of a job: it covers waiting behind earlier jobs, the call (`INFERENCE_MS`) and a retry. */
 export const JOB_DEADLINE_MS = 15 * 60_000;
+/** The queue deadline of a sleep unit: it makes several model calls one after another. */
+export const SLEEP_JOB_DEADLINE_MS = 60 * 60_000;
 
 // ---- ports the application provides (queue and inference are lower than the steward's callers) ----
 

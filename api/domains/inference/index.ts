@@ -5,6 +5,7 @@ export { createCodexHome } from "./adapters/codex-home";
 export {
 	EVENT_SHARE_OF_LOG,
 	REFERENCE_WINDOW_TOKENS,
+	StaleAnswerInput,
 	controlInstructions,
 	estimateJsonTokens,
 	estimateMessageTokens,

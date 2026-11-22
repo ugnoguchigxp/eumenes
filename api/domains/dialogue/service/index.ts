@@ -35,9 +35,20 @@ import type { QueueService } from "../../queue";
 import type { MemoryService } from "../../memory";
 import type { ContinuityService } from "../../continuity";
 import { conversationHasActiveRun } from "./active-run";
+import {
+	hideExcludedInTransaction,
+	retractForgottenInput,
+} from "./forget-hide";
+import {
+	createTargetsGate,
+	createTargetsHoldHandler,
+	type TargetsGate,
+} from "./targets-hold";
+import { releaseHiddenMessages } from "../repository/forget-hidden";
 import type {
 	Run,
 	StewardPort,
+	MemoryTargetPort,
 	AgencyLayerPort,
 	ConversationAgentPort,
 	WorldContextPort,
@@ -143,23 +154,8 @@ function registerForgetHook(deps: DialogueDeps) {
 		deps.contextInputs?.invalidate();
 		forgetCollaborationState(db, purge.messageIds);
 		forgetObservations(db, purge.messageIds);
-		const changed = new Set(
-			deps.conversation.input.retractUtterancesInTransaction(
-				db,
-				purge.messageIds,
-				deps.clock(),
-			),
-		);
-		const summaryRefs = [
-			...purge.messageIds,
-			...purge.itemIds.map((itemId) => `memory:${itemId}`),
-		];
-		for (const conversationId of deps.conversation.input.retractSummariesBySourceRefsInTransaction?.(
-			db,
-			summaryRefs,
-			deps.clock(),
-		) ?? [])
-			changed.add(conversationId);
+		releaseHiddenMessages(db, purge.messageIds);
+		const changed = retractForgottenInput(deps, db, purge);
 		// A forgotten memory item may stand in the state's records, copied as it was.
 		if (purge.itemIds.length) changed.add(purge.conversationId);
 		for (const conversationId of changed)
@@ -170,8 +166,10 @@ function registerForgetHook(deps: DialogueDeps) {
 function registerHandlers(
 	deps: DialogueDeps,
 	progress: ReturnType<typeof createProgress>,
+	targets: TargetsGate,
 ) {
 	deps.queue.registerHandler(createGenerationHandler(deps, progress));
+	deps.queue.registerHandler(createTargetsHoldHandler(deps, targets));
 	deps.queue.registerHandler(createCompactionSummaryHandler(deps));
 	deps.queue.registerHandler(createToolchainCommandHandler(deps));
 	deps.queue.registerHandler(createSpecialistTurnHandler(deps));
@@ -189,6 +187,7 @@ interface DialogueServiceOptions {
 	continuity: ContinuityService;
 	memory?: MemoryService;
 	steward?: StewardPort;
+	memoryTargets?: MemoryTargetPort;
 	agents?: AgentRuntime;
 	music?: MusicPort;
 	excalidraw?: ImagePort;
@@ -210,6 +209,25 @@ interface DialogueServiceOptions {
 	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
 	logFile?: () => string | undefined;
 }
+/** The agency's two calls on a forget it settles: the generations that waited go on, and what it excluded is hidden. */
+function createTargetPorts(deps: DialogueDeps, targets: TargetsGate) {
+	return {
+		/**
+		 * The agency settled what it was given to resolve (a forget that named no short reference, and the like): the
+		 * conversation's generations, which waited for it, go on. Called after the transaction that settled it.
+		 */
+		targetsSettled: (conversationId: string) => targets.settled(conversationId),
+		/**
+		 * The immediate stage of a forget the agency settled: the messages the excluded records stand on leave the
+		 * recent conversation, its summaries and the history reads at once. Called in the transaction that excluded them.
+		 */
+		hideExcludedInTransaction: (
+			db: Database,
+			input: { messageIds: readonly string[]; itemIds?: readonly string[] },
+		) => hideExcludedInTransaction(deps, db, input),
+	};
+}
+
 /** The user's hand on the recent conversation (`POST /api/conversations/:id/recent/clear`). */
 function createRecentPorts(deps: DialogueDeps) {
 	return {
@@ -283,7 +301,8 @@ export function createDialogueService({
 			: undefined,
 	);
 	registerChangeHooks(deps, deps.work);
-	registerHandlers(deps, progress);
+	const targets = createTargetsGate();
+	registerHandlers(deps, progress, targets);
 	registerGeneratedImageObservation(deps);
 	const specialistOps = createSpecialistOps(deps);
 	const agentSync = createAgentSync(deps);
@@ -317,6 +336,7 @@ export function createDialogueService({
 		conversationResources: (conversationId: string) =>
 			conversationResources(deps, conversationId),
 		...createRecentPorts(deps),
+		...createTargetPorts(deps, targets),
 		...createTodoScreenPorts(deps),
 		/** The conversation's resource ledger (`a<n>`), for the `resources` tool and the screen receipts. */
 		resourceLedger: deps.resourceLedger,

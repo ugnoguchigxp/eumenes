@@ -71,7 +71,11 @@ export function mergeNeighbours(db: Database, itemId: string): string[] {
 // ---- tendencies: observations the agent derived from several items ----
 
 export interface TendencyEvidence {
-	namespace: "state" | "continuity";
+	/**
+	 * `state`: a State item; `continuity`: a plan (or the note it was moved from); `message`: a message of the
+	 * user; `candidate`: the candidate (L1) it was promoted from.
+	 */
+	namespace: "state" | "continuity" | "message" | "candidate";
 	id: string;
 }
 export interface TendencyFull {
@@ -230,4 +234,25 @@ export function deleteTendenciesByEvidence(
 	}
 	if (deleted > 0) bumpTendencyRevision(db);
 	return deleted;
+}
+
+/**
+ * Deletes the tendencies promoted from a candidate the library has forgotten (a candidate leaves a tombstone;
+ * the forget's closure removes its value). Runs in every forget's purge, so a replay does it again.
+ */
+export function deleteTendenciesOfTombstonedCandidates(db: Database): number {
+	const tombstoned = db.query(
+		"SELECT 1 FROM memory_tombstone WHERE target_type = 'candidate' AND target_id = ?",
+	);
+	const gone = listStoredTendencies(db).flatMap((tendency) =>
+		tendency.evidence.some(
+			(entry) => entry.namespace === "candidate" && tombstoned.get(entry.id),
+		)
+			? [tendency.id]
+			: [],
+	);
+	const remove = db.query("DELETE FROM memory_tendency WHERE id = ?");
+	for (const id of gone) remove.run(id);
+	if (gone.length > 0) bumpTendencyRevision(db);
+	return gone.length;
 }

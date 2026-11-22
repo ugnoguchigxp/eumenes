@@ -4,11 +4,7 @@ import {
 	type CurationResult,
 } from "../../../memory";
 import { MAX_FAILURES } from "../../contracts";
-import {
-	bumpInboxFailure,
-	deleteEventFailures,
-	resolveInbox,
-} from "../../repository";
+import { bumpInboxFailure, resolveInbox } from "../../repository";
 import {
 	FORGET_LIMIT_NOTICE,
 	NOTHING_TO_FORGET_NOTICE,
@@ -19,7 +15,6 @@ import {
 import type { MemoryRef } from "../context";
 import { relatedToRequest } from "../relevance";
 import { type ForgetSpec, executeForget } from "./curate-forget";
-import { recordRoutes } from "./curate-route";
 import type { ApplyResult, PreparedUnit, StepEnv } from "../types";
 import type {
 	CurateContext,
@@ -27,13 +22,12 @@ import type {
 	CurateOutput,
 	RequestEntry,
 	Resolve,
-	TurnVectors,
 } from "./curate-types";
 
 // ---- apply ----
 
 type Source = {
-	section: "remember" | "update" | "stop" | "notes" | "resolve";
+	section: "resolve";
 	index: number;
 	request?: string;
 };
@@ -130,109 +124,6 @@ function planOutput(
 	withdrawals: ReadonlyMap<string, string[]>,
 ) {
 	const plan = new Plan();
-	// Only a user's own words are evidence of what the user said.
-	const messageOf = (label: string) => {
-		const event = context.events[label];
-		return event?.by === "user" ? (event.messageId ?? undefined) : undefined;
-	};
-	// The notes have no evidence of their own: they stand on every event the unit read (conservative).
-	const noteSources = [
-		...new Set(
-			Object.values(context.events)
-				.map((e) => e.messageId)
-				.filter((id): id is string => id !== null),
-		),
-	];
-	const stateRef = (ref: string) => {
-		const found = context.refs[ref];
-		return found?.namespace === "state" ? found : undefined;
-	};
-	output.remember.forEach((e, index) => {
-		const source: Source = { section: "remember", index };
-		const messageId = messageOf(e.evidence);
-		if (!messageId) return plan.reject(source, "unknown_evidence");
-		plan.add(
-			{
-				op: "remember",
-				kind: e.kind,
-				key: e.key,
-				text: e.text,
-				negated: e.negated,
-				messageId,
-				quote: e.quote,
-				validFrom: e.validFrom,
-				validUntil: e.validUntil,
-			},
-			source,
-		);
-	});
-	output.update.forEach((e, index) => {
-		const source: Source = { section: "update", index };
-		const messageId = messageOf(e.evidence);
-		const ref = stateRef(e.ref);
-		if (!messageId || !ref) return plan.reject(source, "unknown_ref");
-		plan.add(
-			{
-				op: "update",
-				itemId: ref.id,
-				revision: ref.revision,
-				text: e.text,
-				...(e.negated === undefined ? {} : { negated: e.negated }),
-				messageId,
-				quote: e.quote,
-			},
-			source,
-		);
-	});
-	output.stop.forEach((e, index) => {
-		const source: Source = { section: "stop", index };
-		const ref = stateRef(e.ref);
-		if (!ref) return plan.reject(source, "unknown_ref");
-		plan.add({ op: "stop", itemId: ref.id, revision: ref.revision }, source);
-	});
-	// Compared without spaces and punctuation, so a re-worded copy with the same words is caught too.
-	const fold = (text: string) =>
-		text.normalize("NFKC").replace(/[\s、。,.!?！？「」『』（）()・]/g, "");
-	const notes = new Set(context.noteTexts.map(fold));
-	output.notes.forEach((e, index) => {
-		const source: Source = { section: "notes", index };
-		if (e.op === "add" && notes.has(fold(e.text!)))
-			return plan.reject(source, "duplicate_note");
-		if (e.op === "add") notes.add(fold(e.text!));
-		if (e.op === "add")
-			return plan.add(
-				{
-					op: "note_add",
-					kind: e.kind ?? "memo",
-					text: e.text!,
-					messageIds: noteSources,
-				},
-				source,
-			);
-		const ref = e.ref ? context.refs[e.ref] : undefined;
-		if (ref?.namespace !== "continuity")
-			return plan.reject(source, "unknown_ref");
-		if (e.op === "update")
-			return plan.add(
-				{
-					op: "note_update",
-					noteId: ref.id,
-					revision: ref.revision,
-					text: e.text!,
-					messageIds: noteSources,
-				},
-				source,
-			);
-		plan.add(
-			{
-				op: "note_close",
-				noteId: ref.id,
-				revision: ref.revision,
-				status: e.status!,
-			},
-			source,
-		);
-	});
 	const answered = new Set<string>();
 	output.resolve.forEach((e, index) => {
 		const request = context.requests[e.request];
@@ -518,11 +409,9 @@ type Forgotten = { blocked: Set<string>; items: Set<string> };
 
 /**
  * An element that stands on a forgotten message or item is dropped (B1-B3, section 6.1): the forget runs first, so
- * the unit never saves, updates or notes anything from what the user asked to forget.
+ * the unit never saves or updates anything from what the user asked to forget.
  */
 function survives(item: CurationItem, gone: Forgotten): string | null {
-	const blockedAmong = (ids: readonly string[]) =>
-		ids.some((id) => gone.blocked.has(id));
 	switch (item.op) {
 		case "remember":
 			return gone.blocked.has(item.messageId) ? "blocked_source" : null;
@@ -531,12 +420,6 @@ function survives(item: CurationItem, gone: Forgotten): string | null {
 			return gone.blocked.has(item.messageId) ? "blocked_source" : null;
 		case "stop":
 			return gone.items.has(item.itemId) ? "unknown_item" : null;
-		case "note_add":
-			return blockedAmong(item.messageIds) ? "blocked_source" : null;
-		case "note_update":
-			return item.messageIds && blockedAmong(item.messageIds)
-				? "blocked_source"
-				: null;
 		default:
 			return null;
 	}
@@ -731,18 +614,6 @@ export function applyCurate(
 			}
 		}
 	}
-	deps.continuity.events.markCuratedInTransaction(
-		db,
-		conversationId,
-		context.targetSeqs,
-	);
-	deleteEventFailures(db, conversationId, context.targetSeqs);
-	recordRoutes(env, context, output.route);
-	deps.memory.vectors.saveTurnVectors(
-		db,
-		{ conversationId, digests: context.digests },
-		extras.turnVectors as TurnVectors,
-	);
 	const messageIds = new Set(
 		Object.values(context.events)
 			.map((e) => e.messageId)

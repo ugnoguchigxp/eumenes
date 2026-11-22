@@ -3,16 +3,16 @@
 		"persona": "butler, agent name Eumenes, user name ユーザー",
 		"settings": "defaults (emotion on, no interests)",
 		"goal": "goal reply rules and tools added as the always-on reply adds them for a goal-enabled agenda",
-		"steward": "curate-memory step of one exchange, no requests"
+		"steward": "curate-memory step of one remember request, the instructions of the other request steps, the sleep layer's judgement prompts and schemas"
 	},
 	"elements": {
 		"system.alwaysOn": {
-			"chars": 3379,
-			"tokens": 2828
+			"chars": 3375,
+			"tokens": 2827
 		},
 		"system.alwaysOn.Role": {
-			"chars": 1197,
-			"tokens": 990
+			"chars": 1193,
+			"tokens": 989
 		},
 		"system.alwaysOn.Speaking": {
 			"chars": 295,
@@ -31,8 +31,8 @@
 			"tokens": 859
 		},
 		"system.alwaysOnGoal": {
-			"chars": 3720,
-			"tokens": 3040
+			"chars": 3716,
+			"tokens": 3039
 		},
 		"tools.read": {
 			"chars": 2416,
@@ -127,48 +127,96 @@
 			"tokens": 410
 		},
 		"tool.memory": {
-			"chars": 478,
-			"tokens": 180
+			"chars": 1613,
+			"tokens": 692
 		},
 		"agency.planSystem": {
-			"chars": 5177,
-			"tokens": 4294
+			"chars": 5644,
+			"tokens": 4615
 		},
 		"agency.composeSystem": {
-			"chars": 2256,
-			"tokens": 1940
+			"chars": 2325,
+			"tokens": 1990
 		},
-		"agency.profileSystem": {
-			"chars": 1026,
-			"tokens": 825
+		"agency.recordsSystem": {
+			"chars": 1681,
+			"tokens": 1144
 		},
 		"agency.checkSystem": {
 			"chars": 1050,
 			"tokens": 869
 		},
 		"agency.askCheckSystem": {
-			"chars": 988,
-			"tokens": 807
+			"chars": 1150,
+			"tokens": 903
 		},
 		"steward.curateMemory.instructions": {
-			"chars": 4513,
-			"tokens": 3596
+			"chars": 2798,
+			"tokens": 2234
 		},
 		"steward.curateMemory.schema": {
-			"chars": 2381,
-			"tokens": 820
+			"chars": 696,
+			"tokens": 241
 		},
 		"steward.curateMemory.systemSent": {
-			"chars": 6909,
-			"tokens": 4195
+			"chars": 3509,
+			"tokens": 2412
 		},
 		"steward.curateGoals.instructions": {
-			"chars": 1243,
-			"tokens": 960
+			"chars": 1233,
+			"tokens": 952
 		},
 		"steward.curateWorld.instructions": {
-			"chars": 2043,
-			"tokens": 1488
+			"chars": 2033,
+			"tokens": 1481
+		},
+		"steward.sleep.areas.instructions": {
+			"chars": 425,
+			"tokens": 375
+		},
+		"steward.sleep.areas.schema": {
+			"chars": 281,
+			"tokens": 96
+		},
+		"steward.sleep.dedupe.instructions": {
+			"chars": 672,
+			"tokens": 564
+		},
+		"steward.sleep.dedupe.schema": {
+			"chars": 317,
+			"tokens": 108
+		},
+		"steward.sleep.goals.instructions": {
+			"chars": 577,
+			"tokens": 472
+		},
+		"steward.sleep.goals.schema": {
+			"chars": 412,
+			"tokens": 138
+		},
+		"steward.sleep.prep.instructions": {
+			"chars": 560,
+			"tokens": 485
+		},
+		"steward.sleep.prep.schema": {
+			"chars": 407,
+			"tokens": 140
+		},
+		"steward.sleep.promotion.instructions": {
+			"chars": 1033,
+			"tokens": 831
+		},
+		"steward.sleep.promotion.schema": {
+			"chars": 399,
+			"tokens": 136
+		},
+		"steward.sleep.relations.instructions": {
+			"chars": 746,
+			"tokens": 603
+		},
+		"steward.sleep.relations.schema": {
+			"chars": 353,
+			"tokens": 121
 		}
 	}
 }

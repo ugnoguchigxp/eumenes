@@ -12,7 +12,10 @@ test("continuity/0006 retracts the open activity notes and leaves the other note
 		const before = migrations.filter(
 			(m) =>
 				m.id !== "continuity/0006-retract-activity" &&
-				m.id !== "continuity/0007-drop-window",
+				m.id !== "continuity/0007-drop-window" &&
+				m.id !== "continuity/0008-plans" &&
+				m.id !== "continuity/0009-short-term-to-plans" &&
+				m.id !== "continuity/0010-drop-short-term",
 		);
 		const old = openStore(path, before);
 		await old.write((db) => {
@@ -24,7 +27,18 @@ test("continuity/0006 retracts the open activity notes and leaves the other note
 			insert.run("d1", "decision", "active");
 		});
 		await old.close();
-		const store = openStore(path, migrations);
+		// Up to the migration under test (the later ones move the notes away and drop their table).
+		const store = openStore(
+			path,
+			migrations.filter(
+				(m) =>
+					![
+						"0008-plans",
+						"0009-short-term-to-plans",
+						"0010-drop-short-term",
+					].some((later) => m.id === `continuity/${later}`),
+			),
+		);
 		try {
 			expect(
 				store.read((db) =>

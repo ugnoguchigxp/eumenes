@@ -3,11 +3,7 @@ import {
 	type PreparedCuration,
 } from "../../../world";
 import { MAX_FAILURES } from "../../contracts";
-import {
-	bumpWorldEvent,
-	deleteRoutesOfMessages,
-	deleteWorldEvents,
-} from "../../repository";
+import { bumpWorldEvent, deleteWorldEvents } from "../../repository";
 import { localDay, isRecord } from "../context";
 import { instructions } from "../prompts/curate-world";
 import { curateWorldSchema } from "../schemas";
@@ -169,10 +165,6 @@ function apply(
 		}
 		case "settled": {
 			deleteWorldEvents(db, settled.eventIds);
-			deleteRoutesOfMessages(
-				db,
-				window.host.events.map((e) => e.messageId),
-			);
 			return none({
 				applied: settled.elements.filter((e) => e.status === "applied").length,
 				rejected: settled.elements.filter((e) => e.status !== "applied").length,

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONTRACT_VERSIONS } from "eumenes-memory";
-import { planForget } from "eumenes-memory/sqlite";
+import { planExclusion, planForget } from "eumenes-memory/sqlite";
 import { configureLogging } from "../../../infrastructure/logger";
 import { openStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
@@ -34,7 +34,7 @@ afterEach(async () => {
 	for (const h of open.splice(0)) await h.close();
 });
 
-/** Four exchanges in c1 (each is two events); the address fact (two versions) and a note come from the first two; the episode summary covers three of them. */
+/** Four exchanges in c1 (each is two events); the address fact (two versions) and a plan come from the first two; the episode summary covers three of them. */
 async function scenario() {
 	const h = await setupMemory();
 	open.push(h);
@@ -91,20 +91,16 @@ async function scenario() {
 			],
 		},
 	]);
-	const [addressNote, weatherNote] = await h.curate([
-		{
-			op: "note_add",
-			kind: "memo",
-			text: "千代田区に住んでいる",
-			messageIds: [address.inputMessageId],
-		},
-		{
-			op: "note_add",
-			kind: "memo",
-			text: "天気の話",
-			messageIds: [weather.inputMessageId],
-		},
-	]);
+	const addressNote = await h.plan("c1", {
+		kind: "intent",
+		text: "千代田区に住んでいる",
+		messageIds: [address.inputMessageId],
+	});
+	const weatherNote = await h.plan("c1", {
+		kind: "intent",
+		text: "天気の話",
+		messageIds: [weather.inputMessageId],
+	});
 	await h.store.write((db) => {
 		for (const [i, id] of [
 			old.inputMessageId,
@@ -185,16 +181,22 @@ function expectForgotten(s: Scenario) {
 		);
 		expect(found?.message.text.length).toBeGreaterThan(0);
 	}
-	// Notes from the blocked messages are deleted for good (no row, no text); the others stay.
-	const notes = h.continuity.list("c1", true);
-	expect(notes.map((note) => note.id)).toEqual([
+	// Plans from the blocked messages are deleted for good (no row, no text, no search entry); the others stay.
+	const plans = h.store.read((db) =>
+		h.continuity.plans.listInTransaction(db, {
+			conversationId: "c1",
+			states: ["open", "awaiting_confirmation", "closed"],
+		}),
+	);
+	expect(plans.map((plan) => plan.id)).toEqual([
 		(s.weatherNote as { id: string }).id,
 	]);
-	expect(notes[0]?.status).toBe("active");
+	expect(plans[0]?.state).toBe("open");
 	const continuityDump = h.store.read((db) =>
 		JSON.stringify([
-			db.query("SELECT * FROM continuity_items").all(),
-			db.query("SELECT * FROM continuity_revisions").all(),
+			db.query("SELECT * FROM continuity_plans").all(),
+			db.query("SELECT * FROM continuity_plan_search").all(),
+			db.query("SELECT * FROM continuity_evidence").all(),
 		]),
 	);
 	expect(continuityDump).not.toContain("千代田区に住んでいる");
@@ -606,4 +608,55 @@ test("a corrupt block journal makes memory unusable instead of being skipped", a
 	});
 	expect(h.memory.list(true)).toEqual([]);
 	expect(readFileSync(blockPath(h), "utf8")).toBe("{not json\n");
+});
+
+test("an exclusion entry (journal format 3) is replayed by the reconciliation, forgets nothing and purges no derived data; forgetting an excluded item still finds its evidence", async () => {
+	const s = await scenario();
+	const { h } = s;
+	const planned = h.store.read((db) =>
+		planExclusion(db, {
+			contractVersion: 2,
+			access: {
+				principal: PRINCIPAL,
+				scopeKeys: [PROFILE_SCOPE],
+				purpose: "memory.forget",
+				policyRevision: h.memory.policyRevisionInTransaction(db),
+			},
+			op: "exclude",
+			targets: [
+				{ type: "state_item", itemId: s.curry.id, scopeKey: PROFILE_SCOPE },
+			],
+			clock: { atMs: Date.parse(h.time.now) },
+		}),
+	);
+	if (planned.status !== "planned") throw new Error("not planned");
+	expect(planned.plan.entry.journalFormat).toBe(3);
+	// The journal line is written; the database never applied it (a stop between the two).
+	appendJournal(journalPath(h), planned.plan.entry);
+	const memory2 = beforeRecovery(s);
+	const purges: ForgetPurge[] = [];
+	memory2.registerForgetPurge((_db, purge) => {
+		purges.push(purge);
+	});
+	expect(await memory2.recover()).toMatchObject({
+		healthy: true,
+		reapplied: 1,
+	});
+	// Replayed: the item left every default listing, and nothing was forgotten.
+	expect(memory2.list(true).map((item) => item.id)).not.toContain(s.curry.id);
+	expect(memory2.list(true)).toHaveLength(2);
+	expect(purges).toEqual([]);
+	expect(blockRows(h)).toEqual([]);
+	// Idempotent: a second start has nothing to replay.
+	expect(await beforeRecovery(s).recover()).toMatchObject({
+		healthy: true,
+		reapplied: 0,
+	});
+	// The forget of the excluded item blocks the message its version stands on.
+	await memory2.forget({
+		conversationId: "c1",
+		itemIds: [s.curry.id],
+		messageIds: [],
+	});
+	expect(blockRows(h).map((row) => row.id)).toContain(s.food.inputMessageId);
 });

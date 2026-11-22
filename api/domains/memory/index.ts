@@ -21,6 +21,28 @@ export type {
 	SettleResult,
 } from "./contracts";
 export { FORGET_MAX_ITEMS } from "./contracts";
+export type {
+	/** @public */ CandidateEvidenceInput,
+	/** @public */ ChangedExcludingRun,
+	/** @public */ CorrectExplicitInput,
+	/** @public */ CorrectExplicitOutcome,
+	/** @public */ ExcludeForForgetInput,
+	/** @public */ ExcludeForForgetOutcome,
+	/** @public */ ImmediateRejection,
+	/** @public */ ItemTarget,
+	/** @public */ RecordCandidateInput,
+	/** @public */ RecordCandidateOutcome,
+	/** @public */ RememberExplicitInput,
+	/** @public */ RememberExplicitOutcome,
+	/** @public */ ShortRef,
+	/** @public */ SuppressInput,
+	/** @public */ SuppressOutcome,
+	/** @public */ WithdrawExplicitInput,
+	/** @public */ WithdrawExplicitOutcome,
+	/** @public */ WriteTendencyInput,
+	/** @public */ WriteTendencyOutcome,
+} from "./contracts/immediate";
+export { touchesSuppressedTerm } from "./service/suppression";
 export {
 	PENDING_LIMIT,
 	type ProfileItem,

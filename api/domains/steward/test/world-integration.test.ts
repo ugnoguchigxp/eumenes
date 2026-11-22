@@ -60,7 +60,6 @@ async function setup(options: { worldResourceId?: string } = {}) {
 	return { opened, h: stewardHarness };
 }
 
-const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
 const claim = {
 	op: "assert",
 	ref: null,
@@ -87,10 +86,17 @@ test("only the World curation runs on the resource chosen for World; every other
 	const resourceId = crypto.randomUUID();
 	const { opened, h } = await setup({ worldResourceId: resourceId });
 	h.inference.script("curate-memory", {
-		...empty,
-		route: [
-			{ event: "e1", world: true, goals: false },
-			{ event: "e2", world: true, goals: false },
+		resolve: [
+			{
+				request: "r1",
+				action: "none",
+				refs: [],
+				alsoIn: [],
+				text: null,
+				kind: null,
+				key: null,
+				negated: null,
+			},
 		],
 	});
 	h.inference.script("curate-world", {
@@ -102,6 +108,7 @@ test("only the World curation runs on the resource chosen for World; every other
 		user: "音声サービスは9月から利用できる。",
 		answer: "分かりました。",
 		end: "completed",
+		requests: [{ kind: "remember", what: "音声サービスの開始時期" }],
 	});
 	await h.drain();
 	await opened.lifecycle.consumeSourceChanges(SCOPE);
@@ -114,13 +121,6 @@ test("only the World curation runs on the resource chosen for World; every other
 
 test("a statement reaches World through the steward, and a forget request removes the claim, its evidence and the source", async () => {
 	const { opened, h } = await setup();
-	h.inference.script("curate-memory", {
-		...empty,
-		route: [
-			{ event: "e1", world: true, goals: false },
-			{ event: "e2", world: true, goals: false },
-		],
-	});
 	h.inference.script("curate-world", {
 		entities: [],
 		claims: [claim],
@@ -162,7 +162,6 @@ test("a statement reaches World through the steward, and a forget request remove
 		]);
 		expect(data.worldClaims).toHaveLength(1);
 		return {
-			...empty,
 			resolve: [
 				{
 					request: "r1",
@@ -174,7 +173,6 @@ test("a statement reaches World through the steward, and a forget request remove
 					key: null,
 				},
 			],
-			route: [],
 		};
 	});
 	await h.run({

@@ -39,6 +39,8 @@ const SAID_FAILED = systemContext("dialogue.contexts.local.turn-failed", {});
 const { $schema: _, ...memoryParameters } = z.toJSONSchema(
 	memoryArgs.options[0]!,
 );
+/** The memory calls one reply may make: a request, and the repairs of a refused one. */
+const MEMORY_CALLS = 3;
 const MEMORY_REQUEST_TOOL: AgentToolDefinition = {
 	name: TOOL_NAMES.memory,
 	description: systemContext("dialogue.contexts.local.memory-request", {}),
@@ -590,22 +592,22 @@ function conversationToolPort(
 		acts && deps.debugDiagnostics?.enabled()
 			? deps.debugDiagnostics
 			: undefined;
-	const readTools = [
-		...readToolDefinitions(reads).map((tool) =>
-			debug && tool.name === "read_runs"
-				? {
-						...tool,
-						description:
-							tool.description +
-							" Eumenes自身の失敗や依頼との食い違いを診断するときは target.kind=run を指定します。",
-						parameters: withDebugTarget(tool.parameters),
-					}
-				: tool,
-		),
-		...(acts && input.routed && deps.steward ? [MEMORY_REQUEST_TOOL] : []),
-	];
+	const readTools = readToolDefinitions(reads).map((tool) =>
+		debug && tool.name === "read_runs"
+			? {
+					...tool,
+					description:
+						tool.description +
+						" Eumenes自身の失敗や依頼との食い違いを診断するときは target.kind=run を指定します。",
+					parameters: withDebugTarget(tool.parameters),
+				}
+			: tool,
+	);
+	// The memory tool refuses a call by its reason and the model repairs it in the same reply: a few calls, not one.
+	const memoryTools =
+		acts && input.routed && deps.steward ? [MEMORY_REQUEST_TOOL] : [];
 	const lookup = acts ? deps.lookup : undefined;
-	const tools = [...readTools, ...(work?.tools ?? [])];
+	const tools = [...readTools, ...memoryTools, ...(work?.tools ?? [])];
 	if (lookup)
 		tools.push({
 			name: LOOKUP_TOOL,
@@ -623,7 +625,10 @@ function conversationToolPort(
 	return {
 		tools,
 		maxToolCalls:
-			(readTools.length ? 1 : 0) + (work?.tools.length ?? 0) + (lookup ? 1 : 0),
+			(readTools.length ? 1 : 0) +
+			(memoryTools.length ? MEMORY_CALLS : 0) +
+			(work?.tools.length ?? 0) +
+			(lookup ? 1 : 0),
 		async call(toolCall: AgentToolCall) {
 			let args: unknown;
 			try {

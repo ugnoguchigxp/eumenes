@@ -18,7 +18,7 @@ import {
 } from "../../../infrastructure/log-reader";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { Run } from "../contracts";
-import { recentRuns } from "../repository";
+import { hiddenMessages, recentRuns } from "../repository";
 import { sessionEventsOfRun } from "../repository/specialist";
 import { recentWorkForRead, type WorkRow } from "../repository/work";
 import type { DialogueDeps, GenerateInput } from "./context";
@@ -30,6 +30,7 @@ import type {
 import type { ParsedCall } from "./generation-tools";
 import { memoryItemLine } from "./result-text";
 import { messageDigests, readDiagnostic } from "./diagnostic-evidence";
+import { withheldIn } from "./memory-refs";
 
 /*
  * The conversation's read tools (spec conversation-read-tools-design 2026-10-31): the host reads its own records for
@@ -98,21 +99,35 @@ const codeText = (code: string | null | undefined) =>
 	code ? `（${code}）` : "";
 
 /**
- * The conversation's forgotten messages (memory's block ledger, its journal included); empty without memory (nothing
- * can have been forgotten), null when the ledger cannot be read (the read then shows nothing).
+ * The conversation's forgotten messages (memory's block ledger, its journal included), those an immediate forget hides
+ * and those the memory holds back until the closure delete (asked one by one, as a read looks at them); empty without
+ * memory (nothing can have been forgotten), null when the ledger cannot be read (the read then shows nothing).
  */
 function blockedOf(
 	deps: DialogueDeps,
 	db: Database,
 	conversationId: string,
-): ReadonlySet<string> | null {
+): { has(messageId: string): boolean } | null {
 	try {
-		return new Set(
-			deps.memory?.blockedMessageIdsOfConversationInTransaction(
+		const known = new Set([
+			...(deps.memory?.blockedMessageIdsOfConversationInTransaction(
 				db,
 				conversationId,
-			) ?? [],
-		);
+			) ?? []),
+			...hiddenMessages(db, conversationId),
+		]);
+		const held = new Map<string, boolean>();
+		return {
+			has(messageId) {
+				if (known.has(messageId)) return true;
+				let hidden = held.get(messageId);
+				if (hidden === undefined) {
+					hidden = withheldIn(deps, db, [messageId]).has(messageId);
+					held.set(messageId, hidden);
+				}
+				return hidden;
+			},
+		};
 	} catch {
 		return null;
 	}
@@ -178,23 +193,56 @@ function resultText(tool: ReadTool, found: Found): string {
 	].join("\n");
 }
 
-/** Memory's items as the profile shows them: where each came from, and whether `## Memory` shows it already. */
-function memoryFound(
-	deps: DialogueDeps,
-	input: GenerateInput,
+/**
+ * Memory's items as the profile shows them: where each came from, and whether `## Memory` shows it already. Each
+ * State item carries the short reference of the window the prompt's `## Memory` belongs to (its own when it is
+ * shown there, the next number when it is not); a tendency reads as an estimate and has none; a suppressed item says
+ * it is not to be brought up and has none (a reference is for what the user may correct or forget). The references
+ * are handed out only while the run is still the current one: a call of a run taken back writes nothing.
+ */
+async function memoryFound(
+	x: ExecutorContext,
 	query?: string,
-): Found | null {
-	const checked = deps.memory?.check({
+): Promise<Found | null> {
+	const { deps, input } = x;
+	const memory = deps.memory;
+	const checked = memory?.check({
 		...(query ? { query } : {}),
 		shown: new Set(input.memoryItemIds),
 		limit: LIMITS.memory,
 	});
-	if (!checked) return null;
+	if (!memory || !checked) return null;
 	const itemIds = checked.items.flatMap((item) =>
 		typeof item.id === "string" ? [item.id] : [],
 	);
+	const items = await deps.store.write((tx) => {
+		x.current(tx);
+		const referable = checked.items.flatMap((item) =>
+			typeof item.id === "string" &&
+			!item.id.startsWith("tendency:") &&
+			item.suppressed !== true &&
+			typeof item.revision === "number"
+				? [{ itemId: item.id, revision: item.revision }]
+				: [],
+		);
+		const refs = new Map(
+			input.memory && referable.length
+				? memory.shortRefs
+						.assignInTransaction(tx, {
+							conversationId: input.conversationId,
+							windowKey: input.memory.refsKey,
+							items: referable,
+						})
+						.map((ref) => [ref.itemId, ref.ref])
+				: [],
+		);
+		return checked.items.map((item) => ({
+			...item,
+			...(refs.has(String(item.id)) ? { ref: refs.get(String(item.id)) } : {}),
+		}));
+	});
 	return {
-		lines: checked.items.map(memoryItemLine),
+		lines: items.map(memoryItemLine),
 		more: checked.matched - checked.items.length,
 		...(itemIds.length ? { sources: { itemIds } } : {}),
 	};
@@ -584,16 +632,15 @@ function worldFound(
 }
 
 async function found(
-	deps: DialogueDeps,
-	input: GenerateInput,
+	x: ExecutorContext,
 	call: Extract<ParsedCall, { name: ReadToolName }>,
 ): Promise<Found | null> {
+	const { deps, input } = x;
 	const args = call.args;
 	switch (call.name) {
 		case "read_memory":
 			return memoryFound(
-				deps,
-				input,
+				x,
 				(args as z.infer<(typeof readToolInputs)["read_memory"]>).query,
 			);
 		case "read_history":
@@ -693,7 +740,7 @@ export async function read(
 	}
 	let records: Found | null;
 	try {
-		records = await found(deps, input, call);
+		records = await found(x, call);
 	} catch {
 		records = null;
 	}

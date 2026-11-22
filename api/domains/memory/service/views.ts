@@ -1,5 +1,5 @@
 import type { SqliteStore } from "../../../infrastructure/sqlite";
-import type { ContinuityItem, ContinuityService } from "../../continuity";
+import type { ContinuityService, PlanItem } from "../../continuity";
 import type { MemoryContextDto, MemoryTendencyDto } from "../contracts";
 import { listActiveTendencies, readSettings } from "../repository";
 import { referenceJson } from "../../../infrastructure/reference-json";
@@ -7,7 +7,7 @@ import type { ContextWindowStore, WindowSnapshot } from "./context-window";
 import { profileItemFields } from "./profile";
 
 /**
- * What the settings screen reads besides State: short-term notes, tendencies, and the long-term part of the
+ * What the settings screen reads besides State: plans (L3), tendencies, and the long-term part of the
  * ContextWindow (the published profile). Every body fails closed while memory is unhealthy (an inconsistent journal may mean a
  * forgotten value is still in this database).
  */
@@ -27,11 +27,14 @@ export function createMemoryViews(deps: {
 		newMemories: window.newMemories.length,
 	});
 	return {
-		/** Active, unexpired short-term notes of a conversation. Empty while memory is unhealthy. */
-		shortTerm(conversationId: string): ContinuityItem[] {
+		/**
+		 * The open plans (L3: plans, intents, open questions, decisions; also those waiting for confirmation) of a
+		 * conversation, soonest date first. Those resting on an excluded source are left out. Empty while memory is unhealthy.
+		 */
+		plans(conversationId: string): PlanItem[] {
 			if (!healthy()) return [];
-			return store.read(
-				(db) => continuity.snapshotInTransaction(db, conversationId).items,
+			return store.read((db) =>
+				continuity.plans.listInTransaction(db, { conversationId }),
 			);
 		},
 		tendencies(): MemoryTendencyDto[] {

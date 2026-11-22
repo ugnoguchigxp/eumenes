@@ -2,7 +2,8 @@ import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { ConversationService } from "../../conversation";
 import type { InferencePort } from "../../inference";
 import type { QueueService } from "../../queue";
-import type { MemoryService, PreparedWindow } from "../../memory";
+import type { MemoryService } from "../../memory";
+import type { PreparedMemory } from "./memory-window";
 import type { ContinuityService } from "../../continuity";
 import {
 	RESEARCH_BUDGET,
@@ -13,6 +14,7 @@ import type {
 	Addressee,
 	GuidanceLanguage,
 	AgencyLayerPort,
+	MemoryTargetPort,
 	ConversationAgentPort,
 	Run,
 	SpecialistPort,
@@ -187,11 +189,7 @@ export interface GenerateInput {
 		protectedCount?: number;
 	};
 	/** The memory window fixed at prepare time; re-checked in the adoption transaction. */
-	memory?: {
-		window: PreparedWindow;
-		/** The shown messages already blocked at prepare time; one blocked later expires the generation. */
-		blockedAtPrepare?: string[];
-	};
+	memory?: PreparedMemory;
 }
 export interface Accept {
 	/** Internal only: reuse an already published voice transcript, never accepted from the public submit API. */
@@ -243,6 +241,8 @@ export type DialogueDeps = {
 	memory?: MemoryService;
 	/** Told in the transaction in which a run ends, after its exchange is in memory's ledger. */
 	steward?: StewardPort;
+	/** Resolves the target of a correction, forget or suppression that names no short reference (the agency). */
+	memoryTargets?: MemoryTargetPort;
 	agents?: AgentRuntime;
 	music?: MusicPort;
 	excalidraw?: ImagePort;

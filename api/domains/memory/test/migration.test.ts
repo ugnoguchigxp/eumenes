@@ -19,6 +19,9 @@ import {
 	specialistBlockReasonMigration,
 	retireExchangeLedgerMigration,
 	dropWindowPrefetchMigration,
+	immediateLayerMigration,
+	tendencyRunMigration,
+	explicitRequestedMigration,
 } from "../repository";
 import { hostInputsMigration } from "../repository/host-inputs";
 import {
@@ -42,6 +45,9 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 		path,
 		all.filter(
 			(m) =>
+				m.sql !== immediateLayerMigration &&
+				m.sql !== tendencyRunMigration &&
+				m.sql !== explicitRequestedMigration &&
 				m.sql !== hostInputsMigration &&
 				m.sql !== executionReferencesMigration &&
 				m.sql !== seedImportMigration &&

@@ -172,6 +172,56 @@ test("the vendored steer package matches its manifest, package.json, the lockfil
 	expect(lock).toContain(integrity);
 });
 
+const consolidationManifest = JSON.parse(
+	read("vendor/eumenes-consolidation/manifest.json").toString(),
+);
+
+test("the vendored consolidation package matches its manifest, package.json, the lockfile and the installed copy, and the folder holds only that tarball", () => {
+	const dir = "vendor/eumenes-consolidation";
+	const artifact = read(`${dir}/${consolidationManifest.artifact}`);
+	expect(consolidationManifest.package).toBe("eumenes-consolidation");
+	expect(createHash("sha256").update(artifact).digest("hex")).toBe(
+		consolidationManifest.sha256,
+	);
+	expect(artifact.length).toBe(consolidationManifest.size);
+	expect(
+		read(`${dir}/${consolidationManifest.artifact}.sha256`)
+			.toString()
+			.split(/\s+/)[0],
+	).toBe(consolidationManifest.sha256);
+	const dependency = JSON.parse(read("package.json").toString()).dependencies[
+		consolidationManifest.package
+	];
+	expect(dependency).toBe(`file:${dir}/${consolidationManifest.artifact}`);
+	const installed = JSON.parse(
+		read("node_modules/eumenes-consolidation/package.json").toString(),
+	);
+	expect(installed.version).toBe(consolidationManifest.version);
+	// Its peer is the memory package this repository vendors.
+	expect(installed.peerDependencies["eumenes-memory"]).toBe(pkg.version);
+	// Every file the manifest lists is what is installed.
+	for (const [path, expected] of Object.entries(
+		consolidationManifest.files as Record<string, string>,
+	)) {
+		const inner = path.replace(/^package\//, "");
+		expect(
+			createHash("sha256")
+				.update(read(`node_modules/eumenes-consolidation/${inner}`))
+				.digest("hex"),
+		).toBe(expected);
+	}
+	const lock = read("bun.lock").toString();
+	const integrity = `sha512-${createHash("sha512").update(artifact).digest("base64")}`;
+	expect(lock).toContain(
+		`${consolidationManifest.package}@${dir}/${consolidationManifest.artifact}`,
+	);
+	expect(lock).toContain(integrity);
+	// No other tarball waits in the folder (the general check below covers the rest of vendor/).
+	expect(
+		readdirSync(join(root, dir)).filter((file) => file.endsWith(".tgz")),
+	).toEqual([consolidationManifest.artifact]);
+});
+
 const routerManifest = JSON.parse(
 	read("vendor/router/manifest.json").toString(),
 );

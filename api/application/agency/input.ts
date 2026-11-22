@@ -2,6 +2,7 @@ import type { InputContext } from "eumenes-agency";
 import type { AgencyHostDeps } from "./host-types";
 import type { Database } from "bun:sqlite";
 import { sha256Hex } from "../../infrastructure/digest";
+import { currentRef } from "./always-on-recall";
 
 export const fixedInput = (value: unknown): InputContext => ({
 	sources: [`host-config:${sha256Hex(JSON.stringify(value))}`],
@@ -31,12 +32,14 @@ export function staleMemoryRefs(
 	if (!refs.length || !deps.memory.referenceInputs) return [];
 	const status = deps.memory.status();
 	if (!status.enabled || !status.healthy) return [];
+	// A version a consolidation replaced is its successor (the same meaning): that is what has to be current.
+	const now = new Map(refs.map((r) => [r, currentRef(deps, db, r)]));
 	const current = new Set(
 		deps.memory.referenceInputs.captureInTransaction(db, {
-			itemIds: refs.map((r) => r.slice("memory:".length)),
+			itemIds: [...new Set(now.values())].map((r) => r.slice("memory:".length)),
 		}).sources,
 	);
-	return refs.filter((r) => !current.has(r));
+	return refs.filter((r) => !current.has(now.get(r)!));
 }
 export function currentInput(
 	deps: AgencyHostDeps,
@@ -70,7 +73,7 @@ export function referencedInput(
 	let complete = true;
 	const seen = new Set<string>();
 	const visit = (ref: string) => {
-		const base = ref.replace(/:c\d+$/u, "");
+		const base = currentRef(deps, db, ref.replace(/:c\d+$/u, ""));
 		if (seen.has(base)) return;
 		seen.add(base);
 		if (base.startsWith("memory:")) itemIds.add(base.slice("memory:".length));

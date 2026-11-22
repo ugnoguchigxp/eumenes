@@ -23,7 +23,7 @@ export const memoryMaintenanceInput = z.strictObject({
 	refs: z
 		.array(
 			z.strictObject({
-				kind: z.enum(["state", "note", "tendency"]),
+				kind: z.enum(["state", "tendency"]),
 				id: z.string().min(1).max(240),
 				revision: z.number().int().positive(),
 			}),
@@ -32,14 +32,17 @@ export const memoryMaintenanceInput = z.strictObject({
 		.max(200),
 });
 
-/** This owner-only surface changes use, never text, meaning, origin, sources or forget fences. */
+/**
+ * This owner-only surface changes use, never text, meaning, origin, sources or forget fences. It covers State and
+ * tendencies; plans (L3) are closed and reopened by the agent with evidence, and have no owner-side restore.
+ */
 export function createMemoryMaintenance(
 	store: SqliteStore,
 	deps: CurationDeps,
 	states: (db: Database) => readonly StateItem[],
 ) {
 	const evidence = createEvidence(deps);
-	function inventory(db: Database, conversationId: string) {
+	function inventory(db: Database) {
 		if (!deps.ready()) throw new Error("memory_unavailable");
 		return [
 			...states(db)
@@ -55,15 +58,6 @@ export function createMemoryMaintenance(
 					active: s.status === "active",
 					text: s.value.text,
 				})),
-			...deps.continuity
-				.ownerItemsInTransaction(db, conversationId)
-				.map((s) => ({
-					kind: "note" as const,
-					id: s.id,
-					revision: s.revision,
-					active: s.status === "active",
-					text: s.text,
-				})),
 			...listStoredTendencies(db).map((s) => ({
 				kind: "tendency" as const,
 				id: s.id,
@@ -75,10 +69,7 @@ export function createMemoryMaintenance(
 	}
 	function plan(db: Database, input: z.infer<typeof memoryMaintenanceInput>) {
 		const rows = new Map(
-			inventory(db, input.conversationId).map((r) => [
-				JSON.stringify([r.kind, r.id, r.revision]),
-				r,
-			]),
+			inventory(db).map((r) => [JSON.stringify([r.kind, r.id, r.revision]), r]),
 		);
 		const seen = new Set<string>();
 		return input.refs.map((ref) => {
@@ -94,8 +85,7 @@ export function createMemoryMaintenance(
 		});
 	}
 	return {
-		list: (conversationId: string) =>
-			store.read((db) => ({ items: inventory(db, conversationId) })),
+		list: () => store.read((db) => ({ items: inventory(db) })),
 		preview: (raw: unknown) =>
 			store.read((db) => ({
 				items: plan(db, memoryMaintenanceInput.parse(raw)),
@@ -134,32 +124,6 @@ export function createMemoryMaintenance(
 						);
 						if (result.status !== "applied")
 							throw new Error("maintenance_conflict");
-					} else if (item.kind === "note") {
-						const note = deps.continuity
-							.ownerItemsInTransaction(db, input.conversationId)
-							.find((n) => n.id === item.id)!;
-						if (
-							input.active &&
-							note.sourceMessageIds.some(
-								(id) =>
-									isBlocked(db, id) ||
-									!deps.conversation.messageInTransaction(db, id),
-							)
-						)
-							throw new Error("maintenance_conflict");
-						const changed = input.active
-							? deps.continuity.restoreByOwnerInTransaction(
-									db,
-									item.id,
-									item.revision,
-								)
-							: deps.continuity.closeByAgentInTransaction(
-									db,
-									item.id,
-									item.revision,
-									"retracted",
-								);
-						if (!changed) throw new Error("maintenance_conflict");
 					} else {
 						const tendency = getTendency(db, item.id)!;
 						if (input.active) {
@@ -168,18 +132,24 @@ export function createMemoryMaintenance(
 									.filter((s) => s.status === "active")
 									.map((s) => s.itemId),
 							);
-							const activeNotes = new Set(
-								deps.continuity
-									.snapshotInTransaction(db, input.conversationId)
-									.items.map((n) => n.id),
+							const openPlans = new Set(
+								deps.continuity.plans
+									.listInTransaction(db, {
+										conversationId: input.conversationId,
+									})
+									.map((plan) => plan.id),
 							);
 							if (
-								tendency.evidence.some(
-									(e) =>
-										!(e.namespace === "state" ? activeStates : activeNotes).has(
-											e.id,
-										),
-								) ||
+								tendency.evidence.some((e) => {
+									if (e.namespace === "state") return !activeStates.has(e.id);
+									if (e.namespace === "continuity") return !openPlans.has(e.id);
+									// A message must still be usable; a candidate that was forgotten took the tendency with it.
+									return (
+										e.namespace === "message" &&
+										(isBlocked(db, e.id) ||
+											!deps.conversation.messageInTransaction(db, e.id))
+									);
+								}) ||
 								listStoredTendencies(db).filter((t) => t.status === "active")
 									.length >= 20
 							)
@@ -203,10 +173,7 @@ export function createMemoryMaintenance(
 					purgeWindows(db);
 				}
 				const updated = new Map(
-					inventory(db, input.conversationId).map((r) => [
-						JSON.stringify([r.kind, r.id]),
-						r,
-					]),
+					inventory(db).map((r) => [JSON.stringify([r.kind, r.id]), r]),
 				);
 				return {
 					items: items.map((i) => ({

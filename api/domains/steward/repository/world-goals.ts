@@ -73,64 +73,6 @@ function chunks<T>(values: readonly T[]): T[][] {
 }
 const marks = (n: number) => Array.from({ length: n }, () => "?").join(",");
 
-// ---- routing (section 3.4) ----
-
-export interface RouteRow {
-	messageId: string;
-	revision: string;
-	digest: string;
-	conversationId: string;
-	world: boolean;
-	goals: boolean;
-}
-/** Routes kept per conversation: a route is read once, when the message's World event is due. */
-const ROUTES_PER_CONVERSATION = 500;
-
-export function putRoute(db: Database, row: RouteRow, now: string) {
-	db.query(
-		`INSERT OR REPLACE INTO steward_route (message_id, revision, digest, conversation_id, world, goals, created_at)
-		 VALUES (?,?,?,?,?,?,?)`,
-	).run(
-		row.messageId,
-		row.revision,
-		row.digest,
-		row.conversationId,
-		row.world ? 1 : 0,
-		row.goals ? 1 : 0,
-		now,
-	);
-	db.query(
-		`DELETE FROM steward_route WHERE conversation_id = ? AND rowid NOT IN
-		 (SELECT rowid FROM steward_route WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?)`,
-	).run(row.conversationId, row.conversationId, ROUTES_PER_CONVERSATION);
-}
-/** The judgment of the message as it is now (its revision and digest); null when there is none for that version. */
-export function readRoute(
-	db: Database,
-	messageId: string,
-	revision: string,
-	digest: string,
-): { world: boolean; goals: boolean } | null {
-	const row = db
-		.query(
-			"SELECT world, goals FROM steward_route WHERE message_id = ? AND revision = ? AND digest = ?",
-		)
-		.get(messageId, revision, digest) as {
-		world: number;
-		goals: number;
-	} | null;
-	return row ? { world: row.world === 1, goals: row.goals === 1 } : null;
-}
-export function deleteRoutesOfMessages(
-	db: Database,
-	messageIds: readonly string[],
-) {
-	for (const part of chunks(messageIds))
-		db.query(
-			`DELETE FROM steward_route WHERE message_id IN (${marks(part.length)})`,
-		).run(...part);
-}
-
 // ---- World events ----
 
 export function worldEventCounts(

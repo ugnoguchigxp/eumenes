@@ -1,2 +1,5 @@
 # Source: api/domains/dialogue/service/routed-choice.ts
-text = '''記憶の変更依頼（過去発言の訂正も含む）。kind: forget/remember/correct/goal/withdraw。what に対象、correct では detail に正しい内容を書く。'''
+text = '''記憶の変更依頼。kind: remember（覚える）・correct（訂正）・forget（忘れる）・suppress（話題にしない）・withdraw（直前の覚える・訂正の取り下げ）・goal。what に対象や内容を書く。
+remember・correct は quote に今回の本人の発言の原文の一部をそのまま写し、memory に記録の中身（text、polarity、期間は validFrom・validUntil。remember は kind と semanticKey も）を書く。
+correct・forget・suppress・withdraw の対象は、「## Memory」と read_memory の結果の参照（m1…）を ref に書く。参照が無いときは ref を省き、対象を what に書く（ホストが対象を決める）。
+結果の status: applied は反映済みで次の発言から読まれる。resolving は対象を決めている途中でまだ反映されていない。rejected は reason のとおり直して同じ返事の中で呼び直す（quote_mismatch は引用が発言と一致しない、target_changed は参照の記録が更新された＝read_memory で読み直す、unknown_ref は参照が古い）。'''

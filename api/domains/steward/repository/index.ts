@@ -1,22 +1,28 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
-import type {
-	DecisionDto,
-	InboxState,
-	RequestKind,
-	StepId,
-	UnitKind,
-	UnitSlot,
-	UnitState,
+import {
+	FORGET_KEY,
+	SLEEP_KEY,
+	type DecisionDto,
+	type InboxState,
+	type StoredRequestKind,
+	type StepId,
+	type UnitKind,
+	type UnitSlot,
+	type UnitState,
 } from "../contracts";
 import { dropEpisodeMigration } from "./drop-episode";
 import { activityIndexesMigration } from "./activity-indexes";
 import { dropRecallMigration } from "./drop-recall";
 import { continuityEventsMigration } from "./events";
+import { sleepLayerMigration } from "./sleep";
+import { targetRequestsMigration } from "./targets";
 import { worldGoalsMigration } from "./world-goals";
 
 export * from "./activity";
 export * from "./events";
+export * from "./sleep";
+export * from "./targets";
 export * from "./world-goals";
 
 /**
@@ -92,6 +98,8 @@ export const migrations: readonly Migration[] = [
 		after: ["steward/0004-drop-recall"],
 	},
 	activityIndexesMigration,
+	sleepLayerMigration,
+	targetRequestsMigration,
 ];
 
 const CHUNK = 200;
@@ -106,14 +114,19 @@ const marks = (n: number) => Array.from({ length: n }, () => "?").join(",");
 // ---- units ----
 
 export type UnitTargets = {
-	/** The `seq` of the continuity events the step reads (the ones it settles). */
-	seqs?: number[];
-	/** Inbox ids of the requests a curate step settles. */
+	/** Inbox ids of the requests a curate step settles (the forget closure's excluded requests too). */
 	requests?: string[];
-	/** The maintenance revision an upkeep unit was made for. */
-	revision?: number;
-	/** An upkeep unit made for the pending limit: it does not wait for the foreground. */
+	/** The unit does not wait for a conversation run (the closure delete of a forget). */
 	urgent?: boolean;
+	/** The shallow unit's work: embed the turns of the events waiting, and/or run the library's shallow consolidation. */
+	embed?: boolean;
+	consolidate?: boolean;
+	/** State items the library holds excluded that no excluded request names (a restored database): the closure delete takes them. */
+	orphans?: string[];
+	/** The deep unit made without the time window (the events piled up past the supplement limit). */
+	supplement?: boolean;
+	/** The last event seq of each conversation the deep unit covers (saved when it is adopted). */
+	positions?: Record<string, number>;
 	/** The World events a `world_events` unit curates (the events of one run's messages, at most two). */
 	events?: string[];
 };
@@ -223,28 +236,12 @@ export function pruneUnits(db: Database, conversationId: string, keep: number) {
 		 (SELECT rowid FROM steward_unit WHERE conversation_id = ? AND state <> 'open' ORDER BY rowid DESC LIMIT ?)`,
 	).run(conversationId, conversationId, keep);
 }
-/** Units of an upkeep step over one revision that ended in failure (the step is given up at the limit). */
-export function failedMaintenanceUnits(
-	db: Database,
-	conversationId: string,
-	step: StepId,
-	revision: number,
-): number {
-	return (
-		db
-			.query(
-				`SELECT COUNT(*) AS n FROM steward_unit WHERE conversation_id = ? AND step = ? AND state = 'failed'
-				 AND json_extract(targets, '$.revision') = ?`,
-			)
-			.get(conversationId, step, revision) as { n: number }
-	).n;
-}
-/** Every conversation the steward has ever worked for (the startup kick starts from them). */
+/** Every conversation the steward has units or requests for (the startup kick starts from them). */
 export function conversationsWithWork(db: Database): string[] {
 	return (
 		db
 			.query(
-				`SELECT conversation_id AS id FROM steward_unit UNION SELECT conversation_id FROM steward_state
+				`SELECT conversation_id AS id FROM steward_unit WHERE conversation_id NOT IN ('${SLEEP_KEY}', '${FORGET_KEY}')
 				 UNION SELECT conversation_id FROM steward_inbox`,
 			)
 			.all() as Array<{ id: string }>
@@ -272,65 +269,6 @@ export function takeRequests(db: Database, jobId: string): string[] {
 	return rows.map((row) => row.id);
 }
 
-// ---- upkeep control ----
-
-type QuietSteps = {
-	/** Upkeep steps that found nothing to change: step -> the revision they were quiet at. */
-	quiet?: Record<string, number>;
-	/** The round being run: its revision and the steps already started in it. */
-	round?: { revision: number; count: number };
-	/** The number of pending additions a pending-limit consolidation was last made for. */
-	pending?: number;
-};
-export interface StateRow {
-	conversationId: string;
-	maintenanceRevision: number;
-	maintainedRevision: number;
-	quiet: QuietSteps;
-	nextMaintenanceAt: number | null;
-	deferCount: number;
-}
-export function readState(db: Database, conversationId: string): StateRow {
-	const row = db
-		.query(
-			`SELECT maintenance_revision AS maintenanceRevision, maintained_revision AS maintainedRevision,
-			 quiet_steps AS quiet, next_maintenance_at AS nextMaintenanceAt, defer_count AS deferCount
-			 FROM steward_state WHERE conversation_id = ?`,
-		)
-		.get(conversationId) as
-		(Omit<StateRow, "conversationId" | "quiet"> & { quiet: string }) | null;
-	return row
-		? {
-				conversationId,
-				...row,
-				quiet: JSON.parse(row.quiet) as QuietSteps,
-			}
-		: {
-				conversationId,
-				maintenanceRevision: 0,
-				maintainedRevision: 0,
-				quiet: {},
-				nextMaintenanceAt: null,
-				deferCount: 0,
-			};
-}
-export function writeState(db: Database, state: StateRow) {
-	db.query(
-		`INSERT INTO steward_state (conversation_id, maintenance_revision, maintained_revision, quiet_steps,
-		 next_maintenance_at, defer_count) VALUES (?,?,?,?,?,?)
-		 ON CONFLICT(conversation_id) DO UPDATE SET maintenance_revision = excluded.maintenance_revision,
-		 maintained_revision = excluded.maintained_revision, quiet_steps = excluded.quiet_steps,
-		 next_maintenance_at = excluded.next_maintenance_at, defer_count = excluded.defer_count`,
-	).run(
-		state.conversationId,
-		state.maintenanceRevision,
-		state.maintainedRevision,
-		JSON.stringify(state.quiet),
-		state.nextMaintenanceAt,
-		state.deferCount,
-	);
-}
-
 // ---- inbox ----
 
 export interface InboxRow {
@@ -338,7 +276,7 @@ export interface InboxRow {
 	conversationId: string;
 	/** The user's message the request was made in (the conversation message, not an event). */
 	sourceRef: string;
-	kind: RequestKind;
+	kind: StoredRequestKind;
 	what: string;
 	detail: string | null;
 	state: InboxState;
@@ -346,9 +284,24 @@ export interface InboxRow {
 	failures: number;
 	createdAt: string;
 	resolvedAt: string | null;
+	/** An `excluded` forget: what its closure delete removes (JSON of {@link ForgetExclusion}); null otherwise. */
+	exclusion: string | null;
+	/** A request that names its target in words, as the agency reads it (JSON of `TargetRequest`); null otherwise. */
+	request: string | null;
+	/** When the user was told that nothing was changed (an unresolved request); null before. */
+	toldAt: string | null;
+}
+/** What the closure delete of an excluded forget removes (the ids the immediate stage excluded). */
+export interface ForgetExclusion {
+	itemIds: string[];
+	messageIds: string[];
+	claimIds: string[];
+	entityIds: string[];
+	goalIds: string[];
 }
 const inboxColumns = `id, conversation_id AS conversationId, source_ref AS sourceRef, kind, what, detail,
- state, result_code AS resultCode, failures, created_at AS createdAt, resolved_at AS resolvedAt`;
+ state, result_code AS resultCode, failures, created_at AS createdAt, resolved_at AS resolvedAt, exclusion, request,
+ told_at AS toldAt`;
 /** A request waits as `pending` at once. False when the id was already queued (the first stands). */
 export function insertInbox(
 	db: Database,
@@ -396,7 +349,10 @@ export function countOpenInbox(db: Database, conversationId: string): number {
 			.get(conversationId) as { n: number }
 	).n;
 }
-/** Pending requests, oldest first. `goal` requests belong to the goal reflection, the others to curate-memory. */
+/**
+ * Pending requests, oldest first. `goal` requests belong to the goal reflection, the others to curate-memory. A
+ * request that names its target in words (`request` is kept) is the agency's, never these steps'.
+ */
 export function pendingInbox(
 	db: Database,
 	conversationId: string,
@@ -406,9 +362,44 @@ export function pendingInbox(
 	return db
 		.query(
 			`SELECT ${inboxColumns} FROM steward_inbox WHERE conversation_id = ? AND state = 'pending'
-			 AND kind ${which === "goal" ? "=" : "<>"} 'goal' ORDER BY created_at, id LIMIT ?`,
+			 AND request IS NULL AND kind ${which === "goal" ? "=" : "<>"} 'goal' ORDER BY created_at, id LIMIT ?`,
 		)
 		.all(conversationId, limit) as InboxRow[];
+}
+/**
+ * A pending forget whose targets were excluded at once (the redesign, section 9.2): it waits for the closure delete.
+ * False when the request is not pending. The words stay until it ends: the closure may need them to report.
+ */
+export function markExcluded(
+	db: Database,
+	id: string,
+	exclusion: ForgetExclusion,
+): boolean {
+	return (
+		db
+			.query(
+				"UPDATE steward_inbox SET state = 'excluded', exclusion = ?, request = NULL WHERE id = ? AND kind = 'forget' AND state = 'pending'",
+			)
+			.run(JSON.stringify(exclusion), id).changes === 1
+	);
+}
+/** Excluded forgets waiting for their closure delete, oldest first. */
+export function excludedInbox(db: Database, limit: number): InboxRow[] {
+	return db
+		.query(
+			`SELECT ${inboxColumns} FROM steward_inbox WHERE state = 'excluded' ORDER BY created_at, id LIMIT ?`,
+		)
+		.all(limit) as InboxRow[];
+}
+/** The State items every excluded request names (the ones whose closure delete is on its way). */
+export function excludedItemIds(db: Database): string[] {
+	return (
+		db
+			.query(
+				"SELECT exclusion FROM steward_inbox WHERE state = 'excluded' AND exclusion IS NOT NULL",
+			)
+			.all() as Array<{ exclusion: string }>
+	).flatMap((row) => (JSON.parse(row.exclusion) as ForgetExclusion).itemIds);
 }
 /**
  * Ends a request (done or none): its words are no longer kept (section 6). `afterForget`: the request was
@@ -426,15 +417,15 @@ export function resolveInbox(
 	return (
 		db
 			.query(
-				`UPDATE steward_inbox SET state = ?, result_code = ?, what = '', detail = NULL, resolved_at = ?
-				 WHERE id = ? AND (state = 'pending' OR (? = 1 AND state = 'none' AND result_code = 'forgotten'))`,
+				`UPDATE steward_inbox SET state = ?, result_code = ?, what = '', detail = NULL, exclusion = NULL, request = NULL, resolved_at = ?
+				 WHERE id = ? AND (state IN ('pending','excluded') OR (? = 1 AND state = 'none' AND result_code = 'forgotten'))`,
 			)
 			.run(state, code, now, id, afterForget ? 1 : 0).changes === 1
 	);
 }
 export function bumpInboxFailure(db: Database, id: string): number {
 	db.query(
-		"UPDATE steward_inbox SET failures = failures + 1 WHERE id = ? AND state = 'pending'",
+		"UPDATE steward_inbox SET failures = failures + 1 WHERE id = ? AND state IN ('pending','excluded')",
 	).run(id);
 	return (
 		(
@@ -453,12 +444,12 @@ export function endInboxOfMessages(
 ) {
 	for (const part of chunks(messageIds))
 		db.query(
-			`UPDATE steward_inbox SET state = 'none', result_code = ?, what = '', detail = NULL, resolved_at = ?
+			`UPDATE steward_inbox SET state = 'none', result_code = ?, what = '', detail = NULL, request = NULL, resolved_at = ?
 			 WHERE state = 'pending' AND source_ref IN (${marks(part.length)})`,
 		).run(code, now, ...part);
 	for (const part of chunks(messageIds))
 		db.query(
-			`UPDATE steward_inbox SET what = '', detail = NULL WHERE source_ref IN (${marks(part.length)}) AND what <> ''`,
+			`UPDATE steward_inbox SET what = '', detail = NULL, request = NULL WHERE source_ref IN (${marks(part.length)}) AND what <> ''`,
 		).run(...part);
 }
 

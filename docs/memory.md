@@ -10,7 +10,7 @@
 | --- | --- |
 | `memory` | 除外台帳（block ledger）と忘却 journal、ContextWindow の保管と公開、パッケージ公開APIによるStateの保存・訂正・停止・忘却、傾向と派生データの削除 |
 | `steward` | 判断のすべて。step ジョブ、指示文、出力の検証と正規化、依頼の inbox、判断記録 |
-| `continuity` | 会話の出来事の列、短期メモ（目的・決定・未解決・活動・メモ）の保存 |
+| `continuity` | 会話の出来事の列、期限付きの計画（L3。予定・意図・未解決の問い・決定）と質問の台帳の保存 |
 | `dialogue` | 会話。run の終わりで往復の登録と steward への通知を呼び、`compileContext` で Window を prompt に並べる |
 
 - steward は memory、continuity、conversation を使う。dialogue は memory だけを見る。複数 domain への保存は、step の settle が1つの transaction の中で各 domain の公開操作を呼んで行う。
@@ -24,8 +24,8 @@
 
 本人が対象を選んで日常利用から外す場合に限り、認証済み管理APIを使える。通常の記憶変更は従来どおり会話から行う。設定画面やLLMのツールには管理操作を追加していない。
 
-- `GET /api/memory/maintenance?conversationId=main` は停止中を含む本人のState・傾向と、指定会話の短期メモを返す。
-- `POST /api/memory/maintenance/preview` と `/apply` は `{ conversationId, active, refs: [{ kind, id, revision }] }`。kindは`state`・`note`・`tendency`、revisionは正の整数。active=falseで利用を停止し、trueで復帰する。
+- `GET /api/memory/maintenance?conversationId=main` は停止中を含む本人のState・傾向と、指定会話の計画（open と確認待ち）を返す。
+- `POST /api/memory/maintenance/preview` と `/apply` は `{ conversationId, active, refs: [{ kind, id, revision }] }`。kindは`state`・`tendency`、revisionは正の整数。active=falseで利用を停止し、trueで復帰する。
 - 全参照の存在・版を検査し、1件でも不一致なら全件を適用しない。本文・出典・originを書き換えず、完全忘却された内容を復活させない。復帰でも引用元、既存の件数・文脈上限を確認する。過去版や紛争中のStateはこの操作で採用し直さない。
 - 変更は既存の単一writer内で行い、会話の公開窓を破棄する。古い背景推論を採用しないため、既存の記憶失効連番も進める。この連番の移動自体は忘却や原会話の削除ではない。
 
@@ -33,7 +33,7 @@
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
-配布物は `vendor/eumenes-memory/eumenes-memory-0.0.4-7bed1c085f00.tgz` と `vendor/eumenes-memory-host/eumenes-memory-host-0.2.0-cbca090ca596.tgz` に固定する。どちらも独立リポジトリのコミット `1439bfd9c5b171e2da19a445816688e1e3943651` から作り、`manifest.json` と配布内の `dist/release-manifest.json` で出所を照合する。SQLiteスキーマは9。Eumenesの移行処理が `memory-package/0009` を適用して、有効なStateから全文検索索引を構築する。ホストの補助テーブルはホストの起動時に更新される。移行前のDBとMemory・Worldそれぞれの最新の忘却ジャーナルを保全する。旧版へ切り戻すときは移行前DBを使い、読み取りやワーカーの再開前に最新ジャーナルを再適用する。[バックアップと復元](operations.md#バックアップからの復元)を参照。
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.5-8f58df0d0e59.tgz` と `vendor/eumenes-memory-host/eumenes-memory-host-0.2.1-b4c300aef6ba.tgz` に固定する。どちらも独立リポジトリのコミット `1439bfd9c5b171e2da19a445816688e1e3943651` から作り、`manifest.json` と配布内の `dist/release-manifest.json` で出所を照合する。SQLiteスキーマは10。Eumenesの移行処理が `memory-package/0009` で有効なStateから全文検索索引を構築し、`memory-package/0010` で除外・抑制・記憶の候補・強度の表と変更フィードの拡張を足す（0010を適用したDBは版9の本体では開けない）。ホストの補助テーブルはホストの起動時に更新される。移行前のDBとMemory・Worldそれぞれの最新の忘却ジャーナルを保全する。旧版へ切り戻すときは移行前DBを使い、読み取りやワーカーの再開前に最新ジャーナルを再適用する。[バックアップと復元](operations.md#バックアップからの復元)を参照。
 
 会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
 
@@ -47,7 +47,7 @@ Seedは本人の確認済み発言として扱わない。構造化された候�
 | `host_procedure` | 保留。記憶から実行指示へ昇格させない。採用するなら別途、適切な指示・Skill・ツールとして設計する |
 | `continuity` | 保留。会話を特定できない案件メモを、共通プロフィールへ入れない |
 
-他者の情報は通常の会話の `route.world`、会話ごとの目的・決定は短期メモで扱う。現在の本人の指示をSeedより優先する。Memory担当には保存キー・由来・表示件数と全件数も渡し、条件の保持と省略範囲を判断できるようにする。
+他者の情報は本人のStateにしない。会話ごとの目的・決定・予定は計画（continuity の L3）で扱う。現在の本人の指示をSeedより優先する。Memory担当には保存キー・由来・表示件数と全件数も渡し、条件の保持と省略範囲を判断できるようにする。
 
 初回導入では、稼働中のAPIに対して候補を確認し、登録する。CLIはファイルを読みAPIへ渡すだけで、製品DBを直接開かない。
 
@@ -102,40 +102,54 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 
 ## step と実行単位
 
-1 ジョブ ＝ 1 step ＝ 推論 1 回。確定の単位は step で、サイクル全体をまとめて確定することはしない。
+記憶担当は毎往復の処理をしない。会話の出来事から記憶を書く役は Agency の背景のパス（[設計書](../spec/memory-architecture-redesign-2026-11-22.md) §5.3）で、記憶担当は次の 2 つだけを起動する。
 
-| 種類 | step | 役割 |
-| --- | --- | --- |
-| 反映 step（run の結果報告ごと） | `curate-memory`、`curate-goals` | 記憶の保存・更新・停止と短期メモ（決定・利用者への問い・目標・一時的な例外）、目標、ContextWindow の再公開 |
-| World step（会話の最後の出来事から10分後だけ。会話の間はやらない） | `curate-world` | World |
-| 経緯の step（次の再構成が適用する） | `summarize`、`refine-summary` | `log` から外れる出来事の要約、続いた要約のまとめ直し |
-| 手入れ step（会話の最後の出来事から10分後だけ） | `consolidate-memory`、`consolidate-goals` | 記憶の統合・停止・傾向、目標の整理 |
+- 本人の明示の依頼（`memory` ツールの `request`）のうち、目標（`goal`）と、除外済みの忘却の閉包削除。覚える・訂正・話題の抑制・取り下げは、会話の run の中で即時に適用するのでここには来ない（[即時の層](#即時の層明示の依頼の反映)）。依頼があるときだけ単位を作り、通常の出来事では作らない。
+- 睡眠の層（長い範囲の記憶の整理）。パッケージ `eumenes-consolidation` の `runShallow`・`runDeep` を呼ぶ。
 
-会話の内容を読む step（`curate-memory`・`curate-goals`・`summarize`・`refine-summary`）は、主会話の経路が LARM を使うときは、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話がクラウドの経路（`cloud-only`）のときは、先頭を共有してもキャッシュが効かない（Codex のスレッドは指示と出力 schema で分かれる）ので、`curate-memory`・`curate-goals` は自分の指示と入力だけで推論する。
+1 ジョブ ＝ 1 単位。確定の単位は単位で、まとめて確定することはしない。
 
-主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。どの step も、会話に動いている run（担当に渡して結果を待つ run を含む）がある間は始めず、run の終わりで始まる（保守の step は 30秒・2分・10分の待ち）。会話を読まない step（`curate-world`・`consolidate-memory` など）は自分の接続で推論するが、同じく利用者のための呼出し（会話・専門担当など）が始まると取り消される（LARM は1回に1つずつ推論するので、譲らないと利用者の呼出しが待たされる）。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。明示依頼の対象はresolveで一度だけ処理し、通常のremember/updateへ重ねない。忘却依頼の入力には停止中の記憶も状態を明示して含め、過去の版を対象にできる。
+| 種類 | step | 起動の条件 | 初期値（`service/sleep/policy.ts` の `SLEEP_POLICY`。評価で振る） |
+| --- | --- | --- | --- |
+| 依頼の処理 | `curate-memory`、`curate-goals` | pending の依頼がある（run が終わっている会話で、最大8件） | 依頼があるとき |
+| 忘却の削除 | `forget-closure` | 忘却の依頼が「除外済み・確定待ち」（`excluded`）になった | すぐ。会話の run と重なっても走る。睡眠の単位を待たない |
+| 浅い整理 | `shallow` | 会話が休んでいる、かつ前回の浅い整理以降の未整理の候補（L1）が一定数以上。または、休んでいる会話に未整理の出来事がある（その出来事の発言の turn vector をまとめて作る） | 候補 10 件以上（`shallowCandidates`） |
+| 深い整理 | `deep` | 整理の時間帯に入っている、会話が休んでいる、前回の深い整理以降の出来事が一定数以上、その日の深い整理がまだ | 3:00〜5:00（設定 `memory.consolidationWindow`）、出来事 20 件以上（`deepEvents`）、1 日 1 回 |
+| 深い整理の補い | `deep`（`supplement`） | 時間帯が来ないまま前回以降の出来事が上限を超え、会話が休んでいる | 出来事 200 件以上（`supplementEvents`）。その日の深い整理は使い切らない |
+| World の反映 | `curate-world` | World が受け付けた出来事があり、その会話が休んでいる | 1 run 分（最大2件）ずつ |
+| 続き | （同じ種類） | 前の単位が終わった時点で、その間に新しい対象が来ている | すぐもう一度（次の kick が単位の終わりで呼ばれる） |
+
+- 「会話が休んでいる」は、会話に動いている run が無く、利用者の最後の発話から、利用者が決めた話しかけの間隔（`agency.speechIntervalSec`）が過ぎたこと。固定の待ち時間は置かない。間が過ぎるのを待つ timer と、整理の時間帯の開始を待つ timer だけが steward の wake timer に入る（Queue には未来の時刻のジョブを積まない。同じ `concurrencyKey` の後続を止めるため）。
+- 「出来事」は会話ごとの出来事の列の末尾の seq の増えた分の合計。前回の深い整理がどこまで見たかは `steward_sleep_position`、浅い整理の `watermark`（候補の `updatedSeq`）と時間帯の深い整理を走らせた日（JST）は `steward_sleep_state` に持つ。深い整理が採用されたときに位置と日を進める。
+- 浅い整理は、turn vector の作成、期限切れの計画を「確認待ち」にする（`continuity` の `plans.markDueAwaitingInTransaction`）、候補の重複の統合（`runShallow`）。深い整理は `runDeep`（昇格・矛盾の「未解決」化・前準備・目標の確認の提案）に加えて、期限切れの計画の確認待ち化と、保持期間を過ぎた閉じた計画の削除（`plans.pruneClosedInTransaction`）を行う。
+- `runShallow`・`runDeep` の結果の `instructions` は、その単位の settle の transaction の中で出口（`SleepOutlets`）に渡す。期限切れの計画は `continuity` へ。未解決の矛盾と目標の確認の提案は、`continuity` の open_question（利用者に確かめる問いの形。根拠は両方の記録の item ID と根拠の発言の message ID。同じ問いは重ねて作らない）として保存し、Agency が問いかけの候補として読む。前準備と、意味の変わらない版の付け替え（Agency が記憶の変更フィードで追う）は、ログ（`steward.sleep_instruction_unrouted`、件数だけ）に残す。傾向（L4）の書き込みは memory の公開操作ができるまで拒否する（昇格先が L4 の判断を含む深い整理は採用されない）。結果が採用されなかった（`adopted: false`。受入の検査の違反やモデルの失敗）単位は `failed`（`not_adopted`）で閉じ、watermark・位置・日は進めない。ライブラリやホストが 1 つの操作を拒否したとき（読んだ後に記録が変わった、傾向を書けない）は、その候補だけを保留にして残りを採用する（失敗に数えない）。
+- ライブラリの書き込みは steward が包んだ `store.write` で行い、同じ transaction の最初に、memory が使えること・prepare 以後に忘却が無いこと（`forgetSeq`）・どの会話にも動いている run が無いことを検べる。変わっていれば何も書かず、単位は `stale` で閉じ（失敗に数えない）、すぐ読み直す。embedding が失敗した（turn があるのにベクトルが得られず、embedder はある）ときは出来事を処理済みにせず、`embedding_failed` として数えて再試行する。embedder が未設定のときは、これまでどおりベクトルを保存せずに処理済みにする（問い合わせの embedding が null を返すかで見分ける）。
+- 忘却の削除は `memory.closeExclusionInTransaction`（件数の上限なし）で行い、ジョブは `inference.aux` の枠を取らない（資源 `steward.forget`）。DB の復元の後は、起動時と timer の kick で、記憶が除外したまま inbox の `excluded` の行が名指しない State を同じ単位で閉包削除する。
+- 睡眠の単位は全会話をまとめて 1 つずつ（`steward:sleep` の擬似会話、slot `maintenance`）。モデルの呼出しは単位の中で、1 回ごとに background request を取り、主会話の呼出しが始まると取り消される（`larm_preempted`。失敗に数えない）。同じ step が 3 回続けて失敗すると 6 時間止める。
+
+会話の内容を読む step（`curate-memory`・`curate-goals`）は、主会話の経路が LARM を使うときは、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話がクラウドの経路（`cloud-only`）のときは、先頭を共有してもキャッシュが効かない（Codex のスレッドは指示と出力 schema で分かれる）ので、自分の指示と入力だけで推論する。
+
+主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。どの step も、会話に動いている run（担当に渡して結果を待つ run を含む）がある間は始めず、run の終わりで始まる（忘却の削除だけは run と重なっても走る）。会話を読まない step（`curate-world`・睡眠の層）は自分の接続で推論するが、同じく利用者のための呼出し（会話・専門担当など）が始まると取り消される（LARM は1回に1つずつ推論するので、譲らないと利用者の呼出しが待たされる）。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。明示依頼の対象はresolveで一度だけ処理する。忘却依頼の入力には停止中の記憶も状態を明示して含め、過去の版を対象にできる。
 
 **実行単位**（`steward_unit`）は 1 step ＝ 1 ジョブ。同じ対象に開いている単位は 1 つだけである。
 
 | 種類 | 対象 |
 | --- | --- |
-| 往復の step | 1 つの会話の、その step が未了の往復（最大4往復・16 KiB） |
-| 依頼のまとめ | pending の依頼（最大8件）。`curate-memory` として実行 |
-| 手入れ | 会話の `maintenance_revision` ごとに 1 つ |
+| 依頼のまとめ | pending の依頼（最大8件）。`curate-memory` または `curate-goals` として実行 |
+| World の反映 | 1 つの会話の World の出来事（1 run 分、最大2件） |
+| 睡眠の層 | プロファイル全体。`shallow`・`deep` は 1 つずつ。`forget-closure` は別の slot（`steward:forget`）で、除外済みの依頼（最大8件） |
 
 - ジョブ種別は `steward.step.v1`、`dedupeKey` ＝ unitId。資源は `inference.aux`。
-- **prepare** で対象がまだ有効か確かめ、推論の期限と request を取り、忘却の連番 `forget_seq` を単位に記録する。**execute** は schema 付きの推論 1 回（上限は期限300秒・出力1200 tokens。LARM の考えるモデルには inference が考える分 10,000 tokens を足すので、約45 tokens/秒でも書き終わる長さにしている。会話と同じ route を使い、cloud への切替が期限から最大60秒を確保する。ジョブの期限は15分で、待ち・推論・再試行を含む）。**settle** は 1 つの transaction で、再検証、結果の適用、完了印、判断記録、Window の再公開、次の単位の enqueue を行う。
-- 一時的な失敗（タイムアウト・接続失敗）は Queue の retry（最大3回）で同じジョブのまま再試行する。Queue で終わった（failed / expired / interrupted）単位、または出力が使えなかった単位は `failed` で閉じ、対象ごとに失敗を数える。`kick` が**新しい unitId** の単位を作り直す。3回失敗した往復は `skipped` の印で次へ進み（`dispose-exchanges` が見送られた往復は未処理と同じ扱い、`summarize` が見送られた往復は中身を失わないよう逐語のまま）、依頼は `none`（`steward_failed`）にする。
-- 往復の完了は、3つの反映 step すべてに印（`done` / `skipped`）が付いたときである。`summarize` を選ばれた往復は、要約に入るまで逐語のまま残る。
-- 長期記憶を書く step（`curate-memory`、`consolidate-memory`）の `concurrencyKey` は全会話共通の `steward:long-term`。Window だけを扱う step は `steward:<conversationId>`。
-- **起動時と各 settle の後**に `kickInTransaction` が呼ばれる。会話を指定しない起動時の kick は、steward が知っている会話と、memory の台帳に反映待ちの往復がある会話（`pendingConversationIdsInTransaction`）のすべてを対象にする。開いている単位があればそれを待つ。
-- 手入れが止まる条件: `maintenance_revision` が前回より進んだときだけ走る。1回の手入れは最大3 step。`changed: false` を返した step は次の revision まで走らない。前景の run が動いている間は始めず、steward 内の timer で時刻が来たら kick する（30秒 → 2分 → 10分）。Queue には未来の時刻のジョブを積まない（同じ `concurrencyKey` の後続を止めるため）。例外として `consolidate-memory` は `PENDING_LIMIT` に達したときは待たない。
+- **prepare** で対象がまだ有効か確かめ、忘却の連番 `forget_seq` を単位に記録する（依頼の処理と World の反映は推論の期限と request も取る）。**execute** は schema 付きの推論 1 回（上限は期限300秒・出力1200 tokens。LARM の考えるモデルには inference が考える分 10,000 tokens を足すので、約45 tokens/秒でも書き終わる長さにしている。会話と同じ route を使い、cloud への切替が期限から最大60秒を確保する。ジョブの期限は15分で、待ち・推論・再試行を含む）。睡眠の単位の execute は、ライブラリが何度かモデルを呼び、自分の transaction で書く（ジョブの期限は 60 分）。**settle** は 1 つの transaction で、再検証、結果の適用、判断記録、Window の再公開、次の単位の enqueue を行う。
+- 一時的な失敗（タイムアウト・接続失敗）は Queue の retry（最大3回）で同じジョブのまま再試行する。Queue で終わった（failed / expired / interrupted）単位、または出力が使えなかった単位は `failed` で閉じ、対象ごとに失敗を数える。`kick` が**新しい unitId** の単位を作り直す。3回失敗した依頼は `none`（`steward_failed`）にする。除外済みの忘却は諦めず、失敗のたびに待ちを置いて削除をやり直す。
+- 長期記憶を書く step（`curate-memory`、`curate-goals`、睡眠の層）の `concurrencyKey` は全会話共通の `steward:long-term`。World の反映は `steward:<conversationId>`、忘却の削除は `steward:forget`。
+- **起動時と各 settle の後**に `kickInTransaction` が呼ばれる。会話を指定しない起動時の kick は、steward が知っている会話と、反映待ちの出来事がある会話のすべてを対象にし、睡眠の層はプロファイル全体を見る。開いている単位があればそれを待つ。
 
 ## 依頼キューと run の取り込み
 
 本人の「覚えて」「忘れて」「違う」は、会話エージェントの記憶ツール（`request`：`{ kind: forget|remember|correct, what, detail? }`）で steward の inbox に入る。dialogue が steward の `requestInTransaction` を直接呼び、受付を返すだけである（`steward.request` toolchain は退役した）。
 
-`staged`（ツール呼び出し時）→ `pending`（run が終わる transaction）→ `done` / `none`（`curate-memory` の settle で `resolve` を適用）。破棄されたものは `discarded`。`what` と `detail` は `done` / `none` / `discarded` になった時点で空にする。
+`pending`（ツール呼び出しで受け付けた時点。対象を言葉で言う訂正・忘却・抑制は `targetRequestInTransaction` で中身〈`request`〉を行に持ち、Agency だけが対象を決める。`curate-memory` には回さない。`pendingTargetsInTransaction`・`hasPendingForgetInTransaction`・`settleTargetInTransaction`〈`applied`・`unresolved`〉・`takeUnresolvedTargetsInTransaction`〈未解決を 1 度だけ返す〉）→ `done` / `none`（`curate-memory` の settle で `resolve` を適用）。忘却の依頼は、対象を除外した直後に `excluded`（除外済み・確定待ち。`steward.excludedInTransaction`）になり、`forget-closure` が全版と派生物を閉包削除して `done` にする。`excluded` は再起動の後も起動時の kick が拾う。`what` と `detail` は `done` / `none` になった時点で空にする。
 
 ### run の終わり方ごとの取り込み（§2.5）
 
@@ -164,11 +178,11 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 
 ### 参照する場所
 
-steward の各 step の入力、根拠の作成、`compileContext` の L3・未処理・直近2往復（**memory の有効/無効に関係なく適用**）、想起、要約の入力と依存元、短期メモの作成、調査ツールの `history.search` / `history.read`、調査結果の採用時の検証。会話画面の履歴表示だけは変えない。
+steward の各 step の入力、根拠の作成、`compileContext` の L3・未処理・直近2往復（**memory の有効/無効に関係なく適用**）、想起、要約の入力と依存元、計画の作成、調査ツールの `history.search` / `history.read`、調査結果の採用時の検証。会話画面の履歴表示だけは変えない。
 
 ### 忘却で消すもの（1つの transaction）
 
-State（過去の版を含む）・usage・Window・傾向、World の派生、短期メモ（除外したメッセージを `sourceMessageId` にするもの、忘れた State を根拠にしたもの）、除外したメッセージの turn vector、要約（`memory_summary_source` に除外した往復を含む版。除外されていない依存元の往復は作り直しの対象になり、作り直すまで逐語で残る）、判断記録（`steward_decision_ref` で引ける行）、依頼の本文、往復の `disposition`（`drop` にする）。会話の原文と、本人に見える会話画面は消さない。
+State（過去の版を含む）・usage・Window・傾向、World の派生、計画と質問の台帳（除外したメッセージを根拠にするもの、忘れた State を根拠にしたもの）、除外したメッセージの turn vector、要約（`memory_summary_source` に除外した往復を含む版。除外されていない依存元の往復は作り直しの対象になり、作り直すまで逐語で残る）、判断記録（`steward_decision_ref` で引ける行）、依頼の本文、往復の `disposition`（`drop` にする）。会話の原文と、本人に見える会話画面は消さない。
 
 ### journal と復旧
 
@@ -190,12 +204,12 @@ State（過去の版を含む）・usage・Window・傾向、World の派生、�
 |---|---|---|
 | 長期記憶（Memory State） | 本人についてのこと | curate-memory |
 | World | 本人の外の世界の状態・関係・因果・依存（本人の発言は `user_report`、アシスタントの回答は `model_hypothesis`＝仮説） | curate-world |
-| 目標（Goals） | 本人が目指すこと（明言は採用、推測は提案。期限では取り下げない） | curate-goals、手入れの consolidate-goals |
+| 目標（Goals） | 本人が目指すこと（明言は採用、推測は提案。期限では取り下げない） | curate-goals（目標の依頼）。深い整理は目標の確認の提案を出すだけで、目標は変えない |
 
 - **World の ON/OFF** は設定 `world.enabled`（再起動で反映）。OFF でも World に中身があれば、忘却の伝播だけが動く（protect）。
 - **World の記録に使う AI** は設定 `world.curationResourceId`（設定画面「会話」の「ワールドモデルの記録に使うAI」）。次の記録から反映される。応答は他の手順と同じく `parseLlmJson` で構文だけ補正してから schema で検査する。
 - **World への反映**: 会話の outbox から World が受け付けた event（ユーザー発言と、採用されたアシスタントの回答）を、steward の実行単位 `world_events` が1往復分（最大2件）ずつ処理する。往復の完了は World を待たない。受付の後に World が steward を kick する。3回保留された event は `STEWARD_GAVE_UP` で終わる。
-- **振り分け**: curate-memory が往復ごとに「World・目標の処理が要るか」を判定し、発言の revision と digest に結び付けて記録する。要らない往復は推論しない。版が違う・判定がないときは処理する。
+- **World の起動**: 判定は置かない。World が受け付けた出来事は、会話が休んでいるとき（run が終わっていて、利用者の最後の発話から話しかけの間隔が過ぎている）に 1 run 分ずつ処理する。
 - **回答での使い方**: ① 採用済みの目標を L1 の直後に置く（優先度順、1件120文字、全体 2KB、溢れは「ほか N 件」）。② 本人の発言（今回の入力、直前の往復）に出た既知の対象を名前・別名の一致（決定的、NFKC・小文字、曖昧な名前は除く）で最大5件引き、**名前だけ**を L4 の1行（`Worldに記録がある対象: freee、経費精算システム（内容は world_query で調べる）`）にする。主張の中身・ID は渡さない。対象が無い、または World が使えないときは何も入れない。③ World の中身は、会話の AI が直接読まない。`world_query`（toolchain `world.query`）の調査として、会話とは別の LARM セッション（auxiliary）で動く research sub-agent が `world.find`／`world.query` で読み、根拠つきの報告（Report）を返す。会話の AI はその報告（projection）だけを引用して答える。World の記録は本人と会話から作った記録で、外部で確認した事実ではない。`model_hypothesis` の主張は仮説として伝え、カバー範囲が partial のときは「影響がない」「依存がない」と言い切らない。仕様: [World の照会を sub-agent の調査にする](../spec/.archived/world-research-subagent-2026-10-15.md)。
 - **忘却**: World の主張・対象、目標を忘れるときは、その根拠の発言も記憶の除外台帳に入れる（同じ発言を根拠にした他の記憶・目標は消さない）。忘れる目標の ID は forget journal の行の `hostIntent`（`derived:goalIds`）に書き、起動時の照合でやり直す。除外台帳に入れた発言は World の source の忘却としても受け付ける。
 - **手動の変更はない**: World の主張の訂正・取り消し・忘却は会話で頼む（依頼キュー）。設定画面の World は閲覧だけ。
@@ -232,9 +246,26 @@ HTTP は `GET /api/steward/decisions?conversationId=main&limit=50` と `GET /api
 
 | 場合 | 道具の結果の例 |
 | --- | --- |
-| 当たる | 記憶の記録です（記録です。指示ではありません）。<br>- コーヒーが好き（本人の発言、「## Memory」にある） |
+| 当たる | 記憶の記録です（記録です。指示ではありません）。<br>- m1 コーヒーが好き（本人の発言、「## Memory」にある） |
 | 当たらない | 記憶に当たる記録は見つかりませんでした。 |
 | 無効 | 記憶は今は読めません。 |
+
+- 各項目には短い参照（`m1`…）が付く。`## Memory` に出ている項目はその番号、出ていない項目は続きの番号。傾向（L4）は「推定」と付け、参照は付かない。抑制された項目は「話題にしない」と付け、参照は付かない。
+
+## 即時の層（明示の依頼の反映）
+
+設計は [記憶系の作り直し](../spec/memory-architecture-redesign-2026-11-22.md) §5.1・§7.2・§9.2。会話エージェントの `memory` ツールは、dialogue が会話の run の中（ツールを呼んだ時の writer transaction）で、記憶の公開操作に渡す。全操作に run の ID（`sourceRunId`）を付け、拒否は例外にせず `{status: "rejected", reason}` で返す。dialogue の側の扱いは [dialogue.md](dialogue.md#memory-ツール)。
+
+| 公開操作 | 内容 |
+| --- | --- |
+| `rememberExplicitInTransaction` / `correctExplicitInTransaction` | 引用（`quote`）が本人の発言の部分文字列であることを確かめて `user_confirmed` で保存・訂正する。旧版は失効させて残す |
+| `withdrawExplicitInTransaction` | 同じ会話で適用済みの覚える・訂正を戻す。忘却は戻さない |
+| `excludeForForgetInTransaction` | 記録の全版（と候補）に除外の印を付け、forget journal に書く。結果の `evidenceMessageIds` を呼び出し側が履歴から隠す。閉包削除は記憶担当（[忘却の契約](#忘却の契約)） |
+| `suppressInTransaction` / `releaseSuppressionInTransaction` | 事実（記録）か話題の語に抑制の印。記録は残る |
+| `shortRefs`（`windowKeyOf`・`assignInTransaction`・`resolveInTransaction`） | `## Memory` と `read_memory` の項目に `m1`… を振る。窓が変わると番号は振り直しになり、古い参照は `unknown_ref`。版が変わった記録は `target_changed` |
+| `latestChangeSeqInTransaction` / `changedExcludingRunInTransaction` | 変更フィードの基準と、自分の run を除いた変更の有無 |
+
+返事の採用の検査（`memory_stale`）は、記憶の窓の即時の変更のうち自分の run のものを除く。追加（新しい記憶）では失効しない。
 
 ## 障害調査
 

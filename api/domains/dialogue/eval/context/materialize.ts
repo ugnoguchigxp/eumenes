@@ -123,6 +123,15 @@ export async function publishStep(
 		);
 }
 
+/** The plan kind a seed note becomes (a memo has no kind of its own any more: it is a plan without a date). */
+const NOTE_PLAN_KINDS = {
+	goal: "intent",
+	decision: "decision",
+	open_question: "open_question",
+	activity: "plan",
+	memo: "plan",
+} as const;
+
 /** Writes the seed's State, the notes and the memory step's publications. */
 async function applyMemorySeed(session: Session, seed: Seed, now: string) {
 	const { wiring } = session;
@@ -162,14 +171,15 @@ async function applyMemorySeed(session: Session, seed: Seed, now: string) {
 		items.filter((i) => !i.published),
 		now,
 	);
-	// Notes carry the time they were added; one millisecond apart keeps their order the seed's.
+	// Notes are plans of the continuity (L3); they carry the time they were added, one millisecond apart.
 	for (const [index, note] of (seed.notes ?? []).entries()) {
 		wiring.setNow(new Date(Date.parse(now) + index).toISOString());
 		await store.write((db) =>
-			wiring.continuity.addByAgentInTransaction(db, CONVERSATION_ID, {
-				kind: note.kind,
+			wiring.continuity.plans.addInTransaction(db, {
+				conversationId: CONVERSATION_ID,
+				kind: NOTE_PLAN_KINDS[note.kind],
 				text: note.text,
-				sourceMessageIds: ["note-source"],
+				evidence: { messages: [{ messageId: "note-source" }] },
 			}),
 		);
 	}

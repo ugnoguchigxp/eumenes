@@ -16,6 +16,7 @@ async function setup() {
 	let fake!: FakeWorld;
 	const h = await setupSteward({
 		embed: topicEmbed,
+		sleep: {},
 		goals: true,
 		async world({ store, conversation, kick }) {
 			const made = await createFakeWorld(store, conversation, kick);
@@ -26,14 +27,7 @@ async function setup() {
 	harnesses.push(h);
 	return { h, fake };
 }
-const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
-const judged = (world: boolean, goals: boolean) => ({
-	...empty,
-	route: [
-		{ event: "e1", world, goals },
-		{ event: "e2", world, goals },
-	],
-});
+const empty = { resolve: [] };
 const resolve = (over: Record<string, unknown>) => ({
 	request: "r1",
 	action: "forget",
@@ -42,16 +36,6 @@ const resolve = (over: Record<string, unknown>) => ({
 	text: null,
 	kind: null,
 	key: null,
-	...over,
-});
-const goalChange = (over: Record<string, unknown>) => ({
-	op: "adopt",
-	ref: null,
-	text: null,
-	priority: null,
-	evidence: "e1",
-	entities: [],
-	request: null,
 	...over,
 });
 const claimAnswer = {
@@ -99,37 +83,44 @@ function showWorld(fake: FakeWorld, claimId = "claim-1") {
 	};
 }
 
+/** A goal the earlier goal reflection kept, standing on the user's message (and tied to World entities). */
+const seedGoal = (
+	h: StewardHarness,
+	op: "adopt" | "propose",
+	text: string,
+	messageId: string,
+	entityIds: string[] = [],
+) => {
+	const goal = {
+		scopeKey: CONVERSATION_DEFAULT_SCOPE,
+		desiredState: text,
+		source: { namespace: "conversation", kind: "message", id: messageId },
+		sourceMessageIds: [messageId],
+		entityIds,
+		operationKey: `seed:${text}`,
+	};
+	return h.store.write((db) =>
+		h.goals!.applyInTransaction(db, GOALS_ACCESS, [
+			op === "adopt" ? { op: "adopt", ...goal } : { op: "propose", ...goal },
+		]),
+	);
+};
+
 /**
  * The state the forget tests start from: a world claim (claim-1) learned from E1, a goal linked to the entity from
  * E2 together with a sibling goal from the same message, and an unrelated goal from E3.
  */
 async function learn(h: StewardHarness, fake: FakeWorld) {
 	showWorld(fake);
-	h.inference.script(
-		"curate-memory",
-		judged(true, false),
-		judged(false, true),
-		judged(false, true),
-	);
 	h.inference.script("curate-world", claimAnswer);
-	h.inference.script(
-		"curate-goals",
-		{
-			goals: [
-				goalChange({ text: "音声サービスを速くしたい", entities: ["w1"] }),
-				goalChange({ op: "propose", text: "音声のキャッシュを検討する" }),
-			],
-		},
-		{ goals: [goalChange({ op: "propose", text: "散歩を習慣にする" })] },
-	);
 	const e1 = await h.run({
 		user: "音声サービスは9月から使える",
 		answer: "了解です",
 		end: "completed",
 	});
-	await h.drain();
 	await fake.receiveAll([e1.inputMessageId, e1.answerMessageId!]);
-	await h.drain();
+	// World is curated once the conversation rests.
+	await h.rest();
 	fake.evidence.set("claim-1", [e1.inputMessageId]);
 	fake.evidence.set("ent-1", [e1.inputMessageId]);
 	const e2 = await h.run({
@@ -137,13 +128,16 @@ async function learn(h: StewardHarness, fake: FakeWorld) {
 		answer: "検討します",
 		end: "completed",
 	});
-	await h.drain();
+	await seedGoal(h, "adopt", "音声サービスを速くしたい", e2.inputMessageId, [
+		"ent-1",
+	]);
+	await seedGoal(h, "propose", "音声のキャッシュを検討する", e2.inputMessageId);
 	const e3 = await h.run({
 		user: "散歩を習慣にしたい",
 		answer: "いいですね",
 		end: "completed",
 	});
-	await h.drain();
+	await seedGoal(h, "propose", "散歩を習慣にする", e3.inputMessageId);
 	expect(goalTexts(h)).toEqual([
 		"音声サービスを速くしたい",
 		"音声のキャッシュを検討する",
@@ -170,7 +164,7 @@ test("naming a world entity and claim forgets them, their evidence, the goals ti
 			{ ref: "k1", text: "音声サービス の available: はい" },
 		]);
 		expect((data.goals as unknown[]).length).toBe(3);
-		return { ...empty, resolve: [resolve({ refs: ["w1", "k1"] })], route: [] };
+		return { ...empty, resolve: [resolve({ refs: ["w1", "k1"] })] };
 	});
 	await h.run({
 		user: "音声サービスのことは全部忘れて",
@@ -229,10 +223,6 @@ test("naming a world entity and claim forgets them, their evidence, the goals ti
 		h.steward.decisions("c1").filter((d) => d.step === "curate-world"),
 	).toEqual([]);
 	expect(h.inbox()).toMatchObject([{ state: "done", what: "" }]);
-	// The unrelated goal's decision stays.
-	expect(h.steward.decisions("c1").some((d) => d.step === "curate-goals")).toBe(
-		true,
-	);
 });
 
 test("claims about a chosen entity and the goals tied to it are not counted again, and an unrelated goal is left alone", async () => {
@@ -270,7 +260,6 @@ test("claims about a chosen entity and the goals tied to it are not counted agai
 					],
 				}),
 			],
-			route: [],
 		};
 	});
 	await h.run({
@@ -300,7 +289,7 @@ test("a goal named in a request is forgotten with its message; the goal layer ep
 	h.inference.script("curate-memory", (data) => {
 		const goals = data.goals as Array<{ ref: string; text: string }>;
 		const target = goals.find((g) => g.text === "音声サービスを速くしたい")!;
-		return { ...empty, resolve: [resolve({ refs: [target.ref] })], route: [] };
+		return { ...empty, resolve: [resolve({ refs: [target.ref] })] };
 	});
 	await h.run({
 		user: "速くしたいという目標は忘れて",
@@ -340,7 +329,6 @@ test("one request names at most five things in all, across memory, world and goa
 		return {
 			...empty,
 			resolve: [resolve({ refs: ["k1", "k2", ...goals] })],
-			route: [],
 		};
 	});
 	await h.run({
@@ -370,7 +358,6 @@ test("when World can not be read the forget is refused whole, and the request sa
 	h.inference.script("curate-memory", {
 		...empty,
 		resolve: [resolve({ refs: ["w1", "k1"] })],
-		route: [],
 	});
 	await h.run({
 		user: "音声サービスは忘れて",
@@ -394,7 +381,6 @@ test("when the evidence of the claims can be read only in part the forget is ref
 	h.inference.script("curate-memory", {
 		...empty,
 		resolve: [resolve({ refs: ["w1", "k1"] })],
-		route: [],
 	});
 	await h.run({
 		user: "音声サービスは忘れて",
@@ -417,33 +403,32 @@ test("when the evidence of the claims can be read only in part the forget is ref
 
 test("a memory forget also takes the blocked messages out of World as sources", async () => {
 	const { h, fake } = await setup();
-	const address = {
-		kind: "personal_fact",
-		key: "address",
-		text: "住所は東京都千代田区",
-		evidence: "e1",
-		quote: null,
-		validFrom: null,
-		validUntil: null,
-		negated: false,
-	};
-	h.inference.script("curate-memory", {
-		...empty,
-		remember: [address],
-		route: [],
-	});
 	const first = await h.run({
 		user: "私の住所は東京都千代田区です",
 		answer: "承知しました",
 		end: "completed",
 	});
-	await h.drain();
+	await h.store.write((db) =>
+		h.memory.applyCurationInTransaction(db, {
+			conversationId: "c1",
+			items: [
+				{
+					op: "remember",
+					kind: "personal_fact",
+					key: "address",
+					text: "住所は東京都千代田区",
+					messageId: first.inputMessageId,
+					quote: null,
+				},
+			],
+		}),
+	);
+	await h.rest();
 	h.inference.script("curate-memory", (data) => {
 		const ref = (data.longTerm as Array<{ ref: string }>)[0]!.ref;
 		return {
 			...empty,
 			resolve: [resolve({ refs: [ref], alsoIn: ["xc1"] })],
-			route: [],
 		};
 	});
 	await h.run({

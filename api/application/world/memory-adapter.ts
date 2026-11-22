@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import type { ConversationEvent } from "../../domains/continuity";
+import type { ConversationEvent, PlanItem } from "../../domains/continuity";
 import type { MemoryItemDto, MemoryService } from "../../domains/memory";
 import type { DecisionDto, StewardService } from "../../domains/steward";
 import type { AdapterResult, DomainAdapter } from "../../domains/tool-runtime";
@@ -15,7 +15,7 @@ const SHORT_TERM = "query:memory.short-term@1";
 const CONTEXT = "query:memory.context@1";
 const DECISIONS = "query:memory.steward-decisions@1";
 const EVENTS = "query:memory.steward-events@1";
-/** The conversation whose short-term notes and context the screen shows (the app's one conversation). */
+/** The conversation whose context the screen shows (the app's one conversation). */
 const MEMORY_SCREEN_CONVERSATION = "main";
 
 const setEnabled = z.strictObject({ enabled: z.boolean() });
@@ -34,7 +34,7 @@ export type MemoryAdapterPorts = {
 		| "status"
 		| "list"
 		| "tendencies"
-		| "shortTerm"
+		| "plans"
 		| "storedContext"
 		| "setEnabledInTransaction"
 	>;
@@ -63,19 +63,19 @@ const capturedByLabels: Record<MemoryItemDto["capturedBy"], string> = {
 	agent: "会話から自動で記憶",
 	manual: "手動登録",
 };
-const noteKindLabels: Record<string, string> = {
-	goal: "目的",
-	decision: "決定",
+const planKindLabels: Record<PlanItem["kind"], string> = {
+	plan: "予定",
+	intent: "意図",
 	open_question: "未解決",
-	activity: "活動",
-	memo: "メモ",
+	decision: "決定",
 };
 const stepLabels: Record<DecisionDto["step"], string> = {
-	"curate-memory": "記憶の判断",
-	"consolidate-memory": "記憶の整理",
+	"curate-memory": "記憶の依頼",
 	"curate-world": "World の反映",
-	"curate-goals": "目標の反映",
-	"consolidate-goals": "目標の整理",
+	"curate-goals": "目標の依頼",
+	shallow: "浅い整理",
+	deep: "深い整理",
+	"forget-closure": "忘却の削除",
 };
 const eventTypeLabels: Record<ConversationEvent["type"], string> = {
 	said: "発言",
@@ -430,15 +430,14 @@ export function createMemoryAdapter(ports: MemoryAdapterPorts): DomainAdapter {
 					return {
 						revision: 0,
 						data: {
-							items: memory.shortTerm(conversationId).map((note) => ({
-								id: note.id,
-								revision: note.revision,
-								kind: note.kind,
-								kindLabel: noteKindLabels[note.kind] ?? note.kind,
-								text: note.text,
-								originLabel:
-									note.origin === "agent" ? "会話から自動で記録" : "手動登録",
-								expiresAt: note.expiresAt,
+							items: memory.plans(conversationId).map((plan) => ({
+								id: plan.id,
+								revision: plan.revision,
+								kind: plan.kind,
+								kindLabel: `${planKindLabels[plan.kind]}${plan.state === "awaiting_confirmation" ? "（確認待ち）" : ""}`,
+								text: plan.text,
+								originLabel: "会話から記録",
+								expiresAt: plan.dueAt,
 							})),
 						},
 					};

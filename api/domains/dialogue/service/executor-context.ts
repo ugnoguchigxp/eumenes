@@ -233,6 +233,16 @@ export function createExecutorContext(
 		fields: Record<string, unknown>,
 		shortFields?: Record<string, unknown>,
 	) {
+		return actedOnce(tx, target, fields, shortFields).event;
+	}
+
+	/** `acted`, and whether this call recorded it (false: an earlier call of the same action did). */
+	function actedOnce(
+		tx: Database,
+		target: string,
+		fields: Record<string, unknown>,
+		shortFields?: Record<string, unknown>,
+	) {
 		return events.appendInTransaction(tx, {
 			conversationId: input.conversationId,
 			at: at(),
@@ -242,7 +252,7 @@ export function createExecutorContext(
 			...(shortFields ? { shortFields } : {}),
 			messageIds: origin,
 			dedupeKey: actionKey(target),
-		}).event;
+		});
 	}
 
 	/** A side effect is the generation's first adoption (section 8.2): the utterances it acts on are handled. */
@@ -263,6 +273,7 @@ export function createExecutorContext(
 		utteranceText,
 		current,
 		acted,
+		actedOnce,
 		handle,
 		origin,
 		actionKey,

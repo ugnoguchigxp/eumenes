@@ -250,6 +250,8 @@ test("upgrading retires the generic Collaboration entry and preserves its saved 
 		"dialogue/0043-retire-collaboration-task",
 		"dialogue/0044-confirmation-revision",
 		"dialogue/0045-consumed-confirmation-run",
+		"dialogue/0046-forget-hidden",
+		"dialogue/0047-memory-refs",
 		"collaboration/0005-retire-task-works",
 	]);
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-collaboration-retire-"));

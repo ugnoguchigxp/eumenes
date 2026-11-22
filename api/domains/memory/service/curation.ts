@@ -8,7 +8,7 @@ import type {
 } from "../contracts";
 import { createEvidence } from "./curation-evidence";
 import { createMerge } from "./curation-merge";
-import { createNoteOps } from "./curation-notes";
+import { createTendencyOps } from "./curation-tendencies";
 import { rejected, type CurationDeps } from "./curation-shared";
 import { createStateWriter } from "./curation-state";
 import { createStateOps } from "./curation-state-ops";
@@ -32,7 +32,7 @@ export function createCuration(deps: CurationDeps) {
 	const writer = createStateWriter(deps);
 	const state = createStateOps(deps, evidence, writer);
 	const { merge } = createMerge(deps, evidence, writer);
-	const notes = createNoteOps(deps, writer);
+	const tendencies = createTendencyOps(deps, writer);
 
 	function dispatch(
 		db: Database,
@@ -48,18 +48,12 @@ export function createCuration(deps: CurationDeps) {
 				return state.stop(db, item);
 			case "merge":
 				return merge(db, item);
-			case "note_add":
-				return notes.noteAdd(db, conversationId, item);
-			case "note_update":
-				return notes.noteUpdate(db, conversationId, item);
-			case "note_close":
-				return notes.noteClose(db, conversationId, item);
 			case "tendency_add":
-				return notes.tendencyAdd(db, conversationId, item);
+				return tendencies.tendencyAdd(db, conversationId, item);
 			case "tendency_update":
-				return notes.tendencyUpdate(db, conversationId, item);
+				return tendencies.tendencyUpdate(db, conversationId, item);
 			case "tendency_retire":
-				return notes.tendencyRetire(db, item);
+				return tendencies.tendencyRetire(db, item);
 			default:
 				return rejected(
 					(item as { op: CurationItem["op"] }).op,

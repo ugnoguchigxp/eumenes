@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { StaleAnswerInput } from "../../inference";
 import type { DialogueDeps, GenerateInput } from "./context";
 import type { generationTiming } from "./generation-timing";
 import { validateMemoryWindow } from "./memory-window";
@@ -58,7 +59,12 @@ export function createAnswerStream(
 	const publish = open(input.runId, crypto.randomUUID(), scoped);
 	const validate = () => {
 		const failure = store.read((db) => generationStale(deps, db, input));
-		if (failure) abort.abort(new Error(failure));
+		if (failure) {
+			const retry =
+				failure === "memory_stale" &&
+				!input.trigger.some((t) => t.kind === "not_adopted");
+			abort.abort(retry ? new StaleAnswerInput() : new Error(failure));
+		}
 	};
 	const stop = store.onCommit(() => {
 		const run = store.read((db) => byId(db, input.runId));

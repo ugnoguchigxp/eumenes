@@ -6,9 +6,9 @@ import {
 	readForgetJournalHead,
 	searchState,
 	verifyStateSearchIndex,
-	type ForgetJournalEntry,
 } from "eumenes-memory/sqlite";
 import * as previous from "eumenes-memory-schema8/sqlite";
+import type { ForgetJournalEntry as PreviousJournalEntry } from "eumenes-memory-schema8/sqlite";
 import {
 	appendJournal,
 	readJournal,
@@ -209,11 +209,13 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 	};
 	const clock = { atMs: 1_800_000_000_000 };
 	const migrationId = "memory-package/0009";
+	// The package migrations after the schema-8 library (the search index, the recall controls).
+	const laterIds = new Set([migrationId, "memory-package/0010"]);
 	let store: ReturnType<typeof openStore> | undefined;
 	try {
 		expect(previous.MEMORY_DB_SCHEMA_VERSION).toBe(8);
 		const previousMigrations = migrations
-			.filter((migration) => migration.id !== migrationId)
+			.filter((migration) => !laterIds.has(migration.id))
 			.map((migration) => {
 				const prefix = "memory-package/";
 				if (!migration.id.startsWith(prefix)) return migration;
@@ -306,7 +308,14 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 					clock,
 				});
 			});
-		expect((await forget(store, earlyForget, previous)).completed).toBe(true);
+		// The schema-8 library has the same operations with older journal types (no format 3, no candidates).
+		const previousLifecycle = previous as unknown as {
+			planForget: typeof planForget;
+			applyForget: typeof applyForget;
+		};
+		expect(
+			(await forget(store, earlyForget, previousLifecycle)).completed,
+		).toBe(true);
 		await store.close();
 		store = undefined;
 
@@ -332,7 +341,7 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 					)
 					.get(),
 			),
-		).toEqual({ value: "9" });
+		).toEqual({ value: "10" });
 		expect(
 			store.read((db) =>
 				db
@@ -370,7 +379,7 @@ test("schema 8 upgrades to 9 and rolls back with the latest forget journal", asy
 				return result.items.map((item) => item.itemId);
 			});
 		expect(oldItems(store)).toEqual(expect.arrayContaining([kept, lateForget]));
-		const entries = readJournal<ForgetJournalEntry>(journalPath);
+		const entries = readJournal<PreviousJournalEntry>(journalPath);
 		expect(entries).toHaveLength(2);
 		const reconciled = await store.write((db) =>
 			previous.reconcileForgetJournal(db, {

@@ -23,6 +23,7 @@ import {
 	bumpForgetSeq,
 	deleteProvenance,
 	deleteTendenciesByEvidence,
+	deleteTendenciesOfTombstonedCandidates,
 	deleteTurnVectors,
 	insertBlocks,
 	markBlockApplied,
@@ -31,6 +32,11 @@ import {
 	SEED_IMPORT_FENCE,
 } from "../repository";
 import type { ContextWindowStore } from "./context-window";
+import {
+	candidatesOfFacts,
+	excludedCandidateIds,
+	factKey,
+} from "./candidate-closure";
 import { appendJournal, hostIntentOf, type ForgetIntent } from "./journal";
 
 const VERSION = 1 as const;
@@ -78,6 +84,51 @@ function refuse(code: string): never {
 	throw new Error(code);
 }
 
+/** Every State item of the profile, inactive and excluded ones too: forgetting must not overlook an excluded item. */
+function everyState(db: Database, accessContext: AccessContext) {
+	const listed = listAllState(db, {
+		contractVersion: VERSION,
+		access: accessContext,
+		scopeKey: PROFILE_SCOPE,
+		includeInactive: true,
+		includeExcluded: true,
+	});
+	if (listed.status !== "ok") return refuse("memory_blocked");
+	return listed.items;
+}
+
+/**
+ * The candidates (L1) that go with these items and messages: those of the same facts, promoted into the items, or
+ * standing on one of the messages, and the ones an immediate exclusion hid (a forget in flight excluded them, and a
+ * listing no longer shows them).
+ */
+function candidatesOf(
+	db: Database,
+	accessContext: AccessContext,
+	itemIds: readonly string[],
+	messageIds: readonly string[],
+): string[] {
+	if (itemIds.length === 0 && messageIds.length === 0) return [];
+	const wanted = new Set(itemIds);
+	const facts = new Set(
+		everyState(db, accessContext)
+			.filter((item) => wanted.has(item.itemId))
+			.map(factKey),
+	);
+	return [
+		...new Set([
+			...candidatesOfFacts(
+				db,
+				accessContext,
+				facts,
+				wanted,
+				new Set(messageIds),
+			).map((candidate) => candidate.candidateId),
+			...excludedCandidateIds(db, accessContext),
+		]),
+	];
+}
+
 function deleteTurnVectorsOf(db: Database, messageIds: string[]): number {
 	const present = messageIds.filter(
 		(id) =>
@@ -92,6 +143,7 @@ function deleteTurnVectorsOf(db: Database, messageIds: string[]): number {
 function forgetTargets(
 	itemIds: readonly string[],
 	intent: ForgetIntent | null,
+	candidateIds: readonly string[],
 ): import("eumenes-memory/sqlite").ForgetTarget[] {
 	return [
 		...itemIds.map((itemId) => ({
@@ -104,7 +156,38 @@ function forgetTargets(
 			recordId,
 			scopeKey: PROFILE_SCOPE,
 		})),
+		...candidateIds.map((candidateId) => ({
+			type: "candidate" as const,
+			candidateId,
+			scopeKey: PROFILE_SCOPE,
+		})),
 	];
+}
+
+/**
+ * What the continuity domain derived from forgotten messages or items: plans and question-ledger entries, and the
+ * tendencies built on plans, items or messages. A plan keeps the id of the note it was moved from, so tendencies
+ * written before the move are matched too. Returns whether anything was deleted.
+ */
+function deleteContinuityDerived(
+	db: Database,
+	continuity: ContinuityService,
+	purge: { messageIds: readonly string[]; itemIds: readonly string[] },
+): boolean {
+	const derived = continuity.deleteDerivedBySourcesInTransaction(db, {
+		messageIds: purge.messageIds,
+		memoryItemIds: purge.itemIds,
+	});
+	const tendencies =
+		deleteTendenciesByEvidence(db, "continuity", derived.planIds) +
+		deleteTendenciesByEvidence(db, "state", purge.itemIds) +
+		deleteTendenciesByEvidence(db, "message", purge.messageIds) +
+		deleteTendenciesOfTombstonedCandidates(db);
+	return (
+		derived.planIds.length > 0 ||
+		derived.questionIds.length > 0 ||
+		tendencies > 0
+	);
 }
 
 export function createForget(deps: ForgetDeps) {
@@ -164,7 +247,16 @@ export function createForget(deps: ForgetDeps) {
 		onJournaled: () => void,
 	): { forgetId: string; forgetIds: string[]; completed: boolean } {
 		const max = LIMITS_LIFECYCLE.maxJournalTargets;
-		const targets = forgetTargets(itemIds, intent);
+		const targets = forgetTargets(
+			itemIds,
+			intent,
+			candidatesOf(
+				db,
+				access(db, "memory.forget"),
+				itemIds,
+				intent?.messageIds ?? [],
+			),
+		);
 		const chunks: (typeof targets)[] = [];
 		for (let i = 0; i < targets.length; i += max)
 			chunks.push(targets.slice(i, i + max));
@@ -224,14 +316,7 @@ export function createForget(deps: ForgetDeps) {
 		db: Database,
 		itemIds: ReadonlySet<string>,
 	): string[] {
-		const listed = listAllState(db, {
-			contractVersion: VERSION,
-			access: access(db, "memory.forget"),
-			scopeKey: PROFILE_SCOPE,
-			includeInactive: true,
-		});
-		if (listed.status !== "ok") return refuse("memory_blocked");
-		return listed.items
+		return everyState(db, access(db, "memory.forget"))
 			.filter((item) => itemIds.has(item.itemId))
 			.flatMap((item) =>
 				item.evidence
@@ -291,16 +376,7 @@ export function createForget(deps: ForgetDeps) {
 			})),
 			now,
 		);
-		// Short-term notes that came from them are deleted; tendencies built on notes or items are deleted.
-		const notes = continuity.deleteBySourceMessagesInTransaction(
-			db,
-			purge.messageIds,
-		);
-		if (notes.deleted > 0) changed = true;
-		const tendencies =
-			deleteTendenciesByEvidence(db, "continuity", notes.noteIds) +
-			deleteTendenciesByEvidence(db, "state", purge.itemIds);
-		if (tendencies > 0) changed = true;
+		if (deleteContinuityDerived(db, continuity, purge)) changed = true;
 		deleteProvenance(db, purge.itemIds);
 		if (deleteTurnVectorsOf(db, existing) > 0) changed = true;
 		// The active short-term memory (section 13): every event that showed one of them keeps only that it
@@ -326,6 +402,7 @@ export function createForget(deps: ForgetDeps) {
 	}
 	return {
 		factOf,
+		expandItems,
 		forgetItems,
 		purgeDerivedInTransaction,
 		/**
@@ -337,6 +414,8 @@ export function createForget(deps: ForgetDeps) {
 			db: Database,
 			input: ForgetInput,
 			onJournaled: () => void,
+			/** false: the closure delete of an exclusion, whose items are every version of what was asked (no count limit). */
+			bounded = true,
 		): ForgetOutcome {
 			if (!deps.ready()) return refuse("memory_unavailable");
 			let derived = input.derived;
@@ -349,7 +428,7 @@ export function createForget(deps: ForgetDeps) {
 					!Object.values(derived ?? {}).some((ids) => ids.length > 0))
 			)
 				return refuse("invalid_forget");
-			if (input.itemIds.length > FORGET_MAX_ITEMS)
+			if (bounded && input.itemIds.length > FORGET_MAX_ITEMS)
 				return refuse("forget_limit");
 			const itemIds = new Set<string>();
 			for (const requested of input.itemIds)

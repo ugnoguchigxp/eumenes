@@ -66,7 +66,11 @@ test("a database that holds the old F host's records starts: they are quarantine
 		await f.restart();
 		const records = f.h.store.read((db) => f.port.recordsInTransaction(db));
 		expect(records.map((r) => r.conversationId)).toEqual(["ao"]);
-		expect(records[0]!.snapshot).toEqual(agendaBefore.snapshot);
+		// The agenda's own record stays; the revision moves when the records writer read the words after a restart.
+		expect({ ...(records[0]!.snapshot as object), revision: 0 }).toEqual({
+			...(agendaBefore.snapshot as object),
+			revision: 0,
+		});
 		expect(
 			f.h.store.read((db) =>
 				old.map(([id]) => f.port.epochInTransaction(db, id)),

@@ -10,7 +10,7 @@ export {
 } from "./repository";
 export { registerSettings } from "./controller";
 export type { Settings, Purpose, Connection, Resource } from "./contracts";
-export { isAgentConnection } from "./contracts";
+export { defaultConsolidationWindow, isAgentConnection } from "./contracts";
 export { migrations } from "./repository";
 export {
 	readStoredLarm,

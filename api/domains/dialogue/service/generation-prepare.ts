@@ -60,6 +60,8 @@ import {
 import { ASK_STEP } from "./tool-exchange";
 import { taskTargets } from "./task-work";
 import { screenLinesInTransaction } from "./resource-context";
+import { preparedMemoryInTransaction } from "./memory-refs";
+import { parkGenerationInTransaction } from "./targets-hold";
 
 const log = getLogger("dialogue");
 
@@ -181,8 +183,13 @@ function noticeForAnswer(
 	hostNote: string | null,
 	results: string[],
 	noticeText: string | null,
+	unresolved: ReadonlyArray<{ what: string }>,
 ) {
 	return [
+		...unresolved.map(
+			({ what }) =>
+				`「${lineText(what)}」の対象を決められず、何も変えていません。`,
+		),
 		...(notAdopted
 			? [
 					"前の返事は届けられませんでした。すでに頼んだ仕事は「## State」の仕事にあります。",
@@ -192,6 +199,34 @@ function noticeForAnswer(
 		...results,
 		...(noticeText !== null ? noticeLines(noticeText) : []),
 	];
+}
+
+/** The finished or asking work the host notice tells, one text each (the TODO's line and what it made). */
+function reportedTexts(
+	deps: DialogueDeps,
+	tx: Database,
+	conversationId: string,
+	reported: ReadonlyArray<WorkRow>,
+	refs: DocumentRefs,
+): string[] {
+	return reported.map(
+		(row) =>
+			resultText({
+				ref: refs.todo(row.id) ?? "t?",
+				title: row.title,
+				status: row.status,
+				...(row.outcome ? { outcome: row.outcome } : {}),
+				...(row.question ? { question: row.question } : {}),
+				result: row.result,
+				made: deps.work
+					? deps.work
+							.todosInTransaction(tx, conversationId)
+							.filter((todo) => todo.id === row.id)
+							.flatMap((todo) => madeOf(todo, refs))
+					: [],
+				resource: refs.resource,
+			}).text,
+	);
 }
 
 /** The specialist's hand-back as a line of the work (`## State`): who gave the words back, and on what. */
@@ -458,6 +493,9 @@ export function createPrepare(
 		const run = byId(tx, claim.payload.runId);
 		if (!run || run.status !== "queued" || run.jobId !== claim.jobId)
 			return { status: "stale", reason: "run_not_queued" };
+		// A forget the agency has not settled yet would still be in this prompt: the run waits behind it.
+		if (parkGenerationInTransaction(deps, tx, run, claim))
+			return { status: "stale", reason: "targets_pending" };
 		if (!transition(tx, run.id, run.revision, "running", clock()))
 			return { status: "stale", reason: "run_changed" };
 		const current = byId(tx, run.id) as Run;
@@ -564,6 +602,7 @@ export function createPrepare(
 			window,
 			pending: pendingIds,
 			traceInput: deps.contextInputs?.enabled(),
+			assignRefs: true,
 		});
 		const { texts, final, attachments, origins } = pendingInput(
 			deps,
@@ -595,29 +634,17 @@ export function createPrepare(
 			conversationId,
 			reported.map((row) => row.id),
 		);
-		const results = reported.map(
-			(row) =>
-				resultText({
-					ref: refs.todo(row.id) ?? "t?",
-					title: row.title,
-					status: row.status,
-					...(row.outcome ? { outcome: row.outcome } : {}),
-					...(row.question ? { question: row.question } : {}),
-					result: row.result,
-					made: deps.work
-						? deps.work
-								.todosInTransaction(tx, conversationId)
-								.filter((todo) => todo.id === row.id)
-								.flatMap((todo) => madeOf(todo, refs))
-						: [],
-					resource: refs.resource,
-				}).text,
-		);
+		const results = reportedTexts(deps, tx, conversationId, reported, refs);
+		// What the agency could not settle of the user's forgets and corrections: told once, nothing was changed.
+		const unresolved =
+			deps.steward?.takeUnresolvedTargetsInTransaction(tx, conversationId) ??
+			[];
 		const noticeBody = noticeForAnswer(
 			notAdopted,
 			hostNote,
 			results,
 			noticeText,
+			unresolved,
 		);
 		const lastAgent =
 			[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null;
@@ -731,14 +758,13 @@ export function createPrepare(
 				offers,
 				retained: retainedInTransaction(deps, tx, conversationId),
 				sessionContext: answerSessionContext(prefix),
-				...(window && memory
+				...(window && memory && prefix.refsKey
 					? {
-							memory: {
-								window: memory.preparedWindow(window, shownForMemory),
-								blockedAtPrepare: [
-									...memory.blockedMessageIdsInTransaction(tx, shownForMemory),
-								],
-							},
+							memory: preparedMemoryInTransaction(memory, tx, {
+								window,
+								shownMessageIds: shownForMemory,
+								refsKey: prefix.refsKey,
+							}),
 						}
 					: {}),
 			},

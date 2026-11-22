@@ -58,8 +58,6 @@ export function recallConversation(
 			text,
 			at,
 		});
-		// Old words are no new evidence for the plans-and-interests note.
-		c.profileSeen.add(m.id);
 	}
 	// The user's old words do not end a quiet they asked for after them.
 	if (

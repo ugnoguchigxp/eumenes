@@ -15,7 +15,15 @@ import { buildMessages, taskText } from "./messages";
 import { createUnitEnd } from "./unit-end";
 import { createPrepare } from "./unit-prepare";
 import { createSettle } from "./unit-settle";
-import type { StewardDeps, StewardInput, StewardOutput } from "./types";
+import type {
+	LlmInput,
+	LlmOutput,
+	SleepInput,
+	SleepOutput,
+	StewardDeps,
+	StewardInput,
+	StewardOutput,
+} from "./types";
 import type { Wake } from "./wake";
 
 /**
@@ -44,10 +52,29 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 	const prepareInTransaction = createPrepare(deps, kick, end, wake);
 	const settleInTransaction = createSettle(deps, kick, end);
 
+	/** A sleep unit's step makes its own model calls and writes; what it returns is settled in the unit's transaction. */
+	async function executeSleep(
+		input: SleepInput,
+		context: { signal: AbortSignal },
+	): Promise<SleepOutput> {
+		const started = deps.nowMs();
+		const result = await input.step.run(input, { ...context, deps });
+		return { kind: "sleep", result, durationMs: deps.nowMs() - started };
+	}
+
 	async function execute(
 		input: StewardInput,
 		context: { signal: AbortSignal },
 	): Promise<StewardOutput> {
+		return input.kind === "sleep"
+			? executeSleep(input, context)
+			: executeLlm(input, context);
+	}
+
+	async function executeLlm(
+		input: LlmInput,
+		context: { signal: AbortSignal },
+	): Promise<LlmOutput> {
 		const started = deps.nowMs();
 		const { step, prepared } = input;
 		const before = await step.beforeInfer?.(prepared, {
@@ -112,6 +139,7 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 						deps,
 					})) ?? before?.extras);
 		return {
+			kind: "llm",
 			receipt,
 			output,
 			extras,

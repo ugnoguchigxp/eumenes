@@ -8,9 +8,16 @@ import { mayStep } from "./always-on-cycle";
 import { feedAgenda, pumpAgendaHost } from "./always-on-feed";
 import { keepNote, logNoteDisplayFailure } from "./always-on-flow";
 import type { createAgendaHearing } from "./always-on-heard";
-import { scheduleProfile } from "./always-on-profile";
 import { recallConversation } from "./always-on-recovery";
-import { type AgendaScope, createAgendaScope } from "./always-on-scope";
+import { keepPosition } from "./always-on-position";
+import { withheldIds } from "./always-on-recall";
+import { scheduleRecords } from "./always-on-records";
+import {
+	type AgendaScope,
+	agendaEnvelope,
+	createAgendaScope,
+	positionOf,
+} from "./always-on-scope";
 import type { createGoalAgenda } from "./goal-agenda";
 import type { AgencyHostDeps } from "./host-types";
 
@@ -42,7 +49,7 @@ export function readUserMessageText(deps: AgencyHostDeps, messageId: string) {
 		const source = deps.conversation.sourceInTransaction(db, messageId);
 		return source.state === "available" &&
 			source.message.role === "user" &&
-			!deps.memory.isBlockedInTransaction?.(db, messageId)
+			withheldIds(deps, db, [messageId]).size === 0
 			? source.message.text
 			: null;
 	});
@@ -56,7 +63,21 @@ export function createAgendaScopeStore(ctx: {
 	now(): number;
 	track<T>(p: Promise<T>): Promise<T>;
 	kick(scope: AgendaScope): void;
+	/** The pump runs (what the records writer kept is saved). */
+	changed(): void;
+	/** Saves a scope's checkpoint inside the caller's transaction (the records writer's position goes with its writes). */
+	saveScope(db: Database, c: AgendaScope): void;
 }) {
+	/** The records writer's pass of a scope: at once when none runs, else right after the one that does. */
+	const records = (c: AgendaScope) =>
+		scheduleRecords({
+			deps: ctx.deps,
+			c,
+			now: ctx.now,
+			changed: ctx.changed,
+			track: ctx.track,
+			save: ctx.saveScope,
+		});
 	function make(id: string, previous?: AgencyRecord) {
 		const c = createAgendaScope({
 			deps: ctx.deps,
@@ -77,6 +98,7 @@ export function createAgendaScopeStore(ctx: {
 			ctx.recovering.add(id);
 			// The notes a restart brought back are kept as documents too (one made before is not made again).
 			for (const note of c.notes) void ctx.track(keepNote(ctx.deps, c, note));
+			records(c);
 		}
 		return c;
 	}
@@ -92,7 +114,7 @@ export function createAgendaScopeStore(ctx: {
 			throw new Error("agency_runtime_not_recovered");
 		return make(id, record);
 	}
-	return { make, conv };
+	return { make, conv, records };
 }
 
 export async function recoverAgendaRecords(
@@ -107,8 +129,11 @@ export async function recoverAgendaRecords(
 		deps.state!.quarantineLegacyInTransaction(db);
 		deps.state!.recoverForgottenInTransaction(db);
 		for (const r of deps.state!.recordsInTransaction(db))
-			if (!isAgendaSnapshot(r.snapshot) || r.settingsDigest !== hostDigest)
+			if (!isAgendaSnapshot(r.snapshot) || r.settingsDigest !== hostDigest) {
+				// What the agency remembers goes; where reading the conversation stopped stays.
+				keepPosition(deps, r.conversationId, positionOf(r));
 				deps.state!.revokeInTransaction(db, r.conversationId);
+			}
 	});
 }
 
@@ -125,6 +150,7 @@ export function drainConversationOutbox(ctx: {
 	schedule(): void;
 	setTimer(fn: () => void, ms: number): unknown;
 	clearTimer(id: unknown): void;
+	records(scope: AgendaScope): void;
 }) {
 	for (;;) {
 		const events = ctx.deps.store.read((db) =>
@@ -143,14 +169,7 @@ export function drainConversationOutbox(ctx: {
 					at: ctx.now(),
 					hearing: ctx.hearing,
 					forget: (scope, refs) => ctx.forgetRefs(scope, refs),
-					exchanged: (scope) =>
-						scheduleProfile({
-							deps: ctx.deps,
-							c: scope,
-							now: ctx.now,
-							changed: ctx.schedule,
-							track: ctx.track,
-						}),
+					exchanged: (scope) => ctx.records(scope),
 					show: (scope, noteIds, runId) => {
 						for (const id of noteIds) {
 							const note =
@@ -222,7 +241,7 @@ export function disposeAgendaScope(
 	c: AgendaScope,
 ) {
 	hearing.dispose(c);
-	c.profileAbort.abort();
+	c.closed.abort();
 	if (c.timer !== undefined) clearTimer(c.timer);
 	c.timer = undefined;
 }
@@ -249,6 +268,9 @@ export function syncAgendaBusy(ctx: {
 	busy(c: AgendaScope): boolean;
 	arm(c: AgendaScope): void;
 	schedule(): void;
+	/** Starts the records writer's pass (the main conversation is free again after it called one off). */
+	records(c: AgendaScope): void;
+	foreground(): boolean;
 }) {
 	if (
 		ctx.state.goalStep &&
@@ -266,6 +288,7 @@ export function syncAgendaBusy(ctx: {
 			!ctx.on() ||
 			ctx.recovering.has(c.id);
 		ctx.arm(c);
+		if (c.recordsOwed && !c.recordsRun && !ctx.foreground()) ctx.records(c);
 	}
 	for (const look of ctx.idleWaiters) look();
 	// What was said is saved, and the plan of it is due.
@@ -524,4 +547,44 @@ export async function attendAgendaScope<T>(
 	ctx.syncBusy();
 	if (entering) await ctx.save();
 	return ctx.status(id);
+}
+
+/** What the agent of a conversation holds now, for a look from outside (null: it has no scope). */
+export function inspectScope(
+	c: AgendaScope | undefined,
+	now: () => number,
+	status: (id: string) => { idle: unknown },
+) {
+	return c
+		? {
+				snapshot: agendaEnvelope(c, now()),
+				generation: c.generation,
+				idle: status(c.id).idle,
+			}
+		: null;
+}
+
+/** Waits until the user is free again (false: the scope or the host is gone). The user's words end the wait early. */
+export function waitForIdle(
+	ctx: {
+		state: AgendaHostState;
+		convs: Map<string, AgendaScope>;
+		on(): boolean;
+		busy(c: AgendaScope): boolean;
+		idleWaiters: Set<() => void>;
+	},
+	c: AgendaScope,
+) {
+	// The user's words (or a forget) make the held line stale: the wait ends, and the retry drops it.
+	const generation = c.generation;
+	return new Promise<boolean>((resolve) => {
+		const look = () => {
+			const gone = ctx.state.closed || ctx.convs.get(c.id) !== c || !ctx.on();
+			if (!gone && c.generation === generation && ctx.busy(c)) return;
+			ctx.idleWaiters.delete(look);
+			resolve(!gone);
+		};
+		ctx.idleWaiters.add(look);
+		look();
+	});
 }

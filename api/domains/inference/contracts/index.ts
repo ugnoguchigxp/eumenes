@@ -501,3 +501,10 @@ export const errorStatus = {
 export * from "./screen-presence";
 
 export * from "./image-input";
+
+/** The host discarded the input of a retained answer and will prepare it again. */
+export class StaleAnswerInput extends Error {
+	constructor() {
+		super("memory_stale");
+	}
+}

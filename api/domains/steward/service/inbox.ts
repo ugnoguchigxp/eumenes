@@ -3,16 +3,23 @@ import {
 	type MemoryRequestInput,
 	type RequestKind,
 	type RunEnd,
+	type TargetRequest,
 	memoryRequestInput,
 } from "../contracts";
 import type { ForgetPurge } from "../../memory";
 import {
+	type ForgetExclusion,
 	countOpenInbox,
 	deleteDecisionsByRefs,
-	deleteRoutesOfMessages,
 	endInboxOfMessages,
+	hasPendingForget,
 	insertInbox,
+	markExcluded,
+	pendingTargets,
+	putTargetRequest,
 	readInbox,
+	settleTarget,
+	takeUnresolved,
 } from "../repository";
 import type { Kick } from "./kick";
 import type { StewardDeps } from "./types";
@@ -33,7 +40,7 @@ export type RequestInput = {
 
 /**
  * The request queue (section 13): a request waits as `pending` from the moment the conversation agent's action is
- * committed, and is resolved by the curate step. Cancelling the generation that made it never discards it; the
+ * committed, and is resolved by the curate step (or, once its targets are excluded, by the closure delete). Cancelling the generation that made it never discards it; the
  * user takes one back with a `withdraw` request. `what` and `detail` are cleared as soon as a request ends.
  */
 export function createInbox(deps: StewardDeps, kick: Kick) {
@@ -108,12 +115,75 @@ export function createInbox(deps: StewardDeps, kick: Kick) {
 			goalIds,
 		});
 		endInboxOfMessages(db, purged.messageIds, "forgotten", deps.clock());
-		// What was judged of the forgotten messages goes too. The goal reflection and the memory reflection still due
-		// for their events find the events forgotten when they are read (they are given up there).
-		deleteRoutesOfMessages(db, purged.messageIds);
 	}
+
+	/**
+	 * A forget request whose targets were excluded at once (the immediate stage, section 9.2) waits for the closure
+	 * delete: the steward removes every version and what was derived from them, at once and whether or not a run is
+	 * going. The request stays in the inbox, across a restart, until then. False when it is not a pending forget.
+	 */
+	function excludedInTransaction(
+		db: Database,
+		input: { id: string; conversationId: string; exclusion: ForgetExclusion },
+	): boolean {
+		const marked = markExcluded(db, input.id, input.exclusion);
+		if (marked) kick.kickInTransaction(db, input.conversationId);
+		return marked;
+	}
+	/**
+	 * A request that names its target in words (a correction, a forget, a suppression): the agency alone resolves the
+	 * target, so it waits in the inbox, with what the agency needs, across a restart. A forget the conversation agent
+	 * already queued with `requestInTransaction` (the same id) keeps its row and gets the details.
+	 */
+	function targetRequestInTransaction(
+		db: Database,
+		input: { id: string; request: TargetRequest },
+	) {
+		const { request } = input;
+		const sourceRef = request.messageIds.at(-1);
+		const message = sourceRef
+			? deps.conversation.messageInTransaction(db, sourceRef)
+			: undefined;
+		if (
+			!message ||
+			message.message.role !== "user" ||
+			message.message.conversationId !== request.conversationId
+		)
+			throw new Error("invalid_request_source");
+		if (
+			!readInbox(db, input.id) &&
+			countOpenInbox(db, request.conversationId) >= OPEN_REQUESTS
+		)
+			throw new Error("request_queue_full");
+		putTargetRequest(db, {
+			id: input.id,
+			request,
+			sourceRef: sourceRef!,
+			createdAt: deps.clock(),
+		});
+	}
+
 	return {
 		requestInTransaction,
+		targetRequestInTransaction,
+		/** The requests the agency has yet to resolve (of one conversation, or of all), oldest first. */
+		pendingTargetsInTransaction: (
+			db: Database,
+			input: { conversationId?: string } = {},
+		) => pendingTargets(db, input.conversationId),
+		/** A forget of the conversation is not settled yet: its target is not decided, or not excluded yet. */
+		hasPendingForgetInTransaction: hasPendingForget,
+		/** The agency settled a request. A forget that was excluded is settled by `excludedInTransaction`. */
+		settleTargetInTransaction: (
+			db: Database,
+			input: { id: string; outcome: "applied" | "unresolved" },
+		) => settleTarget(db, { ...input, now: deps.clock() }),
+		/** The requests the agency could not settle, each once: the next answer tells the user nothing was changed. */
+		takeUnresolvedTargetsInTransaction: (
+			db: Database,
+			conversationId: string,
+		) => takeUnresolved(db, conversationId, deps.clock()),
+		excludedInTransaction,
 		runEndedInTransaction,
 		purge,
 	};

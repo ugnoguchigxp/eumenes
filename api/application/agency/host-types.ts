@@ -1,12 +1,16 @@
 import type { Database } from "bun:sqlite";
 import type { LlmPort, LlmRequest } from "eumenes-agency";
+import type { ContinuityService } from "../../domains/continuity";
 import type { ConversationService } from "../../domains/conversation";
 import type { MemoryService } from "../../domains/memory";
 import type { Settings } from "../../domains/settings";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { SpeechRouter } from "./speech";
 import type { AgencyCallIdentity } from "./llm-port";
-import type { AgencyStatePort } from "../../domains/dialogue";
+import type {
+	AgencyStatePort,
+	MemoryTargetRequest,
+} from "../../domains/dialogue";
 import type { SteeringInbox } from "eumenes-steer";
 import type {
 	GoalDesigner,
@@ -71,6 +75,8 @@ export type AgencyHostDeps = {
 			params: unknown,
 		): Promise<HostResult>;
 		isGoalContextCurrent(snapshotId: string, db?: Database): boolean;
+		/** The messages a goal stands on (a goal resting on a forgotten or excluded one is not shown). */
+		sourceMessageIds?(db: Database, goalId: string): readonly string[];
 		designer?: GoalDesigner;
 		analysisMs?: number;
 		trace?(event: GoalHostEvent): void;
@@ -103,8 +109,24 @@ export type AgencyHostDeps = {
 		};
 		onChange(listener: () => void): () => void;
 	};
-	/** The user's State items are the topic material (hostTopics mode). */
-	memory: Pick<MemoryService, "status" | "list" | "check"> &
+	/**
+	 * The user's State items are the topic material (hostTopics mode); its immediate operations are what the records
+	 * writer and the target resolution write with (the memory domain's public operations).
+	 */
+	memory: Pick<
+		MemoryService,
+		| "status"
+		| "list"
+		| "check"
+		| "stateItemsInTransaction"
+		| "rememberExplicitInTransaction"
+		| "recordCandidateInTransaction"
+		| "correctExplicitInTransaction"
+		| "excludeForForgetInTransaction"
+		| "suppressInTransaction"
+		| "suppressionsInTransaction"
+		| "policyRevisionInTransaction"
+	> &
 		Partial<
 			Pick<
 				MemoryService,
@@ -112,7 +134,54 @@ export type AgencyHostDeps = {
 				| "isBlockedInTransaction"
 				| "blockMessagesInTransaction"
 			>
-		>;
+		> & {
+			/** The messages among these the memory withholds now (forgotten, or excluded while a forget is on its way). */
+			withheldMessagesInTransaction?(
+				db: Database,
+				messageIds: readonly string[],
+			): Iterable<string>;
+		};
+	/**
+	 * The steward's inbox. A request to correct, forget or suppress a target named in words waits there until the agency
+	 * resolves it (`pendingTargetsInTransaction`) and settles it; a forget whose targets were excluded waits there for its
+	 * closure delete (`excludedInTransaction`, false when it is not a pending forget).
+	 */
+	steward?: {
+		excludedInTransaction(
+			db: Database,
+			input: {
+				id: string;
+				conversationId: string;
+				exclusion: {
+					itemIds: string[];
+					messageIds: string[];
+					claimIds: string[];
+					entityIds: string[];
+					goalIds: string[];
+				};
+			},
+		): boolean;
+		pendingTargetsInTransaction(
+			db: Database,
+			input?: { conversationId?: string },
+		): ReadonlyArray<{ id: string; request: MemoryTargetRequest }>;
+		settleTargetInTransaction(
+			db: Database,
+			input: { id: string; outcome: "applied" | "unresolved" },
+		): unknown;
+	};
+	/** The dialogue domain's side of a resolved target (built after the agency: read when used). */
+	dialogueTargets?: {
+		/** The messages the excluded records stand on leave the recent conversation, the summaries and the history reads. */
+		hideExcludedInTransaction(
+			db: Database,
+			input: { messageIds: readonly string[]; itemIds?: readonly string[] },
+		): void;
+		/** The conversation's requests without a reference are settled: its next generation may go on. */
+		targetsSettled(conversationId: string): void;
+	};
+	/** The plans (L3) and the question ledger the records writer writes and the agent reads. */
+	continuity: Pick<ContinuityService, "plans" | "questions" | "events">;
 	backgroundDiagnostic?(
 		db: Database,
 		conversationId: string,

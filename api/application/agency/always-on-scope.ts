@@ -4,6 +4,7 @@ import {
 	defaultPersona,
 	speechIntervals,
 	type AgendaAgent,
+	type AgendaSnapshot,
 	type NoteRef,
 	type ReplyCall,
 	type SpeechIntervalSec,
@@ -16,12 +17,13 @@ import {
 	type AgencyRecord,
 	type AgendaHostSnapshot,
 	type AgendaNote,
-	type AgendaProfile,
 	type AgendaResearchTicket,
 	agendaSources,
 	READ_MEMORY_LIMIT,
 } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
+import { knownFor, marksFor, recordsFor, saidOf } from "./always-on-recall";
+import { takePosition } from "./always-on-position";
 import type { AgencyThought } from "../../domains/dialogue/contracts/agency-status";
 import type { Unheard } from "./always-on-heard";
 
@@ -92,17 +94,25 @@ export type AgendaScope = {
 	calls: Map<string, readonly ReplyCall[]>;
 	/** The user's messages a reply of the run took into a model call (eumenes-steer). */
 	taken: Map<string, string[]>;
-	/** The user's plans and interests (the package's profile note), written behind the talk. */
-	profile: AgendaProfile;
-	/** The words the profile writer has read already. */
-	profileSeen: Set<string>;
-	/** Ends the writer's call when the scope goes. */
-	profileAbort: AbortController;
+	/**
+	 * The outbox seq of the last event the records writer has read (saved with the checkpoint, in the transaction of
+	 * what the pass wrote): the next pass reads the conversation's words after it. Moves only when a pass was kept.
+	 * null: no position is known (the first pass starts a little before the end of the conversation).
+	 */
+	recordsSeq: number | null;
+	/** Ends the records writer's call (and a note's display) when the scope goes. */
+	closed: AbortController;
 	/** The writer's pass while one runs (one at a time); `again` is set by a reply that came in meanwhile. */
-	profileRun: { again: boolean } | null;
+	recordsRun: { again: boolean } | null;
+	/** A pass was called off or failed: it owes a read of the words after `recordsSeq`. */
+	recordsOwed: boolean;
 	/** Grows with every forget: a writer pass that began before one is not kept. */
 	forgetSeq: number;
-	/** The agency's calls without the step's staleness rules (the profile writer runs beside the user's words). */
+	/** `memory:<id>` versions a consolidation replaced that the agent's items still cite, to their successors (saved so). */
+	renames: Map<string, string>;
+	/** The `memory:<id>` items the calls of the agent were given lately (what its input rests on). */
+	shown: Set<string>;
+	/** The agency's calls without the step's staleness rules (the records writer runs beside the user's words). */
 	background: LlmPort;
 	/** What each reply was given (memory, notes, the agent's state), as references: captured again when it is adopted. */
 	given: Map<string, string[]>;
@@ -121,17 +131,42 @@ export type AgendaScope = {
 	kick(): void;
 };
 
+/** What the host keeps in the record's `idle` slot: the records writer's position. */
+export type AgencyRecordSlot = { recordsSeq: number | null };
+
+/** Where the records writer stopped in a saved record (null: not known). */
+export const positionOf = (record: AgencyRecord | undefined): number | null => {
+	const idle = record?.idle;
+	return typeof idle === "object" &&
+		idle !== null &&
+		typeof (idle as AgencyRecordSlot).recordsSeq === "number"
+		? (idle as AgencyRecordSlot).recordsSeq
+		: null;
+};
+
+/** The agent's snapshot with the references of replaced versions turned to the versions that took their place. */
+export const renamed = (
+	snapshot: AgendaSnapshot,
+	renames: ReadonlyMap<string, string>,
+): AgendaSnapshot =>
+	renames.size === 0
+		? snapshot
+		: {
+				...snapshot,
+				items: snapshot.items.map((item) => ({
+					...item,
+					refs: item.refs.map((ref) => renames.get(ref) ?? ref),
+				})),
+			};
+
 export function agendaEnvelope(c: AgendaScope, at: number): AgendaHostSnapshot {
 	return {
 		kind: "agenda",
 		version: 1,
 		revision: c.revision,
-		agent: c.agent.snapshot(at),
+		agent: renamed(c.agent.snapshot(at), c.renames),
 		tickets: structuredClone(c.tickets),
 		notes: structuredClone(c.notes),
-		...(c.profile.markdown || c.profile.passes.length
-			? { profile: structuredClone(c.profile) }
-			: {}),
 	};
 }
 
@@ -146,7 +181,8 @@ export function agendaRecord(
 		scope: c.scope,
 		epoch: c.epoch,
 		snapshot,
-		idle: null,
+		// The record's own slot beside the snapshot (the contract of the snapshot is the dialogue domain's).
+		idle: { recordsSeq: c.recordsSeq } satisfies AgencyRecordSlot,
 		settingsDigest,
 		sourceRefs: agendaSources(snapshot),
 	};
@@ -190,9 +226,6 @@ export const noteRef = (n: AgendaNote): NoteRef => ({
 	refs: n.refs,
 });
 
-/** How many memory items a background call (plan, ask check, profile writer) is given: the most recently updated. */
-export const KNOWN_LIMIT = 24;
-
 /** Every active memory item of the user (`memory:<id>`), without what is out of its validity, newest update first. */
 function activeMemory(deps: AgencyHostDeps, now: number) {
 	const status = deps.memory.status();
@@ -207,17 +240,20 @@ function activeMemory(deps: AgencyHostDeps, now: number) {
 		);
 }
 
+/** How many memory refs the scope remembers having shown (the newest ones). */
+const SHOWN_KEPT = 200;
+
 /**
- * The memory the agent's background calls read: the `KNOWN_LIMIT` most recently updated active items (the memory
- * lists them newest update first), as `memory:<id>`. What is left out is not given, and not recorded as given.
+ * The `memory:<id>` items the agent's calls were given lately that are still in force now: what a research or a
+ * line it makes may rest on (a superseded or forgotten one is no longer in force, and is not recorded as seen).
  */
-export function knownOf(deps: AgencyHostDeps, now: number) {
-	return activeMemory(deps, now)
-		.slice(0, KNOWN_LIMIT)
-		.map((item) => ({
-			id: item.id,
-			text: `${item.polarity === "negated" ? "（否定）" : ""}${item.text}`,
-		}));
+export function shownMemory(
+	deps: AgencyHostDeps,
+	c: Pick<AgendaScope, "shown">,
+	now: number,
+) {
+	const active = new Set(activeMemory(deps, now).map((item) => item.id));
+	return [...c.shown].filter((ref) => active.has(ref.slice("memory:".length)));
 }
 
 /**
@@ -312,11 +348,20 @@ export function createAgendaScope(input: {
 	};
 	const agent = createAgendaAgent({
 		llm,
-		known: () => knownOf(deps, now()),
+		known: (call) => {
+			const known = knownFor(deps, call, saidOf(c), now());
+			for (const item of known) c.shown.add(`memory:${item.id}`);
+			for (const old of c.shown) {
+				if (c.shown.size <= SHOWN_KEPT) break;
+				c.shown.delete(old);
+			}
+			return known;
+		},
+		records: (call) => recordsFor(deps, call, saidOf(c)),
+		marks: () => marksFor(deps, c),
 		notes: () => c.notes.map(noteRef),
 		persona: personaOf(deps),
 		speechIntervalSec: agendaInterval(cfg.agency.speechIntervalSec),
-		profile: () => c.profile.markdown,
 		clock: agendaClock,
 		startedAt: now(),
 		...(restored ? { restore: restored.agent } : {}),
@@ -339,13 +384,14 @@ export function createAgendaScope(input: {
 		steering: steering ?? null,
 		tickets: structuredClone(restored?.tickets ?? []),
 		notes: structuredClone(restored?.notes ?? []),
-		profile: structuredClone(
-			restored?.profile ?? { markdown: "", base: "", passes: [] },
-		),
-		profileSeen: new Set(),
-		profileAbort: new AbortController(),
-		profileRun: null,
+		// The reading position is the conversation's, not the agency's memory: a revoked checkpoint leaves it behind.
+		recordsSeq: positionOf(input.previous) ?? takePosition(deps, id),
+		closed: new AbortController(),
+		recordsRun: null,
+		recordsOwed: false,
 		forgetSeq: 0,
+		renames: new Map(),
+		shown: new Set(),
 		background: inner,
 		finished: new Map(),
 		controller: null,

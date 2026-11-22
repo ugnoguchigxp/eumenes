@@ -13,21 +13,11 @@ afterEach(async () => {
 	for (const h of harnesses.splice(0)) await h.close();
 });
 async function setup() {
-	const h = await setupSteward({ embed: topicEmbed });
+	const h = await setupSteward({ embed: topicEmbed, sleep: {} });
 	harnesses.push(h);
 	return h;
 }
-const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
-const address = {
-	kind: "personal_fact",
-	key: "address",
-	text: "住所は東京都千代田区",
-	evidence: "e1",
-	quote: null,
-	validFrom: null,
-	validUntil: null,
-	negated: false,
-};
+const empty = { resolve: [] };
 const resolve = (over: Record<string, unknown>) => ({
 	request: "r1",
 	action: "forget",
@@ -38,26 +28,43 @@ const resolve = (over: Record<string, unknown>) => ({
 	key: null,
 	...over,
 });
+/** The exchange where the address was said, and the memory the earlier reflection kept of it (turns embedded). */
 async function learnAddress(h: StewardHarness) {
-	h.inference.script("curate-memory", { ...empty, remember: [address] });
 	const first = await h.run({
 		user: "私の住所は東京都千代田区です",
 		answer: "住所を承知しました",
 		end: "completed",
 	});
-	await h.drain();
+	await h.store.write((db) =>
+		h.memory.applyCurationInTransaction(db, {
+			conversationId: "c1",
+			items: [
+				{
+					op: "remember",
+					kind: "personal_fact",
+					key: "address",
+					text: "住所は東京都千代田区",
+					messageId: first.inputMessageId,
+					quote: null,
+				},
+			],
+		}),
+	);
+	// The sleep layer embeds the turns of the handled events once the conversation rests.
+	await h.rest();
 	return first;
 }
 
 test("a forget request can identify and erase an inactive memory", async () => {
 	const h = await setup();
 	await learnAddress(h);
-	h.inference.script("curate-memory", (data) => {
-		const ref = (data.longTerm as Array<{ ref: string }>)[0]!.ref;
-		return { ...empty, stop: [{ ref, why: "user_asked" }] };
-	});
-	await h.run({ user: "住所の記憶は使うのをやめてください", end: "completed" });
-	await h.drain();
+	const stopped = h.memory.list()[0]!;
+	await h.store.write((db) =>
+		h.memory.applyCurationInTransaction(db, {
+			conversationId: "c1",
+			items: [{ op: "stop", itemId: stopped.id, revision: stopped.revision }],
+		}),
+	);
 	expect(h.memory.list()).toEqual([]);
 	expect(h.memory.list(true)[0]!.status).toBe("inactive");
 	h.inference.script("curate-memory", (data) => {
@@ -84,20 +91,23 @@ test("a fact with more than five versions uses one forget reference and erases e
 	await learnAddress(h);
 	for (let version = 1; version <= 5; version++) {
 		const text = `住所は東京都千代田区の${version}番地`;
-		h.inference.script("curate-memory", (data) => ({
-			...empty,
-			update: [
-				{
-					ref: (data.longTerm as Array<{ ref: string }>)[0]!.ref,
-					text,
-					evidence: "e1",
-					quote: null,
-					negated: false,
-				},
-			],
-		}));
-		await h.run({ user: text, end: "completed" });
-		await h.drain();
+		const said = await h.run({ user: text, end: "completed" });
+		const current = h.memory.list()[0]!;
+		await h.store.write((db) =>
+			h.memory.applyCurationInTransaction(db, {
+				conversationId: "c1",
+				items: [
+					{
+						op: "update",
+						itemId: current.id,
+						revision: current.revision,
+						text,
+						messageId: said.inputMessageId,
+						quote: null,
+					},
+				],
+			}),
+		);
 	}
 	expect(h.memory.list(true)).toHaveLength(6);
 	h.inference.script("curate-memory", (data) => {
@@ -120,10 +130,6 @@ test("a forget request erases the memory and blocks the exchanges, and nothing e
 	const h = await setup();
 	const first = await learnAddress(h);
 	expect(h.memory.list().map((i) => i.semanticKey)).toEqual(["address"]);
-	const learned = h.steward
-		.decisions("c1")
-		.filter((d) => d.step === "curate-memory");
-	expect(learned).toHaveLength(1);
 
 	const callsBefore = h.inference.calls.length;
 	h.inference.script("curate-memory", (data) => {
@@ -181,24 +187,36 @@ test("an answer that stood on ground a forget removed is not adopted, and leaves
 	const h = await setup();
 	await learnAddress(h);
 	const item = h.memory.list()[0]!;
-	h.inference.script("curate-memory", async () => {
-		await h.memory.forget({
-			conversationId: "c1",
-			itemIds: [item.id],
-			messageIds: [],
-		});
-		return {
-			...empty,
-			remember: [
-				{ ...address, key: "food.spicy", text: "辛い物が好き", evidence: "e1" },
-			],
-		};
+	const answer = {
+		resolve: [
+			resolve({
+				action: "remember",
+				kind: "preference",
+				key: "food.spicy",
+				text: "辛い物が好き",
+			}),
+		],
+	};
+	h.inference.script(
+		"curate-memory",
+		async () => {
+			await h.memory.forget({
+				conversationId: "c1",
+				itemIds: [item.id],
+				messageIds: [],
+			});
+			return answer;
+		},
+		answer,
+	);
+	await h.run({
+		user: "辛いものが好きです。覚えて",
+		end: "completed",
+		requests: [{ kind: "remember", what: "辛い物が好き" }],
 	});
-	h.inference.script("curate-memory", empty);
-	await h.run({ user: "辛いものが好きです", end: "completed" });
 	await h.drain();
 	const units = h.units().filter((u) => u.step === "curate-memory");
-	expect(units.map((u) => u.state)).toEqual(["applied", "stale", "applied"]);
+	expect(units.map((u) => u.state)).toEqual(["stale", "applied"]);
 	const stale = h.steward
 		.decisions("c1")
 		.find((d) => d.errorCode === "stale_forget")!;
@@ -207,9 +225,9 @@ test("an answer that stood on ground a forget removed is not adopted, and leaves
 		output: null,
 		results: null,
 	});
-	// The stale answer's memory was not saved; the unit was made again and ran on the new state.
-	expect(h.memory.list().map((i) => i.semanticKey)).toEqual([]);
-	expect(h.inference.callsOf("curate-memory")).toHaveLength(3);
+	// The stale answer was not adopted; the unit was made again and ran on the new state.
+	expect(h.memory.list().map((i) => i.semanticKey)).toEqual(["food.spicy"]);
+	expect(h.inference.callsOf("curate-memory")).toHaveLength(2);
 	expect(h.inference.statuses("pending")).toBe(0);
 });
 
@@ -230,6 +248,7 @@ test("the purge is idempotent: running it again changes nothing", async () => {
 		inference: h.inference.port,
 		conversationOnLarm: () => true,
 		foregroundActive: () => false,
+		restMs: () => 10_000,
 		runStateOf: () => "stale",
 		clock: () => new Date(h.time.ms).toISOString(),
 		nowMs: () => h.time.ms,

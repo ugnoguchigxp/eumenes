@@ -10,7 +10,7 @@ async function setup() {
 	harnesses.push(h);
 	return h;
 }
-const empty = { remember: [], update: [], stop: [], notes: [], resolve: [] };
+const empty = { resolve: [] };
 const resolve = (over: Record<string, unknown>) => ({
 	request: "r1",
 	action: "none",
@@ -21,24 +21,9 @@ const resolve = (over: Record<string, unknown>) => ({
 	key: null,
 	...over,
 });
-const remember = (over: Record<string, unknown> = {}) => ({
-	kind: "preference",
-	key: "food.spicy",
-	text: "辛い食べ物が好き",
-	evidence: "e1",
-	quote: null,
-	validFrom: null,
-	validUntil: null,
-	negated: false,
-	...over,
-});
-
 test("a request alone starts a unit, is settled by the request's state, and its words are cleared", async () => {
 	const h = await setup();
-	// The run's events are already learned; a cancelled run then leaves only a remember request.
-	h.inference.script("curate-memory", empty);
-	await h.run({ user: "こんにちは", end: "completed" });
-	await h.drain();
+	// A cancelled run leaves only a remember request.
 	const run = await h.run({
 		user: "誕生日は5月1日だと覚えて",
 		end: "cancelled",
@@ -88,8 +73,8 @@ test("a request alone starts a unit, is settled by the request's state, and its 
 	expect(item!.sourceMessageIds).toEqual([run.inputMessageId]);
 	const [row] = h.inbox();
 	expect(row).toMatchObject({ state: "done", what: "", detail: null });
-	// The cancelled run recorded no event (the notice of the saved request is the only new one), and no more units are made.
-	expect(h.log()).toHaveLength(3);
+	// The cancelled run recorded no event (the notice of the saved request is the only one), and no more units are made.
+	expect(h.log()).toHaveLength(1);
 	await h.kick("c1");
 	expect(h.units().filter((u) => u.state === "open")).toEqual([]);
 	expect(h.notices()).toContain("覚える依頼を保存しました。");
@@ -131,9 +116,11 @@ test("several requests are settled by one call, and one the model leaves out is 
 
 test("an explicit remember of what is already stored makes a new confirmed version", async () => {
 	const h = await setup();
-	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
-	await h.run({ user: "辛いものが好きです", end: "completed" });
-	await h.drain();
+	await h.seedMemory({
+		user: "辛いものが好きです",
+		key: "food.spicy",
+		text: "辛い食べ物が好き",
+	});
 	const [before] = h.memory.list();
 	expect(before).toMatchObject({ origin: "agent_inferred", revision: 1 });
 	h.inference.script("curate-memory", (data) => {
@@ -166,9 +153,11 @@ test("an explicit remember of what is already stored makes a new confirmed versi
 
 test("a remember request the model answers with none but points at the stored item is still reconfirmed", async () => {
 	const h = await setup();
-	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
-	await h.run({ user: "辛いものが好きです", end: "completed" });
-	await h.drain();
+	await h.seedMemory({
+		user: "辛いものが好きです",
+		key: "food.spicy",
+		text: "辛い食べ物が好き",
+	});
 	const [before] = h.memory.list();
 	// The live model said "already stored, nothing to save" with the item's ref and a reason as its text.
 	h.inference.script("curate-memory", (data) => {
@@ -199,9 +188,11 @@ test("a remember request the model answers with none but points at the stored it
 
 test("a remember request answered with none and a wrong ref is reconfirmed through its key", async () => {
 	const h = await setup();
-	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
-	await h.run({ user: "辛いものが好きです", end: "completed" });
-	await h.drain();
+	await h.seedMemory({
+		user: "辛いものが好きです",
+		key: "food.spicy",
+		text: "辛い食べ物が好き",
+	});
 	const [before] = h.memory.list();
 	// The live model cited the event instead of the item, but named the item's key.
 	h.inference.script("curate-memory", {
@@ -246,12 +237,11 @@ test("a request the model never answers is given up after three tries", async ()
 
 test("a correct request updates an item and is shown to the user once as a notice", async () => {
 	const h = await setup();
-	h.inference.script("curate-memory", {
-		...empty,
-		remember: [remember({ key: "food.spicy", text: "辛いものは苦手" })],
+	await h.seedMemory({
+		user: "辛いものは苦手",
+		key: "food.spicy",
+		text: "辛いものは苦手",
 	});
-	await h.run({ user: "辛いものは苦手", end: "completed" });
-	await h.drain();
 	h.inference.script("curate-memory", (data) => {
 		const ref = (data.longTerm as Array<{ ref: string }>)[0]!.ref;
 		return {
@@ -281,15 +271,17 @@ test("a transcription correction replaces the recorded fact and preserves unrela
 	const h = await setup();
 	const beforeText = "接続は一本の改善にまとめている";
 	const afterText = "接続は一本の回線にまとめている";
-	h.inference.script("curate-memory", {
-		...empty,
-		remember: [
-			remember({ kind: "personal_fact", key: "connection", text: beforeText }),
-			remember(),
-		],
+	await h.seedMemory({
+		user: `${beforeText}。`,
+		kind: "personal_fact",
+		key: "connection",
+		text: beforeText,
 	});
-	await h.run({ user: `${beforeText}。辛い食べ物が好き`, end: "completed" });
-	await h.drain();
+	await h.seedMemory({
+		user: "辛い食べ物が好き",
+		key: "food.spicy",
+		text: "辛い食べ物が好き",
+	});
 	const before = h.memory
 		.list()
 		.find((item) => item.semanticKey === "connection")!;
@@ -333,9 +325,11 @@ test("a transcription correction replaces the recorded fact and preserves unrela
 
 test("a withdraw request takes back a request that was not applied yet: the forget is not carried out", async () => {
 	const h = await setup();
-	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
-	await h.run({ user: "辛いものが好きです", end: "completed" });
-	await h.drain();
+	await h.seedMemory({
+		user: "辛いものが好きです",
+		key: "food.spicy",
+		text: "辛い食べ物が好き",
+	});
 	const [item] = h.memory.list();
 	h.inference.script("curate-memory", (data) => {
 		const requests = data.requests as Array<{ id: string; kind: string }>;
@@ -378,9 +372,11 @@ test("a withdraw request takes back a request that was not applied yet: the forg
 
 test("a withdraw request can not undo an applied forget: it finds nothing to take back and the forget stays", async () => {
 	const h = await setup();
-	h.inference.script("curate-memory", { ...empty, remember: [remember()] });
-	await h.run({ user: "辛いものが好きです", end: "completed" });
-	await h.drain();
+	await h.seedMemory({
+		user: "辛いものが好きです",
+		key: "food.spicy",
+		text: "辛い食べ物が好き",
+	});
 	h.inference.script("curate-memory", (data) => {
 		const ref = (data.longTerm as Array<{ ref: string }>)[0]!.ref;
 		return {

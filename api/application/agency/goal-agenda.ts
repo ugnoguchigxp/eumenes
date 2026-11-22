@@ -17,13 +17,51 @@ import {
 } from "../../domains/memory/contracts";
 import type { AgendaNote } from "../../domains/dialogue";
 import type { GoalsService } from "../../domains/goals";
+import type { createMemoryHostConnection } from "../memory-host";
 import { currentInput, referencedInput } from "./input";
 import { agendaClock, type AgendaScope } from "./always-on-scope";
+import { slotGoals } from "./always-on-recall";
 import type { AgencyHostDeps, NoteDocumentPort } from "./host-types";
 
 const access = { principal: PRINCIPAL, scopeKeys: [PROFILE_SCOPE] };
 export const goalScope = PROFILE_SCOPE;
 const reportMessage = (id: string) => `agency-goal-report:${id}`;
+
+/**
+ * The goals in the agenda's slots, in slot order, for `## State`. A goal that stands on a message the memory withholds
+ * (forgotten, or excluded while its forget is on its way) is not returned.
+ */
+export function goalSlots(deps: AgencyHostDeps, db: Database) {
+	return slotGoals(deps, db).map(({ slot, text, state }) => ({
+		slot,
+		text,
+		state,
+	}));
+}
+
+/** The agenda goals of the host: the slots' store, the goal host's directory, and what the goals read of the memory. */
+export function agendaGoalDeps(input: {
+	store: GoalStore;
+	goals: GoalsService;
+	mockDir: string;
+	memoryHost: Pick<
+		ReturnType<typeof createMemoryHostConnection>,
+		"readForGoals" | "isGoalContextCurrent"
+	>;
+}): NonNullable<AgencyHostDeps["agendaGoals"]> {
+	return {
+		store: input.store,
+		mockDir: input.mockDir,
+		readMemory: input.memoryHost.readForGoals,
+		isGoalContextCurrent: input.memoryHost.isGoalContextCurrent,
+		// The messages a goal stands on, as the goals domain resolves them for a forget (read-only).
+		sourceMessageIds: (db, goalId) =>
+			input.goals.resolveForgetInTransaction(db, {
+				goalIds: [goalId],
+				entityIds: [],
+			}).messageIds,
+	};
+}
 
 export function createAgendaGoalStore(
 	store: Parameters<typeof createGoalStore>[0],

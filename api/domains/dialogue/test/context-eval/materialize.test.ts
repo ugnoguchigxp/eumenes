@@ -159,7 +159,7 @@ test("a case becomes the production messages: the system part, the recent conver
 	expect(lastOf(m)).toStartWith("## State\n今: ");
 });
 
-test("`## Memory` is the published leanings: a waiting memory, the notes, goals and World are not in the input", async () => {
+test("`## Memory` is the published leanings: a waiting memory, the decisions, goals and World are not in the input; a dated or open plan is in `## State`", async () => {
 	const m = await prepared(fullCase);
 	const memory = memoryOf(m).join("\n");
 	expect(memory).toContain("辛い物が好き（本人の発言）");
@@ -167,15 +167,13 @@ test("`## Memory` is the published leanings: a waiting memory, the notes, goals 
 	expect(memory).not.toContain("刺激の強い食事を好む傾向");
 	expect(memory).not.toContain("夜は通知を控える");
 	const all = allOf(m);
-	for (const absent of [
-		"旅行は十一月",
-		"来週は出張",
-		"来週までに資料を作る",
-		"音声サービス",
-	])
+	for (const absent of ["旅行は十一月", "来週までに資料を作る", "音声サービス"])
 		expect(all).not.toContain(absent);
 	// Nothing older than the cut is put in by the host: the history toolchain reads it.
 	expect(all).not.toContain("京都です");
+	// The seed's memo is an open plan now: `## State` tells it, not `## Memory`.
+	expect(sect(m, "State").join("\n")).toContain("予定:\n- p1 来週は出張");
+	expect(memory).not.toContain("来週は出張");
 });
 
 test("the recent conversation is what reached the user: a partial delivery as heard, nothing being spoken, no notice or tool line", async () => {

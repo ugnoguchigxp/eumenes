@@ -16,6 +16,7 @@ import { createDialogueService } from "..";
 import type {
 	AgencyLayerPort,
 	ConversationAgentPort,
+	MemoryTargetPort,
 	StewardPort,
 	WorldContextPort,
 } from "../contracts";
@@ -157,6 +158,8 @@ export type SetupOptions = {
 	autoStart?: boolean;
 	/** The steward receives requests and run ends (default: a recording steward). */
 	steward?: StewardPort | null;
+	/** Resolves the target of a memory request that names no short reference (default: a recording port; null: none). */
+	memoryTargets?: MemoryTargetPort | null;
 	/** Revisions the catalog lists whose card cannot be rebuilt (the pinned submit then fails). */
 	unbuildable?: string[];
 	/** The model window the run's LARM lease reports (tokens); absent: the reference window. */
@@ -199,6 +202,19 @@ export async function setup(options: SetupOptions = {}) {
 		instantAnswer: "東京は12時です。" as string | null,
 		stewardRequests: [] as Array<
 			Parameters<StewardPort["requestInTransaction"]>[1]
+		>,
+		/** The forgets the steward's inbox marked excluded, by request id. */
+		excluded: [] as Array<Parameters<StewardPort["excludedInTransaction"]>[1]>,
+		/** What the steward kept of the requests that named no short reference, and whether a forget of them is pending. */
+		keptTargets: [] as Array<
+			Parameters<StewardPort["targetRequestInTransaction"]>[1]
+		>,
+		pendingForget: false,
+		/** The requests the agency could not settle (the next generation tells the user once). */
+		unresolved: [] as Array<{ id: string; what: string }>,
+		/** The corrections, forgets and suppressions that named no short reference (the agency resolves them). */
+		targetRequests: [] as Array<
+			Parameters<MemoryTargetPort["requestInTransaction"]>[1]
 		>,
 		runEnds: [] as Array<Parameters<StewardPort["runEndedInTransaction"]>[1]>,
 		selections: [] as Array<Record<string, unknown>>,
@@ -434,6 +450,17 @@ export async function setup(options: SetupOptions = {}) {
 							replay: false,
 						};
 					},
+					excludedInTransaction: (_db, input) => {
+						state.excluded.push(input);
+						return true;
+					},
+					targetRequestInTransaction: (_db, input) => {
+						state.keptTargets.push(input);
+						if (input.request.kind === "forget") state.pendingForget = true;
+					},
+					hasPendingForgetInTransaction: () => state.pendingForget,
+					takeUnresolvedTargetsInTransaction: () =>
+						state.unresolved.splice(0, state.unresolved.length),
 				});
 	const memory: MemoryService | undefined = options.memory
 		? createMemoryService(store, conversation, continuity, {
@@ -457,6 +484,15 @@ export async function setup(options: SetupOptions = {}) {
 		image,
 		...(music ? { music } : {}),
 		...(steward ? { steward } : {}),
+		...(options.memoryTargets === null
+			? {}
+			: {
+					memoryTargets: options.memoryTargets ?? {
+						requestInTransaction: (_db, input) => {
+							state.targetRequests.push(input);
+						},
+					},
+				}),
 		...(memory ? { memory } : {}),
 		...(options.agency ? { agency: options.agency } : {}),
 		...(options.worldContext ? { worldContext: options.worldContext } : {}),

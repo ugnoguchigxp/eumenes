@@ -14,11 +14,13 @@ import {
 	createConversationService,
 } from "../../conversation";
 import {
-	type ContinuityKind,
+	type PlanKind,
 	migration as continuityMigration,
 	shortTermMigration,
 	itemSourceMigration,
 	eventsMigration,
+	plansMigration,
+	shortTermToPlansMigration,
 } from "../../continuity";
 import { createContinuityFixture as createContinuityService } from "../../../application/world/state-services.fixture";
 import {
@@ -35,6 +37,9 @@ import {
 	specialistBlockReasonMigration,
 	executionReferencesMigration,
 	retireExchangeLedgerMigration,
+	immediateLayerMigration,
+	tendencyRunMigration,
+	explicitRequestedMigration,
 } from "../repository";
 import type {
 	CurationItem,
@@ -55,6 +60,8 @@ export const memoryTestMigrations = [
 	shortTermMigration,
 	itemSourceMigration,
 	eventsMigration,
+	plansMigration,
+	shortTermToPlansMigration,
 	migration,
 	contextWindowMigration,
 	agentHardeningMigration,
@@ -66,6 +73,9 @@ export const memoryTestMigrations = [
 	executionReferencesMigration,
 	...memoryPackageMigrations,
 	hostInputsMigration,
+	immediateLayerMigration,
+	tendencyRunMigration,
+	explicitRequestedMigration,
 	// Last, so a test that opens a database without it (the earlier design's) keeps every other position.
 	retireExchangeLedgerMigration,
 ];
@@ -219,21 +229,39 @@ export async function setupMemory(
 				text,
 			});
 		},
-		/** A short-term note, written the way the steward writes one (its source message need not exist). */
-		note: (
+		/**
+		 * A plan (L3), written the way the sleeping layer's writers write one: it rests on messages (by default one
+		 * that need not exist).
+		 */
+		plan: (
 			conversationId: string,
-			input: { kind: ContinuityKind; text: string },
+			input: {
+				kind: PlanKind;
+				text: string;
+				dueAt?: string | null;
+				messageIds?: readonly string[];
+			},
 		) =>
 			store.write((db) =>
-				continuity.addByAgentInTransaction(db, conversationId, {
-					...input,
-					sourceMessageIds: ["note-source"],
+				continuity.plans.addInTransaction(db, {
+					conversationId,
+					kind: input.kind,
+					text: input.text,
+					...(input.dueAt === undefined ? {} : { dueAt: input.dueAt }),
+					evidence: {
+						messages: (input.messageIds ?? ["plan-source"]).map(
+							(messageId) => ({ messageId }),
+						),
+					},
 				}),
 			),
-		/** Closes a note at the revision the caller saw. */
-		closeNote: (id: string, revision: number) =>
+		/** Closes a plan at the revision the caller saw. */
+		closePlan: (id: string, revision: number) =>
 			store.write((db) =>
-				continuity.closeByAgentInTransaction(db, id, revision, "resolved"),
+				continuity.plans.closeInTransaction(db, id, {
+					evidence: { messages: [{ messageId: "plan-source" }] },
+					expectedRevision: revision,
+				}),
 			),
 		/** Saves one item (see `saveItem`). */
 		remember: (input: SeedInput) => saveItem(store, memory, input),

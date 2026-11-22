@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { agendaFixture, promiseResearch, replyWith } from "./always-on.fixture";
 import { createAgendaScope } from "./always-on-scope";
 import { createAgendaCheckpoints } from "./always-on-checkpoint";
+import { marksFor } from "./always-on-recall";
 import { recoverAgendaScope } from "./always-on-recovery";
 import { settle } from "../../infrastructure/wait-for";
 import { isAgendaSnapshot } from "../../domains/dialogue";
@@ -128,7 +129,10 @@ test("a checkpoint keeps the open promises and the quiet across a restart, and n
 		expect(saved.snapshot_json).not.toContain("fixture user-a");
 		// Nothing runs while the pause lasts: no plan, no research.
 		await f.advance();
-		expect(f.requests).toHaveLength(0);
+		// (The records writer reads the words that were not read before the restart: it is no plan or research.)
+		expect(f.requests.filter((_, i) => f.kinds[i] !== "records")).toHaveLength(
+			0,
+		);
 		expect(f.h.toolchain.agents.executions.list("ao")).toHaveLength(0);
 	} finally {
 		await f.close();
@@ -250,7 +254,11 @@ test("superseded memory is removed from live agenda items before the next reply"
 			saved: () => {},
 		});
 		await checkpoints.refresh(c);
-		expect(c.agent.view().items).toEqual([]);
+		// A corrected record is not forgotten: what rests on it is held, under review, until the agent lets it go.
+		expect(c.agent.view().items.map((item) => item.refs)).toEqual([
+			["source", memoryRef],
+		]);
+		expect(marksFor(f.deps, c).underReview).toContain(memoryRef);
 	} finally {
 		await f.close();
 	}

@@ -4,6 +4,7 @@ import type { Run } from "../contracts";
 import { liveSession, markReported, unreportedEnded } from "../repository";
 import type { DialogueDeps } from "./context";
 import { agencyWork } from "../repository/agency";
+import { planGoalLines } from "./state-plans";
 import { taskForWork, taskTargets } from "./task-work";
 import { workContextCurrent } from "./work-context-input";
 import type { DocumentRefs, TodoItem } from "./work-items";
@@ -275,6 +276,7 @@ export function stateProjectionInTransaction(
 			sharedLinesInTransaction(deps, tx, input.conversationId, shown),
 		);
 	}
+	lines.push(...planGoalLines(deps, tx));
 	return { lines, resources: [...resources], todos };
 }
 

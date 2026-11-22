@@ -1,3 +1,5 @@
+import { forgetHiddenMigration } from "./forget-hidden";
+import { memoryRefsMigration } from "./memory-refs";
 import { generatedImagesMigration } from "./generated-images";
 import {
 	agencyMigration,
@@ -100,6 +102,8 @@ export function saveAnnouncement(
 		throw new Error("run_changed");
 }
 export * from "./specialist";
+export * from "./forget-hidden";
+export * from "./memory-refs";
 export function linkAgent(
 	db: Database,
 	runId: string,
@@ -521,6 +525,8 @@ CREATE TABLE dialogue_search_offers (
 		after: ["dialogue/0044-confirmation-revision"],
 		sql: "ALTER TABLE dialogue_confirmations ADD COLUMN used_by_run TEXT REFERENCES dialogue_runs(id) ON DELETE SET NULL;",
 	},
+	forgetHiddenMigration,
+	memoryRefsMigration,
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

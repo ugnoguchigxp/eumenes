@@ -36,6 +36,7 @@ import type {
 import { migrations as stewardMigrations } from "../repository";
 import { createStewardService } from "../service";
 import { steps } from "../service/steps";
+import type { SleepWindow } from "../service/sleep/policy";
 import type { StewardDeps, StewardWorld } from "../service/types";
 
 export const migrations = [
@@ -135,8 +136,17 @@ export function createFakeInference() {
 			control,
 			session,
 		): Promise<ControlReceipt> {
-			const step = stepOf(messages);
-			const data = dataOf(messages);
+			// A sleep-layer judgement is one user message with the library's own system text as the control's instructions.
+			const sleepCall =
+				messages.length === 1 &&
+				control !== undefined &&
+				!Object.values(steps).some((step) =>
+					control.instructions.startsWith(step.instructions),
+				);
+			const step = sleepCall ? "sleep" : stepOf(messages);
+			const data = sleepCall
+				? { system: control!.instructions, user: messages[0]!.content }
+				: dataOf(messages);
 			calls.push({
 				step,
 				requestId,
@@ -183,6 +193,10 @@ export function createFakeInference() {
 		captures,
 		requests,
 		state,
+		/** What a step answers once its scripted answers are used up. */
+		answer(step: string, answer: Scripted) {
+			defaults[step] = answer;
+		},
 		/** The next calls of this step are answered in order. */
 		script(step: string, ...answers: Scripted[]) {
 			scripts.set(step, [...(scripts.get(step) ?? []), ...answers]);
@@ -202,6 +216,13 @@ export async function setupSteward(
 		wrapMemory?: (memory: MemoryService) => MemoryService;
 		/** The steward maintains goals (the real goals service on the same database). */
 		goals?: boolean;
+		/** How long the user's last utterance must be past for the conversation to rest (default 10 s). */
+		restMs?: number;
+		/** The sleep layer (shallow and deep consolidation) runs; its window and outlets may be replaced. */
+		sleep?: {
+			window?: SleepWindow;
+			outlets?: NonNullable<StewardDeps["sleep"]>["outlets"];
+		};
 		/** The saved resource the World curation runs on. */
 		worldResourceId?: string;
 		/** The World the steward curates: built once the store and the conversation exist. */
@@ -275,6 +296,18 @@ export async function setupSteward(
 		inference: inference.port,
 		conversationOnLarm: () => options.conversationOnLarm ?? true,
 		foregroundActive: (_db, conversationId) => foreground.has(conversationId),
+		restMs: () => options.restMs ?? 10_000,
+		...(options.sleep
+			? {
+					sleep: {
+						window: () =>
+							options.sleep?.window ?? { start: "03:00", end: "05:00" },
+						...(options.sleep.outlets
+							? { outlets: options.sleep.outlets }
+							: {}),
+					},
+				}
+			: {}),
 		runStateOf: (runId) => runStates[runId] ?? "stale",
 		clock,
 		nowMs: () => time.ms,
@@ -532,21 +565,52 @@ export async function setupSteward(
 						: {};
 					return fields.action === "memory.notice" ? [String(fields.text)] : [];
 				}),
-		state: (conversationId = "c1") =>
-			store.read(
-				(db) =>
-					db
-						.query(
-							"SELECT maintenance_revision AS revision, maintained_revision AS maintained, quiet_steps AS quiet, next_maintenance_at AS nextAt, defer_count AS deferCount FROM steward_state WHERE conversation_id = ?",
-						)
-						.get(conversationId) as {
-						revision: number;
-						maintained: number;
-						quiet: string;
-						nextAt: number | null;
-						deferCount: number;
-					} | null,
-			),
+		/**
+		 * Memory the steward's earlier work would have left: one State item the agent wrote from an exchange of the
+		 * conversation (the exchange's events are handled). `text` is what is saved; `user` is what was said.
+		 */
+		async seedMemory(input: {
+			user: string;
+			text: string;
+			key: string;
+			kind?: "preference" | "personal_fact" | "constraint" | "habit";
+			conversationId?: string;
+			negated?: boolean;
+		}) {
+			const conversationId = input.conversationId ?? "c1";
+			const exchange = await harness.settledExchange(
+				input.user,
+				"了解しました",
+				conversationId,
+			);
+			const [result] = await store.write((db) =>
+				memory.applyCurationInTransaction(db, {
+					conversationId,
+					items: [
+						{
+							op: "remember",
+							kind: input.kind ?? "preference",
+							key: input.key,
+							text: input.text,
+							...(input.negated === undefined
+								? {}
+								: { negated: input.negated }),
+							messageId: exchange.inputMessageId,
+							quote: null,
+						},
+					],
+				}),
+			);
+			if (result?.status !== "applied") throw new Error("seed_rejected");
+			return { ...exchange, itemId: result.id! };
+		},
+		/** The user leaves: the conversation rests once the interval they chose has passed, and the steward looks at what waits. */
+		async rest(ms = (options.restMs ?? 10_000) + 1) {
+			time.ms += ms;
+			await harness.kick();
+			// What waits for a time (a window, a retry) stays waiting: only the timers of the test move the clock.
+			await harness.drain(200, { timers: false });
+		},
 		runEnded: (runId: string, conversationId: string, state: RunEnd) =>
 			store.write((db) =>
 				steward.runEndedInTransaction(db, { runId, conversationId, state }),
@@ -554,7 +618,7 @@ export async function setupSteward(
 		kick: (conversationId?: string) =>
 			store.write((db) => steward.kickInTransaction(db, conversationId)),
 		/** Runs the queue until no steward job is open (advancing the clock for jobs that wait). */
-		async drain(limit = 200) {
+		async drain(limit = 200, options: { timers?: boolean } = {}) {
 			for (let i = 0; i < limit; i++) {
 				await queue.tick();
 				for (let j = 0; j < 20; j++) await yieldTurn();
@@ -570,7 +634,7 @@ export async function setupSteward(
 				);
 				if (open === 0) {
 					// Waiting without a job (a failed target's retry, a deferred upkeep): the timer kicks again.
-					if (await harness.fireTimer()) continue;
+					if (options.timers !== false && (await harness.fireTimer())) continue;
 					return;
 				}
 				const next = store.read(
@@ -632,15 +696,9 @@ export async function setupSteward(
 }
 export type StewardHarness = Awaited<ReturnType<typeof setupSteward>>;
 
-/** The whole reflecting pipeline answered with "nothing to save, keep everything". */
+/** The request step answered with "nothing to do". */
 export function quietReflect(h: StewardHarness) {
-	h.inference.script("curate-memory", {
-		remember: [],
-		update: [],
-		stop: [],
-		notes: [],
-		resolve: [],
-	});
+	h.inference.script("curate-memory", { resolve: [] });
 }
 
 /** Texts that mention a topic share a vector: enough for the recall to find "the earlier talk about it". */

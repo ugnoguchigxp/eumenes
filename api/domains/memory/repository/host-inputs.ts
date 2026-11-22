@@ -33,3 +33,16 @@ export function purgeHostInputs(db: Database, refs: ReadonlySet<string>) {
 			);
 	}
 }
+/** The forget purge of the run inputs: every run whose sources include a forgotten message or State item. */
+export function purgeHostInputsOfForget(
+	db: Database,
+	purge: { messageIds: Iterable<string>; itemIds: Iterable<string> },
+) {
+	purgeHostInputs(
+		db,
+		new Set([
+			...purge.messageIds,
+			...[...purge.itemIds].map((id) => `memory:${id}`),
+		]),
+	);
+}
