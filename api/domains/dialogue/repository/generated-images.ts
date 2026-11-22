@@ -63,6 +63,16 @@ export function recentImageObservations(db: Database, conversationId: string) {
 	).map((row) => JSON.parse(row.record) as ImageObservation);
 }
 
+/** Whether the conversation has any image observation (the same rows `recentImageObservations` reads, as one `EXISTS`). */
+export function hasImageObservations(db: Database, conversationId: string) {
+	const row = db
+		.query<{ present: number }, [string]>(
+			"SELECT EXISTS(SELECT 1 FROM dialogue_generated_images WHERE conversation_id=?) AS present",
+		)
+		.get(conversationId);
+	return row?.present === 1;
+}
+
 export function deleteImageObservation(db: Database, workId: string) {
 	db.query("DELETE FROM dialogue_generated_images WHERE work_id=?").run(workId);
 }

@@ -5,12 +5,17 @@ import type { ChatMessage } from "./context";
 import type { Turn } from "./routed-turn";
 
 const oneOf = (values: string[]) => ({ type: "string", enum: values });
-/** A later call after a tool result already has a decision to follow. Only the first foreground reply is eligible. */
-export function firstConfirmationReply() {
+/** A later call after a tool result already has a decision to follow. Only the first foreground reply with pending confirmations is eligible. */
+export function firstConfirmationReply(routed?: Turn["routed"]) {
 	let first = true;
+	const hasPending = !!(
+		routed?.pending.confirmations.length || routed?.pending.revisions?.length
+	);
 	return (tools: readonly { name: string }[]) => {
 		const pending =
-			first && tools.some((t) => t.name === "decline_confirmation");
+			first &&
+			hasPending &&
+			tools.some((t) => t.name === "decline_confirmation");
 		first = false;
 		return pending;
 	};

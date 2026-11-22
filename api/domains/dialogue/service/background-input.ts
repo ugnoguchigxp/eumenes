@@ -64,6 +64,7 @@ export function backgroundInput(
 			`host-confirmation:${JSON.stringify([row.id, sha256Hex(JSON.stringify(row))])}`,
 		);
 	}
+	for (const ref of prefix.summarySourceRefs ?? []) sources.add(ref);
 	const window = deps.memory?.storedWindowInTransaction(db, id);
 	const itemRevisions = Object.fromEntries(
 		(window?.profile.items ?? [])

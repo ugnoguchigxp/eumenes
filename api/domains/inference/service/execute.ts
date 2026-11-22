@@ -27,6 +27,7 @@ import {
 	attemptDuration,
 	callOptionsFor,
 	chooseLlmDelivery,
+	deliveryJudgeSkipped,
 	chooseTtsDelivery,
 	decider,
 	fenced,
@@ -224,7 +225,8 @@ async function attempt(
 			r.preparation?.deliveryScope !== "chunk" &&
 			// A reply is judged even beside a tool call (a spoken answer carries its analysis call); a call alone is not.
 			typeof value === "string" &&
-			value.trim() !== ""
+			value.trim() !== "" &&
+			!deliveryJudgeSkipped(r, value)
 		)
 			delivery = await measureStage(
 				"inference",

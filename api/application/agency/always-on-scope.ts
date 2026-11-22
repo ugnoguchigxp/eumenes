@@ -19,6 +19,7 @@ import {
 	type AgendaProfile,
 	type AgendaResearchTicket,
 	agendaSources,
+	READ_MEMORY_LIMIT,
 } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
 import type { AgencyThought } from "../../domains/dialogue/contracts/agency-status";
@@ -95,10 +96,10 @@ export type AgendaScope = {
 	profile: AgendaProfile;
 	/** The words the profile writer has read already. */
 	profileSeen: Set<string>;
-	/** The writer's passes, one after another. */
-	profileWriting: Promise<void>;
 	/** Ends the writer's call when the scope goes. */
 	profileAbort: AbortController;
+	/** The writer's pass while one runs (one at a time); `again` is set by a reply that came in meanwhile. */
+	profileRun: { again: boolean } | null;
 	/** Grows with every forget: a writer pass that began before one is not kept. */
 	forgetSeq: number;
 	/** The agency's calls without the step's staleness rules (the profile writer runs beside the user's words). */
@@ -189,8 +190,11 @@ export const noteRef = (n: AgendaNote): NoteRef => ({
 	refs: n.refs,
 });
 
-/** The memory's active items as the agent reads them (`memory:<id>`), without what is out of its validity. */
-export function knownOf(deps: AgencyHostDeps, now: number) {
+/** How many memory items a background call (plan, ask check, profile writer) is given: the most recently updated. */
+export const KNOWN_LIMIT = 24;
+
+/** Every active memory item of the user (`memory:<id>`), without what is out of its validity, newest update first. */
+function activeMemory(deps: AgencyHostDeps, now: number) {
 	const status = deps.memory.status();
 	if (!status.enabled || !status.healthy) return [];
 	return deps.memory
@@ -200,11 +204,44 @@ export function knownOf(deps: AgencyHostDeps, now: number) {
 				item.status === "active" &&
 				(item.validFromMs === null || item.validFromMs <= now) &&
 				(item.validUntilMs === null || item.validUntilMs > now),
-		)
+		);
+}
+
+/**
+ * The memory the agent's background calls read: the `KNOWN_LIMIT` most recently updated active items (the memory
+ * lists them newest update first), as `memory:<id>`. What is left out is not given, and not recorded as given.
+ */
+export function knownOf(deps: AgencyHostDeps, now: number) {
+	return activeMemory(deps, now)
+		.slice(0, KNOWN_LIMIT)
 		.map((item) => ({
 			id: item.id,
 			text: `${item.polarity === "negated" ? "（否定）" : ""}${item.text}`,
 		}));
+}
+
+/**
+ * The memory items a `read_memory` call returned, as `memory:<id>` (the tool's result is text without ids): the
+ * same read the tool makes (with the tool's own limit, from the dialogue domain), restricted to the user's items
+ * the agent can cite (not the tendencies).
+ */
+export function readMemoryRefs(
+	deps: AgencyHostDeps,
+	query: string | undefined,
+	now: number,
+) {
+	const checked = deps.memory.check({
+		...(query ? { query } : {}),
+		shown: new Set(),
+		limit: READ_MEMORY_LIMIT,
+	});
+	if (!checked) return [];
+	const active = new Set(activeMemory(deps, now).map((item) => item.id));
+	return checked.items.flatMap((item) =>
+		typeof item.id === "string" && active.has(item.id)
+			? [`memory:${item.id}`]
+			: [],
+	);
 }
 
 /** The agent's voice: the built-in purpose, the configured persona and the standing interests. */
@@ -306,8 +343,8 @@ export function createAgendaScope(input: {
 			restored?.profile ?? { markdown: "", base: "", passes: [] },
 		),
 		profileSeen: new Set(),
-		profileWriting: Promise.resolve(),
 		profileAbort: new AbortController(),
+		profileRun: null,
 		forgetSeq: 0,
 		background: inner,
 		finished: new Map(),

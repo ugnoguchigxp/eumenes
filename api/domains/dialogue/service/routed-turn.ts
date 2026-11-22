@@ -5,6 +5,7 @@ import type { RoutedPipelineStep } from "../../tool-runtime";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
 import { ValidationFailure } from "../../../infrastructure/validation-log";
+import { emotionEmojis } from "eumenes-agency";
 import { z } from "zod";
 import type { NativeTool } from "../../../infrastructure/chat-stream";
 import type {
@@ -22,6 +23,7 @@ import { imageAnswerTrace } from "./attachment-context";
 import { availableReadTools, readToolDefinitions } from "./executor-read";
 import type {
 	GenerationOutcome,
+	ReadSources,
 	ToolExecutor,
 	ToolOutcome,
 } from "./executor-context";
@@ -34,10 +36,13 @@ import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 const log = getLogger("dialogue");
 /** The host's words for a turn whose call failed before anything was said. */
 const SAID_FAILED = systemContext("dialogue.contexts.local.turn-failed", {});
+const { $schema: _, ...memoryParameters } = z.toJSONSchema(
+	memoryArgs.options[0]!,
+);
 const MEMORY_REQUEST_TOOL: AgentToolDefinition = {
 	name: TOOL_NAMES.memory,
 	description: systemContext("dialogue.contexts.local.memory-request", {}),
-	parameters: z.toJSONSchema(memoryArgs.options[0]!),
+	parameters: memoryParameters,
 };
 
 export type RoutedTurnOptions = {
@@ -104,6 +109,33 @@ function completedTalk(
 	};
 }
 
+function collectReadSources(
+	executed: ReadonlyArray<{ outcome: ToolOutcome }>,
+): ReadSources | undefined {
+	const messageIds = new Set<string>();
+	const itemIds = new Set<string>();
+	const sources = new Set<string>();
+	for (const { outcome } of executed) {
+		for (const id of outcome.readSources?.messageIds ?? []) messageIds.add(id);
+		for (const id of outcome.readSources?.itemIds ?? []) itemIds.add(id);
+		for (const ref of outcome.readSources?.sources ?? []) sources.add(ref);
+	}
+	if (!messageIds.size && !itemIds.size && !sources.size) return undefined;
+	return {
+		...(messageIds.size ? { messageIds: [...messageIds] } : {}),
+		...(itemIds.size ? { itemIds: [...itemIds] } : {}),
+		...(sources.size ? { sources: [...sources] } : {}),
+	};
+}
+
+function parseJsonOrText(raw: string): unknown {
+	try {
+		return JSON.parse(raw);
+	} catch {
+		return raw;
+	}
+}
+
 /** Let the conversation agent understand the turn and act through its offered tools. */
 export async function runConversationTurn(
 	deps: DialogueDeps,
@@ -124,6 +156,7 @@ export async function runConversationTurn(
 	log.info("dialogue.turn_routed", { kind: "talk", count: turn.calls() });
 	options.signal.throwIfAborted();
 	const { receipt, emotion, imageAnswer, writeOutput } = turn.result();
+	const readSources = collectReadSources(turn.executed);
 	return {
 		text: turn.said().trim(),
 		...(writeOutput
@@ -144,6 +177,7 @@ export async function runConversationTurn(
 		...(receipt ? { receipt } : {}),
 		...(emotion ? { emotion } : {}),
 		...(imageAnswer ? { imageAnswer } : {}),
+		...(readSources ? { readSources } : {}),
 		executed: turn.executed,
 		exchange: turn.exchange,
 		ended: turn.executed.some(({ outcome }) => outcome.end === true),
@@ -167,7 +201,6 @@ function callSession(
 		// so a choice can be made again, the talk turn follow it, or the host answer.
 		retainRequest: true,
 		outputLimit: input.harness.call.outputLimit,
-		...(options.session?.context ? { context: options.session.context } : {}),
 		...(options.session?.refs ? { refs: options.session.refs } : {}),
 	};
 }
@@ -180,6 +213,17 @@ function turnModelCall(
 ) {
 	const { signal } = options;
 	const session = callSession(input, options);
+	/**
+	 * What only the reply call has: where its messages split (a choice call has messages of its own), and that its
+	 * feeling is read from its leading emoji when the agent asks for one: the marks are the emojis `runRespond` reads
+	 * (the delivery judge is not run for a reply that starts with one).
+	 */
+	const replySession = () => ({
+		...(options.session?.context ? { context: options.session.context } : {}),
+		...(deps.conversationAgent.system().emotionRules
+			? { emotionMarks: emotionEmojis }
+			: {}),
+	});
 
 	/** One model call on the run's request: a streamed reply (`onDelta`) or a silent choice (`outputSchema`). */
 	return (
@@ -203,6 +247,7 @@ function turnModelCall(
 				tools,
 				{
 					...session,
+					...(onDelta ? replySession() : {}),
 					...extra,
 					...(onDelta && input.observeInput
 						? { observeInput: input.observeInput }
@@ -383,7 +428,7 @@ function createTurn(
 			// What this talk spoke, and whether it read: a call that fails after a read gets the host's words after it.
 			let spoken = "";
 			let toolMade = false;
-			const firstPending = firstConfirmationReply();
+			const firstPending = firstConfirmationReply(input.routed);
 			const release = releasePendingReply.bind(null, this);
 			const saidBefore = said;
 			const toolPort = conversationToolPort(
@@ -625,14 +670,31 @@ function conversationToolPort(
 				try {
 					const result = await lookup(query.trim(), turn.signal);
 					turn.lookupSources.push(...result.sources);
+					turn.exchange.push({
+						name: LOOKUP_TOOL,
+						arguments: toolCall.arguments,
+						result,
+					});
 					return { content: JSON.stringify(result) };
 				} catch {
 					turn.signal.throwIfAborted();
 					return { content: JSON.stringify({ code: "lookup_unavailable" }) };
 				}
 			}
-			if (work?.handles(toolCall.name))
-				return work.call(toolCall.name, args as Record<string, unknown>);
+			if (work?.handles(toolCall.name)) {
+				const before = turn.exchange.length;
+				const answer = await work.call(
+					toolCall.name,
+					args as Record<string, unknown>,
+				);
+				if (turn.exchange.length === before && carriesExchange(toolCall.name))
+					turn.exchange.push({
+						name: toolCall.name,
+						arguments: toolCall.arguments,
+						result: parseJsonOrText(answer.content),
+					});
+				return answer;
+			}
 			const read = await turn.act(
 				toolCall.name,
 				args as Record<string, unknown>,

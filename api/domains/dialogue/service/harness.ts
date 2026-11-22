@@ -12,8 +12,10 @@ export type ConversationHarness = {
 	history: {
 		/** Leave out the agent's utterances that copy the system part. */
 		copyFilter: boolean;
-		/** The user's utterances the recent conversation keeps, with the agent's words after the oldest; absent: all. */
+		/** The user's utterances the recent conversation keeps, with the agent's words after the oldest; absent: all after the cut. */
 		users?: number;
+		/** Replay carried tool calls and results from the recent conversation (`false` keeps words only). */
+		withCalls?: boolean;
 	};
 	call: {
 		/** Tokens of one model call, the reasoning included. */
@@ -26,14 +28,24 @@ export type ConversationHarness = {
 };
 
 /**
- * The harness of the conversation (the local harness rebuild plan, the single harness plan): the host routes each
- * turn, the talk turn reads a talk-only system and the last two of the user's utterances, and no call carries tool
- * definitions. The background calls on the conversation reuse its history under their own system (the agency
- * SystemContext integration). The thinking level is not part of the harness: every call thinks at the one saved level
- * (`general.reasoningEffort`, chosen on the chat screen). The limit holds the thinking and the answer.
+ * The main conversation harness (cache-first append-only until compaction cut): keeps every utterance after the
+ * active cut together with its normalized tool calls and results, maximizing prefix KV cache hits.
  */
-export const localHarness: ConversationHarness = {
-	history: { copyFilter: true, users: 2 },
+export const conversationHarness: ConversationHarness = {
+	history: { copyFilter: true, withCalls: true },
+	call: { outputLimit: 4096 },
+	gates: { systemCopy: true },
+};
+
+/** Alias kept for existing callers of the main conversation harness. */
+export const localHarness: ConversationHarness = conversationHarness;
+
+/**
+ * Lightweight harness for background calls on a conversation (steward, agency): words only (no tool roles, since
+ * `backgroundMessage` carries `{ role, content }` only) and bounded user turns.
+ */
+export const backgroundHarness: ConversationHarness = {
+	history: { copyFilter: true, users: 4, withCalls: false },
 	call: { outputLimit: 4096 },
 	gates: { systemCopy: true },
 };

@@ -138,13 +138,17 @@ test("a plain exchange can answer without calling its offered tools", async () =
 	const run = await h.say("こんにちは");
 	expect(h.dialogue.answerText(run.id)).toBe("こんにちは。");
 	const talk = h.state.calls.at(-1)!;
-	// The read tools this host has (spec conversation-read-tools-design 2026-10-31): no memory or agents here.
+	// The read tools and static work/control tools this host has (kept fixed for KV cache stability).
 	expect(talk.tools).toEqual([
 		"read_history",
 		"read_runs",
 		"memory",
 		"find_toolchain",
 		"delegate",
+		"approve_confirmation",
+		"decline_confirmation",
+		"work",
+		"discard_for_pending_switch",
 	]);
 	expect(talk.session?.outputSchema).toBeUndefined();
 	const system = talk.messages[0]!.content;

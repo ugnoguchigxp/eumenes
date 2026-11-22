@@ -226,3 +226,63 @@ test("history is dropped by whole exchanges, so what is sent never starts with a
 		expect(sent[1]!.role).toBe("user");
 	}
 });
+
+test("an exact request over the window keeps the history message that holds the memory and drops the oldest exchanges after it", async () => {
+	const h = await setup();
+	const text = (tag: string) => `${tag}-${"x".repeat(4000)}`;
+	const memory = `## Memory\n- 好み\n\n${text("opening")}`;
+	const history = [
+		{ role: "user" as const, content: memory },
+		...Array.from({ length: 4 }, (_, i) => [
+			{ role: "assistant" as const, content: text(`a${i}`) },
+			{ role: "user" as const, content: text(`q${i}`) },
+		]).flat(),
+	];
+	const list = [
+		{ role: "system" as const, content: "system" },
+		...history,
+		{ role: "user" as const, content: "request" },
+	];
+	const id = await h.store.write((db) => {
+		const requestId = h.inference.captureInTransaction!(
+			db,
+			crypto.randomUUID(),
+			"llm",
+			Date.now() + 30_000,
+		);
+		h.inference.setContextPolicyInTransaction!(db, requestId, "exact");
+		return requestId;
+	});
+	await h.inference.executeStream!(
+		id,
+		list,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		undefined,
+		{
+			sessionRole: "main",
+			context: {
+				instructionCount: 1,
+				historyCount: history.length,
+				// The memory message is the opening utterance's user message: it stays with its answer.
+				protectedCount: 2,
+			},
+		},
+	);
+	const sent = (
+		JSON.parse(String(h.payloads.at(-1))) as {
+			messages: Array<{ role: string; content: string }>;
+		}
+	).messages;
+	expect(sent.length).toBeLessThan(list.length);
+	expect(sent[0]!.content).toBe("system");
+	expect(sent[1]!.content).toBe(memory);
+	expect(sent.at(-1)!.content).toBe("request");
+	expect(sent[2]!.content).toBe(history[1]!.content);
+	expect(sent.map((m) => m.content)).not.toContain(history[2]!.content);
+	expect(sent.map((m) => m.content)).toContain(history.at(-1)!.content);
+	// Whole exchanges went: no user message follows another before the request.
+	for (let i = 1; i < sent.length - 2; i++)
+		expect([sent[i]!.role, sent[i + 1]!.role]).not.toEqual(["user", "user"]);
+});

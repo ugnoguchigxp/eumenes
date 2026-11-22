@@ -166,8 +166,21 @@ export type CallSession = {
 	 * instructions; the first `historyCount` user/assistant messages after them are the adopted exchanges stored in
 	 * the conversation ledger (the history a session resumes from); every other message is this turn's input.
 	 * Providers that cannot resume a session (LARM, Codex, OpenAI-compatible) ignore it and send `messages` whole.
+	 * `protectedCount`: the first messages of that history that carry the `## Memory` section; a list over the
+	 * window drops the history from after them, oldest first, so the memory is never dropped with it.
 	 */
-	context?: { instructionCount: number; historyCount: number };
+	context?: {
+		instructionCount: number;
+		historyCount: number;
+		protectedCount?: number;
+	};
+	/**
+	 * `main` only. The marks a reply's feeling is read from when it starts with one of them (its leading emoji). A
+	 * generated reply that starts with a mark has its feeling settled, so the delivery judge's result is read by nothing
+	 * and is not run: unless the reply stands beside a tool call (judged as before) or the attitude dataset collects
+	 * this answer. A reply without a mark is judged as before. The caller gives the marks when it asks for that emoji.
+	 */
+	emotionMarks?: readonly string[];
 	/**
 	 * What the messages were built from: conversation message ids and memory item ids. Forgetting one of them
 	 * revokes the call while it runs (`revokeAgentAttemptsInTransaction`).

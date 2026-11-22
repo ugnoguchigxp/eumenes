@@ -180,6 +180,9 @@ export function createGenerationHandler(
 								? { imageAnswer: generated.imageAnswer }
 								: {}),
 							exchange: generated.exchange,
+							...(generated.readSources
+								? { readSources: generated.readSources }
+								: {}),
 							...(generated.debugTarget
 								? { debugTarget: generated.debugTarget }
 								: {}),

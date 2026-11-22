@@ -15,15 +15,13 @@ export function agencyReplyParts(
 	agenda = true,
 ): ConversationAgentSystem {
 	return {
-		base: [
-			systemContext("dialogue.contexts.agency.reply", {}),
-			...(agenda
-				? [
-						systemContext("dialogue.contexts.agency.always-on-reply", {}),
-						agendaReplyRules(),
-					]
-				: []),
-		].join("\n\n"),
+		// The agenda serves the reply: its own rules. Without it (the memory is not ready) the host's plain reply.
+		base: agenda
+			? [
+					systemContext("dialogue.contexts.agency.always-on-reply", {}),
+					agendaReplyRules(),
+				].join("\n")
+			: systemContext("dialogue.contexts.agency.reply", {}),
 		...(settings.interests.length
 			? {
 					persona: systemContext("dialogue.contexts.agency.interests", {

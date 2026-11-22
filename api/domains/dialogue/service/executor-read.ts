@@ -20,8 +20,13 @@ import { systemContext } from "../../../infrastructure/system-context";
 import type { Run } from "../contracts";
 import { recentRuns } from "../repository";
 import { sessionEventsOfRun } from "../repository/specialist";
+import { recentWorkForRead, type WorkRow } from "../repository/work";
 import type { DialogueDeps, GenerateInput } from "./context";
-import type { ExecutorContext, ToolOutcome } from "./executor-context";
+import type {
+	ExecutorContext,
+	ReadSources,
+	ToolOutcome,
+} from "./executor-context";
 import type { ParsedCall } from "./generation-tools";
 import { memoryItemLine } from "./result-text";
 import { messageDigests, readDiagnostic } from "./diagnostic-evidence";
@@ -33,24 +38,29 @@ import { messageDigests, readDiagnostic } from "./diagnostic-evidence";
  * memory's block ledger is left out wherever it would show.
  */
 
+/** How many items one `read_memory` call returns; the agency host reads the same number to record what a reply saw. */
+export const READ_MEMORY_LIMIT = 16;
+
 /** The bounds of one read (section 2.1). */
 const LIMITS = {
 	resultChars: 3000,
 	/** One line of a result, whatever it holds. */
 	lineChars: 600,
-	memory: 16,
+	memory: READ_MEMORY_LIMIT,
 	history: 12,
 	/** What one history search may return (its schema's most), before the forgotten messages are left out. */
 	historySearch: 20,
 	/** One record's words: a saved message, a request, a report. */
 	textChars: 200,
+	/** Stored work request text shown by `read_agents`. */
+	workRequestChars: 300,
 	/** The head of a run's utterance; a page's name. */
 	headChars: 40,
 	sourceChars: 80,
 	/** Warnings told of one run. */
 	warnings: 3,
-	/** Runs looked back over for the newest ones (forgotten ones and those without work are passed over). */
-	scannedRuns: 20,
+	/** Runs and work items looked back over for `read_runs` / `read_agents`. */
+	scannedRuns: 100,
 	/** Per piece of work: pages, tools and specialist steps told. */
 	sources: 3,
 	tools: 6,
@@ -67,7 +77,12 @@ const TURN_LABELS: Readonly<Record<string, string>> = {
 	pending: "保留の答え",
 };
 
-type Found = { lines: string[]; more: number; partial?: true };
+type Found = {
+	lines: string[];
+	more: number;
+	partial?: true;
+	sources?: ReadSources;
+};
 
 const toolOf = (name: ReadToolName): ReadTool =>
 	READ_TOOLS.find((tool) => tool.name === name)!;
@@ -175,10 +190,33 @@ function memoryFound(
 		limit: LIMITS.memory,
 	});
 	if (!checked) return null;
+	const itemIds = checked.items.flatMap((item) =>
+		typeof item.id === "string" ? [item.id] : [],
+	);
 	return {
 		lines: checked.items.map(memoryItemLine),
 		more: checked.matched - checked.items.length,
+		...(itemIds.length ? { sources: { itemIds } } : {}),
 	};
+}
+
+function toolSummaryTag(
+	calls: ReadonlyArray<{ name: string; arguments: string; result: string }>,
+): string {
+	if (!calls.length) return "";
+	const labels = calls.slice(0, 3).map((call) => {
+		let extra = "";
+		try {
+			const res = JSON.parse(call.result) as Record<string, unknown>;
+			if (typeof res.todo === "string") extra = `→${res.todo}`;
+			else if (typeof res.confirmation === "string")
+				extra = `→${res.confirmation}`;
+		} catch {
+			// plain text result
+		}
+		return `${call.name}${extra}`;
+	});
+	return `[道具: ${labels.join("、")}]`;
 }
 
 function historyFound(
@@ -205,14 +243,35 @@ function historyFound(
 				},
 				{ ...args, query: args.query ?? "", limit: LIMITS.historySearch },
 			);
-		const lines = candidates
-			.filter((view) => !blocked.has(view.messageId))
-			.map((view) =>
-				`- ${when(view.createdAt)} ${view.speaker === "user" ? "利用者" : "Eumenes"}: ${clip(view.text, LIMITS.textChars)} ${imageReferenceText((view.imageReferences ?? []).filter((ref) => !blocked.has(ref.messageId)))}`.trimEnd(),
-			);
+		const kept = candidates.filter((view) => !blocked.has(view.messageId));
+		const shown = kept.slice(0, LIMITS.history);
+		const agentIds = shown
+			.filter((view) => view.speaker !== "user")
+			.map((view) => view.messageId);
+		const toolByMessage = new Map<
+			string,
+			ReadonlyArray<{ name: string; arguments: string; result: string }>
+		>();
+		if (agentIds.length) {
+			const utterances =
+				deps.conversation.input.utterancesByMessageIdsInTransaction?.(
+					db,
+					input.conversationId,
+					agentIds,
+				) ?? [];
+			for (const u of utterances)
+				if (u.messageId && u.speaker === "agent" && u.toolCalls.length)
+					toolByMessage.set(u.messageId, u.toolCalls);
+		}
+		const lines = shown.map((view) => {
+			const tag = toolSummaryTag(toolByMessage.get(view.messageId) ?? []);
+			return `- ${when(view.createdAt)} ${view.speaker === "user" ? "利用者" : "Eumenes"}: ${clip(view.text, LIMITS.textChars)} ${imageReferenceText((view.imageReferences ?? []).filter((ref) => !blocked.has(ref.messageId)))} ${tag}`.trimEnd();
+		});
+		const messageIds = shown.map((view) => view.messageId);
 		return {
-			lines: lines.slice(0, LIMITS.history),
-			more: Math.max(0, lines.length - LIMITS.history),
+			lines,
+			more: Math.max(0, kept.length - shown.length),
+			...(messageIds.length ? { sources: { messageIds } } : {}),
 			// The search stops at its scan bound: what lies before it was not looked at.
 			...(cursor !== null || !scope.scanComplete
 				? { partial: true as const }
@@ -293,6 +352,7 @@ async function runsFound(
 		deps.logFile?.(),
 		rows.flatMap(({ run }) => [run.id, ...(run.jobId ? [run.jobId] : [])]),
 	);
+	const messageIds = rows.map(({ run }) => run.inputMessageId).filter(Boolean);
 	return {
 		lines: rows.map(({ run, said, usage }) => {
 			const logs = logsByRun(entries, run);
@@ -305,6 +365,7 @@ async function runsFound(
 			].join(" ");
 		}),
 		more: 0,
+		...(messageIds.length ? { sources: { messageIds } } : {}),
 	};
 }
 
@@ -312,17 +373,57 @@ async function runsFound(
 const toolName = (revisionId: string) =>
 	/^tool:([^@]+)@/.exec(revisionId)?.[1] ?? revisionId;
 
+function workResultSummary(result: WorkRow["result"]): string | null {
+	if (!result || typeof result !== "object") return null;
+	const rec = result as Record<string, unknown>;
+	for (const key of ["summary", "text", "title", "message"]) {
+		const val = rec[key];
+		if (typeof val === "string" && val.trim())
+			return clip(val, LIMITS.textChars);
+	}
+	return null;
+}
+
+function matchesAgentsFilter(
+	text: string,
+	toolchainId: string | null | undefined,
+	args: z.infer<(typeof readToolInputs)["read_agents"]>,
+): boolean {
+	if (args.toolchain?.trim()) {
+		const wanted = args.toolchain.normalize("NFKC").toLowerCase().trim();
+		if (!(toolchainId ?? "").normalize("NFKC").toLowerCase().includes(wanted))
+			return false;
+	}
+	if (args.query?.trim()) {
+		const tokens = args.query
+			.normalize("NFKC")
+			.toLowerCase()
+			.trim()
+			.split(/[\s\u3000]+/)
+			.filter(Boolean);
+		const hay = text.normalize("NFKC").toLowerCase();
+		if (!tokens.every((t) => hay.includes(t))) return false;
+	}
+	return true;
+}
+
 function agentsFound(
 	deps: DialogueDeps,
 	input: GenerateInput,
-	count: number,
+	args: z.infer<(typeof readToolInputs)["read_agents"]>,
 ): Found | null {
 	const agents = deps.agents;
 	if (!agents) return null;
-	const runs = deps.store.read((db) => {
+	const count = args.count ?? 1;
+	const loaded = deps.store.read((db) => {
 		const blocked = blockedOf(deps, db, input.conversationId);
 		if (!blocked) return null;
-		return recentRuns(db, input.conversationId, input.runId, LIMITS.scannedRuns)
+		const runs = recentRuns(
+			db,
+			input.conversationId,
+			input.runId,
+			LIMITS.scannedRuns,
+		)
 			.filter((run) => !blocked.has(run.inputMessageId))
 			.map((run) => {
 				const usage = deps.toolchains?.usageOfRunInTransaction?.(db, run.id);
@@ -336,13 +437,34 @@ function agentsFound(
 					session: sessionEventsOfRun(db, run.id),
 				};
 			});
+		const works = recentWorkForRead(
+			db,
+			input.conversationId,
+			LIMITS.scannedRuns,
+		).filter(
+			(row) =>
+				(row.request.trim() || row.title.trim()) &&
+				!row.messageIds.some((id) => blocked.has(id)),
+		);
+		return { runs, works };
 	});
-	if (!runs) return null;
-	const lines: string[] = [];
-	for (const { run, usage, session } of runs) {
-		if (lines.length >= count) break;
+	if (!loaded) return null;
+	const workByRun = new Map<string, WorkRow>();
+	for (const w of loaded.works)
+		if (!workByRun.has(w.runId)) workByRun.set(w.runId, w);
+	const seenRuns = new Set<string>();
+	type Entry = {
+		at: string;
+		toolchainId: string | null | undefined;
+		line: string;
+		messageIds: string[];
+	};
+	const entries: Entry[] = [];
+	for (const { run, usage, session } of loaded.runs) {
+		seenRuns.add(run.id);
+		const w = workByRun.get(run.id);
 		const tasks = agents.list(run.id);
-		if (!usage && !tasks.length && !session.length) continue;
+		if (!usage && !tasks.length && !session.length && !w) continue;
 		const tools = new Map<string, number>();
 		for (const task of tasks)
 			for (const outcome of task.toolOutcomes) {
@@ -363,36 +485,75 @@ function agentsFound(
 				clip(source.title || source.url || "", LIMITS.sourceChars),
 			)
 			.filter(Boolean);
-		lines.push(
-			[
-				`- ${when(run.createdAt)} 担当: ${usage?.toolchainId ?? "なし"}`,
-				...(usage?.request
-					? [`依頼: ${clip(usage.request, LIMITS.textChars)}`]
-					: []),
-				`状態: ${usage?.outcome ?? root?.status ?? run.status}${codeText(usage?.code ?? root?.errorCode)}`,
-				...(tools.size
-					? [
-							`道具: ${[...tools]
-								.slice(0, LIMITS.tools)
-								.map(([label, n]) => (n > 1 ? `${label}×${n}` : label))
-								.join("、")}`,
-						]
-					: []),
-				...session
-					.slice(0, LIMITS.sessionSteps)
-					.map((event) =>
-						event.kind === "handover"
-							? `専門担当への引き渡し: ${clip(event.request, LIMITS.textChars)}`
-							: `専門担当の操作: ${event.tool}(${event.ok ? "成功" : `失敗${codeText(event.error)}`})`,
-					),
-				...(sources.length ? [`見た所: ${sources.join("、")}`] : []),
-				...(report?.summary
-					? [`報告: ${clip(report.summary, LIMITS.textChars)}`]
-					: []),
-			].join(" "),
-		);
+		const toolchainId = w?.toolchainId ?? usage?.toolchainId;
+		const requestText = w?.request?.trim() || usage?.request;
+		const summaryText = report?.summary ?? workResultSummary(w?.result ?? null);
+		const line = [
+			`- ${when(w?.createdAt ?? run.createdAt)}${w ? ` t${w.ref}` : ""} 担当: ${toolchainId ?? "なし"}`,
+			...(requestText
+				? [`依頼: ${clip(requestText, LIMITS.workRequestChars)}`]
+				: []),
+			`状態: ${w?.outcome ?? w?.status ?? usage?.outcome ?? root?.status ?? run.status}${codeText(usage?.code ?? root?.errorCode)}`,
+			...(tools.size
+				? [
+						`道具: ${[...tools]
+							.slice(0, LIMITS.tools)
+							.map(([label, n]) => (n > 1 ? `${label}×${n}` : label))
+							.join("、")}`,
+					]
+				: []),
+			...session
+				.slice(0, LIMITS.sessionSteps)
+				.map((event) =>
+					event.kind === "handover"
+						? `専門担当への引き渡し: ${clip(event.request, LIMITS.textChars)}`
+						: `専門担当の操作: ${event.tool}(${event.ok ? "成功" : `失敗${codeText(event.error)}`})`,
+				),
+			...(sources.length ? [`見た所: ${sources.join("、")}`] : []),
+			...(summaryText ? [`報告: ${clip(summaryText, LIMITS.textChars)}`] : []),
+		].join(" ");
+		const msgIds = [
+			...(run.inputMessageId ? [run.inputMessageId] : []),
+			...(w?.messageIds ?? []),
+		];
+		entries.push({
+			at: w?.createdAt ?? run.createdAt,
+			toolchainId,
+			line,
+			messageIds: msgIds,
+		});
 	}
-	return { lines, more: 0 };
+	for (const w of loaded.works) {
+		if (seenRuns.has(w.runId)) continue;
+		const summaryText = workResultSummary(w.result);
+		const line = [
+			`- ${when(w.createdAt)} t${w.ref} 担当: ${w.toolchainId}`,
+			...(w.request.trim()
+				? [`依頼: ${clip(w.request, LIMITS.workRequestChars)}`]
+				: []),
+			`状態: ${w.outcome ?? w.status}`,
+			...(summaryText ? [`報告: ${summaryText}`] : []),
+		].join(" ");
+		entries.push({
+			at: w.createdAt,
+			toolchainId: w.toolchainId,
+			line,
+			messageIds: [...w.messageIds],
+		});
+	}
+	entries.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+	const filtered = entries.filter((entry) =>
+		matchesAgentsFilter(entry.line, entry.toolchainId, args),
+	);
+	const selected = filtered.slice(0, count);
+	const messageIds = [
+		...new Set(selected.flatMap((entry) => entry.messageIds)),
+	];
+	return {
+		lines: selected.map((entry) => entry.line),
+		more: Math.max(0, filtered.length - selected.length),
+		...(messageIds.length ? { sources: { messageIds } } : {}),
+	};
 }
 
 function worldFound(
@@ -402,6 +563,10 @@ function worldFound(
 ): Found | null {
 	const records = deps.worldContext?.recordsInTransaction?.(db, names);
 	if (!records) return null;
+	const worldRefs = [
+		...records.entities.map((entity) => `world:entity:${entity.name}`),
+		...records.documents.map((document) => `world:document:${document.title}`),
+	];
 	return {
 		lines: [
 			...records.entities.map(
@@ -414,6 +579,7 @@ function worldFound(
 			),
 		],
 		more: 0,
+		...(worldRefs.length ? { sources: { sources: worldRefs } } : {}),
 	};
 }
 
@@ -449,7 +615,7 @@ async function found(
 			return agentsFound(
 				deps,
 				input,
-				(args as z.infer<(typeof readToolInputs)["read_agents"]>).count ?? 1,
+				args as z.infer<(typeof readToolInputs)["read_agents"]>,
 			);
 		case "read_world":
 			return deps.store.read((db) =>
@@ -551,6 +717,9 @@ export async function read(
 		);
 		const card = offered.get(call.name);
 		if (card) x.state.read = { card, inputs: call.args };
-		return { result: { text: text + scope } };
+		return {
+			result: { text: text + scope },
+			...(records?.sources ? { readSources: records.sources } : {}),
+		};
 	});
 }

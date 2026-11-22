@@ -1,7 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
+import { emotionEmojis } from "eumenes-agency";
+import { answerSessionContext } from "../service/generation-prepare";
 import { waitFor } from "../../../infrastructure/wait-for";
 import { TALK_SECTIONS } from "../service/context-system";
-import { choice, reply, setup, type Harness } from "./generation.fixture";
+import { testConversationAgent } from "./conversation-agent.fixture";
+import {
+	choice,
+	INSTANT,
+	reply,
+	setup,
+	type Harness,
+} from "./generation.fixture";
 
 /**
  * The claim-time half of a generation (the conversation input specification, sections 3 to 8): the system part,
@@ -41,6 +50,84 @@ test("the recent conversation keeps the opening user utterance and the last mess
 		expect(all).not.toContain(absent);
 });
 
+test("the reply call says where its messages split: the adopted history, and the memory message protected", async () => {
+	h = await setup();
+	h.state.steps.push(...reply("ansA"), ...reply("ansB"), ...reply("ansC"));
+	await h.say("A");
+	await h.say("B");
+	await h.say("C");
+	const talks = h.state.calls.filter((c) => !c.session?.outputSchema);
+	expect(talks).toHaveLength(3);
+	// The first turn has no history: its one user message is the turn's own, with the memory.
+	expect(talks[0]!.session!.context).toEqual({
+		instructionCount: 1,
+		historyCount: 0,
+	});
+	// Then the opening exchange (its user message opens with `## Memory`), and so on; the turn is never history.
+	expect(talks[1]!.messages.map((m) => m.role)).toEqual([
+		"system",
+		"user",
+		"assistant",
+		"user",
+	]);
+	expect(talks[1]!.session!.context).toEqual({
+		instructionCount: 1,
+		historyCount: 2,
+		protectedCount: 2,
+	});
+	expect(talks[2]!.messages).toHaveLength(6);
+	expect(talks[2]!.session!.context).toEqual({
+		instructionCount: 1,
+		historyCount: 4,
+		protectedCount: 2,
+	});
+	for (const talk of talks) {
+		const { historyCount, protectedCount = 0 } = talk.session!.context!;
+		const history = talk.messages.slice(1, 1 + historyCount);
+		// What the context calls history ends before the turn's message, and its first message holds the memory.
+		expect(talk.messages.at(-1)).not.toBe(history.at(-1));
+		if (protectedCount) expect(history[0]!.content).toStartWith("## Memory");
+	}
+});
+
+test("a choice call has messages of its own: only the reply calls carry the split of the answer's messages", async () => {
+	h = await setup();
+	h.state.steps.push({
+		text: JSON.stringify({ choice: INSTANT.id, inputs: { city: "東京" } }),
+	});
+	await h.say("東京は今何時？");
+	const choices = h.state.calls.filter((c) => c.session?.outputSchema);
+	const replies = h.state.calls.filter((c) => !c.session?.outputSchema);
+	expect(choices.length).toBeGreaterThan(0);
+	expect(replies.length).toBeGreaterThan(0);
+	for (const one of choices) expect(one.session!.context).toBeUndefined();
+	for (const one of replies)
+		expect(one.session!.context).toMatchObject({ instructionCount: 1 });
+});
+
+test("the reply call gives the marks its feeling is read from only when the agent asks for one", async () => {
+	h = await setup();
+	h.state.steps.push(...reply("a"));
+	await h.say("A");
+	for (const one of h.state.calls)
+		expect(one.session!.emotionMarks).toBeUndefined();
+	await h.close();
+	h = await setup({
+		conversationAgent: {
+			...testConversationAgent,
+			system: () => ({ base: "", emotionRules: "先頭に絵文字を付ける。" }),
+		},
+	});
+	h.state.steps.push(...reply("a"));
+	await h.say("A");
+	const talks = h.state.calls.filter((c) => !c.session?.outputSchema);
+	expect(talks).toHaveLength(1);
+	expect(talks[0]!.session!.emotionMarks).toEqual([...emotionEmojis]);
+	// A choice call is the host's own question: no reply, no emoji.
+	for (const one of h.state.calls.filter((c) => c.session?.outputSchema))
+		expect(one.session!.emotionMarks).toBeUndefined();
+});
+
 test("the talk system part is its sections in order, and the same in every talk call", async () => {
 	h = await setup();
 	h.state.steps.push(...reply("a"), ...reply("b"));
@@ -57,7 +144,7 @@ test("the talk system part is its sections in order, and the same in every talk 
 		expect(system).not.toContain(`${heading}\n`);
 });
 
-test("a read stays in its own turn: the next input has the reply only, and what was read was text", async () => {
+test("a read tool's text result stays in the working epoch for the next turn (never raw JSON)", async () => {
 	h = await setup();
 	h.state.steps.push(
 		choice({ choice: "none" }),
@@ -69,7 +156,10 @@ test("a read stays in its own turn: the next input has the reply only, and what 
 	await h.say("そう");
 	const next = call(2);
 	expect(next.messages.map((m) => m.content)).toContain("覚えていません。");
-	expect(next.messages.some((m) => (m.role as string) === "tool")).toBe(false);
+	// The carried read tool call and its text result remain in the working epoch for KV cache continuity.
+	const carried = next.messages.find((m) => (m.role as string) === "tool")!;
+	expect(carried).toBeDefined();
+	expect(carried.content.trim().startsWith("{")).toBe(false);
 	// What the read found reached the talk call as the tool's result, never as JSON.
 	const read = call(1).messages.find((m) => (m.role as string) === "tool")!;
 	expect(read.content.trim().startsWith("{")).toBe(false);
@@ -175,3 +265,73 @@ async function waitForRun(runId: string) {
 		),
 	);
 }
+
+test("the memory message is protected with the assistant message after it, joined to the opening utterance or alone", () => {
+	const turn = { role: "user" as const, content: "## State\n今" };
+	const joined = [
+		{ role: "system" as const, content: "S" },
+		{
+			role: "user" as const,
+			content: "## Memory\n- m\n\n## Earlier\n\nA",
+		},
+		{ role: "assistant" as const, content: "ansA" },
+		{ role: "user" as const, content: "B" },
+		{ role: "assistant" as const, content: "ansB" },
+		turn,
+	];
+	expect(answerSessionContext({ messages: joined })).toEqual({
+		instructionCount: 1,
+		historyCount: 4,
+		protectedCount: 2,
+	});
+	const alone = [
+		{ role: "system" as const, content: "S" },
+		{ role: "user" as const, content: "## Memory\n- m" },
+		{ role: "assistant" as const, content: "ansA" },
+		{ role: "user" as const, content: "B" },
+		{ role: "assistant" as const, content: "ansB" },
+		turn,
+	];
+	expect(answerSessionContext({ messages: alone })).toEqual({
+		instructionCount: 1,
+		historyCount: 4,
+		protectedCount: 2,
+	});
+	// Alone and followed by a user message, nothing would pair with it: it is the one protected message.
+	expect(
+		answerSessionContext({
+			messages: [
+				{ role: "system" as const, content: "S" },
+				{ role: "user" as const, content: "## Memory\n- m" },
+				{ role: "user" as const, content: "B" },
+				{ role: "assistant" as const, content: "ansB" },
+				turn,
+			],
+		}),
+	).toEqual({ instructionCount: 1, historyCount: 3, protectedCount: 1 });
+	const none = [
+		{ role: "system" as const, content: "S" },
+		{ role: "user" as const, content: "A" },
+		{ role: "assistant" as const, content: "ansA" },
+		turn,
+	];
+	expect(answerSessionContext({ messages: none })).toEqual({
+		instructionCount: 1,
+		historyCount: 2,
+	});
+	// When the opening exchange includes tool_calls + tool results, the whole exchange is protected so trimming never orphans a tool message.
+	expect(
+		answerSessionContext({
+			messages: [
+				{ role: "system" as const, content: "S" },
+				{ role: "user" as const, content: "## Memory\n- m\n\n## Earlier\nA" },
+				{ role: "assistant" as const, content: "" },
+				{ role: "tool" as unknown as "assistant", content: "結果" },
+				{ role: "assistant" as const, content: "ansA" },
+				{ role: "user" as const, content: "B" },
+				{ role: "assistant" as const, content: "ansB" },
+				turn,
+			],
+		}),
+	).toEqual({ instructionCount: 1, historyCount: 6, protectedCount: 4 });
+});

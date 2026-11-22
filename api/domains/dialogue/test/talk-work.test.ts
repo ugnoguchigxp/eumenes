@@ -88,6 +88,10 @@ test("a reply that agreed to make something finds the toolchain and hands it the
 		"memory",
 		"find_toolchain",
 		"delegate",
+		"approve_confirmation",
+		"decline_confirmation",
+		"work",
+		"discard_for_pending_switch",
 	]);
 	// It sees the toolchains only (the read tools are its own), by what they do; inputs are the host's to fill.
 	expect(toolResults(afterFind!)).toEqual([
@@ -313,6 +317,48 @@ test("the conversation can look up current information and read the cited eviden
 	expect(h.todos()).toHaveLength(0);
 });
 
+test("the confirmation and work control tools stay byte-for-byte identical across plain talk, one confirmation, and two confirmations for KV cache stability", async () => {
+	h = await setup({
+		conversationAgent: handing,
+		cards: [{ ...IMAGE, minImpact: "modify_existing" }, INSTANT],
+	});
+	type Definition = {
+		function: { name: string; parameters: Record<string, unknown> };
+	};
+	const allDefinitions = (calls: Call[]) =>
+		(calls.findLast(({ tools }) => tools.includes("approve_confirmation"))
+			?.toolDefinitions ?? []) as Definition[];
+	h.state.steps.push({ text: "こんにちは。" });
+	await h.say("こんにちは");
+	const none = allDefinitions(h.state.calls);
+	const first = "壁紙を夕暮れの猫に差し替える";
+	h.state.steps.push(find("壁紙を差し替える"), delegate(IMAGE.id, first));
+	await h.say("お願い");
+	h.state.steps.push({ text: "確認待ちです。" });
+	await h.say("今どうなってる？");
+	const one = allDefinitions(h.state.calls);
+	const second = "別の壁紙を青い海に差し替える";
+	h.state.steps.push(find("壁紙を差し替える"), delegate(IMAGE.id, second));
+	await h.say("もう一つお願い");
+	h.state.steps.push({ text: "どちらも確認待ちです。" });
+	await h.say("今どうなってる？");
+	const two = allDefinitions(h.state.calls);
+	// Every tool definition stays byte-for-byte identical across 0, 1, and 2 confirmations.
+	expect(one).toEqual(none);
+	expect(two).toEqual(none);
+	const text = JSON.stringify(two);
+	expect(text).not.toContain(first);
+	expect(text).not.toContain(second);
+	// The saved requests are told by `## State`, which the reply reads.
+	const seen = h.state.calls
+		.findLast(({ tools }) => tools.includes("approve_confirmation"))!
+		.messages.map(({ content }) => content)
+		.join("\n");
+	expect(seen).toContain(`c1 確認待ち`);
+	expect(seen).toContain(first);
+	expect(seen).toContain(second);
+});
+
 test("a correction closes the old confirmation and carries forward the work to a new one", async () => {
 	const old = { ...IMAGE, minImpact: "modify_existing" as const };
 	const newTool = {
@@ -420,7 +466,16 @@ test("a correction waiting for more detail survives a cut, while cancelling its 
 	expect(correction.messages.at(-1)!.content).toContain(
 		"対象は今使っている端末だけ",
 	);
-	expect(correction.tools).not.toContain("approve_confirmation");
+	// `approve_confirmation` stays statically offered in KV cache, and approving a closed/revising ref is refused by the host.
+	expect(correction.tools).toContain("approve_confirmation");
+	h.state.steps.push(confirm("approve_confirmation", "c1"), {
+		text: "承認できる確認はありません。",
+	});
+	await h.say("これで承認");
+	expect(toolResults(h.state.calls.at(-1)!)).toContainEqual({
+		ok: false,
+		code: "unknown_confirmation",
+	});
 	h.state.steps.push({ text: "受付済みの作業はありません。" });
 	await h.say("いまの状態は？");
 	expect(h.state.calls.at(-1)!.messages.at(-1)!.content).not.toContain(

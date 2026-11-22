@@ -42,17 +42,17 @@ test("the default trajectory is twelve generations that keep the message invaria
 	);
 });
 
-test("the system part stays the same and the recent conversation is a window of the user's last two utterances", async () => {
+test("the system part stays the same and the recent conversation stays within the epoch cut bound", async () => {
 	const calls = await play(DEFAULT_TRAJECTORY);
 	const system = calls[0]!.input.messages[0]!.content;
 	for (const call of calls) {
 		expect(call.input.messages[0]!.content).toBe(system);
-		// Between the system part and the last message: `## Memory` (a user message of its own) and the window.
+		// Between the system part and the last message: `## Memory` (a user message of its own) and the working epoch.
 		const window = call.input.messages
 			.slice(1, -1)
 			.filter((m) => !m.content.startsWith("## Memory\n"));
 		expect(window.filter((m) => m.role === "user").length).toBeLessThanOrEqual(
-			call.input.harness.history.users!,
+			call.input.harness.history.users ?? 20,
 		);
 	}
 });

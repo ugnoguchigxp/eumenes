@@ -1,6 +1,9 @@
+import type { Database } from "bun:sqlite";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { InferencePort } from "../../inference";
 import type { ConversationAgentSystem } from "../contracts";
+import { hasImageObservations } from "../repository/generated-images";
+import type { DialogueDeps } from "./context";
 
 /** The persona the system part is written for: the agent's name, the user's name and the tone. */
 export type PersonaSpec = Pick<
@@ -70,12 +73,30 @@ export function conversationPersona(persona: PersonaSpec) {
 }
 
 /**
+ * Whether the conversation has an image in its record: an attachment on a user's utterance, or a generated image
+ * observed for it. The image rules are in the system part from then on, so the cached prefix changes once (when the
+ * first image comes) and not with each turn. Both are one `EXISTS` each, not a read of the record.
+ */
+export function conversationHasImages(
+	deps: Pick<DialogueDeps, "conversation">,
+	tx: Database,
+	conversationId: string,
+): boolean {
+	return (
+		hasImageObservations(tx, conversationId) ||
+		deps.conversation.hasImageInputsInTransaction(tx, conversationId)
+	);
+}
+
+/**
  * The system part: the agent's parts and the host's rules under their section headings. Each rule says when it
- * applies and stands in one section only, so the text is the same in every call and changes only with the settings.
+ * applies and stands in one section only, so the text is the same in every call and changes only with the settings
+ * and with the conversation having an image (`images`: the image rules are only then there).
  */
 export function systemText(
 	persona: PersonaSpec,
 	agent: ConversationAgentSystem,
+	images = false,
 ): string {
 	const own = conversationPersona(persona);
 	const sections: Record<SystemSection, Array<string | undefined>> = {
@@ -90,7 +111,9 @@ export function systemText(
 		Input: [systemContext("dialogue.contexts.system.input", {})],
 		Facts: [
 			agent.facts ?? systemContext("dialogue.contexts.system.talk-facts", {}),
-			systemContext("dialogue.contexts.system.image-history", {}),
+			images
+				? systemContext("dialogue.contexts.system.image-history", {})
+				: undefined,
 		],
 	};
 	return TALK_SECTIONS.flatMap((name) => {

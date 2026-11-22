@@ -309,11 +309,17 @@ export function createGoalAgenda(input: {
 				throw error;
 			},
 		));
+	/** How many goals the user has registered (the slots in use). */
+	const registered = () =>
+		goalStore.list(access).filter((slot) => slot.goal).length;
 	return {
 		init,
-		nextAt: () => host?.nextAt() ?? null,
+		registered,
+		// With no goal registered there is nothing to prepare or poll for: no step, and no host to open for one.
+		nextAt: () => (host && registered() > 0 ? host.nextAt() : null),
 		changed: () => host?.infoChanged(),
-		tick: (signal: AbortSignal) => host?.tick(signal),
+		tick: (signal: AbortSignal) =>
+			registered() > 0 ? host?.tick(signal) : undefined,
 		close: async () => {
 			await opening?.catch(() => undefined);
 			await host?.close();

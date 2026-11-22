@@ -4,6 +4,8 @@ import type { Utterance } from "../../conversation";
 import type { DialogueDeps, GenerateInput } from "../service/context";
 import { conversationPrefixFrom } from "../service/conversation-input";
 import {
+	backgroundHarness,
+	conversationHarness,
 	localHarness,
 	routeConversation,
 	type ConversationHarness,
@@ -18,10 +20,16 @@ import { waitFor } from "../../../infrastructure/wait-for";
  * The conversation harness (the conversation harness design, sections 4.1 to 4.3; the single harness plan): its
  * one value, the model's route chosen from the saved settings, and what each part of the value changes.
  */
-test("the harness: the last two utterances within 4,096 tokens, and no thinking level of its own", () => {
+test("the harness: append-only history with carried tool calls for conversation, lightweight text-only for background", () => {
+	expect(localHarness).toBe(conversationHarness);
 	expect(localHarness.gates).toEqual({ systemCopy: true });
-	expect(localHarness.history).toEqual({ copyFilter: true, users: 2 });
+	expect(localHarness.history).toEqual({ copyFilter: true, withCalls: true });
 	expect(localHarness.call).toEqual({ outputLimit: 4096 });
+	expect(backgroundHarness.history).toEqual({
+		copyFilter: true,
+		users: 4,
+		withCalls: false,
+	});
 });
 
 test("the llm route is LARM only unless the saved route picks a usable cloud model", () => {

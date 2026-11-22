@@ -6,6 +6,7 @@ import {
 	restoreToolExchangeMigration,
 	utteranceNoticeMigration,
 } from "./input";
+import { conversationSummaryMigration } from "./summaries";
 import {
 	attributionMigration,
 	readAttribution,
@@ -779,4 +780,5 @@ export const migrations: readonly Migration[] = [
 		after: ["conversation/0018-image-answer-sequences"],
 		sql: "CREATE TABLE message_displays (message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE, text TEXT NOT NULL)",
 	},
+	conversationSummaryMigration,
 ];

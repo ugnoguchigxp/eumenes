@@ -76,6 +76,42 @@ test("a context that does not fit the messages is refused", () => {
 		expect(() => splitMessages(messages, context, invalid)).toThrow("invalid");
 });
 
+test("a history that holds an image is not split off: every message after the instructions is this call's input", () => {
+	const image = {
+		mime: "image/png" as const,
+		bytes: new Uint8Array([1]),
+		width: 1,
+		height: 1,
+	};
+	const messages = [
+		m("system", "base"),
+		{ ...m("user", "u1"), images: [image] },
+		m("assistant", "a1"),
+		m("user", "current"),
+	];
+	const parts = splitMessages(
+		messages,
+		{ instructionCount: 1, historyCount: 2 },
+		invalid,
+	);
+	expect(parts.whole).toBe(true);
+	expect(parts.history).toEqual([]);
+	expect(parts.turn).toEqual(messages.slice(1));
+	// The same history without the image is split as usual.
+	const plain = splitMessages(
+		[
+			m("system", "base"),
+			m("user", "u1"),
+			m("assistant", "a1"),
+			m("user", "x"),
+		],
+		{ instructionCount: 1, historyCount: 2 },
+		invalid,
+	);
+	expect(plain.whole).toBe(false);
+	expect(plain.history).toHaveLength(2);
+});
+
 test("a history starts with a user turn and merges runs of one role", () => {
 	expect(
 		normalizeHistory([

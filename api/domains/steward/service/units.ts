@@ -56,13 +56,16 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 		});
 		const data = before?.data ?? prepared.data;
 		// The conversation's prompt as it stands now (read at the call, so its prefix is what the next generation sends).
-		const read = ON_CONVERSATION.has(step.id)
-			? deps.conversationTask?.()
-			: undefined;
-		const prefix = read
-			? deps.store.read((db) =>
-					read(db, input.conversationId, taskText(step, prepared, data)),
-				)
+		// Only where the conversation runs on LARM: a cloud call can not share that prefix (its thread is the
+		// conversation's own), so there the step sends its own input and re-reads nothing of the conversation.
+		const prefix = ON_CONVERSATION.has(step.id)
+			? deps.store.read((db) => {
+					if (!deps.conversationOnLarm(db)) return null;
+					const read = deps.conversationTask?.();
+					return read
+						? read(db, input.conversationId, taskText(step, prepared, data))
+						: null;
+				})
 			: null;
 		const messages = prefix
 			? prefix.messages

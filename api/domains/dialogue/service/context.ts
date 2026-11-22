@@ -179,7 +179,12 @@ export interface GenerateInput {
 	retained: ReturnType<
 		import("./work-ledger").WorkLedger["retainedInTransaction"]
 	>;
-	sessionContext: { instructionCount: number; historyCount: number };
+	/** Where the adopted history sits; the first `protectedCount` history messages (`## Memory`) are never dropped. */
+	sessionContext: {
+		instructionCount: number;
+		historyCount: number;
+		protectedCount?: number;
+	};
 	/** The memory window fixed at prepare time; re-checked in the adoption transaction. */
 	memory?: {
 		window: PreparedWindow;

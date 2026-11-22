@@ -30,7 +30,7 @@ import type {
 	CloudAgentKind,
 	CloudAgents,
 } from "../adapters/cloud-agents";
-import type { Messages } from "../contracts";
+import type { CallSession, Messages } from "../contracts";
 import type { RequestRow } from "../repository";
 import {
 	acquireAgentSession,
@@ -73,7 +73,7 @@ function fitMessages(
 	row: RequestRow,
 	resource: Resource,
 	input: Messages,
-	context?: { instructionCount: number; historyCount: number },
+	context?: NonNullable<CallSession["context"]>,
 ) {
 	const messages = [...input];
 	const window = resource.contextWindow ?? 0;
@@ -98,7 +98,8 @@ function fitMessages(
 		}
 		if (tokens > budget) throw new Error("context_window_exceeded");
 	} else if (tokens > budget) {
-		// The adopted history: the first `historyCount` non-system messages after the instructions.
+		// The adopted history: the first `historyCount` non-system messages after the instructions. The first
+		// `protectedCount` of them hold `## Memory`: they stay, and the oldest exchanges go from after them.
 		const at: number[] = [];
 		for (
 			let i = split?.instructionCount ?? 0;
@@ -106,6 +107,7 @@ function fitMessages(
 			i++
 		)
 			if (messages[i]!.role !== "system") at.push(i);
+		at.splice(0, split?.protectedCount ?? 0);
 		const gone = new Set<number>();
 		const roles = at.map((i) => messages[i]!.role);
 		// Whole exchanges go, the oldest first, so the history never starts with an assistant message.

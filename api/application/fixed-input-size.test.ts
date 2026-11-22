@@ -3,9 +3,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { composeSystem, planSystem } from "eumenes-agency/agenda";
 import {
-	withGoalReplyInstructions,
-	withGoalReplyTools,
-} from "eumenes-agency/agenda/runtime";
+	goalReplyInstructions,
+	goalReplyTools,
+} from "./agency/always-on-goal-reply";
 import type { ConversationAgentPort } from "../domains/dialogue";
 import { testConversationAgent } from "../domains/dialogue/test/conversation-agent.fixture";
 import {
@@ -232,7 +232,7 @@ async function measure() {
 	const sections = sectionsOf(alwaysOn.system);
 	for (const name of SECTIONS)
 		elements[`system.alwaysOn.${name}`] = textSize(sections.get(name) ?? "");
-	const [withGoal] = withGoalReplyInstructions([
+	const [withGoal] = goalReplyInstructions([
 		{ role: "system", content: alwaysOn.system },
 	]);
 	elements["system.alwaysOnGoal"] = textSize(withGoal!.content);
@@ -244,7 +244,7 @@ async function measure() {
 			if (!tool) throw new Error(`tool_not_offered:${name}`);
 			return tool;
 		});
-	const goalTools = withGoalReplyTools(
+	const goalTools = goalReplyTools(
 		{ tools: [], call: async () => ({ content: "" }) },
 		{} as never,
 		() => undefined,
@@ -258,6 +258,12 @@ async function measure() {
 			"read_world",
 		]),
 		"tools.talkWork": toolsNamed(["find_toolchain", "delegate"]),
+		"tools.workControls": toolsNamed([
+			"approve_confirmation",
+			"decline_confirmation",
+			"work",
+			"discard_for_pending_switch",
+		]),
 		"tools.agenda": agency.agendaTools,
 		"tools.goalReply": goalTools,
 	};

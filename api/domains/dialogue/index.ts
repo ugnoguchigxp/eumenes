@@ -17,6 +17,7 @@ export type {
 export { migrations } from "./repository";
 export { researchSourceIds } from "./repository/work";
 export { INPUT_HEADINGS } from "./service/input-text";
+export { READ_MEMORY_LIMIT } from "./service/executor-read";
 export { localHarness, routeConversation } from "./service/harness";
 
 export {

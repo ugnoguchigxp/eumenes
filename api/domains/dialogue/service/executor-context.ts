@@ -18,6 +18,13 @@ import type { DialogueDeps, GenerateInput } from "./context";
 import { operationRejection } from "./operation-authority";
 import { consumeAnswer } from "./result-intake";
 
+/** Provenance of records read by read tools during a turn, so forgetting any source invalidates carried results. */
+export type ReadSources = {
+	messageIds?: string[];
+	itemIds?: string[];
+	sources?: string[];
+};
+
 /** What one executed tool call gave the generation. */
 export type ToolOutcome = {
 	/** The tool's result. */
@@ -28,6 +35,8 @@ export type ToolOutcome = {
 	end?: true;
 	/** A search's cards as it found them, and the vector of its query (what the router scores and corrects by). */
 	search?: { cards: ToolchainCard[]; query?: QueryVector };
+	/** Sources referenced by a read tool call, merged into the run's provenance manifest. */
+	readSources?: ReadSources;
 };
 
 /** Executes one call of a fixed tool; throws a `ValidationFailure` for a call the host refuses outright. */
@@ -57,6 +66,8 @@ export type GenerationOutcome = {
 	executed: Array<{ call: ParsedCall; outcome: ToolOutcome }>;
 	/** The searches and hand-overs as the model made them, refused ones too: what later turns see of this one. */
 	exchange: ExchangeStep[];
+	/** Merged provenance of all read-tool records returned during this turn. */
+	readSources?: ReadSources;
 	/** A tool call handed the work over and ended the generation. */
 	ended: boolean;
 };

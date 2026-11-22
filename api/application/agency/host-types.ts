@@ -104,7 +104,7 @@ export type AgencyHostDeps = {
 		onChange(listener: () => void): () => void;
 	};
 	/** The user's State items are the topic material (hostTopics mode). */
-	memory: Pick<MemoryService, "status" | "list"> &
+	memory: Pick<MemoryService, "status" | "list" | "check"> &
 		Partial<
 			Pick<
 				MemoryService,

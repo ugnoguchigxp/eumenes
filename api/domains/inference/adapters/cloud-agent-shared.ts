@@ -99,7 +99,7 @@ export function promptParts(messages: Messages, context?: ContextSplit) {
 		parts.turn,
 		turns.length === 1 && turns[0]!.role === "user"
 			? null
-			: context
+			: context && !parts.whole
 				? "turn-context"
 				: "conversation-context",
 	);

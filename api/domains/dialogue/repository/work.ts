@@ -307,6 +307,21 @@ export function workOfRun(db: Database, runId: string): WorkRow[] {
 	).map(map);
 }
 
+/** Newest TODOs of a conversation (open or archived) for `read_agents` long-term lookup. */
+export function recentWorkForRead(
+	db: Database,
+	conversationId: string,
+	limit: number,
+): WorkRow[] {
+	return (
+		db
+			.query(
+				`SELECT ${columns} FROM dialogue_work WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?`,
+			)
+			.all(conversationId, limit) as Record<string, unknown>[]
+	).map(map);
+}
+
 /** The TODOs not archived, oldest first. */
 export function openWork(db: Database, conversationId: string): WorkRow[] {
 	return (

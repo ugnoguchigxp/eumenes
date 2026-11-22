@@ -55,7 +55,7 @@ const found = (inputId: string) => ({
 	})),
 });
 
-test("a hand-over's search and delegation are kept with its announcement, the next local turn draws the words alone, and the background calls read the same prefix", async () => {
+test("a hand-over's search and delegation are kept and replayed in the main conversation, while background calls stay text-only without tool roles", async () => {
 	h = await setup();
 	h.state.steps.push(choice({ choice: IMAGE.id }));
 	const waiting = await h.say("猫の絵を描いて", "queued");
@@ -64,9 +64,16 @@ test("a hand-over's search and delegation are kept with its announcement, the ne
 		text: "どういたしまして。",
 	});
 	await h.say("ありがとう");
-	// The request opens the recent conversation with `## Memory`; the host's announcement follows it, alone.
 	const announced = "「画像」に頼みます。";
-	expect(recent()).toEqual([{ role: "assistant", content: announced }]);
+	// The main conversation replays the normalized search and delegation tool exchange before the announcement.
+	const replayed = recent();
+	expect(replayed.map((m) => String(m.role))).toEqual([
+		"assistant",
+		"tool",
+		"tool",
+		"assistant",
+	]);
+	expect(replayed.at(-1)).toEqual({ role: "assistant", content: announced });
 	expect(
 		kept(announced).toolCalls.map(({ name, arguments: args, result }) => ({
 			name,
@@ -91,15 +98,21 @@ test("a hand-over's search and delegation are kept with its announcement, the ne
 			result: '{"todo":"t1"}',
 		},
 	]);
-	const prefix = h.state.calls.at(-1)!.messages.slice(0, -1);
+	// Background calls use `backgroundHarness` (words only, no tool roles that `backgroundMessage` would strip).
 	const background = h.store.read((db) =>
 		h!.dialogue.conversationTaskInTransaction(db, "main", "読むだけです。"),
 	)!;
-	expect(background.messages.slice(0, prefix.length)).toEqual(prefix);
+	expect(background.messages.some((m) => (m.role as string) === "tool")).toBe(
+		false,
+	);
+	expect(background.messages.some((m) => m.content.includes(announced))).toBe(
+		true,
+	);
 });
 
-test("a confirmation's number and a refused call are kept; the read is not", async () => {
+test("a confirmation's number, a refused call, and a read tool's result are kept as normalized snapshots", async () => {
 	h = await setup({
+		memory: true,
 		cards: [{ ...IMAGE, minImpact: "modify_existing" }, INSTANT],
 	});
 	h.state.steps.push(
@@ -119,7 +132,7 @@ test("a confirmation's number and a refused call are kept; the read is not", asy
 	expect(said).toContain("よろしいですか？");
 	expect(
 		kept("記憶にはありませんでした。").toolCalls.map((c) => c.name),
-	).toEqual([]);
+	).toEqual(["read_memory"]);
 	const calls = kept(said).toolCalls;
 	expect(calls.map((c) => c.name)).toEqual([
 		"find_toolchain",
@@ -133,7 +146,7 @@ test("a confirmation's number and a refused call are kept; the read is not", asy
 	]);
 });
 
-test("a result keeps only the candidates' names and the host's numbers, never an instant answer's text", () => {
+test("a result keeps search candidates, host numbers, and work/memory snapshots as valid JSON", () => {
 	const refs = {
 		...NO_REFS,
 		todo: (id: string) => (id === "w1" ? "t4" : null),
@@ -163,7 +176,7 @@ test("a result keeps only the candidates' names and the host's numbers, never an
 				step("delegate", { delegated: true }),
 				step("delegate", { answered: true, answer: "東京は15時です" }),
 				step("delegate", { delegated: false, code: "toolchain_unavailable" }),
-				step("memory", { items: [] }),
+				step("memory", { accepted: true, requestId: "r1" }),
 				step("work", { ok: true }),
 			],
 			refs,
@@ -175,6 +188,8 @@ test("a result keeps only the candidates' names and the host's numbers, never an
 		["delegate", '{"delegated":true}'],
 		["delegate", '{"answered":true}'],
 		["delegate", '{"delegated":false}'],
+		["memory", '{"accepted":true,"requestId":"r1"}'],
+		["work", '{"ok":true}'],
 	]);
 });
 
@@ -224,10 +239,15 @@ test("a report keeps the notice of the work it told; the next local turn draws t
 	expect(kept("猫の絵ができあがりました。").notice).toBe(
 		`[ホストの知らせ] t${todo!.ref}「猫の絵」が終わりました（成功）。`,
 	);
-	expect(recent()).toEqual([
-		{
-			role: "assistant",
-			content: "「画像」に頼みます。\n猫の絵ができあがりました。",
-		},
+	const replayed = recent();
+	expect(replayed.map((m) => String(m.role))).toEqual([
+		"assistant",
+		"tool",
+		"tool",
+		"assistant",
 	]);
+	expect(replayed.at(-1)).toEqual({
+		role: "assistant",
+		content: "「画像」に頼みます。\n猫の絵ができあがりました。",
+	});
 });

@@ -47,6 +47,7 @@ import { byId, interruptUnfinished, listRuns } from "../repository";
 import { workOfRun } from "../repository/work";
 import { createAgentSync } from "./agent-sync";
 import { DEFAULT_DEADLINE_MS, TERMINAL, type DialogueDeps } from "./context";
+import { createCompactionSummaryHandler } from "./compaction-summary";
 import { createGenerationHandler } from "./generation-handler";
 import { createWorkLedger } from "./work-ledger";
 import { createTodoScreenPorts } from "./work-stop";
@@ -149,6 +150,16 @@ function registerForgetHook(deps: DialogueDeps) {
 				deps.clock(),
 			),
 		);
+		const summaryRefs = [
+			...purge.messageIds,
+			...purge.itemIds.map((itemId) => `memory:${itemId}`),
+		];
+		for (const conversationId of deps.conversation.input.retractSummariesBySourceRefsInTransaction?.(
+			db,
+			summaryRefs,
+			deps.clock(),
+		) ?? [])
+			changed.add(conversationId);
 		// A forgotten memory item may stand in the state's records, copied as it was.
 		if (purge.itemIds.length) changed.add(purge.conversationId);
 		for (const conversationId of changed)
@@ -161,6 +172,7 @@ function registerHandlers(
 	progress: ReturnType<typeof createProgress>,
 ) {
 	deps.queue.registerHandler(createGenerationHandler(deps, progress));
+	deps.queue.registerHandler(createCompactionSummaryHandler(deps));
 	deps.queue.registerHandler(createToolchainCommandHandler(deps));
 	deps.queue.registerHandler(createSpecialistTurnHandler(deps));
 }

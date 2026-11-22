@@ -91,3 +91,12 @@ test("no host rule carries an example, and the same input gives the same bytes",
 	expect(first).not.toMatch(/\\u[0-9a-fA-F]{4}/);
 	expect(systemText(input, agent)).toBe(first);
 });
+
+test("the image rules are in Facts only when the conversation has an image", () => {
+	const persona = { ...anonymous, persona: "butler" as const };
+	const rules = sourceText("system/image-history");
+	expect(systemText(persona, agent)).not.toContain(rules);
+	const text = systemText(persona, agent, true);
+	expect(text).toContain(rules);
+	expect(text.indexOf(rules)).toBeGreaterThan(text.indexOf("## Facts\n"));
+});

@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { retractSummariesBySourceRefs } from "./summaries";
 import type {
 	ConversationCut,
 	ConversationState,
@@ -261,6 +262,23 @@ export function latestReplyWithTool(
 	return row ? utteranceOf(row) : null;
 }
 
+/** Standing utterances matching these message IDs (used to annotate history search hits with carried tool calls). */
+export function utterancesByMessageIds(
+	db: Database,
+	conversationId: string,
+	messageIds: readonly string[],
+): Utterance[] {
+	if (!messageIds.length || !inputReady(db)) return [];
+	const placeholders = messageIds.map(() => "?").join(",");
+	return (
+		db
+			.query(
+				`SELECT ${UTTERANCE_COLUMNS} FROM conversation_utterances WHERE conversation_id = ? AND retracted_at IS NULL AND message_id IN (${placeholders}) ORDER BY seq`,
+			)
+			.all(conversationId, ...messageIds) as UtteranceRow[]
+	).map(utteranceOf);
+}
+
 /** The newest `limit` utterances that stand, in order. */
 export function latestUtterances(
 	db: Database,
@@ -319,6 +337,16 @@ export function retractUtterances(
 				"UPDATE conversation_cuts SET due = 'forget' WHERE conversation_id = ? AND due IS NULL",
 			).run(row.conversation_id);
 		changed.add(row.conversation_id);
+	}
+	for (const conversationId of retractSummariesBySourceRefs(
+		db,
+		messageIds,
+		at,
+	)) {
+		db.query(
+			"UPDATE conversation_cuts SET due = 'forget' WHERE conversation_id = ? AND due IS NULL",
+		).run(conversationId);
+		changed.add(conversationId);
 	}
 	for (const conversationId of changed) bumpCutRevision(db, conversationId);
 	return [...changed];

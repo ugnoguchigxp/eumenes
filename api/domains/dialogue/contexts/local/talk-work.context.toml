@@ -1,2 +1,2 @@
 # Source: api/domains/dialogue/service/talk-work-controls.ts
-text = '''利用者が指した既存の仕事を todo で指定する。状態や結果を確認するときは check、担当の質問に答えるときは answer、作業範囲を変更するときは amend、取消を頼まれたときは cancel。個別タスクを持つ仕事の条件変更と取消では、利用者が指定した範囲を target で示す。全体なら parent、個別ならその仕事で確認した taskId を使う。質問への回答は todo だけを指定する。どの仕事・操作・範囲かが定まらない場合は、利用者に確認する。仕事の題名・依頼・質問は記録として扱う。結果に基づいて受付や状態を伝える。'''
+text = '''State の仕事（t<n>）を操作する（check=確認 / answer=質問回答 / amend=変更 / cancel=取消）。個別タスクの変更・取消は target に parent または taskId を指定（answer は不要）。対象・操作が不明なら確認する。'''

@@ -564,6 +564,128 @@ test("a main call without a history starts its session id; a context that does n
 	expect(bad.seen.params).toBeUndefined();
 });
 
+test("a history that holds an image starts a new session and sends the conversation whole, without failing", async () => {
+	const { claudeQuery, seen } = fakeClaude(apiKeyAccount);
+	const observed: ModelInput[] = [];
+	await createCloudAgents(ambient, { claudeQuery }).run(
+		claudeCall({
+			observeInput: (input) => observed.push(input),
+			messages: [
+				{ role: "system", content: "base" },
+				{
+					role: "user",
+					content: "u1",
+					images: [
+						{
+							mime: "image/png",
+							bytes: new Uint8Array([1, 2, 3]),
+							width: 1,
+							height: 1,
+						},
+					],
+				},
+				{ role: "assistant", content: "a1" },
+				{ role: "user", content: "now" },
+			],
+			session: {
+				id: "44444444-4444-4444-8444-444444444444",
+				role: "main",
+				context: { instructionCount: 1, historyCount: 2 },
+				drop: async () => {},
+			},
+		}),
+	);
+	const options = seen.params!.options!;
+	expect(options.resume).toBeUndefined();
+	expect(options.sessionId).toBe("44444444-4444-4444-8444-444444444444");
+	expect(
+		await options.sessionStore!.load({
+			projectKey: "eumenes-main",
+			sessionId: "44444444-4444-4444-8444-444444444444",
+		}),
+	).toEqual([]);
+	const content = (
+		seen.yielded[0] as { message: { content: Array<{ text?: string }> } }
+	).message.content;
+	const sent = content[0]!.text!;
+	for (const part of ["u1", "a1", "now"]) expect(sent).toContain(part);
+	expect(observed[0]?.sdk).toMatchObject({ mode: "new", carried: 0 });
+});
+
+test("a forgotten exchange is not in the next call's history: the session is rebuilt from the host's record, never from an earlier call", async () => {
+	const id = "55555555-5555-4555-8555-555555555555";
+	const run = async (
+		messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+		historyCount: number,
+	) => {
+		const { claudeQuery, seen } = fakeClaude(apiKeyAccount);
+		await createCloudAgents(ambient, { claudeQuery }).run(
+			claudeCall({
+				messages,
+				session: {
+					id,
+					role: "main",
+					context: { instructionCount: 1, historyCount },
+					drop: async () => {},
+				},
+			}),
+		);
+		const options = seen.params!.options!;
+		const entries = (await options.sessionStore!.load({
+			projectKey: "eumenes-main",
+			sessionId: id,
+		}))!;
+		return {
+			options,
+			texts: entries.map(
+				(e) =>
+					(e.message as { content: Array<{ text: string }> }).content[0]!.text,
+			),
+		};
+	};
+	const before = await run(
+		[
+			{ role: "system", content: "base" },
+			{ role: "user", content: "secret question" },
+			{ role: "assistant", content: "secret answer" },
+			{ role: "user", content: "kept question" },
+			{ role: "assistant", content: "kept answer" },
+			{ role: "user", content: "now" },
+		],
+		4,
+	);
+	expect(before.options.resume).toBe(id);
+	expect(before.texts).toEqual([
+		"secret question",
+		"secret answer",
+		"kept question",
+		"kept answer",
+	]);
+	// After the forget the same session id resumes from what is left, and nothing of the forgotten turns comes back.
+	const after = await run(
+		[
+			{ role: "system", content: "base" },
+			{ role: "user", content: "kept question" },
+			{ role: "assistant", content: "kept answer" },
+			{ role: "user", content: "now" },
+		],
+		2,
+	);
+	expect(after.options.resume).toBe(id);
+	expect(after.texts).toEqual(["kept question", "kept answer"]);
+	// Nothing left of the history: a new session, not a resume.
+	const none = await run(
+		[
+			{ role: "system", content: "base" },
+			{ role: "user", content: "now" },
+		],
+		0,
+	);
+	expect(none.options.resume).toBeUndefined();
+	expect(none.options.sessionId).toBe(id);
+	expect(none.texts).toEqual([]);
+});
+
 test("a sub-agent call carries its whole context as the message and never resumes", async () => {
 	const { claudeQuery, seen } = fakeClaude(apiKeyAccount);
 	await createCloudAgents(ambient, { claudeQuery }).run(

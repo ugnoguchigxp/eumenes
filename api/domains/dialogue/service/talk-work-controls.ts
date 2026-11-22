@@ -9,14 +9,83 @@ import type { Turn } from "./routed-turn";
 const APPROVE = "approve_confirmation";
 const DECLINE = "decline_confirmation";
 const DISCARD = "discard_for_pending_switch";
-const PREVIEW_CHARS = 240;
+/** Static definitions kept in the prompt's KV cache across turns; every reference is validated against `## State` at call time. */
+const CONFIRMATION_REF = "`## State` の確認参照 c<n>";
+const TODO_REF = "`## State` の仕事参照 t<n>";
+
+const CONFIRMATION_PARAMS = {
+	type: "object",
+	additionalProperties: false,
+	required: ["confirmation"],
+	properties: {
+		confirmation: { type: "string", description: CONFIRMATION_REF },
+	},
+};
+
+export const WORK_CONTROL_TOOLS: readonly AgentToolDefinition[] = [
+	{
+		name: APPROVE,
+		description: systemContext(
+			"dialogue.contexts.local.talk-approve-confirmation",
+			{},
+		),
+		parameters: CONFIRMATION_PARAMS,
+	},
+	{
+		name: DECLINE,
+		description: systemContext(
+			"dialogue.contexts.local.talk-decline-confirmation",
+			{},
+		),
+		parameters: {
+			...CONFIRMATION_PARAMS,
+			properties: {
+				...CONFIRMATION_PARAMS.properties,
+				followUp: { type: "string", enum: ["revise", "cancel"] },
+			},
+		},
+	},
+	{
+		name: TOOL_NAMES.work,
+		description: systemContext("dialogue.contexts.local.talk-work", {}),
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["todo", "operation"],
+			properties: {
+				operation: {
+					type: "string",
+					enum: ["check", "answer", "amend", "cancel"],
+				},
+				todo: { type: "string", description: TODO_REF },
+				target: {
+					type: "string",
+					description: "parent または `## State` の taskId",
+				},
+			},
+		},
+	},
+	{
+		name: DISCARD,
+		description: systemContext(
+			"dialogue.contexts.local.talk-discard-switch",
+			{},
+		),
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["request"],
+			properties: { request: { type: "string" } },
+		},
+	},
+];
 
 const result = (value: unknown, end?: boolean) => ({
 	content: typeof value === "string" ? value : (JSON.stringify(value) ?? ""),
 	...(end ? { end } : {}),
 });
 
-/** Offer only the operations that refer to records from this conversation. The executor checks them again. */
+/** Keep work-control tool schemas static for KV cache reuse; every call is validated against this turn's records. */
 export function createWorkControls(turn: Turn) {
 	const routed = turn.routed!;
 	const confirmations = new Map(
@@ -30,115 +99,7 @@ export function createWorkControls(turn: Turn) {
 	);
 	const todos = new Map(routed.todos.map((item) => [`t${item.ref}`, item]));
 	const switching = switchingOf(turn);
-	const tools: AgentToolDefinition[] = [];
-	if (confirmations.size || revisions.size) {
-		const parameters = {
-			type: "object",
-			additionalProperties: false,
-			required: ["confirmation"],
-			properties: {
-				confirmation: {
-					type: "string",
-					enum: [...confirmations.keys()],
-					description: JSON.stringify(
-						Array.from(confirmations, ([confirmation, item]) => ({
-							confirmation,
-							toolchain: item.toolchain,
-							request: lineText(item.request).slice(0, PREVIEW_CHARS),
-							target:
-								item.target && lineText(item.target).slice(0, PREVIEW_CHARS),
-						})),
-					),
-				},
-			},
-		};
-		if (confirmations.size)
-			tools.push({
-				name: APPROVE,
-				description: systemContext(
-					"dialogue.contexts.local.talk-approve-confirmation",
-					{},
-				),
-				parameters,
-			});
-		tools.push({
-			name: DECLINE,
-			description: systemContext(
-				"dialogue.contexts.local.talk-decline-confirmation",
-				{},
-			),
-			parameters: {
-				...parameters,
-				properties: {
-					confirmation: {
-						...parameters.properties.confirmation,
-						enum: [...confirmations.keys(), ...revisions.keys()],
-					},
-					followUp: { type: "string", enum: ["revise", "cancel"] },
-				},
-			},
-		});
-	}
-	if (todos.size)
-		tools.push({
-			name: TOOL_NAMES.work,
-			description: systemContext("dialogue.contexts.local.talk-work", {}),
-			parameters: {
-				type: "object",
-				additionalProperties: false,
-				required: ["todo", "operation"],
-				properties: {
-					operation: {
-						type: "string",
-						enum: ["check", "answer", "amend", "cancel"],
-					},
-					...([...todos.values()].some(({ tasks }) => tasks !== undefined)
-						? {
-								target: {
-									type: "string",
-									description:
-										"対象。全体は parent、個別タスクは todo の記録で確認した taskId。",
-								},
-							}
-						: {}),
-					todo: {
-						type: "string",
-						enum: [...todos.keys()],
-						description: JSON.stringify(
-							Array.from(todos, ([todo, item]) => ({
-								todo,
-								title: item.title,
-								open: item.open,
-								request:
-									item.request &&
-									lineText(item.request).slice(0, PREVIEW_CHARS),
-								question: questions.get(todo),
-								tasks: item.tasks?.map(({ taskId, title, state, reason }) => ({
-									taskId,
-									title,
-									state,
-									reason: lineText(reason).slice(0, PREVIEW_CHARS),
-								})),
-							})),
-						),
-					},
-				},
-			},
-		});
-	if (switching)
-		tools.push({
-			name: DISCARD,
-			description: systemContext(
-				"dialogue.contexts.local.talk-discard-switch",
-				{},
-			),
-			parameters: {
-				type: "object",
-				additionalProperties: false,
-				required: ["request"],
-				properties: { request: { type: "string" } },
-			},
-		});
+	const tools: readonly AgentToolDefinition[] = WORK_CONTROL_TOOLS;
 
 	async function confirmation(name: string, args: Record<string, unknown>) {
 		const ref = args.confirmation;

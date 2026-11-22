@@ -18,12 +18,17 @@ import {
 	type GenerateInput,
 	type GeneratePayload,
 } from "./context";
-import type { GenerationOutcome, Handover } from "./executor-context";
+import type {
+	GenerationOutcome,
+	Handover,
+	ReadSources,
+} from "./executor-context";
 import { eventFields, SIDE_EFFECTS } from "./event-fields";
 import { generationStale } from "./generation-stream";
 import { adoptMemoryWindow } from "./memory-window";
 import { consumeAnswer, type ReportedWork } from "./result-intake";
 import { acceptRunAnswer, endRun, type RunEndState } from "./run-end";
+import { maybeEnqueueCompactionInTransaction } from "./compaction-summary";
 import { carriedToolCalls, type ExchangeStep } from "./tool-exchange";
 
 const log = getLogger("dialogue");
@@ -43,6 +48,8 @@ export type GenerationResult = {
 	confirmationId?: string;
 	/** Its searches and hand-overs: kept with the agent's utterance that ends the turn. */
 	exchange?: ExchangeStep[];
+	/** Sources referenced by read tools during this turn, merged into the run's provenance manifest. */
+	readSources?: ReadSources;
 	/** The trace of an utterance generation that answered without handing work over. */
 	selection?: Omit<
 		Parameters<ToolchainRoutingPort["recordSelectionInTransaction"]>[1],
@@ -126,6 +133,7 @@ function recordAgencyInput(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
+	readSources?: ReadSources,
 ): boolean {
 	const memory = deps.memory?.referenceInputs;
 	const given = deps.agency?.replyInputInTransaction?.(tx, run.id) ?? null;
@@ -134,8 +142,29 @@ function recordAgencyInput(
 		steered.length && memory
 			? memory.captureInTransaction(tx, { messageIds: steered })
 			: null;
+	const readCaptured =
+		readSources && memory
+			? memory.captureInTransaction(tx, {
+					messageIds: readSources.messageIds,
+					itemIds: readSources.itemIds,
+				})
+			: null;
+	const readAllSources = [
+		...new Set([
+			...(readCaptured?.sources ?? []),
+			...(readSources?.messageIds ?? []),
+			...(readSources?.itemIds?.map((itemId) => `memory:${itemId}`) ?? []),
+			...(readSources?.sources ?? []),
+		]),
+	];
+	const readValid =
+		!readAllSources.length ||
+		!memory ||
+		memory.staleInTransaction(tx, readAllSources).length === 0;
 	const known =
-		memory && (given || taken) ? memory.readRunInTransaction(tx, run.id) : null;
+		memory && (given || taken || readAllSources.length)
+			? memory.readRunInTransaction(tx, run.id)
+			: null;
 	if (memory && known)
 		memory.recordRunInTransaction(tx, run.id, {
 			sources: [
@@ -143,6 +172,7 @@ function recordAgencyInput(
 					...known.sources,
 					...(given?.sources ?? []),
 					...(taken?.sources ?? []),
+					...readAllSources,
 				]),
 			],
 			complete:
@@ -150,7 +180,7 @@ function recordAgencyInput(
 				(given?.complete ?? true) &&
 				(taken?.complete ?? true),
 		});
-	return (given?.complete ?? true) && (taken?.complete ?? true);
+	return (given?.complete ?? true) && (taken?.complete ?? true) && readValid;
 }
 
 const steeredIds = (deps: DialogueDeps, tx: Database, run: Run) =>
@@ -224,8 +254,11 @@ export function createGenerationSettlement(
 				return retryNotAdopted(deps, tx, run, input, claim.payload)
 					? "applied"
 					: fail(deps, tx, run, stale, input);
-			// What the agency gave the reply is gone (forgotten meanwhile): it is written again, not adopted.
-			if (!result.handover && !recordAgencyInput(deps, tx, run)) {
+			// What the agency or read tools gave the reply is gone (forgotten meanwhile): it is written again, not adopted.
+			if (
+				!result.handover &&
+				!recordAgencyInput(deps, tx, run, result.readSources)
+			) {
 				const retried = retryNotAdopted(
 					deps,
 					tx,
@@ -374,15 +407,26 @@ export function createGenerationSettlement(
 					run.id,
 					true,
 				);
+			if (done && !result.handover)
+				maybeEnqueueCompactionInTransaction(deps, tx, run.conversationId);
 			return done ? "applied" : "stale";
 		}
 		// A run that is already terminal (e.g. cancelled), or handed over to another job, keeps its state.
 		if (run.status !== "queued" && run.status !== "running") return "applied";
 		if (run.jobId !== claim.jobId) return "applied";
-		// A failure after an action committed starts the "not adopted" generation instead of ending the run.
+		// A failure after an action committed starts the "not adopted" generation instead of ending the run. So does
+		// a generation aborted while streaming because the memory it stood on changed (generationStale): its partial
+		// body was dropped with the abort, and it is written again like one found stale at adoption.
 		if (
 			outcome.type !== "retry" &&
-			retryNotAdopted(deps, tx, run, input, claim.payload)
+			retryNotAdopted(
+				deps,
+				tx,
+				run,
+				input,
+				claim.payload,
+				outcome.type === "failed" && outcome.errorCode === "memory_stale",
+			)
 		)
 			return "applied";
 		const next: [RunEndState | "queued", string | null] =
@@ -459,6 +503,7 @@ const toolCallsOf = (
 					confirmation: () => null,
 					resource: () => null,
 				},
+				Date.parse(deps.clock()),
 			)
 		: [];
 

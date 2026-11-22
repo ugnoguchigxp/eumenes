@@ -1,6 +1,6 @@
 import { backfillSourceEvents } from "../repository/source-backfill";
 import { type AttachmentStored, createAttachments } from "./attachments";
-import { linkAttachments } from "../repository/attachments";
+import { hasImageInputs, linkAttachments } from "../repository/attachments";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import type { AvatarMotion, SpeechDelivery } from "../../delivery";
@@ -54,8 +54,18 @@ import {
 	readCut,
 	retractUtterances,
 	utterancesAfter,
+	utterancesByMessageIds,
 	writeCut,
 } from "../repository/input";
+import {
+	activateStagedSummary,
+	activeSummary,
+	clearSummaries,
+	replaceActiveSummary,
+	retractSummariesBySourceRefs,
+	saveStagedSummary,
+	stagedSummary,
+} from "../repository/summaries";
 import { createHistory } from "./history";
 import { imageReferences } from "./image-context";
 import { recordImageAnswer } from "../repository/image-answers";
@@ -130,6 +140,8 @@ export function createConversationService(
 	};
 	return {
 		imageReferencesInTransaction: imageReferences,
+		/** Whether any user utterance that stands in the conversation has an attached image (one `EXISTS`). */
+		hasImageInputsInTransaction: hasImageInputs,
 		recordImageAnswerInTransaction: recordImageAnswer,
 		...createAttachments(
 			store,
@@ -145,6 +157,7 @@ export function createConversationService(
 			attachToolCallsInTransaction: attachToolCalls,
 			reviseUtteranceInTransaction: reviseUtterance,
 			utterancesAfterInTransaction: utterancesAfter,
+			utterancesByMessageIdsInTransaction: utterancesByMessageIds,
 			latestUtterancesInTransaction: latestUtterances,
 			latestReplyWithToolInTransaction: latestReplyWithTool,
 			retractUtterancesInTransaction: retractUtterances,
@@ -155,6 +168,22 @@ export function createConversationService(
 			latestStateInTransaction: latestState,
 			appendStateInTransaction: appendState,
 			dropStatesInTransaction: dropStates,
+			activeSummaryInTransaction: activeSummary,
+			stagedSummaryInTransaction: stagedSummary,
+			saveStagedSummaryInTransaction: saveStagedSummary,
+			activateStagedSummaryInTransaction: activateStagedSummary,
+			replaceActiveSummaryInTransaction: replaceActiveSummary,
+			clearSummariesInTransaction: clearSummaries,
+			retractSummariesBySourceRefsInTransaction: (
+				db: Database,
+				sourceRefs: readonly string[],
+				at: string,
+			) => {
+				const affected = retractSummariesBySourceRefs(db, sourceRefs, at);
+				for (const conversationId of affected)
+					markCutDue(db, conversationId, "forget");
+				return affected;
+			},
 		},
 		historyFingerprintInTransaction: history.fingerprint,
 		historySearchInTransaction: history.search,

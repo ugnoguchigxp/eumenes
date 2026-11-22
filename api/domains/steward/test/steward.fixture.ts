@@ -218,6 +218,8 @@ export async function setupSteward(
 		> extends () => infer F
 			? F
 			: never;
+		/** The conversation runs on LARM (default) or on a cloud connection (the steps then send their own input). */
+		conversationOnLarm?: boolean;
 		/** A database and conversation service made elsewhere (the real World's); `dir` is its folder. */
 		host?: {
 			store: SqliteStore;
@@ -271,6 +273,7 @@ export async function setupSteward(
 		continuity,
 		queue,
 		inference: inference.port,
+		conversationOnLarm: () => options.conversationOnLarm ?? true,
 		foregroundActive: (_db, conversationId) => foreground.has(conversationId),
 		runStateOf: (runId) => runStates[runId] ?? "stale",
 		clock,

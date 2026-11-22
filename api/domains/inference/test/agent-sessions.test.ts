@@ -123,6 +123,53 @@ const stream = (
 		session,
 	);
 
+test("a main call over the window sends the agent the history without its oldest exchanges, the memory message kept, and the context fitted to it", async () => {
+	const seen: CloudAgentCall[] = [];
+	const h = await setup(async (call) => {
+		seen.push(call);
+		return { text: "answer" };
+	});
+	const big = (tag: string) => `${tag}-${"x".repeat(160_000)}`;
+	const memory = "## Memory\n- 好み\n\nopening";
+	const list = [
+		{ role: "system" as const, content: "system" },
+		{ role: "user" as const, content: memory },
+		{ role: "assistant" as const, content: big("a0") },
+		{ role: "user" as const, content: big("u1") },
+		{ role: "assistant" as const, content: big("a1") },
+		{ role: "user" as const, content: "recent" },
+		{ role: "assistant" as const, content: "reply" },
+		{ role: "user" as const, content: "now" },
+	];
+	const id = await h.request();
+	await h.store.write((db) =>
+		h.inference.setContextPolicyInTransaction!(db, id, "exact"),
+	);
+	await h.inference.executeStream(
+		id,
+		list,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		undefined,
+		{
+			sessionRole: "main",
+			context: { instructionCount: 1, historyCount: 6, protectedCount: 1 },
+		},
+	);
+	const call = seen[0]!;
+	const sent = call.messages.map((m) => m.content);
+	// The oldest exchange goes (its answer first, as the memory message is the opening of the history), not the memory.
+	expect(sent.slice(0, 2)).toEqual(["system", memory]);
+	expect(sent).not.toContain(list[2]!.content);
+	expect(sent.slice(-3)).toEqual(["recent", "reply", "now"]);
+	expect(call.session!.context).toEqual({
+		instructionCount: 1,
+		historyCount: sent.length - 2,
+		protectedCount: 1,
+	});
+});
+
 test("a main call uses the ledger's one session id per connection, auth and model, and records what it stood on", async () => {
 	const seen: CloudAgentCall[] = [];
 	const h = await setup(async (call) => {

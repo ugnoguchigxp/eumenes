@@ -142,3 +142,56 @@ test("image analysis stays linked in text history across restart, corrections an
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("hasImageInputsInTransaction answers whether a standing user utterance carries an attachment", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "image-presence-"));
+	const store = openStore(join(dir, "db"), migrations);
+	const c = createConversationService(store, { requireOutbox: true });
+	try {
+		const has = (conversationId: string) =>
+			store.read((db) => c.hasImageInputsInTransaction(db, conversationId));
+		const image = await c.uploadAttachment(
+			"main",
+			crypto.randomUUID(),
+			(await syntheticImages())[1]!,
+		);
+		const append = (
+			id: string,
+			role: "user" | "assistant",
+			conversationId: string,
+			attachments?: (typeof image)[],
+		) =>
+			c.append({
+				id,
+				role,
+				text: "text",
+				runId: id,
+				conversationId,
+				createdAt: new Date().toISOString(),
+				...(attachments ? { attachments } : {}),
+			});
+		const say = (id: string) =>
+			store.write((db) =>
+				c.input.appendUtteranceInTransaction(db, {
+					conversationId: "main",
+					speaker: "user",
+					text: "text",
+					messageId: id,
+					at: new Date().toISOString(),
+				}),
+			);
+		await append("plain", "user", "main");
+		await say("plain");
+		expect(has("main")).toBe(false);
+		await append("with-image", "user", "main", [image]);
+		expect(has("main")).toBe(false);
+		await say("with-image");
+		expect(has("main")).toBe(true);
+		expect(has("other")).toBe(false);
+		await c.retract({ messageId: "with-image" });
+		expect(has("main")).toBe(false);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

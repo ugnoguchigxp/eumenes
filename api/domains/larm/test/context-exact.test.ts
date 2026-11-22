@@ -165,3 +165,44 @@ test("history goes by whole exchanges: an unanswered run does not leave an assis
 		}
 	}
 });
+
+test("an exact request over the window drops the oldest exchanges from after the protected memory message, and keeps the memory", () => {
+	// S, then the history whose first message holds `## Memory` with the opening utterance, then this turn's input.
+	const history = Array.from({ length: 6 }, (_, i) => ({
+		role: i % 2 === 0 ? ("user" as const) : ("assistant" as const),
+		content: `${i === 0 ? "## Memory\n- 好み\n\n" : ""}turn${i}-${"x".repeat(400)}`,
+	}));
+	const messages = [
+		{ role: "system" as const, content: "policy" },
+		...history,
+		{ role: "user" as const, content: "request" },
+	];
+	const small = { ...window, maxTokens: 700 };
+	// The memory message is the opening utterance's user message: it stays with its answer.
+	const range = { instructionCount: 1, historyCount: 6, protectedCount: 2 };
+	const trimmed = fitContext(messages, small, true, range);
+	const contents = trimmed.messages.map((m) => m.content);
+	expect(contents).toContain(history[0]!.content);
+	expect(contents).toContain(history[1]!.content);
+	expect(contents).not.toContain(history[2]!.content);
+	expect(contents).toContain(history[5]!.content);
+	// Whole exchanges went: no user message follows another.
+	const roles = trimmed.messages.map((m) => m.role);
+	for (let i = 1; i < roles.length; i++)
+		expect([roles[i - 1], roles[i]]).not.toEqual(["user", "user"]);
+	expect(trimmed.messages.at(-1)!.content).toBe("request");
+	// The protected message stays in the range that is handed on.
+	expect(trimmed.history).toEqual({
+		...range,
+		historyCount: 6 - (messages.length - trimmed.messages.length),
+	});
+	// Even with no room at all, the memory message is the last of the history to stay.
+	const tiny = fitContext(messages, { ...window, maxTokens: 230 }, true, range);
+	expect(tiny.messages.map((m) => m.content)).toEqual([
+		"policy",
+		history[0]!.content,
+		history[1]!.content,
+		"request",
+	]);
+	expect(tiny.history).toEqual({ ...range, historyCount: 2 });
+});

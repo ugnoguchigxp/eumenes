@@ -106,6 +106,7 @@ test("a database restored from before a goal forget loses the goal again at star
 			continuity,
 			queue,
 			inference: createFakeInference().port,
+			conversationOnLarm: () => true,
 			foregroundActive: () => false,
 			runStateOf: () => "stale",
 			clock: () => new Date().toISOString(),

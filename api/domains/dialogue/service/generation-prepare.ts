@@ -14,6 +14,7 @@ import {
 	estimateTextTokens,
 	planWindow,
 } from "../../inference";
+import { exchangeEnd } from "../../../infrastructure/context-budget";
 import type { HandlerDefinition } from "../../queue";
 import { isSystemPrompt, type Run } from "../contracts";
 import { byId, transition } from "../repository";
@@ -35,10 +36,11 @@ import {
 	conversationSystem,
 	placeCutInTransaction,
 	inputMessageRevision,
+	workingLimits,
 	type ConversationPrefix,
 } from "./conversation-input";
 import { localHarness, routeConversation } from "./harness";
-import { dataText, lineText } from "./input-text";
+import { INPUT_HEADINGS, dataText, lineText } from "./input-text";
 import {
 	consumeAnswer,
 	answerTicketInTransaction,
@@ -64,6 +66,38 @@ const log = getLogger("dialogue");
 export const TALK_BREAK_MS = 2 * 60 * 1000;
 
 const tokens = (text: string) => estimateTextTokens(text);
+
+/**
+ * Where the answer's messages split for a provider that keeps a history (the call's `context`): the one system
+ * message, then the adopted conversation, then this turn's input. The turn joins the prefix's last message when that
+ * one is the user's (`withLastMessage`), so that message is the turn's, not history. The first history message holds
+ * `## Memory` (alone, or in front of the opening utterance): it is protected, with the answer to the opening
+ * utterance when they are one message, so a list over the window loses the oldest exchanges and never the memory.
+ */
+export function answerSessionContext(
+	prefix: Pick<ConversationPrefix, "messages">,
+) {
+	const { messages } = prefix;
+	const joinsLast = messages.length > 1 && messages.at(-1)!.role === "user";
+	const historyCount = messages.length - 1 - (joinsLast ? 1 : 0);
+	const holdsMemory =
+		historyCount > 0 &&
+		messages[1]!.role === "user" &&
+		messages[1]!.content.startsWith(INPUT_HEADINGS.memory);
+	// The memory/summary message stays with the entire opening exchange after it (including any tool_calls + tool
+	// results), so trimming never orphans a tool message or leaves two user messages in a row.
+	const historyRoles = messages
+		.slice(1, 1 + historyCount)
+		.map((message) => message.role);
+	const protectedCount = holdsMemory
+		? exchangeEnd(historyRoles, 0, historyCount)
+		: 0;
+	return {
+		instructionCount: 1,
+		historyCount,
+		...(protectedCount ? { protectedCount } : {}),
+	};
+}
 
 /** The model window of this run: the claimed LARM lease's, the saved cloud resource's, else the reference. */
 function windowOf(deps: DialogueDeps, tx: Database, runId: string): number {
@@ -521,6 +555,7 @@ export function createPrepare(
 			window,
 			nowMs,
 			pending: pendingIds,
+			limits: workingLimits(plan),
 		});
 		window = placed.window;
 		if (placed.reason)
@@ -653,6 +688,12 @@ export function createPrepare(
 				? { nowMs, noticeId: notice ? run.inputMessageId : undefined, origins }
 				: undefined,
 		});
+		const shownForMemory = [
+			...new Set([
+				...(final.kind === "utterances" ? final.messageIds : []),
+				...(prefix.summarySourceRefs ?? []).filter((ref) => !ref.includes(":")),
+			]),
+		];
 		return {
 			status: "ready",
 			input: {
@@ -690,19 +731,13 @@ export function createPrepare(
 				),
 				offers,
 				retained: retainedInTransaction(deps, tx, conversationId),
-				sessionContext: { instructionCount: 1, historyCount: 0 },
+				sessionContext: answerSessionContext(prefix),
 				...(window && memory
 					? {
 							memory: {
-								window: memory.preparedWindow(
-									window,
-									final.kind === "utterances" ? final.messageIds : [],
-								),
+								window: memory.preparedWindow(window, shownForMemory),
 								blockedAtPrepare: [
-									...memory.blockedMessageIdsInTransaction(
-										tx,
-										final.kind === "utterances" ? final.messageIds : [],
-									),
+									...memory.blockedMessageIdsInTransaction(tx, shownForMemory),
 								],
 							},
 						}

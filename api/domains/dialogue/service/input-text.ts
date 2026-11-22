@@ -9,6 +9,7 @@ import {
  */
 export const INPUT_HEADINGS = {
 	memory: "## Memory",
+	summary: "## Summary",
 	earlier: "## Earlier",
 	state: "## State",
 	user: "## User",

@@ -228,6 +228,7 @@ test("the purge is idempotent: running it again changes nothing", async () => {
 		continuity: h.continuity,
 		queue: h.queue,
 		inference: h.inference.port,
+		conversationOnLarm: () => true,
 		foregroundActive: () => false,
 		runStateOf: () => "stale",
 		clock: () => new Date(h.time.ms).toISOString(),

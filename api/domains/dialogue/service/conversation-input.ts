@@ -18,26 +18,33 @@ import { imageReferenceText } from "../../conversation";
 import { keepOrder, type ProfileItem, type WindowSnapshot } from "../../memory";
 import { latestConversationId } from "../repository";
 import type { ChatMessage, DialogueDeps } from "./context";
-import { systemText } from "./context-system";
+import { conversationHasImages, systemText } from "./context-system";
 import { conversationHasActiveRun } from "./active-run";
-import { localHarness, type ConversationHarness } from "./harness";
+import { backgroundHarness, type ConversationHarness } from "./harness";
 import { INPUT_HEADINGS, dataText, joinSections, section } from "./input-text";
 import { memoryItemLine } from "./result-text";
-import { agendaCalls } from "./tool-exchange";
+import {
+	RECENT,
+	compactOnOverLimitInTransaction,
+	keepNewestCut,
+	overHardLimit,
+	summaryRefsValid,
+	tokensOf,
+	utteranceTokens,
+	workingLimits,
+	type WorkingLimits,
+} from "./summary-format";
+import { replayableCalls } from "./tool-exchange";
 import { stateLinesInTransaction, stateText } from "./state-text";
 
-/** Bounds of the recent conversation and its cuts (the conversation input specification, sections 6.1 and 6.1.1). */
-export const RECENT = {
-	/** One utterance shows at most this much; the rest is cut with `…`. */
-	utteranceTokens: 300,
-	/** The host cuts by its fixed rule past this many. */
-	hardCount: 20,
-	hardTokens: 4000,
-	/** A fixed-rule cut keeps this many newest utterances (starting with the agent's). */
-	keep: 4,
-	/** A silence this long before an input starts the recent conversation again. */
-	gapMs: 30 * 60 * 1000,
-} as const;
+export {
+	RECENT,
+	keepNewestCut,
+	tokensOf,
+	utteranceTokens,
+	workingLimits,
+	type WorkingLimits,
+};
 
 /** `## Memory` holds the profile's leanings only, within this bound (section 5.1). */
 export const MEMORY_TOKENS = 300;
@@ -54,7 +61,11 @@ export function conversationSystem(
 		userName: "",
 		persona: "butler" as const,
 	};
-	const base = systemText(persona, deps.conversationAgent.system());
+	const base = systemText(
+		persona,
+		deps.conversationAgent.system(),
+		!!conversationId && conversationHasImages(deps, tx, conversationId),
+	);
 	return conversationId && deps.externalOutput?.active(tx, conversationId)
 		? `${base}\n${systemContext("dialogue.contexts.live-output", {})}`
 		: base;
@@ -99,9 +110,6 @@ export function memoryLines(items: readonly ProfileItem[]): {
 	return { lines: shown.map(line), ids: shown.map((item) => item.id) };
 }
 
-const tokensOf = (utterances: readonly Utterance[]) =>
-	utterances.reduce((sum, u) => sum + estimateTextTokens(u.text), 0);
-
 /** The recent utterances in the configured window, excluding pending user input. */
 export function recentUtterances(
 	after: readonly Utterance[],
@@ -127,9 +135,11 @@ export function recentUtterances(
 export function recentMessages(
 	utterances: readonly Utterance[],
 	imageNotes: ReadonlyMap<string, string> = new Map(),
-	/** The agency serves the replies: the tools a reply called and what they answered stay in the history. */
+	/** Replay carried tool calls and results in the working conversation history. */
 	withCalls = false,
 	originOf?: (utterance: Utterance) => InputOrigin,
+	/** Include agency-owned tools (`start_preparation`, `read_note`, goal tools) when the agency serves replies. */
+	includeAgency = withCalls,
 ): ChatMessage[] {
 	const messages: ChatMessage[] = [];
 	for (const u of utterances) {
@@ -140,7 +150,10 @@ export function recentMessages(
 				.filter(Boolean)
 				.join("\n"),
 		);
-		const calls = withCalls && role === "assistant" ? agendaCalls(u) : [];
+		const calls =
+			withCalls && role === "assistant"
+				? replayableCalls(u, includeAgency)
+				: [];
 		const origin = originOf?.(u);
 		if (calls.length) {
 			// The reply's own tool calls come back as its history: it sees what it did (the package's rule).
@@ -185,17 +198,6 @@ export function recentMessages(
 	return messages;
 }
 
-/** The seq a fixed-rule cut is placed after: the newest `RECENT.keep` utterances stay, from an agent's. */
-export function keepNewestCut(
-	shown: readonly Utterance[],
-	fallback: number,
-): number {
-	let at = Math.max(0, shown.length - RECENT.keep);
-	while (at < shown.length && shown[at]!.speaker === "user") at++;
-	if (at >= shown.length) return shown.at(-1)?.seq ?? fallback;
-	return shown[at]!.seq - 1;
-}
-
 /** Why the host cuts by its fixed rule now (section 6.1.1 ② to ⑤), or null. */
 function fixedCutReason(
 	cut: ConversationCut,
@@ -204,6 +206,7 @@ function fixedCutReason(
 		systemDigest: string;
 		memoryDigest: string;
 		nowMs: number;
+		limits?: WorkingLimits;
 	},
 ): string | null {
 	// A gap comes first: it keeps nothing of what was said before, which serves every other reason too (a memory or
@@ -214,8 +217,7 @@ function fixedCutReason(
 	if (cut.due) return cut.due;
 	if (cut.systemDigest !== input.systemDigest) return "system_changed";
 	if (cut.memoryDigest !== input.memoryDigest) return "memory_changed";
-	if (shown.length > RECENT.hardCount || tokensOf(shown) > RECENT.hardTokens)
-		return "over_limit";
+	if (overHardLimit(shown, input.limits)) return "over_limit";
 	return null;
 }
 
@@ -235,6 +237,7 @@ export function placeCutInTransaction(
 		window: WindowSnapshot | null;
 		nowMs: number;
 		pending: ReadonlySet<string>;
+		limits?: WorkingLimits;
 	},
 ): {
 	cut: ConversationCut;
@@ -271,15 +274,30 @@ export function placeCutInTransaction(
 		systemDigest,
 		memoryDigest: memoryDigestOf(window),
 		nowMs: input.nowMs,
+		limits: input.limits,
 	});
 	if (!reason) return { cut: existing, reason: null, window };
-	// Nothing said before a gap stays, nor the input states saved for it.
-	if (reason === "resumed") store.dropStatesInTransaction(tx, conversationId);
+	// Nothing said before a gap stays, nor the input states or compacted summaries saved for it.
+	if (reason === "resumed") {
+		store.dropStatesInTransaction(tx, conversationId);
+		store.clearSummariesInTransaction?.(tx, conversationId);
+	}
+	const targetSeq =
+		reason === "resumed"
+			? (shown.at(-1)?.seq ?? existing.seq)
+			: reason === "over_limit"
+				? compactOnOverLimitInTransaction(
+						deps,
+						tx,
+						conversationId,
+						existing,
+						shown,
+						at,
+						input.limits,
+					)
+				: keepNewestCut(shown, existing.seq, input.limits);
 	const moved = moveCutInTransaction(deps, tx, conversationId, {
-		seq:
-			reason === "resumed"
-				? (shown.at(-1)?.seq ?? existing.seq)
-				: keepNewestCut(shown, existing.seq),
+		seq: targetSeq,
 		window,
 		nowMs: input.nowMs,
 		system: input.system,
@@ -336,9 +354,11 @@ export function clearRecentInTransaction(
 	const store = deps.conversation.input;
 	const newest = store.latestUtterancesInTransaction(tx, conversationId, 1)[0];
 	const cut = store.cutInTransaction(tx, conversationId);
-	if (!newest || (cut && cut.seq >= newest.seq)) return true;
-	// The input states saved for the earlier words go with them.
+	const hasSummary = !!store.activeSummaryInTransaction?.(tx, conversationId);
+	if (!newest || (cut && cut.seq >= newest.seq && !hasSummary)) return true;
+	// The input states and compacted summaries saved for the earlier words go with them.
 	store.dropStatesInTransaction(tx, conversationId);
+	store.clearSummariesInTransaction?.(tx, conversationId);
 	let window: WindowSnapshot | null = null;
 	try {
 		window = deps.memory?.storedWindowInTransaction(tx, conversationId) ?? null;
@@ -370,6 +390,10 @@ export type ConversationPrefix = {
 	memoryItemIds: string[];
 	/** `## Memory` as this prefix shows it, when it shows any item (a routed turn's choice reads the same). */
 	memory: string | null;
+	/** Compacted `## Summary` section shown below `## Memory`, if an active valid summary exists. */
+	summary?: string | null;
+	/** Source provenance refs of the active `## Summary`, merged into forgetting checks. */
+	summarySourceRefs?: string[];
 	/** The user utterances from the window for argument extraction. */
 	earlier: string[];
 };
@@ -478,7 +502,7 @@ export function conversationPrefixFrom(
 	const conversation = recentMessages(
 		recent,
 		imageNotes,
-		serves,
+		input.harness.history.withCalls ?? serves,
 		input.traceInput
 			? (u) => ({
 					kind: "history",
@@ -487,9 +511,22 @@ export function conversationPrefixFrom(
 					...(u.messageId ? inputMessageRevision(deps, tx, u.messageId) : {}),
 				})
 			: undefined,
+		serves,
 	);
+	const rawSummary =
+		store.activeSummaryInTransaction?.(tx, conversationId) ?? null;
+	const validSummary =
+		rawSummary &&
+		rawSummary.text.trim() &&
+		summaryRefsValid(deps, tx, conversationId, rawSummary.sourceRefs)
+			? rawSummary
+			: null;
+	const summarySection = validSummary
+		? section(INPUT_HEADINGS.summary, [dataText(validSummary.text)])
+		: null;
+	const semiStatic = joinSections([memory, summarySection]);
 	const messages: ChatMessage[] = [{ role: "system", content: input.system }];
-	const memoryFrame: ChatMessage = { role: "user", content: memory ?? "" };
+	const memoryFrame: ChatMessage = { role: "user", content: semiStatic };
 	if (input.traceInput) {
 		markInput(messages[0]!, { kind: "system" });
 		let from = INPUT_HEADINGS.memory.length + 1;
@@ -507,10 +544,21 @@ export function conversationPrefixFrom(
 			);
 			from += line.length + 1;
 		}
-		if (!lines.length) markInput(memoryFrame, { kind: "memory" });
+		if (!lines.length)
+			markInput(memoryFrame, { kind: "memory" }, 0, (memory ?? "").length);
+		if (summarySection && validSummary) {
+			const start = semiStatic.indexOf(summarySection);
+			if (start >= 0)
+				markInput(
+					memoryFrame,
+					{ kind: "summary", id: validSummary.id },
+					start,
+					start + summarySection.length,
+				);
+		}
 	}
-	if (memory && conversation.length) {
-		// Keep Memory separate from the opening history inside the same user message.
+	if (semiStatic && conversation.length) {
+		// Keep Memory (+ Summary) separate from the opening history inside the same user message.
 		if (conversation[0]!.role === "user") {
 			const earlier = prependInput(conversation[0]!, {
 				content: INPUT_HEADINGS.earlier,
@@ -531,12 +579,12 @@ export function conversationPrefixFrom(
 					input.pending.has(u.messageId)
 				),
 		);
+	const hasCarry =
+		!conversation.length && (lines.length > 0 || !!summarySection);
 	return {
 		messages,
-		carry: conversation.length || !lines.length ? null : memory,
-		...(input.traceInput && !conversation.length && lines.length
-			? { carryInput: memoryFrame }
-			: {}),
+		carry: hasCarry ? semiStatic : null,
+		...(input.traceInput && hasCarry ? { carryInput: memoryFrame } : {}),
 		cut,
 		recent,
 		lastAt: last ? Date.parse(last.at) : null,
@@ -548,6 +596,8 @@ export function conversationPrefixFrom(
 				: null,
 		memoryItemIds: ids,
 		memory: lines.length ? memory : null,
+		summary: summarySection,
+		summarySourceRefs: validSummary ? validSummary.sourceRefs : [],
 		earlier: recent.filter((u) => u.speaker === "user").map((u) => u.text),
 	};
 }
@@ -617,7 +667,7 @@ export function backgroundPrefixInTransaction(
 		return null;
 	}
 	return conversationPrefixFrom(deps, tx, conversationId, {
-		harness: localHarness,
+		harness: backgroundHarness,
 		system: conversationSystem(deps, tx, conversationId),
 		window,
 		pending: pendingMessageIdsInTransaction(deps, tx, conversationId),

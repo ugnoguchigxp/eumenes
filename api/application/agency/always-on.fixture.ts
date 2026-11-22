@@ -398,6 +398,8 @@ export async function replyWith(
 		runId?: string;
 		messageIds?: string[];
 		host?: Pick<typeof f.host, "conversationAgent">;
+		/** The host's own read tools: the names it offers (each answers `host tool`). */
+		hostTools?: readonly string[];
 	} = {},
 ) {
 	let call = 0;
@@ -431,7 +433,11 @@ export async function replyWith(
 			},
 		},
 		tools: {
-			tools: [],
+			tools: (options.hostTools ?? []).map((name) => ({
+				name,
+				description: name,
+				parameters: { type: "object", properties: {} },
+			})),
 			call: async () => ({ content: "host tool" }),
 		},
 		signal: new AbortController().signal,

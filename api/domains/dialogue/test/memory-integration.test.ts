@@ -93,25 +93,70 @@ test("a forgotten fact leaves the next prompt, and the messages it came from sta
 	);
 });
 
-test("a forget of a fact shown while the answer is generated makes that answer stale: nothing is adopted", async () => {
+test("a forget of a fact shown while the answer is generated writes the answer again: the stale body is never adopted", async () => {
 	h = await setup({ memory: true });
 	const saved = await rememberFact(SPICY);
 	await republish();
 	let release!: () => void;
 	h.state.gate = new Promise<void>((resolve) => (release = resolve));
-	h.state.steps.push(...reply("はい。"));
+	h.state.steps.push(...reply("古い答え。"), ...reply("新しい答え。"));
 	const run = await h.dialogue.submit({
 		requestId: crypto.randomUUID(),
 		conversationId: "main",
 		text: "夕食の候補は？",
 	});
 	await waitFor(() => h!.dialogue.get(run.id)?.status === "running");
+	const before = h.state.calls.length;
 	await h.memory!.forget({
 		conversationId: "main",
 		itemIds: [saved.id],
 		messageIds: [],
 	});
 	release();
+	await waitFor(() => h!.dialogue.get(run.id)?.status === "completed");
+	expect(h.dialogue.get(run.id)?.error).toBeNull();
+	expect(h.dialogue.answerText(run.id)).toBe("新しい答え。");
+	expect(h.state.calls).toHaveLength(before + 1);
+	const written = h.state.calls
+		.at(-1)!
+		.messages.map((m) => m.content)
+		.join("\n");
+	expect(written).not.toContain(SPICY);
+	expect(h.conversation.get("main").messages.map((m) => m.text)).not.toContain(
+		"古い答え。",
+	);
+});
+
+test("a second forget while the answer is written again ends the run as before", async () => {
+	h = await setup({ memory: true });
+	const first = await rememberFact(SPICY);
+	const second = await rememberFact("甘いものも好き");
+	await republish();
+	let release!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (release = resolve));
+	h.state.steps.push(...reply("一度目。"), ...reply("二度目。"));
+	const run = await h.dialogue.submit({
+		requestId: crypto.randomUUID(),
+		conversationId: "main",
+		text: "夕食の候補は？",
+	});
+	await waitFor(() => h!.dialogue.get(run.id)?.status === "running");
+	const before = h.state.calls.length;
+	await h.memory!.forget({
+		conversationId: "main",
+		itemIds: [first.id],
+		messageIds: [],
+	});
+	let releaseAgain!: () => void;
+	h.state.gate = new Promise<void>((resolve) => (releaseAgain = resolve));
+	release();
+	await waitFor(() => h!.state.calls.length === before + 1);
+	await h.memory!.forget({
+		conversationId: "main",
+		itemIds: [second.id],
+		messageIds: [],
+	});
+	releaseAgain();
 	await waitFor(() => h!.dialogue.get(run.id)?.status === "failed");
 	expect(h.dialogue.get(run.id)?.error).toBe("memory_stale");
 	expect(h.dialogue.answerText(run.id)).toBeNull();

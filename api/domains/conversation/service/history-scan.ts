@@ -3,6 +3,21 @@ import type { HistoryOwner, HistoryView } from "../contracts/history";
 import { historySearchInput } from "../contracts/history";
 import { historyChunk, type HistoryRow } from "../repository/history";
 const byteSize = (v: unknown) => Buffer.byteLength(JSON.stringify(v));
+
+const normalizeSearch = (text: string) => text.normalize("NFKC").toLowerCase();
+
+function queryTokens(query: string): string[] {
+	const normalized = normalizeSearch(query).trim();
+	return normalized ? normalized.split(/[\s\u3000]+/).filter(Boolean) : [];
+}
+
+function matchOffset(rawText: string, normText: string, token: string): number {
+	const exact = rawText.indexOf(token);
+	if (exact >= 0) return exact;
+	const idx = normText.indexOf(token);
+	return idx >= 0 ? Math.min(idx, rawText.length) : 0;
+}
+
 export type HistoryPosition = {
 	session: string;
 	messageId: string | null;
@@ -27,6 +42,11 @@ export function scanHistory(
 	) => HistoryView,
 ) {
 	const candidates: HistoryView[] = [];
+	const partialHits: Array<{ hits: number; view: HistoryView }> = [];
+	const tokens = queryTokens(c.query);
+	const overlapLen = tokens.length
+		? Math.max(...tokens.map((t) => Array.from(t).length))
+		: 0;
 	let scannedBytes = 0,
 		scannedMessages = 0,
 		complete = true;
@@ -53,7 +73,7 @@ export function scanHistory(
 			do {
 				// SQLite positions are Unicode code points. Overlap preserves matches across chunks.
 				const count = Math.min(64000, Math.floor((1048576 - scannedBytes) / 4));
-				if (count <= c.query.length) {
+				if (count <= overlapLen) {
 					next = {
 						session: sessionId,
 						messageId: row.id,
@@ -65,8 +85,16 @@ export function scanHistory(
 				}
 				const text = historyChunk(db, owner.conversationId, row.id, pos, count);
 				scannedBytes += Buffer.byteLength(text);
-				const found = c.query ? text.indexOf(c.query) : 0;
-				if (found >= 0) {
+				const normText = tokens.length ? normalizeSearch(text) : "";
+				const hitTokens = tokens.length
+					? tokens.filter((t) => normText.includes(t))
+					: [];
+				const allMatched =
+					tokens.length === 0 || hitTokens.length === tokens.length;
+				if (allMatched) {
+					const found = tokens.length
+						? matchOffset(text, normText, tokens[0]!)
+						: 0;
 					const start =
 						pos + Math.max(0, Array.from(text.slice(0, found)).length - 80);
 					const candidate = view(db, sessionId, row, start, 300);
@@ -83,11 +111,23 @@ export function scanHistory(
 					candidates.push(candidate);
 					pos = row.size; // One candidate per message; read explores its remaining text.
 				} else {
+					// Record partial multi-token hits as a fallback when no AND match is found.
+					if (
+						tokens.length > 1 &&
+						hitTokens.length > 0 &&
+						partialHits.length < 20 &&
+						!partialHits.some((p) => p.view.messageId === row.id)
+					) {
+						const found = matchOffset(text, normText, hitTokens[0]!);
+						const start =
+							pos + Math.max(0, Array.from(text.slice(0, found)).length - 80);
+						partialHits.push({
+							hits: hitTokens.length,
+							view: view(db, sessionId, row, start, 300),
+						});
+					}
 					const length = Array.from(text).length;
-					pos +=
-						length < count
-							? length
-							: Math.max(1, length - Array.from(c.query).length + 1);
+					pos += length < count ? length : Math.max(1, length - overlapLen + 1);
 				}
 				if (pos < row.size && scannedBytes >= 1048576 - 800) {
 					next = {
@@ -112,6 +152,13 @@ export function scanHistory(
 			};
 			complete = false;
 			break;
+		}
+	}
+	if (!candidates.length && partialHits.length) {
+		partialHits.sort((a, b) => b.hits - a.hits);
+		for (const item of partialHits.slice(0, Math.min(5, c.limit))) {
+			if (byteSize({ candidates: [...candidates, item.view] }) > 12000) break;
+			candidates.push(item.view);
 		}
 	}
 	return { candidates, scannedBytes, scannedMessages, complete, next };

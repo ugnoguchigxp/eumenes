@@ -6,6 +6,7 @@ const origin = z.object({
 		"system",
 		"history",
 		"memory",
+		"summary",
 		"state",
 		"agency",
 		"user",

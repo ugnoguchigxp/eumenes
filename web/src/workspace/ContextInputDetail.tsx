@@ -24,6 +24,7 @@ const originLabel: Record<Origin["kind"], string> = {
 	system: "指示",
 	history: "会話履歴",
 	memory: "記憶",
+	summary: "圧縮要約",
 	state: "状態",
 	agency: "Agency",
 	user: "今回の発言",

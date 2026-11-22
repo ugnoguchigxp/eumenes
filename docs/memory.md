@@ -111,7 +111,9 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 | 経緯の step（次の再構成が適用する） | `summarize`、`refine-summary` | `log` から外れる出来事の要約、続いた要約のまとめ直し |
 | 手入れ step（会話の最後の出来事から10分後だけ） | `consolidate-memory`、`consolidate-goals` | 記憶の統合・停止・傾向、目標の整理 |
 
-会話の内容を読む step（`curate-memory`・`curate-goals`・`summarize`・`refine-summary`）は、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。どの step も、会話に動いている run（担当に渡して結果を待つ run を含む）がある間は始めず、run の終わりで始まる（保守の step は 30秒・2分・10分の待ち）。会話を読まない step（`curate-world`・`consolidate-memory` など）は自分の接続で推論するが、同じく利用者のための呼出し（会話・専門担当など）が始まると取り消される（LARM は1回に1つずつ推論するので、譲らないと利用者の呼出しが待たされる）。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。明示依頼の対象はresolveで一度だけ処理し、通常のremember/updateへ重ねない。忘却依頼の入力には停止中の記憶も状態を明示して含め、過去の版を対象にできる。
+会話の内容を読む step（`curate-memory`・`curate-goals`・`summarize`・`refine-summary`）は、主会話の経路が LARM を使うときは、主会話と同じ先頭（system・tool定義・資料の文書）の後に自分の指示と入力を置き、主会話の接続で推論する。主会話がクラウドの経路（`cloud-only`）のときは、先頭を共有してもキャッシュが効かない（Codex のスレッドは指示と出力 schema で分かれる）ので、`curate-memory`・`curate-goals` は自分の指示と入力だけで推論する。
+
+主会話の呼出しや音声の文字起こしが始まると取り消され（`larm_preempted`）、失敗に数えずに15秒後に作り直される。どの step も、会話に動いている run（担当に渡して結果を待つ run を含む）がある間は始めず、run の終わりで始まる（保守の step は 30秒・2分・10分の待ち）。会話を読まない step（`curate-world`・`consolidate-memory` など）は自分の接続で推論するが、同じく利用者のための呼出し（会話・専門担当など）が始まると取り消される（LARM は1回に1つずつ推論するので、譲らないと利用者の呼出しが待たされる）。記憶の依頼の結果は、会話の `log` に `memory.notice` の出来事として足す。明示依頼の対象はresolveで一度だけ処理し、通常のremember/updateへ重ねない。忘却依頼の入力には停止中の記憶も状態を明示して含め、過去の版を対象にできる。
 
 **実行単位**（`steward_unit`）は 1 step ＝ 1 ジョブ。同じ対象に開いている単位は 1 つだけである。
 

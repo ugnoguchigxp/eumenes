@@ -3,7 +3,8 @@ import type { ConversationState, Utterance } from "../../conversation";
 import type { Run } from "../contracts";
 import { liveSession, markReported, unreportedEnded } from "../repository";
 import type { DialogueDeps } from "./context";
-import { taskForWork } from "./task-work";
+import { agencyWork } from "../repository/agency";
+import { taskForWork, taskTargets } from "./task-work";
 import { workContextCurrent } from "./work-context-input";
 import type { DocumentRefs, TodoItem } from "./work-items";
 import { INPUT_HEADINGS, gapText, jstNowLine, lineText } from "./input-text";
@@ -25,6 +26,8 @@ export const STATE_LIMITS = {
 	shared: SHARED_LINES,
 	/** A TODO archived this long ago is no longer named (its notice told the user it finished). */
 	archivedMs: 2 * 60 * 60 * 1000,
+	/** A TODO's request and a task's reason are told cut to this many characters. */
+	preview: 240,
 	/** A gap this long since the last utterance is said in the `今` line. */
 	gapMs: 30 * 60 * 1000,
 } as const;
@@ -69,6 +72,36 @@ function todoLine(todo: TodoItem, made: string[], archived: boolean): string {
 			? `（${OUTCOMES[todo.outcome]}）`
 			: "";
 	return `- t${todo.ref} ${lineText(todo.title)} ${status}${outcome}${made.length ? ` ${made.join(" ")}` : ""}`;
+}
+
+/**
+ * What the `work` tool's schema used to carry per TODO and now names only by `t<n>`: the request, the question the
+ * user is asked and the tasks by their taskId. The agency's own research is outside the user's work controls.
+ */
+function todoDetail(deps: DialogueDeps, tx: Database, todo: TodoItem): string {
+	const row = deps.work?.workInTransaction(tx, todo.id);
+	if (!row || agencyWork(tx, row.runId)) return "";
+	// A request the title already says is not told twice.
+	const request = lineText(row.request).slice(0, STATE_LIMITS.preview);
+	const said = request === lineText(todo.title);
+	const tasks = taskTargets(deps, tx, row)?.tasks;
+	const detail = {
+		...(request && !said ? { request } : {}),
+		...(todo.status === "waiting" && todo.question
+			? { question: lineText(todo.question) }
+			: {}),
+		...(tasks
+			? {
+					tasks: tasks.map(({ taskId, title, state, reason }) => ({
+						taskId,
+						title,
+						state,
+						reason: lineText(reason).slice(0, STATE_LIMITS.preview),
+					})),
+				}
+			: {}),
+	};
+	return Object.keys(detail).length ? ` ${JSON.stringify(detail)}` : "";
 }
 
 /** What the host knows of a specialist's work: a suspended one, a switch waiting for the user, one that ended. */
@@ -163,7 +196,7 @@ export function stateProjectionInTransaction(
 	let briefs = 0;
 	const showTodo = (todo: TodoItem, archived: boolean) => {
 		todos.push(todo.ref);
-		const line = todoLine(todo, madeOf(todo, refs, resources), archived);
+		const line = `${todoLine(todo, madeOf(todo, refs, resources), archived)}${todoDetail(deps, tx, todo)}`;
 		if (
 			!input.run ||
 			!["manual", "voice"].includes(input.run.sourceKind) ||

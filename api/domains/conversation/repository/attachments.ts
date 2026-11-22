@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 import type { Attachment } from "../contracts/attachments";
 import type { ImageReference } from "../contracts/history";
+import { inputReady } from "./input";
 
 export const attachmentsMigration: Migration = {
 	id: "conversation/0006-attachments",
@@ -24,6 +25,25 @@ function attachmentsReady(db: Database) {
 	return !!db
 		.query("SELECT 1 FROM sqlite_master WHERE name='conversation_attachments'")
 		.get();
+}
+/**
+ * Whether a user's utterance that stands in the conversation has an attachment on its message: one `EXISTS`, which
+ * stops at the first one (each utterance is looked up by the attachment links' key, nothing is read into memory). A
+ * retracted utterance or message does not count, as with `imageInputReferences`.
+ */
+export function hasImageInputs(db: Database, conversationId: string): boolean {
+	if (!attachmentsReady(db) || !inputReady(db)) return false;
+	const row = db
+		.query<{ present: number }, [string]>(
+			`SELECT EXISTS(
+SELECT 1 FROM conversation_utterances u
+WHERE u.conversation_id=? AND u.speaker='user' AND u.retracted_at IS NULL AND u.message_id IS NOT NULL
+ AND EXISTS(SELECT 1 FROM message_attachments a WHERE a.message_id=u.message_id)
+ AND EXISTS(SELECT 1 FROM messages m WHERE m.id=u.message_id AND m.retracted_at IS NULL)
+) AS present`,
+		)
+		.get(conversationId);
+	return row?.present === 1;
 }
 /** Metadata only, scoped to the target's conversation and the newest image input of its exchange. */
 export function imageInputReferences(

@@ -108,9 +108,14 @@ export type LarmCallOptions = {
 	/**
 	 * `exact` only: where the adopted history sits in the host-fixed list (the first `instructionCount` messages are
 	 * instructions, then `historyCount` user/assistant messages). If the list is over the window, the oldest of
-	 * these are dropped first; without it nothing is dropped.
+	 * these are dropped first; without it nothing is dropped. The first `protectedCount` of them hold `## Memory` and
+	 * are never dropped: the oldest exchanges go from after them.
 	 */
-	history?: { instructionCount: number; historyCount: number };
+	history?: {
+		instructionCount: number;
+		historyCount: number;
+		protectedCount?: number;
+	};
 	onExchange?: (exchange: LarmExchange) => Promise<void>;
 	speechVoice?: string;
 	intonationScale?: number;

@@ -1,5 +1,9 @@
 import type { Database } from "bun:sqlite";
-import type { DialogueService } from "../../domains/dialogue";
+import {
+	routeConversation,
+	type DialogueService,
+} from "../../domains/dialogue";
+import type { InferencePort } from "../../domains/inference";
 import {
 	createStewardService,
 	type RunLookup,
@@ -15,7 +19,11 @@ type AssemblyDeps = Omit<
 	| "nowMs"
 	| "newId"
 	| "conversationTask"
+	| "conversationOnLarm"
 > & {
+	/** The route judgement reads the saved settings, so the snapshot read is required here. */
+	inference: StewardDeps["inference"] &
+		Required<Pick<InferencePort, "snapshotInTransaction">>;
 	queue: StewardDeps["queue"] & {
 		registerHandler(handler: StewardService["handler"]): void;
 	};
@@ -41,6 +49,14 @@ export function createStewardAssembly(deps: AssemblyDeps) {
 			dialogue?.conversationHasActiveRunInTransaction(db, conversationId) ??
 			false,
 		conversationTask: () => dialogue?.conversationTaskInTransaction,
+		// The conversation's own route judgement, on a copy (the same one the live bridge makes).
+		conversationOnLarm: (db) => {
+			const snapshot = structuredClone(
+				deps.inference.snapshotInTransaction(db),
+			);
+			routeConversation(snapshot);
+			return snapshot.routes.llm.mode !== "cloud-only";
+		},
 		runStateOf: (runId): RunLookup => {
 			const run = dialogue?.get(runId);
 			if (!run) return "stale";

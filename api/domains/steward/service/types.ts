@@ -94,6 +94,12 @@ export interface StewardDeps {
 				task: string,
 		  ) => { messages: ChatMessage[] } | null)
 		| undefined;
+	/**
+	 * The conversation is served by LARM (not a cloud connection), judged by the conversation's own route decision,
+	 * in the caller's transaction. Only then do the steps that read the conversation share its prefix (`conversationTask`);
+	 * on a cloud route they send their own input.
+	 */
+	conversationOnLarm(db: Database): boolean;
 	/** A conversation run is generating an answer now (upkeep waits for it); read in the caller's transaction. */
 	foregroundActive(db: Database, conversationId: string): boolean;
 	/** How a run stands (startup sorts the requests of finished runs). */

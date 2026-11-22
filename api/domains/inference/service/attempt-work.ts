@@ -372,6 +372,21 @@ export function fenced<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 	});
 }
 
+/**
+ * Whether an answer's delivery judge is left out. The caller gave the marks its reply's feeling is read from
+ * (`emotionMarks`) and the generated answer starts with one of them, so the judge's result is read by nothing: unless
+ * a reply beside a tool call (judged as before) or the attitude dataset collecting this answer, which reads the
+ * judge's own decision. An answer that starts with no mark has no feeling to read and is judged.
+ */
+export function deliveryJudgeSkipped(r: Request, value: string): boolean {
+	const marks = r.session?.emotionMarks;
+	if (!marks?.length || r.toolCalls?.length) return false;
+	const head = value.trimStart();
+	if (!marks.some((mark) => head.startsWith(mark))) return false;
+	const dataset = r.env.options.attitudeDataset;
+	return !(dataset && r.preparation?.collection && dataset.status().enabled);
+}
+
 export async function chooseLlmDelivery(
 	r: Request,
 	decide: ReturnType<typeof decider>,

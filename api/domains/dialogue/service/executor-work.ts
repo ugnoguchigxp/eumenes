@@ -3,10 +3,11 @@ import type { Run } from "../contracts";
 import type { WorkRow } from "../repository/work";
 import type { DialogueDeps } from "./context";
 import { type ParsedCall, type WorkArgs } from "./generation-tools";
-import { CHECK_MAX_TOKENS } from "./input-text";
+import { CHECK_MAX_TOKENS, lineText } from "./input-text";
 import { resultText } from "./result-text";
 import { reportExecutionInTransaction } from "./result-intake";
-import { madeOf } from "./state-text";
+import { agencyWork } from "../repository/agency";
+import { STATE_LIMITS, madeOf } from "./state-text";
 import { taskForWork } from "./task-work";
 import { dispatchInTransaction } from "./work-dispatch";
 import { hideUris, type DocumentRefs } from "./work-items";
@@ -112,9 +113,14 @@ export async function work(
 				if (!x.input.shown.todos.includes(checked.id))
 					x.input.shown.todos.push(checked.id);
 				const refs = ledger.refsInTransaction(tx, run.conversationId);
+				// The request is in `## State` only for the work it lists; this is where the model reads the others'
+				// (cut as State cuts it; the agency's own research has none, as in State).
+				const request = agencyWork(tx, row.runId)
+					? ""
+					: lineText(row.request).slice(0, STATE_LIMITS.preview);
 				// The result as the host notice shows one: the same text, so the model reads it the same way.
 				return {
-					result: `- ok: true\n${
+					result: `- ok: true\n${request ? `- request: ${request}\n` : ""}${
 						resultText(
 							{
 								ref: `t${checked.ref}`,

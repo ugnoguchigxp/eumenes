@@ -26,6 +26,8 @@ export type CallSessionRole = {
 	/** `main` only: a failure of this call leaves the request pending for another call. */
 	retainRequest?: true;
 	context?: NonNullable<CallSession["context"]>;
+	/** `main` only: the marks a reply's feeling is read from (see `CallSession.emotionMarks`). */
+	emotionMarks?: readonly string[];
 	refs?: { messageIds: string[]; itemIds: string[] };
 };
 
@@ -43,6 +45,11 @@ export const sessionCallOptions = (session?: CallSessionRole) =>
 			}
 		: {};
 
+/** A bounded list of non-empty marks. */
+const validMarks = (marks: readonly unknown[]) =>
+	Array.isArray(marks) &&
+	marks.length <= 64 &&
+	marks.every((m) => typeof m === "string" && m !== "" && m.length <= 16);
 const TASK_ID = /^[a-zA-Z0-9_.:-]{1,160}$/;
 const REF_LIMIT = 4096;
 const refList = (ids: readonly string[] | undefined) => {
@@ -118,6 +125,8 @@ export function resolveSession(
 			!controlSchemaAllowed) ||
 		(given?.target !== undefined && sessionRole !== "main") ||
 		(given?.retainRequest !== undefined && sessionRole !== "main") ||
+		(given?.emotionMarks !== undefined &&
+			(sessionRole !== "main" || !validMarks(given.emotionMarks))) ||
 		(sessionRole === "main" && row.mode !== "answer") ||
 		(sessionRole === "subagent") !== !!given?.taskId ||
 		(given?.taskId !== undefined && !TASK_ID.test(given.taskId))
@@ -140,7 +149,10 @@ export function resolveSession(
 		context &&
 		(sessionRole !== "main" ||
 			!count(context.instructionCount) ||
-			!count(context.historyCount))
+			!count(context.historyCount) ||
+			(context.protectedCount !== undefined &&
+				(!count(context.protectedCount) ||
+					context.protectedCount > context.historyCount)))
 	)
 		throw new Error("invalid_session_context");
 	return {
@@ -161,8 +173,14 @@ export function resolveSession(
 					context: {
 						instructionCount: context.instructionCount,
 						historyCount: context.historyCount,
+						...(context.protectedCount
+							? { protectedCount: context.protectedCount }
+							: {}),
 					},
 				}
+			: {}),
+		...(given?.emotionMarks?.length
+			? { emotionMarks: [...given.emotionMarks] }
 			: {}),
 		...(given?.refs
 			? {

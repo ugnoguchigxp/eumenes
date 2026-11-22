@@ -90,9 +90,19 @@ export const readToolInputs = {
 				.number()
 				.int()
 				.min(1)
-				.max(3)
+				.max(10)
 				.optional()
-				.describe("何件前まで見るか（1〜3、書かなければ1）。"),
+				.describe("何件前まで見るか（1〜10、書かなければ1）。"),
+			query: z
+				.string()
+				.max(120)
+				.optional()
+				.describe("依頼内容や結果のキーワード絞り込み（任意）。"),
+			toolchain: z
+				.string()
+				.max(80)
+				.optional()
+				.describe("担当IDの絞り込み（任意、例: image.create）。"),
 		})
 		.strict(),
 	read_world: z
@@ -190,7 +200,7 @@ export const READ_TOOLS: readonly ReadTool[] = [
 		title: "担当の作業の記録の確認",
 		subject: "担当の作業",
 		description:
-			"最近の依頼で担当（サブエージェント）が受けた依頼、使った道具、結果を確かめる。count に何件前まで見るか。",
+			"過去〜最近の担当（サブエージェント・制作TODO）の依頼内容、使った道具、結果を確かめる。count・query・toolchainで絞れる。",
 		useWhen: [
 			"「担当は何をしたの？」と、担当が受けた依頼や使った道具を確かめたい",
 			"「さっきの調べもの、どこを見たの？」と、担当の作業の中身を確かめたい",

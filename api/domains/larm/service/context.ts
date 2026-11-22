@@ -9,8 +9,15 @@ import type { Provider } from "./profiles";
 type Messages = Parameters<LarmPort["answer"]>[0];
 const log = getLogger("larm");
 
-/** Where the adopted history sits in a host-fixed list: after `instructionCount` messages, `historyCount` of them. */
-type HistoryRange = { instructionCount: number; historyCount: number };
+/**
+ * Where the adopted history sits in a host-fixed list: after `instructionCount` messages, `historyCount` of them. The
+ * first `protectedCount` of those hold `## Memory` and are never dropped.
+ */
+type HistoryRange = {
+	instructionCount: number;
+	historyCount: number;
+	protectedCount?: number;
+};
 
 /**
  * Fits the request to the model window, by the token estimate (never the byte size).
@@ -51,7 +58,7 @@ export function fitContext(
 		if (tokens > budget) throw new Error("context_window_exceeded");
 	} else if (tokens > budget) {
 		// The adopted history is the first `historyCount` user/assistant messages after the instructions (system
-		// messages between them, such as the working memory, are not history).
+		// messages between them, such as the working memory, are not history). The first `protectedCount` of them stay.
 		const at: number[] = [];
 		for (
 			let i = range?.instructionCount ?? 0;
@@ -59,6 +66,7 @@ export function fitContext(
 			i++
 		)
 			if (selected[i]!.role !== "system") at.push(i);
+		at.splice(0, range?.protectedCount ?? 0);
 		let dropped = 0;
 		const gone = new Set<number>();
 		const roles = at.map((i) => selected[i]!.role);

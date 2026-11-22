@@ -338,6 +338,33 @@ test("a step on its own prompt runs on a connection of its own and yields to the
 	expect(call!.session).toEqual({ sessionRole: "auxiliary", yields: true });
 });
 
+test("on a cloud route a step reading the conversation does not read its prompt and sends its own input", async () => {
+	let reads = 0;
+	const h = await setupSteward({
+		conversationOnLarm: false,
+		conversationTask: (_db, _conversationId, task) => {
+			reads++;
+			return { messages: [{ role: "user" as const, content: task }] };
+		},
+	});
+	harnesses.push(h);
+	h.inference.script("curate-memory", {
+		...empty,
+		remember: [remember({ quote: "辛いものが好きです" })],
+	});
+	await h.exchange("辛いものが好きです", "覚えておきます");
+	await h.drain();
+	const [call] = h.inference.callsOf("curate-memory");
+	expect(reads).toBe(0);
+	expect(call!.messages.map((m) => m.role)).toEqual(["system", "user"]);
+	expect(call!.messages[1]!.content).toContain("辛いものが好きです");
+	expect(call!.messages[0]!.content).toContain("OUTPUT_SCHEMA=");
+	expect(call!.session).toEqual({ sessionRole: "auxiliary", yields: true });
+	expect(h.memory.list().map((item) => item.text)).toEqual([
+		"辛い食べ物が好き",
+	]);
+});
+
 test("a step reading the conversation runs on the conversation's prompt with its own task last, on the conversation's connection", async () => {
 	const prefix = {
 		messages: [

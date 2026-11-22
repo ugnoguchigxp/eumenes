@@ -39,27 +39,15 @@ export const TALK_WORK_TOOLS: readonly AgentToolDefinition[] = [
 			additionalProperties: false,
 			required: ["toolchain", "request"],
 			properties: {
-				toolchain: {
-					type: "string",
-					description: "宛先の候補ID。担当の呼出しはこの引数で指定する。",
-				},
+				toolchain: { type: "string", description: "宛先候補ID" },
 				request: {
 					type: "string",
 					minLength: 1,
 					maxLength: REQUEST_CHARS,
-					description:
-						"担当へ直接伝える作業指示を記入する。訂正時も元の依頼で維持する条件と変更点を合わせた全文を書く。",
+					description: "担当への作業指示全文",
 				},
-				revises: {
-					type: "string",
-					description:
-						"訂正する確認の参照 c<n>。確認待ち・訂正中の元依頼を置き換えるときに指定する。",
-				},
-				diagnosticRef: {
-					type: "string",
-					description:
-						"エラー修正に渡す場合、内部診断でホストが返した参照 e<n>。対象に合う参照だけを指定する。",
-				},
+				revises: { type: "string", description: "訂正元の確認 c<n>" },
+				diagnosticRef: { type: "string", description: "該当診断参照 e<n>" },
 				// The agent's rules name these two; the host decides both itself.
 				mode: { type: "string", enum: ["execute"] },
 				impact: { type: "string" },

@@ -21,9 +21,10 @@ afterEach(async () => {
 	h = undefined;
 });
 
-/** The tool message a talk call answered with (the read's result), if any. */
+/** The latest tool message a talk call answered with (the current turn's read result), if any. */
 const toolResult = (call: Call) =>
-	call.messages.find((m) => (m.role as string) === "tool")?.content;
+	[...call.messages].reverse().find((m) => (m.role as string) === "tool")
+		?.content;
 
 const READ_HISTORY: ToolchainCard = {
 	revisionId: "host:read_history@1",
@@ -329,7 +330,15 @@ test("the sub-agents' work and World's records are told as records; nothing foun
 	await h.say("担当は何をしたの？");
 	expect(h.state.calls.at(-2)!.tools).toEqual(
 		["read_memory", "read_history", "read_runs", "read_agents", "read_world"]
-			.concat("memory", "find_toolchain", "delegate")
+			.concat(
+				"memory",
+				"find_toolchain",
+				"delegate",
+				"approve_confirmation",
+				"decline_confirmation",
+				"work",
+				"discard_for_pending_switch",
+			)
 			.filter((name) => name !== "read_memory"),
 	);
 	expect(toolResult(h.state.calls.at(-1)!)).toMatch(

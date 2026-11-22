@@ -61,3 +61,30 @@ export type ConversationState = {
 	basedOnSeq: number;
 	at: string;
 };
+
+/** Lifecycle state of a compacted conversation summary (`## Summary`). */
+export type ConversationSummaryState =
+	"staged" | "active" | "superseded" | "retracted";
+
+/** How a compacted summary was produced (`llm` background compaction or `mechanical` fallback). */
+export type ConversationSummaryKind = "llm" | "mechanical";
+
+/**
+ * Compacted summary of older conversation turns and tool exchanges (`## Summary`), sitting in the semi-static
+ * KV-cached prefix right below `## Memory` and carrying full source provenance for immediate forgetting.
+ */
+export type ConversationSummary = {
+	id: string;
+	conversationId: string;
+	state: ConversationSummaryState;
+	baseCutRevision: number;
+	coveredFromSeq: number;
+	coveredThroughSeq: number;
+	text: string;
+	sourceRefs: string[];
+	tokenEstimate: number;
+	kind: ConversationSummaryKind;
+	createdAt: string;
+	activatedAt: string | null;
+	retractedAt: string | null;
+};

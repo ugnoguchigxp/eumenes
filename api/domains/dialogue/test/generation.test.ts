@@ -27,13 +27,17 @@ test("an utterance is answered with plain text: the said events, a full delivery
 	expect(call.messages.map((m) => m.role)).toEqual(["system", "user"]);
 	expect(call.messages[1]!.content).toStartWith("## State\n今: ");
 	expect(call.messages[1]!.content).toEndWith("\n\n## User\nやあ");
-	// The talk turn offers only the read tools this host has (no memory or agents here).
+	// The talk turn offers static read, memory, and work tools (no memory/agents read tools in this fixture).
 	expect(call.tools).toEqual([
 		"read_history",
 		"read_runs",
 		"memory",
 		"find_toolchain",
 		"delegate",
+		"approve_confirmation",
+		"decline_confirmation",
+		"work",
+		"discard_for_pending_switch",
 	]);
 	const log = h.log();
 	expect(log.map((e) => [e.type, e.by, h!.fields(e).action ?? null])).toEqual([
