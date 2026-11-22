@@ -6,13 +6,11 @@ afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
 
-test("old settings retain F implicitly and explicit always-on settings survive reopening", async () => {
+test("the agenda's settings survive reopening, and an old document's agency.runtime is dropped on read", async () => {
 	const h = await setup();
 	const before = h.settings.get();
-	expect(before.agency.runtime ?? "F").toBe("F");
 	const settings = structuredClone(before);
 	Object.assign(settings.agency, {
-		runtime: "always-on",
 		thinkResourceId: crypto.randomUUID(),
 		speechIntervalSec: 60,
 	});
@@ -32,6 +30,17 @@ test("old settings retain F implicitly and explicit always-on settings survive r
 				agency: { ...settings.agency, speechIntervalSec },
 			}).success,
 		).toBe(false);
+	// A document saved while the F host still existed carries the removed switch.
+	const old = JSON.parse(JSON.stringify(reopened.get())) as Record<string, any>;
+	old.agency.runtime = "F";
+	await h.store.write((db) =>
+		db
+			.query("UPDATE settings_document SET document=? WHERE id=1")
+			.run(JSON.stringify(old)),
+	);
+	const again = await createSettings(h.store, { dbPath: h.dbPath, env: {} });
+	expect(again.get().agency).not.toHaveProperty("runtime");
+	expect(again.get().agency).toEqual(settings.agency);
 });
 
 test("the saved thinking level defaults to low, survives reopening, and an old document's agency.thinkReasoning is dropped on read", async () => {

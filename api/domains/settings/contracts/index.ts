@@ -389,8 +389,6 @@ export const settingsSchema = z
 			.default({ enabled: false, curationResourceId: null }),
 		agency: z
 			.object({
-				/** Absent in existing installations: keep the adopted F host until explicitly switched. */
-				runtime: z.enum(["F", "always-on"]).optional(),
 				debugMode: z.boolean().optional(),
 				thinkResourceId: z.string().min(1).nullable().optional(),
 				speechIntervalSec: z
