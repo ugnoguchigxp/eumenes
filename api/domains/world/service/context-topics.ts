@@ -122,32 +122,41 @@ export function createWorldContextNames(options: ContextNamesOptions) {
 			principal: CONVERSATION_DEFAULT_PRINCIPAL,
 			scopeKey: CONVERSATION_DEFAULT_SCOPE,
 		}));
+	function knownEntitiesInTransaction(
+		db: Database,
+		input: { conversationId: string; texts: readonly string[] },
+	): TopicCandidate[] {
+		if (input.texts.every((text) => text.trim() === "")) return [];
+		if (!world.statusInTransaction(db).usable) return [];
+		const scope = scopeOf(input.conversationId);
+		const listed = listEntities(db, {
+			contractVersion: 1,
+			access: world.accessInTransaction(db, {
+				access: {
+					principal: scope.principal,
+					scopeKeys: [scope.scopeKey],
+					purpose,
+				},
+			}),
+			scopeKey: scope.scopeKey,
+			limit: MAX_LISTED_ENTITIES,
+		});
+		if (listed.status !== "ready") return [];
+		const entities = new Map(
+			listed.entities.map((entity) => [entity.id, entity]),
+		);
+		return matchTopicEntities(listed.entities, input.texts).flatMap(
+			(id) => entities.get(id) ?? [],
+		);
+	}
 	return {
+		knownEntitiesInTransaction,
 		knownNamesInTransaction(
 			db: Database,
-			input: { conversationId: string; texts: readonly string[] },
+			input: Parameters<typeof knownEntitiesInTransaction>[1],
 		): string[] {
-			if (input.texts.every((text) => text.trim() === "")) return [];
-			if (!world.statusInTransaction(db).usable) return [];
-			const scope = scopeOf(input.conversationId);
-			const listed = listEntities(db, {
-				contractVersion: 1,
-				access: world.accessInTransaction(db, {
-					access: {
-						principal: scope.principal,
-						scopeKeys: [scope.scopeKey],
-						purpose,
-					},
-				}),
-				scopeKey: scope.scopeKey,
-				limit: MAX_LISTED_ENTITIES,
-			});
-			if (listed.status !== "ready") return [];
-			const names = new Map(
-				listed.entities.map((entity) => [entity.id, entity.displayName]),
-			);
-			return matchTopicEntities(listed.entities, input.texts).flatMap(
-				(id) => names.get(id) ?? [],
+			return knownEntitiesInTransaction(db, input).map(
+				({ displayName }) => displayName,
 			);
 		},
 	};

@@ -5,6 +5,7 @@ import type { DialogueDeps } from "./context";
 import { type ParsedCall, type WorkArgs } from "./generation-tools";
 import { CHECK_MAX_TOKENS } from "./input-text";
 import { resultText } from "./result-text";
+import { reportExecutionInTransaction } from "./result-intake";
 import { madeOf } from "./state-text";
 import { taskForWork } from "./task-work";
 import { dispatchInTransaction } from "./work-dispatch";
@@ -72,11 +73,15 @@ export async function work(
 				return todoView(next, ledger.refsInTransaction(tx, run.conversationId));
 			};
 			const record = (fields: Record<string, unknown>) => {
-				acted(tx, `work:${row.id}:${args.operation}:${args.revision}`, {
-					action: `work.${args.operation}`,
-					todo: row.id,
-					...fields,
-				});
+				acted(
+					tx,
+					`work:${row.id}:${args.operation}:${args.revision}${args.target ? `:${args.target}` : ""}`,
+					{
+						action: `work.${args.operation}`,
+						todo: row.id,
+						...fields,
+					},
+				);
 				// An operation on the work is a side effect (section 8.2); a check only reads.
 				if (args.operation !== "check") handle(tx);
 			};
@@ -89,6 +94,18 @@ export async function work(
 								checked.sourceRef,
 							)
 						: null;
+				const tasks =
+					given.target !== undefined && given.target !== "parent"
+						? execution?.tasks?.filter(({ taskId }) => taskId === given.target)
+						: execution?.tasks;
+				if (given.target && given.target !== "parent" && !tasks?.length)
+					return {
+						result: { ok: false, code: "task_not_in_work", ...state() },
+					};
+				if (execution?.tasks)
+					x.state.executionRevisions.set(row.ref, execution.revision);
+				for (const task of tasks ?? [])
+					x.state.taskRevisions.set(`${row.ref}:${task.taskId}`, task.revision);
 				record({});
 				x.state.todoRevisions.set(checked.id, checked.revision);
 				// What the check read is what a reply may report now (its sources may be linked).
@@ -125,6 +142,12 @@ export async function work(
 										observedAt: execution.progress.observedAt,
 									},
 									inputSchema: execution.question?.inputSchema,
+									...(tasks
+										? {
+												executionRevision: execution.revision,
+												tasks: hideUris(tasks, refs),
+											}
+										: {}),
 								})
 							: ""
 					}`,
@@ -137,6 +160,8 @@ export async function work(
 				return { result: { ok: false, code: "todo_done", ...state() } };
 			if (row.execution === "task" || row.execution === "pipeline")
 				return controlExecution(x, tx, run, row, args, record, state);
+			if (args.target !== undefined && args.target !== "parent")
+				return { result: { ok: false, code: "task_not_in_work", ...state() } };
 			if (args.operation === "answer")
 				return answerCommand(x, tx, run, row, args, record, state);
 			if (args.operation === "cancel") {
@@ -203,6 +228,26 @@ export function controlExecution(
 			: args.operation === "amend"
 				? "amend"
 				: "cancel";
+	const taskId = args.target === "parent" ? undefined : args.target;
+	let expectedRevision = view.revision;
+	if (taskId) {
+		const task = view.tasks?.find(({ taskId: id }) => id === taskId);
+		if (!task || action === "answer")
+			return { result: { ok: false, code: "task_not_in_work", ...state() } };
+		const seen = x.state.taskRevisions.get(`${row.ref}:${taskId}`);
+		if (seen === undefined || seen !== task.revision)
+			return { result: { ok: false, code: "revision_stale", ...state() } };
+		expectedRevision = seen;
+	} else if (view.tasks && action !== "answer") {
+		if (view.tasks.length && args.target === undefined)
+			return {
+				result: { ok: false, code: "work_target_required", ...state() },
+			};
+		const seen = x.state.executionRevisions.get(row.ref);
+		if (seen === undefined || seen !== view.revision)
+			return { result: { ok: false, code: "revision_stale", ...state() } };
+		expectedRevision = seen;
+	}
 	// A question that asks for a structured answer (its input schema is not a plain string) takes the text as JSON.
 	const schema = view.question?.inputSchema;
 	const structured = !!schema && schema.type !== "string";
@@ -225,19 +270,22 @@ export function controlExecution(
 	}
 	let updated;
 	try {
-		updated = executions.controlInTransaction(
-			tx,
-			run.conversationId,
-			{
-				workRef: view.id,
-				expectedRevision: view.revision,
-				action,
-				...(args.questionId ? { questionRef: args.questionId } : {}),
-				...(action === "answer" && args.text ? { input: answer } : {}),
-				...(action === "amend" && args.text ? { request: args.text } : {}),
-			},
-			messageId,
-		);
+		updated = tx.transaction(() =>
+			executions.controlInTransaction(
+				tx,
+				run.conversationId,
+				{
+					workRef: view.id,
+					expectedRevision,
+					...(taskId ? { taskRef: taskId } : {}),
+					action,
+					...(args.questionId ? { questionRef: args.questionId } : {}),
+					...(action === "answer" && args.text ? { input: answer } : {}),
+					...(action === "amend" && args.text ? { request: args.text } : {}),
+				},
+				messageId,
+			),
+		)();
 	} catch (error) {
 		const code =
 			error instanceof Error && /^[a-z_]+$/.test(error.message)
@@ -253,16 +301,21 @@ export function controlExecution(
 			},
 		};
 	}
-	const next =
-		action === "amend" && args.text
-			? deps.work!.amendInTransaction(tx, row.id, row.revision, args.text)
-			: deps.work!.reportInTransaction(
-					tx,
-					row.id,
-					action === "cancel" && updated.status === "cancelled"
-						? { status: "done", outcome: "cancelled", result: null }
-						: { status: "todo" },
-				);
+	const ledger = deps.work!;
+	if (action === "amend" && args.text && !taskId) {
+		const current = ledger.workInTransaction(tx, row.id);
+		if (current)
+			ledger.amendInTransaction(tx, row.id, current.revision, args.text);
+	}
+	// A task owner that already advanced to the next question has the authoritative state.
+	reportExecutionInTransaction(deps, tx, updated);
+	const next = ledger.workInTransaction(tx, row.id);
+	if (updated.tasks) x.state.executionRevisions.set(row.ref, updated.revision);
+	if (taskId) {
+		const current = updated.tasks?.find((task) => task.taskId === taskId);
+		if (current)
+			x.state.taskRevisions.set(`${row.ref}:${taskId}`, current.revision);
+	}
 	record({});
 	return {
 		result: {

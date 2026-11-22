@@ -21,6 +21,7 @@ import { sourceExcerpt } from "./source-excerpt";
 import { spokenText } from "../../domains/delivery";
 import { createContinuityService } from "../../domains/continuity";
 import { testConversationAgent } from "../../domains/dialogue/test/conversation-agent.fixture";
+import { sha256Hex } from "../../infrastructure/digest";
 
 const request =
 	"Eumenes の初期化はどのファイルからどの関数へ進みますか。行番号を添えてください。";
@@ -147,6 +148,15 @@ async function conversation(
 		// Steward reads the said event and its backing message, without the display payload.
 		const { events } = createContinuityService();
 		h.store.read((db) => {
+			const completed = db.query("SELECT id FROM web_note_runs").get() as {
+				id: string;
+			};
+			const storedResult = h.toolchain.webNote.task.viewInTransaction(
+				db,
+				completed.id,
+			)?.result;
+			expect(storedResult?.summary).toBe(answer.text);
+			expect(storedResult?.report).toBeUndefined();
 			const said = events
 				.ofMessageInTransaction(db, answer.id)
 				.find((event) => event.type === "said");
@@ -263,13 +273,15 @@ test("diff excerpts are limited to authorized snapshots and stay out of memory i
 			findings: [
 				{
 					summary: `api/start.ts ${commit} 確認できた初期化`,
-					evidence: [{ path: "api/start.ts", startLine: 1, endLine: 1 }],
+					evidence: [
+						{ path: "api/start.ts", symbol: "start", startLine: 1, endLine: 1 },
+					],
 				},
 				{
 					summary: "根拠が無効な主張",
 					evidence: [
-						{ path: "api/start.ts", startLine: 3, endLine: 4 },
-						{ path: "api/outside.ts", startLine: 1, endLine: 1 },
+						{ path: "api/start.ts", symbol: null, startLine: 3, endLine: 4 },
+						{ path: "api/outside.ts", symbol: null, startLine: 1, endLine: 1 },
 					],
 				},
 			],
@@ -280,22 +292,38 @@ test("diff excerpts are limited to authorized snapshots and stay out of memory i
 			inspect: async (input) => {
 				expect(input.commit).toBe(commit);
 				expect(input.prompt).toContain(request);
+				const result = await sourceResult(
+					response,
+					snapshot.current,
+					({ path, startLine, endLine }) =>
+						sourceExcerpt(
+							directory,
+							working,
+							path,
+							true,
+							true,
+							startLine,
+							endLine,
+							input.signal,
+						),
+					commit,
+				);
+				expect(result.report?.sources).toEqual([
+					{
+						sourceId: "source-1",
+						kind: "source",
+						location: {
+							path: "api/start.ts",
+							symbol: "start",
+							startLine: 1,
+							endLine: 1,
+							commit,
+							digest: sha256Hex("dirty worktree"),
+						},
+					},
+				]);
 				return {
-					result: await sourceResult(
-						response,
-						snapshot.current,
-						({ path, startLine, endLine }) =>
-							sourceExcerpt(
-								directory,
-								working,
-								path,
-								true,
-								true,
-								startLine,
-								endLine,
-								input.signal,
-							),
-					),
+					result,
 					usage: null,
 				};
 			},
@@ -328,6 +356,7 @@ test.each([
 		const paths = Array.from({ length: 7 }, (_, i) => `api/source-${i}.ts`);
 		const evidence = [...paths, paths[0]!].map((path) => ({
 			path,
+			symbol: null,
 			startLine: 1,
 			endLine: 1,
 		}));
@@ -338,7 +367,12 @@ test.each([
 				limitations: "",
 			}),
 			new Map(paths.map((path) => [path, 1])),
-			async () => ({ kind: "code", text: "const fixture = true;" }),
+			async () => ({
+				kind: "code",
+				text: "const fixture = true;",
+				digest: sha256Hex("const fixture = true;"),
+			}),
+			"fixture-commit",
 		);
 		expect(result.displayAnswer).toContain(`一部抜粋（表示深度：${label}）`);
 		expect(result.displayAnswer?.match(/> \*\*ソース：/gu)).toHaveLength(max);
@@ -351,23 +385,119 @@ test("a report with no usable excerpt keeps neutral wording", async () => {
 		JSON.stringify({ depth: "small", findings: [], limitations: "途中" }),
 		new Map(),
 		async () => null,
+		"fixture-commit",
 	);
 	expect(result.status).toBe("partial");
 	expect(result.displayAnswer).toContain("一部抜粋");
 	expect(result.answer).not.toContain("失敗");
 });
 
+test("a source citation keeps its original bytes and shows the cited lines when the diff is elsewhere", async () => {
+	const root = await mkdtemp(
+		join(tmpdir(), "eumenes-inspect-excerpt-fixture-"),
+	);
+	const before = join(root, "before"),
+		current = join(root, "current");
+	const cited = "\uFEFFexport const cited = 2;";
+	const lines = [cited, ...Array.from({ length: 10 }, (_, i) => `// ${i}`)];
+	try {
+		await Promise.all([mkdir(before), mkdir(current)]);
+		await Promise.all([
+			writeFile(
+				join(before, "fixture.ts"),
+				[...lines, "export const unrelated = 3;"].join("\n"),
+			),
+			writeFile(
+				join(current, "fixture.ts"),
+				[...lines, "export const unrelated = 4;"].join("\n"),
+			),
+		]);
+		expect(
+			await sourceExcerpt(
+				before,
+				current,
+				"fixture.ts",
+				true,
+				true,
+				1,
+				1,
+				signal(),
+			),
+		).toEqual({
+			kind: "code",
+			text: cited,
+			digest: sha256Hex(cited),
+		});
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
+
 test.skipIf(!process.env.EUMENES_LIVE_SOURCE_INSPECTION)(
-	"the real Codex SDK returns checked citations to the requesting chat",
+	"the real Codex SDK returns versioned citations from an isolated synthetic checkout",
 	async () => {
-		const source = await createCodexSourceInspect(
-			process.env,
-			"codex",
-			process.cwd(),
+		const repository = await mkdtemp(
+			join(tmpdir(), "eumenes-inspect-live-fixture-"),
 		);
-		expect(source).toBeDefined();
-		const answer = await conversation(source!, request, true);
-		expect(answer.displayText).toMatch(/ソース：.*api\//u);
+		try {
+			await mkdir(join(repository, "api"));
+			const git = (...args: string[]) => {
+				const result = Bun.spawnSync(["/usr/bin/git", ...args], {
+					cwd: repository,
+					env: {
+						PATH: "/usr/bin:/bin",
+						GIT_CONFIG_NOSYSTEM: "1",
+						GIT_CONFIG_GLOBAL: "/dev/null",
+					},
+				});
+				if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+			};
+			git("init");
+			const path = join(repository, "api", "start.ts");
+			await writeFile(path, "export function start() {\n  return 11;\n}\n");
+			git("add", "api/start.ts");
+			git(
+				"-c",
+				"user.name=Fixture",
+				"-c",
+				"user.email=fixture@example.test",
+				"commit",
+				"-m",
+				"fixture",
+			);
+			const current = "export function start() {\n  return 17;\n}\n";
+			await writeFile(path, current);
+			const source = await createCodexSourceInspect(
+				{
+					PATH: process.env.PATH,
+					HOME: process.env.HOME,
+					CODEX_HOME: process.env.CODEX_HOME,
+				},
+				"codex",
+				repository,
+			);
+			expect(source).toBeDefined();
+			const commit = await source!.resolveCommit(signal());
+			const { result } = await source!.inspect({
+				commit,
+				prompt:
+					"現在の start 関数が返す数値を確認してください。変更の実行は不要です。",
+				signal: AbortSignal.timeout(90_000),
+			});
+			expect(result.answer).toContain("17");
+			const citation = result.report?.sources.find(
+				({ location }) => location?.path === "api/start.ts",
+			)?.location;
+			expect(citation).toMatchObject({ commit, symbol: "start" });
+			const excerpt = current
+				.split("\n")
+				.slice(citation!.startLine - 1, citation!.endLine)
+				.join("\n");
+			expect(citation!.digest).toBe(sha256Hex(excerpt));
+			expect(await readFile(path, "utf-8")).toBe(current);
+		} finally {
+			await rm(repository, { recursive: true, force: true });
+		}
 	},
 	100_000,
 );

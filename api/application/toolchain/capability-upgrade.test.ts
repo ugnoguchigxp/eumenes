@@ -5,11 +5,16 @@ import { join } from "node:path";
 import {
 	capabilityBundleV1,
 	createCapabilities,
+	dormantBundleFile,
 } from "../../domains/capabilities";
 import { hash } from "../../domains/capabilities/contracts";
 import { openStore } from "../../infrastructure/sqlite";
 import { migrations } from "../migrations";
-import { offlineBundleHost } from "./toolchain-adapters";
+import {
+	bundleHostOf,
+	hostAdapterDescriptions,
+	offlineBundleHost,
+} from "./toolchain-adapters";
 
 const bundle = (name: string) =>
 	capabilityBundleV1.parse(
@@ -218,18 +223,96 @@ test("seed upgrades the deployed board and terminal schemas without replacing ar
 		expect(published()).toEqual({
 			toolchains: [
 				"toolchain:claude-code.request@6",
-				"toolchain:kanban.manage@5",
+				"toolchain:kanban.manage@6",
 			],
-			board: ["artifact:kanban.board@4"],
+			board: ["artifact:kanban.board@5"],
 		});
 		await caps.seed();
 		expect(archived()).toEqual(before);
-		expect(published().board).toEqual(["artifact:kanban.board@4"]);
+		expect(published().board).toEqual(["artifact:kanban.board@5"]);
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test.each(["original", "revised"] as const)(
+	"terminal toolchains upgrade a catalog with the %s repair skill at revision 3",
+	async (variant) => {
+		const dir = mkdtempSync(join(tmpdir(), "eumenes-terminal-repair-upgrade-"));
+		const store = openStore(join(dir, "db"), migrations);
+		const terminalHost = () =>
+			bundleHostOf(
+				hostAdapterDescriptions.filter(
+					(adapter) => adapter.ref !== "adapter:claude-code-task@1",
+				),
+			);
+		const caps = createCapabilities(store, new Set(["claude-code"]), {
+			bundleHost: terminalHost,
+		});
+		try {
+			const previous = bundle("terminals-screen");
+			const revised = previous.definitions.find(
+				(d) =>
+					d.kind === "skill" &&
+					d.id === "claude-code.repair" &&
+					d.revision === 4,
+			)!;
+			previous.definitions = previous.definitions.filter(
+				(d) =>
+					!(d.id === "claude-code.repair" && d.revision !== 2) &&
+					d.publishFromRevision === undefined,
+			);
+			previous.bindings = previous.bindings.filter(
+				(b) => b.id !== "claude-code.request" || b.revision < 3,
+			);
+			const archived = capabilityBundleV1.parse(
+				dormantBundleFile("terminals-repair-v3"),
+			);
+			if (variant === "revised")
+				archived.definitions.find((d) => d.kind === "skill")!.body =
+					revised.body;
+			await store.write((db) => {
+				caps.importBundleInTransaction(db, previous, terminalHost());
+				caps.importBundleInTransaction(db, archived, terminalHost());
+			});
+			const oldSkill = () =>
+				store.read((db) =>
+					caps.getDefinitionInTransaction(db, "skill:claude-code.repair@3"),
+				);
+			const active = () =>
+				store.read((db) =>
+					caps
+						.toolchainsInTransaction(db)
+						.filter(({ id }) => id.startsWith("claude-code."))
+						.map(({ revisionId, bindingRevisionId }) => [
+							revisionId,
+							bindingRevisionId,
+						])
+						.sort(),
+				);
+			const before = oldSkill();
+			expect(before?.body).toBe(String(archived.definitions[0]!.body));
+			expect(active()).toEqual([
+				["toolchain:claude-code.repair@3", "binding:claude-code.repair@3"],
+				["toolchain:claude-code.request@4", "binding:claude-code.request@2"],
+			]);
+			await caps.seed();
+			expect(active()).toEqual([
+				["toolchain:claude-code.repair@6", "binding:claude-code.repair@3"],
+				["toolchain:claude-code.request@6", "binding:claude-code.request@3"],
+			]);
+			expect(oldSkill()).toEqual(before);
+			const after = active();
+			await caps.seed();
+			expect(active()).toEqual(after);
+			expect(oldSkill()).toEqual(before);
+		} finally {
+			await store.close();
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
 
 test("a card upgrade preserves the administrator's selected terminal or managed execution binding", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-claude-card-upgrade-"));
@@ -267,6 +350,11 @@ test("a card upgrade preserves the administrator's selected terminal or managed 
 					.toolchainsInTransaction(db)
 					.find((c) => c.id === "claude-code.request")?.revisionId,
 			).toBe("toolchain:claude-code.request@7");
+			expect(
+				caps
+					.toolchainsInTransaction(db)
+					.find((c) => c.id === "claude-code.repair")?.revisionId,
+			).toBe("toolchain:claude-code.repair@4");
 		});
 	} finally {
 		await store.close();

@@ -1,4 +1,5 @@
 export type KanbanEventAction =
+	| "kanban-supervised-control"
 	| "kanban-add"
 	| "kanban-add-run"
 	| "kanban-select-executor"

@@ -6,6 +6,7 @@ import type { ArchivePort } from "../contracts";
 import {
 	generatedInput,
 	type GeneratedHost,
+	type GeneratedInput,
 	type GeneratedReceipt,
 } from "../contracts/generated";
 import {
@@ -13,7 +14,11 @@ import {
 	generatedReceipt,
 	generatedValue,
 } from "../repository/generated";
-import { registerGeneratedJob, frozenGenerated } from "./generated-job";
+import {
+	registerGeneratedJob,
+	frozenGenerated,
+	generatedLocalJobKind,
+} from "./generated-job";
 import { confirmSave } from "./archive-save";
 
 export function createGeneratedDocuments(
@@ -26,6 +31,19 @@ export function createGeneratedDocuments(
 	const owners = new Map<string, GeneratedHost>();
 	const hostFor = (ownerRef: string) =>
 		owners.get(ownerRef.slice(0, ownerRef.indexOf(":"))) ?? host;
+	const storedPreview = (db: Database, input: GeneratedInput) => {
+		const owner = hostFor(input.ownerRef);
+		return (
+			!!owner &&
+			"storedPreviewInTransaction" in owner &&
+			owner.storedPreviewInTransaction(db, input)
+		);
+	};
+	const hasLocal = (db: Database, input: GeneratedInput) => {
+		if (input.retention === "local") return storedPreview(db, input);
+		const owner = hostFor(input.ownerRef);
+		return !!owner && "hasLocal" in owner && owner.hasLocal(input.id);
+	};
 	const aborted = new Set<string>();
 	registerGeneratedJob(store, queue, archive, hostFor, publish);
 	return {
@@ -74,7 +92,7 @@ export function createGeneratedDocuments(
 				!r ||
 				r.state !== "settled" ||
 				generatedReceipt(r).local.state !== "saved" ||
-				!hostFor(generatedValue(r).ownerRef)?.hasLocal(id)
+				!hasLocal(db, generatedValue(r))
 			)
 				return null;
 			const { title, markdown } = generatedValue(r);
@@ -84,7 +102,9 @@ export function createGeneratedDocuments(
 		originalInTransaction(db: Database, id: string) {
 			const r = generatedRow(db, id);
 			if (!r || r.state === "cancelled") return null;
-			const { title, markdown } = generatedValue(r);
+			const input = generatedValue(r);
+			if (input.retention === "local" && !storedPreview(db, input)) return null;
+			const { title, markdown } = input;
 			return { title, markdown };
 		},
 		startInTransaction(db: Database, raw: unknown): GeneratedReceipt {
@@ -95,6 +115,9 @@ export function createGeneratedDocuments(
 					canonicalJson(input, { omitUndefined: true, keyOrder: "codeUnit" }),
 				),
 				old = generatedRow(db, input.id);
+			const local = input.retention === "local";
+			if (local && !storedPreview(db, input))
+				throw new Error("markdown_source_invalid");
 			if (old) {
 				if (old.digest !== digest) throw new Error("request_conflict");
 				return generatedReceipt(old);
@@ -107,16 +130,16 @@ export function createGeneratedDocuments(
 				)
 			)
 				throw new Error("markdown_source_invalid");
-			const binding = archive.binding();
+			const binding = local ? null : archive.binding();
 			const { job } = queue.enqueueInTransaction(db, {
 				scope: "markdown",
-				kind: "markdown.generated",
+				kind: local ? generatedLocalJobKind : "markdown.generated",
 				dedupeKey: input.id,
 				payload: { id: input.id },
 				subjectRef: input.id,
 				lane: "background",
 				concurrencyKey: `markdown-generated:${binding}:${input.namespace}`,
-				maxAttempts: 1,
+				maxAttempts: local ? 3 : 1,
 				deadlineAtMs: Date.now() + 200000,
 			});
 			db.query(
@@ -147,6 +170,8 @@ export function createGeneratedDocuments(
 		currentInTransaction(db: Database, id: string): GeneratedReceipt | null {
 			const r = generatedRow(db, id);
 			if (!r) return null;
+			const input = generatedValue(r);
+			if (input.retention === "local" && !storedPreview(db, input)) return null;
 			if (r.state === "pending") {
 				const job = queue.getInTransaction(db, r.job_id);
 				if (!job || !["queued", "running", "retry_wait"].includes(job.state)) {
@@ -155,15 +180,12 @@ export function createGeneratedDocuments(
 				}
 			}
 			const value = generatedReceipt(r);
-			if (archive.binding() !== r.binding)
+			if (input.retention !== "local" && archive.binding() !== r.binding)
 				value.archive = {
 					state: value.archive.state === "unsaved" ? "unsaved" : "unknown",
 					code: "markdown_archive_connection_changed",
 				};
-			if (
-				value.local.state === "saved" &&
-				!hostFor(generatedValue(r).ownerRef)?.hasLocal(id)
-			)
+			if (value.local.state === "saved" && !hasLocal(db, input))
 				value.local = { state: "expired", code: "item_not_found" };
 			return value;
 		},
@@ -172,7 +194,8 @@ export function createGeneratedDocuments(
 			if (!r) return;
 			queue.cancelInTransaction(db, r.job_id, "markdown_source_invalid");
 			aborted.add(r.job_id);
-			hostFor(generatedValue(r).ownerRef)?.forgetLocal(id);
+			const owner = hostFor(generatedValue(r).ownerRef);
+			if (owner && "forgetLocal" in owner) owner.forgetLocal(id);
 			if (forget) {
 				db.query("DELETE FROM markdown_generated WHERE id=?").run(id);
 			} else

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { request } from "node:http";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,7 +10,49 @@ import {
 	privateDirectory,
 } from "../src/storage";
 import { ClaudeService } from "../src/claude-service";
+import { servePrivateRunner } from "../src/sdk-server";
 import type { ClaudeObservation, ClaudeStart } from "../src/claude-contracts";
+
+test("the private socket preserves a Japanese instruction split inside a UTF-8 character", async () => {
+	const directory = mkdtempSync(join(realpathSync(tmpdir()), "runner-wire-"));
+	const socket = join(directory, "claude.sock");
+	const host = await servePrivateRunner(
+		socket,
+		"/claude",
+		{
+			request: (input: { instruction: string }) => input.instruction,
+			close: async () => {},
+		},
+		"claude",
+	);
+	try {
+		const instruction = "入力処理を確認する";
+		const body = Buffer.from(JSON.stringify({ instruction }));
+		const split = body.indexOf(Buffer.from(instruction)) + 1;
+		const result = await new Promise<string>((resolve, reject) => {
+			const req = request(
+				{ socketPath: socket, path: "/claude", method: "POST" },
+				async (res) => {
+					try {
+						const chunks: Buffer[] = [];
+						for await (const chunk of res) chunks.push(chunk);
+						resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+					} catch (error) {
+						reject(error);
+					}
+				},
+			);
+			req.on("error", reject);
+			req.write(body.subarray(0, split), () => {
+				setTimeout(() => req.end(body.subarray(split)), 30);
+			});
+		});
+		expect(result).toBe(instruction);
+	} finally {
+		await host.close();
+		rmSync(directory, { recursive: true, force: true });
+	}
+});
 
 test("the private runner deduplicates work and binds an answer to a specific pending tool request", async () => {
 	const root = mkdtempSync(

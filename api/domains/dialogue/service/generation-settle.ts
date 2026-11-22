@@ -533,10 +533,11 @@ export function finishReportedWork(
 		replyInConversation?: unknown;
 		answer?: unknown;
 	} | null;
-	const text = result?.answer;
+	const text = intake?.conversationText ?? result?.answer;
 	if (
-		work?.outcome === "cancelled" ||
-		result?.replyInConversation !== true ||
+		(!intake?.conversationText &&
+			(work?.outcome === "cancelled" ||
+				result?.replyInConversation !== true)) ||
 		typeof text !== "string" ||
 		!text.trim()
 	)

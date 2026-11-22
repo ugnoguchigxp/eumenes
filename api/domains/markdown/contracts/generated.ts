@@ -12,6 +12,7 @@ export const generatedInput = z.strictObject({
 	markdown: z.string().min(1).max(1_048_576),
 	namespace: z.string().min(1).max(160),
 	path: libraryPath.refine((v) => v.endsWith(".md")),
+	retention: z.literal("local").optional(),
 });
 export type GeneratedInput = z.infer<typeof generatedInput>;
 export type GeneratedReceipt = {
@@ -28,7 +29,14 @@ export type GeneratedReceipt = {
 };
 export type GeneratedHost = {
 	validInTransaction(db: Database, id: string, ownerRef: string): boolean;
-	writeLocal(input: GeneratedInput, signal: AbortSignal): Promise<string>;
-	hasLocal(id: string): boolean;
-	forgetLocal(id: string): void;
-};
+} & (
+	| {
+			/** Frozen Markdown in the application store, with owner validation on every read. */
+			storedPreviewInTransaction(db: Database, input: GeneratedInput): boolean;
+	  }
+	| {
+			writeLocal(input: GeneratedInput, signal: AbortSignal): Promise<string>;
+			hasLocal(id: string): boolean;
+			forgetLocal(id: string): void;
+	  }
+);

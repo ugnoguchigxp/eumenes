@@ -18,6 +18,7 @@ type Prepared = {
 	instructions: string;
 	request: string;
 	inspection?: { commit?: string };
+	retainSourceEvidence: boolean;
 };
 type Done = { note: Note } | { inspection: ExecutionResult };
 
@@ -65,7 +66,9 @@ async function inspect(ctx: Context, input: Prepared, signal: AbortSignal) {
 			result.code ?? null,
 			usage,
 		);
-		return { inspection: result };
+		if (input.retainSourceEvidence) return { inspection: result };
+		const { report: _sourceEvidence, ...conversationResult } = result;
+		return { inspection: conversationResult };
 	} catch (error) {
 		const candidate = toErrorCode(error, "");
 		const code = candidate.startsWith("inspect_source_")
@@ -128,6 +131,7 @@ export function registerJobs(ctx: Context) {
 					instructions: state.instructions,
 					request: state.request,
 					inspection: state.inspection,
+					retainSourceEvidence: state.source.origin === "supervised",
 				},
 			};
 		},

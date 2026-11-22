@@ -3,6 +3,7 @@ import { createFixture } from "./fixture";
 import { openFromLauncher } from "./artifact-launcher";
 import { resolve } from "node:path";
 const fixture = createFixture();
+const token = "fixture-token-for-toolchain-browser";
 let origin: string;
 let api: string;
 let network: object[] = [];
@@ -25,7 +26,7 @@ test.beforeAll(async () => {
 	await fixture.launchWeb({
 		webPort: webPort!,
 		apiPort: apiPort!,
-		token: "fixture-token-for-toolchain-browser",
+		token,
 		cacheDir: `/tmp/eumenes-kanban-sdk-vite-${webPort}`,
 	});
 	await fixture.ready(origin);
@@ -198,4 +199,90 @@ test("Codex settings can be saved twice with the refreshed revision", async ({
 			page.getByRole("button", { name: "保存", exact: true }),
 		).toBeEnabled();
 	}
+});
+
+test("mixed board shows all seven labels and refreshes when only a supervised row changes", async ({
+	page,
+}) => {
+	network = [];
+	const outcomes = [
+		["succeeded", "完了"],
+		["partial", "一部達成"],
+		["failed", "失敗"],
+		["cancelled", "取消"],
+		["interrupted", "中断"],
+	] as const;
+	const manual = [
+		["done", "Done"],
+		["blocker", "Blocker"],
+	] as const;
+	const updatedAt = new Date().toISOString();
+	const cards = manual.map(([label]) => ({
+		id: `manual-${label}`,
+		revision: 1,
+		title: `手動 ${label}`,
+		prompt: "固定入力",
+		column: "finished",
+		label,
+		reviewed: false,
+		commitPushReported: false,
+		followedByOtherRun: false,
+		files: [],
+		updatedAt,
+		actions: [],
+	}));
+	const change = `${api}/fixture/supervised-change`;
+	await page.route("**/sources/kanban", async (route) => {
+		const path = new URL(route.request().url()).pathname;
+		const [response, marker] = await Promise.all([
+			fetch(`${api}${path}`, { headers: { authorization: `Bearer ${token}` } }),
+			fetch(change),
+		]);
+		const source = await response.json();
+		const { revision: tick } = (await marker.json()) as { revision: number };
+		const revision = source.revision + tick;
+		const supervisedRows = outcomes.map(([outcome]) => {
+			const running = outcome === "interrupted" && tick === 0;
+			return {
+				parentId: "fixture-parent",
+				taskId: outcome,
+				parentRevision: revision,
+				revision: 1,
+				title: `監督 ${outcome}`,
+				column: running ? "running" : "finished",
+				reason: running ? "作業中" : "固定結果を確認",
+				designRevision: 2,
+				evidenceRefs: [],
+				outcome: running ? undefined : outcome,
+			};
+		});
+		await route.fulfill({
+			status: response.status,
+			json: {
+				...source,
+				revision,
+				data: { ...source.data, revision, cards, supervisedRows },
+			},
+		});
+	});
+	await page.setViewportSize({ width: 1500, height: 950 });
+	await page.goto(origin);
+	await openFromLauncher(page, "タスクボード");
+	const board = page.getByRole("region", { name: "タスクボード", exact: true });
+	const label = (kind: string, name: string) =>
+		board.getByRole("article", { name: `${kind} ${name}` });
+	await expect(
+		label("監督", "interrupted").getByText("作業中", { exact: true }),
+	).toBeVisible();
+	for (const [name, text] of manual)
+		await expect(label("手動", name).locator(".kanban-label")).toHaveText(text);
+
+	const response = await fetch(change, { method: "POST" });
+	expect(response.status).toBe(204);
+	for (const [outcome, text] of outcomes)
+		await expect(
+			label("監督", outcome).getByText(text, { exact: true }),
+		).toBeVisible();
+	for (const [name, text] of manual)
+		await expect(label("手動", name).locator(".kanban-label")).toHaveText(text);
 });

@@ -3,6 +3,7 @@ import {
 	type KanbanBoardCard,
 	type KanbanBoardProps,
 	type KanbanBoardQueue,
+	type SupervisedBoardRow,
 } from "@eumenes/design-system";
 import { Feedback, useAction } from "./action";
 import type { ArtifactEvent, ArtifactRequest } from "./contracts";
@@ -29,6 +30,7 @@ type KanbanManualActivity = {
 	stale: boolean;
 };
 export type KanbanBoardSource = {
+	supervisedRows?: SupervisedBoardRow[];
 	revision: number;
 	defaultExecutorId?: string;
 	executors?: Array<{
@@ -293,6 +295,19 @@ export function KanbanBoardView({ request }: { request: ArtifactRequest }) {
 		<>
 			<KanbanBoard
 				{...kanbanBoardProps(data.board)}
+				supervisedRows={data.board.supervisedRows}
+				onSupervisedControl={
+					data.board.supervisedRows
+						? (row, operation, request) =>
+								action.send("kanban-supervised-control", {
+									parentId: row.parentId,
+									taskId: row.taskId,
+									expectedRevision: String(row.revision),
+									action: operation,
+									...(request ? { request } : {}),
+								})
+						: undefined
+				}
 				title={request.title}
 				defaultExecutorId={data.board.defaultExecutorId}
 				busy={action.pending}

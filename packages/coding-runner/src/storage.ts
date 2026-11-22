@@ -18,7 +18,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { canonicalJSON } from "./contracts";
+import { canonicalJSON, RUNNER_FILE_MAX_BYTES } from "./contracts";
 
 export const digest = (value: string | Uint8Array) =>
 	createHash("sha256").update(value).digest("hex");
@@ -45,7 +45,7 @@ export function readPrivate(path: string): string {
 			!s.isFile() ||
 			(s.mode & 0o077) !== 0 ||
 			s.uid !== process.getuid?.() ||
-			s.size > 2 * 1024 * 1024
+			s.size > RUNNER_FILE_MAX_BYTES
 		)
 			throw new Error("runner_file_not_private");
 		const data = Buffer.alloc(s.size + 1);

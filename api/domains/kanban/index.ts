@@ -24,6 +24,10 @@ export type { KanbanExecutor } from "./contracts/shared";
 export { DEFAULT_EXECUTOR_ID } from "./contracts/shared";
 export {
 	readWorkspaceGuard,
+	readWorkspaceGuards,
+	recoverWorkspaceReleaseInTransaction,
+	type WorkspaceGuard,
+	type WorkspaceGuardMode,
 	reserveWorkspaceInTransaction,
 	beginWorkspaceReleaseInTransaction,
 	finishWorkspaceReleaseInTransaction,

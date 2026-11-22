@@ -67,7 +67,8 @@ command 担当の SystemContext は、登録 profile・SKILL・共通の操作�
 - 受け付けない本文: `\n`・`\t` 以外の制御文字（C0・C1。`ESC` で bracketed paste を終わらせて残りをキー入力にできるため）は `terminal_prompt_invalid`（400）。貼り付け時も `ESC` を除く。`owner` が `kanban:*` の依頼は `exclusiveGroup: "kanban"` に固定する。
 - 保存期間: 終端の依頼は30日で、また新しい2000件を超えた分を `pruneInTransaction(tx, now)` で削除する（host が定期的に呼ぶ。未完了の依頼は消さない）。
 - 終了済みの Kanban のセッションを画面から再起動するとき、同じ `claudeSessionId` の生きた PTY があれば `terminal_conversation_busy`（409）。
-- 作業フォルダーを別の実行が確保している場合、画面からの起動・再起動は `terminal_workspace_busy`（409）を返す。直接セッションの起動に失敗した場合や backend の終了処理で PTY の停止を確認した場合は、そのセッションの使用権を解放する。
+- 作業フォルダーを別の実行が確保している場合、画面からの起動・再起動は `terminal_workspace_busy`（409）を返す。直接セッションの起動に失敗した場合や PTY の終了を確認した場合は、そのセッションの使用権を解放する。
+- OS の再起動をまたいで直接セッションの確保が残った場合は、同じセッション・作業フォルダーの最終依頼記録が OS 起動前であることを照合し、backend の起動時に解放する。解放時には `terminals.workspace_recovered` を記録する。最終記録がない場合や停止未確認の確保は保持する。
 - git の制限: **`owner` が `kanban:` で始まり `mode` が `work` の PTY だけ**、設定ファイルに `permissions.deny: ["Bash(git commit *)", "Bash(git push *)"]` を入れて起動する（実機で `git commit`・`git push` が止まることを確認）。直接依頼（`direct`）は利用者がその場で明示した作業なので制限しない。`mode: commit` は制限を外した設定で `--resume` する。
 
 ## 完了の報告と SE
@@ -103,6 +104,8 @@ PTY の入出力・会話本文・依頼本文はログに出さない。ログ�
 - Windows は Bun の PTY が未対応のため使えない。
 
 ## 検証
+
+2026-11-22。エラー修正 Skill の同一版に異なる本文が保存され、端末 bundle 全体が起動時に取り消されていた。Skill と package を版 4 とし、エラー修正の端末版 2・3 からそれぞれ toolchain 版 5・6 に更新する。通常依頼は既存の toolchain 版 6 が公開され、承認した本文を端末に渡す。隔離 DB で二種類の旧版からの更新、端末終了後の再利用、OS 再起動をまたいだ確保解放を確認した。
 
 ```sh
 bun run verify -- --domain terminals   # 偽PTYの固定試験と、/bin/sh を実PTYで動かす試験

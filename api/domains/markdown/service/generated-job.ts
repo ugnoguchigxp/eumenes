@@ -18,6 +18,8 @@ import { assertLibraryIdle } from "../repository/library-operations";
 import { archiveDigest } from "./archive-content";
 import { confirmSave, executeArchiveSave } from "./archive-save";
 
+export const generatedLocalJobKind = "markdown.generated_local";
+
 export function frozenGenerated(r: GeneratedRow): ArchiveSave {
 	const input = generatedValue(r);
 	return {
@@ -40,13 +42,18 @@ export function registerGeneratedJob(
 	host: (ownerRef: string) => GeneratedHost | undefined,
 	publish?: () => void,
 ) {
-	const valid = (db: Database, r: GeneratedRow) =>
-		r.state === "pending" &&
-		!!host(generatedValue(r).ownerRef)?.validInTransaction(
-			db,
-			r.id,
-			generatedValue(r).ownerRef,
+	const valid = (db: Database, r: GeneratedRow) => {
+		if (r.state !== "pending") return false;
+		const input = generatedValue(r);
+		const owner = host(input.ownerRef);
+		return (
+			!!owner &&
+			owner.validInTransaction(db, r.id, input.ownerRef) &&
+			(input.retention !== "local" ||
+				("storedPreviewInTransaction" in owner &&
+					owner.storedPreviewInTransaction(db, input)))
 		);
+	};
 
 	function localState(
 		db: Database,
@@ -57,6 +64,56 @@ export function registerGeneratedJob(
 			"UPDATE markdown_generated SET local_json=? WHERE id=? AND state='pending'",
 		).run(JSON.stringify(value), id);
 	}
+	const payload = z.strictObject({ id: z.uuid() });
+	function readyRow(db: Database, id: string, jobId: string, local: boolean) {
+		const row = generatedRow(db, id);
+		return row &&
+			row.job_id === jobId &&
+			(generatedValue(row).retention === "local") === local &&
+			valid(db, row)
+			? row
+			: null;
+	}
+	// Owner-retained previews have no effect beyond the writer. Retry them after a lost claim.
+	queue.registerHandler<{ id: string }, null, null>({
+		kind: generatedLocalJobKind,
+		payloadVersions: [1],
+		schema: payload,
+		recovery: "replay_safe",
+		prepareInTransaction(db, claim) {
+			return readyRow(db, claim.payload.id, claim.jobId, true)
+				? { status: "ready", input: null }
+				: { status: "stale", reason: "markdown_source_invalid" };
+		},
+		async execute(_input, { signal }) {
+			signal.throwIfAborted();
+			return null;
+		},
+		classify: () => "fail",
+		settleInTransaction(db, claim, _input, outcome) {
+			const row = readyRow(db, claim.payload.id, claim.jobId, true);
+			if (!row) return "stale";
+			if (outcome.type === "retry") return "applied";
+			if (outcome.type === "success")
+				localState(db, row.id, { state: "saved" });
+			db.query(
+				"UPDATE markdown_generated SET state='settled',archive_json=? WHERE id=?",
+			).run(
+				JSON.stringify({
+					state: "unsaved",
+					code: "markdown_archive_not_requested",
+				}),
+				row.id,
+			);
+			return "applied";
+		},
+		cancelInTransaction(db, job) {
+			db.query(
+				"UPDATE markdown_generated SET state='cancelled' WHERE id=? AND state='pending'",
+			).run(job.payload.id);
+		},
+		afterCommit: publish,
+	});
 	queue.registerHandler<
 		{ id: string },
 		GeneratedRow,
@@ -64,12 +121,11 @@ export function registerGeneratedJob(
 	>({
 		kind: "markdown.generated",
 		payloadVersions: [1],
-		schema: z.strictObject({ id: z.uuid() }),
+		schema: payload,
 		recovery: "interrupt",
 		prepareInTransaction(db, claim) {
-			const r = generatedRow(db, claim.payload.id);
-			if (!r || r.job_id !== claim.jobId || !valid(db, r))
-				return { status: "stale", reason: "markdown_source_invalid" };
+			const r = readyRow(db, claim.payload.id, claim.jobId, false);
+			if (!r) return { status: "stale", reason: "markdown_source_invalid" };
 			return { status: "ready", input: r };
 		},
 		async execute(r, { signal }) {
@@ -85,9 +141,11 @@ export function registerGeneratedJob(
 					throw new Error("markdown_source_invalid");
 			};
 			assertCurrent();
+			const owner = host(input.ownerRef);
 			try {
-				if (!host(input.ownerRef)) throw new Error("scratch_unavailable");
-				const uri = await host(input.ownerRef)!.writeLocal(input, signal);
+				if (!owner || !("writeLocal" in owner))
+					throw new Error("scratch_unavailable");
+				const uri = await owner.writeLocal(input, signal);
 				assertCurrent();
 				await store.write((db) =>
 					localState(db, r.id, { state: "saved", uri }),
@@ -95,12 +153,14 @@ export function registerGeneratedJob(
 			} catch (e) {
 				// A late local write is removed even when cancellation raced its completion.
 				if (
+					owner &&
+					"forgetLocal" in owner &&
 					!store.read((db) => {
 						const current = generatedRow(db, r.id);
 						return current && valid(db, current);
 					})
 				)
-					host(input.ownerRef)?.forgetLocal(r.id);
+					owner.forgetLocal(r.id);
 				await store.write((db) =>
 					localState(db, r.id, {
 						state: "failed",
@@ -170,8 +230,8 @@ export function registerGeneratedJob(
 		},
 		classify: () => "fail",
 		settleInTransaction(db, claim, _input, outcome) {
-			const r = generatedRow(db, claim.payload.id);
-			if (!r || r.job_id !== claim.jobId || !valid(db, r)) return "stale";
+			const r = readyRow(db, claim.payload.id, claim.jobId, false);
+			if (!r) return "stale";
 			const value =
 				outcome.type === "success" &&
 				(!r.binding || archive.binding() === r.binding)

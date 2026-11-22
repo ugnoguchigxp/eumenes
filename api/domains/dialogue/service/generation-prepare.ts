@@ -50,13 +50,12 @@ import { finishReportedWork } from "./generation-settle";
 import { workOfRun, type WorkRow } from "../repository/work";
 import {
 	madeOf,
-	namedResources,
-	namedTodos,
-	stateLinesInTransaction,
+	stateProjectionInTransaction,
 	agencyStateLines,
 	stateText,
 } from "./state-text";
 import { ASK_STEP } from "./tool-exchange";
+import { taskTargets } from "./task-work";
 import { screenLinesInTransaction } from "./resource-context";
 
 const log = getLogger("dialogue");
@@ -249,7 +248,7 @@ function routedInputInTransaction(
 	input: {
 		conversationId: string;
 		nowMs: number;
-		state: readonly string[];
+		state: ReturnType<typeof stateProjectionInTransaction>;
 		revisions: RoutedInput["pending"]["revisions"];
 		media: readonly { line: string }[];
 		diagnostics: readonly { line: string; ref: string }[];
@@ -281,7 +280,7 @@ function routedInputInTransaction(
 	// The agency reports its own research in notes and keeps it outside the user's work controls.
 	const own = (row: { runId: string } | null | undefined) =>
 		!!row && !!agencyWork(tx, row.runId);
-	const finished = namedTodos(input.state).flatMap((ref) => {
+	const finished = input.state.todos.flatMap((ref) => {
 		if (todos.some((todo) => todo.ref === ref)) return [];
 		const row = deps.work?.workByRefInTransaction(
 			tx,
@@ -289,7 +288,14 @@ function routedInputInTransaction(
 			ref,
 		);
 		return row?.title && !own(row)
-			? [{ ref, title: row.title, open: false }]
+			? [
+					{
+						ref,
+						title: row.title,
+						open: false,
+						...taskTargets(deps, tx, row),
+					},
+				]
 			: [];
 	});
 	return {
@@ -299,7 +305,7 @@ function routedInputInTransaction(
 			.map((said) => lineText(said).slice(0, PREVIOUS_REPLY_CHARS))
 			.filter((said) => said.trim()),
 		state: stateText([
-			...input.state,
+			...input.state.lines,
 			...input.media.map(({ line }) => line),
 			...input.diagnostics.map(({ line }) => line),
 		]),
@@ -338,12 +344,13 @@ function routedInputInTransaction(
 								title: todo.title,
 								request: row?.request,
 								open: true,
+								...taskTargets(deps, tx, row),
 							},
 						];
 			}),
 			...finished,
 		],
-		resources: namedResources(input.state),
+		resources: input.state.resources,
 		switching:
 			liveSession(tx, input.conversationId)?.pendingSwitch?.toolchainId ?? null,
 		switchTarget:
@@ -377,7 +384,7 @@ function recordPromptSources(
 		messageIds: [...pendingIds],
 	});
 	const mediaInputs = media.map(({ workId }) =>
-		workContextInput(deps, tx, workId),
+		workContextInput(deps, tx, workId, "image-observation"),
 	);
 	memory.referenceInputs.recordRunInTransaction(
 		tx,
@@ -582,7 +589,7 @@ export function createPrepare(
 		const lastAgent =
 			[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null;
 		const screenLines = screenLinesInTransaction(deps, tx, current);
-		const stateLines = stateLinesInTransaction(deps, tx, {
+		const state = stateProjectionInTransaction(deps, tx, {
 			conversationId,
 			run: current,
 			screenLines,
@@ -606,7 +613,7 @@ export function createPrepare(
 		const userTurn =
 			final.kind === "utterances" && !isSystemPrompt(current.sourceKind);
 		const { offers, revisions, sources } = userTurn
-			? delegationContext(deps, tx, conversationId, stateLines)
+			? delegationContext(deps, tx, conversationId, state.lines)
 			: { offers: [], revisions: [], sources: [] };
 		recordPromptSources(deps, tx, {
 			runId: run.id,
@@ -621,7 +628,7 @@ export function createPrepare(
 			? routedInputInTransaction(deps, tx, {
 					conversationId,
 					nowMs,
-					state: stateLines,
+					state,
 					revisions,
 					media,
 					diagnostics,
@@ -629,13 +636,12 @@ export function createPrepare(
 					prefix,
 				})
 			: undefined;
+		const viewing = screenLines.map(({ text }) => text);
+		const screenState = viewing.length ? ["提示中:", ...viewing] : [];
 		const messages = answerMessages(prefix, {
 			stateLines: routed
-				? stateLines
-				: [
-						...stateLines.slice(0, 1),
-						...(screenLines.length ? ["提示中:", ...screenLines] : []),
-					],
+				? state.lines
+				: [...state.lines.slice(0, 1), ...screenState],
 			askedRequest: routed?.asked?.request,
 			agencyLines: agencyStateLines(deps, tx, conversationId),
 			media,

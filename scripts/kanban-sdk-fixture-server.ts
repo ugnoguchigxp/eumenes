@@ -170,11 +170,36 @@ await h.store.write((tx) =>
 const maintenance = setInterval(() => {
 	void sdkHost.runs.maintain();
 }, 250);
+await h.store.write((db) => {
+	db.exec(
+		"CREATE TABLE fixture_supervised_change (revision INTEGER NOT NULL); INSERT INTO fixture_supervised_change VALUES (0)",
+	);
+});
 const api = Bun.serve({
 	hostname: "127.0.0.1",
 	port: Number(process.env.EUMENES_PORT),
-	fetch: (request) => {
+	// Match production so the change stream stays open past its 15-second heartbeat.
+	idleTimeout: 60,
+	fetch: async (request) => {
 		const path = new URL(request.url).pathname;
+		if (path === "/fixture/supervised-change") {
+			if (request.method === "POST") {
+				// Trigger the genuine commit/change stream without updating any manual card.
+				await h.store.write((db) =>
+					db.run("UPDATE fixture_supervised_change SET revision=revision+1"),
+				);
+				return new Response(null, { status: 204 });
+			}
+			return Response.json(
+				h.store.read((db) =>
+					db
+						.query<{ revision: number }, []>(
+							"SELECT revision FROM fixture_supervised_change",
+						)
+						.get(),
+				),
+			);
+		}
 		if (path === "/fixture/sdk-calls") return Response.json(calls);
 		if (path === "/fixture/sdk-state")
 			return Response.json({

@@ -1,10 +1,12 @@
 import { z } from "zod";
 import type { ExecutionResult } from "../../domains/tool-runtime";
+import type { SourceExcerpt } from "./source-excerpt";
 
 const location = z.strictObject({
 	path: z.string(),
 	startLine: z.number().int(),
 	endLine: z.number().int(),
+	symbol: z.string().max(180).nullable(),
 });
 type Location = z.infer<typeof location>;
 const depths = {
@@ -57,9 +59,8 @@ const markdown = (text: string) => text.replace(/[\\`*_[\]<>]/gu, "\\$&");
 export async function sourceResult(
 	text: string,
 	lineCounts: ReadonlyMap<string, number>,
-	excerpt: (
-		location: Location,
-	) => Promise<{ kind: "diff" | "code"; text: string } | null>,
+	excerpt: (location: Location) => Promise<SourceExcerpt | null>,
+	commit: string,
 ): Promise<ExecutionResult> {
 	if (Buffer.byteLength(text) > 12_000)
 		throw new Error("inspect_source_output_limit");
@@ -71,11 +72,15 @@ export async function sourceResult(
 	}
 	const [label, max] = depths[parsed.depth];
 	const sources = new Map<string, string>();
+	const evidence: NonNullable<ExecutionResult["report"]>["sources"] = [];
+	const evidenceClaims: NonNullable<ExecutionResult["report"]>["claims"] = [];
+	const seenLocations = new Map<string, string>();
 	const claims: string[] = [];
 	let partial = Boolean(parsed.limitations.trim());
 	for (const finding of parsed.findings.slice(0, 12)) {
 		const claim = prose(finding.summary, finding.evidence);
 		let supported = false;
+		const sourceIds = new Set<string>();
 		for (const location of finding.evidence) {
 			const { path, startLine, endLine } = location;
 			if (
@@ -86,11 +91,17 @@ export async function sourceResult(
 				partial = true;
 				continue;
 			}
-			if (sources.has(path)) {
+			const key = JSON.stringify([path, startLine, endLine]);
+			const seen = seenLocations.get(key);
+			if (seen) {
+				sourceIds.add(seen);
 				supported = true;
 				continue;
 			}
-			if (sources.size >= max) {
+			if (
+				(!sources.has(path) && sources.size >= max) ||
+				evidence.length >= 12
+			) {
 				partial = true;
 				continue;
 			}
@@ -103,13 +114,32 @@ export async function sourceResult(
 				snippet.kind === "diff"
 					? "差分（− 元のコード／＋ 現在のコード）"
 					: `コードの抜粋（${startLine}行目から）`;
-			sources.set(
-				path,
-				`> **ソース：** \`${path}\`\n\n${legend}\n\n${formatExcerpt(snippet.kind, snippet.text)}`,
-			);
+			if (!sources.has(path))
+				sources.set(
+					path,
+					`> **ソース：** \`${path}\`\n\n${legend}\n\n${formatExcerpt(snippet.kind, snippet.text)}`,
+				);
+			const sourceId = `source-${evidence.length + 1}`;
+			seenLocations.set(key, sourceId);
+			sourceIds.add(sourceId);
+			evidence.push({
+				sourceId,
+				kind: "source",
+				location: {
+					path,
+					symbol: location.symbol?.trim() || null,
+					commit,
+					startLine,
+					endLine,
+					digest: snippet.digest,
+				},
+			});
 			supported = true;
 		}
-		if (supported && claim) claims.push(claim);
+		if (supported && claim) {
+			claims.push(claim);
+			evidenceClaims.push({ text: claim, sourceIds: [...sourceIds] });
+		}
 	}
 	const summary =
 		claims.join("\n").slice(0, 1800) || "今回は表示できる抜粋がありません。";
@@ -128,5 +158,15 @@ export async function sourceResult(
 		replyInConversation: true,
 		answer: summary,
 		displayAnswer,
+		report: {
+			summary,
+			coverage: partial || !sources.size ? "partial" : "complete",
+			verification: "evidence_linked",
+			claims: evidenceClaims,
+			limitations: parsed.limitations.trim()
+				? [prose(parsed.limitations, [])]
+				: [],
+			sources: evidence,
+		},
 	};
 }

@@ -1,5 +1,8 @@
 export { registerTerminals } from "./controller";
-export { migrations } from "./repository";
+export {
+	latestDirectTerminalActivityInTransaction,
+	migrations,
+} from "./repository";
 export { createTerminals, type TerminalsService } from "./service";
 export type {
 	/** @public */ SpawnPty,

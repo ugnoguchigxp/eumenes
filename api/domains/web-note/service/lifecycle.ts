@@ -3,6 +3,10 @@ import type { ExecutionResult, ExecutionView } from "../../tool-runtime";
 import type { HostState } from "../contracts";
 import { active, rowOf, save, stateOf, type RunRow } from "../repository";
 import type { Context } from "./context";
+import {
+	isStandardExecutionSource,
+	isSupervisedExecutionSource,
+} from "../../tool-runtime";
 import { failedResult } from "./note";
 
 // The conversation message contract limits visual replies to 32,768 characters.
@@ -10,6 +14,14 @@ const DISPLAY_LIMIT = 32_768;
 
 function conversationResult(state: HostState): ExecutionResult | null {
 	const { result, source } = state;
+	if (result && source.origin === "supervised") {
+		const {
+			replyInConversation: _replyInConversation,
+			displayAnswer: _displayAnswer,
+			...childResult
+		} = result;
+		return childResult;
+	}
 	if (
 		state.inspection ||
 		source.origin ||
@@ -65,8 +77,18 @@ export function current(
 	if (!row?.data_json || (!terminal && !active(row)))
 		throw new Error("web_note_run_stale");
 	const state = stateOf(row);
-	if (!ctx.source().validSourceInTransaction(db, state.source))
-		throw new Error("web_note_source_invalid");
+	const valid = isSupervisedExecutionSource(state.source)
+		? ctx.source().supervised?.authorizeInTransaction(db, {
+				source: state.source,
+				request: state.request,
+				action: "continue",
+				workId: row.id,
+				toolchainRevisionId: state.toolchainRevisionId,
+				bindingRevisionId: state.bindingRevisionId,
+			})
+		: isStandardExecutionSource(state.source) &&
+			ctx.source().validSourceInTransaction(db, state.source);
+	if (!valid) throw new Error("web_note_source_invalid");
 	if (
 		ctx.capabilities.toolchainBindingInTransaction(
 			db,
@@ -86,9 +108,15 @@ function announce(
 	view: ExecutionView,
 ) {
 	row.notice = "pending";
-	const delivered = ctx
-		.source()
-		.deliverInTransaction(db, view, `web-note:${row.id}`);
+	const origin = stateOf(row).source;
+	const eventId = `web-note:${row.id}`;
+	const delivered = isSupervisedExecutionSource(origin)
+		? ctx
+				.source()
+				.supervised?.deliverInTransaction(db, origin, view, eventId) === true
+		: isStandardExecutionSource(origin) &&
+			ctx.source().deliverInTransaction(db, view, eventId);
+	if (!delivered && !isStandardExecutionSource(origin)) return;
 	row.notice = delivered ? "delivered" : "accepted";
 }
 export function finish(
@@ -135,7 +163,7 @@ export function forget(ctx: Context, db: Database, id: string) {
 		ctx.queue.cancelInTransaction(db, row.job_id, "web_note_forgotten");
 		ctx.abortJobs.add(row.job_id);
 	}
-	if (row.notice !== "none")
+	if (row.notice !== "none" && isStandardExecutionSource(stateOf(row).source))
 		ctx.source().revokeDeliveryInTransaction?.(db, `web-note:${id}`);
 	db.query(
 		"UPDATE web_note_runs SET data_json=NULL,job_id=NULL,notice='none',state='cancelled',revision=revision+1,updated_at=? WHERE id=?",

@@ -100,6 +100,7 @@ export const workArgs = z
 	.object({
 		todo: id,
 		operation: z.enum(["check", "answer", "amend", "cancel"]),
+		target: z.union([z.literal("parent"), z.uuid()]).optional(),
 		text: z.string().trim().min(1).max(8000).optional(),
 	})
 	.strict();

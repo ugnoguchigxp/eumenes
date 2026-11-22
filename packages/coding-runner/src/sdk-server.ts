@@ -32,12 +32,14 @@ export async function servePrivateRunner<T>(
 			return;
 		}
 		try {
-			let body = "";
+			const chunks: Buffer[] = [];
+			let size = 0;
 			for await (const chunk of req) {
-				body += chunk.toString();
-				if (Buffer.byteLength(body) > 512 * 1024)
-					throw new Error(`${namespace}_request_limit`);
+				size += chunk.length;
+				if (size > 512 * 1024) throw new Error(`${namespace}_request_limit`);
+				chunks.push(chunk);
 			}
+			const body = Buffer.concat(chunks, size).toString("utf8");
 			res.end(JSON.stringify(service.request(JSON.parse(body))));
 		} catch (error) {
 			const code =

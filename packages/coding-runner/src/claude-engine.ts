@@ -6,6 +6,10 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { processTree } from "./sdk-process-tree";
+import type { ClaudeEvidence } from "./claude-contracts";
+import type { supervisedTools } from "./claude-supervised-tools";
+
+type ToolScope = ReturnType<typeof supervisedTools>;
 
 const questionInput = z.object({
 	questions: z
@@ -33,12 +37,21 @@ export type ClaudeEngineInput = {
 	maxTurns: number;
 	tools: string[];
 	sandbox?: Options["sandbox"];
-	authorize(tool: string, input: Record<string, unknown>): boolean;
+	authorize(
+		tool: string,
+		input: Record<string, unknown>,
+	): boolean | Promise<boolean>;
+	supervisedTools?: ToolScope;
+	deferredQuestions?: boolean;
 	validateAccount(
 		account: Awaited<ReturnType<ReturnType<typeof query>["accountInfo"]>>,
 	): boolean;
 	onSession(id: string): void;
-	onEvidence(ref: string, observation: string): void;
+	onEvidence(
+		ref: string,
+		observation: string,
+		evidence?: Omit<ClaudeEvidence, "ref" | "executionId">,
+	): void;
 	ask(
 		question: { id: string; prompt: string; expiresAt: number },
 		signal: AbortSignal,
@@ -50,6 +63,7 @@ type ClaudeEngineResult = {
 	managedExecutionStopped: boolean;
 	aborted: boolean;
 	evidenceCount: number;
+	confirmStopped?: () => boolean;
 };
 
 export async function runClaudeExecution(
@@ -78,17 +92,36 @@ export async function runClaudeExecution(
 	let child: ChildProcessWithoutNullStreams | undefined;
 	let tree: ReturnType<typeof processTree> | undefined;
 	let processExited = false;
+	const groupStopped = () => {
+		if (!input.supervisedTools) return true;
+		if (!child?.pid) return false;
+		try {
+			process.kill(-child.pid, 0);
+			return false;
+		} catch (error) {
+			return (error as NodeJS.ErrnoException).code === "ESRCH";
+		}
+	};
+	const confirmStopped = () =>
+		processExited && groupStopped() && tree?.confirmed() === true;
 	let observed = 0;
 	let evidenceBytes = 0;
-	const evidence = (text: string) => {
+	const evidence = (
+		text: string,
+		fact?: Omit<ClaudeEvidence, "ref" | "executionId">,
+	) => {
 		const size = Buffer.byteLength(text);
 		evidenceBytes += size;
 		if (size > 256 * 1024 || evidenceBytes > 64 * 1024 * 1024) {
 			abort();
 			return;
 		}
-		input.onEvidence(String(++observed), text);
+		input.onEvidence(String(++observed), text, fact);
 	};
+	const requests = new Map<
+		string,
+		NonNullable<ReturnType<ToolScope["toolRequest"]>>
+	>();
 	const stream = open({
 		prompt: prompt(),
 		options: {
@@ -118,6 +151,7 @@ export async function runClaudeExecution(
 					cwd: options.cwd,
 					env: options.env,
 					stdio: "pipe",
+					detached: !!input.supervisedTools,
 				});
 				child.once("exit", () => {
 					processExited = true;
@@ -132,16 +166,42 @@ export async function runClaudeExecution(
 						hooks: [
 							async (hook) => {
 								if (hook.hook_event_name !== "PreToolUse") return {};
-								if (hook.tool_name === "AskUserQuestion") return {};
+								if (hook.tool_name === "AskUserQuestion" && !combined.aborted)
+									return {};
+								const raw = hook.tool_input as Record<string, unknown>;
+								const scoped = input.supervisedTools?.toolRequest(
+									hook.tool_name,
+									raw,
+								);
 								if (
 									!combined.aborted &&
 									input.tools.includes(hook.tool_name) &&
-									input.authorize(
+									(!input.supervisedTools || scoped) &&
+									(await input.authorize(hook.tool_name, raw)) &&
+									!combined.aborted
+								) {
+									if (!input.supervisedTools) return {};
+									const currentScope = input.supervisedTools.toolRequest(
 										hook.tool_name,
-										hook.tool_input as Record<string, unknown>,
-									)
-								)
-									return {};
+										raw,
+									);
+									if (
+										currentScope &&
+										(currentScope.fact.kind === "read" ||
+											![...requests.values()].some(
+												(request) => request.fact.kind !== "read",
+											))
+									) {
+										requests.set(hook.tool_use_id, currentScope);
+										return {
+											hookSpecificOutput: {
+												hookEventName: "PreToolUse",
+												permissionDecision: "allow",
+												updatedInput: currentScope.input,
+											},
+										};
+									}
+								}
 								return {
 									hookSpecificOutput: {
 										hookEventName: "PreToolUse",
@@ -158,14 +218,45 @@ export async function runClaudeExecution(
 					{
 						hooks: [
 							async (hook, id) => {
-								if (hook.hook_event_name === "PostToolUse")
+								if (hook.hook_event_name !== "PostToolUse") return {};
+								const scoped = requests.get(hook.tool_use_id);
+								requests.delete(hook.tool_use_id);
+								const fact =
+									scoped &&
+									input.supervisedTools?.toolEvidence(
+										scoped,
+										hook.tool_response,
+										true,
+									);
+								evidence(
+									JSON.stringify({
+										id,
+										tool: hook.tool_name,
+										input: hook.tool_input,
+										result: hook.tool_response,
+									}),
+									fact,
+								);
+								return {};
+							},
+						],
+					},
+				],
+				PostToolUseFailure: [
+					{
+						hooks: [
+							async (hook) => {
+								if (hook.hook_event_name !== "PostToolUseFailure") return {};
+								const scoped = requests.get(hook.tool_use_id);
+								requests.delete(hook.tool_use_id);
+								if (scoped)
 									evidence(
-										JSON.stringify({
-											id,
-											tool: hook.tool_name,
-											input: hook.tool_input,
-											result: hook.tool_response,
-										}),
+										hook.error,
+										input.supervisedTools?.toolEvidence(
+											scoped,
+											hook.error,
+											false,
+										),
 									);
 								return {};
 							},
@@ -179,7 +270,11 @@ export async function runClaudeExecution(
 					tool !== "AskUserQuestion" ||
 					!data.success ||
 					data.data.questions[0]?.multiSelect ||
-					combined.aborted
+					combined.aborted ||
+					requestSignal.aborted ||
+					(input.supervisedTools && !(await input.authorize(tool, raw))) ||
+					combined.aborted ||
+					requestSignal.aborted
 				)
 					return {
 						behavior: "deny",
@@ -195,7 +290,9 @@ export async function runClaudeExecution(
 						]
 							.join("\n")
 							.slice(0, 2_000),
-						expiresAt: Math.min(input.deadline, Date.now() + 15 * 60_000),
+						expiresAt: input.deferredQuestions
+							? input.deadline
+							: Math.min(input.deadline, Date.now() + 15 * 60_000),
 					},
 					AbortSignal.any([combined, requestSignal]),
 				);
@@ -241,23 +338,23 @@ export async function runClaudeExecution(
 		stream.close();
 		clearInterval(monitor);
 		combined.removeEventListener("abort", abort);
-		if (child && (!processExited || tree?.confirmed() === false)) {
+		if (child && !confirmStopped()) {
 			tree?.kill("SIGTERM");
-			await boundedExit(() => processExited);
-			if (!processExited || tree?.confirmed() === false) {
+			await boundedExit(confirmStopped);
+			if (!confirmStopped()) {
 				tree?.kill("SIGKILL");
 				if (!processExited) child.kill("SIGKILL");
-				await boundedExit(() => processExited);
+				await boundedExit(confirmStopped);
 			}
 		}
 	}
-	const managedExecutionStopped =
-		!!child && processExited && tree?.confirmed() === true;
+	const managedExecutionStopped = confirmStopped();
 	return {
 		result,
 		managedExecutionStopped,
 		aborted: combined.aborted,
 		evidenceCount: observed,
+		confirmStopped,
 	};
 }
 

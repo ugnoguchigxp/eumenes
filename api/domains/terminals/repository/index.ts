@@ -153,6 +153,21 @@ export function get(db: Database, id: string): RequestRow | null {
 }
 
 /** Queued requests, oldest first. */
+/** Latest saved observation of a direct PTY, for comparing its lifetime with a host reboot. */
+export function latestDirectTerminalActivityInTransaction(
+	db: Database,
+	sessionId: string,
+	workspaceRef: string,
+): string | null {
+	return (
+		db
+			.query<{ updatedAt: string | null }, [string, string]>(
+				"SELECT MAX(updated_at) AS updatedAt FROM terminal_requests WHERE terminal_session_id=? AND project_id=? AND owner='direct'",
+			)
+			.get(sessionId, workspaceRef)?.updatedAt ?? null
+	);
+}
+
 export function queued(db: Database): RequestRow[] {
 	return (
 		db

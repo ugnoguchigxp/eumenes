@@ -516,6 +516,11 @@ CREATE TABLE dialogue_search_offers (
  conversation_id TEXT PRIMARY KEY, run_seq INTEGER NOT NULL, message_id TEXT NOT NULL, search_json TEXT
 );`,
 	},
+	{
+		id: "dialogue/0045-consumed-confirmation-run",
+		after: ["dialogue/0044-confirmation-revision"],
+		sql: "ALTER TABLE dialogue_confirmations ADD COLUMN used_by_run TEXT REFERENCES dialogue_runs(id) ON DELETE SET NULL;",
+	},
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

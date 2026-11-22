@@ -676,3 +676,109 @@ test("logo buttons filter locally and toggle back to all cards", async () => {
 	expect(onAdd).not.toHaveBeenCalled();
 	expect(onMove).not.toHaveBeenCalled();
 });
+
+test("owner rows show five outcomes alongside manual cards and send only the selected task control", async () => {
+	const onSupervisedControl = vi.fn();
+	const outcomes = [
+		"succeeded",
+		"partial",
+		"failed",
+		"cancelled",
+		"interrupted",
+	] as const;
+	const labels = ["完了", "一部達成", "失敗", "取消", "中断"];
+	const held = {
+		parentId: "parent",
+		taskId: "reader",
+		title: "入力処理の再現",
+		reason: "編集枠待ち",
+		column: "running" as const,
+		parentRevision: 8,
+		revision: 3,
+		designRevision: 2,
+		evidenceRefs: ["read-run:3"],
+		blockerRef: "work:aggregate",
+	};
+	const h = setup({
+		cards: [doneCard, blockerCard],
+		onSupervisedControl,
+		supervisedRows: [
+			held,
+			...outcomes.map((outcome) => ({
+				...held,
+				taskId: outcome,
+				title: outcome,
+				outcome,
+				column: "finished" as const,
+			})),
+		],
+	});
+	outcomes.forEach((name, i) =>
+		expect(within(cardOf(name)).getByText(labels[i]!)).toBeVisible(),
+	);
+	const row = within(cardOf(held.title));
+	expect(row.getByText(held.reason)).toBeVisible();
+	await h.user.click(row.getByText("作業の詳細"));
+	expect(row.getByText("read-run:3")).toBeVisible();
+	expect(row.getByText("work:aggregate")).toBeVisible();
+	expect(
+		row.queryByRole("button", { name: /commit|push|コミット|プッシュ/i }),
+	).toBeNull();
+	await h.user.click(row.getByRole("button", { name: "条件変更" }));
+	await h.user.type(
+		row.getByRole("textbox", { name: "変更する条件" }),
+		"既存の固定入力を使う",
+	);
+	await h.user.click(row.getByRole("button", { name: "条件を送る" }));
+	expect(onSupervisedControl).toHaveBeenCalledWith(
+		held,
+		"amend",
+		"既存の固定入力を使う",
+	);
+	await h.user.click(row.getByRole("button", { name: "作業を取り消す" }));
+	expect(onSupervisedControl).toHaveBeenLastCalledWith(held, "cancel");
+});
+
+test("a condition draft survives a column change and needs the updated task reviewed before submission", async () => {
+	const original = {
+		parentId: "parent",
+		taskId: "task",
+		parentRevision: 1,
+		revision: 0,
+		title: "集計処理",
+		reason: "編集枠待ち",
+		column: "todo" as const,
+	};
+	const onSupervisedControl = vi.fn();
+	const h = setup({ supervisedRows: [original], onSupervisedControl });
+	await h.user.click(screen.getByRole("button", { name: "条件変更" }));
+	await h.user.type(
+		screen.getByRole("textbox", { name: "変更する条件" }),
+		"固定入力を追加する",
+	);
+	h.again({ supervisedRows: [{ ...original, parentRevision: 2 }] });
+	expect(screen.getByRole("button", { name: "条件を送る" })).toBeEnabled();
+	const current = {
+		...original,
+		parentRevision: 3,
+		revision: 1,
+		reason: "検証中",
+		column: "running" as const,
+	};
+	h.again({ supervisedRows: [current] });
+	const row = within(cardOf(current.title));
+	expect(row.getByRole("textbox", { name: "変更する条件" })).toHaveValue(
+		"固定入力を追加する",
+	);
+	expect(row.getByRole("button", { name: "条件を送る" })).toBeDisabled();
+	expect(onSupervisedControl).not.toHaveBeenCalled();
+	await h.user.click(
+		row.getByRole("button", { name: "更新後の状態を確認した" }),
+	);
+	await h.user.click(row.getByRole("button", { name: "条件を送る" }));
+	expect(onSupervisedControl).toHaveBeenCalledWith(
+		current,
+		"amend",
+		"固定入力を追加する",
+	);
+});

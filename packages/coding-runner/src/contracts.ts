@@ -1,4 +1,6 @@
 /** Independent SDK protocol shares the package's public contract boundary. */
+export const RUNNER_FILE_MAX_BYTES = 2 * 1024 * 1024;
+
 export { sdkId, sdkSpecSchema, sdkTerminal } from "./sdk-contracts";
 export type {
 	SdkSpec,
@@ -12,6 +14,16 @@ export type {
 	SdkGitResult,
 	SdkSnapshot,
 } from "./sdk-git-contracts";
+
+export { claudeAuthorization } from "./claude-contracts";
+export type {
+	ClaudeObservation,
+	ClaudeStart,
+	ClaudeEvidence,
+	ClaudeRunAuthorization,
+	ClaudeLease,
+} from "./claude-contracts";
+export { claudeInputDigest } from "./claude-input-digest";
 
 /** Protocol digests use code-point ordering, independent of the host's locale. */
 export function canonicalJSON(value: unknown): string {

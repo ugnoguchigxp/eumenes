@@ -114,6 +114,19 @@ test("a shared file that is gone is neither presented nor listed", async () => {
 	expect(stateOf()).not.toContain("IMG_2041.jpg");
 });
 
+test("attachments beyond the presentation limit remain visible in the shared file list", async () => {
+	const resources = fakeResources();
+	const files = shared(resources);
+	h = await setup({ resources: resources.access, sharedFiles: files.port });
+	for (let i = 1; i <= 5; i++)
+		files.attach(`file-${i}`, `資料${i}.txt`, "添付");
+	await say("資料を確認して");
+	const state = stateOf();
+	expect(state).toContain("共有中:");
+	for (let i = 1; i <= 5; i++)
+		expect(state.split(`a${i}「資料${i}.txt」`)).toHaveLength(2);
+});
+
 test("a store that cannot take the input leaves the input accepted without numbers", async () => {
 	const resources = fakeResources();
 	h = await setup({

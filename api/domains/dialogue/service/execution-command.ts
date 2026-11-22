@@ -2,7 +2,11 @@ import { autonomousActionSource } from "../repository/agency";
 import { liveSession } from "../repository/specialist";
 import type { Database } from "bun:sqlite";
 import { parseLlmJson } from "../../../infrastructure/llm-json";
-import { executionCallSession, type ChildExecution } from "../../tool-runtime";
+import {
+	executionCallSession,
+	isStandardExecutionSource,
+	type ChildExecution,
+} from "../../tool-runtime";
 import type { BoundCommandSet } from "../contracts/toolchains";
 import { byId } from "../repository";
 import type { DialogueDeps } from "./context";
@@ -18,8 +22,9 @@ import { specialistExecutionSource } from "./specialist-source";
 
 /** The existing command translator, with a real source turn and a separate child-call identity. */
 export function executionCommands(deps: DialogueDeps) {
-	const sourceOf = (db: Database, child: ChildExecution) =>
-		child.source.origin === "autonomous"
+	const sourceOf = (db: Database, child: ChildExecution) => {
+		if (!isStandardExecutionSource(child.source)) return null;
+		return child.source.origin === "autonomous"
 			? autonomousActionSource(db, child.source.runId, Date.now())
 			: child.source.specialistSessionId !== undefined
 				? specialistExecutionSource(
@@ -30,6 +35,7 @@ export function executionCommands(deps: DialogueDeps) {
 						child.source.specialistEpoch,
 					)
 				: executionSourceInTransaction(deps, db, child.source.runId);
+	};
 	function prepareInTransaction(
 		db: Database,
 		child: ChildExecution,
@@ -179,6 +185,8 @@ export function executionCommands(deps: DialogueDeps) {
 		execute,
 		sessionAvailableInTransaction: () => !!deps.specialist,
 		sessionHandoffInTransaction(db: Database, child: ChildExecution) {
+			if (!isStandardExecutionSource(child.source))
+				throw new Error("execution_source_invalid");
 			if (!deps.specialist) throw new Error("capability_unavailable");
 			const set = deps.specialist.setInTransaction(db, child.chainRevisionId);
 			const session = liveSession(db, child.source.conversationId);

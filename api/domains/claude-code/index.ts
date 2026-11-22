@@ -4,11 +4,16 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { Capabilities } from "../capabilities";
 import type { InferencePort } from "../inference";
 import type { QueueService } from "../queue";
+import {
+	isStandardExecutionSource,
+	isSupervisedExecutionSource,
+	type SupervisedExecutionSource,
+} from "../tool-runtime";
 import { type Host, type Runner, type Work } from "./contracts";
 import { DECISION_JOB, registerDecisionJobs } from "./jobs";
+import { drive, recover, tryRecovery } from "./driver";
 import { createTaskPort } from "./task";
 import {
-	acceptObservation,
 	authorityCurrent,
 	finish,
 	newId,
@@ -18,7 +23,14 @@ import {
 import { pending, read, save, terminal } from "./repository";
 
 export { migrations } from "./repository";
-export { adapterRef, type Runner, type Host } from "./contracts";
+export {
+	adapterRef,
+	type Runner,
+	type Host,
+	type ClaudeRunAuthorization,
+	type SupervisedAuthority,
+	type SupervisedView,
+} from "./contracts";
 const log = getLogger("claude-code");
 
 type Deps = {
@@ -43,33 +55,43 @@ export function createClaudeCode({
 	let maintenance: Promise<void> | undefined;
 	let closed = false;
 	let nextProbe = 0;
+	let nextRecoveryCheck = 0;
 	const abortJobs = new Set<string>();
-	const available = () =>
+	const configured = () =>
 		!closed &&
 		!!host &&
-		!!runner?.ready() &&
 		!!inference.captureUserControlInTransaction &&
 		!!inference.executeControl &&
 		!!inference.acceptInTransaction;
+	const available = () => configured() && !!runner?.ready();
+	const supervisedAvailable = () =>
+		configured() &&
+		!!host?.supervised &&
+		!!runner?.supportsSupervised?.() &&
+		!!runner.present &&
+		!!runner.recover &&
+		!!runner.approveTool;
 	function cancel(
 		db: Database,
 		work: Work,
 		reason: "cancel" | "amend" | "expired" | "forgotten",
+		operationId?: string,
 	) {
 		if (!host) return;
 		if (work.decisionId) {
 			queue.cancelInTransaction(db, work.decisionId, "cancel_requested");
 			abortJobs.add(work.decisionId);
 		}
-		requestStop(db, host, work, reason, now());
+		requestStop(db, host, work, reason, now(), operationId);
 		save(db, work, now());
 	}
 
 	registerDecisionJobs(queue, inference, () => host, now, kick);
-	const task = createTaskPort({
+	const { task, supervised } = createTaskPort({
 		capabilities,
 		getHost: () => host,
 		available,
+		supervisedAvailable,
 		now,
 		cancel,
 	});
@@ -80,6 +102,8 @@ export function createClaudeCode({
 			terminal(work) ||
 			work.decisionId ||
 			work.effect ||
+			work.supervision?.blocked === "verification_isolation_unavailable" ||
+			work.supervision?.blocked === "workspace_inputs_changed" ||
 			work.question
 		)
 			return;
@@ -98,7 +122,35 @@ export function createClaudeCode({
 			queueDecision(db, work, "progress");
 		} else {
 			if (!work.holdsWorkspace) {
-				if (!host.workspace.hold(db, work.id)) return;
+				const reservation = host.workspace.hold(
+					db,
+					work.id,
+					work.supervision?.authorization,
+				);
+				if (
+					!reservation ||
+					(work.supervision && typeof reservation !== "object")
+				) {
+					if (reservation) host.workspace.release(db, work.id, true);
+					if (work.supervision) {
+						const blocker = host.workspace.blocker?.(db, work.id);
+						const summary =
+							blocker?.state === "unknown"
+								? "他タスクの停止未確認のため起動を保留しています。"
+								: work.supervision.authorization.mode === "read"
+									? "読取り枠が空くまで待機しています。"
+									: "編集枠が空くまで待機しています。";
+						if (work.summary !== summary) {
+							work.summary = summary;
+							work.observedAt = now();
+							work.notice = newId();
+							save(db, work, now());
+						}
+					}
+					return;
+				}
+				if (work.supervision && typeof reservation === "object")
+					work.supervision.lease = reservation;
 				work.holdsWorkspace = true;
 			}
 			if (work.calls >= work.maxCalls)
@@ -118,7 +170,8 @@ export function createClaudeCode({
 			dedupeKey: newId(),
 			subjectRef: work.id,
 			concurrencyKey: `claude-code:${work.id}`,
-			lane: mode === "progress" ? "background" : "interactive",
+			lane:
+				work.supervision || mode === "progress" ? "background" : "interactive",
 			deadlineAtMs: work.deadline,
 			payload: { id: work.id },
 			maxAttempts: 1,
@@ -137,8 +190,12 @@ export function createClaudeCode({
 			abortJobs.clear();
 		}
 		if (!store.readSnapshot((db) => pending(db).length)) return;
+		const checkRecovery = now() >= nextRecoveryCheck;
+		if (checkRecovery) nextRecoveryCheck = now() + 5_000;
 		const rows = await store.write((db) => {
 			const external: Work[] = [];
+			const unconfirmed: { source: SupervisedExecutionSource; id: string }[] =
+				[];
 			for (const work of pending(db)) {
 				if (
 					!terminal(work) &&
@@ -156,16 +213,32 @@ export function createClaudeCode({
 							: "forgotten",
 					);
 				if (work.notice) {
-					if (currentHost.deliverInTransaction(db, view(work), work.notice)) {
+					const notice =
+						work.supervision && isSupervisedExecutionSource(work.source)
+							? currentHost.supervised?.observeInTransaction(
+									db,
+									work.source,
+									view(work),
+									work.notice,
+								)
+							: isStandardExecutionSource(work.source) &&
+								currentHost.deliverInTransaction(db, view(work), work.notice);
+					if (notice) {
 						work.deliveredNotice = work.notice;
 						work.notice = null;
 						save(db, work, now());
 					}
 				}
 				schedule(db, work);
-				if (work.executionId) external.push(work);
+				if (work.executionId && !terminal(work)) external.push(work);
+				if (
+					checkRecovery &&
+					work.stop === "unconfirmed" &&
+					isSupervisedExecutionSource(work.source)
+				)
+					unconfirmed.push({ id: work.id, source: work.source });
 			}
-			return external;
+			return { external, unconfirmed };
 		});
 		queue.wake();
 		if (abortJobs.size) {
@@ -173,60 +246,30 @@ export function createClaudeCode({
 			abortJobs.clear();
 		}
 		if (!runner) return;
-		await Promise.all(rows.map((work) => drive(currentHost, runner, work)));
-	}
-
-	async function drive(currentHost: Host, target: Runner, snapshot: Work) {
-		const executionId = snapshot.executionId!;
-		const effect = snapshot.effect;
-		let observation;
-		try {
-			observation =
-				effect?.kind === "start"
-					? await target.start(effect.operation)
-					: effect?.kind === "reply"
-						? await target.reply(
-								executionId,
-								effect.id,
-								effect.questionId,
-								effect.answer,
-							)
-						: effect?.kind === "stop"
-							? await target.stop(executionId, effect.id)
-							: await target.inspect(executionId);
-		} catch {
-			// Preserve the intent on transport failure. An elapsed deadline never authorizes a fresh execution.
-			if (effect?.kind !== "stop" || (snapshot.stopAt ?? Infinity) > now())
-				return;
-			observation = null;
-		}
-		if (
-			effect?.kind === "stop" &&
-			(snapshot.stopAt ?? Infinity) <= now() &&
-			!observation?.managedExecutionStopped
-		)
-			observation = null;
-		await store.write((db) => {
-			const work = read(db, snapshot.id);
-			if (
-				!work ||
-				work.generation !== snapshot.generation ||
-				work.executionId !== executionId ||
-				work.effect?.kind !== effect?.kind ||
-				!acceptObservation(db, currentHost, work, observation)
-			)
-				return;
-			if (
-				work.status !== "waiting_child" &&
-				snapshot.decisionMode === "progress" &&
-				snapshot.decisionId
-			) {
-				queue.cancelInTransaction(db, snapshot.decisionId, "cancel_requested");
-				abortJobs.add(snapshot.decisionId);
-				if (work.decisionId === snapshot.decisionId) work.decisionId = null;
-			}
-			save(db, work, now());
-		});
+		await Promise.all(
+			rows.external.map((work) =>
+				drive(
+					{
+						store,
+						now,
+						cancel,
+						cancelDecision(db, jobId) {
+							queue.cancelInTransaction(db, jobId, "cancel_requested");
+							abortJobs.add(jobId);
+						},
+					},
+					currentHost,
+					runner,
+					work,
+				),
+			),
+		);
+		if (runner.supportsSupervised?.())
+			await Promise.all(
+				rows.unconfirmed.map(({ id, source }) =>
+					tryRecovery((proof) => recoverSupervised(source, id, proof)),
+				),
+			);
 	}
 
 	function kick() {
@@ -242,15 +285,43 @@ export function createClaudeCode({
 			});
 		return maintenance;
 	}
+	async function recoverSupervised(
+		source: SupervisedExecutionSource,
+		id: string,
+		proof: "process_exit" | "host_reboot",
+	) {
+		const currentHost = host;
+		if (!currentHost || !runner) return false;
+		const recovered = await recover(
+			store,
+			currentHost,
+			runner,
+			id,
+			proof,
+			(db) => !!supervised.viewInTransaction(db, source, id),
+			now,
+		);
+		if (recovered) {
+			nextProbe = 0;
+			void kick();
+		}
+		return recovered;
+	}
 	return {
 		task,
+		supervised,
 		availableInTransaction: available,
+		supervisedAvailableInTransaction: supervisedAvailable,
 		configure(value: Host) {
 			host = value;
 		},
 		sourceRunInTransaction(db: Database, id: string) {
-			return read(db, id)?.source.runId ?? null;
+			const work = read(db, id);
+			return work && isStandardExecutionSource(work.source)
+				? work.source.runId
+				: null;
 		},
+		recoverSupervised,
 		recover: kick,
 		start() {
 			timer ??= setInterval(kick, 500);

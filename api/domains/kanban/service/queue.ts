@@ -13,7 +13,7 @@ import {
 	type RunRow,
 } from "../repository/runs";
 import { noticeText, QUEUE_PAUSED_TEXT } from "./text";
-import { readWorkspaceGuard } from "../repository/workspace-guard";
+import { readWorkspaceGuards } from "../repository/workspace-guard";
 
 const dispatchOf = (run: RunRow): KanbanDispatch => ({
 	runId: run.id,
@@ -92,12 +92,15 @@ export function createQueue(core: Core) {
 		const registered = core.executor(executorId);
 		if (!registered.available || registered.revision !== next.executorRevision)
 			return undefined;
-		const guard = readWorkspaceGuard(tx, next.workspaceRef);
+		const guards = readWorkspaceGuards(tx, next.workspaceRef);
 		if (
-			guard &&
-			(guard.state !== "held" ||
-				guard.ownerRef !== `kanban:${next.cardId}` ||
-				guard.executorId !== executorId)
+			guards.some(
+				(guard) =>
+					guard.state !== "held" ||
+					guard.mode !== "exclusive" ||
+					guard.ownerRef !== `kanban:${next.cardId}` ||
+					guard.executorId !== executorId,
+			)
 		)
 			return undefined;
 		transitionRun(tx, next.id, ["queued"], {

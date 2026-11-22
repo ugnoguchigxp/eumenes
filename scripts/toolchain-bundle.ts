@@ -45,6 +45,7 @@ const BACKENDS = [
 	"steward",
 	"world-query",
 	"weather",
+	"development-supervision",
 	"stock",
 ];
 const USAGE =

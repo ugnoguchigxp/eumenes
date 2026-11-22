@@ -1,9 +1,18 @@
 import { type DragEvent, Fragment, useId, useRef } from "react";
 import { KanbanCard, type KanbanCardProps } from "./KanbanCard";
 import { dropBeforeId, type MovableColumn } from "./positions";
-import type { KanbanBoardCard, KanbanBoardColumn } from "./types";
+import type {
+	KanbanBoardCard,
+	KanbanBoardColumn,
+	KanbanBoardProps,
+} from "./types";
+import { type ConditionDraft, SupervisedRow } from "./SupervisedRow";
 
 type KanbanColumnProps = Omit<KanbanCardProps, "card" | "dragging"> & {
+	supervisedRows?: KanbanBoardProps["supervisedRows"];
+	drafts: Record<string, ConditionDraft>;
+	onDraft: (taskId: string, draft: ConditionDraft | null) => void;
+	onSupervisedControl?: KanbanBoardProps["onSupervisedControl"];
 	id: KanbanBoardColumn;
 	label: string;
 	description: string;
@@ -26,11 +35,16 @@ export function KanbanColumn({
 	onDropTarget,
 	onDropLeave,
 	onDropCard,
+	supervisedRows,
+	onSupervisedControl,
+	drafts,
+	onDraft,
 	...card
 }: KanbanColumnProps) {
 	const labelId = useId();
 	const list = useRef<HTMLUListElement>(null);
 	const items = card.cards.filter((c) => c.column === id);
+	const supervised = supervisedRows?.filter((row) => row.column === id) ?? [];
 	const accepts = id !== "running" && draggingId !== null;
 
 	const beforeAt = (event: DragEvent): string | null => {
@@ -60,7 +74,7 @@ export function KanbanColumn({
 		>
 			<h3 className="kanban-column-head">
 				<span id={labelId}>{label}</span>
-				<span className="kanban-count">{items.length}</span>
+				<span className="kanban-count">{items.length + supervised.length}</span>
 			</h3>
 			<p className="kanban-column-description">{description}</p>
 			{/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- handles keys or drag events that bubble up from its interactive children */}
@@ -84,9 +98,9 @@ export function KanbanColumn({
 					onDropCard(id as MovableColumn, beforeAt(event));
 				}}
 			>
-				{items.length === 0 && dropBefore === undefined && (
-					<li className="kanban-empty">{empty}</li>
-				)}
+				{items.length === 0 &&
+					supervised.length === 0 &&
+					dropBefore === undefined && <li className="kanban-empty">{empty}</li>}
 				{items.map((c: KanbanBoardCard) => (
 					<Fragment key={c.id}>
 						{dropBefore === c.id && c.id !== draggingId && line}
@@ -94,6 +108,16 @@ export function KanbanColumn({
 					</Fragment>
 				))}
 				{dropBefore === null && line}
+				{supervised.map((row) => (
+					<SupervisedRow
+						key={row.taskId}
+						row={row}
+						draft={drafts[row.taskId]}
+						onDraft={onDraft}
+						onControl={onSupervisedControl}
+						busy={card.busy}
+					/>
+				))}
 			</ul>
 		</section>
 	);

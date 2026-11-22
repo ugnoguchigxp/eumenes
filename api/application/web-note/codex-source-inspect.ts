@@ -198,7 +198,7 @@ export async function createCodexSourceInspect(
 						},
 					},
 					configOverrides: [...permissions(directory), "mcp_servers={}"],
-					prompt: `${prompt}\n\n現在のコードは source/、比較用の元コードは before/ にあります。根拠の行番号は現在のコードを使い、削除されたファイルだけ元コードを使います。path は source/ や before/ を含めないリポジトリ相対パスです。depth は依頼に応じて small・medium・large を選び、指定がなければ medium とします。概要はパス、ハッシュ、コード抜粋を含めない短い日本語にします。`,
+					prompt: `${prompt}\n\n現在のコードは source/、比較用の元コードは before/ にあります。根拠の行番号は現在のコードを使い、削除されたファイルだけ元コードを使います。path は source/ や before/ を含めないリポジトリ相対パスです。symbol は根拠が属する関数や型の名前です。該当しなければ null にします。depth は依頼に応じて small・medium・large を選び、指定がなければ medium とします。概要はパス、ハッシュ、コード抜粋を含めない短い日本語にします。`,
 					signal,
 				});
 				if (turn.searches)
@@ -218,6 +218,7 @@ export async function createCodexSourceInspect(
 								endLine,
 								signal,
 							),
+						commit,
 					),
 					usage: turn.usage,
 				};

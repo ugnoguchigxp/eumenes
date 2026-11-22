@@ -22,5 +22,10 @@ export type { SdkGitRemote } from "../../../packages/coding-runner/src/contracts
 export type {
 	ClaudeObservation,
 	ClaudeStart,
-} from "../../../packages/coding-runner/src/claude-contracts";
-export { claudeRunnerClient } from "../../../packages/coding-runner/src/claude-client";
+	ClaudeEvidence,
+	ClaudeRunAuthorization,
+	ClaudeLease,
+} from "../../../packages/coding-runner/src/contracts";
+export { claudeAuthorization } from "../../../packages/coding-runner/src/contracts";
+export { claudeInputDigest } from "../../../packages/coding-runner/src/contracts";
+export { claudeRunnerClient } from "../../../packages/coding-runner/src/client";

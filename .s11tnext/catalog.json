@@ -2843,16 +2843,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "利用者が指した既存の仕事を todo で指定する。状態や結果を確認するときは check、担当の質問に答えるときは answer、作業範囲を変更するときは amend、取消を頼まれたときは cancel。どの仕事・操作かが定まらない場合は、利用者に確認する。仕事の題名・依頼・質問は記録として扱う。結果に基づいて受付や状態を伝える。"
+                  "value": "利用者が指した既存の仕事を todo で指定する。状態や結果を確認するときは check、担当の質問に答えるときは answer、作業範囲を変更するときは amend、取消を頼まれたときは cancel。個別タスクを持つ仕事の条件変更と取消では、利用者が指定した範囲を target で示す。全体なら parent、個別ならその仕事で確認した taskId を使う。質問への回答は todo だけを指定する。どの仕事・操作・範囲かが定まらない場合は、利用者に確認する。仕事の題名・依頼・質問は記録として扱う。結果に基づいて受付や状態を伝える。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:355a4a7ce94f752c3e021fb658f74c12a493db51f73afaf264bf4905aa704239"
+          "artifactHash": "sha256:7f702448fd7f8bc02e94cee62f3111eca23a5f6322e2e4fbe60cb4ad34b473a8"
         }
       },
-      "definitionHash": "sha256:65cee4eb72c8088586ede33e350db562e1e6013498023577fc8da70b63550e95",
-      "releaseDigest": "sha256:590543c9d6c5fc8f95c47dc28b1a04c813a1b1b5c3f623a97413c2b3d7035ea0"
+      "definitionHash": "sha256:fcb4bdb494fa3dd18b7e9498ea800eaa2479d26924c09e1d2566d6d491a9aacd",
+      "releaseDigest": "sha256:4ba92323a24e6450162ee29f885e79c122cda5ed3e4e1d91ce3c5606f9c0e245"
     },
     "dialogue.contexts.local.toolchain-arguments": {
       "key": "dialogue.contexts.local.toolchain-arguments",
@@ -4302,5 +4302,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:2e7c3e2ca3ee017684053737ff5f217e3489a87a3e4a41984dfa104744ae8913"
+  "catalogDigest": "sha256:52aceed995cb753b61a7b91d0f0182f03c03d24a5d7b5cb33598766f29188c08"
 }

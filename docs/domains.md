@@ -63,6 +63,7 @@
 | `scheduler` | 1 | `api/domains/scheduler/index.ts` | `web/src/domains/scheduler/` | なし | `queue` | なし | なし |
 | `timers` | 2 | `api/domains/timers/index.ts` | `web/src/domains/timers/` | `web/src/components/domains/timers/` | `queue`、`scheduler` | `resources` | なし |
 | `pursuit` | 3 | `api/domains/pursuit/index.ts` | なし | なし | `capabilities`、`resources`、`tool-runtime` | なし | なし |
+| `development-supervision` | 3 | `api/domains/development-supervision/index.ts` | なし | なし | `capabilities`、`inference`、`queue`、`tool-runtime` | なし | なし |
 | `claude-code` | 3 | `api/domains/claude-code/index.ts` | なし | なし | `capabilities`、`coding`、`inference`、`queue`、`tool-runtime` | なし | なし |
 | `web-note` | 3 | `api/domains/web-note/index.ts` | なし | なし | `capabilities`、`queue`、`tool-runtime` | なし | なし |
 | `dialogue` | 5 | `api/domains/dialogue/index.ts` | `web/src/domains/dialogue/index.ts` | なし | `agent-runtime`、`capabilities`、`continuity`、`conversation`、`delivery`、`inference`、`memory`、`queue`、`resources`、`scheduler`、`toolchain-history`、`tool-runtime` | `conversation` | `goals` |

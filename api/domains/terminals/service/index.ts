@@ -106,7 +106,9 @@ export function createTerminals(options: TerminalsOptions = {}) {
 			}
 		})();
 	};
-	const sessions = createSessions(rt, ledger, trackingLost);
+	const sessions = createSessions(rt, ledger, trackingLost, (session) =>
+		releaseDirectWorkspace(rt, workspaceIdentity(session), session),
+	);
 	const dispatcher = createDispatcher(rt, ledger, sessions);
 	const applyHook = createHookEvents(rt, ledger, trackingLost);
 
@@ -265,6 +267,8 @@ export function createTerminals(options: TerminalsOptions = {}) {
 		 * Nothing is dispatched before this has completed.
 		 */
 		async recover() {
+			// Consult the saved PTY observation before ledger recovery updates its timestamp.
+			if (options.workspace) await options.workspace.recoverDirect(options.cwd);
 			await ledger.recover();
 			recovered = true;
 			rt.kick();

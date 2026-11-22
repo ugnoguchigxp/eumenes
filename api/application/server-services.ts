@@ -31,6 +31,7 @@ import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contract
 import { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
 import { createSchedulerDiagnostics } from "./scheduler/scheduler-diagnostics";
+import { configureDevelopmentSupervision } from "./work/development-supervision-host";
 import { configureTaskExecution } from "./toolchain/task-execution-port";
 import { forgetRetiredResearch } from "./pursuit/forget-research";
 import { toolchainForgetPurge } from "./toolchain/toolchain-forget";
@@ -305,6 +306,7 @@ export async function buildServices(
 	});
 	const resources = buildResources({
 		store,
+		markdown,
 		retireUiCompositions: true,
 		capabilities: toolchain.capabilities,
 		gateway: media.gateway,
@@ -430,12 +432,13 @@ export async function buildServices(
 	workflow.attachDialogue(dialogue);
 	links.attachDialogue(dialogue);
 	knowledge.attachDialogue(dialogue);
-	if (enabled && toolchains)
+	if (enabled && toolchains) {
 		agencyExecution = configureTaskExecution({
 			settings,
 			...workflowPorts,
 			webNote: toolchain.webNote,
 			claudeCode: toolchain.claudeCode,
+			developmentSupervision: toolchain.developmentSupervision,
 			collaboration: toolchain.collaboration,
 			interact: browser.interact,
 			queue,
@@ -458,10 +461,40 @@ export async function buildServices(
 			legacy: taskLegacyPorts(dialogue),
 			resources: resources.access.registry,
 		});
+		configureDevelopmentSupervision({
+			supervisor: toolchain.developmentSupervision,
+			store,
+			inference,
+			execution: agencyExecution,
+			capabilities: toolchain.capabilities,
+			note: toolchain.webNote,
+			claude: toolchain.claudeCode,
+			markdown,
+			dialogue,
+			knowledge,
+			checkout: process.cwd(),
+			context: {
+				memory,
+				goals: goals.goals,
+				...(world
+					? {
+							world: {
+								store,
+								service: world.service,
+								documents: world.documents,
+							},
+						}
+					: {}),
+			},
+		});
+	}
 	agency.attachWork(createAgencyWork({ dialogue }));
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
 	memory.registerForgetPurge(toolchainForgetPurge(toolchain));
+	memory.registerForgetPurge((db, purge) =>
+		knowledge.forgetSupervisionSourcesInTransaction(db, purge.messageIds),
+	);
 	memory.registerForgetPurge((db, purge) => {
 		forgetRetiredResearch(
 			db,

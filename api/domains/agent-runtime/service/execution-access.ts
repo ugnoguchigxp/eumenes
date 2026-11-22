@@ -215,7 +215,7 @@ export function executionAccess(
 			return (
 				db
 					.query(
-						"SELECT r.reference_json FROM agent_execution_refs r JOIN agent_executions e ON e.id=r.execution_id WHERE e.conversation_id=? AND json_extract(r.reference_json,'$.owner')='agent-runtime' AND COALESCE(json_extract(e.source_json,'$.origin'),'')!='workflow' ORDER BY e.updated_at DESC LIMIT 8",
+						"SELECT r.reference_json FROM agent_execution_refs r JOIN agent_executions e ON e.id=r.execution_id WHERE e.conversation_id=? AND e.source_json IS NOT NULL AND json_extract(r.reference_json,'$.owner')='agent-runtime' AND (json_type(e.source_json,'$.origin') IS NULL OR json_extract(e.source_json,'$.origin')='autonomous') AND json_type(e.source_json,'$.delegation') IS NULL ORDER BY e.updated_at DESC LIMIT 8",
 					)
 					.all(conversationId) as { reference_json: string }[]
 			).map((r) => executionReference.parse(JSON.parse(r.reference_json)));

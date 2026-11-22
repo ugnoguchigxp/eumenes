@@ -5,6 +5,20 @@
  */
 
 export type KanbanBoardColumn = "todo" | "running" | "finished";
+export type SupervisedBoardRow = {
+	parentId: string;
+	taskId: string;
+	parentRevision: number;
+	revision: number;
+	title: string;
+	column: KanbanBoardColumn;
+	reason: string;
+	designRevision?: number | null;
+	blockerRef?: string;
+	evidenceRefs?: string[];
+	result?: { summary: string; fulfilled: string[]; missing: string[] } | null;
+	outcome?: "succeeded" | "partial" | "failed" | "cancelled" | "interrupted";
+};
 
 /** Actions a card may offer; the host lists only the allowed ones for each card. */
 export type KanbanCardAction =
@@ -82,6 +96,13 @@ export type KanbanBoardQueue = {
 export type KanbanBoardProps = {
 	title?: string;
 	cards: KanbanBoardCard[];
+	supervisedRows?: readonly SupervisedBoardRow[];
+	/** A negative receipt keeps the condition draft available for correction. */
+	onSupervisedControl?: (
+		row: SupervisedBoardRow,
+		action: "amend" | "cancel",
+		request?: string,
+	) => void | boolean | Promise<void | boolean>;
 	queue: KanbanBoardQueue;
 	executors?: readonly KanbanExecutorChoice[];
 	queues?: Array<KanbanBoardQueue & { executorId: string; label: string }>;

@@ -8,6 +8,13 @@ import {
 	choiceRound,
 } from "../toolchain/conversation-script.fixture";
 import { waitFor } from "../../infrastructure/wait-for";
+import { createAgencyStatePort } from "../../domains/dialogue";
+import {
+	archiveWork,
+	dropRunResults,
+	insertWork,
+	updateWork,
+} from "../../domains/dialogue/test/store.fixture";
 
 const observation = "左上の画素は RGB 235, 130, 110。";
 const followUp = "受け取った画像の特徴は？";
@@ -19,7 +26,11 @@ for (const scenario of [
 	"withdrawn",
 ] as const)
 	test(`generated image delivery and native inference input: ${scenario}`, async () => {
-		const f = imageFixture();
+		const imageGate = Promise.withResolvers<void>();
+		const f = imageFixture(
+			"success",
+			scenario === "observed" ? imageGate.promise : undefined,
+		);
 		const gate = Promise.withResolvers<void>();
 		const transport = imageLarmFixture({
 			response: observation,
@@ -28,8 +39,20 @@ for (const scenario of [
 		});
 		let followUpContext = "";
 		let observedModelCalls = 0;
+		const state = createAgencyStatePort({ now: Date.now });
 		const h = await harness({
 			resources: true,
+			memory: scenario === "observed",
+			agency: {
+				isCurrentInputInTransaction(db, input) {
+					return (
+						(h.memory?.referenceInputs.isCurrentInTransaction(db, input) ??
+							true) &&
+						!state.staleSourcesInTransaction(db, input.sources).length
+					);
+				},
+				workChangedInTransaction() {},
+			},
 			observeGeneratedImages: true,
 			imageGateway: () => {
 				const gateway = f.gateway();
@@ -76,12 +99,66 @@ for (const scenario of [
 				presentation: "artifact",
 				...(scenario === "observed" ? {} : { toolchainId: "image.create" }),
 			};
+			const priorRunId = crypto.randomUUID();
+			const priorWork =
+				scenario === "observed"
+					? await h.store.write((db) => {
+							h.memory!.referenceInputs.recordRunInTransaction(db, priorRunId, {
+								sources: [],
+								complete: true,
+							});
+							return insertWork(db, {
+								id: crypto.randomUUID(),
+								conversationId: request.conversationId,
+								runId: priorRunId,
+								toolchainId: "web.note",
+								toolchainRevisionId: "toolchain:web.note@1",
+								execution: "queued",
+								request: "天気を調べて",
+								title: "天気",
+								sourceRef: null,
+								dedupeKey: priorRunId,
+								createdAt: new Date().toISOString(),
+								messageIds: [],
+							});
+						})
+					: undefined;
 			const submission = await h.request("/api/runs", request);
 			expect(submission.status).toBe(202);
 			const { id, inputMessageId } = await submission.json();
 			expect((await (await h.request("/api/runs", request)).json()).id).toBe(
 				id,
 			);
+			if (priorWork) {
+				await waitFor(() =>
+					f.requests.some(
+						({ method, path }) =>
+							method === "POST" && path === "/v1/images/generations",
+					),
+				);
+				const priorRef = `host-work:${JSON.stringify([priorWork.id, priorWork.revision])}`;
+				await h.store.write((db) => {
+					expect(
+						h.memory!.referenceInputs.readRunInTransaction(db, id)?.sources,
+					).toContain(priorRef);
+					const at = new Date().toISOString();
+					expect(
+						updateWork(
+							db,
+							priorWork.id,
+							priorWork.revision,
+							{
+								status: "done",
+								outcome: "succeeded",
+								result: { summary: "晴れ" },
+							},
+							at,
+						),
+					).toBe(true);
+					expect(archiveWork(db, priorWork.id, at)).toBe(true);
+				});
+				imageGate.resolve();
+			}
 			expect(
 				(await h.dialogue.waitForTerminal(id, { timeoutMs: 5000 }))?.status,
 			).toBe("completed");
@@ -182,7 +259,12 @@ for (const scenario of [
 			).toBe("completed");
 			expect(followUpContext).toContain(observation);
 			expect(observedModelCalls).toBe(1);
+			await h.store.write((db) =>
+				dropRunResults(db, priorRunId, new Date().toISOString()),
+			);
+			expect(JSON.stringify(await notices())).not.toContain(observation);
 		} finally {
+			imageGate.resolve();
 			gate.resolve();
 			await h.close();
 		}

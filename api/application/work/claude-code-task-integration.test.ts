@@ -88,17 +88,32 @@ async function fixture() {
 		},
 	};
 	const inference = {
-		captureUserControlInTransaction: () => "request",
-		executeControl: async () => ({
-			requestId: "request",
-			attemptId: "attempt",
-			value: JSON.stringify({
-				action: "invoke",
-				summary: "作業を依頼しました",
-				memo: "",
-				instruction: "Use the requested value.",
-			}),
-		}),
+		captureUserControlInTransaction: ((_, input) => {
+			expect(input.subject).toMatch(/^claude-code:[\da-f-]+-0-1$/);
+			expect(input.deadline).toBeGreaterThan(Date.now());
+			expect(input.deadline).toBeLessThanOrEqual(Date.now() + input.attemptMs!);
+			expect(input.attemptMs).toBeLessThanOrEqual(120_000);
+			return "request";
+		}) satisfies NonNullable<InferencePort["captureUserControlInTransaction"]>,
+		executeControl: (async (_, _messages, _signal, contract) => {
+			expect(contract?.outputSchema).toMatchObject({
+				type: "object",
+				required: ["decision"],
+				additionalProperties: false,
+			});
+			return {
+				requestId: "request",
+				attemptId: "attempt",
+				value: JSON.stringify({
+					decision: {
+						action: "invoke",
+						summary: "作業を依頼しました",
+						memo: "",
+						instruction: "Use the requested value.",
+					},
+				}),
+			};
+		}) satisfies NonNullable<InferencePort["executeControl"]>,
 		acceptInTransaction: () => true,
 	} as unknown as InferencePort;
 	service = createClaudeCode({ store, queue, capabilities, inference, runner });

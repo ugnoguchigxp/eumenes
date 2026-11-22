@@ -173,6 +173,7 @@ export function createSessions(
 	rt: Runtime,
 	ledger: Ledger,
 	trackingLost: (session: Session) => void,
+	releaseWorkspace: (session: Session) => Promise<void>,
 ) {
 	const { options } = rt;
 	const spawn = options.spawn ?? bunSpawnPty(options.cwd);
@@ -232,6 +233,7 @@ export function createSessions(
 		session.exitCode = code;
 		session.endedAt = rt.nowIso();
 		session.closing = false;
+		const released = releaseWorkspace(session);
 		endListeners(session);
 		session.exitDone();
 		log.info("terminals.exited", {
@@ -255,6 +257,7 @@ export function createSessions(
 				log.warn("terminals.finish_save_failed", { attemptId: flight.id });
 			}
 		}
+		await released;
 		prune();
 		rt.changed();
 		rt.kick();

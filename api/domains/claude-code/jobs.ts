@@ -25,13 +25,14 @@ export function registerDecisionJobs(
 		prepareInTransaction(db, claim) {
 			const host = getHost();
 			const work = read(db, claim.payload.id);
-			if (!host || !work || !currentDecision(host, db, work, claim.jobId))
+			const at = now();
+			if (!host || !work || !currentDecision(host, db, work, claim.jobId, at))
 				return { status: "stale", reason: "claude_decision_stale" };
 			work.calls++;
 			if (work.decisionMode === "progress") work.progressCalls++;
-			const requestId = capture(db, inference, work);
+			const requestId = capture(db, inference, work, at);
 			if (!requestId) throw new Error("claude_decision_unavailable");
-			save(db, work, now());
+			save(db, work, at);
 			return { status: "ready", input: { work, requestId } };
 		},
 		execute: ({ work, requestId }, { signal }) =>
@@ -39,7 +40,11 @@ export function registerDecisionJobs(
 		settleInTransaction(db, claim, _input, outcome) {
 			const host = getHost();
 			const work = read(db, claim.payload.id);
-			if (!host || !work || !currentDecision(host, db, work, claim.jobId))
+			if (
+				!host ||
+				!work ||
+				!currentDecision(host, db, work, claim.jobId, now())
+			)
 				return "stale";
 			work.decisionId = null;
 			if (work.decisionMode === "progress") {
@@ -77,12 +82,19 @@ export function registerDecisionJobs(
 	});
 }
 
-function currentDecision(host: Host, db: Database, work: Work, jobId: string) {
+function currentDecision(
+	host: Host,
+	db: Database,
+	work: Work,
+	jobId: string,
+	now: number,
+) {
 	return (
 		work.decisionId === jobId &&
 		work.status ===
 			(work.decisionMode === "progress" ? "waiting_child" : "deciding") &&
 		!work.forgotten &&
+		work.deadline > now &&
 		authorityCurrent(host, db, work)
 	);
 }

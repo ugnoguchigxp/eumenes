@@ -13,6 +13,8 @@ import {
 	describeMarkdownAdapter,
 	markdownDomainSchemas,
 } from "../markdown/markdown-adapter";
+import { supervisedControl } from "../work/supervision-board";
+import { describeSupervisionAdapter } from "../work/supervision-adapter";
 import { describeClaudeCodeTaskAdapter } from "../work/claude-code-task-adapter";
 import {
 	describeInspectSourceAdapter,
@@ -186,6 +188,7 @@ import {
 /** `domain:` result schemas registered by the host's adapters. */
 const domainSchemas: Readonly<Record<string, ZodType>> = {
 	...dotsWorkDomainSchemas,
+	"domain:kanban.supervised-control@1": supervisedControl,
 	...doclingDomainSchemas,
 	...canvasDomainSchemas,
 	...markdownDomainSchemas,
@@ -265,6 +268,10 @@ export const hostAdapterDescriptions: Array<
 	{ ref: TASK_ADAPTER_REF, describe: describeTaskAdapter },
 	{ ref: "adapter:web-note@1", describe: describeWebNoteAdapter },
 	{ ref: INSPECT_SOURCE_ADAPTER, describe: describeInspectSourceAdapter },
+	{
+		ref: "adapter:development-supervision@1",
+		describe: describeSupervisionAdapter,
+	},
 	{
 		ref: "adapter:claude-code-task@1",
 		describe: describeClaudeCodeTaskAdapter,

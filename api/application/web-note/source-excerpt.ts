@@ -1,4 +1,12 @@
 import { join } from "node:path";
+import { sha256Hex } from "../../infrastructure/digest";
+import { sourceLines } from "./source-snapshot";
+
+export type SourceExcerpt = {
+	kind: "diff" | "code";
+	text: string;
+	digest: string;
+};
 
 function boundedHunk(hunk: string) {
 	const [header, ...lines] = hunk.trimEnd().split("\n");
@@ -23,7 +31,7 @@ export async function sourceExcerpt(
 	start: number,
 	end: number,
 	signal: AbortSignal,
-): Promise<{ kind: "diff" | "code"; text: string } | null> {
+): Promise<SourceExcerpt | null> {
 	signal.throwIfAborted();
 	const before = old ? join(base, path) : "/dev/null";
 	const after = current ? join(working, path) : "/dev/null";
@@ -38,24 +46,27 @@ export async function sourceExcerpt(
 		process.exited,
 	]);
 	signal.throwIfAborted();
+	if (exit > 1 || (!current && !old)) return null;
+	const contents = await Bun.file(current ? after : before).arrayBuffer();
+	signal.throwIfAborted();
+	const lines = sourceLines(Buffer.from(contents));
+	if (!lines || end > lines.length) return null;
+	const digest = sha256Hex(lines.slice(start - 1, end).join("\n"));
 	if (exit === 1) {
 		const hunks = output.split(/(?=^@@ )/mu).slice(1);
-		const selected =
-			hunks.find((hunk) => {
-				const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/u.exec(hunk);
-				if (!match) return false;
-				const line = Number(match[1]);
-				return line <= end && line + Number(match[2] ?? 1) >= start;
-			}) ?? hunks[0];
-		return selected ? { kind: "diff", text: boundedHunk(selected) } : null;
+		const side = current ? 3 : 1;
+		const selected = hunks.find((hunk) => {
+			const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/u.exec(hunk);
+			if (!match) return false;
+			const line = Number(match[side]);
+			const count = Number(match[side + 1] ?? 1);
+			return line <= end && line + Math.max(0, count - 1) >= start;
+		});
+		if (selected) return { kind: "diff", text: boundedHunk(selected), digest };
 	}
-	if (exit !== 0 || !current) return null;
-	const contents = await Bun.file(after).text();
 	return {
 		kind: "code",
-		text: contents
-			.split("\n")
-			.slice(start - 1, Math.min(end, start + 17))
-			.join("\n"),
+		text: lines.slice(start - 1, Math.min(end, start + 17)).join("\n"),
+		digest,
 	};
 }

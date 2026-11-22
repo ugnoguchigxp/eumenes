@@ -266,7 +266,7 @@
 		{
 			"kind": "skill",
 			"id": "claude-code.repair",
-			"revision": 3,
+			"revision": 4,
 			"title": "エラー修正の依頼手順",
 			"summary": "分析・評価・改善案・実装の順序と報告の形",
 			"aliases": [],
@@ -279,7 +279,7 @@
 		{
 			"kind": "package",
 			"id": "claude-code.repair",
-			"revision": 3,
+			"revision": 4,
 			"title": "エラー修正",
 			"summary": "発生したエラーを Claude Code に調べさせ、承認された範囲で修正させる",
 			"aliases": [],
@@ -291,19 +291,20 @@
 			],
 			"dependencies": [
 				"profile:claude-code.repair@2",
-				"skill:claude-code.repair@3",
+				"skill:claude-code.repair@4",
 				"tool:claude-code.request@2"
 			],
 			"backend": "claude-code",
 			"schemaKey": "claudeCodeRequest",
 			"profileRevisionId": "profile:claude-code.repair@2",
-			"requiredSkillRevisionIds": ["skill:claude-code.repair@3"],
+			"requiredSkillRevisionIds": ["skill:claude-code.repair@4"],
 			"toolRevisionIds": ["tool:claude-code.request@2"]
 		},
 		{
 			"kind": "toolchain",
 			"id": "claude-code.repair",
-			"revision": 3,
+			"revision": 5,
+			"publishFromRevision": 2,
 			"title": "エラー修正",
 			"summary": "発生したエラーを Claude Code に調べさせ、承認された範囲で修正させる",
 			"aliases": [],
@@ -318,13 +319,45 @@
 				"エラーの意味や一般的な説明を聞いているだけ",
 				"Claude Code の使い方を聞いているだけ"
 			],
-			"dependencies": ["package:claude-code.repair@3"],
+			"dependencies": ["package:claude-code.repair@4"],
 			"examples": [
 				"このエラーを調べて修正して",
 				"さっき失敗した実行の原因を調べて直して",
 				"エラーが出たので、調べて修正を頼みたい"
 			],
-			"packageRevisionId": "package:claude-code.repair@3",
+			"packageRevisionId": "package:claude-code.repair@4",
+			"functionName": "repair_error",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.repair@3",
+			"artifactRevisionId": "artifact:terminals.workspace@2",
+			"minImpact": "modify_existing"
+		},
+		{
+			"kind": "toolchain",
+			"id": "claude-code.repair",
+			"revision": 6,
+			"publishFromRevision": 3,
+			"title": "エラー修正",
+			"summary": "発生したエラーを Claude Code に調べさせ、承認された範囲で修正させる",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"発生したエラーの原因調査と修正を頼みたい",
+				"失敗した実行を調べて直してほしい",
+				"Eumenes の機能を確認した結果を根拠に、Claude Code に原因を調べさせたい"
+			],
+			"avoidWhen": [
+				"エラーが起きていない作業を頼みたい",
+				"エラーの意味や一般的な説明を聞いているだけ",
+				"Claude Code の使い方を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.repair@4"],
+			"examples": [
+				"このエラーを調べて修正して",
+				"さっき失敗した実行の原因を調べて直して",
+				"エラーが出たので、調べて修正を頼みたい"
+			],
+			"packageRevisionId": "package:claude-code.repair@4",
 			"functionName": "repair_error",
 			"redirects": [],
 			"bindingRevisionId": "binding:claude-code.repair@3",

@@ -50,6 +50,7 @@ export function dispatchInTransaction(
 		inputs?: Record<string, unknown>;
 		diagnosticRef?: string;
 		references: ExecutionReference[];
+		confirmationId?: string;
 		/** A command toolchain's question this run answers: the interaction it resumes. */
 		interactionId?: string;
 	},
@@ -157,6 +158,9 @@ export function dispatchInTransaction(
 			if ((!agents && !task) || !source)
 				return { ok: false, code: "execution_source_invalid" };
 			const view = (task ?? agents!.executions).startInTransaction(tx, {
+				...(input.confirmationId
+					? { confirmationId: input.confirmationId }
+					: {}),
 				source,
 				request,
 				references: input.references,

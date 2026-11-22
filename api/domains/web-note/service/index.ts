@@ -1,8 +1,15 @@
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
-import { executionControl, type TaskLifecyclePort } from "../../tool-runtime";
+import { hash } from "../../capabilities";
+import {
+	executionControl,
+	isStandardExecutionSource,
+	isSupervisedExecutionSource,
+	type SupervisedExecutionSource,
+	type TaskLifecyclePort,
+} from "../../tool-runtime";
 import type { HostState, SourcePort } from "../contracts";
-import { active, rowOf } from "../repository";
+import { active, rowOf, stateOf } from "../repository";
 import {
 	ADAPTER,
 	INSPECT_SOURCE_ADAPTER,
@@ -47,80 +54,124 @@ export function createWebNote(deps: WebNoteDeps) {
 	};
 	registerJobs(ctx);
 
-	const task: TaskLifecyclePort = {
-		startInTransaction(db, input) {
-			if (closed || !source) throw new Error("web_note_unavailable");
-			if (!input.toolchainRevisionId || !input.bindingRevisionId)
-				throw new Error("web_note_unavailable");
-			if (!source.validSourceInTransaction(db, input.source))
+	type Start = Parameters<TaskLifecyclePort["startInTransaction"]>[1];
+	function startInTransaction(
+		db: Database,
+		input: Start,
+		operationId?: string,
+	) {
+		if (closed || !source) throw new Error("web_note_unavailable");
+		if (!input.toolchainRevisionId || !input.bindingRevisionId)
+			throw new Error("web_note_unavailable");
+		let grantDeadline = Infinity;
+		if (operationId !== undefined) {
+			if (!operationId || !isSupervisedExecutionSource(input.source))
 				throw new Error("web_note_source_invalid");
-			const set = ctx.capabilities.toolchainSetInTransaction(
-					db,
-					input.toolchainRevisionId,
-				),
-				binding = set.binding?.document;
-			const inspection = binding?.adapterRef === INSPECT_SOURCE_ADAPTER;
-			if (
-				set.binding?.revisionId !== input.bindingRevisionId ||
-				binding?.execution !== "task" ||
-				(!inspection && binding.adapterRef !== ADAPTER)
-			)
-				throw new Error("web_note_binding_invalid");
-			if (inspection) {
-				if (!ctx.inspectSource) throw new Error("inspect_source_unavailable");
-				if (
-					input.source.origin ||
-					!input.source.messageId ||
-					input.source.specialistSessionId !== undefined
-				)
-					throw new Error("inspect_source_conversation_required");
-			} else if (!ctx.turn) throw new Error("web_note_unavailable");
-			const request = input.request.trim();
-			if (!request || request.length > policy.requestMaxChars)
-				throw new Error("web_note_request_invalid");
-			const id = newId(),
-				at = ctx.now(),
-				deadline = Math.min(
-					at + binding.timeLimits.runMs,
-					input.deadline ?? Number.POSITIVE_INFINITY,
-				);
-			const state: HostState = {
+			const grant = source.supervised?.authorizeInTransaction(db, {
 				source: input.source,
-				request,
+				request: input.request,
+				action: "start",
+				operationId,
 				toolchainRevisionId: input.toolchainRevisionId,
 				bindingRevisionId: input.bindingRevisionId,
-				instructions: [set.profile, ...set.skills].join("\n"),
-				...(inspection ? { inspection: {} } : {}),
-				result: null,
-			};
-			const job = ctx.queue.enqueueInTransaction(db, {
-				scope: "web-note",
-				kind: WEB_NOTE_JOB,
-				dedupeKey: id,
-				subjectRef: id,
-				concurrencyKey: `web-note:${id}`,
-				lane:
-					input.source.origin === "autonomous" ? "background" : "interactive",
-				deadlineAtMs: deadline,
-				payload: { id },
-				maxAttempts: 1,
 			});
-			db.query(
-				"INSERT INTO web_note_runs(id,conversation_id,state,revision,deadline,job_id,data_json,notice,created_at,updated_at) VALUES (?,?,'queued',0,?,?,?,'none',?,?)",
-			).run(
-				id,
-				input.source.conversationId,
-				deadline,
-				job.job.id,
-				JSON.stringify(state),
-				at,
-				at,
+			if (!grant || grant.deadline <= ctx.now())
+				throw new Error("web_note_source_invalid");
+			grantDeadline = grant.deadline;
+		} else if (
+			!isStandardExecutionSource(input.source) ||
+			!source.validSourceInTransaction(db, input.source)
+		) {
+			throw new Error("web_note_source_invalid");
+		}
+		const set = ctx.capabilities.toolchainSetInTransaction(
+				db,
+				input.toolchainRevisionId,
+			),
+			binding = set.binding?.document;
+		const inspection = binding?.adapterRef === INSPECT_SOURCE_ADAPTER;
+		if (
+			set.binding?.revisionId !== input.bindingRevisionId ||
+			binding?.execution !== "task" ||
+			(!inspection && binding.adapterRef !== ADAPTER)
+		)
+			throw new Error("web_note_binding_invalid");
+		if (inspection) {
+			if (!ctx.inspectSource) throw new Error("inspect_source_unavailable");
+			if (
+				operationId === undefined &&
+				(input.source.origin ||
+					!input.source.messageId ||
+					input.source.specialistSessionId !== undefined)
+			)
+				throw new Error("inspect_source_conversation_required");
+		} else if (!ctx.turn) throw new Error("web_note_unavailable");
+		const request = input.request.trim();
+		if (!request || request.length > policy.requestMaxChars)
+			throw new Error("web_note_request_invalid");
+		const startDigest = operationId === undefined ? undefined : hash(input);
+		if (operationId !== undefined) {
+			const prior = rowOf(db, operationId);
+			if (prior) {
+				if (!prior.data_json || stateOf(prior).startDigest !== startDigest)
+					throw new Error("web_note_start_conflict");
+				return viewInTransaction(db, operationId)!;
+			}
+		}
+		const id = operationId ?? newId(),
+			at = ctx.now(),
+			deadline = Math.min(
+				at + binding.timeLimits.runMs,
+				input.deadline ?? Number.POSITIVE_INFINITY,
+				grantDeadline,
 			);
-			return viewInTransaction(db, id)!;
-		},
+		if (operationId !== undefined && deadline <= at)
+			throw new Error("web_note_deadline_exceeded");
+		const state: HostState = {
+			source: input.source,
+			...(startDigest ? { startDigest } : {}),
+			request,
+			toolchainRevisionId: input.toolchainRevisionId,
+			bindingRevisionId: input.bindingRevisionId,
+			instructions: [set.profile, ...set.skills].join("\n"),
+			...(inspection ? { inspection: {} } : {}),
+			result: null,
+		};
+		const job = ctx.queue.enqueueInTransaction(db, {
+			scope: "web-note",
+			kind: WEB_NOTE_JOB,
+			dedupeKey: id,
+			subjectRef: id,
+			concurrencyKey: `web-note:${id}`,
+			lane:
+				input.source.origin === "autonomous" ||
+				input.source.origin === "supervised"
+					? "background"
+					: "interactive",
+			deadlineAtMs: deadline,
+			payload: { id },
+			maxAttempts: 1,
+		});
+		db.query(
+			"INSERT INTO web_note_runs(id,conversation_id,state,revision,deadline,job_id,data_json,notice,created_at,updated_at) VALUES (?,?,'queued',0,?,?,?,'none',?,?)",
+		).run(
+			id,
+			input.source.conversationId,
+			deadline,
+			job.job.id,
+			JSON.stringify(state),
+			at,
+			at,
+		);
+		return viewInTransaction(db, id)!;
+	}
+	const task: TaskLifecyclePort = {
+		startInTransaction: (db, input) => startInTransaction(db, input),
 		controlInTransaction(db, conversationId, raw) {
 			const input = executionControl.parse(raw),
 				row = current(ctx, db, input.workRef, true);
+			if (!isStandardExecutionSource(stateOf(row).source))
+				throw new Error("web_note_source_invalid");
 			if (row.conversation_id !== conversationId)
 				throw new Error("web_note_conversation_mismatch");
 			if (input.action === "status") return viewInTransaction(db, row.id)!;
@@ -134,7 +185,8 @@ export function createWebNote(deps: WebNoteDeps) {
 		},
 		viewInTransaction(db, id) {
 			try {
-				current(ctx, db, id, true);
+				const row = current(ctx, db, id, true);
+				if (!isStandardExecutionSource(stateOf(row).source)) return null;
 				return viewInTransaction(db, id);
 			} catch {
 				return null;
@@ -144,13 +196,42 @@ export function createWebNote(deps: WebNoteDeps) {
 			const row = rowOf(db, id);
 			if (
 				row?.data_json &&
+				isStandardExecutionSource(stateOf(row).source) &&
 				row.conversation_id === conversationId &&
 				active(row)
 			)
 				end(ctx, db, row, "cancelled", "web_note_user_cancelled");
 		},
-		forgetInTransaction: (db, id) => forget(ctx, db, id),
+		forgetInTransaction(db, id) {
+			const row = rowOf(db, id);
+			if (row?.data_json && isStandardExecutionSource(stateOf(row).source))
+				forget(ctx, db, id);
+		},
 	};
+
+	function supervisedRow(
+		db: Database,
+		origin: SupervisedExecutionSource,
+		id: string,
+		action: "view" | "cancel",
+		operationId?: string,
+	) {
+		const row = rowOf(db, id);
+		if (!row?.data_json || !isSupervisedExecutionSource(origin)) return null;
+		const state = stateOf(row);
+		if (hash(origin) !== hash(state.source)) return null;
+		return source?.supervised?.authorizeInTransaction(db, {
+			source: origin,
+			workId: id,
+			request: state.request,
+			action,
+			operationId,
+			toolchainRevisionId: state.toolchainRevisionId,
+			bindingRevisionId: state.bindingRevisionId,
+		})
+			? row
+			: null;
+	}
 
 	function flush() {
 		ctx.queue.flushCancellations([...ctx.abortJobs]);
@@ -167,6 +248,37 @@ export function createWebNote(deps: WebNoteDeps) {
 	}
 	return {
 		task,
+		supervised: {
+			startInTransaction(
+				db: Database,
+				input: Start & {
+					source: SupervisedExecutionSource;
+					operationId: string;
+				},
+			) {
+				return startInTransaction(db, input, input.operationId);
+			},
+			viewInTransaction(
+				db: Database,
+				origin: SupervisedExecutionSource,
+				id: string,
+			) {
+				return supervisedRow(db, origin, id, "view")
+					? viewInTransaction(db, id)
+					: null;
+			},
+			cancelInTransaction(
+				db: Database,
+				origin: SupervisedExecutionSource,
+				id: string,
+				operationId: string,
+			) {
+				const row = supervisedRow(db, origin, id, "cancel", operationId);
+				if (!row) throw new Error("web_note_source_invalid");
+				if (active(row))
+					end(ctx, db, row, "cancelled", "web_note_user_cancelled");
+			},
+		},
 		configure(port: SourcePort) {
 			source = port;
 		},

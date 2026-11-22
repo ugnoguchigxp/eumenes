@@ -1,6 +1,7 @@
 export { KanbanBoard } from "./KanbanBoard";
 export type {
 	KanbanBoardCard,
+	SupervisedBoardRow,
 	KanbanBoardColumn,
 	KanbanBoardProps,
 	KanbanBoardQueue,

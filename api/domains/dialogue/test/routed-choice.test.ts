@@ -6,7 +6,6 @@ import {
 	strictChoiceSchema,
 	type ChoiceCandidate,
 } from "../service/routed-choice";
-import { namedResources, namedTodos } from "../service/state-text";
 
 /**
  * Argument extraction for the toolchain the conversation chose: a
@@ -29,19 +28,6 @@ const refsOf = (schema: Record<string, unknown>) =>
 	).find((branch) => branch.properties.choice.enum[0] === MUSIC.id)!.properties
 		.refs;
 
-test("the resources State names are its references, not the words of their labels", () => {
-	expect(
-		namedResources([
-			"今: 10-30（木）14:00",
-			"仕事:",
-			"- t1 朝の曲 通知済み a3「朝の曲 a9」",
-			"提示中:",
-			"- a4 画像「data1の図」（画面に表示中）",
-			"- a3（直前の返事で示した）",
-		]),
-	).toEqual(["a3", "a4"]);
-});
-
 test("a hand-over's refs are the named resources; with none named the branch has no refs", () => {
 	expect(refsOf(fillSchema(MUSIC, { resources: ["a3", "a4"] }))).toEqual({
 		type: "array",
@@ -49,18 +35,6 @@ test("a hand-over's refs are the named resources; with none named the branch has
 		items: { type: "string", enum: ["a3", "a4"] },
 	});
 	expect(refsOf(fillSchema(MUSIC, { resources: [] }))).toBeUndefined();
-});
-
-test("the work State lists is read by its lines' heads: a title that holds a number is not work", () => {
-	expect(
-		namedTodos([
-			"## State",
-			"仕事:",
-			"- t1 t5の見直し 実行中",
-			"- t3 朝の曲 通知済み a3「朝の曲 t9」",
-			"- c2 確認待ち fake.image「t7」",
-		]),
-	).toEqual([1, 3]);
 });
 
 test("a toolchain with saved items always names its target: new first, then the items; the system says when each", () => {

@@ -1,0 +1,165 @@
+{
+	"formatVersion": 1,
+	"bundleId": "development-supervision",
+	"pins": [],
+	"definitions": [
+		{
+			"kind": "profile",
+			"id": "development-supervision.supervisor",
+			"revision": 1,
+			"title": "開発監督",
+			"summary": "既存の仕組みを調べて開発の設計書を作り、許可された作業と受入を管理する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "利用者の開発依頼について、現状を確認し、設計上の判断と受入条件を具体化してください。会話の窓口は一つです。実行と受入の判断に必要な進展、質問、結果を元の会話へ返してください。"
+		},
+		{
+			"kind": "skill",
+			"id": "development-supervision.managed",
+			"revision": 1,
+			"title": "開発監督の手順",
+			"summary": "調査、設計、作業分割、依存、証跡による受入",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "調査は設計を左右する問いに絞り、版付きの根拠を示してください。設計レビューの依頼なら設計書の提示までです。作業依頼なら同じチェックアウトでの干渉と既存差分を確認し、必要な先行関係と作業範囲を定めます。静的読解と検証を分け、現行の対象版、子仕事と実行の証跡、既存差分の保持を確認して受け入れます。再試行の前に新たな根拠と変わった条件を記録してください。"
+		},
+		{
+			"kind": "package",
+			"id": "development-supervision.managed",
+			"revision": 1,
+			"title": "開発監督",
+			"summary": "版付き設計を作成し、開発の実行と受入を監督する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:development-supervision.supervisor@1",
+				"skill:development-supervision.managed@1"
+			],
+			"backend": "development-supervision",
+			"schemaKey": "emptyInput",
+			"profileRevisionId": "profile:development-supervision.supervisor@1",
+			"requiredSkillRevisionIds": ["skill:development-supervision.managed@1"],
+			"toolRevisionIds": []
+		},
+		{
+			"kind": "toolchain",
+			"id": "development-supervision.request",
+			"revision": 1,
+			"title": "開発監督",
+			"summary": "開発の事前調査と版付き設計を作成し、複数の作業の依存・並行実行・試験・受入を管理する。設計書だけの依頼も扱う。",
+			"aliases": ["開発監督", "開発の設計と検証"],
+			"tags": [],
+			"useWhen": [
+				"リポジトリの実装に向けて現状を調べ、根拠と受入条件のある設計書を作りたい",
+				"独立する開発タスクを同じ作業場所で並行して調査・実装・試験したい",
+				"設計、実装、回帰試験、証跡を一つの開発依頼として管理したい"
+			],
+			"avoidWhen": [
+				"一般的なプログラミングの解説や公開情報だけを教えてほしい",
+				"事前設計や複数作業の調整が不要な一件を直接 Claude Code へ依頼したい"
+			],
+			"dependencies": ["package:development-supervision.managed@1"],
+			"examples": [
+				"設定画面の現状を調べ、互換性と試験手順を含めた設計書を作って",
+				"集計の回帰試験を走らせながら、入力処理の分岐を別に調べて",
+				"失敗する回帰試験と修正範囲を確認してから修正と再試験を進めて"
+			],
+			"packageRevisionId": "package:development-supervision.managed@1",
+			"functionName": "development_supervision",
+			"redirects": [],
+			"bindingRevisionId": "binding:development-supervision.managed@1"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "development-supervision.managed",
+			"revision": 1,
+			"execution": "task",
+			"adapterRef": "adapter:development-supervision@1",
+			"availabilityRef": "availability:development-supervision@1",
+			"tools": [],
+			"inputSchemaRef": "schema:development-supervision.request@1",
+			"outputSchemaRef": "schema:development-supervision.result@1",
+			"conversationSummary": "next_turn",
+			"timeLimits": {
+				"runMs": 3600000,
+				"turnMs": 120000,
+				"inferenceMs": 120000
+			},
+			"limits": {
+				"parentCalls": 24,
+				"childCalls": 12,
+				"searches": 8,
+				"modelCalls": 24
+			}
+		}
+	],
+	"artifacts": [],
+	"schemas": [
+		{
+			"kind": "schema",
+			"id": "development-supervision.request",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"properties": {
+					"request": { "type": "string", "minLength": 1, "maxLength": 8000 }
+				},
+				"required": ["request"],
+				"additionalProperties": false
+			}
+		},
+		{
+			"kind": "schema",
+			"id": "development-supervision.result",
+			"revision": 1,
+			"schema": {
+				"type": "object",
+				"properties": {
+					"status": {
+						"type": "string",
+						"enum": [
+							"completed",
+							"partial",
+							"failed",
+							"cancelled",
+							"interrupted"
+						]
+					},
+					"summary": { "type": "string", "maxLength": 2000 },
+					"fulfilled": {
+						"type": "array",
+						"items": { "type": "string", "maxLength": 600 },
+						"maxItems": 12
+					},
+					"missing": {
+						"type": "array",
+						"items": { "type": "string", "maxLength": 600 },
+						"maxItems": 12
+					},
+					"refs": {
+						"type": "array",
+						"items": { "type": "string", "maxLength": 256 },
+						"maxItems": 12
+					},
+					"links": {
+						"type": "array",
+						"items": { "type": "string", "maxLength": 160 },
+						"maxItems": 12
+					}
+				},
+				"required": ["status", "summary", "fulfilled", "missing", "refs"],
+				"additionalProperties": false
+			}
+		}
+	]
+}

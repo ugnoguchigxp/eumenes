@@ -12,6 +12,7 @@ import { Button } from "../Button";
 import { TaskForm } from "./CardForms";
 import { ExecutorQueues } from "./ExecutorQueues";
 import { KanbanColumn } from "./KanbanColumn";
+import type { ConditionDraft } from "./SupervisedRow";
 import { COLUMNS, isNoopMove, type MovableColumn } from "./positions";
 import type { KanbanBoardProps } from "./types";
 import "./KanbanBoard.css";
@@ -42,6 +43,15 @@ export function KanbanBoard(props: KanbanBoardProps) {
 	} = props;
 	const headingId = useId();
 	const [adding, setAdding] = useState(false);
+	const [drafts, setDrafts] = useState<Record<string, ConditionDraft>>({});
+	function updateDraft(taskId: string, draft: ConditionDraft | null) {
+		setDrafts((current) => {
+			const next = { ...current };
+			if (draft) next[taskId] = draft;
+			else delete next[taskId];
+			return next;
+		});
+	}
 	const [executorFilter, setExecutorFilter] = useState("");
 	const [lastExecutor, setLastExecutor] = useState(props.defaultExecutorId);
 	const [dragId, setDragId] = useState<string | null>(null);
@@ -168,6 +178,10 @@ export function KanbanBoard(props: KanbanBoardProps) {
 					<KanbanColumn
 						key={column.id}
 						{...column}
+						supervisedRows={executorFilter ? [] : props.supervisedRows}
+						drafts={drafts}
+						onDraft={updateDraft}
+						onSupervisedControl={props.onSupervisedControl}
 						cards={
 							executorFilter
 								? cards.filter((card) => card.executorId === executorFilter)

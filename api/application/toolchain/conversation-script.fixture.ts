@@ -454,6 +454,7 @@ export function callsOf(step: Step, id: () => string) {
 				arguments: JSON.stringify({
 					todo: args.todo,
 					operation: args.operation,
+					...(args.target !== undefined ? { target: args.target } : {}),
 				}),
 			};
 		return { id: id(), name, arguments: JSON.stringify(args) };

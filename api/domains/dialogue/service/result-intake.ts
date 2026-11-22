@@ -4,6 +4,7 @@ import type { AnswerTicket } from "../../agent-runtime";
 import {
 	executionNoticeResult,
 	type ExecutionStatus,
+	type ExecutionView,
 } from "../../tool-runtime";
 import type { SelectionOutcome } from "../../toolchain-history";
 import type { Run } from "../contracts";
@@ -21,7 +22,11 @@ type Report =
 			links?: readonly string[];
 	  };
 
-export type ReportedWork = { rows: WorkRow[]; displayAnswer?: string };
+export type ReportedWork = {
+	rows: WorkRow[];
+	displayAnswer?: string;
+	conversationText?: string;
+};
 
 const executionOutcome: Partial<Record<ExecutionStatus, WorkOutcome>> = {
 	completed: "succeeded",
@@ -108,6 +113,8 @@ export function intakeInTransaction(
 		const notice = taskNotice(deps, tx, run);
 		if (!notice) return null;
 		const row = ledger.workOfSourceInTransaction(tx, notice.workRef);
+		if (row && notice.conversationText)
+			return { rows: [row], conversationText: notice.conversationText };
 		if (row && notice.report) report(row, notice.report);
 		return { rows: changed, displayAnswer: notice.displayAnswer };
 	}
@@ -118,6 +125,45 @@ export function intakeInTransaction(
 		if (next) report(row, next);
 	}
 	return { rows: changed };
+}
+
+/** A registered owner mirrors its one parent TODO in the same transaction as its board. */
+export function reportExecutionInTransaction(
+	deps: DialogueDeps,
+	db: Database,
+	view: ExecutionView,
+) {
+	const row = deps.work?.workOfSourceInTransaction(db, view.id);
+	if (!row || row.conversationId !== view.conversationId || row.archivedAt)
+		return;
+	const report = reportOfView(view);
+	if (
+		report?.status === "waiting" &&
+		row.status === "waiting" &&
+		row.questionId === report.questionId
+	)
+		return;
+	if (report) deps.work!.reportInTransaction(db, row.id, report);
+	else if (row.status === "waiting")
+		deps.work!.reportInTransaction(db, row.id, { status: "todo" });
+}
+
+function reportOfView(view: ExecutionView): Report | null {
+	if (view.status === "waiting_user" && view.question)
+		return {
+			status: "waiting",
+			questionId: view.question.id,
+			question: view.question.prompt,
+		};
+	const outcome = executionOutcome[view.status];
+	return outcome
+		? {
+				status: "done",
+				outcome,
+				result: executionNoticeResult(view.result),
+				...(view.result?.links?.length ? { links: view.result.links } : {}),
+			}
+		: null;
 }
 
 /** The report of one piece of run-centric work, or null while its owner has nothing new. */
@@ -189,17 +235,29 @@ function taskNotice(
 	deps: DialogueDeps,
 	tx: Database,
 	run: Run,
-): { workRef: string; report: Report | null; displayAnswer?: string } | null {
+): {
+	workRef: string;
+	report: Report | null;
+	displayAnswer?: string;
+	conversationText?: string;
+} | null {
 	const text = deps.conversation.messageInTransaction(tx, run.inputMessageId)
 		?.message.text;
-	let raw: { kind?: unknown; workRef?: unknown };
+	let raw: {
+		kind?: unknown;
+		workRef?: unknown;
+		revision?: unknown;
+		questionId?: unknown;
+	};
 	try {
 		raw = JSON.parse(text ?? "") as { kind?: unknown; workRef?: unknown };
 	} catch {
 		return null;
 	}
 	if (
-		(raw.kind !== "task_question" && raw.kind !== "task_result") ||
+		(raw.kind !== "task_question" &&
+			raw.kind !== "task_result" &&
+			raw.kind !== "supervised_update") ||
 		typeof raw.workRef !== "string"
 	)
 		return null;
@@ -207,27 +265,22 @@ function taskNotice(
 	const view = taskForWork(deps, tx, work)?.viewInTransaction(tx, raw.workRef);
 	if (!view || view.conversationId !== run.conversationId)
 		return { workRef: raw.workRef, report: null };
-	if (view.status === "waiting_user" && view.question)
-		return {
-			workRef: view.id,
-			report: {
-				status: "waiting",
-				questionId: view.question.id,
-				question: view.question.prompt,
-			},
-		};
-	const outcome = executionOutcome[view.status];
+	if (raw.kind === "supervised_update") {
+		if (
+			work?.toolchainId !== "development-supervision.request" ||
+			(raw.questionId
+				? view.question?.id !== raw.questionId
+				: raw.revision !== view.revision)
+		)
+			return { workRef: view.id, report: null };
+		const text =
+			view.question?.prompt ?? view.result?.summary ?? view.progress?.summary;
+		return { workRef: view.id, report: null, conversationText: text };
+	}
 	return {
 		workRef: view.id,
+		report: reportOfView(view),
 		displayAnswer: view.result?.displayAnswer,
-		report: outcome
-			? {
-					status: "done",
-					outcome,
-					result: executionNoticeResult(view.result),
-					...(view.result?.links?.length ? { links: view.result.links } : {}),
-				}
-			: null,
 	};
 }
 

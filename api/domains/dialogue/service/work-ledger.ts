@@ -354,8 +354,11 @@ function confirmationLedger(
 			return confirmationById(db, row.id)!;
 		},
 		confirmationInTransaction: confirmationById,
-		useConfirmationInTransaction: (db: Database, confirmationId: string) =>
-			useConfirmation(db, confirmationId, clock()),
+		useConfirmationInTransaction: (
+			db: Database,
+			confirmationId: string,
+			runId?: string,
+		) => useConfirmation(db, confirmationId, clock(), runId),
 		/** The user declined the confirmation `c<ref>`: it is closed and can no longer be approved. */
 		withdrawConfirmationInTransaction: (
 			db: Database,

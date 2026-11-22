@@ -6,6 +6,7 @@ import type {
 	ExecutionStatus,
 	ExecutionView,
 	TaskLifecyclePort,
+	SupervisedExecutionSource,
 } from "../tool-runtime";
 import type { Database } from "bun:sqlite";
 
@@ -38,14 +39,22 @@ export const decisionSchema = z.discriminatedUnion("action", [
 	}),
 ]);
 export type Decision = z.infer<typeof decisionSchema>;
-export type Question = NonNullable<ExecutionView["question"]>;
+export type Question = NonNullable<ExecutionView["question"]> & {
+	presentation?: "waiting" | "presented";
+};
 export type {
 	ClaudeObservation as Observation,
 	ClaudeStart as Start,
+	ClaudeRunAuthorization,
+	ClaudeEvidence,
+	ClaudeLease,
 } from "../coding";
 import type {
 	ClaudeObservation as Observation,
 	ClaudeStart as Start,
+	ClaudeRunAuthorization,
+	ClaudeEvidence,
+	ClaudeLease,
 } from "../coding";
 export interface Runner {
 	ready(): boolean;
@@ -58,8 +67,79 @@ export interface Runner {
 		questionId: string,
 		answer: string,
 	): Promise<Observation>;
-	stop(id: string, operationId: string): Promise<Observation | null>;
+	stop(
+		id: string,
+		operationId: string,
+		supervised?: Start["supervised"],
+	): Promise<Observation | null>;
+	supportsSupervised?(): boolean;
+	present?(id: string, questionId: string, expiresAt: number): Promise<void>;
+	recover?(
+		id: string,
+		lease: ClaudeLease,
+		proof: "process_exit" | "host_reboot",
+	): Promise<Observation>;
+	approveTool?(
+		id: string,
+		requestId: string,
+		lease: ClaudeLease,
+	): Promise<void>;
 }
+
+export type SupervisedAuthority = {
+	source: SupervisedExecutionSource;
+	workId?: string;
+	toolchainRevisionId: string;
+	bindingRevisionId: string;
+	request: string;
+	action:
+		| "start"
+		| "continue"
+		| "inspect"
+		| "view"
+		| "stop"
+		| "cancel"
+		| "present"
+		| "answer";
+	operationId?: string;
+	questionId?: string;
+	parentQuestionId?: string;
+	messageId?: string;
+};
+export type SupervisedStart = Parameters<
+	TaskLifecyclePort["startInTransaction"]
+>[1] & {
+	source: SupervisedExecutionSource;
+	operationId: string;
+	toolchainRevisionId: string;
+	bindingRevisionId: string;
+};
+export type SupervisedPresentation = {
+	operationId: string;
+	questionId: string;
+	parentQuestionId: string;
+	presentedAt: number;
+	expiresAt: number;
+};
+export type SupervisedAnswer = Pick<
+	SupervisedPresentation,
+	"operationId" | "questionId" | "parentQuestionId"
+> & {
+	messageId: string;
+	answer: string;
+};
+export type SupervisedView = {
+	view: ExecutionView;
+	executionId: string | null;
+	questionExecutionId?: string | null;
+	evidence: ClaudeEvidence[];
+	releaseConfirmed: boolean;
+	blocking?: { state: "waiting" | "held"; reason: string };
+	answerDelivery?: {
+		operationId: string;
+		state: "pending" | "delivered" | "failed";
+	};
+};
 
 export type Work = {
 	id: string;
@@ -115,6 +195,15 @@ export type Work = {
 	stop: ExecutionView["stop"];
 	mode: "work" | "analysis";
 	conversationSummary: ExecutionView["conversationSummary"];
+	supervision?: {
+		toolchainRevisionId: string;
+		authorization: ClaudeRunAuthorization;
+		lease?: ClaudeLease;
+		presentation?: SupervisedPresentation & { sent?: boolean };
+		answerDelivery?: SupervisedView["answerDelivery"];
+		evidence?: ClaudeEvidence[];
+		blocked?: Observation["blocked"];
+	};
 };
 
 export type Host = Pick<
@@ -124,8 +213,36 @@ export type Host = Pick<
 	validSourceInTransaction(db: Database, source: ExecutionSource): boolean;
 	deliverInTransaction(db: Database, view: ExecutionView, id: string): boolean;
 	revokeInTransaction(db: Database, eventId: string): void;
+	supervised?: {
+		authorizeInTransaction(
+			db: Database,
+			input: SupervisedAuthority,
+		): ClaudeRunAuthorization | null;
+		observeInTransaction(
+			db: Database,
+			source: SupervisedExecutionSource,
+			view: ExecutionView,
+			eventId: string,
+		): boolean;
+	};
 	workspace: {
-		hold(db: Database, workId: string): boolean;
-		release(db: Database, workId: string, confirmed: boolean): void;
+		hold(
+			db: Database,
+			workId: string,
+			authorization?: ClaudeRunAuthorization,
+		): boolean | ClaudeLease;
+		release(
+			db: Database,
+			workId: string,
+			confirmed: boolean,
+			lease?: ClaudeLease,
+		): void;
+		released?(db: Database, lease: ClaudeLease): boolean;
+		current?(db: Database, lease: ClaudeLease): boolean;
+		blocker?(
+			db: Database,
+			workId: string,
+		): { ownerRef: string; state: "unknown" | "releasing" } | null;
+		recover?(db: Database, lease: ClaudeLease): boolean;
 	};
 };

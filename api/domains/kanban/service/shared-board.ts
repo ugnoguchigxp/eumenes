@@ -9,7 +9,7 @@ import {
 	waitingCount,
 } from "../repository/runs";
 import type { CommonRunState, ExecutorRegistry } from "../contracts/shared";
-import { readWorkspaceGuard } from "../repository/workspace-guard";
+import { readWorkspaceGuards } from "../repository/workspace-guard";
 
 export type SharedBoardView = Omit<KanbanBoardView, "runs" | "cards"> & {
 	defaultExecutorId: string;
@@ -71,14 +71,19 @@ export function sharedBoardInTransaction(
 			const run = card.currentRunId ? runs.get(card.currentRunId) : undefined;
 			const guard =
 				run?.state === "queued"
-					? readWorkspaceGuard(tx, run.workspaceRef)
+					? readWorkspaceGuards(tx, run.workspaceRef).find(
+							(holder) =>
+								holder.mode !== "exclusive" ||
+								holder.executorId !== card.executorId ||
+								holder.ownerRef !== `kanban:${card.id}` ||
+								holder.state !== "held",
+						)
 					: null;
 			return {
 				...shown,
 				executorId: card.executorId,
 				canSelectExecutor: card.column === "todo" && !card.hasExecutionHistory,
-				...(guard &&
-				(guard.ownerRef !== `kanban:${card.id}` || guard.state !== "held")
+				...(guard
 					? {
 							workspaceBusy: {
 								executorId: guard.executorId,

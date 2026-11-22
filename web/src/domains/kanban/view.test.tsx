@@ -2,6 +2,7 @@ import {
 	ArtifactRenderer,
 	type ArtifactEvent,
 	type KanbanBoardSource,
+	type Receipt,
 	type Snapshot,
 } from "@eumenes/artifact-ui";
 import {
@@ -24,7 +25,7 @@ const definition = JSON.stringify({
 });
 
 function mount(board: KanbanBoardSource = boardFixture, revision = 7) {
-	const dispatch = vi.fn(async (_event: ArtifactEvent) => ({
+	const dispatch = vi.fn(async (_event: ArtifactEvent): Promise<Receipt> => ({
 		status: "accepted" as const,
 		message: "",
 	}));
@@ -43,6 +44,61 @@ function mount(board: KanbanBoardSource = boardFixture, revision = 7) {
 const settle = () =>
 	waitFor(() => expect(document.querySelector("[aria-busy=true]")).toBeNull());
 const cardOf = (title: string) => screen.getByRole("article", { name: title });
+
+const supervisedRow = {
+	parentId: "parent",
+	taskId: "reader",
+	parentRevision: 12,
+	revision: 3,
+	title: "入力の読解",
+	column: "running" as const,
+	reason: "回答待ち",
+};
+test("a supervised row sends its own revision when a sibling has advanced the parent", async () => {
+	const row = supervisedRow;
+	const { dispatch } = mount({ ...boardFixture, supervisedRows: [row] });
+	fireEvent.click(
+		within(cardOf(row.title)).getByRole("button", { name: "作業を取り消す" }),
+	);
+	await settle();
+	expect(dispatch).toHaveBeenCalledWith(
+		expect.objectContaining({
+			action: "kanban-supervised-control",
+			values: {
+				parentId: row.parentId,
+				taskId: row.taskId,
+				expectedRevision: "3",
+				action: "cancel",
+			},
+		}),
+	);
+});
+
+test("a server conflict keeps the submitted supervised condition available for correction", async () => {
+	const { dispatch } = mount({
+		...boardFixture,
+		supervisedRows: [supervisedRow],
+	});
+	dispatch.mockResolvedValueOnce({
+		status: "conflict",
+		message: "作業の版が更新されました。",
+	});
+	const row = within(cardOf(supervisedRow.title));
+	fireEvent.click(row.getByRole("button", { name: "条件変更" }));
+	const condition = "現在の入力を保存してから検証する";
+	fireEvent.change(row.getByRole("textbox", { name: "変更する条件" }), {
+		target: { value: condition },
+	});
+	fireEvent.click(row.getByRole("button", { name: "条件を送る" }));
+	expect((await screen.findByRole("alert")).textContent).toContain(
+		"作業の版が更新されました。",
+	);
+	expect(
+		(row.getByRole("textbox", { name: "変更する条件" }) as HTMLTextAreaElement)
+			.value,
+	).toBe(condition);
+	expect(dispatch).toHaveBeenCalledTimes(1);
+});
 
 test("the snapshot is drawn in three columns with the wording of each run state", () => {
 	mount();

@@ -2,7 +2,10 @@ import { taskAutonomy } from "../toolchain/task-autonomy";
 import type { Database } from "bun:sqlite";
 import type { ComponentRecord } from "eumenes-pipeline";
 import type { TaskExecutionHost } from "../toolchain/task-execution-port";
-import type { ExecutionSource } from "../../domains/tool-runtime";
+import {
+	isStandardExecutionSource,
+	type ExecutionSource,
+} from "../../domains/tool-runtime";
 import type { TaskChildContext } from "../toolchain/task-execution-catalog";
 /** Public cards and host evidence only; command receipts are not completed-output schemas. */
 export function pipelineComponents(
@@ -11,6 +14,7 @@ export function pipelineComponents(
 	db: Database,
 	source: ExecutionSource,
 ): ComponentRecord[] {
+	if (!isStandardExecutionSource(source)) return [];
 	return context
 		.available(db, source.runId)
 		.filter((e) => e.selectable !== false)

@@ -115,7 +115,8 @@ export function workerPacket(
 }
 export async function harness(options: HarnessOptions = {}) {
 	const fixtureActionKey = crypto.getRandomValues(new Uint8Array(32));
-	const dir = mkdtempSync(join(tmpdir(), "eumenes-toolchain-"));
+	const dir =
+		options.directory ?? mkdtempSync(join(tmpdir(), "eumenes-toolchain-"));
 	// The terminals request table is registered by the host; added here until it is.
 	const store = openStore(join(dir, "db"), [
 		...migrations,
@@ -293,6 +294,10 @@ export async function harness(options: HarnessOptions = {}) {
 					confidence: 0.99,
 				});
 			const system = messages[0]!.content;
+			if (callOptions?.jsonSchema && options.structuredResponse) {
+				const response = options.structuredResponse(messages);
+				if (response !== undefined) return JSON.stringify(response);
+			}
 			if (
 				options.reviewSubagent &&
 				system.includes("あなたはEumenesの評価担当です")
@@ -649,6 +654,7 @@ export async function harness(options: HarnessOptions = {}) {
 	const toolchain = await createToolchain(store, queue, inference, web, {
 		webResearch: options.webResearch,
 		...(options.webNote ? { webNote: options.webNote } : {}),
+		claudeRunner: options.claudeRunner,
 		docling: options.docling,
 		compute,
 		video,
@@ -789,6 +795,7 @@ export async function harness(options: HarnessOptions = {}) {
 			? createSchedulerDiagnostics({ scheduler, queue, apps: appRuntime?.apps })
 			: undefined,
 		conversationAgent: options.conversationAgent ?? testConversationAgent,
+		agency: options.agency,
 		excalidraw: drawingOperations,
 		objectRecognition: objectRecognition?.port(CONVERSATION_DEFAULT_PRINCIPAL),
 		generatedImages:
@@ -856,6 +863,8 @@ export async function harness(options: HarnessOptions = {}) {
 			...appWorkflowPorts,
 			settings,
 			webNote: toolchain.webNote,
+			claudeCode: toolchain.claudeCode,
+			developmentSupervision: toolchain.developmentSupervision,
 			collaboration: toolchain.collaboration,
 			interact: browser?.interact,
 			memory,
@@ -991,6 +1000,8 @@ export async function harness(options: HarnessOptions = {}) {
 			return calls;
 		},
 		async close() {
+			toolchain.developmentSupervision.close();
+			await toolchain.claudeCode.close();
 			toolchain.webNote.close();
 			await browser?.service.disconnect();
 			await kanbanRuns?.disconnect();
@@ -1007,7 +1018,7 @@ export async function harness(options: HarnessOptions = {}) {
 			await inference.close();
 			await excalidraw?.close();
 			await store.close();
-			rmSync(dir, { recursive: true, force: true });
+			if (!options.directory) rmSync(dir, { recursive: true, force: true });
 		},
 	};
 }

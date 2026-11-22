@@ -1,4 +1,5 @@
 import { taskAutonomy } from "./task-autonomy";
+import { isStandardExecutionSource } from "../../domains/tool-runtime";
 import type { Database } from "bun:sqlite";
 import type { ChildExecution, ChildResult } from "../../domains/tool-runtime";
 import type { TaskExecutionHost } from "./task-execution-port";
@@ -36,6 +37,8 @@ export function taskChildContext(host: TaskExecutionHost) {
 		});
 	}
 	function resolve(db: Database, child: ChildExecution) {
+		if (!isStandardExecutionSource(child.source))
+			throw new Error("execution_source_invalid");
 		const ownWorker =
 			child.selectedWorker &&
 			routing.cardInTransaction(db, child.chainRevisionId)?.execution ===

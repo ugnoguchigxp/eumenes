@@ -102,7 +102,26 @@ export type ExecutionEvidenceReport = {
 		end?: number;
 		documentId?: string;
 		fetchedAt?: string;
+		location?: {
+			path: string;
+			symbol: string | null;
+			commit: string;
+			startLine: number;
+			endLine: number;
+			digest: string;
+		};
 	}>;
+};
+/** A named, independently controlled task of a registered execution owner. */
+export type ExecutionTaskView = {
+	taskId: string;
+	revision: number;
+	title: string;
+	state: "waiting" | "running" | "held" | "finished";
+	reason: string;
+	result: ExecutionResult | null;
+	evidenceRefs: readonly string[];
+	outcome?: "succeeded" | "partial" | "failed" | "cancelled" | "interrupted";
 };
 export type ExecutionView = {
 	id: string;
@@ -122,6 +141,8 @@ export type ExecutionView = {
 		summary: string;
 		observedAt: number;
 	};
+	/** Subtasks with scoped controls, supplied by the same owner as the parent view. */
+	tasks?: readonly ExecutionTaskView[];
 	conversationSummary?: "on_read" | "next_turn";
 	stop?: "requested" | "confirmed" | "unconfirmed";
 	/** A task pipeline's run: its fixed steps answer for the request as one step of it. */
@@ -142,11 +163,12 @@ export type ExecutionResponse = {
 	/** A verified response sent to a specialist following a pre-existing execution. */
 	specialistSessionId?: string;
 };
-export type ExecutionSource = {
+type StandardExecutionSource = {
 	conversationId: string;
 	messageId: string | null;
 	/** A persisted Agency work owns autonomous execution; never a user-message identity. */
 	origin?: "autonomous" | "workflow";
+	delegation?: never;
 	/** Host-issued reference to an accepted, scoped workflow run. */
 	workflow?: { scope: string; definitionId: string; revision: number };
 	agency?: {
@@ -164,6 +186,66 @@ export type ExecutionSource = {
 	amendments?: ExecutionResponse[];
 	responses?: ExecutionResponse[];
 };
+/** Only the supervision owner can issue this receipt. Revalidate it at the registered child owner. */
+export type SupervisedExecutionSource = {
+	origin: "supervised";
+	conversationId: string;
+	messageId: null;
+	runId: string;
+	request: string;
+	digest: string;
+	delegation: {
+		grantRef: string;
+		parentWorkId: string;
+		taskId: string;
+		parentGeneration: number;
+		taskGeneration: number;
+	};
+	workflow?: never;
+	agency?: never;
+	specialistSessionId?: never;
+	specialistEpoch?: never;
+	amendments?: never;
+	responses?: never;
+};
+export type ExecutionSource =
+	StandardExecutionSource | SupervisedExecutionSource;
+
+const supervisedSourceShape = z.strictObject({
+	origin: z.literal("supervised"),
+	conversationId: z.string().min(1),
+	messageId: z.null(),
+	runId: z.string().min(1),
+	request: z.string().min(1).max(8000),
+	digest: z.string().min(1),
+	delegation: z.strictObject({
+		grantRef: z.string().min(1),
+		parentWorkId: z.string().min(1),
+		taskId: z.string().min(1),
+		parentGeneration: z.number().int().nonnegative(),
+		taskGeneration: z.number().int().nonnegative(),
+	}),
+});
+
+export function isSupervisedExecutionSource(
+	source: unknown,
+): source is SupervisedExecutionSource {
+	return supervisedSourceShape.safeParse(source).success;
+}
+
+/** Persisted sources can come from older versions. Unknown origins have no ordinary execution authority. */
+export function isStandardExecutionSource(
+	source: ExecutionSource,
+): source is StandardExecutionSource {
+	return (
+		!!source &&
+		typeof source === "object" &&
+		source.delegation === undefined &&
+		(source.origin === undefined ||
+			source.origin === "autonomous" ||
+			source.origin === "workflow")
+	);
+}
 /** A registered task owner. Dialogue owns the TODO; this port owns the actual work. */
 export interface TaskLifecyclePort {
 	/** This registered owner runs its own selected package as a research worker. */
@@ -174,6 +256,7 @@ export interface TaskLifecyclePort {
 			source: ExecutionSource;
 			request: string;
 			references: ExecutionReference[];
+			confirmationId?: string;
 			toolchainRevisionId?: string;
 			bindingRevisionId?: string;
 			deadline?: number;

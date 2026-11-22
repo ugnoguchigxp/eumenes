@@ -1,6 +1,17 @@
 import type { Database } from "bun:sqlite";
-import type { ExecutionView } from "../tool-runtime";
-import type { Decision, Host, Observation, Work } from "./contracts";
+import {
+	isStandardExecutionSource,
+	isSupervisedExecutionSource,
+	type ExecutionView,
+} from "../tool-runtime";
+import { codingCanonicalJSON } from "../coding";
+import type {
+	Decision,
+	Host,
+	Observation,
+	SupervisedAuthority,
+	Work,
+} from "./contracts";
 import { terminal } from "./repository";
 
 export const newId = () => crypto.randomUUID();
@@ -21,8 +32,11 @@ export function view(work: Work): ExecutionView {
 }
 
 export function closeQuestion(db: Database, host: Host, work: Work) {
-	if (work.notice) host.revokeInTransaction(db, work.notice);
-	if (work.deliveredNotice) host.revokeInTransaction(db, work.deliveredNotice);
+	if (!work.supervision) {
+		if (work.notice) host.revokeInTransaction(db, work.notice);
+		if (work.deliveredNotice)
+			host.revokeInTransaction(db, work.deliveredNotice);
+	} else work.supervision.presentation = undefined;
 	work.notice = null;
 	work.deliveredNotice = undefined;
 	work.question = null;
@@ -45,6 +59,8 @@ export function finish(
 	},
 ) {
 	closeQuestion(db, host, work);
+	if (work.supervision?.answerDelivery?.state === "pending")
+		work.supervision.answerDelivery.state = "failed";
 	work.status = status;
 	work.summary = summary;
 	work.result = { status, summary, ...result };
@@ -56,6 +72,7 @@ export function finish(
 			db,
 			work.id,
 			!work.executionId || work.stop === "confirmed",
+			work.supervision?.lease,
 		);
 		work.holdsWorkspace = false;
 	}
@@ -67,6 +84,7 @@ export function requestStop(
 	work: Work,
 	reason: Extract<NonNullable<Work["effect"]>, { kind: "stop" }>["reason"],
 	now: number,
+	operationId: string = newId(),
 ) {
 	if (terminal(work)) return;
 	if (work.effect?.kind === "stop" && work.effect.reason === reason) return;
@@ -78,7 +96,7 @@ export function requestStop(
 		work.stop = "requested";
 		work.stopAt ??= now + 15_000;
 		work.summary = "Claude Codeの停止を確認しています。";
-		work.effect = { kind: "stop", id: newId(), reason };
+		work.effect = { kind: "stop", id: operationId, reason };
 		return;
 	}
 	if (reason === "amend") {
@@ -102,6 +120,46 @@ export function acceptObservation(
 	observation: Observation | null,
 ) {
 	const effect = work.effect;
+	if (observation && observation.executionId !== work.executionId) return false;
+	const supervised = work.supervision;
+	if (
+		supervised &&
+		observation &&
+		!observation.blocked &&
+		(observation.supervised || observation.state !== "stopped") &&
+		codingCanonicalJSON(observation.supervised) !==
+			codingCanonicalJSON({
+				lease: supervised.lease,
+				authorization: supervised.authorization,
+			})
+	)
+		return false;
+	if (supervised && observation?.blocked) {
+		if (effect?.kind !== "start" || supervised.blocked === observation.blocked)
+			return false;
+		supervised.blocked = observation.blocked;
+		work.summary =
+			observation.blocked === "verification_isolation_unavailable"
+				? "検証用の書込み制限を適用できないため保留しています。"
+				: observation.blocked === "workspace_inputs_changed"
+					? "承認対象のファイルが変わったため保留しています。"
+					: observation.blocked === "runner_quarantined"
+						? "他タスクの停止未確認のため起動を保留しています。"
+						: "実行枠が空くまで起動を保留しています。";
+		work.status = "queued";
+		work.notice = newId();
+		if (
+			observation.blocked === "verification_isolation_unavailable" ||
+			observation.blocked === "workspace_inputs_changed"
+		) {
+			// The runner refused before executing. A new plan may use the freed slot.
+			work.effect = null;
+			work.executionId = null;
+			host.workspace.release(db, work.id, true, supervised.lease);
+			work.holdsWorkspace = false;
+		}
+		return true;
+	}
 	if (effect?.kind === "stop") {
 		if (
 			observation &&
@@ -151,11 +209,32 @@ export function acceptObservation(
 		);
 		return true;
 	}
-	if (observation.executionId !== work.executionId) return false;
 	if (!effect && work.observation && observation.seq <= work.observation.seq)
 		return false;
 	work.effect = null;
 	work.observation = observation;
+	if (supervised) {
+		supervised.blocked = undefined;
+		if (observation.structuredEvidence?.length) {
+			const references = new Map(
+				(supervised.evidence ?? []).map((item) => [item.ref, item]),
+			);
+			for (const item of observation.structuredEvidence) {
+				if (
+					item.executionId === observation.executionId &&
+					item.targetRevision === supervised.authorization.targetRevision
+				)
+					references.set(item.ref, item);
+			}
+			supervised.evidence = [...references.values()].slice(-64);
+		}
+		if (
+			effect?.kind === "reply" &&
+			supervised.answerDelivery?.state === "pending"
+		)
+			supervised.answerDelivery.state = "delivered";
+		work.notice = newId();
+	}
 	if (observation.state === "waiting" && observation.question) {
 		work.status = "waiting_user";
 		if (work.question?.id !== observation.question.id) {
@@ -178,9 +257,11 @@ export function acceptObservation(
 		work.executionId = null;
 		work.stop = "confirmed";
 		work.status = "deciding";
+		if (supervised) work.notice = newId();
 	} else {
 		closeQuestion(db, host, work);
 		work.status = "waiting_child";
+		if (supervised) work.notice = newId();
 	}
 	return true;
 }
@@ -206,6 +287,28 @@ export function applyDecision(
 				finish(db, host, work, "partial", "追加実行の上限に達しました。");
 				return;
 			}
+			let instruction = decision.instruction;
+			if (work.supervision) {
+				const limit = 8_000;
+				if (work.request.length > limit) {
+					finish(
+						db,
+						host,
+						work,
+						"partial",
+						"依頼書が実行指示の上限を超えています。",
+					);
+					return;
+				}
+				const heading = "\n\n## 今回の実行指示\n";
+				const available = limit - work.request.length - heading.length;
+				const addition = decision.instruction
+					.slice(0, Math.max(0, available))
+					.trimEnd();
+				instruction = work.request;
+				if (decision.instruction !== work.request && addition)
+					instruction += heading + addition;
+			}
 			work.executionId = newId();
 			work.executions++;
 			work.turnsUsedBeforeExecution = work.turnsReserved;
@@ -218,11 +321,20 @@ export function applyDecision(
 					id: work.executionId,
 					workId: work.id,
 					generation: work.generation,
-					instruction: decision.instruction,
+					instruction,
 					priorExecutionId: work.previousId,
 					deadline: work.deadline,
 					maxTurns,
 					readOnly: work.mode === "analysis",
+					...(work.supervision?.lease
+						? {
+								readOnly: work.supervision.authorization.mode === "read",
+								supervised: {
+									authorization: work.supervision.authorization,
+									lease: work.supervision.lease,
+								},
+							}
+						: {}),
 				},
 			};
 			return;
@@ -232,13 +344,20 @@ export function applyDecision(
 			work.question = {
 				id: newId(),
 				prompt: decision.question,
-				expiresAt: Math.min(work.deadline, now + 15 * 60_000),
+				expiresAt: work.supervision
+					? work.deadline
+					: Math.min(work.deadline, now + 15 * 60_000),
 				inputSchema: { type: "string", maxLength: 2_000 },
+				...(work.supervision ? { presentation: "waiting" as const } : {}),
 			};
 			work.notice = newId();
 			return;
 		case "finish": {
-			const known = new Set(work.observation?.evidence?.map(({ ref }) => ref));
+			const known = new Set(
+				(work.supervision?.evidence ?? work.observation?.evidence)?.map(
+					({ ref }) => ref,
+				),
+			);
 			const refs = decision.refs.filter((ref) => known.has(ref));
 			const verified =
 				decision.status !== "completed" ||
@@ -274,9 +393,49 @@ export function applyDecision(
 	}
 }
 
-export function authorityCurrent(host: Host, db: Database, work: Work) {
+export function supervisedAuthority(
+	host: Host,
+	db: Database,
+	work: Work,
+	action: SupervisedAuthority["action"],
+	input: Pick<
+		SupervisedAuthority,
+		"operationId" | "questionId" | "parentQuestionId" | "messageId"
+	> = {},
+) {
+	if (!work.supervision || !isSupervisedExecutionSource(work.source))
+		return null;
 	return (
-		host.validSourceInTransaction(db, work.source) &&
+		host.supervised?.authorizeInTransaction(db, {
+			source: work.source,
+			workId: work.id,
+			bindingRevisionId: work.binding,
+			toolchainRevisionId: work.supervision.toolchainRevisionId,
+			request: work.request,
+			action,
+			...(input.operationId ? { operationId: input.operationId } : {}),
+			...(input.questionId ? { questionId: input.questionId } : {}),
+			...(input.parentQuestionId
+				? { parentQuestionId: input.parentQuestionId }
+				: {}),
+			...(input.messageId ? { messageId: input.messageId } : {}),
+		}) ?? null
+	);
+}
+
+export function authorityCurrent(
+	host: Host,
+	db: Database,
+	work: Work,
+	action: "continue" | "inspect" = "continue",
+) {
+	const valid = work.supervision
+		? codingCanonicalJSON(supervisedAuthority(host, db, work, action)) ===
+			codingCanonicalJSON(work.supervision.authorization)
+		: isStandardExecutionSource(work.source) &&
+			host.validSourceInTransaction(db, work.source);
+	return (
+		valid &&
 		work.references.every((reference) =>
 			host.validReferenceInTransaction(db, work.source, reference),
 		)

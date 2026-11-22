@@ -92,6 +92,15 @@ export function createWorkControls(turn: Turn) {
 						type: "string",
 						enum: ["check", "answer", "amend", "cancel"],
 					},
+					...([...todos.values()].some(({ tasks }) => tasks !== undefined)
+						? {
+								target: {
+									type: "string",
+									description:
+										"対象。全体は parent、個別タスクは todo の記録で確認した taskId。",
+								},
+							}
+						: {}),
 					todo: {
 						type: "string",
 						enum: [...todos.keys()],
@@ -104,6 +113,12 @@ export function createWorkControls(turn: Turn) {
 									item.request &&
 									lineText(item.request).slice(0, PREVIEW_CHARS),
 								question: questions.get(todo),
+								tasks: item.tasks?.map(({ taskId, title, state, reason }) => ({
+									taskId,
+									title,
+									state,
+									reason: lineText(reason).slice(0, PREVIEW_CHARS),
+								})),
 							})),
 						),
 					},
@@ -164,12 +179,16 @@ export function createWorkControls(turn: Turn) {
 	}
 
 	async function work(args: Record<string, unknown>) {
-		const { todo, operation } = args;
+		const { todo, operation, target } = args;
 		const item = typeof todo === "string" ? todos.get(todo) : undefined;
 		if (
 			typeof todo !== "string" ||
 			!item ||
-			Object.keys(args).length !== 2 ||
+			Object.keys(args).some(
+				(key) => key !== "todo" && key !== "operation" && key !== "target",
+			) ||
+			(target !== undefined && typeof target !== "string") ||
+			(operation === "answer" && target !== undefined) ||
 			(operation !== "check" && !item.open) ||
 			(operation === "answer" && !questions.has(todo))
 		)
@@ -180,6 +199,7 @@ export function createWorkControls(turn: Turn) {
 				: await turn.act(TOOL_NAMES.work, {
 						todo,
 						operation,
+						...(target !== undefined ? { target } : {}),
 						...(operation === "amend" ? { text: turn.utterance } : {}),
 					});
 		return "outcome" in acted

@@ -542,6 +542,7 @@ export type ConfirmationRow = {
 	issuedAt: string;
 	expiresAt: string;
 	usedAt: string | null;
+	usedByRun?: string | null;
 	supersededAt: string | null;
 };
 function mapConfirmation(row: Record<string, unknown>): ConfirmationRow {
@@ -568,6 +569,7 @@ function mapConfirmation(row: Record<string, unknown>): ConfirmationRow {
 		issuedAt: row.issued_at as string,
 		expiresAt: row.expires_at as string,
 		usedAt: (row.used_at as string | null) ?? null,
+		usedByRun: (row.used_by_run as string | null) ?? null,
 		supersededAt: (row.superseded_at as string | null) ?? null,
 	};
 }
@@ -686,13 +688,18 @@ export function withdrawConfirmation(
 	return closed;
 }
 
-export function useConfirmation(db: Database, id: string, at: string): boolean {
+export function useConfirmation(
+	db: Database,
+	id: string,
+	at: string,
+	runId?: string,
+): boolean {
 	const used =
 		db
 			.query(
-				"UPDATE dialogue_confirmations SET used_at = ? WHERE id = ? AND used_at IS NULL AND superseded_at IS NULL AND expires_at > ?",
+				"UPDATE dialogue_confirmations SET used_at = ?, used_by_run = ? WHERE id = ? AND used_at IS NULL AND superseded_at IS NULL AND expires_at > ?",
 			)
-			.run(at, id, at).changes === 1;
+			.run(at, runId ?? null, id, at).changes === 1;
 	if (used) finishConfirmationRevision(db, id);
 	return used;
 }

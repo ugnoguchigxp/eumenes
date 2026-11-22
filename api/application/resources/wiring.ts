@@ -1,4 +1,7 @@
-import { createMarkdownResourceAdapter } from "../../domains/markdown";
+import {
+	createMarkdownResourceAdapter,
+	type MarkdownService,
+} from "../../domains/markdown";
 import {
 	createScratchResourceAdapter,
 	SCRATCH_RESOURCE_KIND,
@@ -70,6 +73,7 @@ export function buildResources(deps: {
 	webResearch: Pick<WebResearchService, "get">;
 	shell?: Pick<ShellService, "runInTransaction" | "recentInTransaction">;
 	scratch?: ScratchStore;
+	markdown?: Pick<MarkdownService, "generated">;
 }) {
 	const { store } = deps;
 	const owner = CONVERSATION_DEFAULT_PRINCIPAL;
@@ -125,7 +129,11 @@ export function buildResources(deps: {
 			...(deps.retireUiCompositions
 				? []
 				: [createUiCompositionResourceAdapter({ store })]),
-			createMarkdownResourceAdapter(store, (id) => !!deps.scratch?.get(id)),
+			createMarkdownResourceAdapter(
+				store,
+				(id) => !!deps.scratch?.get(id),
+				deps.markdown?.generated,
+			),
 			...(deps.scratch ? [createScratchResourceAdapter(deps.scratch)] : []),
 			reports,
 			createComputeResourceAdapter({ store, owner }),

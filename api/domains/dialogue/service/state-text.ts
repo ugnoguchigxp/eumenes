@@ -7,7 +7,10 @@ import { taskForWork } from "./task-work";
 import { workContextCurrent } from "./work-context-input";
 import type { DocumentRefs, TodoItem } from "./work-items";
 import { INPUT_HEADINGS, gapText, jstNowLine, lineText } from "./input-text";
-import { screenLinesInTransaction } from "./resource-context";
+import {
+	screenLinesInTransaction,
+	type ResourceContextLine,
+} from "./resource-context";
 import {
 	attachedLinesInTransaction,
 	SHARED_LINES,
@@ -39,19 +42,20 @@ const IMPACTS: Record<string, string> = {
 };
 
 /** The resources a TODO made, as `a<n>「label」`. */
-export function madeOf(todo: TodoItem, refs: DocumentRefs): string[] {
+export function madeOf(
+	todo: TodoItem,
+	refs: DocumentRefs,
+	visible?: Set<string>,
+): string[] {
 	return (todo.links ?? []).flatMap((link) => {
 		const ref = refs.resource(link.uri);
-		return ref ? [`${ref}「${lineText(link.label)}」`] : [];
+		if (!ref) return [];
+		visible?.add(ref);
+		return [`${ref}「${lineText(link.label)}」`];
 	});
 }
 
-function todoLine(
-	todo: TodoItem,
-	refs: DocumentRefs,
-	archived: boolean,
-): string {
-	const made = madeOf(todo, refs);
+function todoLine(todo: TodoItem, made: string[], archived: boolean): string {
 	// Finished work is archived as it finishes and told by a notice on screen; work the user cancelled has none.
 	const status = archived
 		? todo.outcome === "cancelled"
@@ -106,7 +110,7 @@ export type StateInput = {
 	/** The run being prepared; absent for a background call, which shows no screen and consumes nothing. */
 	run?: Run;
 	/** The same frozen screen projection that normal talk receives. */
-	screenLines?: readonly string[];
+	screenLines?: readonly ResourceContextLine[];
 	/** Use an empty list when the caller appends the agency section with its own provenance. */
 	agencyLines?: readonly string[];
 	nowMs: number;
@@ -130,8 +134,19 @@ export function stateLinesInTransaction(
 	tx: Database,
 	input: StateInput,
 ): string[] {
+	return stateProjectionInTransaction(deps, tx, input).lines;
+}
+
+/** Keep the callable references with the host records that produced the visible lines. */
+export function stateProjectionInTransaction(
+	deps: DialogueDeps,
+	tx: Database,
+	input: StateInput,
+) {
 	const { refs } = input;
 	const lines: string[] = [];
+	const resources = new Set<string>();
+	const todos: number[] = [];
 	const gap =
 		input.lastAt !== null && input.nowMs - input.lastAt >= STATE_LIMITS.gapMs
 			? `（前の発言から${gapText(input.nowMs - input.lastAt)}）`
@@ -149,7 +164,8 @@ export function stateLinesInTransaction(
 	);
 	let briefs = 0;
 	const showTodo = (todo: TodoItem, archived: boolean) => {
-		const line = todoLine(todo, refs, archived);
+		todos.push(todo.ref);
+		const line = todoLine(todo, madeOf(todo, refs, resources), archived);
 		if (
 			!input.run ||
 			!["manual", "voice"].includes(input.run.sourceKind) ||
@@ -173,17 +189,19 @@ export function stateLinesInTransaction(
 			summary: lineText(summary).slice(0, 320),
 		})}`;
 	};
-	const work = [
-		...(
-			ledger?.pendingConfirmationsInTransaction(tx, input.conversationId) ?? []
-		).map(
-			(c) =>
-				`- c${c.ref} 確認待ち ${c.toolchain}「${lineText(c.request)}」${c.target ? ` 対象「${lineText(c.target)}」` : ""}（${IMPACTS[c.impact] ?? c.impact}）`,
-		),
-		...open.slice(0, STATE_LIMITS.work).map((todo) => showTodo(todo, false)),
+	const work = (
+		ledger?.pendingConfirmationsInTransaction(tx, input.conversationId) ?? []
+	).map(
+		(c) =>
+			`- c${c.ref} 確認待ち ${c.toolchain}「${lineText(c.request)}」${c.target ? ` 対象「${lineText(c.target)}」` : ""}（${IMPACTS[c.impact] ?? c.impact}）`,
+	);
+	work.push(
+		...open
+			.slice(0, Math.max(0, STATE_LIMITS.work - work.length))
+			.map((todo) => showTodo(todo, false)),
 		...specialistLines(deps, tx, input.conversationId, !!input.run),
 		...(input.handoff ? [`- ${lineText(input.handoff)}`] : []),
-	];
+	);
 	const room = STATE_LIMITS.work - work.length;
 	if (ledger && room > 0)
 		work.push(
@@ -206,15 +224,26 @@ export function stateLinesInTransaction(
 		);
 	if (work.length) lines.push("仕事:", ...work.slice(0, STATE_LIMITS.work));
 
-	const shown = new Set<string>();
-	const presented = presentedLines(deps, tx, input, open, shown);
-	if (presented.length)
-		lines.push("提示中:", ...presented.slice(0, STATE_LIMITS.presented));
-	const shared = input.run
-		? sharedLinesInTransaction(deps, tx, input.conversationId, shown)
-		: [];
-	if (shared.length)
-		lines.push("共有中:", ...shared.slice(0, STATE_LIMITS.shared));
+	const appendResources = (heading: string, rows: ResourceContextLine[]) => {
+		if (!rows.length) return;
+		lines.push(heading);
+		for (const row of rows) {
+			lines.push(row.text);
+			if (row.resource) resources.add(row.resource);
+		}
+	};
+	const presented = presentedLines(deps, tx, input, open).slice(
+		0,
+		STATE_LIMITS.presented,
+	);
+	appendResources("提示中:", presented);
+	if (input.run) {
+		const shown = new Set(presented.flatMap(({ resource }) => resource ?? []));
+		appendResources(
+			"共有中:",
+			sharedLinesInTransaction(deps, tx, input.conversationId, shown),
+		);
+	}
 
 	// The context keeper's fields, only while it runs (it is off for now: the review fixes design C5).
 	const body = deps.contextKeeper ? input.state?.body : undefined;
@@ -238,7 +267,7 @@ export function stateLinesInTransaction(
 		items("未解決", "o", body.open);
 		items("関係する記録", "r", body.records);
 	}
-	return lines;
+	return { lines, resources: [...resources], todos };
 }
 
 /**
@@ -250,15 +279,13 @@ function presentedLines(
 	tx: Database,
 	input: StateInput,
 	open: readonly TodoItem[],
-	/** The URIs presented here, so `共有中` leaves them out. */
-	shown: Set<string>,
-): string[] {
+): ResourceContextLine[] {
 	const { refs } = input;
-	const lines: string[] = [];
+	const lines = input.run
+		? [...(input.screenLines ?? screenLinesInTransaction(deps, tx, input.run))]
+		: [];
+	const shown = new Set(lines.flatMap(({ resource }) => resource ?? []));
 	if (input.run) {
-		lines.push(
-			...(input.screenLines ?? screenLinesInTransaction(deps, tx, input.run)),
-		);
 		// The input's own attachments and long paste (§8.1).
 		lines.push(
 			...attachedLinesInTransaction(deps, tx, input.run.inputMessageId, shown),
@@ -274,39 +301,16 @@ function presentedLines(
 		tx,
 		message.id,
 	) ?? []) {
-		if (shown.has(row.uri)) continue;
-		shown.add(row.uri);
 		const ref = `a${row.ref}`;
+		if (shown.has(ref)) continue;
+		shown.add(ref);
 		const full = `${ref}「${lineText(row.label)}」`;
-		lines.push(`- ${named.has(full) ? ref : full}（直前の返事で示した）`);
+		lines.push({
+			resource: ref,
+			text: `- ${named.has(full) ? ref : full}（直前の返事で示した）`,
+		});
 	}
 	return lines;
-}
-
-/**
- * The resources (`a<n>`) the lines of `## State` name, in order: the only ones a choice may hand over. A label in
- * 「」 is the resource's own words, not a reference.
- */
-export function namedResources(lines: readonly string[]): string[] {
-	const named = new Set<string>();
-	for (const line of lines)
-		for (const [ref] of line
-			.replace(/「[^」]*」/g, "")
-			.matchAll(/(?<![\p{L}\p{N}_])a\d+(?!\p{N})/gu))
-			named.add(ref);
-	return [...named];
-}
-
-/**
- * The work `## State` lists (its `- t<n> ` lines, by number; a title is not quoted, so only a line's head is read):
- * the only finished work a choice may check.
- */
-export function namedTodos(lines: readonly string[]): number[] {
-	const named = new Set<number>();
-	for (const line of lines)
-		for (const [, ref] of line.matchAll(/^- t(\d+) /gmu))
-			named.add(Number(ref));
-	return [...named];
 }
 
 /** `## State` as the input shows it. */

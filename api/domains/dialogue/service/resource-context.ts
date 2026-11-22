@@ -7,6 +7,9 @@ import type { DialogueDeps } from "./context";
 import { lineText } from "./input-text";
 import { viewedSpecialistTarget } from "./specialist-context";
 
+/** The displayed text and the ledger reference the host actually placed on this line. */
+export type ResourceContextLine = { text: string; resource?: string };
+
 const phases = {
 	loading: "読込中",
 	ready: "表示可能",
@@ -32,13 +35,13 @@ export function screenLinesInTransaction(
 	deps: DialogueDeps,
 	db: Database,
 	run: Run,
-): string[] {
+): ResourceContextLine[] {
 	const screen = runViewingSchema.safeParse(runViewing(db, run.id)).data
 		?.screen;
 	const registered =
 		screen &&
 		deps.toolchains?.screenInTransaction?.(db, screen.artifactRevisionId);
-	const lines: string[] = [];
+	const lines: ResourceContextLine[] = [];
 	const variant =
 		registered && (screen?.variantId ?? registered.defaultVariant);
 	const adapterRefs =
@@ -56,9 +59,9 @@ export function screenLinesInTransaction(
 		]
 			.filter(Boolean)
 			.join("、");
-		lines.push(
-			`- 送信時の画面「${lineText(registered.title)}」（表示モード「${lineText(variant)}」、${details}、観測 ${screen.observedAt}）`,
-		);
+		lines.push({
+			text: `- 送信時の画面「${lineText(registered.title)}」（表示モード「${lineText(variant)}」、${details}、観測 ${screen.observedAt}）`,
+		});
 	}
 	const viewing = screen
 		? adapterRefs
@@ -66,14 +69,15 @@ export function screenLinesInTransaction(
 			: undefined
 		: viewingLineInTransaction(deps, db, run);
 	if (viewing)
-		lines.push(
-			`- ${lineText(viewing)}（${screen ? "送信時に画面に表示" : "画面に表示中"}）`,
-		);
+		lines.push({
+			text: `- ${lineText(viewing.text)}（${screen ? "送信時に画面に表示" : "画面に表示中"}）`,
+			resource: viewing.resource,
+		});
 	const target = viewedSpecialistTarget(deps, db, run);
 	if (target)
-		lines.push(
-			`- ${lineText(target.specialist)}「${lineText(target.label)}」（画面に表示中、target ${target.ref}）`,
-		);
+		lines.push({
+			text: `- ${lineText(target.specialist)}「${lineText(target.label)}」（画面に表示中、target ${target.ref}）`,
+		});
 	return lines;
 }
 
@@ -87,7 +91,7 @@ function viewingLineInTransaction(
 	db: Database,
 	run: { id: string; conversationId: string },
 	adapterRefs?: readonly string[],
-): string | undefined {
+) {
 	const access = deps.resources;
 	const ledger = deps.resourceLedger;
 	if (!access || !ledger) return undefined;
@@ -106,5 +110,9 @@ function viewingLineInTransaction(
 		source: "viewed",
 	});
 	if (entered.forgottenAt) return undefined;
-	return `a${entered.ref} ${resolved.resource.kindLabel}「${lineText(resolved.resource.label)}」`;
+	const resource = `a${entered.ref}`;
+	return {
+		resource,
+		text: `${resource} ${resolved.resource.kindLabel}「${lineText(resolved.resource.label)}」`,
+	};
 }

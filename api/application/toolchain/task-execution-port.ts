@@ -7,7 +7,10 @@ import { pipelineComponents } from "../pipelines/component-catalog";
 import type { CollaborationInteract } from "../collaboration/collaboration-backends";
 import { configureCollaboration } from "../collaboration/collaboration-wiring";
 import type { CollaborationHost } from "../collaboration/collaboration-host";
-import { executionNoticeResult } from "../../domains/tool-runtime";
+import {
+	executionNoticeResult,
+	isStandardExecutionSource,
+} from "../../domains/tool-runtime";
 import type { AgentRuntime } from "../../domains/agent-runtime";
 import { type Capabilities } from "../../domains/capabilities";
 import type { ConversationService } from "../../domains/conversation";
@@ -32,6 +35,9 @@ import { taskExecutionStops } from "./task-execution-stops";
 import { reference, result, total } from "./task-execution-values";
 
 export type TaskExecutionHost = {
+	developmentSupervision?: ReturnType<
+		typeof import("../../domains/development-supervision").createDevelopmentSupervision
+	>;
 	webNote?: import("../../domains/web-note").WebNoteService;
 	claudeCode?: import("../../domains/claude-code").ClaudeCodeService;
 	settings?: Pick<
@@ -128,6 +134,24 @@ function configureWebNote(
 	const note = host.webNote;
 	if (!note) return;
 	note.configure({
+		supervised: host.developmentSupervision && {
+			authorizeInTransaction(db, input) {
+				const grant = host.developmentSupervision!.authorizeInTransaction(
+					db,
+					input,
+				);
+				return grant && grant.kind !== "claude"
+					? { deadline: grant.scope.deadline }
+					: null;
+			},
+			deliverInTransaction(db, source, view) {
+				return host.developmentSupervision!.observeInTransaction(
+					db,
+					source,
+					view.id,
+				);
+			},
+		},
 		validSourceInTransaction: port.validSourceInTransaction,
 		revokeDeliveryInTransaction: dialogue.revokeExecutionNoticeInTransaction,
 		deliveryStateInTransaction: dialogue.noticeDeliveryInTransaction,
@@ -156,7 +180,25 @@ function configureClaudeCode(
 ) {
 	const claude = host.claudeCode;
 	claude?.configure({
-		workspace: claudeWorkspace("eumenes"),
+		workspace: claudeWorkspace("eumenes", {
+			parallel: !!host.developmentSupervision,
+		}),
+		supervised: host.developmentSupervision && {
+			authorizeInTransaction(db, input) {
+				const grant = host.developmentSupervision!.authorizeInTransaction(
+					db,
+					input,
+				);
+				return grant?.kind === "claude" ? grant.scope : null;
+			},
+			observeInTransaction(db, source, view) {
+				return host.developmentSupervision!.observeInTransaction(
+					db,
+					source,
+					view.id,
+				);
+			},
+		},
 		controlSourceInTransaction: port.controlSourceInTransaction,
 		validReferenceInTransaction: port.validReferenceInTransaction,
 		validSourceInTransaction: port.validSourceInTransaction,
@@ -182,6 +224,48 @@ function configureClaudeCode(
 	});
 }
 
+function configureBrowserSource(
+	host: TaskExecutionHost,
+	port: ToolchainExecutionPort,
+) {
+	const { agents, conversation } = host;
+	host.browser?.setTaskExecutionSource((db, frozen) => {
+		const child = (frozen as { execution?: ChildExecution } | null)?.execution;
+		if (!child || !agents.executions.authorizeChildInTransaction(db, child))
+			return null;
+		if (
+			!port.validSourceInTransaction(db, child.source) ||
+			child.refs.some(
+				(ref) => !port.validReferenceInTransaction(db, child.source, ref),
+			)
+		)
+			return null;
+		const answer = child.resume
+			? conversation.messageInTransaction(db, child.resume.answerMessageId)
+					?.message
+			: null;
+		if (
+			child.resume &&
+			(!answer ||
+				answer.role !== "user" ||
+				answer.conversationId !== child.source.conversationId ||
+				!port.controlSourceInTransaction(
+					db,
+					child.source.conversationId,
+					answer.id,
+					child.source,
+				))
+		)
+			return null;
+		return [
+			child.source.request,
+			...(child.source.amendments ?? []).map((update) => update.request),
+			...(child.source.responses ?? []).map((update) => update.request),
+			...(answer ? [answer.text] : []),
+		].join("\n");
+	});
+}
+
 /** Composition of public operations. Only execution types dispatch here; the model chooses the purpose. */
 export function configureTaskExecution(host: TaskExecutionHost) {
 	const {
@@ -191,7 +275,6 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		routing,
 		registry,
 		dialogue,
-		conversation,
 		inference,
 	} = host;
 	const stopExternal = taskExecutionStops(host.queue, registry, agents);
@@ -212,6 +295,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 		...taskExecutionSources(host, context),
 		cardInTransaction: routing.cardInTransaction,
 		async find(query, source, signal, options) {
+			if (!isStandardExecutionSource(source)) return [];
 			const vector = await routing.embedQuery(query, signal).catch((error) => {
 				signal.throwIfAborted();
 				if (!options?.lexicalFallback) throw error;
@@ -243,6 +327,8 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			port.readReferenceInTransaction(db, source, ref, start, limit),
 		),
 		currentInTransaction(db, child, raw) {
+			if (!isStandardExecutionSource(child.source))
+				throw new Error("execution_source_invalid");
 			if (child.source.origin === "workflow")
 				return host.workflowSteps!.current(db, child, raw);
 			if (raw === null)
@@ -267,6 +353,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			);
 		},
 		adoptInTransaction(db, child, outcome) {
+			if (!isStandardExecutionSource(child.source)) return false;
 			if (child.source.origin === "workflow")
 				return host.workflowSteps!.adopt(db, child, outcome);
 			resolve(db, child);
@@ -280,6 +367,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			return true;
 		},
 		cancelInTransaction(db, child, raw) {
+			if (!isStandardExecutionSource(child.source)) return;
 			if (child.source.origin === "workflow")
 				return host.workflowSteps?.cancel(db, child, raw);
 			const dispatched = agents.executionChildReceiptInTransaction(
@@ -325,6 +413,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 				host.legacy?.cancelInTransaction(db, child, raw);
 		},
 		validateAnswerInTransaction(db, child, outcome, input) {
+			if (!isStandardExecutionSource(child.source)) return false;
 			if (child.source.origin === "workflow") return false;
 			const ref = reference.parse(outcome.ref);
 			if (ref.kind === "bound" && ref.operationId && ref.adapterRef)
@@ -358,6 +447,7 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 			);
 		},
 		purgeSourcesInTransaction(db, source, children) {
+			if (!isStandardExecutionSource(source)) return;
 			agents.deleteTaskDataInTransaction(db, source.runId);
 			for (const child of children)
 				host.media?.purgeCallInTransaction(db, child.id);
@@ -403,10 +493,12 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 				: pipelineComponents(host, context, db, source),
 		workflowPlanInTransaction: host.workflowAuthority?.planInTransaction,
 		stepToolchainInTransaction: (db, toolchainId, source) =>
-			source.origin === "workflow" && host.workflowCatalog
-				? host.workflowCatalog.revisionOf(toolchainId)
-				: (available(db, source.runId).find((e) => e.id === toolchainId)
-						?.revisionId ?? null),
+			!isStandardExecutionSource(source)
+				? null
+				: source.origin === "workflow" && host.workflowCatalog
+					? host.workflowCatalog.revisionOf(toolchainId)
+					: (available(db, source.runId).find((e) => e.id === toolchainId)
+							?.revisionId ?? null),
 		controlInTransaction(db) {
 			const sets = capabilities.toolchainsInTransaction(db).flatMap((d) => {
 				const bound = capabilities.toolchainBindingInTransaction(
@@ -439,40 +531,6 @@ export function configureTaskExecution(host: TaskExecutionHost) {
 	configureWebNote(host, port);
 	configureClaudeCode(host, port);
 	configureCollaboration(host, port);
-	host.browser?.setTaskExecutionSource((db, frozen) => {
-		const child = (frozen as { execution?: ChildExecution } | null)?.execution;
-		if (!child || !agents.executions.authorizeChildInTransaction(db, child))
-			return null;
-		if (
-			!port.validSourceInTransaction(db, child.source) ||
-			child.refs.some(
-				(ref) => !port.validReferenceInTransaction(db, child.source, ref),
-			)
-		)
-			return null;
-		const answer = child.resume
-			? conversation.messageInTransaction(db, child.resume.answerMessageId)
-					?.message
-			: null;
-		if (
-			child.resume &&
-			(!answer ||
-				answer.role !== "user" ||
-				answer.conversationId !== child.source.conversationId ||
-				!port.controlSourceInTransaction(
-					db,
-					child.source.conversationId,
-					answer.id,
-					child.source,
-				))
-		)
-			return null;
-		return [
-			child.source.request,
-			...(child.source.amendments ?? []).map((update) => update.request),
-			...(child.source.responses ?? []).map((update) => update.request),
-			...(answer ? [answer.text] : []),
-		].join("\n");
-	});
+	configureBrowserSource(host, port);
 	return port;
 }

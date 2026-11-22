@@ -9,6 +9,8 @@ import {
 	type ClaudeCodeService,
 	type Runner as ClaudeRunner,
 } from "../../domains/claude-code";
+import { createDevelopmentSupervision } from "../../domains/development-supervision";
+import { createSupervisionAdapter } from "../work/supervision-adapter";
 import { createClaudeCodeTaskAdapter } from "../work/claude-code-task-adapter";
 import { createWebNoteAdapters } from "../web-note/web-note-adapter";
 import { createMarkdownAdapter } from "../markdown/markdown-adapter";
@@ -259,7 +261,7 @@ function enabledBackends(options: ToolchainOptions) {
 	return new Set([
 		...(options.docling ? ["docling"] : []),
 		...(options.canvasAdapter ? ["canvas"] : []),
-		...(options.markdown ? ["markdown"] : []),
+		...(options.markdown ? ["markdown", "development-supervision"] : []),
 		"task-execution",
 		...(options.webNote?.turn ? ["web-note"] : []),
 		...(options.webNote?.inspectSource ? ["inspect-source"] : []),
@@ -318,6 +320,7 @@ export async function createToolchain(
 ) {
 	let webNoteRuntime: WebNoteService | undefined;
 	let claudeCode: ClaudeCodeService | undefined;
+	let supervision: ReturnType<typeof createDevelopmentSupervision> | undefined;
 	let taskRuntime:
 		import("../../domains/agent-runtime").AgentRuntime | undefined;
 	const shared =
@@ -330,6 +333,7 @@ export async function createToolchain(
 				kanban: options.kanbanSdk.kanban,
 				registry: options.kanbanSdk.registry,
 				activity: options.kanbanSdk.activity,
+				supervision: () => supervision,
 			},
 		);
 	const weather = options.weather && createWeatherAdapter(options.weather);
@@ -347,6 +351,7 @@ export async function createToolchain(
 		createTaskAdapter(() => taskRuntime, options.todos),
 		...createWebNoteAdapters(() => webNoteRuntime),
 		createClaudeCodeTaskAdapter(() => claudeCode),
+		createSupervisionAdapter(() => supervision),
 		createPipelinesAdapter(() => taskRuntime),
 		...(shared && options.kanbanSdk
 			? [
@@ -462,6 +467,7 @@ export async function createToolchain(
 		options,
 	);
 	const taskDeps = { store, queue, capabilities };
+	supervision = createDevelopmentSupervision({ ...taskDeps, inference });
 	webNoteRuntime = createWebNote({ ...taskDeps, ...options.webNote });
 	claudeCode = createClaudeCode({
 		...taskDeps,
@@ -560,6 +566,7 @@ export async function createToolchain(
 	return {
 		capabilities,
 		webNote: webNoteRuntime,
+		developmentSupervision: supervision,
 		claudeCode,
 		collaboration,
 		childOperations: children,

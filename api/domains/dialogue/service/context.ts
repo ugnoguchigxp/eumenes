@@ -103,7 +103,19 @@ export type RoutedInput = {
 	 * The work the choice may name: the open work, which it may check, correct or cancel, and the finished work
 	 * `## State` shows, which it may only check. The agency's own research is not among them.
 	 */
-	todos: Array<{ ref: number; title: string; request?: string; open: boolean }>;
+	todos: Array<{
+		ref: number;
+		title: string;
+		request?: string;
+		open: boolean;
+		executionRevision?: number;
+		tasks?: ReadonlyArray<
+			Pick<
+				import("../../tool-runtime").ExecutionTaskView,
+				"taskId" | "revision" | "title" | "state" | "reason"
+			>
+		>;
+	}>;
 	/** The resources `## State` names (`a<n>`): the only ones a choice may hand over with its request. */
 	resources: string[];
 	/** Host-issued observations available for a repair request. */

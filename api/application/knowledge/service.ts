@@ -32,6 +32,11 @@ import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { QueueService } from "../../domains/queue";
 import type { ControlContract } from "../../domains/inference";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../../domains/conversation/contracts";
+import {
+	createSupervisionSkillGuidance,
+	supervisionKnowledgeScope,
+} from "../work/supervision-research-skill";
+import type { ExecutionSource } from "../../domains/tool-runtime";
 
 const log = getLogger("knowledge");
 const languages = ["ja", "en"] as const;
@@ -180,6 +185,15 @@ export const searchSchema = z.strictObject({
 });
 type Submission = z.infer<typeof submissionSchema>;
 const scope = "knowledge:local-owner";
+const knowledgeAuthority: Ports<Database>["authority"] = {
+	valid: (tx, auth, refs) =>
+		auth.principal === CONVERSATION_DEFAULT_PRINCIPAL &&
+		(auth.scope === scope ||
+			auth.scope === supervisionKnowledgeScope ||
+			auth.scope.startsWith(specialistScope)) &&
+		auth.epoch === 0 &&
+		refs.every((ref) => !sqliteRepository.blocked(tx, ref)),
+};
 const policy = {
 	id: "knowledge:direct-delivery",
 	version: "1",
@@ -260,6 +274,27 @@ function guidanceRequest(
 	};
 }
 
+function supervisionGuidanceRequest(
+	query: string,
+	source: ExecutionSource,
+): GuidanceRequest {
+	const uncertainty = situationText.parse(query);
+	return guidanceRequest(
+		{
+			goal: source.request,
+			acceptance: [{ id: "applicability", text: uncertainty }],
+			constraints: [],
+			situation: { revision: source.digest, uncertainty },
+		},
+		{
+			requestId: crypto.randomUUID(),
+			audience: "worker",
+			environmentId: "eumenes:direct-delivery",
+			deadlineAt: Date.now() + 32_000,
+		},
+	);
+}
+
 function createSpecialistInference(
 	control: KnowledgeControl,
 	read: <T>(op: (tx: Database) => T) => T,
@@ -331,13 +366,7 @@ export function createKnowledge(options: {
 		repository: sqliteRepository,
 		now: Date.now,
 		id: () => crypto.randomUUID(),
-		authority: {
-			valid: (tx, auth, refs) =>
-				auth.principal === CONVERSATION_DEFAULT_PRINCIPAL &&
-				(auth.scope === scope || auth.scope.startsWith(specialistScope)) &&
-				auth.epoch === 0 &&
-				refs.every((ref) => !sqliteRepository.blocked(tx, ref)),
-		},
+		authority: knowledgeAuthority,
 		registry: {
 			async search() {
 				return [];
@@ -562,6 +591,12 @@ export function createKnowledge(options: {
 			source && options.specialistContextSearch
 				? prepareForSpecialist
 				: undefined,
+		...createSupervisionSkillGuidance({
+			service,
+			store,
+			selectionCalls: (signal) => boundedCalls(signal, 1),
+			request: supervisionGuidanceRequest,
+		}),
 		readForSpecialist: specialist.read,
 		finishSpecialistTurn: specialist.finishTurn,
 		attachDialogue: specialist.attachDialogue,

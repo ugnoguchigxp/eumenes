@@ -18,6 +18,7 @@ import { buildServices } from "../server-services";
 import { offlineBundleHost } from "./toolchain-adapters";
 
 const backends = new Set([
+	"development-supervision",
 	"docling",
 	"web",
 	"web-note",
@@ -151,6 +152,7 @@ test("fresh initialization installs every repository seed and bundle without run
 		);
 		expect(repair).toMatchObject({
 			functionName: "repair_error",
+			revisionId: "toolchain:claude-code.repair@5",
 			minImpact: "modify_existing",
 		});
 		const request = store.read((db) =>
@@ -247,6 +249,7 @@ test("upgrading retires the generic Collaboration entry and preserves its saved 
 		"capabilities/0013-retire-collaboration-task",
 		"dialogue/0043-retire-collaboration-task",
 		"dialogue/0044-confirmation-revision",
+		"dialogue/0045-consumed-confirmation-run",
 		"collaboration/0005-retire-task-works",
 	]);
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-collaboration-retire-"));

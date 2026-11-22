@@ -179,7 +179,11 @@ export async function handOver(
 			adoptHere(x, tx, run);
 			if (
 				chosen.confirmationId &&
-				!deps.work!.useConfirmationInTransaction(tx, chosen.confirmationId)
+				!deps.work!.useConfirmationInTransaction(
+					tx,
+					chosen.confirmationId,
+					run.id,
+				)
 			)
 				throw new Error("confirmation_used");
 			const dispatched = dispatchInTransaction(deps, tx, {
@@ -187,6 +191,9 @@ export async function handOver(
 				run,
 				card: chosen.card,
 				request: chosen.request,
+				...(chosen.confirmationId
+					? { confirmationId: chosen.confirmationId }
+					: {}),
 				...(chosen.target ? { target: chosen.target } : {}),
 				...(chosen.resolveUnsaved
 					? { resolveUnsaved: chosen.resolveUnsaved }

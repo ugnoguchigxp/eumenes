@@ -1,0 +1,105 @@
+{
+	"formatVersion": 1,
+	"bundleId": "codex-tasks-supervised-board",
+	"pins": [
+		{
+			"revisionId": "package:codex-tasks.manage@1",
+			"digest": "001291ce89169f5f88535ceb1c9e09b8d5568fbc67b9d889c8cc0af464295245"
+		},
+		{
+			"revisionId": "tool:codex-tasks.request@1",
+			"digest": "594c0cc6feb4d9a9d53b19a25489445a5b2901cdd7ebd0a017b932830c88ddb0"
+		},
+		{
+			"revisionId": "tool:codex-tasks.list@1",
+			"digest": "47da1d2d10d7193fc04acc9349c99ec7d9afce2b8bbfd07e1816600b5e9f6db9"
+		},
+		{
+			"revisionId": "tool:codex-tasks.followup@1",
+			"digest": "42602e2657aefc32ba10a452dcc6ff80405db278a7c65846fce46671a3dfaa1c"
+		},
+		{
+			"revisionId": "tool:codex-tasks.cancel@1",
+			"digest": "7d561744a270990a91042eea254f8faf980a7967823d116a95763af934fbff57"
+		},
+		{
+			"revisionId": "tool:codex-tasks.stop@1",
+			"digest": "a481b397bd420838080d63e97947789c429d460149318651666e70d21017e8cc"
+		}
+	],
+	"definitions": [
+		{
+			"kind": "toolchain",
+			"id": "codex-tasks.manage",
+			"revision": 3,
+			"title": "Codexへの開発依頼",
+			"summary": "Codexを指定した新規タスクと既存Codexカードの続行・状況確認",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"Codexを明示した新規依頼",
+				"Codex担当の既存カードへの追加依頼・回答・停止"
+			],
+			"avoidWhen": ["Claudeへの依頼", "担当をまたぐボードの整理"],
+			"dependencies": ["package:codex-tasks.manage@1"],
+			"packageRevisionId": "package:codex-tasks.manage@1",
+			"functionName": "codex_tasks",
+			"redirects": [],
+			"examples": [
+				"CodexでREADMEを修正して",
+				"Codexのさっきのタスクを続けて",
+				"Codexのタスクが止まった理由を教えて"
+			],
+			"bindingRevisionId": "binding:codex-tasks.manage@3",
+			"artifactRevisionId": "artifact:kanban.board@5"
+		}
+	],
+	"bindings": [
+		{
+			"kind": "binding",
+			"id": "codex-tasks.manage",
+			"revision": 3,
+			"execution": "command",
+			"adapterRef": "adapter:codex-tasks@1",
+			"availabilityRef": "availability:codex-tasks@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:codex-tasks.request@1",
+					"operationId": "codex-tasks.request",
+					"inputSchemaRef": "builtin:codexTaskRequest"
+				},
+				{
+					"toolRevisionId": "tool:codex-tasks.list@1",
+					"operationId": "codex-tasks.list",
+					"inputSchemaRef": "builtin:kanbanList"
+				},
+				{
+					"toolRevisionId": "tool:codex-tasks.followup@1",
+					"operationId": "codex-tasks.followup",
+					"inputSchemaRef": "builtin:codexTaskFollowup"
+				},
+				{
+					"toolRevisionId": "tool:codex-tasks.cancel@1",
+					"operationId": "codex-tasks.cancel",
+					"inputSchemaRef": "builtin:codexTaskRef"
+				},
+				{
+					"toolRevisionId": "tool:codex-tasks.stop@1",
+					"operationId": "codex-tasks.stop",
+					"inputSchemaRef": "builtin:codexTaskRef"
+				}
+			],
+			"outputSchemaRef": "domain:kanban.receipt@1",
+			"resultProjectionRef": "projection:codex-tasks.result@1",
+			"artifactRevisionId": "artifact:kanban.board@5",
+			"questions": [
+				{
+					"inputSchemaRef": "builtin:kanbanCardAnswer",
+					"choiceField": "cardId"
+				}
+			]
+		}
+	],
+	"artifacts": [],
+	"schemas": []
+}

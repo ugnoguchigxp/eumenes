@@ -27,3 +27,28 @@ export function taskForWork(
 			}
 		: undefined;
 }
+
+/** The small projection needed to choose the parent or an individual task in a conversation. */
+export function taskTargets(
+	deps: DialogueDeps,
+	db: Database,
+	row: WorkRow | null | undefined,
+) {
+	if (
+		!row?.sourceRef ||
+		(row.execution !== "task" && row.execution !== "pipeline")
+	)
+		return undefined;
+	const view = taskForWork(deps, db, row)?.viewInTransaction(db, row.sourceRef);
+	if (!view?.tasks) return undefined;
+	return {
+		executionRevision: view.revision,
+		tasks: view.tasks.map(({ taskId, revision, title, state, reason }) => ({
+			taskId,
+			revision,
+			title,
+			state,
+			reason,
+		})),
+	};
+}

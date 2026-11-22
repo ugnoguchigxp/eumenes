@@ -17,6 +17,7 @@ import { migrations } from "../migrations";
 import { createTerminalWorkspacePort } from "./terminal-workspace";
 
 const workspaceRef = "eumenes";
+const hostBootedAt = Date.parse("2026-11-17T10:00:00Z");
 const token = "fixture-terminal-workspace";
 const size = { cols: 80, rows: 24 };
 const request = {
@@ -46,6 +47,7 @@ function fixture(spawn: SpawnPty, stopConfirmMs = 100) {
 			store,
 			workspaceRef: () => workspaceRef,
 			executorId: "claude-code",
+			hostBootedAtMs: hostBootedAt,
 		}),
 	});
 	const app = createApp({
@@ -109,6 +111,96 @@ test.each(["held", "unknown"] as const)(
 				error: "terminal_workspace_busy",
 			});
 			expect(h.guard()).toEqual(guard);
+		} finally {
+			await h.close();
+		}
+	},
+);
+
+const priorBootActivity = "2026-11-15T13:00:00.000Z";
+const currentBootActivity = "2026-11-17T11:00:00.000Z";
+const previousTerminal = "direct:previous-session";
+
+test.each([
+	[
+		"a direct terminal from before the host reboot",
+		previousTerminal,
+		"held",
+		priorBootActivity,
+		201,
+		"completed",
+	],
+	[
+		"a direct terminal with an unfinished request from before the host reboot",
+		previousTerminal,
+		"held",
+		priorBootActivity,
+		201,
+		"started",
+	],
+	[
+		"a direct terminal from the current host boot",
+		previousTerminal,
+		"held",
+		currentBootActivity,
+		409,
+		"completed",
+	],
+	[
+		"a direct terminal with no saved evidence",
+		previousTerminal,
+		"held",
+		null,
+		409,
+		"completed",
+	],
+	[
+		"a direct terminal whose reservation is unknown",
+		previousTerminal,
+		"unknown",
+		priorBootActivity,
+		409,
+		"completed",
+	],
+	[
+		"a Kanban terminal reservation",
+		"kanban:fixture",
+		"held",
+		priorBootActivity,
+		409,
+		"completed",
+	],
+] as const)(
+	"startup handles %s",
+	async (
+		_case,
+		ownerRef,
+		state,
+		lastActivity,
+		expectedStatus,
+		requestState,
+	) => {
+		const h = fixture(() => fakeSpawn());
+		const guard = {
+			workspaceRef,
+			ownerRef,
+			executorId: "claude-code",
+			epoch: "previous-epoch",
+			state,
+		};
+		try {
+			await h.store.write((tx) => {
+				reserveWorkspaceInTransaction(tx, guard);
+				if (!lastActivity) return;
+				const attemptId = crypto.randomUUID();
+				h.terminals.enqueueInTransaction(tx, { ...request, attemptId });
+				tx.query(
+					"UPDATE terminal_requests SET terminal_session_id=?, state=?, updated_at=? WHERE id=?",
+				).run("previous-session", requestState, lastActivity, attemptId);
+			});
+			await h.terminals.recover();
+			expect(h.guard()).toEqual(expectedStatus === 201 ? null : guard);
+			expect((await h.start()).status).toBe(expectedStatus);
 		} finally {
 			await h.close();
 		}
@@ -194,6 +286,22 @@ test("a rejected restart preserves the reservation of a running terminal", async
 			"terminal_running",
 		);
 		expect(h.guard()).toEqual(guard);
+	} finally {
+		await h.close();
+	}
+});
+
+test("a direct Claude Code exit releases the workspace before the next terminal starts", async () => {
+	const pty = fakeSpawn();
+	let launches = 0;
+	const h = fixture(() => (launches++ === 0 ? pty : fakeSpawn()));
+	try {
+		const started = await h.start();
+		expect(started.status).toBe(201);
+		pty.kill();
+		await pty.exited;
+		expect((await h.start()).status).toBe(201);
+		expect(launches).toBe(2);
 	} finally {
 		await h.close();
 	}

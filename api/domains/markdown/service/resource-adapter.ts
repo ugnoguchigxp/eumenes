@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { headWithin } from "../../../infrastructure/context-budget";
 import {
@@ -12,17 +13,29 @@ import {
 	generatedReceipt,
 } from "../repository/generated";
 import { row, list, type Workspace } from "../repository";
+import type { MarkdownService } from "./index";
 
 export function createMarkdownResourceAdapter(
 	store: SqliteStore,
 	hasLocal?: (id: string) => boolean,
+	generated?: Pick<MarkdownService["generated"], "localPreviewInTransaction">,
 ): ResourceAdapter {
-	const available = (value: NonNullable<ReturnType<typeof generatedRow>>) => {
-		const { archive, local } = generatedReceipt(value);
+	const local = (
+		db: Database,
+		value: NonNullable<ReturnType<typeof generatedRow>>,
+	) =>
+		generatedValue(value).retention === "local"
+			? !!generated?.localPreviewInTransaction(db, value.id)
+			: hasLocal?.(value.id) === true;
+	const available = (
+		db: Database,
+		value: NonNullable<ReturnType<typeof generatedRow>>,
+	) => {
+		const receipt = generatedReceipt(value);
 		return (
 			value.state === "settled" &&
-			(archive.state === "saved" ||
-				(local.state === "saved" && hasLocal?.(value.id) === true))
+			(receipt.archive.state === "saved" ||
+				(receipt.local.state === "saved" && local(db, value)))
 		);
 	};
 	const ref = (value: Workspace): ResourceRef => ({
@@ -31,9 +44,9 @@ export function createMarkdownResourceAdapter(
 		label: [...value.title].slice(0, 120).join(""),
 		createdAt: new Date(value.created_at).toISOString(),
 	});
-	const generatedRef = (db: import("bun:sqlite").Database, id: string) => {
+	const generatedRef = (db: Database, id: string) => {
 		const value = generatedRow(db, id);
-		if (!value || !available(value)) return null;
+		if (!value || !available(db, value)) return null;
 		return {
 			uri: formatResourceUri("markdown.document", `generated-${id}`),
 			kind: "markdown.document",
@@ -75,7 +88,7 @@ export function createMarkdownResourceAdapter(
 						output.document.archive.sourceId === saved.archive.sourceId) ||
 						(output.document.local?.state === "saved" &&
 							saved.local.state === "saved" &&
-							hasLocal?.(r.id) === true))
+							local(db, r)))
 					? [ref]
 					: [];
 			}
@@ -123,10 +136,11 @@ export function createMarkdownResourceAdapter(
 		},
 		async read(id) {
 			if (id.startsWith("generated-")) {
-				const r = store.read((db) =>
-					generatedRow(db, id.slice("generated-".length)),
-				);
-				if (!r || !available(r)) throw new Error("item_not_found");
+				const r = store.read((db) => {
+					const row = generatedRow(db, id.slice("generated-".length));
+					return row && available(db, row) ? row : null;
+				});
+				if (!r) throw new Error("item_not_found");
 				return {
 					text: headWithin(
 						generatedValue(r).markdown,

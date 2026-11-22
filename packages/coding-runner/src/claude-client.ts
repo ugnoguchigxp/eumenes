@@ -1,14 +1,17 @@
 import { request } from "node:http";
 import { lstatSync, realpathSync } from "node:fs";
 import { dirname } from "node:path";
+import { RUNNER_FILE_MAX_BYTES } from "./contracts";
 import {
 	claudeObservation,
+	type ClaudeLease,
 	type ClaudeRequest,
 	type ClaudeStart,
 } from "./claude-contracts";
 
 export function claudeRunnerClient(socketPath: string, workspace: string) {
 	let available = false;
+	let supervised = false;
 	function call(body: ClaudeRequest): Promise<unknown> {
 		const parent = lstatSync(dirname(socketPath));
 		const socket = lstatSync(socketPath);
@@ -30,7 +33,7 @@ export function claudeRunnerClient(socketPath: string, workspace: string) {
 					let size = 0;
 					res.on("data", (chunk: Buffer) => {
 						size += chunk.length;
-						if (size > 64 * 1024)
+						if (size > RUNNER_FILE_MAX_BYTES)
 							req.destroy(new Error("claude_response_limit"));
 						else chunks.push(chunk);
 					});
@@ -56,16 +59,20 @@ export function claudeRunnerClient(socketPath: string, workspace: string) {
 			const health = (await call({ operation: "health" })) as {
 				ready?: boolean;
 				workspace?: string;
+				supervised?: boolean;
 			} | null;
-			available =
-				health?.ready === true && health.workspace === realpathSync(workspace);
+			const matches = health?.workspace === realpathSync(workspace);
+			available = matches && health?.ready === true;
+			supervised = matches && health?.supervised === true;
 		} catch {
 			available = false;
+			supervised = false;
 		}
 		return available;
 	}
 	return {
 		ready: () => available,
+		supportsSupervised: () => supervised,
 		probe,
 		async start(spec: ClaudeStart) {
 			return claudeObservation.parse(await call({ operation: "start", spec }));
@@ -75,10 +82,14 @@ export function claudeRunnerClient(socketPath: string, workspace: string) {
 				.nullable()
 				.parse(await call({ operation: "inspect", id }));
 		},
-		async stop(id: string, operationId: string) {
+		async stop(
+			id: string,
+			operationId: string,
+			supervised?: ClaudeStart["supervised"],
+		) {
 			return claudeObservation
 				.nullable()
-				.parse(await call({ operation: "stop", id, operationId }));
+				.parse(await call({ operation: "stop", id, operationId, supervised }));
 		},
 		async reply(
 			id: string,
@@ -89,6 +100,23 @@ export function claudeRunnerClient(socketPath: string, workspace: string) {
 			return claudeObservation.parse(
 				await call({ operation: "reply", id, operationId, questionId, answer }),
 			);
+		},
+		async present(id: string, questionId: string, expiresAt: number) {
+			claudeObservation.parse(
+				await call({ operation: "present", id, questionId, expiresAt }),
+			);
+		},
+		async recover(
+			id: string,
+			lease: ClaudeLease,
+			proof: "process_exit" | "host_reboot",
+		) {
+			return claudeObservation.parse(
+				await call({ operation: "recover", id, lease, proof }),
+			);
+		},
+		async approveTool(id: string, requestId: string, lease: ClaudeLease) {
+			await call({ operation: "approve_tool", id, requestId, lease });
 		},
 	};
 }

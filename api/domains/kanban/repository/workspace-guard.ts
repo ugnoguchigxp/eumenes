@@ -6,40 +6,96 @@ export type WorkspaceGuard = {
 	executorId: string;
 	epoch: string;
 	state: "held" | "releasing" | "unknown";
+	mode?: WorkspaceGuardMode;
 };
+export type WorkspaceGuardMode = "read" | "edit" | "exclusive";
+type Holder = Pick<WorkspaceGuard, "ownerRef" | "executorId"> & {
+	epoch?: string;
+};
+
+export function readWorkspaceGuards(tx: Database, workspaceRef: string) {
+	return tx
+		.query<WorkspaceGuard & { mode: WorkspaceGuardMode }, [string]>(
+			`SELECT workspace_ref AS workspaceRef,owner_ref AS ownerRef,executor_id AS executorId,epoch,state,mode
+			 FROM kanban_workspace_guards WHERE workspace_ref=?
+			 ORDER BY CASE state WHEN 'unknown' THEN 0 WHEN 'releasing' THEN 1 ELSE 2 END, mode`,
+		)
+		.all(workspaceRef);
+}
+
 export function readWorkspaceGuard(
 	tx: Database,
 	workspaceRef: string,
+	holder?: Holder,
 ): WorkspaceGuard | null {
-	return tx
-		.query(
-			"SELECT workspace_ref AS workspaceRef,owner_ref AS ownerRef,executor_id AS executorId,epoch,state FROM kanban_workspace_guards WHERE workspace_ref=?",
-		)
-		.get(workspaceRef) as WorkspaceGuard | null;
+	const current = readWorkspaceGuards(tx, workspaceRef).find(
+		(guard) =>
+			!holder ||
+			(guard.ownerRef === holder.ownerRef &&
+				guard.executorId === holder.executorId &&
+				(holder.epoch === undefined || guard.epoch === holder.epoch)),
+	);
+	if (!holder && current?.mode === "exclusive") {
+		const { mode: _mode, ...legacy } = current;
+		return legacy;
+	}
+	return current ?? null;
 }
 /** Host resolves equivalent cwd paths to one registered workspaceRef before this call. */
 export function reserveWorkspaceInTransaction(
 	tx: Database,
 	guard: WorkspaceGuard,
 ): boolean {
-	const current = readWorkspaceGuard(tx, guard.workspaceRef);
+	const mode = guard.mode ?? "exclusive";
+	if (guard.state !== "held" && mode !== "exclusive") return false;
+	const holders = readWorkspaceGuards(tx, guard.workspaceRef);
+	const current = holders.find(
+		(entry) =>
+			entry.ownerRef === guard.ownerRef &&
+			entry.executorId === guard.executorId,
+	);
 	if (current)
 		return (
-			current.ownerRef === guard.ownerRef &&
-			current.executorId === guard.executorId &&
+			guard.state === "held" &&
 			current.epoch === guard.epoch &&
+			current.mode === mode &&
 			current.state === "held"
 		);
+	if (
+		holders.some(
+			(holder) =>
+				holder.state !== "held" ||
+				holder.mode === "exclusive" ||
+				mode === "exclusive" ||
+				holder.mode === mode,
+		)
+	)
+		return false;
 	tx.query(
-		"INSERT INTO kanban_workspace_guards(workspace_ref,owner_ref,executor_id,epoch,state) VALUES(?,?,?,?,?)",
+		"INSERT INTO kanban_workspace_guards(workspace_ref,owner_ref,executor_id,epoch,state,mode) VALUES(?,?,?,?,?,?)",
 	).run(
 		guard.workspaceRef,
 		guard.ownerRef,
 		guard.executorId,
 		guard.epoch,
 		guard.state,
+		mode,
 	);
 	return true;
+}
+/** The caller must first confirm the same runner receipt stopped. */
+export function recoverWorkspaceReleaseInTransaction(
+	tx: Database,
+	guard: WorkspaceGuard,
+) {
+	return (
+		tx
+			.query(
+				"DELETE FROM kanban_workspace_guards WHERE workspace_ref=? AND owner_ref=? AND executor_id=? AND epoch=? AND state='unknown'",
+			)
+			.run(guard.workspaceRef, guard.ownerRef, guard.executorId, guard.epoch)
+			.changes === 1
+	);
 }
 export function beginWorkspaceReleaseInTransaction(
 	tx: Database,

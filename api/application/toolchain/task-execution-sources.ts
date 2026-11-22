@@ -1,6 +1,9 @@
 import { autonomousActionSource } from "../../domains/dialogue";
 import { hash } from "../../domains/capabilities";
-import type { ToolchainExecutionPort } from "../../domains/tool-runtime";
+import {
+	isStandardExecutionSource,
+	type ToolchainExecutionPort,
+} from "../../domains/tool-runtime";
 import type { TaskChildContext } from "./task-execution-catalog";
 import type { TaskExecutionHost } from "./task-execution-port";
 import { reference } from "./task-execution-values";
@@ -19,6 +22,7 @@ export function taskExecutionSources(
 	const checkingReferences = new Set<string>();
 	const port: ReturnType<typeof taskExecutionSources> = {
 		validSourceInTransaction(db, source) {
+			if (!isStandardExecutionSource(source)) return false;
 			if (source.origin === "workflow")
 				return (
 					!!host.workflowSteps &&
@@ -79,8 +83,13 @@ export function taskExecutionSources(
 			);
 		},
 		controlSourceInTransaction(db, conversationId, messageId, forSource) {
+			if (forSource && !isStandardExecutionSource(forSource)) return null;
 			const message = conversation.messageInTransaction(db, messageId)?.message;
-			if (!message?.runId || message.conversationId !== conversationId)
+			if (
+				!message?.runId ||
+				message.role !== "user" ||
+				message.conversationId !== conversationId
+			)
 				return null;
 			const source =
 				forSource?.specialistSessionId !== undefined
@@ -91,7 +100,7 @@ export function taskExecutionSources(
 							forSource.specialistEpoch,
 						)
 					: dialogue.executionSourceInTransaction(db, message.runId);
-			return source
+			return source?.messageId === messageId
 				? {
 						messageId: source.messageId,
 						request: source.request,
@@ -100,6 +109,7 @@ export function taskExecutionSources(
 				: null;
 		},
 		validReferenceInTransaction(db, source, ref) {
+			if (!isStandardExecutionSource(source)) return false;
 			if (source.origin === "workflow" && ref.owner !== "agent-runtime")
 				return false;
 			if (checkingReferences.has(ref.ref) || checkingReferences.size >= 32)

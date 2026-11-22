@@ -1,3 +1,5 @@
+import type { ExecutionView } from "../../tool-runtime";
+import { reportExecutionInTransaction } from "./result-intake";
 import { clearOffersFromMessage } from "../repository/search-offers";
 import { awaitingWorkConfirmation } from "./confirmation-revisions";
 import {
@@ -61,7 +63,10 @@ import { createResubmit } from "./resubmit";
 import { endRun, runEndedInTransaction } from "./run-end";
 import { createProgress } from "./progress";
 import { createErrorReport } from "./error-report";
-import { executionSourceInTransaction } from "./execution-source";
+import {
+	confirmedExecutionRequest,
+	executionSourceInTransaction,
+} from "./execution-source";
 import { createSpecialistHost } from "./specialist-host";
 import { forgetObservations } from "../repository/specialist-observations";
 import { forgetCollaborationState } from "./collaboration-state";
@@ -307,9 +312,11 @@ export function createDialogueService({
 		),
 		backgroundDiagnosticInTransaction: (db: Database, conversationId: string) =>
 			backgroundDiagnostic(deps, db, conversationId),
-		executionSourceInTransaction: (db: Database, runId: string) =>
-			executionSourceInTransaction(deps, db, runId),
+		executionSourceInTransaction: executionSourceInTransaction.bind(null, deps),
+		confirmedRequestInTransaction: confirmedExecutionRequest.bind(null, deps),
 		notifyInTransaction: intake.notifyInTransaction,
+		reportExecutionInTransaction: (db: Database, view: ExecutionView) =>
+			reportExecutionInTransaction(deps, db, view),
 		revokeExecutionNoticeInTransaction: (db: Database, eventId: string) =>
 			revokeExecutionNotice(deps, db, eventId),
 		...createOperationPorts(deps),

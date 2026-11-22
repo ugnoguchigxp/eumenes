@@ -7,6 +7,7 @@ export type TerminalWorkspaceIdentity = {
 	run: number;
 };
 export type TerminalWorkspacePort = {
+	recoverDirect: (cwd: string | undefined) => Promise<void>;
 	reserveDirect: (identity: TerminalWorkspaceIdentity) => Promise<void>;
 	releaseDirect: (
 		identity: TerminalWorkspaceIdentity,

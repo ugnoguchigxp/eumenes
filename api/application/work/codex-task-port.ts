@@ -129,7 +129,11 @@ export function createCodexTaskPort(options: {
 			);
 			if (!options.tasks.cancelQueuedInTransaction(tx, id)) return false;
 			if (!executed) {
-				const guard = readWorkspaceGuard(tx, attempt.workspaceRef);
+				const guard = readWorkspaceGuard(tx, attempt.workspaceRef, {
+					ownerRef: `kanban:${attempt.cardId}`,
+					executorId: options.definition().id,
+					epoch: attempt.guardEpoch,
+				});
 				if (
 					guard?.ownerRef === `kanban:${attempt.cardId}` &&
 					guard.epoch === attempt.guardEpoch &&
@@ -150,7 +154,11 @@ export function adoptCodexTaskInTransaction(
 	executorId: string,
 	attempt: CodexAttempt,
 ) {
-	const guard = readWorkspaceGuard(tx, attempt.workspaceRef);
+	const guard = readWorkspaceGuard(tx, attempt.workspaceRef, {
+		ownerRef: `kanban:${attempt.cardId}`,
+		executorId,
+		epoch: attempt.guardEpoch,
+	});
 	if (
 		!guard ||
 		guard.ownerRef !== `kanban:${attempt.cardId}` ||

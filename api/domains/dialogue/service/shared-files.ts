@@ -4,6 +4,7 @@ import { toErrorCode } from "../../../infrastructure/error-code";
 import type { ConversationResource } from "../contracts/resources";
 import type { DialogueDeps } from "./context";
 import { lineText } from "./input-text";
+import type { ResourceContextLine } from "./resource-context";
 import { resourceName } from "./resource-ledger";
 
 const log = getLogger("dialogue");
@@ -79,25 +80,29 @@ function sharedLine(
 	const resolved = deps.resources?.registry.resolveInTransaction(db, row.uri);
 	if (!resolved?.ok) return null;
 	const note = resolved.resource.note;
-	return `- ${resourceName(row.ref)}「${lineText(row.label)}」${note ? `（${lineText(note)}）` : ""}`;
+	const resource = resourceName(row.ref);
+	return {
+		resource,
+		text: `- ${resource}「${lineText(row.label)}」${note ? `（${lineText(note)}）` : ""}`,
+	};
 }
 
-/** The `提示中` lines of the input's own shared files, the ones still there. Adds their URIs to `shown`. */
+/** The input's own shared files. Each ledger reference is presented once. */
 export function attachedLinesInTransaction(
 	deps: Pick<DialogueDeps, "resources" | "resourceLedger">,
 	db: Database,
 	inputMessageId: string,
 	shown: Set<string>,
-): string[] {
-	const lines: string[] = [];
+): ResourceContextLine[] {
+	const lines: ResourceContextLine[] = [];
 	for (const row of deps.resourceLedger?.ofMessageInTransaction(
 		db,
 		inputMessageId,
 	) ?? []) {
-		if (row.source !== "attached" || shown.has(row.uri)) continue;
+		if (row.source !== "attached" || shown.has(resourceName(row.ref))) continue;
 		const line = sharedLine(deps, db, row);
 		if (!line) continue;
-		shown.add(row.uri);
+		shown.add(line.resource);
 		lines.push(line);
 	}
 	return lines;
@@ -109,17 +114,16 @@ export function sharedLinesInTransaction(
 	db: Database,
 	conversationId: string,
 	shown: ReadonlySet<string>,
-): string[] {
+): ResourceContextLine[] {
 	const { resourceLedger: ledger } = deps;
 	const sharedFiles = deps.resources?.sharedFiles;
 	if (!sharedFiles || !ledger) return [];
-	const lines: string[] = [];
+	const lines: ResourceContextLine[] = [];
 	// Recent files without a number (an attachment never sent, a write no TODO returned) are passed over.
 	for (const uri of sharedFiles.recentUris(conversationId, 50)) {
 		if (lines.length >= SHARED_LINES) break;
-		if (shown.has(uri)) continue;
 		const row = ledger.byUriInTransaction(db, conversationId, uri);
-		if (!row || row.forgottenAt) continue;
+		if (!row || row.forgottenAt || shown.has(resourceName(row.ref))) continue;
 		const line = sharedLine(deps, db, row);
 		if (line) lines.push(line);
 	}

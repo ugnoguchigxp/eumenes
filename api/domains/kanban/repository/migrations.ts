@@ -174,4 +174,25 @@ CREATE UNIQUE INDEX kanban_notices_run_kind ON kanban_notices(run_id,kind) WHERE
 		after: ["kanban/0004-git"],
 		sql: "ALTER TABLE kanban_notices ADD COLUMN archived_at INTEGER;",
 	},
+	{
+		id: "kanban/0006-workspace-holders",
+		after: ["kanban/0005-notice-archive"],
+		sql: `
+ALTER TABLE kanban_workspace_guards RENAME TO kanban_workspace_guards_legacy;
+CREATE TABLE kanban_workspace_guards (
+ workspace_ref TEXT NOT NULL,
+ owner_ref TEXT NOT NULL,
+ executor_id TEXT NOT NULL,
+ epoch TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('held','releasing','unknown')),
+ mode TEXT NOT NULL CHECK(mode IN ('read','edit','exclusive')),
+ PRIMARY KEY (workspace_ref,owner_ref,executor_id,epoch),
+ UNIQUE (workspace_ref,owner_ref,executor_id),
+ UNIQUE (workspace_ref,mode)
+);
+INSERT INTO kanban_workspace_guards(workspace_ref,owner_ref,executor_id,epoch,state,mode)
+SELECT workspace_ref,owner_ref,executor_id,epoch,state,'exclusive' FROM kanban_workspace_guards_legacy;
+DROP TABLE kanban_workspace_guards_legacy;
+`,
+	},
 ];

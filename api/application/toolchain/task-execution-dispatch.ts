@@ -1,4 +1,5 @@
 import { taskAutonomy } from "./task-autonomy";
+import { isStandardExecutionSource } from "../../domains/tool-runtime";
 import type { ToolchainRoutingPort } from "../../domains/dialogue";
 import type { DialogueService } from "../../domains/dialogue";
 import type {
@@ -21,6 +22,8 @@ export function taskExecutionDispatch(
 	> = {
 		readReferenceInTransaction: readReference,
 		prepareInTransaction(db, child) {
+			if (!isStandardExecutionSource(child.source))
+				throw new Error("execution_source_invalid");
 			live(db, child);
 			if (child.source.origin === "workflow")
 				return host.workflowSteps!.prepare(db, child);
@@ -111,6 +114,8 @@ export function taskExecutionDispatch(
 			} as const;
 		},
 		async execute(raw, child, signal) {
+			if (!isStandardExecutionSource(child.source))
+				throw new Error("execution_source_invalid");
 			if (child.source.origin === "workflow") {
 				store.read((db) => live(db, child));
 				signal.throwIfAborted();

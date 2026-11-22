@@ -59,7 +59,13 @@ export function imageObservationCurrent(
 		!!work &&
 		work.revision === record.revision &&
 		originDigest(deps, db, work) === record.originDigest &&
-		workContextCurrent(deps, db, work.conversationId, work.id)
+		workContextCurrent(
+			deps,
+			db,
+			work.conversationId,
+			work.id,
+			"image-observation",
+		)
 	);
 }
 

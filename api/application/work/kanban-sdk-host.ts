@@ -224,9 +224,12 @@ export function createKanbanSdkHost(options: {
 			}
 			await options.store.write((tx) => {
 				for (const entry of terminals.list().sessions) {
-					const guard = readWorkspaceGuard(tx, workspaceRef);
 					const owner =
 						entry.owner === "direct" ? `direct:${entry.id}` : entry.owner;
+					const guard = readWorkspaceGuard(tx, workspaceRef, {
+						ownerRef: owner,
+						executorId: "claude-code",
+					});
 					if (
 						entry.status === "exited" &&
 						guard?.state === "held" &&

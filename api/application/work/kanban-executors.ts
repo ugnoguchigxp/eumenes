@@ -58,7 +58,10 @@ export function createKanbanExecutorRegistry(
 			)
 				throw new Error("kanban_executor_unavailable");
 			const ownerRef = `kanban:${dispatch.cardId}`;
-			const held = readWorkspaceGuard(tx, dispatch.workspaceRef);
+			const held = readWorkspaceGuard(tx, dispatch.workspaceRef, {
+				ownerRef,
+				executorId: dispatch.executorId,
+			});
 			const epoch = held?.epoch ?? dispatch.runId;
 			if (
 				!reserveWorkspaceInTransaction(tx, {

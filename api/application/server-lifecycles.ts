@@ -213,6 +213,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "compute_discovery", recover: () => s.compute.refresh() },
 		{ name: "queue_recovery", recover: () => s.queue.recover() },
 		{ name: "workflow_recovery", recover: () => s.workflow.recover() },
+		{
+			name: "development_supervision_recovery",
+			recover: () => s.toolchain.developmentSupervision?.recover(),
+		},
 		{ name: "web_note_recovery", recover: () => s.toolchain.webNote.recover() },
 		{
 			name: "claude_code_recovery",
@@ -326,6 +330,10 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		{ name: "browser", close: () => s.browser.close() },
 		{ name: "capabilities", close: () => s.toolchain.capabilities.close() },
 		{ name: "agents", close: () => s.toolchain.agents.close() },
+		{
+			name: "development_supervision",
+			close: () => s.toolchain.developmentSupervision?.close(),
+		},
 		{ name: "web_note", close: () => s.toolchain.webNote.close() },
 		{
 			name: "claude_code_task",

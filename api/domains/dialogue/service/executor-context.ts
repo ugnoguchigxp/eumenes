@@ -149,6 +149,8 @@ export function createExecutorContext(
 		receipt: Receipt | undefined;
 		/** Each TODO's revision as the model last saw it (`<state>`, then the work tool's results). */
 		todoRevisions: Map<string, number>;
+		taskRevisions: Map<string, number>;
+		executionRevisions: Map<number, number>;
 		/** The searches and hand-overs made before the call that runs now (the tool-call reliability design, P1). */
 		exchange: readonly ExchangeStep[];
 	} = {
@@ -159,6 +161,21 @@ export function createExecutorContext(
 		read: null,
 		receipt: undefined,
 		todoRevisions: new Map(Object.entries(input.todoRevisions)),
+		taskRevisions: new Map(
+			input.routed?.todos.flatMap(
+				({ ref, tasks }) =>
+					tasks?.map(
+						({ taskId, revision }) => [`${ref}:${taskId}`, revision] as const,
+					) ?? [],
+			),
+		),
+		executionRevisions: new Map(
+			input.routed?.todos.flatMap(({ ref, executionRevision }) =>
+				executionRevision === undefined
+					? []
+					: [[ref, executionRevision] as const],
+			),
+		),
 		exchange: [],
 	};
 	/** The user's messages this generation acts on: every action, TODO and confirmation it makes comes from them. */

@@ -7,6 +7,12 @@ import type { Step } from "./conversation-script.fixture";
 
 /** The knobs of the toolchain harness (`harness` in toolchain.fixture.ts). */
 export type HarnessOptions = {
+	/** Caller-owned test directory, shared by successive backend processes in a recovery test. */
+	directory?: string;
+	claudeRunner?: import("../../domains/claude-code").Runner;
+	structuredResponse?: (
+		messages: import("../../domains/inference/contracts").Messages,
+	) => unknown;
 	webResearch?: boolean;
 	/** Keep the Web search withdrawn from selection as production seeds it (the fixtures otherwise publish its earlier revision). */
 	/** Compose the real resource registry for autonomous output delivery. */
@@ -49,6 +55,9 @@ export type HarnessOptions = {
 	) => { name: string; arguments: Record<string, unknown> };
 	model?: LarmPort;
 	conversationAgent?: import("../../domains/dialogue").ConversationAgentPort;
+	agency?: Parameters<
+		typeof import("../../domains/dialogue").createDialogueService
+	>[0]["agency"];
 	/** Keep the host's real tool lookup and conversation decision for a live acceptance run. */
 	liveRouting?: boolean;
 	/** Cloud transport seams for end-to-end attachment verification, with no external calls. */

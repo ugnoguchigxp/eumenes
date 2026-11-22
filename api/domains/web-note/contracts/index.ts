@@ -1,8 +1,11 @@
 import type {
 	ExecutionResult,
 	ExecutionSource,
+	ExecutionView,
+	SupervisedExecutionSource,
 	ToolchainExecutionPort,
 } from "../../tool-runtime";
+import type { Database } from "bun:sqlite";
 
 /** What the research note task keeps of one run (the row's `data_json`). */
 export type HostState = {
@@ -10,6 +13,8 @@ export type HostState = {
 	request: string;
 	toolchainRevisionId: string;
 	bindingRevisionId: string;
+	/** Fingerprint of the host-issued start operation for supervised research. */
+	startDigest?: string;
 	/** The package's profile and SKILL, with `{{today}}` still in them. */
 	instructions: string;
 	/** Present only for a source inspection. Once captured, the commit is immutable. */
@@ -70,4 +75,25 @@ export type SourcePort = Pick<
 	| "deliverInTransaction"
 	| "deliveryStateInTransaction"
 	| "revokeDeliveryInTransaction"
->;
+> & {
+	supervised?: {
+		authorizeInTransaction(
+			db: Database,
+			input: {
+				source: SupervisedExecutionSource;
+				request: string;
+				toolchainRevisionId: string;
+				bindingRevisionId: string;
+				action: "start" | "view" | "cancel" | "continue";
+				workId?: string;
+				operationId?: string;
+			},
+		): { deadline: number } | null;
+		deliverInTransaction(
+			db: Database,
+			source: SupervisedExecutionSource,
+			view: ExecutionView,
+			eventId: string,
+		): boolean;
+	};
+};
