@@ -6,6 +6,13 @@
 	pointer-events: none;
 	background: radial-gradient(ellipse at 72% 45%, #293347, #0b1018 75%);
 }
+/* Above the area's own colour, below the canvas: a failed image leaves that colour showing. */
+.hiyori-avatar-backdrop {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: center / cover no-repeat;
+}
 .hiyori-avatar-background canvas {
 	display: block;
 	width: 100%;

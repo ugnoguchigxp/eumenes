@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import type { BackgroundKind } from "../../../api/domains/settings/contracts";
 import type { SpatialItem, SpatialOptions } from "../domains/background";
 import type { AvatarCue } from "../domains/avatar";
+import type { AvatarBackdrop } from "./domains/conversation/HiyoriAvatarBackground";
 import { LightAvatarBackground } from "./domains/conversation/LightAvatarBackground";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -23,6 +24,7 @@ export function ConversationBackground({
 	spatial,
 	items,
 	interactive = false,
+	backdrop,
 	...avatar
 }: {
 	kind: BackgroundKind;
@@ -31,6 +33,8 @@ export function ConversationBackground({
 	items?: readonly SpatialItem[];
 	/** Background mode: the chat is hidden and the background takes pointer input. */
 	interactive?: boolean;
+	/** The saved image behind the Live2D model; the other backgrounds ignore it. */
+	backdrop?: AvatarBackdrop;
 	active: boolean;
 	cue?: AvatarCue | null;
 	phase?: "neutral" | "listening" | "thinking";
@@ -41,7 +45,11 @@ export function ConversationBackground({
 		return (
 			<ErrorBoundary label="avatar">
 				<Suspense fallback={null}>
-					<HiyoriAvatarBackground {...avatar} interactive={interactive} />
+					<HiyoriAvatarBackground
+						{...avatar}
+						interactive={interactive}
+						backdrop={backdrop}
+					/>
 				</Suspense>
 			</ErrorBoundary>
 		);

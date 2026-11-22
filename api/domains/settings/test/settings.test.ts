@@ -57,6 +57,38 @@ test("background selection persists without changing inference permissions; old 
 		}).success,
 	).toBe(false);
 });
+test("the Live2D backdrop image id defaults to none, persists, clears and rejects other forms", async () => {
+	const h = await setup();
+	const original = h.settings.get();
+	expect(original.general.avatarBackdropImageId).toBeNull();
+	const legacy: { general: Record<string, unknown> } =
+		structuredClone(original);
+	delete legacy.general.avatarBackdropImageId;
+	expect(settingsSchema.parse(legacy).general.avatarBackdropImageId).toBeNull();
+	for (const id of ["image_0123abcd", null]) {
+		const settings = h.settings.get();
+		settings.general.avatarBackdropImageId = id;
+		await h.settings.apply({
+			requestId: crypto.randomUUID(),
+			expectedRevision: settings.revision,
+			settings,
+			keys: [],
+		});
+		const reopened = await createSettings(h.store, {
+			dbPath: h.dbPath,
+			env: {},
+		});
+		expect(reopened.get().general.avatarBackdropImageId).toBe(id);
+		expect(reopened.get().general.background).toBe(original.general.background);
+	}
+	for (const id of ["", "a/b", 'x")', "a".repeat(129), 1])
+		expect(
+			settingsSchema.safeParse({
+				...original,
+				general: { ...original.general, avatarBackdropImageId: id },
+			}).success,
+		).toBe(false);
+});
 test("a fresh install has no profile; the env import and saved choices survive reopening", async () => {
 	expect(defaults({}).larm.profile).toBeUndefined();
 	expect(defaults({ LARM_PROFILE: " " }).larm.profile).toBeUndefined();

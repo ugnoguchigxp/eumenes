@@ -11,17 +11,27 @@ import {
 import { HiyoriViewControls } from "./HiyoriViewControls";
 import "./hiyori-avatar.css";
 
+/** A saved image behind the model, with the operations that choose and remove it. */
+export type AvatarBackdrop = {
+	/** null: no image; the colour or the built-in gradient shows. */
+	url: string | null;
+	onPick(): void;
+	onClear(): void;
+};
+
 /** Animation stays outside React; unmount, tab hiding and context loss cancel its single loop. */
 export function HiyoriAvatarBackground({
 	active,
 	cue = null,
 	phase = "neutral",
 	interactive = false,
+	backdrop,
 }: {
 	active: boolean;
 	cue?: AvatarCue | null;
 	phase?: "neutral" | "listening" | "thinking";
 	interactive?: boolean;
+	backdrop?: AvatarBackdrop;
 }) {
 	const host = useRef<HTMLDivElement>(null);
 	const [view, setView] = useState(readAvatarView);
@@ -139,6 +149,12 @@ export function HiyoriAvatarBackground({
 			data-avatar-state={active ? "loading" : "inactive"}
 			style={background ? { background } : undefined}
 		>
+			{backdrop?.url && (
+				<div
+					className="hiyori-avatar-backdrop"
+					style={{ backgroundImage: `url("${backdrop.url}")` }}
+				/>
+			)}
 			<output className="hiyori-avatar-unavailable">
 				桃瀬ひよりを読み込めませんでした。他の背景に切り替えて引き続き利用できます。
 			</output>
@@ -149,6 +165,7 @@ export function HiyoriAvatarBackground({
 					onChange={setView}
 					background={background}
 					onBackgroundChange={setBackground}
+					backdrop={backdrop}
 				/>
 			)}
 		</div>

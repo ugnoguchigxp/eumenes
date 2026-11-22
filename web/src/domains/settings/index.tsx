@@ -286,21 +286,20 @@ export function useVoiceMute(client: EumenesClient) {
 	};
 }
 
-/** Switches the conversation background without opening the settings page. */
-export function useBackground(client: EumenesClient) {
+/** Saves one change to the general settings through the shared settings document. */
+function useGeneralChange(client: EumenesClient, failure: string) {
 	const cache = useQueryClient();
 	const query = useSettings(client);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const value = query.data;
-	const selected = value?.general.background ?? "light-fairy";
-	async function select(kind: BackgroundKind) {
-		if (!value || busy || kind === selected) return;
+	async function save(change: (general: Settings["general"]) => void) {
+		if (!value || busy) return;
 		setBusy(true);
 		setError(null);
 		try {
 			const settings = structuredClone(value);
-			settings.general.background = kind;
+			change(settings.general);
 			const saved = await client.applySettings({
 				requestId: crypto.randomUUID(),
 				expectedRevision: value.revision,
@@ -309,7 +308,7 @@ export function useBackground(client: EumenesClient) {
 			});
 			cache.setQueryData([queryRoots.settings, client.identity], saved);
 		} catch {
-			setError("背景を切り替えられませんでした");
+			setError(failure);
 			void cache.invalidateQueries({
 				queryKey: [queryRoots.settings, client.identity],
 			});
@@ -317,7 +316,40 @@ export function useBackground(client: EumenesClient) {
 			setBusy(false);
 		}
 	}
-	return { ready: !!value, selected, busy, error, select };
+	return { general: value?.general, busy, error, save };
+}
+
+/** Switches the conversation background without opening the settings page. */
+export function useBackground(client: EumenesClient) {
+	const { general, busy, error, save } = useGeneralChange(
+		client,
+		"背景を切り替えられませんでした",
+	);
+	const selected = general?.background ?? "light-fairy";
+	async function select(kind: BackgroundKind) {
+		if (kind === selected) return;
+		await save((next) => {
+			next.background = kind;
+		});
+	}
+	return { ready: !!general, selected, busy, error, select };
+}
+
+/** The saved image behind the Live2D model: chosen from the image library, kept in the settings. */
+export function useAvatarBackdrop(client: EumenesClient) {
+	const { general, busy, error, save } = useGeneralChange(
+		client,
+		"背景の画像を保存できませんでした",
+	);
+	const imageId = general?.avatarBackdropImageId ?? null;
+	/** null removes the image. */
+	async function select(id: string | null) {
+		if (id === imageId) return;
+		await save((next) => {
+			next.avatarBackdropImageId = id;
+		});
+	}
+	return { ready: !!general, imageId, busy, error, select };
 }
 
 export { notificationSoundWav, completionVoiceWav } from "./notification-sound";

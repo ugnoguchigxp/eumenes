@@ -3,6 +3,7 @@ import {
 	type AvatarBackground,
 	type AvatarView,
 } from "../../../domains/avatar";
+import type { AvatarBackdrop } from "./HiyoriAvatarBackground";
 
 /** The colour picker needs a value; it shows the gradient's centre until a colour is chosen. */
 const gradientCentre = "#293347";
@@ -12,11 +13,13 @@ export function HiyoriViewControls({
 	onChange,
 	background,
 	onBackgroundChange,
+	backdrop,
 }: {
 	view: AvatarView;
 	onChange: (view: AvatarView) => void;
 	background: AvatarBackground;
 	onBackgroundChange: (background: AvatarBackground) => void;
+	backdrop?: AvatarBackdrop;
 }) {
 	return (
 		<details className="hiyori-view-controls">
@@ -91,10 +94,27 @@ export function HiyoriViewControls({
 							}
 						/>
 					</label>
+					{backdrop && (
+						<div className="hiyori-view-actions">
+							<button type="button" onClick={backdrop.onPick}>
+								画像を選ぶ
+							</button>
+							<button
+								type="button"
+								disabled={!backdrop.url}
+								onClick={backdrop.onClear}
+							>
+								画像を外す
+							</button>
+						</div>
+					)}
 					<button
 						type="button"
-						disabled={background === null}
-						onClick={() => onBackgroundChange(null)}
+						disabled={background === null && !backdrop?.url}
+						onClick={() => {
+							onBackgroundChange(null);
+							if (backdrop?.url) backdrop.onClear();
+						}}
 					>
 						既定の背景
 					</button>

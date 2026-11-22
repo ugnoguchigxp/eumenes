@@ -395,3 +395,110 @@ test("the chosen drawing-area colour shows behind the real model, stays apart fr
 		rmSync(profile, { recursive: true, force: true });
 	}
 });
+
+test("a chosen image fills the area behind the real model, and an unreadable one leaves the colour showing", async ({
+	playwright,
+}) => {
+	test.skip(
+		!existsSync("web/public/live2d/hiyori/Hiyori.moc3"),
+		"The local model is not installed.",
+	);
+	const profile = mkdtempSync(join(tmpdir(), "eumenes-avatar-image-profile-"));
+	const errors: string[] = [];
+	const { launch, close } = persistent(playwright, profile, errors);
+	const corner = async (page: Page) => {
+		const box = (await page
+			.locator(".hiyori-avatar-background")
+			.boundingBox())!;
+		const image = await page.screenshot({
+			clip: { x: box.x + box.width - 12, y: box.y + 4, width: 8, height: 8 },
+		});
+		const pixels = await sharp(image).raw().toBuffer();
+		return [pixels[0]!, pixels[1]!, pixels[2]!];
+	};
+	const button = (page: Page, name: string) =>
+		page.getByRole("button", { name, exact: true });
+	try {
+		const page = await launch();
+		// A square image on a wide area: it must cover the corners, not letterbox.
+		const square = await sharp({
+			create: {
+				width: 64,
+				height: 64,
+				channels: 3,
+				background: { r: 200, g: 40, b: 120 },
+			},
+		})
+			.png()
+			.toBuffer();
+		await page.route("**/backdrop.png", (route) =>
+			route.fulfill({ contentType: "image/png", body: square }),
+		);
+		await page.route("**/missing.png", (route) =>
+			route.fulfill({ status: 404, body: "" }),
+		);
+		const gradient = await corner(page);
+		await button(page, "チャットを隠す").click();
+		await page.getByText("モデルの表示調整").click();
+		await expect(button(page, "画像を外す")).toBeDisabled();
+		await button(page, "上半身").click();
+		const canvas = page.locator("canvas");
+		const before = await sharp(await canvas.screenshot())
+			.raw()
+			.toBuffer();
+		const framed = await page.evaluate(() => window.avatarViewMatrix());
+		await button(page, "画像を選ぶ").click();
+		await expect.poll(() => corner(page)).toEqual([200, 40, 120]);
+		const painted = await sharp(
+			await canvas.screenshot({
+				path: "test-results/hiyori-backdrop-image-canvas.png",
+			}),
+		)
+			.raw()
+			.toBuffer();
+		let image = 0;
+		let model = 0;
+		for (let i = 0; i < painted.length; i += 3) {
+			if (
+				Math.abs(painted[i]! - 200) <= 3 &&
+				Math.abs(painted[i + 1]! - 40) <= 3 &&
+				Math.abs(painted[i + 2]! - 120) <= 3
+			)
+				image++;
+			else if (
+				Math.abs(painted[i]! - before[i]!) +
+					Math.abs(painted[i + 1]! - before[i + 1]!) +
+					Math.abs(painted[i + 2]! - before[i + 2]!) <=
+				9
+			)
+				model++;
+		}
+		// The image fills the empty area while the opaque model pixels draw unchanged above it.
+		expect(image / (painted.length / 3)).toBeGreaterThan(0.2);
+		expect(model / (painted.length / 3)).toBeGreaterThan(0.1);
+		expect(await page.evaluate(() => window.avatarViewMatrix())).toEqual(
+			framed,
+		);
+		await page.screenshot({ path: "test-results/hiyori-backdrop-image.png" });
+
+		await button(page, "画像を外す").click();
+		await expect.poll(() => corner(page)).toEqual(gradient);
+		await page.getByLabel("背景色", { exact: true }).fill("#f0e6d2");
+		await expect.poll(() => corner(page)).toEqual([240, 230, 210]);
+		await page.evaluate(() => {
+			window.avatarBackdropUrl = "/missing.png";
+		});
+		const missing = page.waitForResponse("**/missing.png");
+		await button(page, "画像を選ぶ").click();
+		await missing;
+		await expect(page.locator(".hiyori-avatar-backdrop")).toHaveCount(1);
+		expect(await corner(page)).toEqual([240, 230, 210]);
+		await button(page, "既定の背景").click();
+		await expect(page.locator(".hiyori-avatar-backdrop")).toHaveCount(0);
+		await expect.poll(() => corner(page)).toEqual(gradient);
+		expect(errors).toEqual([]);
+	} finally {
+		await close();
+		rmSync(profile, { recursive: true, force: true });
+	}
+});

@@ -367,6 +367,15 @@ export const settingsSchema = z
 					.default(["ja", "en"]),
 				theme: z.enum(["system", "light", "dark"]),
 				background: backgroundSchema.optional(),
+				/**
+				 * The saved image shown behind the Live2D model (an id from the image library); null: none.
+				 * Only the id's form is checked: an image the library no longer holds simply does not show.
+				 */
+				avatarBackdropImageId: z
+					.string()
+					.regex(/^[A-Za-z0-9_-]{1,128}$/)
+					.nullable()
+					.default(null),
 				...spatialSettingsShape,
 				subtitles: subtitleSchema.default(defaultSubtitles),
 			})

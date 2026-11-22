@@ -3,12 +3,15 @@ import {
 	useVideoAdmission,
 	videoAdmissionMessage,
 } from "../domains/video/admission";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { EumenesClient } from "../../../client";
 import type { AudioStore } from "../domains/audio";
 import { ConversationBackground } from "../components/ConversationBackground";
 import { Subtitle } from "../components/domains/subtitle/Subtitle";
 import { useMonitoringItems } from "../domains/monitoring";
+import { useAvatarBackdrop } from "../domains/settings";
+import { imageContentUrl } from "../media/use-image-library";
+import { AvatarBackdropPicker } from "./AvatarBackdropPicker";
 import { ConversationComposer } from "./ConversationComposer";
 import { ConversationHistory } from "./ConversationHistory";
 import { ConversationStatusBar } from "./ConversationStatusBar";
@@ -64,6 +67,15 @@ export function ConversationPanel({
 		() => spatialPreferences(settings.data?.general),
 		[settings.data?.general],
 	);
+	const avatarBackdrop = useAvatarBackdrop(client);
+	const [backdropPicking, setBackdropPicking] = useState(false);
+	const backdrop = {
+		url: avatarBackdrop.imageId
+			? imageContentUrl(avatarBackdrop.imageId)
+			: null,
+		onPick: () => setBackdropPicking(true),
+		onClear: () => void avatarBackdrop.select(null),
+	};
 	return (
 		<section
 			ref={panel}
@@ -81,6 +93,7 @@ export function ConversationPanel({
 				spatial={spatial}
 				items={monitored}
 				interactive={chatHidden}
+				backdrop={backdrop}
 				active={!settings.isPending}
 				cue={replayCue ?? voiceCue ?? answerCue}
 				phase={
@@ -93,6 +106,15 @@ export function ConversationPanel({
 								: "neutral"
 				}
 			/>
+			{hiyori && (
+				<AvatarBackdropPicker
+					client={client}
+					open={backdropPicking}
+					selectedId={avatarBackdrop.imageId}
+					onClose={() => setBackdropPicking(false)}
+					onConfirm={(id) => void avatarBackdrop.select(id)}
+				/>
+			)}
 			<ConversationStatusBar
 				client={client}
 				state={state}

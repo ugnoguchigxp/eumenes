@@ -273,3 +273,53 @@ test("the background colour paints only the drawing area, stays apart from frami
 		y: 0,
 	});
 });
+
+test("a saved image shows between the area's colour and the model, and is chosen and removed from the background controls", async () => {
+	const first = await fixture();
+	const layer = () =>
+		document.querySelector<HTMLElement>(".hiyori-avatar-backdrop");
+	const area = () =>
+		document.querySelector<HTMLElement>(".hiyori-avatar-background")!;
+	const button = (name: string) =>
+		screen.getByRole("button", { name }) as HTMLButtonElement;
+	const backdrop = { url: null, onPick: vi.fn(), onClear: vi.fn() };
+	first.view.rerender(
+		<HiyoriAvatarBackground active interactive backdrop={backdrop} />,
+	);
+	fireEvent.click(screen.getByText("モデルの表示調整"));
+	expect(layer()).toBeNull();
+	expect(button("画像を外す").disabled).toBe(true);
+	expect(button("既定の背景").disabled).toBe(true);
+	fireEvent.click(button("画像を選ぶ"));
+	expect(backdrop.onPick).toHaveBeenCalledTimes(1);
+
+	fireEvent.input(screen.getByLabelText("背景色", { selector: "input" }), {
+		target: { value: "#f0e6d2" },
+	});
+	const renders = first.model.render.mock.calls.length;
+	const chosen = { ...backdrop, url: "/api/images/image_1/content" };
+	first.view.rerender(
+		<HiyoriAvatarBackground active interactive backdrop={chosen} />,
+	);
+	expect(layer()!.style.backgroundImage).toBe(
+		'url("/api/images/image_1/content")',
+	);
+	// The colour stays underneath, so an image that cannot be read leaves it showing.
+	expect(area().style.background).toBe("rgb(240, 230, 210)");
+	expect(first.model.render.mock.calls.length).toBe(renders);
+	expect(createHiyori).toHaveBeenCalledTimes(1);
+	fireEvent.click(button("画像を外す"));
+	expect(chosen.onClear).toHaveBeenCalledTimes(1);
+	fireEvent.click(button("既定の背景"));
+	expect(chosen.onClear).toHaveBeenCalledTimes(2);
+	expect(area().style.background).toBe("");
+
+	// An image alone enables the reset; outside background mode it shows without controls.
+	expect(button("既定の背景").disabled).toBe(false);
+	first.view.rerender(<HiyoriAvatarBackground active backdrop={chosen} />);
+	expect(layer()).not.toBeNull();
+	expect(screen.queryByText("モデルの表示調整")).toBeNull();
+	first.view.rerender(<HiyoriAvatarBackground active interactive />);
+	expect(layer()).toBeNull();
+	expect(screen.queryByRole("button", { name: "画像を選ぶ" })).toBeNull();
+});

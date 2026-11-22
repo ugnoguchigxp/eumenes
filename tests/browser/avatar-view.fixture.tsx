@@ -7,12 +7,15 @@ import "../../web/src/app.css";
 declare global {
 	interface Window {
 		avatarViewMatrix: () => number[];
+		/** The image the fixture's stand-in picker chooses. */
+		avatarBackdropUrl?: string;
 	}
 }
 
 function Shell() {
 	const [hidden, setHidden] = useState(false);
 	const [selected, setSelected] = useState(true);
+	const [backdrop, setBackdrop] = useState<string | null>(null);
 	return (
 		<main style={{ height: "100%", display: "flex", flexDirection: "column" }}>
 			<button type="button" onClick={() => setHidden((v) => !v)}>
@@ -31,6 +34,12 @@ function Shell() {
 						kind="live2d-hiyori"
 						active
 						interactive={hidden}
+						backdrop={{
+							url: backdrop,
+							onPick: () =>
+								setBackdrop(window.avatarBackdropUrl ?? "/backdrop.png"),
+							onClear: () => setBackdrop(null),
+						}}
 					/>
 				) : (
 					<div>ほかの背景</div>

@@ -63,6 +63,7 @@ const settings: Settings = {
 		userName: "",
 		persona: "butler",
 		theme: "system",
+		avatarBackdropImageId: null,
 		subtitles: { enabled: false, style: "netflix", size: "large" },
 	},
 };
