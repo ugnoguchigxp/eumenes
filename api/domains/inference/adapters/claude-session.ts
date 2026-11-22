@@ -12,7 +12,7 @@ import type { Messages } from "../contracts";
  * the first `instructionCount` messages are the instructions (system prompt), and the first `historyCount`
  * user/assistant messages after them are the history the session resumes from. Every other message
  * (working memory, notices, operation results, the current input, a correction) is this turn's input, in order.
- * A history that holds an image is not resumed (a transcript entry carries text only): nothing is split off, and
+ * A history with images or tool exchanges is not resumed (a transcript entry carries text only): nothing is split off, and
  * `whole` says every message after the instructions is sent as this call's input.
  */
 export type ContextSplit = {
@@ -51,7 +51,11 @@ export function splitMessages(
 	const turn: Messages = [];
 	for (const message of rest) {
 		if (history.length < wanted && message.role !== "system") {
-			if (message.images?.length)
+			if (
+				message.images?.length ||
+				message.tool_calls?.length ||
+				message.role === "tool"
+			)
 				return {
 					instructions: messages.slice(0, instructionEnd).map((m) => m.content),
 					history: [],
@@ -59,7 +63,7 @@ export function splitMessages(
 					whole: true,
 				};
 			history.push({
-				role: message.role as Turn["role"],
+				role: message.role,
 				content: message.content,
 			});
 		} else turn.push(message);

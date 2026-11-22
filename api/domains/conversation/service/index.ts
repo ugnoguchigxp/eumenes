@@ -44,6 +44,7 @@ import {
 	appendState,
 	appendUtterance,
 	attachToolCalls,
+	invalidateCorrectedSummaries,
 	correctUtterances,
 	reviseUtterance,
 	dropStates,
@@ -115,8 +116,10 @@ export function createConversationService(
 			{ messageId: input.messageId, text: input.text, at },
 			outbox,
 		);
-		if (result.status === "applied")
+		if (result.status === "applied") {
+			invalidateCorrectedSummaries(db, input.messageId, at);
 			for (const hook of correctHooks) hook(db, input.messageId, at);
+		}
 		return result;
 	};
 	/** Called inside every retraction, before the message is tombstoned (each higher domain drops what it derived from it). */

@@ -33,6 +33,17 @@ CREATE INDEX conversation_summaries_lookup
 `,
 };
 
+/** Earlier summaries can contain replayed tool output whose source manifest had already been purged. */
+export const resetUnverifiedSummariesMigration = {
+	id: "conversation/0021-reset-unverified-summaries",
+	after: [conversationSummaryMigration.id],
+	sql: `
+UPDATE conversation_cuts SET revision = revision + 1
+ WHERE conversation_id IN (SELECT conversation_id FROM conversation_summaries WHERE state IN ('active','staged'));
+DELETE FROM conversation_summaries;
+`,
+};
+
 const readyCache = new WeakMap<Database, boolean>();
 export function summariesReady(db: Database): boolean {
 	let value = readyCache.get(db);
@@ -223,7 +234,7 @@ export function clearSummaries(db: Database, conversationId: string): void {
 }
 
 /**
- * Retracts every active or staged summary whose `source_refs_json` contains any forgotten source reference.
+ * Scrubs every version derived from a withdrawn source. Only visible or pending summaries affect the current cut.
  * Returns the distinct conversation IDs affected so callers can mark cuts due for forgetting.
  */
 export function retractSummariesBySourceRefs(
@@ -235,18 +246,22 @@ export function retractSummariesBySourceRefs(
 	const placeholders = sourceRefs.map(() => "?").join(",");
 	const rows = db
 		.query(
-			`SELECT id, conversation_id FROM conversation_summaries
-			 WHERE state IN ('active','staged') AND retracted_at IS NULL
+			`SELECT id, conversation_id, state FROM conversation_summaries
+			 WHERE retracted_at IS NULL
 			 AND EXISTS (SELECT 1 FROM json_each(source_refs_json) r WHERE r.value IN (${placeholders}))`,
 		)
-		.all(...sourceRefs) as Array<{ id: string; conversation_id: string }>;
+		.all(...sourceRefs) as Array<{
+		id: string;
+		conversation_id: string;
+		state: ConversationSummaryState;
+	}>;
 	if (!rows.length) return [];
 	const conversations = new Set<string>();
 	for (const row of rows) {
 		db.query(
 			"UPDATE conversation_summaries SET state = 'retracted', summary_text = '', retracted_at = ? WHERE id = ?",
 		).run(at, row.id);
-		conversations.add(row.conversation_id);
+		if (row.state !== "superseded") conversations.add(row.conversation_id);
 	}
 	return [...conversations];
 }

@@ -191,6 +191,10 @@
 3. **生成中の忘却検知（採用ゲート連携）**:
    - `generation-prepare.ts` と [background-input.ts](../api/domains/dialogue/service/background-input.ts) の `shownMessageIds` / `ReferenceInput` に、`active` な `## Summary` の `source_refs` をすべて合流させる。応答生成中に要約元の発話・記憶が忘却された場合、既存の `validateMemoryWindow` / `shownMessageForgotten` で安全に不採用・再生成される。
 
+2026-11-23 の修正で、即時の抜粋と背景要約は、通常の会話と同じ出典検査を使う。出典を追えなくなった回答は、その回答が保持するツール結果ごと圧縮対象から外す。訂正・忘却時は旧版を含め該当する要約の本文を消去し、背景推論の採用時には元発言と推論の採用可否を再検査する。更新前に作った要約は欠けた出典を復元できないため、移行 `conversation/0021-reset-unverified-summaries` で一度失効させる。元発言と履歴のカット位置は保持する。
+
+先行要約のジョブには、会話で使った窓から算出した保持量と要約上限を渡す。Claude Agent SDK の履歴にツール交換がある場合は、画像履歴と同様に、全メッセージを役割・呼出 ID・引数・結果付きで今回の入力に含める。テキストだけの履歴では通常の再開を使う。
+
 ---
 
 ## 5. 長期参照ツールの改善（圧縮後に掘り出す層）

@@ -12,6 +12,7 @@ import type {
 } from "../../conversation";
 import type { DialogueDeps } from "./context";
 import { lineText } from "./input-text";
+import { inheritedHistorySources } from "./history-sources";
 import { replayableCalls } from "./tool-exchange";
 
 const MECHANICAL_MAX_TOKENS = 400;
@@ -175,27 +176,31 @@ export function buildMechanicalSummary(
 	return headWithin(lines.join("\n"), maxTokens).text;
 }
 
-/** Collects all source references (message IDs + inherited run provenance + previous summary refs) for forgetting. */
-export function collectSummarySourceRefs(
+/** Collect text and provenance together. A reply whose manifest was purged cannot be summarized. */
+export function summaryMaterial(
 	deps: DialogueDeps,
 	tx: Database,
+	conversationId: string,
 	existing: ConversationSummary | null,
-	dropped: readonly Utterance[],
-): string[] {
-	const refs = new Set<string>(existing?.sourceRefs ?? []);
-	for (const u of dropped) {
+	candidates: readonly Utterance[],
+) {
+	const refs = new Set(existing?.sourceRefs);
+	const dropped: Utterance[] = [];
+	for (const u of candidates) {
 		if (!u.messageId) continue;
+		const sources = inheritedHistorySources(
+			deps,
+			tx,
+			conversationId,
+			u,
+			!!deps.memory || !!deps.agency?.inputForMessageInTransaction,
+		);
+		if (!sources) continue;
+		dropped.push(u);
 		refs.add(u.messageId);
-		const source = deps.conversation.sourceInTransaction(tx, u.messageId);
-		if (source.state === "available" && source.message.runId) {
-			const runInput = deps.memory?.referenceInputs.readRunInTransaction(
-				tx,
-				source.message.runId,
-			);
-			for (const ref of runInput?.sources ?? []) refs.add(ref);
-		}
+		for (const ref of sources) refs.add(ref);
 	}
-	return [...refs];
+	return { dropped, sourceRefs: [...refs] };
 }
 
 export function summaryRefsValid(
@@ -204,7 +209,15 @@ export function summaryRefsValid(
 	conversationId: string,
 	refs: readonly string[],
 ): boolean {
-	if (!refs.length || !deps.memory) return true;
+	if (
+		deps.agency?.isCurrentInputInTransaction?.(
+			tx,
+			{ sources: refs, complete: true },
+			conversationId,
+		) === false
+	)
+		return false;
+	if (!deps.memory) return true;
 	if (deps.memory.referenceInputs.staleInTransaction(tx, refs).length > 0)
 		return false;
 	const blocked = new Set(
@@ -252,21 +265,23 @@ export function compactOnOverLimitInTransaction(
 		}
 	}
 	const targetSeq = keepNewestCut(shown, existing.seq, limits);
-	const dropped = shown.filter((u) => u.seq <= targetSeq);
-	if (dropped.length && store.replaceActiveSummaryInTransaction) {
+	const candidates = shown.filter((u) => u.seq <= targetSeq);
+	if (candidates.length && store.replaceActiveSummaryInTransaction) {
 		const current =
 			store.activeSummaryInTransaction?.(tx, conversationId) ?? null;
 		const validCurrent =
 			current && summaryRefsValid(deps, tx, conversationId, current.sourceRefs)
 				? current
 				: null;
-		const text = buildMechanicalSummary(validCurrent, dropped);
-		const sourceRefs = collectSummarySourceRefs(
+		const { dropped, sourceRefs } = summaryMaterial(
 			deps,
 			tx,
+			conversationId,
 			validCurrent,
-			dropped,
+			candidates,
 		);
+		if (!dropped.length) return targetSeq;
+		const text = buildMechanicalSummary(validCurrent, dropped);
 		if (text && summaryRefsValid(deps, tx, conversationId, sourceRefs)) {
 			store.replaceActiveSummaryInTransaction(tx, {
 				id: deps.id(),

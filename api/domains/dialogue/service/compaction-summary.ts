@@ -9,6 +9,7 @@ import {
 import { getLogger } from "../../../infrastructure/logger";
 import { systemContext } from "../../../infrastructure/system-context";
 import type { ConversationSummary, Utterance } from "../../conversation";
+import type { Receipt } from "../../inference";
 import type { HandlerDefinition } from "../../queue";
 import type { DialogueDeps } from "./context";
 import {
@@ -20,7 +21,11 @@ import {
 	type WorkingLimits,
 } from "./conversation-input";
 import { dataText } from "./input-text";
-import { collectSummarySourceRefs, shortSummaryTime } from "./summary-format";
+import {
+	summaryMaterial,
+	summaryRefsValid,
+	shortSummaryTime,
+} from "./summary-format";
 import { replayableCalls } from "./tool-exchange";
 
 const log = getLogger("dialogue");
@@ -33,6 +38,14 @@ const COMPACT_TIMEOUT_MS = 30_000;
 const compactPayloadSchema = z.object({
 	conversationId: z.string(),
 	baseCutRevision: z.number().int(),
+	// Jobs queued before the foreground budget was captured have no budget.
+	budget: z
+		.object({
+			lowTokens: z.number().int().positive(),
+			lowUtterances: z.number().int().positive(),
+			summaryMaxTokens: z.number().int().positive(),
+		})
+		.optional(),
 });
 type CompactPayload = z.infer<typeof compactPayloadSchema>;
 
@@ -42,6 +55,7 @@ type CompactPrepared = {
 	coveredFromSeq: number;
 	coveredThroughSeq: number;
 	sourceRefs: string[];
+	coveredSeqs: number[];
 	requestId: string;
 	maxTokens: number;
 	prompt: string;
@@ -79,7 +93,7 @@ function limitsForConversation(
 ): WorkingLimits {
 	const system = conversationSystem(deps, tx, conversationId);
 	const plan = planWindow({
-		window: REFERENCE_WINDOW_TOKENS,
+		window: deps.larm.savedLlmContextWindow?.() ?? REFERENCE_WINDOW_TOKENS,
 		fixed: estimateTextTokens(system),
 	});
 	return workingLimits(plan);
@@ -93,7 +107,7 @@ export function maybeEnqueueCompactionInTransaction(
 	deps: DialogueDeps,
 	tx: Database,
 	conversationId: string,
-	limits?: WorkingLimits,
+	limits: WorkingLimits,
 ): boolean {
 	if (!deps.larm.captureInTransaction || !deps.larm.executeRequest)
 		return false;
@@ -108,21 +122,28 @@ export function maybeEnqueueCompactionInTransaction(
 		.filter(
 			(u) => !(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
 		);
-	const resolved = limits ?? limitsForConversation(deps, tx, conversationId);
 	const users = shown.reduce(
 		(sum, u) => sum + (u.speaker === "user" ? 1 : 0),
 		0,
 	);
-	if (users <= resolved.softUsers && tokensOf(shown) <= resolved.softTokens)
+	if (users <= limits.softUsers && tokensOf(shown) <= limits.softTokens)
 		return false;
-	const targetCutSeq = keepNewestCut(shown, cut.seq, resolved);
+	const targetCutSeq = keepNewestCut(shown, cut.seq, limits);
 	if (targetCutSeq <= cut.seq) return false;
 	const nowMs = Date.parse(deps.clock());
 	deps.queue.enqueueInTransaction(tx, {
 		scope: "dialogue",
 		kind: COMPACT_SUMMARY_KIND,
 		dedupeKey: `compact:${conversationId}:${cut.revision}`,
-		payload: { conversationId, baseCutRevision: cut.revision },
+		payload: {
+			conversationId,
+			baseCutRevision: cut.revision,
+			budget: {
+				lowTokens: limits.lowTokens,
+				lowUtterances: limits.lowUtterances,
+				summaryMaxTokens: limits.summaryMaxTokens,
+			},
+		},
 		subjectRef: `background:compact:${conversationId}:${cut.revision}`,
 		lane: "background",
 		resourceKey: "inference.llm",
@@ -136,7 +157,14 @@ export function maybeEnqueueCompactionInTransaction(
 /** Background queue handler that generates and stages compacted `## Summary` rows with strict TOCTOU checks. */
 export function createCompactionSummaryHandler(
 	deps: DialogueDeps,
-): HandlerDefinition<CompactPayload, CompactPrepared, string> {
+): HandlerDefinition<CompactPayload, CompactPrepared, Receipt> {
+	function cancelRequest(tx: Database, jobId: string, requestId?: string) {
+		const id =
+			requestId ??
+			deps.larm.requestFor?.(tx, `background:compact:${jobId}`, "llm");
+		if (id) deps.larm.cancelRequestsInTransaction?.(tx, [id]);
+	}
+
 	return {
 		kind: COMPACT_SUMMARY_KIND,
 		payloadVersions: [1],
@@ -160,20 +188,25 @@ export function createCompactionSummaryHandler(
 					(u) =>
 						!(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
 				);
-			const limits = limitsForConversation(deps, tx, conversationId);
+			const limits =
+				claim.payload.budget ?? limitsForConversation(deps, tx, conversationId);
 			const targetCutSeq = keepNewestCut(shown, cut.seq, limits);
-			const dropped = shown.filter((u) => u.seq <= targetCutSeq);
+			const existing = store.activeSummaryInTransaction(tx, conversationId);
+			const current =
+				existing &&
+				summaryRefsValid(deps, tx, conversationId, existing.sourceRefs)
+					? existing
+					: null;
+			const { dropped, sourceRefs } = summaryMaterial(
+				deps,
+				tx,
+				conversationId,
+				current,
+				shown.filter((u) => u.seq <= targetCutSeq),
+			);
 			if (!dropped.length)
 				return { status: "stale", reason: "nothing_to_compact" };
-			const existing =
-				store.activeSummaryInTransaction?.(tx, conversationId) ?? null;
-			const sourceRefs = collectSummarySourceRefs(deps, tx, existing, dropped);
-			if (
-				sourceRefs.length &&
-				deps.memory &&
-				deps.memory.referenceInputs.staleInTransaction(tx, sourceRefs).length >
-					0
-			)
+			if (!summaryRefsValid(deps, tx, conversationId, sourceRefs))
 				return { status: "stale", reason: "sources_forgotten" };
 			const requestId = deps.larm.captureInTransaction(
 				tx,
@@ -186,13 +219,14 @@ export function createCompactionSummaryHandler(
 				input: {
 					conversationId,
 					baseCutRevision,
-					coveredFromSeq: existing?.coveredFromSeq ?? dropped[0]!.seq,
+					coveredFromSeq: current?.coveredFromSeq ?? dropped[0]!.seq,
 					coveredThroughSeq: targetCutSeq,
+					coveredSeqs: dropped.map((u) => u.seq),
 					sourceRefs,
 					requestId,
 					maxTokens: limits.summaryMaxTokens,
 					prompt: formatCompactionPrompt(
-						existing,
+						current,
 						dropped,
 						limits.summaryMaxTokens,
 					),
@@ -225,12 +259,13 @@ export function createCompactionSummaryHandler(
 						: {}),
 				},
 			);
-			const raw = String(receipt.value ?? "").trim();
-			if (!raw) throw new Error("compact_summary_empty");
-			return headWithin(raw, input.maxTokens).text;
+			if (typeof receipt.value !== "string" || !receipt.value.trim())
+				throw new Error("compact_summary_empty");
+			return receipt;
 		},
-		settleInTransaction(tx, _claim, input, outcome) {
+		settleInTransaction(tx, claim, input, outcome) {
 			if (outcome.type !== "success" || !input) {
+				cancelRequest(tx, claim.jobId, input?.requestId);
 				if (outcome.type === "failed")
 					log.warn("dialogue.compact_summary_failed", {
 						reason: outcome.errorCode,
@@ -239,45 +274,40 @@ export function createCompactionSummaryHandler(
 			}
 			const store = deps.conversation.input;
 			const cut = store.cutInTransaction(tx, input.conversationId);
-			// Strict TOCTOU check: reject if cut moved/bumped (e.g. forgetting) or any source became stale meanwhile.
-			if (!cut || cut.revision !== input.baseCutRevision || cut.due)
-				return "stale";
+			const reject = () => {
+				cancelRequest(tx, claim.jobId, input.requestId);
+				return "stale" as const;
+			};
 			if (
-				input.sourceRefs.length &&
-				deps.memory &&
-				deps.memory.referenceInputs.staleInTransaction(tx, input.sourceRefs)
-					.length > 0
+				!cut ||
+				cut.revision !== input.baseCutRevision ||
+				cut.due ||
+				!summaryRefsValid(deps, tx, input.conversationId, input.sourceRefs)
 			)
-				return "stale";
+				return reject();
 			const standing = store.utterancesAfterInTransaction(
 				tx,
 				input.conversationId,
 				cut.seq,
 			);
-			const standingIds = new Set(
-				standing.map((u) => u.messageId).filter((id): id is string => !!id),
+			const expected = new Set(input.coveredSeqs);
+			const { dropped } = summaryMaterial(
+				deps,
+				tx,
+				input.conversationId,
+				null,
+				standing.filter((u) => expected.has(u.seq)),
 			);
-			const blocked = deps.memory
-				? new Set(
-						deps.memory.blockedMessageIdsOfConversationInTransaction(
-							tx,
-							input.conversationId,
-						),
-					)
-				: new Set<string>();
+			const receipt = outcome.result;
 			if (
-				input.sourceRefs.some((ref) => blocked.has(ref)) ||
-				!standing.some((u) => u.seq <= input.coveredThroughSeq)
+				dropped.length !== expected.size ||
+				receipt.requestId !== input.requestId ||
+				typeof receipt.value !== "string" ||
+				!deps.larm.acceptInTransaction?.(tx, receipt)
 			)
-				return "stale";
-			// Also ensure no message in the compacted range was retracted without a cut bump.
-			const compacted = standing.filter(
-				(u) => u.seq <= input.coveredThroughSeq,
-			);
-			for (const u of compacted)
-				if (u.messageId && !standingIds.has(u.messageId)) return "stale";
-			const text = outcome.result;
-			store.saveStagedSummaryInTransaction?.(tx, {
+				return reject();
+			const text = headWithin(receipt.value.trim(), input.maxTokens).text;
+			store.saveStagedSummaryInTransaction(tx, {
 				id: deps.id(),
 				conversationId: input.conversationId,
 				baseCutRevision: input.baseCutRevision,
@@ -295,6 +325,8 @@ export function createCompactionSummaryHandler(
 			});
 			return "applied";
 		},
-		cancelInTransaction() {},
+		cancelInTransaction(tx, job) {
+			cancelRequest(tx, job.jobId);
+		},
 	};
 }

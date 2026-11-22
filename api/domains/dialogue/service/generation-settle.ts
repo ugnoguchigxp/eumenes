@@ -408,7 +408,12 @@ export function createGenerationSettlement(
 					true,
 				);
 			if (done && !result.handover)
-				maybeEnqueueCompactionInTransaction(deps, tx, run.conversationId);
+				maybeEnqueueCompactionInTransaction(
+					deps,
+					tx,
+					run.conversationId,
+					input.limits,
+				);
 			return done ? "applied" : "stale";
 		}
 		// A run that is already terminal (e.g. cancelled), or handed over to another job, keeps its state.

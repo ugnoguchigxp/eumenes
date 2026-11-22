@@ -6,7 +6,10 @@ import {
 	restoreToolExchangeMigration,
 	utteranceNoticeMigration,
 } from "./input";
-import { conversationSummaryMigration } from "./summaries";
+import {
+	conversationSummaryMigration,
+	resetUnverifiedSummariesMigration,
+} from "./summaries";
 import {
 	attributionMigration,
 	readAttribution,
@@ -781,4 +784,5 @@ export const migrations: readonly Migration[] = [
 		sql: "CREATE TABLE message_displays (message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE, text TEXT NOT NULL)",
 	},
 	conversationSummaryMigration,
+	resetUnverifiedSummariesMigration,
 ];

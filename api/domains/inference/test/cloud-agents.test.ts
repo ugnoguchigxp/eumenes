@@ -777,3 +777,47 @@ test("Claude image blocks remain withheld until authentication and reach the SDK
 		}
 	}
 });
+
+test("Claude receives a historical tool exchange with its call name, arguments and result ID intact", async () => {
+	const { claudeQuery, seen } = fakeClaude(apiKeyAccount);
+	const exchange = [
+		{ role: "user" as const, content: "before" },
+		{
+			role: "assistant" as const,
+			content: "",
+			tool_calls: [
+				{
+					id: "lookup-1",
+					type: "function" as const,
+					function: { name: "read_history", arguments: '{"query":"past"}' },
+				},
+			],
+		},
+		{
+			role: "tool" as const,
+			tool_call_id: "lookup-1",
+			content: "found result",
+		},
+		{ role: "assistant" as const, content: "reply" },
+	];
+	await createCloudAgents(ambient, { claudeQuery }).run(
+		claudeCall({
+			messages: [
+				{ role: "system", content: "base" },
+				...exchange,
+				{ role: "user", content: "now" },
+			],
+			session: {
+				id: "44444444-4444-4444-8444-444444444444",
+				role: "main",
+				context: { instructionCount: 1, historyCount: exchange.length },
+				drop: async () => {},
+			},
+		}),
+	);
+	expect(seen.params!.options!.resume).toBeUndefined();
+	const { message } = seen.yielded[0] as { message: { content: string } };
+	expect(
+		JSON.parse(message.content.slice(message.content.indexOf("\n") + 1)),
+	).toEqual([...exchange, { role: "user", content: "now" }]);
+});

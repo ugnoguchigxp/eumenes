@@ -8,6 +8,7 @@ import type { Database } from "bun:sqlite";
 import { recentDiagnostics } from "./diagnostic-evidence";
 import { reportNoticeInTransaction } from "./report-notice";
 import { getLogger } from "../../../infrastructure/logger";
+import type { WindowSnapshot } from "../../memory";
 import type { ConversationEvent } from "../../continuity";
 import {
 	REFERENCE_WINDOW_TOKENS,
@@ -64,8 +65,6 @@ const log = getLogger("dialogue");
 
 /** A gap this long since the last delivery is a break in the talk (section 7.3). */
 export const TALK_BREAK_MS = 2 * 60 * 1000;
-
-const tokens = (text: string) => estimateTextTokens(text);
 
 /**
  * Where the answer's messages split for a provider that keeps a history (the call's `context`): the one system
@@ -508,9 +507,7 @@ export function createPrepare(
 			endRun(deps, tx, current, "cancelled", "utterance_handled");
 			return { status: "stale", reason: "utterance_handled" };
 		}
-		let window: ReturnType<
-			NonNullable<typeof memory>["windowForRunInTransaction"]
-		> = null;
+		let window: WindowSnapshot | null = null;
 		try {
 			window = memory?.windowForRunInTransaction(tx, conversationId) ?? null;
 		} catch (error) {
@@ -542,7 +539,7 @@ export function createPrepare(
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
 		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
 		const system = conversationSystem(deps, tx, conversationId);
-		const fixed = tokens(system);
+		const fixed = estimateTextTokens(system);
 		const plan = planWindow({ window: windowOf(deps, tx, run.id), fixed });
 		if (!plan.usable) {
 			endRun(deps, tx, current, "failed", "window_too_small");
@@ -550,12 +547,13 @@ export function createPrepare(
 		}
 		const pendingIds = new Set(pending.flatMap((event) => event.messageIds));
 		// The recent conversation is cut by the host's fixed rules before it is drawn (section 6.1.1).
+		const limits = workingLimits(plan);
 		const placed = placeCutInTransaction(deps, tx, conversationId, {
 			system,
 			window,
 			nowMs,
 			pending: pendingIds,
-			limits: workingLimits(plan),
+			limits,
 		});
 		window = placed.window;
 		if (placed.reason)
@@ -705,6 +703,7 @@ export function createPrepare(
 				conversationId,
 				...(requestId ? { requestId } : {}),
 				harness,
+				limits,
 				messages,
 				...(observeInput ? { observeInput } : {}),
 				utterances: texts,

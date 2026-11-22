@@ -352,6 +352,18 @@ export function retractUtterances(
 	return [...changed];
 }
 
+/** A corrected source can occur in summaries of other conversations too. */
+export function invalidateCorrectedSummaries(
+	db: Database,
+	messageId: string,
+	at: string,
+) {
+	for (const id of retractSummariesBySourceRefs(db, [messageId], at)) {
+		bumpCutRevision(db, id);
+		dropStates(db, id);
+	}
+}
+
 /**
  * A corrected message's utterance says its new text; returns the conversations that changed. The user's words are
  * corrected, never the agent's announcement that shares their message id.

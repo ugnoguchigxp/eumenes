@@ -1,3 +1,4 @@
+import { inheritedHistorySources } from "./history-sources";
 import { backgroundInput } from "./background-input";
 import type { Database } from "bun:sqlite";
 import { systemContext } from "../../../infrastructure/system-context";
@@ -429,48 +430,17 @@ export function conversationPrefixFrom(
 		false;
 	const after = store
 		.utterancesAfterInTransaction(tx, conversationId, cut?.seq ?? 0)
-		.filter((u) => {
-			if (copies && u.speaker === "agent" && copies(u.text)) return false;
-			if (
-				u.messageId &&
-				deps.memory?.isSourceRevokedInTransaction(tx, u.messageId)
-			)
-				return false;
-			if (
-				u.messageId &&
-				deps.agency?.isCurrentInputInTransaction &&
-				!deps.agency.isCurrentInputInTransaction(
+		.filter(
+			(u) =>
+				!(copies && u.speaker === "agent" && copies(u.text)) &&
+				inheritedHistorySources(
+					deps,
 					tx,
-					{ sources: [u.messageId], complete: true },
 					conversationId,
-				)
-			)
-				return false;
-			if (!requireProvenance || u.speaker === "user") return true;
-			if (!u.messageId) return false;
-			const source = deps.conversation.sourceInTransaction(tx, u.messageId);
-			if (source.state !== "available") return false;
-			const inherited = source.message.runId
-				? deps.memory?.referenceInputs.readRunInTransaction(
-						tx,
-						source.message.runId,
-					)
-				: (deps.memory?.referenceInputs.readMessageInTransaction(
-						tx,
-						u.messageId,
-					) ?? deps.agency?.inputForMessageInTransaction?.(tx, u.messageId));
-			return (
-				!!inherited?.complete &&
-				(!deps.memory ||
-					deps.memory.referenceInputs.isCurrentInTransaction(tx, inherited)) &&
-				(!deps.agency?.isCurrentInputInTransaction ||
-					deps.agency.isCurrentInputInTransaction(
-						tx,
-						inherited,
-						conversationId,
-					))
-			);
-		});
+					u,
+					requireProvenance,
+				) !== null,
+		);
 	const serves =
 		deps.agency?.servesRepliesInTransaction?.(tx, conversationId) ?? false;
 	const recent = recentUtterances(after, input.pending, history.users);

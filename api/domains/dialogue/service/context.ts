@@ -130,6 +130,7 @@ export type RoutedInput = {
 };
 
 export interface GenerateInput {
+	limits: import("./summary-format").WorkingLimits;
 	/** Previously presented candidates still callable for this conversation. */
 	offers?: import("./conversation-offers").ConversationOffer[];
 	/** Passed only to the model calls that produce this reply. */

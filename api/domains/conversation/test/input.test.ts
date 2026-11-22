@@ -260,3 +260,104 @@ test("a state version is appended only on the version it was made from", async (
 		store.read((db) => input.latestStateInTransaction(db, "c1"))?.basedOnSeq,
 	).toBe(5);
 });
+
+test("forgetting also scrubs obsolete summary versions and leaves unrelated versions intact", async () => {
+	const { store, input } = setup();
+	await store.write((db) => {
+		const base = {
+			conversationId: "c1",
+			baseCutRevision: 1,
+			coveredFromSeq: 1,
+			coveredThroughSeq: 3,
+			kind: "mechanical" as const,
+			at: "2026-11-22T00:00:00Z",
+			tokenEstimate: 8,
+		};
+		for (const id of ["old", "current", "unrelated"])
+			input.replaceActiveSummaryInTransaction(db, {
+				...base,
+				id,
+				sourceRefs: [id === "unrelated" ? "other" : "m1"],
+				text: id,
+			});
+		input.retractUtterancesInTransaction(db, ["m1"], base.at);
+		expect(
+			db
+				.query("SELECT id,summary_text FROM conversation_summaries ORDER BY id")
+				.all(),
+		).toEqual([
+			{ id: "current", summary_text: "" },
+			{ id: "old", summary_text: "" },
+			{ id: "unrelated", summary_text: "unrelated" },
+		]);
+		expect(input.activeSummaryInTransaction(db, "c1")?.id).toBe("unrelated");
+	});
+});
+
+test("upgrading legacy summaries retires unverifiable text once and keeps the conversation and cut position", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-legacy-summary-"));
+	dirs.push(dir);
+	const file = join(dir, "db.sqlite3");
+	const legacy = openStore(
+		file,
+		migrations.filter(
+			(m) => m.id !== "conversation/0021-reset-unverified-summaries",
+		),
+	);
+	const summary = {
+		id: "old",
+		conversationId: "c1",
+		baseCutRevision: 1,
+		coveredFromSeq: 1,
+		coveredThroughSeq: 1,
+		text: "unverified text",
+		sourceRefs: ["m1"],
+		tokenEstimate: 3,
+		kind: "llm" as const,
+		at: "2026-11-22T00:00:00Z",
+	};
+	const before = await legacy.write((db) => {
+		const input = createConversationService(legacy).input;
+		input.appendUtteranceInTransaction(db, say("user", "元の発言", "m1"));
+		input.replaceActiveSummaryInTransaction(db, summary);
+		return input.writeCutInTransaction(db, "c1", {
+			seq: 1,
+			systemDigest: "s",
+			memoryDigest: "m",
+			at: summary.at,
+		});
+	});
+	await legacy.close();
+	const upgraded = openStore(file, migrations);
+	try {
+		const input = createConversationService(upgraded).input;
+		await upgraded.write((db) => {
+			expect(input.activeSummaryInTransaction(db, "c1")).toBeNull();
+			expect(input.utterancesAfterInTransaction(db, "c1", 0)[0]?.text).toBe(
+				"元の発言",
+			);
+			expect(input.cutInTransaction(db, "c1")).toMatchObject({
+				seq: 1,
+				revision: before.revision + 1,
+			});
+			input.replaceActiveSummaryInTransaction(db, {
+				...summary,
+				id: "verified",
+				text: "updated",
+			});
+		});
+	} finally {
+		await upgraded.close();
+	}
+	const reopened = openStore(file, migrations);
+	stores.push(reopened);
+	expect(
+		reopened.read(
+			(db) =>
+				createConversationService(reopened).input.activeSummaryInTransaction(
+					db,
+					"c1",
+				)?.id,
+		),
+	).toBe("verified");
+});
