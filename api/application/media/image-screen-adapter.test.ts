@@ -40,16 +40,28 @@ test("image screen bundle seeds one registered screen and reads the image domain
 		);
 		expect(artifact.variants[0]!.definition).toMatchObject({
 			creationOptions: {
-				defaults: { model: "qwen-image-2.1-turbo" },
-				models: [
-					{ value: "qwen-image-2.1-turbo", label: "Qwen Turbo（既定）" },
-					{
-						value: "flux-3-image-klein",
-						label: "FLUX 3 Image Klein（準備中）",
-					},
-				],
+				defaults: {
+					width: 512,
+					height: 512,
+					format: "webp",
+					seed: 0,
+				},
 			},
 		});
+		expect(
+			(
+				artifact.variants[0]!.definition as {
+					creationOptions?: { defaults?: { model?: unknown }; models?: unknown };
+				}
+			).creationOptions?.defaults?.model,
+		).toBeUndefined();
+		expect(
+			(
+				artifact.variants[0]!.definition as {
+					creationOptions?: { models?: unknown };
+				}
+			).creationOptions?.models,
+		).toBeUndefined();
 		await caps.seed();
 		expect(
 			store

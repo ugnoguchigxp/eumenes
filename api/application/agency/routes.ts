@@ -1,22 +1,17 @@
 import type { Hono } from "hono";
 import { z } from "zod";
-import type { createAgencyHost } from "./host";
+import type { createAlwaysOnHost } from "./always-on-host";
 import {
 	agencyActivitySchema,
 	type AgencyActivity,
-	type AgencyThought,
 } from "../../domains/dialogue/contracts/agency-status";
 
 export function registerAgency(
 	app: Hono,
-	host: Pick<ReturnType<typeof createAgencyHost>, "status"> & {
-		attend(
-			id: string,
-			activity?: AgencyActivity,
-		): ReturnType<ReturnType<typeof createAgencyHost>["attend"]>;
-		/** The agenda's thoughts of the conversation (absent: the host shows none). */
-		thoughts?(id: string): AgencyThought[];
-	},
+	host: Pick<
+		ReturnType<typeof createAlwaysOnHost>,
+		"status" | "attend" | "thoughts"
+	>,
 ) {
 	const id = z.string().min(1).max(160);
 	app.get("/api/agency/conversations/:id/status", (c) => {
@@ -28,7 +23,7 @@ export function registerAgency(
 	app.get("/api/agency/conversations/:id/thoughts", (c) => {
 		const parsed = id.safeParse(c.req.param("id"));
 		return parsed.success
-			? c.json({ thoughts: host.thoughts?.(parsed.data) ?? [] })
+			? c.json({ thoughts: host.thoughts(parsed.data) })
 			: c.json({ error: "invalid_conversation_id" }, 400);
 	});
 	app.post("/api/agency/conversations/:id/attention", async (c) => {

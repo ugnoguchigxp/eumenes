@@ -61,12 +61,11 @@ const CONDITIONS = {
 };
 const SECTIONS = ["Role", "Speaking", "Emotion", "Input", "Facts"] as const;
 
-function settingsOf(runtime: "F" | "always-on"): Settings {
+function settingsOf(): Settings {
 	const settings = defaults({});
 	settings.general.agentName = "Eumenes";
 	settings.general.userName = "ユーザー";
 	settings.general.persona = "butler";
-	settings.agency.runtime = runtime;
 	return settings;
 }
 
@@ -83,8 +82,8 @@ const definitionOf = (tool: NativeTool) => {
 };
 
 /** The real talk call of a conversation: its system text and the tools the host offers it. */
-async function talkCall(runtime: "F" | "always-on") {
-	const settings = settingsOf(runtime);
+async function talkCall() {
+	const settings = settingsOf();
 	const agent: ConversationAgentPort = {
 		...testConversationAgent,
 		system: () => agencyReplyParts(settings.agency, true),
@@ -228,9 +227,7 @@ const stewardInstructions = (
 
 async function measure() {
 	const elements: Record<string, Size> = {};
-	const alwaysOn = await talkCall("always-on");
-	const flat = await talkCall("F");
-	elements["system.f"] = textSize(flat.system);
+	const alwaysOn = await talkCall();
 	elements["system.alwaysOn"] = textSize(alwaysOn.system);
 	const sections = sectionsOf(alwaysOn.system);
 	for (const name of SECTIONS)

@@ -30,13 +30,7 @@ import {
 import type { MemoryService } from "../../memory";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
-import {
-	agencyObservations,
-	saveAgencyObservation,
-	deleteAgencyObservation,
-	agencyDependents,
-	replaceAgencyDependents,
-} from "../repository/agency-observations";
+import { agencyObservations } from "../repository/agency-observations";
 
 export function createAgencyStatePort(
 	deps: AgencyActionDeps & {
@@ -163,24 +157,6 @@ export function createAgencyStatePort(
 		staleSourcesInTransaction: (db: Database, refs: readonly string[]) =>
 			staleAgencySources(db, refs, () => catalog(db).map((c) => c.revisionId)),
 		observationsInTransaction: agencyObservations,
-		messageInputInTransaction(db: Database, messageId: string) {
-			for (const record of agencyRecords(db)) {
-				// The agenda's speech records its own input with the message (Memory keeps it).
-				if (isAgendaSnapshot(record.snapshot)) continue;
-				const snapshot =
-					record.snapshot as import("eumenes-agency").AgencySnapshot;
-				const attempt = snapshot.state.attempts?.find(
-					(a) => messageId === `agency:${record.scope}:${a.id}`,
-				);
-				if (!attempt) continue;
-				return (
-					snapshot.provenance?.entries.find(
-						([key]) => key === `attempt:${attempt.id}`,
-					)?.[1] ?? null
-				);
-			}
-			return null;
-		},
 		refreshDependenciesInTransaction(
 			db: Database,
 			conversationId: string,
@@ -189,10 +165,6 @@ export function createAgencyStatePort(
 		) {
 			refreshAgencyDependencies(db, deps.memory, conversationId, scope, refs);
 		},
-		saveObservationInTransaction: saveAgencyObservation,
-		deleteObservationInTransaction: deleteAgencyObservation,
-		dependentsInTransaction: agencyDependents,
-		replaceDependentsInTransaction: replaceAgencyDependents,
 		recordsInTransaction: (db: Database) => readAgencyRecords(db, deps.memory),
 		claimDispatchInTransaction: claimAgencyDispatch,
 		epochInTransaction: agencyEpoch,
@@ -200,8 +172,6 @@ export function createAgencyStatePort(
 		saveInTransaction: saveAgency,
 		saveFeedInTransaction: saveAgencyFeed,
 		catalogInTransaction: catalog,
-		findCapabilities: actions.find,
-		generalActionsAvailable: actions.available,
 		linkFindingsInTransaction(
 			db: Database,
 			conversationId: string,

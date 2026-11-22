@@ -537,6 +537,62 @@ test("a call this domain makes think gets room for the thinking on its output li
 	]);
 });
 
+test("the conversation's own call on LARM gets room for the thinking only above the default level", async () => {
+	const sizes: Record<string, number | undefined> = {};
+	for (const effort of ["low", "medium"]) {
+		const larm = larmCalls("hello");
+		const h = await setup(
+			{ text: "cloud" },
+			{ mode: "larm-preferred", localStream: larm.localStream, effort },
+		);
+		await h.inference.executeStream(
+			await h.request(),
+			messages,
+			new AbortController().signal,
+			() => {},
+			undefined,
+			undefined,
+			{ sessionRole: "main", outputLimit: 4096 },
+		);
+		sizes[effort] = larm.options[0]?.maxOutputTokens;
+	}
+	expect(sizes).toEqual({
+		low: 4096,
+		medium: 4096 + REASONING_ALLOWANCE_TOKENS,
+	});
+});
+
+test("a request whose snapshot holds no thinking level runs at the setting's default", async () => {
+	const larm = larmCalls("hello");
+	const h = await setup(
+		{ text: "cloud" },
+		{ mode: "larm-preferred", localStream: larm.localStream, effort: "high" },
+	);
+	const id = await h.request();
+	// A request made before the level was a setting.
+	await h.store.write((db) => {
+		const row = db
+			.query("SELECT snapshot FROM inference_requests WHERE id=?")
+			.get(id) as { snapshot: string };
+		const snapshot = JSON.parse(row.snapshot) as Settings;
+		delete (snapshot.general as Partial<Settings["general"]>).reasoningEffort;
+		db.query("UPDATE inference_requests SET snapshot=? WHERE id=?").run(
+			JSON.stringify(snapshot),
+			id,
+		);
+	});
+	await h.inference.executeStream(
+		id,
+		messages,
+		new AbortController().signal,
+		() => {},
+		undefined,
+		undefined,
+		{ sessionRole: "main" },
+	);
+	expect(larm.options[0]?.reasoning).toBe("low");
+});
+
 test("an output schema or a target on a non-main call is refused", async () => {
 	const h = await setup({ text: "answer" });
 	for (const session of [

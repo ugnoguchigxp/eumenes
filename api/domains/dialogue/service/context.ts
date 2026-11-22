@@ -269,10 +269,6 @@ export type DialogueDeps = {
 	specialist?: SpecialistPort;
 	/** Set by `createDialogueService` once intake exists (it accepts the resumed runs). */
 	interactions?: CommandInteractions;
-	/** The context keeper: told of every utterance written to the input (section 7.3). Absent: no keeper runs. */
-	contextKeeper?: {
-		noteUtterance(conversationId: string, speaker: "user" | "agent"): void;
-	};
 	/** Installed by the voice delivery owner; awaited after publishing, before any operation starts. */
 	/** Plays the announcement; resolves with how much was heard (cut short by the user: partial), rejects when nothing was. */
 	deliverAnnouncement?: (

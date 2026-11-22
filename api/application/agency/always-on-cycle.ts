@@ -6,7 +6,8 @@ import {
 } from "eumenes-agency/agenda";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
-import { currentInput, fixedInput } from "./input";
+import { currentInput } from "./input";
+import { agendaSettingsKey } from "./always-on-settings";
 import {
 	deliverSpeak,
 	startNoteDocument,
@@ -148,10 +149,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 				c.generation !== generation ||
 				controller.signal.aborted ||
 				digest() !== before ||
-				fixedInput({
-					agency: deps.settings.inTransaction(db).agency,
-					general: deps.settings.inTransaction(db).general,
-				}).sources[0] !== before ||
+				agendaSettingsKey(deps.settings.inTransaction(db)) !== before ||
 				deps.conversation.latestOrdinalInTransaction(db, c.id) !== ordinal ||
 				(diagnosis &&
 					deps.backgroundDiagnostic?.(db, c.id)?.digest !== diagnosis.digest) ||

@@ -562,4 +562,23 @@ flowchart LR
 | --- | --- | --- |
 | `C6` | 実装済み | 着手条件を既存ログで確認した: 2026-11-21 以降の LLM 呼出しは返答・agency・steward ともクラウドで、`background:prewarm` だけが LARM に 28 回成功していた。`conversation-prewarm.ts` は依存 `usesLarm(db)` が false なら要求の作成も DB 書込みもしない。判定は dialogue の `routeConversation`（公開窓口から再 export、複製なし）を、配線側の `api/application/media/live-bridge.ts` が inference の snapshot の複製に対して呼ぶ。cloud-only で推論 0 回・書込み 0 回、LARM を使う経路は従来どおりを試験で固定 |
 | `A2-前半` | 実装後に取り消し（未採用） | 4 経路（LARM、OpenAI 互換クラウド、Codex、Claude Agent SDK）とも出力スキーマはプロバイダ側で strict に渡ることを確認した（`control-schema.test.ts` が固定）。外すと記憶担当の system は 6,909 字 / ~4,195 tok から 4,513 字 / ~3,596 tok になる。ただし [記憶担当の入力の重複削減](steward-input-dedup-2026-11-08.md) で同種の削減が、12 件中 1 件の訂正の失敗で不採用になっている。意味判断に影響しうるため、同じ採用条件（新規の意味の失敗 0、旧版以上の合格数）の live 比較を通すまで採用しない。比較は利用者の開始の指示を待つ |
-| `F1` | 実装中（統合待ち） | 思考レベルは保存済みの設定 `general.reasoningEffort`（既定 `low`）だけで決まる。選べる値は Codex・Claude は catalog、LARM は `low`・`medium`・`high` の宣言。チャット画面のモデル選択の隣に `ReasoningSelect`。受け付けない値は送信時に `reasoning_effort_unsupported` で失敗する。`agency.thinkReasoning`、`harness.ts` の定数、Codex の既定 `high`、書き起こし用の `larmReasoning: "off"` を撤去（書き起こし・日誌・評価の呼出しは `low` で思考するようになる）。残り: 廃止した `agency.thinkReasoning` が適用済み bundle の revision 3 件（`settings.conversation@9`・`@11`・`@12`）に残り、bundle の検証で落ちる。扱いは利用者の判断待ち |
+| `F1` | 実装済み | 思考レベルは保存済みの設定 `general.reasoningEffort`（既定 `low`）だけで決まり、全 LLM 呼出しが `attempt-work.ts` の `callOptionsFor` で snapshot から読む（snapshot に値の無い古い要求も `low`）。選べる値は Codex・Claude は catalog、LARM は `low`・`medium`・`high` の宣言。チャット画面のモデル選択の隣に `ReasoningSelect`。モデル切替時と catalog の読込み時に、保存済みの値が選べなければそのモデルの既定値へ一度だけ保存で直す。受け付けない値は送信時に `reasoning_effort_unsupported` で失敗し、画面に専用の文が出る。LARM の会話呼出しは `low` より上のとき出力上限に思考分を足す。`agency.thinkReasoning`、`harness.ts` の定数、Codex の既定 `high`、書き起こし用の `larmReasoning: "off"` を撤去（書き起こし・日誌・評価の呼出しは `low` で思考する）。bundle: 廃止したフィールドを持つ適用済みの revision（`settings.conversation@9`・`@11`・`@12`）をファイルから削除し（利用者の決定、取込み済み DB には残る）、`app-development` に binding@10・toolchain@11 を追加。live の確認（現在のモデルが `low` で閲覧ツールを選べるか、Claude の effort と Codex の `xhigh` 以上が通るか、LARM の厳密 JSON 呼出しと思考の両立）は未実施 |
+| `D4` | 実装済み | 旧 F host 一式（`api/application/agency/` の 16 ファイル・2,563 行）と F 専用の試験 26 ファイル、`switching-host.ts`、休止中の context keeper（677 行と試験・SystemContext）、F 専用の SystemContext 6 件、呼び手の無い port の機能を削除。設定 `agency.runtime`・`agency.idleSec`・`agency.maxUnanswered` を撤去（保存値は読込み時に捨てる）。bundle は `settings.conversation@14`（`agency.runtime` を外した版）だけにした。旧 Router の `ids` 経路を整理。`router-selection.ts` は比較検証の `scripts/router-issue-eval.ts` が使うため残した。docs（`agency.md`・`toolchain.md`・README）を現行に合わせた |
+| `D2` | 実装済み | `rebuilding-host.ts` が、host の作成時に取り込む 8 項目（`always-on-settings.ts`）の変更だけで always-on host を作り直す。保存記録の digest も同じ 8 項目にした。初回の再起動では digest が変わるため、保存済みの agenda の記録は一度だけ読み直されない |
+
+独立レビュー（Phase 2、1 回）と改善（1 回）:
+
+| 指摘 | 対応 |
+| --- | --- |
+| 設定全体の hash による照合のため、思考レベルや theme を変えるだけで進行中の調べものが捨てられる | 照合を撤去し、保存記録の digest（8 項目）だけにした。思考レベルを変えても採用され、persona を変えると採用されないことを試験で固定 |
+| D4 で消した試験が持っていた always-on 側の保証が無くなった | `always-on-safety`・`always-on-forget`・`always-on-legacy`・`always-on-forgotten-context` の試験を追加（調べもの中の忘却・取消・無効化、記憶項目の忘却、旧記録のある DB での起動、承認が要る操作の拒否、忘却後の再起動の prefix）。実装の不具合は見つからなかった。dialogue の verify の試験一覧に always-on 側の試験 12 本を載せた |
+| 保存済みの思考レベルが選べないと全呼出しが止まる、LARM の出力上限、境界違反、古い要求 | 上記 `F1` の行のとおり直した |
+
+検証（fixture）: `bun run verify -- --domain dialogue --domain inference --domain settings --domain capabilities --domain steward` は bun 1,408 pass・2 skip・0 fail、Web 40 pass。ただし並行の別作業（品質ガードレール）が検証中にソースを変えたため、検証全体は invalidated として記録された。`bunx tsc --noEmit -p .` はエラー 0。境界検査の残り 1 件（`api/application/agency/note-input.test.ts`）は今回の変更前からある。`api/application/fixed-names.test.ts` の 2 件の失敗は別件（6.1 に記載）。
+
+### 6.3 残っている項目
+
+| 項目 | 状態 | 次に要るもの |
+| --- | --- | --- |
+| `A1`・`A3`〜`A6`・`B1`〜`B4`・`C4`・`C5`・`A2-前半`・`D1` の 3 | 未着手 | §4.3 の単独採用の比較の基準値。[E1] の計測を、`F1` 採用後の状態で live（利用者の開始の指示が要る）で取る。`A2-前半` は 11-08 と同じ採用条件の live 比較 |
+| `F1` の live 確認 | 未実施 | 上記 `F1` の行の 4 点 |

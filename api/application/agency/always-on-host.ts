@@ -10,7 +10,7 @@ import { feedAgenda, pumpAgendaHost } from "./always-on-feed";
 import { isAgendaSnapshot, type AgencyRecord } from "../../domains/dialogue";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
-import { fixedInput } from "./input";
+import { agendaSettingsKey } from "./always-on-settings";
 import {
 	keepNote,
 	logNoteDisplayFailure,
@@ -24,7 +24,6 @@ import {
 	type AgendaScope,
 } from "./always-on-scope";
 import type { AgencyHostDeps } from "./host-types";
-import type { AgencyWork } from "./work";
 import { createAgencyActivity } from "./always-on-activity";
 import { createAgendaHearing } from "./always-on-heard";
 import { recallConversation } from "./always-on-recovery";
@@ -61,11 +60,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	let display: { id: string; until: number } | null = null;
 	let pumping: Promise<void> | null = null;
 	let requested = false;
-	const settings = () => {
-		const s = deps.settings.get();
-		return { agency: s.agency, general: s.general };
-	};
-	const digest = () => fixedInput(settings()).sources[0]!;
+	const digest = () => agendaSettingsKey(deps.settings.get());
 	const hostDigest = digest();
 	const activity = createAgencyActivity({
 		now,
@@ -478,9 +473,6 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		},
 		dialoguePort,
 		conversationAgent,
-		attachWork(_value: AgencyWork) {
-			// The agenda's work is its own research; the TODOs of the conversation are the dialogue's.
-		},
 		forgetInTransaction,
 		planForgetInTransaction: (
 			db: Database,

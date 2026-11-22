@@ -30,10 +30,7 @@ import { stateLinesInTransaction, stateText } from "./state-text";
 export const RECENT = {
 	/** One utterance shows at most this much; the rest is cut with `…`. */
 	utteranceTokens: 300,
-	/** The context keeper is asked for a cut past this many utterances or tokens. */
-	softCount: 12,
-	softTokens: 2400,
-	/** The host cuts by its fixed rule past this many, whether the keeper came or not. */
+	/** The host cuts by its fixed rule past this many. */
 	hardCount: 20,
 	hardTokens: 4000,
 	/** A fixed-rule cut keeps this many newest utterances (starting with the agent's). */
@@ -276,7 +273,7 @@ export function placeCutInTransaction(
 		nowMs: input.nowMs,
 	});
 	if (!reason) return { cut: existing, reason: null, window };
-	// Nothing said before a gap stays, nor what the context keeper made of it.
+	// Nothing said before a gap stays, nor the input states saved for it.
 	if (reason === "resumed") store.dropStatesInTransaction(tx, conversationId);
 	const moved = moveCutInTransaction(deps, tx, conversationId, {
 		seq:
@@ -291,7 +288,7 @@ export function placeCutInTransaction(
 }
 
 /**
- * Moves the cut after `seq` (a fixed-rule cut, or the context keeper's): the system part it stands on is the current
+ * Moves the cut after `seq` (a fixed-rule cut): the system part it stands on is the current
  * one, and `## Memory` is drawn again, the waiting additions joining it (the only time they do).
  */
 export function moveCutInTransaction(
@@ -340,7 +337,7 @@ export function clearRecentInTransaction(
 	const newest = store.latestUtterancesInTransaction(tx, conversationId, 1)[0];
 	const cut = store.cutInTransaction(tx, conversationId);
 	if (!newest || (cut && cut.seq >= newest.seq)) return true;
-	// What the context keeper made of the earlier words goes with them.
+	// The input states saved for the earlier words go with them.
 	store.dropStatesInTransaction(tx, conversationId);
 	let window: WindowSnapshot | null = null;
 	try {

@@ -1,33 +1,31 @@
-import { createAgencyHost } from "./host";
 import { createAlwaysOnHost } from "./always-on-host";
-import { fixedInput } from "./input";
+import { agendaSettingsKey } from "./always-on-settings";
 import { agencyReplyParts } from "./system-context";
 import { agendaReady } from "./always-on-scope";
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import type { AgencyHostDeps } from "./host-types";
-import type { AgencyWork } from "./work";
 import type {
 	AgencyActivity,
 	AgencyThought,
 } from "../../domains/dialogue/contracts/agency-status";
-type Legacy = ReturnType<typeof createAgencyHost>;
 
-/** One owner at a time. A switch drains and invalidates the previous owner before constructing the next. */
-export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
-	const mode = () => deps.settings.get().agency.runtime ?? "F";
-	const key = () =>
-		fixedInput({
-			mode: mode(),
-			...(mode() === "always-on" ? deps.settings.get() : {}),
-		}).sources[0]!;
-	const create = () =>
-		mode() === "always-on" ? createAlwaysOnHost(deps) : createAgencyHost(deps);
-	let current = create();
+type Host = ReturnType<typeof createAlwaysOnHost>;
+
+/**
+ * The always-on host of the server. The host takes what it reads of the settings when it is made (the agent's voice,
+ * its interval, its connection), so a saved change of one of them drains the host and makes the next one; a change of
+ * any other setting leaves it running (`agendaSettingsKey` names what it reads).
+ */
+export function createRebuildingAgencyHost(
+	deps: AgencyHostDeps,
+	create: (deps: AgencyHostDeps) => Host = createAlwaysOnHost,
+) {
+	const key = () => agendaSettingsKey(deps.settings.get());
+	let current = create(deps);
 	let ownerKey = key(),
 		started = false,
 		closed = false;
-	let work: AgencyWork | undefined;
 	let unsubscribe: (() => void) | undefined;
 	let changing = Promise.resolve();
 	const change = () => {
@@ -36,15 +34,14 @@ export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
 				if (closed || key() === ownerKey) return;
 				await current.close();
 				const nextKey = key();
-				current = create();
-				if (work) current.attachWork(work);
+				current = create(deps);
 				await current.recover();
 				ownerKey = nextKey;
 				if (started && !closed) current.start();
 			})
 			.catch((error) =>
-				getLogger("agency").warn("agency.switch_failed", {
-					reason: toErrorCode(error, "switch_failed"),
+				getLogger("agency").warn("agency.rebuild_failed", {
+					reason: toErrorCode(error, "rebuild_failed"),
 				}),
 			);
 	};
@@ -113,29 +110,19 @@ export function createSwitchingAgencyHost(deps: AgencyHostDeps) {
 				>
 			) => current.dialoguePort.replyInputInTransaction?.(...args) ?? null,
 		},
-		attachWork(value: AgencyWork) {
-			work = value;
-			current.attachWork(value);
-		},
 		forgetInTransaction: (
-			db: Parameters<Legacy["forgetInTransaction"]>[0],
-			purge: Parameters<Legacy["forgetInTransaction"]>[1],
+			db: Parameters<Host["forgetInTransaction"]>[0],
+			purge: Parameters<Host["forgetInTransaction"]>[1],
 		) => current.forgetInTransaction(db, purge),
 		planForgetInTransaction: (
-			db: Parameters<Legacy["planForgetInTransaction"]>[0],
-			input: Parameters<Legacy["planForgetInTransaction"]>[1],
+			db: Parameters<Host["planForgetInTransaction"]>[0],
+			input: Parameters<Host["planForgetInTransaction"]>[1],
 		) => current.planForgetInTransaction(db, input),
 		invalidateTopics: () => current.invalidateTopics(),
-		attend: (id: string, report?: AgencyActivity) =>
-			mode() === "always-on"
-				? (current as ReturnType<typeof createAlwaysOnHost>).attend(id, report)
-				: report && (!report.visible || report.leaving)
-					? Promise.resolve(current.status(id))
-					: current.attend(id),
+		attend: (id: string, report?: AgencyActivity) => current.attend(id, report),
 		status: (id: string) => current.status(id),
-		/** The agenda's thoughts; the F host shows none. */
-		thoughts: (id: string): AgencyThought[] =>
-			"thoughts" in current ? current.thoughts(id) : [],
+		/** What the agent of the conversation thought lately (display only). */
+		thoughts: (id: string): AgencyThought[] => current.thoughts(id),
 		inspect: (id: string) => current.inspect(id),
 	};
 }

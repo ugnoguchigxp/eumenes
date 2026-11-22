@@ -435,7 +435,8 @@ test("stored settings are migrated once: Managed Agents removed, auth filled, no
 	// The removed dedicated LLM selections are dropped; agency keeps its other fields.
 	expect("enabled" in migrated.agency).toBe(false);
 	expect("resourceId" in migrated.agency).toBe(false);
-	expect(migrated.agency.idleSec).toBe(20);
+	expect("idleSec" in migrated.agency).toBe(false);
+	expect("maxUnanswered" in migrated.agency).toBe(false);
 	expect("subagent" in migrated).toBe(false);
 	expect("codingSupervision" in migrated).toBe(false);
 	expect(h.settings.credential(migrated.connections[0]!)).toBe("sk-keep");
@@ -575,8 +576,6 @@ test("agency defaults, also for saved documents without it", async () => {
 	const h = await setup();
 	const defaultAgency = {
 		actions: { enabled: true, maxConcurrent: 1, dailyLimit: 3 },
-		idleSec: 20,
-		maxUnanswered: 1,
 		interests: [],
 		emotion: true,
 	};
@@ -593,10 +592,10 @@ test("agency defaults, also for saved documents without it", async () => {
 	expect(reopened.get().agency).toEqual(defaultAgency);
 	// A partial section fills the rest with the defaults.
 	const partial = JSON.parse(JSON.stringify(legacy));
-	partial.agency = { idleSec: 5 };
+	partial.agency = { interests: ["a"] };
 	expect(settingsSchema.parse(partial).agency).toEqual({
 		...defaultAgency,
-		idleSec: 5,
+		interests: ["a"],
 	});
 });
 
@@ -605,8 +604,6 @@ test("agency persists through apply", async () => {
 	const s = h.settings.get();
 	s.agency = {
 		actions: { enabled: false, maxConcurrent: 2, dailyLimit: 5 },
-		idleSec: 0,
-		maxUnanswered: 10,
 		interests: ["a", "b", "c"],
 		emotion: false,
 	};
@@ -623,13 +620,9 @@ test("agency rejects out-of-range values and unknown fields", async () => {
 		settingsSchema.safeParse({ ...s, agency: { ...s.agency, ...patch } })
 			.success;
 	expect(withAgency({})).toBe(true);
-	expect(withAgency({ idleSec: 86400 })).toBe(true);
-	expect(withAgency({ idleSec: -1 })).toBe(false);
-	expect(withAgency({ idleSec: 86401 })).toBe(false);
-	expect(withAgency({ idleSec: 1.5 })).toBe(false);
-	expect(withAgency({ maxUnanswered: 0 })).toBe(false);
-	expect(withAgency({ maxUnanswered: 11 })).toBe(false);
-	expect(withAgency({ maxUnanswered: 1.5 })).toBe(false);
+	// The removed fields are not accepted any more (a stored document loses them in the migration).
+	expect(withAgency({ idleSec: 20 })).toBe(false);
+	expect(withAgency({ maxUnanswered: 1 })).toBe(false);
 	expect(withAgency({ interests: ["a", "b", "c", "d"] })).toBe(false);
 	expect(withAgency({ interests: [""] })).toBe(false);
 	expect(withAgency({ interests: ["x".repeat(200)] })).toBe(true);

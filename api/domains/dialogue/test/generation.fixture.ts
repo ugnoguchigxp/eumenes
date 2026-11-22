@@ -174,8 +174,6 @@ export type SetupOptions = {
 	settings?: unknown;
 	/** With `settings`: the run is not captured when it is accepted, so its prepare takes the request. */
 	lateCapture?: boolean;
-	/** The context keeper's inference and quiet wait; absent: no keeper runs. */
-	keeper?: NonNullable<Parameters<typeof createDialogueService>[0]["keeper"]>;
 };
 
 /** A real store, queue, continuity and dialogue with a scripted model, a fake toolchain catalog and image port. */
@@ -473,7 +471,6 @@ export async function setup(options: SetupOptions = {}) {
 					},
 				}
 			: {}),
-		...(options.keeper ? { keeper: options.keeper } : {}),
 	});
 	if (options.autoStart !== false) queue.start();
 	const run = (id: string) => dialogue.get(id);

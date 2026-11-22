@@ -3,7 +3,6 @@ import { createSteeringInbox } from "eumenes-steer";
 import { SET_QUIET, START_PREPARATION } from "eumenes-agency/agenda";
 import { createAgencyStatePort } from "../../domains/dialogue";
 import { createAlwaysOnHost } from "./always-on-host";
-import { createAgencyWork } from "./work";
 import { settle } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
 import type { imageFixture } from "../media/image.fixture";
@@ -110,7 +109,6 @@ export async function agendaFixture(
 			: {}),
 	});
 	const config = h.settings.get();
-	config.agency.runtime = "always-on";
 	config.agency.emotion = false;
 	await h.settings.apply({
 		requestId: crypto.randomUUID(),
@@ -141,7 +139,6 @@ export async function agendaFixture(
 		agents: h.toolchain.agents,
 		toolchains: h.routing,
 		execution: () => h.executionPort,
-		store: h.store,
 		settings: h.settings,
 		resources: h.resources,
 		producesInTransaction: h.toolchain.capabilities.producesInTransaction,
@@ -335,7 +332,6 @@ export async function agendaFixture(
 			await memoryHost?.listen();
 			memoryHost?.start();
 			await host.recover();
-			host.attachWork(createAgencyWork({ dialogue: h.dialogue }));
 			host.start();
 			await host.attend("ao");
 			await settle();

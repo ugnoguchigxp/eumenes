@@ -1,5 +1,5 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EumenesClient } from "../../../../client";
 import {
 	type BackgroundKind,
@@ -188,6 +188,10 @@ export function useConversationModel(client: EumenesClient) {
 	async function selectEffort(effort: string) {
 		if (!value || busy || !current?.efforts?.includes(effort)) return;
 		if (effort === value.general.reasoningEffort) return;
+		await saveEffort(effort);
+	}
+	async function saveEffort(effort: string) {
+		if (!value) return;
 		setBusy(true);
 		setError(null);
 		try {
@@ -209,6 +213,23 @@ export function useConversationModel(client: EumenesClient) {
 			setBusy(false);
 		}
 	}
+	// Once the selected model's levels are known and the saved level is not among them, the level moves to the model's
+	// default the way a model switch moves it. One try per (model, saved level): a failed save is not repeated.
+	const adjustTried = useRef<string | null>(null);
+	const savedEffort = value?.general.reasoningEffort;
+	const adjusted =
+		current && savedEffort !== undefined
+			? adjustedEffort(current, savedEffort)
+			: undefined;
+	useEffect(() => {
+		if (!current || savedEffort === undefined || adjusted === undefined) return;
+		if (adjusted === savedEffort || busy) return;
+		const key = `${current.id}:${savedEffort}`;
+		if (adjustTried.current === key) return;
+		adjustTried.current = key;
+		void saveEffort(adjusted);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [current?.id, savedEffort, adjusted, busy]);
 	return {
 		ready: !!value,
 		options,

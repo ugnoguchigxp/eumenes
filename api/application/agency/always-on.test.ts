@@ -13,7 +13,7 @@ import { researchRevision } from "./always-on-flow";
 import { noteFromResult } from "./always-on-memory";
 import { agendaClock, NOTES_KEPT } from "./always-on-scope";
 import type { AgendaHostSnapshot } from "../../domains/dialogue";
-import { createSwitchingAgencyHost } from "./switching-host";
+import { createRebuildingAgencyHost } from "./rebuilding-host";
 import { settle, waitFor } from "../../infrastructure/wait-for";
 import { imageFixture } from "../media/image.fixture";
 
@@ -640,9 +640,9 @@ test("words a forgotten message left are not given to a reply", async () => {
 	}
 });
 
-test("the switching host forwards what a steered reply took, so the settle sees it", async () => {
+test("the rebuilding host forwards what a steered reply took, so the settle sees it", async () => {
 	const f = await agendaFixture();
-	const host = createSwitchingAgencyHost(f.deps);
+	const host = createRebuildingAgencyHost(f.deps);
 	try {
 		await host.recover();
 		host.start();
@@ -850,7 +850,7 @@ test("the reply's system holds the agenda's rules only where the agenda serves t
 			"start_preparation",
 		);
 		expect(agencyReplyParts(settings, false).facts).toBeUndefined();
-		const host = createSwitchingAgencyHost(f.deps);
+		const host = createRebuildingAgencyHost(f.deps);
 		expect(host.conversationAgent.system().facts).toContain(
 			"start_preparation",
 		);
@@ -974,7 +974,7 @@ test("the agenda's research is not counted against the daily and concurrent limi
 		},
 	});
 	try {
-		// The limits of actions: one a day, one at a time. The F host's actions keep them.
+		// The count limits of actions (one a day, one at a time) do not pace an agenda's own research.
 		const settings = f.h.settings.get();
 		settings.agency.actions = {
 			enabled: true,
@@ -1222,7 +1222,7 @@ test("a reply to a notice keeps four tool calls and offers no question; a failed
 	}
 });
 
-test("the switching host forwards what a reply was given and that the agency serves, so forgetting reaches the reply in production", async () => {
+test("the rebuilding host forwards what a reply was given and that the agency serves, so forgetting reaches the reply in production", async () => {
 	let planned = false;
 	const f = await agendaFixture({
 		media: imageFixture("success"),
@@ -1234,7 +1234,7 @@ test("the switching host forwards what a reply was given and that the agency ser
 			return kind === "plan" ? planNothing() : undefined;
 		},
 	});
-	const host = createSwitchingAgencyHost(f.deps);
+	const host = createRebuildingAgencyHost(f.deps);
 	try {
 		await host.recover();
 		host.start();

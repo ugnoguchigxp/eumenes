@@ -124,8 +124,6 @@ export type StateInput = {
 	/** A specialist handed the user's words back (its line names it). */
 	handoff?: string;
 	refs: DocumentRefs;
-	/** The context keeper's view: the model's items carry the numbers it names them by (`d<n>`, `o<n>`, `r<n>`). */
-	numbered?: boolean;
 };
 
 /** The host's and the model's fields of `## State`, without its heading. */
@@ -243,29 +241,6 @@ export function stateProjectionInTransaction(
 			"共有中:",
 			sharedLinesInTransaction(deps, tx, input.conversationId, shown),
 		);
-	}
-
-	// The context keeper's fields, only while it runs (it is off for now: the review fixes design C5).
-	const body = deps.contextKeeper ? input.state?.body : undefined;
-	if (body?.topic) lines.push(`話題: ${lineText(body.topic)}`);
-	const items = (
-		label: string,
-		prefix: string,
-		list: ReadonlyArray<{ text: string }>,
-	) => {
-		if (list.length)
-			lines.push(
-				`${label}:`,
-				...list.map(
-					(item, i) =>
-						`- ${input.numbered ? `${prefix}${i + 1} ` : ""}${lineText(item.text)}`,
-				),
-			);
-	};
-	if (body) {
-		items("決まったこと", "d", body.decisions);
-		items("未解決", "o", body.open);
-		items("関係する記録", "r", body.records);
 	}
 	return { lines, resources: [...resources], todos };
 }

@@ -496,20 +496,15 @@ function said(
 		(deps.larm.snapshotFor?.(tx, run.id)?.voice.autoSpeak ?? true);
 	// The reply takes its place in the input's order now (a user who cuts in speaks after it); a spoken one is
 	// revised to what was heard when its playback reports (`recordHeardInTransaction`).
-	recordUtteranceInTransaction(
-		deps,
-		tx,
-		{
-			conversationId: run.conversationId,
-			speaker: "agent",
-			text,
-			messageId,
-			at: deps.clock(),
-			toolCalls: toolCallsOf(deps, tx, run, result),
-			...(notice ? { notice } : {}),
-		},
-		!spoken,
-	);
+	recordUtteranceInTransaction(deps, tx, {
+		conversationId: run.conversationId,
+		speaker: "agent",
+		text,
+		messageId,
+		at: deps.clock(),
+		toolCalls: toolCallsOf(deps, tx, run, result),
+		...(notice ? { notice } : {}),
+	});
 	if (spoken) return;
 	events.appendInTransaction(tx, {
 		conversationId: run.conversationId,

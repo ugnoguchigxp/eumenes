@@ -75,7 +75,6 @@ import {
 	clearRecentInTransaction,
 	conversationTaskPort,
 } from "./conversation-input";
-import { createContextKeeper, type KeeperInference } from "./context-keeper";
 import { revokeExecutionNotice } from "./execution-notices";
 import { createContextInputs } from "./context-inputs";
 import type { MusicPort } from "../contracts/music";
@@ -109,18 +108,6 @@ function registerCorrectionHook(deps: DialogueDeps) {
 		))
 			deps.conversation.input.dropStatesInTransaction(db, conversationId);
 	});
-}
-
-/** The context keeper, told of every utterance through `deps.contextKeeper`; none without its inference. */
-function startKeeper(
-	deps: DialogueDeps,
-	options: DialogueServiceOptions["keeper"],
-) {
-	const keeper = options
-		? createContextKeeper(deps, options.inference, options)
-		: undefined;
-	deps.contextKeeper = keeper;
-	return keeper;
 }
 
 /**
@@ -210,11 +197,6 @@ interface DialogueServiceOptions {
 	specialist?: import("../contracts").SpecialistPort;
 	/** The operational log file the error report reads (`config.logFile`); no log is read when absent. */
 	logFile?: () => string | undefined;
-	/**
-	 * The context keeper (section 7.3): the inference it calls on, and its quiet wait (default `KEEPER.quietMs`).
-	 * Without it `## State` keeps the host's fields only.
-	 */
-	keeper?: { inference: KeeperInference; quietMs?: number };
 }
 /** The user's hand on the recent conversation (`POST /api/conversations/:id/recent/clear`). */
 function createRecentPorts(deps: DialogueDeps) {
@@ -250,7 +232,6 @@ async function stopUnhandedReply(
 export function createDialogueService({
 	clock = () => new Date().toISOString(),
 	id = () => crypto.randomUUID(),
-	keeper: keeperOptions,
 	debugDiagnostics,
 	...options
 }: DialogueServiceOptions) {
@@ -289,7 +270,6 @@ export function createDialogueService({
 				}
 			: undefined,
 	);
-	const keeper = startKeeper(deps, keeperOptions);
 	registerChangeHooks(deps, deps.work);
 	registerHandlers(deps, progress);
 	registerGeneratedImageObservation(deps);
@@ -539,7 +519,6 @@ export function createDialogueService({
 		async close() {
 			deps.debugDiagnostics?.close();
 			deps.contextInputs?.close();
-			keeper?.close();
 			await agentSync.close();
 			progress.close();
 		},

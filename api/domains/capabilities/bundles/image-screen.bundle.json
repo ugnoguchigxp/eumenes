@@ -167,20 +167,8 @@
 								"width": 512,
 								"height": 512,
 								"format": "webp",
-								"seed": 0,
-								"model": "qwen-image-2.1-turbo"
-							},
-							"models": [
-								{
-									"value": "qwen-image-2.1-turbo",
-									"label": "Qwen Turbo（既定）"
-								},
-								{
-									"value": "flux-3-image-klein",
-									"label": "FLUX 3 Image Klein（準備中）",
-									"description": "準備中です。LARMへの配置・実生成確認・本番配備は未完了です。"
-								}
-							]
+								"seed": 0
+							}
 						}
 					}
 				}

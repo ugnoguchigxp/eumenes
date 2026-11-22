@@ -44,12 +44,7 @@ export function taskExecutionSources(
 				return false;
 			const current =
 				source.origin === "autonomous"
-					? autonomousActionSource(
-							db,
-							source.runId,
-							Date.now(),
-							host.settings?.inTransaction(db),
-						)
+					? autonomousActionSource(db, source.runId, Date.now())
 					: source.specialistSessionId !== undefined
 						? dialogue.specialistExecutionSourceInTransaction(
 								db,

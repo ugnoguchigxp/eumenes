@@ -62,15 +62,15 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。依頼ツールの`inputs`（区域・日）から天気予報を取得し、決まった形の文をツールの結果で返す。予告・TODOなし | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
 | `stock_quote` | `stock.quote` | `package:stock.quote@1` | 即時回答型（instant）。依頼ツールの`inputs`（`query`＝言われた会社名・ティッカー）から、EDINETの上場会社一覧（日次更新・失敗中は前の一覧）とYahoo検索で一社を特定し（日本株優先、同名は完全一致→前方一致→部分一致）、Yahooのチャートで取得した現在値・前日比・JST時刻を決まった形の文にしてツールの結果で返す。履歴・指標・財務・ニュース・複数銘柄比較は対象外 | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
 
-候補の提示: 依頼の検索・選択は Router（次の段落）が行います。仕事の実行（委任された仕事が担当を探す `find`）は、ツールチェーンの`title: summary`・`useWhen`の各行・`examples`の各文をLARMのembedding（担当の文はpassage、依頼はquery）で埋め込み、担当ごとに一番近い1文の内積で並べ、種類ごとの枠（専用の担当の上位3件と、1位との差が0.05以内のパイプライン・汎用の担当を各2件まで。[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §3）で候補にします。
+候補の提示: 依頼かどうかの判断と担当の選択は会話エージェントが行い、新しい依頼の担当は `find_toolchain` で探します（次の段落）。仕事の実行（委任された仕事が担当を探す `find`）と `find_toolchain` の検索は、ツールチェーンの`title: summary`・`useWhen`の各行・`examples`の各文をLARMのembedding（担当の文はpassage、依頼はquery）で埋め込み、担当ごとに一番近い1文の内積で並べ、種類ごとの枠（専用の担当の上位3件と、1位との差が0.05以内のパイプライン・汎用の担当を各2件まで。[担当の検索と選び方の設計](../spec/toolchain-search-choice-design-2026-10-30.md) §3）で候補にします。
 
-Router（担当の振り分け）: `eumenes_router` パッケージ（`vendor/router/` のtarball）の `routeWithSelection` を使います。カードの全文検索、LARM の埋め込み、過去の訂正から候補を探し、クラウド LLM が担当を選びます。会話前の判定は発言の構造を判断し、最大5件の担当候補から選びます。会話エージェントが `find_toolchain` を呼ぶ場合は、会話から組み立てた依頼をツール専用の選択に渡します。利用者の発言は4,000文字まで受け付け、ルーターには先頭2,000文字を渡します。文字のない発言（添付のみ）はルーターに問わず会話として答えます。判定先と期限は `GET`／`PATCH /api/settings/router` または CLI の `router status`／`router set` で確認・変更できます。[選択方式への切替](../spec/router-package-integration-2026-11-04.md#2026-11-14-選択方式への切替)を参照してください。
+会話主導の担当選択（2026-11-21の合意、[設計](../spec/conversation-first-toolchain-2026-11-21.md)）: 通常の会話から独立した自動の Router（会話前の判定）は動かしません。会話エージェントが最近の会話と `State` から、雑談か実行依頼かを判断します。依頼なら、作業・対象・範囲・指定担当を読み取り、単独で通じる依頼文を `find_toolchain` に渡します。検索は上の埋め込み検索で、返った候補だけから `delegate` で選びます。保留質問への回答・既存の確認や仕事への参照は、ホストが提示した候補から会話モデルが選びます。利用者の発言は4,000文字まで受け付けます。`eumenes_router` パッケージは、保存済み履歴と過去の比較に使う検証資産（`scripts/router-issue-eval.ts` など）としてだけ残っています。
 
-ホストは実在する仕事・承認・質問・切替待ちと進行中の担当を候補へ加えます。選択した担当は `find_toolchain` の候補提示と既存の権限・影響・承認・TODO・Queueを通して実行します。複数作業の決定は登録済みPipelineへ元依頼全体を渡し、利用できない場合に先頭の仕事だけを代わりに実行しません。
+ホストが提示する実在の仕事・承認・質問・切替待ちと進行中の担当だけを、会話エージェントは参照できます。選択した担当は `find_toolchain` の候補提示と既存の権限・影響・承認・TODO・Queueを通して実行します。複数作業の決定は登録済みPipelineへ元依頼全体を渡し、利用できない場合に先頭の仕事だけを代わりに実行しません。
 
-Routerが会話に決めた回では、agendaが返事を担う会話に限り、返事が `find_toolchain`（検索）と `delegate`（その返事で見つけた担当への依頼）を使えます。引き渡しは上と同じ権限・影響・承認・TODO・Queueを通ります（[agency.md](agency.md)の「会話の返事から担当に頼む」）。
+agendaが返事を担う会話では、返事が `find_toolchain`（検索）と `delegate`（その返事で見つけた担当への依頼）を使えます。引き渡しは上と同じ権限・影響・承認・TODO・Queueを通ります（[agency.md](agency.md)の「会話の返事から担当に頼む」）。
 
-引数を要する担当は、その担当に限定した欄埋めを会話モデルが行います。保留への回答は同じ仕事へ戻し、構造化回答のschemaに合わない自然文だけを既存の形変換で一回補います。訂正は `router_feedback` に保存し、`feedbackNear` と `feedbackWeight` の範囲で補正します。記録は `router_traces`（30日）、訂正の一覧は `GET /api/toolchain-history/router-feedback`、取消は `POST /api/toolchain-history/router-feedback/:id/state`です。元発言の忘却で派生記録も削除します。方式の評価はRouterのbench、hostの操作・成果物・通知はEumenesの結合と通常会話の受入で確認します。
+引数を要する担当は、その担当に限定した欄埋めを会話モデルが行います。保留への回答は同じ仕事へ戻し、構造化回答のschemaに合わない自然文だけを既存の形変換で一回補います。過去の訂正（`router_feedback`）と記録（`router_traces`）は保存済みの履歴として残り、一覧は `GET /api/toolchain-history/router-feedback`、取消は `POST /api/toolchain-history/router-feedback/:id/state` で扱えます。新しい会話はこれらを書き足しません。元発言の忘却で派生記録も削除します。hostの操作・成果物・通知はEumenesの結合と通常会話の受入で確認します。
 
 読む道具: 会話の回の読む道具（`read_memory` 記憶・`read_history` 会話ログ・`read_runs` 最近の回・`read_agents` 担当の作業・`read_world` World）は担当ではなく、bundle も持たないが、検索の文を `api/domains/capabilities/contracts/read-tools.ts` に持ち、担当と同じ索引（key `host:<関数名>@<版>`）で専用の担当の枠を取り合う。候補に出ると execution は `read` で、選ぶ呼出しは即答の担当と同じ形（`choice` と `inputs`）で選び、ホストが読んで会話の回が話す。候補に出なくても、会話の回の呼出しに native tools として渡り、1回だけ呼べる（[設計](../spec/conversation-read-tools-design-2026-10-31.md)）。
 
@@ -155,4 +155,4 @@ EUMENES_LIVE_LLM_NATIVE=1 bun scripts/llm-native-live.ts --suite all --cases api
 
 Web本文の根拠は、履歴等と同じ最大300文字の連続範囲を使います。短い行を一件ずつ数えず、見出し・表ヘッダ等の対応は範囲間のcontext参照で補います。正確な抜粋を保持し、根拠64件・資料32 KiB・全体64 KiBの上限を変えません。日本語パス・国際化ドメインを含む指定URLはURL parserの正規形で許可対象と照合し、別パスや未提示の取得先へ権限を広げません。
 
-2026-11-06採用候補のRouter 0.0.2（route契約4、structure契約2）は、構造判断へ現在有効な保留質問を渡し、回答・新規依頼・会話・確認を区別します。回答は既存の仕事へ戻し、混在や不正な参照では実操作を先行させません。構造解析の失敗時は全文の単独振り分けへ戻さず、全体が未実施であると伝えます。保存済みentryの一括切替は行っていません。実モデルの残課題は[全体課題の実施記録](../spec/project-issues-first-batch-2026-11-06.md)を参照してください。
+（過去の記録）2026-11-06採用候補のRouter 0.0.2（route契約4、structure契約2）は、構造判断へ現在有効な保留質問を渡し、回答・新規依頼・会話・確認を区別していました。2026-11-21に通常会話から自動の Router を外し、同じ区別は会話エージェントが行います。実モデルの残課題は[全体課題の実施記録](../spec/project-issues-first-batch-2026-11-06.md)を参照してください。

@@ -1,7 +1,7 @@
 import { createAgencyStatePort } from "../../domains/dialogue";
 import type { DialogueService } from "../../domains/dialogue";
 import type { AgencyHostDeps } from "./host-types";
-import { createSwitchingAgencyHost } from "./switching-host";
+import { createRebuildingAgencyHost } from "./rebuilding-host";
 import { createAgencyLlmPort } from "./llm-port";
 
 /**
@@ -38,9 +38,7 @@ export function assembleAgency(
 		},
 	dialogue: () => Pick<
 		DialogueService,
-		| "conversationHasActiveRunInTransaction"
-		| "recordSpontaneousInTransaction"
-		| "conversationTaskInTransaction"
+		"conversationHasActiveRunInTransaction" | "recordSpontaneousInTransaction"
 	> &
 		Partial<
 			Pick<
@@ -63,24 +61,9 @@ export function assembleAgency(
 					now: Date.now,
 				})
 			: undefined);
-	return createSwitchingAgencyHost({
+	return createRebuildingAgencyHost({
 		...deps,
 		...(state ? { state } : {}),
-		captureContext: (conversationId) =>
-			store.read((db) => {
-				const captured = dialogue().conversationTaskInTransaction(
-					db,
-					conversationId,
-					"",
-					{ requireProvenance: true },
-				);
-				return captured
-					? {
-							messages: structuredClone(captured.messages),
-							input: captured.input ?? { sources: [], complete: false },
-						}
-					: null;
-			}),
 		conversationBusy: (db, conversationId) =>
 			dialogue().conversationHasActiveRunInTransaction(db, conversationId),
 		awaitingWorkConfirmation: (db, conversationId) =>

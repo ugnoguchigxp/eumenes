@@ -13,6 +13,7 @@ const space: VectorSpace = {
 	artifactDigest: "d1",
 	dimension: 2,
 };
+let musicFunction = "";
 const question = "日曜日の朝にぴったりな音楽を作って";
 
 test("the current music request reaches generation after unrelated Web and image history", async () => {
@@ -22,13 +23,12 @@ test("the current music request reaches generation after unrelated Web and image
 		...f.model,
 		answer: async (...args: Parameters<typeof f.model.answer>) => {
 			// The utterance's generation offers the conversation's fixed tools; the toolchain is found by search, not offered.
-			if (isUtteranceRound(args[2]))
-				expect(args[2]!.tools!.map((t) => t.function.name)).toEqual([
-					"memory",
-					"find_toolchain",
-					"delegate",
-					"work",
-				]);
+			if (isUtteranceRound(args[2])) {
+				const names = args[2]!.tools!.map((t) => t.function.name);
+				expect(names).toContain("find_toolchain");
+				expect(names).toContain("delegate");
+				expect(names).not.toContain(musicFunction);
+			}
 			return f.model.answer(...args);
 		},
 	};
@@ -36,6 +36,12 @@ test("the current music request reaches generation after unrelated Web and image
 		model,
 		musicGateway: f.gateway,
 		imageGateway: f.gateway,
+		// The Web research toolchain the conversation can select (`web.note`) is registered; this run never uses it.
+		webNote: {
+			turn: async () => {
+				throw new Error("web_note_unused");
+			},
+		},
 		uiCompositions: true,
 		timers: true,
 		history: true,
@@ -48,6 +54,7 @@ test("the current music request reaches generation after unrelated Web and image
 		const active = h.store.read((db) =>
 			h.toolchain.capabilities.toolchainsInTransaction(db),
 		);
+		musicFunction = active.find((d) => d.id === "music.create")!.functionName!;
 		await h.store.write((db) => {
 			h.toolchain.capabilities.saveToolchainVectorsInTransaction(
 				db,
@@ -61,7 +68,7 @@ test("the current music request reaches generation after unrelated Web and image
 					})),
 				),
 			);
-			for (const id of ["web.service-search", "image.create"]) {
+			for (const id of ["web.note", "image.create"]) {
 				const d = active.find((d) => d.id === id)!;
 				h.toolchain.history.recordSelectionInTransaction(db, {
 					runId: `previous-${id}`,
@@ -101,13 +108,13 @@ test("the current music request reaches generation after unrelated Web and image
 		expect(run?.status).toBe("completed");
 		expect(h.music!.list("main")[0]?.state).toBe("completed");
 		const selection = h.toolchain.history.getSelection(id)!;
-		// The router (the eumenes_router package) found it: the earlier choices are not shown as history.
+		// The conversation's search found it by the embedding; the earlier Web and image choices do not lead it.
 		expect(selection).toMatchObject({
-			retrieval: "hybrid",
+			retrieval: "embedding",
 			toolchainId: "music.create",
-			historyRefs: [],
 		});
-		// Only the offer's query is embedded for the record (the request), never the earlier requests.
+		expect(selection.candidates.some((c) => c.fromHistory)).toBe(false);
+		// Only the search's query is embedded for the record (the request), never the earlier requests.
 		expect(embeddedQueries).toEqual([question]);
 		expect(
 			selection.candidates.find((c) => c.toolchainId === "music.create")!.rank,

@@ -16,9 +16,7 @@ const settings: Settings = {
 	revision: 1,
 	agency: {
 		emotion: true,
-		idleSec: 20,
 		interests: [],
-		maxUnanswered: 1,
 		actions: { enabled: true, dailyLimit: 3, maxConcurrent: 1 },
 	},
 	live: {

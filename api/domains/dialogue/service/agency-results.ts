@@ -149,12 +149,7 @@ export function agencyResults(
 			const w = agencyWork(db, rootId);
 			let adopted = true;
 			if (w?.execution_id) {
-				const source = autonomousActionSource(
-					db,
-					rootId,
-					deps.now(),
-					deps.settings?.inTransaction(db),
-				);
+				const source = autonomousActionSource(db, rootId, deps.now());
 				if (
 					!currentAgencyWork(db, w) ||
 					!source ||

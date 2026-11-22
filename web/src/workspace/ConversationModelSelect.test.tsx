@@ -284,3 +284,59 @@ test("the thinking level is locked while an answer is running", async () => {
 	renderView(true);
 	expect((await effortTrigger()).disabled).toBe(true);
 });
+
+function cloudRoute(client: ReturnType<typeof makeClient>) {
+	return client.settings().then((saved) => {
+		client.settings.mockResolvedValue({
+			...saved,
+			routes: {
+				...saved.routes,
+				llm: {
+					...saved.routes.llm,
+					mode: "cloud-only",
+					fallbackId: resourceId,
+				},
+			},
+		});
+	});
+}
+
+test("once the catalog shows the saved level is not the selected model's, it moves to the model's default one time", async () => {
+	const client = makeClient(["low", "xhigh"], "medium");
+	await cloudRoute(client);
+	renderView(false, null, client);
+	await waitFor(() => expect(client.applySettings).toHaveBeenCalledTimes(1));
+	const sent = client.applySettings.mock.calls[0]?.[0].settings as Settings;
+	expect(sent.general.reasoningEffort).toBe("low");
+	expect(sent.routes.llm.fallbackId).toBe(resourceId);
+	// The saved settings the page reads still hold the old level (the mock does not refetch): no second try.
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	expect(client.applySettings).toHaveBeenCalledTimes(1);
+});
+
+test("a failed adjustment is not repeated", async () => {
+	const client = makeClient(["low", "xhigh"], "medium");
+	await cloudRoute(client);
+	client.applySettings.mockRejectedValue(new Error("save_failed"));
+	renderView(false, null, client);
+	await waitFor(() => expect(client.applySettings).toHaveBeenCalledTimes(1));
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	expect(client.applySettings).toHaveBeenCalledTimes(1);
+});
+
+test("a saved level the model accepts, or levels not known, are not saved on load", async () => {
+	const accepted = makeClient(["low", "medium"], "medium");
+	await cloudRoute(accepted);
+	renderView(false, null, accepted);
+	await waitFor(() => expect(accepted.connectionModels).toHaveBeenCalled());
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	expect(accepted.applySettings).not.toHaveBeenCalled();
+	cleanup();
+
+	const unknown = makeClient(null, "medium");
+	await cloudRoute(unknown);
+	renderView(false, null, unknown);
+	await waitFor(() => expect(unknown.connectionModels).toHaveBeenCalled());
+	await new Promise((resolve) => setTimeout(resolve, 50));
+	expect(unknown.applySettings).not.toHaveBeenCalled();
+});

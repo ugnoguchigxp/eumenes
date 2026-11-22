@@ -6,10 +6,6 @@
 		"steward": "curate-memory step of one exchange, no requests"
 	},
 	"elements": {
-		"system.f": {
-			"chars": 4234,
-			"tokens": 3837
-		},
 		"system.alwaysOn": {
 			"chars": 8761,
 			"tokens": 7843

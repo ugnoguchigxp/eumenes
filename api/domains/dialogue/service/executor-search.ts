@@ -25,14 +25,11 @@ export async function find(
 	call: ParsedCall,
 	query: string,
 	signal: AbortSignal,
-	/** The router's offer (spec router-package-integration 2026-11-04 §1 #11): given, not searched. Absent: a search. */
-	ids?: readonly string[],
 ): Promise<ToolOutcome> {
 	const { deps, offered, current, acted } = x;
 	const { store, toolchains } = deps;
 	if (!toolchains) return { result: { candidates: [] } };
-	// The router's offer is not searched, but its record keeps the query's vector as a search's does (the procedures
-	// and the past choices are found by it). The talk turn's reply searches by it.
+	// The record keeps the query's vector (the procedures and the past choices are found by it).
 	let embeddingFailed = false;
 	const vector = await measureStage("dialogue", "query_embedding", () =>
 		toolchains.embedQuery(query, signal),
@@ -58,7 +55,6 @@ export async function find(
 			]),
 			strict: true,
 			lexicalFallback: true,
-			...(ids ? { ids } : {}),
 		});
 		x.state.search = {
 			route,

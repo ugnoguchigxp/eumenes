@@ -1,9 +1,6 @@
 {
-	"files": {
-		"api/application/agency/host.ts": 939
-	},
+	"files": {},
 	"functions": {
-		"api/application/agency/host.ts#createAgencyHost": 801,
 		"api/application/server-services.ts#buildServices": 348,
 		"api/domains/attitude-dataset/service/index.ts#createAttitudeDataset": 618,
 		"api/domains/excalidraw/service/index.ts#createExcalidraw": 305,

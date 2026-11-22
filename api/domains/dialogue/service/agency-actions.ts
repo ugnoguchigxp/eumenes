@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { hash } from "../../capabilities";
 import type { AgentRuntime } from "../../agent-runtime";
 import type { ToolchainExecutionPort } from "../../tool-runtime";
@@ -28,7 +27,6 @@ export type AgencyActionDeps = {
 	agents?: AgentRuntime;
 	toolchains?: ToolchainRoutingPort;
 	execution?: () => ToolchainExecutionPort | undefined;
-	store?: Pick<SqliteStore, "read">;
 	/** Host policy input; dialogue does not depend on the settings domain. */
 	settings?: {
 		inTransaction(db: Database): {
@@ -39,7 +37,6 @@ export type AgencyActionDeps = {
 					dailyLimit: number;
 				};
 			};
-			general: unknown;
 		};
 	};
 	resources?: ResourceRegistry;
@@ -84,25 +81,6 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 	return {
 		available: () => !!deps.execution?.(),
 		catalog,
-		async find(query: string, signal: AbortSignal) {
-			if (!deps.toolchains || !deps.store)
-				throw new Error("agency_catalog_unavailable");
-			const vector = await deps.toolchains.embedQuery(query, signal);
-			if (!vector) throw new Error("embedding_unavailable");
-			return deps.store.read((db) => {
-				const offered = deps.toolchains!.routeInTransaction(db, {
-					runId: "agency-catalog",
-					text: query,
-					query: vector,
-					strict: true,
-					available: new Set(
-						deps.toolchains!.catalogInTransaction(db).map((e) => e.id),
-					),
-				}).cards;
-				const ids = new Set(offered.map((card) => card.revisionId));
-				return catalog(db).filter((card) => ids.has(card.revisionId));
-			});
-		},
 		start(
 			db: Database,
 			input: {
@@ -163,7 +141,7 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 					.get(input.conversationId, dayStart) as { n: number }
 			).n;
 			// The agenda's own research is the agent's to pace (it keeps one at a time, and the user sets no
-			// budget on the agency's thinking): the count limits are for the F host's actions. Approval stays.
+			// budget on the agency's thinking): the count limits apply only to a record that is not an agenda. Approval stays.
 			if (
 				!policy.enabled ||
 				(!agenda &&
@@ -216,14 +194,6 @@ export function createAgencyActions(deps: AgencyActionDeps) {
 				{
 					settingsDigest: record.settingsDigest,
 					inputDigest: digest(input),
-					...(deps.settings
-						? {
-								settingsStateDigest: hash({
-									agency: deps.settings.inTransaction(db).agency,
-									general: deps.settings.inTransaction(db).general,
-								}),
-							}
-						: {}),
 					policyDigest: hash({
 						version: 1,
 						input,

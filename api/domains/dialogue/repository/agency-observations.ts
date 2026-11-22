@@ -51,17 +51,6 @@ export function agencyObservations(
 		input: JSON.parse(row.input_json) as InputContext,
 	}));
 }
-export function saveAgencyObservation(db: Database, row: AgencyObservationRef) {
-	db.query(
-		"INSERT INTO dialogue_agency_observations VALUES(?,?,?,?,?) ON CONFLICT(conversation_id,scope,observation_id) DO UPDATE SET record_ref=excluded.record_ref,input_json=excluded.input_json",
-	).run(
-		row.conversationId,
-		row.scope,
-		row.observationId,
-		JSON.stringify(row.ref),
-		JSON.stringify(row.input),
-	);
-}
 export function deleteAgencyObservation(
 	db: Database,
 	row: AgencyObservationRef,

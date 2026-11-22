@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Utterance } from "../../conversation";
 import type { ProfileItem } from "../../memory";
-import { applyKeeperOutput } from "../service/context-keeper";
 import {
 	MEMORY_TOKENS,
 	RECENT,
@@ -20,8 +19,7 @@ import { estimateTextTokens } from "../../../infrastructure/context-budget";
 
 /**
  * The parts of the conversation's input (the conversation input specification, sections 3 to 9), each drawn by a
- * fixed rule: the recent conversation, `## Memory`, the text of results, and the keeper's operations as the host
- * checks them.
+ * fixed rule: the recent conversation, `## Memory` and the text of results.
  */
 let seq = 0;
 const said = (
@@ -306,63 +304,6 @@ test("lines past a bound name how many were left out and of what", () => {
 	expect(jstNowLine(Date.parse("2026-10-26T10:12:00Z"))).toBe(
 		"10-26（月）19:12",
 	);
-});
-
-test("the keeper's operations apply by the numbers shown; a rule broken anywhere refuses the whole output", () => {
-	const before = {
-		topic: "曲を作る",
-		decisions: [{ text: "アップテンポ（10-26、本人の希望）" }],
-		open: [{ text: "曲名が未定" }],
-		records: [],
-	};
-	const candidates = new Map([
-		["w1", "七里ヶ浜駅: World に記録がある対象（World）"],
-	]);
-	const points = new Map([["k1", 4]]);
-	const applied = applyKeeperOutput(
-		before,
-		{
-			ops: [
-				{
-					op: "replace_decision",
-					id: "d1",
-					text: "スローテンポ（10-26、本人の訂正）",
-				},
-				{ op: "resolve_open", id: "o1" },
-				{ op: "add_record", candidate: "w1" },
-				{ op: "cut_before", point: "k1" },
-			],
-		},
-		candidates,
-		points,
-	);
-	expect(applied).toEqual({
-		body: {
-			topic: "曲を作る",
-			decisions: [{ text: "スローテンポ（10-26、本人の訂正）" }],
-			open: [],
-			records: [{ text: "七里ヶ浜駅: World に記録がある対象（World）" }],
-		},
-		cutAfter: 4,
-	});
-	for (const op of [
-		{ op: "add_decision" as const, text: "詳しくは https://example.com" },
-		{ op: "add_open" as const, text: "さっきの件" },
-		{ op: "add_decision" as const, text: "返事は短くしてください" },
-		{ op: "remove_decision" as const, id: "d9" },
-		{ op: "add_record" as const, candidate: "m1" },
-		{ op: "cut_before" as const, point: "k2" },
-	])
-		expect(
-			applyKeeperOutput(before, { ops: [op] }, candidates, points),
-		).toBeNull();
-	const tooMany = Array.from({ length: 9 }, (_, i) => ({
-		op: "add_decision" as const,
-		text: `決めたこと${i}`,
-	}));
-	expect(
-		applyKeeperOutput(before, { ops: tooMany }, candidates, points),
-	).toBeNull();
 });
 
 test("after a gap nothing said before stays, even when the memory or the system part changed meanwhile", () => {

@@ -59,8 +59,6 @@ export function recordHeardInTransaction(
 					heard === "partial" && deliveredText.trim() ? deliveredText : null,
 				at: deps.clock(),
 			});
-		if (heard !== "none")
-			deps.contextKeeper?.noteUtterance(run.conversationId, "agent");
 	}
 }
 

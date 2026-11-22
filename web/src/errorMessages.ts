@@ -117,6 +117,8 @@ const messages: Record<string, string> = {
 		"対応する英語の声の公開情報が一致しないため、読み上げを続けられません。",
 	speech_tts_target_unavailable:
 		"選択した言語の声を利用できません。音声設定を確認してください。",
+	reasoning_effort_unsupported:
+		"今の思考レベルをこのモデルは受け付けません。チャット画面の思考レベルを選び直してください。",
 	image_invalid: "画像を読み取れません。破損していない画像を選んでください。",
 	image_format_unsupported: "対応形式はJPG・PNG・BMPです。",
 	image_mime_mismatch:

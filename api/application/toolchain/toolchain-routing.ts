@@ -228,20 +228,6 @@ export function createToolchainRouting(
 			return card ? enrich(db, card)[0] : undefined;
 		},
 		routeInTransaction(db, input) {
-			// The router's offer (the eumenes_router package searched already): those cards, no search of ours.
-			if (input.ids)
-				return {
-					cards: capabilities
-						.toolchainCandidatesInTransaction(db, {
-							text: "",
-							available: (id) => input.available.has(id),
-							ids: input.ids,
-						})
-						.flatMap((card) => enrich(db, card)),
-					past: [],
-					// The package's retrieval is lexical and by embedding.
-					retrieval: "hybrid",
-				};
 			const active = capabilities
 				.toolchainsInTransaction(db)
 				.filter((d) => d.selectable !== false && input.available.has(d.id));

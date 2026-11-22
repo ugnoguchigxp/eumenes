@@ -8,7 +8,7 @@ import type { DialogueDeps } from "./context";
  * notice, a specialist's words and the words said to a specialist are never written here.
  */
 export function recordUtteranceInTransaction(
-	deps: Pick<DialogueDeps, "conversation" | "contextKeeper">,
+	deps: Pick<DialogueDeps, "conversation">,
 	db: Database,
 	input: {
 		conversationId: string;
@@ -21,10 +21,7 @@ export function recordUtteranceInTransaction(
 		/** The host notice an agent utterance reports (`reportNoticeInTransaction`). */
 		notice?: string;
 	},
-	/** Tell the context keeper (false for a reply whose playback is still to come: its delivery tells it). */
-	notify = true,
 ): void {
 	if (!input.text.trim()) return;
-	if (deps.conversation.input.appendUtteranceInTransaction(db, input) && notify)
-		deps.contextKeeper?.noteUtterance(input.conversationId, input.speaker);
+	deps.conversation.input.appendUtteranceInTransaction(db, input);
 }

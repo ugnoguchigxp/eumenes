@@ -52,3 +52,10 @@ test.each([["speech_tts_target_unavailable", "声を利用できません"]])(
 		expect(describeError(new Error(code))).not.toContain(code);
 	},
 );
+
+test("an unsupported thinking level tells the user to choose again on the chat screen", () => {
+	const text = describeError(new Error("reasoning_effort_unsupported"));
+	expect(text).toContain("思考レベル");
+	expect(text).toContain("チャット画面");
+	expect(text).not.toContain("reasoning_effort_unsupported");
+});

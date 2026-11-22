@@ -19,6 +19,8 @@ const isObject = (v: unknown): v is Json =>
  * - The removed `agency.thinkReasoning` (the background's own thinking level) is dropped: every call thinks at the one
  *   level `general.reasoningEffort` saves (absent: the default).
  * - The removed `agency.runtime` (the F host / always-on switch) is dropped: the always-on agenda is the only runtime.
+ * - The removed `agency.idleSec` and `agency.maxUnanswered` (the F host's silence timer and run of unanswered speech;
+ *   the agenda reads neither) are dropped.
  * - The removed `codingSupervision` section (instruction approval for the retired CLI runner) is dropped.
  * - Speech has no fallback: a `larm-preferred` speech route becomes `larm-only`.
  * - The router decides every utterance turn (spec router-package-integration 2026-11-04 §1 #12): its `mode` and the
@@ -38,6 +40,8 @@ export function migrateStoredSettings(
 				enabled: _enabled,
 				thinkReasoning: _thinkReasoning,
 				runtime: _runtime,
+				idleSec: _idleSec,
+				maxUnanswered: _maxUnanswered,
 				...agency
 			} = rest.agency;
 			rest.agency = agency;

@@ -9,7 +9,7 @@ import {
 
 /**
  * `## State` keeps nothing of the conversation before the recent one (the review fixes design, C4 and C5): finished
- * work from before it is left out, and the context keeper's fields show only while the keeper runs.
+ * work from before it is left out.
  */
 const nowMs = Date.parse("2026-10-29T14:50:00.000Z");
 const refs = {
@@ -17,16 +17,7 @@ const refs = {
 	confirmation: () => null,
 	resource: () => null,
 };
-const keeperState = {
-	body: {
-		topic: "火曜の夜の音楽",
-		decisions: [{ text: "プレイリストを作る" }],
-		open: [],
-		records: [],
-	},
-};
-
-function depsOf(keeper: boolean, archivedSince: string[]) {
+function depsOf(archivedSince: string[]) {
 	return {
 		work: {
 			todosInTransaction: () => [],
@@ -40,7 +31,6 @@ function depsOf(keeper: boolean, archivedSince: string[]) {
 				return [];
 			},
 		},
-		...(keeper ? { contextKeeper: {} } : {}),
 	} as unknown as DialogueDeps;
 }
 
@@ -51,28 +41,23 @@ const lines = (deps: DialogueDeps, since: number | null) =>
 		lastAt: null,
 		since,
 		lastAgent: null,
-		state: keeperState as never,
+		state: null,
 		refs,
 	});
 
 test("finished work is shown from the start of the recent conversation, within its usual window", () => {
 	const since: string[] = [];
 	const clearedAt = nowMs - 5 * 60 * 1000;
-	lines(depsOf(false, since), clearedAt);
-	lines(depsOf(false, since), null);
+	lines(depsOf(since), clearedAt);
+	lines(depsOf(since), null);
 	expect(since).toEqual([
 		new Date(clearedAt).toISOString(),
 		new Date(nowMs - STATE_LIMITS.archivedMs).toISOString(),
 	]);
 });
 
-test("the context keeper's fields show only while it runs", () => {
-	expect(lines(depsOf(false, []), null).join("\n")).not.toContain("火曜の夜");
-	expect(lines(depsOf(true, []), null)).toContain("話題: 火曜の夜の音楽");
-});
-
 test("routing gets visible ledger references in display order, independently of titles, labels, links and prose", () => {
-	const deps = depsOf(true, []);
+	const deps = depsOf([]);
 	const open = Array.from({ length: STATE_LIMITS.work }, (_, i) => ({
 		id: `work-${i + 1}`,
 		ref: i + 1,
@@ -96,9 +81,7 @@ test("routing gets visible ledger references in display order, independently of 
 		nowMs,
 		lastAt: null,
 		lastAgent: null,
-		state: {
-			body: { ...keeperState.body, open: [{ text: "t97 a18" }] },
-		} as never,
+		state: null,
 		refs: { ...refs, resource: (uri) => (uri === "song" ? "a3" : "a20") },
 		run: { sourceKind: "scheduled" } as never,
 		screenLines: [
@@ -112,7 +95,6 @@ test("routing gets visible ledger references in display order, independently of 
 		],
 	});
 	expect(state.lines.join("\n")).toContain("実行中 a3「朝の曲 a9」");
-	expect(state.lines).toContain("- t97 a18");
 	expect(state.lines.join("\n")).not.toContain("表示枠外");
 	expect(state.resources).toEqual(["a3", "a4"]);
 	expect(state.todos).toEqual(

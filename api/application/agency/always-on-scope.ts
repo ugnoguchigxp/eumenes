@@ -27,12 +27,9 @@ import type { Unheard } from "./always-on-heard";
 /** Notes kept per conversation: the newest ones (the older are still in the work ledger). */
 export const NOTES_KEPT = 30;
 
-/** Whether the agenda can serve replies and think: the runtime is on, with a healthy memory and the ledger. */
+/** Whether the agenda can serve replies and think: a healthy memory and the ledger. */
 export const agendaReady = (deps: AgencyHostDeps) =>
-	deps.settings.get().agency.runtime === "always-on" &&
-	deps.memory.status().healthy &&
-	!!deps.state &&
-	!!deps.memory.referenceInputs;
+	deps.memory.status().healthy && !!deps.state && !!deps.memory.referenceInputs;
 
 /** Local time as the user would say it (the CLI's format): "2026/11/11(水) 14:02", in Japan time. */
 export const agendaClock = (at: number) =>

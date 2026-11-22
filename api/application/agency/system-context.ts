@@ -1,11 +1,9 @@
 import { emotions } from "eumenes-agency";
-import { conversationPersona } from "../../domains/dialogue";
 import type { ConversationAgentSystem } from "../../domains/dialogue/contracts";
 import type { Settings } from "../../domains/settings";
 import { systemContext } from "../../infrastructure/system-context";
 import { agendaReplyRules } from "./always-on-system";
 
-type Persona = Pick<Settings["general"], "agentName" | "userName" | "persona">;
 const feelingNames = emotions
 	.map(({ emoji, label }) => `${emoji}: ${label}`)
 	.join(" / ");
@@ -13,13 +11,13 @@ const feelingNames = emotions
 /** Only Eumenes-authored instruction assets; Agency supplies the public execution contracts. */
 export function agencyReplyParts(
 	settings: Settings["agency"],
-	/** The agenda serves the reply now (always-on, and its memory ready): only then are its rules in the system. */
+	/** The agenda serves the reply now (its memory ready): only then are its rules in the system. */
 	agenda = true,
 ): ConversationAgentSystem {
 	return {
 		base: [
 			systemContext("dialogue.contexts.agency.reply", {}),
-			...(settings.runtime === "always-on" && agenda
+			...(agenda
 				? [
 						systemContext("dialogue.contexts.agency.always-on-reply", {}),
 						agendaReplyRules(),
@@ -33,7 +31,7 @@ export function agencyReplyParts(
 					}),
 				}
 			: {}),
-		...(settings.runtime === "always-on" && agenda
+		...(agenda
 			? { facts: systemContext("dialogue.contexts.agency.talk-facts", {}) }
 			: {}),
 		spokenReplyStyle: systemContext("dialogue.contexts.agency.spoken", {}),
@@ -45,31 +43,4 @@ export function agencyReplyParts(
 				}
 			: {}),
 	};
-}
-
-/** A full purpose-specific system, resolved for this logical call, with no observation or history in it. */
-export function agencyBackgroundSystem(
-	purpose: "update" | "select",
-	input: { readonly outputContract: { readonly description: string } },
-	persona: Persona,
-	emotion: boolean,
-): string {
-	const own = conversationPersona(persona);
-	return [
-		systemContext("dialogue.contexts.agency.background", own),
-		systemContext("dialogue.contexts.system.image-history", {}),
-		purpose === "update"
-			? systemContext("dialogue.contexts.agency.update", {})
-			: systemContext("dialogue.contexts.agency.select", {
-					utterance: systemContext("dialogue.contexts.agency.utterance", {}),
-					emotion: emotion
-						? systemContext("dialogue.contexts.agency.select-emotion", {
-								emotions: feelingNames,
-							})
-						: "",
-				}),
-		systemContext("dialogue.contexts.agency.output-contract", {
-			contract: input.outputContract.description,
-		}),
-	].join("\n\n");
 }

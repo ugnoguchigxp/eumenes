@@ -408,10 +408,6 @@ export const settingsSchema = z
 					.strict()
 					.default({ enabled: true, maxConcurrent: 1, dailyLimit: 3 })
 					.optional(),
-				/** Seconds of silence before an AI-initiated turn; 0 turns the silence-triggered turns off (turn_end still runs). */
-				idleSec: z.number().int().min(0).max(86400).default(20),
-				/** AI-initiated utterances allowed in a row without a user reply. */
-				maxUnanswered: z.number().int().min(1).max(10).default(1),
 				/** Standing interests the persona may bring up on its own. */
 				interests: z.array(z.string().min(1).max(200)).max(3).default([]),
 				/** The agency picks a light feeling for each utterance (voice tone and motion). */
@@ -420,8 +416,6 @@ export const settingsSchema = z
 			.strict()
 			.default({
 				actions: { enabled: true, maxConcurrent: 1, dailyLimit: 3 },
-				idleSec: 20,
-				maxUnanswered: 1,
 				interests: [],
 				emotion: true,
 			}),

@@ -66,7 +66,6 @@ import { createHostToolchain } from "./toolchain/toolchain-host";
 import { createCodexInspection } from "./web-note/codex-web-note";
 import { assembleAgency } from "./agency/assembly";
 import { createNoteDocuments } from "./agency/note-documents";
-import { createAgencyWork } from "./agency/work";
 
 const log = getLogger("server");
 
@@ -365,7 +364,6 @@ export async function buildServices(
 			research: {
 				agents: toolchain.agents,
 				toolchains,
-				store,
 				settings,
 				resources: resources.access.registry,
 				producesInTransaction: resources.dialogue.producesInTransaction,
@@ -394,8 +392,6 @@ export async function buildServices(
 		conversationAgent: agency.conversationAgent,
 		lookup: createConversationLookup(webNote),
 		logFile: () => config.logFile,
-		// The context keeper is off for now (2026-10-29 user instruction, the review fixes design C5): no State of its
-		// own reaches the input, and the recent conversation is cut by the host's fixed rules alone.
 		objectRecognition: enabled
 			? media.objectRecognition.port(CONVERSATION_DEFAULT_PRINCIPAL)
 			: undefined,
@@ -488,7 +484,6 @@ export async function buildServices(
 			},
 		});
 	}
-	agency.attachWork(createAgencyWork({ dialogue }));
 	lateResources.attach(resources.access.registry);
 	stewardAssembly.attachDialogue(dialogue);
 	memory.registerForgetPurge(toolchainForgetPurge(toolchain));

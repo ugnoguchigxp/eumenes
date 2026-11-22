@@ -1,5 +1,4 @@
 import type { Database } from "bun:sqlite";
-import { hash } from "../../capabilities";
 import { isAgendaSnapshot } from "../contracts/agency-always-on";
 
 export const agencyMigration = `
@@ -276,7 +275,6 @@ export function autonomousActionSource(
 	db: Database,
 	root: string,
 	now: number,
-	settings?: { agency: unknown; general: unknown },
 ): import("../../tool-runtime").ExecutionSource | null {
 	const work = agencyWork(db, root);
 	if (
@@ -298,16 +296,12 @@ export function autonomousActionSource(
 		version: number;
 		settingsDigest: string;
 		policyDigest: string;
-		settingsStateDigest?: string;
 		inputDigest?: string;
 	};
 	if (
 		authority.version !== 1 ||
 		record?.epoch !== work.epoch ||
-		record.settings_digest !== authority.settingsDigest ||
-		(settings !== undefined &&
-			authority.settingsStateDigest !==
-				hash({ agency: settings.agency, general: settings.general }))
+		record.settings_digest !== authority.settingsDigest
 	)
 		return null;
 	return {
@@ -331,7 +325,6 @@ export function authorizeAgencyAction(
 	authority: {
 		settingsDigest: string;
 		policyDigest: string;
-		settingsStateDigest?: string;
 		inputDigest?: string;
 	},
 	now: number,

@@ -1,15 +1,10 @@
 # 会話エージェント（agency）と agenda の思考表示
 
-会話の返事と自分からの話しかけは `eumenes-agency` が担う。背景で動く runtime は保存済み設定の `agency.runtime` で決まる。設計と決定は [spec/agency-agenda-integration-2026-11-11.md](../spec/agency-agenda-integration-2026-11-11.md)。
+会話の返事と自分からの話しかけは `eumenes-agency` が担う。背景で動くのは always-on の agenda エージェント（計画・調べもの・自分からの発話。ログは `agency.llm_call` の `purpose: "think"`）だけで、設定の切替はない。設計と決定は [spec/agency-agenda-integration-2026-11-11.md](../spec/agency-agenda-integration-2026-11-11.md)。
 
-## runtime
+## 設定変更と host の作り直し
 
-| `agency.runtime` | 背景で動くもの | 思考の表示 |
-| --- | --- | --- |
-| 未設定・`"F"` | 旧 F host（idle の判断で話すか待つかを選ぶ。ログは `agency.decision` / `agency.idle_cycle`） | なし |
-| `"always-on"` | agenda エージェント（計画・調べもの・自分からの発話。ログは `agency.llm_call` の `purpose: "think"`） | あり |
-
-既存の環境は未設定（F）のまま。agenda を動かすには設定 API（`POST /api/settings/apply`）で `agency.runtime` を `"always-on"` にする。保存すると host がその場で作り直され、再起動は要らない。どちらが動いているかは `bun run logs -- --component agency` の上の event 名で分かる。
+host が設定から読むのは、`agency.thinkResourceId`・`agency.speechIntervalSec`・`agency.interests`・`agency.emotion`・`agency.actions.enabled`、`general.agentName`・`general.userName`・`general.persona` だけ。このどれかを保存すると host を止めて作り直す。保存済みの記録は作り直しの前の設定の `settingsDigest`（この 8 項目の hash）を持つので、新しい host は記録の `settingsDigest` が合わないものを破棄（revoke）する。進行中の調べものの結果は採用されず、計画・メモ・調べものは捨てられる（再起動は要らない）。思考レベル・画面・音声・接続など、ほかの設定を保存しても host は作り直さず、記録も有効のままで、進行中の調べものの結果も採用される。
 
 ## 自分から話す間合い（agenda）
 
@@ -27,14 +22,14 @@ agent の規則は参照ホスト（agenda の CLI）と同じ。Eumenes が違�
 
 ## 会話の返事から担当に頼む
 
-Router が担当に決めた回は、従来どおり host が引き渡す。Router が会話に決めた回（決められずに会話へ回した回も）では、agenda の返事が自分で担当を探して頼める。「作りましょうか？」に「はい、お願いします」と答えた回のように、利用者の言葉だけでは依頼の中身が分からない場合のための道（[設計](../spec/router-package-integration-2026-11-04.md)の「会話の返事から担当に頼む道」）。
+担当への依頼は、会話エージェントが判断する（雑談か実行依頼か）。依頼なら、返事が自分で担当を探して頼める。「作りましょうか？」に「はい、お願いします」と答えた回のように、利用者の言葉だけでは依頼の中身が分からない場合も同じ道を通る（[設計](../spec/conversation-first-toolchain-2026-11-21.md)）。
 
 | 道具 | すること |
 | --- | --- |
 | `find_toolchain`（`query`） | 担当を検索する（全文検索・埋め込み・過去の選択）。候補は `id`・`title`・`summary`・`useWhen`・`produces` |
-| `delegate`（`toolchain`・`request`） | その返事で見つけた担当に頼む。欄埋め・予告・確認・TODO は Router の引き渡しと同じ host 操作。依頼文は返事が書いた `request` |
+| `delegate`（`toolchain`・`request`） | その返事で見つけた担当に頼む。欄埋め・予告・確認・TODO は host の操作。依頼文は返事が書いた `request` |
 
-- 渡すのは、agenda が返事を担う会話で、利用者の発言に答える回だけ（通知・作業報告・Router の聞き返しの回には渡さない）。
+- 渡すのは、agenda が返事を担う会話で、利用者の発言に答える回だけ（通知・作業報告の回には渡さない）。
 - 引き渡したら返事はそこで終わり、host の予告（「〜に頼みます。」）が回の答えになる。既存のものを変える依頼は、host が確認文を言って待つ。即答の担当の答えは、返事が自分の言葉で伝える。
 - 確かめ方: ログの `dialogue.read_tools_offered` に `source: "work"` があれば道具は渡っている。探した回は `dialogue.candidates_selected`、頼んだ回は会話ログの `acted`（`delegate`）に残る。
 
@@ -74,4 +69,4 @@ agenda が動いている会話では、考えたこと（足した・落とし�
 
 ## 調べものと会話の仕事
 
-agency が自分で始めた調べものは、会話の仕事の一覧（`## State`）には出るが、ルーターの候補（確認・訂正・取消）にはならない。利用者の発言が agency の調べものの取消として扱われることはない。調べものの結果は、返事の `read_note` / `show_note` から使う。
+agency が自分で始めた調べものは、会話の仕事の一覧（`## State`）には出るが、会話エージェントが参照する候補（確認・訂正・取消）にはならない。利用者の発言が agency の調べものの取消として扱われることはない。調べものの結果は、返事の `read_note` / `show_note` から使う。

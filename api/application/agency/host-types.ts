@@ -1,14 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type {
-	AgencyRuntime,
-	IdlePlanner,
-	Opportunity,
-	createIdleScheduler,
-	LlmPort,
-	LlmRequest,
-	InputContext,
-} from "eumenes-agency";
-import type { Messages } from "../../domains/inference";
+import type { LlmPort, LlmRequest } from "eumenes-agency";
 import type { ConversationService } from "../../domains/conversation";
 import type { MemoryService } from "../../domains/memory";
 import type { Settings } from "../../domains/settings";
@@ -122,10 +113,6 @@ export type AgencyHostDeps = {
 				| "blockMessagesInTransaction"
 			>
 		>;
-	/** Frozen conversation prefix and State, including all host input dependencies. */
-	captureContext?(
-		conversationId: string,
-	): { messages: Messages; input: InputContext } | null;
 	backgroundDiagnostic?(
 		db: Database,
 		conversationId: string,
@@ -172,36 +159,4 @@ export type AgencyHostDeps = {
 	nowMs?(): number;
 	setTimer?(fn: () => void, ms: number): unknown;
 	clearTimer?(handle: unknown): void;
-};
-
-export type Conv = {
-	epoch: number;
-	reviewTimer?: unknown;
-	id: string;
-	/** Unique per runtime instance: ticket ids restart per runtime, message ids must not repeat. */
-	scope: string;
-	runtime: AgencyRuntime;
-	planner: IdlePlanner;
-	scheduler: ReturnType<typeof createIdleScheduler>;
-	generation: number;
-	background: AbortController | null;
-	preparedContext?: Messages;
-	/** Used by ephemeral hosts without a durable state port. */
-	lastDispatchAt?: number;
-	opportunities: number;
-	calls: number;
-	/** Last time the conversation had an event or a cycle (for forgetting idle conversations). */
-	touched: number;
-	/** The questions of TODOs the agent was last given an opportunity for. */
-	reportable: Set<string>;
-};
-
-export type Cycle = {
-	c: Conv;
-	runtime: AgencyRuntime;
-	planner: IdlePlanner;
-	trigger: Opportunity["trigger"];
-	controller: AbortController;
-	mine: number;
-	ordinal: number;
 };

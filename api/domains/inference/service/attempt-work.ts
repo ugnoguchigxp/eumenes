@@ -11,6 +11,7 @@ import type { Connection } from "../../settings";
 import {
 	asrAcceptedLanguages,
 	asrRequestLanguage,
+	defaultReasoningEffort,
 } from "../../settings/contracts";
 import { controlJsonOptions, type Messages } from "../contracts";
 import { cloudRequest } from "./cloud";
@@ -75,9 +76,14 @@ export function callOptionsFor(
 	source: Source,
 ): LarmCallOptions {
 	const exchanges: LarmExchange[] = [];
-	// The conversation's own call and an independent control (the agency's) size their output limit for the thinking.
+	// A request made before the level was a setting has none in its snapshot: it runs at the setting's default.
+	const effort =
+		r.row.snapshot.general.reasoningEffort ?? defaultReasoningEffort;
+	// The conversation's own call sizes its limit for thinking at the default level; above it the thinking needs more
+	// room. An independent control (the agency's) sizes its limit for the thinking itself.
 	const limitHoldsThinking =
-		r.session?.sessionRole === "main" || !!r.session?.independent;
+		(r.session?.sessionRole === "main" && effort === defaultReasoningEffort) ||
+		!!r.session?.independent;
 	const thinksByDefault =
 		!limitHoldsThinking && source === "larm" && r.row.purpose === "llm";
 	const observe = r.session?.observeInput;
@@ -145,9 +151,7 @@ export function callOptionsFor(
 				}
 			: {}),
 		// Every LLM call thinks at the one saved level, whichever side answers and whatever the call is.
-		...(r.row.purpose === "llm"
-			? { reasoning: r.row.snapshot.general.reasoningEffort }
-			: {}),
+		...(r.row.purpose === "llm" ? { reasoning: effort } : {}),
 		// A read-ahead only reads the prompt and stops at its own bound (one token): it gets no room for thinking.
 		...(r.row.outputLimit || r.outputLimit
 			? {

@@ -2,7 +2,6 @@ import type { Database } from "bun:sqlite";
 import {
 	reportedTodoIds,
 	type ActionTicket,
-	type ActionReceipt,
 	type EmotionName,
 } from "eumenes-agency";
 import { hostDelivery, type DeliveryEmotion } from "../../domains/delivery";
@@ -74,15 +73,3 @@ export function persistSpeech(
 	);
 	return "appended";
 }
-export const speechReceipt = (
-	outcome: "appended" | "routed",
-	text: string,
-): Omit<ActionReceipt, "ticketId" | "at"> =>
-	outcome === "routed"
-		? {
-				status: "succeeded",
-				speechHandoff: true,
-				resultText:
-					"発話の提案を音声会話の出力先に渡しました。実際の発話・再生は未確認です。",
-			}
-		: { status: "succeeded", resultText: text };

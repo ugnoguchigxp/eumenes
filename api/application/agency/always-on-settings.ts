@@ -13,7 +13,7 @@ import type { AgencySettings, HostPersona } from "./host-types";
  * - `agency.emotion`: whether a reply and a line carry a feeling.
  * - `agency.actions.enabled`: whether the agenda may start work (shown in the status, and the dialogue's budget).
  * - `general.agentName`, `general.userName`, `general.persona`: the agent's voice.
- * `agency.debugMode`, `agency.idleSec`, `agency.maxUnanswered`, `agency.actions.maxConcurrent/dailyLimit` and every
+ * `agency.debugMode`, `agency.actions.maxConcurrent/dailyLimit` and every
  * other section (the thinking level, the voice, the screen, connections, the router, the world) are read by other
  * parts at the time they are used, never captured here.
  */

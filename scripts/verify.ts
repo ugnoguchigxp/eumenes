@@ -13,6 +13,7 @@ import {
 	unusedDependencies,
 } from "./boundaries";
 import { closure } from "./domains";
+import { checkFixedNames } from "./fixed-names";
 import { testInventory } from "./test-inventory";
 import {
 	createReport,
@@ -117,6 +118,7 @@ export function verificationPlan(
 		tool(["run", "context:check"], (output) => contextFindings(output, root)),
 	);
 	check("size-budget", tool(["scripts/size-budget.ts"], sizeBudgetFindings));
+	check("fixed-names", () => checkFixedNames(root));
 	check(
 		"sql-boundaries",
 		tool(["scripts/sql-boundaries.ts"], sqlBoundaryFindings),

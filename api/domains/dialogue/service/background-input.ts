@@ -85,12 +85,7 @@ export function backgroundInput(
 			complete: true,
 		},
 	);
-	// Legacy state and specialist records do not carry a complete input manifest.
-	if (
-		deps.contextKeeper &&
-		deps.conversation.input.latestStateInTransaction(db, id)
-	)
-		complete = false;
+	// Specialist records do not carry a complete input manifest.
 	if (deps.specialist && liveSession(db, id)?.state === "suspended")
 		complete = false;
 	return { sources: [...sources], complete };

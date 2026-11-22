@@ -60,7 +60,7 @@ import { screenLinesInTransaction } from "./resource-context";
 
 const log = getLogger("dialogue");
 
-/** A gap this long since the last delivery is a break in the talk: the context keeper's fallback runs (section 7.3). */
+/** A gap this long since the last delivery is a break in the talk (section 7.3). */
 export const TALK_BREAK_MS = 2 * 60 * 1000;
 
 const tokens = (text: string) => estimateTextTokens(text);

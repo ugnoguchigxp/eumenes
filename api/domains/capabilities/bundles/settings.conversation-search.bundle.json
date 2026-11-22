@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.conversation",
-			"revision": 13,
+			"revision": 14,
 			"title": "会話の設定",
 			"variants": [
 				{
@@ -139,25 +139,6 @@
 					"unset": "null",
 					"optionsSource": "query:settings.llm-resources@1",
 					"help": "未設定なら会話と同じAIで記録します。クラウドのAIを選ぶと、記録のたびに会話の内容をそのAIへ送ります。次の記録から反映されます。"
-				},
-				{
-					"fieldId": "agency.runtime",
-					"document": "document:settings@1",
-					"path": "$.agency.runtime",
-					"label": "会話の合間の動作",
-					"control": "select",
-					"defaultValue": "F",
-					"options": [
-						{
-							"value": "F",
-							"label": "従来の動作"
-						},
-						{
-							"value": "always-on",
-							"label": "常に考えて準備する"
-						}
-					],
-					"help": "変更すると背景処理を切り替えます。既に実行中の仕事は切替時に停止・照合します。"
 				},
 				{
 					"fieldId": "agency.think-resource",

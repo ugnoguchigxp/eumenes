@@ -58,11 +58,6 @@ export interface ToolchainRoutingPort {
 			strict?: boolean;
 			/** Allow matching registered toolchains by text when embedding retrieval yields no candidates. */
 			lexicalFallback?: boolean;
-			/**
-			 * The router's offer (spec router-package-integration 2026-11-04 §1 #11): exactly these toolchains and read
-			 * tools, without a search.
-			 */
-			ids?: readonly string[];
 		},
 	): ToolchainRoute;
 	/** Rebuild a callable card from its exact active revision without retrieval. */

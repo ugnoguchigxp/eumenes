@@ -1,4 +1,3 @@
-import { REASONING_ALLOWANCE_TOKENS } from "../../domains/inference/service/attempt-work";
 import { expect, test } from "bun:test";
 import { createGitObservation } from "../../domains/git-observation";
 import { fixture, movies } from "./app-development.fixture";
@@ -39,9 +38,10 @@ test("app development can request a read-only review of its current draft with t
 			expect(options).toMatchObject({
 				// The saved level (the default), not a level of the review's own; its thinking gets room on the limit.
 				reasoning: "low",
-				maxOutputTokens: 4096 + REASONING_ALLOWANCE_TOKENS,
 				jsonOutput: true,
 			});
+			// The review's own limit is 4096; its thinking gets room on top of it.
+			expect(options?.maxOutputTokens).toBeGreaterThan(4096);
 			expect(options?.jsonSchema).toBeUndefined();
 			const system = messages[0]!.content;
 			expect(system).toContain("人間工学レビュー");
