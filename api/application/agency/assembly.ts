@@ -1,6 +1,6 @@
 import { createAgencyStatePort } from "../../domains/dialogue";
 import type { DialogueService } from "../../domains/dialogue";
-import type { AgencyHostDeps } from "./host";
+import type { AgencyHostDeps } from "./host-types";
 import { createSwitchingAgencyHost } from "./switching-host";
 import { createAgencyLlmPort } from "./llm-port";
 

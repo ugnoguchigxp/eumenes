@@ -8,7 +8,7 @@ import {
 import { hostDelivery, type DeliveryEmotion } from "../../domains/delivery";
 export const deliveryEmotionOf = (emotion: EmotionName): DeliveryEmotion =>
 	emotion === "calm" ? "none" : emotion;
-import type { AgencyHostDeps } from "./host";
+import type { AgencyHostDeps } from "./host-types";
 import type { InputContext } from "eumenes-agency";
 /** Proposal acceptance is separate from the actual speech transcript and playback evidence. */
 export type SpeechRouter = (
