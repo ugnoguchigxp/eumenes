@@ -1,3 +1,4 @@
+import { systemContext } from "../../../infrastructure/system-context";
 import type { ToolchainCard } from "../../capabilities";
 import type { ChatMessage } from "../service/context";
 import type { Step } from "./generation.fixture";
@@ -36,6 +37,7 @@ const call = (name: string, args: Record<string, unknown>): Step => ({
 export function conversationSteps(
 	steps: Step[],
 	cards: readonly ToolchainCard[],
+	confirmationDecisions: Record<string, unknown>[] = [],
 ) {
 	let request = "";
 	const followUp: Array<(messages: ChatMessage[]) => Step | undefined> = [];
@@ -70,6 +72,16 @@ export function conversationSteps(
 			followUp.length = 0;
 			fill = undefined;
 		}
+		if (
+			structured &&
+			messages[0]?.content ===
+				systemContext("dialogue.contexts.local.confirmation-decision", {})
+		)
+			return {
+				text: JSON.stringify(
+					confirmationDecisions.shift() ?? { choice: "reply" },
+				),
+			};
 		if (structured) {
 			const next = fill ?? steps.shift();
 			fill = undefined;

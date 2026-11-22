@@ -71,12 +71,21 @@ function createBoundCommandPort(
 	return {
 		snapshotInTransaction: (db, bindingRevisionId, context) =>
 			adapterOf(db, bindingRevisionId).snapshotInTransaction(db, context),
-		parseInvocation(set, toolId, args) {
+		parseInvocation(set, toolId, args, conversationRequest) {
 			const tool = set.tools.find((t) => t.id === toolId);
 			if (!tool) return { ok: false, code: "toolchain_command_tool_unknown" };
 			const schema = schemas.get(tool.inputSchemaRef);
 			if (!schema) return { ok: false, code: "unsupported_schema" };
-			const parsed = schema.safeParse(args ?? {});
+			let input = args ?? {};
+			if (tool.conversationRequestField && conversationRequest !== undefined) {
+				if (typeof input !== "object" || Array.isArray(input))
+					return { ok: false, code: "toolchain_command_invalid_arguments" };
+				input = {
+					...input,
+					[tool.conversationRequestField]: conversationRequest,
+				};
+			}
+			const parsed = schema.safeParse(input);
 			return parsed.success
 				? {
 						ok: true,
@@ -365,6 +374,7 @@ export function createToolchainRouting(
 		linkTaskInTransaction: history.linkTaskInTransaction,
 		settleSelectionInTransaction: history.settleSelectionInTransaction,
 		requestOfRunInTransaction: history.requestOfRunInTransaction,
+		offeredInRunInTransaction: history.offeredInRunInTransaction,
 		usageOfRunInTransaction: history.usageOfRunInTransaction,
 	};
 }
@@ -385,6 +395,9 @@ function boundTools(
 			toolRevisionId: t.toolRevisionId,
 			operationName: t.operationId,
 			inputSchemaRef: t.inputSchemaRef,
+			...("conversationRequestField" in t && t.conversationRequestField
+				? { conversationRequestField: t.conversationRequestField }
+				: {}),
 			summary: tool.summary,
 			schema: z.toJSONSchema(schema) as Record<string, unknown>,
 		};

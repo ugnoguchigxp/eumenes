@@ -89,6 +89,7 @@ export type RoutedInput = {
 	asked: { request: string } | null;
 	/** Confirmations not yet answered, and the questions the work asks the user. */
 	pending: {
+		revisions?: Array<{ ref: number; toolchain: string; request: string }>;
 		confirmations: Array<{
 			ref: number;
 			toolchain: string;
@@ -117,6 +118,8 @@ export type RoutedInput = {
 };
 
 export interface GenerateInput {
+	/** Previously presented candidates still callable for this conversation. */
+	offers?: import("./conversation-offers").ConversationOffer[];
 	/** Passed only to the model calls that produce this reply. */
 	observeInput?: import("../../inference/contracts").CallSession["observeInput"];
 	runId: string;

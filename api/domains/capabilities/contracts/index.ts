@@ -421,6 +421,8 @@ export type Definition = {
 	resourceKindData?: ResourceDefinitionData;
 	id: string;
 	revision: number;
+	/** Register this revision while advancing only the specified published predecessor. */
+	publishFromRevision?: number;
 	title: string;
 	summary: string;
 	aliases: string[];

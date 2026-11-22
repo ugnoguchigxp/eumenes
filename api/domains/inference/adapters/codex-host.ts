@@ -1,4 +1,5 @@
 import { join, resolve } from "node:path";
+import { measureStage } from "../../../infrastructure/performance";
 import { fail } from "./cloud-agent-shared";
 import {
 	runCodexTurn,
@@ -95,9 +96,18 @@ export function createCodexHost(
 		async run(login, turn) {
 			await enter();
 			try {
-				const rpc = await processes.connect(
-					spec(login, turn.nativeWebSearch === true),
-					turn.signal,
+				const rpc = await measureStage(
+					"inference",
+					"codex_process_ready",
+					() =>
+						processes.connect(
+							spec(login, turn.nativeWebSearch === true),
+							turn.signal,
+						),
+					{
+						...(turn.attemptId ? { attemptId: turn.attemptId } : {}),
+						...(turn.connectionId ? { connectionId: turn.connectionId } : {}),
+					},
 				);
 				return await runCodexTurn({ rpc, threads, cwd: home.cwd }, turn, fail);
 			} finally {

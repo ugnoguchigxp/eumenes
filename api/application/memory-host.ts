@@ -1,4 +1,6 @@
 import { randomBytes } from "node:crypto";
+import type { Database } from "bun:sqlite";
+import type { MemoryDb } from "eumenes-memory/sqlite";
 import {
 	chmodSync,
 	closeSync,
@@ -17,6 +19,7 @@ import {
 	MemoryHost,
 	serveHost,
 	type HostConfig,
+	type HostResult,
 } from "eumenes-memory-host";
 import type { MemoryService } from "../domains/memory";
 import { PRINCIPAL, PROFILE_SCOPE } from "../domains/memory/contracts";
@@ -146,6 +149,29 @@ export function createMemoryHostConnection(
 		profilePath,
 		socketPath,
 		status: () => ({ state }),
+		async readForGoals(
+			method: "context" | "read",
+			params: unknown,
+		): Promise<HostResult> {
+			if (!host || !accepting)
+				return { status: "blocked", code: "HOST_NOT_READY" };
+			const profile = profileSchema.parse(readPrivateJson(profilePath));
+			return host.dispatch(profile.credential, method, params);
+		},
+		isGoalContextCurrent(snapshotId: string, db?: Database): boolean {
+			const memoryHost = host;
+			if (!memoryHost || !accepting) return false;
+			try {
+				const { credential } = profileSchema.parse(
+					readPrivateJson(profilePath),
+				);
+				const check = (tx: MemoryDb) =>
+					memoryHost.isContextCurrentInTransaction(tx, credential, snapshotId);
+				return db ? check(db) : memory.sharedHost.read(check);
+			} catch {
+				return false;
+			}
+		},
 		async recover() {
 			if (state === "recovered" || state === "listening" || state === "ready")
 				return;

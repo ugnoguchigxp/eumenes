@@ -372,8 +372,8 @@ function confirmationLedger(
 					id: row.id,
 					ref: row.ref,
 					toolchain: row.toolchainId,
-					// What the user said, not the request the agent reads (which may carry the utterance before it).
-					request: row.words ?? row.request,
+					// Corrections must see the full frozen request, including agreed conditions.
+					request: row.request,
 					impact: row.impact,
 					target: row.targetLabel,
 				}));

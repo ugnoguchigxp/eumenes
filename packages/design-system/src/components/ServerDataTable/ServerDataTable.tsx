@@ -22,6 +22,8 @@ export type ServerDataTableProps<T extends { id: string }> = {
 	label: string;
 	rows: T[];
 	columns: ColumnDef<T>[];
+	/** Minimum widths in em by column id. */
+	columnMinWidths?: Readonly<Record<string, number>>;
 	query: TableQuery;
 	total: number;
 	busy?: boolean;
@@ -38,6 +40,7 @@ export function ServerDataTable<T extends { id: string }>({
 	label,
 	rows,
 	columns,
+	columnMinWidths,
 	query,
 	total,
 	busy,
@@ -149,6 +152,11 @@ export function ServerDataTable<T extends { id: string }>({
 									<th
 										key={header.id}
 										scope="col"
+										style={
+											columnMinWidths?.[header.column.id]
+												? { minWidth: `${columnMinWidths[header.column.id]}em` }
+												: undefined
+										}
 										aria-sort={
 											header.column.getIsSorted() === "asc"
 												? "ascending"

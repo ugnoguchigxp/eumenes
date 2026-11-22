@@ -1,3 +1,4 @@
+import { delegationContext } from "./confirmation-revisions";
 import { workContextInput } from "./work-context-input";
 import type { InputOrigin } from "../../../infrastructure/model-input";
 import { answerMessages } from "./answer-input";
@@ -143,6 +144,24 @@ function noticeLines(text: string): string[] {
 	return [dataText(text)];
 }
 
+function noticeForAnswer(
+	notAdopted: boolean,
+	hostNote: string | null,
+	results: string[],
+	noticeText: string | null,
+) {
+	return [
+		...(notAdopted
+			? [
+					"前の返事は届けられませんでした。すでに頼んだ仕事は「## State」の仕事にあります。",
+				]
+			: []),
+		...(hostNote ? [dataText(hostNote)] : []),
+		...results,
+		...(noticeText !== null ? noticeLines(noticeText) : []),
+	];
+}
+
 /** The specialist's hand-back as a line of the work (`## State`): who gave the words back, and on what. */
 function handoffLine(handoff: string): string {
 	try {
@@ -231,6 +250,7 @@ function routedInputInTransaction(
 		conversationId: string;
 		nowMs: number;
 		state: readonly string[];
+		revisions: RoutedInput["pending"]["revisions"];
 		media: readonly { line: string }[];
 		diagnostics: readonly { line: string; ref: string }[];
 		lastAgent: {
@@ -289,6 +309,7 @@ function routedInputInTransaction(
 			: null,
 		asked,
 		pending: {
+			revisions: input.revisions,
 			confirmations: (
 				deps.work?.pendingConfirmationsInTransaction(
 					tx,
@@ -513,14 +534,6 @@ export function createPrepare(
 		const media = notice
 			? []
 			: generatedImageLines(deps, tx, conversationId, prefix.since);
-		recordPromptSources(deps, tx, {
-			runId: run.id,
-			conversationId,
-			prefix,
-			pendingIds,
-			media,
-			notAdopted,
-		});
 		const observeInput = deps.contextInputs?.begin(tx, current, placed.reason);
 		const noticeText = notice
 			? (conversation.messageInTransaction(tx, run.inputMessageId)?.message
@@ -560,16 +573,12 @@ export function createPrepare(
 					resource: refs.resource,
 				}).text,
 		);
-		const noticeBody = [
-			...(notAdopted
-				? [
-						"前の返事は届けられませんでした。すでに頼んだ仕事は「## State」の仕事にあります。",
-					]
-				: []),
-			...(hostNote ? [dataText(hostNote)] : []),
-			...results,
-			...(noticeText !== null ? noticeLines(noticeText) : []),
-		];
+		const noticeBody = noticeForAnswer(
+			notAdopted,
+			hostNote,
+			results,
+			noticeText,
+		);
 		const lastAgent =
 			[...prefix.recent].reverse().find((u) => u.speaker === "agent") ?? null;
 		const screenLines = screenLinesInTransaction(deps, tx, current);
@@ -594,19 +603,32 @@ export function createPrepare(
 		const diagnostics = notice
 			? []
 			: recentDiagnostics(deps, tx, conversationId);
+		const userTurn =
+			final.kind === "utterances" && !isSystemPrompt(current.sourceKind);
+		const { offers, revisions, sources } = userTurn
+			? delegationContext(deps, tx, conversationId, stateLines)
+			: { offers: [], revisions: [], sources: [] };
+		recordPromptSources(deps, tx, {
+			runId: run.id,
+			conversationId,
+			prefix,
+			pendingIds: new Set([...pendingIds, ...sources]),
+			media,
+			notAdopted,
+		});
 		// Scheduled prompts can receive an answer but carry no authority to control or start work.
-		const routed =
-			final.kind === "utterances" && !isSystemPrompt(current.sourceKind)
-				? routedInputInTransaction(deps, tx, {
-						conversationId,
-						nowMs,
-						state: stateLines,
-						media,
-						diagnostics,
-						lastAgent,
-						prefix,
-					})
-				: undefined;
+		const routed = userTurn
+			? routedInputInTransaction(deps, tx, {
+					conversationId,
+					nowMs,
+					state: stateLines,
+					revisions,
+					media,
+					diagnostics,
+					lastAgent,
+					prefix,
+				})
+			: undefined;
 		const messages = answerMessages(prefix, {
 			stateLines: routed
 				? stateLines
@@ -660,6 +682,7 @@ export function createPrepare(
 						(row) => [row.id, row.revision],
 					),
 				),
+				offers,
 				retained: retainedInTransaction(deps, tx, conversationId),
 				sessionContext: { instructionCount: 1, historyCount: 0 },
 				...(window && memory

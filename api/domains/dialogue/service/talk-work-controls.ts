@@ -22,13 +22,16 @@ export function createWorkControls(turn: Turn) {
 	const confirmations = new Map(
 		routed.pending.confirmations.map((item) => [`c${item.ref}`, item]),
 	);
+	const revisions = new Map(
+		routed.pending.revisions?.map((item) => [`c${item.ref}`, item]),
+	);
 	const questions = new Map(
 		routed.pending.questions.map((item) => [`t${item.ref}`, item.question]),
 	);
 	const todos = new Map(routed.todos.map((item) => [`t${item.ref}`, item]));
 	const switching = switchingOf(turn);
 	const tools: AgentToolDefinition[] = [];
-	if (confirmations.size) {
+	if (confirmations.size || revisions.size) {
 		const parameters = {
 			type: "object",
 			additionalProperties: false,
@@ -49,24 +52,32 @@ export function createWorkControls(turn: Turn) {
 				},
 			},
 		};
-		tools.push(
-			{
+		if (confirmations.size)
+			tools.push({
 				name: APPROVE,
 				description: systemContext(
 					"dialogue.contexts.local.talk-approve-confirmation",
 					{},
 				),
 				parameters,
+			});
+		tools.push({
+			name: DECLINE,
+			description: systemContext(
+				"dialogue.contexts.local.talk-decline-confirmation",
+				{},
+			),
+			parameters: {
+				...parameters,
+				properties: {
+					confirmation: {
+						...parameters.properties.confirmation,
+						enum: [...confirmations.keys(), ...revisions.keys()],
+					},
+					followUp: { type: "string", enum: ["revise", "cancel"] },
+				},
 			},
-			{
-				name: DECLINE,
-				description: systemContext(
-					"dialogue.contexts.local.talk-decline-confirmation",
-					{},
-				),
-				parameters,
-			},
-		);
+		});
 	}
 	if (todos.size)
 		tools.push({
@@ -116,12 +127,31 @@ export function createWorkControls(turn: Turn) {
 
 	async function confirmation(name: string, args: Record<string, unknown>) {
 		const ref = args.confirmation;
-		const item = typeof ref === "string" ? confirmations.get(ref) : undefined;
-		if (!item || Object.keys(args).length !== 1)
-			return result({ ok: false, code: "unknown_confirmation" });
+		const item =
+			typeof ref === "string"
+				? (confirmations.get(ref) ??
+					(name === DECLINE ? revisions.get(ref) : undefined))
+				: undefined;
+		if (
+			!item ||
+			Object.keys(args).some(
+				(k) => k !== "confirmation" && (name !== DECLINE || k !== "followUp"),
+			) ||
+			(args.followUp !== undefined &&
+				args.followUp !== "revise" &&
+				args.followUp !== "cancel")
+		)
+			return result(
+				name === DECLINE
+					? { declined: false, code: "unknown_confirmation" }
+					: { ok: false, code: "unknown_confirmation" },
+			);
 		if (name === DECLINE)
-			return (await turn.decline(item.ref))
-				? result({ declined: true })
+			return (await turn.decline(item.ref, args.followUp === "revise"))
+				? result({
+						declined: true,
+						...(args.followUp === "revise" ? { revises: ref } : {}),
+					})
 				: result({ declined: false, code: "confirmation_not_open" });
 		const ready = await turn.act(TOOL_NAMES.delegate, {
 			mode: "approve",

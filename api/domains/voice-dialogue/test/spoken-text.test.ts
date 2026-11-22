@@ -1,6 +1,24 @@
 import { expect, test } from "bun:test";
-import { spokenPrefix, spokenText } from "../service/spoken-text";
+import {
+	reconcileSpeechBody,
+	spokenPrefix,
+	spokenText,
+} from "../service/spoken-text";
 import { SpeechSentences } from "../service/sentences";
+
+test("only the adopted answer can remove streamed repetitions without changing the speech source", () => {
+	const sentence = "記録を確かめます。";
+	const tail = "結果は二件です";
+	const streamed = sentence + sentence + tail;
+	const adopted = sentence + tail;
+	expect(reconcileSpeechBody(adopted, streamed, true)).toBe(streamed);
+	expect(() => reconcileSpeechBody(adopted, streamed, false)).toThrow(
+		"speech_stream_diverged",
+	);
+	expect(() =>
+		reconcileSpeechBody(sentence + "結果は三件です", streamed, true),
+	).toThrow("speech_stream_diverged");
+});
 
 test("displayed citations stay out of speech while inline labels and surrounding facts survive", () => {
 	const body = "調べました。晴れ、最高26度、最低17度、降水確率0％です。";

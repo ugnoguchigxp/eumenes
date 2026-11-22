@@ -132,10 +132,14 @@ export function createExecutorContext(
 	const { input, jobId } = ctx;
 	const events = continuity.events;
 	const offered = new Map<string, ToolchainCard>(
-		input.retained.map((entry) => [entry.card.id, entry.card]),
+		[...input.retained, ...(input.offers ?? [])].map((entry) => [
+			entry.card.id,
+			entry.card,
+		]),
 	);
 	const state: {
 		search: { route: ToolchainRoute; query?: QueryVector; text: string } | null;
+		newlyOffered: Set<string>;
 		handover: Handover | null;
 		/** The instant toolchain that answered in this generation, with the inputs it was given. */
 		instant: { card: ToolchainCard; inputs: Record<string, unknown> } | null;
@@ -149,6 +153,7 @@ export function createExecutorContext(
 		exchange: readonly ExchangeStep[];
 	} = {
 		search: null,
+		newlyOffered: new Set(),
 		handover: null,
 		instant: null,
 		read: null,

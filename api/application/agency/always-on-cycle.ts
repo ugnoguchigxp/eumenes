@@ -144,6 +144,7 @@ export async function runAgendaStep(host: CycleHost, c: AgendaScope) {
 			const speech = (db: Database) =>
 				!current() ||
 				deps.backgroundPaused?.(db, c.id) ||
+				deps.awaitingWorkConfirmation?.(db, c.id) ||
 				c.generation !== generation ||
 				controller.signal.aborted ||
 				digest() !== before ||

@@ -8,6 +8,10 @@ export type TerminalWorkspaceIdentity = {
 };
 export type TerminalWorkspacePort = {
 	reserveDirect: (identity: TerminalWorkspaceIdentity) => Promise<void>;
+	releaseDirect: (
+		identity: TerminalWorkspaceIdentity,
+		isInactive: () => boolean,
+	) => Promise<void>;
 	assertLaunch: (identity: TerminalWorkspaceIdentity) => void;
 	assertInput: (identity: TerminalWorkspaceIdentity) => Promise<void>;
 	reserveSending: (
@@ -148,6 +152,7 @@ export type Outcome = {
 export type Runtime = {
 	options: TerminalsOptions;
 	sessions: Map<string, Session>;
+	closing: boolean;
 	command: readonly string[] | null;
 	/** Validated loopback URL of the hooks; undefined when hooks are off. */
 	baseUrl: string | undefined;

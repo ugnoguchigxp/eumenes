@@ -1,4 +1,7 @@
-import { measureStage } from "../../../infrastructure/performance";
+import {
+	measureStage,
+	measureSyncStage,
+} from "../../../infrastructure/performance";
 import type { LarmCallOptions, LarmPort } from "../contracts";
 import type { Fetcher, Provider } from "./profiles";
 import { startLlmTiming } from "./llm-timing";
@@ -33,11 +36,10 @@ export async function answerRequest(
 		!!p.chatInput || messages.some((m) => m.images?.length),
 	);
 	try {
-		const { body, serialized, count } = validatedChatBody(
-			p,
-			timing.selected,
-			!!onDelta,
-			options,
+		const { body, serialized, count } = measureSyncStage(
+			"larm",
+			"request_prepare",
+			() => validatedChatBody(p, timing.selected, !!onDelta, options),
 		);
 		if (p.chatInput)
 			timing.setRequestBytes(Buffer.byteLength(serialized, "utf8"));

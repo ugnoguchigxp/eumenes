@@ -85,7 +85,18 @@ export const commandBindingV1 = z.strictObject({
 	execution: z.literal("command"),
 	adapterRef: hostRef("adapter"),
 	availabilityRef: hostRef("availability"),
-	tools: z.array(bindingTool).min(1).max(32),
+	tools: z
+		.array(
+			bindingTool.extend({
+				/** Text argument supplied from the request the conversation handed over. */
+				conversationRequestField: z
+					.string()
+					.regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/)
+					.optional(),
+			}),
+		)
+		.min(1)
+		.max(32),
 	outputSchemaRef: schemaRef,
 	resultProjectionRef: hostRef("projection"),
 	artifactRevisionId: z.string().regex(artifactRevisionIdPattern),

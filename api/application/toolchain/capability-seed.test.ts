@@ -160,7 +160,8 @@ test("fresh initialization installs every repository seed and bundle without run
 		);
 		expect(request).toMatchObject({
 			functionName: "claude_code",
-			revisionId: "toolchain:claude-code.request@4",
+			revisionId: "toolchain:claude-code.request@6",
+			summary: expect.stringContaining("登録済みの作業場所"),
 			minImpact: "modify_existing",
 		});
 		expect(
@@ -245,6 +246,7 @@ test("upgrading retires the generic Collaboration entry and preserves its saved 
 	const retirement = new Set([
 		"capabilities/0013-retire-collaboration-task",
 		"dialogue/0043-retire-collaboration-task",
+		"dialogue/0044-confirmation-revision",
 		"collaboration/0005-retire-task-works",
 	]);
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-collaboration-retire-"));
@@ -394,9 +396,11 @@ test("normal server assembly seeds toolchains and launchers without a separate i
 			expect(artifacts).toContain("settings.hub");
 			// Exercise the public read path too: adapter availability may require a snapshot.
 			const entries = services.toolchain.actionRequests!.artifacts();
-			expect(entries.map((entry) => entry.artifactId)).not.toContain(
-				"collaboration.task",
-			);
+			expect(
+				entries.some((entry) =>
+					entry.artifactRevisionId.startsWith("artifact:collaboration.task@"),
+				),
+			).toBe(false);
 			expect(() =>
 				services.toolchain.actionRequests!.artifact(
 					"artifact:collaboration.task@1",

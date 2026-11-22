@@ -17,8 +17,13 @@ import { type HookPayload, hookBaseUrl, sameToken } from "./hooks";
 import { createLedger } from "./ledger";
 import * as repository from "../repository";
 import { toView } from "./requests";
-import { activityStale, createSessions, sessionView } from "./sessions";
-import { createWorkspaceSessions } from "./workspace";
+import {
+	activityStale,
+	createSessions,
+	sessionView,
+	workspaceIdentity,
+} from "./sessions";
+import { createWorkspaceSessions, releaseDirectWorkspace } from "./workspace";
 import type { Runtime, Session, TerminalSize, TerminalsOptions } from "./types";
 
 const log = getLogger("terminals");
@@ -42,11 +47,13 @@ export function createTerminals(options: TerminalsOptions = {}) {
 		log.warn("terminals.hooks_disabled", { reason: "hook_url_invalid" });
 	const curl = options.curl === undefined ? Bun.which("curl") : options.curl;
 	let revision = 0;
+	let shutdown: Promise<void> | undefined;
 	/** Set once startup recovery completed: nothing is sent before (a leftover request is stale). */
 	let recovered = false;
 	const rt: Runtime = {
 		options,
 		sessions: new Map<string, Session>(),
+		closing: false,
 		command,
 		baseUrl,
 		projects:
@@ -62,7 +69,7 @@ export function createTerminals(options: TerminalsOptions = {}) {
 			options.onChange?.();
 		},
 		kick: () => {
-			if (recovered) dispatcher.kick();
+			if (recovered && !rt.closing) dispatcher.kick();
 		},
 		/** Requests can be tracked: hooks reach this server, `curl` exists, and they are saved. */
 		trackable: () =>
@@ -274,11 +281,36 @@ export function createTerminals(options: TerminalsOptions = {}) {
 		},
 		/** Resolves once the sender has nothing more to do right now. */
 		settled: () => dispatcher.settled(),
-		/** Ends every running session (server shutdown). */
+		/** When guarded, wait for direct PTY exits before clearing the in-memory sessions. */
 		closeAll() {
+			if (rt.closing) return shutdown;
+			rt.closing = true;
 			clearInterval(sweep);
 			unsubscribe?.();
-			sessions.closeAll();
+			if (!options.workspace) return sessions.closeAll();
+			shutdown = (async () => {
+				try {
+					await dispatcher.settled();
+					const direct = sessions.all().filter((s) => s.owner === "direct");
+					await Promise.all(
+						direct.map(async (session) => {
+							if (
+								sessions.isLive(session) &&
+								!(await sessions.terminate(session))
+							)
+								return;
+							await releaseDirectWorkspace(
+								rt,
+								workspaceIdentity(session),
+								session,
+							);
+						}),
+					);
+				} finally {
+					sessions.closeAll();
+				}
+			})();
+			return shutdown;
 		},
 	};
 }

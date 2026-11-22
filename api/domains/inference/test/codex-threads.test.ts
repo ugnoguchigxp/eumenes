@@ -144,17 +144,19 @@ test.each([
 			await waitFor(async () => (await codex.of("turn/start")).length === 1);
 			expect((await codex.of("turn/start"))[0]!.params.effort).toBe("low");
 			if (!ignoreStart)
-				await waitFor(() => phases().length === 1, { timeout: 1000 });
+				await waitFor(() => phases().length === 3, { timeout: 1000 });
 			controller.abort(new Error("stopped_by_user"));
 			await expect(running).rejects.toThrow("stopped_by_user");
-			expect(phases()).toEqual(
-				ignoreStart
+			expect(phases()).toEqual([
+				["codex_process_ready", "ok", "command-attempt"],
+				["codex_thread_ready", "ok", "command-attempt"],
+				...(ignoreStart
 					? [["codex_turn_start", "error", "command-attempt"]]
 					: [
 							["codex_turn_start", "ok", "command-attempt"],
 							["codex_turn_completion", "error", "command-attempt"],
-						],
-			);
+						]),
+			]);
 		} finally {
 			controller.abort();
 			await codex.cleanup();

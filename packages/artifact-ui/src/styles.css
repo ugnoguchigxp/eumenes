@@ -437,7 +437,11 @@
 	color: var(--muted-foreground);
 	line-height: 1.55;
 }
-.aui-collection-workspace > table {
+.aui-collection-table-scroll {
+	min-width: 0;
+	overflow-x: auto;
+}
+.aui-collection-table-scroll > table {
 	width: 100%;
 	border-collapse: separate;
 	border-spacing: 0;
@@ -445,19 +449,19 @@
 	border-radius: 0.5rem;
 	overflow: hidden;
 }
-.aui-collection-workspace > table th,
-.aui-collection-workspace > table td {
+.aui-collection-table-scroll > table th,
+.aui-collection-table-scroll > table td {
 	padding: 0.72rem 0.8rem;
 	border-bottom: 1px solid var(--border);
 	text-align: left;
 	vertical-align: middle;
 }
-.aui-collection-workspace > table th {
+.aui-collection-table-scroll > table th {
 	background: color-mix(in srgb, var(--muted) 55%, var(--card));
 	color: var(--muted-foreground);
 	font-weight: 600;
 }
-.aui-collection-workspace > table tr:last-child td {
+.aui-collection-table-scroll > table tr:last-child td {
 	border-bottom: 0;
 }
 .aui-collection-workspace > form {

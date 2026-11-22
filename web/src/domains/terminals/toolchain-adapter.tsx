@@ -16,6 +16,8 @@ const MESSAGES: Record<string, string> = {
 	terminal_limit_reached: "同時に開ける Claude Code の上限に達しました。",
 	terminal_running: "この Claude Code はまだ実行中です。",
 	terminal_not_found: "このセッションは既に終了しています。",
+	terminal_workspace_busy:
+		"Claude Code の作業フォルダーが使用中です。空いてから開き直してください。",
 };
 const rejected = (error: unknown): Receipt => ({
 	status: "rejected",

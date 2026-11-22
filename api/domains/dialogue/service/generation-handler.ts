@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { getLogger, withLogContext } from "../../../infrastructure/logger";
+import {
+	measureStage,
+	measureSyncStage,
+} from "../../../infrastructure/performance";
 import type { Run } from "../contracts";
 import { byId } from "../repository";
 import { resolveAttachmentContext } from "./attachment-context";
@@ -64,6 +68,8 @@ export function createGenerationHandler(
 	{ publish, openAnswerStream }: Pick<Progress, "publish" | "openAnswerStream">,
 ) {
 	const { store } = deps;
+	const prepare = createPrepare(deps);
+	const settle = createGenerationSettlement(deps);
 
 	const handler: GenerationHandler = {
 		kind: GENERATE_KIND,
@@ -76,7 +82,13 @@ export function createGenerationHandler(
 		}),
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
-		prepareInTransaction: createPrepare(deps),
+		prepareInTransaction: (tx, claim) =>
+			measureSyncStage(
+				"dialogue",
+				"generation_prepare",
+				() => prepare(tx, claim),
+				{ runId: claim.payload.runId, jobId: claim.jobId },
+			),
 		async execute(input, { signal: caller }) {
 			const run = store.read((db) => byId(db, input.runId));
 			return withLogContext(
@@ -92,8 +104,10 @@ export function createGenerationHandler(
 						caller.throwIfAborted();
 						return pinnedGeneration(deps, input, run!);
 					}
-					resolveAttachmentContext(deps, input, run!.conversationId);
-					await refreshAgentAnswer(deps, input);
+					await measureStage("dialogue", "generation_input_refresh", () => {
+						resolveAttachmentContext(deps, input, run!.conversationId);
+						return refreshAgentAnswer(deps, input);
+					});
 					const body = createAnswerStream(
 						deps,
 						input,
@@ -116,7 +130,11 @@ export function createGenerationHandler(
 							execute: executor.execute,
 							decline: executor.decline,
 						};
-						const generated = await runConversationTurn(deps, input, turn);
+						const generated = await measureStage(
+							"dialogue",
+							"generation_respond",
+							() => runConversationTurn(deps, input, turn),
+						);
 						const handover = executor.handover();
 						if (handover) {
 							log.info("dialogue.generation_handed_over", {
@@ -182,7 +200,13 @@ export function createGenerationHandler(
 				},
 			);
 		},
-		settleInTransaction: createGenerationSettlement(deps),
+		settleInTransaction: (tx, claim, input, outcome) =>
+			measureSyncStage(
+				"dialogue",
+				"generation_settle",
+				() => settle(tx, claim, input, outcome),
+				{ runId: claim.payload.runId, jobId: claim.jobId },
+			),
 		// A session switched or ended while this settled: abort what that withdrew.
 		afterCommit: () => flushDeferred(deps),
 		cancelInTransaction(tx, job) {

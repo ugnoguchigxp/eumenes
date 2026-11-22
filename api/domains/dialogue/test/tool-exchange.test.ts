@@ -39,15 +39,21 @@ const kept = (text: string) =>
 		)
 		.find((u) => u.text === text)!;
 
-/** The fixture's search finds these two: kept by id, title, summary and execution only. */
-const FOUND = {
+/** The frozen search keeps the input version and the two candidates actually shown. */
+const found = (inputId: string) => ({
+	sources: h!.store.read((db) => {
+		const source = h!.conversation.sourceInTransaction(db, inputId);
+		if (source.state !== "available") throw new Error("missing fixture source");
+		return [{ id: inputId, revision: source.revision }];
+	}),
 	candidates: [IMAGE, INSTANT].map((card) => ({
 		id: card.id,
+		revisionId: card.revisionId,
 		title: card.title,
 		summary: card.summary,
 		execution: card.execution,
 	})),
-};
+});
 
 test("a hand-over's search and delegation are kept with its announcement, the next local turn draws the words alone, and the background calls read the same prefix", async () => {
 	h = await setup();
@@ -72,7 +78,7 @@ test("a hand-over's search and delegation are kept with its announcement, the ne
 			// The conversation asked the existing search for candidates.
 			name: "find_toolchain",
 			args: { query: "猫の絵を描いて" },
-			result: JSON.stringify(FOUND),
+			result: JSON.stringify(found(waiting.inputMessageId)),
 		},
 		{
 			name: "delegate",
@@ -121,7 +127,7 @@ test("a confirmation's number and a refused call are kept; the read is not", asy
 		"delegate",
 	]);
 	expect(calls.map((c) => c.result)).toEqual([
-		JSON.stringify(FOUND),
+		JSON.stringify(found(statement.inputMessageId)),
 		'{"refused":true}',
 		'{"confirmation":"c1"}',
 	]);

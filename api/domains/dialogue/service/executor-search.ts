@@ -1,4 +1,5 @@
 import { getLogger } from "../../../infrastructure/logger";
+import { measureStage } from "../../../infrastructure/performance";
 import type { ToolchainCard } from "../../capabilities";
 import { isSystemPrompt } from "../contracts";
 import type { ToolchainRoutingPort } from "../contracts/toolchains";
@@ -33,7 +34,9 @@ export async function find(
 	// The router's offer is not searched, but its record keeps the query's vector as a search's does (the procedures
 	// and the past choices are found by it). The talk turn's reply searches by it.
 	let embeddingFailed = false;
-	const vector = await toolchains.embedQuery(query, signal).catch(() => {
+	const vector = await measureStage("dialogue", "query_embedding", () =>
+		toolchains.embedQuery(query, signal),
+	).catch(() => {
 		signal.throwIfAborted();
 		embeddingFailed = true;
 		return undefined;
@@ -62,7 +65,12 @@ export async function find(
 			text: query,
 			...(vector ? { query: vector } : {}),
 		};
-		for (const card of route.cards) offered.set(card.id, card);
+		offered.clear();
+		x.state.newlyOffered.clear();
+		for (const card of route.cards) {
+			offered.set(card.id, card);
+			x.state.newlyOffered.add(card.id);
+		}
 		acted(tx, `find_toolchain:${call.call.id}`, {
 			action: "find_toolchain",
 			candidates: route.cards.map((card) => ({

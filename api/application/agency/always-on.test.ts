@@ -378,7 +378,7 @@ test("the reply's system holds the package's rules for the agenda, with the tool
 		expect(base).toContain("【あなたの仕組み】");
 		expect(f.host.conversationAgent.handsWork?.()).toBe(true);
 		expect(f.host.conversationAgent.system().facts).toContain(
-			"find_toolchain と delegate が渡されているときは担当を探して頼みます。",
+			"State の検索済みの候補から合う担当を選びます。該当する担当がない場合や別の候補を求められた場合に find_toolchain",
 		);
 		// Eumenes' own persona and emotion rules stay outside the package's span.
 		expect(base).not.toContain("【気持ちの絵文字】");

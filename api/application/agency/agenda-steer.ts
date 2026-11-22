@@ -22,7 +22,7 @@ export type AgendaSteering = Omit<AgendaAddedWords, "begin"> & {
 	begin(
 		replyId: string,
 		traceInput?: true,
-	): ReturnType<AgendaAddedWords["begin"]>;
+	): ReturnType<AgendaAddedWords["begin"]> & { delivered(): readonly string[] };
 };
 
 /** One conversation's steering: its replies run one at a time; `send` goes to the reply open now. */
@@ -112,6 +112,7 @@ export function createAgendaSteering(input: {
 						},
 					};
 				},
+				delivered: () => [...run.taken],
 				end() {
 					run.target.close();
 					if (open === run) open = null;

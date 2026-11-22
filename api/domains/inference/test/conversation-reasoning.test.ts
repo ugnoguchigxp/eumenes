@@ -11,6 +11,10 @@ import {
 	parentsMigration,
 } from "..";
 import { openStore } from "../../../infrastructure/sqlite";
+import {
+	configureLogging,
+	withLogContext,
+} from "../../../infrastructure/logger";
 import type { LarmPort } from "../../larm";
 import {
 	createSettings,
@@ -588,6 +592,59 @@ function streamOf(pieces: string[]) {
 	return localStream;
 }
 const pieces = ["hel", "lo, ", "how ", "are you?"];
+
+test("provider timing records the first nonblank chunk once with its attempt, even when held", async () => {
+	const h = await setup(
+		{ text: "unused cloud response" },
+		{
+			mode: "larm-preferred",
+			localStream: streamOf([" ", "private fixture reply", " tail"]),
+		},
+	);
+	const id = await h.request();
+	const lines: Array<Record<string, unknown>> = [];
+	configureLogging({
+		level: "info",
+		destination: { write: (line) => void lines.push(JSON.parse(line)) },
+	});
+	try {
+		const firstDeltas = () =>
+			lines.filter(
+				(event) =>
+					event.event === "performance.stage" &&
+					event.phase === "provider_first_delta",
+			);
+		const counts: number[] = [];
+		const receipt = await withLogContext(
+			{ runId: "fixture-run", jobId: "fixture-job" },
+			() =>
+				h.inference.executeStream(
+					id,
+					messages,
+					new AbortController().signal,
+					() => {
+						counts.push(firstDeltas().length);
+						return false;
+					},
+				),
+		);
+		expect(counts).toEqual([0, 1, 1]);
+		expect(firstDeltas()).toMatchObject([
+			{
+				runId: "fixture-run",
+				jobId: "fixture-job",
+				inferenceId: id,
+				attemptId: receipt.attemptId,
+				source: "larm",
+				outcome: "ok",
+			},
+		]);
+		expect(Number(firstDeltas()[0]?.durationMs)).toBeGreaterThanOrEqual(0);
+		expect(JSON.stringify(lines)).not.toContain("private fixture reply");
+	} finally {
+		configureLogging({ level: "silent" });
+	}
+});
 
 test("pieces held unpublished (the delta returns false) then a throw leave the request pending for the cloud", async () => {
 	const h = await setup(

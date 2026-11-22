@@ -21,8 +21,6 @@ const IMPACT_SAID: Record<string, string> = {
 		{},
 	),
 };
-/** The request a confirmation statement quotes, at most. */
-const CONFIRM_REQUEST_CHARS = 80;
 
 /** The fields a hand-over takes besides the toolchain (`request`, `inputs`, `target`, `refs`, `resolveUnsaved`). */
 export type Fields = Record<string, unknown>;
@@ -99,17 +97,23 @@ export async function handWith(
 		// The user's own words, when the request carries more than they said: the TODO's title and the statement's quote.
 		...(typeof fields.words === "string" ? { words: fields.words } : {}),
 	};
-	const handed = await turn.act(TOOL_NAMES.delegate, {
-		mode: "execute",
-		...request,
-	});
-	if ("refused" in handed) {
-		if (handed.refused.message !== "confirmation_required")
+	const handed =
+		typeof fields.revises === "number"
+			? null
+			: await turn.act(TOOL_NAMES.delegate, {
+					mode: "execute",
+					...request,
+				});
+	if (!handed || "refused" in handed) {
+		if (handed && handed.refused.message !== "confirmation_required")
 			return { retry: turn.reasonOf(handed.refused) };
 		// A change of something that exists, or one that cannot be undone, is confirmed first (section 6.7).
 		const issued = await turn.act(TOOL_NAMES.delegate, {
 			mode: "confirm",
 			...request,
+			...(typeof fields.revises === "number"
+				? { revises: fields.revises }
+				: {}),
 		});
 		if ("refused" in issued) return { retry: turn.reasonOf(issued.refused) };
 		if (!issued.outcome.confirmationId)
@@ -193,7 +197,7 @@ function confirmStatement(
 	const impact = impactOf(candidate, request.target);
 	const words = {
 		title: lineText(candidate.title),
-		request: lineText(request.request ?? "").slice(0, CONFIRM_REQUEST_CHARS),
+		request: lineText(request.request ?? ""),
 		impact: IMPACT_SAID[impact] ?? IMPACT_SAID.modify_existing!,
 	};
 	// The item it changes is named as the candidate showed it: the user approves that item, not any.

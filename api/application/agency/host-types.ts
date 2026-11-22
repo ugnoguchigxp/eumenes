@@ -17,6 +17,12 @@ import type { SpeechRouter } from "./speech";
 import type { AgencyCallIdentity } from "./llm-port";
 import type { AgencyStatePort } from "../../domains/dialogue";
 import type { SteeringInbox } from "eumenes-steer";
+import type {
+	GoalDesigner,
+	GoalHostEvent,
+	GoalStore,
+} from "eumenes-agency/agenda/runtime";
+import type { HostResult } from "eumenes-memory-host";
 export type AgencySettings = Settings["agency"];
 export type HostPersona = Pick<
 	Settings["general"],
@@ -66,6 +72,18 @@ export type NoteDocumentPort = {
 
 export type AgencyHostDeps = {
 	state?: AgencyStatePort;
+	agendaGoals?: {
+		store: GoalStore;
+		mockDir: string;
+		readMemory(
+			method: "context" | "read",
+			params: unknown,
+		): Promise<HostResult>;
+		isGoalContextCurrent(snapshotId: string, db?: Database): boolean;
+		designer?: GoalDesigner;
+		analysisMs?: number;
+		trace?(event: GoalHostEvent): void;
+	};
 	/** Keeps and shows research notes as Markdown documents; absent: notes are not kept and cannot be shown. */
 	noteDocuments?: NoteDocumentPort;
 	routeSpeechInTransaction?: SpeechRouter;
@@ -122,6 +140,7 @@ export type AgencyHostDeps = {
 	/** True when the conversation has a queued or running run (inside a transaction, read-only). */
 	conversationBusy(db: Database, conversationId: string): boolean;
 	/** A specialist has the conversation and handles its requests and replies. */
+	awaitingWorkConfirmation?(db: Database, conversationId: string): boolean;
 	backgroundPaused?(db: Database, conversationId: string): boolean;
 	/** Records the agency's utterance as an event of the conversation, in the transaction that stores it. */
 	recordSpokeInTransaction(

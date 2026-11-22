@@ -120,7 +120,7 @@ test.each(["maid", "butler", "strategist", "sage"] as const)(
 		expect(start.session.audio.output).toBeUndefined();
 	},
 );
-test("Live transcript delegates through the actual routed harness and returns only its actual spoken transcript to chat", async () => {
+test("Live transcript delegates through the conversation tools and returns only its actual spoken transcript to chat", async () => {
 	const { peer, id } = await fixture();
 	h!.state.steps.push({
 		text: JSON.stringify({ choice: INSTANT.id, inputs: { city: "東京" } }),
@@ -135,7 +135,10 @@ test("Live transcript delegates through the actual routed harness and returns on
 	await until(() =>
 		peer.sent.some((e) => e.type === "session.commentary.append"),
 	);
-	expect(h!.state.calls.length).toBe(1);
+	// The conversation chooses to search, selects the tool, fills its inputs, and receives the instant result.
+	expect(h!.state.calls).toHaveLength(4);
+	expect(h!.state.calls[0]!.tools).toContain("find_toolchain");
+	expect(h!.state.calls[1]!.tools).toContain("delegate");
 	expect(h!.conversation.get("main").messages.map((m) => m.text)).toEqual([
 		"東京の時刻は？",
 	]);
@@ -259,6 +262,7 @@ test("a typed supplement is sent to Live and its repeated delegation reuses the 
 		text: JSON.stringify({ choice: INSTANT.id, inputs: { city: "京都" } }),
 	});
 	await h!.say("京都の時刻は？");
+	expect(h!.state.calls).toHaveLength(4);
 	await until(() =>
 		peer.sent.some((e) => e.type === "session.thinking.append"),
 	);
@@ -270,7 +274,7 @@ test("a typed supplement is sent to Live and its repeated delegation reuses the 
 		delegation: { id: "typed-duplicate" },
 	});
 	await Bun.sleep(450);
-	expect(h!.state.calls).toHaveLength(1);
+	expect(h!.state.calls).toHaveLength(4);
 });
 test("a confirmation requires its exact screen receipt before the existing LLM approval gate can dispatch work", async () => {
 	const { id } = await fixture(true);

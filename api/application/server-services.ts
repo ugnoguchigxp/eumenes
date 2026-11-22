@@ -2,6 +2,10 @@ import { generatedImageInput } from "./media/generated-image-input";
 import { createConversationLookup } from "../domains/web-note";
 import { createSteeringInbox } from "eumenes-steer";
 import {
+	createAgendaGoalStore,
+	forgetGoalDocuments,
+} from "./agency/goal-agenda";
+import {
 	configuredContextStill,
 	createKnowledge,
 	permitsSpecialistContextSearch,
@@ -331,11 +335,31 @@ export async function buildServices(
 		scratch: core.scratch,
 		ledger: () => dialogue.resourceLedger,
 	});
+	const memoryHost = createMemoryHostConnection(
+		memory,
+		dirname(resolve(dbPath)),
+	);
+	const agendaGoalStore = createAgendaGoalStore(store, goals.goals);
+	memory.registerForgetPurge((db, purge) =>
+		forgetGoalDocuments(
+			db,
+			agendaGoalStore,
+			noteDocuments,
+			memory.referenceInputs,
+			purge,
+		),
+	);
 	const agency = assembleAgency(
 		{
 			...core,
 			memory,
 			noteDocuments,
+			agendaGoals: {
+				store: agendaGoalStore,
+				mockDir: resolve(dirname(dbPath), "agenda-goal-mock"),
+				readMemory: memoryHost.readForGoals,
+				isGoalContextCurrent: memoryHost.isGoalContextCurrent,
+			},
 			research: {
 				agents: toolchain.agents,
 				toolchains,
@@ -523,7 +547,7 @@ export async function buildServices(
 		dotsMessages,
 		continuity,
 		memory,
-		memoryHost: createMemoryHostConnection(memory, dirname(resolve(dbPath))),
+		memoryHost,
 		steward,
 		settings,
 		world,

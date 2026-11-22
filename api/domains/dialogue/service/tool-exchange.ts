@@ -42,6 +42,26 @@ export type ExchangeStep = { name: string; arguments: string; result: unknown };
 
 export const carriesExchange = (name: string) => CARRIED.has(name);
 
+/** A completed empty search also replaces the previous list. Refused calls carry no search result. */
+export function lastShownSearch(steps: readonly ExchangeStep[]) {
+	for (let i = steps.length - 1; i >= 0; i--) {
+		const step = steps[i]!;
+		const value = recordOf(step.result);
+		if (
+			step.name === TOOL_NAMES.search &&
+			Array.isArray(value.sources) &&
+			Array.isArray(value.candidates)
+		)
+			return {
+				sources: value.sources,
+				candidates: value.candidates.map((c) => ({
+					id: recordOf(c).id,
+					revisionId: recordOf(c).revisionId,
+				})),
+			};
+	}
+}
+
 /** A carried argument string shows at most this many characters; the rest is cut with `…`. */
 export const ARGUMENT_CHARS = 300;
 
@@ -64,6 +84,7 @@ function carriedResult(
 	if (name === ASK_STEP) return {};
 	if (name === TOOL_NAMES.search)
 		return {
+			...(record.sources ? { sources: record.sources } : {}),
 			candidates: (Array.isArray(record.candidates)
 				? record.candidates
 				: []
@@ -71,6 +92,7 @@ function carriedResult(
 				const c = recordOf(candidate);
 				return {
 					id: c.id,
+					...(c.revisionId ? { revisionId: c.revisionId } : {}),
 					title: c.title,
 					summary: c.summary,
 					...(c.execution ? { execution: c.execution } : {}),

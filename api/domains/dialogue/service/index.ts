@@ -1,3 +1,5 @@
+import { clearOffersFromMessage } from "../repository/search-offers";
+import { awaitingWorkConfirmation } from "./confirmation-revisions";
 import {
 	forgetGeneratedImages,
 	registerGeneratedImageObservation,
@@ -79,6 +81,7 @@ const log = getLogger("dialogue");
 /** A corrected message is shown as corrected: the log's frozen copy of it is rewritten (section 13). */
 function registerCorrectionHook(deps: DialogueDeps) {
 	deps.conversation.addCorrectHook?.((db, messageId, at) => {
+		clearOffersFromMessage(db, messageId, at);
 		const found = deps.conversation.messageInTransaction(db, messageId);
 		if (!found) return;
 		const { message } = found;
@@ -130,7 +133,10 @@ function registerChangeHooks(
 		work.dropRunResultsInTransaction(db, runId),
 	);
 	registerCorrectionHook(deps);
-	deps.conversation.addRetractHook?.(() => deps.contextInputs?.invalidate());
+	deps.conversation.addRetractHook?.((db, messageId) => {
+		clearOffersFromMessage(db, messageId, deps.clock());
+		deps.contextInputs?.invalidate();
+	});
 	registerForgetHook(deps);
 }
 
@@ -295,6 +301,10 @@ export function createDialogueService({
 		executionCommands: executionCommands(deps),
 		/** True while the conversation has a queued or running run (the agency host waits for a quiet moment). */
 		conversationHasActiveRunInTransaction: conversationHasActiveRun,
+		awaitingWorkConfirmationInTransaction: awaitingWorkConfirmation.bind(
+			null,
+			deps,
+		),
 		backgroundDiagnosticInTransaction: (db: Database, conversationId: string) =>
 			backgroundDiagnostic(deps, db, conversationId),
 		executionSourceInTransaction: (db: Database, runId: string) =>

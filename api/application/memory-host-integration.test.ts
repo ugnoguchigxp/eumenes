@@ -216,7 +216,7 @@ test("installed Eumenes, memory CLI and two MCP processes share curation, correc
 		clients.push(b);
 		expect(a.getServerVersion()).toEqual({
 			name: "eumenes-memory",
-			version: "0.1.0",
+			version: "0.2.0",
 		});
 		expect((await a.listTools()).tools.map((t) => t.name).sort()).toEqual([
 			"memory_apply",

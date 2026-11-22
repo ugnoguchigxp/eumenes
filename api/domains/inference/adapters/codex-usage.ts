@@ -36,6 +36,24 @@ export function codexTotals(raw: unknown): CodexTotals | null {
 		reasoning: count(total.reasoningOutputTokens),
 	};
 }
+
+/** Operational metadata from the most recent upstream completion and the SDK's effective window. */
+export function codexUsageLogFields(raw: unknown) {
+	const info = raw as {
+		last?: Record<string, unknown>;
+		modelContextWindow?: unknown;
+	} | null;
+	const input = count(info?.last?.inputTokens);
+	const cached = count(info?.last?.cachedInputTokens);
+	return {
+		providerPromptTokens: input ?? undefined,
+		providerCachedTokens:
+			input !== null && cached !== null && cached <= input ? cached : undefined,
+		providerOutputTokens: count(info?.last?.outputTokens) ?? undefined,
+		modelContextWindow: count(info?.modelContextWindow) || undefined,
+	};
+}
+
 const minus = (now: number | null, before: number | null) =>
 	now === null ? null : count(now - (before ?? 0));
 

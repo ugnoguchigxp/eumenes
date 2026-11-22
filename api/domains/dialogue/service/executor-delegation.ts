@@ -1,3 +1,7 @@
+import { saveLatestSearch } from "../repository/search-offers";
+import { linkConfirmationRevision } from "../repository/confirmation-revisions";
+import { currentRevisions } from "./confirmation-revisions";
+import { conversationOffers } from "./conversation-offers";
 import type { Database } from "bun:sqlite";
 import type { RoutedPipelineStep } from "../../tool-runtime";
 import { isSystemPrompt } from "../contracts";
@@ -17,7 +21,7 @@ import {
 	type ParsedCall,
 } from "./generation-tools";
 import { sessionTargetsInTransaction } from "./specialist-context";
-import { carriedToolCalls } from "./tool-exchange";
+import { carriedToolCalls, lastShownSearch } from "./tool-exchange";
 import { recordUtteranceInTransaction } from "./utterances";
 import { dispatchInTransaction } from "./work-dispatch";
 
@@ -31,6 +35,27 @@ import {
 	type ToolOutcome,
 } from "./executor-context";
 import { instant } from "./executor-search";
+
+/** A previous offer can be revoked between the model reading State and a tool committing. */
+function offerEvidence(
+	x: ExecutorContext,
+	db: Database,
+	card: Request["card"],
+) {
+	const offer =
+		!x.state.newlyOffered.has(card.id) &&
+		x.input.offers?.find((o) => o.card.revisionId === card.revisionId);
+	if (!offer) return [];
+	if (
+		!conversationOffers(x.deps, db, x.input.conversationId).some(
+			(current) =>
+				current.replyId === offer.replyId &&
+				current.card.revisionId === card.revisionId,
+		)
+	)
+		return null;
+	return [...new Set([offer.replyId, ...offer.sources.map((s) => s.id)])];
+}
 
 /* Delegations: the announced handover, the confirmation before a change and its approval (sections 6.5, 6.7). */
 /**
@@ -146,6 +171,11 @@ export async function handOver(
 				)
 			)
 				throw new HandoverRefused("diagnostic_evidence_changed");
+			const sources = chosen.confirmationId
+				? (deps.work!.confirmationInTransaction(tx, chosen.confirmationId)
+						?.messageIds ?? [])
+				: offerEvidence(x, tx, chosen.card);
+			if (!sources) throw new HandoverRefused("toolchain_unavailable");
 			adoptHere(x, tx, run);
 			if (
 				chosen.confirmationId &&
@@ -189,7 +219,7 @@ export async function handOver(
 						request: chosen.request,
 						...(chosen.words ? { title: chosen.words } : {}),
 						dedupeKey: actionKey(target),
-						messageIds: origin,
+						messageIds: [...new Set([...origin, ...sources])],
 						...(dispatched.sourceRef
 							? { sourceRef: dispatched.sourceRef }
 							: {}),
@@ -222,6 +252,12 @@ export async function handOver(
 				...(x.state.search?.query ? { query: x.state.search.query } : {}),
 			});
 			// The announcement reached the user before this commit: the turn's calls join it here, with the work.
+			saveLatestSearch(
+				tx,
+				run.id,
+				run.inputMessageId,
+				lastShownSearch(x.state.exchange),
+			);
 			deps.conversation.input.attachToolCallsInTransaction(tx, {
 				conversationId: run.conversationId,
 				messageId: run.inputMessageId,
@@ -279,6 +315,7 @@ export function confirm(
 	_call: ParsedCall,
 	chosen: Omit<Request, "announcement">,
 	impact: string,
+	revises?: number,
 ): Promise<ToolOutcome> {
 	const { deps, current, acted, handle, origin } = x;
 	const { store } = deps;
@@ -303,6 +340,17 @@ export function confirm(
 			: { label: null };
 		if (!target)
 			return { result: { delegated: false, code: "target_not_found" } };
+		const draft =
+			revises === undefined
+				? undefined
+				: currentRevisions(deps, tx, run.conversationId).find(
+						(d) => d.row.ref === revises,
+					);
+		if (revises !== undefined && !draft)
+			return { result: { delegated: false, code: "revision_not_open" } };
+		const sources = offerEvidence(x, tx, chosen.card);
+		if (!sources)
+			return { result: { delegated: false, code: "toolchain_unavailable" } };
 		const row = deps.work!.issueConfirmationInTransaction(
 			tx,
 			{
@@ -320,8 +368,9 @@ export function confirm(
 				impact,
 				statementDeliveryKey: `run:${run.id}`,
 			},
-			origin,
+			[...new Set([...origin, ...(draft?.row.messageIds ?? []), ...sources])],
 		);
+		if (draft) linkConfirmationRevision(tx, draft.row.id, row.id, deps.clock());
 		// The resources named with the request are handed over as they were when it is approved.
 		if (chosen.refUris?.length)
 			saveConfirmationRefs(tx, row.id, chosen.refUris);
@@ -406,6 +455,8 @@ export async function delegate(
 				reason: "toolchain_not_offered",
 			},
 		]);
+	if (!store.read((db) => offerEvidence(x, db, card)))
+		return { result: { delegated: false, code: "toolchain_unavailable" } };
 	if (card.instant && args.mode === "execute")
 		return instant(x, call, card, args.inputs, signal);
 	// The request text is what the toolchain works from; an instant one needed only its inputs.
@@ -446,7 +497,8 @@ export async function delegate(
 		]!;
 	const needsConfirmation =
 		impact === "modify_existing" || impact === "irreversible";
-	if (args.mode === "confirm") return confirm(x, call, chosen, impact);
+	if (args.mode === "confirm")
+		return confirm(x, call, chosen, impact, args.revises);
 	if (needsConfirmation)
 		throw toolRejection("confirmation_required", [
 			{

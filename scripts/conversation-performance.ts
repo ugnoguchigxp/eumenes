@@ -15,7 +15,7 @@ import { createClient } from "../client";
 import { median } from "./verification-metrics";
 
 const events =
-	/dialogue\.(accepted|generation_started|router_selection|first_delta)|voice\.first_chunk_ready|queue\.settled|inference\.(attempt_(started|succeeded|failed)|codex_thread|router_usage)/;
+	/dialogue\.(accepted|generation_started|router_selection|first_delta)|voice\.first_chunk_ready|queue\.settled|inference\.(attempt_(started|succeeded|failed)|codex_thread|codex_usage_updated|prepared|router_usage)|performance\.stage|larm\.llm_timing/;
 const attemptEvents = new Set([
 	"inference.attempt_started",
 	"inference.attempt_succeeded",
@@ -173,7 +173,57 @@ function runTiming(entries: LogEntry[]) {
 		acceptToFirstBodyMs: elapsed(delta),
 		acceptToAudioReadyMs: elapsed(first("voice.first_chunk_ready")),
 		acceptToSettledMs: terminal.has(status) ? elapsed(settled) : null,
+		firstBodyToSettledMs: delta ? elapsed(settled, logTimeMs(delta)) : null,
 	};
+}
+
+/** Include the stages of failed and cancelled turns as well as completed ones. */
+function stageTimings(entries: LogEntry[]) {
+	const bins = new Map<
+		string,
+		{
+			component: string;
+			phase: string;
+			purpose: string | null;
+			source: string | null;
+			kind: string | null;
+			mode: string | null;
+			outcome: "ok" | "error";
+			times: number[];
+		}
+	>();
+	const label = (value: unknown) => (typeof value === "string" ? value : null);
+	for (const entry of entries) {
+		const prepared = entry.event === "inference.prepared";
+		if (!prepared && entry.event !== "performance.stage") continue;
+		const component = label(entry.component);
+		const phase = prepared ? "attempt_prepare" : label(entry.phase);
+		const outcome = prepared ? "ok" : entry.outcome;
+		const ms = duration(entry.durationMs);
+		if (
+			!component ||
+			!phase ||
+			(outcome !== "ok" && outcome !== "error") ||
+			ms === null
+		)
+			continue;
+		const group = {
+			component,
+			phase,
+			purpose: label(entry.purpose),
+			source: label(entry.source),
+			kind: label(entry.kind),
+			mode: label(entry.mode),
+			outcome,
+		};
+		const key = JSON.stringify(group);
+		const bin = bins.get(key);
+		if (bin) bin.times.push(ms);
+		else bins.set(key, { ...group, outcome, times: [ms] });
+	}
+	return [...bins.values()]
+		.map(({ times, ...group }) => ({ ...group, ...stats(times) }))
+		.sort((a, b) => (b.p90 ?? 0) - (a.p90 ?? 0));
 }
 
 export function conversationPerformance(
@@ -190,8 +240,13 @@ export function conversationPerformance(
 	const runs = dialogueRuns(entries, runIds);
 	const turns = [...runs.values()].map(runTiming);
 	const completed = turns.filter((t) => t.outcome === "completed");
+	const runEntries = [...runs.values()].flat();
+	const larmTiming = runEntries.filter(
+		(e) => e.event === "larm.llm_timing" && e.outcome === "ok",
+	);
 	const attempts = new Map<string, Stage | "excluded">();
 	const threadModes = new Map<string, string>();
+	const usageUpdates = new Map<string, number>();
 	for (const entry of entries) {
 		if (typeof entry.attemptId !== "string") continue;
 		if (
@@ -199,6 +254,11 @@ export function conversationPerformance(
 			typeof entry.mode === "string"
 		)
 			threadModes.set(entry.attemptId, entry.mode);
+		if (entry.event === "inference.codex_usage_updated")
+			usageUpdates.set(
+				entry.attemptId,
+				(usageUpdates.get(entry.attemptId) ?? 0) + 1,
+			);
 		if (!attemptEvents.has(String(entry.event)) || entry.purpose !== "llm")
 			continue;
 		const stage =
@@ -243,6 +303,19 @@ export function conversationPerformance(
 			acceptToFirstBody: stats(completed.map((t) => t.acceptToFirstBodyMs)),
 			acceptToAudioReady: stats(completed.map((t) => t.acceptToAudioReadyMs)),
 			acceptToSettled: stats(completed.map((t) => t.acceptToSettledMs)),
+			firstBodyToSettled: stats(completed.map((t) => t.firstBodyToSettledMs)),
+		},
+		stageTimingMs: stageTimings(runEntries),
+		larmTimingMs: {
+			firstBodyAfterSend: stats(
+				larmTiming.map((e) => duration(e.providerTtftMs)),
+			),
+			providerPrefill: stats(
+				larmTiming.map((e) => duration(e.providerPromptMs)),
+			),
+			providerDecode: stats(
+				larmTiming.map((e) => duration(e.providerDecodeMs)),
+			),
 		},
 		attempts: Object.fromEntries(
 			stages.map((stage) => [
@@ -273,12 +346,23 @@ export function conversationPerformance(
 				const rows = [...savedUsage.values()].filter(
 					(r) => (attempts.get(r.id) ?? "unlinked") === stage,
 				);
+				const updates = [...usageUpdates].flatMap(([id, count]) =>
+					(attempts.get(id) ?? "unlinked") === stage ? [count] : [],
+				);
 				return [
 					stage,
 					{
 						modes: Object.fromEntries(
 							modes.map((mode, i) => [mode, modeCounts[i]]),
 						),
+						usageUpdates: updates.length
+							? {
+									observed: updates.reduce((sum, count) => sum + count, 0),
+									attempts: updates.length,
+									multipleUpdateAttempts: updates.filter((count) => count > 1)
+										.length,
+								}
+							: null,
 						usage: usage
 							? {
 									calls: rows.length,

@@ -61,6 +61,7 @@ export const delegateArgs = z.discriminatedUnion("mode", [
 	z
 		.object({
 			mode: z.enum(["execute", "confirm"]),
+			revises: z.number().int().positive().optional(),
 			toolchain: id,
 			/** Asked for by the definition; an instant toolchain answers from its inputs alone, any other refuses it absent. */
 			request: z.string().trim().min(1).max(8000).optional(),

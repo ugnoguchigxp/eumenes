@@ -404,6 +404,15 @@ export function markCurated(
 	for (const seq of seqs) update.run(conversationId, seq);
 }
 
+/** Latest speech from anyone other than the user; a newer unrelated line breaks the reference to a confirmation. */
+export function latestReplySeq(db: Database, conversationId: string) {
+	return db
+		.query<{ seq: number }, [string]>(
+			"SELECT seq FROM continuity_events WHERE conversation_id=? AND type='said' AND actor<>'user' ORDER BY seq DESC LIMIT 1",
+		)
+		.get(conversationId)?.seq;
+}
+
 /** The newest seq of the conversation's events (0 when none). */
 export function latestSeq(db: Database, conversationId: string): number {
 	return (

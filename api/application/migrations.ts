@@ -28,6 +28,7 @@ import { migrations as continuityMigrations } from "../domains/continuity";
 import { migrations as conversationMigrations } from "../domains/conversation";
 import { migrations as dialogueMigrations } from "../domains/dialogue";
 import { migrations as goalsMigrations } from "../domains/goals";
+import { goalMigrations } from "eumenes-agency/agenda/runtime";
 import { migrations as inferenceMigrations } from "../domains/inference";
 import { migrations as memoryMigrations } from "../domains/memory";
 import { migrations as stewardMigrations } from "../domains/steward";
@@ -225,6 +226,7 @@ const catalog: readonly Migration[] = [
 	...toolRuntimeMigrations,
 	...agentRuntimeMigrations,
 	...goalsMigrations,
+	...goalMigrations,
 	...tasksMigrations,
 	...dotsMigrations,
 	...retiredResearchRoutesMigrations,

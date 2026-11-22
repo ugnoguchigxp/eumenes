@@ -140,6 +140,8 @@ export type SetupOptions = {
 	extraMigrations?: import("../../../infrastructure/sqlite").Migration[];
 	/** Cards the catalog lists (default: image and instant). */
 	cards?: ToolchainCard[];
+	/** Ordered search results for tests that replace an offer. The catalog remains available. */
+	searches?: string[][];
 	/** Offer the music port (the music toolchain is then available). */
 	music?: boolean;
 	/** Real memory service (its journal in the test directory). */
@@ -188,6 +190,7 @@ export async function setup(options: SetupOptions = {}) {
 	const state = {
 		offsetMs: 0,
 		steps: [] as Step[],
+		confirmationDecisions: [] as Record<string, unknown>[],
 		calls: [] as Call[],
 		receiptAllowed: true,
 		/** Whether adoption accepts the receipt (permission still held). */
@@ -230,7 +233,11 @@ export async function setup(options: SetupOptions = {}) {
 			arguments: JSON.stringify(call.args),
 		})),
 	});
-	const nextModelStep = conversationSteps(state.steps, cards);
+	const nextModelStep = conversationSteps(
+		state.steps,
+		cards,
+		state.confirmationDecisions,
+	);
 	const larm = {
 		status: () => ({ state: "ready", capabilities: ["llm"] }),
 		requestFor: (_db: unknown, runId: string) =>
@@ -336,11 +343,10 @@ export async function setup(options: SetupOptions = {}) {
 		screenInTransaction: options.screenInTransaction,
 		embedQuery: async () => state.vector,
 		routeInTransaction: (_db: unknown, input: { ids?: readonly string[] }) => {
+			const ids = input.ids ?? options.searches?.[state.searchSlots.length];
 			state.searchSlots.push(input.ids);
 			return {
-				cards: input.ids
-					? cards.filter((c) => input.ids!.includes(c.id))
-					: cards,
+				cards: ids ? cards.filter((c) => ids.includes(c.id)) : cards,
 				past: [],
 				retrieval: "fts",
 			};

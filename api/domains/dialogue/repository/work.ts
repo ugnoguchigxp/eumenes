@@ -97,7 +97,7 @@ export function forgetWork(
 		).run(at, at, row.id);
 	// The row stays without its words, so its number (`c<ref>`) is never given to another confirmation.
 	db.query(
-		`UPDATE dialogue_confirmations SET request = '', words = NULL, inputs_json = NULL, target = NULL, target_label = NULL, resolve_unsaved = NULL, superseded_at = COALESCE(superseded_at, ?) WHERE ${fromMessages("dialogue_confirmations", messageIds.length)}`,
+		`UPDATE dialogue_confirmations SET request = '', revision_sources_json=NULL, words = NULL, inputs_json = NULL, target = NULL, target_label = NULL, resolve_unsaved = NULL, superseded_at = COALESCE(superseded_at, ?) WHERE ${fromMessages("dialogue_confirmations", messageIds.length)}`,
 	).run(at, ...messageIds);
 	return rows;
 }
@@ -661,6 +661,12 @@ export function openConfirmations(
 	).map(mapConfirmation);
 }
 
+function finishConfirmationRevision(db: Database, nextId: string) {
+	db.query(
+		"UPDATE dialogue_confirmations SET revision_sources_json=NULL WHERE id=(SELECT revises_id FROM dialogue_confirmations WHERE id=?)",
+	).run(nextId);
+}
+
 /** A confirmation the user declined: closed, as a newer one for the same request would close it. */
 export function withdrawConfirmation(
 	db: Database,
@@ -668,23 +674,27 @@ export function withdrawConfirmation(
 	ref: number,
 	at: string,
 ): boolean {
-	return (
+	const row = confirmationByRef(db, conversationId, ref);
+	if (!row) return false;
+	const closed =
 		db
 			.query(
-				"UPDATE dialogue_confirmations SET superseded_at = ? WHERE conversation_id = ? AND ref = ? AND used_at IS NULL AND superseded_at IS NULL AND expires_at > ?",
+				"UPDATE dialogue_confirmations SET superseded_at = ? WHERE id = ? AND used_at IS NULL AND superseded_at IS NULL AND expires_at > ?",
 			)
-			.run(at, conversationId, ref, at).changes === 1
-	);
+			.run(at, row.id, at).changes === 1;
+	if (closed) finishConfirmationRevision(db, row.id);
+	return closed;
 }
 
 export function useConfirmation(db: Database, id: string, at: string): boolean {
-	return (
+	const used =
 		db
 			.query(
 				"UPDATE dialogue_confirmations SET used_at = ? WHERE id = ? AND used_at IS NULL AND superseded_at IS NULL AND expires_at > ?",
 			)
-			.run(at, id, at).changes === 1
-	);
+			.run(at, id, at).changes === 1;
+	if (used) finishConfirmationRevision(db, id);
+	return used;
 }
 
 /** Remove copied bodies of one autonomous work while preserving its identity and replay key. */

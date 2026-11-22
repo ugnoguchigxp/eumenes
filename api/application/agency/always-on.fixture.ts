@@ -8,8 +8,19 @@ import { settle } from "../../infrastructure/wait-for";
 import { harness } from "../toolchain/toolchain.fixture";
 import type { imageFixture } from "../media/image.fixture";
 import type { AgencyHostDeps, NoteDocumentPort } from "./host-types";
+import { createGoalsService } from "../../domains/goals";
+import { createMemoryHostConnection } from "../memory-host";
+import { createAgendaGoalStore, forgetGoalDocuments } from "./goal-agenda";
+import { join } from "node:path";
 
-export type CallKind = "plan" | "check" | "ask_check" | "compose" | "profile";
+export type CallKind =
+	| "plan"
+	| "check"
+	| "ask_check"
+	| "compose"
+	| "profile"
+	| "goal_mock"
+	| "goal_verify";
 
 /** Which of the agenda's four model calls a request is, by the call's own instruction. */
 export function callKind(request: { system: string }): CallKind {
@@ -18,6 +29,9 @@ export function callKind(request: { system: string }): CallKind {
 	if (request.system.includes("質問の聞き直しチェック")) return "ask_check";
 	if (request.system.includes("話す文を書く")) return "compose";
 	if (request.system.includes("メモ係")) return "profile";
+	if (request.system.includes("Claude Code モックです")) return "goal_mock";
+	if (request.system.includes("模擬成果物を目標と設計書に照らして検査"))
+		return "goal_verify";
 	throw new Error("fixture_unknown_call");
 }
 
@@ -55,6 +69,7 @@ export async function agendaFixture(
 			kind: CallKind,
 			request: LlmRequest<unknown>,
 			n: number,
+			signal: AbortSignal,
 		): unknown | Promise<unknown>;
 		media?: ReturnType<typeof imageFixture>;
 		routeSpeech?: NonNullable<AgencyHostDeps["routeSpeechInTransaction"]>;
@@ -65,6 +80,11 @@ export async function agendaFixture(
 			"voiceText" | "firstRound"
 		>;
 		backgroundPaused?: AgencyHostDeps["backgroundPaused"];
+		awaitingWorkConfirmation?: AgencyHostDeps["awaitingWorkConfirmation"];
+		goals?: Pick<
+			NonNullable<AgencyHostDeps["agendaGoals"]>,
+			"designer" | "analysisMs" | "trace"
+		>;
 		/** How many looks find a shown note's document still being saved. */
 		noteSavingPolls?: number;
 	} = {},
@@ -102,6 +122,15 @@ export async function agendaFixture(
 		serial = 0,
 		published = 0,
 		foreground = false;
+	const goalStore = options.goals
+		? createAgendaGoalStore(
+				h.store,
+				createGoalsService(() => new Date(now).toISOString()),
+			)
+		: undefined;
+	const memoryHost = options.goals
+		? createMemoryHostConnection(h.memory!, h.dir)
+		: undefined;
 	const timers = new Map<number, { at: number; fn(): void }>();
 	const requests: LlmRequest<unknown>[] = [];
 	const kinds: CallKind[] = [];
@@ -186,6 +215,17 @@ export async function agendaFixture(
 		conversation: h.conversation,
 		settings: h.settings,
 		memory: h.memory!,
+		...(goalStore && memoryHost
+			? {
+					agendaGoals: {
+						...options.goals,
+						mockDir: join(h.dir, "goal-mock"),
+						store: goalStore,
+						readMemory: memoryHost.readForGoals,
+						isGoalContextCurrent: memoryHost.isGoalContextCurrent,
+					},
+				}
+			: {}),
 		state: { ...port, catalogInTransaction: catalogOf },
 		inference: {
 			foregroundBusy: () => foreground,
@@ -211,6 +251,7 @@ export async function agendaFixture(
 					kind,
 					request as LlmRequest<unknown>,
 					requests.length,
+					signal,
 				) ?? fallback(kind));
 				signal.throwIfAborted();
 				return {
@@ -225,6 +266,7 @@ export async function agendaFixture(
 		}),
 		conversationBusy: () => false,
 		backgroundPaused: options.backgroundPaused,
+		awaitingWorkConfirmation: options.awaitingWorkConfirmation,
 		recordSpokeInTransaction: () => {},
 		publish: () => {
 			published++;
@@ -250,6 +292,16 @@ export async function agendaFixture(
 			? { routeSpeechInTransaction: options.routeSpeech }
 			: {}),
 	};
+	if (goalStore)
+		h.memory!.registerForgetPurge((db, purge) =>
+			forgetGoalDocuments(
+				db,
+				goalStore,
+				noteDocuments,
+				h.memory!.referenceInputs,
+				purge,
+			),
+		);
 	host = createAlwaysOnHost(deps);
 	h.memory!.registerForgetPurge(
 		(db, p) => host.forgetInTransaction(db, p),
@@ -261,6 +313,8 @@ export async function agendaFixture(
 		kinds,
 		signals,
 		documents,
+		goalStore,
+		memoryHost,
 		port,
 		deps,
 		steering,
@@ -277,6 +331,9 @@ export async function agendaFixture(
 		/** The calls of one kind, in order. */
 		calls: (kind: CallKind) => requests.filter((_, i) => kinds[i] === kind),
 		async start() {
+			await memoryHost?.recover();
+			await memoryHost?.listen();
+			memoryHost?.start();
 			await host.recover();
 			host.attachWork(createAgencyWork({ dialogue: h.dialogue }));
 			host.start();
@@ -331,6 +388,7 @@ export async function agendaFixture(
 		},
 		async close() {
 			await host.close();
+			await memoryHost?.close();
 			await h.close();
 		},
 	};

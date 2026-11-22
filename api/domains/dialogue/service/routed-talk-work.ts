@@ -4,6 +4,8 @@ import { TOOL_NAMES } from "./generation-tools";
 import { lineText } from "./input-text";
 import { handWith, type Fields } from "./routed-actions";
 import type { ChoiceCandidate } from "./routed-choice";
+import { offerSources } from "./conversation-offers";
+import { retainedChoice } from "./routed-search";
 import { fieldsOf } from "./routed-fields";
 import { createWorkControls } from "./talk-work-controls";
 import type { Turn } from "./routed-turn";
@@ -37,8 +39,22 @@ export const TALK_WORK_TOOLS: readonly AgentToolDefinition[] = [
 			additionalProperties: false,
 			required: ["toolchain", "request"],
 			properties: {
-				toolchain: { type: "string" },
-				request: { type: "string" },
+				toolchain: {
+					type: "string",
+					description: "宛先の候補ID。担当の呼出しはこの引数で指定する。",
+				},
+				request: {
+					type: "string",
+					minLength: 1,
+					maxLength: REQUEST_CHARS,
+					description:
+						"担当へ直接伝える作業指示を記入する。訂正時も元の依頼で維持する条件と変更点を合わせた全文を書く。",
+				},
+				revises: {
+					type: "string",
+					description:
+						"訂正する確認の参照 c<n>。確認待ち・訂正中の元依頼を置き換えるときに指定する。",
+				},
 				diagnosticRef: {
 					type: "string",
 					description:
@@ -59,9 +75,12 @@ const answer = (value: Record<string, unknown>, end = false): Answer => ({
 	...(end ? { end: true } : {}),
 });
 
-/** The talk turn's hand-over tools for one reply: `delegate` takes only a toolchain this reply found. */
+/** The talk turn's hand-over tools for one reply: `delegate` takes a toolchain this conversation has been offered. */
 export function createTalkWork(turn: Turn) {
-	const found = new Map<string, ChoiceCandidate>();
+	const found = new Map<string, ChoiceCandidate>(
+		turn.input.offers?.map(({ card }) => [card.id, retainedChoice(turn, card)]),
+	);
+	let revisionUnderCorrection: number | undefined;
 	const controls = createWorkControls(turn);
 	const tools = [...TALK_WORK_TOOLS, ...controls.tools];
 
@@ -78,6 +97,7 @@ export function createTalkWork(turn: Turn) {
 			candidates?: Array<ChoiceCandidate & { produces?: readonly string[] }>;
 			code?: unknown;
 		};
+		found.clear();
 		const shown: Record<string, unknown>[] = [];
 		for (const card of searched.outcome.search?.cards ?? []) {
 			if (card.read) continue;
@@ -98,9 +118,21 @@ export function createTalkWork(turn: Turn) {
 		const kept = turn.exchange.at(-1);
 		if (kept?.name === TOOL_NAMES.search)
 			kept.result = {
-				candidates: (result.candidates ?? []).filter((c) =>
-					shown.some((s) => s.id === c.id),
+				sources: turn.deps.store.read((db) =>
+					offerSources(
+						turn.deps,
+						db,
+						turn.input.final.kind === "utterances"
+							? turn.input.final.messageIds
+							: [],
+					),
 				),
+				candidates: shown.map((c) => ({
+					...c,
+					revisionId: searched.outcome.search!.cards.find(
+						(card) => card.id === c.id,
+					)!.revisionId,
+				})),
 				...(typeof result.code === "string" ? { code: result.code } : {}),
 			};
 		return answer({
@@ -116,12 +148,30 @@ export function createTalkWork(turn: Turn) {
 
 	async function delegate(args: Record<string, unknown>): Promise<Answer> {
 		const request = typeof args.request === "string" ? args.request.trim() : "";
-		if (
-			!request ||
-			request.length > REQUEST_CHARS ||
-			typeof args.toolchain !== "string"
-		)
-			return answer({ delegated: false, code: "invalid_arguments" });
+		let revision = revisionUnderCorrection;
+		if (args.revises !== undefined) {
+			const item = [
+				...turn.routed!.pending.confirmations,
+				...(turn.routed!.pending.revisions ?? []),
+			].find((c) => `c${c.ref}` === args.revises);
+			if (!item || !(await turn.decline(item.ref, true)))
+				return answer({ delegated: false, code: "revision_not_open" });
+			revision = item.ref;
+			revisionUnderCorrection = revision;
+		}
+		if (!request || request.length > REQUEST_CHARS)
+			return answer({
+				delegated: false,
+				code: "invalid_arguments",
+				field: "request",
+				...(revision ? { revises: `c${revision}` } : {}),
+			});
+		if (typeof args.toolchain !== "string")
+			return answer({
+				delegated: false,
+				code: "invalid_arguments",
+				field: "toolchain",
+			});
 		const choice = found.get(args.toolchain);
 		if (!choice) return answer({ delegated: false, code: "unknown_toolchain" });
 		// The reply owns the request. The fill supplies arguments specific to the selected toolchain.
@@ -159,6 +209,7 @@ export function createTalkWork(turn: Turn) {
 				code?: unknown;
 			};
 			// The reply tells the answer in its own words (a read's result does the same).
+			if (revision && result.answered === true) await turn.decline(revision);
 			return result.answered === true && typeof result.answer === "string"
 				? answer({ answered: true, answer: result.answer })
 				: answer({
@@ -170,6 +221,7 @@ export function createTalkWork(turn: Turn) {
 		// The pending-switch control is the only path here that can request discard of unsaved work.
 		const { resolveUnsaved: _unsaved, ...given } = filled.fields;
 		const fields: Fields = {
+			...(revision ? { revises: revision } : {}),
 			...(resources.length ? { refs: resources } : {}),
 			...given,
 			...(typeof args.diagnosticRef === "string"

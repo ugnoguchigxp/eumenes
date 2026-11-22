@@ -145,7 +145,7 @@ test("seed upgrades the deployed board and terminal schemas without replacing ar
 				),
 		);
 		oldTerminal.bindings = oldTerminal.bindings.filter(
-			(b) => b.id !== "claude-code.repair",
+			(b) => b.id === "claude-code.request" && b.revision === 2,
 		);
 		for (const d of [...oldTerminal.definitions, ...oldTerminal.bindings])
 			if (["tool", "package", "binding", "toolchain"].includes(String(d.kind)))
@@ -217,7 +217,7 @@ test("seed upgrades the deployed board and terminal schemas without replacing ar
 			}));
 		expect(published()).toEqual({
 			toolchains: [
-				"toolchain:claude-code.request@4",
+				"toolchain:claude-code.request@6",
 				"toolchain:kanban.manage@5",
 			],
 			board: ["artifact:kanban.board@4"],
@@ -225,6 +225,49 @@ test("seed upgrades the deployed board and terminal schemas without replacing ar
 		await caps.seed();
 		expect(archived()).toEqual(before);
 		expect(published().board).toEqual(["artifact:kanban.board@4"]);
+	} finally {
+		await store.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a card upgrade preserves the administrator's selected terminal or managed execution binding", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-claude-card-upgrade-"));
+	const store = openStore(join(dir, "db"), migrations);
+	const caps = createCapabilities(store, new Set(["claude-code"]), {
+		bundleHost: offlineBundleHost,
+	});
+	try {
+		await store.write((db) => {
+			for (const name of ["terminals-screen", "claude-code-task"]) {
+				const previous = bundle(name);
+				previous.definitions = previous.definitions.filter(
+					(d) => d.publishFromRevision === undefined,
+				);
+				expect(
+					caps.importBundleInTransaction(db, previous, offlineBundleHost())
+						.issues,
+				).toEqual([]);
+			}
+			caps.publishToolchainRevisionInTransaction(
+				db,
+				"claude-code.request",
+				"toolchain:claude-code.request@5",
+			);
+			for (const name of ["terminals-screen", "claude-code-task"])
+				expect(
+					caps.importBundleInTransaction(db, bundle(name), offlineBundleHost())
+						.issues,
+				).toEqual([]);
+			expect(
+				caps.getDefinitionInTransaction(db, "toolchain:claude-code.request@6"),
+			).toBeDefined();
+			expect(
+				caps
+					.toolchainsInTransaction(db)
+					.find((c) => c.id === "claude-code.request")?.revisionId,
+			).toBe("toolchain:claude-code.request@7");
+		});
 	} finally {
 		await store.close();
 		rmSync(dir, { recursive: true, force: true });

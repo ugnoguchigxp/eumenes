@@ -27,7 +27,12 @@ export type CommandInput = {
 	/** Present for bound command toolchains: tools map to registered adapter operations. */
 	boundSet?: BoundCommandSet;
 	/** Present when this run resumes an interaction: the generation and epoch it started under. */
-	interaction?: { id: string; generation: number; epoch: number };
+	interaction?: {
+		id: string;
+		generation: number;
+		epoch: number;
+		exchanges?: Array<{ question: string; answer: unknown }>;
+	};
 };
 /** The typed operation of a bound chain, as the agent runtime executes it (route "action"). */
 export type BoundInvocation = {

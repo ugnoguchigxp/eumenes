@@ -3,7 +3,7 @@ import type { RunSpeechEvent, RunSpeechPlayed } from "../contracts";
 import type { Speech } from "./speech-state";
 import { createSpeechQueue } from "./speech-queue";
 import { recordRunSpeech } from "./run-speech-record";
-import { spokenPrefix, spokenText } from "./spoken-text";
+import { reconcileSpeechBody, spokenPrefix } from "./spoken-text";
 import { spokenBySpeaker } from "./speech-claims";
 import { toErrorCode } from "../../../infrastructure/error-code";
 import { getLogger } from "../../../infrastructure/logger";
@@ -95,13 +95,8 @@ export function createRunSpeechSession(
 		}
 	}
 	function append(body: string, final = false) {
-		if (!body.startsWith(prefix)) {
-			if (!final || spokenText(body) !== spokenText(prefix))
-				throw new Error("speech_stream_diverged");
-			body = prefix;
-		}
-		prefix = body;
-		speech!.append(spokenPrefix(body, final), final);
+		prefix = reconcileSpeechBody(body, prefix, final);
+		speech!.append(spokenPrefix(prefix, final), final);
 	}
 	function start(next: string, signal?: AbortSignal) {
 		generation.abort(new Error("generation_replaced"));

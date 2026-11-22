@@ -148,7 +148,7 @@ export function createLedger(rt: Runtime) {
 		markSending: (id: string, sessionId: string, run: number) =>
 			store().write((tx) => {
 				const row = repository.get(tx, id);
-				if (!row) return false;
+				if (row?.state !== "queued") return false;
 				if (
 					rt.options.workspace &&
 					!rt.options.workspace.reserveSending(tx, {

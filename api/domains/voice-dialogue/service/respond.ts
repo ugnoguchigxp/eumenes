@@ -6,7 +6,7 @@ import type { InferencePort } from "../../inference";
 import type { SpeechPreparation } from "../../delivery";
 import type { VoiceTurn } from "../contracts";
 import type { Speech } from "./speech-state";
-import { spokenPrefix, spokenText } from "./spoken-text";
+import { reconcileSpeechBody, spokenPrefix, spokenText } from "./spoken-text";
 import { getLogger } from "../../../infrastructure/logger";
 import { get, update } from "../repository";
 const log = getLogger("voice-dialogue");
@@ -281,12 +281,7 @@ export function createVoiceResponder({
 				sequence,
 			);
 		const append = (body: string, final = false) => {
-			if (!body.startsWith(live.bodyPrefix)) {
-				// Adoption can rewrite display links while leaving the spoken answer intact.
-				if (!final || spokenText(body) !== spokenText(live.bodyPrefix))
-					throw new Error("speech_stream_diverged");
-				body = live.bodyPrefix;
-			}
+			body = reconcileSpeechBody(body, live.bodyPrefix, final);
 			live.sourcePrefix += body.slice(live.bodyPrefix.length);
 			live.bodyPrefix = body;
 			live.speech!.append(spokenPrefix(live.sourcePrefix, final), final);

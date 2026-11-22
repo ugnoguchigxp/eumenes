@@ -1,3 +1,5 @@
+import { saveLatestSearch } from "../repository/search-offers";
+import { lastShownSearch } from "./tool-exchange";
 import type { Database } from "bun:sqlite";
 import { recordUtteranceInTransaction } from "./utterances";
 import type { HandlerDefinition } from "../../queue";
@@ -345,6 +347,13 @@ export function createGenerationSettlement(
 						delivery,
 					);
 			}
+
+			saveLatestSearch(
+				tx,
+				run.id,
+				messageId ?? run.inputMessageId,
+				lastShownSearch(result.exchange ?? []),
+			);
 			if (result.selection)
 				deps.toolchains?.recordSelectionInTransaction(tx, {
 					runId: run.id,

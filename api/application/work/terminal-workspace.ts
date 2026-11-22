@@ -3,6 +3,7 @@ import {
 	readWorkspaceGuard,
 	reserveWorkspaceInTransaction,
 	beginWorkspaceReleaseInTransaction,
+	finishWorkspaceReleaseInTransaction,
 } from "../../domains/kanban";
 import type {
 	TerminalWorkspaceIdentity,
@@ -49,6 +50,20 @@ export function createTerminalWorkspacePort(options: {
 				)
 					throw new Error("terminal_workspace_busy");
 			}),
+		releaseDirect: (identity, isInactive) =>
+			options.store.write(
+				(tx) => {
+					if (identity.owner !== "direct" || !isInactive()) return;
+					const guard = readWorkspaceGuard(tx, ref(identity));
+					if (
+						guard?.ownerRef === owner(identity) &&
+						guard.executorId === options.executorId &&
+						beginWorkspaceReleaseInTransaction(tx, guard)
+					)
+						finishWorkspaceReleaseInTransaction(tx, guard, true);
+				},
+				{ reserved: true },
+			),
 		assertLaunch: (identity) => {
 			if (!allowed(identity)) throw new Error("terminal_workspace_busy");
 		},

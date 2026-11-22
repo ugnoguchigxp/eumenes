@@ -137,7 +137,7 @@ async function fixture() {
 			},
 			request: "Work",
 			references: [],
-			toolchainRevisionId: "toolchain:claude-code.request@5",
+			toolchainRevisionId: "toolchain:claude-code.request@7",
 			bindingRevisionId: "binding:claude-code.managed@1",
 		}),
 	);

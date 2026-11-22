@@ -35,6 +35,11 @@ export function registerRevision(
 		!/^[a-z][a-z0-9._-]{0,100}$/.test(d.id) ||
 		!Number.isInteger(d.revision) ||
 		d.revision < 1 ||
+		(d.publishFromRevision !== undefined &&
+			(d.kind !== "toolchain" ||
+				!Number.isSafeInteger(d.publishFromRevision) ||
+				d.publishFromRevision < 1 ||
+				d.publishFromRevision >= d.revision)) ||
 		bytes(d) > 32768
 	)
 		throw new Error("invalid_capability");
@@ -104,15 +109,24 @@ export function registerRevision(
 		digest,
 		now(),
 	);
-	db.query(
-		"INSERT INTO capability_items(key,id,kind,active_revision_id,origin) VALUES(?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET active_revision_id=excluded.active_revision_id,generation=generation+1",
-	).run(key, d.id, d.kind, rev, origin);
+	const predecessor = d.publishFromRevision
+		? `${key}@${d.publishFromRevision}`
+		: null;
+	const published = db
+		.query(
+			"INSERT INTO capability_items(key,id,kind,active_revision_id,origin) VALUES(?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET active_revision_id=excluded.active_revision_id,generation=generation+1 WHERE ? IS NULL OR capability_items.active_revision_id=?",
+		)
+		.run(key, d.id, d.kind, rev, origin, predecessor, predecessor).changes;
 	for (const dependency of d.dependencies)
 		db.query("INSERT INTO capability_dependencies VALUES(?,?)").run(
 			rev,
 			dependency,
 		);
-	if (d.kind === "requirement" || resourceDefinitionKinds.includes(d.kind))
+	if (
+		!published ||
+		d.kind === "requirement" ||
+		resourceDefinitionKinds.includes(d.kind)
+	)
 		return;
 	indexSearch(db, d);
 }

@@ -13,6 +13,7 @@ import {
 	forgetEvent,
 	insertEvent,
 	latestEventMs,
+	latestReplySeq,
 	latestSeq,
 	logEvent,
 	loggedAfter,
@@ -144,6 +145,7 @@ export function createEventStore() {
 		loggedAfterInTransaction: loggedAfter,
 		/** The newest event seq of the conversation (0 when none). */
 		latestSeqInTransaction: latestSeq,
+		latestReplySeqInTransaction: latestReplySeq,
 		/** How much of an utterance reached the user (its `delivered` event); null while none was recorded. */
 		heardInTransaction(
 			db: Database,

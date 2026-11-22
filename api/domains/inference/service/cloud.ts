@@ -16,6 +16,7 @@ import {
 	OUTPUT_RESERVE_DEFAULT_TOKENS,
 } from "../../../infrastructure/context-budget";
 import { getLogger } from "../../../infrastructure/logger";
+import { measureSyncStage } from "../../../infrastructure/performance";
 import type { SqliteStore } from "../../../infrastructure/sqlite";
 import { billingPath, googleCloudTts } from "../../settings/contracts";
 import {
@@ -258,7 +259,9 @@ async function agentRequest(
 	if (row.purpose !== "llm") throw new Error("cloud_agent_purpose_unsupported");
 	if (!env.agents) throw new Error("cloud_agent_unavailable");
 	// Fit first: dropping history turns changes the split the session resumes from.
-	const fitted = fitMessages(row, resource, input, role?.context);
+	const fitted = measureSyncStage("inference", "context_fit", () =>
+		fitMessages(row, resource, input, role?.context),
+	);
 	const session = await agentSession(
 		env,
 		connection,
@@ -444,11 +447,10 @@ export async function cloudRequest(
 				response_format: "wav",
 			};
 		else {
-			const { messages, reserve } = fitMessages(
-				row,
-				resource,
-				input as Messages,
-				role?.context,
+			const { messages, reserve } = measureSyncStage(
+				"inference",
+				"context_fit",
+				() => fitMessages(row, resource, input as Messages, role?.context),
 			);
 			const request = {
 				model: resource.model,

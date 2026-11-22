@@ -27,6 +27,7 @@ import {
 	messagesBefore,
 	nthLatestUserOrdinal,
 	tailMessages,
+	latestEvent,
 	listOutbox,
 	outboxHead,
 	outboxReady,
@@ -48,6 +49,7 @@ import {
 	dropStates,
 	latestState,
 	latestUtterances,
+	latestReplyWithTool,
 	markCutDue,
 	readCut,
 	retractUtterances,
@@ -144,6 +146,7 @@ export function createConversationService(
 			reviseUtteranceInTransaction: reviseUtterance,
 			utterancesAfterInTransaction: utterancesAfter,
 			latestUtterancesInTransaction: latestUtterances,
+			latestReplyWithToolInTransaction: latestReplyWithTool,
 			retractUtterancesInTransaction: retractUtterances,
 			correctUtterancesInTransaction: correctUtterances,
 			cutInTransaction: readCut,
@@ -216,6 +219,10 @@ export function createConversationService(
 		/** The newest outbox seq (0 when there is none): where a consumer that skips the past starts. */
 		outboxHeadInTransaction(db: Database): number {
 			return outboxHead(db);
+		},
+		/** The recorded search belongs to the original delivery of this message. */
+		originalMessageInTransaction(db: Database, id: string) {
+			return latestEvent(db, id)?.kind === "added";
 		},
 		/** Current source state of a message: available / retracted / missing. */
 		sourceInTransaction(db: Database, id: string): ConversationSourceState {

@@ -9,7 +9,14 @@ import { newHookToken, removeHookSettings, writeHookSettings } from "./hooks";
 import type { Ledger } from "./ledger";
 import { bunSpawnPty } from "../../../infrastructure/pty";
 import { type Listener, outputStream } from "../../../infrastructure/pty";
-import type { Inflight, Pty, Runtime, Session, TerminalSize } from "./types";
+import type {
+	Inflight,
+	Pty,
+	Runtime,
+	Session,
+	TerminalSize,
+	TerminalWorkspaceIdentity,
+} from "./types";
 
 const log = getLogger("terminals");
 
@@ -44,6 +51,13 @@ export function sessionView(s: Session): TerminalSessionView {
 		startedAt: s.startedAt,
 		...(s.endedAt ? { endedAt: s.endedAt } : {}),
 	};
+}
+
+export function workspaceIdentity(
+	session: Session,
+	run = session.run,
+): TerminalWorkspaceIdentity {
+	return { sessionId: session.id, owner: session.owner, cwd: session.cwd, run };
 }
 
 /** A turn the person started (no request of ours) counts as running for this long after its last hook. */
@@ -116,7 +130,6 @@ function openDirect(
 		size: request,
 		claude: { resume: false, id: crypto.randomUUID() },
 	});
-	rt.sessions.set(session.id, session);
 	ops.prune();
 	log.info("terminals.started", {
 		sessionId: session.id,
@@ -249,13 +262,13 @@ export function createSessions(
 
 	/** Starts a run in `session` (a new entry or an exited one); throws when it cannot start. */
 	function launch(session: Session, spec: Launch) {
-		options.workspace?.assertLaunch({
-			sessionId: session.id,
-			owner: session.owner,
-			cwd: session.cwd,
-			run: session.run + 1,
-		});
+		if (rt.closing) throw new Error("terminal_unavailable");
+		options.workspace?.assertLaunch(
+			workspaceIdentity(session, session.run + 1),
+		);
 		if (!rt.command) throw new Error("terminal_unavailable");
+		const startedAt = rt.nowIso();
+		const startedAtMs = rt.now();
 		const token = rt.baseUrl ? newHookToken() : undefined;
 		const denyGitWrites =
 			session.owner.startsWith("kanban:") && session.mode === "work";
@@ -264,6 +277,7 @@ export function createSessions(
 			: undefined;
 		let pty: Pty;
 		try {
+			removeHookSettings(session.settingsPath);
 			pty = spawn({
 				command: [
 					...rt.command,
@@ -290,7 +304,6 @@ export function createSessions(
 		// Cleared only once the new run exists, so a failed restart keeps the last output.
 		session.backlog = [];
 		session.backlogSize = 0;
-		removeHookSettings(session.settingsPath);
 		session.settingsPath = settingsPath;
 		session.pty = pty;
 		session.hookToken = token;
@@ -306,8 +319,8 @@ export function createSessions(
 		session.stopping = false;
 		session.inflight = spec.inflight;
 		session.run += 1;
-		session.startedAt = rt.nowIso();
-		session.startedAtMs = rt.now();
+		session.startedAt = startedAt;
+		session.startedAtMs = startedAtMs;
 		session.lastUsedAtMs = session.startedAtMs;
 		session.lastHookAtMs = session.startedAtMs;
 		delete session.exitCode;
@@ -325,7 +338,7 @@ export function createSessions(
 			}, trackingMs);
 			session.trackingTimer.unref?.();
 		}
-		rt.changed();
+		rt.sessions.set(session.id, session);
 		void pty.exited
 			.then((code) => onExit(session, pty, settingsPath, code))
 			.catch(() => {
@@ -333,6 +346,7 @@ export function createSessions(
 				log.warn("terminals.exit_handler_failed", { sessionId: session.id });
 				session.exitDone();
 			});
+		rt.changed();
 	}
 
 	return {

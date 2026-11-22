@@ -82,6 +82,7 @@ export const errorStatus = {
 	terminal_project_unknown: 400,
 	terminal_prompt_invalid: 400,
 	terminal_conversation_busy: 409,
+	terminal_workspace_busy: 409,
 } as const satisfies Record<string, HttpErrorStatus>;
 
 /*

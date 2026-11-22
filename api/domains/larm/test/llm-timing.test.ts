@@ -345,6 +345,11 @@ test("monotonic TTFT separates pre-send preparation and first nonempty content",
 			providerTtftMs: 50,
 			totalMs: 350,
 		});
+		expect(
+			lines.filter((entry) => entry.event === "performance.stage"),
+		).toMatchObject([
+			{ component: "larm", phase: "context_fit", durationMs: 0, outcome: "ok" },
+		]);
 	} finally {
 		now.mockRestore();
 	}

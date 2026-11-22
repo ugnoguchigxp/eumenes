@@ -28,6 +28,7 @@ import type { AgencyWork } from "./work";
 import { createAgencyActivity } from "./always-on-activity";
 import { createAgendaHearing } from "./always-on-heard";
 import { recallConversation } from "./always-on-recovery";
+import { createGoalAgenda } from "./goal-agenda";
 import type {
 	AgencyActivity,
 	AgencyThought,
@@ -45,11 +46,6 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	const clearTimer =
 		deps.clearTimer ??
 		((id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>));
-	const prepareDisplay = prepareNoteDisplay.bind(null, deps, {
-		now,
-		setTimer,
-		clearTimer,
-	});
 	const convs = new Map<string, AgendaScope>();
 	const persisted = new Map<string, number>();
 	const recovering = new Set<string>();
@@ -60,6 +56,8 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		cursor = 0,
 		savedCursor = -1;
 	let activeId: string | null = null;
+	let goalStep: { scope: AgendaScope; controller: AbortController } | null =
+		null;
 	let display: { id: string; until: number } | null = null;
 	let pumping: Promise<void> | null = null;
 	let requested = false;
@@ -92,6 +90,22 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	/** Steps that hold a line until the user is free again. */
 	const idleWaiters = new Set<() => void>();
 	const on = () => started && !closed && agendaReady(deps);
+	const goalAgenda = createGoalAgenda({
+		deps,
+		now,
+		active: () => (on() && activeId ? convs.get(activeId) : undefined),
+		scope: (id) => convs.get(id),
+		idle: (c) =>
+			!recovering.has(c.id) &&
+			!busy(c) &&
+			!deps.store.read((db) => deps.backgroundPaused?.(db, c.id)),
+	});
+	const prepareDisplay = prepareNoteDisplay.bind(null, deps, {
+		now,
+		setTimer,
+		clearTimer,
+		goalNoteInTransaction: goalAgenda?.displayNoteInTransaction,
+	});
 	const track = <T>(p: Promise<T>): Promise<T> => {
 		inflight.add(p);
 		void p.finally(() => inflight.delete(p)).catch(() => {});
@@ -185,8 +199,13 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		if (c.timer !== undefined) clearTimer(c.timer);
 		c.timer = undefined;
 		if (closed || c.stepping || !mayStep(cycleHost(), c)) return;
-		const next = busy(c) ? now() : c.agent.nextAt(now());
-		if (next === null) return;
+		const isBusy = busy(c);
+		const goalAt =
+			!isBusy && !goalStep && activeId === c.id ? goalAgenda?.nextAt() : null;
+		const next = isBusy
+			? now()
+			: Math.min(c.agent.nextAt(now()) ?? Infinity, goalAt ?? Infinity);
+		if (!Number.isFinite(next)) return;
 		const at = Math.max(next, c.backoffUntil);
 		c.timer = setTimer(
 			() => {
@@ -199,12 +218,41 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	/** One step now (or right after the one running), then the timer for the next. */
 	function kickScope(c: AgendaScope) {
 		return track(
-			runAgendaStep(cycleHost(), c).finally(() => {
-				if (convs.get(c.id) === c) arm(c);
-			}),
+			runAgendaStep(cycleHost(), c)
+				.then(async () => {
+					const at = goalAgenda?.nextAt();
+					if (
+						!goalAgenda ||
+						goalStep ||
+						c.stepping ||
+						c.id !== activeId ||
+						!on() ||
+						busy(c) ||
+						at == null ||
+						at > now()
+					)
+						return;
+					const controller = new AbortController();
+					goalStep = { scope: c, controller };
+					try {
+						await goalAgenda.tick(controller.signal);
+					} catch (error) {
+						c.backoffUntil = now() + 10_000;
+						log.warn("agency.goal_step_failed", {
+							reason: toErrorCode(error, "goal_step_failed"),
+						});
+					} finally {
+						goalStep = null;
+					}
+				})
+				.finally(() => {
+					if (convs.get(c.id) === c) arm(c);
+				}),
 		);
 	}
 	function syncBusy() {
+		if (goalStep && (goalStep.scope.id !== activeId || busy(goalStep.scope)))
+			goalStep.controller.abort();
 		// A reading that ended: its words are said now, before anything is planned.
 		let heard = false;
 		for (const c of convs.values()) heard = hearing.check(c) || heard;
@@ -225,6 +273,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	function invalidate(c: AgendaScope) {
 		c.generation++;
 		c.controller?.abort();
+		if (goalStep?.scope === c) goalStep.controller.abort();
 		c.revision++;
 		for (const look of idleWaiters) look();
 	}
@@ -275,7 +324,9 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 						},
 						show: (scope, noteIds, runId) => {
 							for (const id of noteIds) {
-								const note = scope.notes.find((n) => n.id === id);
+								const note =
+									scope.notes.find((n) => n.id === id) ??
+									goalAgenda?.noteForDisplay(id);
 								if (note)
 									void track(
 										prepareDisplay(scope, note, runId)
@@ -285,8 +336,11 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 							}
 						},
 					});
-					if (event.speaker === "user" && (!display || display.until <= now()))
-						activeId = c.id;
+					if (event.speaker === "user") {
+						goalAgenda?.changed();
+						if (goalStep?.scope === c) goalStep.controller.abort();
+						if (!display || display.until <= now()) activeId = c.id;
+					}
 				}
 				cursor = event.seq;
 			}
@@ -309,6 +363,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		deps,
 		convs,
 		prepareDisplay,
+		goalAgenda,
 		serving: (id) => {
 			if (!on()) return null;
 			try {
@@ -375,6 +430,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 	return {
 		async recover() {
 			if (!deps.state) return;
+			await goalAgenda?.init();
 			await deps.store.write((db) => {
 				deps.state!.quarantineLegacyInTransaction(db);
 				deps.state!.recoverForgottenInTransaction(db);
@@ -405,6 +461,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 		async close() {
 			if (closed) return;
 			closed = true;
+			goalStep?.controller.abort();
 			for (const stop of stoppers.splice(0)) stop();
 			activity.close();
 			for (const look of idleWaiters) look();
@@ -415,6 +472,7 @@ export function createAlwaysOnHost(deps: AgencyHostDeps) {
 				dispose(c);
 			}
 			await Promise.allSettled(inflight);
+			await goalAgenda?.close();
 			if (deps.state && deps.memory.referenceInputs) await save();
 		},
 		dialoguePort,

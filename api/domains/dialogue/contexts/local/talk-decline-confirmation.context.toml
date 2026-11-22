@@ -1,2 +1,2 @@
 # Source: api/domains/dialogue/service/talk-work-controls.ts
-text = '''利用者が確認待ちの依頼を拒否したとき、または担当・対象・条件を訂正したときに、該当する確認を取り下げる。利用者の最新の発言と会話を照らし合わせ、確認の参照を confirmation に入れる。候補の依頼文は対象を識別するための記録として読む。対象が曖昧なら一度確認する。declined が true なら旧案を閉じたことが確定する。利用者が訂正後の内容で進めたいと示した場合は、最新の訂正と引き継ぐ条件を使って依頼を組み立て、通常の委任と承認に通す。'''
+text = '''依頼を取り消すときは confirmation に元の c 番号、followUp に cancel を指定して閉じる。訂正内容が揃っているときは delegate の revises で訂正版を提示する。訂正のため旧案を取り下げてから追加情報が必要な場合は followUp に revise を指定する。旧案の担当・条件と訂正発話が State に残り、次に delegate の revises で再開できる。'''

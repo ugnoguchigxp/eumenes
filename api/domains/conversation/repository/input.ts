@@ -244,6 +244,23 @@ export function utterancesAfter(
 	).map(utteranceOf);
 }
 
+/** Read the final pre-upgrade reply with a completed search when no current slot exists. */
+export function latestReplyWithTool(
+	db: Database,
+	conversationId: string,
+	name: string,
+): Utterance | null {
+	const row = db
+		.query<UtteranceRow, [string, string]>(
+			`SELECT ${UTTERANCE_COLUMNS} FROM conversation_utterances WHERE conversation_id=? AND speaker='agent'
+		AND retracted_at IS NULL AND tool_exchange_json IS NOT NULL AND EXISTS
+		(SELECT 1 FROM json_each(tool_exchange_json) WHERE json_extract(value,'$.name')=? AND CASE WHEN json_valid(json_extract(value,'$.result')) THEN json_type(json_extract(value,'$.result'),'$.candidates')='array' END)
+		ORDER BY seq DESC LIMIT 1`,
+		)
+		.get(conversationId, name);
+	return row ? utteranceOf(row) : null;
+}
+
 /** The newest `limit` utterances that stand, in order. */
 export function latestUtterances(
 	db: Database,

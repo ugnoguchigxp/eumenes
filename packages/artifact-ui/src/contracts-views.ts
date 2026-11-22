@@ -325,6 +325,13 @@ export const viewRegistry = {
 					.min(1)
 					.max(32)
 					.optional(),
+				// Minimum column widths in em, keyed by the registered collection column.
+				columnMinWidths: z
+					.record(
+						z.string().regex(/^[A-Za-z][A-Za-z0-9_.]{0,80}$/),
+						z.number().min(1).max(32),
+					)
+					.optional(),
 				detailMode: z.enum(["inline", "modal"]).optional(),
 				selectionField: z
 					.string()

@@ -73,12 +73,17 @@ function killOnExit() {
 	});
 }
 
-export function createCodexProcesses(options: {
+type CodexProcessEnvironment = {
 	runtime: CodexRuntime;
 	home: CodexHome;
-	/** Called after a process ended and left the pool; `remaining` counts the processes still in it. */
-	onExit(rpc: CodexRpc, remaining: number): Promise<void>;
-}): CodexProcesses {
+};
+
+export function createCodexProcesses(
+	options: CodexProcessEnvironment & {
+		/** Called after a process ended and left the pool; `remaining` counts the processes still in it. */
+		onExit(rpc: CodexRpc, remaining: number): Promise<void>;
+	},
+): CodexProcesses {
 	killOnExit();
 	type Pooled = {
 		ready: Promise<CodexRpc>;
@@ -145,6 +150,7 @@ export function createCodexProcesses(options: {
 			await options.home.ready();
 			if (stopRequested) throw fail("incomplete_turn");
 			const spawned = spawnProcess(
+				options,
 				spec,
 				(c) => (child = c),
 				(code, signal) => {
@@ -184,228 +190,227 @@ export function createCodexProcesses(options: {
 		pooled.stop = stop;
 		return pooled;
 	}
+}
 
-	function spawnProcess(
-		spec: CodexConnectionSpec,
-		hold: (child: Child) => void,
-		onExit: (code: number | null, signal: string | null) => void,
-	): { rpc: CodexRpc; handshake: Promise<void> } {
-		const overrides = [
-			...Object.keys(disabledFeatures).map((name) => `features.${name}=false`),
-			"features.skip_host_skill_discovery=true",
-			"project_doc_max_bytes=0",
-			'history.persistence="none"',
-			...requestHeadOverrides,
-			spec.nativeWebSearch ? 'web_search="live"' : 'web_search="disabled"',
-			...(spec.credential
-				? [`openai_base_url=${JSON.stringify(spec.baseUrl)}`]
-				: []),
-		];
-		const proc = spawn(
-			options.runtime.command,
-			["app-server", ...overrides.flatMap((o) => ["-c", o])],
-			{
-				cwd: options.home.cwd,
-				env: {
-					...options.runtime.env,
-					CODEX_HOME: options.home.path,
-					...(spec.credential ? { CODEX_API_KEY: spec.credential } : {}),
-				},
-				detached: true,
-				stdio: ["pipe", "pipe", "pipe"],
+/** Owns one child process, its JSON-RPC channels, and the initialize handshake. */
+function spawnProcess(
+	{ runtime, home }: CodexProcessEnvironment,
+	spec: CodexConnectionSpec,
+	hold: (child: Child) => void,
+	onExit: (code: number | null, signal: string | null) => void,
+): { rpc: CodexRpc; handshake: Promise<void> } {
+	const overrides = [
+		...Object.keys(disabledFeatures).map((name) => `features.${name}=false`),
+		"features.skip_host_skill_discovery=true",
+		"project_doc_max_bytes=0",
+		'history.persistence="none"',
+		...requestHeadOverrides,
+		spec.nativeWebSearch ? 'web_search="live"' : 'web_search="disabled"',
+		...(spec.credential
+			? [`openai_base_url=${JSON.stringify(spec.baseUrl)}`]
+			: []),
+	];
+	const proc = spawn(
+		runtime.command,
+		["app-server", ...overrides.flatMap((o) => ["-c", o])],
+		{
+			cwd: home.cwd,
+			env: {
+				...runtime.env,
+				CODEX_HOME: home.path,
+				...(spec.credential ? { CODEX_API_KEY: spec.credential } : {}),
 			},
-		);
-		const child: Child = {
-			pid: proc.pid,
-			exited: false,
-			kill(signal) {
-				if (child.exited || !proc.pid) return;
-				try {
-					process.kill(-proc.pid, signal);
-				} catch {
-					try {
-						proc.kill(signal);
-					} catch {
-						/* already gone */
-					}
-				}
-			},
-		};
-		running.add(child);
-		hold(child);
-		let nextId = 1;
-		const channels = new Map<string, Channel>();
-		const pending = new Map<
-			number,
-			{
-				resolve(value: unknown): void;
-				reject(error: Error): void;
-				received?: (value: unknown) => void;
-			}
-		>();
-		const endAll = (error: Error) => {
-			for (const p of pending.values()) p.reject(error);
-			pending.clear();
-			for (const channel of channels.values()) channel.handler.fail(error);
-		};
-		const die = (error: Error) => {
-			endAll(error);
-			child.kill("SIGKILL");
-		};
-		const send = (value: unknown) =>
-			proc.stdin.write(JSON.stringify(value) + "\n");
-		let ended = false;
-		const end = (code: number | null, signal: string | null) => {
-			if (ended) return;
-			ended = true;
-			child.exited = true;
-			running.delete(child);
-			lines.close();
-			endAll(fail("incomplete_turn"));
-			onExit(code, signal);
-		};
-		proc.on("error", () => {
-			die(fail("codex_unavailable"));
-			// A process that never started has no exit to wait for.
-			if (!proc.pid) end(null, null);
-		});
-		proc.stdin.on("error", () => die(fail("incomplete_turn")));
-		proc.stderr.resume();
-		proc.on("exit", end);
-		const request = (
-			method: string,
-			params: unknown,
-			onResult?: (value: unknown) => void,
-		) => {
-			if (child.exited) return Promise.reject(fail("incomplete_turn"));
-			const id = nextId++;
-			const result = new Promise<unknown>((resolve, reject) =>
-				pending.set(id, { resolve, reject, received: onResult }),
-			);
-			send({ id, method, params });
-			return result;
-		};
-		const lines = createInterface({ input: proc.stdout, crlfDelay: Infinity });
-		lines.on("line", (line) => {
-			const bytes = Buffer.byteLength(line);
-			let echoCap = 0;
-			for (const c of channels.values())
-				echoCap = Math.max(echoCap, c.echoFrameLimit);
-			// Nothing a turn may legitimately produce is this large: the stream itself is not trusted any more.
-			if (bytes > Math.max(TURN_LIMIT, echoCap)) {
-				die(fail("output_limit"));
-				return;
-			}
-			let value: Record<string, unknown>;
+			detached: true,
+			stdio: ["pipe", "pipe", "pipe"],
+		},
+	);
+	const child: Child = {
+		pid: proc.pid,
+		exited: false,
+		kill(signal) {
+			if (child.exited || !proc.pid) return;
 			try {
-				value = JSON.parse(line);
+				process.kill(-proc.pid, signal);
 			} catch {
-				if (bytes > FRAME_LIMIT) die(fail("output_limit"));
-				return;
-			}
-			if (!value || typeof value !== "object" || Array.isArray(value)) {
-				die(fail("codex_turn_failed"));
-				return;
-			}
-			const event = value.params as
-				{ threadId?: unknown; item?: { type?: unknown } } | undefined;
-			const channel =
-				typeof event?.threadId === "string"
-					? channels.get(event.threadId)
-					: undefined;
-			const notification = typeof value.method === "string" && !("id" in value);
-			if (channel && notification) {
-				if (
-					(value.method === "item/started" ||
-						value.method === "item/completed") &&
-					event?.item?.type === "userMessage"
-				) {
-					channel.echoRemaining -= bytes;
-					if (bytes > channel.echoFrameLimit || channel.echoRemaining < 0)
-						channel.handler.fail(fail("output_limit"));
-					return;
+				try {
+					proc.kill(signal);
+				} catch {
+					/* already gone */
 				}
-				channel.received += bytes;
-				if (bytes > FRAME_LIMIT || channel.received > TURN_LIMIT) {
+			}
+		},
+	};
+	running.add(child);
+	hold(child);
+	let nextId = 1;
+	const channels = new Map<string, Channel>();
+	const pending = new Map<
+		number,
+		{
+			resolve(value: unknown): void;
+			reject(error: Error): void;
+			received?: (value: unknown) => void;
+		}
+	>();
+	const endAll = (error: Error) => {
+		for (const p of pending.values()) p.reject(error);
+		pending.clear();
+		for (const channel of channels.values()) channel.handler.fail(error);
+	};
+	const die = (error: Error) => {
+		endAll(error);
+		child.kill("SIGKILL");
+	};
+	const send = (value: unknown) =>
+		proc.stdin.write(JSON.stringify(value) + "\n");
+	let ended = false;
+	const end = (code: number | null, signal: string | null) => {
+		if (ended) return;
+		ended = true;
+		child.exited = true;
+		running.delete(child);
+		lines.close();
+		endAll(fail("incomplete_turn"));
+		onExit(code, signal);
+	};
+	proc.on("error", () => {
+		die(fail("codex_unavailable"));
+		// A process that never started has no exit to wait for.
+		if (!proc.pid) end(null, null);
+	});
+	proc.stdin.on("error", () => die(fail("incomplete_turn")));
+	proc.stderr.resume();
+	proc.on("exit", end);
+	const request = (
+		method: string,
+		params: unknown,
+		onResult?: (value: unknown) => void,
+	) => {
+		if (child.exited) return Promise.reject(fail("incomplete_turn"));
+		const id = nextId++;
+		const result = new Promise<unknown>((resolve, reject) =>
+			pending.set(id, { resolve, reject, received: onResult }),
+		);
+		send({ id, method, params });
+		return result;
+	};
+	const lines = createInterface({ input: proc.stdout, crlfDelay: Infinity });
+	lines.on("line", (line) => {
+		const bytes = Buffer.byteLength(line);
+		let echoCap = 0;
+		for (const c of channels.values())
+			echoCap = Math.max(echoCap, c.echoFrameLimit);
+		// Nothing a turn may legitimately produce is this large: the stream itself is not trusted any more.
+		if (bytes > Math.max(TURN_LIMIT, echoCap)) {
+			die(fail("output_limit"));
+			return;
+		}
+		let value: Record<string, unknown>;
+		try {
+			value = JSON.parse(line);
+		} catch {
+			if (bytes > FRAME_LIMIT) die(fail("output_limit"));
+			return;
+		}
+		if (!value || typeof value !== "object" || Array.isArray(value)) {
+			die(fail("codex_turn_failed"));
+			return;
+		}
+		const event = value.params as
+			{ threadId?: unknown; item?: { type?: unknown } } | undefined;
+		const channel =
+			typeof event?.threadId === "string"
+				? channels.get(event.threadId)
+				: undefined;
+		const notification = typeof value.method === "string" && !("id" in value);
+		if (channel && notification) {
+			if (
+				(value.method === "item/started" ||
+					value.method === "item/completed") &&
+				event?.item?.type === "userMessage"
+			) {
+				channel.echoRemaining -= bytes;
+				if (bytes > channel.echoFrameLimit || channel.echoRemaining < 0)
 					channel.handler.fail(fail("output_limit"));
-					return;
-				}
-			} else if (bytes > FRAME_LIMIT) {
-				die(fail("output_limit"));
 				return;
 			}
-			try {
-				if (typeof value.id === "number" && !("method" in value)) {
-					const p = pending.get(value.id);
-					if (!p) return;
-					pending.delete(value.id);
-					if (value.error) p.reject(fail("codex_turn_failed"));
-					else {
-						p.received?.(value.result);
-						p.resolve(value.result);
-					}
-				} else if ("id" in value) {
-					send({
-						id: value.id,
-						error: { code: -32601, message: "unsupported by Eumenes" },
-					});
-				} else if (notification)
-					channel?.handler.notify(
-						value.method as string,
-						(value.params ?? {}) as Record<string, unknown>,
-					);
-			} catch (error) {
-				const failure =
-					error instanceof Error ? error : fail("codex_turn_failed");
-				if (channel) channel.handler.fail(failure);
-				else die(failure);
+			channel.received += bytes;
+			if (bytes > FRAME_LIMIT || channel.received > TURN_LIMIT) {
+				channel.handler.fail(fail("output_limit"));
+				return;
 			}
-		});
-		const rpc: CodexRpc = {
-			get alive() {
-				return !child.exited;
-			},
-			request,
-			attach(threadId, handler) {
-				const channel: Channel = {
-					handler,
-					received: 0,
-					echoFrameLimit: 0,
-					echoRemaining: 0,
-				};
-				channels.set(threadId, channel);
-				return {
-					beginTurn(inputBytes) {
-						channel.received = 0;
-						channel.echoFrameLimit = inputBytes + 4096;
-						channel.echoRemaining = 2 * channel.echoFrameLimit;
-					},
-					detach() {
-						if (channels.get(threadId) === channel) channels.delete(threadId);
-					},
-				};
-			},
-		};
-		const handshake = (async () => {
-			const late = setTimeout(
-				() => die(fail("codex_unavailable")),
-				HANDSHAKE_MS,
-			);
-			late.unref?.();
-			try {
-				await request("initialize", {
-					clientInfo: { name: "eumenes", title: "Eumenes", version: "1" },
-					capabilities: null,
+		} else if (bytes > FRAME_LIMIT) {
+			die(fail("output_limit"));
+			return;
+		}
+		try {
+			if (typeof value.id === "number" && !("method" in value)) {
+				const p = pending.get(value.id);
+				if (!p) return;
+				pending.delete(value.id);
+				if (value.error) p.reject(fail("codex_turn_failed"));
+				else {
+					p.received?.(value.result);
+					p.resolve(value.result);
+				}
+			} else if ("id" in value) {
+				send({
+					id: value.id,
+					error: { code: -32601, message: "unsupported by Eumenes" },
 				});
-			} catch (error) {
-				die(error instanceof Error ? error : fail("codex_unavailable"));
-				throw error;
-			} finally {
-				clearTimeout(late);
-			}
-			send({ method: "initialized" });
-		})();
-		handshake.catch(() => {});
-		return { rpc, handshake };
-	}
+			} else if (notification)
+				channel?.handler.notify(
+					value.method as string,
+					(value.params ?? {}) as Record<string, unknown>,
+				);
+		} catch (error) {
+			const failure =
+				error instanceof Error ? error : fail("codex_turn_failed");
+			if (channel) channel.handler.fail(failure);
+			else die(failure);
+		}
+	});
+	const rpc: CodexRpc = {
+		get alive() {
+			return !child.exited;
+		},
+		request,
+		attach(threadId, handler) {
+			const channel: Channel = {
+				handler,
+				received: 0,
+				echoFrameLimit: 0,
+				echoRemaining: 0,
+			};
+			channels.set(threadId, channel);
+			return {
+				beginTurn(inputBytes) {
+					channel.received = 0;
+					channel.echoFrameLimit = inputBytes + 4096;
+					channel.echoRemaining = 2 * channel.echoFrameLimit;
+				},
+				detach() {
+					if (channels.get(threadId) === channel) channels.delete(threadId);
+				},
+			};
+		},
+	};
+	const handshake = (async () => {
+		const late = setTimeout(() => die(fail("codex_unavailable")), HANDSHAKE_MS);
+		late.unref?.();
+		try {
+			await request("initialize", {
+				clientInfo: { name: "eumenes", title: "Eumenes", version: "1" },
+				capabilities: null,
+			});
+		} catch (error) {
+			die(error instanceof Error ? error : fail("codex_unavailable"));
+			throw error;
+		} finally {
+			clearTimeout(late);
+		}
+		send({ method: "initialized" });
+	})();
+	handshake.catch(() => {});
+	return { rpc, handshake };
 }

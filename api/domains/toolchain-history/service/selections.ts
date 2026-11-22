@@ -302,6 +302,18 @@ export function createSelections(store: SqliteStore, now: () => number) {
 		markRecipeInTransaction,
 		toolchainOfRunInTransaction,
 		requestOfRunInTransaction,
+		offeredInRunInTransaction(
+			db: Database,
+			runId: string,
+			conversationId: string,
+		): SelectionCandidate[] {
+			const row = db
+				.query<{ candidates_json: string }, [string, string]>(
+					"SELECT candidates_json FROM toolchain_selections WHERE run_id=? AND conversation_id=?",
+				)
+				.get(runId, conversationId);
+			return row ? JSON.parse(row.candidates_json) : [];
+		},
 		usageOfRunInTransaction(db: Database, runId: string) {
 			const row = db
 				.query(

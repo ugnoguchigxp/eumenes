@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getLogger } from "../../../infrastructure/logger";
 import { measureStage } from "../../../infrastructure/performance";
 import { checkImageRequest } from "../service/cloud-images";
 import { readCodexModels } from "./codex-models";
@@ -8,6 +9,7 @@ import type { CodexRpc } from "./codex-transport";
 import {
 	codexTotals,
 	codexUsage,
+	codexUsageLogFields,
 	type CodexTotals,
 	type CodexUsage,
 } from "./codex-usage";
@@ -15,6 +17,7 @@ import { imageDataUrl } from "../../../infrastructure/chat-image-parts";
 
 /** The longest a cancelled turn may take to end before its thread is given up. */
 const INTERRUPT_MS = 2000;
+const log = getLogger("inference");
 
 /** One conversation turn over `codex app-server` (stdio JSON-RPC), which streams
  * agent message deltas that `codex exec --json` only reports when complete. */
@@ -100,6 +103,10 @@ export async function runCodexTurn(
 		connectionId: turn.connectionId,
 	});
 	const { threadId } = lease;
+	const fields = {
+		...(turn.attemptId ? { attemptId: turn.attemptId } : {}),
+		...(turn.connectionId ? { connectionId: turn.connectionId } : {}),
+	};
 	let input: ReturnType<CodexTurn["input"]>;
 	try {
 		// A call cancelled while its thread was being prepared starts no turn.
@@ -156,6 +163,19 @@ export async function runCodexTurn(
 						(next.inputTokens! >= usage.inputTokens! &&
 							next.outputTokens! >= usage.outputTokens!))
 				) {
+					// Rate-limit notifications can repeat the same cumulative usage.
+					if (
+						(next.inputTokens ?? 0) > (usage?.inputTokens ?? 0) ||
+						(next.outputTokens ?? 0) > (usage?.outputTokens ?? 0)
+					)
+						log.info("inference.codex_usage_updated", {
+							...fields,
+							mode: lease.mode,
+							promptTokens: next.inputTokens ?? undefined,
+							cachedTokens: next.cacheReadTokens ?? undefined,
+							completionTokens: next.outputTokens ?? undefined,
+							...codexUsageLogFields(params.tokenUsage),
+						});
 					usage = next;
 					totals = codexTotals(params.tokenUsage);
 					turn.onUsage?.(next);
@@ -225,10 +245,6 @@ export async function runCodexTurn(
 		started = startResponse;
 		startResponse.catch(() => {});
 		turn.signal.throwIfAborted();
-		const fields = {
-			...(turn.attemptId ? { attemptId: turn.attemptId } : {}),
-			...(turn.connectionId ? { connectionId: turn.connectionId } : {}),
-		};
 		await measureStage(
 			"inference",
 			"codex_turn_start",

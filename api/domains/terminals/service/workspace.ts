@@ -1,34 +1,65 @@
-import type { Runtime, TerminalSize, TerminalWorkspaceIdentity } from "./types";
-import { sessionView, type Sessions } from "./sessions";
-import type { Session } from "./types";
+import { getLogger } from "../../../infrastructure/logger";
+import type {
+	Runtime,
+	Session,
+	TerminalSize,
+	TerminalWorkspaceIdentity,
+} from "./types";
+import { sessionView, workspaceIdentity, type Sessions } from "./sessions";
 
-const identity = (session: Session): TerminalWorkspaceIdentity => ({
-	sessionId: session.id,
-	owner: session.owner,
-	cwd: session.cwd,
-	run: session.run,
-});
+const log = getLogger("terminals");
+
+/** A launch failed or an exit was observed. Check for a new run again in the writer. */
+export async function releaseDirectWorkspace(
+	rt: Runtime,
+	identity: TerminalWorkspaceIdentity,
+	session = rt.sessions.get(identity.sessionId),
+) {
+	if (identity.owner !== "direct") return;
+	try {
+		await rt.options.workspace?.releaseDirect(identity, () => {
+			const current = rt.sessions.get(identity.sessionId) ?? session;
+			return current?.status !== "running";
+		});
+	} catch {
+		log.warn("terminals.workspace_release_failed", {
+			sessionId: identity.sessionId,
+		});
+	}
+}
+
 /** Authorization is awaited before PTY IO; pending input also prevents an idle handoff. */
 export function createWorkspaceSessions(rt: Runtime, sessions: Sessions) {
+	async function launch(
+		identity: TerminalWorkspaceIdentity,
+		start: () => Session,
+		existing?: Session,
+	) {
+		await rt.options.workspace?.reserveDirect(identity);
+		try {
+			return sessionView(start());
+		} catch (error) {
+			await releaseDirectWorkspace(rt, identity, existing);
+			throw error;
+		}
+	}
+
 	return {
 		async startGuarded(request: { title?: string } & TerminalSize) {
 			if (!rt.command) throw new Error("terminal_unavailable");
 			const id = crypto.randomUUID();
-			await rt.options.workspace?.reserveDirect({
-				sessionId: id,
-				owner: "direct",
-				cwd: rt.options.cwd,
-				run: 1,
-			});
-			return sessionView(sessions.open(request, id));
+			return launch(
+				{ sessionId: id, owner: "direct", cwd: rt.options.cwd, run: 1 },
+				() => sessions.open(request, id),
+			);
 		},
 		async restartGuarded(id: string, size: TerminalSize) {
 			const session = sessions.find(id);
-			await rt.options.workspace?.reserveDirect({
-				...identity(session),
-				run: session.run + 1,
-			});
-			return sessionView(sessions.restart(id, size));
+			return launch(
+				workspaceIdentity(session, session.run + 1),
+				() => sessions.restart(id, size),
+				session,
+			);
 		},
 		async inputGuarded(id: string, data: string) {
 			const session = sessions.find(id);
@@ -38,7 +69,7 @@ export function createWorkspaceSessions(rt: Runtime, sessions: Sessions) {
 			const run = session.run;
 			session.pendingManualInputs++;
 			try {
-				await rt.options.workspace?.assertInput(identity(session));
+				await rt.options.workspace?.assertInput(workspaceIdentity(session));
 				if (session.pty !== pty || session.run !== run || session.closing)
 					throw new Error("terminal_workspace_releasing");
 				sessions.input(id, data);
@@ -51,7 +82,7 @@ export function createWorkspaceSessions(rt: Runtime, sessions: Sessions) {
 				.all()
 				.filter(sessions.isLive)
 				.map((session) => ({
-					...identity(session),
+					...workspaceIdentity(session),
 					activity: session.activity,
 					inflight: !!session.inflight,
 					closing: session.closing,

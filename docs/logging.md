@@ -170,14 +170,20 @@ Toolchainのlive検証も、一時DBを削除する前に運用ログを `verifi
 | `inference.codex_process` | `outcome` | `started`（ハンドシェイクまで終わった）・`exited` |
 | | `count` | その時点で生きているプロセス数 |
 | | `exitCode`・`processSignal` | `exited` のとき、分かる場合だけ |
+| `performance.stage` | `phase=codex_process_ready` | 呼出しでプロセスを確保するまで。初回はホーム準備と初期化を含む |
+| `performance.stage` | `phase=codex_thread_ready` | スレッドの選択と準備。作成、巻き戻し、続きのいずれかを `mode` で確認できる |
 | `performance.stage` | `phase=codex_turn_start` | `turn/start` の送信後、開始応答または先に届いた完了を待つ時間 |
 | `performance.stage` | `phase=codex_turn_completion` | 開始待ちの後、ターンの結果を受け取るまでの時間 |
+| `inference.codex_usage_updated` | `promptTokens`・`cachedTokens`・`completionTokens` | そのSDKターンの累計。報告された入力または出力の累計が増えたときだけ記録 |
+| | `providerPromptTokens`・`providerCachedTokens`・`providerOutputTokens` | Codexが直近のモデル応答について報告した計数 |
+| | `modelContextWindow` | Codexが報告した実効コンテキスト長 |
 
 会話本文・指示文・出力 schema・認証情報・Codex の生応答は出しません。見分けに使うハッシュも出しません。
 
 読み方:
 
 - `append` は同じ推論要求で、保持済みの入力と直前に返した応答・ツール呼出しが今回の先頭に一致するときに使います。別の発話で推論要求が変われば、同じ会話でも `reset` で先頭のキャッシュを使える場合があります。`new` が続く場合は、先頭（モデル・system・ツール一覧・出力 schema・思考量）と利用できるスレッドの有無を確認します。`append` の `usage` はその呼出しの消費量（スレッドの累計の差）です。
+- 同じ `attemptId` に複数の `inference.codex_usage_updated` があれば、SDKターン内で利用量が複数回増えています。消費量は最後の累計を使い、キャッシュで引き継いだ入力を比較するときは各モデル応答の確定値を使います。Codexが報告しなかった値は省略します。
 - `exited` の直後の呼出しは、新しいプロセスで `new` から始まります（スレッドは作り直し）。`count: 0` の `exited` は最後のプロセスの終了で、そのときホームは空にされます。10分使われなかった後の `exited`（スレッドがなくなったための停止）は正常です。
 - スレッドの捨て（10分の空き、作ってから30分、先頭ごとに空き2本、全体32本、取消で2秒以内に止まらない、ターンの失敗、忘却）は `thread/delete` で行い、ログは出しません。削除できなかったスレッドの記録ファイルはアダプタが消します。
 - 忘却では、空いているスレッドをすぐ捨て、実行中のターンは終わりを待ってから捨てます。その後すべてのプロセスを止めてホームを空にします。その間に来た呼出しは、空になるまで待ってから新しいプロセスで始まります。
@@ -200,12 +206,20 @@ workerは共通補正の拒否分類を `agent.control_rejected.validationCode` 
 
 | component / phase・event | 区間と用途 |
 | --- | --- |
-| `dialogue / query_embedding` | 候補選択のquery embedding待ち。既存 `dialogue.candidates_selected` はrecall等も含む |
+| `dialogue / generation_prepare` | キューのclaim処理内で、採用履歴・展開する指示・今回入力を組み立てる時間。writerの待ち時間は含まない |
+| `dialogue / generation_input_refresh` | 生成開始後に添付を解決し、応答に添える作業結果を更新する時間 |
+| `dialogue / generation_respond` | 会話エージェントが応答・ツール呼出しを終えるまで |
+| `dialogue / tool_execution` | 検証済みのツール呼出し1回の時間。`kind` に登録済みのツール名を記録する |
+| `dialogue / query_embedding` | `find_toolchain` の検索用embedding待ち。`tool_execution` の内側で計測する |
+| `dialogue / generation_settle` | writerに入ってから会話応答の採用・失効を処理する時間 |
 | `larm / main_connection_wait` | 同じ主会話接続の先行要求待ち |
 | `larm / provider_ready` | 接続・claim・必要なrenew等が返るまで。`kind` がProviderの役割。再利用ならほぼ0 |
+| `inference / context_fit`、`larm / context_fit` | 実際に送るメッセージをウィンドウに合わせる処理。正式計数を使うLARM経路では、下の `token_count` で確認する |
+| `larm / request_prepare` | LARMに渡す要求の構築・検証・シリアル化 |
 | `larm / token_count` | 正式token計数とその契約検査。計数不要のProviderでは即時に返る |
 | `larm / response_headers` | HTTP要求開始からヘッダー到着まで。body受信完了・純粋なモデル計算時間ではない。`kind` は操作名 |
 | `inference / provider` | ASR/LLM/TTSのadapter呼出し全体。接続・計数・受信も含む |
+| `inference / provider_first_delta` | adapter呼出しから、空白以外の本文差分が初めて推論層に届くまで。公開保留中でも記録し、差分なしの呼出しでは値がない |
 | `inference.router_usage` | Router の直接API呼出し1回の `durationMs` と `outcome`。報告された入力・キャッシュ読取・出力の各トークン数を記録。呼出し元の `runId` があれば、会話の `dialogue.router_selection` と照合できる |
 | `inference / answer_delivery` | 回答生成後の態度判定の実際の待ち時間。接続準備・収集処理を含みうる |
 | `voice-dialogue / asr` | 音声認識要求から結果が返るまで |
@@ -217,7 +231,9 @@ workerは共通補正の拒否分類を `agent.control_rejected.validationCode` 
 
 `larm.llm_timing.ttftMs` は従来どおり、接続確保後の計数等を含む最初の非空本文までの時間です。追加した `providerTtftMs` は計数完了後、生成要求の送信直前から最初の非空本文まで。通信、Provider内部待ち、応答ヘッダー後のexchange記録待ちを含むため、純粋なprefill時間ではありません。非streamのcontrol要求には本文TTFTを付けません。`totalMs` も単調増加時計に変更しています。
 
-これらの区間は**入れ子**です。`provider` に `provider_ready`・`token_count`・`response_headers` が含まれるため、全行の `durationMs` を合計しないでください。`inference.delivery_selected.durationMs` は採用するdelivery内の値で、既存deliveryをTTSで再利用した場合は過去の判定時間です。新しい待ち時間として重複加算しません。
+これらの区間は**入れ子**です。`generation_respond` にモデル呼出しとツール実行が含まれ、`provider` は `provider_ready`・`token_count`・`response_headers` などを含みます。全行の `durationMs` を合計すると内側の時間を重複して数えます。`inference.delivery_selected.durationMs` は採用するdelivery内の値で、既存deliveryをTTSで再利用した場合は過去の判定時間です。
+
+特定の会話実行は `bun run logs -- --id <run-id> --event performance.stage --json` で区間だけを確認できます。複数の実行の分布は[性能の集計手順](performance.md#保存済みログから会話の基準値を取る)を参照してください。
 
 ### 音声入力：話し終えてから入力欄に表示されるまで
 

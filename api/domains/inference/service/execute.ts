@@ -1,4 +1,4 @@
-import { measureStage } from "../../../infrastructure/performance";
+import { measureStage, recordStage } from "../../../infrastructure/performance";
 import {
 	estimateJsonTokens,
 	estimateMessageTokens,
@@ -80,6 +80,7 @@ async function attempt(
 	const attemptSignal = AbortSignal.any([r.signal, abort.signal]);
 	const decide = decider(r, attemptSignal);
 	let checkedAt = -1;
+	let providerStarted: number | undefined;
 	const delta = r.onDelta
 		? (text: string) => {
 				attemptSignal.throwIfAborted();
@@ -91,6 +92,16 @@ async function attempt(
 					checkedAt = generation;
 				}
 				if (text) {
+					if (providerStarted !== undefined && text.trim()) {
+						recordStage(
+							"inference",
+							"provider_first_delta",
+							providerStarted,
+							"ok",
+							logFields,
+						);
+						providerStarted = undefined;
+					}
 					let held: void | false;
 					try {
 						held = r.onDelta!(text);
@@ -145,8 +156,9 @@ async function attempt(
 			measureStage(
 				"inference",
 				"provider",
-				() =>
-					fenced(
+				() => {
+					providerStarted = performance.now();
+					return fenced(
 						startWork(r, {
 							source,
 							sent,
@@ -156,7 +168,8 @@ async function attempt(
 							delta,
 						}),
 						attemptSignal,
-					),
+					);
+				},
 				logFields,
 			);
 		let value: Awaited<ReturnType<typeof provide>>;

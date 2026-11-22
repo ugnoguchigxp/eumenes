@@ -53,6 +53,8 @@ test("conversation timing uses the run and job, and usage uses the attempt", () 
 			attemptId: "attempt-1",
 			mode: "reset",
 		}),
+		event(272, "inference.codex_usage_updated", { attemptId: "attempt-1" }),
+		event(380, "inference.codex_usage_updated", { attemptId: "attempt-1" }),
 		event(500, "dialogue.first_delta", { ...reply, kind: "streamed" }),
 		event(520, "voice.first_chunk_ready", reply),
 		event(600, "inference.attempt_succeeded", attempt),
@@ -69,6 +71,7 @@ test("conversation timing uses the run and job, and usage uses the attempt", () 
 			phase: "generation",
 		}),
 		event(230, "dialogue.first_delta", { ...cancelled, kind: "streamed" }),
+		event(233, "inference.codex_usage_updated", { attemptId: "attempt-2" }),
 		event(240, "queue.settled", {
 			jobId: cancelled.jobId,
 			status: "cancelled",
@@ -90,6 +93,7 @@ test("conversation timing uses the run and job, and usage uses the attempt", () 
 		attemptToFirstBody: { count: 1, p50: 249 },
 		acceptToAudioReady: { count: 1, p50: 420 },
 		acceptToSettled: { count: 1, p50: 800 },
+		firstBodyToSettled: { count: 1, p50: 400 },
 		router: { count: 1, p50: 100 },
 	});
 	expect(report.attempts).toMatchObject({ reply: 2, background: 1 });
@@ -100,6 +104,7 @@ test("conversation timing uses the run and job, and usage uses the attempt", () 
 	});
 	expect(report.codex.reply).toMatchObject({
 		modes: { reset: 1, append: 0 },
+		usageUpdates: { observed: 3, attempts: 2, multipleUpdateAttempts: 1 },
 		usage: {
 			calls: 2,
 			withCacheCounts: 1,
@@ -121,6 +126,11 @@ test("conversation timing uses the run and job, and usage uses the attempt", () 
 		new Set([reply.runId]),
 	);
 	expect(selected.codex.reply?.usage?.calls).toBe(1);
+	expect(selected.codex.reply?.usageUpdates).toEqual({
+		observed: 2,
+		attempts: 1,
+		multipleUpdateAttempts: 1,
+	});
 	expect(selected.codex.background?.usage?.calls).toBe(1);
 });
 
@@ -135,9 +145,87 @@ test("logs alone preserve missing usage and skip held text", () => {
 		end,
 	);
 	expect(report.codex.reply?.usage).toBeNull();
+	expect(report.codex.reply?.usageUpdates).toBeNull();
 	expect(report.completedTimingMs.acceptToFirstBody).toMatchObject({
 		count: 0,
 		p50: null,
+	});
+	expect(report.stageTimingMs).toEqual([]);
+	expect(report.larmTimingMs.providerPrefill).toMatchObject({
+		count: 0,
+		p50: null,
+	});
+});
+
+test("stage timings follow selected runs, separate outcomes and preserve missing provider metrics", () => {
+	const stage = {
+		component: "inference",
+		phase: "provider",
+		purpose: "llm",
+		source: "larm",
+	};
+	const logs = [
+		event(100, "dialogue.accepted", { runId: "run" }),
+		event(110, "dialogue.accepted", { runId: "other" }),
+		event(175, "performance.stage", {
+			...stage,
+			runId: "run",
+			outcome: "ok",
+			durationMs: 25,
+		}),
+		event(180, "performance.stage", {
+			...stage,
+			runId: "run",
+			outcome: "ok",
+			durationMs: 45,
+		}),
+		event(200, "performance.stage", {
+			...stage,
+			runId: "run",
+			outcome: "error",
+			durationMs: 90,
+		}),
+		event(201, "performance.stage", {
+			...stage,
+			runId: "run",
+			outcome: "ok",
+			durationMs: -5,
+		}),
+		event(210, "performance.stage", {
+			...stage,
+			runId: "other",
+			outcome: "ok",
+			durationMs: 900,
+		}),
+		event(211, "performance.stage", {
+			...stage,
+			outcome: "ok",
+			durationMs: 900,
+		}),
+		event(220, "inference.prepared", { ...stage, runId: "run", durationMs: 0 }),
+		event(225, "larm.llm_timing", {
+			runId: "run",
+			outcome: "ok",
+			providerTtftMs: 30,
+			providerPromptMs: 0,
+		}),
+	];
+	const report = conversationPerformance(
+		logs,
+		start,
+		end,
+		undefined,
+		new Set(["run"]),
+	);
+	expect(report.stageTimingMs).toMatchObject([
+		{ ...stage, outcome: "error", count: 1, p50: 90, p90: 90 },
+		{ ...stage, outcome: "ok", count: 2, p50: 35, p90: 45 },
+		{ phase: "attempt_prepare", count: 1, p50: 0 },
+	]);
+	expect(report.larmTimingMs).toMatchObject({
+		firstBodyAfterSend: { count: 1, p50: 30 },
+		providerPrefill: { count: 1, p50: 0 },
+		providerDecode: { count: 0, p50: null },
 	});
 });
 

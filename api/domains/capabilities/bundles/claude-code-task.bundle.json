@@ -79,6 +79,36 @@
 			"minImpact": "modify_existing"
 		},
 		{
+			"kind": "toolchain",
+			"id": "claude-code.request",
+			"revision": 7,
+			"publishFromRevision": 5,
+			"title": "Claude Code",
+			"summary": "Claude Code が登録済みの作業場所で開発作業を引き受ける。担当が実行を管理し、進捗・確認事項・検証結果を返す。",
+			"aliases": ["Claude Code", "クロードコード"],
+			"tags": [],
+			"useWhen": [
+				"コードの実装・修正・調査・テストを Claude Code に頼みたい",
+				"登録済みの作業場所で Claude Code に開発作業と検証を任せたい"
+			],
+			"avoidWhen": [
+				"プログラミングの一般的な質問に答えるだけ",
+				"Claude Code の使い方や料金を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.managed@1"],
+			"examples": [
+				"Claude Code でログイン画面のバグを直して",
+				"README のセットアップ手順を最新にするよう Claude Code に頼んで",
+				"Claude Code で設定画面に項目を足して",
+				"別のセッションの Claude Code で依存パッケージを更新して"
+			],
+			"packageRevisionId": "package:claude-code.managed@1",
+			"functionName": "claude_code",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.managed@1",
+			"minImpact": "modify_existing"
+		},
+		{
 			"aliases": [],
 			"tags": [],
 			"useWhen": [],

@@ -1,5 +1,6 @@
 import { AsyncResource } from "node:async_hooks";
 import { getLogger } from "../../../infrastructure/logger";
+import { recordStage } from "../../../infrastructure/performance";
 import { fail } from "./cloud-agent-shared";
 import type { CodexRpc, ThreadChannel, ThreadHandler } from "./codex-transport";
 import { emptyTotals, type CodexTotals } from "./codex-usage";
@@ -167,6 +168,7 @@ export function createCodexThreads(options: {
 			attemptId?: string;
 			connectionId?: string;
 		}): Promise<ThreadLease> {
+			const startedAt = performance.now();
 			const idle = [...entries].filter(
 				(e) =>
 					e.rpc === input.rpc &&
@@ -221,6 +223,12 @@ export function createCodexThreads(options: {
 			entry.busy = true;
 			clearTimeout(entry.timer);
 			if (!reusable) entries.add(entry);
+			const fields = {
+				mode,
+				...(input.attemptId ? { attemptId: input.attemptId } : {}),
+				...(input.connectionId ? { connectionId: input.connectionId } : {}),
+			};
+			let outcome: "ok" | "error" = "error";
 			try {
 				if (mode === "new") {
 					const started = (await input.rpc.request(
@@ -243,15 +251,22 @@ export function createCodexThreads(options: {
 					entry.continuation = undefined;
 					entry.totals = emptyTotals;
 				}
+				outcome = "ok";
 			} catch (error) {
 				await retire(entry);
 				throw error;
+			} finally {
+				recordStage(
+					"inference",
+					"codex_thread_ready",
+					startedAt,
+					outcome,
+					fields,
+				);
 			}
 			log.info("inference.codex_thread", {
-				mode,
+				...fields,
 				count: entries.size,
-				...(input.attemptId ? { attemptId: input.attemptId } : {}),
-				...(input.connectionId ? { connectionId: input.connectionId } : {}),
 			});
 			return {
 				threadId: entry.id,

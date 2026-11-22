@@ -3,6 +3,7 @@ import {
 	type ChatDiagnostics,
 } from "../../../infrastructure/chat-stream";
 import { getLogger } from "../../../infrastructure/logger";
+import { measureSyncStage } from "../../../infrastructure/performance";
 import type { LarmCallOptions, LarmPort } from "../contracts";
 import { type Provider } from "./profiles";
 import { fitContext } from "./context";
@@ -27,13 +28,15 @@ export function startLlmTiming(
 	// The fit check already measured the final messages; no extra serialization.
 	const fitted = formalCount
 		? { messages, bytes: 0 }
-		: fitContext(
-				messages,
-				window.outputLimit === "remaining-context"
-					? { ...window, outputReserveTokens: maxTokens }
-					: window,
-				options?.contextPolicy === "exact",
-				options?.history,
+		: measureSyncStage("larm", "context_fit", () =>
+				fitContext(
+					messages,
+					window.outputLimit === "remaining-context"
+						? { ...window, outputReserveTokens: maxTokens }
+						: window,
+					options?.contextPolicy === "exact",
+					options?.history,
+				),
 			);
 	const selected = fitted.messages;
 	let requestBytes = fitted.bytes;

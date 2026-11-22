@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { configureLogging } from "../../../infrastructure/logger";
 import { createCodexHost } from "../adapters/codex-host";
 import { codexUsage } from "../adapters/codex-usage";
 import { codexCall, fakeCodex, user } from "./codex.fixture";
@@ -28,7 +29,7 @@ out({id:m.id,result:{turn:{id:"u"+turns}}});
 const turnId = "u"+turns;
 for(const [threadId,id,n] of [["other",turnId,9999],["t","other",9999],["t",turnId,base+100],["t",turnId,base+250],["t",turnId,base+250],["t",turnId,base+100]]){
 const part={inputTokens:n,outputTokens:n/10,cachedInputTokens:n/2,cacheWriteInputTokens:0,reasoningOutputTokens:n/25};
-out({method:"thread/tokenUsage/updated",params:{threadId,turnId:id,tokenUsage:{total:part,last:{...part,inputTokens:7}}}});
+out({method:"thread/tokenUsage/updated",params:{threadId,turnId:id,tokenUsage:{total:part,last:{inputTokens:7,outputTokens:1,cachedInputTokens:3},modelContextWindow:4096}}});
 }
 if(turns===1)out({method:"model/rerouted",params:{threadId:"t",turnId,fromModel:"fixture-a",toModel:"fixture-b"}});
 out({method:"item/completed",params:{threadId:"t",turnId,item:{type:"agentMessage",text:"ok"}}});
@@ -41,12 +42,18 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"comple
 		{ PATH: "" },
 		{ executable: command, home: join(dir, "home") },
 	)!;
+	const lines: string[] = [];
+	configureLogging({
+		level: "info",
+		destination: { write: (line) => void lines.push(line) },
+	});
 	try {
 		const run = async (messages: string[]) => {
 			const observations: unknown[] = [];
 			const result = await host.run(
 				{ credential: null, baseUrl: "https://example.test" },
 				{
+					attemptId: `attempt-${messages.length}`,
 					model: "fixture-a",
 					instructions: "",
 					messages,
@@ -70,6 +77,23 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"comple
 			usageModel: null,
 		});
 		expect(first.observations).not.toHaveLength(0);
+		const updates = () =>
+			lines
+				.map((line) => JSON.parse(line))
+				.filter((entry) => entry.event === "inference.codex_usage_updated");
+		expect(updates()).toMatchObject([
+			{
+				attemptId: "attempt-1",
+				mode: "new",
+				promptTokens: 100,
+				cachedTokens: 50,
+				providerPromptTokens: 7,
+				providerCachedTokens: 3,
+				providerOutputTokens: 1,
+				modelContextWindow: 4096,
+			},
+			{ attemptId: "attempt-1", mode: "new", promptTokens: 250 },
+		]);
 		// The same thread continued: the total began this turn at 250 / 25 / 125 / 10 and the turn added the rest.
 		const second = await run(["a", first.result.text, "c"]);
 		expect(second.result).toMatchObject({
@@ -79,6 +103,10 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"comple
 			reasoningTokens: 50 - 10,
 			usageModel: "fixture-a",
 		});
+		expect(updates().slice(2)).toMatchObject([
+			{ attemptId: "attempt-3", mode: "append", promptTokens: 850 },
+			{ attemptId: "attempt-3", mode: "append", promptTokens: 1000 },
+		]);
 		expect(
 			codexUsage(
 				{ total: { inputTokens: 100, outputTokens: -1 } },
@@ -96,6 +124,7 @@ out({method:"turn/completed",params:{threadId:"t",turn:{id:turnId,status:"comple
 	} finally {
 		await host.close();
 		await rm(dir, { recursive: true, force: true });
+		configureLogging({ level: "silent" });
 	}
 });
 

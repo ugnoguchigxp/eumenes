@@ -64,7 +64,7 @@ export function availableToolchainsInTransaction(
 	return new Set(readyCatalog(deps, db).map((entry) => entry.id));
 }
 
-function readyCatalog(deps: DialogueDeps, db: Database) {
+export function readyCatalog(deps: DialogueDeps, db: Database) {
 	const { agents, toolchains } = deps;
 	if (!toolchains) return [];
 	const ready = (requires: string | undefined) =>

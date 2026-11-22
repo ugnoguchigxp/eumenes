@@ -303,6 +303,12 @@ export async function prepareNoteDisplay(
 		now(): number;
 		setTimer(fn: () => void, ms: number): unknown;
 		clearTimer(handle: unknown): void;
+		goalNoteInTransaction:
+			| ((
+					db: Database,
+					id: string,
+			  ) => (AgendaNote & { documentConversationId: string }) | undefined)
+			| undefined;
 	},
 	c: AgendaScope,
 	note: AgendaNote,
@@ -318,17 +324,23 @@ export async function prepareNoteDisplay(
 	const shown = (db: Database) =>
 		deps.conversation.sourceInTransaction(db, messageId).state === "available";
 	const origin = (db: Database) => {
-		const context = referencedInput(deps, db, citableNotes(c), [
-			`note:${note.id}`,
-		]);
+		const notes = citableNotes(c);
+		const design = host.goalNoteInTransaction?.(db, note.id);
+		if (design) notes.push(design);
+		const context = referencedInput(deps, db, notes, [`note:${note.id}`]);
 		if (!context.complete) throw new Error("agency_origin_stale");
-		return context;
+		return { context, design };
 	};
 	const id = await deps.store.write((db) => {
 		signal.throwIfAborted();
 		if (shown(db)) return null;
-		origin(db);
-		return startNoteDocument(deps, db, c.id, note);
+		const { design } = origin(db);
+		return startNoteDocument(
+			deps,
+			db,
+			design?.documentConversationId ?? c.id,
+			design ?? note,
+		);
 	});
 	if (id === null) return () => {};
 	const until = host.now() + NOTE_DOCUMENT_WAIT_MS;
@@ -351,7 +363,7 @@ export async function prepareNoteDisplay(
 	return (db) => {
 		signal.throwIfAborted();
 		if (shown(db)) return;
-		const context = origin(db);
+		const { context } = origin(db);
 		const document = documents.stateInTransaction(db, id);
 		if (document === "pending") throw new Error("agency_note_document_pending");
 		if ("code" in document) throw new Error(document.code);

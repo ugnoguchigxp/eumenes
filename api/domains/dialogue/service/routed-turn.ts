@@ -13,6 +13,10 @@ import type {
 	AgentToolDefinition,
 } from "../contracts";
 import type { ChatMessage, DialogueDeps, GenerateInput } from "./context";
+import {
+	firstConfirmationReply,
+	releasePendingReply,
+} from "./confirmation-decision";
 import { conversationOutput } from "./conversation-output";
 import { imageAnswerTrace } from "./attachment-context";
 import { availableReadTools, readToolDefinitions } from "./executor-read";
@@ -43,7 +47,11 @@ export type RoutedTurnOptions = {
 	session?: Pick<CallSession, "context" | "refs">;
 	execute: ToolExecutor;
 	/** Closes the confirmation `c<ref>` the user declined, with the run's authority checks; false when not open. */
-	decline?: (ref: number, receipt?: Receipt) => Promise<boolean>;
+	decline?: (
+		ref: number,
+		receipt?: Receipt,
+		revise?: boolean,
+	) => Promise<boolean>;
 };
 
 /**
@@ -348,8 +356,8 @@ function createTurn(
 		},
 
 		/** Closes the confirmation `c<ref>` the user declined (false when it was not open, or no port closes it). */
-		decline(ref: number) {
-			return options.decline?.(ref, receipt) ?? Promise.resolve(false);
+		decline(ref: number, revise = false) {
+			return options.decline?.(ref, receipt, revise) ?? Promise.resolve(false);
 		},
 
 		/** One host operation through the generation's executor: its outcome, or the refusal of its arguments. */
@@ -379,6 +387,8 @@ function createTurn(
 			// What this talk spoke, and whether it read: a call that fails after a read gets the host's words after it.
 			let spoken = "";
 			let toolMade = false;
+			const firstPending = firstConfirmationReply();
+			const release = releasePendingReply.bind(null, this);
 			const saidBefore = said;
 			const toolPort = conversationToolPort(
 				this,
@@ -404,7 +414,11 @@ function createTurn(
 					messages: messages as AgentMessage[],
 					chat: {
 						async complete(request, onDelta, chatSignal) {
-							const output = conversationOutput(onDelta, system);
+							const check = firstPending(request.tools);
+							const output = conversationOutput(
+								check ? () => {} : onDelta,
+								system,
+							);
 							// A port without the streamed call answers in one piece, as the agent loop's does.
 							if (!input.requestId || !deps.larm.executeStream) {
 								// The messages of this call (steered words and the agency's state are in them), not the prompt's.
@@ -432,6 +446,15 @@ function createTurn(
 									request.messages as ChatMessage[],
 									output,
 								);
+								if (check) {
+									const operation = await release(
+										request.messages as ChatMessage[],
+										reply,
+										onDelta,
+									);
+									if (operation) return { text: "", toolCalls: [operation] };
+									receipt = answered;
+								}
 								talkImageAnswer = trace;
 								return reply;
 							} catch (error) {

@@ -492,7 +492,7 @@ test("the memory bundle runs through the action ledger: only the connection swit
 		registry,
 		scope: "test-scope",
 	});
-	const revisionId = "artifact:settings.memory@5";
+	const revisionId = "artifact:settings.memory@6";
 	expect(ledger.artifacts().map((a) => a.artifactRevisionId)).toContain(
 		revisionId,
 	);

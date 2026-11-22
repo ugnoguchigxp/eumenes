@@ -1,0 +1,23 @@
+{
+	"catalog": {
+		"file": "ruri-catalog.sqlite",
+		"bytes": 46481408,
+		"sha256": "e1da23e8404a2f01fb4da11b6b15ccae338e9632f75f6f2b770b99a2f31a1825"
+	},
+	"seed": {
+		"file": "ruri-catalog.seed.sql.gz",
+		"format": "sqlite-sql-gzip.v1",
+		"bytes": 23045532,
+		"sha256": "921a4cabb4e84d202c2ac8c62bf9557879931187751a5a95edb2f788a41b7f9c"
+	},
+	"format": "skillsmith-ruri-catalog.v1",
+	"id": "8dd45da2003ef2102680f61c12fedc9d",
+	"model": "cl-nagoya/ruri-v3-130m",
+	"revision": "e3114c6ee10dbab8b4b235fbc6dcf9dd4d5ac1a6",
+	"tokenizerDigest": "0a94ac9a0a02c067bdef25b72ae9f4ee33f48f552e55988d444f6d25eeb1d062",
+	"dimension": 512,
+	"skills": 4259,
+	"completeDocuments": 4257,
+	"sourceBackupSha256": "def8159403f68a024933f72961a52d07aa8ef262ba9ac803745c3392cd1b9740",
+	"integrity": "ok"
+}

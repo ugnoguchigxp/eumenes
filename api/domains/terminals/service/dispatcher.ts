@@ -6,9 +6,11 @@ import {
 	activityStale,
 	createEntry,
 	DEFAULT_TERMINAL_SIZE,
+	workspaceIdentity,
 	type Sessions,
 } from "./sessions";
 import type { Inflight, Runtime, Session } from "./types";
+import { releaseDirectWorkspace } from "./workspace";
 
 const log = getLogger("terminals");
 
@@ -187,9 +189,9 @@ export function createDispatcher(
 					inflight: flight,
 				});
 			} catch {
+				await releaseDirectWorkspace(rt, workspaceIdentity(entry), entry);
 				return fail(row);
 			}
-			if (!reuse) rt.sessions.set(entry.id, entry);
 			session = entry;
 		}
 		session.lastUsedAtMs = rt.now();
@@ -219,6 +221,7 @@ export function createDispatcher(
 		const store = rt.options.store;
 		if (!store) return;
 		for (const row of store.read((db) => repository.queued(db))) {
+			if (rt.closing) return;
 			const chosen = plan(row);
 			if (chosen.kind === "wait") continue;
 			const send = execute(row, chosen).catch((error) => {

@@ -122,49 +122,66 @@ function CollectionDetail({
 function CollectionPlainTable({
 	data,
 	label,
+	columnMinWidths,
 	busy,
 	onAct,
 }: {
 	data: CollectionResource;
 	label: string;
+	columnMinWidths?: Record<string, number>;
 	busy: boolean;
 	onAct: (row: Row, action: CollectionRowAction) => void;
 }) {
 	return (
-		<table aria-label={label}>
-			<thead>
-				<tr>
-					{data.columns.map((column) => (
-						<th key={column.key} scope="col">
-							{column.label}
-						</th>
-					))}
-					{data.rows.some((row) => row.actions.length) && (
-						<th scope="col">操作</th>
-					)}
-				</tr>
-			</thead>
-			<tbody>
-				{data.rows.map((row) => (
-					<tr key={row.id}>
+		<section
+			className="aui-collection-table-scroll"
+			aria-label={`${label}の表`}
+			// eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- allow keyboard scrolling
+			tabIndex={columnMinWidths ? 0 : undefined}
+		>
+			<table aria-label={label}>
+				<thead>
+					<tr>
 						{data.columns.map((column) => (
-							<td key={column.key}>
-								{column.media ? (
-									<MediaValue row={row} column={column.key} />
-								) : (
-									row.cells[column.key]
-								)}
-							</td>
+							<th
+								key={column.key}
+								scope="col"
+								style={
+									columnMinWidths?.[column.key]
+										? { minWidth: `${columnMinWidths[column.key]}em` }
+										: undefined
+								}
+							>
+								{column.label}
+							</th>
 						))}
-						{row.actions.length > 0 && (
-							<td>
-								<RowActions row={row} disabled={busy} onAct={onAct} />
-							</td>
+						{data.rows.some((row) => row.actions.length) && (
+							<th scope="col">操作</th>
 						)}
 					</tr>
-				))}
-			</tbody>
-		</table>
+				</thead>
+				<tbody>
+					{data.rows.map((row) => (
+						<tr key={row.id}>
+							{data.columns.map((column) => (
+								<td key={column.key}>
+									{column.media ? (
+										<MediaValue row={row} column={column.key} />
+									) : (
+										row.cells[column.key]
+									)}
+								</td>
+							))}
+							{row.actions.length > 0 && (
+								<td>
+									<RowActions row={row} disabled={busy} onAct={onAct} />
+								</td>
+							)}
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</section>
 	);
 }
 
@@ -286,16 +303,9 @@ export function CollectionWorkspaceView({
 				indicator={request.indicator}
 			/>
 		);
-	const catalog =
-		request.view === "collection-workspace" &&
-		request.presentation === "catalog" &&
-		!data.paging;
-	const summary =
-		request.view === "collection-workspace" &&
-		request.presentation === "summary" &&
-		!data.paging;
-	const table =
-		request.view === "collection-workspace" && request.presentation === "table";
+	const catalog = collectionRequest?.presentation === "catalog" && !data.paging;
+	const summary = collectionRequest?.presentation === "summary" && !data.paging;
+	const table = collectionRequest?.presentation === "table";
 	const tableKeys = collectionRequest?.tableColumns;
 	const foundRows = data.rows.filter((row) =>
 		Object.values(row.cells).some((value) =>
@@ -442,6 +452,7 @@ export function CollectionWorkspaceView({
 					data={data}
 					label={data.title ?? request.title ?? "一覧"}
 					columns={columns}
+					columnMinWidths={collectionRequest?.columnMinWidths}
 					busy={busy}
 					error={data.error}
 					emptyMessage={
@@ -468,6 +479,7 @@ export function CollectionWorkspaceView({
 				<CollectionPlainTable
 					data={data}
 					label={data.title ?? request.title ?? "一覧"}
+					columnMinWidths={collectionRequest?.columnMinWidths}
 					busy={busy}
 					onAct={act}
 				/>

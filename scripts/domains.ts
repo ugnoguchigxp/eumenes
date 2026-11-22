@@ -160,6 +160,7 @@ export const domains = {
 		backend: "api/domains/terminals",
 		web: "web/src/domains/terminals",
 		components: null,
+		integrationTests: ["api/application/work/terminal-workspace.test.ts"],
 		depends: { api: [], web: [], test: [] },
 	},
 	background: {
@@ -444,6 +445,10 @@ export const domains = {
 		backend: "api/domains/goals",
 		web: null,
 		components: null,
+		integrationTests: [
+			"api/application/agency/goal-agenda.test.ts",
+			"api/application/agency/goal-agenda-regressions.test.ts",
+		],
 		depends: { api: [], web: [], test: [] },
 	},
 	world: {

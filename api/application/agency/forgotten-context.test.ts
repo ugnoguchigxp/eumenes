@@ -107,10 +107,18 @@ for (const withCompletedWork of [false, true]) {
 		);
 		host.start();
 		try {
+			const forgottenTopic = "古い観測だけに属する話題";
+			const forgottenAnswer = "古い話を受け取りました。";
 			let workInputId: string | undefined;
 			if (withCompletedWork) {
-				h.state.steps.push(routeChoice({ choice: IMAGE.id }));
-				const run = await h.say("古い制作の成果を画像にしてください", "queued");
+				// Tie the text under test to the work input whose observation will be forgotten.
+				h.state.steps.push(
+					routeChoice({ choice: IMAGE.id, say: forgottenAnswer }),
+				);
+				const run = await h.say(
+					`${forgottenTopic}を画像にしてください`,
+					"queued",
+				);
 				workInputId = run.inputMessageId;
 				await h.finishImage(run.id, {
 					state: "completed",
@@ -120,8 +128,16 @@ for (const withCompletedWork of [false, true]) {
 				expect(h.archived()).toHaveLength(1);
 			}
 			const earlierSelections = selections;
-			h.state.steps.push(...reply("古い話を受け取りました。"));
-			await h.say("古い観測だけに属する話題です。");
+			h.state.steps.push(
+				...reply(
+					withCompletedWork ? "別の話題を記録しました。" : forgottenAnswer,
+				),
+			);
+			const observed = await h.say(
+				withCompletedWork
+					? "こちらは別の話題です。"
+					: `${forgottenTopic}です。`,
+			);
 			await waitFor(
 				() => selections === earlierSelections + 1 && !host.status("main").busy,
 			);
@@ -135,7 +151,7 @@ for (const withCompletedWork of [false, true]) {
 					return (
 						source.state === "available" &&
 						source.message.role === "user" &&
-						(!workInputId || o.observationId === workInputId)
+						o.observationId === (workInputId ?? observed.inputMessageId)
 					);
 				}),
 			)!;
@@ -196,7 +212,7 @@ for (const withCompletedWork of [false, true]) {
 				}),
 			)!;
 			expect(prefix.messages.map((m) => m.content).join("\n")).not.toContain(
-				"古い観測だけに属する話題",
+				forgottenTopic,
 			);
 			expect(prefix.input?.sources).not.toContain(row.observationId);
 			if (withCompletedWork) {
@@ -207,7 +223,7 @@ for (const withCompletedWork of [false, true]) {
 				expect(h.archived()).toHaveLength(1);
 			}
 			expect(prefix.messages.map((m) => m.content).join("\n")).not.toContain(
-				"古い話を受け取りました",
+				forgottenAnswer,
 			);
 			const before = selections;
 			h.state.steps.push(...reply("今の話を受け取りました。"));

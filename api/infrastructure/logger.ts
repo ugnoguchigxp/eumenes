@@ -110,6 +110,8 @@ export interface LogFields {
 	providerPromptTokens?: number;
 	providerCachedTokens?: number;
 	providerOutputTokens?: number;
+	/** Effective context window reported by the SDK. */
+	modelContextWindow?: number;
 	reasoningChars?: number;
 	totalMs?: number;
 	/** voice.input_timing: the browser's side of speech end → transcript on screen. */
@@ -178,6 +180,7 @@ const keys = new Set<keyof LogFields>([
 	"providerPromptTokens",
 	"providerCachedTokens",
 	"providerOutputTokens",
+	"modelContextWindow",
 	"reasoningChars",
 	"totalMs",
 	"requestBytes",

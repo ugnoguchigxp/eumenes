@@ -105,3 +105,51 @@ test("a voice request reads a saved note and replies without starting work", asy
 		await f.close();
 	}
 });
+
+test("voice playback finishes when adoption removes a repeated tool preamble", async () => {
+	const preamble = "実行の記録を確かめます。";
+	const tail = "対象の実行は完了しました";
+	const f = await agendaFixture({
+		dialogue: {
+			voiceText: "実行の結果を教えてください。",
+			firstRound(tools, _question, messages) {
+				if (messages.at(-1)?.role === "tool") return { text: preamble + tail };
+				if (tools.some(({ function: tool }) => tool.name === "read_runs"))
+					return {
+						text: preamble,
+						calls: [{ name: "read_runs", args: {} }],
+					};
+			},
+		},
+	});
+	try {
+		await f.start();
+		await f.host.attend("main");
+		const sessionId = crypto.randomUUID();
+		const utteranceId = crypto.randomUUID();
+		const wav = new Uint8Array(48);
+		wav.set(new TextEncoder().encode("RIFF"));
+		wav.set(new TextEncoder().encode("WAVE"), 8);
+		const { voice, dialogue, spoken } = f.h;
+		voice.start(sessionId, 1);
+		await voice.accept(sessionId, 1, 1, utteranceId, wav);
+		await waitFor(() => voice.get(utteranceId)?.status === "input_ready");
+		await voice.commit(utteranceId, voice.get(utteranceId)!.revision);
+		await waitFor(() => {
+			const turn = voice.get(utteranceId);
+			return turn?.status === "ready" || turn?.status === "failed";
+		});
+
+		const turn = voice.get(utteranceId)!;
+		expect(dialogue.answerText(turn.runId!)).toBe(preamble + tail);
+		expect(turn).toMatchObject({ status: "ready", error: null });
+		expect(spoken).toEqual([preamble, preamble, tail]);
+		for (const chunk of turn.audioChunks) {
+			expect(voice.takeAudio(utteranceId, chunk.index)).toEqual(wav);
+			await voice.played(utteranceId, chunk.index);
+		}
+		expect(voice.get(utteranceId)?.status).toBe("played");
+	} finally {
+		await f.close();
+	}
+});

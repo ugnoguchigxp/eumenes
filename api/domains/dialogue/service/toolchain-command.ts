@@ -178,6 +178,9 @@ async function executeCommand(
 				input.boundSet,
 				out.tool ?? "",
 				out.arguments ?? {},
+				input.interaction?.exchanges?.length
+					? `${input.request}\n\n${JSON.stringify({ previousQuestions: input.interaction.exchanges })}`
+					: input.request,
 			);
 			if (!checked.ok) {
 				log.warn("dialogue.operation_rejected", {
@@ -334,6 +337,7 @@ export function createToolchainCommandHandler(
 									id: claim.payload.interactionId,
 									generation: resume.generation,
 									epoch: resume.epoch,
+									exchanges: resume.exchanges,
 								},
 							}
 						: {}),

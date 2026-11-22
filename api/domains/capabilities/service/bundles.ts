@@ -22,6 +22,7 @@ import {
 	checkFields,
 	claimField,
 	schemaProperties,
+	schemaShape,
 } from "./bundle-fields";
 import { bundleFiles } from "./bundle-files";
 import { isWorkflowSchema } from "./workflow-schemas";
@@ -270,6 +271,18 @@ function checkTool(
 		issue("invalid_format", `${at}/toolRevisionId`, tool.toolRevisionId);
 	seen.add(tool.toolRevisionId);
 	c.schemaRef(tool.inputSchemaRef, `${at}/inputSchemaRef`);
+	if (
+		"conversationRequestField" in tool &&
+		tool.conversationRequestField &&
+		!schemaShape(c, tool.inputSchemaRef)?.stringProperties.includes(
+			tool.conversationRequestField,
+		)
+	)
+		issue(
+			"schema_mismatch",
+			`${at}/conversationRequestField`,
+			tool.conversationRequestField,
+		);
 	if (!adapter) return;
 	const operation = adapter.operations.get(tool.operationId);
 	if (!operation)

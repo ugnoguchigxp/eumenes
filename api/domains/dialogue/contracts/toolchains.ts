@@ -147,6 +147,11 @@ export interface ToolchainRoutingPort {
 		result: { outcome: SelectionOutcome; code?: string | null },
 	): void;
 	/** Optional status metadata for a usage reference; no output body or prior approval is exposed. */
+	offeredInRunInTransaction?(
+		db: Database,
+		runId: string,
+		conversationId: string,
+	): SelectionCandidate[];
 	usageOfRunInTransaction?(
 		db: Database,
 		runId: string,
@@ -196,6 +201,8 @@ export type BoundCommandSet = {
 		operationName: string;
 		inputSchemaRef: string;
 		summary: string;
+		/** For a direct handover, the host supplies this text argument from the conversation. */
+		conversationRequestField?: string;
 		/** Flat JSON Schema projected from inputSchemaRef. */
 		schema: Record<string, unknown>;
 	}>;
@@ -230,6 +237,7 @@ export interface BoundCommandPort {
 		set: BoundCommandSet,
 		toolId: string,
 		args: unknown,
+		conversationRequest?: string,
 	):
 		| {
 				ok: true;

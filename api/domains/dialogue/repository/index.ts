@@ -506,6 +506,16 @@ SET state='ended', end_reason='revoked', closing_reason=NULL, close_failures=0,
     revision=revision+1, epoch=epoch+1, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
 WHERE toolchain_id='collaboration.task' AND state<>'ended';`,
 	},
+	{
+		id: "dialogue/0044-confirmation-revision",
+		after: ["dialogue/0043-retire-collaboration-task"],
+		sql: `ALTER TABLE dialogue_confirmations ADD COLUMN revision_sources_json TEXT;
+ALTER TABLE dialogue_confirmations ADD COLUMN revises_id TEXT REFERENCES dialogue_confirmations(id);
+CREATE INDEX dialogue_confirmation_revisions ON dialogue_confirmations(conversation_id) WHERE revision_sources_json IS NOT NULL;
+CREATE TABLE dialogue_search_offers (
+ conversation_id TEXT PRIMARY KEY, run_seq INTEGER NOT NULL, message_id TEXT NOT NULL, search_json TEXT
+);`,
+	},
 ];
 
 /** A screen's form submit names its toolchain; only such a run writes the column. */

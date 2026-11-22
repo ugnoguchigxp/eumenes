@@ -408,6 +408,17 @@ test("each kind of reference problem is refused", async () => {
 				"schema_mismatch",
 			],
 			[
+				"request field outside the tool schema",
+				(b) => (b.bindings[0].tools[0].conversationRequestField = "missing"),
+				"schema_mismatch",
+			],
+			[
+				"numeric field used for the conversation request",
+				(b) =>
+					(b.bindings[0].tools[0].conversationRequestField = "durationSeconds"),
+				"schema_mismatch",
+			],
+			[
 				"tool schema differs from tool",
 				(b) => {
 					b.bindings[0].tools[0].operationId = "timers.pause";

@@ -29,7 +29,11 @@ export function documentOwner(
 export function schemaShape(
 	c: Check,
 	ref: string,
-): { properties: string[]; required: string[] } | null {
+): {
+	properties: string[];
+	stringProperties: string[];
+	required: string[];
+} | null {
 	const local = c.bundle.schemas.find(
 		(x) => `schema:${x.id}@${x.revision}` === ref,
 	);
@@ -46,7 +50,13 @@ export function schemaShape(
 				(r): r is string => typeof r === "string",
 			)
 		: [];
-	return { properties: Object.keys(properties), required };
+	return {
+		properties: Object.keys(properties),
+		stringProperties: Object.entries(properties)
+			.filter(([, property]) => property?.type === "string")
+			.map(([key]) => key),
+		required,
+	};
 }
 /** Property names of an object schema reference, or null when it cannot be read. */
 export function schemaProperties(c: Check, ref: string): string[] | null {

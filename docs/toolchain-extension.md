@@ -14,6 +14,10 @@ Docling Deskの入口は`docling-desk.bundle.json`と`adapter:docling@1`で追�
 
 ## 1. 全体像
 
+同じ担当IDに複数の実行方式がある場合、改訂版の toolchain 定義には `publishFromRevision` で更新元の版番号を指定できる。登録時にその版が選択中なら新しい版を公開する。別の版が選択中なら新しい定義だけを保存する。
+
+会話で合意した依頼本文をそのまま渡す command は、binding の tool に `conversationRequestField` で文字列引数を指定する。ホストがその引数に引き渡し時の本文を入れ、追加の確認があった場合だけ質問と回答を添える。残りの引数は通常どおりコマンド担当が設定する。
+
 | 単位 | 置き場所 | 持つもの |
 | --- | --- | --- |
 | bundle | `api/domains/capabilities/bundles/<名前>.bundle.json`（`CapabilityBundleV1`） | 依存revisionのpin、definitions、bindings、artifacts、schemas。コード・URLは実行しない |

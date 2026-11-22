@@ -66,13 +66,13 @@ function fakeClaude() {
 	};
 }
 
-/** Approves the open confirmation (the router's `c<n>.approve` candidate) when the utterance starts with はい. */
+/** The scripted user accepts the exact open reference from the reply's State. */
 function confirmWhenAsked(
 	messages: ReadonlyArray<{ content: string }>,
 	question: string,
 ) {
 	if (!question.startsWith("はい")) return undefined;
-	const ref = /- (c\d+)\.approve:/.exec(
+	const ref = /- (c\d+) 確認待ち /.exec(
 		messages.map((m) => m.content).join("\n"),
 	)?.[1];
 	return ref ? { calls: [approve(ref)] } : undefined;
@@ -97,7 +97,7 @@ test("a correction withdraws the wrong Claude Code request and only the approved
 	const wrong =
 		"ChatGPT Scheduledのタスク状態や実行履歴を調査し、自己診断の試作を実装してください。";
 	const corrected =
-		"Eumenes のスケジューラーが動かない原因を調べて報告してください。コードや設定は変更しないでください。";
+		"Eumenes のスケジューラーが動かない原因を調べて報告してください。\nコードや設定は変更しないでください。";
 	const decline = "decline_confirmation";
 	const h = await harness({
 		terminals: claude.terminals,
@@ -105,13 +105,18 @@ test("a correction withdraws the wrong Claude Code request and only the approved
 		conversationAgent: { ...testConversationAgent, handsWork: () => true },
 		firstRound: (tools, question, messages) => {
 			const native = tools.some((tool) => tool.function.parameters);
-			if (!native) return confirmWhenAsked(messages, question) ?? {};
+			const approving = confirmWhenAsked(messages, question);
+			if (approving) return approving;
+			if (!native) return {};
 			if (question === open)
 				return { text: "スケジューラーの自己診断を頼んでみましょうか？" };
-			if (question === consent || question === corrected) {
-				const request = question === consent ? wrong : corrected;
+			if (question === corrected) {
+				expect(messages.at(-1)?.content).toContain("検索済みの担当候補:");
+				return { calls: [delegate(toolchain, corrected)] };
+			}
+			if (question === consent) {
 				return toolResults(messages, "find_toolchain").length
-					? { calls: [delegate(toolchain, request)] }
+					? { calls: [delegate(toolchain, wrong)] }
 					: { calls: [findToolchain("Claude Code にコードの調査を依頼する")] };
 			}
 			if (question === correction) {
@@ -138,14 +143,15 @@ test("a correction withdraws the wrong Claude Code request and only the approved
 			}
 			return { text: "承知しました。" };
 		},
-		command: (messages) => {
-			const data = JSON.parse(messages.at(-1)!.content) as { request: string };
-			return JSON.stringify({
+		command: () =>
+			JSON.stringify({
 				action: "invoke",
 				tool: toolchain,
-				arguments: { prompt: askedOf(data.request), task: "予約の原因調査" },
-			});
-		},
+				arguments: {
+					prompt: "Claude Code 自身の設定を変更してください。",
+					task: "予約の原因調査",
+				},
+			}),
 	});
 	const say = async (text: string) => {
 		const run = await h.dialogue.submit({
@@ -193,6 +199,33 @@ test("a correction withdraws the wrong Claude Code request and only the approved
 		]);
 		expect(requests()).toEqual([]);
 
+		// A pre-upgrade utterance kept candidate IDs, while its selection kept their exact revisions.
+		await h.store.write((db) => {
+			db.query(
+				"DELETE FROM dialogue_search_offers WHERE conversation_id=?",
+			).run("main");
+			const reply = h.conversation.input.latestReplyWithToolInTransaction(
+				db,
+				"main",
+				"find_toolchain",
+			);
+			const oldCalls = reply!.toolCalls.map((call) => {
+				if (call.name !== "find_toolchain") return call;
+				const { candidates } = JSON.parse(call.result) as {
+					candidates: Array<{ id: string }>;
+				};
+				return {
+					...call,
+					result: JSON.stringify({
+						candidates: candidates.map(({ id }) => ({ id })),
+					}),
+				};
+			});
+			db.query(
+				"UPDATE conversation_utterances SET tool_exchange_json=? WHERE conversation_id=? AND seq=?",
+			).run(JSON.stringify(oldCalls), "main", reply!.seq);
+		});
+		await h.dialogue.clearRecent("main");
 		expect(await say(corrected)).toContain("Eumenes のスケジューラー");
 		expect(confirmations()).toHaveLength(2);
 		expect(confirmations()[1]).toEqual({
@@ -759,7 +792,17 @@ test.each(["missing", "completed", "changed"] as const)(
 			conversationAgent: { ...testConversationAgent, handsWork: () => true },
 			firstRound: (tools, question, messages) => {
 				const native = tools.some((tool) => tool.function.parameters);
-				if (!native) return confirmWhenAsked(messages, question) ?? {};
+				const verdict = toolResults(messages, "approve_confirmation").at(-1);
+				if (verdict) {
+					expect(JSON.parse(verdict)).toEqual({
+						delegated: false,
+						code: "diagnostic_evidence_changed",
+					});
+					return { text: "対象を再確認できません。作業は受け付けていません。" };
+				}
+				const approving = confirmWhenAsked(messages, question);
+				if (approving) return approving;
+				if (!native) return {};
 				if (question === diagnose) {
 					const result = toolResults(messages, "read_runs").at(-1);
 					if (!result)

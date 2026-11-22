@@ -1,5 +1,13 @@
 import { expect, test } from "bun:test";
-import { harness } from "../toolchain/toolchain.fixture";
+import { createBrowser } from "../../domains/browser";
+import {
+	FakeDriver,
+	FakeEncoder,
+	FakeFiles,
+	fakeResolver,
+} from "../../domains/browser/test/fakes";
+import { registerBrowserEffects } from "../browser/browser-effects";
+import { harness, workerPacket } from "../toolchain/toolchain.fixture";
 import {
 	createAgencyStatePort,
 	autonomousResearchSource,
@@ -11,7 +19,60 @@ import type { LlmPort } from "eumenes-agency";
 
 // The real registry, queue, research worker and result contract; only models/network are fixtures.
 test("autonomous intent dispatches real research, receives a result, survives restart and is revoked on forget", async () => {
-	const h = await harness();
+	const h = await harness({
+		// The service-search bundle pins registered browser operations even when the model selects web lookup.
+		browser(store, queue) {
+			const service = createBrowser({
+				store,
+				queue,
+				driver: new FakeDriver(),
+				encoder: new FakeEncoder(),
+				files: new FakeFiles(),
+				webOrigins: [],
+				resolveHost: fakeResolver(),
+			});
+			return {
+				service,
+				effects: registerBrowserEffects({ queue, service }),
+				requests: { userMessageInTransaction: () => null },
+			};
+		},
+		control(messages) {
+			const packet = workerPacket(messages);
+			const page = packet.observations.find(
+				(observation: { basis: string }) => observation.basis === "page",
+			);
+			if (page) {
+				const excerpt = page.excerpts[0];
+				const summary = excerpt.quote.split("\n")[0];
+				return JSON.stringify({
+					action: "finish",
+					report: {
+						completion: "complete",
+						answer: summary,
+						summary,
+						resultKind: "facts",
+						candidateRefs: [],
+						claims: [
+							{
+								text: summary,
+								status: "verified",
+								evidence: [excerpt.reference],
+							},
+						],
+						limitations: [],
+					},
+				});
+			}
+			const candidate = packet.candidates?.[0];
+			if (candidate)
+				return JSON.stringify({
+					action: "invoke",
+					tool: "web.read",
+					arguments: { candidateRef: candidate.reference },
+				});
+		},
+	});
 	const port = createAgencyStatePort({
 		agents: h.toolchain.agents,
 		toolchains: h.routing,
@@ -260,5 +321,6 @@ test("autonomous intent dispatches real research, receives a result, survives re
 		).toBeNull();
 	} finally {
 		await host.close();
+		await h.close();
 	}
 }, 20000);

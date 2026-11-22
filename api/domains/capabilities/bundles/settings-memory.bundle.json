@@ -8,7 +8,7 @@
 		{
 			"kind": "artifact",
 			"id": "settings.memory",
-			"revision": 5,
+			"revision": 6,
 			"title": "記憶",
 			"variants": [
 				{
@@ -41,7 +41,15 @@
 							{
 								"view": "collection-workspace",
 								"source": "memory-items",
-								"title": "いつも使う記憶（長期）"
+								"title": "いつも使う記憶（長期）",
+								"columnMinWidths": {
+									"kindLabel": 6.5,
+									"text": 17,
+									"statusLabel": 5,
+									"capturedByLabel": 11,
+									"validity": 7,
+									"quote": 8.5
+								}
 							},
 							{
 								"view": "collection-workspace",
@@ -51,7 +59,13 @@
 							{
 								"view": "collection-workspace",
 								"source": "memory-short-term",
-								"title": "最近の活動・メモ（短期）"
+								"title": "最近の活動・メモ（短期）",
+								"columnMinWidths": {
+									"kindLabel": 5,
+									"text": 16,
+									"originLabel": 11,
+									"expiresAt": 7
+								}
 							},
 							{
 								"view": "collection-workspace",
@@ -61,7 +75,14 @@
 							{
 								"view": "collection-workspace",
 								"source": "memory-history",
-								"title": "記憶の履歴"
+								"title": "記憶の履歴",
+								"columnMinWidths": {
+									"kindLabel": 6.5,
+									"text": 17,
+									"statusLabel": 7,
+									"capturedByLabel": 11,
+									"quote": 8.5
+								}
 							},
 							{
 								"view": "collection-workspace",

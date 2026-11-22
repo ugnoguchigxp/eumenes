@@ -1,12 +1,12 @@
 {
 	"package": "eumenes-memory-host",
-	"version": "0.1.0",
-	"artifact": "eumenes-memory-host-0.1.0-ce6f3e7b220b.tgz",
-	"sha256": "ce6f3e7b220bb5da2cee5798af706acbe1a60d28d8c4f4ebda53bfd3d17e5f5c",
+	"version": "0.2.0",
+	"artifact": "eumenes-memory-host-0.2.0-cbca090ca596.tgz",
+	"sha256": "cbca090ca596e7d57dd55b6caf946a1bd46d748721139bcc8ba5ec1b0f73299c",
 	"sourceGitCommit": "1439bfd9c5b171e2da19a445816688e1e3943651",
-	"sourceHash": "375a6bfce4ddd08aaba412372a3a8b1419cce3d8a6ec0fa55faee9ef1957f65e",
-	"sourceTreeState": "clean committed source",
-	"verifiedWith": "Vendored artifact checks, Eumenes memory integration, and schema 8 to 9 cutover and rollback fixture.",
+	"sourceHash": "b0657663d3708e47e443a1912fe7fdbbdb05fa49b13eb52d70413b18226b9580",
+	"sourceTreeState": "base commit plus Memory Host Agenda changes and application snapshot checks",
+	"verifiedWith": "Memory Host Agenda tests and embedded Memory archive comparison",
 	"mcpSdk": "2.4.0",
 	"corePackage": "eumenes-memory@0.0.4",
 	"coreSchemaVersion": 9

@@ -174,13 +174,13 @@ export function stateLinesInTransaction(
 		})}`;
 	};
 	const work = [
-		...open.slice(0, STATE_LIMITS.work).map((todo) => showTodo(todo, false)),
 		...(
 			ledger?.pendingConfirmationsInTransaction(tx, input.conversationId) ?? []
 		).map(
 			(c) =>
 				`- c${c.ref} 確認待ち ${c.toolchain}「${lineText(c.request)}」${c.target ? ` 対象「${lineText(c.target)}」` : ""}（${IMPACTS[c.impact] ?? c.impact}）`,
 		),
+		...open.slice(0, STATE_LIMITS.work).map((todo) => showTodo(todo, false)),
 		...specialistLines(deps, tx, input.conversationId, !!input.run),
 		...(input.handoff ? [`- ${lineText(input.handoff)}`] : []),
 	];

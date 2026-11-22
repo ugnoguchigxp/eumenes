@@ -233,6 +233,37 @@
 			"minImpact": "modify_existing"
 		},
 		{
+			"kind": "toolchain",
+			"id": "claude-code.request",
+			"revision": 6,
+			"publishFromRevision": 4,
+			"title": "Claude Code",
+			"summary": "Claude Code が開発作業を引き受ける。実行中の端末を使い、なければホストが登録済みの作業場所で起動して依頼文を渡す。",
+			"aliases": ["Claude Code", "クロードコード"],
+			"tags": [],
+			"useWhen": [
+				"コードの実装・修正・調査・テストを Claude Code に頼みたい",
+				"登録済みの作業場所で Claude Code に開発作業を任せ、端末で進捗を見たい"
+			],
+			"avoidWhen": [
+				"プログラミングの一般的な質問に答えるだけ",
+				"Claude Code の使い方や料金を聞いているだけ"
+			],
+			"dependencies": ["package:claude-code.request@2"],
+			"examples": [
+				"Claude Code でログイン画面のバグを直して",
+				"README のセットアップ手順を最新にするよう Claude Code に頼んで",
+				"Claude Code で設定画面に項目を足して",
+				"別のセッションの Claude Code で依存パッケージを更新して"
+			],
+			"packageRevisionId": "package:claude-code.request@2",
+			"functionName": "claude_code",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.request@3",
+			"artifactRevisionId": "artifact:terminals.workspace@2",
+			"minImpact": "modify_existing"
+		},
+		{
 			"kind": "skill",
 			"id": "claude-code.repair",
 			"revision": 3,
@@ -314,6 +345,25 @@
 					"toolRevisionId": "tool:claude-code.request@2",
 					"operationId": "claude-code.request",
 					"inputSchemaRef": "builtin:claudeCodeRequest"
+				}
+			],
+			"outputSchemaRef": "domain:claude-code.receipt@1",
+			"resultProjectionRef": "projection:claude-code.result@1",
+			"artifactRevisionId": "artifact:terminals.workspace@2"
+		},
+		{
+			"kind": "binding",
+			"id": "claude-code.request",
+			"revision": 3,
+			"execution": "command",
+			"adapterRef": "adapter:terminals@1",
+			"availabilityRef": "availability:terminals@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:claude-code.request@2",
+					"operationId": "claude-code.request",
+					"inputSchemaRef": "builtin:claudeCodeRequest",
+					"conversationRequestField": "prompt"
 				}
 			],
 			"outputSchemaRef": "domain:claude-code.receipt@1",
