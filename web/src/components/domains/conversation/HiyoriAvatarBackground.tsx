@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { readAssistantMouth } from "../../../domains/audio";
 import {
 	createHiyori,
+	readAvatarBackground,
 	readAvatarView,
+	saveAvatarBackground,
 	saveAvatarView,
 	type AvatarCue,
 } from "../../../domains/avatar";
@@ -24,6 +26,7 @@ export function HiyoriAvatarBackground({
 	const host = useRef<HTMLDivElement>(null);
 	const [view, setView] = useState(readAvatarView);
 	const viewRef = useRef(view);
+	const [background, setBackground] = useState(readAvatarBackground);
 	const redraw = useRef<(() => void) | undefined>(undefined);
 	const latest = useRef({ cue, phase });
 	useEffect(() => {
@@ -34,6 +37,7 @@ export function HiyoriAvatarBackground({
 		viewRef.current = view;
 		redraw.current?.();
 	}, [view]);
+	useEffect(() => saveAvatarBackground(background), [background]);
 	useEffect(() => {
 		const element = host.current;
 		if (!element || !active) return;
@@ -133,13 +137,19 @@ export function HiyoriAvatarBackground({
 			className="hiyori-avatar-background"
 			ref={host}
 			data-avatar-state={active ? "loading" : "inactive"}
+			style={background ? { background } : undefined}
 		>
 			<output className="hiyori-avatar-unavailable">
 				桃瀬ひよりを読み込めませんでした。他の背景に切り替えて引き続き利用できます。
 			</output>
 			<span className="hiyori-avatar-credit">桃瀬ひより © Live2D Inc.</span>
 			{interactive && active && (
-				<HiyoriViewControls view={view} onChange={setView} />
+				<HiyoriViewControls
+					view={view}
+					onChange={setView}
+					background={background}
+					onBackgroundChange={setBackground}
+				/>
 			)}
 		</div>
 	);

@@ -31,8 +31,12 @@ test("the deployed image-answer migration keeps its recorded checksum", () => {
 test("deployed image-answer evidence upgrades without rewriting history or reviving corrected sources", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "image-answer-upgrade-"));
 	const path = join(dir, "db.sqlite3");
+	// The deployed database ran everything before the upgrade; later migrations were not yet released.
 	const oldMigrations = migrations
-		.filter((m) => m.id !== upgradeId)
+		.slice(
+			0,
+			migrations.findIndex((m) => m.id === upgradeId),
+		)
 		.map((m) => (m.id === deployedId ? { ...m, sql: deployedSql } : m));
 	let store = openStore(path, oldMigrations);
 	let c = createConversationService(store, { requireOutbox: true });
@@ -82,13 +86,22 @@ FROM conversation_outbox a, conversation_outbox s WHERE a.source_id=? AND s.sour
 		store = openStore(path, migrations);
 		c = createConversationService(store, { requireOutbox: true });
 		expect(c.get("main")).toEqual(messages);
+		// Rows recorded before the upgrade stay byte-for-byte; the upgrade only adds new ones.
+		const deployed = new Set(oldMigrations.map((m) => m.id));
+		expect(
+			store
+				.read((db) =>
+					db.query("SELECT * FROM schema_migrations_v2 ORDER BY id").all(),
+				)
+				.filter((row) => deployed.has((row as { id: string }).id)),
+		).toEqual(history);
 		expect(
 			store.read((db) =>
 				db
-					.query("SELECT * FROM schema_migrations_v2 WHERE id<>? ORDER BY id")
-					.all(upgradeId),
+					.query("SELECT id FROM schema_migrations_v2 WHERE id=?")
+					.get(upgradeId),
 			),
-		).toEqual(history);
+		).toEqual({ id: upgradeId });
 		expect(
 			store.read((db) => c.imageReferencesInTransaction(db, "answer")),
 		).toEqual([

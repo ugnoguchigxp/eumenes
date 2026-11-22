@@ -38,24 +38,24 @@ test("the deployed input migration keeps its recorded checksum", () => {
 	).toBe(deployedChecksum);
 });
 
-const LATER = [
-	"conversation/0012-input-memory-digest",
-	"conversation/0013-utterance-tool-exchange",
-	"conversation/0014-drop-utterance-tool-exchange",
-	"conversation/0015-utterance-tool-exchange",
-	"conversation/0016-utterance-notice",
-	"conversation/0017-image-answers",
-	"conversation/0018-image-answer-sequences",
-];
+/** A deployed database ran every migration before `id`; later ones (including future ones) are not yet applied. */
+const deployedBefore = (id: string) =>
+	migrations.slice(
+		0,
+		migrations.findIndex((m) => m.id === id),
+	);
+const LATER = migrations
+	.slice(migrations.findIndex((m) => m.id === "conversation/0011-input") + 1)
+	.map((m) => m.id);
 
 test("a deployed input database upgrades without losing cuts, utterances, state or migration history", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "conversation-input-upgrade-"));
 	const path = join(dir, "db.sqlite3");
-	const oldMigrations = migrations
-		.filter((m) => !LATER.includes(m.id))
-		.map((m) =>
-			m.id === "conversation/0011-input" ? { ...m, sql: deployedInputSql } : m,
-		);
+	const oldMigrations = deployedBefore(
+		"conversation/0012-input-memory-digest",
+	).map((m) =>
+		m.id === "conversation/0011-input" ? { ...m, sql: deployedInputSql } : m,
+	);
 	let store = openStore(path, oldMigrations);
 	try {
 		await store.write((db) => {
@@ -161,13 +161,7 @@ test("0013 keeps the checksum it ran with, and a database that went through 0014
 	const path = join(dir, "db.sqlite3");
 	let store = openStore(
 		path,
-		migrations.filter(
-			(m) =>
-				m.id !== "conversation/0015-utterance-tool-exchange" &&
-				m.id !== "conversation/0016-utterance-notice" &&
-				m.id !== "conversation/0017-image-answers" &&
-				m.id !== "conversation/0018-image-answer-sequences",
-		),
+		deployedBefore("conversation/0015-utterance-tool-exchange"),
 	);
 	try {
 		const columns = () =>

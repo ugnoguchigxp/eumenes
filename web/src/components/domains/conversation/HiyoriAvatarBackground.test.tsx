@@ -218,3 +218,58 @@ test("framing and reset survive destroying and recreating the background", async
 	const third = await fixture();
 	expect(third.model.render.mock.calls[0]?.[4]).toEqual(defaultAvatarView);
 });
+
+test("the background colour paints only the drawing area, stays apart from framing and survives remounting", async () => {
+	const first = await fixture();
+	const area = () =>
+		document.querySelector<HTMLElement>(".hiyori-avatar-background")!;
+	expect(area().style.background).toBe("");
+	first.view.rerender(<HiyoriAvatarBackground active interactive />);
+	fireEvent.click(screen.getByText("モデルの表示調整"));
+	expect(
+		(screen.getByRole("button", { name: "既定の背景" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(true);
+	fireEvent.click(screen.getByRole("button", { name: "上半身" }));
+	const renders = first.model.render.mock.calls.length;
+	fireEvent.input(screen.getByLabelText("背景色", { selector: "input" }), {
+		target: { value: "#f0e6d2" },
+	});
+	expect(area().style.background).toBe("rgb(240, 230, 210)");
+	expect(screen.getByText("#f0e6d2")).toBeTruthy();
+	expect(first.model.render.mock.calls.length).toBe(renders);
+	expect(first.model.render.mock.lastCall?.[4]).toEqual({
+		zoom: 2.2,
+		x: 0,
+		y: 0,
+	});
+	fireEvent.click(screen.getByRole("button", { name: "リセット" }));
+	expect(first.model.render.mock.lastCall?.[4]).toEqual(defaultAvatarView);
+	expect(area().style.background).toBe("rgb(240, 230, 210)");
+	first.view.rerender(<HiyoriAvatarBackground active />);
+	expect(area().style.background).toBe("rgb(240, 230, 210)");
+	expect(createHiyori).toHaveBeenCalledTimes(1);
+	first.view.unmount();
+
+	const second = await fixture();
+	expect(area().style.background).toBe("rgb(240, 230, 210)");
+	second.view.rerender(<HiyoriAvatarBackground active interactive />);
+	fireEvent.click(screen.getByText("モデルの表示調整"));
+	fireEvent.click(screen.getByRole("button", { name: "上半身" }));
+	fireEvent.click(screen.getByRole("button", { name: "既定の背景" }));
+	expect(area().style.background).toBe("");
+	expect(second.model.render.mock.lastCall?.[4]).toEqual({
+		zoom: 2.2,
+		x: 0,
+		y: 0,
+	});
+	second.view.unmount();
+
+	const third = await fixture();
+	expect(area().style.background).toBe("");
+	expect(third.model.render.mock.calls[0]?.[4]).toEqual({
+		zoom: 2.2,
+		x: 0,
+		y: 0,
+	});
+});

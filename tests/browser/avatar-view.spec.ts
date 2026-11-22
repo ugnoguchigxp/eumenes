@@ -1,4 +1,10 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import {
+	expect,
+	test,
+	type BrowserContext,
+	type BrowserType,
+	type Page,
+} from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -157,16 +163,13 @@ test("background mode adjusts real WebGL framing, keeps it across chat toggles, 
 	}
 });
 
-test("framing and reset survive reload, background changes and a real browser restart", async ({
-	playwright,
-}) => {
-	test.skip(
-		!existsSync("web/public/live2d/hiyori/Hiyori.moc3"),
-		"The local model is not installed.",
-	);
-	const profile = mkdtempSync(join(tmpdir(), "eumenes-avatar-view-profile-"));
+/** One test-only browser profile that can be closed and relaunched like a browser restart. */
+function persistent(
+	playwright: { chromium: BrowserType },
+	profile: string,
+	errors: string[],
+) {
 	let context: BrowserContext | undefined;
-	const errors: string[] = [];
 	const ready = async (page: Page) => {
 		await page.addStyleTag({
 			content: readFileSync(join(directory, "avatar-view.fixture.css"), "utf8"),
@@ -208,6 +211,23 @@ test("framing and reset survive reload, background changes and a real browser re
 		await ready(page);
 		return page;
 	};
+	const close = async () => {
+		await context?.close();
+		context = undefined;
+	};
+	return { ready, launch, close };
+}
+
+test("framing and reset survive reload, background changes and a real browser restart", async ({
+	playwright,
+}) => {
+	test.skip(
+		!existsSync("web/public/live2d/hiyori/Hiyori.moc3"),
+		"The local model is not installed.",
+	);
+	const profile = mkdtempSync(join(tmpdir(), "eumenes-avatar-view-profile-"));
+	const errors: string[] = [];
+	const { ready, launch, close } = persistent(playwright, profile, errors);
 	try {
 		let page = await launch();
 		const original = await page.evaluate(() => window.avatarViewMatrix());
@@ -238,8 +258,7 @@ test("framing and reset survive reload, background changes and a real browser re
 		expect(await page.evaluate(() => window.avatarViewMatrix())).toEqual(
 			adjusted,
 		);
-		await context!.close();
-		context = undefined;
+		await close();
 		page = await launch();
 		expect(await page.evaluate(() => window.avatarViewMatrix())).toEqual(
 			adjusted,
@@ -259,15 +278,120 @@ test("framing and reset survive reload, background changes and a real browser re
 		await expect
 			.poll(() => page.evaluate(() => window.avatarViewMatrix()))
 			.toEqual(original);
-		await context!.close();
-		context = undefined;
+		await close();
 		page = await launch();
 		expect(await page.evaluate(() => window.avatarViewMatrix())).toEqual(
 			original,
 		);
 		expect(errors).toEqual([]);
 	} finally {
-		await context?.close();
+		await close();
+		rmSync(profile, { recursive: true, force: true });
+	}
+});
+
+test("the chosen drawing-area colour shows behind the real model, stays apart from framing and survives restarts", async ({
+	playwright,
+}) => {
+	test.skip(
+		!existsSync("web/public/live2d/hiyori/Hiyori.moc3"),
+		"The local model is not installed.",
+	);
+	const profile = mkdtempSync(join(tmpdir(), "eumenes-avatar-bg-profile-"));
+	const errors: string[] = [];
+	const { ready, launch, close } = persistent(playwright, profile, errors);
+	/** The drawing area's top-right corner stays clear of the model, chat text and credit. */
+	const corner = async (page: Page) => {
+		const box = (await page
+			.locator(".hiyori-avatar-background")
+			.boundingBox())!;
+		const image = await page.screenshot({
+			clip: { x: box.x + box.width - 12, y: box.y + 4, width: 8, height: 8 },
+		});
+		const pixels = await sharp(image).raw().toBuffer();
+		return [pixels[0]!, pixels[1]!, pixels[2]!];
+	};
+	const open = async (page: Page) => {
+		await page.getByRole("button", { name: "チャットを隠す" }).click();
+		await page.getByText("モデルの表示調整").click();
+	};
+	const near = (actual: number[], expected: number[]) =>
+		actual.every((value, i) => Math.abs(value - expected[i]!) <= 3);
+	try {
+		let page = await launch();
+		const gradient = await corner(page);
+		await open(page);
+		const color = page.getByLabel("背景色", { exact: true });
+		await expect(color).toHaveValue("#293347");
+		await expect(
+			page.getByRole("button", { name: "既定の背景", exact: true }),
+		).toBeDisabled();
+		await page.getByRole("button", { name: "上半身", exact: true }).click();
+		const framed = await page.evaluate(() => window.avatarViewMatrix());
+		const canvas = page.locator("canvas");
+		const before = await sharp(await canvas.screenshot())
+			.raw()
+			.toBuffer();
+		await color.fill("#f0e6d2");
+		await expect.poll(() => corner(page)).toEqual([240, 230, 210]);
+		const painted = await sharp(
+			await canvas.screenshot({
+				path: "test-results/hiyori-background-color-canvas.png",
+			}),
+		)
+			.raw()
+			.toBuffer();
+		let background = 0;
+		let model = 0;
+		for (let i = 0; i < painted.length; i += 3) {
+			const pixel = [painted[i]!, painted[i + 1]!, painted[i + 2]!];
+			if (near(pixel, [240, 230, 210])) background++;
+			else if (
+				Math.abs(painted[i]! - before[i]!) +
+					Math.abs(painted[i + 1]! - before[i + 1]!) +
+					Math.abs(painted[i + 2]! - before[i + 2]!) <=
+				9
+			)
+				model++;
+		}
+		// The colour fills the empty area while the opaque model pixels draw unchanged above it.
+		expect(background / (painted.length / 3)).toBeGreaterThan(0.2);
+		expect(model / (painted.length / 3)).toBeGreaterThan(0.1);
+		expect(await page.evaluate(() => window.avatarViewMatrix())).toEqual(
+			framed,
+		);
+		await page.screenshot({ path: "test-results/hiyori-background-color.png" });
+		await page.getByRole("button", { name: "リセット", exact: true }).click();
+		const reset = await page.evaluate(() => window.avatarViewMatrix());
+		expect(reset).not.toEqual(framed);
+		expect(await corner(page)).toEqual([240, 230, 210]);
+		await page.getByRole("button", { name: "背景を切り替える" }).click();
+		await expect(page.locator("canvas")).toHaveCount(0);
+		await page.getByRole("button", { name: "背景を切り替える" }).click();
+		await ready(page);
+		expect(await corner(page)).toEqual([240, 230, 210]);
+		await page.reload();
+		await ready(page);
+		expect(await corner(page)).toEqual([240, 230, 210]);
+		await close();
+		page = await launch();
+		expect(await corner(page)).toEqual([240, 230, 210]);
+		await open(page);
+		await expect(page.getByLabel("背景色", { exact: true })).toHaveValue(
+			"#f0e6d2",
+		);
+		await page.getByRole("button", { name: "上半身", exact: true }).click();
+		const kept = await page.evaluate(() => window.avatarViewMatrix());
+		await page.getByRole("button", { name: "既定の背景", exact: true }).click();
+		await expect.poll(() => corner(page)).toEqual(gradient);
+		expect(await page.evaluate(() => window.avatarViewMatrix())).toEqual(kept);
+		await close();
+		page = await launch();
+		expect(await corner(page)).toEqual(gradient);
+		expect(await page.evaluate(() => window.avatarViewMatrix())).toEqual(kept);
+		expect(errors).toEqual([]);
+	} finally {
+		await close();
 		rmSync(profile, { recursive: true, force: true });
 	}
 });

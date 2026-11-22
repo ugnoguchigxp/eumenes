@@ -1,11 +1,22 @@
-import { defaultAvatarView, type AvatarView } from "../../../domains/avatar";
+import {
+	defaultAvatarView,
+	type AvatarBackground,
+	type AvatarView,
+} from "../../../domains/avatar";
+
+/** The colour picker needs a value; it shows the gradient's centre until a colour is chosen. */
+const gradientCentre = "#293347";
 
 export function HiyoriViewControls({
 	view,
 	onChange,
+	background,
+	onBackgroundChange,
 }: {
 	view: AvatarView;
 	onChange: (view: AvatarView) => void;
+	background: AvatarBackground;
+	onBackgroundChange: (background: AvatarBackground) => void;
 }) {
 	return (
 		<details className="hiyori-view-controls">
@@ -67,6 +78,27 @@ export function HiyoriViewControls({
 						リセット
 					</button>
 				</div>
+				<fieldset className="hiyori-view-background">
+					<legend>背景</legend>
+					<label>
+						背景色 <output>{background ?? "既定"}</output>
+						<input
+							aria-label="背景色"
+							type="color"
+							value={background ?? gradientCentre}
+							onChange={(event) =>
+								onBackgroundChange(event.currentTarget.value.toLowerCase())
+							}
+						/>
+					</label>
+					<button
+						type="button"
+						disabled={background === null}
+						onClick={() => onBackgroundChange(null)}
+					>
+						既定の背景
+					</button>
+				</fieldset>
 			</div>
 		</details>
 	);
