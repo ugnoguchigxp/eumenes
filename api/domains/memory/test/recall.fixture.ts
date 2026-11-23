@@ -7,7 +7,5 @@ export const readEverything = (memory: MemoryService) =>
 		limit: 21,
 		shown: new Set(),
 		omitShown: false,
-		withPrevious: false,
 		minScore: 0,
-		audience: "tool",
 	});

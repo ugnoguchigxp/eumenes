@@ -9,12 +9,8 @@ export type MemoryRecallInput = {
 	shown: ReadonlySet<string>;
 	/** true: leave the shown records out. false: keep them, marked inProfile. */
 	omitShown: boolean;
-	/** Attach the expired versions (a correction's old values). */
-	withPrevious: boolean;
 	/** When text is not empty, records scoring at or below this are left out. read_memory uses 0. */
 	minScore: number;
-	/** host: suppressed records are left out, and sensitive or about-other records come only when direct. tool: all. */
-	audience: "tool" | "host";
 };
 
 export type MemoryRecalled = {
@@ -32,10 +28,6 @@ export type MemoryRecalled = {
 	inProfile?: true;
 	/** 0 when text is empty. */
 	score: number;
-	/** One of the query's words (two characters or more) appears as is in the record's text. */
-	direct: boolean;
-	/** With withPrevious: the expired versions of the same matter, newest first, at most 2. until: the day it expired (Asia/Tokyo, YYYY-MM-DD). */
-	previous?: { text: string; until: string }[];
 };
 
 export type MemoryRecallResult = {

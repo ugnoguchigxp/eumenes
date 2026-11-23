@@ -197,7 +197,7 @@ export function createMemoryService(
 	});
 	const atMs = () => Date.parse(clock());
 	const windows = createContextWindowStore({ clock, id: newId });
-	const recall = createRecall({ windows, scoped });
+	const recall = createRecall({ windows });
 
 	const toDto = (db: Database, item: StateItem) =>
 		itemDto(conversation, db, item);

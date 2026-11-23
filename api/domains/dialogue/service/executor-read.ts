@@ -214,9 +214,7 @@ async function memoryFound(
 		limit: LIMITS.memory,
 		shown: new Set(input.memoryItemIds),
 		omitShown: true,
-		withPrevious: false,
 		minScore: 0,
-		audience: "tool",
 	});
 	if (!memory || !recalled) return null;
 	const itemIds = recalled.items.map((item) => item.id);

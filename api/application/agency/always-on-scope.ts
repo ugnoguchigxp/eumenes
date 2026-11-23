@@ -271,9 +271,7 @@ export function readMemoryRefs(
 		limit: READ_MEMORY_LIMIT,
 		shown: new Set(),
 		omitShown: true,
-		withPrevious: false,
 		minScore: 0,
-		audience: "tool",
 	});
 	if (!checked) return [];
 	const active = new Set(activeMemory(deps, now).map((item) => item.id));

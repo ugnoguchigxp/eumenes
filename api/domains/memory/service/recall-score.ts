@@ -85,14 +85,6 @@ export function scoreOf(terms: readonly QueryTerm[], doc: string): number {
 	return score;
 }
 
-/** One of the words (two characters or more) stands as it is in the record's words. */
-export function isDirect(terms: readonly QueryTerm[], text: string): boolean {
-	const normalized = normalizeText(text);
-	return terms.some(
-		(term) => term.single === null && normalized.includes(term.text),
-	);
-}
-
 /** The words of a record without spaces and punctuation, for telling two records of the same words apart from alike ones. */
 export function flattenText(text: string): string {
 	return normalizeText(text).replace(SEPARATORS, "");

@@ -66,9 +66,7 @@ const recall = (
 		limit: 10,
 		shown: new Set(),
 		omitShown: false,
-		withPrevious: false,
 		minScore: 0,
-		audience: "tool",
 		...over,
 	})!;
 const texts = (result: ReturnType<typeof recall>) =>
@@ -144,10 +142,7 @@ test("a record that shares most of the words comes before one that shares a sing
 	await saved(h, "上司の名前は岡田", "boss.name");
 	await saved(h, "猫の名前はミル", "cat.name");
 	const result = recall(h, "上司の名前");
-	expect(result.items[0]).toMatchObject({
-		text: "上司の名前は岡田",
-		direct: true,
-	});
+	expect(result.items[0]).toMatchObject({ text: "上司の名前は岡田" });
 	expect(result.items[0]!.score).toBeGreaterThan(result.items[1]!.score);
 	// The ties go to the newer record.
 	expect(texts(result).slice(1)).toEqual([
@@ -173,79 +168,9 @@ test("an empty query lists every record newest first, tendencies last, and readi
 	const before = h.memory.list(true);
 	const result = recall(h, "");
 	expect(texts(result)).toEqual(["猫の名前はミル", "妹の名前は美咲"]);
-	expect(result.items.every((item) => item.score === 0 && !item.direct)).toBe(
-		true,
-	);
+	expect(result.items.every((item) => item.score === 0)).toBe(true);
 	recall(h, "猫");
 	expect(h.memory.list(true)).toEqual(before);
-});
-
-test("the host audience leaves suppressed records out, and marked records come only when a word of the query is in them", async () => {
-	const h = await setup();
-	const hidden = await saved(h, "通院している病院は駅前にある", "clinic", {
-		sensitive: true,
-	});
-	await saved(h, "田島さんの趣味はカメラ", "tajima.hobby", {
-		aboutOther: true,
-	});
-	const quiet = await saved(h, "京都出身で実家はお寺", "home.town");
-	await write(h, (db) =>
-		h.memory.suppressInTransaction(db, {
-			conversationId: "c1",
-			sourceRunId: "run-s",
-			target: { itemId: quiet.itemId },
-		}),
-	);
-	await saved(h, "毎朝コーヒーを飲む", "coffee");
-	const host = (text: string) => recall(h, text, { audience: "host" });
-	// Not named: neither the marked records nor the suppressed one.
-	expect(texts(host(""))).toEqual(["毎朝コーヒーを飲む"]);
-	expect(texts(host("最近どう？"))).toEqual([]);
-	// Named: the marked record comes, with its marks; the suppressed one never does.
-	expect(host("病院").items).toEqual([
-		expect.objectContaining({
-			id: hidden.itemId,
-			sensitive: true,
-			direct: true,
-		}),
-	]);
-	expect(texts(host("田島さん、どうしてる？"))).toEqual([
-		"田島さんの趣味はカメラ",
-	]);
-	expect(texts(host("京都"))).toEqual([]);
-	// The tool reads everything, the suppressed record marked.
-	expect(recall(h, "京都").items).toEqual([
-		expect.objectContaining({ id: quiet.itemId, suppressed: true }),
-	]);
-	expect(recall(h, "").total).toBe(4);
-});
-
-test("a corrected record carries the old words and the day they stopped holding", async () => {
-	const h = await setup();
-	const old = await saved(h, "合言葉はさくら", "password");
-	h.time.now = "2026-10-20T20:00:00.000Z";
-	const messageId = await h.say("user", "合言葉はもみじに変えた");
-	const correction: CorrectExplicitInput = {
-		conversationId: "c1",
-		sourceRunId: "run-c",
-		messageId,
-		quote: "合言葉はもみじ",
-		text: "合言葉はもみじ",
-		polarity: "affirmed",
-		target: { itemId: old.itemId },
-	};
-	const outcome = await write(h, (db) =>
-		h.memory.correctExplicitInTransaction(db, correction),
-	);
-	expect(outcome.status).toBe("applied");
-	const withPrevious = recall(h, "合言葉", { withPrevious: true });
-	expect(withPrevious.items).toHaveLength(1);
-	expect(withPrevious.items[0]).toMatchObject({
-		text: "合言葉はもみじ",
-		// 2026-10-21T05:00 in Asia/Tokyo.
-		previous: [{ text: "合言葉はさくら", until: "2026-10-21" }],
-	});
-	expect(recall(h, "合言葉").items[0]).not.toHaveProperty("previous");
 });
 
 test("marks are carried to the version that replaces a record and vanish with a forget", async () => {

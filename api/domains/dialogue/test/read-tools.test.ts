@@ -181,9 +181,7 @@ test("read_memory asks the memory for the query's records, leaves out what `## M
 			limit: 16,
 			shown: new Set(),
 			omitShown: true,
-			withPrevious: false,
 			minScore: 0,
-			audience: "tool",
 		},
 	]);
 	// A record has its reference, a tendency an estimate with none, a suppressed one is not to be brought up; the two

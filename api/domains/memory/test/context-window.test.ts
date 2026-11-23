@@ -377,9 +377,7 @@ const readTool = (
 			limit: 10,
 			shown: new Set(),
 			omitShown: true,
-			withPrevious: false,
 			minScore: 0,
-			audience: "tool",
 			...over,
 		}),
 	);
@@ -418,7 +416,6 @@ test("the read tool's ranked read matches a natural Japanese sentence and leaves
 			source: "user_said",
 			inProfile: true,
 			score: expect.any(Number),
-			direct: true,
 		},
 	]);
 	// A suppressed record is still read by the tool (it says it is not to be brought up), and the mark is shown.
@@ -440,9 +437,7 @@ test("the read tool's ranked read matches a natural Japanese sentence and leaves
 			limit: 10,
 			shown: new Set(),
 			omitShown: true,
-			withPrevious: false,
 			minScore: 0,
-			audience: "tool",
 		}),
 	).toBeNull();
 });
