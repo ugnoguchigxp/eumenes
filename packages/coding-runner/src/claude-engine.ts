@@ -4,26 +4,20 @@ import {
 	type Options,
 	type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
 import { processTree } from "./sdk-process-tree";
 import type { ClaudeEvidence } from "./claude-contracts";
+import {
+	askUserQuestionInput,
+	formatAskQuestion,
+	formatPermissionQuestion,
+	isPermissionApproved,
+	type EngineQuestion,
+} from "./claude-questions";
 import type { supervisedTools } from "./claude-supervised-tools";
 
 type ToolScope = ReturnType<typeof supervisedTools>;
 
-const questionInput = z.object({
-	questions: z
-		.array(
-			z.object({
-				question: z.string().min(1).max(600),
-				options: z
-					.array(z.object({ label: z.string().min(1).max(200) }))
-					.max(8),
-				multiSelect: z.boolean().optional(),
-			}),
-		)
-		.length(1),
-});
+export type ToolAuthorization = boolean | "ask";
 
 export type ClaudeEngineInput = {
 	cwd: string;
@@ -40,26 +34,31 @@ export type ClaudeEngineInput = {
 	authorize(
 		tool: string,
 		input: Record<string, unknown>,
-	): boolean | Promise<boolean>;
+	): ToolAuthorization | Promise<ToolAuthorization>;
 	supervisedTools?: ToolScope;
 	deferredQuestions?: boolean;
 	validateAccount(
 		account: Awaited<ReturnType<ReturnType<typeof query>["accountInfo"]>>,
 	): boolean;
 	onSession(id: string): void;
+	onToolActivity?(tool: string): void;
 	onEvidence(
 		ref: string,
 		observation: string,
 		evidence?: Omit<ClaudeEvidence, "ref" | "executionId">,
 	): void;
-	ask(
-		question: { id: string; prompt: string; expiresAt: number },
-		signal: AbortSignal,
-	): Promise<string | null>;
+	ask(question: EngineQuestion, signal: AbortSignal): Promise<string | null>;
 };
 
 type ClaudeEngineResult = {
-	result?: { text: string; turns: number; ok: boolean };
+	result?: {
+		text: string;
+		turns: number;
+		ok: boolean;
+		subtype?: string;
+		errorDetail?: string;
+	};
+	stderrExcerpt?: string;
 	managedExecutionStopped: boolean;
 	aborted: boolean;
 	evidenceCount: number;
@@ -106,6 +105,7 @@ export async function runClaudeExecution(
 		processExited && groupStopped() && tree?.confirmed() === true;
 	let observed = 0;
 	let evidenceBytes = 0;
+	let stderrTail = "";
 	const evidence = (
 		text: string,
 		fact?: Omit<ClaudeEvidence, "ref" | "executionId">,
@@ -145,7 +145,10 @@ export async function runClaudeExecution(
 			permissionMode: "default",
 			allowedTools: input.tools,
 			includePartialMessages: false,
-			stderr: () => {},
+			stderr: (chunk) => {
+				if (typeof chunk === "string" && chunk)
+					stderrTail = (stderrTail + chunk).slice(-2_048);
+			},
 			spawnClaudeCodeProcess(options) {
 				child = spawn(options.command, options.args, {
 					cwd: options.cwd,
@@ -160,156 +163,12 @@ export async function runClaudeExecution(
 				if (child.pid) tree = processTree(child.pid, process.pid);
 				return child;
 			},
-			hooks: {
-				PreToolUse: [
-					{
-						hooks: [
-							async (hook) => {
-								if (hook.hook_event_name !== "PreToolUse") return {};
-								if (hook.tool_name === "AskUserQuestion" && !combined.aborted)
-									return {};
-								const raw = hook.tool_input as Record<string, unknown>;
-								const scoped = input.supervisedTools?.toolRequest(
-									hook.tool_name,
-									raw,
-								);
-								if (
-									!combined.aborted &&
-									input.tools.includes(hook.tool_name) &&
-									(!input.supervisedTools || scoped) &&
-									(await input.authorize(hook.tool_name, raw)) &&
-									!combined.aborted
-								) {
-									if (!input.supervisedTools) return {};
-									const currentScope = input.supervisedTools.toolRequest(
-										hook.tool_name,
-										raw,
-									);
-									if (
-										currentScope &&
-										(currentScope.fact.kind === "read" ||
-											![...requests.values()].some(
-												(request) => request.fact.kind !== "read",
-											))
-									) {
-										requests.set(hook.tool_use_id, currentScope);
-										return {
-											hookSpecificOutput: {
-												hookEventName: "PreToolUse",
-												permissionDecision: "allow",
-												updatedInput: currentScope.input,
-											},
-										};
-									}
-								}
-								return {
-									hookSpecificOutput: {
-										hookEventName: "PreToolUse",
-										permissionDecision: "deny",
-										permissionDecisionReason:
-											"Outside the authorized work scope",
-									},
-								};
-							},
-						],
-					},
-				],
-				PostToolUse: [
-					{
-						hooks: [
-							async (hook, id) => {
-								if (hook.hook_event_name !== "PostToolUse") return {};
-								const scoped = requests.get(hook.tool_use_id);
-								requests.delete(hook.tool_use_id);
-								const fact =
-									scoped &&
-									input.supervisedTools?.toolEvidence(
-										scoped,
-										hook.tool_response,
-										true,
-									);
-								evidence(
-									JSON.stringify({
-										id,
-										tool: hook.tool_name,
-										input: hook.tool_input,
-										result: hook.tool_response,
-									}),
-									fact,
-								);
-								return {};
-							},
-						],
-					},
-				],
-				PostToolUseFailure: [
-					{
-						hooks: [
-							async (hook) => {
-								if (hook.hook_event_name !== "PostToolUseFailure") return {};
-								const scoped = requests.get(hook.tool_use_id);
-								requests.delete(hook.tool_use_id);
-								if (scoped)
-									evidence(
-										hook.error,
-										input.supervisedTools?.toolEvidence(
-											scoped,
-											hook.error,
-											false,
-										),
-									);
-								return {};
-							},
-						],
-					},
-				],
-			},
-			canUseTool: async (tool, raw, { signal: requestSignal }) => {
-				const data = questionInput.safeParse(raw);
-				if (
-					tool !== "AskUserQuestion" ||
-					!data.success ||
-					data.data.questions[0]?.multiSelect ||
-					combined.aborted ||
-					requestSignal.aborted ||
-					(input.supervisedTools && !(await input.authorize(tool, raw))) ||
-					combined.aborted ||
-					requestSignal.aborted
-				)
-					return {
-						behavior: "deny",
-						message: "The requested operation is outside the current contract.",
-					};
-				const question = data.data.questions[0]!;
-				const answer = await input.ask(
-					{
-						id: crypto.randomUUID(),
-						prompt: [
-							question.question,
-							...question.options.map(({ label }) => label),
-						]
-							.join("\n")
-							.slice(0, 2_000),
-						expiresAt: input.deferredQuestions
-							? input.deadline
-							: Math.min(input.deadline, Date.now() + 15 * 60_000),
-					},
-					AbortSignal.any([combined, requestSignal]),
-				);
-				return answer && !combined.aborted && !requestSignal.aborted
-					? {
-							behavior: "allow",
-							updatedInput: {
-								...raw,
-								answers: { [question.question]: answer },
-							},
-						}
-					: { behavior: "deny", message: "No current answer was available." };
-			},
+			hooks: createEngineHooks(input, combined, requests, evidence),
+			canUseTool: createCanUseTool(input, combined),
 		},
 	});
 	const monitor = setInterval(() => tree?.observe(), 200);
-	let result: { text: string; turns: number; ok: boolean } | undefined;
+	let result: ClaudeEngineResult["result"];
 	try {
 		const account = await Promise.race([
 			stream.accountInfo(),
@@ -323,16 +182,42 @@ export async function runClaudeExecution(
 				input.onSession(event.session_id);
 			if (event.type === "result") {
 				const ok = event.subtype === "success" && !event.is_error;
+				const detail =
+					event.subtype === "success"
+						? event.is_error
+							? event.result.slice(0, 2_000)
+							: undefined
+						: (event.errors?.filter(Boolean).join("\n") || event.subtype).slice(
+								0,
+								2_000,
+							);
 				result = {
-					text: ok ? event.result.slice(0, 4_000) : "",
+					text: event.subtype === "success" ? event.result.slice(0, 4_000) : "",
 					turns: event.num_turns,
 					ok,
+					subtype: event.subtype,
+					...(detail ? { errorDetail: detail } : {}),
 				};
 				break;
 			}
 		}
-	} catch {
-		// Error details from Claude Code may contain tool inputs or credentials.
+	} catch (error) {
+		// Record only safe short error codes; raw exception details may contain tool inputs.
+		if (!result) {
+			const code =
+				error instanceof Error && /^[a-z0-9_:-]{1,80}$/i.test(error.message)
+					? error.message
+					: error instanceof Error
+						? error.name.slice(0, 80)
+						: "execution_error";
+			result = {
+				text: "",
+				turns: 0,
+				ok: false,
+				subtype: "error_exception",
+				errorDetail: code,
+			};
+		}
 	} finally {
 		gate.resolve(false);
 		stream.close();
@@ -349,8 +234,10 @@ export async function runClaudeExecution(
 		}
 	}
 	const managedExecutionStopped = confirmStopped();
+	const trimmedStderr = stderrTail.trim();
 	return {
 		result,
+		...(trimmedStderr ? { stderrExcerpt: trimmedStderr } : {}),
 		managedExecutionStopped,
 		aborted: combined.aborted,
 		evidenceCount: observed,
@@ -370,4 +257,220 @@ function untilAbort(signal: AbortSignal): Promise<never> {
 
 async function boundedExit(exited: () => boolean) {
 	for (let i = 0; i < 20 && !exited(); i++) await Bun.sleep(50);
+}
+
+function createEngineHooks(
+	input: ClaudeEngineInput,
+	combined: AbortSignal,
+	requests: Map<string, NonNullable<ReturnType<ToolScope["toolRequest"]>>>,
+	evidence: (
+		text: string,
+		fact?: Omit<ClaudeEvidence, "ref" | "executionId">,
+	) => void,
+): NonNullable<Options["hooks"]> {
+	return {
+		PreToolUse: [
+			{
+				hooks: [
+					async (hook) => {
+						if (hook.hook_event_name !== "PreToolUse") return {};
+						if (hook.tool_name === "AskUserQuestion" && !combined.aborted)
+							return {};
+						const raw = hook.tool_input as Record<string, unknown>;
+						const scoped = input.supervisedTools?.toolRequest(
+							hook.tool_name,
+							raw,
+						);
+						if (
+							!combined.aborted &&
+							input.tools.includes(hook.tool_name) &&
+							(!input.supervisedTools || scoped)
+						) {
+							const decision = await input.authorize(hook.tool_name, raw);
+							if (!combined.aborted) {
+								if (!input.supervisedTools) {
+									if (decision === true) {
+										input.onToolActivity?.(hook.tool_name);
+										return {};
+									}
+									if (decision === "ask")
+										return {
+											hookSpecificOutput: {
+												hookEventName: "PreToolUse",
+												permissionDecision: "ask",
+												permissionDecisionReason:
+													"Requires explicit user approval",
+											},
+										};
+								} else if (decision === true) {
+									const currentScope = input.supervisedTools.toolRequest(
+										hook.tool_name,
+										raw,
+									);
+									if (
+										currentScope &&
+										(currentScope.fact.kind === "read" ||
+											![...requests.values()].some(
+												(request) => request.fact.kind !== "read",
+											))
+									) {
+										requests.set(hook.tool_use_id, currentScope);
+										input.onToolActivity?.(hook.tool_name);
+										return {
+											hookSpecificOutput: {
+												hookEventName: "PreToolUse",
+												permissionDecision: "allow",
+												updatedInput: currentScope.input,
+											},
+										};
+									}
+								}
+							}
+						}
+						return {
+							hookSpecificOutput: {
+								hookEventName: "PreToolUse",
+								permissionDecision: "deny",
+								permissionDecisionReason: "Outside the authorized work scope",
+							},
+						};
+					},
+				],
+			},
+		],
+		PostToolUse: [
+			{
+				hooks: [
+					async (hook, id) => {
+						if (hook.hook_event_name !== "PostToolUse") return {};
+						const scoped = requests.get(hook.tool_use_id);
+						requests.delete(hook.tool_use_id);
+						const fact =
+							scoped &&
+							input.supervisedTools?.toolEvidence(
+								scoped,
+								hook.tool_response,
+								true,
+							);
+						evidence(
+							JSON.stringify({
+								id,
+								tool: hook.tool_name,
+								input: hook.tool_input,
+								result: hook.tool_response,
+							}),
+							fact,
+						);
+						return {};
+					},
+				],
+			},
+		],
+		PostToolUseFailure: [
+			{
+				hooks: [
+					async (hook) => {
+						if (hook.hook_event_name !== "PostToolUseFailure") return {};
+						const scoped = requests.get(hook.tool_use_id);
+						requests.delete(hook.tool_use_id);
+						if (scoped)
+							evidence(
+								hook.error,
+								input.supervisedTools?.toolEvidence(scoped, hook.error, false),
+							);
+						else
+							evidence(
+								JSON.stringify({
+									tool: hook.tool_name,
+									input: hook.tool_input,
+									error: hook.error,
+									failed: true,
+								}),
+							);
+						return {};
+					},
+				],
+			},
+		],
+	};
+}
+
+function createCanUseTool(
+	input: ClaudeEngineInput,
+	combined: AbortSignal,
+): NonNullable<Options["canUseTool"]> {
+	return async (tool, raw, options) => {
+		const { signal: requestSignal } = options;
+		const questionExpiresAt = () =>
+			input.deferredQuestions
+				? input.deadline
+				: Math.min(input.deadline, Date.now() + 15 * 60_000);
+		if (tool === "AskUserQuestion") {
+			const data = askUserQuestionInput.safeParse(raw);
+			if (
+				!data.success ||
+				combined.aborted ||
+				requestSignal.aborted ||
+				(input.supervisedTools &&
+					(await input.authorize(tool, raw)) !== true) ||
+				combined.aborted ||
+				requestSignal.aborted
+			)
+				return {
+					behavior: "deny",
+					message: "The requested operation is outside the current contract.",
+				};
+			const answers: Record<string, string> = {};
+			const list = data.data.questions;
+			for (let i = 0; i < list.length; i++) {
+				const item = list[i]!;
+				const answer = await input.ask(
+					formatAskQuestion(item, i, list.length, questionExpiresAt()),
+					AbortSignal.any([combined, requestSignal]),
+				);
+				if (!answer || combined.aborted || requestSignal.aborted)
+					return {
+						behavior: "deny",
+						message: "No current answer was available.",
+					};
+				answers[item.question] = answer;
+			}
+			return {
+				behavior: "allow",
+				updatedInput: { ...raw, answers },
+			};
+		}
+		if (
+			input.supervisedTools ||
+			!input.tools.includes(tool) ||
+			combined.aborted ||
+			requestSignal.aborted
+		)
+			return {
+				behavior: "deny",
+				message: "The requested operation is outside the current contract.",
+			};
+		const auth = await input.authorize(tool, raw);
+		if (auth === false || combined.aborted || requestSignal.aborted)
+			return {
+				behavior: "deny",
+				message: "The requested operation is outside the current contract.",
+			};
+		const answer = await input.ask(
+			formatPermissionQuestion(tool, raw, options, questionExpiresAt()),
+			AbortSignal.any([combined, requestSignal]),
+		);
+		if (
+			isPermissionApproved(answer) &&
+			!combined.aborted &&
+			!requestSignal.aborted
+		) {
+			input.onToolActivity?.(tool);
+			return { behavior: "allow", updatedInput: raw };
+		}
+		return {
+			behavior: "deny",
+			message: "The user did not approve the requested operation.",
+		};
+	};
 }

@@ -41,6 +41,43 @@ export function closeQuestion(db: Database, host: Host, work: Work) {
 	work.deliveredNotice = undefined;
 	work.question = null;
 	work.questionFromRunner = false;
+	work.pendingRunnerQuestion = null;
+}
+
+export function escalatePendingQuestion(work: Work, prompt?: string) {
+	const pending = work.pendingRunnerQuestion;
+	if (!pending) return false;
+	work.pendingRunnerQuestion = null;
+	work.question = {
+		...pending,
+		...(prompt ? { prompt } : {}),
+	};
+	work.questionFromRunner = true;
+	work.status = "waiting_user";
+	work.summary =
+		pending.kind === "permission"
+			? "Claude Code の追加操作について利用者の許可を待っています。"
+			: "Claude Code からの質問に対する利用者の回答を待っています。";
+	work.notice = newId();
+	return true;
+}
+
+function recordKnownEvidence(work: Work, observation: Observation) {
+	const refs = new Set(work.knownEvidenceRefs ?? []);
+	for (const item of observation.evidence ?? []) refs.add(item.ref);
+	for (const item of observation.structuredEvidence ?? []) refs.add(item.ref);
+	if (refs.size) work.knownEvidenceRefs = [...refs].slice(-128);
+}
+
+function describeRunningProgress(observation: Observation): string | null {
+	const tool = observation.lastTool?.trim();
+	const count = observation.eventCount;
+	if (tool && typeof count === "number" && count > 0)
+		return `Claude Code が実行中です（直近操作: ${tool} / イベント ${count} 件）。`;
+	if (tool) return `Claude Code が実行中です（直近操作: ${tool}）。`;
+	if (typeof count === "number" && count > 0)
+		return `Claude Code が実行中です（イベント ${count} 件）。`;
+	return null;
 }
 
 export function finish(
@@ -213,6 +250,7 @@ export function acceptObservation(
 		return false;
 	work.effect = null;
 	work.observation = observation;
+	recordKnownEvidence(work, observation);
 	if (supervised) {
 		supervised.blocked = undefined;
 		if (observation.structuredEvidence?.length) {
@@ -236,11 +274,25 @@ export function acceptObservation(
 		work.notice = newId();
 	}
 	if (observation.state === "waiting" && observation.question) {
-		work.status = "waiting_user";
-		if (work.question?.id !== observation.question.id) {
-			closeQuestion(db, host, work);
-			work.question = observation.question;
+		const incoming = observation.question;
+		if (
+			work.question?.id === incoming.id ||
+			work.pendingRunnerQuestion?.id === incoming.id
+		)
+			return true;
+		closeQuestion(db, host, work);
+		if (!supervised && incoming.kind === "question") {
+			work.pendingRunnerQuestion = incoming;
+			work.status = "deciding";
+			work.summary = "Claude Code からの質問を確認しています。";
+		} else {
+			work.question = incoming;
 			work.questionFromRunner = true;
+			work.status = "waiting_user";
+			work.summary =
+				incoming.kind === "permission"
+					? "Claude Code の追加操作について利用者の許可を待っています。"
+					: "Claude Code からの質問に対する利用者の回答を待っています。";
 			work.notice = newId();
 		}
 	} else if (observation.state === "unknown") {
@@ -257,10 +309,19 @@ export function acceptObservation(
 		work.executionId = null;
 		work.stop = "confirmed";
 		work.status = "deciding";
+		work.summary =
+			observation.resultSubtype === "error_max_turns"
+				? "ターン上限に達したため、継続の要否を確認しています。"
+				: observation.state === "failed"
+					? "実行エラーを確認し、次の対応を判断しています。"
+					: "Claude Code の実行結果と証跡を確認しています。";
 		if (supervised) work.notice = newId();
 	} else {
 		closeQuestion(db, host, work);
 		work.status = "waiting_child";
+		const progress = describeRunningProgress(observation);
+		if (progress && work.progressSeq !== observation.seq)
+			work.summary = progress;
 		if (supervised) work.notice = newId();
 	}
 	return true;
@@ -275,6 +336,33 @@ export function applyDecision(
 ) {
 	work.summary = decision.summary;
 	work.memo = decision.memo;
+	if (work.decisionMode === "question" && work.pendingRunnerQuestion) {
+		const pending = work.pendingRunnerQuestion;
+		if (decision.action === "reply" && pending.kind !== "permission") {
+			work.pendingRunnerQuestion = null;
+			work.effect = {
+				kind: "reply",
+				id: newId(),
+				questionId: pending.id,
+				answer: decision.answer,
+			};
+			work.answers.push({
+				messageId: "supervisor",
+				question: pending.prompt,
+				answer: decision.answer,
+			});
+			work.status = "waiting_child";
+			work.summary =
+				decision.summary ||
+				"Claude Code の質問へ回答し、作業を継続しています。";
+			return;
+		}
+		escalatePendingQuestion(
+			work,
+			decision.action === "ask_user" ? decision.question : undefined,
+		);
+		return;
+	}
 	switch (decision.action) {
 		case "invoke": {
 			const maxTurns = Math.min(30, 120 - work.turnsReserved);
@@ -313,6 +401,9 @@ export function applyDecision(
 			work.executions++;
 			work.turnsUsedBeforeExecution = work.turnsReserved;
 			work.turnsReserved += maxTurns;
+			work.decisionRetries = 0;
+			work.eventCursor = 0;
+			work.eventExcerpts = [];
 			work.status = "waiting_child";
 			work.stop = undefined;
 			work.effect = {
@@ -339,6 +430,46 @@ export function applyDecision(
 			};
 			return;
 		}
+		case "read_events": {
+			const targetId = work.observation?.executionId ?? work.previousId;
+			if (
+				!targetId ||
+				work.executionId ||
+				work.calls >= work.maxCalls ||
+				work.eventCursor === -1
+			) {
+				finish(
+					db,
+					host,
+					work,
+					"partial",
+					"詳細イベントを取得できず、作業を中断しました。",
+				);
+				return;
+			}
+			work.effect = {
+				kind: "read_events",
+				executionId: targetId,
+				after: decision.after,
+			};
+			work.status = "deciding";
+			work.summary = "Claude Code の詳細イベントを確認しています。";
+			return;
+		}
+		case "reply": {
+			if (!work.supervision && work.calls < work.maxCalls) {
+				work.status = "deciding";
+				return;
+			}
+			finish(
+				db,
+				host,
+				work,
+				"partial",
+				"対象の質問が存在せず、作業を中断しました。",
+			);
+			return;
+		}
 		case "ask_user":
 			work.status = "waiting_user";
 			work.question = {
@@ -354,9 +485,12 @@ export function applyDecision(
 			return;
 		case "finish": {
 			const known = new Set(
-				(work.supervision?.evidence ?? work.observation?.evidence)?.map(
-					({ ref }) => ref,
-				),
+				work.supervision
+					? (work.supervision.evidence ?? []).map(({ ref }) => ref)
+					: [
+							...(work.observation?.evidence ?? []).map(({ ref }) => ref),
+							...(work.knownEvidenceRefs ?? []),
+						],
 			);
 			const refs = decision.refs.filter((ref) => known.has(ref));
 			const verified =
@@ -383,6 +517,20 @@ export function applyDecision(
 			return;
 		}
 		case "wait":
+			if (work.executionId) {
+				work.status = "waiting_child";
+				return;
+			}
+			if (
+				!work.supervision &&
+				(work.decisionRetries ?? 0) < 2 &&
+				work.calls < work.maxCalls
+			) {
+				work.decisionRetries = (work.decisionRetries ?? 0) + 1;
+				work.status = "deciding";
+				work.summary = "次の作業判断を再確認しています。";
+				return;
+			}
 			finish(
 				db,
 				host,

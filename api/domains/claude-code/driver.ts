@@ -26,6 +26,10 @@ export async function drive(
 	target: Runner,
 	snapshot: Work,
 ) {
+	if (snapshot.effect?.kind === "read_events") {
+		await driveReadEvents(store, now, currentHost, target, snapshot);
+		return;
+	}
 	const executionId = snapshot.executionId!;
 	const effect = snapshot.effect;
 	const current = (db: Database) => {
@@ -265,4 +269,63 @@ export async function tryRecovery(
 			// Until proof is available, this holder stays quarantined.
 		}
 	}
+}
+
+async function driveReadEvents(
+	store: SqliteStore,
+	now: () => number,
+	currentHost: Host,
+	target: Runner,
+	snapshot: Work,
+) {
+	const effect = snapshot.effect;
+	if (effect?.kind !== "read_events") return;
+	const current = (db: Database) => {
+		const work = read(db, snapshot.id);
+		return work?.generation === snapshot.generation &&
+			codingCanonicalJSON(work.effect) === codingCanonicalJSON(effect) &&
+			work.deadline > now() &&
+			authorityCurrent(currentHost, db, work, "inspect")
+			? work
+			: null;
+	};
+	if (!store.readSnapshot(current)) return;
+	let fetched: Awaited<ReturnType<NonNullable<Runner["events"]>>> | null = null;
+	try {
+		fetched = target.events
+			? await target.events(effect.executionId, effect.after)
+			: null;
+	} catch {
+		fetched = null;
+	}
+	await store.write((db) => {
+		const work = current(db);
+		if (!work) return;
+		work.effect = null;
+		if (fetched) {
+			const existing = new Map(
+				(work.eventExcerpts ?? []).map((item) => [
+					`${item.executionId}:${item.seq}`,
+					item,
+				]),
+			);
+			const knownRefs = new Set(work.knownEvidenceRefs ?? []);
+			for (const item of fetched.events) {
+				const ref = `${effect.executionId}:${item.seq}`;
+				existing.set(ref, {
+					executionId: effect.executionId,
+					seq: item.seq,
+					text: item.text.slice(0, 2_000),
+				});
+				knownRefs.add(ref);
+			}
+			work.eventExcerpts = [...existing.values()].slice(-16);
+			work.knownEvidenceRefs = [...knownRefs].slice(-128);
+			work.eventCursor = fetched.next;
+		} else {
+			work.eventCursor = -1;
+		}
+		work.observedAt = now();
+		save(db, work, now());
+	});
 }

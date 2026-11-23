@@ -1,6 +1,7 @@
+import { realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Capabilities } from "../domains/capabilities";
-import { claudeRunnerClient } from "../domains/coding";
+import { claudeDaemonClient, claudeRunnerClient } from "../domains/coding";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import type { createContinuityService } from "../domains/continuity";
 import { createDialogueService } from "../domains/dialogue";
@@ -470,9 +471,29 @@ export async function buildHostToolchainService(
 		inference,
 	);
 	const claudeSocket = config.env.EUMENES_CLAUDE_WORK_RUNNER_SOCKET;
+	const autoStartClaude =
+		!claudeSocket &&
+		config.env.EUMENES_CLAUDE_WORK_RUNNER_AUTOSTART !== "0" &&
+		config.dbPath !== ":memory:" &&
+		Boolean(Bun.which("claude"));
+	const workspaceRoot = realpathSync(process.cwd());
+	const dataRoot =
+		config.dbPath !== ":memory:"
+			? realpathSync(dirname(config.dbPath))
+			: undefined;
 	const claudeRunner = claudeSocket
-		? claudeRunnerClient(claudeSocket, process.cwd())
-		: undefined;
+		? claudeRunnerClient(claudeSocket, workspaceRoot)
+		: autoStartClaude && dataRoot
+			? claudeDaemonClient({
+					root: join(dataRoot, "claude-code-runner"),
+					workspace: workspaceRoot,
+					protectedPaths: [
+						dataRoot,
+						join(workspaceRoot, ".env"),
+						join(workspaceRoot, ".env.local"),
+					],
+				})
+			: undefined;
 	if (claudeRunner) await claudeRunner.probe();
 	const { toolchain, links } = await createHostToolchain({
 		resources: deps.lateResources,

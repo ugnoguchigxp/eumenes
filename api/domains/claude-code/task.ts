@@ -200,6 +200,7 @@ export function createTaskPort({
 					answer: answer.data,
 				};
 				work.status = "waiting_child";
+				work.summary = "回答を受け取り、Claude Code の作業を再開しています。";
 			} else {
 				work.answers.push({
 					messageId,
@@ -207,8 +208,10 @@ export function createTaskPort({
 					answer: answer.data,
 				});
 				work.status = "deciding";
+				work.summary = "回答を受け取り、次の作業を判断しています。";
 			}
 			closeQuestion(db, host, work);
+			work.observedAt = now();
 			save(db, work, now());
 			return view(work);
 		},
@@ -234,6 +237,10 @@ export function createTaskPort({
 			work.amendments = [];
 			work.result = null;
 			work.observation = null;
+			work.knownEvidenceRefs = [];
+			work.eventExcerpts = [];
+			work.eventCursor = 0;
+			work.pendingRunnerQuestion = null;
 			cancel(db, work, "forgotten");
 		},
 	};

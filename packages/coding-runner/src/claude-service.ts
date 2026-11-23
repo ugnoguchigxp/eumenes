@@ -416,14 +416,22 @@ export class ClaudeService {
 			const result = await this.engine(
 				{
 					...input,
-					authorize: async (tool, raw) =>
-						(tool === "AskUserQuestion" ||
-							(await input.authorize(tool, raw))) &&
-						(!saved.spec.supervised ||
-							(await this.requestToolApproval(active, tool))),
+					authorize: async (tool, raw) => {
+						if (!saved.spec.supervised)
+							return tool === "AskUserQuestion"
+								? true
+								: input.authorize(tool, raw);
+						const allowed =
+							tool === "AskUserQuestion" ||
+							(await input.authorize(tool, raw)) === true;
+						return allowed && (await this.requestToolApproval(active, tool));
+					},
 					onSession: (sessionId) => {
 						saved.sessionId = sessionId;
 						this.update(saved, { canResume: true });
+					},
+					onToolActivity: (tool) => {
+						this.update(saved, { lastTool: tool.slice(0, 80) });
 					},
 					onEvidence: (seq, text, fact) =>
 						this.recordEvidence(saved, Number(seq), text, fact),
@@ -439,7 +447,17 @@ export class ClaudeService {
 											expiresAt: input.deadline,
 										}
 									: {}),
-								inputSchema: { type: "string", maxLength: 2_000 },
+								inputSchema: {
+									type: "string",
+									maxLength: 2_000,
+									...(question.options?.length
+										? {
+												description: question.multiSelect
+													? `選択肢（複数可）: ${question.options.join(" / ")}`
+													: `選択肢: ${question.options.join(" / ")}`,
+											}
+										: {}),
+								},
 							},
 						});
 						const pending = Promise.withResolvers<string | null>();
@@ -485,7 +503,11 @@ export class ClaudeService {
 				question: undefined,
 				toolRequests: undefined,
 				summary: result.result?.text,
+				resultSubtype: result.result?.subtype,
+				errorDetail: result.result?.errorDetail,
+				stderrExcerpt: result.stderrExcerpt,
 				turns: result.result?.turns,
+				eventCount: result.evidenceCount,
 			});
 		} catch {
 			this.unknown.add(saved.spec.id);
@@ -698,6 +720,7 @@ export class ClaudeService {
 			structured,
 		});
 		this.update(saved, {
+			eventCount: seq,
 			evidence: [
 				...(saved.observation.evidence ?? []).slice(-11),
 				{ ref, text: text.slice(0, 1_024) },

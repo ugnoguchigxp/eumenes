@@ -10,10 +10,12 @@
 		"./sdk-client": "./src/sdk-client.ts",
 		"./sdk-schema": "./src/sdk-schema.ts",
 		"./sdk-daemon": "./src/sdk-daemon.ts",
+		"./claude-daemon": "./src/claude-daemon.ts",
 		"./claude-server": "./src/claude-server.ts"
 	},
 	"scripts": {
 		"sdk": "bun src/sdk-cli.ts",
+		"claude": "bun src/claude-cli.ts",
 		"test": "bun test test"
 	},
 	"dependencies": {

@@ -66,6 +66,25 @@ export const claudeQuestion = z.strictObject({
 	expiresAt: z.number().int(),
 	inputSchema: z.record(z.string(), z.unknown()),
 	presentation: z.enum(["waiting", "presented"]).optional(),
+	kind: z.enum(["question", "permission"]).optional(),
+	tool: z.string().max(80).optional(),
+	options: z.array(z.string().max(200)).max(16).optional(),
+	multiSelect: z.boolean().optional(),
+});
+export const claudeEventsResponse = z.strictObject({
+	events: z.array(
+		z.strictObject({
+			seq: z.number().int().positive(),
+			text: z.string().max(4_000),
+		}),
+	),
+	next: z.number().int().nonnegative(),
+});
+export const claudeDaemonConfigSchema = z.strictObject({
+	root: path,
+	workspace: path,
+	executable: path.optional(),
+	protectedPaths: z.array(path).max(32).optional(),
 });
 export const claudeEvidence = z.strictObject({
 	ref: z.string().max(160),
@@ -94,6 +113,11 @@ export const claudeObservation = z.strictObject({
 		.strictObject({ operationId: z.uuid(), questionId: z.uuid() })
 		.optional(),
 	summary: z.string().max(4_000).optional(),
+	resultSubtype: z.string().max(80).optional(),
+	errorDetail: z.string().max(2_000).optional(),
+	stderrExcerpt: z.string().max(2_048).optional(),
+	lastTool: z.string().max(80).optional(),
+	eventCount: z.number().int().nonnegative().optional(),
 	evidence: z
 		.array(
 			z.strictObject({ ref: z.string().max(160), text: z.string().max(1_024) }),
@@ -179,3 +203,6 @@ export type ClaudeRunAuthorization = z.infer<typeof claudeAuthorization>;
 export type ClaudeCheck = z.infer<typeof claudeCheck>;
 export type ClaudeEvidence = z.infer<typeof claudeEvidence>;
 export type ClaudeLease = z.infer<typeof claudeLease>;
+export type ClaudeQuestion = z.infer<typeof claudeQuestion>;
+export type ClaudeEventsResponse = z.infer<typeof claudeEventsResponse>;
+export type ClaudeDaemonConfig = z.infer<typeof claudeDaemonConfigSchema>;

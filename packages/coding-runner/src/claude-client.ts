@@ -3,6 +3,7 @@ import { lstatSync, realpathSync } from "node:fs";
 import { dirname } from "node:path";
 import { RUNNER_FILE_MAX_BYTES } from "./contracts";
 import {
+	claudeEventsResponse,
 	claudeObservation,
 	type ClaudeLease,
 	type ClaudeRequest,
@@ -81,6 +82,11 @@ export function claudeRunnerClient(socketPath: string, workspace: string) {
 			return claudeObservation
 				.nullable()
 				.parse(await call({ operation: "inspect", id }));
+		},
+		async events(id: string, after: number) {
+			return claudeEventsResponse.parse(
+				await call({ operation: "events", id, after }),
+			);
 		},
 		async stop(
 			id: string,

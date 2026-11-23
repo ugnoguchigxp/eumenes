@@ -15,13 +15,19 @@ export type {
 	SdkSnapshot,
 } from "./sdk-git-contracts";
 
-export { claudeAuthorization } from "./claude-contracts";
+export {
+	claudeAuthorization,
+	claudeDaemonConfigSchema,
+} from "./claude-contracts";
 export type {
 	ClaudeObservation,
 	ClaudeStart,
 	ClaudeEvidence,
 	ClaudeRunAuthorization,
 	ClaudeLease,
+	ClaudeQuestion,
+	ClaudeEventsResponse,
+	ClaudeDaemonConfig,
 } from "./claude-contracts";
 export { claudeInputDigest } from "./claude-input-digest";
 

@@ -4,7 +4,12 @@ import type { QueueService } from "../queue";
 import type { InferencePort } from "../inference";
 import type { Host, Work } from "./contracts";
 import { capture, decide } from "./decision";
-import { applyDecision, authorityCurrent, finish } from "./lifecycle";
+import {
+	applyDecision,
+	authorityCurrent,
+	escalatePendingQuestion,
+	finish,
+} from "./lifecycle";
 import { read, save } from "./repository";
 
 export const DECISION_JOB = "claude-code.decide";
@@ -60,12 +65,36 @@ export function registerDecisionJobs(
 				save(db, work, now());
 				return "applied";
 			}
+			if (work.decisionMode === "question") {
+				if (
+					outcome.type === "success" &&
+					inference.acceptInTransaction?.(db, outcome.result.receipt)
+				) {
+					work.decisionRetries = 0;
+					applyDecision(db, host, work, outcome.result.output, now());
+				} else {
+					escalatePendingQuestion(work);
+				}
+				work.observedAt = now();
+				save(db, work, now());
+				return "applied";
+			}
 			if (
 				outcome.type === "success" &&
 				inference.acceptInTransaction?.(db, outcome.result.receipt)
-			)
+			) {
+				work.decisionRetries = 0;
 				applyDecision(db, host, work, outcome.result.output, now());
-			else if (outcome.type !== "interrupted" || work.calls >= work.maxCalls)
+			} else if (outcome.type === "interrupted" && work.calls < work.maxCalls) {
+				// Re-scheduled on the next maintenance pass while budget remains.
+			} else if (
+				!work.supervision &&
+				(work.decisionRetries ?? 0) < 2 &&
+				work.calls < work.maxCalls
+			) {
+				work.decisionRetries = (work.decisionRetries ?? 0) + 1;
+				work.summary = "判断を再試行しています。";
+			} else {
 				finish(
 					db,
 					host,
@@ -73,6 +102,7 @@ export function registerDecisionJobs(
 					"partial",
 					"担当の判断を確定できず、作業を終了しました。",
 				);
+			}
 			work.observedAt = now();
 			save(db, work, now());
 			return "applied";
@@ -93,6 +123,7 @@ function currentDecision(
 		work.decisionId === jobId &&
 		work.status ===
 			(work.decisionMode === "progress" ? "waiting_child" : "deciding") &&
+		(work.decisionMode !== "question" || !!work.pendingRunnerQuestion) &&
 		!work.forgotten &&
 		work.deadline > now &&
 		authorityCurrent(host, db, work)

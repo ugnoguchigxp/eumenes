@@ -28,6 +28,16 @@ export const decisionSchema = z.discriminatedUnion("action", [
 		...brief,
 		question: questionAnswer,
 	}),
+	z.strictObject({
+		action: z.literal("reply"),
+		...brief,
+		answer: questionAnswer,
+	}),
+	z.strictObject({
+		action: z.literal("read_events"),
+		...brief,
+		after: z.number().int().nonnegative().max(1_000_000),
+	}),
 	z.strictObject({ action: z.literal("wait"), ...brief }),
 	z.strictObject({
 		action: z.literal("finish"),
@@ -41,6 +51,10 @@ export const decisionSchema = z.discriminatedUnion("action", [
 export type Decision = z.infer<typeof decisionSchema>;
 export type Question = NonNullable<ExecutionView["question"]> & {
 	presentation?: "waiting" | "presented";
+	kind?: "question" | "permission";
+	tool?: string;
+	options?: string[];
+	multiSelect?: boolean;
 };
 export type {
 	ClaudeObservation as Observation,
@@ -48,6 +62,7 @@ export type {
 	ClaudeRunAuthorization,
 	ClaudeEvidence,
 	ClaudeLease,
+	ClaudeEventsResponse,
 } from "../coding";
 import type {
 	ClaudeObservation as Observation,
@@ -55,12 +70,14 @@ import type {
 	ClaudeRunAuthorization,
 	ClaudeEvidence,
 	ClaudeLease,
+	ClaudeEventsResponse,
 } from "../coding";
 export interface Runner {
 	ready(): boolean;
 	probe?(): Promise<boolean>;
 	start(operation: Start): Promise<Observation>;
 	inspect(id: string): Promise<Observation | null>;
+	events?(id: string, after: number): Promise<ClaudeEventsResponse>;
 	reply(
 		id: string,
 		operationId: string,
@@ -160,8 +177,13 @@ export type Work = {
 	memo: string;
 	question: Question | null;
 	questionFromRunner: boolean;
+	pendingRunnerQuestion?: Question | null;
 	result: ExecutionResult | null;
 	observation: Observation | null;
+	knownEvidenceRefs?: string[];
+	eventCursor?: number;
+	eventExcerpts?: { executionId: string; seq: number; text: string }[];
+	decisionRetries?: number;
 	calls: number;
 	executions: number;
 	turnsReserved: number;
@@ -170,13 +192,14 @@ export type Work = {
 	maxExecutions: number;
 	attemptMs: number;
 	decisionId: string | null;
-	decisionMode: "work" | "progress";
+	decisionMode: "work" | "progress" | "question";
 	progressCalls: number;
 	progressSeq: number;
 	progressAt: number;
 	effect:
 		| { kind: "start"; operation: Start }
 		| { kind: "reply"; id: string; questionId: string; answer: string }
+		| { kind: "read_events"; executionId: string; after: number }
 		| {
 				kind: "stop";
 				id: string;

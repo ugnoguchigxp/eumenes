@@ -15,6 +15,8 @@ import { drive, recover, tryRecovery } from "./driver";
 import { createTaskPort } from "./task";
 import {
 	authorityCurrent,
+	closeQuestion,
+	escalatePendingQuestion,
 	finish,
 	newId,
 	requestStop,
@@ -107,6 +109,15 @@ export function createClaudeCode({
 			work.question
 		)
 			return;
+		if (work.pendingRunnerQuestion) {
+			if (work.calls >= work.maxCalls) escalatePendingQuestion(work);
+			else {
+				work.status = "deciding";
+				queueDecision(db, work, "question");
+			}
+			save(db, work, now());
+			return;
+		}
 		if (work.executionId) {
 			if (
 				work.status !== "waiting_child" ||
@@ -197,40 +208,14 @@ export function createClaudeCode({
 			const unconfirmed: { source: SupervisedExecutionSource; id: string }[] =
 				[];
 			for (const work of pending(db)) {
-				if (
-					!terminal(work) &&
-					work.effect?.kind !== "stop" &&
-					(work.deadline <= now() ||
-						(work.question?.expiresAt ?? Infinity) <= now() ||
-						!authorityCurrent(currentHost, db, work))
-				)
-					cancel(
-						db,
-						work,
-						work.deadline <= now() ||
-							(work.question?.expiresAt ?? Infinity) <= now()
-							? "expired"
-							: "forgotten",
-					);
-				if (work.notice) {
-					const notice =
-						work.supervision && isSupervisedExecutionSource(work.source)
-							? currentHost.supervised?.observeInTransaction(
-									db,
-									work.source,
-									view(work),
-									work.notice,
-								)
-							: isStandardExecutionSource(work.source) &&
-								currentHost.deliverInTransaction(db, view(work), work.notice);
-					if (notice) {
-						work.deliveredNotice = work.notice;
-						work.notice = null;
-						save(db, work, now());
-					}
-				}
+				enforceDeadlines(db, currentHost, work, now(), cancel);
+				deliverNotice(db, currentHost, work, now());
 				schedule(db, work);
-				if (work.executionId && !terminal(work)) external.push(work);
+				if (
+					(work.executionId || work.effect?.kind === "read_events") &&
+					!terminal(work)
+				)
+					external.push(work);
 				if (
 					checkRecovery &&
 					work.stop === "unconfirmed" &&
@@ -340,3 +325,59 @@ export function createClaudeCode({
 }
 
 export type ClaudeCodeService = ReturnType<typeof createClaudeCode>;
+
+function enforceDeadlines(
+	db: Database,
+	currentHost: Host,
+	work: Work,
+	at: number,
+	cancel: (db: Database, work: Work, reason: "expired" | "forgotten") => void,
+) {
+	if (terminal(work) || work.effect?.kind === "stop") return;
+	if (
+		work.deadline <= at ||
+		!authorityCurrent(currentHost, db, work) ||
+		(!!work.supervision && (work.question?.expiresAt ?? Infinity) <= at)
+	) {
+		cancel(
+			db,
+			work,
+			work.deadline <= at || (work.question?.expiresAt ?? Infinity) <= at
+				? "expired"
+				: "forgotten",
+		);
+		return;
+	}
+	if (!work.supervision && work.question && work.question.expiresAt <= at) {
+		const fromRunner = work.questionFromRunner;
+		closeQuestion(db, currentHost, work);
+		work.status = fromRunner && work.executionId ? "waiting_child" : "deciding";
+		work.summary = "質問の回答期限が過ぎたため、状況を再確認しています。";
+		work.observedAt = at;
+		save(db, work, at);
+	}
+}
+
+function deliverNotice(
+	db: Database,
+	currentHost: Host,
+	work: Work,
+	at: number,
+) {
+	if (!work.notice) return;
+	const notice =
+		work.supervision && isSupervisedExecutionSource(work.source)
+			? currentHost.supervised?.observeInTransaction(
+					db,
+					work.source,
+					view(work),
+					work.notice,
+				)
+			: isStandardExecutionSource(work.source) &&
+				currentHost.deliverInTransaction(db, view(work), work.notice);
+	if (notice) {
+		work.deliveredNotice = work.notice;
+		work.notice = null;
+		save(db, work, at);
+	}
+}

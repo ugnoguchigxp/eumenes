@@ -25,7 +25,13 @@ export type {
 	ClaudeEvidence,
 	ClaudeRunAuthorization,
 	ClaudeLease,
+	ClaudeQuestion,
+	ClaudeEventsResponse,
+	ClaudeDaemonConfig,
 } from "../../../packages/coding-runner/src/contracts";
 export { claudeAuthorization } from "../../../packages/coding-runner/src/contracts";
 export { claudeInputDigest } from "../../../packages/coding-runner/src/contracts";
-export { claudeRunnerClient } from "../../../packages/coding-runner/src/client";
+export {
+	claudeRunnerClient,
+	claudeDaemonClient,
+} from "../../../packages/coding-runner/src/client";
