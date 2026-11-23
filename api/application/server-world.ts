@@ -12,7 +12,7 @@ import { createGoalsAssembly, GOALS_ACCESS } from "./world/goals-assembly";
 import { createStewardAssembly } from "./world/steward-assembly";
 import type { MemoryService } from "../domains/memory";
 import { createWorldView, type StewardService } from "../domains/steward";
-import { defaultConsolidationWindow, type Settings } from "../domains/settings";
+import type { Settings } from "../domains/settings";
 import { WORLD_CURATE_PURPOSE } from "../domains/world";
 import { agendaInterval } from "./agency/always-on-scope";
 
@@ -78,10 +78,10 @@ export function assembleCuration(
 	config: Config,
 	deps: Omit<
 		Parameters<typeof createStewardAssembly>[0],
-		"worldResourceId" | "restMs" | "sleep"
+		"worldResourceId" | "restMs"
 	> &
 		Omit<Parameters<typeof assembleServerWorld>[1], "steward"> & {
-			/** The saved settings the steward reads at each use: World's resource, the user's interval, the time window. */
+			/** The saved settings the steward reads at each use: World's resource and the user's interval. */
 			settings: { get(): Settings };
 		},
 ) {
@@ -99,11 +99,6 @@ export function assembleCuration(
 		// The conversation rests once the user's own interval between the agent's utterances is past.
 		restMs: () =>
 			agendaInterval(deps.settings.get().agency.speechIntervalSec) * 1000,
-		sleep: {
-			window: () =>
-				deps.settings.get().memory?.consolidationWindow ??
-				defaultConsolidationWindow,
-		},
 		goals: { ops: goals.goals, access: GOALS_ACCESS },
 		...(world
 			? {

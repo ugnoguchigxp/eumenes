@@ -39,7 +39,7 @@ import {
 	type ConversationPrefix,
 } from "./conversation-input";
 import { localHarness, routeConversation } from "./harness";
-import { INPUT_HEADINGS, dataText, lineText, section } from "./input-text";
+import { INPUT_HEADINGS, dataText, lineText } from "./input-text";
 import {
 	consumeAnswer,
 	answerTicketInTransaction,
@@ -59,10 +59,7 @@ import { ASK_STEP } from "./tool-exchange";
 import { taskTargets } from "./task-work";
 import { screenLinesInTransaction } from "./resource-context";
 import { preparedMemoryInTransaction } from "./memory-refs";
-import {
-	recallInTransaction,
-	recordPromptSources,
-} from "./generation-prepare-recall";
+import { recordPromptSources } from "./generation-prepare-sources";
 import { parkGenerationInTransaction } from "./targets-hold";
 
 const log = getLogger("dialogue");
@@ -337,8 +334,6 @@ function routedInputInTransaction(
 		nowMs: number;
 		state: ReturnType<typeof stateProjectionInTransaction>;
 		revisions: RoutedInput["pending"]["revisions"];
-		/** `## Recall` as the talk turn shows it, when it shows any line. */
-		recall: string | null;
 		media: readonly { line: string }[];
 		diagnostics: readonly { line: string; ref: string }[];
 		lastAgent: {
@@ -389,7 +384,6 @@ function routedInputInTransaction(
 	});
 	return {
 		memory: input.prefix.memory,
-		recall: input.recall,
 		// Words with no text (a voice message left empty) name nothing a request could point to.
 		earlier: input.prefix.earlier
 			.map((said) => lineText(said).slice(0, PREVIOUS_REPLY_CHARS))
@@ -671,14 +665,6 @@ export function createPrepare(
 		const { offers, revisions, sources } = userTurn
 			? delegationContext(deps, tx, conversationId, state.lines)
 			: { offers: [], revisions: [], sources: [] };
-		// What this turn's words bring to mind: drawn again by every turn, kept in no history.
-		const recall = userTurn
-			? recallInTransaction(deps, tx, {
-					conversationId,
-					prefix,
-					utterances: texts,
-				})
-			: null;
 		recordPromptSources(deps, tx, {
 			runId: run.id,
 			conversationId,
@@ -686,7 +672,6 @@ export function createPrepare(
 			pendingIds: new Set([...pendingIds, ...sources]),
 			media,
 			notAdopted,
-			recalled: recall?.memoryItemIds ?? [],
 		});
 		// Scheduled prompts can receive an answer but carry no authority to control or start work.
 		const routed = userTurn
@@ -699,7 +684,6 @@ export function createPrepare(
 					diagnostics,
 					lastAgent,
 					prefix,
-					recall: recall ? section(INPUT_HEADINGS.recall, recall.lines) : null,
 				})
 			: undefined;
 		const viewing = screenLines.map(({ text }) => text);
@@ -710,7 +694,6 @@ export function createPrepare(
 				: [...state.lines.slice(0, 1), ...screenState],
 			askedRequest: routed?.asked?.request,
 			agencyLines: agencyStateLines(deps, tx, conversationId),
-			recallLines: recall?.lines ?? [],
 			media,
 			diagnostics,
 			notice: noticeBody,

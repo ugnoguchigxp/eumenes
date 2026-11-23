@@ -137,7 +137,6 @@ export type AgencyHostDeps = {
 		| "marksInTransaction"
 		| "stateItemsInTransaction"
 		| "rememberExplicitInTransaction"
-		| "recordCandidateInTransaction"
 		| "correctExplicitInTransaction"
 		| "excludeForForgetInTransaction"
 		| "suppressInTransaction"

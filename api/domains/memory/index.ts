@@ -24,16 +24,12 @@ export type {
 } from "./contracts";
 export { FORGET_MAX_ITEMS } from "./contracts";
 export type {
-	/** @public */ CandidateEvidenceInput,
-	/** @public */ ChangedExcludingRun,
 	/** @public */ CorrectExplicitInput,
 	/** @public */ CorrectExplicitOutcome,
 	/** @public */ ExcludeForForgetInput,
 	/** @public */ ExcludeForForgetOutcome,
 	/** @public */ ImmediateRejection,
 	/** @public */ ItemTarget,
-	/** @public */ RecordCandidateInput,
-	/** @public */ RecordCandidateOutcome,
 	/** @public */ RememberExplicitInput,
 	/** @public */ RememberExplicitOutcome,
 	/** @public */ ShortRef,
@@ -41,8 +37,6 @@ export type {
 	/** @public */ SuppressOutcome,
 	/** @public */ WithdrawExplicitInput,
 	/** @public */ WithdrawExplicitOutcome,
-	/** @public */ WriteTendencyInput,
-	/** @public */ WriteTendencyOutcome,
 } from "./contracts/immediate";
 export type {
 	MemoryInputBudget,

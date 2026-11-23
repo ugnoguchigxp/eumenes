@@ -92,8 +92,6 @@ export type RememberExplicitOutcome =
 			revision: number;
 			/** The version this one replaced (a different value of the same fact was stored). */
 			replacedItemId: string | null;
-			/** Active records of the same kind with another key whose words are alike (at most 3). Nothing was changed for them. */
-			similar: { itemId: string; revision: number }[];
 	  }
 	| { status: "unchanged"; itemId: string; revision: number }
 	| Rejected;
@@ -167,64 +165,3 @@ export type WithdrawExplicitOutcome =
 
 /** A reference handed out in the conversation's current window. */
 export type ShortRef = { ref: string; itemId: string; revision: number };
-
-/** An evidence of a candidate: a user message of the conversation, or an outside note (its text is the source). */
-export type CandidateEvidenceInput =
-	| { messageId: string; quote?: string | null }
-	| { note: { id: string; text: string }; quote?: string | null };
-export type RecordCandidateInput = Origin & {
-	kind: StateKindName;
-	semanticKey: string;
-	subject: "self";
-	text: string;
-	polarity: "affirmed" | "negated";
-	evidence: readonly CandidateEvidenceInput[];
-};
-export type RecordCandidateOutcome =
-	| {
-			status: "recorded";
-			candidateId: string;
-			created: boolean;
-			/** Observations this call counted (0: a resend). */
-			newObservations: number;
-			observationCount: number;
-			conversationIds: string[];
-			/** Some evidence is an outside note: the candidate must not be promoted without the user's confirmation. */
-			external: boolean;
-	  }
-	| Rejected;
-
-export type ChangedExcludingRun = {
-	changed: boolean;
-	firstSeq: number | null;
-	latestSeq: number;
-};
-
-/**
- * A tendency (L4) from the sleeping layer. `evidence` are references of the library's kind (`SourceRef`) to the
- * user's messages (what a candidate stands on); a reference of any other namespace (an outside note) is refused.
- * Extra fields of the consolidation's own record are ignored: memory counts the conversations itself.
- */
-export type WriteTendencyInput = {
-	sourceRunId: string;
-	text: string;
-	evidence: ReadonlyArray<{
-		namespace: string;
-		kind: string;
-		id: string;
-		revision?: string;
-		digest?: string;
-	}>;
-	/** The candidate it came from: a tendency goes when its candidate is forgotten. */
-	candidateId?: string;
-};
-export type WriteTendencyOutcome =
-	| {
-			status: "written";
-			tendencyId: string;
-			revision: number;
-			conversationIds: string[];
-	  }
-	/** An active tendency of the same words exists. */
-	| { status: "unchanged"; tendencyId: string }
-	| Rejected;

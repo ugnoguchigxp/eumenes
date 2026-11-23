@@ -51,8 +51,4 @@ export type MemoryInputBudget = {
 	alwaysTokens: number;
 	/** responses: constraints and preferences. leanings: + habits. facts: + the user's own facts. */
 	alwaysScope: "responses" | "leanings" | "facts";
-	/** Whether the per-turn section `## Recall` is shown. */
-	recallEnabled: boolean;
-	recallTokens: number;
-	recallItems: number;
 };

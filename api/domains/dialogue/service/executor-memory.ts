@@ -19,20 +19,9 @@ const resolving = (): ToolOutcome => ({
 	result: { accepted: true, status: "resolving" },
 });
 
-const needsResolution = (args: MemoryArgs) =>
-	!args.ref &&
-	(args.kind === "correct" ||
-		args.kind === "forget" ||
-		args.kind === "suppress");
-
 const normalized = (text: string) =>
 	text.normalize("NFKC").toLowerCase().replace(/\s+/gu, " ").trim();
-
-/**
- * What one request is, within a run: a remembered fact (its kind and key), a change of a record named by its
- * reference, or the words of a target not yet named. The same request asked again in other words (a regenerated
- * reply) is the first one, so it is applied once.
- */
+/** What a request asks, apart from its wording: the same request made again has the same key. */
 function requestKey(args: MemoryArgs): string {
 	if (args.kind === "remember" && args.memory)
 		return `remember:${args.memory.kind}:${normalized(args.memory.semanticKey ?? "")}`;
@@ -41,6 +30,12 @@ function requestKey(args: MemoryArgs): string {
 		? `${args.kind}:${args.ref}`
 		: `${args.kind}:${normalized(args.what)}`;
 }
+
+const needsResolution = (args: MemoryArgs) =>
+	!args.ref &&
+	(args.kind === "correct" ||
+		args.kind === "forget" ||
+		args.kind === "suppress");
 
 /**
  * The memory tool (the memory architecture redesign, sections 5.1 and 8). Everything is applied here, in one writer
@@ -53,14 +48,13 @@ export async function memory(
 	_call: ParsedCall,
 	args: MemoryArgs,
 ): Promise<ToolOutcome> {
-	const { deps, input, current, actedOnce, handle, actionKey } = x;
+	const { deps, input, current, actedOnce, handle } = x;
 	/**
-	 * The id of the steward's inbox row and of the target resolution. `actionKey` is the utterance numbers and the
-	 * target, which two conversations share, and the inbox refuses a row id another conversation made: the id carries
-	 * the conversation.
+	 * What this call is: the run and what it asks. The same request within one run (a call repeated, a retried
+	 * generation) has the same key and is applied once; a request of another run, or another request of this run, is
+	 * never taken for one already done. It is also the id of the steward's inbox row and of the target resolution.
 	 */
-	const requestIdOf = (target: string) =>
-		`${input.conversationId}:${actionKey(target)}`;
+	const callKey = `${input.runId}:${requestKey(args)}`;
 	// A request stands on the user's own words: a generation without a new utterance cannot make one. The newest
 	// utterance first: a quote is looked for in each.
 	const messageIds =
@@ -72,7 +66,7 @@ export async function memory(
 		const latest = messageIds[0];
 		if (!latest || isSystemPrompt(run.sourceKind))
 			return rejected("utterance_required");
-		const target = `memory.request:${requestKey(args)}`;
+		const target = `memory.request:${callKey}`;
 		tx.exec("SAVEPOINT memory_request");
 		let outcome: ToolOutcome;
 		try {
@@ -83,8 +77,8 @@ export async function memory(
 			// A retried generation asks again: the first call stands (a withdrawal must not take back another request).
 			outcome = first.created
 				? args.kind === "goal"
-					? goal(x, tx, args, latest, requestIdOf(target))
-					: apply(x, tx, args, messageIds, requestIdOf(target))
+					? goal(x, tx, args, latest, callKey)
+					: apply(x, tx, args, messageIds, callKey)
 				: needsResolution(args)
 					? resolving()
 					: applied();
@@ -175,17 +169,9 @@ function apply(
 	const written = (outcome: {
 		itemId: string;
 		revision: number;
-		/** Records of another key whose words are close to this one (the model corrects one of them if it is the same fact). */
-		similar?: readonly { itemId: string; revision: number }[];
 	}): ToolOutcome => {
 		const ref = refOf(outcome.itemId, outcome.revision);
-		const similar = (outcome.similar ?? [])
-			.map((item) => refOf(item.itemId, item.revision))
-			.filter((similarRef): similarRef is string => !!similarRef);
-		return applied({
-			...(ref ? { ref } : {}),
-			...(similar.length ? { similar } : {}),
-		});
+		return applied(ref ? { ref } : {});
 	};
 	const fields = () => ({
 		text: record!.text,

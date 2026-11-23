@@ -141,9 +141,6 @@ test("read_memory asks the memory for the query's records, leaves out what `## M
 		inputBudgetInTransaction: () => ({
 			alwaysTokens: 300,
 			alwaysScope: "responses",
-			recallEnabled: false,
-			recallTokens: 300,
-			recallItems: 8,
 		}),
 		// The memory's own recall is being built beside this host: it answers as its contract says.
 		recall: (input: Record<string, unknown>) => {

@@ -13,7 +13,7 @@ afterEach(async () => {
 	for (const h of harnesses.splice(0)) await h.close();
 });
 async function setup() {
-	const h = await setupSteward({ embed: topicEmbed, sleep: {} });
+	const h = await setupSteward({ embed: topicEmbed });
 	harnesses.push(h);
 	return h;
 }
@@ -50,8 +50,9 @@ async function learnAddress(h: StewardHarness) {
 			],
 		}),
 	);
-	// The sleep layer embeds the turns of the handled events once the conversation rests.
-	await h.rest();
+	// The reflection reads the exchange's events (and embeds their turns) and learns nothing more from them.
+	h.inference.script("curate-memory", empty);
+	await h.drain();
 	return first;
 }
 
@@ -91,7 +92,7 @@ test("a fact with more than five versions uses one forget reference and erases e
 	await learnAddress(h);
 	for (let version = 1; version <= 5; version++) {
 		const text = `住所は東京都千代田区の${version}番地`;
-		const said = await h.run({ user: text, end: "completed" });
+		const said = await h.settledExchange(text, "了解しました");
 		const current = h.memory.list()[0]!;
 		await h.store.write((db) =>
 			h.memory.applyCurationInTransaction(db, {
@@ -215,8 +216,9 @@ test("an answer that stood on ground a forget removed is not adopted, and leaves
 		requests: [{ kind: "remember", what: "辛い物が好き" }],
 	});
 	await h.drain();
+	// The unit of the earlier exchange's events is first; then the stale one and the one made again.
 	const units = h.units().filter((u) => u.step === "curate-memory");
-	expect(units.map((u) => u.state)).toEqual(["stale", "applied"]);
+	expect(units.map((u) => u.state)).toEqual(["applied", "stale", "applied"]);
 	const stale = h.steward
 		.decisions("c1")
 		.find((d) => d.errorCode === "stale_forget")!;
@@ -227,7 +229,8 @@ test("an answer that stood on ground a forget removed is not adopted, and leaves
 	});
 	// The stale answer was not adopted; the unit was made again and ran on the new state.
 	expect(h.memory.list().map((i) => i.semanticKey)).toEqual(["food.spicy"]);
-	expect(h.inference.callsOf("curate-memory")).toHaveLength(2);
+	// The call over the earlier exchange, the stale one, and the one made again.
+	expect(h.inference.callsOf("curate-memory")).toHaveLength(3);
 	expect(h.inference.statuses("pending")).toBe(0);
 });
 

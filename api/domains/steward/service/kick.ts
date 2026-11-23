@@ -1,12 +1,11 @@
 import type { Database } from "bun:sqlite";
 import { getLogger } from "../../../infrastructure/logger";
 import {
+	EVENTS_PER_UNIT,
 	FORGET_RESOURCE,
 	JOB_DEADLINE_MS,
 	REQUESTS_PER_UNIT,
-	SLEEP_JOB_DEADLINE_MS,
 	FORGET_KEY,
-	SLEEP_KEY,
 	STEWARD_KIND,
 	STEWARD_RESOURCE,
 	STEWARD_SCOPE,
@@ -17,6 +16,7 @@ import {
 import {
 	type UnitTargets,
 	conversationsWithWork,
+	eventFailures,
 	insertUnit,
 	openUnitOf,
 	pendingInbox,
@@ -24,15 +24,15 @@ import {
 	setUnitJob,
 } from "../repository";
 import { kickWorld } from "./kick-world";
-import { createSleepKick } from "./sleep/kick";
-import { sleepSteps } from "./sleep/steps";
+import { createClosureKick } from "./closure-kick";
 import { steps } from "./steps";
+import { pendingEvents } from "./steps/shared";
 import type { StepEnv, StewardDeps } from "./types";
 import type { Wake } from "./wake";
 
 const log = getLogger("steward");
 
-/** The writers of the profile's long-term layers (the explicit requests, the goals, the sleep layer) are serialized. */
+/** The writers of the profile's long-term layers (the memory reflection, the goals) are serialized. */
 const LONG_TERM_KEY = "steward:long-term";
 
 type UnitSpec = {
@@ -45,9 +45,7 @@ type UnitSpec = {
 };
 
 const slotOf = (step: StepId): UnitSlot =>
-	step in sleepSteps
-		? sleepSteps[step as keyof typeof sleepSteps].slot
-		: steps[step as keyof typeof steps].slot;
+	step === "forget-closure" ? "maintenance" : steps[step].slot;
 
 /**
  * Making units: the unit row and its queue job are written together, so a unit never exists without its job.
@@ -55,23 +53,22 @@ const slotOf = (step: StepId): UnitSlot =>
  * job enqueued for later would hold its `concurrencyKey` for every unit behind it.
  * `kickInTransaction` looks at what a conversation still needs and makes the next unit; it never throws.
  *
- * The steps that read the conversation run only for the user's explicit requests (an inbox row is the reason for a
- * unit, never an exchange). The sleep layer's units are the steward's own, made by `createSleepKick`.
+ * The memory reflection runs for the conversation's new events (the handled events of the continuity flow) and for
+ * the user's explicit requests (an inbox row). The closure delete of a forget is the steward's own, made by
+ * `createClosureKick`.
  */
 export function createKick(deps: StewardDeps, wake: Wake) {
 	function createUnit(db: Database, spec: UnitSpec) {
 		const slot = slotOf(spec.step);
-		const sleepStep = sleepSteps[spec.step as keyof typeof sleepSteps];
 		// A failed try of this kind waits; the timer kicks again when it is over.
 		if (wake.paused(spec.conversationId, slot)) return false;
 		const id = deps.newId();
 		const availableAtMs = deps.nowMs();
-		const concurrencyKey = sleepStep
-			? sleepStep.concurrencyKey
-			: `steward:${spec.conversationId}`;
-		const longTerm = sleepStep
-			? false
-			: steps[spec.step as keyof typeof steps].longTerm;
+		const llmStep = spec.step === "forget-closure" ? null : steps[spec.step];
+		const concurrencyKey = llmStep
+			? `steward:${spec.conversationId}`
+			: FORGET_KEY;
+		const longTerm = llmStep?.longTerm ?? false;
 		db.exec("SAVEPOINT steward_unit");
 		try {
 			insertUnit(db, {
@@ -93,16 +90,11 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 				subjectRef: spec.conversationId,
 				lane: "background",
 				// The closure delete asks no model: it takes no inference slot.
-				resourceKey:
-					spec.step === "forget-closure" ? FORGET_RESOURCE : STEWARD_RESOURCE,
+				resourceKey: llmStep ? STEWARD_RESOURCE : FORGET_RESOURCE,
 				concurrencyKey: longTerm ? LONG_TERM_KEY : concurrencyKey,
 				maxAttempts: 3,
 				availableAtMs,
-				deadlineAtMs:
-					availableAtMs +
-					(sleepStep && spec.step !== "forget-closure"
-						? SLEEP_JOB_DEADLINE_MS
-						: JOB_DEADLINE_MS),
+				deadlineAtMs: availableAtMs + JOB_DEADLINE_MS,
 			});
 			setUnitJob(db, id, job.id);
 			db.exec("RELEASE steward_unit");
@@ -119,29 +111,46 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		}
 	}
 
-	const sleep = createSleepKick(deps, wake, (db, spec) =>
+	const closure = createClosureKick(deps, (db, spec) =>
 		createUnit(db, {
-			step: spec.step,
-			kind: spec.step === "forget-closure" ? "forget" : "sleep",
-			conversationId: spec.step === "forget-closure" ? FORGET_KEY : SLEEP_KEY,
+			step: "forget-closure",
+			kind: "forget",
+			conversationId: FORGET_KEY,
 			targets: spec.targets,
 			attempt: spec.attempt,
 		}),
 	);
 
-	/** The next unit that answers the explicit requests of the conversation (the steps read the request's own message). */
+	/**
+	 * The next unit of the memory reflection: the conversation's new handled events and the explicit requests (the
+	 * steps read the request's own message). Without either, the goal requests.
+	 */
 	function kickReflect(env: StepEnv) {
 		const { db, conversationId } = env;
 		if (openUnitOf(db, conversationId, "reflect")) return;
 		const requests = pendingInbox(db, conversationId, REQUESTS_PER_UNIT);
-		if (requests.length > 0)
+		const events = pendingEvents(env).slice(0, EVENTS_PER_UNIT);
+		if (events.length > 0 || requests.length > 0) {
+			const failures = eventFailures(
+				db,
+				conversationId,
+				events.map((event) => event.seq),
+			);
 			return createUnit(db, {
 				step: "curate-memory",
 				kind: "requests",
 				conversationId,
-				targets: { requests: requests.map((row) => row.id) },
-				attempt: Math.max(...requests.map((row) => row.failures)),
+				targets: {
+					seqs: events.map((event) => event.seq),
+					requests: requests.map((row) => row.id),
+				},
+				attempt: Math.max(
+					0,
+					...failures.values(),
+					...requests.map((row) => row.failures),
+				),
 			});
+		}
 		kickGoals(env);
 	}
 
@@ -171,12 +180,11 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		});
 	}
 
-	/** What one conversation needs: its explicit requests and its World events. Not the sleep layer. */
+	/** What one conversation needs: its new events and explicit requests, and its World events. */
 	function kickConversation(db: Database, conversationId: string) {
 		try {
 			const env: StepEnv = { db, deps, conversationId };
 			if (deps.memory.readyInTransaction(db)) {
-				sleep.touch(db, conversationId);
 				kickReflect(env);
 				// World is edited only while the user leaves the conversation, never between turns.
 				kickWorld(env, wake, (spec) =>
@@ -194,25 +202,24 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		}
 	}
 
-	/** A conversation's turn to be looked at, then the sleep layer once (it looks at every conversation itself). */
+	/** A conversation's turn to be looked at, then the closure delete of the forgets waiting for it (a unit of its own). */
 	function kickOne(db: Database, conversationId: string) {
-		// A sleep unit ended: the layer looks at the whole profile again ("the next one at once").
-		if (conversationId !== SLEEP_KEY && conversationId !== FORGET_KEY)
-			kickConversation(db, conversationId);
-		sleep.kick(db);
+		if (conversationId !== FORGET_KEY) kickConversation(db, conversationId);
+		closure.kick(db);
 	}
 
 	/**
 	 * Makes the units the steward needs: for the conversation named, or (at startup and when the timer is due) for
-	 * every conversation with work: requests waiting, a unit open, or events World received that no step has touched
-	 * yet. The sleep layer looks at the whole profile once, after them, however many conversations there are. Called inside the transaction of
-	 * a settle or a run's end; whatever fails inside leaves that transaction alone.
+	 * every conversation with work: requests waiting, a unit open, handled events not yet read, or events World
+	 * received that no step has touched yet. Called inside the transaction of a settle or a run's end; whatever
+	 * fails inside leaves that transaction alone.
 	 */
 	function kickInTransaction(db: Database, conversationId?: string) {
 		if (conversationId !== undefined) return kickOne(db, conversationId);
 		const world = deps.world;
 		const ids = new Set([
 			...conversationsWithWork(db),
+			...deps.continuity.events.conversationsWithUncuratedInTransaction(db),
 			// Events World received that no step has touched yet (the notice that woke the steward is not durable).
 			...(world
 				? world.curation
@@ -221,8 +228,8 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 				: []),
 		]);
 		for (const id of ids) kickConversation(db, id);
-		// A look at the whole profile, and at what the library holds excluded that no request names (a restored database).
-		sleep.kick(db, { orphans: true });
+		// What the library holds excluded that no request names (a restored database) is closed too.
+		closure.kick(db, { orphans: true });
 	}
 	wake.onWake(() => deps.store.write((db) => kickInTransaction(db)));
 	return { kickInTransaction, kickOne };

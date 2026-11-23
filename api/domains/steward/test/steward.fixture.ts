@@ -36,7 +36,6 @@ import type {
 import { migrations as stewardMigrations } from "../repository";
 import { createStewardService } from "../service";
 import { steps } from "../service/steps";
-import type { SleepWindow } from "../service/sleep/policy";
 import type { StewardDeps, StewardWorld } from "../service/types";
 
 export const migrations = [
@@ -136,17 +135,8 @@ export function createFakeInference() {
 			control,
 			session,
 		): Promise<ControlReceipt> {
-			// A sleep-layer judgement is one user message with the library's own system text as the control's instructions.
-			const sleepCall =
-				messages.length === 1 &&
-				control !== undefined &&
-				!Object.values(steps).some((step) =>
-					control.instructions.startsWith(step.instructions),
-				);
-			const step = sleepCall ? "sleep" : stepOf(messages);
-			const data = sleepCall
-				? { system: control!.instructions, user: messages[0]!.content }
-				: dataOf(messages);
+			const step = stepOf(messages);
+			const data = dataOf(messages);
 			calls.push({
 				step,
 				requestId,
@@ -218,11 +208,6 @@ export async function setupSteward(
 		goals?: boolean;
 		/** How long the user's last utterance must be past for the conversation to rest (default 10 s). */
 		restMs?: number;
-		/** The sleep layer (shallow and deep consolidation) runs; its window and outlets may be replaced. */
-		sleep?: {
-			window?: SleepWindow;
-			outlets?: NonNullable<StewardDeps["sleep"]>["outlets"];
-		};
 		/** The saved resource the World curation runs on. */
 		worldResourceId?: string;
 		/** The World the steward curates: built once the store and the conversation exist. */
@@ -297,17 +282,6 @@ export async function setupSteward(
 		conversationOnLarm: () => options.conversationOnLarm ?? true,
 		foregroundActive: (_db, conversationId) => foreground.has(conversationId),
 		restMs: () => options.restMs ?? 10_000,
-		...(options.sleep
-			? {
-					sleep: {
-						window: () =>
-							options.sleep?.window ?? { start: "03:00", end: "05:00" },
-						...(options.sleep.outlets
-							? { outlets: options.sleep.outlets }
-							: {}),
-					},
-				}
-			: {}),
 		runStateOf: (runId) => runStates[runId] ?? "stale",
 		clock,
 		nowMs: () => time.ms,
@@ -506,13 +480,24 @@ export async function setupSteward(
 					input.end === "completed" ||
 					input.end === "failed" ||
 					input.end === "interrupted"
-				)
+				) {
 					harness.recordSaid(
 						db,
 						conversationId,
 						inputMessageId,
 						answerMessageId,
 					);
+					// The memory tool's act: the utterance asked the memory for something.
+					for (const request of input.requests ?? [])
+						continuity.events.appendInTransaction(db, {
+							conversationId,
+							at: clock(),
+							type: "acted",
+							by: "agent",
+							fields: { action: "memory.request", kind: request.kind },
+							messageIds: [inputMessageId],
+						});
+				}
 				steward.runEndedInTransaction(db, {
 					runId,
 					conversationId,
@@ -698,7 +683,11 @@ export type StewardHarness = Awaited<ReturnType<typeof setupSteward>>;
 
 /** The request step answered with "nothing to do". */
 export function quietReflect(h: StewardHarness) {
-	h.inference.script("curate-memory", { resolve: [] });
+	h.inference.script("curate-memory", {
+		remember: [],
+		update: [],
+		resolve: [],
+	});
 }
 
 /** Texts that mention a topic share a vector: enough for the recall to find "the earlier talk about it". */

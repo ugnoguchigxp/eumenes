@@ -4,7 +4,8 @@ import type { MemoryInputBudget } from "../contracts/recall";
 /**
  * The input budget lives in the host settings row (spec/memory-recall-implementation-2026-11-23.md section 5): the
  * values are these column defaults and what the settings API saves, never constants of the code. Appended after the
- * others; frozen once deployed.
+ * others; frozen once deployed. The `recall_*` columns stay in the table (the per-turn `## Recall` section was
+ * removed): nothing reads or writes them.
  */
 export const inputBudgetMigration = `
 ALTER TABLE memory_host_settings ADD COLUMN always_tokens INTEGER NOT NULL DEFAULT 2000;
@@ -15,13 +16,9 @@ ALTER TABLE memory_host_settings ADD COLUMN recall_items INTEGER NOT NULL DEFAUL
 `;
 
 export function readInputBudget(db: Database): MemoryInputBudget {
-	const row = db
+	return db
 		.query(
-			`SELECT always_tokens AS alwaysTokens, always_scope AS alwaysScope, recall_enabled AS recallEnabled,
-			 recall_tokens AS recallTokens, recall_items AS recallItems FROM memory_host_settings WHERE id = 1`,
+			"SELECT always_tokens AS alwaysTokens, always_scope AS alwaysScope FROM memory_host_settings WHERE id = 1",
 		)
-		.get() as Omit<MemoryInputBudget, "recallEnabled"> & {
-		recallEnabled: number;
-	};
-	return { ...row, recallEnabled: row.recallEnabled === 1 };
+		.get() as MemoryInputBudget;
 }

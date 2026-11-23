@@ -16,7 +16,6 @@ import {
 } from "./always-on-recall";
 
 import {
-	candidates,
 	exchange,
 	found,
 	plans,
@@ -145,23 +144,10 @@ test("after the host is closed, a finished pass does not start another", async (
 	}
 });
 
-test("memories go to the long-term memory (L2) as the user's own, candidates to the candidates (L1), plans and questions to the continuity domain", async () => {
+test("plans and questions go to the continuity domain", async () => {
 	const f = await agendaFixture({
 		script: writes(
 			found({
-				memories: [
-					{
-						kind: "preference",
-						semanticKey: "drink.coffee.style",
-						subject: "self",
-						text: "コーヒーはブラックで飲む",
-						quote: "ブラック派",
-						evidence: "user-a",
-					},
-				],
-				candidates: [
-					{ kind: "habit", text: "夜に散歩する", evidence: ["user-a"] },
-				],
 				plans: [
 					{
 						op: "add",
@@ -183,26 +169,13 @@ test("memories go to the long-term memory (L2) as the user's own, candidates to 
 	});
 	try {
 		await f.start();
-		await exchange(
-			f,
-			"a",
-			"コーヒーはブラック派なんだよね。夜は散歩する。週末に出かける",
-		);
-		const item = f.h
-			.memory!.list()
-			.find((i) => i.text === "コーヒーはブラックで飲む");
-		expect(item?.origin).toBe("user_confirmed");
-		expect(candidates(f).map((c) => c.value.text)).toContain("夜に散歩する");
+		await exchange(f, "a", "週末に出かける。コーヒーの飲み方は決めた");
 		expect(plans(f).map((p) => [p.text, p.dueAt, p.state])).toEqual([
 			["週末に出かける", "2026-11-28", "open"],
 		]);
 		expect(questions(f).map((q) => [q.attribute, q.state])).toEqual([
 			["コーヒーの飲み方", "answered"],
 		]);
-		// Not asked to be remembered: a statement of the user's own accord.
-		expect(
-			f.h.memory!.list().filter((i) => i.origin !== "user_confirmed"),
-		).toEqual([]);
 	} finally {
 		await f.close();
 	}

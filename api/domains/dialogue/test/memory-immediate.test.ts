@@ -615,30 +615,3 @@ test("a sensitive record and a record of another person are saved with their mar
 		{ sensitive: 0, about_other: 1 },
 	]);
 });
-
-test("a remember whose words are close to a record of another key returns that record's reference as similar", async () => {
-	await open();
-	await shownFact();
-	h!.state.steps.push(
-		choice({ choice: "none" }),
-		remember("辛いものが好きです", "food.spicy-level", "辛いものが好きです"),
-		{ text: "覚えました。" },
-	);
-	await h!.say("辛いものが好きです");
-	const result = toolResult(h!.state.calls.at(-1)!);
-	expect(result).toContain('"status":"applied"');
-	expect(result).toContain('"similar":["m1"]');
-	// Nothing was merged: both are kept.
-	expect(h!.memory!.list()).toHaveLength(2);
-});
-
-test("a remember with nothing close to it carries no similar", async () => {
-	await open();
-	h!.state.steps.push(
-		choice({ choice: "none" }),
-		remember("鍵は靴箱の上", "home.key", "鍵は靴箱の上"),
-		{ text: "覚えました。" },
-	);
-	await h!.say("鍵は靴箱の上");
-	expect(toolResult(h!.state.calls.at(-1)!)).not.toContain("similar");
-});

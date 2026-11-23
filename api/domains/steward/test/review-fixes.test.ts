@@ -58,6 +58,9 @@ async function learn(h: StewardHarness, count = 1) {
 			})),
 		}),
 	);
+	// The reflection reads the exchange's events and learns nothing more from them.
+	h.inference.script("curate-memory", empty);
+	await h.drain();
 	return first;
 }
 

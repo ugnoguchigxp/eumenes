@@ -17,7 +17,6 @@
         "eumenes-agency": "file:vendor/agency/eumenes-agency-0.1.11-01f61cbac379-ba116b7042f4.tgz",
         "eumenes-canvas": "file:vendor/canvas/eumenes-canvas-0.1.0-5bd98dd17e61.tgz",
         "eumenes-collaboration": "./vendor/collaboration/eumenes-collaboration-0.4.0-ce0d56eedc6a.tgz",
-        "eumenes-consolidation": "file:vendor/eumenes-consolidation/eumenes-consolidation-0.0.3-no-commit.tgz",
         "eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.3-eumenes.2-a88153a824ec.tgz",
         "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.5-8f58df0d0e59.tgz",
         "eumenes-memory-host": "file:vendor/eumenes-memory-host/eumenes-memory-host-0.2.1-b4c300aef6ba.tgz",
@@ -1478,7 +1477,6 @@
 
     "eumenes-collaboration": ["eumenes-collaboration@./vendor/collaboration/eumenes-collaboration-0.4.0-ce0d56eedc6a.tgz", { "dependencies": { "s11tnext": "0.1.2", "zod": "4.6.6" } }, "sha512-O+OwxYek/7/KLui5+YEtcgSkRUOP4i4+LWklFXOwS7q+C867t3lpsG27WpY86VkRNRsVqJJJ0mC8geEblvqNxA=="],
 
-    "eumenes-consolidation": ["eumenes-consolidation@vendor/eumenes-consolidation/eumenes-consolidation-0.0.3-no-commit.tgz", { "peerDependencies": { "eumenes-memory": "0.0.5" } }, "sha512-1Fr+wvrlo6NsMOlF93Huhlhv6iNWM4hSgIXR8tKZaTNklkNN+vSwrK3q6JmYAx3qXdPGF1CLgnAeAO28k+LBKA=="],
 
     "eumenes-interact": ["eumenes-interact@vendor/interact/eumenes-interact-0.1.3-eumenes.2-a88153a824ec.tgz", { "dependencies": { "jsonrepair": "3.15.0", "zod": "4.6.6" } }, "sha512-cacvzSBjQWSKFsvBw9WKx61OYJvfNdRm9eTD0Yx7LyNLmFozyITNxSFNP/BUTdgpISR8J6QaZ8y7I5M3zKhcJA=="],
 

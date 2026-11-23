@@ -1,6 +1,6 @@
 import type { PendingCurationEvent } from "../../world";
 import { openUnitOf, worldEventCounts } from "../repository";
-import { restOf } from "./sleep/rest";
+import { restOf } from "./rest";
 import type { StepEnv } from "./types";
 import type { Wake } from "./wake";
 

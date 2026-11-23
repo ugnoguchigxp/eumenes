@@ -15,15 +15,15 @@ import { dropEpisodeMigration } from "./drop-episode";
 import { activityIndexesMigration } from "./activity-indexes";
 import { dropRecallMigration } from "./drop-recall";
 import { continuityEventsMigration } from "./events";
+import { eventFailureMigration } from "./event-failure";
 import { sleepLayerMigration } from "./sleep";
 import { sleepPressureMigration } from "./sleep-pressure";
 import { targetRequestsMigration } from "./targets";
 import { worldGoalsMigration } from "./world-goals";
 
 export * from "./activity";
+export * from "./event-failure";
 export * from "./events";
-export * from "./sleep";
-export * from "./sleep-pressure";
 export * from "./targets";
 export * from "./world-goals";
 
@@ -103,6 +103,7 @@ export const migrations: readonly Migration[] = [
 	sleepLayerMigration,
 	targetRequestsMigration,
 	sleepPressureMigration,
+	eventFailureMigration,
 ];
 
 const CHUNK = 200;
@@ -117,19 +118,14 @@ const marks = (n: number) => Array.from({ length: n }, () => "?").join(",");
 // ---- units ----
 
 export type UnitTargets = {
+	/** The `seq` of the continuity events the memory reflection reads (the ones it settles). */
+	seqs?: number[];
 	/** Inbox ids of the requests a curate step settles (the forget closure's excluded requests too). */
 	requests?: string[];
 	/** The unit does not wait for a conversation run (the closure delete of a forget). */
 	urgent?: boolean;
-	/** The shallow unit's work: embed the turns of the events waiting, and/or run the library's shallow consolidation. */
-	embed?: boolean;
-	consolidate?: boolean;
 	/** State items the library holds excluded that no excluded request names (a restored database): the closure delete takes them. */
 	orphans?: string[];
-	/** The deep unit made without the time window (the events piled up past the supplement limit). */
-	supplement?: boolean;
-	/** The last event seq of each conversation the deep unit covers (saved when it is adopted). */
-	positions?: Record<string, number>;
 	/** The World events a `world_events` unit curates (the events of one run's messages, at most two). */
 	events?: string[];
 };

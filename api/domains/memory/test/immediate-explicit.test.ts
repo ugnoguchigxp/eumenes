@@ -70,11 +70,8 @@ async function rememberKey(h: MemoryHarness, runId = "run-a") {
 	return { messageId, outcome };
 }
 
-test("an explicit remember saves a user-confirmed item standing on the quote, with the run's id in the change feed", async () => {
+test("an explicit remember saves a user-confirmed item standing on the quote", async () => {
 	const h = await setup();
-	const baseline = await write(h, (db) =>
-		h.memory.latestChangeSeqInTransaction(db),
-	);
 	const { messageId, outcome } = await rememberKey(h);
 	expect(outcome.replacedItemId).toBeNull();
 	expect(outcome.requestId).not.toBeNull();
@@ -86,21 +83,6 @@ test("an explicit remember saves a user-confirmed item standing on the quote, wi
 		text: "鍵は靴箱の上に置いている",
 		capturedBy: "request",
 		evidence: [{ messageId, quote: "鍵は靴箱の上" }],
-	});
-	// The run's own change is not a change to its generation; anybody else's would be.
-	await write(h, (db) => {
-		expect(
-			h.memory.changedExcludingRunInTransaction(db, {
-				sourceRunId: "run-a",
-				afterSeq: baseline,
-			}),
-		).toMatchObject({ changed: false, firstSeq: null });
-		expect(
-			h.memory.changedExcludingRunInTransaction(db, {
-				sourceRunId: "run-other",
-				afterSeq: baseline,
-			}),
-		).toMatchObject({ changed: true });
 	});
 });
 
@@ -573,13 +555,11 @@ test("a refused operation leaves the caller's transaction as it was", async () =
 	const h = await setup();
 	const messageId = await h.say("user", "覚えといて、鍵は靴箱の上。");
 	await write(h, (db) => {
-		const before = h.memory.latestChangeSeqInTransaction(db);
 		const refused = h.memory.rememberExplicitInTransaction(
 			db,
 			rememberInput(messageId, { quote: "鍵は玄関の棚" }),
 		);
 		expect(refused.status).toBe("rejected");
-		expect(h.memory.latestChangeSeqInTransaction(db)).toBe(before);
 		// The transaction goes on: the next operation works.
 		expect(
 			h.memory.rememberExplicitInTransaction(db, rememberInput(messageId))

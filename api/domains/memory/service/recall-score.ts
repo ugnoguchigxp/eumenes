@@ -6,12 +6,6 @@ import type { StateItem } from "eumenes-memory/sqlite";
  * two texts: the same inputs give the same score.
  */
 
-/**
- * The score from which a record counts as alike another (a fixed set of pairs in `recall.test.ts` decides it: a
- * provisional value, to be judged against the live comparison).
- */
-export const SIMILAR_MIN_SCORE = 0.6;
-
 const SEPARATORS =
 	/[\s　、。，．,.!?！？「」『』（）()［］[\]｛｝{}【】〈〉《》"'“”‘’…・:：;；/\\|<>＜＞~〜～]+/u;
 const HIRAGANA_PAIR = /^[ぁ-ゟ]{2}$/u;
@@ -89,11 +83,6 @@ export function scoreOf(terms: readonly QueryTerm[], doc: string): number {
 	let score = 0;
 	for (const term of terms) score += termShare(term, doc);
 	return score;
-}
-
-/** The score divided by the number of words (0 to 1): what `SIMILAR_MIN_SCORE` is measured against. */
-export function similarityOf(terms: readonly QueryTerm[], doc: string): number {
-	return terms.length === 0 ? 0 : scoreOf(terms, doc) / terms.length;
 }
 
 /** One of the words (two characters or more) stands as it is in the record's words. */

@@ -2,7 +2,6 @@ import { createSharedHostPort } from "./shared-host";
 import { purgeHostInputsOfForget } from "../repository/host-inputs";
 import { createReferenceInputs } from "./reference-input";
 import { createMemoryMaintenance } from "./maintenance";
-import { createMemoryResidue } from "./residue";
 import type { Database } from "bun:sqlite";
 import type { AccessContext } from "eumenes-memory";
 import { sliceUtf8Range } from "eumenes-memory";
@@ -198,7 +197,7 @@ export function createMemoryService(
 	});
 	const atMs = () => Date.parse(clock());
 	const windows = createContextWindowStore({ clock, id: newId });
-	const recall = createRecall({ windows, scoped, clock });
+	const recall = createRecall({ windows, scoped });
 
 	const toDto = (db: Database, item: StateItem) =>
 		itemDto(conversation, db, item);
@@ -319,10 +318,6 @@ export function createMemoryService(
 		maintenance: createMemoryMaintenance(store, curationDeps, (db) =>
 			stateItems(db, true, "memory.maintenance"),
 		),
-		residue: createMemoryResidue(store, curationDeps, {
-			states: (db) => stateItems(db, true, "memory.maintenance"),
-			immediate: immediate.operations,
-		}),
 		previewSeeds(input: { seeds: readonly MemorySeed[] }) {
 			return store.read((db) => seedImport.preview(db, input));
 		},
@@ -339,7 +334,7 @@ export function createMemoryService(
 			return store.write((db) => settings.updateInTransaction(db, patch));
 		},
 		updateSettingsInTransaction: settings.updateInTransaction,
-		/** The saved input budget: the always-on section's size and range, and the per-turn recall section. */
+		/** The saved input budget: the always-on section's size and range. */
 		inputBudgetInTransaction: (db: Database): MemoryInputBudget =>
 			readInputBudget(db),
 		/** Memory is switched on and its journals are consistent (the steward only works then). */
@@ -380,9 +375,6 @@ export function createMemoryService(
 		recallInTransaction: recall.recallInTransaction,
 		/** The marks (sensitive, about someone else) of the given records; a record with none has no entry. */
 		marksInTransaction: recall.marksInTransaction,
-		/** The records in force and the alike pairs among them: what the sleeping layer's deep tidying is started by. */
-		consolidationPressureInTransaction:
-			recall.consolidationPressureInTransaction,
 		/** Active (or, with `includeInactive`, every live-status) State items of the profile, as the library holds them. */
 		stateItemsInTransaction: (
 			db: Database,

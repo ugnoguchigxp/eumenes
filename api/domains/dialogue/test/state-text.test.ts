@@ -373,7 +373,7 @@ test("a plan or goal that names a topic the user asked not to be brought up is n
 	expect(text).not.toContain("目標:");
 });
 
-test("the plans `## State` shows are named, so `## Recall` does not tell them again", () => {
+test("the plans `## State` shows are named, and `planIds` names them", () => {
 	const deps = depsOf([]);
 	const plans = Array.from({ length: 40 }, (_, i) =>
 		plan(`予定の内容その${i + 1}を少し長めに書いたもの`, {

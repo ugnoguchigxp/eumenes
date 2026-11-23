@@ -24,12 +24,17 @@ test("completed: the run's events are in the log and every request is pending", 
 	expect(states(h)).toEqual(
 		Object.fromEntries(run.requestIds.map((id) => [id, "pending"])),
 	);
-	expect(h.log().map((e) => [e.by, e.messageIds, e.curated])).toEqual([
-		["user", [run.inputMessageId], false],
-		["agent", [run.answerMessageId!], false],
+	const said = h.log().filter((e) => e.type === "said");
+	expect(said.map((e) => [e.by, e.messageIds])).toEqual([
+		["user", [run.inputMessageId]],
+		["agent", [run.answerMessageId!]],
 	]);
+	// The utterance made requests: it is handled at once (the steward answers it as a request, never learns from it).
+	expect(said[0]!.curated).toBe(true);
+	expect(h.log().filter((e) => e.type === "acted")).toHaveLength(
+		requests.length,
+	);
 	const [unit] = h.units();
-	// Only the requests make a unit; the exchange alone makes none.
 	expect(unit).toMatchObject({ step: "curate-memory", kind: "requests" });
 });
 
@@ -38,7 +43,11 @@ test("failed and interrupted: only the user's event is in the log and requests g
 	for (const end of ["failed", "interrupted"] as const) {
 		const run = await h.run({ user: "予算は3万円", end, requests });
 		expect(
-			h.log().filter((e) => e.messageIds.includes(run.inputMessageId)),
+			h
+				.log()
+				.filter(
+					(e) => e.type === "said" && e.messageIds.includes(run.inputMessageId),
+				),
 		).toHaveLength(1);
 		for (const id of run.requestIds) expect(states(h)[id]).toBe("pending");
 	}

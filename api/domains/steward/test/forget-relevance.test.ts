@@ -19,7 +19,6 @@ async function setup(world = false) {
 	let fake: FakeWorld | undefined;
 	const h = await setupSteward({
 		embed: topicEmbed,
-		sleep: {},
 		...(world
 			? {
 					async world({ store, conversation, kick }) {
@@ -90,6 +89,8 @@ async function learn(h: StewardHarness) {
 			],
 		}),
 	);
+	// The reflection reads the exchange's events and learns nothing more from them.
+	h.inference.script("curate-memory", empty);
 	await h.rest();
 	expect(keys(h)).toEqual(["food.spicy", "hobby.cycling"]);
 	return first;
@@ -251,7 +252,8 @@ test("the strict schema of curate-memory allows only the request labels of the u
 			}
 		).properties.resolve.items.properties.request.enum;
 	const calls = h.inference.callsOf("curate-memory");
-	expect(requestEnum(calls[0]!.schema)).toEqual(["r1", "r2"]);
+	// The call before it read the events of the earlier exchange, which has no request.
+	expect(requestEnum(calls.at(-1)!.schema)).toEqual(["r1", "r2"]);
 });
 
 test("a World entity named in the request is forgotten", async () => {
@@ -274,6 +276,8 @@ test("a World entity named in the request is forgotten", async () => {
 		answer: "はい",
 		end: "completed",
 	});
+	h.inference.script("curate-memory", empty);
+	await h.drain();
 
 	h.inference.script("curate-memory", {
 		...empty,

@@ -10,10 +10,7 @@ import {
 	writes,
 } from "./always-on-records.fixture";
 
-/** More active records than the memory's old count limit (100) was: nothing is refused for their number. */
-const MANY_ITEMS = 101;
-
-test("a memory is saved to the long-term memory (L2) however many records there are, and is not noted as a candidate", async () => {
+test("the facts the writer returns (memories, candidates) are not written: the steward curates the memory", async () => {
 	const f = await agendaFixture({
 		script: writes(
 			found({
@@ -24,113 +21,21 @@ test("a memory is saved to the long-term memory (L2) however many records there 
 						subject: "self",
 						text: "コーヒーはブラックで飲む",
 						quote: "ブラック派",
-						evidence: "user-b",
+						evidence: "user-a",
 					},
+				],
+				candidates: [
+					{ kind: "habit", text: "夜に散歩する", evidence: ["user-a"] },
 				],
 			}),
 		),
 	});
 	try {
 		await f.start();
-		await f.user("user-a", "ao", "好きなものの話");
-		for (let i = 0; i < MANY_ITEMS; i++)
-			await saveItem(f.h.store, f.h.memory!, {
-				conversationId: "ao",
-				messageId: "user-a",
-				kind: "preference",
-				semanticKey: `filler.${i}`,
-				text: `好きなもの${i}`,
-			});
-		await exchange(f, "b", "コーヒーはブラック派なんだよね");
-		expect(f.h.memory!.list()).toHaveLength(MANY_ITEMS + 1);
-		expect(f.h.memory!.list().map((item) => item.text)).toContain(
-			"コーヒーはブラックで飲む",
-		);
-		expect(candidates(f).map((c) => c.value.text)).not.toContain(
-			"コーヒーはブラックで飲む",
-		);
-	} finally {
-		await f.close();
-	}
-});
-
-test("a memory whose subject is not the user is marked as about another; the user's own is not", async () => {
-	const f = await agendaFixture({
-		script: writes(
-			found({
-				memories: [
-					{
-						kind: "personal_fact",
-						semanticKey: "sister.likes.cat",
-						subject: "妹",
-						text: "妹は猫が好き",
-						quote: "妹は猫が好き",
-						evidence: "user-a",
-					},
-					{
-						kind: "preference",
-						semanticKey: "drink.coffee.style",
-						subject: "self",
-						text: "コーヒーはブラックで飲む",
-						quote: "ブラック派",
-						evidence: "user-a",
-					},
-				],
-			}),
-		),
-	});
-	try {
-		await f.start();
-		await exchange(f, "a", "妹は猫が好き。コーヒーはブラック派");
-		const marks = f.h.store.read(
-			(db) =>
-				db
-					.query("SELECT item_id, sensitive, about_other FROM memory_item_mark")
-					.all() as {
-					item_id: string;
-					sensitive: number;
-					about_other: number;
-				}[],
-		);
-		const textOf = (id: string) =>
-			f.h.memory!.list().find((item) => item.id === id)?.text;
-		expect(
-			marks.map((m) => ({
-				text: textOf(m.item_id),
-				sensitive: m.sensitive,
-				about_other: m.about_other,
-			})),
-		).toEqual([{ text: "妹は猫が好き", sensitive: 0, about_other: 1 }]);
-	} finally {
-		await f.close();
-	}
-});
-
-test("the writer's words for the user themselves (self, 本人, user, me, in any case) are not marked as about another", async () => {
-	const subjects = ["Self", "本人", "USER", " me "];
-	const f = await agendaFixture({
-		script: writes(
-			found({
-				memories: subjects.map((subject, i) => ({
-					kind: "preference",
-					semanticKey: `own.${i}`,
-					subject,
-					text: `好きなもの${i}`,
-					quote: `好きなもの${i}`,
-					evidence: "user-a",
-				})),
-			}),
-		),
-	});
-	try {
-		await f.start();
-		await exchange(f, "a", subjects.map((_, i) => `好きなもの${i}`).join("。"));
-		expect(f.h.memory!.list()).toHaveLength(subjects.length);
-		const marks = f.h.store.read(
-			(db) =>
-				db.query("SELECT item_id FROM memory_item_mark").all() as unknown[],
-		);
-		expect(marks).toEqual([]);
+		await exchange(f, "a", "コーヒーはブラック派なんだよね。夜は散歩する");
+		expect(f.calls("records")).toHaveLength(1);
+		expect(f.h.memory!.list()).toEqual([]);
+		expect(candidates(f)).toEqual([]);
 	} finally {
 		await f.close();
 	}

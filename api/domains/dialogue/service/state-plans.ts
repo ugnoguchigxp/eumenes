@@ -45,7 +45,7 @@ export function planNotes(plan: PlanItem): string {
  * shows them (the redesign, section 7.1): the soonest plans first, the goals in slot order, cut at
  * `PLAN_GOAL_TOKENS` together. The continuity leaves out a plan that rests on a forgotten or excluded source, the
  * agency a goal; one that names a topic the user asked not to be brought up is left out here. `planIds` are the plans
- * the lines show (what `## Recall` does not show again).
+ * the lines show.
  */
 export function planGoalFields(
 	deps: DialogueDeps,

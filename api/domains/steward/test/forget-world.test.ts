@@ -16,7 +16,6 @@ async function setup() {
 	let fake!: FakeWorld;
 	const h = await setupSteward({
 		embed: topicEmbed,
-		sleep: {},
 		goals: true,
 		async world({ store, conversation, kick }) {
 			const made = await createFakeWorld(store, conversation, kick);

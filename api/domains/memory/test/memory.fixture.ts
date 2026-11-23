@@ -132,14 +132,18 @@ export async function saveItem(
 
 /** A memory service on a real database, with no queue and no inference. */
 export async function setupMemory(
-	options: { clock?: string; embed?: MemoryEmbed } = {},
+	options: {
+		clock?: string;
+		embed?: MemoryEmbed;
+		extraMigrations?: Parameters<typeof openStore>[1];
+	} = {},
 ) {
 	configureLogging({ level: "silent" });
 	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-fixture-"));
-	const store: SqliteStore = openStore(
-		join(dir, "db.sqlite3"),
-		memoryTestMigrations,
-	);
+	const store: SqliteStore = openStore(join(dir, "db.sqlite3"), [
+		...memoryTestMigrations,
+		...(options.extraMigrations ?? []),
+	]);
 	const time = { now: options.clock ?? "2026-10-13T12:00:00.000Z" };
 	const clock = () => time.now;
 	let counter = 0;
@@ -234,7 +238,7 @@ export async function setupMemory(
 			});
 		},
 		/**
-		 * A plan (L3), written the way the sleeping layer's writers write one: it rests on messages (by default one
+		 * A plan (L3), written the way the background recorder writes one: it rests on messages (by default one
 		 * that need not exist).
 		 */
 		plan: (

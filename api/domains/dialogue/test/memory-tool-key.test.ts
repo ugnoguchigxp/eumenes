@@ -5,9 +5,9 @@ import { testConversationAgent } from "./conversation-agent.fixture";
 import { choice, setup, type Harness } from "./generation.fixture";
 
 /**
- * The id of a `memory` request is unique across conversations (spec/memory-recall-implementation-2026-11-23.md
- * section 2.4): two conversations whose utterances have the same numbers and ask for the same target do not meet the
- * steward inbox's `request_conflict`.
+ * The id of a `memory` request is the run and what it asks (spec/memory-direct-curation-2026-11-23.md section 4): two
+ * conversations never meet the steward inbox's `request_conflict`, the same request repeated within a run is applied
+ * once, and another request is never taken for one already done.
  */
 let h: Harness | undefined;
 afterEach(async () => {
@@ -87,25 +87,35 @@ test("the same utterance numbers and the same forget target in two conversations
 	expect(
 		results.filter((r) => r.includes('"status":"resolving"')),
 	).toHaveLength(2);
-	// The two rows are different, and each carries its conversation.
 	expect(new Set(ids).size).toBe(2);
-	expect(ids.some((id) => id.startsWith("main:"))).toBe(true);
-	expect(ids.some((id) => id.startsWith("other:"))).toBe(true);
 	expect(h.state.targetRequests.map((r) => r.requestId)).toEqual(ids);
 });
 
-test("the same request asked again in one conversation is the same row", async () => {
+test("the same request twice in one turn is one row; another request of the turn is its own row", async () => {
 	const { steward, ids } = conflictingSteward();
 	h = await setup({
 		memory: true,
 		steward,
 		conversationAgent: { ...testConversationAgent, handsWork: () => false },
 	});
-	h.state.steps.push(choice({ choice: "none" }), forget, forget, {
+	const other = {
+		calls: [
+			{
+				name: "memory",
+				args: { operation: "request", kind: "forget", what: "昔の職場の話" },
+			},
+		],
+	};
+	h.state.steps.push(choice({ choice: "none" }), forget, forget, other, {
 		text: "対象を探します。",
 	});
-	await say("main", "元カノの話は全部忘れて");
-	// A retried call finds the first: the steward is asked once.
-	expect(ids).toHaveLength(1);
-	expect(ids[0]).toStartWith("main:");
+	const run = await say("main", "元カノの話と昔の職場の話は忘れて");
+	expect(run.error).toBeNull();
+	expect(new Set(ids)).toEqual(
+		new Set([
+			`${run.id}:forget:元カノの話は全部`,
+			`${run.id}:forget:昔の職場の話`,
+		]),
+	);
+	expect(h.state.targetRequests).toHaveLength(2);
 });

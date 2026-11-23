@@ -1,7 +1,21 @@
 import { afterEach, expect, test } from "bun:test";
-import { closeSleepHarnesses, setupSleep as setup } from "./sleep.fixture";
+import {
+	type StewardHarness,
+	setupSteward,
+	topicEmbed,
+} from "./steward.fixture";
 
-afterEach(closeSleepHarnesses);
+const harnesses: StewardHarness[] = [];
+afterEach(async () => {
+	for (const h of harnesses.splice(0)) await h.close();
+});
+/** A steward whose turns can be embedded; the conversation is known to it (a run of it ended). */
+async function setup() {
+	const h = await setupSteward({ embed: topicEmbed });
+	harnesses.push(h);
+	await h.kick("c1");
+	return h;
+}
 
 test("the forget closure runs at once, even while a run is going, and ends the excluded request", async () => {
 	const h = await setup();

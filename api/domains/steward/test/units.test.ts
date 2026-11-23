@@ -170,7 +170,12 @@ test("the startup kick makes the units every conversation with work still needs"
 
 test("a request whose message was retracted ends without asking the model", async () => {
 	const h = await setup();
-	const { inputMessageId } = await ask(h);
+	// The run left no answer: the request's message is the only thing the unit would read.
+	const { inputMessageId } = await h.run({
+		user: "こんにちは",
+		end: "interrupted",
+		requests: [{ kind: "remember", what: "あいさつ" }],
+	});
 	await h.conversation.retract({ messageId: inputMessageId });
 	await h.drain();
 	expect(h.inference.calls).toEqual([]);

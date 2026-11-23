@@ -1,8 +1,7 @@
 import { getLogger } from "../../../infrastructure/logger";
 import type { StewardJobHandler, StewardPayload } from "../contracts";
 import { closeUnit, readUnit, takeRequests, type UnitRow } from "../repository";
-import { anyForeground } from "./sleep/rest";
-import { isSleepStep } from "./sleep/steps";
+import { forgetClosure } from "./forget-closure";
 import type { Kick } from "./kick";
 import { noticeInTransaction } from "./notices";
 import type { UnitEnd } from "./unit-end";
@@ -10,8 +9,8 @@ import type {
 	ApplyResult,
 	LlmInput,
 	LlmOutput,
-	SleepInput,
-	SleepOutput,
+	ClosureInput,
+	ClosureOutput,
 	StepEnv,
 	StewardDeps,
 	StewardInput,
@@ -120,24 +119,49 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 	}
 
 	/**
-	 * A sleep unit's settle: what its run produced is adopted inside this transaction (the positions, the
-	 * watermark, the instructions to their outlets). A failure inside it ends the unit as failed, rolled back.
+	 * The closure delete's settle: the forget is carried out inside this transaction. A failure inside it ends the unit
+	 * as failed, rolled back.
 	 */
-	function adoptSleep(
-		env: StepEnv,
-		input: SleepInput,
+	function settleClosureInTransaction(
+		db: Settle[0],
+		claim: Settle[1],
+		input: StewardInput | null,
+		outcome: Settle[3],
 		unit: UnitRow,
-		result: SleepOutput,
+	) {
+		const env: StepEnv = { db, deps, conversationId: unit.conversationId };
+		// A retry runs the same unit again.
+		if (outcome.type === "retry") return "applied" as const;
+		if (outcome.type !== "success" || input?.kind !== "closure") {
+			const code =
+				outcome.type === "failed" || outcome.type === "interrupted"
+					? outcome.errorCode
+					: outcome.type === "expired"
+						? "deadline_exceeded"
+						: "no_input";
+			end.failUnit(env, unit, claim.jobId, code, outcome.type === "failed");
+			return "applied" as const;
+		}
+		const result = outcome.result;
+		if (result.kind !== "closure") return "applied" as const;
+		return adoptClosure(env, input, unit, result, claim.jobId);
+	}
+
+	function adoptClosure(
+		env: StepEnv,
+		input: ClosureInput,
+		unit: UnitRow,
+		result: ClosureOutput,
 		jobId: string,
 	): "applied" {
 		const { db } = env;
-		db.exec("SAVEPOINT steward_sleep");
-		let settled: ReturnType<SleepInput["step"]["settle"]>;
+		db.exec("SAVEPOINT steward_closure");
+		let settled: ReturnType<typeof forgetClosure.settle>;
 		try {
-			settled = input.step.settle(env, input, result.result);
+			settled = forgetClosure.settle(env, input);
 		} catch (error) {
-			db.exec("ROLLBACK TO steward_sleep");
-			db.exec("RELEASE steward_sleep");
+			db.exec("ROLLBACK TO steward_closure");
+			db.exec("RELEASE steward_closure");
 			log.warn(
 				"steward.apply_failed",
 				{ stepId: unit.step, reason: "apply_failed" },
@@ -148,12 +172,7 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 			});
 			return "applied";
 		}
-		db.exec("RELEASE steward_sleep");
-		if (settled.stale !== undefined) {
-			// The run's own writes were fenced (or the ground moved): nothing was adopted, read again at once.
-			end.staleUnit(env, unit, jobId, settled.stale);
-			return "applied";
-		}
+		db.exec("RELEASE steward_closure");
 		if (settled.failed) {
 			end.failUnit(
 				env,
@@ -161,9 +180,7 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 				jobId,
 				settled.failed.code,
 				settled.failed.count,
-				{
-					durationMs: result.durationMs,
-				},
+				{ durationMs: result.durationMs },
 			);
 			return "applied";
 		}
@@ -185,55 +202,9 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 			durationMs: result.durationMs,
 			jobId,
 		});
-		// "The next one at once": what came while this unit ran is looked at now.
+		// What came while this unit ran is looked at now.
 		kick.kickOne(db, unit.conversationId);
 		return "applied";
-	}
-
-	function settleSleepInTransaction(
-		db: Settle[0],
-		claim: Settle[1],
-		input: StewardInput | null,
-		outcome: Settle[3],
-		unit: UnitRow,
-	) {
-		const env: StepEnv = { db, deps, conversationId: unit.conversationId };
-		// A retry runs the same unit again.
-		if (outcome.type === "retry") return "applied" as const;
-		if (outcome.type !== "success" || input?.kind !== "sleep") {
-			const code =
-				outcome.type === "failed" || outcome.type === "interrupted"
-					? outcome.errorCode
-					: outcome.type === "expired"
-						? "deadline_exceeded"
-						: "no_input";
-			end.failUnit(
-				env,
-				unit,
-				claim.jobId,
-				code,
-				outcome.type === "failed" && code !== "larm_preempted",
-			);
-			return "applied" as const;
-		}
-		const result = outcome.result;
-		if (result.kind !== "sleep") return "applied" as const;
-		// The closure delete is the forget itself; the other steps stood on the memory and the quiet they read.
-		if (!input.step.urgent) {
-			const fenced = !memory.readyInTransaction(db)
-				? "memory_unavailable"
-				: unit.forgetSeq !== null &&
-					  unit.forgetSeq !== memory.forgetSeqInTransaction(db)
-					? "stale_forget"
-					: anyForeground(db, deps)
-						? "foreground_active"
-						: null;
-			if (fenced) {
-				end.staleUnit(env, unit, claim.jobId, fenced);
-				return "applied" as const;
-			}
-		}
-		return adoptSleep(env, input, unit, result, claim.jobId);
 	}
 
 	function settleInTransaction(...[db, claim, input, outcome]: Settle) {
@@ -243,8 +214,8 @@ export function createSettle(deps: StewardDeps, kick: Kick, end: UnitEnd) {
 			end.release(db, held);
 			return "applied" as const;
 		}
-		if (isSleepStep(unit.step))
-			return settleSleepInTransaction(db, claim, input, outcome, unit);
+		if (unit.step === "forget-closure")
+			return settleClosureInTransaction(db, claim, input, outcome, unit);
 		const env: StepEnv = { db, deps, conversationId: unit.conversationId };
 		// A retry runs the same unit again: its next prepare takes a new request.
 		if (outcome.type === "retry") {

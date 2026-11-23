@@ -15,6 +15,7 @@ import {
 	setupMemory,
 	type MemoryHarness,
 } from "./memory.fixture";
+import { plantCandidate, plantTendency } from "./existing-data.fixture";
 import { readEverything } from "./recall.fixture";
 
 const open: MemoryHarness[] = [];
@@ -59,32 +60,18 @@ async function scenario() {
 		semanticKey: "food",
 		text: "カレーが好き",
 	});
-	const candidate = await write(h, (db) =>
-		h.memory.recordCandidateInTransaction(db, {
-			conversationId: "c1",
-			sourceRunId: "run-c",
-			kind: "personal_fact",
-			semanticKey: "address",
-			subject: "self",
-			text: "東京に住んでいそう",
-			polarity: "affirmed",
-			evidence: [{ messageId: moved, quote: "東京都千代田区に引っ越しました" }],
-		}),
-	);
-	if (candidate.status !== "recorded") throw new Error("not recorded");
-	const unrelated = await write(h, (db) =>
-		h.memory.recordCandidateInTransaction(db, {
-			conversationId: "c1",
-			sourceRunId: "run-c",
-			kind: "habit",
-			semanticKey: "habit.walk",
-			subject: "self",
-			text: "夜に散歩する",
-			polarity: "affirmed",
-			evidence: [{ messageId: food }],
-		}),
-	);
-	if (unrelated.status !== "recorded") throw new Error("not recorded");
+	const candidate = await plantCandidate(h, {
+		messageIds: [moved],
+		kind: "personal_fact",
+		semanticKey: "address",
+		text: "東京に住んでいそう",
+	});
+	const unrelated = await plantCandidate(h, {
+		messageIds: [food],
+		kind: "habit",
+		semanticKey: "habit.walk",
+		text: "夜に散歩する",
+	});
 	const window = await h.window();
 	return {
 		h,
@@ -424,20 +411,6 @@ test("what is being forgotten cannot be corrected, marked, saved again or withdr
 				subject: "self",
 				text: "住所は京都市",
 				polarity: "affirmed",
-			}),
-		),
-	).toEqual({ status: "rejected", reason: "forget_pending" });
-	expect(
-		await write(h, (db) =>
-			h.memory.recordCandidateInTransaction(db, {
-				conversationId: "c1",
-				sourceRunId: "run-y",
-				kind: "personal_fact",
-				semanticKey: "address",
-				subject: "self",
-				text: "京都に住んでいる",
-				polarity: "affirmed",
-				evidence: [{ messageId: again }],
 			}),
 		),
 	).toEqual({ status: "rejected", reason: "forget_pending" });
@@ -877,24 +850,12 @@ test("while a forget is only excluded, the tendencies standing on what is exclud
 	const p1 = await h.say("user", "最近は朝に走ることが多い", "c1");
 	const p2 = await h.say("user", "昨日も朝に走った", "c2");
 	const scheduled = await h.say("user", "定期の問い合わせ");
-	const refs = (...ids: string[]) =>
-		ids.map((id) => ({ namespace: "conversation", kind: "message", id }));
-	const tendency = async (
-		text: string,
-		evidence: ReturnType<typeof refs>,
-		candidateId?: string,
-	) => {
-		const outcome = await write(h, (db) =>
-			h.memory.writeTendencyInTransaction(db, {
-				sourceRunId: "run-deep",
-				text,
-				evidence,
-				...(candidateId ? { candidateId } : {}),
-			}),
-		);
-		if (outcome.status !== "written") throw new Error(JSON.stringify(outcome));
-		return outcome.tendencyId;
-	};
+	const tendency = (text: string, messageIds: string[], candidateId?: string) =>
+		plantTendency(h, {
+			text,
+			messageIds,
+			...(candidateId ? { candidateId } : {}),
+		});
 	// One on two State items (the steward's way), one on messages of an item that will be excluded, one on a
 	// candidate that will be excluded, one that stands on nothing excluded.
 	const [onItems] = await h.curate([
@@ -908,9 +869,9 @@ test("while a forget is only excluded, the tendencies standing on what is exclud
 		},
 	]);
 	if (onItems?.status !== "applied") throw new Error("not applied");
-	await tendency("引っ越しの話をする", refs(s.moved, p2));
-	await tendency("散歩の話をする", refs(p1, p2), s.unrelated.candidateId);
-	await tendency("朝に走る", refs(p1, p2));
+	await tendency("引っ越しの話をする", [s.moved, p2]);
+	await tendency("散歩の話をする", [p1, p2], s.unrelated.candidateId);
+	await tendency("朝に走る", [p1, p2]);
 	const tendencyTexts = () =>
 		(readEverything(h.memory)?.items ?? [])
 			.flatMap((item) => (item.kind === "tendency" ? [item.text] : []))

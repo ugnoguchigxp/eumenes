@@ -144,56 +144,6 @@ test("the words of a request to the memory (and of its taking back) are not read
 	}
 });
 
-test("a statement the memory refuses as a disagreement with a version in force is not written: it is an unresolved question on that version", async () => {
-	const f = await agendaFixture({
-		script: (kind: CallKind) =>
-			kind === "records"
-				? found({
-						memories: [
-							{
-								kind: "preference",
-								semanticKey: "drink.tea",
-								subject: "self",
-								text: "コーヒーのほうが好き",
-								quote: "コーヒーのほうが好き",
-								evidence: "user-b",
-							},
-						],
-					})
-				: undefined,
-	});
-	try {
-		await f.start();
-		await f.user("user-a", "ao", "紅茶が好き");
-		const item = await saveItem(f.h.store, f.h.memory!, {
-			conversationId: "ao",
-			messageId: "user-a",
-			kind: "preference",
-			semanticKey: "drink.tea",
-			text: "紅茶が好き",
-		});
-		const memory = f.deps.memory;
-		(f.deps as { memory: unknown }).memory = {
-			...memory,
-			// The memory's refusal for a statement of the user's own accord that disagrees with a version in force.
-			rememberExplicitInTransaction: () => ({
-				status: "rejected",
-				reason: "conflict",
-				existingId: item.id,
-			}),
-		};
-		await exchange(f, "b", "最近はコーヒーのほうが好き");
-		expect(f.h.memory!.list().map((i) => i.text)).toEqual(["紅茶が好き"]);
-		const open = plans(f).filter((p) => p.kind === "open_question");
-		expect(open.map((p) => p.memoryItemIds)).toEqual([[item.id]]);
-		expect(open[0]!.text).toContain("コーヒーのほうが好き");
-		const records = recordsFor(f.deps, { purpose: "plan" }, []);
-		expect(records.conflicts).toHaveLength(1);
-	} finally {
-		await f.close();
-	}
-});
-
 test("the position is saved in the transaction of what the pass wrote, and it survives a revoke of the checkpoint", async () => {
 	const f = await agendaFixture({
 		script: (kind: CallKind) =>
@@ -261,32 +211,6 @@ test("with no known position a conversation is read from a little before its end
 		expect(
 			f.h.store.read((db) => backfillStart(f.deps, db, "no-such-conversation")),
 		).toBe(0);
-	} finally {
-		await f.close();
-	}
-});
-
-test("the candidates already noted are shown to the writer, so it does not note them again", async () => {
-	let n = 0;
-	const f = await agendaFixture({
-		script: (kind: CallKind) => {
-			if (kind !== "records") return undefined;
-			return ++n === 1
-				? found({
-						candidates: [
-							{ kind: "habit", text: "夜に散歩する", evidence: ["user-a"] },
-						],
-					})
-				: noRecords();
-		},
-	});
-	try {
-		await f.start();
-		await exchange(f, "a", "最近は夜に散歩することが多い");
-		await exchange(f, "b", "今夜も散歩した");
-		const [, second] = f.calls("records");
-		expect(second!.prompt).toContain("夜に散歩する");
-		expect(second!.prompt).toMatch(/"ref":"c1"/u);
 	} finally {
 		await f.close();
 	}

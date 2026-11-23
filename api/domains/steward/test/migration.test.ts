@@ -330,7 +330,7 @@ test("steward/0007 drops the upkeep and the per-exchange judgments, ends the ref
 			]);
 			expect(
 				rows(
-					"SELECT name FROM sqlite_master WHERE name IN ('steward_state','steward_route','steward_goal_todo','steward_event_failure')",
+					"SELECT name FROM sqlite_master WHERE name IN ('steward_state','steward_route','steward_goal_todo')",
 				),
 			).toEqual([]);
 			expect(rows("SELECT id, state, exclusion FROM steward_inbox")).toEqual([
@@ -389,6 +389,45 @@ test("steward/0009 adds the memory baseline of the deep run to the sleep state, 
 							.all() as unknown[],
 				),
 			).toEqual([{ d: "2026-10-14", i: null, p: null }]);
+		} finally {
+			await upgraded.close();
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("steward/0010 brings back the per-event failure count, empty", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "steward-0010-"));
+	const path = join(dir, "db.sqlite3");
+	try {
+		const old = openStore(path, [
+			...conversationMigrations,
+			...stewardMigrations.slice(0, 9),
+		]);
+		await old.close();
+		const upgraded = openStore(path, [
+			...conversationMigrations,
+			...stewardMigrations,
+		]);
+		try {
+			expect(
+				upgraded.read(
+					(db) =>
+						db
+							.query(
+								"SELECT name FROM sqlite_master WHERE name = 'steward_event_failure'",
+							)
+							.all() as unknown[],
+				),
+			).toEqual([{ name: "steward_event_failure" }]);
+			await upgraded.write((db) =>
+				db
+					.query(
+						"INSERT INTO steward_event_failure (conversation_id, seq, failures) VALUES ('c1', 3, 1)",
+					)
+					.run(),
+			);
 		} finally {
 			await upgraded.close();
 		}

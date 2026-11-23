@@ -283,23 +283,12 @@ export function windowConversations(db: Database): string[] {
 	).map((row) => row.id);
 }
 
-/** The run that wrote each tendency of the sleeping layer; a deleted tendency takes its row along. */
+/** The run that wrote each tendency of the removed sleeping layer (rows from before; written no more); a deleted tendency takes its row along. */
 export const tendencyRunMigration = `
 CREATE TABLE memory_tendency_run (tendency_id TEXT PRIMARY KEY, run_id TEXT NOT NULL);
 CREATE TRIGGER memory_tendency_run_cleanup AFTER DELETE ON memory_tendency
 BEGIN DELETE FROM memory_tendency_run WHERE tendency_id = OLD.id; END;
 `;
-
-/** The run that wrote a tendency (L4 written by the sleeping layer). */
-export function putTendencyRun(
-	db: Database,
-	tendencyId: string,
-	runId: string,
-) {
-	db.query(
-		"INSERT OR REPLACE INTO memory_tendency_run (tendency_id, run_id) VALUES (?,?)",
-	).run(tendencyId, runId);
-}
 
 /** Whether the user asked for a record or the background pass noted it (a withdrawal without a target undoes only the former). */
 export const explicitRequestedMigration = `

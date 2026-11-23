@@ -4,7 +4,11 @@ import {
 	type CurationResult,
 } from "../../../memory";
 import { MAX_FAILURES } from "../../contracts";
-import { bumpInboxFailure, resolveInbox } from "../../repository";
+import {
+	bumpInboxFailure,
+	deleteEventFailures,
+	resolveInbox,
+} from "../../repository";
 import {
 	FORGET_LIMIT_NOTICE,
 	NOTHING_TO_FORGET_NOTICE,
@@ -22,12 +26,13 @@ import type {
 	CurateOutput,
 	RequestEntry,
 	Resolve,
+	TurnVectors,
 } from "./curate-types";
 
 // ---- apply ----
 
 type Source = {
-	section: "resolve";
+	section: "remember" | "update" | "resolve";
 	index: number;
 	request?: string;
 };
@@ -124,6 +129,56 @@ function planOutput(
 	withdrawals: ReadonlyMap<string, string[]>,
 ) {
 	const plan = new Plan();
+	// Only a user's own words are evidence of what the user said.
+	// Only a target event counts: a request's source message is shown as context and nothing is saved from it.
+	const targets = new Set(context.targetSeqs);
+	const messageOf = (label: string) => {
+		const event = context.events[label];
+		return event?.by === "user" && event.seq !== null && targets.has(event.seq)
+			? (event.messageId ?? undefined)
+			: undefined;
+	};
+	const stateRef = (ref: string) => {
+		const found = context.refs[ref];
+		return found?.namespace === "state" ? found : undefined;
+	};
+	output.remember.forEach((e, index) => {
+		const source: Source = { section: "remember", index };
+		const messageId = messageOf(e.evidence);
+		if (!messageId) return plan.reject(source, "unknown_evidence");
+		plan.add(
+			{
+				op: "remember",
+				kind: e.kind,
+				key: e.key,
+				text: e.text,
+				negated: e.negated,
+				messageId,
+				quote: e.quote,
+				validFrom: e.validFrom,
+				validUntil: e.validUntil,
+			},
+			source,
+		);
+	});
+	output.update.forEach((e, index) => {
+		const source: Source = { section: "update", index };
+		const messageId = messageOf(e.evidence);
+		const ref = stateRef(e.ref);
+		if (!messageId || !ref) return plan.reject(source, "unknown_ref");
+		plan.add(
+			{
+				op: "update",
+				itemId: ref.id,
+				revision: ref.revision,
+				text: e.text,
+				...(e.negated === undefined ? {} : { negated: e.negated }),
+				messageId,
+				quote: e.quote,
+			},
+			source,
+		);
+	});
 	const answered = new Set<string>();
 	output.resolve.forEach((e, index) => {
 		const request = context.requests[e.request];
@@ -614,6 +669,17 @@ export function applyCurate(
 			}
 		}
 	}
+	deps.continuity.events.markCuratedInTransaction(
+		db,
+		conversationId,
+		context.targetSeqs,
+	);
+	deleteEventFailures(db, conversationId, context.targetSeqs);
+	deps.memory.vectors.saveTurnVectors(
+		db,
+		{ conversationId, digests: context.digests },
+		extras.turnVectors as TurnVectors,
+	);
 	const messageIds = new Set(
 		Object.values(context.events)
 			.map((e) => e.messageId)

@@ -81,8 +81,6 @@ export type FinalMessage =
 export type RoutedInput = {
 	/** `## Memory` as the talk turn shows it (the user's own words only), when it shows any item. */
 	memory: string | null;
-	/** `## Recall` as the talk turn shows it (what this turn's words bring to mind), when it shows any line. */
-	recall?: string | null;
 	/** The user's earlier utterances in the talk turn's window, oldest first (cut to their head): what a request may point to. */
 	earlier: string[];
 	/** `## State` of the choice calls: now, the work by its numbers and what is presented. */
@@ -152,7 +150,7 @@ export interface GenerateInput {
 	/** The harness this run is composed and called with, chosen when it was prepared and kept to its end. */
 	harness: ConversationHarness;
 	/**
-	 * The system part, `## Memory`, the recent conversation, then the last message (`## State`, `## Recall`,
+	 * The system part, `## Memory`, the recent conversation, then the last message (`## State`,
 	 * `## Host notice`, `## User`). Tool calls and results are added while it runs.
 	 */
 	messages: ChatMessage[];
@@ -170,7 +168,7 @@ export interface GenerateInput {
 	agent?: AnswerTicket;
 	/** The TODOs whose result this generation shows (the host notice, and what the work tool read): what a reply may report. */
 	shown: { todos: string[] };
-	/** The memory items `## Memory` shows: a memory read leaves them out (`## Recall`'s are read as any other). */
+	/** The memory items `## Memory` shows: a memory read leaves them out. */
 	memoryItemIds: string[];
 	/** The host notice of the works this generation reports, in one line: kept with its reply (section 5.5 #4). */
 	notice?: string;

@@ -9,8 +9,6 @@ import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { wordsOf } from "./always-on-feed";
 import { overlap, unitsOf } from "./always-on-recall";
-import { PRINCIPAL, PROFILE_SCOPE } from "../../domains/memory/contracts";
-import { listCandidates } from "eumenes-memory/sqlite";
 import { agendaClock, agendaReady, type AgendaScope } from "./always-on-scope";
 import { think } from "./always-on-thoughts";
 import type { AgencyHostDeps } from "./host-types";
@@ -220,15 +218,6 @@ function relatedTo(
 			.slice(0, RELATED_LIMIT)
 			.map((x) => x.item);
 	const refs: Refs = { memories: new Map(), plans: new Map() };
-	// The candidates already noted (open ones), so the writer does not note them again.
-	const candidates = best(
-		openCandidates(deps, db),
-		(candidate) => candidate.value.text,
-	).map((candidate, i) => ({
-		ref: `c${i + 1}`,
-		kind: candidate.kind,
-		text: candidate.value.text,
-	}));
 	const memories = relatedMemories(deps, db, said, refs);
 	const plans = best(
 		deps.continuity.plans.listInTransaction(db),
@@ -241,23 +230,7 @@ function relatedTo(
 	const questions = deps.continuity.questions
 		.listInTransaction(db, { limit: QUESTIONS_SHOWN })
 		.map((q) => ({ attribute: q.attribute, state: q.state }));
-	return { related: { memories, candidates, plans, questions }, refs };
-}
-
-/** The open candidates (L1) of the profile, newest update first. */
-function openCandidates(deps: AgencyHostDeps, db: Database) {
-	const listed = listCandidates(db, {
-		contractVersion: 1,
-		access: {
-			principal: PRINCIPAL,
-			scopeKeys: [PROFILE_SCOPE],
-			purpose: "memory.read",
-			policyRevision: deps.memory.policyRevisionInTransaction(db),
-		},
-		scopeKey: PROFILE_SCOPE,
-	});
-	if (listed.status !== "ok") throw new Error("memory_blocked");
-	return listed.candidates.filter((c) => c.status === "open");
+	return { related: { memories, candidates: [], plans, questions }, refs };
 }
 
 let savepoints = 0;
@@ -276,103 +249,25 @@ function attempt<T>(db: Database, run: () => T): T | { error: string } {
 	}
 }
 
-/** The writer's `subject` words for the user themselves (the instruction says self; a model may write these). */
-const OWN_SUBJECTS = new Set(["self", "本人", "user", "me"]);
-const isOwnSubject = (subject: string) =>
-	OWN_SUBJECTS.has(subject.normalize("NFKC").trim().toLowerCase());
-
-/** The semantic key of a candidate: it names no fact, only the words, so the same words are the same candidate. */
-const candidateKey = (kind: string, text: string) => {
-	const folded = text.normalize("NFKC").toLowerCase().replace(/\s+/gu, "");
-	const hash = new Bun.CryptoHasher("sha256")
-		.update(folded)
-		.digest("hex")
-		.slice(0, 16);
-	return `${kind}.${hash}`;
-};
-
 /**
- * What a kept pass writes, in one transaction of the caller: `memories` to the memory (L2, what the user said of
- * themselves, not asked to be remembered), `candidates` to its candidates (L1), `plans` and `questions` to the
- * continuity domain (L3 and the ledger) and `conflicts` as unresolved questions resting on the memory item they
- * disagree with. Each write is its own unit; what the domains refuse is returned with its reason.
+ * What a kept pass writes, in one transaction of the caller: `plans` and `questions` to the continuity domain (L3
+ * and the ledger) and `conflicts` as unresolved questions resting on the memory item they disagree with. The facts
+ * the writer returns (`memories`, `candidates`) are not written: the steward curates the memory. Each write is its
+ * own unit; what the domains refuse is returned with its reason.
  */
 export function writeRecords(input: {
 	deps: AgencyHostDeps;
 	db: Database;
 	conversationId: string;
-	runId: string;
 	records: ExtractedRecords;
 	refs: Refs;
 }): { applied: string[]; rejected: string[] } {
-	const { deps, db, conversationId, runId, records, refs } = input;
+	const { deps, db, conversationId, records, refs } = input;
 	const applied: string[] = [];
 	const rejected: string[] = [];
 	const evidenceOf = (ids: readonly string[]) => ({
 		messages: ids.map((messageId) => ({ messageId, conversationId })),
 	});
-	for (const m of records.memories) {
-		const out = attempt(db, () =>
-			deps.memory.rememberExplicitInTransaction(db, {
-				conversationId,
-				sourceRunId: runId,
-				messageId: m.evidence,
-				quote: m.quote,
-				kind: m.kind,
-				semanticKey: m.semanticKey,
-				// The memory keeps the record as the user's own statement; the writer's subject says whose it is: a
-				// record about another person or thing is marked, so the memory does not bring it up unasked. A
-				// sensitive one is not marked: the writer is told not to write those.
-				subject: "self",
-				...(isOwnSubject(m.subject) ? {} : { aboutOther: true }),
-				text: m.text,
-				polarity: "affirmed",
-				requested: false,
-			}),
-		);
-		if ("error" in out) rejected.push(`memory:${out.error}`);
-		else if (out.status === "rejected") {
-			// It disagrees with a version in force (the memory's refusal names it): nothing is overwritten, the
-			// disagreement is an unresolved question for the user.
-			const existingId = (out as { existingId?: string }).existingId;
-			if (out.reason !== "conflict" || !existingId) {
-				rejected.push(`memory:${out.reason}`);
-				continue;
-			}
-			const open = attempt(db, () =>
-				deps.continuity.plans.addInTransaction(db, {
-					conversationId,
-					kind: "open_question",
-					text: `記憶と食い違う: ${m.text}`,
-					evidence: {
-						...evidenceOf([m.evidence]),
-						memoryItemIds: [existingId],
-					},
-				}),
-			);
-			if ("error" in open) rejected.push(`memory:conflict:${open.error}`);
-			else applied.push(`conflict: ${m.text}`);
-		} else applied.push(`memory: ${m.text}`);
-	}
-	for (const c of records.candidates) {
-		const kind = c.kind === "interest" ? "preference" : c.kind;
-		const out = attempt(db, () =>
-			deps.memory.recordCandidateInTransaction(db, {
-				conversationId,
-				sourceRunId: runId,
-				kind,
-				semanticKey: candidateKey(kind, c.text),
-				subject: "self",
-				text: c.text,
-				polarity: "affirmed",
-				evidence: c.evidence.map((messageId) => ({ messageId })),
-			}),
-		);
-		if ("error" in out) rejected.push(`candidate:${out.error}`);
-		else if (out.status === "rejected")
-			rejected.push(`candidate:${out.reason}`);
-		else applied.push(`candidate: ${c.text}`);
-	}
 	for (const p of records.plans) {
 		const evidence = evidenceOf(p.evidence);
 		const planId = p.ref === null ? null : (refs.plans.get(p.ref) ?? null);
@@ -493,7 +388,6 @@ async function pass(input: {
 		return "failed";
 	}
 	if (!out.ok) return out.reason === "aborted" ? "aborted" : "failed";
-	const runId = `agency-records:${crypto.randomUUID()}`;
 	const refs = prepared.refs;
 	const extracted = out;
 	let written: { applied: string[]; rejected: string[] } | null;
@@ -521,7 +415,6 @@ async function pass(input: {
 				deps,
 				db,
 				conversationId: c.id,
-				runId,
 				records: extracted.records,
 				refs,
 			});

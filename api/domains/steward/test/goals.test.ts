@@ -56,10 +56,12 @@ async function adoptGoal(h: StewardHarness, text: string) {
 test("a goal request is answered by the goal step, not by curate-memory; an exchange alone makes no goal step", async () => {
 	const h = await setup();
 	await adoptGoal(h, "音声応答の遅延を減らしたい");
-	// An exchange alone never asks a model: nothing reflects every turn.
+	// An exchange alone is read by the memory reflection only: it makes no goal step.
+	h.inference.script("curate-memory", empty);
 	await h.run({ user: "天気の話", answer: "晴れです", end: "completed" });
 	await h.drain();
-	expect(h.units()).toEqual([]);
+	expect(h.units().map((u) => u.step)).toEqual(["curate-memory"]);
+	h.inference.script("curate-memory", empty);
 	h.inference.script("curate-goals", (data) => {
 		const goals = data.goals as Array<{ ref: string; text: string }>;
 		expect(goals).toMatchObject([{ ref: "gl1", status: "adopted" }]);
@@ -74,9 +76,17 @@ test("a goal request is answered by the goal step, not by curate-memory; an exch
 	await h.drain();
 	expect(goalsOf(h)).toMatchObject([{ status: "completed", revision: 2 }]);
 	expect(h.inbox()).toMatchObject([{ kind: "goal", state: "done", what: "" }]);
-	expect(h.units().map((u) => u.step)).toEqual(["curate-goals"]);
-	// curate-memory never saw the goal request.
-	expect(h.inference.callsOf("curate-memory")).toHaveLength(0);
+	// The second exchange is a request and the agent's answer: no user's words to learn from, so no reflection.
+	expect(h.units().map((u) => u.step)).toEqual([
+		"curate-memory",
+		"curate-goals",
+	]);
+	// curate-memory never saw the goal request: it read the first exchange only.
+	const memoryCalls = h.inference.callsOf("curate-memory");
+	expect(memoryCalls).toHaveLength(1);
+	expect(
+		memoryCalls.every((c) => (c.data.requests as unknown[]).length === 0),
+	).toBe(true);
 });
 
 test("a goal request is ended at once when the application keeps no goals", async () => {

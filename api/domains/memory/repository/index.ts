@@ -46,15 +46,8 @@ export function writeSettings(
 ) {
 	db.query(
 		`UPDATE memory_host_settings SET revision = revision + (enabled <> ?1), enabled = ?1, always_tokens = ?2,
-		 always_scope = ?3, recall_enabled = ?4, recall_tokens = ?5, recall_items = ?6 WHERE id = 1`,
-	).run(
-		next.enabled ? 1 : 0,
-		next.alwaysTokens,
-		next.alwaysScope,
-		next.recallEnabled ? 1 : 0,
-		next.recallTokens,
-		next.recallItems,
-	);
+		 always_scope = ?3 WHERE id = 1`,
+	).run(next.enabled ? 1 : 0, next.alwaysTokens, next.alwaysScope);
 }
 export interface UsageReceipt {
 	runId: string;

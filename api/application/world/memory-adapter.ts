@@ -70,11 +70,9 @@ const planKindLabels: Record<PlanItem["kind"], string> = {
 	decision: "決定",
 };
 const stepLabels: Record<DecisionDto["step"], string> = {
-	"curate-memory": "記憶の依頼",
+	"curate-memory": "記憶の反映",
 	"curate-world": "World の反映",
 	"curate-goals": "目標の依頼",
-	shallow: "浅い整理",
-	deep: "深い整理",
 	"forget-closure": "忘却の削除",
 };
 const eventTypeLabels: Record<ConversationEvent["type"], string> = {

@@ -5,7 +5,6 @@ import type { MemoryService } from "..";
 import { settingsSchema } from "../contracts";
 import { memorySeedInputSchema } from "../contracts/seeds";
 import { memoryMaintenanceInput } from "../service/maintenance";
-import { registerMemoryResidue } from "./residue";
 export function registerMemory(app: Hono, service: MemoryService) {
 	app.use(
 		"/api/memory/maintenance/*",
@@ -32,7 +31,6 @@ export function registerMemory(app: Hono, service: MemoryService) {
 				throw error;
 			}
 		});
-	registerMemoryResidue(app, service.residue);
 	app.post("/api/memory/seeds/preview", async (c) => {
 		const parsed = await parseJsonBody(c, memorySeedInputSchema, {
 			code: "invalid_memory_seed",

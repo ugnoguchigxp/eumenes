@@ -157,10 +157,6 @@ export const defaultSubtitles: SubtitleSettings = {
 	style: "netflix",
 	size: "large",
 };
-/** A time of day, `HH:MM` (24 hours). */
-const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
-/** The window the memory's deep consolidation is pulled into (the redesign's default 3:00-5:00). */
-export const defaultConsolidationWindow = { start: "03:00", end: "05:00" };
 /** ASR languages offered in settings (same set as SAAA's Voice settings). */
 export const asrLanguages = [
 	["ja", "日本語"],
@@ -400,20 +396,6 @@ export const settingsSchema = z
 			})
 			.strict()
 			.default({ enabled: false, curationResourceId: null }),
-		/** Absent until saved: the memory's own settings fall back to their defaults. */
-		memory: z
-			.object({
-				/**
-				 * The time of day (Asia/Tokyo) the memory's deep consolidation is pulled into. A window whose end is not
-				 * after its start runs past midnight. Read on each decision: a change applies at once.
-				 */
-				consolidationWindow: z
-					.object({ start: clockTime, end: clockTime })
-					.strict()
-					.default(defaultConsolidationWindow),
-			})
-			.strict()
-			.optional(),
 		agency: z
 			.object({
 				debugMode: z.boolean().optional(),

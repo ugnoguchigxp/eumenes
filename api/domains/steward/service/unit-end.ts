@@ -8,9 +8,11 @@ import {
 } from "../contracts";
 import {
 	type UnitRow,
+	bumpEventFailure,
 	bumpInboxFailure,
 	bumpWorldEvent,
 	closeUnit,
+	deleteEventFailures,
 	deleteWorldEvents,
 	insertDecision,
 	insertDecisionRefs,
@@ -81,6 +83,16 @@ export function createUnitEnd(deps: StewardDeps, kick: Kick, wake: Wake) {
 	function countFailures(env: StepEnv, unit: UnitRow) {
 		const { db } = env;
 		const now = deps.clock();
+		const { conversationId } = unit;
+		// An event that failed three times is given up: it is marked handled, and later events are not held back.
+		if (unit.step === "curate-memory")
+			for (const seq of unit.targets.seqs ?? [])
+				if (bumpEventFailure(db, conversationId, seq) >= MAX_FAILURES) {
+					deps.continuity.events.markCuratedInTransaction(db, conversationId, [
+						seq,
+					]);
+					deleteEventFailures(db, conversationId, [seq]);
+				}
 		const world = deps.world;
 		if (unit.kind === "world_events" && world) {
 			// An event that failed three times is given up (`STEWARD_GAVE_UP`); later events are not held back by it.

@@ -12,7 +12,6 @@ export const INPUT_HEADINGS = {
 	summary: "## Summary",
 	earlier: "## Earlier",
 	state: "## State",
-	recall: "## Recall",
 	user: "## User",
 	notice: "## Host notice",
 	candidates: "## Candidates",

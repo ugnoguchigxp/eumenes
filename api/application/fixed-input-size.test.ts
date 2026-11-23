@@ -13,7 +13,6 @@ import {
 	setup as dialogueSetup,
 } from "../domains/dialogue/test/generation.fixture";
 import { defaults, type Settings } from "../domains/settings";
-import { PROMPTS, SCHEMAS } from "eumenes-consolidation";
 import type { StewardService } from "../domains/steward";
 import { setupSteward } from "../domains/steward/test/steward.fixture";
 import {
@@ -59,7 +58,7 @@ const CONDITIONS = {
 	settings: "defaults (emotion on, no interests)",
 	goal: "goal reply rules and tools added as the always-on reply adds them for a goal-enabled agenda",
 	steward:
-		"curate-memory step of one remember request, the instructions of the other request steps, the sleep layer's judgement prompts and schemas",
+		"curate-memory step of one remember request, the instructions of the other request steps",
 };
 const SECTIONS = ["Role", "Speaking", "Emotion", "Input", "Facts"] as const;
 
@@ -306,11 +305,6 @@ async function measure() {
 	elements["steward.curateWorld.instructions"] = textSize(
 		stewardInstructions("curate-world"),
 	);
-	// The sleep layer asks the model with the package's own prompts and schemas (the steward adds nothing).
-	for (const name of Object.keys(PROMPTS) as Array<keyof typeof PROMPTS>) {
-		elements[`steward.sleep.${name}.instructions`] = textSize(PROMPTS[name]);
-		elements[`steward.sleep.${name}.schema`] = jsonSize(SCHEMAS[name]);
-	}
 	// The instructions are the start of what the call sent (a check that the text measured is the one sent).
 	expect(steward.sent.startsWith(stewardInstructions("curate-memory"))).toBe(
 		true,

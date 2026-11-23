@@ -139,14 +139,14 @@ test("a slot fails while its last closed unit failed for a reason other than a L
 	});
 	await unit(store, {
 		slot: "maintenance",
-		step: "shallow",
+		step: "forget-closure",
 		state: "failed",
 		code: "invalid_output",
 		at: "2026-10-25T04:10:00.000Z",
 	});
 	await unit(store, {
 		slot: "maintenance",
-		step: "shallow",
+		step: "forget-closure",
 		state: "applied",
 		at: "2026-10-25T04:20:00.000Z",
 	});

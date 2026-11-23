@@ -38,6 +38,27 @@ const stateKinds = ["preference", "personal_fact", "constraint", "habit"];
  */
 export const curateSchema = (requestLabels: readonly string[]) =>
 	obj({
+		remember: list(
+			obj({
+				kind: enumOf(stateKinds),
+				key: str,
+				text: str,
+				evidence: str,
+				quote: nullableStr,
+				validFrom: nullableStr,
+				validUntil: nullableStr,
+				negated: bool,
+			}),
+		),
+		update: list(
+			obj({
+				ref: str,
+				text: str,
+				evidence: str,
+				quote: nullableStr,
+				negated: bool,
+			}),
+		),
 		resolve: list(
 			obj({
 				request: enumOf(requestLabels.length > 0 ? requestLabels : [""]),

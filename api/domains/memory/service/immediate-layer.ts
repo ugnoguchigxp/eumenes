@@ -7,7 +7,6 @@ import type {
 import type { ForgetInput, ForgetOutcome, ForgetPurge } from "../contracts";
 import { purgeMarks } from "../repository";
 import { purgeExplicitRequests, purgeShortRefs } from "../repository/immediate";
-import { createCandidates } from "./candidates";
 import { createEvidence } from "./curation-evidence";
 import type { CurationDeps } from "./curation-shared";
 import { createExclusion } from "./exclusion";
@@ -16,7 +15,6 @@ import type { createForget } from "./forget";
 import type { ContextWindowStore } from "./context-window";
 import { createShortRefs } from "./short-refs";
 import { createSuppression } from "./suppression";
-import { createTendencyWriter } from "./tendency-write";
 import { createWithdraw } from "./withdraw";
 import { createWithheld } from "./withheld";
 import type { ConversationService } from "../../conversation";
@@ -55,7 +53,6 @@ export function createImmediateLayer(
 	};
 	const explicit = createExplicitOps(shared);
 	const suppression = createSuppression(shared);
-	const candidates = createCandidates(shared);
 	const exclusion = createExclusion(shared);
 	return {
 		/** A forget removes the requests and short references that name its items. */
@@ -128,14 +125,6 @@ export function createImmediateLayer(
 			releaseSuppressionInTransaction: suppression.release,
 			/** The topic words and the marked facts (read-only). */
 			suppressionsInTransaction: suppression.list,
-			/** A tendency (L4) of the sleeping layer, grounded in messages of several conversations. */
-			writeTendencyInTransaction: createTendencyWriter(shared).write,
-			/** A candidate (L1): grounded, never shown to the conversation. */
-			recordCandidateInTransaction: candidates.record,
-			/** Whether anything but this run changed memory after the baseline (the adoption check of a generation). */
-			changedExcludingRunInTransaction: candidates.changedExcludingRun,
-			/** The change feed's counter: the baseline a run reads at its prepare. */
-			latestChangeSeqInTransaction: candidates.latestChangeSeq,
 			/**
 			 * The messages out of use: blocked ones, and those a record that is only excluded (its closure delete not run
 			 * yet) stands on. One answer for the background pass, goals and the history.

@@ -33,20 +33,6 @@ const askToRemember = (h: StewardHarness, conversationId = "c1") =>
 		requests: [{ kind: "remember", what: "辛いものが好き" }],
 	});
 
-test("an exchange alone asks no model: nothing reflects every turn", async () => {
-	const h = await setup();
-	await h.run({
-		user: "辛いものが好きです",
-		answer: "そうなんですね",
-		end: "completed",
-	});
-	await h.run({ user: "今日は晴れですね", answer: "はい", end: "completed" });
-	await h.drain();
-	expect(h.units()).toEqual([]);
-	expect(h.inference.calls).toEqual([]);
-	expect(h.memory.list()).toEqual([]);
-});
-
 test("the steps that answer requests share one concurrency key across conversations", async () => {
 	const h = await setup();
 	h.inference.script("curate-memory", remember, remember);

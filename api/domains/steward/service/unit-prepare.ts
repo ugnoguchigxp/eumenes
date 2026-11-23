@@ -14,8 +14,7 @@ import {
 } from "../repository";
 import type { Kick } from "./kick";
 import { buildMessages } from "./messages";
-import { anyForeground } from "./sleep/rest";
-import { isSleepStep, sleepSteps } from "./sleep/steps";
+import { forgetClosure } from "./forget-closure";
 import { steps } from "./steps";
 import type { UnitEnd } from "./unit-end";
 import type { PreparedUnit, StepEnv, StewardDeps, StewardInput } from "./types";
@@ -65,28 +64,18 @@ export function createPrepare(
 	}
 
 	/**
-	 * A sleep unit: the step makes its own model calls and writes while it runs, so prepare only fences it (memory
-	 * ready, no conversation run unless the unit is the closure delete of a forget) and lets the step fix its input.
+	 * The closure delete of a forget: it asks no model and works whether or not a conversation run is going, even
+	 * when memory is off, so prepare only lets the step fix its targets.
 	 */
-	function prepareSleep(
+	function prepareClosure(
 		db: Database,
-		claim: { jobId: string; generation: number; attempt: number },
-		unit: UnitRow & { step: keyof typeof sleepSteps },
+		claim: { jobId: string },
+		unit: UnitRow,
 	):
 		| { status: "ready"; input: StewardInput }
 		| { status: "stale"; reason: string } {
-		const step = sleepSteps[unit.step];
 		const env: StepEnv = { db, deps, conversationId: unit.conversationId };
-		const close = (reason: string) => {
-			closeUnit(db, unit.id, "stale", deps.clock());
-			return { status: "stale" as const, reason };
-		};
-		// The closure delete works even when memory is off; the sleep layer needs it.
-		if (!step.urgent && !memory.readyInTransaction(db))
-			return close("memory_unavailable");
-		if (!step.urgent && anyForeground(db, deps))
-			return close("foreground_active");
-		const prepared = step.prepare(env, unit);
+		const prepared = forgetClosure.prepare(env, unit);
 		if (prepared.status === "stale") {
 			closeUnit(db, unit.id, "stale", deps.clock());
 			// What made the unit empty changed the ledger: the next unit follows from it.
@@ -100,16 +89,11 @@ export function createPrepare(
 		return {
 			status: "ready",
 			input: {
-				kind: "sleep",
+				kind: "closure",
 				unitId: unit.id,
 				jobId: claim.jobId,
 				conversationId: unit.conversationId,
-				step,
-				prepared: prepared.prepared,
 				targets: readUnit(db, unit.id)!.targets,
-				forgetSeq: readUnit(db, unit.id)!.forgetSeq,
-				attempt: claim.attempt,
-				generation: claim.generation,
 				startedAt: deps.nowMs(),
 			},
 		};
@@ -129,12 +113,12 @@ export function createPrepare(
 		const unit = readUnit(db, claim.payload.unitId);
 		if (!unit || unit.state !== "open")
 			return { status: "stale", reason: "unit_closed" };
-		if (isSleepStep(unit.step))
-			return prepareSleep(
-				db,
-				claim,
-				unit as UnitRow & { step: keyof typeof sleepSteps },
-			);
+		if (unit.step === "forget-closure") return prepareClosure(db, claim, unit);
+		// A unit of a step that is gone (the sleep layer's, made before it was removed) ends without work.
+		if (!(unit.step in steps)) {
+			closeUnit(db, unit.id, "stale", deps.clock());
+			return { status: "stale", reason: "step_removed" };
+		}
 		const env: StepEnv = { db, deps, conversationId: unit.conversationId };
 		const step = steps[unit.step as keyof typeof steps];
 		const close = (reason: string) => {

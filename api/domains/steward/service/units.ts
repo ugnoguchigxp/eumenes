@@ -18,8 +18,6 @@ import { createSettle } from "./unit-settle";
 import type {
 	LlmInput,
 	LlmOutput,
-	SleepInput,
-	SleepOutput,
 	StewardDeps,
 	StewardInput,
 	StewardOutput,
@@ -28,7 +26,7 @@ import type { Wake } from "./wake";
 
 /**
  * The steps that read the conversation: they run on its prompt (its prefix, then their task) and its connection.
- * Upkeep and the World curation read other things and keep their own prompts.
+ * The World curation reads other things and keeps its own prompt.
  */
 const ON_CONVERSATION: ReadonlySet<string> = new Set([
 	"curate-memory",
@@ -52,22 +50,13 @@ export function createUnitHandler(deps: StewardDeps, kick: Kick, wake: Wake) {
 	const prepareInTransaction = createPrepare(deps, kick, end, wake);
 	const settleInTransaction = createSettle(deps, kick, end);
 
-	/** A sleep unit's step makes its own model calls and writes; what it returns is settled in the unit's transaction. */
-	async function executeSleep(
-		input: SleepInput,
-		context: { signal: AbortSignal },
-	): Promise<SleepOutput> {
-		const started = deps.nowMs();
-		const result = await input.step.run(input, { ...context, deps });
-		return { kind: "sleep", result, durationMs: deps.nowMs() - started };
-	}
-
 	async function execute(
 		input: StewardInput,
 		context: { signal: AbortSignal },
 	): Promise<StewardOutput> {
-		return input.kind === "sleep"
-			? executeSleep(input, context)
+		// The closure delete asks no model: its work is done when it settles, in the unit's transaction.
+		return input.kind === "closure"
+			? { kind: "closure", durationMs: 0 }
 			: executeLlm(input, context);
 	}
 

@@ -1,4 +1,3 @@
-import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
 
 /**
@@ -14,35 +13,3 @@ ALTER TABLE steward_sleep_state ADD COLUMN deep_item_count INTEGER;
 ALTER TABLE steward_sleep_state ADD COLUMN deep_similar_pairs INTEGER;
 `,
 };
-
-/** What the memory held at the last deep consolidation (or when the steward first looked). */
-export interface SleepPressureBaseline {
-	activeItems: number;
-	similarPairs: number;
-}
-
-/** The baseline, or null while there is none (the first look writes it). */
-export function readPressureBaseline(
-	db: Database,
-): SleepPressureBaseline | null {
-	const row = db
-		.query(
-			"SELECT deep_item_count AS activeItems, deep_similar_pairs AS similarPairs FROM steward_sleep_state WHERE id = 1",
-		)
-		.get() as {
-		activeItems: number | null;
-		similarPairs: number | null;
-	} | null;
-	if (!row || row.activeItems === null || row.similarPairs === null)
-		return null;
-	return { activeItems: row.activeItems, similarPairs: row.similarPairs };
-}
-
-export function writePressureBaseline(
-	db: Database,
-	baseline: SleepPressureBaseline,
-) {
-	db.query(
-		"UPDATE steward_sleep_state SET deep_item_count = ?, deep_similar_pairs = ? WHERE id = 1",
-	).run(baseline.activeItems, baseline.similarPairs);
-}

@@ -406,7 +406,7 @@ test("the steward timeline shows decisions with their proposal, result and windo
 	expect(seen).toEqual([["main", 50]]);
 	expect(rows.map((r: { id: string }) => r.id)).toEqual(["2", "1", "0"]);
 	expect(rows[0]).toMatchObject({
-		stepLabel: "記憶の依頼",
+		stepLabel: "記憶の反映",
 		proposal: "remember 2件 / notes 1件",
 		result: "適用 2件 / 却下 1件（blocked_source）",
 		windowDiff: "版 3 → 4",

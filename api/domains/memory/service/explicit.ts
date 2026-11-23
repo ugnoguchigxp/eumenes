@@ -23,16 +23,7 @@ import {
 	type ImmediateDeps,
 } from "./immediate-shared";
 import { normalizeKey } from "./quote";
-import {
-	SIMILAR_MIN_SCORE,
-	flattenText,
-	queryTerms,
-	similarityOf,
-	searchDocOf,
-} from "./recall-score";
-
-/** How many alike records a save reports. */
-const SIMILAR_LIMIT = 3;
+import { flattenText } from "./recall-score";
 
 type Fields = {
 	text: string;
@@ -69,19 +60,6 @@ const sameWords = (item: StateItem, fields: Fields) =>
 
 const hasText = (value: unknown): value is string =>
 	typeof value === "string" && value.trim() !== "";
-
-/** The records of `items` whose words are alike `text` (`SIMILAR_MIN_SCORE` and up): the best first, the newer first at a tie. */
-function alikeOf(items: readonly StateItem[], text: string): StateItem[] {
-	const terms = queryTerms(text);
-	if (terms.length === 0) return [];
-	return items
-		.filter((item) => item.excluded !== true && item.suppressed !== true)
-		.map((item) => ({ item, score: similarityOf(terms, searchDocOf(item)) }))
-		.filter((entry) => entry.score >= SIMILAR_MIN_SCORE)
-		.sort((a, b) => b.score - a.score || b.item.updatedSeq - a.item.updatedSeq)
-		.slice(0, SIMILAR_LIMIT)
-		.map((entry) => entry.item);
-}
 
 /**
  * "Remember this" and what the user said of themselves (sections 5.1 and 4.2): saved at once, `user_confirmed`, only
@@ -280,13 +258,6 @@ export function createExplicitOps(deps: ImmediateDeps) {
 					reason: "conflict",
 					existingId: active.itemId,
 				};
-			// Records alike but not the same, for the caller to see (nothing is changed for them).
-			const similar = active
-				? []
-				: alikeOf(inForce, fields.text).map((item) => ({
-						itemId: item.itemId,
-						revision: item.revision,
-					}));
 			const saved = save(db, {
 				conversationId: input.conversationId,
 				sourceRunId: input.sourceRunId,
@@ -318,7 +289,6 @@ export function createExplicitOps(deps: ImmediateDeps) {
 				itemId: saved.item.itemId,
 				revision: saved.item.revision,
 				replacedItemId: active && !same ? active.itemId : null,
-				similar,
 			};
 		});
 	}

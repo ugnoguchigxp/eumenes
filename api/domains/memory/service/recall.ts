@@ -4,26 +4,16 @@ import {
 	readStateFact,
 	type StateItem,
 } from "eumenes-memory/sqlite";
-import { sha256Hex } from "../../../infrastructure/digest";
 import { readMarksOf } from "../repository";
 import type {
 	MemoryRecallInput,
 	MemoryRecalled,
 	MemoryRecallResult,
 } from "../contracts/recall";
-import { isCurrentSelf, type ContextWindowStore } from "./context-window";
+import type { ContextWindowStore } from "./context-window";
 import { listAllState } from "./state-snapshot";
 import { tokyoDay, type ProfileItem } from "./profile";
-import {
-	SIMILAR_MIN_SCORE,
-	isDirect,
-	normalizeText,
-	queryTerms,
-	scoreOf,
-	searchDocOf,
-	similarityOf,
-	type QueryTerm,
-} from "./recall-score";
+import { isDirect, normalizeText, queryTerms, scoreOf } from "./recall-score";
 import type { CurationDeps } from "./curation-shared";
 
 /** How many expired versions of the same matter a record carries. */
@@ -40,9 +30,8 @@ const collapse = (text: string) => text.replace(/\s+/g, " ").trim();
 export function createRecall(deps: {
 	windows: ContextWindowStore;
 	scoped: CurationDeps["scoped"];
-	clock: () => string;
 }) {
-	const { windows, scoped, clock } = deps;
+	const { windows, scoped } = deps;
 
 	/**
 	 * The expired versions of the records' matters (a correction's old values), newest first. Only the matters of the
@@ -190,64 +179,6 @@ export function createRecall(deps: {
 		};
 	}
 
-	/** The last count of alike pairs, with the versions of the records it was made from. */
-	let pressure: { key: string; similarPairs: number } | undefined;
-	/** The prepared words of the records' texts (a record's words are cut once per version). */
-	let preparedWords = new Map<string, readonly QueryTerm[]>();
-
-	/**
-	 * How much the memory has grown for the sleeping layer to tidy: the records in force, and the pairs of the same
-	 * kind whose words are alike (`SIMILAR_MIN_SCORE`, either one against the other). Only the records are listed (no
-	 * profile items, no tendencies); the pairs are counted again only when a record changed.
-	 */
-	function consolidationPressureInTransaction(db: Database): {
-		activeItems: number;
-		similarPairs: number;
-	} {
-		const listed = listAllState(db, {
-			...scoped(db, "memory.read"),
-			suppressed: "mark",
-		});
-		if (listed.status !== "ok") throw new Error("memory_blocked");
-		const nowMs = Date.parse(clock());
-		const states = listed.items.filter((item) => isCurrentSelf(item, nowMs));
-		const key = sha256Hex(
-			states
-				.map((item) => `${item.itemId}@${item.revision}`)
-				.sort()
-				.join("\n"),
-		);
-		if (pressure?.key !== key) {
-			const words = new Map<string, readonly QueryTerm[]>();
-			const docs = new Map<string, string>();
-			const byKind = new Map<string, StateItem[]>();
-			for (const item of states) {
-				const at = `${item.itemId}@${item.revision}`;
-				words.set(at, preparedWords.get(at) ?? queryTerms(item.value.text));
-				docs.set(at, searchDocOf(item));
-				byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item]);
-			}
-			preparedWords = words;
-			const at = (item: StateItem) => `${item.itemId}@${item.revision}`;
-			let similarPairs = 0;
-			for (const group of byKind.values())
-				for (let i = 0; i < group.length; i++)
-					for (let j = i + 1; j < group.length; j++) {
-						const a = group[i]!;
-						const b = group[j]!;
-						if (
-							similarityOf(words.get(at(a))!, docs.get(at(b))!) >=
-								SIMILAR_MIN_SCORE ||
-							similarityOf(words.get(at(b))!, docs.get(at(a))!) >=
-								SIMILAR_MIN_SCORE
-						)
-							similarPairs++;
-					}
-			pressure = { key, similarPairs };
-		}
-		return { activeItems: states.length, similarPairs: pressure.similarPairs };
-	}
-
 	function marksInTransaction(
 		db: Database,
 		itemIds: readonly string[],
@@ -264,7 +195,6 @@ export function createRecall(deps: {
 
 	return {
 		recallInTransaction,
-		consolidationPressureInTransaction,
 		marksInTransaction,
 	};
 }

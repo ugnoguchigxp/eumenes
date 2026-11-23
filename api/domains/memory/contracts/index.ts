@@ -20,9 +20,6 @@ export const settingsSchema = z
 		enabled: z.boolean().optional(),
 		alwaysTokens: z.number().int().min(200).max(8000).optional(),
 		alwaysScope: z.enum(["responses", "leanings", "facts"]).optional(),
-		recallEnabled: z.boolean().optional(),
-		recallTokens: z.number().int().min(0).max(2000).optional(),
-		recallItems: z.number().int().min(0).max(21).optional(),
 	})
 	.refine((settings) =>
 		Object.values(settings).some((value) => value !== undefined),

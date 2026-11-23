@@ -1,9 +1,8 @@
 import type { Database } from "bun:sqlite";
-import { conversationsWithWork, readPositions } from "../../repository";
-import type { StewardDeps } from "../types";
+import type { StewardDeps } from "./types";
 
 /** The time of the user's newest utterance in the conversation; null when there is none. */
-export function lastUserMs(
+function lastUserMs(
 	db: Database,
 	deps: StewardDeps,
 	conversationId: string,
@@ -22,16 +21,6 @@ export function lastUserMs(
 		1,
 	)[0];
 	return found ? Date.parse(found.message.createdAt) : null;
-}
-
-/** A conversation run goes in any conversation the sleep layer watches (the ones it has seen and the ones with work). */
-export function anyForeground(db: Database, deps: StewardDeps): boolean {
-	const ids = new Set([
-		...Object.keys(readPositions(db)),
-		...conversationsWithWork(db),
-	]);
-	for (const id of ids) if (deps.foregroundActive(db, id)) return true;
-	return false;
 }
 
 /**

@@ -294,10 +294,9 @@ test("marks are carried to the version that replaces a record and vanish with a 
 	expect(marksOf(corrected.itemId)).toBeNull();
 });
 
-test("the same words under another key are one record; alike words are saved and reported", async () => {
+test("the same words under another key are one record; alike words are saved as another", async () => {
 	const h = await setup();
 	const one = await saved(h, "猫の名前はミル", "pet.cat.name");
-	expect(one.similar).toEqual([]);
 	// Same words (spaces and punctuation aside), other key: the first record is confirmed, no second one.
 	const again = await remember(h, "猫の名前は、ミル", "cat_name");
 	expect(again).toMatchObject({ status: "unchanged", itemId: one.itemId });
@@ -307,26 +306,11 @@ test("the same words under another key are one record; alike words are saved and
 		kind: "habit",
 	});
 	expect(other.itemId).not.toBe(one.itemId);
-	// Alike but not the same: saved, and the alike record comes back to be corrected if it is the same matter.
-	const alike = await saved(h, "猫の名前はミルク", "cat.name.v2");
-	expect(alike.similar).toEqual([{ itemId: one.itemId, revision: 1 }]);
+	// Alike but not the same: saved as its own record.
+	await saved(h, "猫の名前はミルク", "cat.name.v2");
 	expect(h.memory.list(true).filter((i) => i.status === "active")).toHaveLength(
 		3,
 	);
-	// A suppressed record is not reported.
-	await write(h, (db) =>
-		h.memory.suppressInTransaction(db, {
-			conversationId: "c1",
-			sourceRunId: "run-s",
-			target: { itemId: alike.itemId },
-		}),
-	);
-	expect((await saved(h, "猫の名前はミルク様", "cat.name.v3")).similar).toEqual(
-		[{ itemId: one.itemId, revision: 1 }],
-	);
-	// A different matter is not reported.
-	const different = await saved(h, "妹の名前は美咲", "sister.name");
-	expect(different.similar).toEqual([]);
 });
 
 test("an unasked statement of the same words under another key confirms the record; a different value still conflicts", async () => {
@@ -345,9 +329,6 @@ test("saving the input budget leaves the access policy alone: saved answers stay
 	const defaults = {
 		alwaysTokens: 2000,
 		alwaysScope: "facts" as const,
-		recallEnabled: false,
-		recallTokens: 400,
-		recallItems: 8,
 	};
 	expect(h.memory.status()).toEqual({
 		enabled: true,
@@ -383,14 +364,12 @@ test("saving the input budget leaves the access policy alone: saved answers stay
 	const before = revision();
 	const status = await h.memory.updateSettings({
 		alwaysTokens: 4000,
-		recallEnabled: true,
 	});
 	expect(status).toEqual({
 		enabled: true,
 		healthy: true,
 		...defaults,
 		alwaysTokens: 4000,
-		recallEnabled: true,
 	});
 	expect(revision()).toBe(before);
 	expect(isCurrent()).toBe(true);
@@ -405,9 +384,6 @@ test("saving the input budget leaves the access policy alone: saved answers stay
 	const rebuilt = await h.window();
 	expect(rebuilt.buildId).not.toBe(built.buildId);
 	expect(rebuilt.inputs.budgetKey).toBe("4000:facts");
-	// The recall settings alone do not touch the window.
-	await h.memory.updateSettings({ recallItems: 4 });
-	expect((await h.window()).buildId).toBe(rebuilt.buildId);
 	// The same values again change nothing.
 	await h.memory.updateSettings({ alwaysTokens: 4000 });
 	expect(revision()).toBe(before);
@@ -417,8 +393,6 @@ test("saving the input budget leaves the access policy alone: saved answers stay
 	expect(h.memory.status()).toMatchObject({
 		enabled: false,
 		alwaysTokens: 4000,
-		recallEnabled: true,
-		recallItems: 4,
 	});
 });
 
@@ -428,9 +402,6 @@ test("the settings schema takes any of the settings, at least one, within their 
 		settingsSchema.safeParse({
 			alwaysTokens: 8000,
 			alwaysScope: "leanings",
-			recallEnabled: true,
-			recallTokens: 0,
-			recallItems: 21,
 		}).success,
 	).toBe(true);
 	for (const bad of [
@@ -438,28 +409,8 @@ test("the settings schema takes any of the settings, at least one, within their 
 		{ alwaysTokens: 199 },
 		{ alwaysTokens: 8001 },
 		{ alwaysScope: "all" },
-		{ recallTokens: 2001 },
-		{ recallItems: 22 },
-		{ recallItems: 1.5 },
 	])
 		expect(settingsSchema.safeParse(bad).success).toBe(false);
-});
-
-test("the consolidation pressure counts the records in force and the alike pairs, again only when a record changed", async () => {
-	const h = await setup();
-	const pressure = () =>
-		h.store.read((db) => h.memory.consolidationPressureInTransaction(db));
-	expect(pressure()).toEqual({ activeItems: 0, similarPairs: 0 });
-	await saved(h, "猫の名前はミル", "cat.name");
-	await saved(h, "飼っている猫の名前はミル", "pet.cat_name");
-	await saved(h, "妹の名前は美咲", "sister.name");
-	expect(pressure()).toEqual({ activeItems: 3, similarPairs: 1 });
-	// Another kind with alike words is not a pair.
-	await saved(h, "猫の名前はミル", "cat.name.habit", { kind: "habit" });
-	expect(pressure()).toEqual({ activeItems: 4, similarPairs: 1 });
-	const first = h.memory.list(true)[0]!;
-	await h.stop(first.id, first.revision);
-	expect(pressure().activeItems).toBe(3);
 });
 
 test("a mark added to a record that stands already takes it out of the published profile at once", async () => {

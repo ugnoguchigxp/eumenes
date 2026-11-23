@@ -3,12 +3,12 @@
 		"persona": "butler, agent name Eumenes, user name ユーザー",
 		"settings": "defaults (emotion on, no interests)",
 		"goal": "goal reply rules and tools added as the always-on reply adds them for a goal-enabled agenda",
-		"steward": "curate-memory step of one remember request, the instructions of the other request steps, the sleep layer's judgement prompts and schemas"
+		"steward": "curate-memory step of one remember request, the instructions of the other request steps"
 	},
 	"elements": {
 		"system.alwaysOn": {
-			"chars": 3451,
-			"tokens": 2896
+			"chars": 3375,
+			"tokens": 2827
 		},
 		"system.alwaysOn.Role": {
 			"chars": 1193,
@@ -23,16 +23,16 @@
 			"tokens": 150
 		},
 		"system.alwaysOn.Input": {
-			"chars": 765,
-			"tokens": 652
+			"chars": 689,
+			"tokens": 583
 		},
 		"system.alwaysOn.Facts": {
 			"chars": 958,
 			"tokens": 859
 		},
 		"system.alwaysOnGoal": {
-			"chars": 3792,
-			"tokens": 3108
+			"chars": 3716,
+			"tokens": 3039
 		},
 		"tools.read": {
 			"chars": 2456,
@@ -127,8 +127,8 @@
 			"tokens": 410
 		},
 		"tool.memory": {
-			"chars": 1536,
-			"tokens": 622
+			"chars": 1490,
+			"tokens": 595
 		},
 		"agency.planSystem": {
 			"chars": 5644,
@@ -151,16 +151,16 @@
 			"tokens": 903
 		},
 		"steward.curateMemory.instructions": {
-			"chars": 2798,
-			"tokens": 2234
+			"chars": 3784,
+			"tokens": 3039
 		},
 		"steward.curateMemory.schema": {
-			"chars": 696,
-			"tokens": 241
+			"chars": 1499,
+			"tokens": 515
 		},
 		"steward.curateMemory.systemSent": {
-			"chars": 3509,
-			"tokens": 2412
+			"chars": 5298,
+			"tokens": 3417
 		},
 		"steward.curateGoals.instructions": {
 			"chars": 1233,
@@ -169,54 +169,6 @@
 		"steward.curateWorld.instructions": {
 			"chars": 2033,
 			"tokens": 1481
-		},
-		"steward.sleep.areas.instructions": {
-			"chars": 425,
-			"tokens": 375
-		},
-		"steward.sleep.areas.schema": {
-			"chars": 281,
-			"tokens": 96
-		},
-		"steward.sleep.dedupe.instructions": {
-			"chars": 672,
-			"tokens": 564
-		},
-		"steward.sleep.dedupe.schema": {
-			"chars": 317,
-			"tokens": 108
-		},
-		"steward.sleep.goals.instructions": {
-			"chars": 577,
-			"tokens": 472
-		},
-		"steward.sleep.goals.schema": {
-			"chars": 412,
-			"tokens": 138
-		},
-		"steward.sleep.prep.instructions": {
-			"chars": 560,
-			"tokens": 485
-		},
-		"steward.sleep.prep.schema": {
-			"chars": 407,
-			"tokens": 140
-		},
-		"steward.sleep.promotion.instructions": {
-			"chars": 1033,
-			"tokens": 831
-		},
-		"steward.sleep.promotion.schema": {
-			"chars": 399,
-			"tokens": 136
-		},
-		"steward.sleep.relations.instructions": {
-			"chars": 746,
-			"tokens": 603
-		},
-		"steward.sleep.relations.schema": {
-			"chars": 353,
-			"tokens": 121
 		}
 	}
 }

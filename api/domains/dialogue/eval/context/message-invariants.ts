@@ -5,11 +5,11 @@
  *
  *  1. The messages are `[system, (user ## Memory), ...recent conversation, user(last)]`, with no two messages of one
  *     role in a row.
- *  2. The last message holds `## State`, then `## Recall` when the turn brings records to mind, then `## Host notice`
+ *  2. The last message holds `## State`, then `## Host notice`
  *     and/or `## User` (the pending utterances, or a host notice when none waits); each input heading once, and only
  *     in its own place.
  *  3. No tag, event number or time of an utterance from the earlier layout reaches the input.
- *  4. `## Memory`, `## Recall` and `## State` stay within their bounds (the memory's setting, when it is given).
+ *  4. `## Memory` and `## State` stay within their bounds (the memory's setting, when it is given).
  */
 import { estimateTextTokens } from "../../../inference";
 import type { GenerateInput } from "../../service/context";
@@ -31,8 +31,8 @@ function sectionOf(content: string, heading: string): string | null {
 /** What breaks the invariants in `input`; empty when the messages are acceptable. */
 export function messageIssues(
 	input: GenerateInput,
-	/** The memory's bounds of `## Memory` and `## Recall`; their size is not checked without them. */
-	budget?: Pick<MemoryInputBudget, "alwaysTokens" | "recallTokens">,
+	/** The memory's bound of `## Memory`; its size is not checked without it. */
+	budget?: Pick<MemoryInputBudget, "alwaysTokens">,
 ): string[] {
 	const issues: string[] = [];
 	const { messages, final } = input;
@@ -63,7 +63,6 @@ export function messageIssues(
 		INPUT_HEADINGS.memory,
 		INPUT_HEADINGS.earlier,
 		INPUT_HEADINGS.state,
-		INPUT_HEADINGS.recall,
 		INPUT_HEADINGS.notice,
 		INPUT_HEADINGS.user,
 	]);
@@ -72,7 +71,7 @@ export function messageIssues(
 	if (new Set(headings).size !== headings.length)
 		issues.push("heading_twice_in_last_message");
 	for (const message of rest.slice(0, -1))
-		if (/^## (State|Recall|User|Host notice)$/m.test(message.content))
+		if (/^## (State|User|Host notice)$/m.test(message.content))
 			issues.push("input_heading_outside_last_message");
 	const all = messages.map((m) => m.content).join("\n");
 	for (const [pattern, issue] of [
@@ -92,22 +91,6 @@ export function messageIssues(
 			budget.alwaysTokens
 	)
 		issues.push("section_over_limit:memory");
-	const recall = sectionOf(body, INPUT_HEADINGS.recall);
-	if (recall !== null) {
-		const at = body.indexOf(`${INPUT_HEADINGS.recall}\n`);
-		const stateAt = body.indexOf(`${INPUT_HEADINGS.state}\n`);
-		if (stateAt < 0 || stateAt > at) issues.push("recall_before_state");
-		for (const later of [INPUT_HEADINGS.notice, INPUT_HEADINGS.user]) {
-			const laterAt = body.indexOf(`${later}\n`);
-			if (laterAt >= 0 && laterAt < at) issues.push("recall_not_before_input");
-		}
-		if (
-			budget &&
-			estimateTextTokens(`${INPUT_HEADINGS.recall}\n${recall}`) >
-				budget.recallTokens
-		)
-			issues.push("section_over_limit:recall");
-	}
 	if (state && estimateTextTokens(state) > STATE_TOKENS)
 		issues.push("section_over_limit:state");
 	return issues;
@@ -117,7 +100,7 @@ export function messageIssues(
 export function assertMessageInvariants(
 	input: GenerateInput,
 	label: string,
-	budget?: Pick<MemoryInputBudget, "alwaysTokens" | "recallTokens">,
+	budget?: Pick<MemoryInputBudget, "alwaysTokens">,
 ): void {
 	const issues = messageIssues(input, budget);
 	if (issues.length)

@@ -7,7 +7,6 @@ import type { GoalAccess, GoalsService } from "../../goals";
 import type { MemoryService } from "../../memory";
 import type { WorldCuration } from "../../world";
 import type { DecisionRefType } from "../repository";
-import type { SleepDeps } from "./sleep/ports";
 import type { WorldViewReader } from "./world-view";
 import type {
 	ChatMessage,
@@ -15,13 +14,13 @@ import type {
 	InferencePort,
 	QueuePort,
 	RunLookup,
+	ClosureStepId,
 	LlmStepId,
-	SleepStepId,
 	UnitSlot,
 } from "../contracts";
 import type { UnitRow, UnitTargets } from "../repository";
 
-/** What the steward uses of memory: the block ledger, the save contract, the forget, the vectors, the Window and the library's access policy. */
+/** What the steward uses of memory: the block ledger, the save contract, the forget, the vectors, the Window and the library's access policy (the closure delete reads what the library holds excluded). */
 type StewardMemory = Pick<
 	MemoryService,
 	| "readyInTransaction"
@@ -29,7 +28,6 @@ type StewardMemory = Pick<
 	| "blockedMessageIdsInTransaction"
 	| "forgetSeqInTransaction"
 	| "applyCurationInTransaction"
-	| "writeTendencyInTransaction"
 	| "closeExclusionInTransaction"
 	| "stateItemsInTransaction"
 	| "forgetInTransaction"
@@ -40,7 +38,6 @@ type StewardMemory = Pick<
 	| "windows"
 	| "publishWindowInTransaction"
 	| "windowPlan"
-	| "consolidationPressureInTransaction"
 >;
 
 /** What the steward calls of World's curation (the World package owns every rule of what becomes a claim). */
@@ -123,12 +120,10 @@ export interface StewardDeps {
 	goals?: StewardGoals;
 	/**
 	 * How long the user's last utterance must be past for a conversation to count as resting: the interval the user
-	 * chose between the agent's own utterances (`agency.speechIntervalSec`), in milliseconds. The sleep layer and the
-	 * World curation start only in a resting conversation.
+	 * chose between the agent's own utterances (`agency.speechIntervalSec`), in milliseconds. The World curation
+	 * starts only in a resting conversation.
 	 */
 	restMs(): number;
-	/** Absent: the sleep layer (shallow and deep consolidation) does not start; the closure delete of a forget still runs. */
-	sleep?: SleepDeps;
 	/** The operational log file the error report reads (`config.logFile`); absent or undefined reads no log. */
 	logFile?(): string | undefined;
 }
@@ -235,25 +230,17 @@ export interface LlmInput {
 	messages: ChatMessage[];
 	startedAt: number;
 }
-/** A sleep-layer unit: it makes its own calls and writes (the library adopts in its own transactions). */
-export interface SleepInput {
-	kind: "sleep";
+/** The closure delete of a forget: it asks no model and takes what prepare fixed as its targets. */
+export interface ClosureInput {
+	kind: "closure";
 	unitId: string;
 	jobId: string;
 	conversationId: string;
-	step: SleepStepDefinition;
-	/** What the step's prepare fixed (the plans it was given, the turns it embeds). */
-	prepared: unknown;
-	/** The memory's forget counter when prepare fenced the unit: a write that finds it moved writes nothing. */
-	forgetSeq: number | null;
-	/** The unit's targets as prepare left them (what the run was made for, the positions a deep run covers). */
+	/** The unit's targets as prepare left them (the excluded requests and the orphaned items it removes). */
 	targets: UnitTargets;
-	/** The job's attempt and generation: the model requests it makes are named after them. */
-	attempt: number;
-	generation: number;
 	startedAt: number;
 }
-export type StewardInput = LlmInput | SleepInput;
+export type StewardInput = LlmInput | ClosureInput;
 export type LlmOutput = {
 	kind: "llm";
 	receipt: ControlReceipt;
@@ -263,40 +250,25 @@ export type LlmOutput = {
 	outputTokens: number | null;
 	durationMs: number;
 };
-export type SleepOutput = {
-	kind: "sleep";
-	/** What the step's run produced (its settle adopts what is still to be written in the unit's transaction). */
-	result: unknown;
-	durationMs: number;
-};
-export type StewardOutput = LlmOutput | SleepOutput;
+export type ClosureOutput = { kind: "closure"; durationMs: number };
+export type StewardOutput = LlmOutput | ClosureOutput;
 
-/** What a sleep step's settle did, for the decision record. */
-export interface SleepSettle {
+/** What the closure delete's settle did, for the decision record. */
+export interface ClosureSettle {
 	/** One entry per kind of change: counts and codes, never text. */
 	results: unknown;
-	/** The unit failed or yielded without being the targets' fault (a code), or null when it was adopted. */
+	/** The unit failed (a code), or null when it was adopted. */
 	failed?: { code: string; count: boolean };
-	/** The unit stood on ground that changed (a forget): nothing is adopted. */
-	stale?: string;
 	refs: ApplyResult["refs"];
 }
-export interface SleepStepDefinition {
-	id: SleepStepId;
+export interface ClosureStepDefinition {
+	id: ClosureStepId;
 	slot: Extract<UnitSlot, "maintenance">;
-	/** The queue's concurrency key: sleep units are serialized with the long-term writers, the closure delete is not. */
-	concurrencyKey: string;
-	/** A unit that does not wait for a conversation run (the closure delete of a forget). */
-	urgent: boolean;
 	prepare(
 		env: StepEnv,
 		unit: UnitRow,
 	):
-		| { status: "ready"; prepared: unknown; targets: UnitTargets }
+		| { status: "ready"; targets: UnitTargets }
 		| { status: "stale"; reason: string };
-	run(
-		input: SleepInput,
-		ctx: { signal: AbortSignal; deps: StewardDeps },
-	): Promise<unknown>;
-	settle(env: StepEnv, input: SleepInput, result: unknown): SleepSettle;
+	settle(env: StepEnv, input: ClosureInput): ClosureSettle;
 }
