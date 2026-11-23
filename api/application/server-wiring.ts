@@ -4,7 +4,10 @@ import type { Capabilities } from "../domains/capabilities";
 import { claudeDaemonClient, claudeRunnerClient } from "../domains/coding";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import type { createContinuityService } from "../domains/continuity";
-import { createDialogueService } from "../domains/dialogue";
+import {
+	createDialogueService,
+	commandInputMessageIdsInTransaction,
+} from "../domains/dialogue";
 import { createGitObservation } from "../domains/git-observation";
 import type { createMemoryService } from "../domains/memory";
 import {
@@ -498,7 +501,13 @@ export async function buildHostToolchainService(
 	const { toolchain, links } = await createHostToolchain({
 		resources: deps.lateResources,
 		canvasAdapter:
-			canvas && createCanvasAdapter(canvas.runtime, canvas.jobs, conversation),
+			canvas &&
+			createCanvasAdapter(
+				canvas.runtime,
+				canvas.jobs,
+				conversation,
+				commandInputMessageIdsInTransaction,
+			),
 		scratch: deps.core.scratch,
 		docling,
 		dotsWork: createDotsWork({

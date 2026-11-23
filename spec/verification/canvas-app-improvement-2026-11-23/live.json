@@ -1,0 +1,44 @@
+{
+  "checkedAt": "2026-11-23T13:39:57.893Z",
+  "conversationId": "canvas-improvement-live-20261123",
+  "jobId": "59da5c50-72ea-41cb-bb96-5392b0eb7201",
+  "runId": "run_jPZm26S421xw",
+  "jobState": "completed",
+  "runState": "presented",
+  "modelCalls": 4,
+  "attempts": 2,
+  "selectedCandidateId": "c_hveAiVY77WpM",
+  "requiredPassed": true,
+  "reviewMode": "judge",
+  "reviewError": null,
+  "verdicts": [
+    {
+      "requirement": "R1",
+      "verdict": "pass"
+    },
+    {
+      "requirement": "R2",
+      "verdict": "unknown"
+    },
+    {
+      "requirement": "R3",
+      "verdict": "unknown"
+    },
+    {
+      "requirement": "R4",
+      "verdict": "pass"
+    },
+    {
+      "requirement": "R5",
+      "verdict": "unknown"
+    }
+  ],
+  "browser": {
+    "candidateVisible": true,
+    "previewVisible": true,
+    "keyboardChanged": true
+  },
+  "saved": false,
+  "manualAcceptance": false,
+  "localNetworkPermissionGranted": true
+}

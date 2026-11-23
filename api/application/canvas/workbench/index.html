@@ -144,7 +144,13 @@
 					<button id="refresh-artworks" type="button">一覧を更新</button>
 				</div>
 				<div id="artworks-status" role="status"></div>
+				<form id="artwork-search" role="search">
+					<label for="artwork-query">作品名で検索</label>
+					<input id="artwork-query" type="search" maxlength="200" />
+					<button type="submit">検索</button>
+				</form>
 				<ul id="artworks" aria-label="作品一覧"></ul>
+				<button id="more-artworks" type="button" hidden>続きを表示</button>
 				<h2>版の履歴</h2>
 				<div id="restore-status" role="status"></div>
 				<div id="revisions-status" role="status"></div>

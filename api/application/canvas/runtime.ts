@@ -2,10 +2,17 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { CanvasService } from "eumenes-canvas/src/core/service";
+import {
+	CanvasService,
+	MAX_FIX_ATTEMPTS,
+	type CandidateAccess,
+} from "eumenes-canvas/src/core/service";
 import { Store } from "eumenes-canvas/src/core/store";
 import { PlaywrightObserver } from "eumenes-canvas/src/core/observer";
 import { PromptMaker } from "eumenes-canvas/src/core/prompt-maker";
+import { PromptEvaluator } from "eumenes-canvas/src/core/prompt-evaluator";
+import { PlaywrightProber } from "eumenes-canvas/src/core/probes";
+import { HostReviewer } from "eumenes-canvas/src/core/host-reviewer";
 import type { InferenceChannel } from "eumenes-canvas/src/core/inference";
 import {
 	PreviewTokens,
@@ -59,7 +66,7 @@ export function makerChannel(
 			const id = await store.write((db) => {
 				signal.throwIfAborted();
 				return capture(db, {
-					subject: `canvas-maker:${randomUUID()}`,
+					subject: `canvas-${request.purpose}:${randomUUID()}`,
 					route: "subagent",
 					deadline: Date.now() + 90_000,
 					maxOutputTokens: 8192,
@@ -84,6 +91,11 @@ export function makerChannel(
 			signal.throwIfAborted();
 			try {
 				if (typeof reply.value === "string") {
+					if (
+						request.maxOutputChars &&
+						reply.value.length > request.maxOutputChars
+					)
+						throw new Error("canvas_invalid_model_output");
 					const checked = validate(JSON.parse(reply.value));
 					if (checked.ok) return checked.value;
 				}
@@ -121,6 +133,7 @@ export function createCanvasRuntime(options: {
 	const tokens = new PreviewTokens();
 	const observationTokens = new PreviewTokens();
 	let service: CanvasService | undefined;
+	let candidateAccess: CandidateAccess | undefined;
 	const listeners: Array<{
 		stop(closeActiveConnections?: boolean): Promise<void>;
 	}> = [];
@@ -137,6 +150,10 @@ export function createCanvasRuntime(options: {
 		},
 		issue: tokens.issue.bind(tokens),
 		ready: () => service !== undefined,
+		setCandidateAccess(access: CandidateAccess) {
+			candidateAccess = access;
+			service?.setCandidateAccess(access);
+		},
 		async start() {
 			const origin = new URL(options.previewOrigin);
 			try {
@@ -189,6 +206,8 @@ export function createCanvasRuntime(options: {
 				observedPreview = `http://127.0.0.1:${observation.port}`;
 				mkdirSync(options.dataDir, { recursive: true, mode: 0o700 });
 				service = new CanvasService({
+					candidateAccess: (run) => candidateAccess?.(run) ?? false,
+					modelCallLimit: (MAX_FIX_ATTEMPTS + 1) * 2,
 					store: new Store(options.dataDir),
 					model: new PromptMaker(
 						makerChannel(options.store, options.inference),
@@ -200,6 +219,21 @@ export function createCanvasRuntime(options: {
 						false,
 					),
 					contract: canvasFile("docs/artwork-contract-v1.md"),
+					review: {
+						mode: "judge",
+						maxReviews: MAX_FIX_ATTEMPTS + 1,
+						reviewer: new HostReviewer(
+							new PlaywrightProber(
+								observedHost,
+								(body) => observationTokens.issue(body),
+								[],
+								false,
+							),
+							new PromptEvaluator(
+								makerChannel(options.store, options.inference),
+							),
+						),
+					},
 				});
 			} catch (error) {
 				await stop();

@@ -88,6 +88,7 @@ test("the authenticated Canvas workbench can produce, preview, save and restore 
 		service,
 		issue: tokens.issue.bind(tokens),
 		ready: () => true,
+		setCandidateAccess: service.setCandidateAccess.bind(service),
 		async start() {},
 		close: () => service.close(),
 	};

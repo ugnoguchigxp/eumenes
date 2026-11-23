@@ -1,0 +1,1187 @@
+diff --git a/package.json b/package.json
+index aee17bd..0660716 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "eumenes-canvas",
+-  "version": "0.1.0",
++  "version": "0.1.2",
+   "private": true,
+   "type": "module",
+   "packageManager": "bun@1.4.4",
+diff --git a/src/core/host-reviewer.ts b/src/core/host-reviewer.ts
+index f44a89c..3feac2e 100644
+--- a/src/core/host-reviewer.ts
++++ b/src/core/host-reviewer.ts
+@@ -41,8 +41,8 @@ export class HostReviewer implements ReviewerPort {
+     this.suite = lab.suite;
+   }
+ 
+-  async review(input: ReviewInput, signal: AbortSignal): Promise<ReviewOutcome> {
+-    if (input.mode === "replay") return this.replay(input, signal);
++  async review(input: ReviewInput, signal: AbortSignal, beforeInference?: (id: string) => Promise<void>): Promise<ReviewOutcome> {
++    if (input.mode === "replay") return this.replay(input, signal, beforeInference);
+     const t0 = performance.now();
+     const report = await this.lab.probe(input.body, input.data, input.spec, signal);
+     const out: ReviewOutcome = { suite: this.suite, environment: report.environment, checks: probeChecks(report), findings: probeFindings(report), verdict: null, evaluatorCalls: 0, ms: 0, error: null };
+@@ -57,6 +57,9 @@ export class HostReviewer implements ReviewerPort {
+     let results: ScriptResult[] = [];
+     if (input.mode === "full") {
+       try {
++        signal.throwIfAborted();
++        await beforeInference?.("plan");
++        signal.throwIfAborted();
+         out.evaluatorCalls++;
+         const raw = await this.evaluator.plan({ request: input.request, conversation: input.conversation, hasBase: !!input.base, spec, probeText: pText }, signal);
+         const plan = normalizePlan(raw, spec);
+@@ -67,11 +70,11 @@ export class HostReviewer implements ReviewerPort {
+         results = [];
+       }
+     }
+-    await this.judge(input, spec, out, pText, results, probeEvidenceIds(report), signal);
++    await this.judge(input, spec, out, pText, results, probeEvidenceIds(report), signal, undefined, beforeInference);
+     return done();
+   }
+ 
+-  private async replay(input: ReviewInput, signal: AbortSignal): Promise<ReviewOutcome> {
++  private async replay(input: ReviewInput, signal: AbortSignal, beforeInference?: (id: string) => Promise<void>): Promise<ReviewOutcome> {
+     const t0 = performance.now();
+     const replay = input.replay;
+     if (!replay?.plan.scripts.length) return failedOutcome(this.suite, "測定できる操作手順がない", 0);
+@@ -87,15 +90,18 @@ export class HostReviewer implements ReviewerPort {
+     const measured = results.some((r) => r.measures.length || r.errors.length);
+     if (!measured) out.error ??= "操作を測定できなかった";
+     if (input.spec && !replay.observeOnly && replay.phase === "initial" && measured) {
+-      await this.judge(input, input.spec, out, "操作手順の測定を参照してください。purpose は制作時の予測です。", results, [], signal, 0);
++      await this.judge(input, input.spec, out, "操作手順の測定を参照してください。purpose は制作時の予測です。", results, [], signal, 0, beforeInference);
+     }
+     out.ms = Math.round(performance.now() - t0);
+     return out;
+   }
+ 
+-  private async judge(input: ReviewInput, spec: MakerSpec, out: ReviewOutcome, pText: string, results: ScriptResult[], observed: string[], signal: AbortSignal, maxRetries?: number) {
++  private async judge(input: ReviewInput, spec: MakerSpec, out: ReviewOutcome, pText: string, results: ScriptResult[], observed: string[], signal: AbortSignal, maxRetries?: number, beforeInference?: (id: string) => Promise<void>) {
+     if (!this.evaluator) return;
+     try {
++      signal.throwIfAborted();
++      await beforeInference?.("judge");
++      signal.throwIfAborted();
+       out.evaluatorCalls++;
+       const evidenceIds = [...observed, ...scriptEvidenceIds(results)];
+       let diffText: string | null = null;
+diff --git a/src/core/observer.ts b/src/core/observer.ts
+index dc54ec5..5117677 100644
+--- a/src/core/observer.ts
++++ b/src/core/observer.ts
+@@ -3,6 +3,7 @@ import type { ArtworkBody } from "../contract/artwork";
+ import { ObservationBrowser, playwrightKey } from "./harness-session";
+ import type { Control } from "./spec";
+ import type { CheckResult, Observation } from "./types";
++import { diffShots, type Shot } from "./pixels";
+ 
+ export interface ObservationResult {
+   environment: string;
+@@ -16,13 +17,19 @@ export interface ObserverPort {
+   close(): Promise<void>;
+ }
+ 
+-/** host-smoke/3：宣言されたキーを実行する。キーの宣言が無い作品には従来の入力を使う。 */
+-export const OBSERVER_SUITE = "host-smoke/3";
++/** 入力あり・なしを同じseedと時刻で比較し、時間だけの変化を操作応答としない。 */
++export const OBSERVER_SUITE = "host-smoke/4";
+ /** 描画領域のクリックの上限。 */
+ export const PAINTED_CLICKS = 16;
+ 
+ type IssueToken = (body: ArtworkBody) => string;
+ 
++export function compareInputRuns(input: readonly Shot[], baseline: readonly Shot[], repeated: readonly Shot[]) {
++  const complete = input.length === baseline.length && baseline.length === repeated.length && input.length > 2;
++  const deterministic = complete && baseline.every((shot, i) => diffShots(shot, repeated[i]).pixels === 0);
++  return { deterministic, responds: deterministic && input.slice(2).some((shot, i) => diffShots(shot, baseline[i + 2]).pixels > 0) };
++}
++
+ /** Playwright（Chromium）で検証ホストのハーネスを開いて観測する。 */
+ export class PlaywrightObserver implements ObserverPort {
+   readonly suite = OBSERVER_SUITE;
+@@ -60,14 +67,18 @@ export class PlaywrightObserver implements ObserverPort {
+       }
+       checks.push({ id: "boot", level: "loaded", pass: true });
+       const frame = page.locator("#frame");
+-      const grab = async () => PNG.sync.read(await frame.screenshot({ scale: "css" }));
++      const takeShot = async () => PNG.sync.read(await frame.screenshot({ scale: "css" }));
++      const shots: Array<{ t: number; shot: Shot }> = [];
++      let elapsed = 0;
++      const advance = async (ms: number) => { await page.evaluate((n) => (window as any).harness.advance(n), ms); elapsed += ms; };
++      const grab = async () => { const shot = await takeShot(); shots.push({ t: elapsed, shot }); return shot; };
+       // 段階ごとに画面を撮り、隣どうしを比べる。実行時エラーは最初に出た段階を残す。
+       let firstErrorPhase: string | null = null;
+       const noteErrors = async (phase: string) => {
+         if (!firstErrorPhase && (await errors()).length) firstErrorPhase = phase;
+       };
+       const s0 = await grab();
+-      await page.evaluate(() => (window as any).harness.advance(1000));
++      await advance(1000);
+       const s1 = await grab();
+       await noteErrors("時間の経過（起動から 1000ms）");
+       const declared = controls.filter((c) => c.kind === "key").map((c) => c.input);
+@@ -81,7 +92,7 @@ export class PlaywrightObserver implements ObserverPort {
+       for (const input of keys) {
+         const k = playwrightKey(input);
+         await page.keyboard.down(k);
+-        await page.evaluate((ms: number) => (window as any).harness.advance(ms), KEY_HOLD_MS);
++        await advance(KEY_HOLD_MS);
+         keyShots.push(await grab()); // 押している間
+         await page.keyboard.up(k);
+         if (declared.length) keyShots.push(await grab());
+@@ -91,30 +102,45 @@ export class PlaywrightObserver implements ObserverPort {
+       await noteErrors(`キー入力（起動から ${keysAt}ms）`);
+       // 画面全体に散らした固定点のクリック（座標は観測の文に書かない）
+       for (let gy = 0; gy < 4; gy++) for (let gx = 0; gx < 6; gx++) await frame.click({ position: { x: 40 + gx * 80, y: 45 + gy * 90 } });
+-      await page.evaluate(() => (window as any).harness.advance(500));
++      await advance(500);
+       const s2 = await grab();
+       await noteErrors(`画面全体のクリック（起動から ${gridAt}ms）`);
+       // 作品が描いた領域（背景色と違う画素のまとまり）の代表点をクリックする
+       const targets = paintedTargets(s2, PAINTED_CLICKS);
+       for (const p of targets) await frame.click({ position: p });
+-      await page.evaluate(() => (window as any).harness.advance(500));
++      await advance(500);
+       const s3 = await grab();
+       await noteErrors(`描画領域のクリック（起動から ${endAt}ms）`);
+       const errs = await errors();
+       const keyDiff = keyShots.slice(1).reduce((a, x, i) => a + diff(keyShots[i], x), 0);
+       const d = [diff(s0, s1), keyDiff, diff(sk, s2), diff(s2, s3)];
+-      const changed = d.some((x) => x > 0);
++      const baseline = async (): Promise<Shot[]> => {
++        const started = await page.evaluate((a: any) => (window as any).harness.startToken(a), { token: this.issue(body), data, seed: 1, clock: "manual", ...(body.runtime === "page" ? { runtime: "page" } : {}) });
++        if (started.type !== "ready") return [];
++        const out: Shot[] = [];
++        let at = 0;
++        for (const capture of shots) {
++          signal.throwIfAborted();
++          if (capture.t > at) await page.evaluate((n) => (window as any).harness.advance(n), capture.t - at);
++          at = capture.t;
++          out.push(await takeShot());
++        }
++        return out;
++      };
++      const comparison = compareInputRuns(shots.map((capture) => capture.shot), await baseline(), await baseline());
++      const changed = comparison.responds;
+       const varied = colors(s2) > 1;
+       const clicked = targets.length ? targets.map((p) => `(${p.x},${p.y})`).join(" ") : "なし（背景以外の描画が見つからない）";
+       const keyLabel = declared.length ? `宣言されたキー（${keys.join("・")}）` : "キー（← → ↑ Space）";
+       const staticMsg =
+-        `起動から ${endAt}ms 観測したが描画が変わらない。段階ごとの差分画素（前の段階の画面との比較）：` +
++        `起動から ${endAt}ms 観測した。段階ごとの差分画素（前の段階の画面との比較）：` +
+         `時間の経過 1000ms（入力なし）で ${d[0]}、${keyLabel}を 1 つずつ ${KEY_HOLD_MS}ms 押し続けている間と離した直後に ${d[1]}、` +
+         `画面全体に散らした ${GRID_CLICKS} 点のクリックのあと 500ms で ${d[2]}、描画のある領域 ${targets.length} 点のクリックのあと 500ms で ${d[3]}。` +
+         `描画領域のクリック座標（CSS px、画面 ${s2.width}×${s2.height}）：${clicked}`;
+       if (errs.length) observations.push({ kind: "runtime-error", message: `${firstErrorPhase ? `[${firstErrorPhase}の段階で発生] ` : ""}${errs.map((e) => e.message).join(" / ")}`.slice(0, 1000) });
+       if (!varied) observations.push({ kind: "blank", message: `キー入力と画面全体のクリックのあと（起動から ${gridAt}ms）の画面が単色 ${hexAt(s2, 0)} のまま` });
+-      if (!changed) observations.push({ kind: "static", message: staticMsg });
++      if (!changed) observations.push({ kind: "static", message: `${comparison.deterministic ? "同じseed・時刻の入力なしの走行との差がありません。" : "入力なしの再現性を確認できず、操作への応答は未確認です。"}${staticMsg}` });
++      checks.push({ id: "input-comparison", level: "operated", pass: comparison.deterministic, detail: comparison.deterministic ? undefined : "同じ初期状態と時刻の比較を確認できませんでした" });
+       checks.push({ id: "no-runtime-error", level: "operated", pass: errs.length === 0, detail: errs[0]?.message });
+       checks.push({ id: "not-blank", level: "operated", pass: varied });
+       checks.push({ id: "responds", level: "operated", pass: changed, detail: changed ? undefined : `差分画素 ${d.join("/")}、描画領域のクリック ${targets.length} 点` });
+diff --git a/src/core/review.ts b/src/core/review.ts
+index 6f5d4d9..9ab0388 100644
+--- a/src/core/review.ts
++++ b/src/core/review.ts
+@@ -44,7 +44,8 @@ export interface ReviewOutcome {
+ }
+ export interface ReviewerPort {
+   readonly suite: string;
+-  review(input: ReviewInput, signal: AbortSignal): Promise<ReviewOutcome>;
++  /** 推論を呼ぶ実装は各呼出しの直前にbeforeInferenceをawaitする。観測だけなら呼ばない。 */
++  review(input: ReviewInput, signal: AbortSignal, beforeInference?: (id: string) => Promise<void>): Promise<ReviewOutcome>;
+   close(): Promise<void>;
+ }
+ 
+diff --git a/src/core/service.ts b/src/core/service.ts
+index 4d2ca27..cd5206d 100644
+--- a/src/core/service.ts
++++ b/src/core/service.ts
+@@ -8,11 +8,15 @@ import type { ObserverPort } from "./observer";
+ import { blockingCount, failedOutcome, findingsAsObservations, type ReviewerPort, type ReviewMode, type ReviewOutcome } from "./review";
+ import { normalizeSpec } from "./spec";
+ import { normalizePlan, type EvalPlan } from "./eval-types";
++import { ArtworkCatalog } from "./artwork-catalog";
+ import type { Store } from "./store";
+-import type { Artwork, Candidate, CheckResult, Observation, Revision, Run, Turn, Verification } from "./types";
++import type { Artwork, Candidate, CheckResult, Observation, Revision, Run, StartRunRequest, Verification } from "./types";
++export type { StartRunRequest, ArtworkBase, Run } from "./types";
+ 
+ export const MAX_FIX_ATTEMPTS = 2; // 初回 1 回＋修正 2 回
+ export const MAX_TURN_INFERENCES = 6; // 複数ターンの制作推論の合計
++export const canAcceptConversation = (turns: readonly { role: string }[]) => turns.filter((turn) => turn.role === "user").length < MAX_TURN_INFERENCES;
++export type CandidateAccess = (run: Readonly<Run>) => boolean;
+ const MAX_CONCURRENT_RUNS = 5;
+ 
+ /** 期限までの残りがこれより短いときは検証を始めない。 */
+@@ -38,6 +42,8 @@ export interface ServiceOptions {
+   contract: string;
+   datasets?: Dataset[];
+   runTimeoutMs?: number;
++  modelCallLimit?: number;
++  candidateAccess?: CandidateAccess;
+   now?: () => number;
+   /** 候補の検証。省略・mode が off なら従来どおり（必須の検査に通った最初の候補を提示する）。 */
+   review?: { reviewer: ReviewerPort; mode: ReviewMode; maxReviews?: number };
+@@ -54,7 +60,10 @@ export class ServiceError extends Error {
+ const id = (p: string) => p + randomBytes(9).toString("base64url");
+ 
+ export class CanvasService {
++  readonly catalog: ArtworkCatalog;
+   private aborts = new Map<string, AbortController>();
++  private guards = new Map<string, () => boolean>();
++  private invalidating = new Map<string, Promise<unknown>>();
+   private timers = new Map<string, ReturnType<typeof setTimeout>>();
+   private closeTask?: Promise<void>;
+   private admitting = 0;
+@@ -64,10 +73,13 @@ export class CanvasService {
+   readonly runTimeoutMs: number;
+   /** 実行中の生成（試験で完了を待つため）。 */
+   readonly inflight = new Map<string, Promise<void>>();
++  private candidateAccess?: CandidateAccess;
+ 
+   constructor(private o: ServiceOptions) {
++    this.candidateAccess = o.candidateAccess;
+     this.now = o.now ?? (() => Date.now());
+     this.runTimeoutMs = o.runTimeoutMs ?? 180_000;
++    this.catalog = new ArtworkCatalog(this, this.now);
+     for (const d of o.datasets ?? []) {
+       if (!checkData(d.data).ok) throw new Error(`データ ${d.ref} が上限を超える`);
+       this.datasets.set(d.ref, d);
+@@ -78,6 +90,15 @@ export class CanvasService {
+     return body.dataRef ? (this.datasets.get(body.dataRef)?.data ?? null) : null;
+   }
+ 
++  setCandidateAccess(access: CandidateAccess) { this.candidateAccess = access; }
++
++  canUseCandidate(owner: string, candidateId: string): boolean {
++    const c = this.o.store.candidates[candidateId];
++    const run = c && this.o.store.runs[c.runId];
++    if (!c || !this.sees(c.owner, owner) || !run || run.state !== "presented" || run.presentedCandidateId !== c.id) return false;
++    try { return this.candidateAccess ? this.candidateAccess(structuredClone(run)) : true; } catch { return false; }
++  }
++
+   /** 記録の所有者が要求者と一致するか。単一利用者モードでは常に真（既存記録の owner は書き換えずに無視する）。 */
+   private sees(recordOwner: string, owner: string): boolean {
+     return !!this.o.singleUser || recordOwner === owner;
+@@ -90,11 +111,27 @@ export class CanvasService {
+   }
+ 
+   // ---- 受付 ----
+-  async startRun(owner: string, session: string, req: { message: string; artworkId?: string | null; conversation?: Turn[] }): Promise<Run> {
++  async startRun(owner: string, session: string, req: StartRunRequest, canAdopt?: () => boolean): Promise<Run> {
+     if (this.closeTask) throw new ServiceError(503, "ホストを終了しています");
+     if (typeof req.message !== "string" || !req.message.trim() || req.message.length > 4000) throw new ServiceError(400, "依頼は 1〜4000 文字");
+-    const conversation = (req.conversation ?? []).slice(-20);
+-    if (conversation.filter((t) => t.role === "user").length >= MAX_TURN_INFERENCES) throw new ServiceError(429, "複数ターンの上限");
++    const conversation = req.conversation ?? [];
++    if (!Array.isArray(conversation) || conversation.length > 20 || conversation.some((t) => !t || !["user", "assistant"].includes(t.role) || typeof t.text !== "string" || !t.text.trim() || t.text.length > 4000))
++      throw new ServiceError(400, "会話の形式または上限", { code: "input-capacity" });
++    if (req.requestKey !== undefined && (typeof req.requestKey !== "string" || !/^[A-Za-z0-9:_-]{1,200}$/.test(req.requestKey)))
++      throw new ServiceError(400, "受付キーの形式");
++    if (req.modelCallLimit !== undefined && (!Number.isSafeInteger(req.modelCallLimit) || req.modelCallLimit < 1)) throw new ServiceError(400, "推論予算の形式");
++    const modelCallLimit = Math.min(req.modelCallLimit ?? Infinity, this.o.modelCallLimit ?? Infinity);
++    const authority = req.authority ?? { kind: "direct" as const };
++    if (authority.kind !== "direct" && (authority.kind !== "external" || typeof authority.ref !== "string" || !authority.ref || authority.ref.length > 200)) throw new ServiceError(400, "採用元の形式");
++    const requestDigest = req.requestKey ? await sha256Hex(JSON.stringify({ session, message: req.message, conversation, artworkId: req.artworkId ?? null, expectedBase: req.expectedBase ?? null, modelCallLimit: Number.isFinite(modelCallLimit) ? modelCallLimit : null, authority })) : undefined;
++    const replay = () => {
++      const prior = req.requestKey ? this.findRunByRequest(owner, req.requestKey) : null;
++      if (prior && prior.requestDigest !== requestDigest) throw new ServiceError(409, "同じ受付キーで別の制作", { code: "request-conflict" });
++      return prior;
++    };
++    const prior = replay();
++    if (prior) return prior;
++    if (!canAcceptConversation(conversation)) throw new ServiceError(429, "複数ターンの上限");
+     const isNew = !req.artworkId;
+     const artworkId = req.artworkId ? this.ownArtwork(owner, req.artworkId).id : id("a_");
+     // 取消済みでも、下流が終了するまで枠を返さない。
+@@ -105,12 +142,19 @@ export class CanvasService {
+     const superseded: string[] = [];
+     let base: Revision | undefined;
+     let run: Run;
++    let fresh = false;
+     try {
+       run = await this.o.store.write((commit) => {
+         if (this.closeTask) throw new ServiceError(503, "ホストを終了しています");
++        const concurrent = replay();
++        if (concurrent) return concurrent;
+         if (!isNew) {
+           const art = this.ownArtwork(owner, artworkId);
+           base = this.o.store.revisionsOf(artworkId).find((r) => r.revision === art.currentRevision);
++          if (req.expectedBase && (base?.revision !== req.expectedBase.revision || base?.digest !== req.expectedBase.digest))
++            throw new ServiceError(409, "編集元の版が変わっています", { code: "conflict", currentRevision: art.currentRevision, expectedRevision: req.expectedBase.revision });
++        } else if (req.expectedBase) {
++          throw new ServiceError(400, "新規制作には編集元の版を指定できません");
+         }
+         return commit(["runs", "sessions"], (s) => {
+           const generation = this.o.store.nextGeneration(s, owner, session, isNew ? "new" : artworkId);
+@@ -139,18 +183,26 @@ export class CanvasService {
+             failure: null,
+             createdAt: this.now(),
+             finishedAt: null,
++            ...(req.requestKey ? { requestKey: req.requestKey, requestDigest } : {}),
++            ...(Number.isFinite(modelCallLimit) ? { modelCallLimit } : {}),
++            modelCalls: 0,
++            modelCallIds: [],
++            authority: structuredClone(authority),
+           };
+           s.runs[run.id] = run;
++          fresh = true;
+           return run;
+         });
+       });
+     } finally {
+       this.admitting--;
+     }
++    if (!fresh) return structuredClone(run);
+     if (this.closeTask) throw new ServiceError(503, "ホストを終了しています");
+     for (const runId of superseded) this.aborts.get(runId)?.abort();
+     const ac = new AbortController();
+     this.aborts.set(run.id, ac);
++    if (canAdopt) this.guards.set(run.id, canAdopt);
+     this.timers.set(run.id, setTimeout(() => this.expire(run.id), Math.max(0, run.deadline - this.now())));
+     const p = this.execute(run.id, base ? structuredClone(base.body) : null, ac.signal).catch(async (error) => {
+       console.error("[canvas] 制作の中断", error);
+@@ -161,7 +213,10 @@ export class CanvasService {
+       }
+     }).finally(async () => {
+       await this.expiring.get(run.id);
++      await this.invalidating.get(run.id);
++      this.invalidating.delete(run.id);
+       this.aborts.delete(run.id);
++      this.guards.delete(run.id);
+       clearTimeout(this.timers.get(run.id));
+       this.timers.delete(run.id);
+       this.inflight.delete(run.id);
+@@ -170,11 +225,24 @@ export class CanvasService {
+     return structuredClone(run);
+   }
+ 
++  /** 成功結果とは独立した受付キーによる照会。再起動後の失敗・取消も追跡できる。 */
++  findRunByRequest(owner: string, requestKey: string): Run | null {
++    const run = Object.values(this.o.store.runs).find((r) => r.owner === owner && r.requestKey === requestKey);
++    return run ? structuredClone(run) : null;
++  }
++
+   /** 実行が受付時の状態のままで、結果を採用できるか。 */
+   private live(runId: string, signal: AbortSignal): boolean {
+     if (signal.aborted) return false;
+     const r = this.o.store.runs[runId];
+     if (!r || r.state !== "running") return false;
++    let allowed = false;
++    try { allowed = this.guards.get(runId)?.() ?? true; } catch { /* 参照の再照合は失敗時に採用しない。 */ }
++    if (!allowed) {
++      this.aborts.get(runId)?.abort();
++      if (!this.invalidating.has(runId)) this.invalidating.set(runId, this.cancelRun(r.owner, runId).catch(() => {}));
++      return false;
++    }
+     if (this.now() > r.deadline) {
+       this.expire(runId);
+       return false;
+@@ -250,6 +318,19 @@ export class CanvasService {
+   }
+ 
+   // ---- 生成・検査・観測・検証 ----
++  private async recordInference(runId: string, callId: string, signal: AbortSignal) {
++    await this.o.store.write((commit) => {
++      if (!this.live(runId, signal)) throw new ServiceError(409, "実行が失効しました");
++      const run = this.o.store.runs[runId];
++      if (run.modelCallIds?.includes(callId)) return;
++      if ((run.modelCalls ?? 0) >= (run.modelCallLimit ?? Infinity)) throw new ServiceError(429, "推論予算を使い切りました", { code: "model-budget" });
++      return commit(["runs"], (s) => {
++        const next = s.runs[runId];
++        (next.modelCallIds ??= []).push(callId);
++        next.modelCalls = (next.modelCalls ?? 0) + 1;
++      });
++    });
++  }
+   // 必須の検査に通った候補を検証し、重い指摘があって試行が残っていれば直させる。
+   // 提示はループのあとに 1 回だけ（必須の検査に通った候補のうち、重い指摘が最も少ないもの。同数なら後の候補）。
+   private async execute(runId: string, base: ArtworkBody | null, signal: AbortSignal) {
+@@ -265,6 +346,8 @@ export class CanvasService {
+     let observations: Observation[] = [];
+     for (let attempt = 0; attempt <= MAX_FIX_ATTEMPTS; attempt++) {
+       if (!this.live(runId, signal)) return;
++      const budget = this.o.store.runs[runId];
++      if ((budget.modelCalls ?? 0) >= (budget.modelCallLimit ?? Infinity)) break;
+       const input: GenerationInput = {
+         request: run.request.message,
+         conversation: run.request.conversation,
+@@ -280,6 +363,8 @@ export class CanvasService {
+         ...(review?.mode === "replay" && !repairPlan && reviewsUsed < maxReviews ? { requestReplay: true } : {}),
+       };
+       let out;
++      await this.recordInference(runId, `maker:${attempt}`, signal);
++      if (!this.live(runId, signal)) return;
+       try {
+         out = await this.o.model.generate(input, signal);
+       } catch (e) {
+@@ -333,7 +418,7 @@ export class CanvasService {
+         } catch (e) {
+           if (!this.live(runId, signal)) return;
+           if (best) return this.present(runId, best.id, signal);
+-          return this.finish(runId, "failed", "観測に失敗: " + (e as Error).message);
++          return this.finish(runId, "failed", "観測に失敗: " + (e as Error).message, "observation-failed");
+         }
+         if (!this.live(runId, signal)) return;
+         dataDigest = data === null ? null : "sha256:" + (await sha256Hex(JSON.stringify(data)));
+@@ -345,7 +430,9 @@ export class CanvasService {
+       }
+       const requiredOk = requiredPassed(checks);
+       let outcome: ReviewOutcome | null = null;
+-      const firstReview = reviewsUsed < maxReviews && run.deadline - this.now() >= REVIEW_MIN_REMAINING_MS;
++      const remainingCalls = (this.o.store.runs[runId].modelCallLimit ?? Infinity) - (this.o.store.runs[runId].modelCalls ?? 0);
++      const reviewCalls = review?.mode === "probes" ? 0 : review?.mode === "full" ? 2 : 1;
++      const firstReview = reviewsUsed < maxReviews && run.deadline - this.now() >= REVIEW_MIN_REMAINING_MS && remainingCalls >= reviewCalls;
+       if (requiredOk && review && (firstReview || repairPlan)) {
+         if (!repairPlan) reviewsUsed++;
+         const plan = review.mode === "replay" ? repairPlan ?? normalizePlan({ scripts: [out.replay] }, candidate.spec ?? null) : undefined;
+@@ -358,6 +445,7 @@ export class CanvasService {
+               ...(plan ? { replay: { plan, phase: repairPlan ? "repair" : "initial" } } : {}),
+             },
+             signal,
++            (id) => this.recordInference(runId, `review:${attempt}:${id}`, signal),
+           );
+         } catch (e) {
+           // 検証の失敗は候補の失敗にしない
+@@ -378,9 +466,10 @@ export class CanvasService {
+       }
+       const verification = this.makeVerification(digest, dataDigest, environment, [...checks, ...(outcome?.checks ?? [])]);
+       candidate.verificationId = verification.id;
+-      const blocking = candidate.review?.blocking ?? 0; // 検証していない候補は重い指摘 0 件として扱う
++      const reviewed = !!candidate.review && !candidate.review.error;
++      const blocking = review && !reviewed ? Number.POSITIVE_INFINITY : candidate.review?.blocking ?? 0;
+       // 重い指摘がなく再生修正でもなければ、この候補が最終候補。検証記録と同時に提示を確定する。
+-      const readyToPresent = verification.requiredPassed && !repairPlan && blocking === 0;
++      const readyToPresent = verification.requiredPassed && !repairPlan && (blocking === 0 || (!best && !reviewed));
+       const recorded = await this.o.store.write((commit) => {
+         if (!this.live(runId, signal)) return false;
+         return commit(["runs", "verifications", "candidates"], (s) => {
+@@ -415,7 +504,10 @@ export class CanvasService {
+     }
+     if (!this.live(runId, signal)) return;
+     if (best) return this.present(runId, best.id, signal);
+-    return this.finish(runId, "failed", "修正の上限（初回＋2 回）に達した");
++    const last = this.o.store.runs[runId];
++    return (last.modelCalls ?? 0) >= (last.modelCallLimit ?? Infinity)
++      ? this.finish(runId, "failed", "制作の推論予算を使い切りました", "model-budget")
++      : this.finish(runId, "failed", "修正の上限（初回＋2 回）に達した", "attempt-limit");
+   }
+ 
+   private present(runId: string, candidateId: string, signal: AbortSignal) {
+@@ -431,13 +523,14 @@ export class CanvasService {
+     run.finishedAt = this.now();
+   }
+ 
+-  private finish(runId: string, state: "failed", failure: string) {
++  private finish(runId: string, state: "failed", failure: string, failureCode = "generation-failed") {
+     return this.o.store.write((commit) => {
+       if (this.closeTask || this.o.store.runs[runId]?.state !== "running") return;
+       return commit(["runs"], (s) => {
+         const next = s.runs[runId];
+         next.state = state;
+         next.failure = failure;
++        next.failureCode = failureCode;
+         next.finishedAt = this.now();
+       });
+     });
+@@ -488,6 +581,7 @@ export class CanvasService {
+       const run = this.o.store.runs[c.runId];
+       if (!run || run.state !== "presented" || run.presentedCandidateId !== c.id)
+         throw new ServiceError(409, "この候補は採用できない状態", { code: "run-" + (run?.state ?? "missing") });
++      if (!this.canUseCandidate(owner, candidateId)) throw new ServiceError(409, "この候補の採用元は無効です", { code: "candidate-unavailable" });
+       const v = c.verificationId ? this.o.store.verifications[c.verificationId] : null;
+       if (!v || !v.requiredPassed) throw new ServiceError(409, "必須の検証に合格していない", { code: "unverified" });
+       if (v.digest !== c.digest || recomputed !== c.digest) throw new ServiceError(409, "検証した digest と一致しない", { code: "digest-mismatch" });
+@@ -579,7 +673,7 @@ export class CanvasService {
+   listArtworks(owner: string) {
+     return Object.values(this.o.store.artworks)
+       .filter((a) => this.sees(a.owner, owner))
+-      .sort((x, y) => y.updatedAt - x.updatedAt)
++      .sort((x, y) => y.updatedAt - x.updatedAt || x.id.localeCompare(y.id))
+       .map((a) => ({ id: a.id, title: a.title, currentRevision: a.currentRevision, updatedAt: a.updatedAt }));
+   }
+ 
+@@ -596,6 +690,7 @@ export class CanvasService {
+     if (src.candidateId) {
+       const c = this.o.store.candidates[src.candidateId];
+       if (!c || !this.sees(c.owner, owner)) throw new ServiceError(404, "候補が見つからない");
++      if (!this.canUseCandidate(owner, src.candidateId)) throw new ServiceError(409, "この候補は利用できません", { code: "candidate-unavailable" });
+       const v = c.verificationId ? this.o.store.verifications[c.verificationId] : null;
+       // 契約の検査と起動を通った候補だけをプレビューできる
+       if (!v || !v.checks.some((k) => k.level === "loaded" && k.pass)) throw new ServiceError(409, "起動を確認していない候補", { code: "not-loaded" });
+diff --git a/src/core/store.ts b/src/core/store.ts
+index 404729e..888adfb 100644
+--- a/src/core/store.ts
++++ b/src/core/store.ts
+@@ -98,6 +98,19 @@ export class Store {
+     return this.writes;
+   }
+ 
++  /** 保持方針を決めるための読取値。本文や作品名は返さず、削除もしない。 */
++  metrics() {
++    return {
++      artworks: Object.keys(this.s.artworks).length,
++      revisions: Object.values(this.s.revisions).reduce((sum, rows) => sum + rows.length, 0),
++      runs: Object.keys(this.s.runs).length,
++      candidates: Object.keys(this.s.candidates).length,
++      verifications: Object.keys(this.s.verifications).length,
++      receipts: Object.keys(this.s.receipts).length,
++      bytes: Buffer.byteLength(JSON.stringify(this.s)),
++    };
++  }
++
+   /** 更新対象だけを複製し、ファイルの置換に成功してから公開する。 */
+   private async commit<K extends Collection, T>(collections: readonly K[], fn: (s: Pick<State, K>) => T): Promise<T> {
+     const next = { ...this.s };
+diff --git a/src/core/types.ts b/src/core/types.ts
+index a395b00..38becb2 100644
+--- a/src/core/types.ts
++++ b/src/core/types.ts
+@@ -59,6 +59,23 @@ export interface Turn {
+   text: string;
+ }
+ 
++/** ホストが提示・受付した編集元。実行時に最新版へ置き換えない。 */
++export interface ArtworkBase {
++  revision: number;
++  digest: string;
++}
++
++export interface StartRunRequest {
++  message: string;
++  artworkId?: string | null;
++  conversation?: Turn[];
++  expectedBase?: ArtworkBase;
++  /** ホスト発行の受付キー。本文のハッシュとともにrun自体へ保存する。 */
++  requestKey?: string;
++  modelCallLimit?: number;
++  authority?: { kind: "direct" } | { kind: "external"; ref: string };
++}
++
+ export interface Run {
+   id: string;
+   owner: string;
+@@ -75,8 +92,15 @@ export interface Run {
+   candidateIds: string[];
+   presentedCandidateId: string | null;
+   failure: string | null;
++  failureCode?: string;
+   createdAt: number;
+   finishedAt: number | null;
++  requestKey?: string;
++  requestDigest?: string;
++  modelCallLimit?: number;
++  modelCalls?: number;
++  modelCallIds?: string[];
++  authority?: StartRunRequest["authority"];
+ }
+ 
+ export interface Candidate {
+diff --git a/src/host/app.js b/src/host/app.js
+index bc0b960..8be97c8 100644
+--- a/src/host/app.js
++++ b/src/host/app.js
+@@ -4,6 +4,7 @@ import { PreviewController, PreviewConnectError, PAGE_WARNING, isChromium, isWeb
+ 
+ const $ = (id) => document.getElementById(id);
+ const cfg = await (await fetch("/api/config")).json();
++if ($("artwork-search")) $("artwork-search").hidden = cfg.artworkSearch !== true;
+ clog("config", { previewOrigin: cfg.previewOrigin, hostOrigin: cfg.hostOrigin, pageOrigin: location.origin });
+ 
+ function rid(n = 12) {
+@@ -25,6 +26,7 @@ sessionStorage.setItem("canvas-session", session);
+ const state = {
+   artworkId: null,
+   currentRevision: 0,
++  currentDigest: null,
+   conversation: [],
+   runId: null,
+   candidate: null,
+@@ -38,6 +40,7 @@ let artworkRequest = 0;
+ let listRequest = 0;
+ let previewRequest;
+ let restoreAttempt;
++let runAttempt;
+ 
+ // quiet: 定期の状態確認など。成功は記録せず、失敗だけ残す
+ async function api(path, { method = "GET", body, quiet = false } = {}) {
+@@ -271,19 +274,22 @@ $("composer").addEventListener("submit", async (e) => {
+   send.disabled = true;
+   input.value = "";
+   addMessage("user", text);
++  if (!runAttempt || runAttempt.text !== text || runAttempt.selection !== selected) runAttempt = { text, selection: selected, requestKey: rid() };
+   let run;
+   try {
+-    run = await api("/api/runs", { method: "POST", body: { message: text, artworkId: state.artworkId, conversation: state.conversation } });
++    run = await api("/api/runs", { method: "POST", body: { message: text, artworkId: state.artworkId, conversation: state.conversation, ...(cfg.inputVersion === 2 ? { requestKey: runAttempt.requestKey, ...(state.artworkId ? { expectedBase: { revision: state.currentRevision, digest: state.currentDigest } } : {}) } : {}) } });
+   } catch (err) {
+     if (selected !== selection) return;
+     if (input.value === "") input.value = draft;
+-    setRunStatus("受け付けられませんでした");
++    if (err.status && err.status < 500) runAttempt = undefined;
++    setRunStatus(err.status ? "受け付けられませんでした" : "受付結果が未確認です。同じ依頼を再送して確認できます");
+     addMessage("assistant", "受け付けられませんでした: " + err.message);
+     return;
+   } finally {
+     if (selected === selection) send.disabled = false;
+   }
+   if (selected !== selection) return;
++  runAttempt = undefined;
+   hideCandidate();
+   state.conversation.push({ role: "user", text });
+   state.runId = run.id;
+@@ -362,16 +368,23 @@ function addLine(ul, className, text) {
+   ul.appendChild(li);
+ }
+ 
+-/** 候補の検証の結果（宣言・判定・指摘）。検証していない候補は隠す。 */
++/** 候補の検証の結果。未実施・判定不能は未確認として残す。 */
+ function showReview(c, run) {
+   const r = c.review;
+-  $("cand-review").hidden = !r;
++  $("cand-review").hidden = false;
++  if (!r) {
++    $("cand-review-head").textContent = "要件の判定は未確認です";
++    $("cand-findings").textContent = "";
++    const list = $("cand-requirements");
++    list.textContent = "";
++    for (const q of c.spec?.requirements ?? []) addLine(list, "unknown", `${q.id} ${q.text} — 未確認`);
++    return;
++  }
+   const reqs = $("cand-requirements");
+   const finds = $("cand-findings");
+   reqs.textContent = "";
+   finds.textContent = "";
+-  if (!r) return;
+-  $("cand-review-head").textContent = (r.mode === "replay" && !r.verdict
++  $("cand-review-head").textContent = (r.error || !r.verdict
+     ? (r.replay?.phase === "repair" ? "修正後の操作を再生・要件の合否は未確認" : "要件の合否は未確認")
+     : `検証（${r.mode}）：要修正 ${r.blocking} 件`) + (r.error ? `／検証の一部が失敗：${r.error}` : "");
+   const requirements = c.spec?.requirements ?? [];
+@@ -413,7 +426,7 @@ function showCandidate(c, run) {
+     ul.appendChild(li);
+   }
+   showReview(c, run);
+-  $("cand-unconfirmed").textContent = c.unconfirmed.length ? "未確認: " + c.unconfirmed.join(" / ") : "未確認: 依頼に沿うかの照合（自動では確定しない）";
++  $("cand-unconfirmed").textContent = c.unconfirmed.length ? "未確認: " + c.unconfirmed.join(" / ") : "未確認事項の申告はありません。要件ごとの確認結果も参照してください。";
+   $("save-status").textContent = "";
+   $("save").disabled = !c.verification?.requiredPassed;
+ }
+@@ -435,7 +448,7 @@ $("save").addEventListener("click", async () => {
+   }
+   void refreshArtworks();
+   if (selected !== selection || state.candidate !== c) return;
+-  showCommittedRevision(saved.artworkId, saved.revision, c.title);
++  showCommittedRevision(saved.artworkId, saved.revision, c.title, saved.digest);
+   $("save-status").textContent = `保存しました（r${saved.revision}）`;
+   await refreshRevisions(saved.artworkId);
+ });
+@@ -454,12 +467,21 @@ function commitFailure(action, err) {
+ }
+ 
+ // ---- 作品一覧・版 ----
+-async function refreshArtworks() {
++let artworkCursor = null;
++async function refreshArtworks(cursor = null) {
+   const request = ++listRequest;
+   const status = $("artworks-status");
+   let list;
+   try {
+-    list = await api("/api/artworks");
++    if (cfg.artworkSearch) {
++      const params = new URLSearchParams({ conversationId: new URLSearchParams(location.search).get("conversationId") || session, query: $("artwork-query")?.value || "" });
++      if (cursor) params.set("cursor", cursor);
++      const page = await api("/api/artwork-search?" + params);
++      list = page.artworks.map((a) => ({ ...a, id: a.artworkId }));
++      if (request !== listRequest) return;
++      artworkCursor = page.nextCursor;
++      $("more-artworks").hidden = !page.hasMore;
++    } else list = await api("/api/artworks");
+     if (!Array.isArray(list)) throw new Error("作品一覧の形式が違います");
+   } catch {
+     if (request === listRequest) status.textContent = "作品一覧を取得できませんでした。作品情報を再取得できます。";
+@@ -468,7 +490,7 @@ async function refreshArtworks() {
+   if (request !== listRequest) return;
+   const ul = $("artworks");
+   const focusedId = ul.contains(document.activeElement) ? document.activeElement.dataset.artworkId : null;
+-  ul.textContent = "";
++  if (!cursor) ul.textContent = "";
+   let focus;
+   for (const a of list) {
+     const li = document.createElement("li");
+@@ -495,16 +517,17 @@ function markSelectedArtwork() {
+   }
+ }
+ 
+-function setCurrentRevision(id, revision, title) {
++function setCurrentRevision(id, revision, title, digest = null) {
++  state.currentDigest = digest;
+   state.artworkId = id;
+   state.currentRevision = revision;
+   $("current").textContent = `${title}（現在 r${revision}）`;
+   markSelectedArtwork();
+ }
+ 
+-function showCommittedRevision(id, revision, title) {
++function showCommittedRevision(id, revision, title, digest) {
+   if (state.artworkId === id && state.currentRevision > revision) return;
+-  setCurrentRevision(id, revision, title);
++  setCurrentRevision(id, revision, title, digest);
+ }
+ 
+ async function loadArtwork(id) {
+@@ -518,7 +541,7 @@ async function loadArtwork(id) {
+     throw err;
+   }
+   if (selected !== selection || request !== artworkRequest) return;
+-  setCurrentRevision(a.id, a.currentRevision, a.title);
++  setCurrentRevision(a.id, a.currentRevision, a.title, a.revisions.find((r) => r.revision === a.currentRevision)?.digest);
+   const ol = $("revisions");
+   ol.textContent = "";
+   for (const r of [...a.revisions].reverse()) {
+@@ -552,6 +575,12 @@ async function refreshRevisions(id) {
+   }
+ }
+ 
++$("artwork-search")?.addEventListener("submit", (event) => {
++  event.preventDefault();
++  void refreshArtworks();
++});
++$("more-artworks")?.addEventListener("click", () => { if (artworkCursor) void refreshArtworks(artworkCursor); });
++
+ $("refresh-artworks").addEventListener("click", () => {
+   void refreshArtworks();
+   if (state.artworkId) void refreshRevisions(state.artworkId);
+@@ -565,6 +594,8 @@ function selectArtwork(id) {
+   }
+   state.artworkId = null;
+   state.currentRevision = 0;
++  state.currentDigest = null;
++  runAttempt = undefined;
+   state.runId = null;
+   state.previewSource = null;
+   restoreAttempt = undefined;
+@@ -622,7 +653,7 @@ async function restore(id, revision, title) {
+   void refreshArtworks();
+   if (selected !== selection) return;
+   restoreAttempt = undefined;
+-  showCommittedRevision(id, restored.revision, title);
++  showCommittedRevision(id, restored.revision, title, restored.digest);
+   status.textContent = `r${revision} を r${restored.revision} として復元しました`;
+   void refreshRevisions(id);
+   await showPreview({ artworkId: id, revision: restored.revision }, `保存版 r${restored.revision}`).catch((err) => {
+diff --git a/src/server/app.ts b/src/server/app.ts
+index 5740628..d624895 100644
+--- a/src/server/app.ts
++++ b/src/server/app.ts
+@@ -152,7 +152,7 @@ export function startApp(opts: AppOptions) {
+           if (ext === ".html" && opts.onPage) Object.assign(headers, opts.onPage(req));
+           return new Response(readFileSync(join(SRC, file), "utf8"), { headers });
+         }
+-        if (url.pathname === "/api/config") return json({ previewOrigin, hostOrigin, ...(opts.directRender ? { directRender: true } : {}), ...(opts.pageMode ? { pageMode: true } : {}) }); // directRender は有効なときだけ（既定の返事の形は変えない）
++        if (url.pathname === "/api/config") return json({ previewOrigin, hostOrigin, inputVersion: 2, ...(opts.directRender ? { directRender: true } : {}), ...(opts.pageMode ? { pageMode: true } : {}) }); // directRender は有効なときだけ（既定の返事の形は変えない）
+         if (url.pathname === "/api/client-log" && req.method === "POST") {
+           // 所有者 cookie は要求しない（cookie が届かない状態の診断にも使う）。Origin の照合は上で済んでいる
+           if (!clientLimiter.hit()) throw new HttpError(429, "診断ログの送信が多すぎる");
+diff --git a/src/server/canvas-app.ts b/src/server/canvas-app.ts
+index 6f53d4f..c06f4dc 100644
+--- a/src/server/canvas-app.ts
++++ b/src/server/canvas-app.ts
+@@ -29,13 +29,15 @@ function revisionNumber(value: unknown, name: string, min: number): number {
+ }
+ 
+ function conversationOf(value: unknown): Turn[] {
+-  if (!Array.isArray(value)) return [];
++  if (value === undefined) return [];
++  if (!Array.isArray(value)) throw new HttpError(400, "conversation は配列");
+   const turns: Turn[] = [];
+   for (const item of value) {
+-    if (!item || typeof item !== "object") continue;
++    if (!item || typeof item !== "object") throw new HttpError(400, "conversation の形式");
+     const { role, text } = item as Record<string, unknown>;
+     if ((role === "user" || role === "assistant") && typeof text === "string")
+-      turns.push({ role, text: text.slice(0, 4000) });
++      turns.push({ role, text });
++    else throw new HttpError(400, "conversation の形式");
+   }
+   return turns;
+ }
+@@ -78,10 +80,13 @@ export function startCanvasApp(o: CanvasAppOptions) {
+           const session = req.headers.get("x-canvas-session") ?? "";
+           if (!SESSION_RE.test(session)) throw new HttpError(400, "x-canvas-session がない");
+           const b = await readJsonObject(req);
++          const expected = b.expectedBase as Record<string, unknown> | undefined;
+           return json(await svc.startRun(owner, session, {
+             message: requiredString(b.message, "message"),
+             artworkId: b.artworkId == null ? null : requiredString(b.artworkId, "artworkId"),
+             conversation: conversationOf(b.conversation),
++            requestKey: b.requestKey === undefined ? undefined : requiredString(b.requestKey, "requestKey"),
++            expectedBase: expected === undefined ? undefined : { revision: revisionNumber(expected?.revision, "expectedBase.revision", 1), digest: requiredString(expected?.digest, "expectedBase.digest") },
+           }), 201);
+         }
+         if (parts[1] === "runs" && parts.length === 3 && m === "GET") return json(svc.getRun(owner, parts[2]));
+diff --git a/tests/unit/observer.test.ts b/tests/unit/observer.test.ts
+index e63a48e..3956b38 100644
+--- a/tests/unit/observer.test.ts
++++ b/tests/unit/observer.test.ts
+@@ -107,9 +107,9 @@ test("押している間だけ変わる作品も、キーを押し続ける段
+   expect(r.checks.find((c) => c.id === "responds")?.pass).toBe(true);
+ }, 60_000);
+ 
+-test("suite は host-smoke/3", () => {
++test("suite は host-smoke/4", () => {
+   expect(observer.suite).toBe(OBSERVER_SUITE);
+-  expect(OBSERVER_SUITE).toBe("host-smoke/3");
++  expect(OBSERVER_SUITE).toBe("host-smoke/4");
+ });
+ 
+ test("制作担当が宣言したキーを通常の候補提示で入力する", async () => {
+diff --git a/tests/unit/review-loop.test.ts b/tests/unit/review-loop.test.ts
+index 00a68e4..42c0525 100644
+--- a/tests/unit/review-loop.test.ts
++++ b/tests/unit/review-loop.test.ts
+@@ -38,8 +38,10 @@ class FakeReviewer implements ReviewerPort {
+   inputs: ReviewInput[] = [];
+   closed = false;
+   constructor(private seq: (ReviewFinding[] | "throw")[]) {}
+-  async review(input: ReviewInput): Promise<ReviewOutcome> {
++  async review(input: ReviewInput, _signal: AbortSignal, beforeInference?: (id: string) => Promise<void>): Promise<ReviewOutcome> {
+     this.inputs.push(input);
++    await beforeInference?.("plan");
++    await beforeInference?.("judge");
+     const f = this.seq[Math.min(this.inputs.length - 1, this.seq.length - 1)];
+     if (f === "throw") throw new Error("reviewer crashed");
+     const ok = f.length === 0;
+@@ -171,7 +173,7 @@ describe("制作のループと検証", () => {
+     const r = await t.run();
+     expect(t.reviewer.inputs.length).toBe(1);
+     expect(r.candidates[1].review).toBeNull();
+-    expect(r.presentedCandidateId).toBe(r.candidates[1].id);
++    expect(r.presentedCandidateId).toBe(r.candidates[0].id);
+   });
+ 
+   test("期限が近い", async () => {
+diff --git a/tests/unit/service.test.ts b/tests/unit/service.test.ts
+index eb1fd16..e6da8c4 100644
+--- a/tests/unit/service.test.ts
++++ b/tests/unit/service.test.ts
+@@ -249,6 +249,7 @@ describe("失敗・取消・期限・撤回", () => {
+     const dir = mkdtempSync(join(tmpdir(), "canvas-run-io-"));
+     const blocked = join(dir, "store.json.tmp");
+     const generated = Promise.withResolvers<void>();
++    const entered = Promise.withResolvers<void>();
+     let first = true;
+     const svc = new CanvasService({
+       store: new Store(dir),
+@@ -260,6 +261,7 @@ describe("失敗・取消・期限・撤回", () => {
+         async generate(_input, signal) {
+           if (first) {
+             first = false;
++            entered.resolve();
+             if (stage === "deadline")
+               signal.addEventListener("abort", () => generated.resolve(), { once: true });
+             await generated.promise;
+@@ -272,6 +274,7 @@ describe("失敗・取消・期限・撤回", () => {
+     try {
+       const run = await svc.startRun(A, S1, req);
+       const running = svc.inflight.get(run.id);
++      await entered.promise;
+       mkdirSync(blocked);
+       if (stage === "generation") generated.resolve();
+       await expect(running).resolves.toBeUndefined();
+diff --git a/src/core/artwork-catalog.ts b/src/core/artwork-catalog.ts
+new file mode 100644
+index 0000000..2a1537e
+--- /dev/null
++++ b/src/core/artwork-catalog.ts
+@@ -0,0 +1,65 @@
++import { createHash, randomBytes } from "node:crypto";
++import { ServiceError, type CanvasService } from "./service";
++import type { ArtworkBase } from "./types";
++
++type Target = { owner: string; scope: string; artworkId: string; expectedBase: ArtworkBase; expiresAt: number };
++
++/** 会話に提示した対象と版の参照。制作受付後はジョブが編集元を保持する。 */
++export class ArtworkCatalog {
++  private targets = new Map<string, Target>();
++  private shown = new Map<string, { refs: string[]; hasMore: boolean; nextCursor: string | null; expiresAt: number }>();
++  constructor(private service: CanvasService, private now = () => Date.now()) {}
++
++  page(owner: string, scope: string, input: { query?: string; cursor?: string } = {}) {
++    const query = (input.query ?? "").normalize("NFKC").toLocaleLowerCase();
++    if (query.length > 200) throw new ServiceError(400, "検索語の上限");
++    const rows = this.service.listArtworks(owner).filter((a) => a.title.normalize("NFKC").toLocaleLowerCase().includes(query));
++    const fingerprint = createHash("sha256").update(JSON.stringify(rows)).digest("hex");
++    let offset = 0;
++    if (input.cursor) {
++      let cursor;
++      try { cursor = JSON.parse(Buffer.from(input.cursor, "base64url").toString("utf8")); }
++      catch { throw new ServiceError(400, "ページ参照の形式"); }
++      if (!cursor || typeof cursor !== "object" || Array.isArray(cursor)) throw new ServiceError(400, "ページ参照の形式");
++      if (cursor.fingerprint !== fingerprint || cursor.query !== query) throw new ServiceError(409, "一覧が更新されました。検索し直してください", { code: "catalog-changed" });
++      if (!Number.isSafeInteger(cursor.offset) || cursor.offset < 0 || cursor.offset > rows.length) throw new ServiceError(400, "ページ参照の範囲");
++      offset = cursor.offset;
++    }
++    for (const [ref, target] of this.targets) if (target.expiresAt <= this.now()) this.targets.delete(ref);
++    const page = rows.slice(offset, offset + 25);
++    if (this.targets.size + page.length > 2048) throw new ServiceError(429, "対象参照の上限。しばらく待って検索し直してください");
++    const artworks = page.map((a) => {
++      const revision = this.service.getArtwork(owner, a.id).revisions.find((r) => r.revision === a.currentRevision)!;
++      const targetRef = "ct_" + randomBytes(12).toString("base64url");
++      this.targets.set(targetRef, { owner, scope, artworkId: a.id, expectedBase: { revision: revision.revision, digest: revision.digest }, expiresAt: this.now() + 180_000 });
++      return { artworkId: a.id, title: a.title, currentRevision: a.currentRevision, targetRef };
++    });
++    const scopeKey = JSON.stringify([owner, scope]);
++    const hasMore = offset + page.length < rows.length;
++    const nextCursor = hasMore ? Buffer.from(JSON.stringify({ fingerprint, query, offset: offset + page.length })).toString("base64url") : null;
++    this.shown.set(scopeKey, { refs: artworks.map((a) => a.targetRef), hasMore, nextCursor, expiresAt: this.now() + 180_000 });
++    for (const [key, value] of this.shown) if (value.expiresAt <= this.now()) this.shown.delete(key);
++    return { artworks, hasMore, nextCursor };
++  }
++
++  snapshot(owner: string, scope: string) {
++    const shown = this.shown.get(JSON.stringify([owner, scope]));
++    if (!shown || shown.expiresAt <= this.now()) return this.page(owner, scope);
++    const artworks = shown.refs.flatMap((ref) => {
++      const target = this.targets.get(ref);
++      if (!target || target.expiresAt <= this.now()) return [];
++      const a = this.service.getArtwork(owner, target.artworkId);
++      return [{ artworkId: a.id, title: a.title, currentRevision: target.expectedBase.revision, targetRef: ref }];
++    });
++    return { artworks, hasMore: shown.hasMore, nextCursor: shown.nextCursor };
++  }
++
++  resolve(owner: string, scope: string, ref: string) {
++    const target = this.targets.get(ref);
++    if (!target || target.owner !== owner || target.scope !== scope || target.expiresAt <= this.now()) throw new ServiceError(409, "対象参照が失効しました。作品を選び直してください", { code: "target-expired" });
++    const current = this.service.getArtwork(owner, target.artworkId);
++    const base = current.revisions.find((r) => r.revision === current.currentRevision);
++    if (base?.revision !== target.expectedBase.revision || base?.digest !== target.expectedBase.digest) throw new ServiceError(409, "編集元の版が変わっています", { code: "conflict", currentRevision: current.currentRevision, expectedRevision: target.expectedBase.revision });
++    return { artworkId: target.artworkId, expectedBase: { ...target.expectedBase } };
++  }
++}
+diff --git a/tests/unit/inference-accounting.test.ts b/tests/unit/inference-accounting.test.ts
+new file mode 100644
+index 0000000..ec96157
+--- /dev/null
++++ b/tests/unit/inference-accounting.test.ts
+@@ -0,0 +1,68 @@
++import { expect, test } from "bun:test";
++import { mkdtempSync, rmSync } from "node:fs";
++import { join } from "node:path";
++import { tmpdir } from "node:os";
++import { CanvasService } from "../../src/core/service";
++import { Store } from "../../src/core/store";
++import { HostReviewer } from "../../src/core/host-reviewer";
++import { FakeObserver } from "./support";
++import { report } from "./probe-fixtures";
++
++const output = { body: { title: "fixture", entry: "canvasApp.start(() => ({}));" }, changes: "", unconfirmed: [], reply: "", spec: { requirements: ["入力応答"], controls: [] } };
++
++test.each(["cancel", "expiry", "failure"] as const)("判定開始後の%sでも推論2回を永続記録する", async (end) => {
++  const dir = mkdtempSync(join(tmpdir(), "canvas-accounting-"));
++  let now = 1, calls = 0;
++  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
++  const reviewer = new HostReviewer({ suite: "fixture", async probe() { return report(); }, async runScripts() { return []; }, async close() {} },
++    { label: "fixture", async plan() { throw new Error("unused"); }, async judge() { calls++; entered.resolve(); await release.promise; return { verdicts: [], issues: [], summary: "" }; } });
++  const service = new CanvasService({ store: new Store(dir), model: { label: "fixture", async generate() { return structuredClone(output); } }, observer: new FakeObserver(), contract: "fixture", now: () => now, review: { mode: "judge", reviewer } });
++  try {
++    const run = await service.startRun("owner", "session", { message: "request", modelCallLimit: 2 });
++    await entered.promise;
++    if (end === "cancel") await service.cancelRun("owner", run.id);
++    if (end === "expiry") now = run.deadline + 1;
++    if (end === "failure") release.reject(new Error("fixture judge failure")); else release.resolve();
++    await service.drain();
++    const result = service.getRun("owner", run.id);
++    expect(calls).toBe(1);
++    expect(result.modelCalls).toBe(2);
++    expect(result.state).toBe(end === "cancel" ? "cancelled" : end === "expiry" ? "expired" : "presented");
++    const stored = new Store(dir).runs[run.id];
++    expect(stored.modelCalls).toBe(2);
++    expect(stored.modelCallIds).toEqual(["maker:0", "review:0:judge"]);
++  } finally { release.resolve(); await service.close(); rmSync(dir, { recursive: true, force: true }); }
++});
++
++test("観測中に取り消したときは、開始していない判定を数えない", async () => {
++  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>(); let calls = 0;
++  const reviewer = new HostReviewer({ suite: "fixture", async probe() { entered.resolve(); await release.promise; return report(); }, async runScripts() { return []; }, async close() { release.resolve(); } },
++    { label: "fixture", async plan() { throw new Error("unused"); }, async judge() { calls++; return { verdicts: [] }; } });
++  const service = new CanvasService({ store: new Store(null), contract: "fixture", model: { label: "fixture", async generate() { return structuredClone(output); } }, observer: new FakeObserver(), review: { mode: "judge", reviewer } });
++  try {
++    const run = await service.startRun("owner", "session", { message: "request" });
++    await entered.promise; await service.cancelRun("owner", run.id); release.resolve(); await service.drain();
++    expect(calls).toBe(0); expect(service.getRun("owner", run.id).modelCalls).toBe(1);
++  } finally { release.resolve(); await service.close(); }
++});
++
++test("呼出開始の通知は冪等で、候補保存時に二重計上しない", async () => {
++  const service = new CanvasService({ store: new Store(null), contract: "fixture", model: { label: "fixture", async generate() { return structuredClone(output); } }, observer: new FakeObserver(),
++    review: { mode: "judge", reviewer: { suite: "fixture", async review(_input, _signal, before) { await before!("judge"); await before!("judge"); return { suite: "fixture", environment: "fixture", checks: [], findings: [], verdict: null, evaluatorCalls: 1, ms: 0, error: null }; }, async close() {} } } });
++  try {
++    const run = await service.startRun("owner", "session", { message: "request", modelCallLimit: 2 }); await service.drain();
++    expect(service.getRun("owner", run.id)).toMatchObject({ state: "presented", modelCalls: 2 });
++  } finally { await service.close(); }
++});
++
++test("計上を書き込めなければ判定を開始しない", async () => {
++  const store = new Store(null); const write = store.write.bind(store);
++  let calls = 0;
++  const reviewer = new HostReviewer({ suite: "fixture", async probe() { store.write = async () => { throw new Error("fixture ledger write failure"); }; return report(); }, async runScripts() { return []; }, async close() {} },
++    { label: "fixture", async plan() { throw new Error("unused"); }, async judge() { calls++; return { verdicts: [] }; } });
++  const service = new CanvasService({ store, contract: "fixture", model: { label: "fixture", async generate() { return structuredClone(output); } }, observer: new FakeObserver(), review: { mode: "judge", reviewer } });
++  try {
++    const run = await service.startRun("owner", "session", { message: "request" }); await service.drain();
++    expect(calls).toBe(0); expect(service.getRun("owner", run.id).modelCalls).toBe(1);
++  } finally { store.write = write; await service.close(); }
++});
+diff --git a/tests/unit/production-regressions.test.ts b/tests/unit/production-regressions.test.ts
+new file mode 100644
+index 0000000..37c595d
+--- /dev/null
++++ b/tests/unit/production-regressions.test.ts
+@@ -0,0 +1,138 @@
++import { expect, test } from "bun:test";
++import { mkdtempSync, rmSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { CanvasService } from "../../src/core/service";
++import { Store } from "../../src/core/store";
++import { ArtworkCatalog } from "../../src/core/artwork-catalog";
++import { compareInputRuns } from "../../src/core/observer";
++import { FakeObserver } from "./support";
++
++function fixture(dataDir: string | null = null) {
++  let calls = 0;
++  const store = new Store(dataDir);
++  const service = new CanvasService({ store, contract: "contract", observer: new FakeObserver(), model: { label: "fixture", async generate(input) {
++    calls++;
++    return { body: { title: input.request, entry: "canvasApp.start(() => ({}));" }, changes: "", unconfirmed: [], reply: "" };
++  } } });
++  async function save(message: string, artworkId?: string, expectedRevision = 0) {
++    const run = await service.startRun("owner", "s-" + message, { message, artworkId });
++    await service.drain();
++    const completed = service.getRun("owner", run.id);
++    return (await service.save("owner", completed.presentedCandidateId!, { expectedRevision, idempotencyKey: "save_" + message })).result as { artworkId: string; revision: number; digest: string };
++  }
++  return { store, service, save, calls: () => calls };
++}
++
++test("受付キーの同時再送は一つのrunだけを作り、別入力の再送は拒否する", async () => {
++  const f = fixture();
++  try {
++    const req = { message: "new_work", requestKey: "host-request" };
++    const runs = await Promise.all([f.service.startRun("owner", "session", req), f.service.startRun("owner", "session", req)]);
++    await f.service.drain();
++    expect(runs[0].id).toBe(runs[1].id);
++    expect(f.calls()).toBe(1);
++    await expect(f.service.startRun("owner", "session", { ...req, message: "other" })).rejects.toMatchObject({ status: 409, extra: { code: "request-conflict" } });
++    expect(f.service.findRunByRequest("other-owner", req.requestKey)).toBeNull();
++  } finally { await f.service.close(); }
++});
++
++test("受付した編集元が変わると、制作推論を呼ぶ前に競合を返す", async () => {
++  const f = fixture();
++  try {
++    const first = await f.save("revision_one");
++    await f.save("revision_two", first.artworkId, 1);
++    const calls = f.calls();
++    await expect(f.service.startRun("owner", "edit", { message: "edit", artworkId: first.artworkId, expectedBase: { revision: 1, digest: first.digest } })).rejects.toMatchObject({ status: 409, extra: { code: "conflict", currentRevision: 2 } });
++    expect(f.calls()).toBe(calls);
++  } finally { await f.service.close(); }
++});
++
++test("生成中に参照が失効した場合、遅い結果を候補として採用しない", async () => {
++  let valid = true;
++  const reply = Promise.withResolvers<void>();
++  const entered = Promise.withResolvers<void>();
++  const service = new CanvasService({ store: new Store(null), contract: "contract", observer: new FakeObserver(), model: { label: "fixture", async generate() { entered.resolve(); await reply.promise; return { body: { title: "fixture", entry: "canvasApp.start(() => ({}));" }, changes: "", unconfirmed: [], reply: "" }; } } });
++  try {
++    const run = await service.startRun("owner", "session", { message: "request" }, () => valid);
++    await entered.promise;
++    valid = false;
++    reply.resolve();
++    await service.drain();
++    expect(service.getRun("owner", run.id)).toMatchObject({ state: "cancelled", candidateIds: [] });
++  } finally { reply.resolve(); await service.close(); }
++});
++
++test("再起動した保存先から受付キーで失敗runを照会でき、再送で制作し直さない", async () => {
++  const dir = mkdtempSync(join(tmpdir(), "canvas-request-recovery-"));
++  const first = fixture(dir);
++  try {
++    const run = await first.service.startRun("owner", "session", { message: "request", requestKey: "recover-request" });
++    await first.service.drain();
++    await first.store.write((commit) => commit(["runs"], (state) => { state.runs[run.id].state = "running"; }));
++    await first.service.close();
++    const recovered = fixture(dir);
++    try {
++      expect(recovered.service.findRunByRequest("owner", "recover-request")).toMatchObject({ id: run.id, state: "failed" });
++      expect((await recovered.service.startRun("owner", "session", { message: "request", requestKey: "recover-request" })).id).toBe(run.id);
++      expect(recovered.calls()).toBe(0);
++    } finally { await recovered.service.close(); }
++  } finally { await first.service.close(); rmSync(dir, { recursive: true, force: true }); }
++});
++
++test("古い作品へページと検索で到達し、対象の会話・有効期限・版を照合する", async () => {
++  const f = fixture();
++  try {
++    for (let n = 0; n < 26; n++) await f.save(`work_${String(n).padStart(2, "0")}`);
++    let now = 1;
++    const catalog = new ArtworkCatalog(f.service, () => now);
++    const first = catalog.page("owner", "conversation");
++    expect(first.artworks).toHaveLength(25);
++    expect(first.hasMore).toBe(true);
++    const second = catalog.page("owner", "conversation", { cursor: first.nextCursor! });
++    expect(new Set([...first.artworks, ...second.artworks].map((a) => a.artworkId)).size).toBe(26);
++    const [target] = catalog.page("owner", "conversation", { query: "work_00" }).artworks;
++    expect(catalog.resolve("owner", "conversation", target.targetRef).artworkId).toBe(target.artworkId);
++    expect(() => catalog.resolve("owner", "different", target.targetRef)).toThrow();
++    expect(catalog.page("owner", "conversation", { query: "absent" }).artworks).toEqual([]);
++    expect(catalog.snapshot("owner", "conversation").hasMore).toBe(false);
++    expect(() => catalog.page("owner", "conversation", { cursor: Buffer.from("null").toString("base64url") })).toThrow("ページ参照の形式");
++    await f.save("updated_work", target.artworkId, 1);
++    expect(() => catalog.resolve("owner", "conversation", target.targetRef)).toThrow("編集元の版");
++    expect(() => catalog.page("owner", "conversation", { cursor: first.nextCursor! })).toThrow("一覧が更新");
++    now += 180_001;
++    expect(() => catalog.resolve("owner", "conversation", first.artworks[0].targetRef)).toThrow("失効");
++  } finally { await f.service.close(); }
++});
++
++test("入力なしと同じ時間変化だけでは応答とせず、再現できる入力の差だけを採用する", () => {
++  const shot = (n: number) => ({ width: 1, height: 1, data: Uint8Array.of(n, 0, 0, 255) });
++  const baseline = [shot(0), shot(1), shot(2), shot(3)];
++  expect(compareInputRuns(baseline, baseline, baseline)).toEqual({ deterministic: true, responds: false });
++  expect(compareInputRuns([shot(0), shot(1), shot(8), shot(3)], baseline, baseline)).toEqual({ deterministic: true, responds: true });
++  expect(compareInputRuns([shot(0), shot(1), shot(8), shot(3)], baseline, [shot(0), shot(1), shot(9), shot(3)])).toEqual({ deterministic: false, responds: false });
++  expect(compareInputRuns(baseline, [], baseline).responds).toBe(false);
++});
++
++test("失敗した制作推論も呼出数へ数える", async () => {
++  const service = new CanvasService({ store: new Store(null), contract: "contract", observer: new FakeObserver(), model: { label: "fixture", async generate() { throw new Error("fixture_failure"); } } });
++  try {
++    const run = await service.startRun("owner", "session", { message: "request", modelCallLimit: 1 });
++    await service.drain();
++    expect(service.getRun("owner", run.id)).toMatchObject({ state: "failed", modelCalls: 1 });
++  } finally { await service.close(); }
++});
++
++test("親からの呼出予算を超えて生成・判定を続けない", async () => {
++  let makerCalls = 0, judgeCalls = 0;
++  const service = new CanvasService({ store: new Store(null), contract: "contract", observer: new FakeObserver(),
++    model: { label: "fixture", async generate() { makerCalls++; return { body: { title: "fixture", entry: "canvasApp.start(() => ({}));" }, changes: "", unconfirmed: [], reply: "" }; } },
++    review: { mode: "judge", reviewer: { suite: "fixture", async review(_input, _signal, beforeInference) { await beforeInference?.("judge"); judgeCalls++; return { suite: "fixture", environment: "fixture", checks: [], findings: [{ source: "evaluator", severity: "blocking", id: "fixture", message: "要修正" }], verdict: null, evaluatorCalls: 1, ms: 1, error: null }; }, async close() {} } },
++  });
++  try {
++    const run = await service.startRun("owner", "session", { message: "request", modelCallLimit: 2 });
++    await service.drain();
++    expect([makerCalls, judgeCalls]).toEqual([1, 1]);
++    expect(service.getRun("owner", run.id)).toMatchObject({ state: "presented", modelCalls: 2 });
++  } finally { await service.close(); }
++});

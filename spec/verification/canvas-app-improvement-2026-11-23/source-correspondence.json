@@ -1,0 +1,196 @@
+{
+  "baseCommit": "efdc102bcdc069c56c9b2e2610e4b8c4350f3022",
+  "files": {
+    "api/application/canvas/adapter.ts": {
+      "verifiedCopy": "f3a52ea5616dee4fcfd052dbb3678f179124e06c753b5ea1a80bb879bc5f5092",
+      "workspace": "f3a52ea5616dee4fcfd052dbb3678f179124e06c753b5ea1a80bb879bc5f5092",
+      "matches": true
+    },
+    "api/application/canvas/canvas-browser.fixture.ts": {
+      "verifiedCopy": "0aefab3d0c5b5c638f9b5f5c486ab1d46123e01bddba15b9ab1ee8daa42aecdb",
+      "workspace": "0aefab3d0c5b5c638f9b5f5c486ab1d46123e01bddba15b9ab1ee8daa42aecdb",
+      "matches": true
+    },
+    "api/application/canvas/canvas-input.test.ts": {
+      "verifiedCopy": "38781cc0037a56c239c26f5add0d5d60d4e0cd1a4cbf703684f8bd6be36aae43",
+      "workspace": "38781cc0037a56c239c26f5add0d5d60d4e0cd1a4cbf703684f8bd6be36aae43",
+      "matches": true
+    },
+    "api/application/canvas/canvas-jobs.test.ts": {
+      "verifiedCopy": "979c5412930b2d162e83dde36fd515562cd6e0cbe41c8dc3a77a5581c62dd6f3",
+      "workspace": "979c5412930b2d162e83dde36fd515562cd6e0cbe41c8dc3a77a5581c62dd6f3",
+      "matches": true
+    },
+    "api/application/canvas/canvas-registration.test.ts": {
+      "verifiedCopy": "5ceb42beab06ea7cb0f3a28bf25b35ee2be4cc1a6172ea94716a646dee987284",
+      "workspace": "5ceb42beab06ea7cb0f3a28bf25b35ee2be4cc1a6172ea94716a646dee987284",
+      "matches": true
+    },
+    "api/application/canvas/canvas-workbench.test.ts": {
+      "verifiedCopy": "acdd2664a67c02e1bd2b4b7961183373037d6dd90be7032295c6ae54a220557c",
+      "workspace": "acdd2664a67c02e1bd2b4b7961183373037d6dd90be7032295c6ae54a220557c",
+      "matches": true
+    },
+    "api/application/canvas/canvas.fixture.ts": {
+      "verifiedCopy": "95f0f96f9f4e193c710fca08f2737ee7753686f63eabbe1357e0289f5f316fe5",
+      "workspace": "95f0f96f9f4e193c710fca08f2737ee7753686f63eabbe1357e0289f5f316fe5",
+      "matches": true
+    },
+    "api/application/canvas/canvas.test.ts": {
+      "verifiedCopy": "53e9d9be92ab98b275a891e8402e6b4d5e1213f47a36f0101f720dd28628c5b6",
+      "workspace": "53e9d9be92ab98b275a891e8402e6b4d5e1213f47a36f0101f720dd28628c5b6",
+      "matches": true
+    },
+    "api/application/canvas/input.ts": {
+      "verifiedCopy": "b8a18654892fe0d57954cbef7861543c24b838e500b904cd23179049b7fc6b03",
+      "workspace": "b8a18654892fe0d57954cbef7861543c24b838e500b904cd23179049b7fc6b03",
+      "matches": true
+    },
+    "api/application/canvas/jobs.ts": {
+      "verifiedCopy": "626005719634222d9b1a6d2af8f5e6ea0a4aaabac66ddb2d9d9d837253bed11f",
+      "workspace": "626005719634222d9b1a6d2af8f5e6ea0a4aaabac66ddb2d9d9d837253bed11f",
+      "matches": true
+    },
+    "api/application/canvas/routes.ts": {
+      "verifiedCopy": "43a9141eff9858ab95af5b181f8fb0044ef909ef46eeba18c659852da63c395f",
+      "workspace": "43a9141eff9858ab95af5b181f8fb0044ef909ef46eeba18c659852da63c395f",
+      "matches": true
+    },
+    "api/application/canvas/runtime.ts": {
+      "verifiedCopy": "67e4f0968cb0bde01efeae7168a5a19db94724413cf39e0586b68f84bdd2eaef",
+      "workspace": "67e4f0968cb0bde01efeae7168a5a19db94724413cf39e0586b68f84bdd2eaef",
+      "matches": true
+    },
+    "api/application/canvas/workbench/app.css": {
+      "verifiedCopy": "48dad123ac81b964a04ea6b808d51772bae3d56e2f2a568f8f44303ef2884ecd",
+      "workspace": "48dad123ac81b964a04ea6b808d51772bae3d56e2f2a568f8f44303ef2884ecd",
+      "matches": true
+    },
+    "api/application/canvas/workbench/index.html": {
+      "verifiedCopy": "9ebef2c78e354b8f614fe86b98b994764a97ed94f86a76d4ff39f15ec0ed9a10",
+      "workspace": "9ebef2c78e354b8f614fe86b98b994764a97ed94f86a76d4ff39f15ec0ed9a10",
+      "matches": true
+    },
+    "api/application/canvas/workbench/jobs.js": {
+      "verifiedCopy": "8245906119016bdc579cf0ca04e0eb7df2c46836ce4cf1ffad2a0f5cab988558",
+      "workspace": "8245906119016bdc579cf0ca04e0eb7df2c46836ce4cf1ffad2a0f5cab988558",
+      "matches": true
+    },
+    "api/application/server-wiring.ts": {
+      "verifiedCopy": "79947e99b7948e666c91e93e95cf0f885997480bc30fc0700f0d0d6334c5a1c9",
+      "workspace": "79947e99b7948e666c91e93e95cf0f885997480bc30fc0700f0d0d6334c5a1c9",
+      "matches": true
+    },
+    "api/domains/capabilities/bundles/canvas-app.bundle.json": {
+      "verifiedCopy": "0b39fc9b2def831c95b711ef7bfc281179413a70e0f0a3a92809003922adb8fc",
+      "workspace": "0b39fc9b2def831c95b711ef7bfc281179413a70e0f0a3a92809003922adb8fc",
+      "matches": true
+    },
+    "api/domains/capabilities/contracts/index.ts": {
+      "verifiedCopy": "a2cb25ec73acc5b362a90b0fab2ba02d6f55ddb8d6c6166e172b864220fd9b5e",
+      "workspace": "a2cb25ec73acc5b362a90b0fab2ba02d6f55ddb8d6c6166e172b864220fd9b5e",
+      "matches": true
+    },
+    "api/domains/dialogue/index.ts": {
+      "verifiedCopy": "03677185d4ed8c07e3ef2465d32d706492d6f2db3753e29883dfe065b2be9266",
+      "workspace": "03677185d4ed8c07e3ef2465d32d706492d6f2db3753e29883dfe065b2be9266",
+      "matches": true
+    },
+    "api/domains/dialogue/service/action-origin.ts": {
+      "verifiedCopy": "0b5d97ba2d3bb9cd85e724fc33c9250ae26af85587efc176029a619a716b6fc2",
+      "workspace": "0b5d97ba2d3bb9cd85e724fc33c9250ae26af85587efc176029a619a716b6fc2",
+      "matches": true
+    },
+    "api/domains/dialogue/test/action-origin.test.ts": {
+      "verifiedCopy": "9cd909758c2ab3af73b25f9703f5a8032c33b3f4d482d05f61cd137652f094d6",
+      "workspace": "9cd909758c2ab3af73b25f9703f5a8032c33b3f4d482d05f61cd137652f094d6",
+      "matches": true
+    },
+    "bun.lock": {
+      "verifiedCopy": "ba26c4262de59ea5adacec6c3f8988d11b6125d755ac313627bf7f8c9b8cef96",
+      "workspace": "ba26c4262de59ea5adacec6c3f8988d11b6125d755ac313627bf7f8c9b8cef96",
+      "matches": true
+    },
+    "package.json": {
+      "verifiedCopy": "c0eb278ebee6428c143c8e847d42149f3c22ef22a8a8813d9be438cb780f5cbb",
+      "workspace": "c0eb278ebee6428c143c8e847d42149f3c22ef22a8a8813d9be438cb780f5cbb",
+      "matches": true
+    },
+    "scripts/canvas-browser-fixture.ts": {
+      "verifiedCopy": "2245cac63103ca38689d4433d11f4943e8956a3938379ad27a491c71ef936311",
+      "workspace": "2245cac63103ca38689d4433d11f4943e8956a3938379ad27a491c71ef936311",
+      "matches": true
+    },
+    "scripts/canvas-capacity.ts": {
+      "verifiedCopy": "35bd8aa9117838d1c1d187b215a3023974bc6c853fb93ff01a0c7d61d7ba165b",
+      "workspace": "35bd8aa9117838d1c1d187b215a3023974bc6c853fb93ff01a0c7d61d7ba165b",
+      "matches": true
+    },
+    "scripts/domains.ts": {
+      "verifiedCopy": "1f15a341bdaf7497e1e3a68daa54eafa18bb679493e95b738d22c8decc095c3d",
+      "workspace": "ff85046ec0ab1b019bf6da8d37f648e0ee4d25850892239691c4ca08121b54c1",
+      "matches": false
+    },
+    "scripts/package-canvas.ts": {
+      "verifiedCopy": "4f9df62fb959d7031698344b0dfff464bd3e3645117a9e655dc138935a79774d",
+      "workspace": "4f9df62fb959d7031698344b0dfff464bd3e3645117a9e655dc138935a79774d",
+      "matches": true
+    },
+    "tests/browser/canvas-app.fixture.tsx": {
+      "verifiedCopy": "7e4a3fb271384aa2168acc47e57f0af2b1bc77ac8635219f4c0d041ccfd90cbf",
+      "workspace": "7e4a3fb271384aa2168acc47e57f0af2b1bc77ac8635219f4c0d041ccfd90cbf",
+      "matches": true
+    },
+    "tests/browser/canvas-app.spec.ts": {
+      "verifiedCopy": "e756966f9e91ad962bf86eac536152d173a9872f8fa1f2066cea18d3054ae444",
+      "workspace": "e756966f9e91ad962bf86eac536152d173a9872f8fa1f2066cea18d3054ae444",
+      "matches": true
+    },
+    "vendor/canvas/bun-package-resolution.patch": {
+      "verifiedCopy": "4f9a2c0c7a2f7e85d815a1064b6bbe76b4ec6a1784c4281cafc15f541bc17b85",
+      "workspace": "4f9a2c0c7a2f7e85d815a1064b6bbe76b4ec6a1784c4281cafc15f541bc17b85",
+      "matches": true
+    },
+    "vendor/canvas/eumenes-canvas-0.1.1-0b2fbc83f612.tgz": {
+      "verifiedCopy": "0b2fbc83f612c6805a80d94f7e3c66739c24974c382e37947b36ecebc0697282",
+      "workspace": "0b2fbc83f612c6805a80d94f7e3c66739c24974c382e37947b36ecebc0697282",
+      "matches": true
+    },
+    "vendor/canvas/eumenes-canvas-0.1.1-0b2fbc83f612.tgz.sha256": {
+      "verifiedCopy": "8f8a0cca9cca0ccc91027f91efbe233ee8bf85cb295a8ef9310d7d8a0cb18bc9",
+      "workspace": "8f8a0cca9cca0ccc91027f91efbe233ee8bf85cb295a8ef9310d7d8a0cb18bc9",
+      "matches": true
+    },
+    "vendor/canvas/improvement-source.patch": {
+      "verifiedCopy": "cb5bbe94238c7ee52bcebb0abe5e6561457ba7b972c37dfc0598575818350388",
+      "workspace": "cb5bbe94238c7ee52bcebb0abe5e6561457ba7b972c37dfc0598575818350388",
+      "matches": true
+    },
+    "vendor/canvas/provenance.json": {
+      "verifiedCopy": "e4a829259c15b77fb1922ac502b6365334c5a841d7602defd026dd0e898c7c38",
+      "workspace": "e4a829259c15b77fb1922ac502b6365334c5a841d7602defd026dd0e898c7c38",
+      "matches": true
+    },
+    "vendor/canvas/workbench/app.css": {
+      "verifiedCopy": "1eae5b6c67fd939fb4994d877639554e0f63bf32db17ebe25bd579e700f4e8e9",
+      "workspace": "1eae5b6c67fd939fb4994d877639554e0f63bf32db17ebe25bd579e700f4e8e9",
+      "matches": true
+    },
+    "vendor/canvas/workbench/app.js": {
+      "verifiedCopy": "635834c57bffce7d89e96743a98a913d65a3469bb502016d4f2227a0d2bda9bb",
+      "workspace": "635834c57bffce7d89e96743a98a913d65a3469bb502016d4f2227a0d2bda9bb",
+      "matches": true
+    },
+    "vendor/canvas/workbench/index.html": {
+      "verifiedCopy": "9a80e86b99d27a476381367cc25b15b36826438c5eadf3a4a66a4596582b88fc",
+      "workspace": "9a80e86b99d27a476381367cc25b15b36826438c5eadf3a4a66a4596582b88fc",
+      "matches": true
+    }
+  },
+  "retiredAfterSnapshot": [],
+  "note": "Canvas-specific sources match the final verified copy. Shared files may include later parallel work; differences do not carry a whole-workspace verification claim.",
+  "retiredBeforeFinalRun": [
+    "vendor/canvas/eumenes-canvas-0.1.0-5bd98dd17e61.tgz",
+    "vendor/canvas/eumenes-canvas-0.1.0-5bd98dd17e61.tgz.sha256"
+  ]
+}

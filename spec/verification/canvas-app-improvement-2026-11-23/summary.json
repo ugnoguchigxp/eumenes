@@ -1,0 +1,96 @@
+{
+  "date": "2026-11-23",
+  "status": "implemented; C06 retention policy pending",
+  "validation": {
+    "canvasSource": {
+      "typecheck": "pass",
+      "tests": 58,
+      "failed": 0,
+      "additionalReviewTests": 20
+    },
+    "hostCanvasAndOrigin": {
+      "tests": 29,
+      "failed": 0
+    },
+    "dialogueQuestions": {
+      "tests": 35,
+      "failed": 0
+    },
+    "artifactFunctional": {
+      "backend": 340,
+      "web": 78,
+      "failed": 0,
+      "designSystemBuildCompletedBeforeRun": true
+    },
+    "canvasBrowser": {
+      "tests": 4,
+      "failed": 0,
+      "sockets": false,
+      "causalScenarios": [
+        "time-only animation",
+        "input response",
+        "conditional two-step response",
+        "unsatisfied precondition",
+        "input runtime error"
+      ]
+    },
+    "vendor": {
+      "tests": 2,
+      "failed": 0
+    },
+    "domainVerify": {
+      "domains": [
+        "capabilities",
+        "tool-runtime"
+      ],
+      "tests": 380,
+      "skipped": 2,
+      "failed": 0,
+      "result": "pass",
+      "runId": "2026-11-23T13-47-21-704Z-8787b0cd-827c-4f04-a167-f403f777a394",
+      "baseCommit": "efdc102bcdc069c56c9b2e2610e4b8c4350f3022",
+      "inputHash": "f978b51f821f8be9d25747255c6889abc5603a4cd15c8a4e45208108a6c692b4",
+      "finalHash": "f978b51f821f8be9d25747255c6889abc5603a4cd15c8a4e45208108a6c692b4",
+      "integrityErrors": [],
+      "outsideWarnings": [
+        "not formatted: packages/artifact-ui/src/ui-studio-source.test.tsx"
+      ]
+    },
+    "artifactFullGate": {
+      "result": "fail",
+      "stage": "format",
+      "path": "packages/artifact-ui/src/ui-studio-source.test.tsx",
+      "ownership": "separate work; unchanged by Canvas implementation"
+    },
+    "live": "See live.json and live-http.json; generated candidate not saved; human acceptance not performed.",
+    "currentWorkspaceTypecheck": {
+      "result": "fail in later parallel work",
+      "errors": 7,
+      "files": [
+        "api/application/agency/goal-progress-context.ts",
+        "api/application/agency/goal-question-delivery.ts",
+        "api/application/agency/goal-receipts.ts"
+      ],
+      "canvasErrors": 0
+    }
+  },
+  "distribution": {
+    "version": "0.1.1",
+    "baseCommit": "09e3814650ac11cebdfb909ce054fbc6f12f0150",
+    "archive": "eumenes-canvas-0.1.1-0b2fbc83f612.tgz",
+    "sha256": "0b2fbc83f612c6805a80d94f7e3c66739c24974c382e37947b36ecebc0697282",
+    "patchSha256": "cb5bbe94238c7ee52bcebb0abe5e6561457ba7b972c37dfc0598575818350388",
+    "patchAppliedToBaseAndCompared": true,
+    "comparedSourceFiles": 13
+  },
+  "pending": [
+    "C06 operational targets and retention policy",
+    "Broader acceptance with conditional and multi-step real-model works",
+    "Artifact full static gate: unrelated formatting violation"
+  ],
+  "deployment": {
+    "httpErrorFix": "live checked after user restart; 404/400/409 confirmed",
+    "lastInputCapacityGuard": "fixture verified; effective on next backend restart",
+    "serverOperationsByAgent": false
+  }
+}

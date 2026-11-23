@@ -277,7 +277,14 @@ export const domains = {
 		backend: "api/domains/capabilities",
 		web: null,
 		components: null,
-		integrationTests: ["api/application/canvas/canvas.test.ts"],
+		integrationTests: [
+			"api/application/canvas/canvas.test.ts",
+			"api/application/canvas/canvas-input.test.ts",
+			"api/application/canvas/canvas-jobs.test.ts",
+			"api/application/canvas/canvas-adoption.test.ts",
+			"api/application/canvas/canvas-workbench.test.ts",
+			"api/application/canvas/canvas-registration.test.ts",
+		],
 		depends: { api: [], web: [], test: [] },
 	},
 	pipelines: {

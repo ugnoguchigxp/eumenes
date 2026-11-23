@@ -1,0 +1,126 @@
+{
+  "measuredAt": "2026-11-23T13:23:43.373Z",
+  "scope": "synthetic fixture; one saved template plus seeded copies; no model calls, browser, product database or deletion",
+  "bun": "1.4.4",
+  "platform": "darwin",
+  "arch": "arm64",
+  "samples": [
+    {
+      "seededArtworks": 1,
+      "revisionsPerArtwork": 3,
+      "entryBytes": 4163,
+      "metrics": {
+        "artworks": 2,
+        "revisions": 4,
+        "runs": 1,
+        "candidates": 1,
+        "verifications": 1,
+        "receipts": 1,
+        "bytes": 24028
+      },
+      "fileBytes": 24028,
+      "openMs": 2.340916,
+      "saveMs": [
+        0.45120800000000116,
+        0.44570899999999725,
+        0.4262499999999996
+      ],
+      "saveP95Ms": 0.45120800000000116,
+      "restoreMs": [
+        0.4725830000000002,
+        0.38062499999999844,
+        0.4384580000000007
+      ],
+      "restoreP95Ms": 0.4725830000000002,
+      "rssBytes": 14500488
+    },
+    {
+      "seededArtworks": 10,
+      "revisionsPerArtwork": 3,
+      "entryBytes": 4163,
+      "metrics": {
+        "artworks": 11,
+        "revisions": 31,
+        "runs": 1,
+        "candidates": 1,
+        "verifications": 1,
+        "receipts": 1,
+        "bytes": 145898
+      },
+      "fileBytes": 145898,
+      "openMs": 2.9835420000000035,
+      "saveMs": [
+        0.5065829999999991,
+        0.5787079999999989,
+        0.5315000000000012
+      ],
+      "saveP95Ms": 0.5787079999999989,
+      "restoreMs": [
+        0.4745419999999996,
+        0.5505420000000001,
+        0.5934590000000028
+      ],
+      "restoreP95Ms": 0.5934590000000028,
+      "rssBytes": 22774432
+    },
+    {
+      "seededArtworks": 100,
+      "revisionsPerArtwork": 3,
+      "entryBytes": 4163,
+      "metrics": {
+        "artworks": 101,
+        "revisions": 301,
+        "runs": 1,
+        "candidates": 1,
+        "verifications": 1,
+        "receipts": 1,
+        "bytes": 1364679
+      },
+      "fileBytes": 1364679,
+      "openMs": 3.2788749999999993,
+      "saveMs": [
+        1.7062499999999972,
+        1.9123750000000115,
+        1.7821250000000077
+      ],
+      "saveP95Ms": 1.9123750000000115,
+      "restoreMs": [
+        2.4038749999999993,
+        1.576082999999997,
+        1.6011670000000038
+      ],
+      "restoreP95Ms": 2.4038749999999993,
+      "rssBytes": 61784760
+    },
+    {
+      "seededArtworks": 1000,
+      "revisionsPerArtwork": 3,
+      "entryBytes": 4163,
+      "metrics": {
+        "artworks": 1001,
+        "revisions": 3001,
+        "runs": 1,
+        "candidates": 1,
+        "verifications": 1,
+        "receipts": 1,
+        "bytes": 13553380
+      },
+      "fileBytes": 13553380,
+      "openMs": 10.390292000000002,
+      "saveMs": [
+        30.798000000000002,
+        44.72200000000004,
+        31.514791999999943
+      ],
+      "saveP95Ms": 44.72200000000004,
+      "restoreMs": [
+        28.510124999999988,
+        36.86949999999996,
+        27.759500000000003
+      ],
+      "restoreP95Ms": 36.86949999999996,
+      "rssBytes": 88048528
+    }
+  ],
+  "inputDigest": "4636573c1531e4b9f22aa45ab1583a00844875c5c8f0e97ac3f2a51f280253dc"
+}

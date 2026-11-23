@@ -88,6 +88,178 @@
 			"packageRevisionId": "package:canvas.app@1",
 			"bindingRevisionId": "binding:canvas.app@1",
 			"artifactRevisionId": "artifact:canvas.workspace@1"
+		},
+		{
+			"kind": "profile",
+			"id": "canvas.app",
+			"revision": 2,
+			"title": "Canvasアプリの制作受付",
+			"summary": "Canvas専用担当へ作品の制作・修正・修復を委ねる",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "あなたはCanvasアプリの制作受付担当。原依頼と確認回答をCanvas専用ランタイムへ渡す。変更対象はsnapshotのtargetRefから選ぶ。対象が特定できなければ確認し、一覧にない作品はCanvas作品検索かCanvas画面で検索してから対象を選ぶ。作品コードの生成と観測はCanvas専門担当が行う。"
+		},
+		{
+			"kind": "skill",
+			"id": "canvas.app",
+			"revision": 2,
+			"title": "Canvasアプリへの委譲",
+			"summary": "原依頼と対象作品を渡し、受付と候補提示を区別する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"body": "新規制作はcanvas.produceに空の引数を渡す。変更・修復はsnapshotにある対象のtargetRefを渡す。artworkIdや版を推測しない。requestはホストが依頼と確認回答を入れるので書き換えない。対象が複数なら一問だけ確認する。対象参照が失効・競合したら再取得して選び直す。受付と候補提示を区別し、保存・復元は利用者がCanvas画面で確定する。"
+		},
+		{
+			"kind": "tool",
+			"id": "canvas.produce",
+			"revision": 2,
+			"title": "Canvas作品を制作する",
+			"summary": "Canvas専用ランタイムへ制作を依頼する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"backend": "canvas",
+			"schemaKey": "canvasProduceV2"
+		},
+		{
+			"kind": "package",
+			"id": "canvas.app",
+			"revision": 2,
+			"title": "Canvasアプリ",
+			"summary": "Canvas作品の制作を委ねる",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:canvas.app@2",
+				"skill:canvas.app@2",
+				"tool:canvas.produce@2"
+			],
+			"backend": "canvas",
+			"schemaKey": "toolchainRequest",
+			"profileRevisionId": "profile:canvas.app@2",
+			"requiredSkillRevisionIds": ["skill:canvas.app@2"],
+			"toolRevisionIds": ["tool:canvas.produce@2"]
+		},
+		{
+			"kind": "toolchain",
+			"id": "canvas.app",
+			"revision": 2,
+			"title": "Canvasアプリ",
+			"summary": "遊べるゲーム、操作できる可視化、シミュレーションなどのCanvas作品を制作・修正する",
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"Canvasで操作できるゲーム・可視化・シミュレーションを作りたい",
+				"保存したCanvas作品を修正・修復したい"
+			],
+			"avoidWhen": ["実行できる作品を作らず、図やコードの説明だけを求めている"],
+			"dependencies": ["package:canvas.app@2"],
+			"functionName": "canvas_app",
+			"examples": [
+				"キーボードで操作する落ち物ゲームを作って",
+				"操作できるばねのシミュレーションを作って",
+				"保存したCanvas作品の凡例を押して絞り込めるようにして"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:canvas.app@2",
+			"bindingRevisionId": "binding:canvas.app@2",
+			"artifactRevisionId": "artifact:canvas.workspace@1",
+			"publishFromRevision": 1
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"kind": "profile",
+			"id": "canvas.find",
+			"revision": 1,
+			"title": "Canvas作品の検索担当",
+			"summary": "保存したCanvas作品の候補を読み取る",
+			"body": "保存済みCanvas作品を題名で検索する読み取り専用の担当。作品の制作・変更・保存は行わない。見つかった候補は同じ会話のCanvasアプリに引き継ぐ。"
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"kind": "skill",
+			"id": "canvas.find",
+			"revision": 1,
+			"title": "Canvas作品を探す手順",
+			"summary": "作品名とページ参照を使う",
+			"body": "queryに作品名の検索語を渡す。cursorはホストが返したものだけを使う。候補が複数なら対象を利用者に確認する。制作や変更はCanvasアプリへ依頼し、検索を変更完了と説明しない。"
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [],
+			"kind": "tool",
+			"id": "canvas.find",
+			"revision": 1,
+			"title": "Canvas作品を検索する",
+			"summary": "保存作品の題名・版・対象参照を読み取る",
+			"backend": "canvas",
+			"schemaKey": "canvasFind"
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [],
+			"avoidWhen": [],
+			"dependencies": [
+				"profile:canvas.find@1",
+				"skill:canvas.find@1",
+				"tool:canvas.find@1"
+			],
+			"kind": "package",
+			"id": "canvas.find",
+			"revision": 1,
+			"title": "Canvas作品の検索",
+			"summary": "保存したCanvas作品を探す",
+			"backend": "canvas",
+			"schemaKey": "canvasFind",
+			"profileRevisionId": "profile:canvas.find@1",
+			"requiredSkillRevisionIds": ["skill:canvas.find@1"],
+			"toolRevisionIds": ["tool:canvas.find@1"]
+		},
+		{
+			"aliases": [],
+			"tags": [],
+			"useWhen": [
+				"保存したCanvas作品を探したい",
+				"古いCanvas作品を題名で特定したい"
+			],
+			"avoidWhen": ["新しい作品を制作したい"],
+			"dependencies": ["package:canvas.find@1"],
+			"kind": "toolchain",
+			"id": "canvas.find",
+			"revision": 1,
+			"title": "Canvas作品の検索",
+			"summary": "保存済みCanvas作品を題名で検索する。制作や変更はCanvasアプリを使う。",
+			"functionName": "canvas_find",
+			"examples": [
+				"保存したCanvas作品を探して",
+				"前に作ったばねの作品を検索して",
+				"Canvas作品の一覧を見せて"
+			],
+			"redirects": [],
+			"packageRevisionId": "package:canvas.find@1",
+			"bindingRevisionId": "binding:canvas.find@1"
 		}
 	],
 	"bindings": [
@@ -108,6 +280,40 @@
 			"outputSchemaRef": "domain:canvas.receipt@1",
 			"resultProjectionRef": "projection:canvas.receipt@1",
 			"artifactRevisionId": "artifact:canvas.workspace@1"
+		},
+		{
+			"kind": "binding",
+			"id": "canvas.app",
+			"revision": 2,
+			"execution": "command",
+			"adapterRef": "adapter:canvas@1",
+			"availabilityRef": "availability:canvas@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:canvas.produce@2",
+					"operationId": "canvas.produce.v2",
+					"inputSchemaRef": "builtin:canvasProduceV2",
+					"conversationRequestField": "request"
+				}
+			],
+			"outputSchemaRef": "domain:canvas.receipt@1",
+			"resultProjectionRef": "projection:canvas.receipt@1",
+			"artifactRevisionId": "artifact:canvas.workspace@1"
+		},
+		{
+			"kind": "binding",
+			"id": "canvas.find",
+			"revision": 1,
+			"execution": "instant",
+			"adapterRef": "adapter:canvas@1",
+			"availabilityRef": "availability:canvas@1",
+			"tools": [
+				{
+					"toolRevisionId": "tool:canvas.find@1",
+					"operationId": "canvas.find",
+					"inputSchemaRef": "builtin:canvasFind"
+				}
+			]
 		}
 	],
 	"artifacts": [

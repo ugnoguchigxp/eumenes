@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-11-23T13:42:08.271Z",
+  "checks": [
+    {
+      "name": "missing-run",
+      "status": 404,
+      "code": null
+    },
+    {
+      "name": "missing-base",
+      "status": 400,
+      "code": null
+    },
+    {
+      "name": "request-conflict",
+      "status": 409,
+      "code": "request-conflict"
+    }
+  ]
+}

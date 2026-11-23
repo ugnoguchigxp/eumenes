@@ -4,6 +4,7 @@ import { PreviewController, PreviewConnectError, PAGE_WARNING, isChromium, isWeb
 
 const $ = (id) => document.getElementById(id);
 const cfg = await (await fetch("/api/config")).json();
+if ($("artwork-search")) $("artwork-search").hidden = cfg.artworkSearch !== true;
 clog("config", { previewOrigin: cfg.previewOrigin, hostOrigin: cfg.hostOrigin, pageOrigin: location.origin });
 
 function rid(n = 12) {
@@ -25,6 +26,7 @@ sessionStorage.setItem("canvas-session", session);
 const state = {
   artworkId: null,
   currentRevision: 0,
+  currentDigest: null,
   conversation: [],
   runId: null,
   candidate: null,
@@ -38,6 +40,7 @@ let artworkRequest = 0;
 let listRequest = 0;
 let previewRequest;
 let restoreAttempt;
+let runAttempt;
 
 // quiet: 定期の状態確認など。成功は記録せず、失敗だけ残す
 async function api(path, { method = "GET", body, quiet = false } = {}) {
@@ -271,19 +274,22 @@ $("composer").addEventListener("submit", async (e) => {
   send.disabled = true;
   input.value = "";
   addMessage("user", text);
+  if (!runAttempt || runAttempt.text !== text || runAttempt.selection !== selected) runAttempt = { text, selection: selected, requestKey: rid() };
   let run;
   try {
-    run = await api("/api/runs", { method: "POST", body: { message: text, artworkId: state.artworkId, conversation: state.conversation } });
+    run = await api("/api/runs", { method: "POST", body: { message: text, artworkId: state.artworkId, conversation: state.conversation, ...(cfg.inputVersion === 2 ? { requestKey: runAttempt.requestKey, ...(state.artworkId ? { expectedBase: { revision: state.currentRevision, digest: state.currentDigest } } : {}) } : {}) } });
   } catch (err) {
     if (selected !== selection) return;
     if (input.value === "") input.value = draft;
-    setRunStatus("受け付けられませんでした");
+    if (err.status && err.status < 500) runAttempt = undefined;
+    setRunStatus(err.status ? "受け付けられませんでした" : "受付結果が未確認です。同じ依頼を再送して確認できます");
     addMessage("assistant", "受け付けられませんでした: " + err.message);
     return;
   } finally {
     if (selected === selection) send.disabled = false;
   }
   if (selected !== selection) return;
+  runAttempt = undefined;
   hideCandidate();
   state.conversation.push({ role: "user", text });
   state.runId = run.id;
@@ -362,16 +368,23 @@ function addLine(ul, className, text) {
   ul.appendChild(li);
 }
 
-/** 候補の検証の結果（宣言・判定・指摘）。検証していない候補は隠す。 */
+/** 候補の検証の結果。未実施・判定不能は未確認として残す。 */
 function showReview(c, run) {
   const r = c.review;
-  $("cand-review").hidden = !r;
+  $("cand-review").hidden = false;
+  if (!r) {
+    $("cand-review-head").textContent = "要件の判定は未確認です";
+    $("cand-findings").textContent = "";
+    const list = $("cand-requirements");
+    list.textContent = "";
+    for (const q of c.spec?.requirements ?? []) addLine(list, "unknown", `${q.id} ${q.text} — 未確認`);
+    return;
+  }
   const reqs = $("cand-requirements");
   const finds = $("cand-findings");
   reqs.textContent = "";
   finds.textContent = "";
-  if (!r) return;
-  $("cand-review-head").textContent = (r.mode === "replay" && !r.verdict
+  $("cand-review-head").textContent = (r.error || !r.verdict
     ? (r.replay?.phase === "repair" ? "修正後の操作を再生・要件の合否は未確認" : "要件の合否は未確認")
     : `検証（${r.mode}）：要修正 ${r.blocking} 件`) + (r.error ? `／検証の一部が失敗：${r.error}` : "");
   const requirements = c.spec?.requirements ?? [];
@@ -413,7 +426,7 @@ function showCandidate(c, run) {
     ul.appendChild(li);
   }
   showReview(c, run);
-  $("cand-unconfirmed").textContent = c.unconfirmed.length ? "未確認: " + c.unconfirmed.join(" / ") : "未確認: 依頼に沿うかの照合（自動では確定しない）";
+  $("cand-unconfirmed").textContent = c.unconfirmed.length ? "未確認: " + c.unconfirmed.join(" / ") : "未確認事項の申告はありません。要件ごとの確認結果も参照してください。";
   $("save-status").textContent = "";
   $("save").disabled = !c.verification?.requiredPassed;
 }
@@ -435,7 +448,7 @@ $("save").addEventListener("click", async () => {
   }
   void refreshArtworks();
   if (selected !== selection || state.candidate !== c) return;
-  showCommittedRevision(saved.artworkId, saved.revision, c.title);
+  showCommittedRevision(saved.artworkId, saved.revision, c.title, saved.digest);
   $("save-status").textContent = `保存しました（r${saved.revision}）`;
   await refreshRevisions(saved.artworkId);
 });
@@ -454,12 +467,21 @@ function commitFailure(action, err) {
 }
 
 // ---- 作品一覧・版 ----
-async function refreshArtworks() {
+let artworkCursor = null;
+async function refreshArtworks(cursor = null) {
   const request = ++listRequest;
   const status = $("artworks-status");
   let list;
   try {
-    list = await api("/api/artworks");
+    if (cfg.artworkSearch) {
+      const params = new URLSearchParams({ conversationId: new URLSearchParams(location.search).get("conversationId") || session, query: $("artwork-query")?.value || "" });
+      if (cursor) params.set("cursor", cursor);
+      const page = await api("/api/artwork-search?" + params);
+      list = page.artworks.map((a) => ({ ...a, id: a.artworkId }));
+      if (request !== listRequest) return;
+      artworkCursor = page.nextCursor;
+      $("more-artworks").hidden = !page.hasMore;
+    } else list = await api("/api/artworks");
     if (!Array.isArray(list)) throw new Error("作品一覧の形式が違います");
   } catch {
     if (request === listRequest) status.textContent = "作品一覧を取得できませんでした。作品情報を再取得できます。";
@@ -468,7 +490,7 @@ async function refreshArtworks() {
   if (request !== listRequest) return;
   const ul = $("artworks");
   const focusedId = ul.contains(document.activeElement) ? document.activeElement.dataset.artworkId : null;
-  ul.textContent = "";
+  if (!cursor) ul.textContent = "";
   let focus;
   for (const a of list) {
     const li = document.createElement("li");
@@ -495,16 +517,17 @@ function markSelectedArtwork() {
   }
 }
 
-function setCurrentRevision(id, revision, title) {
+function setCurrentRevision(id, revision, title, digest = null) {
+  state.currentDigest = digest;
   state.artworkId = id;
   state.currentRevision = revision;
   $("current").textContent = `${title}（現在 r${revision}）`;
   markSelectedArtwork();
 }
 
-function showCommittedRevision(id, revision, title) {
+function showCommittedRevision(id, revision, title, digest) {
   if (state.artworkId === id && state.currentRevision > revision) return;
-  setCurrentRevision(id, revision, title);
+  setCurrentRevision(id, revision, title, digest);
 }
 
 async function loadArtwork(id) {
@@ -518,7 +541,7 @@ async function loadArtwork(id) {
     throw err;
   }
   if (selected !== selection || request !== artworkRequest) return;
-  setCurrentRevision(a.id, a.currentRevision, a.title);
+  setCurrentRevision(a.id, a.currentRevision, a.title, a.revisions.find((r) => r.revision === a.currentRevision)?.digest);
   const ol = $("revisions");
   ol.textContent = "";
   for (const r of [...a.revisions].reverse()) {
@@ -552,6 +575,12 @@ async function refreshRevisions(id) {
   }
 }
 
+$("artwork-search")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void refreshArtworks();
+});
+$("more-artworks")?.addEventListener("click", () => { if (artworkCursor) void refreshArtworks(artworkCursor); });
+
 $("refresh-artworks").addEventListener("click", () => {
   void refreshArtworks();
   if (state.artworkId) void refreshRevisions(state.artworkId);
@@ -565,6 +594,8 @@ function selectArtwork(id) {
   }
   state.artworkId = null;
   state.currentRevision = 0;
+  state.currentDigest = null;
+  runAttempt = undefined;
   state.runId = null;
   state.previewSource = null;
   restoreAttempt = undefined;
@@ -622,7 +653,7 @@ async function restore(id, revision, title) {
   void refreshArtworks();
   if (selected !== selection) return;
   restoreAttempt = undefined;
-  showCommittedRevision(id, restored.revision, title);
+  showCommittedRevision(id, restored.revision, title, restored.digest);
   status.textContent = `r${revision} を r${restored.revision} として復元しました`;
   void refreshRevisions(id);
   await showPreview({ artworkId: id, revision: restored.revision }, `保存版 r${restored.revision}`).catch((err) => {

@@ -218,6 +218,17 @@ export const canvasProduce = z.strictObject({
 		.regex(/^a_[A-Za-z0-9_-]{12}$/)
 		.optional(),
 });
+export const canvasProduceV2 = z.strictObject({
+	request: z.string().min(1).max(4000).optional(),
+	targetRef: z
+		.string()
+		.regex(/^ct_[A-Za-z0-9_-]{16}$/)
+		.optional(),
+});
+export const canvasFind = z.strictObject({
+	query: z.string().max(200).optional(),
+	cursor: z.string().max(1024).optional(),
+});
 const imageCoordinate = z.number().int().min(0).max(1000);
 const imageRegion = z
 	.strictObject({
@@ -230,6 +241,8 @@ const imageRegion = z
 
 export const validators = {
 	canvasProduce,
+	canvasProduceV2,
+	canvasFind,
 	...collaborationInputs,
 	appReview: appReviewInput,
 	browserInteractStart,

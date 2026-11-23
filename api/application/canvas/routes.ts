@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { readFileSync } from "node:fs";
@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { ServiceError } from "eumenes-canvas/src/core/service";
 import { canvasFile, canvasOwner, type CanvasRuntime } from "./runtime";
 import type { CanvasJobs } from "./jobs";
+import { answerError } from "../app";
 
 const root = "/api/canvas";
 const assets = join(import.meta.dir, "../../../vendor/canvas/workbench");
@@ -14,16 +15,28 @@ const name = z.string().regex(/^[a-z]_[a-zA-Z0-9_-]{12}$/);
 const version = z.number().int().min(1);
 const key = z.string().min(8).max(100);
 const message = z.string().trim().min(1).max(4000);
-const runInput = z.strictObject({
-	message,
-	artworkId: name.nullish(),
-	conversation: z
-		.array(
-			z.strictObject({ role: z.enum(["user", "assistant"]), text: message }),
-		)
-		.max(20)
-		.optional(),
-});
+const runInput = z
+	.strictObject({
+		message,
+		artworkId: name.nullish(),
+		conversation: z
+			.array(
+				z.strictObject({ role: z.enum(["user", "assistant"]), text: message }),
+			)
+			.max(20)
+			.optional(),
+		requestKey: key.optional(),
+		expectedBase: z
+			.strictObject({
+				revision: version,
+				digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+			})
+			.optional(),
+	})
+	.refine(
+		(input) => !input.artworkId || !!input.expectedBase,
+		"編集元の版が必要です",
+	);
 
 function workbenchScript() {
 	const script = readFileSync(join(assets, "app.js"), "utf8")
@@ -47,89 +60,51 @@ function workbenchScript() {
 			'sessionStorage.setItem("canvas-session", session)',
 			'sessionStorage.setItem("eumenes-canvas-session", session)',
 		);
+	const bootstrap = "ctl.mount().catch(() => {});";
+	if (!script.includes(bootstrap))
+		throw new Error("canvas_workbench_bootstrap_missing");
+	const install = `installCanvasJobs({ conversationId: new URLSearchParams(location.search).get("conversationId"), api, $, state, getSelection: () => selection, hideCandidate, setRunStatus, notice, openArtwork, selectArtwork, pollRun, STATE_TEXT });`;
 	return (
-		script +
-		`
-
-const canvasConversation = new URLSearchParams(location.search).get("conversationId");
-let canvasJob = null;
-let lastCanvasRun = null;
-$("cancel").addEventListener("click", (event) => {
-  if (!canvasJob || state.runId) return;
-  event.stopImmediatePropagation();
-  void api("/api/jobs/" + encodeURIComponent(canvasJob.id) + "/cancel", { method: "POST", body: {} })
-    .catch(() => notice("取り消せませんでした。"));
-}, true);
-if (canvasConversation) {
-  async function pollCanvasJob() {
-    try {
-      const job = await api("/api/jobs/latest?conversationId=" + encodeURIComponent(canvasConversation), { quiet: true });
-      if (state.runId || !job) return;
-      if (job.state === "queued" || job.state === "running") {
-        if (!canvasJob || canvasJob.id !== job.id) {
-          hideCandidate();
-          setRunStatus("Eumenesから受け付けた依頼を制作中…");
-          $("cancel").disabled = false;
-        }
-        canvasJob = job;
-        return;
-      }
-      const previous = canvasJob;
-      canvasJob = null;
-      if (job.state === "completed" && job.runId && job.runId !== lastCanvasRun) {
-        const run = await api("/api/runs/" + encodeURIComponent(job.runId), { quiet: true });
-        if (state.runId) return;
-        lastCanvasRun = job.runId;
-        if (run.state !== "presented") return;
-        if (!run.isNew) await openArtwork(run.artworkId);
-        else selectArtwork(null);
-        state.runId = run.id;
-        pollRun(run.id);
-      } else if (previous?.id === job.id && job.state !== "completed") {
-        $("cancel").disabled = true;
-        setRunStatus(STATE_TEXT[job.state] || "制作を完了できませんでした");
-      }
-    } catch {
-      // The next poll may recover. The host keeps the current work visible.
-    } finally {
-      setTimeout(pollCanvasJob, 1000);
-    }
-  }
-  void pollCanvasJob();
-}
-`
+		// Install operation tracking before the first asynchronous list refresh.
+		script.replace(bootstrap, install + "\n" + bootstrap) +
+		"\n" +
+		readFileSync(join(workbench, "jobs.js"), "utf8").replace(
+			"export function",
+			"function",
+		)
 	);
 }
 
 export function registerCanvasRoutes(
-	app: Hono,
+	parent: Hono,
 	runtime: CanvasRuntime,
 	jobs: CanvasJobs,
 ) {
+	const app = new Hono();
+	// Hono handles route exceptions before returning through middleware.
+	app.onError((error, c) => {
+		if (error instanceof z.ZodError || error instanceof SyntaxError)
+			return c.json({ error: "入力の形式を確認してください" }, 400);
+		if (error instanceof ServiceError)
+			return new Response(
+				JSON.stringify({ error: error.message, ...error.extra }),
+				{
+					status: error.status,
+					headers: {
+						"content-type": "application/json",
+						"cache-control": "no-store",
+					},
+				},
+			);
+		return answerError(error, c);
+	});
 	app.use(`${root}/*`, bodyLimit({ maxSize: 256 * 1024 }));
 	app.use(`${root}/*`, async (c, next) => {
 		if (!runtime.ready())
 			return c.json({ error: "Canvasアプリが起動していません" }, 503);
 		if (c.req.method !== "GET" && c.req.header("Origin") !== runtime.hostOrigin)
 			return c.json({ error: "操作元が一致しません" }, 403);
-		try {
-			await next();
-		} catch (error) {
-			if (error instanceof z.ZodError || error instanceof SyntaxError)
-				return c.json({ error: "入力の形式を確認してください" }, 400);
-			if (error instanceof ServiceError)
-				return new Response(
-					JSON.stringify({ error: error.message, ...error.extra }),
-					{
-						status: error.status,
-						headers: {
-							"content-type": "application/json",
-							"cache-control": "no-store",
-						},
-					},
-				);
-			throw error;
-		}
+		await next();
 	});
 	app.get(`${root}/workbench/index.html`, (c) => {
 		c.header(
@@ -146,7 +121,10 @@ export function registerCanvasRoutes(
 		}),
 	);
 	app.get(`${root}/workbench/app.js`, (c) =>
-		c.body(workbenchScript(), 200, { "Content-Type": "text/javascript" }),
+		c.body(workbenchScript(), 200, {
+			"Content-Type": "text/javascript",
+			"Cache-Control": "no-store",
+		}),
 	);
 	// Eumenes keeps Canvas diagnostics out of the general application log.
 	app.get(`${root}/workbench/client-log.js`, (c) =>
@@ -173,6 +151,8 @@ export function registerCanvasRoutes(
 		c.json({
 			hostOrigin: runtime.hostOrigin,
 			previewOrigin: runtime.previewOrigin,
+			artworkSearch: true,
+			inputVersion: 2,
 		}),
 	);
 	app.get(`${root}/jobs/latest`, (c) => {
@@ -182,11 +162,20 @@ export function registerCanvasRoutes(
 			.max(128)
 			.parse(c.req.query("conversationId"));
 		const row = jobs.latest(conversationId);
+		const raw = row ? jobs.runOf(row.id) : null;
+		const run = raw ? jobs.visibleRun(raw.id) : null;
+		const unavailable =
+			row?.state === "completed" &&
+			run?.state === "failed" &&
+			raw?.state === "presented";
 		return c.json(
 			row && {
 				id: row.id,
-				state: row.state,
-				runId: row.state === "completed" ? row.resultRef : null,
+				state: unavailable ? "failed" : row.state,
+				acceptedAt: row.createdAtMs,
+				runId: run?.id ?? null,
+				runState: run?.state ?? null,
+				errorCode: unavailable ? "canvas_source_changed" : row.errorCode,
 			},
 		);
 	});
@@ -206,7 +195,7 @@ export function registerCanvasRoutes(
 		);
 	});
 	app.get(`${root}/runs/:id`, (c) =>
-		c.json(runtime.service.getRun(canvasOwner, c.req.param("id"))),
+		c.json(jobs.visibleRun(c.req.param("id"))),
 	);
 	app.post(`${root}/runs/:id/cancel`, async (c) =>
 		c.json(await runtime.service.cancelRun(canvasOwner, c.req.param("id"))),
@@ -214,6 +203,18 @@ export function registerCanvasRoutes(
 	app.get(`${root}/artworks`, (c) =>
 		c.json(runtime.service.listArtworks(canvasOwner)),
 	);
+	app.get(`${root}/artwork-search`, (c) => {
+		const query = z
+			.strictObject({
+				conversationId: z.string().min(1).max(128),
+				query: z.string().max(200).optional(),
+				cursor: z.string().max(1024).optional(),
+			})
+			.parse(c.req.query());
+		return c.json(
+			runtime.service.catalog.page(canvasOwner, query.conversationId, query),
+		);
+	});
 	app.get(`${root}/artworks/:id`, (c) =>
 		c.json(runtime.service.getArtwork(canvasOwner, c.req.param("id"))),
 	);
@@ -268,4 +269,5 @@ export function registerCanvasRoutes(
 		const { body, data } = runtime.service.resolvePreview(canvasOwner, source);
 		return c.json({ token: runtime.issue(body), title: body.title, data });
 	});
+	parent.route("/", app);
 }

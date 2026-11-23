@@ -1,0 +1,266 @@
+{
+  "date": "2026-11-23",
+  "status": "R01-R04 implemented and fixture verified; backend restart required for rollout",
+  "issues": {
+    "R01": {
+      "result": "fixed",
+      "coverage": [
+        "withdrawal committed before settlement",
+        "cancellation storage failure",
+        "restart with rejected candidate",
+        "presentation, preview and save denied",
+        "unknown legacy origin and missing external job denied",
+        "saved artwork and receipt retained"
+      ]
+    },
+    "R02": {
+      "result": "fixed",
+      "coverage": [
+        "submission during pending second fetch",
+        "selection during pending second fetch",
+        "operation during internal artwork loading",
+        "normal internal loading retained",
+        "real browser: old run response before new POST response",
+        "real browser: submission completes while initial list is pending",
+        "operation tracking installed before initial asynchronous list refresh"
+      ],
+      "startupRace": {
+        "beforeFix": "reproduced: old candidate replaced new result",
+        "afterFix": "same browser test passed"
+      }
+    },
+    "R03": {
+      "result": "fixed",
+      "coverage": [
+        "cancellation, expiry and failure after judge starts: 2 calls persisted",
+        "cancellation during probes: 1 call",
+        "duplicate start notifications: counted once",
+        "failed accounting prevents inference",
+        "parent task returns cancelled and modelCalls 2"
+      ]
+    },
+    "R04": {
+      "result": "fixed",
+      "coverage": [
+        "0 and 5 user history turns accepted",
+        "6 and 7 rejected before job creation",
+        "Canvas public limit reused"
+      ]
+    }
+  },
+  "validation": {
+    "canvasSource": {
+      "typecheck": "pass",
+      "tests": 72,
+      "failed": 0
+    },
+    "hostCanvasAndOrigin": {
+      "tests": 39,
+      "failed": 0
+    },
+    "parentTaskAccounting": {
+      "kind": "deterministic integration check",
+      "state": "cancelled",
+      "modelCalls": 2
+    },
+    "browser": {
+      "tests": 6,
+      "failed": 0,
+      "stats": {
+        "startTime": "2026-11-23T14:33:43.702Z",
+        "duration": 21250.474,
+        "expected": 6,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "sockets": false
+    },
+    "artifactFunctional": {
+      "backend": 340,
+      "web": 78,
+      "failed": 0
+    },
+    "domainVerify": {
+      "domains": [
+        "capabilities",
+        "tool-runtime"
+      ],
+      "tests": 390,
+      "skipped": 2,
+      "failed": 0,
+      "runId": "2026-11-23T14-34-54-588Z-a5a95dff-6cdc-4f7d-b967-aa9612f93762",
+      "baseCommit": "91ba1c739cef17e6837ed3585f5b1eb7527a2208",
+      "inputHash": "a42aef307aeb079ffa946bffe51a96b7630bfb3dc815bdd9e9bc7cc03cffac8e",
+      "finalHash": "a42aef307aeb079ffa946bffe51a96b7630bfb3dc815bdd9e9bc7cc03cffac8e",
+      "integrityErrors": [],
+      "warnings": [
+        "/private/var/folders/mx/jbv8qfwd52z14q0mby_273lhlp5gd2/T/eumenes-canvas-verify-3ryu9rs2/.s11tnext/catalog.json: error S11TNEXT_BUILD_STALE: Generated output is missing or stale",
+        "not formatted: api/application/agency/goal-capability-selection.test.ts",
+        "not formatted: api/application/agency/goal-question-delivery.test.ts",
+        "not formatted: api/application/agency/registered-goals.ts",
+        "not formatted: packages/artifact-ui/src/ui-studio-source.test.tsx",
+        "api/domains/memory/test/recall.test.ts:5:2: Type 'CorrectExplicitInput' is imported but never used. [Error/eslint(no-unused-vars)]",
+        "api/application/agency/registered-goals.ts:29:10: Identifier 'goalAccess' is imported but never used. [Error/eslint(no-unused-vars)]"
+      ]
+    },
+    "vendorAdditionalTarballs": "pass",
+    "vendorGlobalHygiene": {
+      "result": "fail",
+      "outsideCanvas": [
+        "vendor/eumenes-memory/eumenes-memory-0.0.6-a16777d3f9d9.tgz",
+        "vendor/eumenes-memory-host/eumenes-memory-host-0.2.2-f0408abf80d4.tgz"
+      ]
+    },
+    "artifactFullGate": {
+      "result": "fail",
+      "stage": "format",
+      "path": "packages/artifact-ui/src/ui-studio-source.test.tsx"
+    },
+    "live": "Not run for this correction; no model generation or production data writes.",
+    "hostCanvasFormat": {
+      "result": "pass",
+      "files": 19
+    },
+    "hostCanvasLint": "pass"
+  },
+  "distribution": {
+    "version": "0.1.2",
+    "archive": "eumenes-canvas-0.1.2-92cb8c200232.tgz",
+    "sha256": "92cb8c2002328cca6d5197155618024099b0729e56009398d1228b607a144628",
+    "sourceCommit": "09e3814650ac11cebdfb909ce054fbc6f12f0150",
+    "sourcePatchSha256": "5787e89ab47b98a710e4cdfb4d53068b012a419e8c67cda7206c6437d2db9c6a",
+    "sourcePatchApplied": true,
+    "comparedSourceFiles": 16,
+    "reproducibleArchive": true,
+    "canvasDependencyMatchesVerifiedCopy": true,
+    "installedVersion": "0.1.2"
+  },
+  "rollout": {
+    "serverOperationsByAgent": false,
+    "restartRequired": true,
+    "legacyCandidatesWithoutOrigin": "denied; saved artworks and receipts retained"
+  },
+  "sourceCorrespondence": {
+    "api/application/canvas/adapter.ts": {
+      "verifiedCopy": "eeba5c7433e39162eab04f4af90f5bcf72b456cbd124ab436866fabe98db3bf4",
+      "workspace": "eeba5c7433e39162eab04f4af90f5bcf72b456cbd124ab436866fabe98db3bf4"
+    },
+    "api/application/canvas/canvas-adoption.test.ts": {
+      "verifiedCopy": "0688c3e8cce7b7e28d607c14b04cb9476ecaf7a8af33d2608081f8b5fb918c91",
+      "workspace": "0688c3e8cce7b7e28d607c14b04cb9476ecaf7a8af33d2608081f8b5fb918c91"
+    },
+    "api/application/canvas/canvas-browser.fixture.ts": {
+      "verifiedCopy": "0aefab3d0c5b5c638f9b5f5c486ab1d46123e01bddba15b9ab1ee8daa42aecdb",
+      "workspace": "0aefab3d0c5b5c638f9b5f5c486ab1d46123e01bddba15b9ab1ee8daa42aecdb"
+    },
+    "api/application/canvas/canvas-input.test.ts": {
+      "verifiedCopy": "988be61bcc6b2e9e05b2dab5ebe3733a9e7b0d665d0e420d11a1cf8ffd69126a",
+      "workspace": "988be61bcc6b2e9e05b2dab5ebe3733a9e7b0d665d0e420d11a1cf8ffd69126a"
+    },
+    "api/application/canvas/canvas-jobs.test.ts": {
+      "verifiedCopy": "979c5412930b2d162e83dde36fd515562cd6e0cbe41c8dc3a77a5581c62dd6f3",
+      "workspace": "979c5412930b2d162e83dde36fd515562cd6e0cbe41c8dc3a77a5581c62dd6f3"
+    },
+    "api/application/canvas/canvas-registration.test.ts": {
+      "verifiedCopy": "5ceb42beab06ea7cb0f3a28bf25b35ee2be4cc1a6172ea94716a646dee987284",
+      "workspace": "5ceb42beab06ea7cb0f3a28bf25b35ee2be4cc1a6172ea94716a646dee987284"
+    },
+    "api/application/canvas/canvas-workbench.test.ts": {
+      "verifiedCopy": "a03f2a6fd0d2de0ce510be70beee8f6983aa991a4347ab5b95833a5908b1cc42",
+      "workspace": "a03f2a6fd0d2de0ce510be70beee8f6983aa991a4347ab5b95833a5908b1cc42"
+    },
+    "api/application/canvas/canvas.fixture.ts": {
+      "verifiedCopy": "bcc5dbfe181294515ded4aa8977f17cc399d1cef5a4eab9f9226f16e6b9e19b4",
+      "workspace": "bcc5dbfe181294515ded4aa8977f17cc399d1cef5a4eab9f9226f16e6b9e19b4"
+    },
+    "api/application/canvas/canvas.test.ts": {
+      "verifiedCopy": "67b8208f6eb1b0e041a0c4a37b2cfec63d3e3eac66a3670dc6e445d4d5e0f6f6",
+      "workspace": "67b8208f6eb1b0e041a0c4a37b2cfec63d3e3eac66a3670dc6e445d4d5e0f6f6"
+    },
+    "api/application/canvas/input.ts": {
+      "verifiedCopy": "ed391718de6f066639cfa4b38b0f3d8776d5b5e0404a5ca5ac91946d2659c593",
+      "workspace": "ed391718de6f066639cfa4b38b0f3d8776d5b5e0404a5ca5ac91946d2659c593"
+    },
+    "api/application/canvas/jobs.ts": {
+      "verifiedCopy": "dcb4eb9f667e3a0ac49438abeed706c0fe31e653549d0a39fc105878eda4f234",
+      "workspace": "dcb4eb9f667e3a0ac49438abeed706c0fe31e653549d0a39fc105878eda4f234"
+    },
+    "api/application/canvas/routes.ts": {
+      "verifiedCopy": "2ddbbafcf23c78d3f197a3ddecfe06b59b001b01e92efff40876e8f16885f9c6",
+      "workspace": "2ddbbafcf23c78d3f197a3ddecfe06b59b001b01e92efff40876e8f16885f9c6"
+    },
+    "api/application/canvas/runtime.ts": {
+      "verifiedCopy": "5a35d6f7ac47245046428ff6f2dc6185e7b810bfb3ed14848d539060206a9e63",
+      "workspace": "5a35d6f7ac47245046428ff6f2dc6185e7b810bfb3ed14848d539060206a9e63"
+    },
+    "api/application/canvas/workbench/app.css": {
+      "verifiedCopy": "48dad123ac81b964a04ea6b808d51772bae3d56e2f2a568f8f44303ef2884ecd",
+      "workspace": "48dad123ac81b964a04ea6b808d51772bae3d56e2f2a568f8f44303ef2884ecd"
+    },
+    "api/application/canvas/workbench/index.html": {
+      "verifiedCopy": "9ebef2c78e354b8f614fe86b98b994764a97ed94f86a76d4ff39f15ec0ed9a10",
+      "workspace": "9ebef2c78e354b8f614fe86b98b994764a97ed94f86a76d4ff39f15ec0ed9a10"
+    },
+    "api/application/canvas/workbench/jobs.js": {
+      "verifiedCopy": "c1ff7f547a4d08c651bac2c6ea66923918ee643c907e1f7a023b2adcf059050f",
+      "workspace": "c1ff7f547a4d08c651bac2c6ea66923918ee643c907e1f7a023b2adcf059050f"
+    },
+    "bun.lock": {
+      "verifiedCopy": "a22e758c11014f04bc6dd596108d84d6f8773251e4598fc0324c96c0773c6a47",
+      "workspace": "16d09cbdcb51283ceac5af333fdcb507baeecd0e928a88756dcd5b318ed1b4fa"
+    },
+    "package.json": {
+      "verifiedCopy": "463306410a0cdb3af8f3daadab8eb202dbac85fac32e410f99c4a17b3111f3d1",
+      "workspace": "d6b0e1dbb1233f1623771ed4427cf08d4f5a276ea028c0f61817800f1545e33d"
+    },
+    "scripts/canvas-browser-fixture.ts": {
+      "verifiedCopy": "149625d337e7f576d898e39865bbce9244c7f148da63fd7c909a621a4cbe1268",
+      "workspace": "149625d337e7f576d898e39865bbce9244c7f148da63fd7c909a621a4cbe1268"
+    },
+    "scripts/domains.ts": {
+      "verifiedCopy": "ccdb8937e854377fd0ea3067e706038e3d0eaf3a463590a3974ba221b3db7fac",
+      "workspace": "794011e54d550b64b8f7c9ef164a6663d758e1252f71081dfe5c29bdbdd8ac7c"
+    },
+    "tests/browser/canvas-app.fixture.tsx": {
+      "verifiedCopy": "7e4a3fb271384aa2168acc47e57f0af2b1bc77ac8635219f4c0d041ccfd90cbf",
+      "workspace": "7e4a3fb271384aa2168acc47e57f0af2b1bc77ac8635219f4c0d041ccfd90cbf"
+    },
+    "tests/browser/canvas-app.spec.ts": {
+      "verifiedCopy": "fe41cc7eb5e5f0206e5ed0dd201274832908c47f046cf9666dfac87cc2f86a70",
+      "workspace": "fe41cc7eb5e5f0206e5ed0dd201274832908c47f046cf9666dfac87cc2f86a70"
+    },
+    "vendor/canvas/bun-package-resolution.patch": {
+      "verifiedCopy": "4f9a2c0c7a2f7e85d815a1064b6bbe76b4ec6a1784c4281cafc15f541bc17b85",
+      "workspace": "4f9a2c0c7a2f7e85d815a1064b6bbe76b4ec6a1784c4281cafc15f541bc17b85"
+    },
+    "vendor/canvas/eumenes-canvas-0.1.2-92cb8c200232.tgz": {
+      "verifiedCopy": "92cb8c2002328cca6d5197155618024099b0729e56009398d1228b607a144628",
+      "workspace": "92cb8c2002328cca6d5197155618024099b0729e56009398d1228b607a144628"
+    },
+    "vendor/canvas/eumenes-canvas-0.1.2-92cb8c200232.tgz.sha256": {
+      "verifiedCopy": "a91889932dee82d7a5e5fe0a8312148ee17e92f5370fcaefa5e5c2d130db142b",
+      "workspace": "a91889932dee82d7a5e5fe0a8312148ee17e92f5370fcaefa5e5c2d130db142b"
+    },
+    "vendor/canvas/improvement-source.patch": {
+      "verifiedCopy": "5787e89ab47b98a710e4cdfb4d53068b012a419e8c67cda7206c6437d2db9c6a",
+      "workspace": "5787e89ab47b98a710e4cdfb4d53068b012a419e8c67cda7206c6437d2db9c6a"
+    },
+    "vendor/canvas/provenance.json": {
+      "verifiedCopy": "b7e989fccd8e98c37803b2f8bbb6c9dc1325eb451331607d8793f1e32950d012",
+      "workspace": "b7e989fccd8e98c37803b2f8bbb6c9dc1325eb451331607d8793f1e32950d012"
+    },
+    "vendor/canvas/workbench/app.css": {
+      "verifiedCopy": "1eae5b6c67fd939fb4994d877639554e0f63bf32db17ebe25bd579e700f4e8e9",
+      "workspace": "1eae5b6c67fd939fb4994d877639554e0f63bf32db17ebe25bd579e700f4e8e9"
+    },
+    "vendor/canvas/workbench/app.js": {
+      "verifiedCopy": "635834c57bffce7d89e96743a98a913d65a3469bb502016d4f2227a0d2bda9bb",
+      "workspace": "635834c57bffce7d89e96743a98a913d65a3469bb502016d4f2227a0d2bda9bb"
+    },
+    "vendor/canvas/workbench/index.html": {
+      "verifiedCopy": "9a80e86b99d27a476381367cc25b15b36826438c5eadf3a4a66a4596582b88fc",
+      "workspace": "9a80e86b99d27a476381367cc25b15b36826438c5eadf3a4a66a4596582b88fc"
+    }
+  }
+}
