@@ -133,11 +133,11 @@ export type ReadTool = {
 export const READ_TOOLS: readonly ReadTool[] = [
 	{
 		name: "read_memory",
-		revision: 1,
+		revision: 2,
 		title: "記憶の確認",
 		subject: "記憶",
 		description:
-			"覚えている記録（本人の好み・事実・習慣）を確かめる。query に確かめたい語。本人について全体を聞かれたら query を書かない。",
+			"覚えている記録（本人の好み・事実・習慣）を、query に関係の強い順に確かめる。「## Memory」に載っている記録は含まない。query に確かめたい語。本人について全体を聞かれたら query を書かない。",
 		useWhen: [
 			"「記憶を確認して」「メモリーをチェックして」と、覚えている記録を確かめたい",
 			"「私について何を覚えてる？」と、本人について覚えていることを聞いている",

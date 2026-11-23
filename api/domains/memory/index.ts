@@ -7,6 +7,8 @@ export {
 	/** @public */ stewardLedgersMigration,
 	/** @public */ forgetClosureMigration,
 	/** @public */ seedImportMigration,
+	/** @public */ itemMarksMigration,
+	/** @public */ inputBudgetMigration,
 } from "./repository";
 export type { MemoryService } from "./service";
 export type { ReferenceInput } from "./service/reference-input";
@@ -42,6 +44,12 @@ export type {
 	/** @public */ WriteTendencyInput,
 	/** @public */ WriteTendencyOutcome,
 } from "./contracts/immediate";
+export type {
+	MemoryInputBudget,
+	MemoryRecalled,
+	MemoryRecallInput,
+	MemoryRecallResult,
+} from "./contracts/recall";
 export { touchesSuppressedTerm } from "./service/suppression";
 export {
 	PENDING_LIMIT,

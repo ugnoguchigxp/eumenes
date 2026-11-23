@@ -1,11 +1,9 @@
 import { expect, test } from "bun:test";
 import type { Utterance } from "../../conversation";
-import type { ProfileItem } from "../../memory";
+import type { ProfileItem, WindowSnapshot } from "../../memory";
 import {
-	MEMORY_TOKENS,
 	RECENT,
 	keepNewestCut,
-	memoryLines,
 	placeCutInTransaction,
 	recentMessages,
 	systemDigestOf,
@@ -13,6 +11,11 @@ import {
 	withLastMessage,
 	type ConversationPrefix,
 } from "../service/conversation-input";
+import {
+	currentProfileItems,
+	memoryDigestOf,
+	memoryLines,
+} from "../service/memory-lines";
 import { dataText, fitLines, jstNowLine } from "../service/input-text";
 import { resultText, toolResultText } from "../service/result-text";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
@@ -93,44 +96,119 @@ test("a fixed-rule cut keeps the newest few from an agent's utterance", () => {
 	expect(keepNewestCut([said("user", "x")], 7)).toBe(seq);
 });
 
-test("`## Memory` holds the leanings only, with source and date, within its bound", () => {
-	const item = (id: string, kind: string, text: string): ProfileItem => ({
-		id,
-		kind,
-		text,
-		negated: false,
-		source: kind === "tendency" ? "observed" : "user_said",
-		since: "2026-10-20",
-		revision: 1,
-		newness: 1,
-	});
+/** The memory's setting of `## Memory`: its bound and the kinds it holds. */
+const WIDE = { alwaysTokens: 2000, alwaysScope: "facts" } as const;
+const item = (
+	id: string,
+	kind: string,
+	text: string,
+	more: Partial<ProfileItem> = {},
+): ProfileItem => ({
+	id,
+	kind,
+	text,
+	negated: false,
+	source: kind === "tendency" ? "observed" : "user_said",
+	since: "2026-10-20",
+	revision: 1,
+	newness: 1,
+	...more,
+});
+
+test("`## Memory` holds the user's own statements of the scope's kinds, with source and date", () => {
 	const profile: ProfileItem[] = [
 		item("p1", "preference", "ピアノの曲が好き"),
 		item("p2", "personal_fact", "住所は鎌倉"),
 		item("p3", "tendency", "夜は静かな曲を聴く"),
 		{ ...item("p4", "preference", "元気が出る曲を好む"), source: "inferred" },
+		item("p5", "habit", "朝は散歩する"),
+		item("p6", "constraint", "辛いものは食べない"),
 	];
-	const { lines, ids } = memoryLines(profile);
+	const lines = (alwaysScope: "responses" | "leanings" | "facts") =>
+		memoryLines(profile, { alwaysTokens: 2000, alwaysScope }).lines;
 	// The user's own words only: an inference or an observation is not shown as a fact (C4).
-	expect(lines).toEqual(["- ピアノの曲が好き（本人の発言、10-20から）"]);
-	// Each item leads with the short reference the memory handed out for it (numbers go on, they are not positions).
-	expect(memoryLines(profile, new Map([["p1", "m17"]])).lines).toEqual([
-		"- m17 ピアノの曲が好き（本人の発言、10-20から）",
+	expect(lines("responses")).toEqual([
+		"- ピアノの曲が好き（本人の発言、10-20から）",
+		"- 辛いものは食べない（本人の発言、10-20から）",
 	]);
-	expect(ids).toEqual(["p1"]);
+	expect(lines("leanings")).toEqual([
+		"- ピアノの曲が好き（本人の発言、10-20から）",
+		"- 朝は散歩する（本人の発言、10-20から）",
+		"- 辛いものは食べない（本人の発言、10-20から）",
+	]);
+	// The user's own facts join at the widest scope.
+	expect(lines("facts")).toContain("- 住所は鎌倉（本人の発言、10-20から）");
+	expect(memoryLines(profile, WIDE).ids).toEqual(["p1", "p2", "p5", "p6"]);
+	// Each item leads with the short reference the memory handed out for it (numbers go on, they are not positions).
+	expect(
+		memoryLines(profile.slice(0, 1), WIDE, new Map([["p1", "m17"]])).lines,
+	).toEqual(["- m17 ピアノの曲が好き（本人の発言、10-20から）"]);
+});
+
+test("`## Memory` leaves out an item marked sensitive, about another person or not to be brought up", () => {
+	const profile: ProfileItem[] = [
+		item("p1", "personal_fact", "通院している", { sensitive: true }),
+		item("p2", "personal_fact", "妹は看護師", { aboutOther: true }),
+		item("p3", "preference", "静かな曲が好き", { suppressed: true }),
+		item("p4", "personal_fact", "住所は鎌倉"),
+	];
+	expect(memoryLines(profile, WIDE).ids).toEqual(["p4"]);
+});
+
+test("`## Memory` stays within the memory's bound, whatever the references' numbers, and keeps constraints before facts", () => {
 	const many = Array.from({ length: 200 }, (_, i) =>
 		item(`x${i}`, "preference", `好きなもの${i}番目の長めの説明`),
 	);
+	for (const alwaysTokens of [300, 2000]) {
+		const budget = { alwaysTokens, alwaysScope: "facts" } as const;
+		expect(
+			estimateTextTokens(
+				["## Memory", ...memoryLines(many, budget).lines].join("\n"),
+			),
+		).toBeLessThanOrEqual(alwaysTokens);
+		// The references count in the bound, whatever their numbers: the same items are kept with long ones.
+		const numbered = new Map(many.map((i, n) => [i.id, `m${10000 + n}`]));
+		const withRefs = memoryLines(many, budget, numbered);
+		expect(withRefs.ids).toEqual(memoryLines(many, budget).ids);
+		expect(
+			estimateTextTokens(["## Memory", ...withRefs.lines].join("\n")),
+		).toBeLessThanOrEqual(alwaysTokens);
+	}
 	expect(
-		estimateTextTokens(["## Memory", ...memoryLines(many).lines].join("\n")),
-	).toBeLessThanOrEqual(MEMORY_TOKENS);
-	// The references count in the bound, whatever their numbers: the same items are kept with long ones.
-	const numbered = new Map(many.map((i, n) => [i.id, `m${10000 + n}`]));
-	const withRefs = memoryLines(many, numbered);
-	expect(withRefs.ids).toEqual(memoryLines(many).ids);
+		memoryLines(many, { alwaysTokens: 2000, alwaysScope: "facts" }).ids.length,
+	).toBeGreaterThan(
+		memoryLines(many, { alwaysTokens: 300, alwaysScope: "facts" }).ids.length,
+	);
+	// A bound that holds one line keeps the constraint over the newer preference and the fact.
+	const mixed = [
+		item("fact", "personal_fact", "住所は鎌倉", { newness: 9 }),
+		item("pref", "preference", "静かな曲が好き", { newness: 8 }),
+		item("rule", "constraint", "辛いものは食べない", { newness: 1 }),
+	];
+	const one = estimateTextTokens(
+		"## Memory\n- m00000 辛いものは食べない（本人の発言、10-20から）",
+	);
 	expect(
-		estimateTextTokens(["## Memory", ...withRefs.lines].join("\n")),
-	).toBeLessThanOrEqual(MEMORY_TOKENS);
+		memoryLines(mixed, { alwaysTokens: one, alwaysScope: "facts" }).ids,
+	).toEqual(["rule"]);
+});
+
+test("the same records give the same text and digest, and another setting gives another digest", () => {
+	const profile = [
+		item("p1", "preference", "ピアノの曲が好き"),
+		item("p2", "personal_fact", "住所は鎌倉"),
+	];
+	const window = { profile: { items: profile } } as unknown as WindowSnapshot;
+	expect(memoryDigestOf(window, WIDE)).toBe(memoryDigestOf(window, WIDE));
+	expect(memoryDigestOf(window, WIDE)).not.toBe(
+		memoryDigestOf(window, { alwaysTokens: 2000, alwaysScope: "responses" }),
+	);
+	expect(memoryDigestOf(window, WIDE)).not.toBe(memoryDigestOf(null, WIDE));
+	// A mark that takes an item out of the section changes what the cut stands on.
+	const marked = {
+		profile: { items: [profile[0]!, { ...profile[1]!, sensitive: true }] },
+	} as unknown as WindowSnapshot;
+	expect(memoryDigestOf(marked, WIDE)).not.toBe(memoryDigestOf(window, WIDE));
 });
 
 test("the last message joins a trailing user message and carries `## Memory` when nothing comes before it", () => {
@@ -387,4 +465,115 @@ test("after a gap nothing said before stays, even when the memory or the system 
 		// What the context keeper made of the earlier words goes with them.
 		expect(dropped).toBe(1);
 	}
+});
+
+test("a change of the memory's setting of `## Memory` that changes what it shows places a cut, one that does not changes nothing", () => {
+	const system = "## Role\n- 執事です。";
+	const nowMs = Date.parse("2026-10-29T13:51:00.000Z");
+	const window = {
+		profile: {
+			items: [
+				item("p1", "preference", "ピアノの曲が好き"),
+				item("p2", "personal_fact", "住所は鎌倉"),
+			],
+		},
+		republishRequested: false,
+		newMemories: [],
+	} as unknown as WindowSnapshot;
+	const placedWith = (
+		setting: typeof WIDE | { alwaysTokens: number; alwaysScope: "responses" },
+	) => {
+		const written: unknown[] = [];
+		const deps = {
+			memory: {
+				inputBudgetInTransaction: () => setting,
+				withheldMessagesInTransaction: () => [],
+			},
+			conversation: {
+				input: {
+					cutInTransaction: () => ({
+						seq: 5,
+						revision: 1,
+						systemDigest: systemDigestOf(system),
+						memoryDigest: memoryDigestOf(window, WIDE),
+						due: null,
+						at: "2026-10-29T13:50:00.000Z",
+					}),
+					utterancesAfterInTransaction: () => [
+						{
+							conversationId: "c1",
+							seq: 6,
+							speaker: "user",
+							text: "こんにちは",
+							messageId: "m6",
+							at: "2026-10-29T13:50:30.000Z",
+							toolCalls: [],
+							notice: null,
+						},
+					],
+					writeCutInTransaction: (_tx: unknown, _id: string, cut: object) => {
+						written.push(cut);
+						return { ...cut, revision: 2, due: null };
+					},
+				},
+			},
+		} as unknown as Parameters<typeof placeCutInTransaction>[0];
+		const placed = placeCutInTransaction(deps, {} as never, "c1", {
+			system,
+			window,
+			nowMs,
+			pending: new Set(),
+		});
+		return { reason: placed.reason, written: written.length };
+	};
+	expect(placedWith(WIDE)).toEqual({ reason: null, written: 0 });
+	expect(placedWith({ alwaysTokens: 2000, alwaysScope: "responses" })).toEqual({
+		reason: "memory_changed",
+		written: 1,
+	});
+});
+
+test("the window's sources are captured once, and only a window with something stale in it is judged item by item", () => {
+	const items = Array.from({ length: 50 }, (_, i) =>
+		item(`x${i}`, "preference", `好きなもの${i}`),
+	);
+	const captured: string[][] = [];
+	const staleId = "x7";
+	const deps = (stale: boolean) =>
+		({
+			agency: {
+				isCurrentInputInTransaction: (
+					_tx: unknown,
+					input: { sources: string[]; complete: boolean },
+				) => !(stale && input.sources.includes(`memory:${staleId}`)),
+			},
+			memory: {
+				referenceInputs: {
+					captureInTransaction: (
+						_tx: unknown,
+						input: { itemIds: string[] },
+					) => {
+						captured.push(input.itemIds);
+						return {
+							sources: input.itemIds.map((id) => `memory:${id}`),
+							complete: true,
+						};
+					},
+				},
+			},
+		}) as unknown as Parameters<typeof currentProfileItems>[0];
+	expect(
+		currentProfileItems(deps(false), {} as never, "c1", items),
+	).toHaveLength(50);
+	expect(captured).toHaveLength(1);
+	expect(captured[0]).toHaveLength(50);
+	captured.length = 0;
+	const kept = currentProfileItems(deps(true), {} as never, "c1", items);
+	expect(kept.map((entry) => entry.id)).not.toContain(staleId);
+	expect(kept).toHaveLength(49);
+	// The item-by-item judgment is only for what the whole was not current.
+	expect(captured).toHaveLength(51);
+	expect(currentProfileItems({} as never, {} as never, "c1", items)).toBe(
+		items,
+	);
 });

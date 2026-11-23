@@ -5,6 +5,7 @@ import type {
 	ExcludeForForgetOutcome,
 } from "../contracts/immediate";
 import type { ForgetInput, ForgetOutcome, ForgetPurge } from "../contracts";
+import { purgeMarks } from "../repository";
 import { purgeExplicitRequests, purgeShortRefs } from "../repository/immediate";
 import { createCandidates } from "./candidates";
 import { createEvidence } from "./curation-evidence";
@@ -61,6 +62,7 @@ export function createImmediateLayer(
 		purgeInTransaction(db: Database, purge: ForgetPurge) {
 			purgeExplicitRequests(db, purge.itemIds);
 			purgeShortRefs(db, purge.itemIds);
+			purgeMarks(db, purge.itemIds);
 		},
 		operations: {
 			/** "Remember this" and what the user stated of themselves: saved `user_confirmed` when the quote stands in their message. */

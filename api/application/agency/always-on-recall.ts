@@ -64,7 +64,10 @@ type StateItems = ReturnType<
 	AgencyHostDeps["memory"]["stateItemsInTransaction"]
 >;
 
-/** The memory items of the profile in force now (suppressed and excluded ones are not listed), newest update first. */
+/**
+ * The memory items of the profile in force now (suppressed and excluded ones are not listed, nor the ones marked
+ * sensitive or about another person: a line the agent starts on its own does not bring them up), newest update first.
+ */
 export function currentItems(
 	deps: AgencyHostDeps,
 	db: Database,
@@ -73,10 +76,16 @@ export function currentItems(
 	const status = deps.memory.status();
 	if (!status.enabled || !status.healthy) return [];
 	try {
-		return [...deps.memory.stateItemsInTransaction(db, false)]
+		const items = deps.memory.stateItemsInTransaction(db, false);
+		const marked = deps.memory.marksInTransaction(
+			db,
+			items.map((item) => item.itemId),
+		);
+		return [...items]
 			.filter(
 				(item) =>
 					item.status === "active" &&
+					!marked.has(item.itemId) &&
 					(item.validFromMs === null || item.validFromMs <= now) &&
 					(item.validUntilMs === null || item.validUntilMs > now),
 			)

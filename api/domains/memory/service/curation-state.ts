@@ -1,6 +1,5 @@
 import { listAllState } from "./state-snapshot";
 import type { Database } from "bun:sqlite";
-import { classifyValidity, periodFromStateMs } from "eumenes-memory";
 import { assertUserState, deactivateState } from "eumenes-memory/sqlite";
 import type { HostSourceState, StateItem } from "eumenes-memory/sqlite";
 import {
@@ -9,9 +8,8 @@ import {
 	type CurationResult,
 	type stateKinds,
 } from "../contracts";
-import { putProvenance } from "../repository";
+import { inheritMarks, putProvenance } from "../repository";
 import {
-	MAX_ACTIVE_ITEMS,
 	applied,
 	rejected,
 	type CurationDeps,
@@ -71,17 +69,6 @@ export function createStateWriter(deps: CurationDeps) {
 				item.status === "active",
 		);
 		const now = deps.atMs();
-		// An expired item no longer occupies the profile, whatever its status says.
-		const counted = listed.filter(
-			(item) =>
-				item.status === "active" &&
-				classifyValidity(
-					periodFromStateMs(item.validFromMs, item.validUntilMs),
-					now,
-				) !== "past",
-		).length;
-		if (counted >= MAX_ACTIVE_ITEMS && !active)
-			return { ok: false, reason: "limit_reached" };
 		const polarity = w.negated ? "negated" : "affirmed";
 		const sameValue =
 			active !== undefined &&
@@ -129,6 +116,9 @@ export function createStateWriter(deps: CurationDeps) {
 				: {}),
 		});
 		if (result.status === "applied" || result.status === "unchanged") {
+			// The new version carries the marks of the one it replaced.
+			if ((replace || reconfirm) && active)
+				inheritMarks(db, [active.itemId], result.item.itemId);
 			// A replacement by the agent's own inference is not immediate: a run in flight stays adoptable and the next
 			// published window carries the new version. An explicit correction is recorded by `stored`.
 			return {

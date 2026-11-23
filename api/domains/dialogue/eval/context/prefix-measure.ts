@@ -67,6 +67,7 @@ export async function measurePrefix(options: {
 	for (const [name, trajectory] of Object.entries(TRAJECTORIES)) {
 		const wiring = await options.openWiring();
 		let calls: Awaited<ReturnType<typeof playTrajectory>>;
+		const budget = wiring.memory.status();
 		try {
 			calls = await playTrajectory(
 				wiring,
@@ -77,7 +78,7 @@ export async function measurePrefix(options: {
 			await wiring.close();
 		}
 		for (const call of calls)
-			assertMessageInvariants(call.input, `${name}:${call.label}`);
+			assertMessageInvariants(call.input, `${name}:${call.label}`, budget);
 		const lists = calls.map((call) => call.input.messages);
 		const stability: PrefixStability = prefixStability(lists);
 		// The ordinary calls are the ones no re-construction preceded.

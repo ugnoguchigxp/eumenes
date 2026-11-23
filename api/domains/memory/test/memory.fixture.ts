@@ -40,6 +40,8 @@ import {
 	immediateLayerMigration,
 	tendencyRunMigration,
 	explicitRequestedMigration,
+	itemMarksMigration,
+	inputBudgetMigration,
 } from "../repository";
 import type {
 	CurationItem,
@@ -76,6 +78,8 @@ export const memoryTestMigrations = [
 	immediateLayerMigration,
 	tendencyRunMigration,
 	explicitRequestedMigration,
+	itemMarksMigration,
+	inputBudgetMigration,
 	// Last, so a test that opens a database without it (the earlier design's) keeps every other position.
 	retireExchangeLedgerMigration,
 ];

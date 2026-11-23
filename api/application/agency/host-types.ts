@@ -132,7 +132,9 @@ export type AgencyHostDeps = {
 		MemoryService,
 		| "status"
 		| "list"
-		| "check"
+		| "recall"
+		| "recallInTransaction"
+		| "marksInTransaction"
 		| "stateItemsInTransaction"
 		| "rememberExplicitInTransaction"
 		| "recordCandidateInTransaction"

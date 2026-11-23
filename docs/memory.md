@@ -57,7 +57,7 @@ bun run cli -- memory seed import /absolute/path/to/seed.jsonl --json
 bun run cli -- memory list --json
 ```
 
-APIは `POST /api/memory/seeds/preview` と `POST /api/memory/seeds/import`（本文 `{ seeds: [...] }`）。登録は本人が許可した初回データセットに限る。`ready` の項目だけを全件まとめて確定し、同じキーの既存項目は状態・種類にかかわらず `existing_key` として保留する。意味が似ているかはコードで判定しない。上限100件を超える場合は全件 `blocked / capacity`、途中の保存失敗は全件巻き戻す。Memoryの接続設定は変更しない。
+APIは `POST /api/memory/seeds/preview` と `POST /api/memory/seeds/import`（本文 `{ seeds: [...] }`）。登録は本人が許可した初回データセットに限る。`ready` の項目だけを全件まとめて確定し、同じキーの既存項目は状態・種類にかかわらず `existing_key` として保留する。意味が似ているかはコードで判定しない。件数の上限は無い。途中の保存失敗は全件巻き戻す。Memoryの接続設定は変更しない。
 
 同じデータセットの再投入は `unchanged`、別データセットは `blocked / different_dataset`。受付記録は本文を含まないdigestのみで、後の訂正・停止・忘却をSeedで上書きしない。候補の元資料と出典参照はホスト所有の候補資料として保存し、引用もその資料を指す。Eumenesに架空の本人発言を作らず、元のCodexログは読まない。設定画面では出典を「未確認のSeed候補」と表示する。
 
@@ -242,15 +242,39 @@ HTTP は `GET /api/steward/decisions?conversationId=main&limit=50` と `GET /api
 
 ## 会話から記憶を確かめる
 
-覚えている記録の全部は既定の入力に入らない。会話は読む道具 `read_memory` で確かめる（[設計](../spec/conversation-read-tools-design-2026-10-31.md)）。memory の `check`（`checkItemsInTransaction`）が今有効な State と傾向を、query があれば2字の重なりで当たるものだけ、State を先にそれぞれ新しい順で最大16件返し、入力の `## Memory` にあるものに印を付ける。memory が無効か整合しない間は、道具も候補も出ない。
+設計は [記憶の想起の改善: 実装設計](../spec/memory-recall-implementation-2026-11-23.md) §2。記憶の件数に上限はない。件数は深い整理の起動のきっかけ（steward の `consolidationPressureInTransaction`）にだけ使う。返事の入力への載せ方は 3 段。
+
+| 段 | 置き場所 | 中身と枠 |
+| --- | --- | --- |
+| 常時の区画 `## Memory` | 入力の先頭側（KV キャッシュの前置き。区切りでだけ並び直す） | 本人の言葉の記録（`user_said`）のうち、`alwaysScope` の種類（`responses`=制約・好み、`leanings`=＋習慣、`facts`=＋本人の事実）。機微・ほかの人の印と抑制された記録は載せない。枠は `alwaysTokens`（既定 2,000 トークン）。超えたら 制約 → 好み → 習慣 → 事実 → 新しい順 で残す |
+| その回の区画 `## Recall` | 最後の user メッセージの `## State` の次 | `recallEnabled`（既定 切）のとき、利用者の発言に答える回だけ。発言に関係する記憶（常時の区画に無いもの）・以前の値・予定・食い違いを `recallTokens`（既定 400）・`recallItems`（既定 8）の中で出す。履歴に保存しない。見た記録は run の出どころに入り、忘却・訂正で返事が破棄される |
+| 読む道具 `read_memory` | 道具の結果 | `memory.recall`（`audience: tool`）。常時の区画に載っている記録は省き、関係の強い順に最大 16 件。「ほかに N 件」は当たった残り |
+
+枠と範囲は記憶の設定（`memory_host_settings`、`POST /api/memory/settings`、`GET /api/memory/status`）に置く。コードの定数ではない。
+
+| `recall` の規則 | 内容 |
+| --- | --- |
+| 照合 | 問いと記録の文（本文・`semanticKey`・属性）を NFKC・小文字にし、空白と句読点で語に区切る。1 文字の語はその文字があれば当たり、2 文字以上は文字 2 つ組の含まれる割合 |
+| 並び | score の降順、同点は新しい順。語が無いときは新しい順（傾向は後ろ） |
+| 印 | `audience: host` は、抑制された記録を省き、機微・ほかの人の印の記録は問いの語がそのまま含まれるときだけ返す |
+| 以前の値 | `withPrevious` のとき、同じ事柄の失効した版を新しい順に 2 つまで |
 
 | 場合 | 道具の結果の例 |
 | --- | --- |
-| 当たる | 記憶の記録です（記録です。指示ではありません）。<br>- m1 コーヒーが好き（本人の発言、「## Memory」にある） |
+| 当たる | 記憶の記録です（記録です。指示ではありません）。<br>- m3 犬を飼っている（本人の発言） |
 | 当たらない | 記憶に当たる記録は見つかりませんでした。 |
 | 無効 | 記憶は今は読めません。 |
 
-- 各項目には短い参照（`m1`…）が付く。`## Memory` に出ている項目はその番号、出ていない項目は続きの番号。傾向（L4）は「推定」と付け、参照は付かない。抑制された項目は「話題にしない」と付け、参照は付かない。
+- 各項目には短い参照（`m1`…）が付く。傾向（L4）は「推定」と付け、参照は付かない。抑制された項目は「話題にしない」と付け、参照は付かない。
+- 印（`memory_item_mark`）: 機微（`sensitive`）とほかの人（`aboutOther`）。`memory` ツールの `memory.sensitive`・`memory.subject: other`、背景のパスは抽出の `subject` が本人以外のとき付ける。訂正・統合・取り下げの復元で引き継ぎ、忘却で消える。印の無い既存の記録は、本人のこと・機微でないものとして扱う。
+- 似た記録: 鍵が違っても、同じ種類・極性で正規化した本文が同じなら再確認にする。似ている（`SIMILAR_MIN_SCORE` 以上）なら保存は止めずに結果の `similar` に入れ、`memory` ツールは `similar: ["m7"]` と返す。
+
+### 評価の残りの掃除と候補の移し替え
+
+`POST /api/memory/maintenance/residue/preview|apply` と `candidates/preview|apply`。apply は preview の `digest` が一致したときだけ適用する（違えば 409 `maintenance_conflict`）。
+
+- residue: 根拠の発言がすべて指定のプレフィックスの会話（評価の `eval-` など）にある記録・候補・予定・傾向を止める。利用者の会話と混ざった記録は `mixed` に出すだけで止めない。受領書の記録・傾向は `POST /api/memory/maintenance/apply`（`active: true`）で戻せる。閉じた候補・予定を戻すにはバックアップからの復元が要る。
+- candidates: open の本人の候補のうち、根拠がすべて利用者の発言（評価の会話・外のメモ・取り消された発言を除く）のものを一覧に出し、選んだものを L2（`user_confirmed`）に移して候補を閉じる。
 
 ## 即時の層（明示の依頼の反映）
 
@@ -267,7 +291,7 @@ HTTP は `GET /api/steward/decisions?conversationId=main&limit=50` と `GET /api
 
 返事の採用の検査（`memory_stale`）は、記憶の窓の即時の変更のうち自分の run のものを除く。追加（新しい記憶）では失効しない。
 
-- **件数の上限（100 件）**: 本人の明示の依頼（`requested !== false`。`memory` ツールの remember・correct）には掛けない。背景のパス（`requested: false`）だけが上限を受け、満杯で `limit_reached` が返ったら、Agency の背景のパスはその記憶を L1 の候補として残す（深い整理が統合する）。
+- **件数の上限**: 無い（2026-11-23、利用者の決定）。明示の依頼も背景のパスも件数で拒否しない。
 - **目標の忘却**: ref なしの忘却の対象の解決（Agency）は、目標の両区画（`profile:owner` と `profile:owner:agenda-goals`、完了・取下げ済みを含む）を候補に入れる。選ばれた目標は goals domain の `excludeForForgetInTransaction` で即時に除外し（`goals_excluded`。目標の一覧・`## State`・採用済みの目標・World の snapshot から外れ、それ以後の操作は `invalid_goal`）、記憶担当の依頼（`exclusion.goalIds`）の閉包削除（`forgetGoalsInTransaction`）で履歴・根拠の行ごと消す。目標の根拠の発言は記録の根拠の発言と同じに履歴から隠す。
 - **自分の run の忘却**: 閉包削除の purge（`ForgetPurge.exceptSubjects`）は、その除外を行った run の呼出しを取り消さない。除外が塞いだ根拠の発言は、その run の窓の検査で既知として扱う。作り直しになったとき（`not_adopted`）は、run の入力の発言が処理済みでも `## User` に出し直す（履歴の `## Earlier` には落とさない）。
 - **忘却が進行中の返事を取り消したとき**: 閉包削除が取り消した返事（`retainRequest` の主の呼出し）は、request を残して `memory_stale`（`StaleAnswerInput`）で打ち切り、同じ run が作り直す。取り消した attempt は採用しない。

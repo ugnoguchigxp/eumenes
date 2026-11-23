@@ -2,7 +2,7 @@ import type { Database } from "bun:sqlite";
 import { deactivateState } from "eumenes-memory/sqlite";
 import type { HostSourceState, StateItem } from "eumenes-memory/sqlite";
 import type { CurationItem, CurationResult } from "../contracts";
-import { putMergeLineage, putProvenance } from "../repository";
+import { inheritMarks, putMergeLineage, putProvenance } from "../repository";
 import {
 	MAX_EVIDENCE,
 	MAX_TEXT_CHARS,
@@ -89,6 +89,12 @@ export function createMerge(
 		});
 		if (!written.ok) return rejected("merge", written.reason);
 		putProvenance(db, written.item.itemId, null, "agent", clock(), null);
+		// The merged record is as sensitive, and as much about someone else, as any source was.
+		inheritMarks(
+			db,
+			sources.map((source) => source.itemId),
+			written.item.itemId,
+		);
 		// Forgetting the merged item (or any source) must reach the others: they carry the same words.
 		putMergeLineage(
 			db,

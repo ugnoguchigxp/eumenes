@@ -16,12 +16,14 @@ import { activityIndexesMigration } from "./activity-indexes";
 import { dropRecallMigration } from "./drop-recall";
 import { continuityEventsMigration } from "./events";
 import { sleepLayerMigration } from "./sleep";
+import { sleepPressureMigration } from "./sleep-pressure";
 import { targetRequestsMigration } from "./targets";
 import { worldGoalsMigration } from "./world-goals";
 
 export * from "./activity";
 export * from "./events";
 export * from "./sleep";
+export * from "./sleep-pressure";
 export * from "./targets";
 export * from "./world-goals";
 
@@ -100,6 +102,7 @@ export const migrations: readonly Migration[] = [
 	activityIndexesMigration,
 	sleepLayerMigration,
 	targetRequestsMigration,
+	sleepPressureMigration,
 ];
 
 const CHUNK = 200;

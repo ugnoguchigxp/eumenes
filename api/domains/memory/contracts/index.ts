@@ -7,13 +7,27 @@ export const PRINCIPAL = CONVERSATION_DEFAULT_PRINCIPAL;
 export const PROFILE_SCOPE = "profile:owner";
 import { stateKinds } from "./state-kinds";
 import type { HttpErrorStatus } from "../../../infrastructure/http";
+import type { MemoryInputBudget } from "./recall";
 export { stateKinds } from "./state-kinds";
 export {
 	memorySeedResultSchema,
 	parseMemorySeedJsonl,
 	type MemorySeed,
 } from "./seeds";
-export const settingsSchema = z.object({ enabled: z.boolean() });
+/** What the settings API saves: any of these (at least one); the values it leaves out stay as they are. */
+export const settingsSchema = z
+	.object({
+		enabled: z.boolean().optional(),
+		alwaysTokens: z.number().int().min(200).max(8000).optional(),
+		alwaysScope: z.enum(["responses", "leanings", "facts"]).optional(),
+		recallEnabled: z.boolean().optional(),
+		recallTokens: z.number().int().min(0).max(2000).optional(),
+		recallItems: z.number().int().min(0).max(21).optional(),
+	})
+	.refine((settings) =>
+		Object.values(settings).some((value) => value !== undefined),
+	);
+export type MemorySettingsInput = z.infer<typeof settingsSchema>;
 /** Who asked for an item: the user in conversation (`request`), or the steward on its own (`agent`). `manual`: rows from before manual changes were removed. */
 type MemoryCapturedBy = "request" | "agent" | "manual";
 export interface MemoryItemDto {
@@ -44,6 +58,8 @@ export type MemoryStatus = {
 	/** false while the forget journal is inconsistent: memory is not used at all. */
 	healthy: boolean;
 };
+/** The status with the saved input budget (`GET /api/memory/status`). */
+export type MemorySettingsStatus = MemoryStatus & MemoryInputBudget;
 /**
  * What a run fixes of its ContextWindow at prepare time; re-checked in the adoption transaction.
  * The texts stay in the prompt: this only carries the versions and ids needed to judge staleness.

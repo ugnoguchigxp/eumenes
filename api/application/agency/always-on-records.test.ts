@@ -1,7 +1,5 @@
 import { expect, test } from "bun:test";
-import { listCandidates } from "eumenes-memory/sqlite";
 import { saveItem } from "../../domains/memory/test/memory.fixture";
-import { PRINCIPAL, PROFILE_SCOPE } from "../../domains/memory/contracts";
 import { settle } from "../../infrastructure/wait-for";
 import { agendaFixture, noRecords, type CallKind } from "./always-on.fixture";
 import { RECORDS_PASS_EVENTS, readAfter } from "./always-on-records";
@@ -17,44 +15,14 @@ import {
 	recordsFor,
 } from "./always-on-recall";
 
-/** The memory's count limit of active items (the memory domain's `MAX_ACTIVE_ITEMS`). */
-const MAX_ACTIVE_ITEMS = 100;
-
-type Fixture = Awaited<ReturnType<typeof agendaFixture>>;
-const found = (over: Partial<ReturnType<typeof noRecords>>) => ({
-	...noRecords(),
-	...over,
-});
-/** A script that answers the records writer with the given output (the rest of the calls fall back). */
-const writes = (out: unknown | ((n: number) => unknown)) => (kind: CallKind) =>
-	kind === "records"
-		? typeof out === "function"
-			? (out as (n: number) => unknown)(0)
-			: out
-		: undefined;
-const plans = (f: Fixture) =>
-	f.h.store.read((db) => f.deps.continuity.plans.listInTransaction(db));
-const questions = (f: Fixture) =>
-	f.h.store.read((db) => f.deps.continuity.questions.listInTransaction(db));
-const candidates = (f: Fixture) =>
-	f.h.store.read((db) => {
-		const listed = listCandidates(db, {
-			contractVersion: 1,
-			access: {
-				principal: PRINCIPAL,
-				scopeKeys: [PROFILE_SCOPE],
-				purpose: "memory.read",
-				policyRevision: f.h.memory!.policyRevisionInTransaction(db),
-			},
-			scopeKey: PROFILE_SCOPE,
-		});
-		if (listed.status !== "ok") throw new Error("blocked");
-		return listed.candidates;
-	});
-const exchange = async (f: Fixture, n: string, text: string) => {
-	await f.user(`user-${n}`, "ao", text);
-	await f.assistant(`answer-${n}`, "いいですね。", "ao");
-};
+import {
+	candidates,
+	exchange,
+	found,
+	plans,
+	questions,
+	writes,
+} from "./always-on-records.fixture";
 
 test("the records writer runs at once when none is running, with no wait, and reads the exchange", async () => {
 	const f = await agendaFixture();
@@ -235,44 +203,6 @@ test("memories go to the long-term memory (L2) as the user's own, candidates to 
 		expect(
 			f.h.memory!.list().filter((i) => i.origin !== "user_confirmed"),
 		).toEqual([]);
-	} finally {
-		await f.close();
-	}
-});
-
-test("a memory the writer wants to save while the memory is full is noted as a candidate instead", async () => {
-	const f = await agendaFixture({
-		script: writes(
-			found({
-				memories: [
-					{
-						kind: "preference",
-						semanticKey: "drink.coffee.style",
-						subject: "self",
-						text: "コーヒーはブラックで飲む",
-						quote: "ブラック派",
-						evidence: "user-b",
-					},
-				],
-			}),
-		),
-	});
-	try {
-		await f.start();
-		await f.user("user-a", "ao", "好きなものの話");
-		for (let i = 0; i < MAX_ACTIVE_ITEMS; i++)
-			await saveItem(f.h.store, f.h.memory!, {
-				conversationId: "ao",
-				messageId: "user-a",
-				kind: "preference",
-				semanticKey: `filler.${i}`,
-				text: `好きなもの${i}`,
-			});
-		await exchange(f, "b", "コーヒーはブラック派なんだよね");
-		expect(f.h.memory!.list()).toHaveLength(MAX_ACTIVE_ITEMS);
-		expect(candidates(f).map((c) => c.value.text)).toContain(
-			"コーヒーはブラックで飲む",
-		);
 	} finally {
 		await f.close();
 	}

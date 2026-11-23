@@ -1,23 +1,37 @@
 import type { StewardHarness } from "./steward.fixture";
 import { setupSteward, topicEmbed } from "./steward.fixture";
 import { readSleepState } from "../repository";
+import type { MemoryPressure } from "../service/sleep/policy";
 
 /** The harnesses of a sleep test file: its `afterEach` closes them. */
 export const sleepHarnesses: StewardHarness[] = [];
 export async function closeSleepHarnesses() {
 	for (const h of sleepHarnesses.splice(0)) await h.close();
 }
-/** A steward with the sleep layer on and turns that can be embedded. */
+/** A steward with the sleep layer on and turns that can be embedded. `pressure` is what the memory reports to the steward: a test changes it. */
 export async function setupSleep(
 	options: Parameters<typeof setupSteward>[0] = {},
 ) {
-	const h = await setupSteward({ embed: topicEmbed, sleep: {}, ...options });
+	const pressure: MemoryPressure = { activeItems: 0, similarPairs: 0 };
+	const h = await setupSteward({
+		embed: topicEmbed,
+		sleep: {},
+		...options,
+		wrapMemory: (memory) => {
+			const wrapped = options.wrapMemory?.(memory) ?? memory;
+			return {
+				...wrapped,
+				consolidationPressureInTransaction: () => ({ ...pressure }),
+			};
+		},
+	});
+	Object.assign(h, { pressure });
 	sleepHarnesses.push(h);
 	// The judge of duplicates finds none unless a test says otherwise.
 	h.inference.answer("sleep", { groups: [] });
 	// The conversation is known to the steward (a run of it ended).
 	await h.kick("c1");
-	return h;
+	return h as typeof h & { pressure: MemoryPressure };
 }
 /** 03:30 in Asia/Tokyo: inside the default time window. */
 export const JST_0330 = Date.parse("2026-10-14T18:30:00.000Z");

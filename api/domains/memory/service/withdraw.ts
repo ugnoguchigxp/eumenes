@@ -9,7 +9,7 @@ import type {
 	WithdrawExplicitInput,
 	WithdrawExplicitOutcome,
 } from "../contracts/immediate";
-import { provenanceOf, putProvenance } from "../repository";
+import { inheritMarks, provenanceOf, putProvenance } from "../repository";
 import {
 	appliedRequestOfItem,
 	latestAppliedRequest,
@@ -143,6 +143,7 @@ export function createWithdraw(deps: ImmediateDeps) {
 				if (restored.status !== "applied" && restored.status !== "unchanged")
 					return rejected(writeRejection(restored));
 				restoredItemId = restored.item.itemId;
+				inheritMarks(db, [old.itemId], restoredItemId);
 				putProvenance(
 					db,
 					restoredItemId,

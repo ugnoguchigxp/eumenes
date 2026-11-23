@@ -2,6 +2,7 @@ import { createSharedHostPort } from "./shared-host";
 import { purgeHostInputsOfForget } from "../repository/host-inputs";
 import { createReferenceInputs } from "./reference-input";
 import { createMemoryMaintenance } from "./maintenance";
+import { createMemoryResidue } from "./residue";
 import type { Database } from "bun:sqlite";
 import type { AccessContext } from "eumenes-memory";
 import { sliceUtf8Range } from "eumenes-memory";
@@ -23,21 +24,28 @@ import {
 	type ForgetPurge,
 	type MemoryEmbed,
 	type MemoryItemDto,
+	type MemorySettingsInput,
+	type MemorySettingsStatus,
 	type MemoryStatus,
 	type PreparedWindow,
 	type SettleResult,
 	type TurnRecall,
 } from "../contracts";
 import type { MemorySeed } from "../contracts/seeds";
+import type {
+	MemoryInputBudget,
+	MemoryRecallInput,
+	MemoryRecallResult,
+} from "../contracts/recall";
 import {
 	getUsage,
 	insertUsage,
 	provenanceOf,
 	pruneUsage,
 	purgeSeedSources,
+	readInputBudget,
 	readSettings,
 	SEED_NAMESPACE,
-	writeSettings,
 } from "../repository";
 import { deleteUsage, purgeUsageFor } from "../repository/usage";
 import { createAgentVectors } from "./agent-vectors";
@@ -45,11 +53,10 @@ import { createBackfill } from "./backfill";
 import { createImmediateLayer } from "./immediate-layer";
 import {
 	createContextWindowStore,
-	type CheckedItems,
-	type CheckItemsInput,
-	type ReadItemsInput,
 	type WindowSnapshot,
 } from "./context-window";
+import { createRecall } from "./recall";
+import { createMemorySettings } from "./settings";
 import { createCuration } from "./curation";
 import { executionReferences } from "./execution-references";
 import { createForget } from "./forget";
@@ -191,6 +198,7 @@ export function createMemoryService(
 	});
 	const atMs = () => Date.parse(clock());
 	const windows = createContextWindowStore({ clock, id: newId });
+	const recall = createRecall({ windows, scoped, clock });
 
 	const toDto = (db: Database, item: StateItem) =>
 		itemDto(conversation, db, item);
@@ -305,24 +313,16 @@ export function createMemoryService(
 	// The requests and short references that name a forgotten item go with it.
 	purgeHooks.push(immediate.purgeInTransaction);
 
-	function setEnabledInTransaction(
-		db: Database,
-		enabled: boolean,
-	): MemoryStatus {
-		// Toggling to the same value must not invalidate runs in flight.
-		if (readSettings(db).enabled !== enabled) {
-			writeSettings(db, enabled);
-			windows.recordImmediateInTransaction(db, "settings", null);
-			// What was said while memory was off is never learned.
-			if (enabled) ledger.skipUncuratedEventsInTransaction(db);
-		}
-		return { enabled, healthy: health.healthy };
-	}
+	const settings = createMemorySettings({ health, windows, ledger });
 
 	return {
 		maintenance: createMemoryMaintenance(store, curationDeps, (db) =>
 			stateItems(db, true, "memory.maintenance"),
 		),
+		residue: createMemoryResidue(store, curationDeps, {
+			states: (db) => stateItems(db, true, "memory.maintenance"),
+			immediate: immediate.operations,
+		}),
 		previewSeeds(input: { seeds: readonly MemorySeed[] }) {
 			return store.read((db) => seedImport.preview(db, input));
 		},
@@ -331,20 +331,25 @@ export function createMemoryService(
 		},
 		policyRevisionInTransaction,
 		windows,
-		status(): MemoryStatus {
-			return {
-				enabled: store.read((db) => readSettings(db).enabled),
-				healthy: health.healthy,
-			};
+		status(): MemorySettingsStatus {
+			return store.read(settings.statusInTransaction);
 		},
+		/** Saves any of the settings (enabled and the input budget); the others stay as they are. */
+		updateSettings(patch: MemorySettingsInput): Promise<MemorySettingsStatus> {
+			return store.write((db) => settings.updateInTransaction(db, patch));
+		},
+		updateSettingsInTransaction: settings.updateInTransaction,
+		/** The saved input budget: the always-on section's size and range, and the per-turn recall section. */
+		inputBudgetInTransaction: (db: Database): MemoryInputBudget =>
+			readInputBudget(db),
 		/** Memory is switched on and its journals are consistent (the steward only works then). */
 		referenceInputs,
 		readyInTransaction: (db: Database): boolean =>
 			health.healthy && readSettings(db).enabled,
 		setEnabled(enabled: boolean): Promise<MemoryStatus> {
-			return store.write((db) => setEnabledInTransaction(db, enabled));
+			return store.write((db) => settings.setEnabledInTransaction(db, enabled));
 		},
-		setEnabledInTransaction,
+		setEnabledInTransaction: settings.setEnabledInTransaction,
 		/**
 		 * Must complete before workers start. A broken journal makes memory unusable (fail closed).
 		 * The journals are read inside the writer queue, so they can never be older than the database head.
@@ -363,14 +368,21 @@ export function createMemoryService(
 					: [];
 			});
 		},
-		/** The read tool `read_memory`'s read, in a read of its own; null when memory is off or unhealthy. */
-		check(input: CheckItemsInput): CheckedItems | null {
+		/** The read tool `read_memory`'s ranked read, in a read of its own; null when memory is off or unhealthy. */
+		recall(input: MemoryRecallInput): MemoryRecallResult | null {
 			return store.read((db) =>
 				health.healthy && readSettings(db).enabled
-					? windows.checkItemsInTransaction(db, input)
+					? recall.recallInTransaction(db, input)
 					: null,
 			);
 		},
+		/** The same ranked read inside a transaction the caller owns (the caller checks that memory is usable). */
+		recallInTransaction: recall.recallInTransaction,
+		/** The marks (sensitive, about someone else) of the given records; a record with none has no entry. */
+		marksInTransaction: recall.marksInTransaction,
+		/** The records in force and the alike pairs among them: what the sleeping layer's deep tidying is started by. */
+		consolidationPressureInTransaction:
+			recall.consolidationPressureInTransaction,
 		/** Active (or, with `includeInactive`, every live-status) State items of the profile, as the library holds them. */
 		stateItemsInTransaction: (
 			db: Database,
@@ -481,11 +493,6 @@ export function createMemoryService(
 		},
 		/** The window plan of the saved model: background work sizes its inputs from it. */
 		windowPlan,
-		/** The memory tool's read; null when memory is off or unhealthy (nothing is handed over then). */
-		readItemsInTransaction: (db: Database, input: ReadItemsInput) =>
-			health.healthy && readSettings(db).enabled
-				? windows.readItemsInTransaction(db, input)
-				: null,
 		/**
 		 * Earlier exchanges that resemble `vector`, from before the verbatim window (read-only, no tool call).
 		 * null when memory is off or unhealthy, or nothing qualifies.

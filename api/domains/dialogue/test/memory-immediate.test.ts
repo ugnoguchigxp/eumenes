@@ -570,3 +570,75 @@ test("a fact asked to be remembered again in other words is the first one: it is
 	expect(h!.memory!.list().map((item) => item.text)).toEqual(["鍵は靴箱の上"]);
 	expect(h!.memory!.list(true)).toHaveLength(1);
 });
+
+const marksOf = () =>
+	h!.store.read(
+		(db) =>
+			db
+				.query(
+					"SELECT sensitive, about_other FROM memory_item_mark ORDER BY sensitive DESC, about_other",
+				)
+				.all() as { sensitive: number; about_other: number }[],
+	);
+
+test("a sensitive record and a record of another person are saved with their marks", async () => {
+	await open();
+	h!.state.steps.push(
+		choice({ choice: "none" }),
+		memoryCall({
+			kind: "remember",
+			what: "持病のこと",
+			quote: "喘息がある",
+			memory: {
+				kind: "personal_fact",
+				semanticKey: "health.asthma",
+				text: "喘息がある",
+				sensitive: true,
+			},
+		}),
+		memoryCall({
+			kind: "remember",
+			what: "妹の好み",
+			quote: "妹は猫が好き",
+			memory: {
+				kind: "personal_fact",
+				semanticKey: "sister.likes",
+				text: "妹は猫が好き",
+				subject: "other",
+			},
+		}),
+		{ text: "覚えました。" },
+	);
+	await h!.say("喘息がある。妹は猫が好き");
+	expect(marksOf()).toEqual([
+		{ sensitive: 1, about_other: 0 },
+		{ sensitive: 0, about_other: 1 },
+	]);
+});
+
+test("a remember whose words are close to a record of another key returns that record's reference as similar", async () => {
+	await open();
+	await shownFact();
+	h!.state.steps.push(
+		choice({ choice: "none" }),
+		remember("辛いものが好きです", "food.spicy-level", "辛いものが好きです"),
+		{ text: "覚えました。" },
+	);
+	await h!.say("辛いものが好きです");
+	const result = toolResult(h!.state.calls.at(-1)!);
+	expect(result).toContain('"status":"applied"');
+	expect(result).toContain('"similar":["m1"]');
+	// Nothing was merged: both are kept.
+	expect(h!.memory!.list()).toHaveLength(2);
+});
+
+test("a remember with nothing close to it carries no similar", async () => {
+	await open();
+	h!.state.steps.push(
+		choice({ choice: "none" }),
+		remember("鍵は靴箱の上", "home.key", "鍵は靴箱の上"),
+		{ text: "覚えました。" },
+	);
+	await h!.say("鍵は靴箱の上");
+	expect(toolResult(h!.state.calls.at(-1)!)).not.toContain("similar");
+});

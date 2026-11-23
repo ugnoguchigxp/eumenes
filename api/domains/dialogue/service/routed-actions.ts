@@ -1,3 +1,4 @@
+import type { RoutedInput } from "./context";
 import { systemContext } from "../../../infrastructure/system-context";
 import { IMPACT_ORDER } from "./executor-context";
 import { TOOL_NAMES } from "./generation-tools";
@@ -138,6 +139,12 @@ export async function handWith(
 	return { retry: `${candidate.title}: ${String(code ?? "not_delegated")}` };
 }
 
+/** The records the turn's talk call read as `## Recall`, read by the answer's fill as well (after `## State`). */
+const withRecall = (routed: RoutedInput): RoutedInput =>
+	routed.recall
+		? { ...routed, state: `${routed.state}\n\n${routed.recall}` }
+		: routed;
+
 /** The user answered the question work `t<n>` asked. */
 export async function answerQuestion(turn: Turn, todo: string, text: string) {
 	const answer = (words: string) =>
@@ -161,7 +168,7 @@ export async function answerQuestion(turn: Turn, todo: string, text: string) {
 				?.question ?? "";
 		const filled = await turn.choose(
 			answerMessages({
-				routed: turn.routed!,
+				routed: withRecall(turn.routed!),
 				question,
 				inputSchema,
 				utterance: text,

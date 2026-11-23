@@ -196,11 +196,12 @@ function resultText(tool: ReadTool, found: Found): string {
 }
 
 /**
- * Memory's items as the profile shows them: where each came from, and whether `## Memory` shows it already. Each
- * State item carries the short reference of the window the prompt's `## Memory` belongs to (its own when it is
- * shown there, the next number when it is not); a tendency reads as an estimate and has none; a suppressed item says
- * it is not to be brought up and has none (a reference is for what the user may correct or forget). The references
- * are handed out only while the run is still the current one: a call of a run taken back writes nothing.
+ * Memory's items by how strongly they relate to the query (all of them, newest first, without one), the ones `## Memory`
+ * shows already left out: where each came from, and since when. Each State item carries the short reference of the
+ * window the prompt's `## Memory` belongs to (the next number, as it is not shown there); a tendency reads as an
+ * estimate and has none; a suppressed item says it is not to be brought up and has none (a reference is for what the
+ * user may correct or forget). The references are handed out only while the run is still the current one: a call of a
+ * run taken back writes nothing.
  */
 async function memoryFound(
 	x: ExecutorContext,
@@ -208,22 +209,21 @@ async function memoryFound(
 ): Promise<Found | null> {
 	const { deps, input } = x;
 	const memory = deps.memory;
-	const checked = memory?.check({
-		...(query ? { query } : {}),
-		shown: new Set(input.memoryItemIds),
+	const recalled = memory?.recall({
+		text: query ?? "",
 		limit: LIMITS.memory,
+		shown: new Set(input.memoryItemIds),
+		omitShown: true,
+		withPrevious: false,
+		minScore: 0,
+		audience: "tool",
 	});
-	if (!memory || !checked) return null;
-	const itemIds = checked.items.flatMap((item) =>
-		typeof item.id === "string" ? [item.id] : [],
-	);
+	if (!memory || !recalled) return null;
+	const itemIds = recalled.items.map((item) => item.id);
 	const items = await deps.store.write((tx) => {
 		x.current(tx);
-		const referable = checked.items.flatMap((item) =>
-			typeof item.id === "string" &&
-			!item.id.startsWith("tendency:") &&
-			item.suppressed !== true &&
-			typeof item.revision === "number"
+		const referable = recalled.items.flatMap((item) =>
+			!item.id.startsWith("tendency:") && item.suppressed !== true
 				? [{ itemId: item.id, revision: item.revision }]
 				: [],
 		);
@@ -238,14 +238,14 @@ async function memoryFound(
 						.map((ref) => [ref.itemId, ref.ref])
 				: [],
 		);
-		return checked.items.map((item) => ({
+		return recalled.items.map((item) => ({
 			...item,
-			...(refs.has(String(item.id)) ? { ref: refs.get(String(item.id)) } : {}),
+			...(refs.has(item.id) ? { ref: refs.get(item.id) } : {}),
 		}));
 	});
 	return {
 		lines: items.map(memoryItemLine),
-		more: checked.matched - checked.items.length,
+		more: recalled.matched - recalled.items.length,
 		...(itemIds.length ? { sources: { itemIds } } : {}),
 	};
 }

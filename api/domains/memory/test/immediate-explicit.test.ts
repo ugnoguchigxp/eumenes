@@ -5,7 +5,6 @@ import type {
 	CorrectExplicitInput,
 	RememberExplicitInput,
 } from "../contracts/immediate";
-import { MAX_ACTIVE_ITEMS } from "../service/curation-shared";
 import { setupMemory, type MemoryHarness } from "./memory.fixture";
 
 const open: MemoryHarness[] = [];
@@ -665,40 +664,21 @@ test("what the user stated unasked never replaces a record that stands; with non
 	).toMatchObject({ status: "applied", retractedItemId: run.itemId });
 });
 
-test("the count limit holds back what the agent saves on its own, never what the user asked to be remembered", async () => {
+test("there is no count limit: the agent's own saving and the user's request are both kept past a hundred records", async () => {
 	const h = await setup();
 	const messageId = await h.say("user", "覚えといて、鍵は靴箱の上。");
-	for (let i = 0; i < MAX_ACTIVE_ITEMS; i++) {
+	for (let i = 0; i < 101; i++) {
 		const outcome = await write(h, (db) =>
 			h.memory.rememberExplicitInTransaction(
 				db,
-				rememberInput(messageId, { semanticKey: `filler.${i}` }),
+				rememberInput(messageId, {
+					semanticKey: `filler.${i}`,
+					text: `鍵は靴箱の上に置いている（${"あいうえおかきくけこ".charAt(i % 10)}${i}番）`,
+					requested: i % 2 === 0,
+				}),
 			),
 		);
 		expect(outcome.status).toBe("applied");
 	}
-	// Full: the agent's own saving is refused, with a reason the background pass turns into a candidate.
-	expect(
-		await write(h, (db) =>
-			h.memory.rememberExplicitInTransaction(
-				db,
-				rememberInput(messageId, {
-					semanticKey: "unasked.key",
-					requested: false,
-				}),
-			),
-		),
-	).toEqual({ status: "rejected", reason: "limit_reached" });
-	// The user's own request is never refused for the count (section 6.2: an explicit memory is not left out).
-	expect(
-		await write(h, (db) =>
-			h.memory.rememberExplicitInTransaction(
-				db,
-				rememberInput(messageId, { semanticKey: "asked.key" }),
-			),
-		),
-	).toMatchObject({ status: "applied" });
-	expect(items(h).filter((item) => item.status === "active")).toHaveLength(
-		MAX_ACTIVE_ITEMS + 1,
-	);
+	expect(items(h).filter((item) => item.status === "active")).toHaveLength(101);
 });

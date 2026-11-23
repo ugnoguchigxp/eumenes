@@ -309,7 +309,7 @@ test("an agency utterance is recorded as a spontaneous said event, and the next 
 	});
 });
 
-test("a memory read returns the long-term items that match, tells them to the talk call and logs the read", async () => {
+test("a memory read leaves out the items already in `## Memory` and logs the read", async () => {
 	h = await setup({ memory: true });
 	h.state.steps.push(...reply("はい。"));
 	const first = await h.say("私は辛いものが好きです", "completed");
@@ -335,9 +335,8 @@ test("a memory read returns the long-term items that match, tells them to the ta
 	const notice = last.messages.find(
 		(m) => (m.role as string) === "tool",
 	)!.content;
-	// The item is already in `## Memory`: the read says so beside its text.
-	expect(notice).toContain(`- m1 ${saved.text}（本人の発言`);
-	expect(notice).toContain("「## Memory」にある");
+	// The item is already in `## Memory`: the read leaves it out instead of repeating it.
+	expect(notice).not.toContain(saved.text);
 	expect(
 		last.messages.some(
 			(m) =>

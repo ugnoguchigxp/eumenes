@@ -15,6 +15,7 @@ import {
 	setupMemory,
 	type MemoryHarness,
 } from "./memory.fixture";
+import { readEverything } from "./recall.fixture";
 
 const open: MemoryHarness[] = [];
 const extra: Array<() => Promise<void> | void> = [];
@@ -911,9 +912,8 @@ test("while a forget is only excluded, the tendencies standing on what is exclud
 	await tendency("散歩の話をする", refs(p1, p2), s.unrelated.candidateId);
 	await tendency("朝に走る", refs(p1, p2));
 	const tendencyTexts = () =>
-		(h.memory.check({ shown: new Set(), limit: 50 })?.items ?? [])
-			.filter((item) => item.kind === "tendency")
-			.map((item) => item.text)
+		(readEverything(h.memory)?.items ?? [])
+			.flatMap((item) => (item.kind === "tendency" ? [item.text] : []))
 			.sort();
 	expect(tendencyTexts()).toEqual(
 		[

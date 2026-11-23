@@ -202,11 +202,11 @@ test("transaction failure leaves neither State nor receipt nor source archive", 
 	).toMatchObject({ status: "imported", registered: 2 });
 });
 
-test("capacity rejects the whole batch without changing existing memory", async () => {
+test("there is no capacity: over a hundred records the batch is still registered", async () => {
 	const h = await setup();
 	const id = await h.say("user", "既存項目");
 	await h.curate(
-		Array.from({ length: 99 }, (_, i) => ({
+		Array.from({ length: 101 }, (_, i) => ({
 			op: "remember" as const,
 			kind: "preference" as const,
 			key: `existing.${i}`,
@@ -214,14 +214,11 @@ test("capacity rejects the whole batch without changing existing memory", async 
 			messageId: id,
 		})),
 	);
-	const before = h.memory.list(true);
-	expect(before).toHaveLength(99);
+	expect(h.memory.list(true)).toHaveLength(101);
 	expect(
 		await h.memory.importSeeds({ seeds: [seed("one"), seed("two")] }),
-	).toMatchObject({ status: "blocked", reason: "capacity", availableSlots: 1 });
-	expect(h.memory.list(true)).toEqual(before);
-	expect(receipt(h)).toEqual([]);
-	expect(sources(h)).toEqual([]);
+	).toMatchObject({ status: "imported", registered: 2, reason: null });
+	expect(h.memory.list(true)).toHaveLength(103);
 }, 30_000);
 
 test("correction and partial forget persist across repeat import; candidate evidence can be consolidated without promotion", async () => {

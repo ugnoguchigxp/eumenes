@@ -13,9 +13,12 @@ import { jstSeconds } from "../../../../infrastructure/jst-time";
 import type { Seed, SeedEvent } from "./case-schema";
 import {
 	conversationSystem,
-	memoryDigestOf,
 	systemDigestOf,
 } from "../../service/conversation-input";
+import {
+	alwaysBudgetInTransaction,
+	memoryDigestOf,
+} from "../../service/memory-lines";
 import { createSessionContext } from "./session-context";
 import { writeEvent } from "./session-events";
 import { type GenerateRequest, generateIn, settleIn } from "./session-run";
@@ -83,6 +86,7 @@ export function createSession(
 						memoryDigest: memoryDigestOf(
 							ctx.deps.memory?.windowForRunInTransaction(db, CONVERSATION_ID) ??
 								null,
+							alwaysBudgetInTransaction(ctx.deps, db),
 						),
 						at: newest.at,
 					});

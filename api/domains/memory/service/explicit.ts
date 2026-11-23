@@ -8,14 +8,10 @@ import type {
 	RememberExplicitInput,
 	RememberExplicitOutcome,
 } from "../contracts/immediate";
-import {
-	MAX_ACTIVE_ITEMS,
-	MAX_TEXT_CHARS,
-	isStateKind,
-} from "./curation-shared";
+import { MAX_TEXT_CHARS, isStateKind } from "./curation-shared";
 import { validityBounds, type ValidityBounds } from "./curation-evidence";
 import { insertExplicitRequest } from "../repository/immediate";
-import { putProvenance } from "../repository";
+import { inheritMarks, putMarks, putProvenance } from "../repository";
 import {
 	everyItem,
 	groundedEvidence,
@@ -27,6 +23,16 @@ import {
 	type ImmediateDeps,
 } from "./immediate-shared";
 import { normalizeKey } from "./quote";
+import {
+	SIMILAR_MIN_SCORE,
+	flattenText,
+	queryTerms,
+	similarityOf,
+	searchDocOf,
+} from "./recall-score";
+
+/** How many alike records a save reports. */
+const SIMILAR_LIMIT = 3;
 
 type Fields = {
 	text: string;
@@ -56,8 +62,26 @@ const sameValue = (item: StateItem, fields: Fields) =>
 	item.value.polarity === fields.polarity &&
 	Object.keys(item.value.attributes ?? {}).length === 0;
 
+/** A record that holds the same words (spaces, punctuation and width forms aside) with the same polarity. */
+const sameWords = (item: StateItem, fields: Fields) =>
+	item.value.polarity === fields.polarity &&
+	flattenText(item.value.text) === flattenText(fields.text);
+
 const hasText = (value: unknown): value is string =>
 	typeof value === "string" && value.trim() !== "";
+
+/** The records of `items` whose words are alike `text` (`SIMILAR_MIN_SCORE` and up): the best first, the newer first at a tie. */
+function alikeOf(items: readonly StateItem[], text: string): StateItem[] {
+	const terms = queryTerms(text);
+	if (terms.length === 0) return [];
+	return items
+		.filter((item) => item.excluded !== true && item.suppressed !== true)
+		.map((item) => ({ item, score: similarityOf(terms, searchDocOf(item)) }))
+		.filter((entry) => entry.score >= SIMILAR_MIN_SCORE)
+		.sort((a, b) => b.score - a.score || b.item.updatedSeq - a.item.updatedSeq)
+		.slice(0, SIMILAR_LIMIT)
+		.map((entry) => entry.item);
+}
 
 /**
  * "Remember this" and what the user said of themselves (sections 5.1 and 4.2): saved at once, `user_confirmed`, only
@@ -84,6 +108,7 @@ export function createExplicitOps(deps: ImmediateDeps) {
 			replaces: StateItem | null;
 			/** The same value is stored already: the library only confirms it in place, no new version. */
 			inPlace: boolean;
+			marks?: { sensitive?: boolean; aboutOther?: boolean };
 		},
 	):
 		| {
@@ -130,6 +155,20 @@ export function createExplicitOps(deps: ImmediateDeps) {
 		});
 		if (result.status !== "applied" && result.status !== "unchanged")
 			return { ok: false, reason: writeRejection(result) };
+		// The new version carries the marks of the one it replaced; what the caller marks is added to them.
+		if (input.replaces)
+			inheritMarks(db, [input.replaces.itemId], result.item.itemId);
+		// A mark added to a record that stands already takes it out of the published profile at once.
+		if (
+			input.marks &&
+			putMarks(db, result.item.itemId, input.marks) &&
+			input.inPlace
+		)
+			windows.recordImmediateInTransaction(
+				db,
+				"state_correct",
+				input.sourceRunId,
+			);
 		const changed = result.status === "applied";
 		let requestId: string | null = null;
 		if (changed) {
@@ -201,21 +240,38 @@ export function createExplicitOps(deps: ImmediateDeps) {
 			// Saying it again while the fact is being forgotten would stand beside the version the forget removes.
 			if (ofFact.some((item) => item.excluded === true))
 				return rejected("forget_pending");
-			const active = ofFact.find((item) => item.status === "active");
 			const now = deps.atMs();
-			const counted = listed.filter(
+			const inForce = listed.filter(
 				(item) =>
-					item.excluded !== true &&
+					item.kind === input.kind &&
+					item.subject === "self" &&
 					item.status === "active" &&
 					classifyValidity(
 						periodFromStateMs(item.validFromMs, item.validUntilMs),
 						now,
 					) !== "past",
-			).length;
-			// The count limit is for what the agent saves on its own; what the user asked for is not refused by it.
-			if (input.requested === false && counted >= MAX_ACTIVE_ITEMS && !active)
-				return rejected("limit_reached");
-			const same = active !== undefined && sameValue(active, fields);
+			);
+			let active = ofFact.find((item) => item.status === "active");
+			let twin = false;
+			if (!active) {
+				// The same words under another key are the same record, not a second one.
+				if (
+					inForce.some(
+						(item) => item.excluded === true && sameWords(item, fields),
+					)
+				)
+					return rejected("forget_pending");
+				active = inForce.find(
+					(item) =>
+						item.excluded !== true &&
+						sameWords(item, fields) &&
+						Object.keys(item.value.attributes ?? {}).length === 0,
+				);
+				twin = active !== undefined;
+			}
+			const stored: Fields =
+				twin && active ? { ...fields, text: active.value.text } : fields;
+			const same = active !== undefined && sameValue(active, stored);
 			// What the user stated unasked never replaces a record that stands (a contradiction is not settled by
 			// itself, section 6.2): the one who asks has the user's word on it.
 			if (input.requested === false && active && !same)
@@ -224,6 +280,13 @@ export function createExplicitOps(deps: ImmediateDeps) {
 					reason: "conflict",
 					existingId: active.itemId,
 				};
+			// Records alike but not the same, for the caller to see (nothing is changed for them).
+			const similar = active
+				? []
+				: alikeOf(inForce, fields.text).map((item) => ({
+						itemId: item.itemId,
+						revision: item.revision,
+					}));
 			const saved = save(db, {
 				conversationId: input.conversationId,
 				sourceRunId: input.sourceRunId,
@@ -232,11 +295,15 @@ export function createExplicitOps(deps: ImmediateDeps) {
 				requested: input.requested !== false,
 				op: "remember",
 				kind: input.kind,
-				semanticKey: key,
-				fields,
+				semanticKey: active ? active.semanticKey : key,
+				fields: stored,
 				// The same value is never "replaced": the library confirms the version in place (an inference becomes the user's).
 				replaces: active && !same ? active : null,
 				inPlace: same,
+				marks: {
+					sensitive: input.sensitive === true,
+					aboutOther: input.aboutOther === true,
+				},
 			});
 			if (!saved.ok) return rejected(saved.reason);
 			if (!saved.changed)
@@ -251,6 +318,7 @@ export function createExplicitOps(deps: ImmediateDeps) {
 				itemId: saved.item.itemId,
 				revision: saved.item.revision,
 				replacedItemId: active && !same ? active.itemId : null,
+				similar,
 			};
 		});
 	}

@@ -32,6 +32,10 @@ export type ProfileItem = {
 	revision: number;
 	/** Marked "do not bring up" (only in what `read_memory` reads; the profile leaves such items out). */
 	suppressed?: true;
+	/** Marked sensitive (health, belief and the like): never in the always-on section. Not shown. */
+	sensitive?: true;
+	/** Marked as about someone or something other than the user: never in the always-on section. Not shown. */
+	aboutOther?: true;
 	/** Newer is larger (the package's updated sequence, or the tendency's update time in ms). Not shown. */
 	newness: number;
 	/** The exclusive end of its validity in ms, when bounded. Not shown. */
@@ -41,6 +45,19 @@ export type ProfileItem = {
 const rank = (kind: string) => {
 	const at = (PROFILE_KIND_ORDER as readonly string[]).indexOf(kind);
 	return at < 0 ? PROFILE_KIND_ORDER.length : at;
+};
+
+/** Kinds in the order a short budget keeps them: what shapes the answers first, the user's own facts last. */
+const KEEP_KIND_ORDER = [
+	"constraint",
+	"preference",
+	"habit",
+	"personal_fact",
+	"tendency",
+] as const;
+const keepRank = (kind: string) => {
+	const at = (KEEP_KIND_ORDER as readonly string[]).indexOf(kind);
+	return at < 0 ? KEEP_KIND_ORDER.length : at;
 };
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -80,15 +97,15 @@ const SOURCE_ORDER: readonly ProfileItem["source"][] = [
 ];
 
 /**
- * The items kept when the profile is over its budget: the user's own statements first, then kinds in their fixed
- * order, newest first inside a kind. This is the order of keeping, never of showing: the kept items are shown in
+ * The items kept when the profile is over its budget: the user's own statements first, then constraints, preferences,
+ * habits and facts (`KEEP_KIND_ORDER`), newest first inside a kind. This is the order of keeping, never of showing: the kept items are shown in
  * their published order.
  */
 export function keepOrder(items: readonly ProfileItem[]): ProfileItem[] {
 	return [...items].sort(
 		(a, b) =>
 			SOURCE_ORDER.indexOf(a.source) - SOURCE_ORDER.indexOf(b.source) ||
-			rank(a.kind) - rank(b.kind) ||
+			keepRank(a.kind) - keepRank(b.kind) ||
 			b.newness - a.newness ||
 			(a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
 	);

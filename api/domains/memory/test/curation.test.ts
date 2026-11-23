@@ -578,7 +578,7 @@ test("tendencies: add, update and retire with live evidence of two distinct item
 	expect(h.memory.tendencies()).toEqual([]);
 });
 
-test("the active-item limit rejects a new key but not a replacement", async () => {
+test("there is no active-item limit: the 101st key is saved, and a replacement still replaces", async () => {
 	const h = await setup();
 	const id = await h.say("user", "辛いものが好きです");
 	for (let i = 0; i < 100; i++) {
@@ -588,8 +588,7 @@ test("the active-item limit rejects a new key but not a replacement", async () =
 		if (r.status !== "applied") throw new Error(`rejected at ${i}`);
 	}
 	expect(only(await h.curate([remember(id, { key: "over" })]))).toMatchObject({
-		status: "rejected",
-		reason: "limit_reached",
+		status: "applied",
 	});
 	expect(
 		only(await h.curate([remember(id, { key: "k0", text: "置き換え" })])),

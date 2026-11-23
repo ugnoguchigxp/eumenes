@@ -1,5 +1,8 @@
 import type { Database } from "bun:sqlite";
 import type { Migration } from "../../../infrastructure/sqlite";
+import type { MemoryInputBudget } from "../contracts/recall";
+import { inputBudgetMigration } from "./input-budget";
+import { itemMarksMigration } from "./marks";
 import { seedImportMigration } from "./seeds";
 import { hostInputsMigration } from "./host-inputs";
 import {
@@ -8,6 +11,8 @@ import {
 	tendencyRunMigration,
 } from "./immediate";
 export * from "./seeds";
+export * from "./marks";
+export * from "./input-budget";
 export * from "./immediate";
 export * from "./window";
 export * from "./tendency";
@@ -31,10 +36,25 @@ export function readSettings(db: Database): {
 		.get() as { enabled: number; revision: number };
 	return { enabled: row.enabled === 1, revision: row.revision };
 }
-export function writeSettings(db: Database, enabled: boolean) {
+/**
+ * Saves the settings as a whole. The revision is the access policy's: it steps only when the switch changes (what
+ * a saved answer's sources stand on goes stale with it), never for the input budget.
+ */
+export function writeSettings(
+	db: Database,
+	next: { enabled: boolean } & MemoryInputBudget,
+) {
 	db.query(
-		"UPDATE memory_host_settings SET enabled = ?, revision = revision + 1 WHERE id = 1",
-	).run(enabled ? 1 : 0);
+		`UPDATE memory_host_settings SET revision = revision + (enabled <> ?1), enabled = ?1, always_tokens = ?2,
+		 always_scope = ?3, recall_enabled = ?4, recall_tokens = ?5, recall_items = ?6 WHERE id = 1`,
+	).run(
+		next.enabled ? 1 : 0,
+		next.alwaysTokens,
+		next.alwaysScope,
+		next.recallEnabled ? 1 : 0,
+		next.recallTokens,
+		next.recallItems,
+	);
 }
 export interface UsageReceipt {
 	runId: string;
@@ -302,5 +322,15 @@ export const migrations: readonly Migration[] = [
 		id: "memory/0015-explicit-request-requested",
 		after: ["memory/0014-tendency-run"],
 		sql: explicitRequestedMigration,
+	},
+	{
+		id: "memory/0016-item-marks",
+		after: ["memory/0015-explicit-request-requested"],
+		sql: itemMarksMigration,
+	},
+	{
+		id: "memory/0017-input-budget",
+		after: ["memory/0016-item-marks"],
+		sql: inputBudgetMigration,
 	},
 ];

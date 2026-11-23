@@ -6,7 +6,7 @@ import { configureLogging } from "../../../infrastructure/logger";
 import { openStore, type SqliteStore } from "../../../infrastructure/sqlite";
 import { createConversationService } from "../../conversation";
 import { createContinuityFixture as createContinuityService } from "../../../application/world/state-services.fixture";
-import { createMemoryService } from "..";
+import { createMemoryService, type MemoryRecallInput } from "..";
 import { memoryTestMigrations, saveItem } from "./memory.fixture";
 
 const cleanups: Array<() => Promise<void> | void> = [];
@@ -365,74 +365,63 @@ test("an explicit correction republishes at once and leaves no old text; an infe
 	expect(kinds.map((row) => row.kind)).toContain("state_correct");
 });
 
-test("the memory tool's query matches a natural Japanese sentence by character pairs", async () => {
-	const h = await setup();
-	await h.remember("コーヒーが好き");
-	await h.remember("毎朝走っている", "habit", "毎朝走って");
-	const find = (query: string, shown: string[] = []) =>
-		must(
-			h.store.read((db) =>
-				h.memory.readItemsInTransaction(db, {
-					query,
-					shown: new Set(shown),
-					limit: 10,
-				}),
-			),
-		);
-	const texts = (rows: Array<Record<string, unknown>>) =>
-		rows.map((row) => row.text);
-	expect(texts(find("私はコーヒーが好きでしたっけ"))).toEqual([
-		"コーヒーが好き",
-	]);
-	expect(texts(find("毎朝走ってる？"))).toEqual(["毎朝走っている"]);
-	expect(find("全く関係のない話")).toEqual([]);
-	expect(find("")).toEqual([]);
-	const [first] = find("コーヒー");
-	// An item the input already shows comes back marked, not left out.
-	expect(find("コーヒー", [String(first!.id)])).toEqual([
-		{ ...first, inProfile: true },
-	]);
-});
+/** The ranked read as the read tool uses it: everything is returned, suppressed records marked. */
+const readTool = (
+	h: Awaited<ReturnType<typeof setup>>,
+	text: string,
+	over: Partial<MemoryRecallInput> = {},
+) =>
+	must(
+		h.memory.recall({
+			text,
+			limit: 10,
+			shown: new Set(),
+			omitShown: true,
+			withPrevious: false,
+			minScore: 0,
+			audience: "tool",
+			...over,
+		}),
+	);
 
-test("the read tool's memory read takes every current item without a query, matches by character pairs, and counts both", async () => {
+test("the read tool's ranked read matches a natural Japanese sentence and leaves out what the always-on section shows", async () => {
 	const h = await setup();
 	const coffee = await h.remember("コーヒーが好き");
 	await h.remember("毎朝走っている", "habit", "毎朝走って");
-	const check = (query?: string, limit = 10, shown: string[] = []) =>
-		must(
-			h.memory.check({
-				...(query ? { query } : {}),
-				shown: new Set(shown),
-				limit,
-			}),
-		);
-	const texts = (checked: ReturnType<typeof check>) =>
-		checked.items.map((item) => item.text);
-	// Newest first; the limit bounds the items, not the counts.
-	expect(check()).toMatchObject({ total: 2, matched: 2 });
-	expect(texts(check())).toEqual(["毎朝走っている", "コーヒーが好き"]);
-	expect(check(undefined, 1)).toMatchObject({ total: 2, matched: 2 });
-	expect(texts(check(undefined, 1))).toEqual(["毎朝走っている"]);
-	expect(texts(check("私はコーヒーが好きでしたっけ"))).toEqual([
+	const texts = (read: ReturnType<typeof readTool>) =>
+		read.items.map((item) => item.text);
+	expect(texts(readTool(h, "私はコーヒーが好きでしたっけ"))).toEqual([
 		"コーヒーが好き",
 	]);
-	expect(check("全く関係のない話")).toEqual({
+	expect(texts(readTool(h, "毎朝走ってる？"))).toEqual(["毎朝走っている"]);
+	expect(readTool(h, "全く関係のない話")).toEqual({
 		total: 2,
 		matched: 0,
 		items: [],
 	});
-	// As the profile shows an item: where it came from, and marked when the input shows it already.
-	expect(check("コーヒー", 10, [coffee.id]).items).toEqual([
+	// Without words: every record, newest first, and the counts. The limit bounds the items, not the counts.
+	expect(readTool(h, "")).toMatchObject({ total: 2, matched: 2 });
+	expect(texts(readTool(h, ""))).toEqual(["毎朝走っている", "コーヒーが好き"]);
+	expect(readTool(h, "", { limit: 1 })).toMatchObject({ total: 2, matched: 2 });
+	expect(texts(readTool(h, "", { limit: 1 }))).toEqual(["毎朝走っている"]);
+	// What the always-on section shows is left out, and not counted as matched.
+	const shown = new Set([coffee.id]);
+	expect(readTool(h, "", { shown })).toMatchObject({ total: 2, matched: 1 });
+	expect(texts(readTool(h, "コーヒー", { shown }))).toEqual([]);
+	// Kept (the per-turn section does), it is marked.
+	expect(readTool(h, "コーヒー", { shown, omitShown: false }).items).toEqual([
 		{
 			id: coffee.id,
+			revision: coffee.revision,
 			kind: "preference",
 			text: "コーヒーが好き",
 			source: "user_said",
-			revision: coffee.revision,
 			inProfile: true,
+			score: expect.any(Number),
+			direct: true,
 		},
 	]);
-	// A suppressed item is still read (the caller says it is not to be brought up), and the mark is shown.
+	// A suppressed record is still read by the tool (it says it is not to be brought up), and the mark is shown.
 	await h.store.write((db) =>
 		h.memory.suppressInTransaction(db, {
 			conversationId: "c1",
@@ -440,16 +429,22 @@ test("the read tool's memory read takes every current item without a query, matc
 			target: { itemId: coffee.id },
 		}),
 	);
-	expect(check("コーヒー").items).toEqual([
-		expect.objectContaining({
-			id: coffee.id,
-			revision: coffee.revision,
-			suppressed: true,
-		}),
+	expect(readTool(h, "コーヒー").items).toEqual([
+		expect.objectContaining({ id: coffee.id, suppressed: true }),
 	]);
-	expect(check("毎朝走って").items[0]).not.toHaveProperty("suppressed");
+	expect(readTool(h, "毎朝走って").items[0]).not.toHaveProperty("suppressed");
 	await h.memory.setEnabled(false);
-	expect(h.memory.check({ limit: 10 })).toBeNull();
+	expect(
+		h.memory.recall({
+			text: "",
+			limit: 10,
+			shown: new Set(),
+			omitShown: true,
+			withPrevious: false,
+			minScore: 0,
+			audience: "tool",
+		}),
+	).toBeNull();
 });
 
 test("a rolled-back rebuild is discarded: the next read uses the committed row", async () => {
@@ -564,11 +559,10 @@ test("usage receipts: adoption records the window it read", async () => {
 	expect(receipt?.itemIds).toEqual(window.profile.items.map((item) => item.id));
 });
 
-test("S0-3: expired items do not count toward the active-item limit", async () => {
+test("S0-3: expired items stay stored but are not rendered, and nothing counts them against a limit", async () => {
 	const h = await setup();
 	// Through the 19th, inclusive: expired from 2026-10-20T00:00:00Z.
-	const until: string | null = "2026-10-19";
-	const add = (key: string, validUntil: string | null = until) =>
+	const add = (key: string, validUntil: string | null = "2026-10-19") =>
 		h.save({
 			conversationId: "c1",
 			messageId: "m1",
@@ -578,14 +572,10 @@ test("S0-3: expired items do not count toward the active-item limit", async () =
 			text: `項目 ${key}`,
 			...(validUntil === null ? {} : { validUntil }),
 		});
-	for (let i = 0; i < 100; i++) await add(`k${i}`);
-	await expect(add("over", null)).rejects.toThrow("limit_reached");
-	// Replacing a fact under the same key is still allowed at the limit.
-	await add("k0");
-	h.time.now = "2026-10-21T00:00:00.000Z";
+	for (let i = 0; i < 101; i++) await add(`k${i}`);
 	await add("over", null);
-	// Expired items stay stored (status unchanged) but are not rendered.
-	expect(h.memory.list()).toHaveLength(101);
+	h.time.now = "2026-10-21T00:00:00.000Z";
+	expect(h.memory.list()).toHaveLength(102);
 	const window = must(await h.read());
 	const texts = [...shown(window), ...waiting(window)];
 	expect(texts).toContain("項目 over");

@@ -1,5 +1,5 @@
 # Source: api/domains/dialogue/service/routed-choice.ts
 text = '''記憶変更依頼。what に対象/内容。kind: remember(記憶)・correct(訂正)・forget(忘却)・suppress(話題抑制)・withdraw(直前記憶/訂正の取消)・goal。
-remember/correct: quote に本人今回発言の原文一部をそのまま引用し、memory(text 必須、任意 polarity・validFrom・validUntil；remember は kind・semanticKey も必須)を指定。
+remember/correct: quote に本人今回発言の原文一部をそのまま引用し、memory(text 必須、任意 polarity・validFrom・validUntil・sensitive(健康・宗教・信条・性的指向・政治的立場なら true)・subject(本人は self、ほかの人や物は other)；remember は kind・semanticKey も必須)を指定。
 correct/forget/suppress/withdraw: ## Memory・read_memory の m1… を ref に指定（無ければ ref 省略し what に書く）。
-返却 status: applied=反映済(次発言から有効)、resolving=対象特定中(未反映)、rejected=reason を直して同返答内で再呼出（quote_mismatch=原文不一致、target_changed=更新済→read_memory 再取得、unknown_ref=参照切れ）。'''
+返却 status: applied=反映済(次発言から有効。similar は似た記録の m…で、同じ事柄ならその ref を correct で直す)、resolving=対象特定中(未反映)、rejected=reason を直して同返答内で再呼出（quote_mismatch=原文不一致、target_changed=更新済→read_memory 再取得、unknown_ref=参照切れ）。'''

@@ -14,8 +14,6 @@ import {
 } from "../contracts";
 import type { ContextWindowStore } from "./context-window";
 
-/** Active State items kept in the shared profile. Keeps the fixed view inside its byte budget. */
-export const MAX_ACTIVE_ITEMS = 100;
 export const MAX_TEXT_CHARS = 500;
 /** The library keeps at most this many bytes of a quote. */
 export const MAX_QUOTE_BYTES = 1024;

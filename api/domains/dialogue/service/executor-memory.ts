@@ -54,6 +54,13 @@ export async function memory(
 	args: MemoryArgs,
 ): Promise<ToolOutcome> {
 	const { deps, input, current, actedOnce, handle, actionKey } = x;
+	/**
+	 * The id of the steward's inbox row and of the target resolution. `actionKey` is the utterance numbers and the
+	 * target, which two conversations share, and the inbox refuses a row id another conversation made: the id carries
+	 * the conversation.
+	 */
+	const requestIdOf = (target: string) =>
+		`${input.conversationId}:${actionKey(target)}`;
 	// A request stands on the user's own words: a generation without a new utterance cannot make one. The newest
 	// utterance first: a quote is looked for in each.
 	const messageIds =
@@ -76,8 +83,8 @@ export async function memory(
 			// A retried generation asks again: the first call stands (a withdrawal must not take back another request).
 			outcome = first.created
 				? args.kind === "goal"
-					? goal(x, tx, args, latest)
-					: apply(x, tx, args, messageIds, actionKey(target))
+					? goal(x, tx, args, latest, requestIdOf(target))
+					: apply(x, tx, args, messageIds, requestIdOf(target))
 				: needsResolution(args)
 					? resolving()
 					: applied();
@@ -104,8 +111,9 @@ function goal(
 	tx: Database,
 	args: MemoryArgs,
 	sourceRef: string,
+	requestId: string,
 ): ToolOutcome {
-	const { deps, input, actionKey } = x;
+	const { deps, input } = x;
 	if (!deps.steward) return rejected("steward_unavailable");
 	const accepted = deps.steward.requestInTransaction(tx, {
 		conversationId: input.conversationId,
@@ -113,7 +121,7 @@ function goal(
 		what: args.what,
 		...(args.detail ? { detail: args.detail } : {}),
 		sourceRef,
-		requestId: actionKey(`memory.request:goal:${args.what}`),
+		requestId,
 	});
 	return { result: { accepted: true, requestId: accepted.id } };
 }
@@ -167,9 +175,17 @@ function apply(
 	const written = (outcome: {
 		itemId: string;
 		revision: number;
+		/** Records of another key whose words are close to this one (the model corrects one of them if it is the same fact). */
+		similar?: readonly { itemId: string; revision: number }[];
 	}): ToolOutcome => {
 		const ref = refOf(outcome.itemId, outcome.revision);
-		return applied(ref ? { ref } : {});
+		const similar = (outcome.similar ?? [])
+			.map((item) => refOf(item.itemId, item.revision))
+			.filter((similarRef): similarRef is string => !!similarRef);
+		return applied({
+			...(ref ? { ref } : {}),
+			...(similar.length ? { similar } : {}),
+		});
 	};
 	const fields = () => ({
 		text: record!.text,
@@ -187,6 +203,8 @@ function apply(
 					kind: record!.kind!,
 					semanticKey: record!.semanticKey!,
 					subject: "self",
+					...(record!.sensitive ? { sensitive: true } : {}),
+					...(record!.subject === "other" ? { aboutOther: true } : {}),
 					...fields(),
 				}),
 			);

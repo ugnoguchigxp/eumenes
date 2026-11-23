@@ -8,7 +8,7 @@ import {
 import { getLogger } from "../../infrastructure/logger";
 import { toErrorCode } from "../../infrastructure/error-code";
 import { wordsOf } from "./always-on-feed";
-import { currentItems, overlap, unitsOf } from "./always-on-recall";
+import { overlap, unitsOf } from "./always-on-recall";
 import { PRINCIPAL, PROFILE_SCOPE } from "../../domains/memory/contracts";
 import { listCandidates } from "eumenes-memory/sqlite";
 import { agendaClock, agendaReady, type AgendaScope } from "./always-on-scope";
@@ -164,12 +164,47 @@ type Refs = {
 	plans: Map<string, string>;
 };
 
+/**
+ * The memory records that bear on the user's words, in the memory's own ranking (its `recall`): the same order the
+ * conversation reads them in, so a closer record comes before one that shares a single term. Short references, no
+ * ids. The sensitive and other-person records are shown too (the writer must see what is there not to write it
+ * again); a suppressed one is not.
+ */
+function relatedMemories(
+	deps: AgencyHostDeps,
+	db: Database,
+	said: readonly ExtractSaid[],
+	refs: Refs,
+): ExtractRelated["memories"] {
+	const status = deps.memory.status();
+	if (!status.enabled || !status.healthy) return [];
+	const text = said
+		.filter((s) => s.who === "user")
+		.map((s) => s.text)
+		.join("\n");
+	const found = deps.memory.recallInTransaction(db, {
+		text,
+		limit: RELATED_LIMIT,
+		shown: new Set(),
+		omitShown: false,
+		withPrevious: false,
+		minScore: 0,
+		audience: "tool",
+	});
+	return found.items
+		.filter((item) => !item.suppressed)
+		.map((item, i) => {
+			const ref = `m${i + 1}`;
+			refs.memories.set(ref, item.id);
+			return { ref, kind: item.kind, text: item.text };
+		});
+}
+
 /** The records that bear on these words, as the writer sees them (short references, no ids). */
 function relatedTo(
 	deps: AgencyHostDeps,
 	db: Database,
 	said: readonly ExtractSaid[],
-	now: number,
 ): { related: ExtractRelated; refs: Refs } {
 	const wanted = unitsOf(
 		said
@@ -194,13 +229,7 @@ function relatedTo(
 		kind: candidate.kind,
 		text: candidate.value.text,
 	}));
-	const memories = best(currentItems(deps, db, now), (i) => i.value.text).map(
-		(item, i) => {
-			const ref = `m${i + 1}`;
-			refs.memories.set(ref, item.itemId);
-			return { ref, kind: item.kind, text: item.value.text };
-		},
-	);
+	const memories = relatedMemories(deps, db, said, refs);
 	const plans = best(
 		deps.continuity.plans.listInTransaction(db),
 		(p) => p.text,
@@ -247,6 +276,11 @@ function attempt<T>(db: Database, run: () => T): T | { error: string } {
 	}
 }
 
+/** The writer's `subject` words for the user themselves (the instruction says self; a model may write these). */
+const OWN_SUBJECTS = new Set(["self", "本人", "user", "me"]);
+const isOwnSubject = (subject: string) =>
+	OWN_SUBJECTS.has(subject.normalize("NFKC").trim().toLowerCase());
+
 /** The semantic key of a candidate: it names no fact, only the words, so the same words are the same candidate. */
 const candidateKey = (kind: string, text: string) => {
 	const folded = text.normalize("NFKC").toLowerCase().replace(/\s+/gu, "");
@@ -286,8 +320,11 @@ export function writeRecords(input: {
 				quote: m.quote,
 				kind: m.kind,
 				semanticKey: m.semanticKey,
-				// The memory keeps the user's facts as the user's; the words say whose.
+				// The memory keeps the record as the user's own statement; the writer's subject says whose it is: a
+				// record about another person or thing is marked, so the memory does not bring it up unasked. A
+				// sensitive one is not marked: the writer is told not to write those.
 				subject: "self",
+				...(isOwnSubject(m.subject) ? {} : { aboutOther: true }),
 				text: m.text,
 				polarity: "affirmed",
 				requested: false,
@@ -298,27 +335,6 @@ export function writeRecords(input: {
 			// It disagrees with a version in force (the memory's refusal names it): nothing is overwritten, the
 			// disagreement is an unresolved question for the user.
 			const existingId = (out as { existingId?: string }).existingId;
-			// The memory is full: what the user said is noted as a candidate, which the deep consolidation merges.
-			if (out.reason === "limit_reached") {
-				const kind = m.kind;
-				const noted = attempt(db, () =>
-					deps.memory.recordCandidateInTransaction(db, {
-						conversationId,
-						sourceRunId: runId,
-						kind,
-						semanticKey: candidateKey(kind, m.text),
-						subject: "self",
-						text: m.text,
-						polarity: "affirmed",
-						evidence: [{ messageId: m.evidence }],
-					}),
-				);
-				if ("error" in noted) rejected.push(`memory:candidate:${noted.error}`);
-				else if (noted.status === "rejected")
-					rejected.push(`memory:candidate:${noted.reason}`);
-				else applied.push(`candidate: ${m.text}`);
-				continue;
-			}
 			if (out.reason !== "conflict" || !existingId) {
 				rejected.push(`memory:${out.reason}`);
 				continue;
@@ -447,7 +463,7 @@ async function pass(input: {
 		return {
 			read,
 			...(read.said.some((s) => s.who === "user")
-				? relatedTo(deps, db, read.said, at)
+				? relatedTo(deps, db, read.said)
 				: {}),
 		};
 	});

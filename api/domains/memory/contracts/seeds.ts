@@ -114,8 +114,7 @@ export const memorySeedResultSchema = z.strictObject({
 		hostProcedure: z.number().int(),
 		continuity: z.number().int(),
 	}),
-	availableSlots: z.number().int().nonnegative(),
-	reason: z.enum(["capacity", "different_dataset"]).nullable(),
+	reason: z.enum(["different_dataset"]).nullable(),
 	entries: z.array(
 		z.strictObject({
 			id: z.string(),

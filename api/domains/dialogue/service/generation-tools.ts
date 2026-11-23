@@ -42,7 +42,10 @@ const memoryRecord = z
 	.object({
 		kind: z.enum(stateKinds).optional(),
 		semanticKey: z.string().trim().min(1).max(160).optional(),
-		subject: z.literal("self").optional(),
+		/** Whose record it is: the user's own (default), or another person's or a thing's. */
+		subject: z.enum(["self", "other"]).optional(),
+		/** Health, religion, belief, sexual orientation or political stance. */
+		sensitive: z.boolean().optional(),
 		text: z.string().trim().min(1).max(500),
 		polarity: z.enum(["affirmed", "negated"]).optional(),
 		validFrom: calendarDay.optional(),

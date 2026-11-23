@@ -18,6 +18,8 @@ export function answerMessages(
 		stateLines: string[];
 		askedRequest?: string;
 		agencyLines: string[];
+		/** The lines of `## Recall` (without its heading): what this turn's words bring to mind. */
+		recallLines?: readonly string[];
 		media: readonly { line: string }[];
 		diagnostics: readonly { line: string }[];
 		notice: readonly string[];
@@ -42,10 +44,11 @@ export function answerMessages(
 		...mediaLines,
 		...diagnosticLines,
 	]);
+	const recall = section(INPUT_HEADINGS.recall, input.recallLines ?? []);
 	const notice = section(INPUT_HEADINGS.notice, input.notice);
 	const words = input.texts.map(dataText);
 	const user = section(INPUT_HEADINGS.user, words);
-	const sections = [state, notice, user];
+	const sections = [state, recall, notice, user];
 	const messages = withLastMessage(prefix, sections, input.attachments);
 	if (trace) {
 		const last = messages.at(-1)!;
@@ -71,6 +74,10 @@ export function answerMessages(
 				);
 			}
 			from += state.length + 2;
+		}
+		if (recall) {
+			markInput(last, { kind: "memory" }, from, from + recall.length);
+			from += recall.length + 2;
 		}
 		if (notice) {
 			markInput(

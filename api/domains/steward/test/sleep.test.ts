@@ -5,6 +5,7 @@ import type {
 	UnresolvedConflict,
 } from "eumenes-consolidation";
 import { SLEEP_KEY } from "../contracts";
+import { readPressureBaseline } from "../repository";
 import { SLEEP_POLICY } from "../service/sleep/policy";
 import { deliver } from "../service/sleep/steps";
 import type { StewardDeps } from "../service/types";
@@ -744,4 +745,137 @@ test("a refused tendency holds its candidate alone: the deep run is adopted and 
 		.decisions(SLEEP_KEY)
 		.find((d) => d.step === "deep")!;
 	expect(decision.errorCode).toBeNull();
+});
+
+const baselineOf = (h: Awaited<ReturnType<typeof setup>>) =>
+	h.store.read((db) => readPressureBaseline(db));
+
+test("the first look at the memory only takes the baseline: a large memory does not start the deep run", async () => {
+	const h = await setup();
+	// setup's first kick wrote the baseline of an empty memory; the memory is large from the start of another database.
+	h.time.ms = JST_0330;
+	await h.store.write((db) =>
+		db
+			.query(
+				"UPDATE steward_sleep_state SET deep_item_count = NULL, deep_similar_pairs = NULL",
+			)
+			.run(),
+	);
+	h.pressure.activeItems = 500;
+	h.pressure.similarPairs = 40;
+	await talk(h, 1);
+	await h.rest();
+	expect(stepsOf(h, "deep")).toEqual([]);
+	expect(baselineOf(h)).toEqual({
+		activeItems: 500,
+		similarPairs: 40,
+	});
+});
+
+test("growth of the active items starts the deep run inside the window, once a day, and the finished run moves the baseline", async () => {
+	const h = await setup();
+	h.time.ms = JST_0330;
+	await talk(h, 1);
+	h.pressure.activeItems = SLEEP_POLICY.deepItems - 1;
+	await h.rest();
+	expect(stepsOf(h, "deep")).toEqual([]);
+	h.pressure.activeItems = SLEEP_POLICY.deepItems;
+	await h.rest();
+	expect(stepsOf(h, "deep").map((u) => u.state)).toEqual(["applied"]);
+	expect(state(h).deepDay).toBe("2026-10-15");
+	expect(baselineOf(h)).toEqual({
+		activeItems: SLEEP_POLICY.deepItems,
+		similarPairs: 0,
+	});
+	// The same count the next day is no growth.
+	h.time.ms = JST_0330 + 24 * 3_600_000;
+	await h.rest();
+	expect(stepsOf(h, "deep")).toHaveLength(1);
+	// Growth again, but the day is used up until the next one.
+	h.pressure.activeItems = 2 * SLEEP_POLICY.deepItems;
+	await h.rest();
+	expect(stepsOf(h, "deep")).toHaveLength(2);
+	h.pressure.activeItems = 3 * SLEEP_POLICY.deepItems;
+	await h.rest();
+	expect(stepsOf(h, "deep")).toHaveLength(2);
+});
+
+test("growth of the similar pairs starts the deep run, and outside the window the timer waits for the window", async () => {
+	const h = await setup();
+	await talk(h, 1);
+	h.pressure.similarPairs = SLEEP_POLICY.deepSimilarPairs;
+	// 21:00 JST: outside the window.
+	await h.rest();
+	await h.fireTimer();
+	expect(stepsOf(h, "deep")).toEqual([]);
+	expect(h.timerTimes()).toEqual([Date.parse("2026-10-14T18:00:00.000Z")]);
+	await h.fireTimer();
+	await h.drain();
+	expect(stepsOf(h, "deep").map((u) => u.state)).toEqual(["applied"]);
+	expect(JSON.parse(stepsOf(h, "deep")[0]!.targets)).toMatchObject({
+		supplement: false,
+	});
+	expect(baselineOf(h)).toEqual({
+		activeItems: 0,
+		similarPairs: SLEEP_POLICY.deepSimilarPairs,
+	});
+});
+
+test("the supplement does not start from memory growth, and the baseline it writes is the memory it saw", async () => {
+	const h = await setup();
+	await talk(h, 1);
+	h.pressure.activeItems = 10 * SLEEP_POLICY.deepItems;
+	await h.rest();
+	expect(stepsOf(h, "deep")).toEqual([]);
+	await talk(h, SLEEP_POLICY.supplementEvents / 2);
+	await h.rest();
+	const [deep] = stepsOf(h, "deep");
+	expect(JSON.parse(deep!.targets)).toMatchObject({ supplement: true });
+	expect(state(h).deepDay).toBeNull();
+	expect(baselineOf(h)?.activeItems).toBe(10 * SLEEP_POLICY.deepItems);
+});
+
+test("a memory that shrank below the baseline lowers the baseline: the growth is counted from the lower count", async () => {
+	const h = await setup();
+	h.time.ms = JST_0330;
+	await h.store.write((db) =>
+		db
+			.query(
+				"UPDATE steward_sleep_state SET deep_item_count = 100, deep_similar_pairs = 10",
+			)
+			.run(),
+	);
+	h.pressure.activeItems = 40;
+	h.pressure.similarPairs = 10;
+	await talk(h, 1);
+	await h.rest();
+	// The kick that sees the drop only lowers the baseline (the similar pairs did not drop).
+	expect(stepsOf(h, "deep")).toEqual([]);
+	expect(baselineOf(h)).toEqual({ activeItems: 40, similarPairs: 10 });
+	h.pressure.activeItems = 40 + SLEEP_POLICY.deepItems - 1;
+	await h.rest();
+	expect(stepsOf(h, "deep")).toEqual([]);
+	h.pressure.activeItems = 40 + SLEEP_POLICY.deepItems;
+	await h.rest();
+	expect(stepsOf(h, "deep").map((u) => u.state)).toEqual(["applied"]);
+});
+
+test("a drop of the similar pairs lowers only that baseline", async () => {
+	const h = await setup();
+	h.time.ms = JST_0330;
+	await h.store.write((db) =>
+		db
+			.query(
+				"UPDATE steward_sleep_state SET deep_item_count = 5, deep_similar_pairs = 10",
+			)
+			.run(),
+	);
+	h.pressure.activeItems = 5;
+	h.pressure.similarPairs = 2;
+	await talk(h, 1);
+	await h.rest();
+	expect(baselineOf(h)).toEqual({ activeItems: 5, similarPairs: 2 });
+	h.pressure.similarPairs = 2 + SLEEP_POLICY.deepSimilarPairs;
+	await h.rest();
+	expect(stepsOf(h, "deep").map((u) => u.state)).toEqual(["applied"]);
 });

@@ -15,7 +15,7 @@ import {
 } from "../repository";
 import { listStoredTendencies, restoreTendency } from "../repository/tendency";
 import { createEvidence } from "./curation-evidence";
-import { MAX_ACTIVE_ITEMS, type CurationDeps } from "./curation-shared";
+import type { CurationDeps } from "./curation-shared";
 
 export const memoryMaintenanceInput = z.strictObject({
 	conversationId: z.string().min(1).max(120),
@@ -106,12 +106,6 @@ export function createMemoryMaintenance(
 					if (item.kind === "state") {
 						const state = states(db).find((s) => s.itemId === item.id)!;
 						if (input.active && evidence.usableEvidence(db, state).length === 0)
-							throw new Error("maintenance_conflict");
-						if (
-							input.active &&
-							states(db).filter((s) => s.status === "active").length >=
-								MAX_ACTIVE_ITEMS
-						)
 							throw new Error("maintenance_conflict");
 						const result = (input.active ? reactivateState : deactivateState)(
 							db,

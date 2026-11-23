@@ -40,6 +40,7 @@ type StewardMemory = Pick<
 	| "windows"
 	| "publishWindowInTransaction"
 	| "windowPlan"
+	| "consolidationPressureInTransaction"
 >;
 
 /** What the steward calls of World's curation (the World package owns every rule of what becomes a claim). */

@@ -51,12 +51,13 @@ export async function planJobs(
 	const jobs: Job[] = [];
 	let order = 0;
 	for (const testCase of options.cases) {
-		const m = await materialize(testCase, await options.openWiring(), {
+		const wiring = await options.openWiring();
+		const m = await materialize(testCase, wiring, {
 			catalog: options.catalog,
 		});
 		try {
 			// A case whose messages break an invariant stops the run before any call.
-			assertMessageInvariants(m.input, testCase.id);
+			assertMessageInvariants(m.input, testCase.id, wiring.memory.status());
 			for (let trial = 1; trial <= options.trials; trial++)
 				jobs.push({
 					order: order++,

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { PlanItem } from "../../continuity";
 import type { DialogueDeps } from "../service/context";
-import { PLAN_GOAL_TOKENS } from "../service/state-plans";
+import { PLAN_GOAL_TOKENS, planGoalFields } from "../service/state-plans";
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import {
 	STATE_LIMITS,
@@ -371,4 +371,27 @@ test("a plan or goal that names a topic the user asked not to be brought up is n
 	expect(text).toContain("歯医者");
 	expect(text).not.toContain("元カノ");
 	expect(text).not.toContain("目標:");
+});
+
+test("the plans `## State` shows are named, so `## Recall` does not tell them again", () => {
+	const deps = depsOf([]);
+	const plans = Array.from({ length: 40 }, (_, i) =>
+		plan(`予定の内容その${i + 1}を少し長めに書いたもの`, {
+			dueAt: `2026-11-${String((i % 28) + 1).padStart(2, "0")}`,
+		}),
+	);
+	Object.assign(deps, { continuity: plansOf(plans) });
+	const { lines: shown, planIds } = planGoalFields(deps, {} as Database);
+	// The ids are of the plan lines kept within the bound, in the order shown.
+	expect(planIds.length).toBe(
+		shown.filter((line) => /^- p\d+ /.test(line)).length,
+	);
+	expect(planIds.length).toBeGreaterThan(0);
+	expect(planIds.length).toBeLessThan(plans.length);
+	expect(planIds[0]).toBe(plans.find((p) => p.dueAt === "2026-11-01")!.id);
+	// Goals have no plan id.
+	expect(planGoalFields(depsOf([]), {} as Database)).toEqual({
+		lines: [],
+		planIds: [],
+	});
 });

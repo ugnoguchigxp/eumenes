@@ -1,9 +1,7 @@
 import { delegationContext } from "./confirmation-revisions";
-import { workContextInput } from "./work-context-input";
 import type { InputOrigin } from "../../../infrastructure/model-input";
 import { answerMessages } from "./answer-input";
 import { generatedImageLines } from "./generated-image-text";
-import { backgroundInput } from "./background-input";
 import type { Database } from "bun:sqlite";
 import { recentDiagnostics } from "./diagnostic-evidence";
 import { reportNoticeInTransaction } from "./report-notice";
@@ -41,7 +39,7 @@ import {
 	type ConversationPrefix,
 } from "./conversation-input";
 import { localHarness, routeConversation } from "./harness";
-import { INPUT_HEADINGS, dataText, lineText } from "./input-text";
+import { INPUT_HEADINGS, dataText, lineText, section } from "./input-text";
 import {
 	consumeAnswer,
 	answerTicketInTransaction,
@@ -50,7 +48,7 @@ import {
 import { resultText } from "./result-text";
 import { acceptRunAnswer, endRun } from "./run-end";
 import { finishReportedWork } from "./generation-settle";
-import { workOfRun, type WorkRow } from "../repository/work";
+import type { WorkRow } from "../repository/work";
 import {
 	madeOf,
 	stateProjectionInTransaction,
@@ -61,6 +59,10 @@ import { ASK_STEP } from "./tool-exchange";
 import { taskTargets } from "./task-work";
 import { screenLinesInTransaction } from "./resource-context";
 import { preparedMemoryInTransaction } from "./memory-refs";
+import {
+	recallInTransaction,
+	recordPromptSources,
+} from "./generation-prepare-recall";
 import { parkGenerationInTransaction } from "./targets-hold";
 
 const log = getLogger("dialogue");
@@ -335,6 +337,8 @@ function routedInputInTransaction(
 		nowMs: number;
 		state: ReturnType<typeof stateProjectionInTransaction>;
 		revisions: RoutedInput["pending"]["revisions"];
+		/** `## Recall` as the talk turn shows it, when it shows any line. */
+		recall: string | null;
 		media: readonly { line: string }[];
 		diagnostics: readonly { line: string; ref: string }[];
 		lastAgent: {
@@ -385,6 +389,7 @@ function routedInputInTransaction(
 	});
 	return {
 		memory: input.prefix.memory,
+		recall: input.recall,
 		// Words with no text (a voice message left empty) name nothing a request could point to.
 		earlier: input.prefix.earlier
 			.map((said) => lineText(said).slice(0, PREVIOUS_REPLY_CHARS))
@@ -443,52 +448,30 @@ function routedInputInTransaction(
 	};
 }
 
-function recordPromptSources(
+/** The run's LARM request on the conversation's routes, taken once when its settings snapshot is there. */
+function captureLlmRoute(
 	deps: DialogueDeps,
 	tx: Database,
-	{
-		runId,
-		conversationId,
-		prefix,
-		pendingIds,
-		media,
-		notAdopted,
-	}: {
-		runId: string;
-		conversationId: string;
-		prefix: ConversationPrefix;
-		pendingIds: ReadonlySet<string>;
-		media: ReadonlyArray<{ workId: string }>;
-		notAdopted: boolean;
-	},
+	runId: string,
+	deadlineAtMs: number | null | undefined,
 ) {
-	const memory = deps.memory;
-	if (!memory?.referenceInputs) return;
-	const context = backgroundInput(deps, tx, conversationId, prefix);
-	const pendingInput = memory.referenceInputs.captureInTransaction(tx, {
-		messageIds: [...pendingIds],
-	});
-	const mediaInputs = media.map(({ workId }) =>
-		workContextInput(deps, tx, workId, "image-observation"),
-	);
-	memory.referenceInputs.recordRunInTransaction(
+	const { larm } = deps;
+	if (!larm.captureInTransaction || larm.requestFor?.(tx, runId, "llm")) return;
+	const snapshot = larm.snapshotInTransaction?.(tx);
+	if (!snapshot) return;
+	routeConversation(snapshot);
+	for (const p of ["asr", "tts"] as const)
+		snapshot.routes[p] = {
+			...snapshot.routes[p],
+			mode: "larm-only",
+			cloudAllowed: false,
+		};
+	larm.captureInTransaction(
 		tx,
 		runId,
-		{
-			sources: [
-				...new Set([
-					...context.sources,
-					...pendingInput.sources,
-					...mediaInputs.flatMap((entry) => entry?.sources ?? []),
-				]),
-			],
-			complete:
-				context.complete &&
-				pendingInput.complete &&
-				mediaInputs.every((entry) => entry?.complete),
-		},
-		// An already committed work item still inherits the sources of the attempt that created it.
-		{ replace: notAdopted && workOfRun(tx, runId).length === 0 },
+		"llm",
+		deadlineAtMs ?? Date.now() + DEFAULT_DEADLINE_MS,
+		snapshot,
 	);
 }
 
@@ -580,20 +563,7 @@ export function createPrepare(
 				return failPrepare("memory_blocked");
 			throw error;
 		}
-		if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
-			const snapshot = larm.snapshotInTransaction?.(tx);
-			if (snapshot) {
-				routeConversation(snapshot);
-				for (const p of ["asr", "tts"] as const)
-					snapshot.routes[p] = {
-						...snapshot.routes[p],
-						mode: "larm-only",
-						cloudAllowed: false,
-					};
-				const deadline = claim.deadlineAtMs ?? Date.now() + DEFAULT_DEADLINE_MS;
-				larm.captureInTransaction(tx, run.id, "llm", deadline, snapshot);
-			}
-		}
+		captureLlmRoute(deps, tx, run.id, claim.deadlineAtMs);
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
 		const harness = localHarness;
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
@@ -701,6 +671,14 @@ export function createPrepare(
 		const { offers, revisions, sources } = userTurn
 			? delegationContext(deps, tx, conversationId, state.lines)
 			: { offers: [], revisions: [], sources: [] };
+		// What this turn's words bring to mind: drawn again by every turn, kept in no history.
+		const recall = userTurn
+			? recallInTransaction(deps, tx, {
+					conversationId,
+					prefix,
+					utterances: texts,
+				})
+			: null;
 		recordPromptSources(deps, tx, {
 			runId: run.id,
 			conversationId,
@@ -708,6 +686,7 @@ export function createPrepare(
 			pendingIds: new Set([...pendingIds, ...sources]),
 			media,
 			notAdopted,
+			recalled: recall?.memoryItemIds ?? [],
 		});
 		// Scheduled prompts can receive an answer but carry no authority to control or start work.
 		const routed = userTurn
@@ -720,6 +699,7 @@ export function createPrepare(
 					diagnostics,
 					lastAgent,
 					prefix,
+					recall: recall ? section(INPUT_HEADINGS.recall, recall.lines) : null,
 				})
 			: undefined;
 		const viewing = screenLines.map(({ text }) => text);
@@ -730,6 +710,7 @@ export function createPrepare(
 				: [...state.lines.slice(0, 1), ...screenState],
 			askedRequest: routed?.asked?.request,
 			agencyLines: agencyStateLines(deps, tx, conversationId),
+			recallLines: recall?.lines ?? [],
 			media,
 			diagnostics,
 			notice: noticeBody,

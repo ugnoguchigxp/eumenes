@@ -78,6 +78,10 @@ export type RememberExplicitInput = Origin &
 		subject: "self";
 		/** false: the user said it of their own accord (not "remember this"): captured as the agent's, not a request. Default true. */
 		requested?: boolean;
+		/** Health, religion, belief, sexual orientation, political stance: kept out of the always-on section. */
+		sensitive?: boolean;
+		/** The record is about someone or something other than the user. */
+		aboutOther?: boolean;
 	};
 export type RememberExplicitOutcome =
 	| {
@@ -88,6 +92,8 @@ export type RememberExplicitOutcome =
 			revision: number;
 			/** The version this one replaced (a different value of the same fact was stored). */
 			replacedItemId: string | null;
+			/** Active records of the same kind with another key whose words are alike (at most 3). Nothing was changed for them. */
+			similar: { itemId: string; revision: number }[];
 	  }
 	| { status: "unchanged"; itemId: string; revision: number }
 	| Rejected;

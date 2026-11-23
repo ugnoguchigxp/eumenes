@@ -70,6 +70,27 @@ test("the keep order is kinds first, newest first inside a kind (never the showi
 	]);
 });
 
+test("over the budget a habit is kept before the user's own facts, while the showing order keeps the facts first", () => {
+	const items = [
+		item("fact", "personal_fact", 9),
+		item("habit", "habit", 1),
+		item("constraint", "constraint", 0),
+		item("preference", "preference", 0),
+	];
+	expect(keepOrder(items).map((i) => i.id)).toEqual([
+		"constraint",
+		"preference",
+		"habit",
+		"fact",
+	]);
+	expect(publishedOrder(items, []).map((i) => i.id)).toEqual([
+		"constraint",
+		"preference",
+		"fact",
+		"habit",
+	]);
+});
+
 test("over the budget the user's own words are kept before inferences and observations", () => {
 	const items = [
 		item("c-inferred", "constraint", 9, { source: "inferred" }),

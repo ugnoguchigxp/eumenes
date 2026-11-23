@@ -49,3 +49,28 @@ test("a delegate call without impact or the request is taken (the host fills or 
 			.name,
 	).toBe("delegate");
 });
+
+test("the memory tool takes the marks of a record: sensitive, and whose it is", () => {
+	const call = (memory: Record<string, unknown>) => ({
+		id: "c1",
+		name: "memory",
+		arguments: JSON.stringify({
+			operation: "request",
+			kind: "remember",
+			what: "妹の好み",
+			quote: "妹は猫が好き",
+			memory: {
+				kind: "personal_fact",
+				semanticKey: "sister.likes",
+				text: "妹は猫が好き",
+				...memory,
+			},
+		}),
+	});
+	expect(parseCall(call({ subject: "other", sensitive: true })).name).toBe(
+		"memory",
+	);
+	expect(parseCall(call({ subject: "self" })).name).toBe("memory");
+	expect(() => parseCall(call({ subject: "pet" }))).toThrow();
+	expect(() => parseCall(call({ sensitive: "yes" }))).toThrow();
+});

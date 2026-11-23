@@ -22,6 +22,8 @@ import {
 	immediateLayerMigration,
 	tendencyRunMigration,
 	explicitRequestedMigration,
+	inputBudgetMigration,
+	itemMarksMigration,
 } from "../repository";
 import { hostInputsMigration } from "../repository/host-inputs";
 import {
@@ -48,6 +50,8 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 				m.sql !== immediateLayerMigration &&
 				m.sql !== tendencyRunMigration &&
 				m.sql !== explicitRequestedMigration &&
+				m.sql !== itemMarksMigration &&
+				m.sql !== inputBudgetMigration &&
 				m.sql !== hostInputsMigration &&
 				m.sql !== executionReferencesMigration &&
 				m.sql !== seedImportMigration &&
@@ -89,7 +93,12 @@ test("adding the Seed migration preserves existing memory, conversation and conn
 				],
 			}),
 		);
-		await memory.setEnabled(false);
+		// The version before has no budget columns: switch memory off as that version did.
+		await store.write((db) =>
+			db.exec(
+				"UPDATE memory_host_settings SET enabled = 0, revision = revision + 1 WHERE id = 1",
+			),
+		);
 		const before = memory.list(true);
 		expect(before).toHaveLength(1);
 		await store.close();
@@ -227,6 +236,71 @@ test("memory/0005-steward-ledgers moves the old exclusions to unscoped scheduled
 			await upgraded.close();
 		}
 	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("memory/0016-item-marks and memory/0017-input-budget come up from the version before, keeping the settings and giving the budget its defaults", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "eumenes-memory-0016-"));
+	const path = join(dir, "db.sqlite3");
+	const all = [
+		...conversationMigrations,
+		...continuityMigrations,
+		...hostMemoryMigrations,
+		...packageSql.map((sql, i) => ({ id: `package/${i + 1}`, sql })),
+	];
+	let store = openStore(
+		path,
+		all.filter(
+			(m) => m.sql !== itemMarksMigration && m.sql !== inputBudgetMigration,
+		),
+	);
+	try {
+		await store.write((db) =>
+			db.exec(
+				"UPDATE memory_host_settings SET enabled = 0, revision = 7 WHERE id = 1",
+			),
+		);
+		expect(
+			store.read((db) =>
+				db
+					.query(
+						"SELECT name FROM sqlite_master WHERE name = 'memory_item_mark'",
+					)
+					.get(),
+			),
+		).toBeNull();
+		await store.close();
+		store = openStore(path, all);
+		expect(
+			store.read((db) =>
+				db.query("SELECT * FROM memory_host_settings WHERE id = 1").get(),
+			),
+		).toEqual({
+			id: 1,
+			enabled: 0,
+			revision: 7,
+			always_tokens: 2000,
+			always_scope: "facts",
+			recall_enabled: 0,
+			recall_tokens: 400,
+			recall_items: 8,
+		});
+		expect(
+			store.read((db) =>
+				db
+					.query(
+						"SELECT name FROM pragma_table_info('memory_item_mark') ORDER BY cid",
+					)
+					.all(),
+			),
+		).toEqual([
+			{ name: "item_id" },
+			{ name: "sensitive" },
+			{ name: "about_other" },
+		]);
+	} finally {
+		await store.close();
 		rmSync(dir, { recursive: true, force: true });
 	}
 });

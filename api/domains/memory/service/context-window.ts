@@ -1,8 +1,10 @@
 import { estimateTextTokens } from "../../../infrastructure/context-budget";
 import { referenceJson } from "../../../infrastructure/reference-json";
 import { listAllState } from "./state-snapshot";
+import { normalizeText, searchDocOf } from "./recall-score";
 import type { Database } from "bun:sqlite";
 import { classifyValidity, periodFromStateMs } from "eumenes-memory";
+import type { StateItem } from "eumenes-memory/sqlite";
 import { PRINCIPAL, PROFILE_SCOPE } from "../contracts";
 import {
 	activeTendencies,
@@ -10,6 +12,8 @@ import {
 	insertImmediate,
 	maxImmediateSeq,
 	purgeWindows,
+	readInputBudget,
+	readMarks,
 	readSettings,
 	readWindowKey,
 	readWindowRow,
@@ -41,6 +45,8 @@ export type WindowInputs = {
 	stateChangeSeq: number;
 	tendencyRevision: number;
 	policyRevision: string;
+	/** What the always-on section is built from (its size and range): a change republishes the profile. */
+	budgetKey: string;
 };
 /**
  * The long-term memory a conversation's window shows (`profile`), what has changed since it was published
@@ -69,8 +75,8 @@ export type WindowSnapshot = {
 };
 
 const CONTRACT_VERSION = 1 as const;
-/** 2: a State item's source follows its origin (an inference is not the user's own words). */
-const WINDOW_FORMAT = 2;
+/** 2: a State item's source follows its origin (an inference is not the user's own words). 3: the items carry their marks (sensitive, about someone else). */
+const WINDOW_FORMAT = 3;
 
 /** The package's change counter for the shared profile: it moves whenever State there changes. */
 function latestStateChange(db: Database, policyRevision: string): number {
@@ -107,6 +113,16 @@ function partialDay(date: PartialDateLike): string {
 	return `${date.year}-${two(date.month!)}-${two(date.day!)}`;
 }
 
+/** The user's own record, valid now (or with no bounds). */
+export function isCurrentSelf(item: StateItem, nowMs: number): boolean {
+	if (item.subject !== "self") return false;
+	const validity = classifyValidity(
+		periodFromStateMs(item.validFromMs, item.validUntilMs),
+		nowMs,
+	);
+	return validity === "current" || validity === "unknown";
+}
+
 /** The current, valid State of the profile and the tendencies as items, and the next time validity changes. */
 function currentItems(
 	db: Database,
@@ -135,15 +151,10 @@ function currentItems(
 				(nextBoundaryMs === null || at < nextBoundaryMs)
 			)
 				nextBoundaryMs = at;
+	const marks = readMarks(db);
+	const docs = new Map<string, string>();
 	const states = listed.items
-		.filter((item) => {
-			if (item.subject !== "self") return false;
-			const validity = classifyValidity(
-				periodFromStateMs(item.validFromMs, item.validUntilMs),
-				nowMs,
-			);
-			return validity === "current" || validity === "unknown";
-		})
+		.filter((item) => isCurrentSelf(item, nowMs))
 		.map((item): ProfileItem => {
 			const validity = (
 				item as {
@@ -160,9 +171,13 @@ function currentItems(
 				: item.validUntilMs === null
 					? undefined
 					: lastTokyoDay(item.validUntilMs);
+			const mark = marks.get(item.itemId);
+			docs.set(item.itemId, searchDocOf(item));
 			return {
 				id: item.itemId,
 				...(item.suppressed ? { suppressed: true as const } : {}),
+				...(mark?.sensitive ? { sensitive: true as const } : {}),
+				...(mark?.aboutOther ? { aboutOther: true as const } : {}),
 				kind: item.kind,
 				text: item.value.text.replace(/\s+/g, " ").trim(),
 				negated: item.value.polarity === "negated",
@@ -178,75 +193,25 @@ function currentItems(
 				...(item.validUntilMs === null ? {} : { untilMs: item.validUntilMs }),
 			};
 		});
-	const tendencies = activeTendencies(db).map((row): ProfileItem => ({
-		id: `tendency:${row.id}`,
-		kind: "tendency",
-		text: row.text.replace(/\s+/g, " ").trim(),
-		negated: false,
-		source: "observed",
-		revision: row.revision,
-		newness: Date.parse(row.updatedAt),
-	}));
-	return { items: [...states, ...tendencies], nextBoundaryMs };
+	const tendencies = activeTendencies(db).map((row): ProfileItem => {
+		const id = `tendency:${row.id}`;
+		docs.set(id, normalizeText(row.text));
+		return {
+			id,
+			kind: "tendency",
+			text: row.text.replace(/\s+/g, " ").trim(),
+			negated: false,
+			source: "observed",
+			revision: row.revision,
+			newness: Date.parse(row.updatedAt),
+		};
+	});
+	return { items: [...states, ...tendencies], nextBoundaryMs, docs };
 }
 
 /** Tokens of the profile as the conversation reads it (the items' JSON). */
 export function profileTokens(items: readonly ProfileItem[]): number {
 	return estimateTextTokens(referenceJson(items.map(profileItemFields)));
-}
-
-/** What the memory tool asks to read: the terms of a query; the items the conversation's input already shows. */
-export type ReadItemsInput = {
-	query?: string;
-	shown: ReadonlySet<string>;
-	limit: number;
-};
-
-/**
- * What the read tool `read_memory` reads: the terms of a query (every current item without one), the items the
- * conversation's input already shows, and how many items it returns.
- */
-export type CheckItemsInput = {
-	query?: string;
-	shown?: ReadonlySet<string>;
-	limit: number;
-};
-
-/** That read: the current item count, how many of them match, and the first `limit` of those (as the profile shows them). */
-export type CheckedItems = {
-	total: number;
-	matched: number;
-	items: Array<Record<string, unknown>>;
-};
-
-/** Share of the character pairs of the query, or of the item, the other side must hold for a match. */
-const MATCH_SHARE = 0.5;
-
-/** The characters and character bigrams of each whitespace-separated term, lowercased (a one-character term is itself). */
-function gramsOf(text: string): Set<string> {
-	const grams = new Set<string>();
-	for (const term of text.toLowerCase().split(/\s+/).filter(Boolean)) {
-		const chars = [...term];
-		if (chars.length === 1) grams.add(term);
-		for (let i = 0; i + 1 < chars.length; i++)
-			grams.add(chars[i]! + chars[i + 1]!);
-	}
-	return grams;
-}
-
-/**
- * Natural Japanese has no word breaks, so a query matches an item by overlapping character pairs: at least two
- * shared (or all of a smaller set), and half of the query's pairs (a short query inside a long item) or half of the
- * item's (a long question around a short item).
- */
-function matchesQuery(query: ReadonlySet<string>, text: string): boolean {
-	const item = gramsOf(text);
-	let hit = 0;
-	for (const gram of query) if (item.has(gram)) hit++;
-	return (
-		hit >= Math.min(2, query.size, item.size) &&
-		(hit / query.size >= MATCH_SHARE || hit / item.size >= MATCH_SHARE)
-	);
 }
 
 export function createContextWindowStore(deps: {
@@ -281,6 +246,11 @@ export function createContextWindowStore(deps: {
 	/** A performance copy only: correctness is the (version, buildId) match against the database row. */
 	const cache = new Map<string, WindowSnapshot>();
 
+	function budgetKeyOf(db: Database): string {
+		const { alwaysTokens, alwaysScope } = readInputBudget(db);
+		return `${alwaysTokens}:${alwaysScope}`;
+	}
+
 	function readInputs(db: Database): WindowInputs {
 		const policyRevision = String(readSettings(db).revision);
 		return {
@@ -288,6 +258,7 @@ export function createContextWindowStore(deps: {
 			stateChangeSeq: latestStateChange(db, policyRevision),
 			tendencyRevision: tendencyRevision(db),
 			policyRevision,
+			budgetKey: budgetKeyOf(db),
 		};
 	}
 
@@ -382,6 +353,7 @@ export function createContextWindowStore(deps: {
 							...inputs,
 							immediateSeq: previous.inputs.immediateSeq,
 							policyRevision: previous.inputs.policyRevision,
+							budgetKey: previous.inputs.budgetKey,
 						},
 			profile: { items: shown, tokens: profileTokens(shown) },
 			newMemories,
@@ -409,6 +381,7 @@ export function createContextWindowStore(deps: {
 		return (
 			inputs.immediateSeq !== snapshot.inputs.immediateSeq ||
 			inputs.policyRevision !== snapshot.inputs.policyRevision ||
+			inputs.budgetKey !== snapshot.inputs.budgetKey ||
 			boundaryCrossed(snapshot)
 		);
 	}
@@ -476,64 +449,15 @@ export function createContextWindowStore(deps: {
 			cache.clear();
 		},
 		/**
-		 * The memory tool's read: the current State items and tendencies matching the query (character-pair overlap,
-		 * deterministic), newest first. Items the input already shows are marked `inProfile`; nothing is added,
-		 * strengthened or reordered by reading.
+		 * The current State items and tendencies as profile items (suppressed ones marked), with what each is searched
+		 * by. The material of `recall`: nothing is added, strengthened or reordered by reading.
 		 */
-		readItemsInTransaction(
-			db: Database,
-			input: ReadItemsInput,
-		): Array<Record<string, unknown>> {
-			const { items } = itemsNow(
+		currentItemsInTransaction(db: Database) {
+			return itemsNow(
 				db,
 				String(readSettings(db).revision),
 				Date.parse(clock()),
 			);
-			const grams = gramsOf(input.query ?? "");
-			if (grams.size === 0) return [];
-			return items
-				.filter((item) => matchesQuery(grams, item.text))
-				.sort((a, b) => b.newness - a.newness)
-				.slice(0, input.limit)
-				.map((item) => ({
-					...profileItemFields(item),
-					revision: item.revision,
-					...(item.suppressed ? { suppressed: true } : {}),
-					...(input.shown.has(item.id) ? { inProfile: true } : {}),
-				}));
-		},
-		/**
-		 * The read tool `read_memory`'s read: how many current items the profile holds, and those matching the query
-		 * (every one without a query), the State items before the tendencies, each newest first. Items the input already
-		 * shows are marked `inProfile`. Nothing is added, strengthened or reordered by reading.
-		 */
-		checkItemsInTransaction(
-			db: Database,
-			input: CheckItemsInput,
-		): CheckedItems {
-			const { items } = itemsNow(
-				db,
-				String(readSettings(db).revision),
-				Date.parse(clock()),
-			);
-			const grams = gramsOf(input.query ?? "");
-			const found = grams.size
-				? items.filter((item) => matchesQuery(grams, item.text))
-				: [...items];
-			const tendency = (item: ProfileItem) => Number(item.kind === "tendency");
-			return {
-				total: items.length,
-				matched: found.length,
-				items: found
-					.sort((a, b) => tendency(a) - tendency(b) || b.newness - a.newness)
-					.slice(0, input.limit)
-					.map((item) => ({
-						...profileItemFields(item),
-						revision: item.revision,
-						...(item.suppressed ? { suppressed: true } : {}),
-						...(input.shown?.has(item.id) ? { inProfile: true } : {}),
-					})),
-			};
 		},
 		/** Same transaction as the change itself: a run in flight that predates it is expired. */
 		recordImmediateInTransaction(

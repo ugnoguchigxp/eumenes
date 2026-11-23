@@ -9,6 +9,10 @@ export const SLEEP_POLICY = {
 	shallowCandidates: 10,
 	/** Deep consolidation in the time window: events (of all conversations) since the last deep run. */
 	deepEvents: 20,
+	/** Deep consolidation in the time window: active memory items added since the last deep run (a first hypothesis). */
+	deepItems: 20,
+	/** Deep consolidation in the time window: pairs of similar records added since the last deep run (a first hypothesis). */
+	deepSimilarPairs: 3,
 	/** Deep consolidation without the time window ("supplement"): events since the last deep run. */
 	supplementEvents: 200,
 	/** Shallow consolidation reads at most this many events' turns to embed in one unit. */
@@ -16,6 +20,23 @@ export const SLEEP_POLICY = {
 	/** The closure delete takes at most this many excluded forgets in one unit. */
 	forgetsPerUnit: 8,
 } as const;
+
+/** What the memory holds now, or held at the last deep run. */
+export interface MemoryPressure {
+	activeItems: number;
+	similarPairs: number;
+}
+
+/** Whether the memory grew enough since the baseline to start the deep consolidation (the time window and the day still apply). */
+export function memoryPressed(
+	now: MemoryPressure,
+	baseline: MemoryPressure,
+): boolean {
+	return (
+		now.activeItems - baseline.activeItems >= SLEEP_POLICY.deepItems ||
+		now.similarPairs - baseline.similarPairs >= SLEEP_POLICY.deepSimilarPairs
+	);
+}
 
 /** The time window deep consolidation is pulled into, as `HH:MM` in Asia/Tokyo (a saved setting, 3:00-5:00 by default). */
 export interface SleepWindow {

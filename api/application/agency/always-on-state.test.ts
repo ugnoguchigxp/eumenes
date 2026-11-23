@@ -147,9 +147,9 @@ test("read_memory's record reads with the dialogue domain's own limit", () => {
 		memory: {
 			status: () => ({ enabled: true, healthy: true }),
 			list: () => [],
-			check: (input: { limit: number }) => {
+			recall: (input: { limit: number }) => {
 				limits.push(input.limit);
-				return { items: [], matched: 0 };
+				return { total: 0, items: [], matched: 0 };
 			},
 		},
 	} as unknown as AgencyHostDeps;

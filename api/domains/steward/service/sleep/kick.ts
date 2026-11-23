@@ -14,8 +14,10 @@ import {
 	failedSleepUnits,
 	openUnitOf,
 	readPositions,
+	readPressureBaseline,
 	readSleepState,
 	touchPosition,
+	writePressureBaseline,
 } from "../../repository";
 import { pendingEvents } from "../steps/shared";
 import type { StepEnv, StewardDeps } from "../types";
@@ -25,6 +27,7 @@ import { restOf } from "./rest";
 import {
 	SLEEP_POLICY,
 	inSleepWindow,
+	memoryPressed,
 	jstDay,
 	type SleepWindow,
 } from "./policy";
@@ -150,8 +153,33 @@ export function createSleepKick(
 		const state = readSleepState(db);
 		const window = sleep.window();
 		const events = newEvents(db, conversationIds);
+		// Counted only when it can matter: before a baseline exists, or on a day the deep run has not used up.
+		const baseline = readPressureBaseline(db);
+		const dayFree = state.deepDay !== jstDay(now);
+		const pressure =
+			baseline === null || dayFree
+				? deps.memory.consolidationPressureInTransaction(db)
+				: null;
+		// The first look only takes the baseline: the growth is counted from here.
+		if (baseline === null && pressure) writePressureBaseline(db, pressure);
+		// A forget or a cleanup that took the memory below the baseline lowers it: the growth is counted from there.
+		const lowered =
+			baseline !== null &&
+			pressure !== null &&
+			(pressure.activeItems < baseline.activeItems ||
+				pressure.similarPairs < baseline.similarPairs);
+		if (lowered)
+			writePressureBaseline(db, {
+				activeItems: Math.min(pressure.activeItems, baseline.activeItems),
+				similarPairs: Math.min(pressure.similarPairs, baseline.similarPairs),
+			});
+		const pressed =
+			!lowered &&
+			baseline !== null &&
+			pressure !== null &&
+			memoryPressed(pressure, baseline);
 		const windowDeep =
-			events.total >= SLEEP_POLICY.deepEvents && state.deepDay !== jstDay(now);
+			(events.total >= SLEEP_POLICY.deepEvents || pressed) && dayFree;
 		const deep: "deep" | "supplement" | null =
 			windowDeep && inSleepWindow(now, window)
 				? "deep"

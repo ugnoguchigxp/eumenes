@@ -19,6 +19,7 @@ import {
 	readSleepState,
 	resolveInbox,
 	setDeepDay,
+	writePressureBaseline,
 	setShallowWatermark,
 	writePositions,
 } from "../../repository";
@@ -446,6 +447,11 @@ export const deep: SleepStepDefinition = {
 		// What the run covered is not counted again; the day is used up only by a run of the time window.
 		writePositions(db, input.targets.positions ?? {});
 		if (input.targets.supplement !== true) setDeepDay(db, jstDay(deps.nowMs()));
+		// What the memory holds now is the baseline of the next run's growth (the supplement writes it too).
+		writePressureBaseline(
+			db,
+			deps.memory.consolidationPressureInTransaction(db),
+		);
 		return { results, refs: [] };
 	},
 };

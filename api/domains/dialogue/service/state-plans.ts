@@ -12,7 +12,10 @@ export const PLAN_GOAL_TOKENS = 150;
  * The topic words the user asked not to be brought up. None without memory (nothing can have been asked); null when
  * memory cannot say: the fields are then not shown (a topic that may be one to leave out is not brought up).
  */
-function suppressedTerms(deps: DialogueDeps, tx: Database): string[] | null {
+export function suppressedTerms(
+	deps: DialogueDeps,
+	tx: Database,
+): string[] | null {
 	if (!deps.memory) return [];
 	try {
 		return deps.memory.suppressionsInTransaction(tx).terms;
@@ -22,27 +25,39 @@ function suppressedTerms(deps: DialogueDeps, tx: Database): string[] | null {
 }
 
 function planLine(plan: PlanItem, index: number): string {
+	return `- p${index + 1} ${planText(plan)}${planNotes(plan)}`;
+}
+
+/** The one-line words of a plan. */
+export const planText = (plan: PlanItem) => lineText(plan.text);
+
+/** `（2026-11-25、確認待ち）`: the plan's date and whether it waits for the user's word; empty with neither. */
+export function planNotes(plan: PlanItem): string {
 	const notes = [
 		plan.dueAt,
 		plan.state === "awaiting_confirmation" ? "確認待ち" : null,
 	].filter((note): note is string => !!note);
-	return `- p${index + 1} ${lineText(plan.text)}${notes.length ? `（${notes.join("、")}）` : ""}`;
+	return notes.length ? `（${notes.join("、")}）` : "";
 }
 
 /**
  * The plans with a date (L3: open or waiting for the user's word) and the goals in the agenda's slots, as `## State`
  * shows them (the redesign, section 7.1): the soonest plans first, the goals in slot order, cut at
  * `PLAN_GOAL_TOKENS` together. The continuity leaves out a plan that rests on a forgotten or excluded source, the
- * agency a goal; one that names a topic the user asked not to be brought up is left out here.
+ * agency a goal; one that names a topic the user asked not to be brought up is left out here. `planIds` are the plans
+ * the lines show (what `## Recall` does not show again).
  */
-export function planGoalLines(deps: DialogueDeps, tx: Database): string[] {
+export function planGoalFields(
+	deps: DialogueDeps,
+	tx: Database,
+): { lines: string[]; planIds: string[] } {
 	const terms = suppressedTerms(deps, tx);
-	if (terms === null) return [];
+	if (terms === null) return { lines: [], planIds: [] };
 	const allowed = (text: string) => !touchesSuppressedTerm(terms, text);
 	const plans = deps.continuity.plans
 		.listInTransaction(tx, { kinds: ["plan", "intent"] })
-		.filter((plan) => allowed(plan.text))
-		.map(planLine);
+		.filter((plan) => allowed(plan.text));
+	const planLines = plans.map(planLine);
 	const goals = (deps.agency?.goalSlotsInTransaction?.(tx) ?? [])
 		.filter((goal) => allowed(goal.text))
 		.map(
@@ -58,15 +73,23 @@ export function planGoalLines(deps: DialogueDeps, tx: Database): string[] {
 			if (tokens([heading, ...kept, line]) > left) break;
 			kept.push(line);
 		}
-		return kept.length ? [heading, ...kept] : [];
+		return kept;
 	};
 	// The goals keep room for their first line: a full list of plans does not take every goal away.
 	const reserved = goals.length ? tokens(["目標:", goals[0]!]) : 0;
-	const planField = fit("予定:", plans, PLAN_GOAL_TOKENS - reserved);
-	const goalField = fit(
+	const planKept = fit("予定:", planLines, PLAN_GOAL_TOKENS - reserved);
+	const planField = planKept.length ? ["予定:", ...planKept] : [];
+	const goalKept = fit(
 		"目標:",
 		goals,
 		PLAN_GOAL_TOKENS - (planField.length ? tokens(planField) : 0),
 	);
-	return [...planField, ...goalField];
+	return {
+		lines: [...planField, ...(goalKept.length ? ["目標:", ...goalKept] : [])],
+		planIds: plans.slice(0, planKept.length).map((plan) => plan.id),
+	};
 }
+
+/** The lines of `planGoalFields`, for `## State`. */
+export const planGoalLines = (deps: DialogueDeps, tx: Database): string[] =>
+	planGoalFields(deps, tx).lines;

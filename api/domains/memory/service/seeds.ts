@@ -1,9 +1,5 @@
 import type { Database } from "bun:sqlite";
-import {
-	classifyValidity,
-	periodFromStateMs,
-	type HostSourceState,
-} from "eumenes-memory";
+import type { HostSourceState } from "eumenes-memory";
 import { sha256Hex } from "../../../infrastructure/digest";
 import {
 	memorySeedInputSchema,
@@ -18,7 +14,7 @@ import {
 	seedImportDigest,
 	SEED_NAMESPACE,
 } from "../repository";
-import { MAX_ACTIVE_ITEMS, type CurationDeps } from "./curation-shared";
+import type { CurationDeps } from "./curation-shared";
 import { createStateWriter } from "./curation-state";
 
 /** One additive candidate import. No semantic matching, overwriting, origin promotion or startup auto-import. */
@@ -31,15 +27,6 @@ export function createSeedImport(deps: CurationDeps) {
 			.seeds.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 		const digest = sha256Hex(JSON.stringify(seeds));
 		const items = writer.items(db, true);
-		const counted = items.filter(
-			(item) =>
-				item.status === "active" &&
-				classifyValidity(
-					periodFromStateMs(item.validFromMs, item.validUntilMs),
-					deps.atMs(),
-				) !== "past",
-		).length;
-		const availableSlots = Math.max(0, MAX_ACTIVE_ITEMS - counted);
 		const counts = {
 			total: seeds.length,
 			state: seeds.filter((s) => s.proposed_target === "state").length,
@@ -54,7 +41,6 @@ export function createSeedImport(deps: CurationDeps) {
 			digest,
 			registered: 0,
 			counts,
-			availableSlots,
 			reason: receipt && receipt !== digest ? "different_dataset" : null,
 			entries: seeds.map((seed) => {
 				const existing = items.find(
@@ -75,13 +61,6 @@ export function createSeedImport(deps: CurationDeps) {
 				};
 			}),
 		};
-		if (
-			result.status === "ready" &&
-			result.entries.filter((e) => e.result === "ready").length > availableSlots
-		) {
-			result.status = "blocked";
-			result.reason = "capacity";
-		}
 		return { seeds, result };
 	}
 

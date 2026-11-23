@@ -266,15 +266,23 @@ export function readMemoryRefs(
 	query: string | undefined,
 	now: number,
 ) {
-	const checked = deps.memory.check({
-		...(query ? { query } : {}),
-		shown: new Set(),
+	const checked = deps.memory.recall({
+		text: query ?? "",
 		limit: READ_MEMORY_LIMIT,
+		shown: new Set(),
+		omitShown: true,
+		withPrevious: false,
+		minScore: 0,
+		audience: "tool",
 	});
 	if (!checked) return [];
 	const active = new Set(activeMemory(deps, now).map((item) => item.id));
+	// A record marked sensitive or about another person is not one a line the agent starts on its own may rest on.
 	return checked.items.flatMap((item) =>
-		typeof item.id === "string" && active.has(item.id)
+		typeof item.id === "string" &&
+		!item.sensitive &&
+		!item.aboutOther &&
+		active.has(item.id)
 			? [`memory:${item.id}`]
 			: [],
 	);

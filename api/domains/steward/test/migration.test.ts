@@ -357,3 +357,42 @@ test("steward/0007 drops the upkeep and the per-exchange judgments, ends the ref
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("steward/0009 adds the memory baseline of the deep run to the sleep state, empty (no baseline yet)", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "steward-0009-"));
+	const path = join(dir, "db.sqlite3");
+	try {
+		const old = openStore(path, [
+			...conversationMigrations,
+			...stewardMigrations.slice(0, 8),
+		]);
+		await old.write((db) =>
+			db
+				.query(
+					"UPDATE steward_sleep_state SET deep_day = '2026-10-14' WHERE id = 1",
+				)
+				.run(),
+		);
+		await old.close();
+		const upgraded = openStore(path, [
+			...conversationMigrations,
+			...stewardMigrations,
+		]);
+		try {
+			expect(
+				upgraded.read(
+					(db) =>
+						db
+							.query(
+								"SELECT deep_day AS d, deep_item_count AS i, deep_similar_pairs AS p FROM steward_sleep_state",
+							)
+							.all() as unknown[],
+				),
+			).toEqual([{ d: "2026-10-14", i: null, p: null }]);
+		} finally {
+			await upgraded.close();
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
