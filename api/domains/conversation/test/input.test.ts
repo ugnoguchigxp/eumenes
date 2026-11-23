@@ -361,3 +361,34 @@ test("upgrading legacy summaries retires unverifiable text once and keeps the co
 		),
 	).toBe("verified");
 });
+
+test("clearing staged summaries supersedes pending rows without touching the active summary", async () => {
+	const { store, input } = setup();
+	await store.write((db) => {
+		const base = {
+			conversationId: "c1",
+			baseCutRevision: 1,
+			coveredFromSeq: 1,
+			coveredThroughSeq: 3,
+			sourceRefs: ["m1"],
+			tokenEstimate: 5,
+			kind: "llm" as const,
+			at: "2026-11-23T00:00:00Z",
+		};
+		input.replaceActiveSummaryInTransaction(db, {
+			...base,
+			id: "active-1",
+			text: "active",
+		});
+		input.saveStagedSummaryInTransaction(db, {
+			...base,
+			id: "staged-1",
+			coveredThroughSeq: 6,
+			text: "staged",
+		});
+		expect(input.stagedSummaryInTransaction(db, "c1", 1)?.id).toBe("staged-1");
+		input.clearStagedSummariesInTransaction(db, "c1");
+		expect(input.stagedSummaryInTransaction(db, "c1", 1)).toBeNull();
+		expect(input.activeSummaryInTransaction(db, "c1")?.id).toBe("active-1");
+	});
+});

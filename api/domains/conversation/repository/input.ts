@@ -269,13 +269,15 @@ export function utterancesByMessageIds(
 	messageIds: readonly string[],
 ): Utterance[] {
 	if (!messageIds.length || !inputReady(db)) return [];
-	const placeholders = messageIds.map(() => "?").join(",");
 	return (
 		db
 			.query(
-				`SELECT ${UTTERANCE_COLUMNS} FROM conversation_utterances WHERE conversation_id = ? AND retracted_at IS NULL AND message_id IN (${placeholders}) ORDER BY seq`,
+				`SELECT ${UTTERANCE_COLUMNS} FROM conversation_utterances WHERE conversation_id = ? AND retracted_at IS NULL AND message_id IN (SELECT value FROM json_each(?)) ORDER BY seq`,
 			)
-			.all(conversationId, ...messageIds) as UtteranceRow[]
+			.all(
+				conversationId,
+				JSON.stringify([...new Set(messageIds)]),
+			) as UtteranceRow[]
 	).map(utteranceOf);
 }
 

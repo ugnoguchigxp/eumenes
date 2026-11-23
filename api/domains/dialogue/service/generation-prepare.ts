@@ -568,44 +568,47 @@ export function createPrepare(
 			endRun(deps, tx, current, "cancelled", "utterance_handled");
 			return { status: "stale", reason: "utterance_handled" };
 		}
+		const failPrepare = (reason: string) => {
+			endRun(deps, tx, current, "failed", reason);
+			return { status: "stale" as const, reason };
+		};
 		let window: WindowSnapshot | null = null;
 		try {
 			window = memory?.windowForRunInTransaction(tx, conversationId) ?? null;
 		} catch (error) {
-			if (!(error instanceof Error) || error.message !== "memory_blocked")
-				throw error;
-			// Never silently drop memory and continue; end the run with the reason.
-			endRun(deps, tx, current, "failed", "memory_blocked");
-			return { status: "stale", reason: "memory_blocked" };
+			if (error instanceof Error && error.message === "memory_blocked")
+				return failPrepare("memory_blocked");
+			throw error;
 		}
 		if (larm.captureInTransaction && !larm.requestFor?.(tx, run.id, "llm")) {
 			const snapshot = larm.snapshotInTransaction?.(tx);
 			if (snapshot) {
 				routeConversation(snapshot);
-				for (const p of ["asr", "tts"] as const) {
-					snapshot.routes[p].mode = "larm-only";
-					snapshot.routes[p].cloudAllowed = false;
-				}
-				larm.captureInTransaction(
-					tx,
-					run.id,
-					"llm",
-					claim.deadlineAtMs ?? Date.now() + DEFAULT_DEADLINE_MS,
-					snapshot,
-				);
+				for (const p of ["asr", "tts"] as const)
+					snapshot.routes[p] = {
+						...snapshot.routes[p],
+						mode: "larm-only",
+						cloudAllowed: false,
+					};
+				const deadline = claim.deadlineAtMs ?? Date.now() + DEFAULT_DEADLINE_MS;
+				larm.captureInTransaction(tx, run.id, "llm", deadline, snapshot);
 			}
 		}
 		const requestId = larm.requestFor?.(tx, run.id, "llm");
 		const harness = localHarness;
 		// This run's context is fixed by the host: the server must neither trim nor reorder it.
-		if (requestId) larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
+		if (requestId)
+			try {
+				larm.setContextPolicyInTransaction?.(tx, requestId, "exact");
+			} catch (error) {
+				if (error instanceof Error && error.message === "permission_revoked")
+					return failPrepare("permission_revoked");
+				throw error;
+			}
 		const system = conversationSystem(deps, tx, conversationId);
 		const fixed = estimateTextTokens(system);
 		const plan = planWindow({ window: windowOf(deps, tx, run.id), fixed });
-		if (!plan.usable) {
-			endRun(deps, tx, current, "failed", "window_too_small");
-			return { status: "stale", reason: "window_too_small" };
-		}
+		if (!plan.usable) return failPrepare("window_too_small");
 		const pendingIds = new Set(pending.flatMap((event) => event.messageIds));
 		// The recent conversation is cut by the host's fixed rules before it is drawn (section 6.1.1).
 		const limits = workingLimits(plan);

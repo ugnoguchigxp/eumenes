@@ -21,6 +21,7 @@ import {
 	type WorkingLimits,
 } from "./conversation-input";
 import { dataText } from "./input-text";
+import { excludedOnlyIn } from "./memory-refs";
 import {
 	summaryMaterial,
 	summaryRefsValid,
@@ -33,11 +34,13 @@ const log = getLogger("dialogue");
 /** Background queue job kind for pre-computing compacted conversation summaries (`## Summary`). */
 export const COMPACT_SUMMARY_KIND = "dialogue.compact_summary";
 
-const COMPACT_TIMEOUT_MS = 30_000;
+const COMPACT_TIMEOUT_MS = 45_000;
 
 const compactPayloadSchema = z.object({
 	conversationId: z.string(),
 	baseCutRevision: z.number().int(),
+	// Optional for jobs queued before cut-seq scoping; required on new jobs so repeated compactions never collide.
+	baseCutSeq: z.number().int().nonnegative().optional(),
 	// Jobs queued before the foreground budget was captured have no budget.
 	budget: z
 		.object({
@@ -52,6 +55,7 @@ type CompactPayload = z.infer<typeof compactPayloadSchema>;
 type CompactPrepared = {
 	conversationId: string;
 	baseCutRevision: number;
+	baseCutSeq: number;
 	coveredFromSeq: number;
 	coveredThroughSeq: number;
 	sourceRefs: string[];
@@ -114,14 +118,28 @@ export function maybeEnqueueCompactionInTransaction(
 	const store = deps.conversation.input;
 	const cut = store.cutInTransaction(tx, conversationId);
 	if (!cut || cut.due) return false;
-	if (store.stagedSummaryInTransaction?.(tx, conversationId, cut.revision))
-		return false;
+	const staged = store.stagedSummaryInTransaction?.(
+		tx,
+		conversationId,
+		cut.revision,
+	);
+	if (staged && staged.coveredThroughSeq > cut.seq) return false;
 	const pending = pendingMessageIdsInTransaction(deps, tx, conversationId);
-	const shown = store
-		.utterancesAfterInTransaction(tx, conversationId, cut.seq)
-		.filter(
-			(u) => !(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
-		);
+	const rawShown = store.utterancesAfterInTransaction(
+		tx,
+		conversationId,
+		cut.seq,
+	);
+	const withheld = excludedOnlyIn(
+		deps,
+		tx,
+		rawShown.flatMap((u) => (u.messageId ? [u.messageId] : [])),
+	);
+	const shown = rawShown.filter(
+		(u) =>
+			!(u.messageId && withheld.has(u.messageId)) &&
+			!(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
+	);
 	const users = shown.reduce(
 		(sum, u) => sum + (u.speaker === "user" ? 1 : 0),
 		0,
@@ -130,26 +148,33 @@ export function maybeEnqueueCompactionInTransaction(
 		return false;
 	const targetCutSeq = keepNewestCut(shown, cut.seq, limits);
 	if (targetCutSeq <= cut.seq) return false;
-	deps.queue.enqueueInTransaction(tx, {
-		scope: "dialogue",
-		kind: COMPACT_SUMMARY_KIND,
-		dedupeKey: `compact:${conversationId}:${cut.revision}`,
-		payload: {
-			conversationId,
-			baseCutRevision: cut.revision,
-			budget: {
-				lowTokens: limits.lowTokens,
-				lowUtterances: limits.lowUtterances,
-				summaryMaxTokens: limits.summaryMaxTokens,
+	try {
+		deps.queue.enqueueInTransaction(tx, {
+			scope: "dialogue",
+			kind: COMPACT_SUMMARY_KIND,
+			dedupeKey: `compact:${conversationId}:${cut.revision}:${cut.seq}`,
+			payload: {
+				conversationId,
+				baseCutRevision: cut.revision,
+				baseCutSeq: cut.seq,
+				budget: {
+					lowTokens: limits.lowTokens,
+					lowUtterances: limits.lowUtterances,
+					summaryMaxTokens: limits.summaryMaxTokens,
+				},
 			},
-		},
-		subjectRef: `background:compact:${conversationId}:${cut.revision}`,
-		lane: "background",
-		resourceKey: "inference.llm",
-		maxAttempts: 1,
-		concurrencyKey: `compact:${conversationId}`,
-	});
-	return true;
+			subjectRef: `background:compact:${conversationId}:${cut.revision}:${cut.seq}`,
+			lane: "background",
+			resourceKey: "inference.llm",
+			maxAttempts: 1,
+			concurrencyKey: `compact:${conversationId}`,
+		});
+		return true;
+	} catch (error) {
+		if (error instanceof Error && error.message === "queue_dedupe_conflict")
+			return false;
+		throw error;
+	}
 }
 
 /** Background queue handler that generates and stages compacted `## Summary` rows with strict TOCTOU checks. */
@@ -170,22 +195,41 @@ export function createCompactionSummaryHandler(
 		recovery: "interrupt",
 		resourceKey: "inference.llm",
 		prepareInTransaction(tx, claim) {
-			const { conversationId, baseCutRevision } = claim.payload;
+			const { conversationId, baseCutRevision, baseCutSeq } = claim.payload;
 			if (!deps.larm.captureInTransaction || !deps.larm.executeRequest)
 				return { status: "stale", reason: "inference_unavailable" };
 			const store = deps.conversation.input;
 			const cut = store.cutInTransaction(tx, conversationId);
-			if (!cut || cut.revision !== baseCutRevision || cut.due)
+			if (
+				!cut ||
+				cut.revision !== baseCutRevision ||
+				(baseCutSeq !== undefined && cut.seq !== baseCutSeq) ||
+				cut.due
+			)
 				return { status: "stale", reason: "cut_changed" };
-			if (store.stagedSummaryInTransaction?.(tx, conversationId, cut.revision))
+			const staged = store.stagedSummaryInTransaction?.(
+				tx,
+				conversationId,
+				cut.revision,
+			);
+			if (staged && staged.coveredThroughSeq > cut.seq)
 				return { status: "stale", reason: "already_staged" };
 			const pending = pendingMessageIdsInTransaction(deps, tx, conversationId);
-			const shown = store
-				.utterancesAfterInTransaction(tx, conversationId, cut.seq)
-				.filter(
-					(u) =>
-						!(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
-				);
+			const rawShown = store.utterancesAfterInTransaction(
+				tx,
+				conversationId,
+				cut.seq,
+			);
+			const withheld = excludedOnlyIn(
+				deps,
+				tx,
+				rawShown.flatMap((u) => (u.messageId ? [u.messageId] : [])),
+			);
+			const shown = rawShown.filter(
+				(u) =>
+					!(u.messageId && withheld.has(u.messageId)) &&
+					!(u.speaker === "user" && u.messageId && pending.has(u.messageId)),
+			);
 			const limits =
 				claim.payload.budget ?? limitsForConversation(deps, tx, conversationId);
 			const targetCutSeq = keepNewestCut(shown, cut.seq, limits);
@@ -217,6 +261,7 @@ export function createCompactionSummaryHandler(
 				input: {
 					conversationId,
 					baseCutRevision,
+					baseCutSeq: cut.seq,
 					coveredFromSeq: current?.coveredFromSeq ?? dropped[0]!.seq,
 					coveredThroughSeq: targetCutSeq,
 					coveredSeqs: dropped.map((u) => u.seq),
@@ -246,7 +291,7 @@ export function createCompactionSummaryHandler(
 					{ role: "system", content: system },
 					{ role: "user", content: input.prompt },
 				],
-				signal,
+				AbortSignal.any([signal, AbortSignal.timeout(COMPACT_TIMEOUT_MS)]),
 				undefined,
 				{
 					sessionRole: "auxiliary",
@@ -279,6 +324,7 @@ export function createCompactionSummaryHandler(
 			if (
 				!cut ||
 				cut.revision !== input.baseCutRevision ||
+				cut.seq !== input.baseCutSeq ||
 				cut.due ||
 				!summaryRefsValid(deps, tx, input.conversationId, input.sourceRefs)
 			)

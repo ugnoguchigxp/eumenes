@@ -2051,16 +2051,16 @@
               "segments": [
                 {
                   "type": "literal",
-                  "value": "記憶の変更依頼。kind: remember（覚える）・correct（訂正）・forget（忘れる）・suppress（話題にしない）・withdraw（直前の覚える・訂正の取り下げ）・goal。what に対象や内容を書く。\nremember・correct は quote に今回の本人の発言の原文の一部をそのまま写し、memory に記録の中身（text、polarity、期間は validFrom・validUntil。remember は kind と semanticKey も）を書く。\ncorrect・forget・suppress・withdraw の対象は、「## Memory」と read_memory の結果の参照（m1…）を ref に書く。参照が無いときは ref を省き、対象を what に書く（ホストが対象を決める）。\n結果の status: applied は反映済みで次の発言から読まれる。resolving は対象を決めている途中でまだ反映されていない。rejected は reason のとおり直して同じ返事の中で呼び直す（quote_mismatch は引用が発言と一致しない、target_changed は参照の記録が更新された＝read_memory で読み直す、unknown_ref は参照が古い）。"
+                  "value": "記憶変更依頼。what に対象/内容。kind: remember(記憶)・correct(訂正)・forget(忘却)・suppress(話題抑制)・withdraw(直前記憶/訂正の取消)・goal。\nremember/correct: quote に本人今回発言の原文一部をそのまま引用し、memory(text 必須、任意 polarity・validFrom・validUntil；remember は kind・semanticKey も必須)を指定。\ncorrect/forget/suppress/withdraw: ## Memory・read_memory の m1… を ref に指定（無ければ ref 省略し what に書く）。\n返却 status: applied=反映済(次発言から有効)、resolving=対象特定中(未反映)、rejected=reason を直して同返答内で再呼出（quote_mismatch=原文不一致、target_changed=更新済→read_memory 再取得、unknown_ref=参照切れ）。"
                 }
               ]
             }
           ],
-          "artifactHash": "sha256:e44d49f11ca7bc8ee12a04856a0ddd5aa797bd337ca2d0d4b79f34b4690b8425"
+          "artifactHash": "sha256:98f3cf88b9fd7351be1b07c9d78755e9ae6449fce178298c8491ef738fccc509"
         }
       },
-      "definitionHash": "sha256:b1b23fb3e1aac099b15465beb6ff2df57ba2905feb63af32ad8ce7a6d82f2513",
-      "releaseDigest": "sha256:3ea2130134de1c9add1881ee7aefab937d0c19e3792f498bc18ce1b41c6f6580"
+      "definitionHash": "sha256:15fddcf589e531f8aa48f1a6555f54fbf5361749fe2353c4c64f73c0e1d48458",
+      "releaseDigest": "sha256:8e48706f514fe7342fb44b133d80af7fe589b306a47974152ee485fc61595c8a"
     },
     "dialogue.contexts.local.read-found": {
       "key": "dialogue.contexts.local.read-found",
@@ -3974,5 +3974,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:69f922ef5e67b2def020470948c384db2f9d4c9dd50b19f6382f05479dee35a6"
+  "catalogDigest": "sha256:3ba3a4372a53ddd4de774b7fa18192715afe29e56b3d8efc09a03eec08caf2bf"
 }

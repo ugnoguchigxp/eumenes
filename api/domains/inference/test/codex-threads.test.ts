@@ -764,3 +764,77 @@ test("the Codex home is emptied before the first process, and a CLI login is lin
 		await codex.cleanup();
 	}
 });
+
+test("cross-turn reset picks the idle thread with the longest matching message prefix", async () => {
+	const codex = await fakeCodex();
+	try {
+		const agents = codex.agents(codex.host());
+		const tools = [
+			{
+				type: "function" as const,
+				function: { name: "look", description: "", parameters: {} },
+			},
+		];
+		await codex.behave({
+			text: JSON.stringify({
+				reply: null,
+				tool: { name: "look", arguments: "{}" },
+			}),
+		});
+		const a1 = await agents.run(
+			codexCall([user("conv-a-1")], { tools, requestId: "r-a1" }),
+		);
+		const [call] = a1.toolCalls!;
+		await codex.behave({ text: JSON.stringify({ reply: "b1", tool: null }) });
+		await agents.run(
+			codexCall([user("conv-b-1")], { tools, requestId: "r-b1" }),
+		);
+		await codex.behave({ text: JSON.stringify({ reply: "a1", tool: null }) });
+		const aTool = {
+			...assistant(a1.text),
+			tool_calls: [
+				{
+					id: call!.id,
+					type: "function" as const,
+					function: { name: call!.name, arguments: call!.arguments },
+				},
+			],
+		};
+		await agents.run(
+			codexCall([user("conv-a-1"), aTool, toolResult("ok", call!.id)], {
+				tools,
+				requestId: "r-a1",
+			}),
+		);
+		// Thread A is now more recently idle than Thread B, yet Conversation B's next turn picks Thread B.
+		await agents.run(
+			codexCall([user("conv-b-1"), assistant("b1"), user("conv-b-2")], {
+				tools,
+				requestId: "r-b2",
+			}),
+		);
+		// Thread B is now more recently idle than Thread A, yet Conversation A's next turn picks Thread A.
+		await agents.run(
+			codexCall(
+				[
+					user("conv-a-1"),
+					aTool,
+					toolResult("ok", call!.id),
+					assistant("a1"),
+					user("conv-a-2"),
+				],
+				{ tools, requestId: "r-a2" },
+			),
+		);
+		const turns = await codex.of("turn/start");
+		const [threadA, threadB] = [
+			turns[0]!.params.threadId,
+			turns[1]!.params.threadId,
+		];
+		expect(threadA).not.toBe(threadB);
+		expect(turns[3]!.params.threadId).toBe(threadB);
+		expect(turns[4]!.params.threadId).toBe(threadA);
+	} finally {
+		await codex.cleanup();
+	}
+});

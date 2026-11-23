@@ -61,6 +61,7 @@ import {
 import {
 	activateStagedSummary,
 	activeSummary,
+	clearStagedSummaries,
 	clearSummaries,
 	replaceActiveSummary,
 	retractSummariesBySourceRefs,
@@ -85,6 +86,17 @@ export type ConversationServiceOptions = {
 	/** Told after each attachment upload is stored. */
 	attachmentStored?: AttachmentStored;
 };
+
+function retractSummariesAndMarkCut(
+	db: Database,
+	sourceRefs: readonly string[],
+	at: string,
+) {
+	const affected = retractSummariesBySourceRefs(db, sourceRefs, at);
+	for (const conversationId of affected)
+		markCutDue(db, conversationId, "forget");
+	return affected;
+}
 
 export function createConversationService(
 	store: SqliteStore,
@@ -176,17 +188,9 @@ export function createConversationService(
 			saveStagedSummaryInTransaction: saveStagedSummary,
 			activateStagedSummaryInTransaction: activateStagedSummary,
 			replaceActiveSummaryInTransaction: replaceActiveSummary,
+			clearStagedSummariesInTransaction: clearStagedSummaries,
 			clearSummariesInTransaction: clearSummaries,
-			retractSummariesBySourceRefsInTransaction: (
-				db: Database,
-				sourceRefs: readonly string[],
-				at: string,
-			) => {
-				const affected = retractSummariesBySourceRefs(db, sourceRefs, at);
-				for (const conversationId of affected)
-					markCutDue(db, conversationId, "forget");
-				return affected;
-			},
+			retractSummariesBySourceRefsInTransaction: retractSummariesAndMarkCut,
 		},
 		historyFingerprintInTransaction: history.fingerprint,
 		historySearchInTransaction: history.search,

@@ -33,6 +33,16 @@ import {
 } from "./runner-shared";
 import { createSettler } from "./settle";
 
+function rollbackPrepare(db: Tx, running: JobRecord, error: unknown) {
+	db.exec("ROLLBACK TO queue_prepare");
+	db.exec("RELEASE queue_prepare");
+	log.warn("queue.prepare_failed", {
+		jobId: running.id,
+		kind: running.kind,
+		reason: toErrorCode(error),
+	});
+}
+
 export function createRunner(
 	store: SqliteStore,
 	registry: Registry,
@@ -330,9 +340,8 @@ export function createRunner(
 						deadlineHit: false,
 					},
 				};
-			} catch {
-				db.exec("ROLLBACK TO queue_prepare");
-				db.exec("RELEASE queue_prepare");
+			} catch (error) {
+				rollbackPrepare(db, running, error);
 				failClaim(db, running, handler, "prepare_failed", now);
 				return { type: "progress" };
 			}

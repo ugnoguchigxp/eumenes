@@ -49,6 +49,8 @@ type Entry = {
 	rpc: CodexRpc;
 	identity: string;
 	continuation?: Continuation;
+	/** Message digests of the last completed turn on this thread, for cross-turn reset prefix affinity. */
+	lastPrefix?: string[];
 	busy: boolean;
 	gone: boolean;
 	/** Something was forgotten while the thread ran a turn: it is deleted when that turn ends. */
@@ -73,6 +75,18 @@ function continues(
 		messages.length > previous.covered.length &&
 		previous.covered.every((digest, i) => messages[i] === digest)
 	);
+}
+
+/** Leading message digests shared by an idle thread's last turn and the incoming call. */
+function sharedPrefixLen(
+	previous: readonly string[] | undefined,
+	messages: readonly string[],
+): number {
+	if (!previous?.length) return 0;
+	const n = Math.min(previous.length, messages.length);
+	let i = 0;
+	while (i < n && previous[i] === messages[i]) i++;
+	return i;
 }
 
 /**
@@ -193,9 +207,15 @@ export function createCodexThreads(options: {
 					? undefined
 					: candidates[0];
 			// A thread whose answer asked for something is left for the call that continues it, while there is room.
+			// Prefer the idle thread whose last completed turn shares the longest message prefix with this call.
 			const free = idle
 				.filter((e) => !e.continuation?.awaitsMore)
-				.sort((a, b) => b.idleSince - a.idleSince)[0];
+				.sort(
+					(a, b) =>
+						sharedPrefixLen(b.lastPrefix, input.messages) -
+							sharedPrefixLen(a.lastPrefix, input.messages) ||
+						b.idleSince - a.idleSince,
+				)[0];
 			const reusable =
 				following ??
 				free ??
@@ -287,6 +307,9 @@ export function createCodexThreads(options: {
 				},
 				done(totals, reply) {
 					if (entry.gone) return;
+					entry.lastPrefix = reply
+						? [...input.messages, reply.digest]
+						: [...input.messages];
 					entry.continuation =
 						input.requestId && reply
 							? {
@@ -303,6 +326,7 @@ export function createCodexThreads(options: {
 				},
 				interrupted() {
 					if (entry.gone) return;
+					entry.lastPrefix = undefined;
 					entry.continuation = undefined;
 					release(entry);
 				},

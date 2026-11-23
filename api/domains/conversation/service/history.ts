@@ -46,6 +46,13 @@ type HistoryEvidenceView = {
 	start: number;
 	end: number;
 };
+function searchRange(c: Conditions) {
+	return {
+		...(c.from ? { from: new Date(c.from).toISOString() } : {}),
+		...(c.until ? { until: new Date(c.until).toISOString() } : {}),
+	};
+}
+
 /** Only identities and positions are retained. All excerpts come from the current conversation source. */
 export function createHistory(now: () => number, outbox: OutboxOptions) {
 	const sessions = new Map<string, Session>();
@@ -200,21 +207,30 @@ export function createHistory(now: () => number, outbox: OutboxOptions) {
 			last,
 			offset > 0,
 			501,
-			{
-				...(c.from ? { from: new Date(c.from).toISOString() } : {}),
-				...(c.until ? { until: new Date(c.until).toISOString() } : {}),
-			},
+			searchRange(c),
 		);
-		const { candidates, scannedBytes, scannedMessages, complete, next } =
-			scanHistory(db, owner, c, sessionId, rows, last, offset, view);
-		const scope = {
+		const found = scanHistory(
+			db,
+			owner,
+			c,
+			sessionId,
+			rows,
+			last,
+			offset,
+			view,
+		);
+		s.scope = {
 			...s.scope,
-			scannedBytes,
-			scannedMessages,
-			scanComplete: complete,
+			scannedBytes: found.scannedBytes,
+			scannedMessages: found.scannedMessages,
+			scanComplete: found.complete,
 		};
-		s.scope = scope;
-		return { candidates, cursor: next ? cursor(next) : null, scope };
+		return {
+			candidates: found.candidates,
+			cursor: found.next ? cursor(found.next) : null,
+			scope: s.scope,
+			...(found.partialMatch ? { partialMatch: true as const } : {}),
+		};
 	}
 	function read(db: Database, owner: HistoryOwner, raw: unknown) {
 		const input = historyReadInput.parse(raw),

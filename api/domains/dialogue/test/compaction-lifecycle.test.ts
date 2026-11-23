@@ -257,3 +257,72 @@ test("a delayed background claim still gets its full inference deadline", async 
 		stop();
 	}
 });
+
+test("a second compaction round runs background LLM pre-compaction even though cut.revision stays unchanged", async () => {
+	let round = 0;
+	const h = (harness = await setup({
+		window: 32_768,
+		debugInference: {
+			captureInTransaction: (_, subject) => `req:${subject}`,
+			executeRequest: async (requestId) => ({
+				requestId,
+				attemptId: `summary-${++round}`,
+				value: `第${round}回のまとめ`,
+			}),
+		},
+	}));
+	// Round 1: soft at 9 users -> staged -> hard at 11 users -> active
+	for (let n = 1; n <= 9; n++) await say(h, `一期予定${n}`);
+	await waitFor(() => !!staged(h));
+	expect(staged(h)?.text).toBe("第1回のまとめ");
+	for (let n = 10; n <= 12; n++) await say(h, `一期予定${n}`);
+	expect(active(h)).toMatchObject({ kind: "llm", text: "第1回のまとめ" });
+
+	// Round 2: cut.seq advanced while cut.revision stayed 1; crossing soft again must enqueue & stage a second LLM job.
+	for (let n = 1; n <= 5; n++) await say(h, `二期予定${n}`);
+	await waitFor(() => staged(h)?.text === "第2回のまとめ");
+	for (let n = 6; n <= 9; n++) await say(h, `二期予定${n}`);
+	expect(active(h)).toMatchObject({ kind: "llm", text: "第2回のまとめ" });
+	expect(round).toBe(2);
+});
+
+test("an immediately excluded memory record hides its compacted summary before closure delete runs", async () => {
+	const h = (harness = await setup({
+		window: 32_768,
+		memory: true,
+	}));
+	for (let n = 1; n <= 7; n++) await say(h, `通常話題${n}`);
+	const secret = await say(h, "暗証番号は青九番です。");
+	const item = await saveItem(h.store, h.memory!, {
+		kind: "personal_fact",
+		semanticKey: "pin.code",
+		text: "暗証番号は青九番です。",
+		conversationId: "main",
+		messageId: secret.inputMessageId,
+	});
+	for (let n = 8; n <= 11; n++) await say(h, `通常話題${n}`);
+	expect(active(h)?.text).toContain("青九番");
+	expect(active(h)?.sourceRefs).toContain(secret.inputMessageId);
+
+	// Exclude immediately without running closure delete or retracting utterances yet.
+	await h.store.write((tx) => {
+		const ref = h.memory!.shortRefs.assignInTransaction(tx, {
+			conversationId: "main",
+			windowKey: "test-window",
+			items: [{ itemId: item.id, revision: item.revision }],
+		})[0]!.ref;
+		const excluded = h.memory!.excludeForForgetInTransaction(tx, {
+			conversationId: "main",
+			sourceRunId: "manual-exclude",
+			targets: [{ ref }],
+		});
+		expect(excluded.status).toBe("applied");
+	});
+
+	await say(h, "次の話題");
+	const prompt = h.state.calls
+		.at(-1)!
+		.messages.map((m) => m.content)
+		.join("\n");
+	expect(prompt).not.toContain("青九番");
+});

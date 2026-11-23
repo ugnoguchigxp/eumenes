@@ -281,16 +281,21 @@ export function placeCutInTransaction(
 			reason: "started",
 			window,
 		};
-	const shown = store
-		.utterancesAfterInTransaction(tx, conversationId, existing.seq)
-		.filter(
-			(u) =>
-				!(
-					u.speaker === "user" &&
-					u.messageId &&
-					input.pending.has(u.messageId)
-				),
-		);
+	const rawShown = store.utterancesAfterInTransaction(
+		tx,
+		conversationId,
+		existing.seq,
+	);
+	const withheld = excludedOnlyIn(
+		deps,
+		tx,
+		rawShown.flatMap((u) => (u.messageId ? [u.messageId] : [])),
+	);
+	const shown = rawShown.filter(
+		(u) =>
+			!(u.messageId && withheld.has(u.messageId)) &&
+			!(u.speaker === "user" && u.messageId && input.pending.has(u.messageId)),
+	);
 	const reason = fixedCutReason(existing, shown, {
 		systemDigest,
 		memoryDigest: memoryDigestOf(window),
@@ -302,7 +307,8 @@ export function placeCutInTransaction(
 	if (reason === "resumed") {
 		store.dropStatesInTransaction(tx, conversationId);
 		store.clearSummariesInTransaction?.(tx, conversationId);
-	}
+	} else if (reason !== "over_limit")
+		store.clearStagedSummariesInTransaction?.(tx, conversationId);
 	const targetSeq =
 		reason === "resumed"
 			? (shown.at(-1)?.seq ?? existing.seq)

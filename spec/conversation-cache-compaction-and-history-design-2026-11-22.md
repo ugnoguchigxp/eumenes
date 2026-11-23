@@ -1,7 +1,7 @@
 # 会話コンテキストのキャッシュ最優先4層構成・圧縮要約エリア・長期履歴参照の実装計画書
 
 - 日付: 2026-11-22（第2版: 実コード照合レビュー反映済み）
-- 状態: Phase 1〜3 実装済み・fixture 検証済み（2026-11-22）。live 検証・実機器受入は未実施（サーバー再起動後）
+- 状態: Phase 1〜3 実装済み・fixture 検証済み・CLI live 25往復検証済み（[context-window-cache-live-2026-11-23.md](verification/context-window-cache-live-2026-11-23.md)）。実機器受入は未実施
 - 前提・完了済み事項:
   - 2026-11-22 実施の「SystemContext 圧縮＋全 19 ツール常時 KV 固定化」は実装・fixture 検証・live 5 ターン検証済み（`tools:4,162 + system:3,007 = 7,169 tok`、実測キャッシュヒット率 85.5〜95.0%）。
 - 位置付け:
@@ -258,7 +258,7 @@ CREATE INDEX conversation_summaries_lookup
 
 | 層 / domain | ファイル | 変更内容 |
 | --- | --- | --- |
-| `conversation` | [api/domains/conversation/repository/input.ts](../api/domains/conversation/repository/input.ts) | `0017` マイグレーション、要約 CRUD、`retractUtterances` / `retractSummariesBySourceRefs` / クリア時の `active`+`staged` 無効化 |
+| `conversation` | [api/domains/conversation/repository/summaries.ts](../api/domains/conversation/repository/summaries.ts) / [input.ts](../api/domains/conversation/repository/input.ts) | `0020`/`0021` マイグレーション、要約 CRUD、`retractUtterances` / `retractSummariesBySourceRefs` / クリア時の `active`+`staged` 無効化 |
 | `conversation` | [api/domains/conversation/contracts/input.ts](../api/domains/conversation/contracts/input.ts) | `ConversationSummary` 型定義 |
 | `conversation` | [api/domains/conversation/service/history-scan.ts](../api/domains/conversation/service/history-scan.ts) | NFKC 正規化・空白分割 AND 検索・一部一致フォールバック |
 | `capabilities` | `api/domains/capabilities/` (`read_agents` スキーマ) | `read_agents` に任意引数 `query`, `toolchain` を追加 |
@@ -271,7 +271,7 @@ CREATE INDEX conversation_summaries_lookup
 | `dialogue` | [api/domains/dialogue/service/generation-prepare.ts](../api/domains/dialogue/service/generation-prepare.ts) / [generation-settle.ts](../api/domains/dialogue/service/generation-settle.ts) | `answerSessionContext()` の `exchangeEnd` 対応、`plan` 閾値渡し、`active` 要約と `readSources` の provenance 登録、Soft 超過時の先行要約エンキュー |
 | `dialogue` | [api/domains/dialogue/service/background-input.ts](../api/domains/dialogue/service/background-input.ts) / [agency-forgetting.ts](../api/domains/dialogue/service/agency-forgetting.ts) | `prefix.summarySourceRefs` の `ReferenceInput` 合流、記憶/World 忘却時の要約無効化呼び出し |
 | `dialogue` | [api/domains/dialogue/repository/work.ts](../api/domains/dialogue/repository/work.ts) / [executor-read.ts](../api/domains/dialogue/service/executor-read.ts) | `read_agents` での `dialogue_work` 参照統合・100 件走査・フィルタ対応、`read_*` の `readSources` 返却、`read_history` のツール実行タグ併記 |
-| SystemContext | [api/domains/dialogue/contexts/system/input.context.toml](../api/domains/dialogue/contexts/system/input.context.toml) 他 | `## Summary` の読み方（1 行追加）および要約生成用コンテキスト（`dialogue.contexts.dialogue.compact-summary`）新設 |
+| SystemContext | [api/domains/dialogue/contexts/system/input.context.toml](../api/domains/dialogue/contexts/system/input.context.toml) 他 | `## Summary` の読み方（1 行追加）および要約生成用コンテキスト（`dialogue.contexts.system.compact-summary`）新設 |
 
 ---
 
@@ -287,7 +287,7 @@ CREATE INDEX conversation_summaries_lookup
 - **完了条件**: 10 ターン連続対話で過去の発言・ツール閲覧結果が保持され、Turn 2〜10 の `tools + system + Memory + 過去ターン` がバイト一致し、背景呼び出しに `tool` ロールが混入せず、忘却された閲覧元が履歴から確実に消えること（fixture 試験＋`fixed-input-size.json` 更新）。
 
 ### Phase 2: 要約保持エリア `[2] ## Summary` と先行バックグラウンド圧縮
-- `conversation/0017-conversation-summaries` マイグレーションと永続化 API を実装。
+- `conversation/0020-conversation-summaries` マイグレーションと永続化 API を実装。
 - 機械的フォールバック要約＋バックグラウンド LLM 統合要約ジョブ（`dialogue.compact_summary`、`maxAttempts: 1`、TOCTOU 検証）を実装。
 - `placeCutInTransaction` での `staged → active` 0ms 切替（残存超過時の安全弁含む）、30 分空白・明示クリア時の `active`+`staged` 一括リセット、発言・記憶・World 忘却時の即時無効化、`background-input.ts` / `generation-prepare.ts` の provenance 連携を実装。
 - `input.context.toml` に `## Summary` の説明を追加し、`context:lint` / `context:build` / `context:check` を通す。

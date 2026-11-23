@@ -180,6 +180,8 @@ function boundedJson(value: unknown, maxChars: number): string {
 	for (const key of [
 		"status",
 		"code",
+		"reason",
+		"ref",
 		"todo",
 		"confirmation",
 		"delegated",
@@ -191,6 +193,11 @@ function boundedJson(value: unknown, maxChars: number): string {
 		"slot",
 	])
 		if (rec[key] !== undefined) compact[key] = rec[key];
+	if (typeof rec.text === "string" && rec.text.trim()) {
+		const baseLen = JSON.stringify(compact).length + 12;
+		if (maxChars - baseLen >= 24)
+			compact.text = clipText(rec.text, maxChars - baseLen, "…");
+	}
 	return JSON.stringify(compact);
 }
 

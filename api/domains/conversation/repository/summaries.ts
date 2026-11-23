@@ -148,7 +148,8 @@ export type SaveSummaryInput = {
 export function saveStagedSummary(
 	db: Database,
 	input: SaveSummaryInput,
-): ConversationSummary {
+): ConversationSummary | null {
+	if (!summariesReady(db)) return null;
 	db.query(
 		"UPDATE conversation_summaries SET state = 'superseded' WHERE conversation_id = ? AND state = 'staged'",
 	).run(input.conversationId);
@@ -169,7 +170,7 @@ export function saveStagedSummary(
 		input.kind,
 		input.at,
 	);
-	return stagedSummary(db, input.conversationId, input.baseCutRevision)!;
+	return stagedSummary(db, input.conversationId, input.baseCutRevision);
 }
 
 /** Promotes a matching `staged` summary to `active`, superseding any previous `active` summary. */
@@ -233,6 +234,17 @@ export function clearSummaries(db: Database, conversationId: string): void {
 	).run(conversationId);
 }
 
+/** Supersedes pending staged summaries when a cut advances without promoting them, keeping any active summary intact. */
+export function clearStagedSummaries(
+	db: Database,
+	conversationId: string,
+): void {
+	if (!summariesReady(db)) return;
+	db.query(
+		"UPDATE conversation_summaries SET state = 'superseded' WHERE conversation_id = ? AND state = 'staged'",
+	).run(conversationId);
+}
+
 /**
  * Scrubs every version derived from a withdrawn source. Only visible or pending summaries affect the current cut.
  * Returns the distinct conversation IDs affected so callers can mark cuts due for forgetting.
@@ -243,14 +255,13 @@ export function retractSummariesBySourceRefs(
 	at: string,
 ): string[] {
 	if (!sourceRefs.length || !summariesReady(db)) return [];
-	const placeholders = sourceRefs.map(() => "?").join(",");
 	const rows = db
 		.query(
 			`SELECT id, conversation_id, state FROM conversation_summaries
 			 WHERE retracted_at IS NULL
-			 AND EXISTS (SELECT 1 FROM json_each(source_refs_json) r WHERE r.value IN (${placeholders}))`,
+			 AND EXISTS (SELECT 1 FROM json_each(source_refs_json) r WHERE r.value IN (SELECT value FROM json_each(?)))`,
 		)
-		.all(...sourceRefs) as Array<{
+		.all(JSON.stringify([...new Set(sourceRefs)])) as Array<{
 		id: string;
 		conversation_id: string;
 		state: ConversationSummaryState;

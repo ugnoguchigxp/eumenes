@@ -335,3 +335,13 @@ test("the memory message is protected with the assistant message after it, joine
 		}),
 	).toEqual({ instructionCount: 1, historyCount: 6, protectedCount: 4 });
 });
+
+test("a revoked inference request during prepare ends the run with permission_revoked instead of prepare_failed", async () => {
+	h = await setup();
+	h.larm.setContextPolicyInTransaction = () => {
+		throw new Error("permission_revoked");
+	};
+	const run = await h.say("こんにちは", "failed");
+	expect(run.error).toBe("permission_revoked");
+	expect(h.state.calls).toHaveLength(0);
+});

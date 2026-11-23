@@ -111,20 +111,31 @@ export function scanHistory(
 					candidates.push(candidate);
 					pos = row.size; // One candidate per message; read explores its remaining text.
 				} else {
-					// Record partial multi-token hits as a fallback when no AND match is found.
+					// Record partial multi-token hits as a fallback when no AND match is found (keep highest-scoring 20).
 					if (
 						tokens.length > 1 &&
 						hitTokens.length > 0 &&
-						partialHits.length < 20 &&
 						!partialHits.some((p) => p.view.messageId === row.id)
 					) {
-						const found = matchOffset(text, normText, hitTokens[0]!);
-						const start =
-							pos + Math.max(0, Array.from(text.slice(0, found)).length - 80);
-						partialHits.push({
-							hits: hitTokens.length,
-							view: view(db, sessionId, row, start, 300),
-						});
+						const minIdx =
+							partialHits.length < 20
+								? -1
+								: partialHits.reduce(
+										(best, item, idx) =>
+											item.hits < partialHits[best]!.hits ? idx : best,
+										0,
+									);
+						if (minIdx === -1 || hitTokens.length > partialHits[minIdx]!.hits) {
+							const found = matchOffset(text, normText, hitTokens[0]!);
+							const start =
+								pos + Math.max(0, Array.from(text.slice(0, found)).length - 80);
+							const entry = {
+								hits: hitTokens.length,
+								view: view(db, sessionId, row, start, 300),
+							};
+							if (minIdx === -1) partialHits.push(entry);
+							else partialHits[minIdx] = entry;
+						}
 					}
 					const length = Array.from(text).length;
 					pos += length < count ? length : Math.max(1, length - overlapLen + 1);
@@ -154,12 +165,21 @@ export function scanHistory(
 			break;
 		}
 	}
+	let partialMatch = false;
 	if (!candidates.length && partialHits.length) {
 		partialHits.sort((a, b) => b.hits - a.hits);
 		for (const item of partialHits.slice(0, Math.min(5, c.limit))) {
 			if (byteSize({ candidates: [...candidates, item.view] }) > 12000) break;
 			candidates.push(item.view);
 		}
+		if (candidates.length) partialMatch = true;
 	}
-	return { candidates, scannedBytes, scannedMessages, complete, next };
+	return {
+		candidates,
+		scannedBytes,
+		scannedMessages,
+		complete,
+		next,
+		partialMatch,
+	};
 }

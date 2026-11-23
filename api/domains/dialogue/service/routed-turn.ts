@@ -36,8 +36,24 @@ import { carriesExchange, type ExchangeStep } from "./tool-exchange";
 const log = getLogger("dialogue");
 /** The host's words for a turn whose call failed before anything was said. */
 const SAID_FAILED = systemContext("dialogue.contexts.local.turn-failed", {});
-const { $schema: _, ...memoryParameters } = z.toJSONSchema(
-	memoryArgs.options[0]!,
+/** Strip non-structural string length bounds from the tool schema sent to the model; Zod still enforces them. */
+function compactToolSchema(
+	schema: Record<string, unknown>,
+): Record<string, unknown> {
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(schema)) {
+		if (key === "$schema" || key === "minLength" || key === "maxLength")
+			continue;
+		out[key] =
+			value && typeof value === "object" && !Array.isArray(value)
+				? compactToolSchema(value as Record<string, unknown>)
+				: value;
+	}
+	return out;
+}
+
+const memoryParameters = compactToolSchema(
+	z.toJSONSchema(memoryArgs.options[0]!) as Record<string, unknown>,
 );
 /** The memory calls one reply may make: a request, and the repairs of a refused one. */
 const MEMORY_CALLS = 3;

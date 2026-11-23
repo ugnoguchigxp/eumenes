@@ -13,6 +13,7 @@ import type {
 import type { DialogueDeps } from "./context";
 import { lineText } from "./input-text";
 import { inheritedHistorySources } from "./history-sources";
+import { excludedOnlyIn } from "./memory-refs";
 import { replayableCalls } from "./tool-exchange";
 
 const MECHANICAL_MAX_TOKENS = 400;
@@ -176,7 +177,7 @@ export function buildMechanicalSummary(
 	return headWithin(lines.join("\n"), maxTokens).text;
 }
 
-/** Collect text and provenance together. A reply whose manifest was purged cannot be summarized. */
+/** Collect text and provenance together. A reply whose manifest was purged or excluded cannot be summarized. */
 export function summaryMaterial(
 	deps: DialogueDeps,
 	tx: Database,
@@ -185,9 +186,14 @@ export function summaryMaterial(
 	candidates: readonly Utterance[],
 ) {
 	const refs = new Set(existing?.sourceRefs);
+	const withheld = excludedOnlyIn(
+		deps,
+		tx,
+		candidates.flatMap((u) => (u.messageId ? [u.messageId] : [])),
+	);
 	const dropped: Utterance[] = [];
 	for (const u of candidates) {
-		if (!u.messageId) continue;
+		if (!u.messageId || withheld.has(u.messageId)) continue;
 		const sources = inheritedHistorySources(
 			deps,
 			tx,
@@ -220,6 +226,8 @@ export function summaryRefsValid(
 	if (!deps.memory) return true;
 	if (deps.memory.referenceInputs.staleInTransaction(tx, refs).length > 0)
 		return false;
+	const msgRefs = refs.filter((ref) => !ref.includes(":"));
+	if (excludedOnlyIn(deps, tx, msgRefs).size > 0) return false;
 	const blocked = new Set(
 		deps.memory.blockedMessageIdsOfConversationInTransaction(
 			tx,
@@ -280,7 +288,12 @@ export function compactOnOverLimitInTransaction(
 			validCurrent,
 			candidates,
 		);
-		if (!dropped.length) return targetSeq;
+		if (!dropped.length) {
+			if (!validCurrent)
+				store.clearSummariesInTransaction?.(tx, conversationId);
+			else store.clearStagedSummariesInTransaction?.(tx, conversationId);
+			return targetSeq;
+		}
 		const text = buildMechanicalSummary(validCurrent, dropped);
 		if (text && summaryRefsValid(deps, tx, conversationId, sourceRefs)) {
 			store.replaceActiveSummaryInTransaction(tx, {

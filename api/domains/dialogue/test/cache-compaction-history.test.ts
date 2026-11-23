@@ -314,6 +314,7 @@ test("read_history supports NFKC normalization, multi-token AND, partial fallbac
 		.find((m) => (m.role as string) === "tool")!;
 	expect(andResult.content).toContain("ＬＡＲＭと鎌倉カフェの相談です");
 	expect(andResult.content).toContain("[道具: read_memory]");
+	expect(andResult.content).not.toContain("一部語句一致");
 
 	// Partial fallback when multi-token AND has 0 hits
 	h.state.steps.push(
@@ -327,6 +328,7 @@ test("read_history supports NFKC normalization, multi-token AND, partial fallbac
 	const partialResult = [...h.state.calls.at(-1)!.messages]
 		.reverse()
 		.find((m) => (m.role as string) === "tool")!;
+	expect(partialResult.content).toContain("（一部語句一致）");
 	expect(partialResult.content).toContain(
 		"鎌倉のカフェとLARMの話を記録しました。",
 	);

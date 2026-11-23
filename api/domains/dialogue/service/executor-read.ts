@@ -82,6 +82,7 @@ type Found = {
 	lines: string[];
 	more: number;
 	partial?: true;
+	partialMatch?: true;
 	sources?: ReadSources;
 };
 
@@ -181,6 +182,7 @@ function resultText(tool: ReadTool, found: Found): string {
 	const left = found.lines.length - kept.length + found.more;
 	return [
 		head,
+		...(found.partialMatch ? ["（一部語句一致）"] : []),
 		...kept,
 		...(left > 0
 			? [
@@ -253,6 +255,21 @@ function toolSummaryTag(
 ): string {
 	if (!calls.length) return "";
 	const labels = calls.slice(0, 3).map((call) => {
+		let target = "";
+		if (call.name === "delegate") {
+			try {
+				const args = JSON.parse(call.arguments) as Record<string, unknown>;
+				const tc =
+					typeof args.toolchainId === "string"
+						? args.toolchainId
+						: typeof args.toolchain === "string"
+							? args.toolchain
+							: "";
+				if (tc) target = `(${tc})`;
+			} catch {
+				// ignore malformed args
+			}
+		}
 		let extra = "";
 		try {
 			const res = JSON.parse(call.result) as Record<string, unknown>;
@@ -262,7 +279,7 @@ function toolSummaryTag(
 		} catch {
 			// plain text result
 		}
-		return `${call.name}${extra}`;
+		return `${call.name}${target}${extra}`;
 	});
 	return `[道具: ${labels.join("、")}]`;
 }
@@ -280,7 +297,7 @@ function historyFound(
 		input.final.kind === "utterances" ? input.final.messageIds[0] : undefined;
 	const key = `read:${input.runId}`;
 	try {
-		const { candidates, cursor, scope } =
+		const { candidates, cursor, scope, partialMatch } =
 			deps.conversation.historySearchInTransaction(
 				db,
 				{
@@ -319,6 +336,7 @@ function historyFound(
 		return {
 			lines,
 			more: Math.max(0, kept.length - shown.length),
+			...(partialMatch && lines.length ? { partialMatch: true as const } : {}),
 			...(messageIds.length ? { sources: { messageIds } } : {}),
 			// The search stops at its scan bound: what lies before it was not looked at.
 			...(cursor !== null || !scope.scanComplete
@@ -534,7 +552,8 @@ function agentsFound(
 			)
 			.filter(Boolean);
 		const toolchainId = w?.toolchainId ?? usage?.toolchainId;
-		const requestText = w?.request?.trim() || usage?.request;
+		const requestText =
+			w?.request?.trim() || usage?.request || w?.title?.trim();
 		const summaryText = report?.summary ?? workResultSummary(w?.result ?? null);
 		const line = [
 			`- ${when(w?.createdAt ?? run.createdAt)}${w ? ` t${w.ref}` : ""} 担当: ${toolchainId ?? "なし"}`,
@@ -574,10 +593,11 @@ function agentsFound(
 	for (const w of loaded.works) {
 		if (seenRuns.has(w.runId)) continue;
 		const summaryText = workResultSummary(w.result);
+		const requestText = w.request.trim() || w.title.trim();
 		const line = [
 			`- ${when(w.createdAt)} t${w.ref} 担当: ${w.toolchainId}`,
-			...(w.request.trim()
-				? [`依頼: ${clip(w.request, LIMITS.workRequestChars)}`]
+			...(requestText
+				? [`依頼: ${clip(requestText, LIMITS.workRequestChars)}`]
 				: []),
 			`状態: ${w.outcome ?? w.status}`,
 			...(summaryText ? [`報告: ${summaryText}`] : []),
