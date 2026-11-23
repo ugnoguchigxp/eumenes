@@ -298,6 +298,27 @@ export function writeRecords(input: {
 			// It disagrees with a version in force (the memory's refusal names it): nothing is overwritten, the
 			// disagreement is an unresolved question for the user.
 			const existingId = (out as { existingId?: string }).existingId;
+			// The memory is full: what the user said is noted as a candidate, which the deep consolidation merges.
+			if (out.reason === "limit_reached") {
+				const kind = m.kind;
+				const noted = attempt(db, () =>
+					deps.memory.recordCandidateInTransaction(db, {
+						conversationId,
+						sourceRunId: runId,
+						kind,
+						semanticKey: candidateKey(kind, m.text),
+						subject: "self",
+						text: m.text,
+						polarity: "affirmed",
+						evidence: [{ messageId: m.evidence }],
+					}),
+				);
+				if ("error" in noted) rejected.push(`memory:candidate:${noted.error}`);
+				else if (noted.status === "rejected")
+					rejected.push(`memory:candidate:${noted.reason}`);
+				else applied.push(`candidate: ${m.text}`);
+				continue;
+			}
 			if (out.reason !== "conflict" || !existingId) {
 				rejected.push(`memory:${out.reason}`);
 				continue;

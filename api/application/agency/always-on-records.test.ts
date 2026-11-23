@@ -17,6 +17,9 @@ import {
 	recordsFor,
 } from "./always-on-recall";
 
+/** The memory's count limit of active items (the memory domain's `MAX_ACTIVE_ITEMS`). */
+const MAX_ACTIVE_ITEMS = 100;
+
 type Fixture = Awaited<ReturnType<typeof agendaFixture>>;
 const found = (over: Partial<ReturnType<typeof noRecords>>) => ({
 	...noRecords(),
@@ -232,6 +235,44 @@ test("memories go to the long-term memory (L2) as the user's own, candidates to 
 		expect(
 			f.h.memory!.list().filter((i) => i.origin !== "user_confirmed"),
 		).toEqual([]);
+	} finally {
+		await f.close();
+	}
+});
+
+test("a memory the writer wants to save while the memory is full is noted as a candidate instead", async () => {
+	const f = await agendaFixture({
+		script: writes(
+			found({
+				memories: [
+					{
+						kind: "preference",
+						semanticKey: "drink.coffee.style",
+						subject: "self",
+						text: "コーヒーはブラックで飲む",
+						quote: "ブラック派",
+						evidence: "user-b",
+					},
+				],
+			}),
+		),
+	});
+	try {
+		await f.start();
+		await f.user("user-a", "ao", "好きなものの話");
+		for (let i = 0; i < MAX_ACTIVE_ITEMS; i++)
+			await saveItem(f.h.store, f.h.memory!, {
+				conversationId: "ao",
+				messageId: "user-a",
+				kind: "preference",
+				semanticKey: `filler.${i}`,
+				text: `好きなもの${i}`,
+			});
+		await exchange(f, "b", "コーヒーはブラック派なんだよね");
+		expect(f.h.memory!.list()).toHaveLength(MAX_ACTIVE_ITEMS);
+		expect(candidates(f).map((c) => c.value.text)).toContain(
+			"コーヒーはブラックで飲む",
+		);
 	} finally {
 		await f.close();
 	}

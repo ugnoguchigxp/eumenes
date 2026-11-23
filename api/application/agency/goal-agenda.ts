@@ -39,6 +39,34 @@ export function goalSlots(deps: AgencyHostDeps, db: Database) {
 	}));
 }
 
+/** The two compartments of the goals: the agenda's slots and the ledger of the agenda's goals. */
+const goalCompartments = {
+	principal: PRINCIPAL,
+	scopeKeys: [goalScope, `${goalScope}:agenda-goals`],
+};
+
+/** What a forget needs of the goals: the goals it may name (both compartments), and their immediate exclusion. */
+export function goalForgetDeps(goals: GoalsService) {
+	return {
+		// The messages a goal stands on, as the goals domain resolves them for a forget (read-only).
+		sourceMessageIds: (db: Database, goalId: string) =>
+			goals.resolveForgetInTransaction(db, { goalIds: [goalId], entityIds: [] })
+				.messageIds,
+		goalsInTransaction: (db: Database) =>
+			goals.listForStewardInTransaction(db, goalCompartments).map((goal) => ({
+				goalId: goal.goalId,
+				text: goal.desiredState,
+				status: goal.status,
+				scopeKey: goal.scopeKey,
+			})),
+		excludeGoalsInTransaction: (db: Database, goalIds: readonly string[]) =>
+			goals.excludeForForgetInTransaction(db, {
+				goalIds: [...goalIds],
+				entityIds: [],
+			}),
+	};
+}
+
 /** The agenda goals of the host: the slots' store, the goal host's directory, and what the goals read of the memory. */
 export function agendaGoalDeps(input: {
 	store: GoalStore;
@@ -54,12 +82,7 @@ export function agendaGoalDeps(input: {
 		mockDir: input.mockDir,
 		readMemory: input.memoryHost.readForGoals,
 		isGoalContextCurrent: input.memoryHost.isGoalContextCurrent,
-		// The messages a goal stands on, as the goals domain resolves them for a forget (read-only).
-		sourceMessageIds: (db, goalId) =>
-			input.goals.resolveForgetInTransaction(db, {
-				goalIds: [goalId],
-				entityIds: [],
-			}).messageIds,
+		...goalForgetDeps(input.goals),
 	};
 }
 
@@ -69,7 +92,7 @@ export function createAgendaGoalStore(
 ) {
 	return createGoalStore(store, goals, {
 		agendaScopeKey: goalScope,
-		ledgerScopeKey: `${goalScope}:agenda-goals`,
+		ledgerScopeKey: goalCompartments.scopeKeys[1]!,
 	});
 }
 

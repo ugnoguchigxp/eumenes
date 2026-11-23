@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { waitFor } from "../../../infrastructure/wait-for";
@@ -205,6 +206,13 @@ export async function setup(options: SetupOptions = {}) {
 		>,
 		/** The forgets the steward's inbox marked excluded, by request id. */
 		excluded: [] as Array<Parameters<StewardPort["excludedInTransaction"]>[1]>,
+		/** Told of each forget the steward's inbox marked excluded (the steward's closure delete starts at once). */
+		onExcluded: undefined as
+			| ((
+					db: Database,
+					input: Parameters<StewardPort["excludedInTransaction"]>[1],
+			  ) => void)
+			| undefined,
 		/** What the steward kept of the requests that named no short reference, and whether a forget of them is pending. */
 		keptTargets: [] as Array<
 			Parameters<StewardPort["targetRequestInTransaction"]>[1]
@@ -450,8 +458,9 @@ export async function setup(options: SetupOptions = {}) {
 							replay: false,
 						};
 					},
-					excludedInTransaction: (_db, input) => {
+					excludedInTransaction: (db, input) => {
 						state.excluded.push(input);
+						state.onExcluded?.(db, input);
 						return true;
 					},
 					targetRequestInTransaction: (_db, input) => {

@@ -242,6 +242,23 @@ function handoffLine(handoff: string): string {
 	}
 }
 
+/** The user's utterances of the run's own input, handled or not: what a generation that was not delivered answers again. */
+function ownUtterances(
+	events: DialogueDeps["continuity"]["events"],
+	tx: Database,
+	run: Run,
+): ConversationEvent[] {
+	return events
+		.ofMessageInTransaction(tx, run.inputMessageId)
+		.filter(
+			(event) =>
+				event.conversationId === run.conversationId &&
+				event.type === "said" &&
+				event.by === "user" &&
+				!event.forgotten,
+		);
+}
+
 /** The trigger of a generation: the TODOs that changed, the utterances it handles, or what a host notice says. */
 function triggerOf(
 	run: Run,
@@ -511,12 +528,18 @@ export function createPrepare(
 		const agent = answerTicketInTransaction(deps, tx, current);
 		// A host notice speaks about what happened; a user's or a schedule's input is a pending utterance.
 		const notice = run.sourceKind === "notice";
-		const pending = notice
+		const waiting = notice
 			? []
 			: events.pendingInTransaction(tx, conversationId);
+		// The earlier generation handled the run's utterance with its first action (a request to the memory) and was not
+		// delivered: the reply is still the answer to that request, so it stays the input, not a line of the history.
+		const notAdopted = claim.payload.notAdopted === true;
+		const pending =
+			notAdopted && !notice && waiting.length === 0
+				? ownUtterances(events, tx, current)
+				: waiting;
 		// A host note the work did not take as its report (a specialist switch to confirm) is this run's trigger.
 		const hostNote = changed ? null : (claim.payload.commandNote ?? null);
-		const notAdopted = claim.payload.notAdopted === true;
 		// A TODO that changed runs no generation: finished work is told by its notice on screen, a question is the
 		// agency's to ask on its own opportunity. The sub-agent's answer is consumed here (one whose evidence changed
 		// drops its result).

@@ -448,6 +448,102 @@ test("the sweeper reclaims an expired task row that was written back after the r
 	expect(rows()).toBe(1);
 });
 
+test("a purge leaves the call of the run that made the forget, and revokes the others", async () => {
+	let started = 0;
+	let aborted = 0;
+	const h = await setup(
+		(call) =>
+			new Promise((_, reject) => {
+				started++;
+				call.signal.addEventListener("abort", () => {
+					aborted++;
+					reject(new Error("aborted"));
+				});
+			}),
+	);
+	const ids = [await h.request(), await h.request()];
+	const refs = { messageIds: ["m1"], itemIds: ["i1"] };
+	const calls = ids.map((id) =>
+		stream(h, id, new AbortController().signal, {
+			sessionRole: "main",
+			context,
+			refs,
+		}).catch(() => "ended"),
+	);
+	await waitFor(() => started === 2);
+	const subject = h.store.read(
+		(db) =>
+			(
+				db
+					.query("SELECT subject FROM inference_requests WHERE id=?")
+					.get(ids[0]!) as { subject: string }
+			).subject,
+	);
+	await h.store.write((db) =>
+		h.inference.revokeAgentAttemptsInTransaction(db, {
+			messageIds: [],
+			itemIds: ["i1"],
+			exceptSubjects: [subject],
+		}),
+	);
+	await waitFor(() => aborted === 1);
+	expect(
+		h.store.read((db) =>
+			db
+				.query(
+					"SELECT r.id AS id, a.status AS status FROM inference_attempts a JOIN inference_requests r ON r.id=a.request_id ORDER BY a.status",
+				)
+				.all(),
+		),
+	).toEqual(
+		expect.arrayContaining([
+			{ id: ids[0]!, status: "running" },
+			{ id: ids[1]!, status: "revoked" },
+		]),
+	);
+	void calls;
+});
+
+test("a forget that revokes a retained call keeps the request, so the host's retry still has its authority", async () => {
+	let started!: () => void;
+	const running = new Promise<void>((resolve) => (started = resolve));
+	let calls = 0;
+	const h = await setup((call) =>
+		++calls === 1
+			? new Promise((_, reject) => {
+					started();
+					call.signal.addEventListener("abort", () =>
+						reject(call.signal.reason),
+					);
+				})
+			: Promise.resolve({ text: "answer" }),
+	);
+	const id = await h.request();
+	const session = {
+		sessionRole: "main",
+		retainRequest: true,
+		context,
+		refs: { messageIds: ["m1"], itemIds: ["i1"] },
+	} as const;
+	const first = stream(h, id, new AbortController().signal, session).then(
+		() => "resolved",
+		(error: Error) => error.message,
+	);
+	await running;
+	await forget(h, { messageIds: [], itemIds: ["i1"] });
+	// The retry is told the answer's input is stale, the same as for a change the host made itself.
+	expect(await first).toBe("memory_stale");
+	expect(
+		h.store.read((db) =>
+			db.query("SELECT status FROM inference_requests WHERE id=?").get(id),
+		),
+	).toEqual({ status: "pending" });
+	const fresh = await stream(h, id, new AbortController().signal, session);
+	expect(
+		await h.store.write((db) => h.inference.acceptInTransaction(db, fresh)),
+	).toBe(true);
+});
+
 test("stale host input discards earlier receipts but permits a fresh answer on the original request", async () => {
 	const abort = new AbortController();
 	let calls = 0;

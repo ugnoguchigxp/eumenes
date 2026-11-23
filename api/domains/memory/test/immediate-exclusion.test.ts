@@ -964,3 +964,37 @@ test("while a forget is only excluded, the tendencies standing on what is exclud
 	// After the closure delete the forgotten messages are blocked: still withheld.
 	expect(await withheld(all)).toEqual(new Set([s.old, s.moved, scheduled]));
 });
+
+test("the purge of a closure delete is told which run excluded the items, so it can leave that run's calls standing", async () => {
+	const h = await setupMemory();
+	open.push(h);
+	const [made] = await versions(h, "pet", ["ペットは猫"]);
+	const purges: Array<readonly string[] | undefined> = [];
+	h.memory.registerForgetPurge((_db, purge) => {
+		purges.push(purge.exceptSubjects);
+	});
+	const excluded = await write(h, (db) =>
+		h.memory.excludeForForgetInTransaction(db, {
+			conversationId: "c1",
+			sourceRunId: "run-x",
+			targets: [{ itemId: made!.id }],
+		}),
+	);
+	if (excluded.status !== "applied") throw new Error(JSON.stringify(excluded));
+	await write(h, (db) =>
+		h.memory.closeExclusionInTransaction(db, {
+			conversationId: "c1",
+			itemIds: excluded.itemIds,
+			messageIds: excluded.evidenceMessageIds,
+		}),
+	);
+	expect(purges).toEqual([["run-x"]]);
+	// A forget nobody excluded first names no run.
+	const [other] = await versions(h, "car", ["車はトヨタ"]);
+	await h.memory.forget({
+		conversationId: "c1",
+		itemIds: [other!.id],
+		messageIds: [],
+	});
+	expect(purges.at(-1)).toBeUndefined();
+});

@@ -236,13 +236,14 @@ export function pruneUnits(db: Database, conversationId: string, keep: number) {
 		 (SELECT rowid FROM steward_unit WHERE conversation_id = ? AND state <> 'open' ORDER BY rowid DESC LIMIT ?)`,
 	).run(conversationId, conversationId, keep);
 }
-/** Every conversation the steward has units or requests for (the startup kick starts from them). */
+/** The conversations that have work now: a request waiting (or excluded) in the inbox, or a unit still open. */
 export function conversationsWithWork(db: Database): string[] {
 	return (
 		db
 			.query(
-				`SELECT conversation_id AS id FROM steward_unit WHERE conversation_id NOT IN ('${SLEEP_KEY}', '${FORGET_KEY}')
-				 UNION SELECT conversation_id FROM steward_inbox`,
+				`SELECT conversation_id AS id FROM steward_unit
+				 WHERE state = 'open' AND conversation_id NOT IN ('${SLEEP_KEY}', '${FORGET_KEY}')
+				 UNION SELECT conversation_id FROM steward_inbox WHERE state IN ('pending', 'excluded')`,
 			)
 			.all() as Array<{ id: string }>
 	).map((row) => row.id);

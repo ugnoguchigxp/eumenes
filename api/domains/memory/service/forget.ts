@@ -164,6 +164,20 @@ function forgetTargets(
 	];
 }
 
+/** The runs that excluded these items (the library's change feed names the run of each exclusion). */
+function excludingRuns(db: Database, itemIds: readonly string[]): string[] {
+	if (itemIds.length === 0) return [];
+	return (
+		db
+			.query(
+				`SELECT DISTINCT source_run_id AS id FROM memory_change
+				 WHERE change_kind = 'excluded' AND target_type = 'state_item' AND source_run_id IS NOT NULL
+				 AND target_id IN (SELECT value FROM json_each(?))`,
+			)
+			.all(JSON.stringify(itemIds)) as Array<{ id: string }>
+	).map((row) => row.id);
+}
+
 /**
  * What the continuity domain derived from forgotten messages or items: plans and question-ledger entries, and the
  * tendencies built on plans, items or messages. A plan keeps the id of the note it was moved from, so tendencies
@@ -388,11 +402,13 @@ export function createForget(deps: ForgetDeps) {
 		)
 			changed = true;
 		deps.purgeUsageFor(db, purge.itemIds);
+		const exceptSubjects = excludingRuns(db, purge.itemIds);
 		for (const hook of deps.purgeHooks)
 			hook(db, {
 				itemIds: purge.itemIds,
 				messageIds: existing,
 				conversationId: purge.conversationId,
+				...(exceptSubjects.length > 0 ? { exceptSubjects } : {}),
 				derived: purge.derived ?? {},
 				forgetIds: purge.forgetIds ?? [purge.forgetId],
 			});

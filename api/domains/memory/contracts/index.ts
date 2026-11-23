@@ -260,6 +260,11 @@ export type ForgetPurge = {
 	itemIds: readonly string[];
 	messageIds: readonly string[];
 	conversationId: string;
+	/**
+	 * The runs that excluded these items themselves (their `sourceRunId`): the answer such a run is writing is the
+	 * answer to that forget, so a purge leaves its calls standing.
+	 */
+	exceptSubjects?: readonly string[];
 	/** The opaque `derived` of the forget that wrote this journal line (empty when it had none). */
 	derived: ForgetDerived;
 };

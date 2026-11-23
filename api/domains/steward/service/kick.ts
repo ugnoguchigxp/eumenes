@@ -171,10 +171,8 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		});
 	}
 
-	function kickOne(db: Database, conversationId: string) {
-		// A sleep unit ended: the layer looks at the whole profile again ("the next one at once").
-		if (conversationId === SLEEP_KEY || conversationId === FORGET_KEY)
-			return sleep.kick(db);
+	/** What one conversation needs: its explicit requests and its World events. Not the sleep layer. */
+	function kickConversation(db: Database, conversationId: string) {
 		try {
 			const env: StepEnv = { db, deps, conversationId };
 			if (deps.memory.readyInTransaction(db)) {
@@ -194,13 +192,20 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		} catch (error) {
 			log.warn("steward.kick_failed", { reason: "kick_failed" }, error);
 		}
+	}
+
+	/** A conversation's turn to be looked at, then the sleep layer once (it looks at every conversation itself). */
+	function kickOne(db: Database, conversationId: string) {
+		// A sleep unit ended: the layer looks at the whole profile again ("the next one at once").
+		if (conversationId !== SLEEP_KEY && conversationId !== FORGET_KEY)
+			kickConversation(db, conversationId);
 		sleep.kick(db);
 	}
 
 	/**
 	 * Makes the units the steward needs: for the conversation named, or (at startup and when the timer is due) for
-	 * every conversation with work, the ones the steward knows and the ones with events World received that no
-	 * step has touched yet. The sleep layer looks at the whole profile each time. Called inside the transaction of
+	 * every conversation with work: requests waiting, a unit open, or events World received that no step has touched
+	 * yet. The sleep layer looks at the whole profile once, after them, however many conversations there are. Called inside the transaction of
 	 * a settle or a run's end; whatever fails inside leaves that transaction alone.
 	 */
 	function kickInTransaction(db: Database, conversationId?: string) {
@@ -208,7 +213,6 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 		const world = deps.world;
 		const ids = new Set([
 			...conversationsWithWork(db),
-			...deps.continuity.events.conversationsWithUncuratedInTransaction(db),
 			// Events World received that no step has touched yet (the notice that woke the steward is not durable).
 			...(world
 				? world.curation
@@ -216,7 +220,7 @@ export function createKick(deps: StewardDeps, wake: Wake) {
 						.map((event) => event.conversationId)
 				: []),
 		]);
-		for (const id of ids) kickOne(db, id);
+		for (const id of ids) kickConversation(db, id);
 		// A look at the whole profile, and at what the library holds excluded that no request names (a restored database).
 		sleep.kick(db, { orphans: true });
 	}

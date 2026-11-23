@@ -15,7 +15,11 @@ import {
 } from "./configured-larm";
 import { createScreenPresence, screenOperations } from "./screen-presence";
 import type { SettingsService, Settings } from "../../settings";
-import type { AgentAttemptRevocation, InferencePort } from "../contracts";
+import {
+	StaleAnswerInput,
+	type AgentAttemptRevocation,
+	type InferencePort,
+} from "../contracts";
 import { get } from "../repository";
 import { snapshotPort } from "./snapshot-port";
 import type {
@@ -145,7 +149,12 @@ export function createInference(
 					)
 					.get(requestId),
 			);
-			if (revoked) active.get(requestId)?.controller.abort();
+			const running = active.get(requestId);
+			// A call that keeps its request is told its input is stale: the host prepares the answer again.
+			if (revoked)
+				running?.controller.abort(
+					running.retained ? new StaleAnswerInput() : undefined,
+				);
 		}
 		revokedRequests.clear();
 	});

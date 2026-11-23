@@ -619,7 +619,7 @@ test("a thread older than the limit is deleted when its turn ends", async () => 
 
 test("revoking attempts that stood on a forgotten reference makes the agents forget their threads", () => {
 	const db = new Database(":memory:");
-	db.exec(`CREATE TABLE inference_requests (id TEXT, status TEXT);
+	db.exec(`CREATE TABLE inference_requests (id TEXT, status TEXT, subject TEXT);
 		CREATE TABLE inference_attempts (id TEXT, request_id TEXT, refs TEXT, accepted INT, status TEXT, reason TEXT, ended INT);`);
 	let forgotten = 0;
 	revokeAgentAttempts(db, { messageIds: [], itemIds: [] }, () => forgotten++);

@@ -50,6 +50,19 @@ CREATE TABLE goals_entity (
 CREATE INDEX goals_entity_entity ON goals_entity(entity_id);
 `;
 
+/**
+ * Goals a forget excluded at once (the redesign, section 9.2): out of every listing until the closure delete removes
+ * them with their history. Ids are opaque; the row dies with the goal.
+ */
+const excludedMigration = `
+CREATE TABLE goals_excluded (
+ goal_id TEXT PRIMARY KEY, excluded_at TEXT NOT NULL
+);
+`;
+
+/** A listing never shows a goal that is excluded. */
+const live = " AND id NOT IN (SELECT goal_id FROM goals_excluded)";
+
 const columns =
 	"id, principal, scope_key, desired_state, priority, status, source_json, proposed_from_json, revision, created_at, updated_at";
 
@@ -189,7 +202,7 @@ export function listAdoptedGoals(
 	return (
 		db
 			.query(
-				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND status='adopted' AND scope_key IN (${marks}) ORDER BY priority DESC, rowid`,
+				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND status='adopted' AND scope_key IN (${marks})${live} ORDER BY priority DESC, rowid`,
 			)
 			.all(principal, ...scopeKeys) as Record<string, unknown>[]
 	).map(map);
@@ -205,7 +218,7 @@ export function listProposedGoals(
 	return (
 		db
 			.query(
-				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND status='proposed' AND scope_key IN (${marks}) ORDER BY rowid`,
+				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND status='proposed' AND scope_key IN (${marks})${live} ORDER BY rowid`,
 			)
 			.all(principal, ...scopeKeys) as Record<string, unknown>[]
 	).map(map);
@@ -267,7 +280,7 @@ export function listGoals(
 	return (
 		db
 			.query(
-				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND scope_key IN (${scopes}) AND status IN (${marks}) ORDER BY CASE status WHEN 'adopted' THEN 0 WHEN 'proposed' THEN 1 WHEN 'completed' THEN 2 ELSE 3 END, priority DESC, updated_at DESC, rowid DESC`,
+				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND scope_key IN (${scopes}) AND status IN (${marks})${live} ORDER BY CASE status WHEN 'adopted' THEN 0 WHEN 'proposed' THEN 1 WHEN 'completed' THEN 2 ELSE 3 END, priority DESC, updated_at DESC, rowid DESC`,
 			)
 			.all(principal, ...scopeKeys, ...statuses) as Record<string, unknown>[]
 	).map(map);
@@ -284,7 +297,7 @@ export function listAdoptedByPriority(
 	return (
 		db
 			.query(
-				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND status='adopted' AND scope_key IN (${marks}) ORDER BY priority DESC, updated_at DESC, rowid DESC`,
+				`SELECT ${columns} FROM goals_ledger WHERE principal=? AND status='adopted' AND scope_key IN (${marks})${live} ORDER BY priority DESC, updated_at DESC, rowid DESC`,
 			)
 			.all(principal, ...scopeKeys) as Record<string, unknown>[]
 	).map(map);
@@ -345,12 +358,32 @@ export function scopesOfGoals(
 	).map((r) => ({ principal: r.principal, scopeKey: r.scope_key }));
 }
 
+/** Marks the goals (those that exist) as excluded; the ones already marked keep their time. */
+export function excludeGoals(
+	db: Database,
+	goalIds: readonly string[],
+	at: string,
+) {
+	db.query(
+		`INSERT OR IGNORE INTO goals_excluded (goal_id, excluded_at)
+		 SELECT id, ?2 FROM goals_ledger WHERE id IN (SELECT value FROM json_each(?1))`,
+	).run(JSON.stringify(goalIds), at);
+}
+
+export function isExcluded(db: Database, goalId: string): boolean {
+	return (
+		db.query("SELECT 1 FROM goals_excluded WHERE goal_id = ?").get(goalId) !==
+		null
+	);
+}
+
 /** Deletes the goals with every revision, history row and provenance row. */
 export function deleteGoals(db: Database, goalIds: readonly string[]) {
 	const ids = JSON.stringify(goalIds);
 	for (const sql of [
 		"DELETE FROM goals_source WHERE goal_id IN (SELECT value FROM json_each(?))",
 		"DELETE FROM goals_entity WHERE goal_id IN (SELECT value FROM json_each(?))",
+		"DELETE FROM goals_excluded WHERE goal_id IN (SELECT value FROM json_each(?))",
 		"DELETE FROM goals_history WHERE goal_id IN (SELECT value FROM json_each(?))",
 		"DELETE FROM goals_ledger WHERE id IN (SELECT value FROM json_each(?))",
 	])
@@ -365,5 +398,10 @@ export const migrations: readonly Migration[] = [
 		id: "goals/0003-sources",
 		sql: sourceMigration,
 		after: ["goals/0002-operation"],
+	},
+	{
+		id: "goals/0004-excluded",
+		sql: excludedMigration,
+		after: ["goals/0003-sources"],
 	},
 ];

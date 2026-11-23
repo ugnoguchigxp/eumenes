@@ -212,7 +212,8 @@ export function createExplicitOps(deps: ImmediateDeps) {
 						now,
 					) !== "past",
 			).length;
-			if (counted >= MAX_ACTIVE_ITEMS && !active)
+			// The count limit is for what the agent saves on its own; what the user asked for is not refused by it.
+			if (input.requested === false && counted >= MAX_ACTIVE_ITEMS && !active)
 				return rejected("limit_reached");
 			const same = active !== undefined && sameValue(active, fields);
 			// What the user stated unasked never replaces a record that stands (a contradiction is not settled by

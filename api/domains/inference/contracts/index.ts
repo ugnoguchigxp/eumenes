@@ -194,6 +194,8 @@ export type CallSession = {
 export type AgentAttemptRevocation = {
 	messageIds: readonly string[];
 	itemIds: readonly string[];
+	/** Requests (by subject) the purge leaves standing: the run that made the forget answers it. */
+	exceptSubjects?: readonly string[];
 };
 export interface InferencePort {
 	/** Exact usage of a finished receipt, for domain-owned metered workers. */

@@ -242,6 +242,54 @@ test("a forget by reference excludes at once: the input, read_memory and read_hi
 	expect(hidden.map((row) => row.message_id)).toEqual([first.inputMessageId]);
 });
 
+test("the steward's closure delete, started at once by the run's own forget, does not take the reply away: it is answered, and a retry would still carry the request", async () => {
+	await open();
+	const { saved, first } = await shownFact();
+	// The steward does not wait for the run: its closure delete blocks the messages while the reply is written.
+	h!.state.onExcluded = (db, input) => {
+		h!.memory!.closeExclusionInTransaction(db, {
+			conversationId: input.conversationId,
+			itemIds: input.exclusion.itemIds,
+			messageIds: input.exclusion.messageIds,
+		});
+	};
+	h!.state.steps.push(
+		choice({ choice: "none" }),
+		memoryCall({ kind: "forget", what: "辛いものの好み", ref: "m1" }),
+		{ text: "忘れました。" },
+	);
+	const run = await h!.say("辛いものの話は忘れて");
+	expect(h!.dialogue.get(run.id)?.error).toBeNull();
+	expect(h!.dialogue.answerText(run.id)).toBe("忘れました。");
+	expect(h!.memory!.list(true).map((item) => item.id)).not.toContain(saved.id);
+	expect(
+		h!.store.read((db) =>
+			h!.memory!.blockedMessageIdsInTransaction(db, [first.inputMessageId]),
+		),
+	).toEqual(new Set([first.inputMessageId]));
+});
+
+test("a reply made again after the run's own forget still shows the user's request", async () => {
+	await open();
+	await shownFact();
+	h!.state.steps.push(
+		choice({ choice: "none" }),
+		memoryCall({ kind: "forget", what: "辛いものの好み", ref: "m1" }),
+		// The closure delete revoked the call that made the forget: the host writes the reply again.
+		{ fail: "memory_stale" },
+		choice({ choice: "none" }),
+		{ text: "忘れました。" },
+	);
+	const run = await h!.say("辛いものの話は忘れて");
+	expect(h!.dialogue.answerText(run.id)).toBe("忘れました。");
+	// The retry's input is the request itself, not a line of the history under a host notice.
+	const again = h!.state.calls.at(-1)!;
+	const last = String(again.messages.at(-1)!.content);
+	expect(last).toContain("## User\n辛いものの話は忘れて");
+	expect(last).not.toContain("## Earlier");
+	expect(again.tools).toContain("memory");
+});
+
 test("a forget that names no reference is queued for the agency to resolve, and the model is told it is resolving", async () => {
 	await open();
 	h!.state.steps.push(

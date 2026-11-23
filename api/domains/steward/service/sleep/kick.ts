@@ -168,11 +168,13 @@ export function createSleepKick(
 				SLEEP_POLICY.shallowCandidates,
 			) >= SLEEP_POLICY.shallowCandidates;
 		// Turns of the handled events are embedded together with the shallow run (not at every exchange).
-		const embed = conversationIds.some(
-			(id) =>
-				pendingEvents({ db, deps, conversationId: id } satisfies StepEnv)
-					.length > 0,
-		);
+		const embed = deps.continuity.events
+			.conversationsWithUncuratedInTransaction(db)
+			.some(
+				(id) =>
+					pendingEvents({ db, deps, conversationId: id } satisfies StepEnv)
+						.length > 0,
+			);
 		if (!deep && !consolidate && !embed) return;
 		const resting = restOf(db, deps, conversationIds);
 		if (!resting.rested) {

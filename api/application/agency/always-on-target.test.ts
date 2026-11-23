@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { PRINCIPAL, PROFILE_SCOPE } from "../../domains/memory/contracts";
 import { settle } from "../../infrastructure/wait-for";
 import { saveItem } from "../../domains/memory/test/memory.fixture";
 import { agendaFixture, type CallKind } from "./always-on.fixture";
@@ -126,6 +127,74 @@ test("a forget picks the target from the candidates the host showed, excludes it
 		const [call] = f.calls("target");
 		expect(call!.prompt).toContain("コーヒーはブラックで飲む");
 		expect(call!.prompt).not.toContain(coffee.id);
+	} finally {
+		await f.close();
+	}
+});
+
+test("a forget picks the goals of both compartments too: they leave every listing at once and the steward's request carries them", async () => {
+	const f = await agendaFixture({
+		goals: {},
+		script: targetScript(picks(["g1", "g2"])),
+	});
+	try {
+		const state = inbox(f);
+		await f.start();
+		await f.user(
+			"user-a",
+			"ao",
+			"元上司の堀江さんに謝りたい。謝るのを今年の目標にしたい",
+		);
+		const access = {
+			principal: PRINCIPAL,
+			scopeKeys: [PROFILE_SCOPE, `${PROFILE_SCOPE}:agenda-goals`],
+		};
+		const goal = (scopeKey: string, text: string) => ({
+			op: "adopt" as const,
+			scopeKey,
+			desiredState: text,
+			source: { namespace: "conversation", kind: "message", id: "user-a" },
+			sourceMessageIds: ["user-a"],
+		});
+		const results = await f.h.store.write((db) =>
+			f.goalsService!.applyInTransaction(db, access, [
+				goal(PROFILE_SCOPE, "堀江さんに謝る"),
+				goal(`${PROFILE_SCOPE}:agenda-goals`, "堀江さんへの手紙を書く"),
+				goal(PROFILE_SCOPE, "英語の勉強を続ける"),
+			]),
+		);
+		const ids = results.map((r) =>
+			r.status === "applied" ? r.goal.id : "",
+		) as [string, string, string];
+		await f.user("user-b", "ao", "堀江さんの話はもう全部忘れて");
+		const request = await ask(f, state, {
+			what: "堀江さんの話",
+			requestId: "steward-request",
+		});
+		const listed = () =>
+			f.h.store.read((db) =>
+				f
+					.goalsService!.listForStewardInTransaction(db, access)
+					.map((g) => g.goalId),
+			);
+		// Both of 堀江さん's goals are out of every listing; the other goal stays.
+		expect(listed()).toEqual([ids[2]]);
+		expect(state.excluded).toMatchObject([
+			{
+				id: request.requestId,
+				exclusion: { goalIds: [ids[0], ids[1]].sort(), messageIds: ["user-a"] },
+			},
+		]);
+		// The messages the goals stand on are hidden with them.
+		expect(state.hidden).toEqual([["user-a"]]);
+		// Hidden from what is said and shown: the slots and the context list never carry them.
+		expect(
+			f.h.store.read((db) =>
+				f
+					.goalsService!.adoptedForContextInTransaction(db, access)
+					.map((g) => g.goalId),
+			),
+		).toEqual([ids[2]]);
 	} finally {
 		await f.close();
 	}

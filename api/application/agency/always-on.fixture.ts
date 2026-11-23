@@ -10,7 +10,11 @@ import type { AgencyHostDeps, NoteDocumentPort } from "./host-types";
 import { createContinuityService } from "../../domains/continuity";
 import { createGoalsService } from "../../domains/goals";
 import { createMemoryHostConnection } from "../memory-host";
-import { createAgendaGoalStore, forgetGoalDocuments } from "./goal-agenda";
+import {
+	createAgendaGoalStore,
+	forgetGoalDocuments,
+	goalForgetDeps,
+} from "./goal-agenda";
 import { join } from "node:path";
 
 export type CallKind =
@@ -135,11 +139,11 @@ export async function agendaFixture(
 		serial = 0,
 		published = 0,
 		foreground = false;
-	const goalStore = options.goals
-		? createAgendaGoalStore(
-				h.store,
-				createGoalsService(() => new Date(now).toISOString()),
-			)
+	const goalsService = options.goals
+		? createGoalsService(() => new Date(now).toISOString())
+		: undefined;
+	const goalStore = goalsService
+		? createAgendaGoalStore(h.store, goalsService)
 		: undefined;
 	const memoryHost = options.goals
 		? createMemoryHostConnection(h.memory!, h.dir)
@@ -230,10 +234,11 @@ export async function agendaFixture(
 		settings: h.settings,
 		memory: h.memory!,
 		continuity,
-		...(goalStore && memoryHost
+		...(goalStore && goalsService && memoryHost
 			? {
 					agendaGoals: {
 						...options.goals,
+						...goalForgetDeps(goalsService),
 						mockDir: join(h.dir, "goal-mock"),
 						store: goalStore,
 						readMemory: memoryHost.readForGoals,
@@ -329,6 +334,7 @@ export async function agendaFixture(
 		signals,
 		documents,
 		goalStore,
+		goalsService,
 		memoryHost,
 		port,
 		deps,

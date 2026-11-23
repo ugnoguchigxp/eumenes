@@ -251,6 +251,15 @@ function apply(
 				itemIds: outcome.itemIds,
 				messageIds: outcome.evidenceMessageIds,
 			});
+			// What this call excluded was in its own prompt: its closure delete (the steward does not wait for the run)
+			// blocking those messages does not expire the reply that asked for it.
+			if (input.memory)
+				input.memory.blockedAtPrepare = [
+					...new Set([
+						...(input.memory.blockedAtPrepare ?? []),
+						...outcome.evidenceMessageIds,
+					]),
+				];
 			// The words this call took out of the input were in its own prompt: the run goes on, its input is the new one.
 			input.inputRevision =
 				deps.conversation.input.cutInTransaction(tx, input.conversationId)

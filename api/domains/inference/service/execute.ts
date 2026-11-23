@@ -478,7 +478,13 @@ export async function executeRequest(
 	const done = new Promise<void>((resolve) => {
 		finish = resolve;
 	});
-	const running: Running = { controller, row, done, finish };
+	const running: Running = {
+		controller,
+		row,
+		done,
+		finish,
+		...(resolvedSession?.retainRequest ? { retained: true as const } : {}),
+	};
 	env.active.set(row.id, running);
 	env.touch?.();
 	const request: Request = {
@@ -533,7 +539,9 @@ export async function executeRequest(
 		if (
 			resolvedSession?.retainRequest &&
 			signal.reason instanceof StaleAnswerInput &&
-			!controller.signal.aborted &&
+			// A forget that revoked the call aborts its own controller with that reason; any other abort is final.
+			(!controller.signal.aborted ||
+				controller.signal.reason instanceof StaleAnswerInput) &&
 			Date.now() < deadline
 		) {
 			// Keep the captured authority for the host's retry. No earlier tool-step receipt may be adopted.
@@ -544,6 +552,8 @@ export async function executeRequest(
 					)
 					.run(row.id),
 			);
+			// A forget revoked the call: the host is told its input is stale, not that the call was cancelled.
+			if (controller.signal.aborted) throw signal.reason;
 		} else if (
 			(session?.failureScope !== "call" &&
 				!resolvedSession?.retainRequest &&

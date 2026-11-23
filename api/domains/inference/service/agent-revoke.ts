@@ -24,9 +24,14 @@ export function revokeAgentAttempts(
 			`SELECT a.id, a.request_id AS requestId, a.refs FROM inference_attempts a
 			 JOIN inference_requests r ON r.id=a.request_id
 			 WHERE a.refs IS NOT NULL AND a.accepted=0
-			 AND (a.status='running' OR (a.status='succeeded' AND r.status='pending'))`,
+			 AND (a.status='running' OR (a.status='succeeded' AND r.status='pending'))
+			 AND r.subject NOT IN (SELECT value FROM json_each(?))`,
 		)
-		.all() as Array<{ id: string; requestId: string; refs: string }>;
+		.all(JSON.stringify(input.exceptSubjects ?? [])) as Array<{
+		id: string;
+		requestId: string;
+		refs: string;
+	}>;
 	const requests = new Set<string>();
 	for (const row of rows) {
 		let refs: {

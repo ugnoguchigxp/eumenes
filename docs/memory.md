@@ -143,7 +143,7 @@ ContextWindowの内容・並び・予算・保持・再構成・忘却の扱い�
 - **prepare** で対象がまだ有効か確かめ、忘却の連番 `forget_seq` を単位に記録する（依頼の処理と World の反映は推論の期限と request も取る）。**execute** は schema 付きの推論 1 回（上限は期限300秒・出力1200 tokens。LARM の考えるモデルには inference が考える分 10,000 tokens を足すので、約45 tokens/秒でも書き終わる長さにしている。会話と同じ route を使い、cloud への切替が期限から最大60秒を確保する。ジョブの期限は15分で、待ち・推論・再試行を含む）。睡眠の単位の execute は、ライブラリが何度かモデルを呼び、自分の transaction で書く（ジョブの期限は 60 分）。**settle** は 1 つの transaction で、再検証、結果の適用、判断記録、Window の再公開、次の単位の enqueue を行う。
 - 一時的な失敗（タイムアウト・接続失敗）は Queue の retry（最大3回）で同じジョブのまま再試行する。Queue で終わった（failed / expired / interrupted）単位、または出力が使えなかった単位は `failed` で閉じ、対象ごとに失敗を数える。`kick` が**新しい unitId** の単位を作り直す。3回失敗した依頼は `none`（`steward_failed`）にする。除外済みの忘却は諦めず、失敗のたびに待ちを置いて削除をやり直す。
 - 長期記憶を書く step（`curate-memory`、`curate-goals`、睡眠の層）の `concurrencyKey` は全会話共通の `steward:long-term`。World の反映は `steward:<conversationId>`、忘却の削除は `steward:forget`。
-- **起動時と各 settle の後**に `kickInTransaction` が呼ばれる。会話を指定しない起動時の kick は、steward が知っている会話と、反映待ちの出来事がある会話のすべてを対象にし、睡眠の層はプロファイル全体を見る。開いている単位があればそれを待つ。
+- **起動時と各 settle の後**に `kickInTransaction` が呼ばれる。会話を指定しない起動時の kick は、受付箱に依頼がある会話・開いた単位がある会話・World の反映待ちの出来事がある会話を 1 つずつ見て、睡眠の層はそのあとで 1 回だけプロファイル全体を見る（会話の数に比例する費用は 1 回分）。開いている単位があればそれを待つ。
 
 ## 依頼キューと run の取り込み
 
@@ -266,6 +266,11 @@ HTTP は `GET /api/steward/decisions?conversationId=main&limit=50` と `GET /api
 | `latestChangeSeqInTransaction` / `changedExcludingRunInTransaction` | 変更フィードの基準と、自分の run を除いた変更の有無 |
 
 返事の採用の検査（`memory_stale`）は、記憶の窓の即時の変更のうち自分の run のものを除く。追加（新しい記憶）では失効しない。
+
+- **件数の上限（100 件）**: 本人の明示の依頼（`requested !== false`。`memory` ツールの remember・correct）には掛けない。背景のパス（`requested: false`）だけが上限を受け、満杯で `limit_reached` が返ったら、Agency の背景のパスはその記憶を L1 の候補として残す（深い整理が統合する）。
+- **目標の忘却**: ref なしの忘却の対象の解決（Agency）は、目標の両区画（`profile:owner` と `profile:owner:agenda-goals`、完了・取下げ済みを含む）を候補に入れる。選ばれた目標は goals domain の `excludeForForgetInTransaction` で即時に除外し（`goals_excluded`。目標の一覧・`## State`・採用済みの目標・World の snapshot から外れ、それ以後の操作は `invalid_goal`）、記憶担当の依頼（`exclusion.goalIds`）の閉包削除（`forgetGoalsInTransaction`）で履歴・根拠の行ごと消す。目標の根拠の発言は記録の根拠の発言と同じに履歴から隠す。
+- **自分の run の忘却**: 閉包削除の purge（`ForgetPurge.exceptSubjects`）は、その除外を行った run の呼出しを取り消さない。除外が塞いだ根拠の発言は、その run の窓の検査で既知として扱う。作り直しになったとき（`not_adopted`）は、run の入力の発言が処理済みでも `## User` に出し直す（履歴の `## Earlier` には落とさない）。
+- **忘却が進行中の返事を取り消したとき**: 閉包削除が取り消した返事（`retainRequest` の主の呼出し）は、request を残して `memory_stale`（`StaleAnswerInput`）で打ち切り、同じ run が作り直す。取り消した attempt は採用しない。
 
 ## 障害調査
 

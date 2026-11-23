@@ -528,3 +528,113 @@ test("forgetting rolls back with the surrounding transaction", async () => {
 	).rejects.toThrow("host_abort");
 	expect(dump()).toBe(before);
 });
+
+test("an excluded goal leaves every listing at once, takes no further operation, and the closure delete removes it", async () => {
+	const goals = service();
+	const both: GoalAccess = {
+		principal: "alice",
+		scopeKeys: ["work", "work:agenda-goals"],
+	};
+	const make = async (scopeKey: string, text: string, message: string) => {
+		const [r] = await apply(
+			goals,
+			[
+				{
+					op: "adopt",
+					scopeKey,
+					desiredState: text,
+					source: src(message),
+					sourceMessageIds: [message],
+				},
+			],
+			both,
+		);
+		return r?.status === "applied" ? r.goal.id : "";
+	};
+	const [r2] = await apply(
+		goals,
+		[
+			{
+				op: "propose",
+				scopeKey: "work",
+				desiredState: "堀江さんの提案",
+				source: src("m2"),
+				sourceMessageIds: ["m2"],
+			},
+		],
+		both,
+	);
+	const proposed = r2?.status === "applied" ? r2.goal.id : "";
+	const apology = await make("work", "堀江さんに謝る", "m1");
+	const agenda = await make("work:agenda-goals", "堀江さんに手紙を書く", "m3");
+	const keep = await make("work", "英語の勉強", "m4");
+	const listed = () =>
+		store.read((db) => ({
+			steward: goals
+				.listForStewardInTransaction(db, both)
+				.map((goal) => goal.goalId)
+				.sort(),
+			context: goals
+				.adoptedForContextInTransaction(db, both)
+				.map((goal) => goal.goalId)
+				.sort(),
+			snapshot: goals
+				.snapshotInTransaction(db, both)
+				.goals.map((goal) => goal.goalId)
+				.sort(),
+			proposals: goals.proposalsInTransaction(db, both).map((goal) => goal.id),
+		}));
+	expect(listed().steward).toEqual([agenda, apology, keep, proposed].sort());
+	const before = epoch();
+	const excluded = await store.write((db) =>
+		goals.excludeForForgetInTransaction(db, {
+			goalIds: [apology, agenda, proposed, "nope"],
+			entityIds: [],
+		}),
+	);
+	// What the closure delete will remove, and the messages the goals stand on: the same answer as the resolution.
+	expect(excluded).toEqual({
+		goalIds: [agenda, apology, proposed].sort(),
+		messageIds: ["m1", "m2", "m3"],
+	});
+	expect(epoch()).toBeGreaterThan(before);
+	expect(listed()).toEqual({
+		steward: [keep],
+		context: [keep],
+		snapshot: [keep],
+		proposals: [],
+	});
+	// The goal is not changed or completed any more; it only waits for its delete.
+	const [revised] = await apply(
+		goals,
+		[
+			{
+				op: "revise",
+				goalId: apology,
+				expectedRevision: 1,
+				desiredState: "堀江さんに電話する",
+				source: src("m5"),
+				sourceMessageIds: ["m5"],
+			},
+		],
+		both,
+	);
+	expect(revised).toMatchObject({ status: "rejected", reason: "invalid_goal" });
+	// Again: the same answer, nothing more written.
+	expect(
+		await store.write((db) =>
+			goals.excludeForForgetInTransaction(db, {
+				goalIds: [apology],
+				entityIds: [],
+			}),
+		),
+	).toEqual({ goalIds: [apology], messageIds: ["m1"] });
+	await store.write((db) =>
+		goals.forgetGoalsInTransaction(db, {
+			goalIds: excluded.goalIds,
+			entityIds: [],
+		}),
+	);
+	expect(rows("SELECT id FROM goals_ledger").map((r) => r.id)).toEqual([keep]);
+	expect(rows("SELECT goal_id FROM goals_excluded")).toEqual([]);
+});

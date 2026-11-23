@@ -47,6 +47,8 @@ export type Running = {
 	controller: AbortController;
 	row: RequestRow;
 	connection?: Connection;
+	/** The call keeps its request for the host's retry (`retainRequest`): a revoked input is told, not failed. */
+	retained?: true;
 	done: Promise<void>;
 	finish: () => void;
 };

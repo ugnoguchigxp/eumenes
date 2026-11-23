@@ -28,6 +28,8 @@ export type TargetOutcome =
 			picked: { ref: string; reason: string }[];
 			/** The memory items the operation changed. */
 			itemIds: string[];
+			/** `forget`: the goals excluded (either compartment). */
+			goalIds: string[];
 			/** `forget`: the messages the excluded versions stand on (the caller hides them until the closure delete). */
 			evidenceMessageIds: string[];
 			/** What the memory or the checks refused, with the reason. */
@@ -51,6 +53,7 @@ export const CANDIDATE_LIMITS = {
 	items: 12,
 	plans: 6,
 	agency: 6,
+	goals: 6,
 	utterances: 10,
 } as const;
 /** How many of the conversation's latest messages are searched. */
@@ -78,12 +81,14 @@ type Resolution = z.infer<typeof resolutionSchema>;
 type Item = ReturnType<AgencyHostDeps["memory"]["list"]>[number];
 type Candidate = {
 	ref: string;
-	kind: "memory" | "plan" | "agency" | "utterance";
+	kind: "memory" | "plan" | "agency" | "goal" | "utterance";
 	text: string;
 	/** The memory items the candidate stands for or rests on. */
 	items: Item[];
 	/** What the agent drops with it (message ids and `memory:<id>` it rests on). */
 	refs: string[];
+	/** The goals (either compartment) the candidate stands for. */
+	goalIds: string[];
 };
 
 const strip = (text: string) =>
@@ -132,6 +137,7 @@ function candidatesFor(
 			text: item.text,
 			items: [item],
 			refs: [`memory:${item.id}`, ...item.sourceMessageIds],
+			goalIds: [],
 		});
 	n = 0;
 	for (const plan of top(
@@ -146,6 +152,7 @@ function candidatesFor(
 			text: plan.text,
 			items: itemsOf(messageIds, plan.memoryItemIds),
 			refs: [...messageIds, ...plan.memoryItemIds.map((id) => `memory:${id}`)],
+			goalIds: [],
 		});
 	}
 	n = 0;
@@ -163,8 +170,29 @@ function candidatesFor(
 			text: item.text,
 			items: itemsOf(item.refs, memoryIds),
 			refs: [...item.refs],
+			goalIds: [],
 		});
 	}
+	// A forget reaches the goals of both compartments (the agenda's slots and the ledger of its goals), whatever
+	// their state: what the user asks to be forgotten is not kept as a goal either.
+	n = 0;
+	if (request.kind === "forget" && deps.agendaGoals?.goalsInTransaction)
+		for (const goal of top(
+			deps.agendaGoals.goalsInTransaction(db),
+			(g) => g.text,
+			CANDIDATE_LIMITS.goals,
+		)) {
+			const sources =
+				deps.agendaGoals.sourceMessageIds?.(db, goal.goalId) ?? [];
+			shown.push({
+				ref: `g${++n}`,
+				kind: "goal",
+				text: goal.text,
+				items: itemsOf(sources, []),
+				refs: [...sources],
+				goalIds: [goal.goalId],
+			});
+		}
 	n = 0;
 	const own = new Set(request.messageIds);
 	const said = deps.conversation
@@ -182,6 +210,7 @@ function candidatesFor(
 			text: said1.text,
 			items: itemsOf([said1.id], []),
 			refs: [said1.id],
+			goalIds: [],
 		});
 	return { shown, words };
 }
@@ -266,9 +295,14 @@ async function decide(input: {
 	const items = [
 		...new Map(picked.flatMap((p) => p.items).map((i) => [i.id, i])).values(),
 	];
+	const goalIds = [...new Set(picked.flatMap((p) => p.goalIds))];
 	if (request.kind === "correct" && items.length !== 1)
 		return { status: "unresolved", reason: "ambiguous", rejected };
-	if (items.length === 0 && (request.kind !== "suppress" || topic === null))
+	if (
+		items.length === 0 &&
+		goalIds.length === 0 &&
+		(request.kind !== "suppress" || topic === null)
+	)
 		return { status: "unresolved", reason: "no_candidates", rejected };
 	const outcome = await deps.store.write((db) => {
 		if (c.closed.signal.aborted) return null;
@@ -277,42 +311,65 @@ async function decide(input: {
 			sourceRunId: request.runId,
 		};
 		const itemIds: string[] = [];
+		const excludedGoalIds: string[] = [];
 		const evidenceMessageIds: string[] = [];
 		const refused: string[] = [];
 		/** The operation took effect (a topic word counts: it names no item). */
 		let applied = false;
 		if (request.kind === "forget") {
-			const out = deps.memory.excludeForForgetInTransaction(db, {
-				...origin,
-				targets: items.map((i) => ({ itemId: i.id, revision: i.revision })),
-			});
-			if (out.status === "rejected") refused.push(`forget:${out.reason}`);
-			else {
+			const out =
+				items.length > 0
+					? deps.memory.excludeForForgetInTransaction(db, {
+							...origin,
+							targets: items.map((i) => ({
+								itemId: i.id,
+								revision: i.revision,
+							})),
+						})
+					: null;
+			if (out?.status === "rejected") refused.push(`forget:${out.reason}`);
+			else if (out) {
 				applied = true;
 				itemIds.push(...out.itemIds);
 				evidenceMessageIds.push(...out.evidenceMessageIds);
+			}
+			// The goals of both compartments go out of every listing with it, and are deleted by the same closure.
+			if (goalIds.length > 0 && deps.agendaGoals?.excludeGoalsInTransaction) {
+				const excluded = deps.agendaGoals.excludeGoalsInTransaction(
+					db,
+					goalIds,
+				);
+				if (excluded.goalIds.length > 0) {
+					applied = true;
+					excludedGoalIds.push(...excluded.goalIds);
+					evidenceMessageIds.push(...excluded.messageIds);
+				}
+			}
+			if (applied) {
+				const messageIds = [...new Set(evidenceMessageIds)];
+				evidenceMessageIds.splice(0, evidenceMessageIds.length, ...messageIds);
 				// The request waits for the closure delete of what was excluded (its id is the steward's request).
 				const recorded = deps.steward?.excludedInTransaction(db, {
 					id: request.requestId,
 					conversationId: request.conversationId,
 					exclusion: {
-						itemIds: out.itemIds,
-						messageIds: out.evidenceMessageIds,
+						itemIds,
+						messageIds,
 						claimIds: [],
 						entityIds: [],
-						goalIds: [],
+						goalIds: excludedGoalIds,
 					},
 				});
 				// Not a pending forget (settled meanwhile): the hiding goes on, the outcome is told.
 				if (recorded === false)
 					log.warn("agency.target_exclusion_not_recorded", {
 						subjectId: request.conversationId,
-						hitCount: out.itemIds.length,
+						hitCount: itemIds.length + excludedGoalIds.length,
 					});
-				// The messages the excluded records stand on leave the conversation's view at once.
+				// The messages the excluded records and goals stand on leave the conversation's view at once.
 				deps.dialogueTargets?.hideExcludedInTransaction(db, {
-					messageIds: out.evidenceMessageIds,
-					itemIds: out.itemIds,
+					messageIds,
+					itemIds,
 				});
 			}
 		} else if (request.kind === "suppress") {
@@ -374,7 +431,13 @@ async function decide(input: {
 				id: request.requestId,
 				outcome: "applied",
 			});
-		return { applied, itemIds, evidenceMessageIds, refused };
+		return {
+			applied,
+			itemIds,
+			goalIds: excludedGoalIds,
+			evidenceMessageIds,
+			refused,
+		};
 	});
 	if (!outcome) return { status: "unresolved", reason: "aborted", rejected };
 	rejected.push(...outcome.refused);
@@ -390,6 +453,7 @@ async function decide(input: {
 			reason: reasons.get(p.ref) ?? "",
 		})),
 		itemIds: outcome.itemIds,
+		goalIds: outcome.goalIds,
 		evidenceMessageIds: outcome.evidenceMessageIds,
 		rejected,
 	};

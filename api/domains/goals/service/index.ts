@@ -35,10 +35,12 @@ import {
 	bumpScopeEpoch,
 	countGoals,
 	deleteGoals,
+	excludeGoals,
 	forgetClosure,
 	getGoal,
 	getGoalByOperation,
 	insertGoal,
+	isExcluded,
 	listAdoptedByPriority,
 	listAdoptedGoals,
 	listGoals,
@@ -238,6 +240,25 @@ function resolveGoalForget(
 }
 
 /**
+ * The immediate stage of a forget (the redesign, section 9.2): the goals the forget reaches (the named ones and those
+ * linked to the entities) leave every listing and take no further operation; the closure delete (`forgetGoals`)
+ * removes them. Returns what the closure delete will remove, the same answer as the resolution. Idempotent. The goal
+ * epoch of every affected scope moves, so anything built from the goals is invalidated.
+ */
+function excludeGoalsForForget(
+	db: Database,
+	input: ForgetGoalsInput,
+	at: string,
+): ForgetGoalsResult {
+	const result = resolveGoalForget(db, input);
+	if (result.goalIds.length === 0) return result;
+	excludeGoals(db, result.goalIds, at);
+	for (const scope of scopesOfGoals(db, result.goalIds))
+		bumpScopeEpoch(db, scope.principal, scope.scopeKey);
+	return result;
+}
+
+/**
  * F8: deletes the named goals and those linked to the given World entities
  * with every revision, history row and provenance row, whatever their status.
  * Idempotent: a repeat finds nothing and returns empty lists. The goal epoch
@@ -266,7 +287,9 @@ export function createGoalsService(
 		if (
 			!goal ||
 			goal.principal !== access.principal ||
-			!access.scopeKeys.includes(goal.scopeKey)
+			!access.scopeKeys.includes(goal.scopeKey) ||
+			// A goal a forget excluded waits for its delete: it takes no operation.
+			isExcluded(db, goalId)
 		)
 			throw new Error("invalid_goal");
 		return goal;
@@ -499,6 +522,9 @@ export function createGoalsService(
 		adoptedForContextInTransaction: adoptedGoalsForContext,
 		/** What `forgetGoalsInTransaction` would delete; writes nothing. */
 		resolveForgetInTransaction: resolveGoalForget,
+		/** The immediate stage of a forget: out of every listing now, deleted by `forgetGoalsInTransaction`. */
+		excludeForForgetInTransaction: (db: Database, input: ForgetGoalsInput) =>
+			excludeGoalsForForget(db, input, clock()),
 		forgetGoalsInTransaction: forgetGoals,
 		snapshotInTransaction: goalSnapshot,
 		/** Access is required: a goal outside it is reported as unknown. */

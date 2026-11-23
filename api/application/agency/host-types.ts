@@ -77,6 +77,21 @@ export type AgencyHostDeps = {
 		isGoalContextCurrent(snapshotId: string, db?: Database): boolean;
 		/** The messages a goal stands on (a goal resting on a forgotten or excluded one is not shown). */
 		sourceMessageIds?(db: Database, goalId: string): readonly string[];
+		/** Every goal of both compartments (`profile:owner` and `profile:owner:agenda-goals`), any state, that a forget may name. */
+		goalsInTransaction?(db: Database): ReadonlyArray<{
+			goalId: string;
+			text: string;
+			status: string;
+			scopeKey: string;
+		}>;
+		/**
+		 * The immediate stage of a forget for these goals: out of every listing now, deleted by the closure delete. Returns
+		 * what the closure delete will remove and the messages the goals stand on.
+		 */
+		excludeGoalsInTransaction?(
+			db: Database,
+			goalIds: readonly string[],
+		): { goalIds: string[]; messageIds: string[] };
 		designer?: GoalDesigner;
 		analysisMs?: number;
 		trace?(event: GoalHostEvent): void;
