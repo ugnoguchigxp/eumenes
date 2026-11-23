@@ -18,8 +18,53 @@ import {
 	migrations as goalsMigrations,
 } from "../../domains/goals";
 import { openStore } from "../../infrastructure/sqlite";
+import { createApp } from "../app";
 import { createGoalReplyWork } from "./goal-permission";
 import { createGoalWorkspaceRegistry } from "./goal-workspaces";
+import { registerAgency } from "./routes";
+
+async function verifyGoalListRoute(
+	store: Pick<ReturnType<typeof openStore>, "onCommit">,
+	list: ReturnType<typeof createGoalReplyWork>["list"],
+	expected: unknown,
+) {
+	const unexpected = () => {
+		throw new Error("goal_list_must_only_read");
+	};
+	const app = createApp({
+		token: "test-token",
+		origin: "http://localhost",
+		modules: [
+			{
+				mount(app) {
+					registerAgency(app, {
+						status: unexpected,
+						attend: unexpected,
+						thoughts: unexpected,
+						listGoals: list,
+					});
+				},
+			},
+		],
+	});
+	let commits = 0;
+	const unsubscribe = store.onCommit(() => commits++);
+	try {
+		const url = "/api/agency/goals";
+		expect((await app.request(url)).status).toBe(401);
+		for (let replay = 0; replay < 2; replay++) {
+			const response = await app.request(url, {
+				headers: { Authorization: "Bearer test-token" },
+			});
+			expect(response.status).toBe(200);
+			expect(response.headers.get("Cache-Control")).toBe("no-store");
+			expect(await response.json()).toEqual(expected);
+		}
+		expect(commits).toBe(0);
+	} finally {
+		unsubscribe();
+	}
+}
 
 test("one utterance registers and grants once, even on replay, and stale authority cannot execute", async () => {
 	const root = mkdtempSync(join(tmpdir(), "goal-permission-"));
@@ -75,7 +120,7 @@ test("one utterance registers and grants once, even on replay, and stale authori
 			oldOwnerWakes++;
 		},
 	} as GoalHost;
-	const bind = (owner = access.principal, blocked = false) =>
+	const bindReply = (owner = access.principal, blocked = false) =>
 		createGoalReplyWork({
 			store,
 			goals,
@@ -86,7 +131,9 @@ test("one utterance registers and grants once, even on replay, and stale authori
 			access: { ...access, principal: owner },
 			binding: () => ({ toolchainRevisionId: "development@1" }),
 			progress: { submitInTransaction() {}, wake() {} },
-		})("chat", legacy);
+		});
+	const bind = (owner = access.principal, blocked = false) =>
+		bindReply(owner, blocked)("chat", legacy);
 	const call = async (
 		work: ReturnType<typeof bind>,
 		name: string,
@@ -152,6 +199,10 @@ test("one utterance registers and grants once, even on replay, and stale authori
 		const slots = await call(bind(), "list_goals", {});
 		expect(slots.slots).toHaveLength(10);
 		expect(slots.workspaces[0].ref).toBe("trial");
+		await verifyGoalListRoute(store, bindReply().list, slots);
+		expect(bindReply("other").list().slots.every(({ goal }) => !goal)).toBe(
+			true,
+		);
 		const update = {
 			slot: 1,
 			goalId: first.goalId,

@@ -801,6 +801,7 @@ export const applicationPaths: Partial<Record<Domain, readonly string[]>> = {
 		"api/application/agency/goal-web-note.ts",
 		"api/application/agency/goal-workspaces.ts",
 		"api/application/agency/registered-goals.ts",
+		"api/application/agency/routes.ts",
 		"api/application/work/claude-runners.ts",
 		"api/application/work/goal-supervision.ts",
 	],
