@@ -1,7 +1,7 @@
 # 記憶の想起の改善: 実装設計（作業の単位・契約・手順）
 
 - 日付: 2026-11-23
-- 状態: 実装済み・fixture 検証済み（2026-11-23、§11）。live は分離した backend の起動待ち。本番の掃除は未実行
+- 状態: 実装済み・fixture 検証済み（2026-11-23、§11）。本番の掃除と L1→L2 の移し替えは適用済み（§11）。live 評価は行わない（利用者の判断、2026-11-23）
 - 前提: [記憶の想起の改善設計](memory-recall-improvement-2026-11-23.md)（以下「改善設計」）。利用者は §9 の推奨をすべて承認した（2026-11-23）
 - 元の設計: [記憶系の作り直し設計](memory-architecture-redesign-2026-11-22.md) §5・§6・§13・§16
 - 対象のリポジトリ: 本体 `/Users/y.noguchi/Code/eumenes`、評価 `/Users/y.noguchi/Code/eumenes_consolidation`。記憶ライブラリ `/Users/y.noguchi/Code/eumenes_memory` は変更しない（§9 に理由）
@@ -474,3 +474,12 @@ fixture と live を分けて記録する。全件を流すのは最後に 1 回
 | 評価の分離 | 偽 CLI 以外は `--fixture` でも分離の検査をする。既定の URL と同じとみなす綴りを広げた（IPv4 射影・`0.0.0.0`・機器名・自機のアドレス）。`GET /api/memory/status` の `healthy` も見る。深い整理は会話の段の後に始まったもの（`createdAt − durationMs`）だけ数える | 本番の backend に流れる経路を塞ぐ |
 
 残り（直さなかった軽微）: 印は付けるだけで外す口がない。`direct` は句読点のない文ではほぼ立たない（機微・ほかの人の記録が `## Recall` に出にくい安全側）。古い記録が窓に混じったときだけ、`## Memory` の出どころの判定が記録ごとになる。
+
+### 11.1 本番への適用（2026-11-23）
+
+| 手順 | 結果 |
+| --- | --- |
+| バックアップ・migration | サーバー停止中に `bun run db:backup` の後、未適用の migration を適用（`memory/0016`・`0017`、`steward/0009` ほか別作業の3件）。整合性検査 `ok` |
+| 掃除（`conversationPrefix: "eval-"`） | preview の digest で apply。State 82 件を停止、候補 57 件を取り下げ、予定 51 件を終了、本人の旧版 1 件を復元。再 preview で残り 0 件 |
+| L1→L2 の移し替え | 評価以外の会話の候補 2 件（どちらも本人の好み）を利用者の指示で移した（`moved: 2`） |
+| live 評価 | 行わない（利用者の判断）。`## Recall` は既定の切のまま |
