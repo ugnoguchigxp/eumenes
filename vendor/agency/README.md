@@ -7,3 +7,7 @@ Agency と同じ依存関係を用意し、同じ TypeScript 版で `bun scripts
 0.1.10 は 0.1.9 の上に、記憶系の作り直し（`spec/memory-architecture-redesign-2026-11-22.md` §5.3・§5.4・§9.1）のパッケージ側だけを加えた。「予定と関心」の Markdown（`profile.ts`、`updateProfile`・`emptyProfile`・`profileLines`・`PROFILE_TITLE`）を廃止し、構造化出力の書き出し（`extract.ts`、`extractRecords`）、ホストの記録（`AgendaDeps.records`・`known(call)`）と印（`AgendaDeps.marks`、`marks.ts`）、質問の台帳、返事の規則行の変更（`reply.ts`）を入れた。差分は `memory-redesign-adoption-source.patch`（`baseCommit` からの全差分）。0.1.11 の `derivedFrom` の照合用に 0.1.10 の tgz とこのパッチを保持し、元でなくなった 0.1.9 の tgz と `prompt-cache-adoption-source.patch` は削除した。
 
 0.1.11 は 0.1.10 の上に、背景の書き出しの指示文（`extractSystem`）へ「記憶の操作（覚えて・忘れて・訂正して・話題にしないで・取り消して）を頼んだ発言そのものは記録しない」の 1 行を足しただけである。差分は `memory-review-adoption-source.patch`（`baseCommit` からの全差分）で、`derivedFrom` は 0.1.10 の tgz。
+
+0.1.12 の土台は `2262088`（記録係の出力を予定と質問の台帳だけにした。事実・候補・食い違いの出力と、入力の記憶・候補の一覧を廃止）。その上に、登録目標の判断契約、進行台帳と許可・観測の書き込み、会話からの登録・許可ツールを追加した。`registered-goal-autonomy-adoption-source.patch` から再現できる。直接の採用元は 0.1.11 の tgz。この tgz を照合用に保持し、直接の採用元でなくなった 0.1.10 の tgz と SHA-256 ファイルは削除した。
+
+同じ採用差分に、質問待ちの受付を保ったまま独立した条件を進める遷移、複数の読取ポリシー、構成変更の観測と質問の解消を含めた。既存台帳への追加は `agency-goals/0006-read-policies` が担う。
