@@ -1,5 +1,3 @@
-import { listCandidates } from "eumenes-memory/sqlite";
-import { PRINCIPAL, PROFILE_SCOPE } from "../../domains/memory/contracts";
 import { agendaFixture, noRecords, type CallKind } from "./always-on.fixture";
 
 export type Fixture = Awaited<ReturnType<typeof agendaFixture>>;
@@ -19,21 +17,6 @@ export const plans = (f: Fixture) =>
 	f.h.store.read((db) => f.deps.continuity.plans.listInTransaction(db));
 export const questions = (f: Fixture) =>
 	f.h.store.read((db) => f.deps.continuity.questions.listInTransaction(db));
-export const candidates = (f: Fixture) =>
-	f.h.store.read((db) => {
-		const listed = listCandidates(db, {
-			contractVersion: 1,
-			access: {
-				principal: PRINCIPAL,
-				scopeKeys: [PROFILE_SCOPE],
-				purpose: "memory.read",
-				policyRevision: f.h.memory!.policyRevisionInTransaction(db),
-			},
-			scopeKey: PROFILE_SCOPE,
-		});
-		if (listed.status !== "ok") throw new Error("blocked");
-		return listed.candidates;
-	});
 export const exchange = async (f: Fixture, n: string, text: string) => {
 	await f.user(`user-${n}`, "ao", text);
 	await f.assistant(`answer-${n}`, "いいですね。", "ao");

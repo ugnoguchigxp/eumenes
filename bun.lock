@@ -18,8 +18,8 @@
         "eumenes-canvas": "file:vendor/canvas/eumenes-canvas-0.1.0-5bd98dd17e61.tgz",
         "eumenes-collaboration": "./vendor/collaboration/eumenes-collaboration-0.4.0-ce0d56eedc6a.tgz",
         "eumenes-interact": "file:vendor/interact/eumenes-interact-0.1.3-eumenes.2-a88153a824ec.tgz",
-        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.5-8f58df0d0e59.tgz",
-        "eumenes-memory-host": "file:vendor/eumenes-memory-host/eumenes-memory-host-0.2.1-b4c300aef6ba.tgz",
+        "eumenes-memory": "file:vendor/eumenes-memory/eumenes-memory-0.0.6-a16777d3f9d9.tgz",
+        "eumenes-memory-host": "file:vendor/eumenes-memory-host/eumenes-memory-host-0.2.2-f0408abf80d4.tgz",
         "eumenes-pipeline": "file:vendor/pipeline/eumenes-pipeline-0.1.0-a859fd16ce46.tgz",
         "eumenes-skill-smith": "file:vendor/skill-smith/eumenes-skill-smith-0.1.0-c907cb70a230.tgz",
         "eumenes-steer": "file:vendor/steer/eumenes-steer-0.1.0-1ca04b8bee9b.tgz",
@@ -1480,9 +1480,9 @@
 
     "eumenes-interact": ["eumenes-interact@vendor/interact/eumenes-interact-0.1.3-eumenes.2-a88153a824ec.tgz", { "dependencies": { "jsonrepair": "3.15.0", "zod": "4.6.6" } }, "sha512-cacvzSBjQWSKFsvBw9WKx61OYJvfNdRm9eTD0Yx7LyNLmFozyITNxSFNP/BUTdgpISR8J6QaZ8y7I5M3zKhcJA=="],
 
-    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.5-8f58df0d0e59.tgz", {}, "sha512-oZ+AcEd4z+q9T2aMrg6CX+o4E1GnPoP9/gJ+zEgiiVRqFpNeljW84rBOcIAF5hDfUkS8cnMreoqqaKoBrSJ/HA=="],
+    "eumenes-memory": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.6-a16777d3f9d9.tgz", {}, "sha512-qURg9ffudIWwc1IqRYUwBoMGL5QmpAhNCSnUrbqIoCDqLBvKlrYpPLBInPK+aUB+X16LAGtl5k9IgQZeQzkHHQ=="],
 
-    "eumenes-memory-host": ["eumenes-memory-host@vendor/eumenes-memory-host/eumenes-memory-host-0.2.1-b4c300aef6ba.tgz", { "dependencies": { "@modelcontextprotocol/server": "2.4.0", "zod": "4.6.7" }, "bin": { "eumenes-memory": "dist/cli.js" } }, "sha512-Fs92e7BGFqzeF6Ewgha7KcV9G7r5fOg1HkqFze/4yW3BROHn58TM5lArjpae9RToJiHc8k5NPEGfA5e07UGhpg=="],
+    "eumenes-memory-host": ["eumenes-memory-host@vendor/eumenes-memory-host/eumenes-memory-host-0.2.2-f0408abf80d4.tgz", { "dependencies": { "@modelcontextprotocol/server": "2.4.0", "zod": "4.6.7" }, "bin": { "eumenes-memory": "dist/cli.js" } }, "sha512-vECIosgR7ZQsXJsUd3+EPVmmcb0f8hiFdjw3rfPlaGO0uYpzmvVVHVzaTbCThkwAyID2R8wpHIVV1qi+rEHIgA=="],
 
     "eumenes-memory-schema8": ["eumenes-memory@vendor/eumenes-memory/eumenes-memory-0.0.4-30721f30aa19.tgz", {}, "sha512-8wiUMnFdMHQtyDVcCEKpo5qQnjcBb8dNXpBZi6pqz5jEfTZfYt+CM8xav9yBbjx3ajvjtHY/Kvy21qBos1R1hg=="],
 

@@ -41,16 +41,19 @@ export function callKind(request: { system: string }): CallKind {
 	throw new Error("fixture_unknown_call");
 }
 
-export const noRecords = (): Record<
-	"memories" | "candidates" | "plans" | "questions" | "conflicts",
-	unknown[]
-> => ({
-	memories: [],
-	candidates: [],
+export const noRecords = (): Record<"plans" | "questions", unknown[]> => ({
 	plans: [],
 	questions: [],
-	conflicts: [],
 });
+/** The records writer's lists the script left out, as empty ones (the lists the package's schema names). */
+const withEmptyLists = (value: unknown, schema: object): unknown => {
+	const shape = (schema as { shape?: Record<string, unknown> }).shape;
+	if (!shape || typeof value !== "object" || value === null) return value;
+	return {
+		...Object.fromEntries(Object.keys(shape).map((key) => [key, []])),
+		...value,
+	};
+};
 export const planNothing = () => ({ add: [], drop: [], focus: "" });
 export const composeDecline = () => ({
 	utterance: null,
@@ -275,7 +278,9 @@ export async function agendaFixture(
 				) ?? fallback(kind));
 				signal.throwIfAborted();
 				return {
-					value: request.schema.parse(value),
+					value: request.schema.parse(
+						kind === "records" ? withEmptyLists(value, request.schema) : value,
+					),
 					model: "fixture",
 					inputTokens: 1,
 					outputTokens: 1,

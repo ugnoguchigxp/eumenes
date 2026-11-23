@@ -1,13 +1,13 @@
 {
 	"package": "eumenes-memory-host",
-	"version": "0.2.1",
-	"artifact": "eumenes-memory-host-0.2.1-b4c300aef6ba.tgz",
-	"sha256": "b4c300aef6bb92e5e847f64472f5efb501170ae9bbd28f8c2851923b26b4781f",
-	"sourceGitCommit": "1439bfd9c5b171e2da19a445816688e1e3943651",
-	"sourceHash": "f5d08036bcef9cdfee81b3589e32217d90c23dd9043863e1630924497ea43728",
-	"sourceTreeState": "base commit plus uncommitted memory host 0.2.0 changes (packages/host), the recall-controls components of core 0.0.5 (migration 0010), the fix of two host tests (search-index T-MIG-2, agenda legacy-agenda) to roll a version 10 database back to version 9, and the host version bump to 0.2.1",
-	"verifiedWith": "verify (1134 tests passed), verify:host (host build, typecheck, host tests, archive and source-hash controls, Bun/MCP consumers), verify:package",
+	"version": "0.2.2",
+	"artifact": "eumenes-memory-host-0.2.2-f0408abf80d4.tgz",
+	"sha256": "f0408abf80d48165882a828bba4c6eb2743dc520f06a33cac992b403a8833f93",
+	"sourceGitCommit": "5bd64540726d065d060cb752ea3e78942eeee6eb",
+	"sourceHash": "18ef29a9e9bc29630d828fdfed3b28ff8710a139c07d50a83c9610f08c7500d4",
+	"sourceTreeState": "clean checkout of the base commit (no uncommitted changes)",
+	"verifiedWith": "verify (1122 tests passed, 3 skipped), verify:host (host build, typecheck, host tests, archive and source-hash controls, Bun/MCP consumers: 189 host tests passed), verify:package",
 	"mcpSdk": "2.4.0",
-	"corePackage": "eumenes-memory@0.0.5",
+	"corePackage": "eumenes-memory@0.0.6",
 	"coreSchemaVersion": 10
 }

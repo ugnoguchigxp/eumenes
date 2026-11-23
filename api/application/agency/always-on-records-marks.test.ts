@@ -3,43 +3,6 @@ import { saveItem } from "../../domains/memory/test/memory.fixture";
 import { agendaFixture } from "./always-on.fixture";
 import { knownFor } from "./always-on-recall";
 import { readMemoryRefs } from "./always-on-scope";
-import {
-	candidates,
-	exchange,
-	found,
-	writes,
-} from "./always-on-records.fixture";
-
-test("the facts the writer returns (memories, candidates) are not written: the steward curates the memory", async () => {
-	const f = await agendaFixture({
-		script: writes(
-			found({
-				memories: [
-					{
-						kind: "preference",
-						semanticKey: "drink.coffee.style",
-						subject: "self",
-						text: "コーヒーはブラックで飲む",
-						quote: "ブラック派",
-						evidence: "user-a",
-					},
-				],
-				candidates: [
-					{ kind: "habit", text: "夜に散歩する", evidence: ["user-a"] },
-				],
-			}),
-		),
-	});
-	try {
-		await f.start();
-		await exchange(f, "a", "コーヒーはブラック派なんだよね。夜は散歩する");
-		expect(f.calls("records")).toHaveLength(1);
-		expect(f.h.memory!.list()).toEqual([]);
-		expect(candidates(f)).toEqual([]);
-	} finally {
-		await f.close();
-	}
-});
 
 test("a record marked sensitive or about another person is not given to the agent's own calls, nor kept as a ref it read", async () => {
 	const f = await agendaFixture();

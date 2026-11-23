@@ -33,7 +33,7 @@
 
 `eumenes-memory` の公開SQLite APIをMemory domainから使う。判断は既存のstewardの `prepare → infer → settle` で行い、保存は単一writerのtransactionで行う。単体検証用のExamplesやCodex専用クライアントを会話経路へ組み込まない。モデル・接続先は既存の保存済み設定を使う。
 
-配布物は `vendor/eumenes-memory/eumenes-memory-0.0.5-8f58df0d0e59.tgz` と `vendor/eumenes-memory-host/eumenes-memory-host-0.2.1-b4c300aef6ba.tgz` に固定する。どちらも独立リポジトリのコミット `1439bfd9c5b171e2da19a445816688e1e3943651` から作り、`manifest.json` と配布内の `dist/release-manifest.json` で出所を照合する。SQLiteスキーマは10。Eumenesの移行処理が `memory-package/0009` で有効なStateから全文検索索引を構築し、`memory-package/0010` で除外・抑制・記憶の候補・強度の表と変更フィードの拡張を足す（0010を適用したDBは版9の本体では開けない）。ホストの補助テーブルはホストの起動時に更新される。移行前のDBとMemory・Worldそれぞれの最新の忘却ジャーナルを保全する。旧版へ切り戻すときは移行前DBを使い、読み取りやワーカーの再開前に最新ジャーナルを再適用する。[バックアップと復元](operations.md#バックアップからの復元)を参照。
+配布物は `vendor/eumenes-memory/eumenes-memory-0.0.6-a16777d3f9d9.tgz` と `vendor/eumenes-memory-host/eumenes-memory-host-0.2.2-f0408abf80d4.tgz` に固定する。どちらも独立リポジトリの同じコミット `5bd64540726d065d060cb752ea3e78942eeee6eb` から作り（ホストは本体 0.0.6 を同梱する）、`manifest.json` と配布内の `dist/release-manifest.json` で出所を照合する。本体 0.0.6 は、睡眠の層の廃止で使い手が無くなった候補の昇格・却下、強度の減衰・強化、自分の run を除く変更の照会を取り除いた版（表と列、読み取り、忘却は残る）。SQLiteスキーマは10。Eumenesの移行処理が `memory-package/0009` で有効なStateから全文検索索引を構築し、`memory-package/0010` で除外・抑制・記憶の候補・強度の表と変更フィードの拡張を足す（0010を適用したDBは版9の本体では開けない）。ホストの補助テーブルはホストの起動時に更新される。移行前のDBとMemory・Worldそれぞれの最新の忘却ジャーナルを保全する。旧版へ切り戻すときは移行前DBを使い、読み取りやワーカーの再開前に最新ジャーナルを再適用する。[バックアップと復元](operations.md#バックアップからの復元)を参照。
 
 会話と記憶担当は、持ち主・述語と否定の範囲・条件・例外・数量の範囲を保つ。必要な条件が不明なら、条件付きの規則を現在の適用可否として断定しない。記録のない事実や関係は不明と明示し、根拠がある部分だけを答える。意味の判断は既存のLLMが担い、コードは引用・参照・版・権限と保存の契約を検証する。[取込み計画と検証範囲](../spec/memory-integration-2026-11-05.md)に、単独パッケージの評価とホスト結合の証拠を分けて記録する。
 

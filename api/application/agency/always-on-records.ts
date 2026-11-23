@@ -212,8 +212,8 @@ function attempt<T>(db: Database, run: () => T): T | { error: string } {
 
 /**
  * What a kept pass writes, in one transaction of the caller: `plans` and `questions` to the continuity domain (L3
- * and the ledger). The facts the writer returns (`memories`, `candidates`, `conflicts`) are not written: the steward
- * curates the memory. Each write is its own unit; what the domains refuse is returned with its reason.
+ * and the ledger). The writer returns nothing else: the steward curates the memory. Each write is its own unit; what
+ * the domains refuse is returned with its reason.
  */
 export function writeRecords(input: {
 	deps: AgencyHostDeps;
