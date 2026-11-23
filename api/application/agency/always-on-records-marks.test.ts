@@ -93,33 +93,3 @@ test("a record marked sensitive or about another person is not given to the agen
 		await f.close();
 	}
 });
-
-test("the records the writer is shown as already there come in the memory's ranking, and a record sharing nothing is left out", async () => {
-	const f = await agendaFixture({ script: writes(found({})) });
-	try {
-		await f.start();
-		await f.user("user-a", "ao", "記録のもと");
-		const save = (key: string, text: string) =>
-			saveItem(f.h.store, f.h.memory!, {
-				conversationId: "ao",
-				messageId: "user-a",
-				kind: "personal_fact",
-				semanticKey: key,
-				text,
-			});
-		await save("cat.name", "猫の名前はミル");
-		// Newer, and shares one pair of characters with the words below: it comes after the closer one.
-		await save("paper.note", "名前を書くのが苦手");
-		await save("sea.trip", "海へ行くのが好き");
-		await exchange(f, "b", "猫の名前は何だっけ");
-		const prompt = f.calls("records")[0]!.prompt;
-		expect(prompt).toContain("猫の名前はミル");
-		expect(prompt).toContain("名前を書くのが苦手");
-		expect(prompt.indexOf("猫の名前はミル")).toBeLessThan(
-			prompt.indexOf("名前を書くのが苦手"),
-		);
-		expect(prompt).not.toContain("海へ行くのが好き");
-	} finally {
-		await f.close();
-	}
-});

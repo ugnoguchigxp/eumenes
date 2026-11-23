@@ -133,15 +133,12 @@ export type AgencyHostDeps = {
 		| "status"
 		| "list"
 		| "recall"
-		| "recallInTransaction"
 		| "marksInTransaction"
 		| "stateItemsInTransaction"
-		| "rememberExplicitInTransaction"
 		| "correctExplicitInTransaction"
 		| "excludeForForgetInTransaction"
 		| "suppressInTransaction"
 		| "suppressionsInTransaction"
-		| "policyRevisionInTransaction"
 	> &
 		Partial<
 			Pick<

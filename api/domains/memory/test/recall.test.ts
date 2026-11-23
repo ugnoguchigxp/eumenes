@@ -61,18 +61,16 @@ const recall = (
 	text: string,
 	over: Partial<MemoryRecallInput> = {},
 ) =>
-	h.store.read((db) =>
-		h.memory.recallInTransaction(db, {
-			text,
-			limit: 10,
-			shown: new Set(),
-			omitShown: false,
-			withPrevious: false,
-			minScore: 0,
-			audience: "tool",
-			...over,
-		}),
-	);
+	h.memory.recall({
+		text,
+		limit: 10,
+		shown: new Set(),
+		omitShown: false,
+		withPrevious: false,
+		minScore: 0,
+		audience: "tool",
+		...over,
+	})!;
 const texts = (result: ReturnType<typeof recall>) =>
 	result.items.map((item) => item.text);
 

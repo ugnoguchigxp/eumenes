@@ -157,46 +157,7 @@ export function readAfter(
 	return { said: [...said.values()], to, more: false };
 }
 
-type Refs = {
-	memories: Map<string, string>;
-	plans: Map<string, string>;
-};
-
-/**
- * The memory records that bear on the user's words, in the memory's own ranking (its `recall`): the same order the
- * conversation reads them in, so a closer record comes before one that shares a single term. Short references, no
- * ids. The sensitive and other-person records are shown too (the writer must see what is there not to write it
- * again); a suppressed one is not.
- */
-function relatedMemories(
-	deps: AgencyHostDeps,
-	db: Database,
-	said: readonly ExtractSaid[],
-	refs: Refs,
-): ExtractRelated["memories"] {
-	const status = deps.memory.status();
-	if (!status.enabled || !status.healthy) return [];
-	const text = said
-		.filter((s) => s.who === "user")
-		.map((s) => s.text)
-		.join("\n");
-	const found = deps.memory.recallInTransaction(db, {
-		text,
-		limit: RELATED_LIMIT,
-		shown: new Set(),
-		omitShown: false,
-		withPrevious: false,
-		minScore: 0,
-		audience: "tool",
-	});
-	return found.items
-		.filter((item) => !item.suppressed)
-		.map((item, i) => {
-			const ref = `m${i + 1}`;
-			refs.memories.set(ref, item.id);
-			return { ref, kind: item.kind, text: item.text };
-		});
-}
+type Refs = { plans: Map<string, string> };
 
 /** The records that bear on these words, as the writer sees them (short references, no ids). */
 function relatedTo(
@@ -217,8 +178,7 @@ function relatedTo(
 			.sort((a, b) => b.score - a.score || a.i - b.i)
 			.slice(0, RELATED_LIMIT)
 			.map((x) => x.item);
-	const refs: Refs = { memories: new Map(), plans: new Map() };
-	const memories = relatedMemories(deps, db, said, refs);
+	const refs: Refs = { plans: new Map() };
 	const plans = best(
 		deps.continuity.plans.listInTransaction(db),
 		(p) => p.text,
@@ -230,7 +190,8 @@ function relatedTo(
 	const questions = deps.continuity.questions
 		.listInTransaction(db, { limit: QUESTIONS_SHOWN })
 		.map((q) => ({ attribute: q.attribute, state: q.state }));
-	return { related: { memories, candidates: [], plans, questions }, refs };
+	// No memory records: the writer writes no facts (the steward curates the memory), so it needs none to compare with.
+	return { related: { plans, questions }, refs };
 }
 
 let savepoints = 0;
@@ -251,9 +212,8 @@ function attempt<T>(db: Database, run: () => T): T | { error: string } {
 
 /**
  * What a kept pass writes, in one transaction of the caller: `plans` and `questions` to the continuity domain (L3
- * and the ledger) and `conflicts` as unresolved questions resting on the memory item they disagree with. The facts
- * the writer returns (`memories`, `candidates`) are not written: the steward curates the memory. Each write is its
- * own unit; what the domains refuse is returned with its reason.
+ * and the ledger). The facts the writer returns (`memories`, `candidates`, `conflicts`) are not written: the steward
+ * curates the memory. Each write is its own unit; what the domains refuse is returned with its reason.
  */
 export function writeRecords(input: {
 	deps: AgencyHostDeps;
@@ -309,23 +269,6 @@ export function writeRecords(input: {
 		);
 		if ("error" in out) rejected.push(`question:${q.op}:${out.error}`);
 		else applied.push(`question ${q.op}: ${q.attribute}`);
-	}
-	for (const c of records.conflicts) {
-		const itemId = refs.memories.get(c.with);
-		if (itemId === undefined) {
-			rejected.push("conflict:not_a_memory");
-			continue;
-		}
-		const out = attempt(db, () =>
-			deps.continuity.plans.addInTransaction(db, {
-				conversationId,
-				kind: "open_question",
-				text: c.note,
-				evidence: { ...evidenceOf([c.evidence]), memoryItemIds: [itemId] },
-			}),
-		);
-		if ("error" in out) rejected.push(`conflict:${out.error}`);
-		else applied.push(`conflict: ${c.note}`);
 	}
 	return { applied, rejected };
 }

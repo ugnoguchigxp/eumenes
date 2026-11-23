@@ -371,8 +371,6 @@ export function createMemoryService(
 					: null,
 			);
 		},
-		/** The same ranked read inside a transaction the caller owns (the caller checks that memory is usable). */
-		recallInTransaction: recall.recallInTransaction,
 		/** The marks (sensitive, about someone else) of the given records; a record with none has no entry. */
 		marksInTransaction: recall.marksInTransaction,
 		/** Active (or, with `includeInactive`, every live-status) State items of the profile, as the library holds them. */

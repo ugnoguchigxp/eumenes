@@ -244,43 +244,6 @@ test("a plan the writer was shown is updated and closed through its short refere
 	}
 });
 
-test("a disagreement with a memory item is kept as an unresolved question resting on that item", async () => {
-	const f = await agendaFixture({
-		script: writes(
-			found({
-				conflicts: [
-					{ with: "m1", evidence: "user-b", note: "前は紅茶派と言っていた" },
-				],
-			}),
-		),
-	});
-	try {
-		await f.start();
-		await f.user("user-a", "ao", "紅茶が好き");
-		const item = await saveItem(f.h.store, f.h.memory!, {
-			conversationId: "ao",
-			messageId: "user-a",
-			kind: "preference",
-			semanticKey: "drink.tea",
-			text: "紅茶が好き",
-		});
-		await exchange(f, "b", "最近は紅茶よりコーヒー");
-		const conflict = plans(f).find((p) => p.kind === "open_question");
-		expect(conflict?.memoryItemIds).toEqual([item.id]);
-		// The memory itself is not changed (a disagreement is not a correction).
-		expect(f.h.memory!.list().map((i) => i.text)).toEqual(["紅茶が好き"]);
-		const records = f.h.store.read(() =>
-			recordsFor(f.deps, { purpose: "plan" }, []),
-		);
-		expect(records.conflicts?.map((c) => c.text)).toEqual([
-			"前は紅茶派と言っていた",
-		]);
-		expect(records.plans).toEqual([]);
-	} finally {
-		await f.close();
-	}
-});
-
 test("a pass that fails does not move the position and sets no timer: the same words are read again when the next reply is heard", async () => {
 	let n = 0;
 	const f = await agendaFixture({
