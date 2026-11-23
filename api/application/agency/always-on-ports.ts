@@ -409,8 +409,11 @@ async function executeAgendaReply(
 				return own.call(call, signal);
 			},
 		};
+		const goalWork = goals ? deps.agendaGoals?.reply?.(c.id, goals) : undefined;
 		const reply = await runRespond({
-			messages: goals ? goalReplyInstructions(messages) : messages,
+			messages: goals
+				? goalReplyInstructions(messages, goalWork !== undefined)
+				: messages,
 			chat: steer ? steer.wrap(args.chat) : args.chat,
 			tools: goals
 				? goalReplyTools(
@@ -435,6 +438,7 @@ async function executeAgendaReply(
 								return undefined;
 							}),
 						goalScope,
+						goalWork,
 					)
 				: tools,
 			// Four calls in all, as the reference host allows (the host's own tools keep theirs on top).
@@ -456,7 +460,13 @@ async function executeAgendaReply(
 	} finally {
 		// A reply that failed is news too: the plan looks again.
 		if (!ok) c.agent.infoChanged(now());
-		quietThought(c, now(), quiet, c.agent.view().quiet);
+		const latestQuiet = c.agent.view().quiet;
+		quietThought(c, now(), quiet, latestQuiet);
+		if (
+			quiet.speechUntil !== latestQuiet.speechUntil ||
+			quiet.allUntil !== latestQuiet.allUntil
+		)
+			await deps.agendaGoals?.quiet?.(latestQuiet);
 		// The target is closed whatever happened (one inbox serves the whole server).
 		if (steer) taken = steer.end();
 		remember(c.taken, run.runId, taken);

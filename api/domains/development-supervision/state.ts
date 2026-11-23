@@ -2,7 +2,6 @@ import type {
 	ExecutionReference,
 	ExecutionResponse,
 	ExecutionResult,
-	ExecutionSource,
 	ExecutionView,
 } from "../tool-runtime";
 import type {
@@ -16,7 +15,9 @@ import type {
 	SupervisionOutcome,
 	SupervisionScope,
 	SupervisionWorkspaceEvidence,
+	SupervisionOwnedEdit,
 	SupervisionWorkspace,
+	SupervisionSource,
 } from "./contracts";
 import type { Proposal } from "./decisions";
 
@@ -37,6 +38,7 @@ export type Task = {
 	outcome: SupervisionOutcome | null;
 	grantRef: string | null;
 	before: SupervisionWorkspaceEvidence | null;
+	ownedEdit?: SupervisionOwnedEdit;
 	readEvidence: SupervisionChildEvidence[];
 	replanEvidence: string[];
 	replanChangedInput: boolean;
@@ -56,7 +58,8 @@ export type Parent = {
 	id: string;
 	generation: number;
 	revision: number;
-	source: ExecutionSource;
+	source: SupervisionSource;
+	goalScope?: SupervisionScope;
 	confirmation?: { id: string; request: string; digest: string };
 	request: string;
 	workspace: SupervisionWorkspace;
@@ -96,6 +99,7 @@ export type Parent = {
 	stop: "cancelled" | "interrupted" | null;
 	forgotten: boolean;
 	question: ExecutionView["question"];
+	goalQuestionReleased?: boolean;
 	questionOp: string | null;
 	notices: {
 		id: string;

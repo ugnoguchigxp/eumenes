@@ -25,6 +25,7 @@ export function assembleAgency(
 		| "steering"
 		| "researchRevision"
 		| "noteDocuments"
+		| "goalResearchNoteInTransaction"
 		| "agendaGoals"
 		| "publish"
 	> & {

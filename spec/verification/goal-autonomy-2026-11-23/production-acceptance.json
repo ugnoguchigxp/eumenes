@@ -1,0 +1,434 @@
+{
+  "schemaVersion": 1,
+  "environment": "本家の通常API・既存DB・保存済みの推論接続。隔離DBの試験ではない。",
+  "agencySha256": "3d0e1932cb9ae4fec95f52160a872a46f77aa61949608a03b109345c3d512c2b",
+  "initialRestart": {
+    "previousApiPid": 46977,
+    "previousDevPid": 46976,
+    "newApiPid": 9436,
+    "launcherPid": 9433,
+    "readyAt": "2026-11-23T12:42:59.653Z",
+    "phase": "ready",
+    "webStatus": 200,
+    "normal": {
+      "socket": "/Users/y.noguchi/Code/eumenes/data/claude-code-runner/claude.sock",
+      "workspace": "/Users/y.noguchi/Code/eumenes",
+      "ready": true,
+      "supervised": true
+    },
+    "goal": {
+      "socket": "/Users/y.noguchi/Code/eumenes/data/claude-goal-7f6ba9046052144a/claude.sock",
+      "workspace": "/Users/y.noguchi/Code/eumenes-autonomy-workspace",
+      "ready": true,
+      "supervised": true
+    }
+  },
+  "inferenceBinding": {
+    "changed": true,
+    "beforeRevision": 196,
+    "revision": 197,
+    "thinkResourceId": "1f9e69c2-f0d1-4bf8-a888-0d04493cbf93",
+    "retainedExistingSelectedResource": true
+  },
+  "workspace": {
+    "workspace": "/Users/y.noguchi/Code/eumenes-autonomy-workspace",
+    "baselineCommit": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+    "registry": [
+      {
+        "ref": "autonomy-workspace",
+        "root": "/Users/y.noguchi/Code/eumenes-autonomy-workspace",
+        "readablePaths": [
+          "README.md",
+          "sample.mjs"
+        ],
+        "writablePaths": [
+          "README.md"
+        ],
+        "checks": [
+          {
+            "ref": "published-invocation",
+            "description": "現状の掲載コマンドをそのまま一度実行して、終了コードと標準エラーを確認する。",
+            "command": "/Users/y.noguchi/.bun/bin/bun",
+            "args": [
+              "sample.mjs",
+              "--style",
+              "json"
+            ],
+            "cwd": "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+          },
+          {
+            "ref": "independent-verification",
+            "description": "現在の文書のコマンドを別の場所で再実行し、固定の期待JSONを検査する。",
+            "command": "/Users/y.noguchi/.bun/bin/bun",
+            "args": [
+              "/Users/y.noguchi/Code/eumenes/spec/verification/goal-autonomy-2026-11-23/check-readme.ts",
+              "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+            ],
+            "cwd": "/Users/y.noguchi/Code/eumenes-autonomy-workspace",
+            "acceptance": true
+          }
+        ]
+      }
+    ]
+  },
+  "initialRequest": {
+    "conversationId": "autonomy-rollout-20261123-663c6e3c",
+    "requestId": "68c44c14-8abd-4823-8bd0-9b949cd270ac",
+    "sentAt": "2026-11-23T12:44:18.522687+00:00",
+    "utteranceFile": "utterance.txt"
+  },
+  "utterance": "2番の目標に「autonomy-workspace のサンプルの README に載った手順をそのまま実行すると、件数3・合計12の JSON が得られる」を登録して進めてください。まず今の掲載手順をそのまま実行し、終了コードと標準エラーを結果として残してください。登録済み作業先 autonomy-workspace で README.md と sample.mjs の参照、README.md だけの編集、登録済みの published-invocation と independent-verification の実行を許可します。sample.mjs と検査本体は変更しないでください。検証のため、この依頼のあと追加の発話はしません。許可の範囲で結果を見て方法を変え、元の条件で独立検証が通るまで進め、完了をこの会話へ1回報告してください。",
+  "registration": {
+    "slot": 2,
+    "goal": {
+      "goalId": "ae3bda79-f63f-476e-a20e-4b72b18b35f6",
+      "scopeKey": "profile:owner",
+      "status": "adopted",
+      "priority": 50,
+      "desiredState": "autonomy-workspace のサンプルについて、README に掲載された手順をそのまま実行すると件数3・合計12の JSON が得られること。まず現行掲載手順をそのまま実行し、終了コードと標準エラーを結果として残す。許可範囲内で結果に応じて方法を変え、元の条件で独立検証が通るまで進める。sample.mjs と検査本体は変更しない。",
+      "revision": 1,
+      "updatedAt": "2026-11-23T12:44:42.500Z"
+    },
+    "status": "registered",
+    "goalId": "ae3bda79-f63f-476e-a20e-4b72b18b35f6",
+    "revision": 1,
+    "permissionStatus": "authorized",
+    "permitId": "02bd5d2d-1d4c-4b1c-a025-945717ee551a",
+    "permitRevision": 1
+  },
+  "acceptedRun": {
+    "id": "d89ab2f4-ac46-4539-a720-c38ddac1669c",
+    "agentTaskId": null,
+    "requestId": "68c44c14-8abd-4823-8bd0-9b949cd270ac",
+    "conversationId": "autonomy-rollout-20261123-663c6e3c",
+    "utteranceId": null,
+    "status": "completed",
+    "revision": 2,
+    "inputMessageId": "d36c3b1c-739a-4e27-b033-8af20ee84207",
+    "answerMessageId": "cb80e6d5-80c9-4bb4-8d36-2bab967a3883",
+    "announcement": null,
+    "error": null,
+    "jobId": "4260b9e7-d3b1-463d-8afc-975a4993a250",
+    "deadlineAt": "2026-11-23T12:47:18.672Z",
+    "deadlineFixed": false,
+    "sourceKind": "manual",
+    "scheduleId": null,
+    "occurrenceId": null,
+    "specialistSessionId": null,
+    "pinnedToolchainId": null,
+    "createdAt": "2026-11-23T12:44:18.672Z",
+    "updatedAt": "2026-11-23T12:45:03.024Z"
+  },
+  "result": {
+    "goalId": "ae3bda79-f63f-476e-a20e-4b72b18b35f6",
+    "userUtteranceCount": 1,
+    "additionalUtteranceCountUntilCompletion": 0,
+    "reportCount": 1,
+    "report": {
+      "id": "agency-goal-report:ae3bda79-f63f-476e-a20e-4b72b18b35f6:2",
+      "text": "登録目標を完了しました。\n- autonomy-workspace のサンプルについて、README に掲載された手順をそのまま実行すると件数3・合計12の JSON が得られること。まず現行掲載手順をそのまま実行し、終了コードと標準エラーを結果として残す。許可範囲内で結果に応じて方法を変え、元の条件で独立検証が通るまで進める。sample.mjs と検査本体は変更しない。\n- autonomy-workspace の README 掲載手順をそのまま実行した出力が JSON で、件数 3・合計 12 になっている。\n- 現行掲載手順の初回実行について、終了コードと標準エラーが記録されている。\n- 独立検証が、元の条件である件数 3・合計 12 の JSON を確認して成功している。"
+    },
+    "noPendingGoalJobs": true,
+    "firstFailureProofs": [
+      {
+        "ref": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a:3",
+        "kind": "check",
+        "executionId": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a",
+        "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+        "inputDigest": "b4f8ae060f9b50c188aa39b9b77aaf17938455aa063f43fa72ec675a49b41b13",
+        "text": "\"Exit code 2\\nUnknown option. Use --help for the supported formats.\"",
+        "passed": false,
+        "exitCode": 2,
+        "stderr": "Unknown option. Use --help for the supported formats.\n",
+        "check": {
+          "executable": "/Users/y.noguchi/.bun/bin/bun",
+          "args": [
+            "sample.mjs",
+            "--style",
+            "json"
+          ],
+          "cwd": "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+        }
+      }
+    ],
+    "editProofs": [
+      {
+        "ref": "3e270642-e0e4-4321-89d7-ad597566462b:3",
+        "kind": "edit",
+        "executionId": "3e270642-e0e4-4321-89d7-ad597566462b",
+        "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+        "inputDigest": "d5b371ecaa53f62d7816bdce65e21ccbcd70cb73a52f6c00c15a1eb7091e8bbd",
+        "text": "{\"filePath\":\"/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md\",\"oldString\":\"bun sample.mjs --style json\",\"newString\":\"bun sample.mjs --format json\",\"originalFile\":\"# 集計サンプル\\n\\n同梱の数値を集計します。このディレクトリで次の手順を実行すると、件数と合計が JSON で返ります。\\n\\n```sh\\nbun sample.mjs --style json\\n```\\n\",\"structuredPatch\":[{\"oldStart\":3,\"oldLines\":5,\"newStart\":3,\"newLines\":5,\"lines\":[\" 同梱の数値を集計します。このディレクトリで次の手順を実行すると、件数と合計が JSON で返ります。\",\" \",\" ```sh\",\"-bun sample.mjs --style json\",\"+bun sample.mjs --format json\",\" ```\"]}],\"userModified\":false,\"replaceAll\":false}",
+        "path": "/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md"
+      }
+    ],
+    "independentCheck": {
+      "passed": true,
+      "reason": "verified",
+      "command": "bun sample.mjs --format json",
+      "exitCode": 0,
+      "stdout": "{\"count\":3,\"total\":12}",
+      "stderr": ""
+    },
+    "changedFiles": [
+      "README.md"
+    ],
+    "untrackedFiles": []
+  },
+  "timeline": {
+    "firstSnapshot": "2026-11-23T12:46:43.854Z",
+    "firstObservedEdit": "2026-11-23T12:50:29.105Z",
+    "firstObservedReport": "2026-11-23T12:51:43.823Z",
+    "singleReportStillObservedAt": "2026-11-23T12:51:59.912Z"
+  },
+  "physicalExecutions": [
+    {
+      "executionId": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a",
+      "state": "finished",
+      "managedExecutionStopped": true,
+      "supervised": {
+        "lease": {
+          "ownerRef": "claude-code-work:ff2fcf35-add8-412c-8c1f-535c3b258941",
+          "executorId": "claude-code-task",
+          "epoch": "ff2fcf35-add8-412c-8c1f-535c3b258941",
+          "slot": "edit"
+        },
+        "authorization": {
+          "workspaceRef": "autonomy-workspace",
+          "mode": "verify",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "baselineInputDigest": "b4f8ae060f9b50c188aa39b9b77aaf17938455aa063f43fa72ec675a49b41b13",
+          "deadline": 1795441508904,
+          "readablePaths": [
+            "/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md",
+            "/Users/y.noguchi/Code/eumenes-autonomy-workspace/sample.mjs"
+          ],
+          "writablePaths": [],
+          "checks": [
+            {
+              "executable": "/Users/y.noguchi/.bun/bin/bun",
+              "args": [
+                "sample.mjs",
+                "--style",
+                "json"
+              ],
+              "cwd": "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+            }
+          ]
+        }
+      },
+      "structuredEvidence": [
+        {
+          "ref": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a:1",
+          "kind": "read",
+          "executionId": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "inputDigest": "b4f8ae060f9b50c188aa39b9b77aaf17938455aa063f43fa72ec675a49b41b13",
+          "text": "{\"type\":\"text\",\"file\":{\"filePath\":\"/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md\",\"content\":\"# 集計サンプル\\n\\n同梱の数値を集計します。このディレクトリで次の手順を実行すると、件数と合計が JSON で返ります。\\n\\n```sh\\nbun sample.mjs --style json\\n```\\n\",\"numLines\":8,\"startLine\":1,\"totalLines\":8}}",
+          "path": "/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md"
+        },
+        {
+          "ref": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a:2",
+          "kind": "read",
+          "executionId": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "inputDigest": "b4f8ae060f9b50c188aa39b9b77aaf17938455aa063f43fa72ec675a49b41b13",
+          "text": "{\"type\":\"text\",\"file\":{\"filePath\":\"/Users/y.noguchi/Code/eumenes-autonomy-workspace/sample.mjs\",\"content\":\"const args = process.argv.slice(2);\\nconst numbers = [2, 4, 6];\\nconst summary = {\\n\\tcount: numbers.length,\\n\\ttotal: numbers.reduce((sum, number) => sum + number, 0),\\n};\\n\\nif (args.length === 1 && args[0] === \\\"--help\\\") {\\n\\tconsole.log(\\\"Usage: bun sample.mjs --format json|text\\\");\\n} else if (args.length !== 2 || args[0] !== \\\"--format\\\") {\\n\\tconsole.error(\\\"Unknown option. Use --help for the supported formats.\\\");\\n\\tprocess.exitCode = 2;\\n} else if (args[1] === \\\"json\\\") {\\n\\tconsole.log(JSON.stringify(summary));\\n} else if (args[1] === \\\"text\\\") {\\n\\tconsole.log(`count=${summary.count}, total=${summary.total}`);\\n} else {\\n\\tconsole.error(\\\"Unknown format. Use --help for the supported formats.\\\");\\n\\tprocess.exitCode = 2;\\n}\\n\",\"numLines\":21,\"startLine\":1,\"totalLines\":21}}",
+          "path": "/Users/y.noguchi/Code/eumenes-autonomy-workspace/sample.mjs"
+        },
+        {
+          "ref": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a:3",
+          "kind": "check",
+          "executionId": "85fdbdf9-f82d-4254-b50e-06d9d49d5e0a",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "inputDigest": "b4f8ae060f9b50c188aa39b9b77aaf17938455aa063f43fa72ec675a49b41b13",
+          "text": "\"Exit code 2\\nUnknown option. Use --help for the supported formats.\"",
+          "passed": false,
+          "exitCode": 2,
+          "stderr": "Unknown option. Use --help for the supported formats.\n",
+          "check": {
+            "executable": "/Users/y.noguchi/.bun/bin/bun",
+            "args": [
+              "sample.mjs",
+              "--style",
+              "json"
+            ],
+            "cwd": "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+          }
+        }
+      ]
+    },
+    {
+      "executionId": "3e270642-e0e4-4321-89d7-ad597566462b",
+      "state": "finished",
+      "managedExecutionStopped": true,
+      "supervised": {
+        "lease": {
+          "ownerRef": "claude-code-work:67bf0194-d25d-431f-8268-c26be4500fb7",
+          "executorId": "claude-code-task",
+          "epoch": "67bf0194-d25d-431f-8268-c26be4500fb7",
+          "slot": "edit"
+        },
+        "authorization": {
+          "workspaceRef": "autonomy-workspace",
+          "mode": "edit",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "baselineInputDigest": "b4f8ae060f9b50c188aa39b9b77aaf17938455aa063f43fa72ec675a49b41b13",
+          "deadline": 1795441790478,
+          "readablePaths": [
+            "/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md",
+            "/Users/y.noguchi/Code/eumenes-autonomy-workspace/sample.mjs"
+          ],
+          "writablePaths": [
+            "/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md"
+          ],
+          "checks": [
+            {
+              "executable": "/Users/y.noguchi/.bun/bin/bun",
+              "args": [
+                "/Users/y.noguchi/Code/eumenes/spec/verification/goal-autonomy-2026-11-23/check-readme.ts",
+                "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+              ],
+              "cwd": "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+            }
+          ]
+        }
+      },
+      "structuredEvidence": [
+        {
+          "ref": "3e270642-e0e4-4321-89d7-ad597566462b:1",
+          "kind": "read",
+          "executionId": "3e270642-e0e4-4321-89d7-ad597566462b",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "inputDigest": "b4f8ae060f9b50c188aa39b9b77aaf17938455aa063f43fa72ec675a49b41b13",
+          "text": "{\"type\":\"text\",\"file\":{\"filePath\":\"/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md\",\"content\":\"# 集計サンプル\\n\\n同梱の数値を集計します。このディレクトリで次の手順を実行すると、件数と合計が JSON で返ります。\\n\\n```sh\\nbun sample.mjs --style json\\n```\\n\",\"numLines\":8,\"startLine\":1,\"totalLines\":8}}",
+          "path": "/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md"
+        },
+        {
+          "ref": "3e270642-e0e4-4321-89d7-ad597566462b:2",
+          "kind": "read",
+          "executionId": "3e270642-e0e4-4321-89d7-ad597566462b",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "inputDigest": "b4f8ae060f9b50c188aa39b9b77aaf17938455aa063f43fa72ec675a49b41b13",
+          "text": "{\"type\":\"text\",\"file\":{\"filePath\":\"/Users/y.noguchi/Code/eumenes-autonomy-workspace/sample.mjs\",\"content\":\"const args = process.argv.slice(2);\\nconst numbers = [2, 4, 6];\\nconst summary = {\\n\\tcount: numbers.length,\\n\\ttotal: numbers.reduce((sum, number) => sum + number, 0),\\n};\\n\\nif (args.length === 1 && args[0] === \\\"--help\\\") {\\n\\tconsole.log(\\\"Usage: bun sample.mjs --format json|text\\\");\\n} else if (args.length !== 2 || args[0] !== \\\"--format\\\") {\\n\\tconsole.error(\\\"Unknown option. Use --help for the supported formats.\\\");\\n\\tprocess.exitCode = 2;\\n} else if (args[1] === \\\"json\\\") {\\n\\tconsole.log(JSON.stringify(summary));\\n} else if (args[1] === \\\"text\\\") {\\n\\tconsole.log(`count=${summary.count}, total=${summary.total}`);\\n} else {\\n\\tconsole.error(\\\"Unknown format. Use --help for the supported formats.\\\");\\n\\tprocess.exitCode = 2;\\n}\\n\",\"numLines\":21,\"startLine\":1,\"totalLines\":21}}",
+          "path": "/Users/y.noguchi/Code/eumenes-autonomy-workspace/sample.mjs"
+        },
+        {
+          "ref": "3e270642-e0e4-4321-89d7-ad597566462b:3",
+          "kind": "edit",
+          "executionId": "3e270642-e0e4-4321-89d7-ad597566462b",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "inputDigest": "d5b371ecaa53f62d7816bdce65e21ccbcd70cb73a52f6c00c15a1eb7091e8bbd",
+          "text": "{\"filePath\":\"/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md\",\"oldString\":\"bun sample.mjs --style json\",\"newString\":\"bun sample.mjs --format json\",\"originalFile\":\"# 集計サンプル\\n\\n同梱の数値を集計します。このディレクトリで次の手順を実行すると、件数と合計が JSON で返ります。\\n\\n```sh\\nbun sample.mjs --style json\\n```\\n\",\"structuredPatch\":[{\"oldStart\":3,\"oldLines\":5,\"newStart\":3,\"newLines\":5,\"lines\":[\" 同梱の数値を集計します。このディレクトリで次の手順を実行すると、件数と合計が JSON で返ります。\",\" \",\" ```sh\",\"-bun sample.mjs --style json\",\"+bun sample.mjs --format json\",\" ```\"]}],\"userModified\":false,\"replaceAll\":false}",
+          "path": "/Users/y.noguchi/Code/eumenes-autonomy-workspace/README.md"
+        },
+        {
+          "ref": "3e270642-e0e4-4321-89d7-ad597566462b:4",
+          "kind": "check",
+          "executionId": "3e270642-e0e4-4321-89d7-ad597566462b",
+          "targetRevision": "979bdd15dbabf607774614b5c6d3be3892ae04c9",
+          "inputDigest": "d5b371ecaa53f62d7816bdce65e21ccbcd70cb73a52f6c00c15a1eb7091e8bbd",
+          "text": "{\"stdout\":\"{\\\"passed\\\":true,\\\"reason\\\":\\\"verified\\\",\\\"command\\\":\\\"bun sample.mjs --format json\\\",\\\"exitCode\\\":0,\\\"stdout\\\":\\\"{\\\\\\\"count\\\\\\\":3,\\\\\\\"total\\\\\\\":12}\\\",\\\"stderr\\\":\\\"\\\"}\",\"stderr\":\"\",\"interrupted\":false,\"isImage\":false,\"noOutputExpected\":false}",
+          "passed": true,
+          "exitCode": 0,
+          "stderr": "",
+          "check": {
+            "executable": "/Users/y.noguchi/.bun/bin/bun",
+            "args": [
+              "/Users/y.noguchi/Code/eumenes/spec/verification/goal-autonomy-2026-11-23/check-readme.ts",
+              "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+            ],
+            "cwd": "/Users/y.noguchi/Code/eumenes-autonomy-workspace"
+          }
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "観測は本家のHTTP GETと管理runnerのinspect。登録発話以降、完了まで別の発話や修正文・方法の注入は行っていない。",
+    "修正担当は初回コマンドの再実行を試みたが、編集担当へ渡した検査範囲に含まれずhookに拒否された。初回の実失敗は別担当の先行実行で測定・保存済みであり、その実測を根拠としている。",
+    "既存の別目標の引用エラー修正と、その後の起動確認は別に記録する。"
+  ],
+  "finalRestart": {
+    "previousApiPid": 9436,
+    "previousDevPid": 9434,
+    "newApiPid": 63793,
+    "launcherPid": 63791,
+    "readyAt": "2026-11-23T13:03:44.318Z",
+    "phase": "ready",
+    "webStatus": 200,
+    "normal": {
+      "socket": "/Users/y.noguchi/Code/eumenes/data/claude-code-runner/claude.sock",
+      "workspace": "/Users/y.noguchi/Code/eumenes",
+      "ready": true,
+      "supervised": true
+    },
+    "goal": {
+      "socket": "/Users/y.noguchi/Code/eumenes/data/claude-goal-7f6ba9046052144a/claude.sock",
+      "workspace": "/Users/y.noguchi/Code/eumenes-autonomy-workspace",
+      "ready": true,
+      "supervised": true
+    }
+  },
+  "postRestartGoalState": {
+    "observedAt": "2026-11-23T13:07:44.755Z",
+    "diagnosticRunId": "437a272d-6f6f-4780-8499-f4fc9cd4981c",
+    "slots": [
+      {
+        "slot": 1,
+        "goalId": "4c31866e-d426-4ce8-a4bd-470d90fa6aae",
+        "goalRevision": 1,
+        "goalStatus": "adopted",
+        "phase": "needs_user",
+        "problem": null,
+        "questions": [
+          {
+            "ref": "9d2146de3f3b7ceeee86a93d770d4cb17f29e8a5051a9a8a4f9d657150abba39",
+            "criterionIds": [
+              "root"
+            ],
+            "missing": "設定・実装を変更する許可済み能力がない",
+            "question": "Live2Dの設定や実装を変更できる作業能力を追加できますか？"
+          }
+        ],
+        "designNoteId": null,
+        "permitWorkspace": "web-note"
+      },
+      {
+        "slot": 2,
+        "goalId": "ae3bda79-f63f-476e-a20e-4b72b18b35f6",
+        "goalRevision": 2,
+        "goalStatus": "completed",
+        "phase": "completed",
+        "problem": null,
+        "questions": [],
+        "designNoteId": "c64cb8c4-66f3-4e23-bc11-e47b126cf169",
+        "permitWorkspace": null
+      }
+    ]
+  },
+  "validation": {
+    "rolloutFixesReport": "rollout-fixes-verification.json",
+    "isolatedGateResult": "pass",
+    "bunPass": 256,
+    "webPass": 25,
+    "designSystemPass": 49,
+    "optInLiveSkipped": 1,
+    "allSelectedGatesPass": 15,
+    "outsideScopeWarnings": 38,
+    "serverBootShutdownTests": {
+      "pass": 7,
+      "fail": 0,
+      "assertions": 44
+    },
+    "fullWorkingTreeTypecheck": "別作業のCanvasテスト4件・梱包script3件の型エラー。対象外として記録し、全体型検査成功とは扱わない。"
+  },
+  "scopeLimit": {
+    "registeredWorkspace": "autonomy-workspace",
+    "writablePaths": [
+      "README.md"
+    ],
+    "otherProjectsRequireOwnRegisteredCheckoutAndPermission": true,
+    "existingGoal1": "引用エラーによる技術的な待機から復旧した。Live2Dの実装が変更された、またはこの目標が達成済みだとは確認していない。"
+  }
+}

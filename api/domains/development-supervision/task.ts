@@ -1,9 +1,20 @@
 import type { Database } from "bun:sqlite";
 import { z } from "zod";
 import { hash, type Capabilities } from "../capabilities";
-import { executionControl, type TaskLifecyclePort } from "../tool-runtime";
-import { sourceCurrent } from "./authority";
-import { adapterRef, type SupervisionHost } from "./contracts";
+import {
+	executionControl,
+	isGoalExecutionSource,
+	type GoalExecutionIdentity,
+	type GoalExecutionSource,
+	type TaskLifecyclePort,
+} from "../tool-runtime";
+import { goalIdentityOf, sourceCurrent } from "./authority";
+import {
+	adapterRef,
+	type SupervisionHost,
+	type SupervisionTarget,
+	type SupervisionWorkspace,
+} from "./contracts";
 import {
 	amend,
 	expectedControl,
@@ -16,7 +27,8 @@ import { answerQuestion, syncQuestions } from "./questions";
 import { markNotice, type Schedule } from "./reconcile";
 import { parentOf, parentOfRun, saveParent } from "./repository";
 import type { Parent } from "./state";
-import { executionView } from "./views";
+import { executionView, goalReceipt } from "./views";
+import { plannedTask } from "./work";
 
 const controlSchema = executionControl.extend({ taskRef: z.uuid().optional() });
 const requiredText = z.string().trim().min(1).max(8_000);
@@ -32,6 +44,77 @@ type LifecycleDeps = {
 	changed(): void;
 };
 
+type BoundToolchain = NonNullable<
+	ReturnType<Capabilities["toolchainSetInTransaction"]>
+>;
+type Binding = Extract<
+	NonNullable<BoundToolchain["binding"]>["document"],
+	{ execution: "task" }
+>;
+function initialParent({
+	source,
+	request,
+	workspace,
+	references,
+	confirmation,
+	deadline,
+	at,
+	set,
+	binding,
+}: {
+	source: Parent["source"];
+	request: string;
+	workspace: SupervisionWorkspace;
+	references: Parent["references"];
+	confirmation?: Parent["confirmation"];
+	deadline: number;
+	at: number;
+	set: BoundToolchain;
+	binding: Binding;
+}): Parent {
+	return {
+		id: crypto.randomUUID(),
+		generation: 0,
+		revision: 0,
+		source,
+		...(confirmation ? { confirmation } : {}),
+		request,
+		workspace,
+		references,
+		profile: set.profile,
+		skills: [...set.skills],
+		deadline,
+		attemptMs: binding.timeLimits.inferenceMs,
+		calls: 0,
+		childCalls: 0,
+		ceiling: null,
+		limits: {
+			calls: Math.min(binding.limits.modelCalls, binding.limits.parentCalls),
+			children: binding.limits.childCalls,
+			research: binding.limits.searches,
+		},
+		conversationSummary: binding.conversationSummary,
+		phase: "authority",
+		jobId: null,
+		plan: null,
+		pendingTaskId: null,
+		designs: [],
+		designUris: {},
+		research: [],
+		context: [],
+		tasks: [],
+		result: null,
+		stop: null,
+		forgotten: false,
+		question: null,
+		questionOp: null,
+		notices: [],
+		controls: [],
+		observedAt: at,
+		reason: "元の依頼の許可を確認中",
+	};
+}
+
 export function controlsFor({
 	requiredHost,
 	save,
@@ -43,6 +126,7 @@ export function controlsFor({
 		if (
 			!parent ||
 			parent.forgotten ||
+			parent.source.origin === "goal" ||
 			parent.source.conversationId !== conversationId ||
 			!sourceCurrent(currentHost, db, parent)
 		)
@@ -152,50 +236,17 @@ export function createTaskPort(
 				input.deadline ?? Infinity,
 			);
 			if (deadline <= at) throw new Error("supervision_deadline_exceeded");
-			const parent: Parent = {
-				id: crypto.randomUUID(),
-				generation: 0,
-				revision: 0,
+			const parent = initialParent({
 				source,
-				...(confirmation ? { confirmation } : {}),
 				request,
 				workspace,
 				references,
-				profile: set.profile,
-				skills: [...set.skills],
 				deadline,
-				attemptMs: binding.timeLimits.inferenceMs,
-				calls: 0,
-				childCalls: 0,
-				ceiling: null,
-				limits: {
-					calls: Math.min(
-						binding.limits.modelCalls,
-						binding.limits.parentCalls,
-					),
-					children: binding.limits.childCalls,
-					research: binding.limits.searches,
-				},
-				conversationSummary: binding.conversationSummary,
-				phase: "authority",
-				jobId: null,
-				plan: null,
-				pendingTaskId: null,
-				designs: [],
-				designUris: {},
-				research: [],
-				context: [],
-				tasks: [],
-				result: null,
-				stop: null,
-				forgotten: false,
-				question: null,
-				questionOp: null,
-				notices: [],
-				controls: [],
-				observedAt: at,
-				reason: "元の依頼の許可を確認中",
-			};
+				at,
+				set,
+				binding,
+				...(confirmation ? { confirmation } : {}),
+			});
 			schedule(db, parent, "authority");
 			saveParent(db, parent, true);
 			changed();
@@ -206,6 +257,8 @@ export function createTaskPort(
 			const parent = currentParent(db, input.workRef, conversationId);
 			if (input.action === "status") return executionView(parent);
 			const currentHost = requiredHost();
+			if (parent.source.origin === "goal")
+				throw new Error("supervision_owner_mismatch");
 			const verified = currentHost.controlSourceInTransaction(
 				db,
 				conversationId,
@@ -255,6 +308,7 @@ export function createTaskPort(
 			return host &&
 				parent &&
 				!parent.forgotten &&
+				parent.source.origin !== "goal" &&
 				sourceCurrent(host, db, parent)
 				? executionView(parent)
 				: null;
@@ -262,7 +316,12 @@ export function createTaskPort(
 		cancelInTransaction(db, conversationId, id) {
 			const parent = parentOf(db, id);
 			const host = getHost();
-			if (!host || !parent || parent.source.conversationId !== conversationId)
+			if (
+				!host ||
+				!parent ||
+				parent.source.origin === "goal" ||
+				parent.source.conversationId !== conversationId
+			)
 				return;
 			const before = structuredClone(parent);
 			startStop(host, db, parent, (jobId) => cancelJob(db, jobId), "cancelled");
@@ -285,6 +344,206 @@ export function createTaskPort(
 			);
 			save(db, parent, before);
 			changed();
+		},
+	};
+}
+
+export function createGoalSupervisionPort({
+	requiredHost,
+	capabilities,
+	now,
+	save,
+	cancelJob,
+	changed,
+}: LifecycleDeps) {
+	function own(db: Database, source: GoalExecutionSource) {
+		const parent = parentOfRun(db, source.runId);
+		if (!parent) return null;
+		if (parent.source.origin !== "goal" || hash(parent.source) !== hash(source))
+			throw new Error("supervision_goal_conflict");
+		return parent;
+	}
+	function byIdentity(
+		db: Database,
+		identity: GoalExecutionIdentity,
+		dispatchId: string,
+	) {
+		const parent = parentOfRun(db, dispatchId);
+		if (
+			parent &&
+			(parent.source.origin !== "goal" ||
+				hash(goalIdentityOf(parent.source)) !== hash(identity))
+		)
+			throw new Error("supervision_goal_conflict");
+		return parent;
+	}
+	function stop(db: Database, parent: Parent | null) {
+		if (!parent || parent.phase === "finished") return true;
+		if (parent.stop) return false;
+		const prior = structuredClone(parent);
+		startStop(
+			requiredHost(),
+			db,
+			parent,
+			(id) => cancelJob(db, id),
+			"cancelled",
+		);
+		save(db, parent, prior);
+		changed();
+		return false;
+	}
+	return {
+		startInTransaction(
+			db: Database,
+			source: GoalExecutionSource,
+			target: SupervisionTarget,
+		) {
+			const host = requiredHost();
+			if (
+				!isGoalExecutionSource(source) ||
+				source.digest !== hash([source.request, source.expectedObservation]) ||
+				source.toolchainRevisionId !== target.toolchainRevisionId ||
+				source.bindingRevisionId !== target.bindingRevisionId
+			)
+				throw new Error("supervision_source_invalid");
+			const authority = host.goal?.authorityInTransaction(db, source);
+			if (!authority) throw new Error("supervision_source_invalid");
+			const set = capabilities.toolchainSetInTransaction(
+				db,
+				target.toolchainRevisionId,
+			);
+			const binding = set?.binding?.document;
+			if (
+				!set ||
+				!binding ||
+				set.binding?.revisionId !== target.bindingRevisionId ||
+				binding.execution !== "task" ||
+				binding.adapterRef !== adapterRef
+			)
+				throw new Error("supervision_binding_invalid");
+			const previous = own(db, source);
+			if (previous) return goalReceipt(previous);
+			const at = now();
+			const deadline = Math.min(
+				at + binding.timeLimits.runMs,
+				authority.scope.deadline,
+			);
+			if (deadline <= at) throw new Error("supervision_deadline_exceeded");
+			const parent = initialParent({
+				source,
+				request: source.request,
+				workspace: authority.workspace,
+				references: [],
+				deadline,
+				at,
+				set,
+				binding,
+			});
+			const scope = { ...authority.scope, deadline };
+			parent.goalScope = scope;
+			parent.ceiling = scope.mode;
+			parent.phase = authority.design ? "waiting_design" : "active";
+			parent.designs = authority.design
+				? [
+						{
+							parentId: parent.id,
+							sourceRunId: source.runId,
+							conversationId: null,
+							goal: goalIdentityOf(source),
+							generation: parent.generation,
+							revision: 1,
+							...authority.design,
+							evidence: [],
+						},
+					]
+				: [];
+			parent.tasks = [
+				plannedTask(
+					{
+						title: source.request.slice(0, 120),
+						instruction: source.request,
+						mode: scope.mode,
+						readablePaths: scope.readablePaths,
+						writablePaths: scope.writablePaths,
+						checks: scope.checks,
+						acceptance: [source.expectedObservation],
+						authorityQuote: "",
+						after: null,
+						verification: null,
+					},
+					null,
+				),
+			];
+			parent.reason = "設計書の版を確認中";
+			saveParent(db, parent, true);
+			changed();
+			return goalReceipt(parent);
+		},
+		lookupInTransaction(db: Database, source: GoalExecutionSource) {
+			const parent = own(db, source);
+			return parent && !parent.forgotten ? goalReceipt(parent) : null;
+		},
+		cancelInTransaction(db: Database, source: GoalExecutionSource) {
+			return stop(db, own(db, source));
+		},
+		answerInTransaction(
+			db: Database,
+			source: GoalExecutionSource,
+			input: {
+				ref: string;
+				messageId: string;
+				answer: string;
+			},
+		) {
+			const host = requiredHost();
+			const parent = own(db, source);
+			if (!parent || !host.goal?.authorityInTransaction(db, source))
+				throw new Error("supervision_source_invalid");
+			const previous = structuredClone(parent);
+			answerQuestion(
+				host,
+				db,
+				parent,
+				{
+					questionRef: input.ref,
+					messageId: input.messageId,
+					answer: input.answer,
+					operationId: input.ref,
+				},
+				now(),
+			);
+			save(db, parent, previous);
+			changed();
+		},
+		cancelByIdentityInTransaction(
+			db: Database,
+			identity: GoalExecutionIdentity,
+			dispatchId: string,
+		) {
+			return stop(db, byIdentity(db, identity, dispatchId));
+		},
+		forgetInTransaction(
+			db: Database,
+			identity: GoalExecutionIdentity,
+			dispatchId: string,
+		) {
+			const parent = byIdentity(db, identity, dispatchId);
+			if (!parent || (parent.forgotten && parent.phase === "finished"))
+				return true;
+			if (parent.forgotten) return false;
+			const prior = structuredClone(parent);
+			parent.stop = null;
+			startStop(
+				requiredHost(),
+				db,
+				parent,
+				(id) => cancelJob(db, id),
+				"interrupted",
+				true,
+			);
+			save(db, parent, prior);
+			changed();
+			return false;
 		},
 	};
 }

@@ -6,13 +6,17 @@ import type {
 	ExecutionSource,
 	ExecutionView,
 	ToolchainExecutionPort,
-	SupervisedExecutionSource,
+	GoalExecutionSource,
+	GoalExecutionIdentity,
+	OwnedExecutionView,
+	OwnedSupervisedExecutionSource,
 } from "../tool-runtime";
 
 export const adapterRef = "adapter:development-supervision@1";
 export const availabilityRef = "availability:development-supervision@1";
 
-export type SupervisedSource = SupervisedExecutionSource;
+export type SupervisedSource = OwnedSupervisedExecutionSource;
+export type SupervisionSource = ExecutionSource | GoalExecutionSource;
 
 export type SupervisionAuthority = "design" | SupervisionMode;
 export type SupervisionMode = "read" | "verify" | "edit";
@@ -84,13 +88,16 @@ export type SupervisionChildEvidence = {
 	text: string;
 	path?: string;
 	passed?: boolean;
+	exitCode?: number;
+	stderr?: string;
 	check?: SupervisionCheck;
 };
 export type SupervisionChildObservation = {
-	view: ExecutionView;
+	view: OwnedExecutionView;
 	executionId: string | null;
 	questionExecutionId?: string | null;
 	evidence: SupervisionChildEvidence[];
+	diagnosticChecks?: SupervisionChildEvidence[];
 	releaseConfirmed: boolean;
 	blocking?: { state: "waiting" | "held"; reason: string };
 	answerDelivery?: {
@@ -134,14 +141,16 @@ export type SupervisionNote = {
 };
 export type SupervisionDesignBinding = {
 	parentId: string;
-	conversationId: string;
 	sourceRunId: string;
 	generation: number;
 	revision: number;
 	documentId: string;
 	digest: string;
 	evidence: readonly SupervisionEvidence[];
-};
+} & (
+	| { conversationId: string; goal?: never }
+	| { conversationId: null; goal: GoalExecutionIdentity }
+);
 export type SupervisionDesignPreparation =
 	| {
 			kind: "ready";
@@ -165,6 +174,11 @@ export type SupervisionWorkspaceEvidence = {
 	preserved: boolean;
 	snapshotId?: string;
 };
+export type SupervisionOwnedEdit = {
+	before: SupervisionWorkspaceEvidence;
+	after: SupervisionWorkspaceEvidence;
+	paths: readonly string[];
+};
 export type SupervisionHost = Pick<
 	ToolchainExecutionPort,
 	| "validSourceInTransaction"
@@ -173,6 +187,17 @@ export type SupervisionHost = Pick<
 	| "readReferenceInTransaction"
 	| "deliverInTransaction"
 > & {
+	goal?: {
+		authorityInTransaction(
+			db: Database,
+			source: GoalExecutionSource,
+		): GoalSupervisionAuthority | null;
+		observeInTransaction?(
+			db: Database,
+			source: GoalExecutionSource,
+			receipt: GoalSupervisionReceipt,
+		): void;
+	};
 	revokeInTransaction(db: Database, noticeId: string): void;
 	confirmedRequestInTransaction?(
 		db: Database,
@@ -184,29 +209,31 @@ export type SupervisionHost = Pick<
 	workspace: {
 		inTransaction(
 			db: Database,
-			source: ExecutionSource,
+			source: SupervisionSource,
 		): SupervisionWorkspace | null;
 		resolveScope?(scope: SupervisionScope): SupervisionScope | null;
 		authorizeInTransaction(
 			db: Database,
 			input: {
-				source: ExecutionSource;
+				source: SupervisionSource;
 				parentRequest: string;
 				ceiling: SupervisionAuthority;
 				scope: SupervisionScope;
 				authorityQuote: string;
-				design: SupervisionDesignView;
+				design: SupervisionDesignView | null;
 			},
 		): boolean;
 		inspectInTransaction(
 			db: Database,
 			scope: SupervisionScope,
 			workId?: string,
+			inherited?: SupervisionOwnedEdit,
 		): { reason?: string; blockerRef?: string; released?: boolean };
 		capture(
 			scope: SupervisionScope,
 			signal: AbortSignal,
 			baseline?: SupervisionWorkspaceEvidence,
+			inherited?: SupervisionOwnedEdit,
 		): Promise<SupervisionWorkspaceEvidence>;
 	};
 	research: {
@@ -228,15 +255,15 @@ export type SupervisionHost = Pick<
 			db: Database,
 			kind: ResearchKind,
 			input: SupervisionStart,
-		): ExecutionView;
+		): OwnedExecutionView;
 		viewInTransaction(
 			db: Database,
 			grant: SupervisedGrant,
-		): ExecutionView | null;
+		): OwnedExecutionView | null;
 		noteInTransaction(
 			db: Database,
 			grant: SupervisedGrant,
-			view: ExecutionView,
+			view: OwnedExecutionView,
 		): SupervisionNote | null;
 		cancelInTransaction(
 			db: Database,
@@ -250,8 +277,20 @@ export type SupervisionHost = Pick<
 		): Promise<SupervisionNote[]>;
 	};
 	child: {
-		targetInTransaction(db: Database): SupervisionTarget | null;
-		startInTransaction(db: Database, input: SupervisionStart): ExecutionView;
+		forgetInTransaction?(
+			db: Database,
+			source: SupervisedSource,
+			workId: string,
+		): void;
+		targetInTransaction(
+			db: Database,
+			forGoal?: boolean,
+			workspaceRef?: string,
+		): SupervisionTarget | null;
+		startInTransaction(
+			db: Database,
+			input: SupervisionStart,
+		): OwnedExecutionView;
 		viewInTransaction(
 			db: Database,
 			source: SupervisedSource,
@@ -345,4 +384,20 @@ export type SupervisionBoardControl = {
 	expectedRevision: number;
 	action: "status" | "amend" | "cancel";
 	request?: string;
+};
+
+export type GoalSupervisionAuthority = {
+	workspace: SupervisionWorkspace;
+	scope: SupervisionScope;
+	design: { documentId: string; digest: string } | null;
+	parked?: true;
+};
+export type GoalSupervisionReceipt = {
+	ownerWorkId: string;
+	ownerRevision: number;
+	status: ExecutionView["status"];
+	question: ExecutionView["question"];
+	questionReleased: boolean;
+	result: ExecutionView["result"];
+	evidence: SupervisionChildEvidence[];
 };

@@ -6,7 +6,10 @@ export {
 	type WebNoteService,
 } from "./service";
 export { migrations } from "./repository";
+export { ADAPTER as webNoteAdapterRef } from "./service/context";
 export type {
+	GoalWebNoteOwner,
+	GoalWebNoteReceipt,
 	InspectSource,
 	SourcePort,
 	WebNoteAttempt,

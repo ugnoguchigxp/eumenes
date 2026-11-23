@@ -1,4 +1,33 @@
-import type { FormResource } from "./contracts";
+import type { FormResource, ArtifactEvent } from "./contracts";
+
+export function workflowFormValues(
+	form: FormResource | null,
+	bindings: Record<string, string>,
+	values: ArtifactEvent["values"],
+) {
+	return Object.fromEntries(
+		Object.entries(values).flatMap(([id, raw]) => {
+			const key = bindings[id];
+			const field = form?.fields.find((value) => value.id === id);
+			if (!key || !field || (raw === "" && !field.required)) return [];
+			let value: unknown = raw;
+			if (
+				field.type === "number" &&
+				typeof raw === "string" &&
+				raw.trim() !== ""
+			)
+				value = Number(raw);
+			if (field.type === "checkbox" && typeof raw === "string") {
+				try {
+					value = JSON.parse(raw);
+				} catch {
+					value = raw;
+				}
+			}
+			return [[key, value]];
+		}),
+	);
+}
 
 /** Source name the studio gives the draft's trial form (never a host source). */
 export const trialFormSource = "trial-form";

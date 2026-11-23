@@ -15,10 +15,19 @@ import { compileJsonSchemaSubset } from "../../domains/capabilities";
 import type { QueueService } from "../../domains/queue";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import type { AppWorkflowControls } from "./app-development-adapter";
+import {
+	createSaveRecovery,
+	reopenStorage,
+	type StorageMode,
+} from "./save-recovery";
 
 type App = NonNullable<ReturnType<AppDevelopment["app"]>>;
 const kind = "app-development.storage";
-const payload = z.strictObject({ appId: z.uuid(), operationId: z.uuid() });
+const payload = z.strictObject({
+	appId: z.uuid(),
+	operationId: z.uuid(),
+	mode: z.enum(["save", "reopen"]).default("save"),
+});
 const pending = (state: string | undefined) =>
 	state === "initializing" || state === "deleting";
 const safeError = (error: unknown, fallback: string) =>
@@ -55,11 +64,12 @@ export function createAppStorageRuntime(deps: {
 		appId: string,
 		operationId: string,
 		retry?: string,
+		mode: StorageMode = "save",
 	) {
 		return queue.enqueueInTransaction(db, {
 			scope,
 			kind,
-			payload: { appId, operationId },
+			payload: { appId, operationId, mode },
 			subjectRef: appId,
 			dedupeKey: retry ? `${operationId}:${retry}` : operationId,
 			lane: "background",
@@ -102,14 +112,28 @@ export function createAppStorageRuntime(deps: {
 				!entry ||
 				!pending(entry.state) ||
 				entry.jobId !== claim.jobId ||
-				entry.operationId !== claim.payload.operationId
+				entry.operationId !== claim.payload.operationId ||
+				(claim.payload.mode === "reopen" &&
+					(entry.state !== "initializing" ||
+						!entry.reopening ||
+						!entry.saveJson)) ||
+				(claim.payload.mode === "save" && !!entry.reopening)
 			)
 				return { status: "stale", reason: "app_operation_inactive" };
-			return { status: "ready", input: entry };
+			return {
+				status: "ready",
+				input: {
+					entry,
+					mode: claim.payload.mode,
+					published: !!apps.storedApp(db, entry.appId),
+				},
+			};
 		},
-		async execute(entry, { signal }) {
+		async execute(input, { signal }) {
 			signal.throwIfAborted();
+			const { entry, mode, published } = input;
 			try {
+				if (mode === "reopen") return reopenStorage(files, entry, published);
 				if (
 					entry.state === "initializing" &&
 					entry.storageId &&
@@ -129,9 +153,11 @@ export function createAppStorageRuntime(deps: {
 			} catch (error) {
 				return safeError(
 					error,
-					entry.state === "deleting"
-						? "app_storage_delete_failed"
-						: "app_storage_setup_failed",
+					mode === "reopen"
+						? "app_storage_reopen_failed"
+						: entry.state === "deleting"
+							? "app_storage_delete_failed"
+							: "app_storage_setup_failed",
 				);
 			}
 		},
@@ -141,8 +167,35 @@ export function createAppStorageRuntime(deps: {
 				return "stale";
 			if (outcome.type === "retry" || outcome.type === "interrupted")
 				return "applied";
+			if (
+				outcome.type === "success" &&
+				outcome.result &&
+				typeof outcome.result === "object" &&
+				outcome.result.kind === "reopened"
+			) {
+				const { revision, keepStorage } = outcome.result;
+				const plan = entry.saveJson
+					? (JSON.parse(entry.saveJson) as PendingSave).plan
+					: null;
+				storage.reopen(
+					db,
+					entry,
+					revision,
+					keepStorage,
+					keepStorage && revision > entry.storageRevision
+						? plan
+						: entry.preparedPlanJson
+							? JSON.parse(entry.preparedPlanJson)
+							: null,
+				);
+				return "applied";
+			}
 			const error =
-				outcome.type === "success" ? outcome.result : "app_storage_job_failed";
+				outcome.type === "success"
+					? typeof outcome.result === "string"
+						? outcome.result
+						: null
+					: "app_storage_job_failed";
 			if (error) {
 				storage.error(db, entry, error);
 				return { status: "failed", errorCode: error };
@@ -184,6 +237,7 @@ export function createAppStorageRuntime(deps: {
 	});
 	return {
 		records,
+		...createSaveRecovery({ apps, queue, enqueue }),
 		save(db: Database, appId: string, operationId: string, save: PendingSave) {
 			storage.stage(
 				db,
@@ -256,6 +310,7 @@ export function createAppStorageRuntime(deps: {
 		async recover() {
 			await store.write((db) => {
 				for (const entry of storage.pending(db)) {
+					if (entry.state === "initializing" && entry.errorCode) continue;
 					const job = entry.jobId
 						? queue.getInTransaction(db, entry.jobId)
 						: null;
@@ -266,7 +321,14 @@ export function createAppStorageRuntime(deps: {
 						storage.resume(
 							db,
 							entry,
-							enqueue(db, entry.appId, entry.operationId, crypto.randomUUID()),
+							enqueue(
+								db,
+								entry.appId,
+								entry.operationId,
+								crypto.randomUUID(),
+								entry.reopening ? "reopen" : "save",
+							),
+							!!entry.reopening,
 						);
 				}
 			});
@@ -287,5 +349,7 @@ export function storageForSave(
 		plan,
 		appDigest,
 	);
+	const prepared = apps.storage.get(db, appId)?.preparedPlanJson;
+	if (prepared) checkStorageUpgrade(JSON.parse(prepared), plan, appDigest);
 	return plan;
 }

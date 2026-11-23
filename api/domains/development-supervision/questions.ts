@@ -72,6 +72,7 @@ export function syncQuestions(
 	notify: (parent: Parent) => void,
 ) {
 	let next: { question: Question; grant: Grant } | null = null;
+	parent.goalQuestionReleased = false;
 	for (const question of questionsOf(db, parent.id)) {
 		if (question.status === "closed") continue;
 		const grant = grantOf(db, question.grantRef);
@@ -110,6 +111,8 @@ export function syncQuestions(
 			closeQuestion(host, db, parent, question);
 			continue;
 		}
+		if (parent.source.origin === "goal" && parent.question?.id === question.id)
+			parent.goalQuestionReleased = child.releaseConfirmed;
 		if (!next && question.status === "queued") next = { question, grant };
 	}
 	if (!next || parent.question) return;
@@ -136,6 +139,9 @@ export function syncQuestions(
 		inputSchema: question.inputSchema,
 	};
 	parent.questionOp = question.presentOperationId;
+	if (parent.source.origin === "goal")
+		parent.goalQuestionReleased =
+			childObservation(host, db, grant)?.releaseConfirmed === true;
 	const task = parent.tasks.find(
 		({ grantRef }) => grantRef === question.grantRef,
 	);

@@ -75,8 +75,12 @@ export function createWorkflowExecutionAuthority(deps: {
 	};
 	return {
 		runInTransaction,
-		sourceInTransaction: (db: Database, scope: string, runId: string) =>
-			resolve(db, scope, runId)?.source ?? null,
+		sourceInTransaction: (
+			db: Database,
+			scope: string,
+			runId: string,
+			stopping = false,
+		) => resolve(db, scope, runId, stopping)?.source ?? null,
 		planInTransaction,
 	};
 }

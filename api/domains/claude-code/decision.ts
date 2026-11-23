@@ -17,7 +17,9 @@ const tools = [
 		),
 	},
 ];
-const decisionResponse = z.strictObject({ decision: decisionSchema });
+const decisionResponse = z.strictObject({
+	decision: z.union(decisionSchema.options),
+});
 const schema = z.toJSONSchema(decisionResponse);
 const rules = [
 	"Return the selected action in the decision field.",

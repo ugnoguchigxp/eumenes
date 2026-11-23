@@ -46,6 +46,15 @@ CREATE TABLE development_supervision_controls(
  digest TEXT NOT NULL
 );`,
 	},
+	{
+		id: "development-supervision/0002-owner",
+		after: ["development-supervision/0001-work"],
+		sql: `
+ALTER TABLE development_supervision_work RENAME COLUMN conversation_id TO owner_key;
+ALTER TABLE development_supervision_work ADD COLUMN owner_kind TEXT NOT NULL DEFAULT 'conversation'
+ CHECK(owner_kind IN ('conversation','goal'));
+`,
+	},
 ];
 
 function decode<T>(row: { data: string } | null): T | null {
@@ -72,6 +81,19 @@ export function parentOfRun(db: Database, runId: string) {
 	);
 }
 
+export function goalParents(
+	db: Database,
+	goalId: string,
+	workspaceRef: string,
+) {
+	return db
+		.query<{ data: string }, [string, string]>(
+			"SELECT data FROM development_supervision_work WHERE owner_kind='goal' AND owner_key=? AND workspace_ref=? AND forgotten=0 AND pending=0 ORDER BY rowid DESC",
+		)
+		.all(goalId, workspaceRef)
+		.map((row) => decode<Parent>(row)!);
+}
+
 export function parents(
 	db: Database,
 	filter: {
@@ -91,7 +113,8 @@ export function parents(
 		>(
 			`SELECT data FROM development_supervision_work
 		 WHERE (($pending=1 AND pending=1) OR ($pending=0 AND forgotten=0))
-		 AND ($conversation IS NULL OR conversation_id=$conversation)
+	 AND ($pending=1 AND $conversation IS NULL OR owner_kind='conversation')
+	 AND ($conversation IS NULL OR owner_key=$conversation)
 		 AND ($workspace IS NULL OR workspace_ref=$workspace) ORDER BY rowid`,
 		)
 		.all({
@@ -104,16 +127,20 @@ export function parents(
 
 export function saveParent(db: Database, parent: Parent, pending: boolean) {
 	db.query(
-		`INSERT INTO development_supervision_work VALUES (?,?,?,?,?,?,?)
+		`INSERT INTO development_supervision_work (id,run_id,owner_key,workspace_ref,pending,forgotten,data,owner_kind)
+		VALUES (?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET pending=excluded.pending, forgotten=excluded.forgotten,data=excluded.data`,
 	).run(
 		parent.id,
 		parent.source.runId,
-		parent.source.conversationId,
+		parent.source.origin === "goal"
+			? parent.source.goalId
+			: parent.source.conversationId,
 		parent.workspace.workspaceRef,
 		Number(pending),
 		Number(parent.forgotten),
 		JSON.stringify(parent),
+		parent.source.origin === "goal" ? "goal" : "conversation",
 	);
 }
 

@@ -31,7 +31,7 @@ import {
 	parents,
 } from "./repository";
 import type { Parent } from "./state";
-import { controlsFor, createTaskPort } from "./task";
+import { controlsFor, createGoalSupervisionPort, createTaskPort } from "./task";
 import { progressOf, rows } from "./views";
 
 export { migrations } from "./repository";
@@ -147,34 +147,37 @@ export function createDevelopmentSupervision({
 		save,
 		changed,
 	});
-	const task = createTaskPort(
-		{
-			getHost: () => host,
-			requiredHost,
-			capabilities,
-			now,
-			save,
-			cancelJob,
-			schedule,
-			changed,
-		},
-		{ currentParent, controlled },
-	);
+	const ports = {
+		getHost: () => host,
+		requiredHost,
+		capabilities,
+		now,
+		save,
+		cancelJob,
+		schedule,
+		changed,
+	};
+	const task = createTaskPort(ports, { currentParent, controlled });
+	const goal = createGoalSupervisionPort(ports);
 
 	return {
 		task,
+		goal,
 		configure(currentHost: SupervisionHost) {
 			host = currentHost;
 			timer ??= setInterval(flush, 2_000);
 			timer.unref();
 		},
 		availableInTransaction: available,
+		goalWorkerAvailableInTransaction: (db: Database, workspaceRef?: string) =>
+			available() && !!host?.child.targetInTransaction(db, true, workspaceRef),
 		sourceRunInTransaction: (db: Database, id: string) =>
 			parentOf(db, id)?.source.runId ?? null,
 		progressInTransaction(db: Database, parentId: string) {
 			const parent = parentOf(db, parentId);
 			return host &&
 				parent &&
+				parent.source.origin !== "goal" &&
 				!parent.forgotten &&
 				sourceCurrent(host, db, parent)
 				? progressOf(parent)

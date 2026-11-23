@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { ExecutionResult, ExecutionView } from "../../tool-runtime";
-import type { HostState } from "../contracts";
+import type { GoalWebNoteReceipt, HostState } from "../contracts";
 import { active, rowOf, save, stateOf, type RunRow } from "../repository";
 import type { Context } from "./context";
 import {
@@ -51,7 +51,7 @@ function conversationResult(state: HostState): ExecutionResult | null {
 
 export const viewOf = (row: RunRow, state: HostState): ExecutionView => ({
 	id: row.id,
-	conversationId: row.conversation_id,
+	conversationId: row.owner_key,
 	request: state.request,
 	revision: row.revision,
 	status: row.state,
@@ -64,7 +64,9 @@ export function viewInTransaction(
 	id: string,
 ): ExecutionView | null {
 	const row = rowOf(db, id);
-	return row?.data_json ? viewOf(row, stateOf(row)) : null;
+	return row?.data_json && row.owner_kind === "conversation"
+		? viewOf(row, stateOf(row))
+		: null;
 }
 /** The run, with the authority it was started under still holding. */
 export function current(
@@ -77,17 +79,20 @@ export function current(
 	if (!row?.data_json || (!terminal && !active(row)))
 		throw new Error("web_note_run_stale");
 	const state = stateOf(row);
-	const valid = isSupervisedExecutionSource(state.source)
-		? ctx.source().supervised?.authorizeInTransaction(db, {
-				source: state.source,
-				request: state.request,
-				action: "continue",
-				workId: row.id,
-				toolchainRevisionId: state.toolchainRevisionId,
-				bindingRevisionId: state.bindingRevisionId,
-			})
-		: isStandardExecutionSource(state.source) &&
-			ctx.source().validSourceInTransaction(db, state.source);
+	const valid =
+		state.source.origin === "goal"
+			? ctx.goal()?.authorityInTransaction(db, state.source)
+			: isSupervisedExecutionSource(state.source)
+				? ctx.source().supervised?.authorizeInTransaction(db, {
+						source: state.source,
+						request: state.request,
+						action: "continue",
+						workId: row.id,
+						toolchainRevisionId: state.toolchainRevisionId,
+						bindingRevisionId: state.bindingRevisionId,
+					})
+				: isStandardExecutionSource(state.source) &&
+					ctx.source().validSourceInTransaction(db, state.source);
 	if (!valid) throw new Error("web_note_source_invalid");
 	if (
 		ctx.capabilities.toolchainBindingInTransaction(
@@ -134,6 +139,11 @@ export function finish(
 	row.state = status as RunRow["state"];
 	const state = stateOf(row);
 	state.result = result;
+	if (state.source.origin === "goal") {
+		save(db, row, state, ctx.now());
+		ctx.goal()?.observeInTransaction(db, state.source, goalReceipt(row, state));
+		return;
+	}
 	// The view is the one `save` is about to store.
 	announce(ctx, db, row, { ...viewOf(row, state), revision: row.revision + 1 });
 	save(db, row, state, ctx.now());
@@ -206,3 +216,13 @@ export function reconcile(ctx: Context, db: Database) {
 		}
 	}
 }
+
+export const goalReceipt = (
+	row: RunRow,
+	state: HostState,
+): GoalWebNoteReceipt => ({
+	ownerWorkId: row.id,
+	ownerRevision: row.revision,
+	status: row.state,
+	result: state.result,
+});

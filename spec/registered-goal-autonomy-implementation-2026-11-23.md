@@ -1,6 +1,6 @@
 # 登録目標の実装手順と受入
 
-2026年11月23日。Sol 6.2 max に渡す実装の入口。対象は隣り合う `eumenes_agency` と `eumenes`。以下の「新設」とコード例は実装する契約である。目的・許可範囲・製品の合格条件は本家の設計、モデル入出力のフィールド名は Agency の判断契約を正本とする。[本家の設計](registered-goal-autonomy-2026-11-23.md)・[Agency の判断契約](../../eumenes_agency/spec/goal-decision-contract-2026-11-23.md)
+2026年11月23日。Sol 6.2 max が担当する実装の順序と受入条件。対象は隣り合う `eumenes_agency` と `eumenes`。以下の「新設」は今回追加する入口を示す。目的・許可範囲・製品の合格条件は本家の設計、モデル入出力のフィールド名は Agency の判断契約を正本とする。各段の実行結果は検証記録から確認する。[本家の設計](registered-goal-autonomy-2026-11-23.md)・[Agency の判断契約](../../eumenes_agency/spec/goal-decision-contract-2026-11-23.md)・[実装・検証記録](verification/goal-autonomy-2026-11-23/README.md)
 
 ## 1. 着手順と作業の区切り
 
@@ -104,6 +104,8 @@ ALTER TABLE goal_reports ADD COLUMN mode TEXT NOT NULL DEFAULT 'mock' CHECK(mode
 1. `registerHandler` はキューの recovery 前に実行する。`prepareInTransaction` で現行版・停止・既存受付を確認し、stale は判断を呼ばずに終える。`execute` は外部I/Oのみ、`settleInTransaction` は比較更新、`afterCommit` は `queue.wake()` と必要な停止通知を担う。再実行可能にするのは、判断・読取・同じ受付を照会する段階。副作用の一意性は担当の受付で担保する。[型とコールバック](../api/domains/queue/types/index.ts)
 2. 状態変更で `needs_enqueue=1` を保存し `enqueueInTransaction` を試す。成功時に `job_id` を記録して印を落とす。`queue_full` のみ未投入の印を残し、予期しないエラーは transaction を戻す。新しい結果が来たら進行版を先に進め、将来に予約された旧ジョブを取り消す。`availableAtMs` だけを変えて同じキーを再投入しても古い行が返る。照会継続でも次の期限を保存して新しい進行版のジョブを作る。処理中の旧ジョブは settle 時にも版を比較する。
 3. 会話が依頼したメモは `collectAgendaResults` の文書採用と同じ writer で、文書ID・版・所有者と購読先を通知する。目標が直接依頼した Web メモは、Web メモが結果を確定する writer から試行IDで通知する。画面も会話チケットも要らない。別経路の結果は許可区画・購読先の一致で候補を届け、関連性をモデルが否定した文書版を既読にする。監督も親の状態を保存する transaction から同じ観測受付へ通知する。後続のキックは commit 後。イベント喪失時にも実行先を読んで復旧できる。[会話用メモの採用](../api/application/agency/always-on-cycle.ts)・[Web メモの確定](../api/domains/web-note/service/jobs.ts)・[監督の状態更新](../api/domains/development-supervision/reconcile.ts)
+
+成果を返す能力の成功後は、対応する独立検査がある条件を `verificationRequired` として判断入力に含める。該当する判断には新たな `act` を提示せず、対象条件を含む `verify` と根拠参照を検査する。検証を行った段階でこの制約を消費し、不一致なら同じ目標版の通常判断へ戻す。成功した変更や調査文書を受け取ったあと、既に終わった初回診断へ戻り続けないようにする。[判断契約](../../eumenes_agency/spec/goal-decision-contract-2026-11-23.md)
 4. 登録・許可・照会の配線は `buildServices` で構成する。子担当は自身の recovery で動き始めるため、現在の目標・許可・停止のガードは各担当の recovery より前に注入する。キュー・開発監督・Webメモ・Claude担当の既存 recovery 後、通常のキュー起動前に未投入フラグ、失われた／終端の job、条件到着済みの待ち、受付済みの仕事、未配送の報告を台帳と照合する。通常運転でも `store.onCommit` の集約通知で未投入があるときだけ空きを再確認する。空きも状態も同じなら書込み0件とし、監視自身の書込みで起動を繰り返さない。[起動順](../api/application/server-lifecycles.ts)・[共有 writer](../api/infrastructure/sqlite/index.ts)
 5. `set_quiet` の適用・解除と、既存仕様で発話休止を解除する利用者発言を受けたときに、目標用の所有者・スコープ制御行も保存する。全停止・設定無効を予約、開始、結果採用で再照合する。発話休止は配送に適用する。別の会話の古いチェックポイントで新しい明示指示を上書きしない。[会話側の適用点](../api/application/agency/always-on-ports.ts)
 

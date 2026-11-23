@@ -64,6 +64,7 @@ export function createSupervisionDesigns(deps: {
 			: null;
 	const matches = (binding: SupervisionDesignBinding, input: GeneratedInput) =>
 		binding.documentId === input.id &&
+		"conversationId" in input &&
 		binding.conversationId === input.conversationId &&
 		binding.sourceRunId === input.sourceRunId &&
 		binding.digest === sha256Hex(input.markdown);
@@ -105,6 +106,7 @@ export function createSupervisionDesigns(deps: {
 			};
 		},
 		startInTransaction(db, binding, prepared) {
+			if (binding.goal) throw new Error("supervision_goal_design_managed");
 			if (
 				!authorized(db, binding) ||
 				prepared.digest !== binding.digest ||

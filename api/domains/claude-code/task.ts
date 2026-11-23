@@ -6,7 +6,7 @@ import {
 	type TaskLifecyclePort,
 } from "../tool-runtime";
 import { adapterRef, questionAnswer, type Host, type Work } from "./contracts";
-import { closeQuestion, newId, view } from "./lifecycle";
+import { closeQuestion, newId, view, workWorkspace } from "./lifecycle";
 import { read, save, terminal } from "./repository";
 import { createSupervisedTaskPort } from "./supervised-task";
 
@@ -21,7 +21,7 @@ export function createTaskPort({
 	capabilities: Capabilities;
 	getHost(): Host | undefined;
 	available(): boolean;
-	supervisedAvailable(): boolean;
+	supervisedAvailable(goal: boolean, workspaceRef?: string): boolean;
 	now(): number;
 	cancel(
 		db: Database,
@@ -32,7 +32,10 @@ export function createTaskPort({
 }) {
 	function start(
 		db: Database,
-		input: Parameters<TaskLifecyclePort["startInTransaction"]>[1],
+		input: Omit<
+			Parameters<TaskLifecyclePort["startInTransaction"]>[1],
+			"source"
+		> & { source: Work["source"] },
 		host: Host,
 		authorization?: NonNullable<Work["supervision"]>["authorization"],
 	) {
@@ -55,7 +58,9 @@ export function createTaskPort({
 			throw new Error("claude_request_invalid");
 		if (
 			input.references.some(
-				(ref) => !host.validReferenceInTransaction(db, input.source, ref),
+				(ref) =>
+					input.source.conversationId === null ||
+					!host.validReferenceInTransaction(db, input.source, ref),
 			)
 		)
 			throw new Error("claude_reference_invalid");
@@ -89,7 +94,10 @@ export function createTaskPort({
 			turnsReserved: 0,
 			turnsUsedBeforeExecution: 0,
 			maxCalls: Math.min(binding.limits.parentCalls, binding.limits.modelCalls),
-			maxExecutions: binding.limits.childCalls,
+			maxExecutions:
+				input.source.conversationId === null
+					? Math.min(1, binding.limits.childCalls)
+					: binding.limits.childCalls,
 			attemptMs: binding.timeLimits.inferenceMs,
 			decisionId: null,
 			decisionMode: "work",
@@ -117,7 +125,7 @@ export function createTaskPort({
 				: {}),
 		};
 		if (work.supervision) {
-			const lease = host.workspace.hold(
+			const lease = workWorkspace(host, work).hold(
 				db,
 				work.id,
 				work.supervision.authorization,
@@ -163,6 +171,7 @@ export function createTaskPort({
 			}
 			if (
 				work.deadline <= now() ||
+				!isStandardExecutionSource(work.source) ||
 				!host.validSourceInTransaction(db, work.source)
 			)
 				throw new Error("claude_source_invalid");

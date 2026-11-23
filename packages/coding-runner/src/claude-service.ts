@@ -155,6 +155,14 @@ function effectiveInput(
 					sandbox: undefined,
 					projectInstructions: [
 						input.projectInstructions,
+						"Follow the registered tool scope below. The workspace reference names the registration. Use the physical working directory and the listed absolute paths for tool arguments.",
+						"Read within a listed readable directory or open a listed file directly. When only files are listed, use their exact absolute paths instead of searching the checkout root.",
+						JSON.stringify({
+							workspaceRef: authority?.workspaceRef,
+							workingDirectory: workspace,
+							readablePaths: scope.readablePaths,
+							writablePaths: scope.writablePaths,
+						}),
 						...scope.commands.map(
 							(command) => `Approved verification Bash command: ${command}`,
 						),

@@ -584,6 +584,15 @@ export function listMessages(db: Database, id: string): Message[] {
 		.all(id) as MessageRow[];
 	return rows.map((row) => toMessage(row, db));
 }
+/** Bounded identity lookup for a retained original request; no semantic matching. */
+export const userMessagesByText = (db: Database, id: string, text: string) =>
+	(
+		db
+			.query(
+				`${messageSelect(db, "m.conversation_id = ? AND m.role = 'user' AND m.text = ?")} ORDER BY m.rowid DESC LIMIT 32`,
+			)
+			.all(id, text) as MessageRow[]
+	).map((row) => toMessage(row, db));
 /** The last `limit` messages of a conversation in acceptance order. */
 export function tailMessages(
 	db: Database,

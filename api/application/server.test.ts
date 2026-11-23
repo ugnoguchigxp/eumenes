@@ -96,6 +96,19 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 	expect(recoveries.indexOf("agency_recovery")).toBeLessThan(
 		recoveries.indexOf("queue_recovery"),
 	);
+	const ordered = items.map((item) => item.name);
+	expect(ordered.indexOf("registered_goals_recovery")).toBeGreaterThan(
+		ordered.indexOf("queue_recovery"),
+	);
+	expect(ordered.indexOf("registered_goals_recovery")).toBeGreaterThan(
+		ordered.indexOf("claude_code_recovery"),
+	);
+	expect(ordered.indexOf("registered_goals_start")).toBeGreaterThan(
+		ordered.indexOf("registered_goals_recovery"),
+	);
+	expect(ordered.indexOf("registered_goals_start")).toBeLessThan(
+		ordered.indexOf("queue_start"),
+	);
 	expect(
 		items
 			.filter((item) => item.close)
@@ -124,7 +137,10 @@ test("the shutdown order is fixed, and a freshly built set of services closes cl
 		"terminals",
 		"shell",
 		"kanban",
+		"registered_goals",
+		"claude_code_task",
 		"web_note",
+		"development_supervision",
 		"agents",
 		"capabilities",
 		"browser",

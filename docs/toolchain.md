@@ -58,7 +58,7 @@ streamでは、function名や制御区切りになり得る末尾だけを保留
 | `ocr` | `ocr.manage` | `package:ocr.manage@1` | 操作担当→OCR | — | — | — | — | 操作結果 |
 | `kanban` / `codex_tasks` | `kanban.manage` / `codex-tasks.manage` | `package:kanban.manage@2` / `package:codex-tasks.manage@1` | 操作担当→タスクボード | — | — | — | — | 操作結果 |
 | `claude_code` | `claude-code.request` | `package:claude-code.request@2` | 操作担当→作業依頼表 | — | — | — | — | 受付 |
-| `develop_app` | `app.develop` | `package:app-development.studio@8` | 専門担当へ切替（session）。Webアプリの画面・フォーム・実行手順を作成・修正する | — | — | — | 1ターン最大4 | 下書き・プレビュー・確認保存 |
+| `develop_app` | `app.develop` | `package:app-development.studio@10` | 専門担当へ切替（session）。会話の条件と本人の参照を引き継ぎ、Webアプリの画面・保存・実行手順を作成・修正する | — | — | — | 1ターン最大4 | 下書き・プレビュー・確認保存・保存再試行 |
 | `weather_forecast` | `weather.forecast` | `package:weather.forecast@1` | 即時回答型（instant）。依頼ツールの`inputs`（区域・日）から天気予報を取得し、決まった形の文をツールの結果で返す。予告・TODOなし | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
 | `stock_quote` | `stock.quote` | `package:stock.quote@1` | 即時回答型（instant）。依頼ツールの`inputs`（`query`＝言われた会社名・ティッカー）から、EDINETの上場会社一覧（日次更新・失敗中は前の一覧）とYahoo検索で一社を特定し（日本株優先、同名は完全一致→前方一致→部分一致）、Yahooのチャートで取得した現在値・前日比・JST時刻を決まった形の文にしてツールの結果で返す。履歴・指標・財務・ニュース・複数銘柄比較は対象外 | — | — | — | 会話の生成の中の1回 | ツールの結果（ホストが作成した文） |
 

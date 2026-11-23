@@ -3,7 +3,7 @@
   "artifactVersion": 2,
   "compilerVersion": "0.1.2",
   "releaseProfile": "application",
-  "policyDigest": "sha256:cd6a68370cb8f8a7b32841720285ade931e431cc7fd63f4a991ddb3360815979",
+  "policyDigest": "sha256:b0644c73fcde5971447dac1595169d1fc10ecf62e9de969d0001d67c9906431f",
   "createdFrom": {
     "configPath": "s11tnext.config.toml",
     "sourceFiles": [
@@ -41,6 +41,7 @@
       "api/domains/dialogue/contexts/agency/emotion.context.toml",
       "api/domains/dialogue/contexts/agency/external-lookup.context.toml",
       "api/domains/dialogue/contexts/agency/goal-reply.context.toml",
+      "api/domains/dialogue/contexts/agency/goal-work.context.toml",
       "api/domains/dialogue/contexts/agency/interests.context.toml",
       "api/domains/dialogue/contexts/agency/reply.context.toml",
       "api/domains/dialogue/contexts/agency/spoken.context.toml",
@@ -1248,6 +1249,39 @@
       },
       "definitionHash": "sha256:6dc96781c5a940eb071d49c0e9e50dc9466d688226ee149e1b64e1b67487d351",
       "releaseDigest": "sha256:5bcdcd57bf4ee74e07623ad94a4ba4c4c5d62fc02cde4b4322b9b0c2670442d0"
+    },
+    "dialogue.contexts.agency.goal-work": {
+      "key": "dialogue.contexts.agency.goal-work",
+      "owner": "unowned",
+      "contentKind": "text",
+      "messageRole": "system",
+      "sourceLocale": "ja-JP",
+      "requiredLocales": [
+        "ja-JP"
+      ],
+      "variables": {},
+      "locales": {
+        "ja-JP": {
+          "sections": [
+            {
+              "id": "context.text",
+              "kind": "instruction",
+              "severity": "must",
+              "optimizable": false,
+              "omitIfEmpty": false,
+              "segments": [
+                {
+                  "type": "literal",
+                  "value": "【登録目標の実作業】本人が同じ発言で実作業の範囲を許可したら、list_goals の workspaces で提示された作業先・パス・検査の参照を確認し、register_goal の workPermission に入れる。引用はその許可を含む今回発言の原文。許可した読み取り、編集先、実行する検査を別々に記録し、指定された範囲を広げない。すでに登録済みなら update_goal の authorize_work を使う。取消では list_goals の permits から本人が指定した許可のIDと版を確認し、revoke_work を使う。目標担当の質問への本人の返答は、list_goals の質問IDを指定して answer_question を使い、同じ返答で実作業の範囲が許可された場合は authorize_work に質問IDを添える。進行や結果はツールに保存された状態から伝える。"
+                }
+              ]
+            }
+          ],
+          "artifactHash": "sha256:1e57eb599d659643dadbf76c5f1c30d990572ab380a0defdde7ab9cc5256d475"
+        }
+      },
+      "definitionHash": "sha256:eaa0663d9d3d6e8e3d51ee6f315acf189cec8b3e9bda375b5f9499b6753df141",
+      "releaseDigest": "sha256:24917fde11335f50ec9e5bce9587e34c288c44bcdc77420d95364b514d042374"
     },
     "dialogue.contexts.agency.interests": {
       "key": "dialogue.contexts.agency.interests",
@@ -3974,5 +4008,5 @@
       "releaseDigest": "sha256:a5598b0dc9cde21fc18bc489c3e5be973275f0493307e41ad62feedf4d30ae6f"
     }
   },
-  "catalogDigest": "sha256:b4281b0a1ced11c9277d98768871283ff37466c41935c6c46899920e6211c564"
+  "catalogDigest": "sha256:6ba103577a2ebac542cf4e7604ecea7e9907d2710f041679e7d9b9966d5c37c8"
 }

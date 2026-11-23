@@ -66,6 +66,7 @@ const schema = z.object({
 	EUMENES_CONTEXT_STILL_MCP_URL: text,
 	EUMENES_CONTEXT_STILL_MCP_TOKEN: text,
 	EUMENES_KNOWLEDGE_SELECTION_RESOURCE_ID: z.uuid().optional(),
+	EUMENES_GOAL_WORKSPACES: text,
 });
 
 export type Config = {
@@ -80,6 +81,7 @@ export type Config = {
 	apiToken: string | undefined;
 	contextStill?: { url?: string; token?: string };
 	knowledgeSelectionResourceId?: string;
+	goalWorkspaces?: string;
 	larmToken: string | undefined;
 	attitudeDatasetPath: string;
 	memoryJournalPath: string;
@@ -140,6 +142,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 			token: v.EUMENES_CONTEXT_STILL_MCP_TOKEN,
 		},
 		knowledgeSelectionResourceId: v.EUMENES_KNOWLEDGE_SELECTION_RESOURCE_ID,
+		...(v.EUMENES_GOAL_WORKSPACES
+			? { goalWorkspaces: v.EUMENES_GOAL_WORKSPACES }
+			: {}),
 		larmToken: resolveLarmToken(present),
 		attitudeDatasetPath:
 			v.EUMENES_ATTITUDE_DATASET ??

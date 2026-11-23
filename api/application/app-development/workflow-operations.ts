@@ -96,10 +96,11 @@ const defs = [
 		entry: "web.records",
 		title: "Webの資料から根拠付きの行を取得",
 		contract: {
-			operationRef: "web.records@1",
+			operationRef: "web.records@2",
 			outputSchemaRef: "publish",
 			requestSchemas: "workflow",
 			acceptedResultSchemas: [],
+			evidenceExemptSchemas: [workflowRefs.showtimesRows],
 		},
 	},
 	{
@@ -130,7 +131,8 @@ const defs = [
 	contract: WorkflowStepContract;
 	effects?: ComponentRecord["card"]["effects"];
 }[];
-const revisionId = (entry: string) => `toolchain:${entry}@1`;
+const revisionId = (entry: string) =>
+	`toolchain:${entry}@${entry === "web.records" ? 2 : 1}`;
 const component = ({
 	entry,
 	title,
@@ -423,6 +425,7 @@ export function createWorkflowOperations(deps: Dependencies) {
 			enabled().some((item) => item.entry === entry) ? revisionId(entry) : null,
 		operations: new Map<string, WorkflowOperation>([
 			["web.records@1", webRecords],
+			["web.records@2", webRecords],
 			["storage.records@1", storageRecords],
 			["git.changes@1", gitOperation],
 			["content.markdown@1", markdown],

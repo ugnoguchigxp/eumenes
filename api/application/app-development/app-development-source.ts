@@ -13,6 +13,7 @@ import {
 } from "./storage-runtime";
 
 export const studio = "query:app-development.studio@1";
+export const recoveryStudio = "query:app-development.studio@2";
 export const records = "query:app-development.records@1";
 type Work = ReturnType<AppDevelopment["draft"]>;
 
@@ -51,11 +52,27 @@ export function createStudioSource(
 				data: deps.storage().records(db, app, input.collection, input.request),
 			};
 		}
-		if (query !== studio) return null;
+		if (query !== studio && query !== recoveryStudio) return null;
 		const work = service.current(db);
 		const viewing = targetRef ? service.storedApp(db, targetRef) : null;
 		const lifecycle = targetRef ? service.storage.get(db, targetRef) : null;
 		const workLifecycle = work ? service.storage.get(db, work.appId) : null;
+		const retrySave = (entry: typeof workLifecycle) => {
+			if (
+				entry?.state !== "initializing" ||
+				!entry.errorCode ||
+				!entry.saveJson ||
+				!entry.operationId
+			)
+				return undefined;
+			const save = JSON.parse(entry.saveJson) as { digest: string };
+			return {
+				appId: entry.appId,
+				operationId: entry.operationId,
+				stateRevision: entry.stateRevision,
+				digest: save.digest,
+			};
+		};
 		const available = !lifecycle || lifecycle.state === "active";
 		const read = z
 			.object({ page: z.number().int().min(0).max(399).default(0) })
@@ -109,6 +126,15 @@ export function createStudioSource(
 						dirty: work.dirty,
 						canUndo: false,
 						canRedo: false,
+						retrySave: workLifecycle?.reopening
+							? undefined
+							: retrySave(workLifecycle),
+						...(query === recoveryStudio
+							? {
+									reopenSave: retrySave(workLifecycle),
+									storageReopening: !!workLifecycle?.reopening,
+								}
+							: {}),
 						...(workLifecycle?.state === "initializing" ||
 						workLifecycle?.state === "deleting"
 							? {
@@ -131,6 +157,13 @@ export function createStudioSource(
 						workflow: available ? (viewing.draft.workflow ?? null) : null,
 						...(viewing.draft.storage ? { hasStorage: true } : {}),
 						deleteDigest: deletionDigest(viewing),
+						retrySave: lifecycle?.reopening ? undefined : retrySave(lifecycle),
+						...(query === recoveryStudio
+							? {
+									reopenSave: retrySave(lifecycle),
+									storageReopening: !!lifecycle?.reopening,
+								}
+							: {}),
 						...(lifecycle
 							? {
 									storageState: lifecycle.state,

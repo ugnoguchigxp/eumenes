@@ -13,7 +13,10 @@ import {
 export function claudeRunnerClient(socketPath: string, workspace: string) {
 	let available = false;
 	let supervised = false;
+	let matchedWorkspace: boolean | null = null;
 	function call(body: ClaudeRequest): Promise<unknown> {
+		if (body.operation !== "health" && matchedWorkspace === false)
+			return Promise.reject(new Error("claude_workspace_mismatch"));
 		const parent = lstatSync(dirname(socketPath));
 		const socket = lstatSync(socketPath);
 		const uid = process.getuid?.();
@@ -63,6 +66,7 @@ export function claudeRunnerClient(socketPath: string, workspace: string) {
 				supervised?: boolean;
 			} | null;
 			const matches = health?.workspace === realpathSync(workspace);
+			matchedWorkspace = matches;
 			available = matches && health?.ready === true;
 			supervised = matches && health?.supervised === true;
 		} catch {

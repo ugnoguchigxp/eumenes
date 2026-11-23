@@ -96,6 +96,8 @@ export type ArtifactEvent = {
 		| "ui-workflow-schedule"
 		| "ui-workflow-cancel"
 		| "ui-workflow-reconcile"
+		| "ui-retry-save"
+		| "ui-reopen-save"
 		| "ui-workflow-stop"
 		| "ui-storage-record"
 		| "ui-storage-page"

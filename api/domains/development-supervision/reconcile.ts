@@ -7,9 +7,14 @@ import { startStop } from "./controls";
 import { enqueue } from "./jobs";
 import { inspectDesign, observeResearch, planningHeld } from "./planning";
 import { syncQuestions } from "./questions";
-import { eraseChildRecords, saveParent, touchBoard } from "./repository";
+import {
+	eraseChildRecords,
+	grantsOf,
+	saveParent,
+	touchBoard,
+} from "./repository";
 import type { Parent } from "./state";
-import { executionView, finishTask, result, rows } from "./views";
+import { executionView, finishTask, goalReceipt, result, rows } from "./views";
 import { hasOldWork, inspectTask, workHold } from "./work";
 
 export type Schedule = (
@@ -77,6 +82,7 @@ export function saveWork(
 		prior.phase !== parent.phase ||
 		prior.reason !== parent.reason ||
 		hash(prior.question) !== hash(parent.question) ||
+		prior.goalQuestionReleased !== parent.goalQuestionReleased ||
 		hash(prior.result) !== hash(parent.result) ||
 		prior.designs.length !== parent.designs.length ||
 		hash(parent.designUris) !== hash(prior.designUris) ||
@@ -86,7 +92,7 @@ export function saveWork(
 		parent.observedAt = now;
 		if (changed || parent.tasks.length > 0) touchBoard(db);
 	}
-	if (!parent.forgotten) {
+	if (!parent.forgotten && parent.source.origin !== "goal") {
 		if (parent.questionOp && parent.questionOp !== prior.questionOp)
 			markNotice(parent, parent.questionOp, "question");
 		if (parent.result && !prior.result) {
@@ -113,8 +119,22 @@ export function saveWork(
 		)
 			markNotice(parent);
 	}
-	saveParent(db, parent, parent.phase !== "finished" || needsNotice(parent));
-	if (visible && !parent.forgotten)
+	saveParent(
+		db,
+		parent,
+		parent.phase !== "finished" ||
+			(parent.forgotten && parent.stop !== null) ||
+			needsNotice(parent),
+	);
+	if (!visible) return;
+	if (parent.source.origin === "goal") {
+		if (!parent.forgotten || parent.phase === "finished")
+			host?.goal?.observeInTransaction?.(
+				db,
+				parent.source,
+				goalReceipt(parent),
+			);
+	} else if (!parent.forgotten)
 		host?.ledgerInTransaction?.(db, executionView(parent));
 }
 function isOpen(queue: QueueService, db: Database, id: string | null) {
@@ -190,7 +210,7 @@ export function reconcileInTransaction(
 				parent,
 				(id) => cancelJob(db, id),
 				"interrupted",
-				parent.deadline > now(),
+				parent.source.origin !== "goal" && parent.deadline > now(),
 			);
 		if (parent.stop) {
 			if (!hasOldWork(currentHost, db, parent)) {
@@ -211,6 +231,14 @@ export function reconcileInTransaction(
 				);
 				parent.phase = "finished";
 				if (parent.forgotten) {
+					for (const grant of grantsOf(db, parent.id)) {
+						if (grant.kind === "claude" && grant.workId)
+							currentHost.child.forgetInTransaction?.(
+								db,
+								grant.source,
+								grant.workId,
+							);
+					}
 					eraseChildRecords(db, parent.id);
 					erase(parent);
 				}
@@ -270,7 +298,7 @@ export function reconcileInTransaction(
 		}
 	}
 	if (hash(parent) !== hash(prior)) save(db, parent, prior);
-	if (!parent.forgotten) {
+	if (!parent.forgotten && parent.source.origin !== "goal") {
 		let updated = false;
 		for (const notice of parent.notices) {
 			if (
@@ -307,7 +335,11 @@ export function reconcileInTransaction(
 	}
 }
 function erase(parent: Parent) {
-	parent.source = { ...parent.source, request: "", digest: "" };
+	parent.stop = null;
+	parent.source =
+		parent.source.origin === "goal"
+			? { ...parent.source, request: "", expectedObservation: "", digest: "" }
+			: { ...parent.source, request: "", digest: "" };
 	delete parent.confirmation;
 	parent.request = "";
 	parent.reason = "";

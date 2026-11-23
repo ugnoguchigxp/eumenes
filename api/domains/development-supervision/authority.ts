@@ -19,6 +19,7 @@ function confirmationCurrent(
 ) {
 	const saved = parent.confirmation;
 	if (!saved) return true;
+	if (parent.source.origin === "goal") return false;
 	const proof = host.confirmedRequestInTransaction?.(
 		db,
 		parent.source,
@@ -33,12 +34,17 @@ export function sourceCurrent(
 	db: Database,
 	parent: Parent,
 ) {
+	const original = parent.source;
+	if (original.origin === "goal")
+		return (
+			!parent.forgotten && !!host.goal?.authorityInTransaction(db, original)
+		);
 	return (
 		!parent.forgotten &&
-		host.validSourceInTransaction(db, parent.source) &&
+		host.validSourceInTransaction(db, original) &&
 		confirmationCurrent(host, db, parent) &&
 		parent.references.every((ref) =>
-			host.validReferenceInTransaction(db, parent.source, ref),
+			host.validReferenceInTransaction(db, original, ref),
 		) &&
 		parent.controls.every(
 			({ source }) =>
@@ -46,9 +52,9 @@ export function sourceCurrent(
 				hash(
 					host.controlSourceInTransaction(
 						db,
-						parent.source.conversationId,
+						original.conversationId,
 						source.messageId,
-						parent.source,
+						original,
 					),
 				) === hash(source),
 		)
@@ -64,9 +70,18 @@ export function bindingCurrent(
 	return (
 		sourceCurrent(host, db, parent) &&
 		binding.generation === parent.generation &&
-		binding.evidence.every((evidence) =>
-			host.research.validEvidenceInTransaction(db, parent.source, evidence),
-		)
+		(parent.source.origin === "goal"
+			? binding.goal?.goalId === parent.source.goalId &&
+				binding.goal.goalRevision === parent.source.goalRevision
+			: binding.evidence.every(
+					(evidence) =>
+						parent.source.origin !== "goal" &&
+						host.research.validEvidenceInTransaction(
+							db,
+							parent.source,
+							evidence,
+						),
+				))
 	);
 }
 
@@ -116,7 +131,9 @@ export function issueGrant(
 		...authority,
 		source: {
 			origin: "supervised",
-			conversationId: parent.source.conversationId,
+			...(parent.source.origin === "goal"
+				? { conversationId: null, goal: goalIdentityOf(parent.source) }
+				: { conversationId: parent.source.conversationId }),
 			messageId: null,
 			runId: parent.source.runId,
 			request,
@@ -138,6 +155,29 @@ export function issueGrant(
 	// This must already exist when the child owner validates its direct start entry in the same writer.
 	saveGrant(db, grant);
 	return grant;
+}
+
+export function goalIdentityOf(
+	source: import("../tool-runtime").GoalExecutionSource,
+) {
+	const {
+		principal,
+		scopeKey,
+		goalId,
+		goalRevision,
+		attemptId,
+		permitId,
+		permitRevision,
+	} = source;
+	return {
+		principal,
+		scopeKey,
+		goalId,
+		goalRevision,
+		attemptId,
+		permitId,
+		permitRevision,
+	};
 }
 
 export function linkedGrant(
@@ -187,11 +227,24 @@ export function liveGrant(
 	if (
 		!task ||
 		task.generation !== delegation.taskGeneration ||
-		task.grantRef !== delegation.grantRef ||
-		!grant.design ||
-		task.designRevision !== grant.design.revision
+		task.grantRef !== delegation.grantRef
 	)
 		return false;
+	if (!grant.design) {
+		return (
+			!!parent.goalScope &&
+			grant.scope.mode !== "edit" &&
+			host.workspace.authorizeInTransaction(db, {
+				source: parent.source,
+				parentRequest: parent.request,
+				ceiling: parent.goalScope.mode,
+				scope: grant.scope,
+				authorityQuote: "",
+				design: null,
+			})
+		);
+	}
+	if (task.designRevision !== grant.design.revision) return false;
 	const design = designFor(host, db, parent, task.designRevision);
 	const ceiling = task.ceiling ?? parent.ceiling;
 	return (
@@ -235,6 +288,12 @@ export function authorize(
 			? grant
 			: null;
 	if (!liveGrant(host, db, grant, parent, now)) return null;
+	if (
+		(input.action === "start" || input.action === "continue") &&
+		parent.source.origin === "goal" &&
+		host.goal?.authorityInTransaction(db, parent.source)?.parked
+	)
+		return null;
 	if (input.action === "start")
 		return input.operationId === grant.operationId &&
 			(!grant.workId ||
@@ -277,7 +336,10 @@ export function parentSource(
 ): ExecutionSource | null {
 	const grant = linkedGrant(db, source);
 	const parent = grant && parentOf(db, grant.source.delegation.parentWorkId);
-	return grant && parent && liveGrant(host, db, grant, parent, now)
+	return grant &&
+		parent &&
+		parent.source.origin !== "goal" &&
+		liveGrant(host, db, grant, parent, now)
 		? parent.source
 		: null;
 }
@@ -292,6 +354,7 @@ export function childObservation(
 	return found &&
 		found.view.id === grant.workId &&
 		found.view.conversationId === grant.source.conversationId &&
+		hash(found.view.goal ?? null) === hash(grant.source.goal ?? null) &&
 		found.view.deadline <= grant.scope.deadline
 		? found
 		: null;

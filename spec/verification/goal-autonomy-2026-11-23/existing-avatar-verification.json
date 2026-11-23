@@ -1,0 +1,45 @@
+{
+  "observedAt": "2026-11-23T22:40:09+09:00",
+  "status": "partial-verification-passed",
+  "method": "existing runGoalCheck / createCheckSandbox",
+  "workspace": "/Users/y.noguchi/Code/eumenes",
+  "check": {
+    "ref": "avatar-background-behavior",
+    "description": "既存のLive2D背景色の選択・保存・復元・表示範囲をunit/component試験で検査する。実機器・実画面の検査ではない。",
+    "command": "/Users/y.noguchi/.local/share/mise/installs/node/24.11.1/bin/node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "--configLoader",
+      "runner",
+      "--no-cache",
+      "web/src/domains/avatar/test/background.test.ts",
+      "web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx"
+    ],
+    "cwd": ".",
+    "acceptance": true
+  },
+  "result": {
+    "exitCode": 0,
+    "testsPassed": 24,
+    "testFilesPassed": 2,
+    "stdout": "\n RUN  v4.1.8 /Users/y.noguchi/Code/eumenes\n\n ✓ web/src/domains/avatar/test/background.test.ts (17 tests) 4ms\n ✓ web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx (7 tests) 165ms\n\n Test Files  2 passed (2)\n      Tests  24 passed (24)\n   Start at  22:40:09\n   Duration  1.15s (transform 59ms, setup 32ms, import 188ms, tests 169ms, environment 1.44s)\n\n",
+    "stderr": ""
+  },
+  "constraints": {
+    "productDatabaseReadOrWritten": false,
+    "productionConfigOrPermissionsChanged": false,
+    "serverStartedStoppedOrRestarted": false,
+    "sandboxNetworkAllowed": false,
+    "sandboxWorkspaceWritesAllowed": false
+  },
+  "limitations": [
+    "unit/component の描画モデルは固定fixture。実画面・実機器の受入ではない。",
+    "本家ソースの既存機能を検査した。登録済みGoalによる参照・判断・実行・完了の受入ではない。",
+    "workspace-proposal.json はレビュー用。稼働設定とGoalの許可には未反映。"
+  ],
+  "unsuccessfulProbe": {
+    "cause": "Vitest既定config loaderがnode_modules/.vite-tempへ書き込もうとしてsandboxに拒否された。",
+    "correction": "sandboxは維持し、configLoader=runner と no-cache を指定した。"
+  }
+}

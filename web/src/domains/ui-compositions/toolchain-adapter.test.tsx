@@ -8,7 +8,10 @@ import {
 	SpecialistBridgeContext,
 	type SpecialistBridge,
 } from "../toolchain-artifacts/specialist-bridge";
-import { uiCompositionsWebAdapter } from "./toolchain-adapter";
+import {
+	appDevelopmentWebAdapter,
+	uiCompositionsWebAdapter,
+} from "./toolchain-adapter";
 
 afterEach(() => {
 	cleanup();
@@ -84,6 +87,7 @@ const bridgeOf = (over: Partial<SpecialistBridge> = {}) => {
 };
 
 function setup(options: {
+	appDevelopment?: boolean;
 	studio?: unknown | (() => unknown);
 	form?: { revision: number; data: unknown };
 	targetRef?: string;
@@ -117,7 +121,10 @@ function setup(options: {
 		setTargetRef,
 		visible: options.visible ?? true,
 	} as unknown as AdapterHostContext;
-	const hook = renderHook(() => uiCompositionsWebAdapter.useArtifact(context), {
+	const adapter = options.appDevelopment
+		? appDevelopmentWebAdapter
+		: uiCompositionsWebAdapter;
+	const hook = renderHook(() => adapter.useArtifact(context), {
 		wrapper: ({ children }: PropsWithChildren) => (
 			<QueryClientProvider client={cache}>
 				<SpecialistBridgeContext.Provider value={options.bridge ?? null}>
@@ -130,6 +137,58 @@ function setup(options: {
 }
 const event = (values: Record<string, string> = {}) => ({ values }) as never;
 const binding = (eventAction: string) => ({ eventAction }) as never;
+
+test("the app source preserves retry approval and the conditions and provenance of displayed data", async () => {
+	const retrySave = {
+		appId: "app",
+		operationId: "save",
+		stateRevision: 2,
+		digest: "a".repeat(64),
+	};
+	const dataContext = {
+		inputs: { date: "2026-11-23" },
+		observedAt: "2026-11-23T00:00:00Z",
+		provenance: {
+			coverage: "partial",
+			evidence: [
+				{
+					pointer: "/rows/0",
+					sources: [
+						{
+							url: "https://example.com/page",
+							fetchedAt: "2026-11-23T00:00:00Z",
+						},
+					],
+				},
+			],
+		},
+	};
+	const h = setup({
+		appDevelopment: true,
+		studio: studioData({
+			work: work({
+				storageState: "initializing",
+				storageError: "app_storage_setup_failed",
+				retrySave,
+				reopenSave: retrySave,
+				storageReopening: true,
+			}),
+			viewing: {
+				id: "app",
+				title: "一覧",
+				definition: { view: "table", columns: [], rows: [] },
+				savedRevision: 1,
+				dataContext,
+			},
+		}),
+	});
+	await waitFor(() => expect(h.hook.result.current.phase.kind).toBe("ready"));
+	expect(h.hook.result.current.snapshot["ui-studio"]).toMatchObject({
+		work: { retrySave, reopenSave: retrySave, storageReopening: true },
+		viewing: { dataContext },
+	});
+	h.cache.clear();
+});
 
 test("the studio source becomes the ui-studio resource with the session's state", async () => {
 	const bridge = bridgeOf({
@@ -198,6 +257,42 @@ test("a refused source apply names the code and the detail; other codes keep the
 	expect(describeRejection?.("generation_in_progress", [])).toContain("制作中");
 	expect(describeRejection?.("revision_conflict", [])).toBeUndefined();
 	expect(describeRejection?.(undefined, [])).toBeUndefined();
+	h.cache.clear();
+});
+
+test("reopening the displayed work returns to its draft without switching to another work", async () => {
+	const ticket = {
+		appId: "app",
+		operationId: "save",
+		stateRevision: 2,
+		digest: "a".repeat(64),
+	};
+	const h = setup({
+		appDevelopment: true,
+		targetRef: "app",
+		studio: studioData({ work: work({ reopenSave: ticket }) }),
+	});
+	await waitFor(() => expect(h.hook.result.current.phase.kind).toBe("ready"));
+	const result = (id: string) =>
+		({ resultRefs: [{ owner: "app-development", id }] }) as never;
+	await act(async () => {
+		await h.hook.result.current.settled(
+			binding("ui-reopen-save"),
+			result("another"),
+			{} as never,
+			{},
+		);
+	});
+	expect(h.setTargetRef).not.toHaveBeenCalled();
+	await act(async () => {
+		await h.hook.result.current.settled(
+			binding("ui-reopen-save"),
+			result("app"),
+			{} as never,
+			{},
+		);
+	});
+	expect(h.setTargetRef).toHaveBeenCalledWith(undefined);
 	h.cache.clear();
 });
 

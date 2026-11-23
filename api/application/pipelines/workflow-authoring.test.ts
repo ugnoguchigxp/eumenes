@@ -136,7 +136,9 @@ test("a confirmed screen, generated type and workflow definition commit or roll 
 						{
 							view: "form",
 							title: "Query",
-							fields: [{ id: "query", label: "Date", type: "text" }],
+							fields: [
+								{ id: "query", label: "Date", type: "text", required: true },
+							],
 						},
 						{
 							view: "data-table",

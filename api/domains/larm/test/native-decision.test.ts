@@ -73,3 +73,25 @@ test("a call's reasoning becomes the chat template's thinking switch and the rea
 		chatRequest(provider, [{ role: "user", content: "fixture" }], true),
 	).toEqual(absent);
 });
+
+test("ordinary collaboration JSON retains thinking and its requested combined output allowance", () => {
+	const body = chatRequest(
+		{
+			model: "fixture",
+			contextWindow: {
+				outputReserveTokens: 65536,
+				outputLimit: "remaining-context",
+			},
+		},
+		[{ role: "user", content: "fixture" }],
+		true,
+		{ jsonOutput: true, reasoning: "low", maxOutputTokens: 16144 },
+	);
+	expect(body).toMatchObject({
+		response_format: { type: "json_object" },
+		chat_template_kwargs: { enable_thinking: true },
+		reasoning_effort: "low",
+		max_tokens: 16144,
+	});
+	expect(body).not.toHaveProperty("tools");
+});

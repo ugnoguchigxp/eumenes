@@ -21,6 +21,11 @@ export type PendingSave = {
 	digest: string;
 	plan: StoragePlan;
 };
+export const storageRecoveryMigration: Migration = {
+	id: "app-development/0005-save-recovery",
+	after: ["app-development/0004-request-context"],
+	sql: "ALTER TABLE app_development_storage ADD COLUMN prepared_plan_json TEXT; ALTER TABLE app_development_storage ADD COLUMN reopen_requested INTEGER NOT NULL DEFAULT 0;",
+};
 type Entry = {
 	appId: string;
 	storageId: string | null;
@@ -30,9 +35,12 @@ type Entry = {
 	jobId: string | null;
 	saveJson: string | null;
 	errorCode: string | null;
+	stateRevision: number;
+	preparedPlanJson: string | null;
+	reopening: number;
 };
 const columns = `app_id AS appId, storage_id AS storageId, storage_revision AS storageRevision,
-state, operation_id AS operationId, job_id AS jobId, save_json AS saveJson, error_code AS errorCode`;
+state, operation_id AS operationId, job_id AS jobId, save_json AS saveJson, error_code AS errorCode, state_revision AS stateRevision, prepared_plan_json AS preparedPlanJson, reopen_requested AS reopening`;
 
 export function createStorageLifecycle(scope: string) {
 	const get = (db: Database, id: string) =>
@@ -66,9 +74,9 @@ export function createStorageLifecycle(scope: string) {
 				throw new Error("app_operation_pending");
 			const storageId = prior?.storageId ?? (save ? crypto.randomUUID() : null);
 			db.run(
-				`INSERT INTO app_development_storage VALUES(?,?,?,?,?,?,?,?,NULL)
+				`INSERT INTO app_development_storage(scope,app_id,storage_id,storage_revision,state,operation_id,job_id,save_json,error_code,state_revision) VALUES(?,?,?,?,?,?,?,?,NULL,1)
 ON CONFLICT(scope,app_id) DO UPDATE SET storage_id=excluded.storage_id,state=excluded.state,
-operation_id=excluded.operation_id,job_id=excluded.job_id,save_json=excluded.save_json,error_code=NULL`,
+operation_id=excluded.operation_id,job_id=excluded.job_id,save_json=excluded.save_json,error_code=NULL,reopen_requested=0,state_revision=app_development_storage.state_revision+1`,
 				[
 					scope,
 					id,
@@ -81,22 +89,51 @@ operation_id=excluded.operation_id,job_id=excluded.job_id,save_json=excluded.sav
 				],
 			);
 		},
-		resume(db: Database, entry: Entry, jobId: string) {
-			db.run(
-				"UPDATE app_development_storage SET job_id=?,error_code=NULL WHERE scope=? AND app_id=? AND operation_id=?",
-				[jobId, scope, entry.appId, entry.operationId],
+		resume(db: Database, entry: Entry, jobId: string, reopening = false) {
+			const result = db.run(
+				"UPDATE app_development_storage SET job_id=?,error_code=NULL,reopen_requested=?,state_revision=state_revision+1 WHERE scope=? AND app_id=? AND operation_id=? AND state_revision=?",
+				[
+					jobId,
+					reopening ? 1 : 0,
+					scope,
+					entry.appId,
+					entry.operationId,
+					entry.stateRevision,
+				],
 			);
+			if (result.changes !== 1) throw new Error("app_operation_changed");
 		},
 		error(db: Database, entry: Entry, code: string) {
 			db.run(
-				"UPDATE app_development_storage SET error_code=? WHERE scope=? AND app_id=? AND job_id=?",
+				"UPDATE app_development_storage SET error_code=?,state_revision=state_revision+1 WHERE scope=? AND app_id=? AND job_id=?",
 				[code, scope, entry.appId, entry.jobId],
 			);
+		},
+		reopen(
+			db: Database,
+			entry: Entry,
+			revision: number,
+			keepStorage: boolean,
+			preparedPlan: StoragePlan | null,
+		) {
+			const result = db.run(
+				"UPDATE app_development_storage SET state='active',storage_id=?,storage_revision=?,prepared_plan_json=?,operation_id=NULL,job_id=NULL,save_json=NULL,error_code=NULL,reopen_requested=0,state_revision=state_revision+1 WHERE scope=? AND app_id=? AND state='initializing' AND job_id=? AND operation_id=?",
+				[
+					keepStorage ? entry.storageId : null,
+					revision,
+					preparedPlan ? JSON.stringify(preparedPlan) : null,
+					scope,
+					entry.appId,
+					entry.jobId,
+					entry.operationId,
+				],
+			);
+			if (result.changes !== 1) throw new Error("app_operation_changed");
 		},
 		complete(db: Database, entry: Entry) {
 			const saving = entry.state === "initializing";
 			const result = db.run(
-				`UPDATE app_development_storage SET state=?,storage_revision=?,job_id=NULL,save_json=NULL,error_code=NULL
+				`UPDATE app_development_storage SET state=?,storage_revision=?,job_id=NULL,save_json=NULL,error_code=NULL,prepared_plan_json=NULL,reopen_requested=0,state_revision=state_revision+1
 WHERE scope=? AND app_id=? AND job_id=? AND state=?`,
 				[
 					saving ? "active" : "deleted",

@@ -80,6 +80,29 @@
 		},
 		{
 			"kind": "toolchain",
+			"id": "claude-code.supervised",
+			"revision": 1,
+			"title": "開発監督配下の Claude Code",
+			"summary": "開発監督が発行した子許可で、登録済みの作業先の開発作業を行う",
+			"aliases": [],
+			"tags": [],
+			"useWhen": ["開発監督が作業範囲と子許可を確認した仕事を受け付ける"],
+			"examples": [
+				"許可されたファイルを読む",
+				"登録済みの検査を実行する",
+				"指定された変更範囲で修正を行う"
+			],
+			"avoidWhen": [],
+			"dependencies": ["package:claude-code.managed@1"],
+			"packageRevisionId": "package:claude-code.managed@1",
+			"functionName": "claude_code_supervised",
+			"redirects": [],
+			"bindingRevisionId": "binding:claude-code.managed@1",
+			"minImpact": "modify_existing",
+			"selectable": false
+		},
+		{
+			"kind": "toolchain",
 			"id": "claude-code.request",
 			"revision": 7,
 			"publishFromRevision": 5,

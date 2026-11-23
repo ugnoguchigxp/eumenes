@@ -31,9 +31,18 @@ export type AppStorageView = {
 	hasMore: boolean;
 	error?: string;
 };
+type SaveTicket = {
+	appId: string;
+	operationId: string;
+	stateRevision: number;
+	digest: string;
+};
 type StorageLifecycle = {
 	storageState?: string | null;
 	storageError?: string | null;
+	retrySave?: SaveTicket;
+	reopenSave?: SaveTicket;
+	storageReopening?: boolean;
 };
 type UiStudioWork = StorageLifecycle & {
 	workRef: string;
@@ -83,6 +92,17 @@ type UiStudioViewing = StorageLifecycle & {
 	workflow?: { trigger?: string; publish?: { schemaRef?: string } } | null;
 	status?: AppWorkflowStatus;
 	data?: unknown;
+	dataContext?: {
+		inputs: Record<string, unknown>;
+		observedAt?: string;
+		provenance?: {
+			coverage: string;
+			evidence: Array<{
+				pointer: string;
+				sources: Array<{ url: string; fetchedAt: string }>;
+			}>;
+		};
+	} | null;
 	hasStorage?: boolean;
 	storage?: AppStorageView | null;
 	deleteDigest?: string;

@@ -7,7 +7,7 @@ import type { QueueService } from "../queue";
 import {
 	isStandardExecutionSource,
 	isSupervisedExecutionSource,
-	type SupervisedExecutionSource,
+	type OwnedSupervisedExecutionSource,
 } from "../tool-runtime";
 import { type Host, type Runner, type Work } from "./contracts";
 import { DECISION_JOB, registerDecisionJobs } from "./jobs";
@@ -21,6 +21,8 @@ import {
 	newId,
 	requestStop,
 	view,
+	supervisedView,
+	workWorkspace,
 } from "./lifecycle";
 import { pending, read, save, terminal } from "./repository";
 
@@ -41,8 +43,34 @@ type Deps = {
 	capabilities: Capabilities;
 	inference: InferencePort;
 	runner?: Runner;
+	goalRunners?: ReadonlyMap<string, Runner>;
 	now?: () => number;
 };
+
+const capableRunner = (client: Runner | undefined) =>
+	!!client?.ready() &&
+	!!client.supportsSupervised?.() &&
+	!!client.present &&
+	!!client.recover &&
+	!!client.approveTool;
+
+const canSchedule = (work: Work) =>
+	!terminal(work) &&
+	!work.decisionId &&
+	!work.effect &&
+	!work.question &&
+	work.supervision?.blocked !== "verification_isolation_unavailable" &&
+	work.supervision?.blocked !== "workspace_inputs_changed";
+const isNewProgress = (
+	work: Work,
+	at: number,
+): work is Work & { observation: NonNullable<Work["observation"]> } =>
+	work.status === "waiting_child" &&
+	Boolean(work.observation?.evidence?.length) &&
+	work.observation!.seq > work.progressSeq &&
+	at - work.progressAt >= 60_000 &&
+	work.progressCalls < 6 &&
+	work.maxCalls - work.calls > 4;
 
 export function createClaudeCode({
 	store,
@@ -50,6 +78,7 @@ export function createClaudeCode({
 	capabilities,
 	inference,
 	runner,
+	goalRunners,
 	now = Date.now,
 }: Deps) {
 	let host: Host | undefined;
@@ -66,13 +95,31 @@ export function createClaudeCode({
 		!!inference.executeControl &&
 		!!inference.acceptInTransaction;
 	const available = () => configured() && !!runner?.ready();
-	const supervisedAvailable = () =>
+	const runnerFor = ({
+		source,
+		supervision,
+	}: Pick<Work, "source" | "supervision">) =>
+		isSupervisedExecutionSource(source) && source.goal
+			? goalRunners?.get(supervision?.authorization.workspaceRef ?? "")
+			: runner;
+	const runners = [
+		...new Set(
+			[runner, ...(goalRunners?.values() ?? [])].filter(
+				(item): item is Runner => !!item,
+			),
+		),
+	];
+	const availabilityListeners = new Set<() => void>();
+	const readiness = () =>
+		runners.map((runner) => capableRunner(runner)).join(",");
+	const supervisedAvailable = (forGoal = false, workspaceRef?: string) =>
 		configured() &&
 		!!host?.supervised &&
-		!!runner?.supportsSupervised?.() &&
-		!!runner.present &&
-		!!runner.recover &&
-		!!runner.approveTool;
+		(forGoal
+			? workspaceRef === undefined
+				? [...(goalRunners?.values() ?? [])].some(capableRunner)
+				: capableRunner(goalRunners?.get(workspaceRef))
+			: capableRunner(runner));
 	function cancel(
 		db: Database,
 		work: Work,
@@ -99,16 +146,7 @@ export function createClaudeCode({
 	});
 
 	function schedule(db: Database, work: Work) {
-		if (
-			!host ||
-			terminal(work) ||
-			work.decisionId ||
-			work.effect ||
-			work.supervision?.blocked === "verification_isolation_unavailable" ||
-			work.supervision?.blocked === "workspace_inputs_changed" ||
-			work.question
-		)
-			return;
+		if (!host || !canSchedule(work)) return;
 		if (work.pendingRunnerQuestion) {
 			if (work.calls >= work.maxCalls) escalatePendingQuestion(work);
 			else {
@@ -119,21 +157,14 @@ export function createClaudeCode({
 			return;
 		}
 		if (work.executionId) {
-			if (
-				work.status !== "waiting_child" ||
-				!work.observation?.evidence?.length ||
-				work.observation.seq <= work.progressSeq ||
-				now() - work.progressAt < 60_000 ||
-				work.progressCalls >= 6 ||
-				work.maxCalls - work.calls <= 4
-			)
-				return;
+			if (!isNewProgress(work, now())) return;
 			work.progressSeq = work.observation.seq;
 			work.progressAt = now();
 			queueDecision(db, work, "progress");
 		} else {
 			if (!work.holdsWorkspace) {
-				const reservation = host.workspace.hold(
+				const workspace = workWorkspace(host, work);
+				const reservation = workspace.hold(
 					db,
 					work.id,
 					work.supervision?.authorization,
@@ -142,9 +173,9 @@ export function createClaudeCode({
 					!reservation ||
 					(work.supervision && typeof reservation !== "object")
 				) {
-					if (reservation) host.workspace.release(db, work.id, true);
+					if (reservation) workspace.release(db, work.id, true);
 					if (work.supervision) {
-						const blocker = host.workspace.blocker?.(db, work.id);
+						const blocker = workspace.blocker?.(db, work.id);
 						const summary =
 							blocker?.state === "unknown"
 								? "他タスクの停止未確認のため起動を保留しています。"
@@ -192,9 +223,12 @@ export function createClaudeCode({
 	async function maintain() {
 		const currentHost = host;
 		if (!currentHost || closed) return;
-		if (runner?.probe && now() >= nextProbe) {
+		if (runners.length && now() >= nextProbe) {
 			nextProbe = now() + 5_000;
-			await runner.probe();
+			const previous = readiness();
+			await Promise.all(runners.map((client) => client.probe?.()));
+			if (readiness() !== previous)
+				for (const listener of availabilityListeners) listener();
 		}
 		if (abortJobs.size) {
 			queue.flushCancellations([...abortJobs]);
@@ -205,8 +239,10 @@ export function createClaudeCode({
 		if (checkRecovery) nextRecoveryCheck = now() + 5_000;
 		const rows = await store.write((db) => {
 			const external: Work[] = [];
-			const unconfirmed: { source: SupervisedExecutionSource; id: string }[] =
-				[];
+			const unconfirmed: {
+				source: OwnedSupervisedExecutionSource;
+				id: string;
+			}[] = [];
 			for (const work of pending(db)) {
 				enforceDeadlines(db, currentHost, work, now(), cancel);
 				deliverNotice(db, currentHost, work, now());
@@ -230,10 +266,11 @@ export function createClaudeCode({
 			queue.flushCancellations([...abortJobs]);
 			abortJobs.clear();
 		}
-		if (!runner) return;
 		await Promise.all(
-			rows.external.map((work) =>
-				drive(
+			rows.external.map((work) => {
+				const client = runnerFor(work);
+				if (!client) return;
+				return drive(
 					{
 						store,
 						now,
@@ -244,17 +281,16 @@ export function createClaudeCode({
 						},
 					},
 					currentHost,
-					runner,
+					client,
 					work,
-				),
+				);
+			}),
+		);
+		await Promise.all(
+			rows.unconfirmed.map(({ id, source }) =>
+				tryRecovery((proof) => recoverSupervised(source, id, proof)),
 			),
 		);
-		if (runner.supportsSupervised?.())
-			await Promise.all(
-				rows.unconfirmed.map(({ id, source }) =>
-					tryRecovery((proof) => recoverSupervised(source, id, proof)),
-				),
-			);
 	}
 
 	function kick() {
@@ -271,16 +307,21 @@ export function createClaudeCode({
 		return maintenance;
 	}
 	async function recoverSupervised(
-		source: SupervisedExecutionSource,
+		source: OwnedSupervisedExecutionSource,
 		id: string,
 		proof: "process_exit" | "host_reboot",
 	) {
 		const currentHost = host;
-		if (!currentHost || !runner) return false;
+		const client = store.read((db) => {
+			if (!supervised.viewInTransaction(db, source, id)) return undefined;
+			const work = read(db, id);
+			return work ? runnerFor(work) : undefined;
+		});
+		if (!currentHost || !client?.supportsSupervised?.()) return false;
 		const recovered = await recover(
 			store,
 			currentHost,
-			runner,
+			client,
 			id,
 			proof,
 			(db) => !!supervised.viewInTransaction(db, source, id),
@@ -295,6 +336,12 @@ export function createClaudeCode({
 	return {
 		task,
 		supervised,
+		onAvailabilityChange(listener: () => void) {
+			availabilityListeners.add(listener);
+			return () => {
+				availabilityListeners.delete(listener);
+			};
+		},
 		availableInTransaction: available,
 		supervisedAvailableInTransaction: supervisedAvailable,
 		configure(value: Host) {
@@ -370,7 +417,7 @@ function deliverNotice(
 			? currentHost.supervised?.observeInTransaction(
 					db,
 					work.source,
-					view(work),
+					supervisedView(work),
 					work.notice,
 				)
 			: isStandardExecutionSource(work.source) &&

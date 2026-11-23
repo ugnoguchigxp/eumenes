@@ -26,7 +26,7 @@ export type AdapterOrigin =
 			conversationId: string;
 			messageId: string;
 	  }
-	| { kind: "ui"; scope: string; actionRequestId: string }
+	| { kind: "ui"; scope: string; actionRequestId: string; targetRef?: string }
 	/**
 	 * A specialist-session turn (spec toolchain-specialist-dialogue 2026-10-17 §4). The host fixes
 	 * the work; the adapter accepts the operation only while `runId` holds that work's turn.

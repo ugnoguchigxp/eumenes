@@ -35,3 +35,4 @@ export {
 	claudeRunnerClient,
 	claudeDaemonClient,
 } from "../../../packages/coding-runner/src/client";
+export { createCheckSandbox } from "../../../packages/coding-runner/src/client";

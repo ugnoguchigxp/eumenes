@@ -4,7 +4,7 @@ import { z } from "zod";
 import { claudeAuthorization, codingCanonicalJSON } from "../coding";
 import {
 	isSupervisedExecutionSource,
-	type SupervisedExecutionSource,
+	type OwnedSupervisedExecutionSource,
 } from "../tool-runtime";
 import {
 	questionAnswer,
@@ -16,7 +16,13 @@ import {
 	type SupervisedAnswer,
 	type SupervisedView,
 } from "./contracts";
-import { closeQuestion, supervisedAuthority, view } from "./lifecycle";
+import {
+	closeQuestion,
+	finish,
+	workWorkspace,
+	supervisedAuthority,
+	supervisedView,
+} from "./lifecycle";
 import { operation, read, recordOperation, save, terminal } from "./repository";
 
 const operationId = z.uuid();
@@ -29,7 +35,7 @@ export function createSupervisedTaskPort({
 	start,
 }: {
 	getHost(): Host | undefined;
-	available(): boolean;
+	available(goal: boolean, workspaceRef?: string): boolean;
 	now(): number;
 	cancel(db: Database, work: Work, reason: "cancel", operationId: string): void;
 	start(
@@ -40,11 +46,38 @@ export function createSupervisedTaskPort({
 	): Work;
 }) {
 	const supervised = {
+		forgetInTransaction(
+			db: Database,
+			source: OwnedSupervisedExecutionSource,
+			id: string,
+		) {
+			const host = getHost();
+			const work = getChild(db, source, id);
+			if (
+				!host ||
+				!work ||
+				work.forgotten ||
+				work.holdsWorkspace ||
+				work.stop === "unconfirmed"
+			)
+				return;
+			work.forgotten = true;
+			work.source = { ...source, request: "", digest: "" };
+			work.request = "";
+			work.memo = "";
+			work.references = [];
+			work.answers = [];
+			work.amendments = [];
+			work.observation = null;
+			work.supervision = undefined;
+			finish(db, host, work, "cancelled", "");
+			work.result = null;
+			save(db, work, now());
+		},
 		startInTransaction(db: Database, input: SupervisedStart) {
 			const host = getHost();
 			if (
 				!host ||
-				!available() ||
 				!isSupervisedExecutionSource(input.source) ||
 				!input.operationId ||
 				input.request !== input.source.request
@@ -62,12 +95,16 @@ export function createSupervisedTaskPort({
 					bindingRevisionId: input.bindingRevisionId,
 				}),
 			);
-			if (!approval.success || approval.data.deadline <= now())
+			if (
+				!approval.success ||
+				approval.data.deadline <= now() ||
+				!available(!!input.source.goal, approval.data.workspaceRef)
+			)
 				throw new Error("claude_source_invalid");
 			if (prior) {
 				const work = getChild(db, input.source, prior.workId);
 				if (!work) throw new Error("claude_work_not_found");
-				return view(work);
+				return supervisedView(work);
 			}
 			const work = start(db, input, host, approval.data);
 			recordOperation(
@@ -76,11 +113,11 @@ export function createSupervisedTaskPort({
 				work.id,
 				fingerprint(["start", input]),
 			);
-			return view(work);
+			return supervisedView(work);
 		},
 		viewInTransaction(
 			db: Database,
-			source: SupervisedExecutionSource,
+			source: OwnedSupervisedExecutionSource,
 			id: string,
 		): SupervisedView | null {
 			const host = getHost();
@@ -90,23 +127,30 @@ export function createSupervisedTaskPort({
 			if (!work?.supervision || !host || !authority) return null;
 			const lease = work.supervision.lease;
 			return {
-				view: view(work),
+				view: supervisedView(work),
 				executionId: work.executionId ?? work.observation?.executionId ?? null,
 				...(work.question
 					? {
 							questionExecutionId: work.questionFromRunner
 								? work.executionId
-								: null,
+								: (work.parkedQuestionExecutionId ?? null),
 						}
 					: {}),
 				// A cached intermediate poll can predate a check that superseded it.
 				evidence: work.observation?.managedExecutionStopped
 					? (work.observation.structuredEvidence ?? [])
 					: (work.supervision.evidence ?? []),
+				...(source.goal
+					? {
+							diagnosticChecks: (work.supervision.evidence ?? []).filter(
+								({ kind, passed }) => kind === "check" && passed === false,
+							),
+						}
+					: {}),
 				releaseConfirmed:
 					!work.holdsWorkspace &&
 					work.stop !== "unconfirmed" &&
-					(!lease || host.workspace.released?.(db, lease) === true),
+					(!lease || workWorkspace(host, work).released?.(db, lease) === true),
 				answerDelivery: work.supervision.answerDelivery,
 				...(work.status === "queued" && work.supervision.blocked
 					? {
@@ -123,12 +167,12 @@ export function createSupervisedTaskPort({
 		},
 		presentInTransaction(
 			db: Database,
-			source: SupervisedExecutionSource,
+			source: OwnedSupervisedExecutionSource,
 			id: string,
 			input: SupervisedPresentation,
 		) {
 			const [, work, replay] = control(db, source, id, "present", input);
-			if (replay) return view(work);
+			if (replay) return supervisedView(work);
 			const question = work.question;
 			const at = now();
 			if (
@@ -155,16 +199,16 @@ export function createSupervisedTaskPort({
 				sent: !work.questionFromRunner,
 			};
 			persistControl(db, work, "present", input, at);
-			return view(work);
+			return supervisedView(work);
 		},
 		answerInTransaction(
 			db: Database,
-			source: SupervisedExecutionSource,
+			source: OwnedSupervisedExecutionSource,
 			id: string,
 			input: SupervisedAnswer,
 		) {
 			const [host, work, replay] = control(db, source, id, "answer", input);
-			if (replay) return view(work);
+			if (replay) return supervisedView(work);
 			const question = work.question;
 			const presented = work.supervision!.presentation;
 			const answer = questionAnswer.safeParse(input.answer);
@@ -195,6 +239,11 @@ export function createSupervisedTaskPort({
 				work.notice = null;
 				work.questionFromRunner = false;
 			} else {
+				if (source.goal && work.parkedQuestionExecutionId)
+					work.maxExecutions = Math.max(
+						work.maxExecutions,
+						work.executions + 1,
+					);
 				work.answers.push({
 					messageId: input.messageId,
 					question: question.prompt,
@@ -204,11 +253,11 @@ export function createSupervisedTaskPort({
 				closeQuestion(db, host, work);
 			}
 			persistControl(db, work, "answer", input, at);
-			return view(work);
+			return supervisedView(work);
 		},
 		cancelInTransaction(
 			db: Database,
-			source: SupervisedExecutionSource,
+			source: OwnedSupervisedExecutionSource,
 			id: string,
 			input: { operationId: string },
 		) {
@@ -222,13 +271,13 @@ export function createSupervisedTaskPort({
 					fingerprint(["cancel", source, id, input]),
 				);
 			}
-			return view(work);
+			return supervisedView(work);
 		},
 	};
 
 	function control(
 		db: Database,
-		source: SupervisedExecutionSource,
+		source: OwnedSupervisedExecutionSource,
 		id: string,
 		action: "present" | "answer" | "cancel",
 		input: {
@@ -285,7 +334,7 @@ function persistControl(
 
 function getChild(
 	db: Database,
-	source: SupervisedExecutionSource,
+	source: OwnedSupervisedExecutionSource,
 	workId: string,
 ) {
 	const work = read(db, workId);

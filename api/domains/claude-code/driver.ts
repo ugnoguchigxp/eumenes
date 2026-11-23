@@ -1,3 +1,4 @@
+import { workWorkspace } from "./lifecycle";
 import type { Database } from "bun:sqlite";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import { codingCanonicalJSON } from "../coding";
@@ -49,8 +50,10 @@ export async function drive(
 		authorityCurrent(currentHost, db, work) &&
 		(!work.supervision ||
 			(!!work.supervision.lease &&
-				currentHost.workspace.current?.(db, work.supervision.lease) ===
-					true)) &&
+				workWorkspace(currentHost, work).current?.(
+					db,
+					work.supervision.lease,
+				) === true)) &&
 		(action === "continue" ||
 			!work.supervision ||
 			authorityCurrent(currentHost, db, work, "inspect"));
@@ -192,7 +195,7 @@ export async function drive(
 			save(db, work, now());
 			return;
 		}
-		if (!acceptObservation(db, currentHost, work, observation)) return;
+		if (!acceptObservation(db, currentHost, work, observation, now())) return;
 		if (
 			work.status !== "waiting_child" &&
 			snapshot.decisionMode === "progress" &&
@@ -215,7 +218,7 @@ export async function recover(
 	owned: (db: Database) => boolean,
 	now: () => number,
 ) {
-	if (!currentHost.workspace.recover || !runner.recover) return false;
+	if (!runner.recover) return false;
 	const snapshot = store.readSnapshot((db) =>
 		owned(db) ? read(db, id) : null,
 	);
@@ -246,7 +249,7 @@ export async function recover(
 		if (work.stop === "confirmed") return true;
 		if (
 			work.stop !== "unconfirmed" ||
-			!currentHost.workspace.recover?.(db, lease)
+			!workWorkspace(currentHost, work).recover?.(db, lease)
 		)
 			return false;
 		work.stop = "confirmed";

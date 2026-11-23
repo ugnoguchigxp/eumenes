@@ -144,7 +144,7 @@ async function infer<T>(input: {
 			sessionRole: "subagent",
 			taskId: parent.id,
 			agentSession: {
-				conversationId: parent.source.conversationId,
+				conversationId: parent.source.conversationId ?? null,
 				agentId: parent.id,
 			},
 			refs: {

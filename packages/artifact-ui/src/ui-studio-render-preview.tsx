@@ -10,6 +10,7 @@ import {
 	savedPreview,
 	trialFormSource,
 	trialPreview,
+	workflowFormValues,
 } from "./ui-studio-preview";
 import {
 	AppStorageRecords,
@@ -159,12 +160,10 @@ export function StudioPreview({
 								appId: app.id,
 								revision: String(app.savedRevision),
 								values: JSON.stringify(
-									Object.fromEntries(
-										Object.entries(event.values).flatMap(([field, value]) =>
-											Object.hasOwn(app.bindings!.inputs, field)
-												? [[app.bindings!.inputs[field], value]]
-												: [],
-										),
+									workflowFormValues(
+										prepared.form,
+										app.bindings.inputs,
+										event.values,
 									),
 								),
 							},
@@ -174,7 +173,7 @@ export function StudioPreview({
 						: runtime.dispatch(event);
 			},
 		}),
-		[runtime, snapshot, app, storage, selected],
+		[runtime, snapshot, app, storage, selected, prepared.form],
 	);
 	const text = useMemo(
 		() => JSON.stringify(prepared.definition),
@@ -186,6 +185,36 @@ export function StudioPreview({
 			: null;
 	return (
 		<div className={`aui-ui-preview-canvas aui-ui-preview-${device}`}>
+			{app?.dataContext && (
+				<section className="aui-ui-notice" aria-label="表示データの条件">
+					<p>
+						表示中:{" "}
+						{Object.values(app.dataContext.inputs).map(String).join(" ・ ")}
+					</p>
+					{app.dataContext.observedAt && (
+						<p>
+							更新完了:{" "}
+							{new Date(app.dataContext.observedAt).toLocaleString("ja-JP")}
+						</p>
+					)}
+					{app.dataContext.provenance?.coverage === "partial" && (
+						<p>確認できた範囲のみ表示しています。</p>
+					)}
+					{[
+						...new Set(
+							app.dataContext.provenance?.evidence.flatMap((item) =>
+								item.sources.map((source) => source.url),
+							) ?? [],
+						),
+					]
+						.slice(0, 20)
+						.map((url) => (
+							<a key={url} href={url} target="_blank" rel="noreferrer">
+								{new URL(url).hostname}
+							</a>
+						))}
+				</section>
+			)}
 			{waitingForm ? (
 				<div className="aui-ui-preview-empty">
 					<output>{waitingForm}</output>

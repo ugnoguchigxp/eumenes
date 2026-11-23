@@ -20,7 +20,12 @@ import {
 import { hasForm } from "./ui-studio-preview";
 import { StudioPreview } from "./ui-studio-render-preview";
 import { StudioSource, type StudioWork } from "./ui-studio-source";
-import { HistoryMenu, StudioNotices } from "./ui-studio-status";
+import {
+	HistoryMenu,
+	StudioNotices,
+	StorageProgress,
+	workflowFailureText,
+} from "./ui-studio-status";
 import "./ui-studio.css";
 
 type Device = "desktop" | "mobile";
@@ -435,15 +440,12 @@ function Studio({
 					viewing={viewing}
 					work={work}
 					pending={storagePending}
+					actionPending={action.pending}
+					send={send}
 				/>
 			)}
 
-			{appDevelopment && editing && work?.issue && (
-				<Feedback message={`確認が必要です（${work.issue}）。`} />
-			)}
-			{appDevelopment && editing && work?.confirmation?.summary != null && (
-				<AppConfirmation summary={work.confirmation.summary} />
-			)}
+			{appDevelopment && editing && <AppDraftConfirmation work={work} />}
 			{appDevelopment && viewing?.workflow && (
 				<AppWorkflowPanel
 					key={viewing.id}
@@ -501,31 +503,22 @@ function Studio({
 	);
 }
 
-function StorageProgress({
-	viewing,
-	work,
-	pending,
-}: Pick<UiStudioResource, "viewing" | "work"> & { pending: boolean }) {
-	if (!viewing && pending)
-		return (
-			<output className="aui-ui-notice">
-				{work?.storageError
-					? `保存先を準備できませんでした（${work.storageError}）。`
-					: "アプリの保存先を準備しています。"}
-			</output>
-		);
-	if (
-		viewing?.storageState !== "deleting" &&
-		viewing?.storageState !== "initializing"
-	)
-		return null;
+function AppDraftConfirmation({ work }: { work: StudioWork | null }) {
+	if (!work) return null;
 	return (
-		<output className="aui-ui-notice">
-			{viewing.storageState === "deleting"
-				? "アプリの削除待ち"
-				: "アプリの保存先を準備しています。"}
-			{viewing.storageError ? `（${viewing.storageError}）` : ""}
-		</output>
+		<>
+			{work.issue && (
+				<Feedback message="この案はまだ確認保存できません。制作担当で設定を修正できます。" />
+			)}
+			{work.confirmation?.summary != null && (
+				<AppConfirmation summary={work.confirmation.summary} />
+			)}
+			{work.confirmation && work.savedRef && (
+				<p className="aui-ui-notice">
+					この版を保存すると、以前の予約と実行を停止します。必要な予約は保存後に設定し直してください。
+				</p>
+			)}
+		</>
 	);
 }
 
@@ -667,7 +660,7 @@ function AppWorkflowPanel({
 	return (
 		<section className="aui-ui-notice" aria-label="アプリの実行状況">
 			{state && <output aria-live="polite">{states[state] ?? state}</output>}
-			{status?.result?.code && <p>{status.result.code}</p>}
+			{status?.result?.code && <p>{workflowFailureText(status.result.code)}</p>}
 			{status?.result?.code === "workflow_markdown_needs_confirmation" &&
 				status.runId && (
 					<Button

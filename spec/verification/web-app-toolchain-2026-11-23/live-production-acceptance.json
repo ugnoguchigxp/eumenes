@@ -1,0 +1,47 @@
+{
+  "inputHash": "84934c514e08b8cab6d83cfea6c111f887b6addb3e34bd07ff1e083a12ceba7a",
+  "bundleHash": "f0d7f6a7fdd329e15aff5f4a162425a1f6cbbb4d8081215a7fbdd14342c904fa",
+  "harnessHash": "54043359838688d91e979f0b7d8833d16c0b7300e1fcfcdabbd529b3d45e38b7",
+  "conversationSystem": "agencyReplyParts/defaults/no-background-agenda",
+  "cases": [
+    "records",
+    "list",
+    "journal"
+  ],
+  "observations": [
+    {
+      "kind": "records",
+      "iteration": 1,
+      "status": "passed",
+      "phase": "amend",
+      "elapsedMs": 120911
+    },
+    {
+      "kind": "records",
+      "iteration": 2,
+      "status": "passed",
+      "phase": "first-use",
+      "elapsedMs": 75228
+    },
+    {
+      "kind": "records",
+      "iteration": 3,
+      "status": "failed",
+      "phase": "create",
+      "elapsedMs": 295521
+    }
+  ],
+  "passed": 2,
+  "status": "failed",
+  "requiredPasses": 9,
+  "notAttempted": 6,
+  "failedRunId": "dc695ac2-ac91-46b9-aa30-dc6f59986ac8",
+  "failure": {
+    "phase": "create",
+    "reason": "chat_stream_incomplete",
+    "finishReason": "length",
+    "streamFailure": "output_limit",
+    "maxTokens": 16144,
+    "reasoningChars": 67727
+  }
+}

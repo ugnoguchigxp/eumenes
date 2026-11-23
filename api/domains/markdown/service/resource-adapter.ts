@@ -79,7 +79,8 @@ export function createMarkdownResourceAdapter(
 				if (!r || !ref) return [];
 				const input = generatedValue(r),
 					saved = generatedReceipt(r);
-				return input.conversationId === context.conversationId &&
+				return "conversationId" in input &&
+					input.conversationId === context.conversationId &&
 					input.sourceRunId === context.runId &&
 					output.document.title === input.title &&
 					output.document.path === input.path &&

@@ -1,7 +1,5 @@
-import { realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Capabilities } from "../domains/capabilities";
-import { claudeDaemonClient, claudeRunnerClient } from "../domains/coding";
 import { CONVERSATION_DEFAULT_PRINCIPAL } from "../domains/conversation/contracts";
 import type { createContinuityService } from "../domains/continuity";
 import {
@@ -60,6 +58,7 @@ import { toolchainForgetPurge } from "./toolchain/toolchain-forget";
 import { createHostToolchain } from "./toolchain/toolchain-host";
 import type { createToolchainRouting } from "./toolchain/toolchain-routing";
 import { createCodexInspection } from "./web-note/codex-web-note";
+import { buildClaudeRunners } from "./work/claude-runners";
 import { configureDevelopmentSupervision } from "./work/development-supervision-host";
 import type { createDotsMessages } from "./work/dots-messages";
 import { createDotsWork } from "./work/dots-work";
@@ -169,6 +168,12 @@ export function buildWorkspaceServices(
 export function registerForgetPurges(deps: {
 	memory: ReturnType<typeof createMemoryService>;
 	agency: ReturnType<typeof assembleAgency>;
+	registeredGoals?: Pick<
+		ReturnType<
+			typeof import("./agency/registered-goals").createRegisteredGoals
+		>,
+		"forgetInTransaction"
+	>;
 	agendaGoalStore: ReturnType<typeof createAgendaGoalStore>;
 	noteDocuments: ReturnType<typeof createNoteDocuments>;
 	toolchain: HostToolchain;
@@ -177,6 +182,8 @@ export function registerForgetPurges(deps: {
 	dialogue: ReturnType<typeof createDialogueService>;
 }) {
 	const { memory } = deps;
+	if (deps.registeredGoals)
+		memory.registerForgetPurge(deps.registeredGoals.forgetInTransaction);
 	memory.registerForgetPurge((db, purge) =>
 		forgetGoalDocuments(
 			db,
@@ -350,6 +357,10 @@ export function buildDialogueService(
 }
 
 export function wireToolchainExecution(deps: {
+	goalWorkspaces?: import("./agency/goal-workspaces").GoalWorkspaceRegistry;
+	goalAuthority?: NonNullable<
+		import("../domains/development-supervision").SupervisionHost["goal"]
+	>;
 	toolchain: Awaited<ReturnType<typeof createHostToolchain>>["toolchain"];
 	toolchains: ReturnType<typeof createToolchainRouting>;
 	workflowPorts: ReturnType<
@@ -375,6 +386,9 @@ export function wireToolchainExecution(deps: {
 		...deps.workflowPorts,
 		webNote: deps.toolchain.webNote,
 		claudeCode: deps.toolchain.claudeCode,
+		claudeWorkspaceRefs: deps.goalWorkspaces
+			?.runnerWorkspaces()
+			.map(({ ref }) => ref),
 		developmentSupervision: deps.toolchain.developmentSupervision,
 		collaboration: deps.toolchain.collaboration,
 		interact: deps.browser.interact,
@@ -410,6 +424,8 @@ export function wireToolchainExecution(deps: {
 		dialogue: deps.dialogue,
 		knowledge: deps.knowledge,
 		checkout: process.cwd(),
+		...(deps.goalWorkspaces ? { goalWorkspaces: deps.goalWorkspaces } : {}),
+		...(deps.goalAuthority ? { goal: deps.goalAuthority } : {}),
 		context: {
 			memory: deps.memory,
 			goals: deps.goals.goals,
@@ -431,6 +447,7 @@ export async function buildHostToolchainService(
 	config: Config,
 	deps: {
 		core: CoreServices;
+		goalWorkspaces?: import("./agency/goal-workspaces").GoalWorkspaceRegistry;
 		workspace: ReturnType<typeof buildWorkspaceServices>;
 		lateResources: ReturnType<typeof createLateResources>;
 		tasks: Awaited<ReturnType<typeof buildTasks>>;
@@ -473,31 +490,11 @@ export async function buildHostToolchainService(
 		config.researchCodexExecutable,
 		inference,
 	);
-	const claudeSocket = config.env.EUMENES_CLAUDE_WORK_RUNNER_SOCKET;
-	const autoStartClaude =
-		!claudeSocket &&
-		config.env.EUMENES_CLAUDE_WORK_RUNNER_AUTOSTART !== "0" &&
-		config.dbPath !== ":memory:" &&
-		Boolean(Bun.which("claude"));
-	const workspaceRoot = realpathSync(process.cwd());
-	const dataRoot =
-		config.dbPath !== ":memory:"
-			? realpathSync(dirname(config.dbPath))
-			: undefined;
-	const claudeRunner = claudeSocket
-		? claudeRunnerClient(claudeSocket, workspaceRoot)
-		: autoStartClaude && dataRoot
-			? claudeDaemonClient({
-					root: join(dataRoot, "claude-code-runner"),
-					workspace: workspaceRoot,
-					protectedPaths: [
-						dataRoot,
-						join(workspaceRoot, ".env"),
-						join(workspaceRoot, ".env.local"),
-					],
-				})
-			: undefined;
-	if (claudeRunner) await claudeRunner.probe();
+	const { claudeRunner, goalClaudeRunners } = await buildClaudeRunners(
+		config,
+		process.cwd(),
+		deps.goalWorkspaces?.runnerWorkspaces() ?? [],
+	);
 	const { toolchain, links } = await createHostToolchain({
 		resources: deps.lateResources,
 		canvasAdapter:
@@ -549,6 +546,7 @@ export async function buildHostToolchainService(
 		webResearchEnabled: config.webResearchToolsEnabled,
 		webNote,
 		claudeRunner,
+		goalClaudeRunners,
 		embed: deps.embedder,
 		terminalHooks: {
 			baseUrl: `http://${config.host}:${config.port}`,

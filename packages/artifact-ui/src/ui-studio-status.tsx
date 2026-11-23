@@ -9,7 +9,16 @@ import { type ReactNode, useState } from "react";
 import type { ArtifactEvent } from "./contracts";
 import { type UiStudioResource } from "./contracts";
 
-/** A small disclosure: a button that reveals a panel; Escape or an outside click closes it. */
+const workflowFailures: Record<string, string> = {
+	workflow_web_upgrade_required:
+		"取得元を確認する仕組みが更新されています。会話でこのアプリの改訂を依頼してください。",
+	workflow_web_evidence_invalid:
+		"取得結果の出典を確認できませんでした。もう一度更新してください。",
+	workflow_web_extraction_incomplete:
+		"対象の情報を確認できませんでした。日付や取得先を確認して、もう一度更新してください。",
+};
+export const workflowFailureText = (code: string) =>
+	workflowFailures[code] ?? code;
 
 /** A small disclosure: a button that reveals a panel; Escape or an outside click closes it. */
 function Disclosure({
@@ -167,3 +176,77 @@ type Send = (
 	event: ArtifactEvent["action"],
 	values?: ArtifactEvent["values"],
 ) => void;
+
+/** Only the app currently displayed can expose its failed save ticket. */
+export function StorageProgress({
+	viewing,
+	work,
+	pending,
+	send,
+	actionPending,
+}: Pick<UiStudioResource, "viewing" | "work"> & {
+	pending: boolean;
+	actionPending: boolean;
+	send: Send;
+}) {
+	const shown = viewing ?? work;
+	const retry = shown?.retrySave;
+	const reopen = shown?.reopenSave;
+	if (retry || reopen)
+		return (
+			<div className="aui-ui-notice">
+				<p>
+					{shown?.storageReopening
+						? "下書きに戻せませんでした。もう一度お試しください。"
+						: reopen
+							? "保存先の準備に失敗しました。原因を解消して再試行するか、下書きに戻して修正できます。"
+							: "保存先の準備に失敗しました。原因を解消した後、同じ内容の保存を再開できます。"}
+				</p>
+				{retry && (
+					<Button
+						size="sm"
+						disabled={actionPending}
+						onClick={() =>
+							send("ui-retry-save", {
+								...retry,
+								stateRevision: String(retry.stateRevision),
+							})
+						}
+					>
+						保存を再試行
+					</Button>
+				)}
+				{reopen && (
+					<Button
+						size="sm"
+						variant="outline"
+						disabled={actionPending}
+						onClick={() =>
+							send("ui-reopen-save", {
+								...reopen,
+								stateRevision: String(reopen.stateRevision),
+							})
+						}
+					>
+						下書きに戻す
+					</Button>
+				)}
+			</div>
+		);
+	if (
+		(!!viewing || !pending) &&
+		shown?.storageState !== "initializing" &&
+		shown?.storageState !== "deleting"
+	)
+		return null;
+	return (
+		<output className="aui-ui-notice">
+			{shown?.storageReopening
+				? "下書きに戻しています。"
+				: shown?.storageState === "deleting"
+					? "アプリの削除待ち"
+					: "アプリの保存先を準備しています。"}
+			{shown?.storageError ? `（${shown.storageError}）` : ""}
+		</output>
+	);
+}

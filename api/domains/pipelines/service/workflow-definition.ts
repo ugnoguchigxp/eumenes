@@ -3,6 +3,7 @@ import { z } from "zod";
 import { checkPipelineDefinition } from "./definition";
 
 const schemaRef = z.string().regex(/^(?:builtin|domain|schema):[^\s]{1,140}$/);
+const evidenceField = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/);
 const output = z.strictObject({
 	from: z.string().min(1),
 	schemaRef,
@@ -13,6 +14,14 @@ const definitionSchema = z.strictObject({
 	input: z.strictObject({ schemaRef, fixed: z.record(z.string(), z.json()) }),
 	pipeline: z.unknown(),
 	checkpoint: output.optional(),
+	evidence: z
+		.strictObject({
+			rowsKey: evidenceField,
+			refsField: evidenceField.optional(),
+			urlField: evidenceField.optional(),
+			minSources: z.number().int().min(1).max(2).default(1),
+		})
+		.optional(),
 	publish: z.discriminatedUnion("kind", [
 		output.extend({ kind: z.literal("dataset") }),
 		output.extend({
@@ -30,6 +39,7 @@ export type WorkflowStepContract = {
 	acceptedResultSchemas: readonly string[];
 	checkpointSchemaRef?: string;
 	coverageSchemaRefs?: readonly string[];
+	evidenceExemptSchemas?: readonly string[];
 };
 
 export type WorkflowCatalog = {
@@ -98,6 +108,19 @@ export function checkWorkflowDefinition(
 		if (!catalog.schema(outputSchemaRef))
 			throw new Error("workflow_step_unavailable");
 		if (
+			contract.evidenceExemptSchemas &&
+			!contract.evidenceExemptSchemas.includes(outputSchemaRef) &&
+			!definition.evidence
+		)
+			throw new WorkflowPipelineError([
+				{
+					path: "workflow.evidence",
+					rule: "workflow_web_evidence_required",
+					detail:
+						"汎用Web取得には evidence の rowsKey と出典・根拠欄の対応を指定してください。",
+				},
+			]);
+		if (
 			step.from.includes("request") &&
 			contract.requestSchemas !== "workflow" &&
 			!contract.requestSchemas?.includes(definition.input.schemaRef)
@@ -125,6 +148,26 @@ export function checkWorkflowDefinition(
 		};
 	});
 	const publisher = steps.get(publish.from);
+	if (definition.evidence) {
+		const type = catalog.schema(publish.schemaRef);
+		const rows =
+			type instanceof z.ZodObject
+				? type.shape[definition.evidence.rowsKey]
+				: null;
+		if (!(rows instanceof z.ZodArray) || !(rows.element instanceof z.ZodObject))
+			throw new Error("workflow_web_evidence_schema_invalid");
+		const { refsField, urlField } = definition.evidence;
+		if (
+			refsField &&
+			(!(rows.element.shape[refsField] instanceof z.ZodArray) ||
+				!(rows.element.shape[refsField].element instanceof z.ZodString))
+		)
+			throw new Error("workflow_web_evidence_schema_invalid");
+		if (urlField && rows.element.shape[urlField]?.type !== "string")
+			throw new Error("workflow_web_evidence_schema_invalid");
+		if (refsField && refsField === urlField)
+			throw new Error("workflow_web_evidence_schema_invalid");
+	}
 	if (
 		!checked.plan.output.from.includes(publish.from) ||
 		publisher?.outputSchemaRef !== publish.schemaRef
@@ -155,5 +198,14 @@ export function workflowInputs(
 		throw new Error("workflow_fixed_input_override");
 	if (!(schema instanceof z.ZodObject))
 		throw new Error("workflow_schema_unavailable");
-	return schema.strict().parse({ ...fixed, ...provided });
+	const result = schema.strict().safeParse({ ...fixed, ...provided });
+	if (!result.success)
+		throw new WorkflowPipelineError(
+			result.error.issues.map((issue) => ({
+				path: "values." + issue.path.join("."),
+				rule: "workflow_input_invalid",
+				detail: "入力の型と必須項目を確認してください。",
+			})),
+		);
+	return result.data;
 }

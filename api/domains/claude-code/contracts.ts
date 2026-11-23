@@ -5,8 +5,10 @@ import type {
 	ToolchainExecutionPort,
 	ExecutionStatus,
 	ExecutionView,
+	OwnedExecutionView,
+	GoalSupervisedExecutionSource,
 	TaskLifecyclePort,
-	SupervisedExecutionSource,
+	OwnedSupervisedExecutionSource,
 } from "../tool-runtime";
 import type { Database } from "bun:sqlite";
 
@@ -104,7 +106,7 @@ export interface Runner {
 }
 
 export type SupervisedAuthority = {
-	source: SupervisedExecutionSource;
+	source: OwnedSupervisedExecutionSource;
 	workId?: string;
 	toolchainRevisionId: string;
 	bindingRevisionId: string;
@@ -123,10 +125,11 @@ export type SupervisedAuthority = {
 	parentQuestionId?: string;
 	messageId?: string;
 };
-export type SupervisedStart = Parameters<
-	TaskLifecyclePort["startInTransaction"]
->[1] & {
-	source: SupervisedExecutionSource;
+export type SupervisedStart = Omit<
+	Parameters<TaskLifecyclePort["startInTransaction"]>[1],
+	"source"
+> & {
+	source: OwnedSupervisedExecutionSource;
 	operationId: string;
 	toolchainRevisionId: string;
 	bindingRevisionId: string;
@@ -146,10 +149,11 @@ export type SupervisedAnswer = Pick<
 	answer: string;
 };
 export type SupervisedView = {
-	view: ExecutionView;
+	view: OwnedExecutionView;
 	executionId: string | null;
 	questionExecutionId?: string | null;
 	evidence: ClaudeEvidence[];
+	diagnosticChecks?: ClaudeEvidence[];
 	releaseConfirmed: boolean;
 	blocking?: { state: "waiting" | "held"; reason: string };
 	answerDelivery?: {
@@ -160,7 +164,7 @@ export type SupervisedView = {
 
 export type Work = {
 	id: string;
-	source: ExecutionSource;
+	source: ExecutionSource | GoalSupervisedExecutionSource;
 	binding: string;
 	request: string;
 	references: Parameters<
@@ -178,6 +182,7 @@ export type Work = {
 	question: Question | null;
 	questionFromRunner: boolean;
 	pendingRunnerQuestion?: Question | null;
+	parkedQuestionExecutionId?: string;
 	result: ExecutionResult | null;
 	observation: Observation | null;
 	knownEvidenceRefs?: string[];
@@ -203,7 +208,7 @@ export type Work = {
 		| {
 				kind: "stop";
 				id: string;
-				reason: "cancel" | "amend" | "expired" | "forgotten";
+				reason: "cancel" | "amend" | "expired" | "forgotten" | "question_wait";
 		  }
 		| null;
 	executionId: string | null;
@@ -243,11 +248,13 @@ export type Host = Pick<
 		): ClaudeRunAuthorization | null;
 		observeInTransaction(
 			db: Database,
-			source: SupervisedExecutionSource,
-			view: ExecutionView,
+			source: OwnedSupervisedExecutionSource,
+			view: OwnedExecutionView,
 			eventId: string,
 		): boolean;
 	};
+	/** Workspace guards for goal-owned work, keyed by the pinned authorization. */
+	goalWorkspace?: (workspaceRef: string) => Host["workspace"];
 	workspace: {
 		hold(
 			db: Database,

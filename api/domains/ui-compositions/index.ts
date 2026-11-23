@@ -16,3 +16,4 @@ export {
 	workflowScreenInTransaction,
 } from "./service/workflow-screen";
 export { createUiCompositionResourceAdapter } from "./service/resource-adapter";
+export { workflowScreenInputIssues } from "./service/workflow-inputs";

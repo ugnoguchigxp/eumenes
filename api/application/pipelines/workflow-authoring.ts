@@ -6,6 +6,7 @@ import {
 } from "../../domains/capabilities";
 import {
 	checkWorkflowDefinition,
+	WorkflowPipelineError,
 	saveWorkflowInTransaction,
 	workflowComponentsDigest,
 	workflowDraftDigest,
@@ -16,6 +17,7 @@ import {
 	prepareWorkflowScreen,
 	saveWorkflowScreenInTransaction,
 	workflowScreenInTransaction,
+	workflowScreenInputIssues,
 } from "../../domains/ui-compositions";
 import type { SqliteStore } from "../../infrastructure/sqlite";
 import { canonicalJson, sha256Hex } from "../../infrastructure/digest";
@@ -138,6 +140,13 @@ export function createWorkflowAuthoring(deps: {
 			!screen?.value.bindings.sections
 		)
 			throw new Error("workflow_artifact_required");
+		const inputIssues = workflowScreenInputIssues(
+			screen?.value.definition,
+			screen?.value.bindings.inputs ?? {},
+			scopedCatalog.schema(definition.input.schemaRef)!,
+			definition.input.fixed,
+		);
+		if (inputIssues.length) throw new WorkflowPipelineError(inputIssues);
 		if (screen)
 			validateBindings(screen.value.bindings, definition, scopedCatalog);
 		const schemaRefs = new Set([

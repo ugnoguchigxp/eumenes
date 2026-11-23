@@ -73,6 +73,35 @@ function selectedView(
 	};
 }
 
+function workflowOutputs(
+	ctx: ExecutionContext,
+	db: Database,
+	id: string,
+	source: import("../../tool-runtime").ExecutionSource,
+	projection: "output" | "receipt",
+) {
+	const row = executionRow(db, id);
+	if (
+		!row?.source_json ||
+		row.state !== "completed" ||
+		source.origin !== "workflow" ||
+		hash(executionSource(row)) !== hash(source) ||
+		!ctx.port().validSourceInTransaction(db, source)
+	)
+		return null;
+	const pipeline = executionState(row).pipeline;
+	if (!pipeline?.executionPlan) return null;
+	const outputs: Record<string, unknown> = Object.create(null);
+	for (const stepId of pipeline.executionPlan.output.from) {
+		if (stepId === "request") continue;
+		const result = pipeline.results[stepId];
+		if (result?.state !== "completed" || result.output === undefined)
+			return null;
+		outputs[stepId] = projection === "output" ? result.output : result.ref;
+	}
+	return outputs;
+}
+
 export function executionAccess(
 	ctx: ExecutionContext,
 	ops: ExecutionOps,
@@ -288,32 +317,12 @@ export function executionAccess(
 			ops.fail(db, row, executionState(row), "workflow_cancelled", "cancelled");
 			return true;
 		},
-		workflowOutputsInTransaction(
+		workflowOutputsInTransaction: (
 			db: Database,
 			id: string,
 			source: import("../../tool-runtime").ExecutionSource,
-		) {
-			const row = executionRow(db, id);
-			if (
-				!row?.source_json ||
-				row.state !== "completed" ||
-				source.origin !== "workflow" ||
-				hash(executionSource(row)) !== hash(source) ||
-				!ctx.port().validSourceInTransaction(db, source)
-			)
-				return null;
-			const pipeline = executionState(row).pipeline;
-			if (!pipeline?.executionPlan) return null;
-			const outputs: Record<string, unknown> = Object.create(null);
-			for (const stepId of pipeline.executionPlan.output.from) {
-				if (stepId === "request") continue;
-				const result = pipeline.results[stepId];
-				if (result?.state !== "completed" || result.output === undefined)
-					return null;
-				outputs[stepId] = result.output;
-			}
-			return outputs;
-		},
+			projection: "output" | "receipt" = "output",
+		) => workflowOutputs(ctx, db, id, source, projection),
 		listInTransaction: (db: Database, conversationId: string) =>
 			table(db)
 				? (

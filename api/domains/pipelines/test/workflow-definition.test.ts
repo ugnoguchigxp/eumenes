@@ -135,6 +135,49 @@ const daily = {
 	},
 };
 
+test("evidence field declarations obey the execution contract before a workflow is saved", () => {
+	const evidenceCatalog: WorkflowCatalog = {
+		...catalog,
+		schema: (ref) =>
+			ref === rowsRef
+				? z.strictObject({
+						rows: z.array(
+							z.strictObject({
+								sourceUrl: z.string(),
+								"source-url": z.string(),
+								refs: z.array(z.string()),
+								"bad-refs": z.array(z.string()),
+							}),
+						),
+					})
+				: catalog.schema(ref),
+	};
+	const definition = {
+		...manual,
+		evidence: { rowsKey: "rows", refsField: "refs", urlField: "sourceUrl" },
+	};
+	expect(
+		checkWorkflowDefinition(definition, request, evidenceCatalog).definition
+			.evidence,
+	).toMatchObject({
+		rowsKey: "rows",
+		refsField: "refs",
+		urlField: "sourceUrl",
+		minSources: 1,
+	});
+	for (const evidence of [
+		{ ...definition.evidence, urlField: "source-url" },
+		{ ...definition.evidence, refsField: "bad-refs" },
+	])
+		expect(() =>
+			checkWorkflowDefinition(
+				{ ...definition, evidence },
+				request,
+				evidenceCatalog,
+			),
+		).toThrow(z.ZodError);
+});
+
 test("workflow definition uses the existing checker and pins typed completed outputs", () => {
 	expect(checkWorkflowDefinition(manual, request, catalog).pins).toEqual([
 		{

@@ -31,9 +31,18 @@ type StudioScreen = {
 };
 const live = createLiveScreen<{ read(): StudioScreen }>();
 
+const saveTicket = z.object({
+	appId: z.string(),
+	operationId: z.string(),
+	stateRevision: z.number().int(),
+	digest: z.string(),
+});
 const lifecycle = {
 	storageState: z.string().nullish(),
 	storageError: z.string().nullish(),
+	retrySave: saveTicket.optional(),
+	reopenSave: saveTicket.optional(),
+	storageReopening: z.boolean().optional(),
 };
 const storageView = z.object({
 	collection: z.string(),
@@ -155,6 +164,25 @@ const studioSchema = z.object({
 				})
 				.optional(),
 			data: z.unknown().optional(),
+			dataContext: z
+				.object({
+					inputs: z.record(z.string(), z.unknown()),
+					observedAt: z.string().optional(),
+					provenance: z
+						.object({
+							coverage: z.string(),
+							evidence: z.array(
+								z.object({
+									pointer: z.string(),
+									sources: z.array(
+										z.object({ url: z.string(), fetchedAt: z.string() }),
+									),
+								}),
+							),
+						})
+						.optional(),
+				})
+				.nullish(),
 		})
 		.nullable(),
 	history: z.array(
@@ -180,6 +208,11 @@ const sourceRefusals: Record<string, string> = {
 		"この操作は保存済みのアプリで許可されていません",
 	app_storage_file_missing: "アプリの保存先が見つかりません",
 	app_operation_pending: "アプリの保存先を処理しています",
+	app_storage_retry_conflict:
+		"保存の状態が変わりました。表示を更新してください",
+	workflow_pipeline_invalid: "入力の型と必須項目を確認してください",
+	workflow_web_evidence_invalid:
+		"取得した資料と根拠の対応を確認できませんでした",
 	app_revision_conflict:
 		"アプリの版が変わりました。作品履歴から開き直してください",
 	document_parse_failed: "JSONとして読み取れませんでした",
@@ -446,6 +479,18 @@ function createStudioAdapter(appDevelopment: boolean): WebArtifactAdapter {
 							(ref) => ref.owner === domain,
 						)?.id;
 						if (deleted === targetRef) setTargetRef(undefined);
+						return;
+					}
+					if (appDevelopment && binding.eventAction === "ui-reopen-save") {
+						const reopened = result.resultRefs.find(
+							(ref) => ref.owner === domain,
+						)?.id;
+						if (
+							reopened &&
+							parsedStudio.success &&
+							parsedStudio.data.work?.reopenSave?.appId === reopened
+						)
+							setTargetRef(undefined);
 						return;
 					}
 					if (binding.eventAction !== "ui-save") return;

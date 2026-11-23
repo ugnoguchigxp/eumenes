@@ -3,12 +3,13 @@ import { getLogger } from "../../../infrastructure/logger";
 import { hash } from "../../capabilities";
 import {
 	executionControl,
+	isGoalExecutionSource,
 	isStandardExecutionSource,
+	type GoalExecutionSource,
 	isSupervisedExecutionSource,
-	type SupervisedExecutionSource,
 	type TaskLifecyclePort,
 } from "../../tool-runtime";
-import type { HostState, SourcePort } from "../contracts";
+import type { GoalWebNoteOwner, HostState, SourcePort } from "../contracts";
 import { active, rowOf, stateOf } from "../repository";
 import {
 	ADAPTER,
@@ -16,6 +17,8 @@ import {
 	type Context,
 	type WebNoteDeps,
 } from "./context";
+import { createGoalWebNotePort } from "./goal";
+import { createSupervisedWebNotePort } from "./supervised";
 import { registerJobs, WEB_NOTE_JOB } from "./jobs";
 import {
 	current,
@@ -42,11 +45,13 @@ const log = getLogger("web-note");
 export function createWebNote(deps: WebNoteDeps) {
 	const newId = deps.id ?? (() => crypto.randomUUID());
 	let source: SourcePort | undefined;
+	let goal: GoalWebNoteOwner | undefined;
 	let closed = false;
 	const ctx: Context = {
 		...deps,
 		now: deps.now ?? Date.now,
 		abortJobs: new Set(),
+		goal: () => goal,
 		source() {
 			if (!source) throw new Error("web_note_not_configured");
 			return source;
@@ -57,14 +62,28 @@ export function createWebNote(deps: WebNoteDeps) {
 	type Start = Parameters<TaskLifecyclePort["startInTransaction"]>[1];
 	function startInTransaction(
 		db: Database,
-		input: Start,
+		input: Omit<Start, "source"> & {
+			source: Start["source"] | GoalExecutionSource;
+		},
 		operationId?: string,
 	) {
 		if (closed || !source) throw new Error("web_note_unavailable");
 		if (!input.toolchainRevisionId || !input.bindingRevisionId)
 			throw new Error("web_note_unavailable");
 		let grantDeadline = Infinity;
-		if (operationId !== undefined) {
+		if (input.source.origin === "goal") {
+			if (
+				!isGoalExecutionSource(input.source) ||
+				hash([input.source.request, input.source.expectedObservation]) !==
+					input.source.digest ||
+				input.source.request !== input.request ||
+				input.source.runId !== operationId ||
+				input.source.toolchainRevisionId !== input.toolchainRevisionId ||
+				input.source.bindingRevisionId !== input.bindingRevisionId ||
+				!goal?.authorityInTransaction(db, input.source)
+			)
+				throw new Error("web_note_source_invalid");
+		} else if (operationId !== undefined) {
 			if (!operationId || !isSupervisedExecutionSource(input.source))
 				throw new Error("web_note_source_invalid");
 			const grant = source.supervised?.authorizeInTransaction(db, {
@@ -97,6 +116,8 @@ export function createWebNote(deps: WebNoteDeps) {
 		)
 			throw new Error("web_note_binding_invalid");
 		if (inspection) {
+			if (input.source.origin === "goal")
+				throw new Error("web_note_binding_invalid");
 			if (!ctx.inspectSource) throw new Error("inspect_source_unavailable");
 			if (
 				operationId === undefined &&
@@ -115,7 +136,7 @@ export function createWebNote(deps: WebNoteDeps) {
 			if (prior) {
 				if (!prior.data_json || stateOf(prior).startDigest !== startDigest)
 					throw new Error("web_note_start_conflict");
-				return viewInTransaction(db, operationId)!;
+				return operationId;
 			}
 		}
 		const id = operationId ?? newId(),
@@ -144,6 +165,7 @@ export function createWebNote(deps: WebNoteDeps) {
 			subjectRef: id,
 			concurrencyKey: `web-note:${id}`,
 			lane:
+				input.source.origin === "goal" ||
 				input.source.origin === "autonomous" ||
 				input.source.origin === "supervised"
 					? "background"
@@ -153,26 +175,30 @@ export function createWebNote(deps: WebNoteDeps) {
 			maxAttempts: 1,
 		});
 		db.query(
-			"INSERT INTO web_note_runs(id,conversation_id,state,revision,deadline,job_id,data_json,notice,created_at,updated_at) VALUES (?,?,'queued',0,?,?,?,'none',?,?)",
+			"INSERT INTO web_note_runs(id,owner_key,owner_kind,state,revision,deadline,job_id,data_json,notice,created_at,updated_at) VALUES (?,?,?,'queued',0,?,?,?,'none',?,?)",
 		).run(
 			id,
-			input.source.conversationId,
+			input.source.origin === "goal"
+				? input.source.goalId
+				: input.source.conversationId,
+			input.source.origin === "goal" ? "goal" : "conversation",
 			deadline,
 			job.job.id,
 			JSON.stringify(state),
 			at,
 			at,
 		);
-		return viewInTransaction(db, id)!;
+		return id;
 	}
 	const task: TaskLifecyclePort = {
-		startInTransaction: (db, input) => startInTransaction(db, input),
+		startInTransaction: (db, input) =>
+			viewInTransaction(db, startInTransaction(db, input))!,
 		controlInTransaction(db, conversationId, raw) {
 			const input = executionControl.parse(raw),
 				row = current(ctx, db, input.workRef, true);
 			if (!isStandardExecutionSource(stateOf(row).source))
 				throw new Error("web_note_source_invalid");
-			if (row.conversation_id !== conversationId)
+			if (row.owner_kind !== "conversation" || row.owner_key !== conversationId)
 				throw new Error("web_note_conversation_mismatch");
 			if (input.action === "status") return viewInTransaction(db, row.id)!;
 			if (input.expectedRevision !== row.revision)
@@ -186,7 +212,11 @@ export function createWebNote(deps: WebNoteDeps) {
 		viewInTransaction(db, id) {
 			try {
 				const row = current(ctx, db, id, true);
-				if (!isStandardExecutionSource(stateOf(row).source)) return null;
+				if (
+					row.owner_kind !== "conversation" ||
+					!isStandardExecutionSource(stateOf(row).source)
+				)
+					return null;
 				return viewInTransaction(db, id);
 			} catch {
 				return null;
@@ -195,43 +225,24 @@ export function createWebNote(deps: WebNoteDeps) {
 		cancelInTransaction(db, conversationId, id) {
 			const row = rowOf(db, id);
 			if (
-				row?.data_json &&
+				row?.owner_kind === "conversation" &&
+				row.data_json &&
 				isStandardExecutionSource(stateOf(row).source) &&
-				row.conversation_id === conversationId &&
+				row.owner_key === conversationId &&
 				active(row)
 			)
 				end(ctx, db, row, "cancelled", "web_note_user_cancelled");
 		},
 		forgetInTransaction(db, id) {
 			const row = rowOf(db, id);
-			if (row?.data_json && isStandardExecutionSource(stateOf(row).source))
+			if (
+				row?.owner_kind === "conversation" &&
+				row.data_json &&
+				isStandardExecutionSource(stateOf(row).source)
+			)
 				forget(ctx, db, id);
 		},
 	};
-
-	function supervisedRow(
-		db: Database,
-		origin: SupervisedExecutionSource,
-		id: string,
-		action: "view" | "cancel",
-		operationId?: string,
-	) {
-		const row = rowOf(db, id);
-		if (!row?.data_json || !isSupervisedExecutionSource(origin)) return null;
-		const state = stateOf(row);
-		if (hash(origin) !== hash(state.source)) return null;
-		return source?.supervised?.authorizeInTransaction(db, {
-			source: origin,
-			workId: id,
-			request: state.request,
-			action,
-			operationId,
-			toolchainRevisionId: state.toolchainRevisionId,
-			bindingRevisionId: state.bindingRevisionId,
-		})
-			? row
-			: null;
-	}
 
 	function flush() {
 		ctx.queue.flushCancellations([...ctx.abortJobs]);
@@ -246,38 +257,30 @@ export function createWebNote(deps: WebNoteDeps) {
 		await ctx.store.write((db: Database) => reconcile(ctx, db));
 		flush();
 	}
+
 	return {
 		task,
-		supervised: {
+		supervised: createSupervisedWebNotePort(
+			ctx,
+			() => source,
+			startInTransaction,
+		),
+
+		goal: createGoalWebNotePort(ctx, (db, origin) =>
 			startInTransaction(
-				db: Database,
-				input: Start & {
-					source: SupervisedExecutionSource;
-					operationId: string;
+				db,
+				{
+					source: origin,
+					request: origin.request,
+					references: [],
+					toolchainRevisionId: origin.toolchainRevisionId,
+					bindingRevisionId: origin.bindingRevisionId,
 				},
-			) {
-				return startInTransaction(db, input, input.operationId);
-			},
-			viewInTransaction(
-				db: Database,
-				origin: SupervisedExecutionSource,
-				id: string,
-			) {
-				return supervisedRow(db, origin, id, "view")
-					? viewInTransaction(db, id)
-					: null;
-			},
-			cancelInTransaction(
-				db: Database,
-				origin: SupervisedExecutionSource,
-				id: string,
-				operationId: string,
-			) {
-				const row = supervisedRow(db, origin, id, "cancel", operationId);
-				if (!row) throw new Error("web_note_source_invalid");
-				if (active(row))
-					end(ctx, db, row, "cancelled", "web_note_user_cancelled");
-			},
+				origin.runId,
+			),
+		),
+		configureGoal(owner: GoalWebNoteOwner) {
+			goal = owner;
 		},
 		configure(port: SourcePort) {
 			source = port;
@@ -288,7 +291,10 @@ export function createWebNote(deps: WebNoteDeps) {
 			!closed && source !== undefined && deps.inspectSource !== undefined,
 		sourceRunInTransaction(db: Database, id: string) {
 			try {
-				return rowSource(current(ctx, db, id, true).data_json);
+				const row = current(ctx, db, id, true);
+				return row.owner_kind === "conversation"
+					? rowSource(row.data_json)
+					: null;
 			} catch {
 				return null;
 			}

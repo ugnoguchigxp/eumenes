@@ -72,6 +72,9 @@ export function agendaGoalDeps(input: {
 	store: GoalStore;
 	goals: GoalsService;
 	mockDir: string;
+	reply?: NonNullable<AgencyHostDeps["agendaGoals"]>["reply"];
+	readDesign?: NonNullable<AgencyHostDeps["agendaGoals"]>["readDesign"];
+	quiet?: NonNullable<AgencyHostDeps["agendaGoals"]>["quiet"];
 	memoryHost: Pick<
 		ReturnType<typeof createMemoryHostConnection>,
 		"readForGoals" | "isGoalContextCurrent"
@@ -80,6 +83,9 @@ export function agendaGoalDeps(input: {
 	return {
 		store: input.store,
 		mockDir: input.mockDir,
+		...(input.reply ? { reply: input.reply } : {}),
+		...(input.quiet ? { quiet: input.quiet } : {}),
+		...(input.readDesign ? { readDesign: input.readDesign } : {}),
 		readMemory: input.memoryHost.readForGoals,
 		isGoalContextCurrent: input.memoryHost.isGoalContextCurrent,
 		...goalForgetDeps(input.goals),
@@ -186,6 +192,8 @@ export function createGoalAgenda(input: {
 		c?.notes.map((note) => ({ ...note, id: researchId(c, note) })) ?? [];
 	const read = (_scopeKey: string, id: string): NoteDoc | null =>
 		deps.store.read((db) => {
+			const design = goals.readDesign?.(db, id);
+			if (design) return design;
 			if (id.startsWith("goal-design-")) {
 				const record = liveRecord(db, id);
 				return record ? readDocument(db, record) : null;
@@ -215,6 +223,15 @@ export function createGoalAgenda(input: {
 		db: Database,
 		id: string,
 	): (AgendaNote & { documentConversationId: string }) | undefined => {
+		const design = goals.readDesign?.(db, id);
+		const viewer = active();
+		if (design && viewer)
+			return {
+				...design,
+				documentId: id,
+				documentConversationId: viewer.id,
+				ticketId: id,
+			};
 		const record = liveRecord(db, id);
 		const note = record && readDocument(db, record);
 		return record && note
@@ -388,6 +405,7 @@ export function createGoalAgenda(input: {
 		noteForDisplay,
 		displayNoteInTransaction,
 		async validNote(id: string) {
+			if (deps.store.read((db) => goals.readDesign?.(db, id))) return true;
 			const record = deps.store.read((db) => liveRecord(db, id));
 			return (
 				!!record &&

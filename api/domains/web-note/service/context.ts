@@ -3,6 +3,7 @@ import type { Capabilities } from "../../capabilities";
 import type { QueueService } from "../../queue";
 import type {
 	InspectSource,
+	GoalWebNoteOwner,
 	SourcePort,
 	WebNoteAttempt,
 	WebNoteTurn,
@@ -28,6 +29,7 @@ export type WebNoteDeps = {
 export type Context = WebNoteDeps & {
 	now: () => number;
 	source: () => SourcePort;
+	goal: () => GoalWebNoteOwner | undefined;
 	/** The jobs to abort once the transaction that cancelled them has committed. */
 	abortJobs: Set<string>;
 };

@@ -344,7 +344,14 @@ function execute(
 			input: value,
 			requestId: event.eventId,
 			issuedAt: iso(p.t),
-			origin: { kind: "ui", scope: ctx.scope, actionRequestId: event.eventId },
+			origin: {
+				kind: "ui",
+				scope: ctx.scope,
+				actionRequestId: event.eventId,
+				...(event.targetRef !== undefined
+					? { targetRef: event.targetRef }
+					: {}),
+			},
 		});
 		if (
 			!result?.receiptRef?.owner ||

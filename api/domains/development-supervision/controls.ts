@@ -37,7 +37,8 @@ export function startStop(
 	saveParent(db, parent, true);
 	for (const grant of all) revokeGrant(host, db, grant);
 	for (const design of parent.designs)
-		host.design.cancelInTransaction(db, design.documentId, forget);
+		if (!design.goal)
+			host.design.cancelInTransaction(db, design.documentId, forget);
 	if (forget)
 		for (const notice of parent.notices)
 			host.revokeInTransaction(db, notice.id);

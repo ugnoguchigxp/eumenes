@@ -226,6 +226,13 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			},
 		},
 		{
+			name: "registered_goals_recovery",
+			recover: async () => {
+				await s.registeredGoals.progress.recover();
+				await s.registeredGoals.reports.recover();
+			},
+		},
+		{
 			name: "visual_analysis_recovery",
 			recover: async () => {
 				await s.ocr.analyses?.recover();
@@ -273,6 +280,13 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 		// This boot's shared files start empty; the last boot's are removed in the background.
 		{ name: "scratch_start", start: () => s.scratch.start() },
 		{ name: "agents_start", start: () => s.toolchain.agents.start() },
+		{
+			name: "registered_goals_start",
+			start: () => {
+				s.registeredGoals.progress.listen();
+				s.registeredGoals.reports.start();
+			},
+		},
 		{ name: "queue_start", start: () => s.queue.start() },
 		{
 			name: "task_report_delivery_start",
@@ -339,6 +353,14 @@ export function createLifecycles(s: Services, http: Lifecycle): Lifecycle[] {
 			name: "claude_code_task",
 			close: async () => {
 				await s.toolchain.claudeCode?.close();
+			},
+		},
+		{
+			// Stop goal subscriptions before their owners and the queue are closed.
+			name: "registered_goals",
+			close: async () => {
+				s.registeredGoals.progress.close();
+				await s.registeredGoals.reports.close();
 			},
 		},
 		{ name: "kanban", close: () => s.toolchain.kanbanRuns.disconnect() },

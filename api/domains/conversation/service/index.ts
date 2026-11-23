@@ -21,6 +21,7 @@ import {
 	getMessage,
 	latestOrdinal,
 	listMessages,
+	userMessagesByText,
 	messageWithDelivery,
 	messagesAfter,
 	messagesOfRun,
@@ -324,6 +325,7 @@ export function createConversationService(
 		messagesInTransaction(db: Database, id: string): Message[] {
 			return listMessages(db, id);
 		},
+		userMessagesByTextInTransaction: userMessagesByText,
 		messageInTransaction(db: Database, id: string) {
 			return getMessage(db, id);
 		},

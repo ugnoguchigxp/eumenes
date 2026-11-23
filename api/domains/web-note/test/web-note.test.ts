@@ -1,4 +1,7 @@
 import { expect, test } from "bun:test";
+import { hash } from "../../capabilities";
+import type { GoalExecutionSource } from "../../tool-runtime";
+import type { GoalWebNoteReceipt } from "..";
 import { waitFor } from "../../../infrastructure/wait-for";
 import { parseNote, today } from "..";
 import { noteSources } from "../service/note";
@@ -324,3 +327,62 @@ test("a run past its deadline ends failed on recovery, and a notice left pending
 		await f.close();
 	}
 }, 15000);
+
+test("a goal-owned note uses one durable run and returns its result only to the matched goal", async () => {
+	const f = await fixture();
+	try {
+		const expectedObservation = "A note with sources.";
+		const source: GoalExecutionSource = {
+			origin: "goal",
+			runId: crypto.randomUUID(),
+			principal: "owner",
+			scopeKey: "profile",
+			goalId: "main",
+			goalRevision: 1,
+			attemptId: crypto.randomUUID(),
+			permitId: crypto.randomUUID(),
+			permitRevision: 1,
+			toolchainRevisionId: "toolchain:web.note@4",
+			bindingRevisionId: "binding:web.note@2",
+			request: f.request,
+			expectedObservation,
+			digest: hash([f.request, expectedObservation]),
+		};
+		const observations: GoalWebNoteReceipt[] = [];
+		f.service.configureGoal({
+			authorityInTransaction: (_db, current) => hash(current) === hash(source),
+			observeInTransaction: (_db, current, receipt) => {
+				expect(current).toEqual(source);
+				observations.push(receipt);
+			},
+		});
+		const start = () =>
+			f.store.write((db) => f.service.goal.startInTransaction(db, source));
+		expect((await start()).ownerWorkId).toBe(source.runId);
+		expect((await start()).ownerWorkId).toBe(source.runId);
+		f.run();
+		await waitFor(() => observations.length === 1, { timeout: 5_000 });
+		expect(observations[0]).toMatchObject({
+			ownerWorkId: source.runId,
+			status: "completed",
+			result: {
+				answer: expect.any(String),
+				sources: [expect.any(Object), expect.any(Object)],
+			},
+		});
+		expect(f.calls).toHaveLength(1);
+		expect(f.view(source.runId)).toBeNull();
+		expect(f.notices).toHaveLength(0);
+		await expect(
+			f.store.write((db) =>
+				f.service.goal.lookupInTransaction(db, { ...source, goalId: "other" }),
+			),
+		).rejects.toThrow("web_note_goal_conflict");
+		const checked = f.store.read((db) =>
+			f.service.goal.lookupInTransaction(db, source),
+		);
+		expect(checked).toEqual(observations[0]!);
+	} finally {
+		await f.close();
+	}
+});

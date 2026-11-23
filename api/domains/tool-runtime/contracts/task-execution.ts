@@ -187,9 +187,8 @@ type StandardExecutionSource = {
 	responses?: ExecutionResponse[];
 };
 /** Only the supervision owner can issue this receipt. Revalidate it at the registered child owner. */
-export type SupervisedExecutionSource = {
+type SupervisedExecutionBase = {
 	origin: "supervised";
-	conversationId: string;
 	messageId: null;
 	runId: string;
 	request: string;
@@ -208,6 +207,42 @@ export type SupervisedExecutionSource = {
 	amendments?: never;
 	responses?: never;
 };
+export type GoalExecutionIdentity = {
+	principal: string;
+	scopeKey: string;
+	goalId: string;
+	goalRevision: number;
+	attemptId: string;
+	permitId: string;
+	permitRevision: number;
+};
+export type GoalExecutionSource = GoalExecutionIdentity & {
+	origin: "goal";
+	conversationId?: never;
+	messageId?: never;
+	delegation?: never;
+	runId: string;
+	request: string;
+	expectedObservation: string;
+	toolchainRevisionId: string;
+	bindingRevisionId: string;
+	digest: string;
+};
+export type SupervisedExecutionSource = SupervisedExecutionBase & {
+	conversationId: string;
+	goal?: never;
+};
+export type GoalSupervisedExecutionSource = SupervisedExecutionBase & {
+	conversationId: null;
+	goal: GoalExecutionIdentity;
+};
+export type OwnedSupervisedExecutionSource =
+	SupervisedExecutionSource | GoalSupervisedExecutionSource;
+export type OwnedExecutionView = Omit<ExecutionView, "conversationId"> &
+	(
+		| { conversationId: string; goal?: never }
+		| { conversationId: null; goal: GoalExecutionIdentity }
+	);
 export type ExecutionSource =
 	StandardExecutionSource | SupervisedExecutionSource;
 
@@ -226,16 +261,46 @@ const supervisedSourceShape = z.strictObject({
 		taskGeneration: z.number().int().nonnegative(),
 	}),
 });
+const goalIdentity = z.strictObject({
+	principal: z.string().min(1),
+	scopeKey: z.string().min(1),
+	goalId: z.string().min(1),
+	goalRevision: z.number().int().positive(),
+	attemptId: z.uuid(),
+	permitId: z.uuid(),
+	permitRevision: z.number().int().positive(),
+});
+const ownedSupervisedSource = supervisedSourceShape.extend({
+	conversationId: z.null(),
+	goal: goalIdentity,
+});
+const goalSource = goalIdentity.extend({
+	origin: z.literal("goal"),
+	runId: z.uuid(),
+	request: z.string().min(1).max(8000),
+	expectedObservation: z.string().min(1).max(8000),
+	toolchainRevisionId: z.string().min(1),
+	bindingRevisionId: z.string().min(1),
+	digest: z.string().min(1),
+});
+export function isGoalExecutionSource(
+	source: unknown,
+): source is GoalExecutionSource {
+	return goalSource.safeParse(source).success;
+}
 
 export function isSupervisedExecutionSource(
 	source: unknown,
-): source is SupervisedExecutionSource {
-	return supervisedSourceShape.safeParse(source).success;
+): source is OwnedSupervisedExecutionSource {
+	return (
+		supervisedSourceShape.safeParse(source).success ||
+		ownedSupervisedSource.safeParse(source).success
+	);
 }
 
 /** Persisted sources can come from older versions. Unknown origins have no ordinary execution authority. */
 export function isStandardExecutionSource(
-	source: ExecutionSource,
+	source: ExecutionSource | GoalSupervisedExecutionSource | GoalExecutionSource,
 ): source is StandardExecutionSource {
 	return (
 		!!source &&

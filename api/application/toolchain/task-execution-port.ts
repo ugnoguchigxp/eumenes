@@ -40,6 +40,7 @@ export type TaskExecutionHost = {
 	>;
 	webNote?: import("../../domains/web-note").WebNoteService;
 	claudeCode?: import("../../domains/claude-code").ClaudeCodeService;
+	claudeWorkspaceRefs?: readonly string[];
 	settings?: Pick<
 		import("../../domains/settings").SettingsService,
 		"inTransaction"
@@ -183,6 +184,12 @@ function configureClaudeCode(
 		workspace: claudeWorkspace("eumenes", {
 			parallel: !!host.developmentSupervision,
 		}),
+		...(host.claudeWorkspaceRefs
+			? {
+					goalWorkspace: (ref: string) =>
+						claudeWorkspace(ref, { parallel: true }),
+				}
+			: {}),
 		supervised: host.developmentSupervision && {
 			authorizeInTransaction(db, input) {
 				const grant = host.developmentSupervision!.authorizeInTransaction(

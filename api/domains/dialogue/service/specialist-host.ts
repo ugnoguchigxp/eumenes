@@ -6,6 +6,7 @@ import {
 	specialistClosingSource,
 	specialistExecutionResponse,
 	specialistExecutionSource,
+	specialistMessageSource,
 } from "./specialist-source";
 import {
 	notifySpecialist,
@@ -19,6 +20,27 @@ import { specialistHandoffMaterials } from "./specialist-handoff-context";
 /** Public host integration for session-scoped sources and child observations. */
 export function createSpecialistHost(deps: DialogueDeps) {
 	return {
+		specialistOriginalRequestSourcesInTransaction: (
+			db: Database,
+			conversationId: string,
+			request: string,
+		) =>
+			deps.conversation
+				.userMessagesByTextInTransaction(db, conversationId, request)
+				.flatMap((message) => {
+					const source = specialistMessageSource(
+						deps,
+						db,
+						conversationId,
+						message.id,
+					);
+					return source ? [source] : [];
+				}),
+		specialistMessageSourceInTransaction: (
+			db: Database,
+			conversationId: string,
+			messageId: string,
+		) => specialistMessageSource(deps, db, conversationId, messageId),
 		specialistHandoffReferencesInTransaction: (
 			db: Database,
 			sessionId: string,

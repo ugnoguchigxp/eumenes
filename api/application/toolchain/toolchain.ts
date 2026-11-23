@@ -154,6 +154,7 @@ type ToolchainOptions = {
 	 */
 	webNote?: Pick<WebNoteDeps, "turn" | "record" | "inspectSource">;
 	claudeRunner?: ClaudeRunner;
+	goalClaudeRunners?: ReadonlyMap<string, ClaudeRunner>;
 	conversation?: import("../../domains/conversation").ConversationService;
 	timers?: import("../../domains/timers").TimersService;
 	schedules?: SchedulerAdapterPorts;
@@ -303,7 +304,8 @@ async function seedToolchainCapabilities(
 					.filter(
 						(adapter) =>
 							adapter.ref !== "adapter:claude-code-task@1" ||
-							options.claudeRunner?.ready(),
+							options.claudeRunner?.ready() ||
+							!!options.goalClaudeRunners?.size,
 					),
 			),
 	});
@@ -473,6 +475,7 @@ export async function createToolchain(
 		...taskDeps,
 		inference,
 		runner: options.claudeRunner,
+		goalRunners: options.goalClaudeRunners,
 	});
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(

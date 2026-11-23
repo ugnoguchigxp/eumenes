@@ -1,0 +1,34 @@
+[
+  {
+    "ref": "eumenes-avatar",
+    "root": "/Users/y.noguchi/Code/eumenes",
+    "readablePaths": [
+      "web/src/domains/avatar",
+      "web/src/components/domains/conversation/HiyoriAvatarBackground.tsx",
+      "web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx",
+      "web/src/components/domains/conversation/HiyoriViewControls.tsx",
+      "web/src/components/domains/conversation/hiyori-avatar.css",
+      "docs/avatar.md",
+      "spec/avatar-view-adjustment-2026-11-07.md"
+    ],
+    "writablePaths": [],
+    "checks": [
+      {
+        "ref": "avatar-background-behavior",
+        "description": "既存のLive2D背景色の選択・保存・復元・表示範囲をunit/component試験で検査する。実機器・実画面の検査ではない。",
+        "command": "/Users/y.noguchi/.local/share/mise/installs/node/24.11.1/bin/node",
+        "args": [
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--configLoader",
+          "runner",
+          "--no-cache",
+          "web/src/domains/avatar/test/background.test.ts",
+          "web/src/components/domains/conversation/HiyoriAvatarBackground.test.tsx"
+        ],
+        "cwd": ".",
+        "acceptance": true
+      }
+    ]
+  }
+]

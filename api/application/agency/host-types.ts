@@ -15,6 +15,8 @@ import type { SteeringInbox } from "eumenes-steer";
 import type {
 	GoalDesigner,
 	GoalHostEvent,
+	GoalHost,
+	GoalReplyWorkPort,
 	GoalStore,
 } from "eumenes-agency/agenda/runtime";
 import type { HostResult } from "eumenes-memory-host";
@@ -69,6 +71,14 @@ export type AgencyHostDeps = {
 	state?: AgencyStatePort;
 	agendaGoals?: {
 		store: GoalStore;
+		reply?: (conversationId: string, legacy: GoalHost) => GoalReplyWorkPort;
+		readDesign?: ReturnType<
+			typeof import("./goal-design-documents").createGoalDesignDocuments
+		>["readInTransaction"];
+		quiet?: (scope: {
+			speechUntil: number | null;
+			allUntil: number | null;
+		}) => Promise<void>;
 		mockDir: string;
 		readMemory(
 			method: "context" | "read",
@@ -98,6 +108,18 @@ export type AgencyHostDeps = {
 	};
 	/** Keeps and shows research notes as Markdown documents; absent: notes are not kept and cannot be shown. */
 	noteDocuments?: NoteDocumentPort;
+	goalResearchNoteInTransaction?(
+		db: Database,
+		note: {
+			id: string;
+			conversationId: string;
+			title: string;
+			summary: string;
+			markdown: string;
+			refs: readonly string[];
+			sources: readonly string[];
+		},
+	): void;
 	routeSpeechInTransaction?: SpeechRouter;
 	store: Pick<SqliteStore, "read" | "write" | "onCommit">;
 	conversation: Pick<

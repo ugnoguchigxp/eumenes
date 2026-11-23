@@ -6,6 +6,28 @@ import type { Run } from "../contracts";
 import type { DialogueDeps } from "./context";
 import { sessionExpired } from "./specialist-core";
 
+export function specialistMessageSource(
+	deps: DialogueDeps,
+	db: Database,
+	conversationId: string,
+	messageId: string,
+) {
+	const message = deps.conversation.messageInTransaction(
+		db,
+		messageId,
+	)?.message;
+	return message?.role === "user" &&
+		message.conversationId === conversationId &&
+		!deps.memory?.isSourceRevokedInTransaction(db, messageId)
+		? {
+				messageId,
+				conversationId,
+				request: message.text,
+				digest: hash(message.text),
+			}
+		: null;
+}
+
 function specialistInput(
 	deps: DialogueDeps,
 	db: Database,

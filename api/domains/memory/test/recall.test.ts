@@ -1,10 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import { configureLogging } from "../../../infrastructure/logger";
-import type {
-	CorrectExplicitInput,
-	RememberExplicitInput,
-} from "../contracts/immediate";
+import type { RememberExplicitInput } from "../contracts/immediate";
 import type { MemoryRecallInput } from "..";
 import { settingsSchema } from "../contracts";
 import { setupMemory, type MemoryHarness } from "./memory.fixture";

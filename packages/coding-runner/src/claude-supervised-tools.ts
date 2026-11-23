@@ -26,6 +26,7 @@ type ToolRequest = {
 	input: Record<string, unknown>;
 	fact: Omit<ToolEvidence, "text" | "passed">;
 	statusPath?: string;
+	stderrPath?: string;
 	editGuard?: { unrelatedDigest: string; contentDigest: string };
 };
 
@@ -118,9 +119,11 @@ export function createCheckSandbox(workspace: string, id: string) {
 			// Only the parent wrapper can write the exit-status file. The tested process
 			// and its descendants run inside the sandbox, with writes confined to files/.
 			const statusPath = join(temporary, `${crypto.randomUUID()}.status`);
+			const stderrPath = statusPath + ".stderr";
 			return {
 				statusPath,
-				command: `if ${check}; then eum_claude_check_exit_code=0; else eum_claude_check_exit_code=$?; fi; (umask 077; printf '%s\\n' "$eum_claude_check_exit_code" > ${shellQuote(statusPath)}); exit "$eum_claude_check_exit_code"`,
+				stderrPath,
+				command: `umask 077; if { ${check}; } 2> ${shellQuote(stderrPath)}; then eum_claude_check_exit_code=0; else eum_claude_check_exit_code=$?; fi; /bin/cat ${shellQuote(stderrPath)} >&2; printf '%s\\n' "$eum_claude_check_exit_code" > ${shellQuote(statusPath)}; exit "$eum_claude_check_exit_code"`,
 			};
 		},
 	};
@@ -195,6 +198,7 @@ export function supervisedTools(
 					timeout: Math.max(1, Math.min(600_000, spec.deadline - Date.now())),
 				},
 				statusPath: witnessed.statusPath,
+				stderrPath: witnessed.stderrPath,
 				fact: {
 					kind: "check",
 					check: command.check,
@@ -246,7 +250,7 @@ export function supervisedTools(
 	}
 
 	function toolEvidence(
-		{ fact, statusPath, editGuard }: ToolRequest,
+		{ fact, statusPath, stderrPath, editGuard }: ToolRequest,
 		output: unknown,
 		success: boolean,
 	): ToolEvidence | undefined {
@@ -256,13 +260,17 @@ export function supervisedTools(
 				output && typeof output === "object"
 					? (output as Record<string, unknown>)
 					: {};
-			let exitedZero = false;
+			let exitCode: number | undefined;
+			let stderr: string | undefined;
 			try {
-				exitedZero = !!statusPath && readPrivate(statusPath) === "0\n";
+				const status = statusPath ? readPrivate(statusPath) : "";
+				if (/^[0-9]{1,3}\n$/.test(status) && Number(status) <= 255)
+					exitCode = Number(status);
+				if (stderrPath) stderr = readPrivate(stderrPath).slice(0, 1024);
 			} catch {}
 			const passed =
 				success &&
-				exitedZero &&
+				exitCode === 0 &&
 				!result.interrupted &&
 				!result.backgroundTaskId &&
 				!result.backgroundedByUser &&
@@ -272,6 +280,8 @@ export function supervisedTools(
 			return {
 				...fact,
 				passed,
+				...(exitCode === undefined ? {} : { exitCode }),
+				...(stderr === undefined ? {} : { stderr }),
 				text: JSON.stringify(output ?? "").slice(0, 1_024),
 			};
 		}
@@ -309,6 +319,8 @@ export function supervisedTools(
 		toolEvidence,
 		inputDigest: () => currentDigest,
 		commands: [...commands.keys()],
+		readablePaths: [...new Set(readable)],
+		writablePaths: writable,
 		cleanup: sandbox?.cleanup,
 	};
 }

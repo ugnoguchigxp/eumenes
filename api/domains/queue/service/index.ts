@@ -62,6 +62,18 @@ export function createQueue(
 	const limits = options.limits ?? { total: 1024, background: 768, scope: 128 };
 	const registry = createRegistry();
 	const runner = createRunner(store, registry, opts);
+	function hasCapacityInTransaction(
+		tx: Tx,
+		scope: string,
+		lane: EnqueueInput["lane"],
+	) {
+		const counts = openCounts(tx, scope);
+		return (
+			counts.total < limits.total &&
+			counts.scoped < limits.scope &&
+			(lane !== "background" || counts.background < limits.background)
+		);
+	}
 
 	function enqueueInTransaction(
 		tx: Tx,
@@ -96,12 +108,7 @@ export function createQueue(
 			if (existing.inputDigest !== digest) throw new Error("request_conflict");
 			return { job: existing, fresh: false };
 		}
-		const counts = openCounts(tx, input.scope);
-		if (
-			counts.total >= limits.total ||
-			counts.scoped >= limits.scope ||
-			(input.lane === "background" && counts.background >= limits.background)
-		)
+		if (!hasCapacityInTransaction(tx, input.scope, input.lane))
 			throw new Error("queue_full");
 		const now = opts.now();
 		const job = insertJob(tx, {
@@ -168,6 +175,7 @@ export function createQueue(
 			registry.register(definition);
 		},
 		enqueueInTransaction,
+		hasCapacityInTransaction,
 		async enqueue(input: EnqueueInput) {
 			const result = await store.write((tx) => enqueueInTransaction(tx, input));
 			runner.wake();

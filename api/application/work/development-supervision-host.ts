@@ -20,6 +20,7 @@ import {
 	supervisionResearchNote,
 } from "./supervision-research";
 import { supervisionWorkspace } from "./supervision-workspace";
+import type { GoalWorkspaceRegistry } from "../agency/goal-workspaces";
 
 export function configureDevelopmentSupervision(input: {
 	supervisor: DevelopmentSupervisionService;
@@ -47,6 +48,8 @@ export function configureDevelopmentSupervision(input: {
 	>;
 	/** The same registered checkout used by inspect.source and the Claude runner. */
 	checkout: string;
+	goal?: NonNullable<SupervisionHost["goal"]>;
+	goalWorkspaces?: GoalWorkspaceRegistry;
 }) {
 	const {
 		supervisor,
@@ -84,10 +87,12 @@ export function configureDevelopmentSupervision(input: {
 			: null;
 	}
 	const viewResearch = (db: Database, grant: SupervisedGrant) =>
-		grant.workId
+		grant.workId && grant.source.conversationId !== null
 			? note.supervised.viewInTransaction(db, grant.source, grant.workId)
 			: null;
+	const workspace = supervisionForOwners(input);
 	const host: SupervisionHost = {
+		...(input.goal ? { goal: input.goal } : {}),
 		validSourceInTransaction: execution.validSourceInTransaction,
 		controlSourceInTransaction: execution.controlSourceInTransaction,
 		validReferenceInTransaction: execution.validReferenceInTransaction,
@@ -109,7 +114,7 @@ export function configureDevelopmentSupervision(input: {
 			});
 			return true;
 		},
-		workspace: supervisionWorkspace(input.checkout),
+		workspace,
 		research: {
 			contextInTransaction: context.contextInTransaction,
 			validEvidenceInTransaction(db, source, evidence) {
@@ -140,15 +145,21 @@ export function configureDevelopmentSupervision(input: {
 						)
 					: null;
 			},
-			startInTransaction: (db, _kind, start) =>
-				note.supervised.startInTransaction(db, start),
+			startInTransaction(db, _kind, start) {
+				if (start.source.conversationId === null)
+					throw new Error("supervision_owner_mismatch");
+				return note.supervised.startInTransaction(db, {
+					...start,
+					source: start.source,
+				});
+			},
 			viewInTransaction: viewResearch,
 			noteInTransaction: (_db, grant, view) =>
-				grant.kind === "claude"
+				grant.kind === "claude" || view.conversationId === null
 					? null
 					: supervisionResearchNote(grant.kind, view, Date.now()),
 			cancelInTransaction(db, grant, id) {
-				if (grant.workId)
+				if (grant.workId && grant.source.conversationId !== null)
 					note.supervised.cancelInTransaction(
 						db,
 						grant.source,
@@ -164,9 +175,14 @@ export function configureDevelopmentSupervision(input: {
 		},
 		child: {
 			...claude.supervised,
-			targetInTransaction: (db) =>
-				claude.supervisedAvailableInTransaction()
-					? target(db, "claude-code.request", "adapter:claude-code-task@1")
+			targetInTransaction: (db, forGoal, workspaceRef) =>
+				claude.supervisedAvailableInTransaction(forGoal, workspaceRef)
+					? (target(
+							db,
+							"claude-code.supervised",
+							"adapter:claude-code-task@1",
+						) ??
+						target(db, "claude-code.request", "adapter:claude-code-task@1"))
 					: null,
 		},
 		design: createSupervisionDesigns({
@@ -176,4 +192,75 @@ export function configureDevelopmentSupervision(input: {
 		}),
 	};
 	supervisor.configure(host);
+}
+
+function supervisionForOwners(input: {
+	checkout: string;
+	goal?: NonNullable<SupervisionHost["goal"]>;
+	goalWorkspaces?: GoalWorkspaceRegistry;
+}): SupervisionHost["workspace"] {
+	const normal = supervisionWorkspace(input.checkout);
+	const background = new Map(
+		input.goalWorkspaces
+			?.runnerWorkspaces()
+			.map((item) => [
+				item.ref,
+				supervisionWorkspace(item.root, item.ref, [
+					...new Set(item.checks.map(({ command }) => command)),
+				]),
+			]),
+	);
+	const scoped = (
+		scope: Parameters<
+			NonNullable<SupervisionHost["workspace"]["resolveScope"]>
+		>[0],
+	) => {
+		const goal = background.get(scope.workspaceRef);
+		return goal?.resolveScope?.(scope) ? goal : normal;
+	};
+	return {
+		inTransaction(db, source) {
+			return source.origin === "goal"
+				? (input.goal?.authorityInTransaction(db, source)?.workspace ?? null)
+				: normal.inTransaction(db, source);
+		},
+		resolveScope: (scope) => scoped(scope).resolveScope!(scope),
+		authorizeInTransaction(db, request) {
+			if (request.source.origin !== "goal")
+				return normal.authorizeInTransaction(db, request);
+			const saved = input.goal?.authorityInTransaction(db, request.source);
+			const scope =
+				saved &&
+				background.get(request.scope.workspaceRef)?.resolveScope!(
+					request.scope,
+				);
+			if (
+				!saved ||
+				!scope ||
+				scope.workspaceRef !== saved.scope.workspaceRef ||
+				scope.targetRevision !== saved.scope.targetRevision ||
+				scope.mode !== saved.scope.mode ||
+				scope.deadline > saved.scope.deadline ||
+				scope.mode !== request.ceiling ||
+				(scope.mode === "edit" &&
+					request.design?.digest !== saved.design?.digest)
+			)
+				return false;
+			return (
+				scope.readablePaths.every((path) =>
+					saved.scope.readablePaths.includes(path),
+				) &&
+				scope.writablePaths.every((path) =>
+					saved.scope.writablePaths.includes(path),
+				) &&
+				scope.checks.every((check) =>
+					saved.scope.checks.some((allowed) => hash(allowed) === hash(check)),
+				)
+			);
+		},
+		inspectInTransaction: (db, scope, workId, inherited) =>
+			scoped(scope).inspectInTransaction(db, scope, workId, inherited),
+		capture: (scope, signal, baseline, inherited) =>
+			scoped(scope).capture(scope, signal, baseline, inherited),
+	};
 }

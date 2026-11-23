@@ -11,7 +11,11 @@ import type { ScheduleDto } from "../../domains/scheduler/contracts";
 
 const PROMPT = "dialogue.prompt";
 const WORKFLOW = "workflow.run";
-const APP_ARTIFACT = "artifact:app-development.studio@2";
+const APP_ARTIFACTS = new Set([
+	"artifact:app-development.studio@2",
+	"artifact:app-development.studio@3",
+	"artifact:app-development.studio@4",
+]);
 const SCHEDULES = 5;
 const OCCURRENCES = 3;
 
@@ -65,7 +69,7 @@ export function createSchedulerDiagnostics(deps: {
 				apps &&
 				viewing &&
 				"artifactRevisionId" in viewing &&
-				viewing.artifactRevisionId === APP_ARTIFACT
+				APP_ARTIFACTS.has(viewing.artifactRevisionId)
 					? apps.app(db, viewing.targetRef)
 					: null;
 			const promptTarget = {

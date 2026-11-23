@@ -11,8 +11,14 @@ import type { ToolchainExecutionPort } from "../domains/tool-runtime";
 import type { Config } from "../infrastructure/config";
 import { getLogger } from "../infrastructure/logger";
 import { assembleAgency } from "./agency/assembly";
-import { agendaGoalDeps, createAgendaGoalStore } from "./agency/goal-agenda";
+import {
+	agendaGoalDeps,
+	createAgendaGoalStore,
+	goalForgetDeps,
+} from "./agency/goal-agenda";
 import { createNoteDocuments } from "./agency/note-documents";
+import { createRegisteredGoals } from "./agency/registered-goals";
+import { createGoalWorkspaceRegistry } from "./agency/goal-workspaces";
 import { createLiveBridge } from "./media/live-bridge";
 import { createMemoryHostConnection } from "./memory-host";
 import { createLateResources } from "./resources/late";
@@ -36,6 +42,140 @@ import { createSearchCheck } from "./toolchain/toolchain-search-check";
 import { createDotsMessages } from "./work/dots-messages";
 
 const log = getLogger("server");
+
+function buildRegisteredGoalServices(
+	core: Awaited<ReturnType<typeof buildCore>>,
+	ports: {
+		goals: Parameters<typeof goalForgetDeps>[0];
+		agendaGoalStore: ReturnType<typeof createAgendaGoalStore>;
+		toolchain: Awaited<
+			ReturnType<typeof buildHostToolchainService>
+		>["toolchain"];
+		goalWorkspaces: ReturnType<typeof createGoalWorkspaceRegistry>;
+		memory: ReturnType<typeof createMemoryService>;
+		continuity: NonNullable<
+			Parameters<typeof createRegisteredGoals>[0]["records"]
+		>["continuity"];
+		markdown: Parameters<typeof createRegisteredGoals>[0]["markdown"];
+	},
+) {
+	const { store, conversation, settings, inference, queue } = core;
+	const {
+		goals,
+		agendaGoalStore,
+		toolchain,
+		goalWorkspaces,
+		memory,
+		continuity,
+		markdown,
+	} = ports;
+	return createRegisteredGoals({
+		store,
+		goals: agendaGoalStore,
+		conversation,
+		settings,
+		inference,
+		queue,
+		capabilities: toolchain.capabilities,
+		webNote: toolchain.webNote,
+		onWorkerAvailabilityChange: toolchain.claudeCode.onAvailabilityChange,
+		workspaces: goalWorkspaces,
+		referenceInputs: memory.referenceInputs,
+		records: {
+			conversation,
+			memory,
+			continuity,
+			agendaGoals: { store: agendaGoalStore, ...goalForgetDeps(goals) },
+		},
+		markdown,
+		...(toolchain.developmentSupervision
+			? { supervision: toolchain.developmentSupervision }
+			: {}),
+		blocked: (db, id) => memory.isBlockedInTransaction(db, id),
+	});
+}
+
+function buildServerAgency(
+	core: Awaited<ReturnType<typeof buildCore>>,
+	ports: Omit<
+		Parameters<typeof buildRegisteredGoalServices>[1],
+		"agendaGoalStore"
+	> & {
+		dbPath: string;
+		toolchains: ReturnType<typeof createToolchainRouting> | undefined;
+		steward: ReturnType<typeof assembleCuration>["steward"];
+		resources: ReturnType<typeof buildResources>;
+		liveBridge: ReturnType<typeof createLiveBridge>;
+		noteDocuments: ReturnType<typeof createNoteDocuments>;
+		dialogue: Parameters<typeof assembleAgency>[1];
+		execution: () => ToolchainExecutionPort | undefined;
+	},
+) {
+	const { store, settings, changes } = core;
+	const {
+		dbPath,
+		goals,
+		toolchain,
+		toolchains,
+		goalWorkspaces,
+		memory,
+		continuity,
+		markdown,
+		steward,
+		resources,
+		liveBridge,
+		noteDocuments,
+	} = ports;
+	// One steering inbox per server (eumenes-steer): words the user sends while a reply is written reach that
+	// reply's next model call. The agency opens one target per reply.
+	const steering = createSteeringInbox({ now: Date.now });
+	const memoryHost = createMemoryHostConnection(
+		memory,
+		dirname(resolve(dbPath)),
+	);
+	const agendaGoalStore = createAgendaGoalStore(store, goals);
+	const registeredGoals = buildRegisteredGoalServices(core, {
+		goals: goals,
+		agendaGoalStore,
+		toolchain,
+		goalWorkspaces,
+		memory,
+		continuity,
+		markdown,
+	});
+	const agency = assembleAgency(
+		{
+			...core,
+			memory,
+			continuity,
+			steward,
+			noteDocuments,
+			goalResearchNoteInTransaction: registeredGoals.adoptNote,
+			agendaGoals: agendaGoalDeps({
+				store: agendaGoalStore,
+				goals: goals,
+				mockDir: resolve(dirname(dbPath), "agenda-goal-mock"),
+				memoryHost,
+				reply: registeredGoals.reply,
+				quiet: registeredGoals.quiet,
+				readDesign: registeredGoals.readDesign,
+			}),
+			research: {
+				agents: toolchain.agents,
+				toolchains,
+				settings,
+				resources: resources.access.registry,
+				producesInTransaction: resources.dialogue.producesInTransaction,
+				execution: ports.execution,
+			},
+			...liveBridge.agency,
+			steering,
+			publish: () => changes.publish(),
+		},
+		ports.dialogue,
+	);
+	return { agency, agendaGoalStore, registeredGoals, memoryHost };
+}
 
 /**
  * Constructs every service. Nothing is recovered, started or listening yet, and
@@ -131,10 +271,12 @@ export async function buildServices(
 	} = workspace;
 	// The toolchain's `resources` tool and `resource.read` reach the registry and ledger once they exist.
 	const lateResources = createLateResources(store);
+	const goalWorkspaces = createGoalWorkspaceRegistry(config.goalWorkspaces);
 	const { toolchain, links, webNote } = await buildHostToolchainService(
 		config,
 		{
 			core,
+			goalWorkspaces,
 			workspace,
 			lateResources,
 			tasks,
@@ -184,9 +326,6 @@ export async function buildServices(
 			)
 		: undefined;
 	const liveBridge = createLiveBridge();
-	// One steering inbox per server (eumenes-steer): words the user sends while a reply is written reach that
-	// reply's next model call. The agency opens one target per reply.
-	const steering = createSteeringInbox({ now: Date.now });
 	let agencyExecution: ToolchainExecutionPort | undefined;
 	// The agency's research notes are documents of the Markdown domain, as a research report is.
 	const noteDocuments = createNoteDocuments({
@@ -195,38 +334,23 @@ export async function buildServices(
 		scratch: core.scratch,
 		ledger: () => dialogue.resourceLedger,
 	});
-	const memoryHost = createMemoryHostConnection(
-		memory,
-		dirname(resolve(dbPath)),
-	);
-	const agendaGoalStore = createAgendaGoalStore(store, goals.goals);
-	const agency = assembleAgency(
-		{
-			...core,
+	const { agency, agendaGoalStore, registeredGoals, memoryHost } =
+		buildServerAgency(core, {
+			dbPath,
+			goals: goals.goals,
+			toolchain,
+			toolchains,
+			goalWorkspaces,
 			memory,
 			continuity,
+			markdown,
 			steward,
+			resources,
+			liveBridge,
 			noteDocuments,
-			agendaGoals: agendaGoalDeps({
-				store: agendaGoalStore,
-				goals: goals.goals,
-				mockDir: resolve(dirname(dbPath), "agenda-goal-mock"),
-				memoryHost,
-			}),
-			research: {
-				agents: toolchain.agents,
-				toolchains,
-				settings,
-				resources: resources.access.registry,
-				producesInTransaction: resources.dialogue.producesInTransaction,
-				execution: () => agencyExecution,
-			},
-			...liveBridge.agency,
-			steering,
-			publish: () => changes.publish(),
-		},
-		() => dialogue,
-	);
+			dialogue: () => dialogue,
+			execution: () => agencyExecution,
+		});
 	const dialogue = buildDialogueService(config, {
 		store,
 		settings,
@@ -254,6 +378,10 @@ export async function buildServices(
 	knowledge.attachDialogue(dialogue);
 	if (enabled && toolchains) {
 		agencyExecution = wireToolchainExecution({
+			goalWorkspaces,
+			...(registeredGoals.authority
+				? { goalAuthority: registeredGoals.authority }
+				: {}),
 			toolchain,
 			toolchains,
 			workflowPorts,
@@ -279,6 +407,7 @@ export async function buildServices(
 		memory,
 		agency,
 		agendaGoalStore,
+		registeredGoals,
 		noteDocuments,
 		toolchain,
 		knowledge,
@@ -359,6 +488,8 @@ export async function buildServices(
 		dialogue,
 		agency,
 		prewarm,
+		registeredGoals,
+		goalLedger: goals.goals,
 		voice,
 		monitoring,
 	};

@@ -56,6 +56,8 @@ export function createNoteDocuments(options: {
 		validInTransaction: (_db, id) => started.has(id) && !forgotten.has(id),
 		async writeLocal(input, signal) {
 			signal.throwIfAborted();
+			if (!("conversationId" in input))
+				throw new Error("markdown_owner_mismatch");
 			if (!scratch) throw new Error("scratch_unavailable");
 			const item = await scratch.put({
 				id: input.id,

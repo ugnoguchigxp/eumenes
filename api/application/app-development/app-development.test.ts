@@ -308,6 +308,7 @@ test("natural language → app draft → confirmed save → protected Web → Op
 }, 20000);
 
 test("following one comparison source keeps the other source available", async () => {
+	let badEvidence = false;
 	const entry = "https://example.com/entry";
 	const detail = "https://example.com/detail";
 	const other = "https://example.org/detail";
@@ -344,6 +345,7 @@ test("following one comparison source keeps the other source available", async (
 			],
 			workflow: {
 				...movies.workflow,
+				evidence: { rowsKey: "rows", minSources: 1 },
 				publish: {
 					...movies.workflow.publish,
 					schemaRef: "schema:generated:comparison",
@@ -402,7 +404,11 @@ test("following one comparison source keeps the other source available", async (
 					(source: { url: string }) => source.url,
 				);
 				if (!urls.includes(detail))
-					return JSON.stringify({ data: null, follow: [detail] });
+					return JSON.stringify({
+						data: null,
+						follow: [detail],
+						citations: [],
+					});
 				expect(urls).toContain(other);
 				return JSON.stringify({
 					data: {
@@ -413,6 +419,14 @@ test("following one comparison source keeps the other source available", async (
 						})),
 					},
 					follow: [],
+					citations: [detail, other].map((url, index) => ({
+						pointer: `/rows/${index}`,
+						refs: badEvidence
+							? ["not-issued"]
+							: packet.sources
+									.find((source: { url: string }) => source.url === url)
+									.ranges.map((range: { ref: string }) => range.ref),
+					})),
 				});
 			},
 		},
@@ -430,6 +444,22 @@ test("following one comparison source keeps the other source available", async (
 			detail,
 			other,
 		]);
+		expect(
+			(await h.source(id)).data.viewing.dataContext.provenance.evidence,
+		).toHaveLength(2);
+		badEvidence = true;
+		await h.action(
+			"run",
+			{ appId: id, revision: "1", values: JSON.stringify({ date }) },
+			id,
+		);
+		await waitFor(
+			async () => (await h.source(id)).data.viewing.status.state === "failed",
+		);
+		expect((await h.source(id)).data.viewing.status.result.code).toBe(
+			"workflow_web_evidence_invalid",
+		);
+		expect((await h.source(id)).data.viewing.data).toEqual(data);
 	} finally {
 		await h.close();
 	}

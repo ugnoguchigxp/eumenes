@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import { z } from "zod";
 import type { createAlwaysOnHost } from "./always-on-host";
+import type { createRegisteredGoals } from "./registered-goals";
 import {
 	agencyActivitySchema,
 	type AgencyActivity,
@@ -11,9 +12,15 @@ export function registerAgency(
 	host: Pick<
 		ReturnType<typeof createAlwaysOnHost>,
 		"status" | "attend" | "thoughts"
-	>,
+	> & { listGoals?: ReturnType<typeof createRegisteredGoals>["list"] },
 ) {
 	const id = z.string().min(1).max(160);
+	const listGoals = host.listGoals;
+	if (listGoals)
+		app.get("/api/agency/goals", (c) => {
+			c.header("Cache-Control", "no-store");
+			return c.json(listGoals());
+		});
 	app.get("/api/agency/conversations/:id/status", (c) => {
 		const parsed = id.safeParse(c.req.param("id"));
 		return parsed.success

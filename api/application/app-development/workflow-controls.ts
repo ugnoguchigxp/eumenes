@@ -22,6 +22,7 @@ import {
 	workflowRevisionInTransaction,
 	workflowRunInTransaction,
 	workflowScheduleInTransaction,
+	workflowSchedulesInTransaction,
 } from "../../domains/pipelines";
 import type { QueueService } from "../../domains/queue";
 import type { SchedulerService } from "../../domains/scheduler";
@@ -116,7 +117,7 @@ export function createAppWorkflowControls(deps: WorkflowDependencies) {
 		code: string,
 		state: "failed" | "cancelled" | "expired" = "failed",
 	) {
-		const source = authority.sourceInTransaction(db, scope, run.runId);
+		const source = authority.sourceInTransaction(db, scope, run.runId, true);
 		if (source && run.parentId)
 			agents.cancelWorkflowInTransaction(db, run.parentId, source);
 		if (run.state === "publishing")
@@ -182,7 +183,7 @@ export function createAppWorkflowControls(deps: WorkflowDependencies) {
 				occurrence.scheduleId,
 			);
 			if (
-				!apps.app(db, definitionId) ||
+				apps.app(db, definitionId)?.workflowRevision !== revision ||
 				binding?.definition_revision !== revision
 			)
 				throw new Error("workflow_schedule_forbidden");
@@ -324,6 +325,22 @@ export function createAppWorkflowControls(deps: WorkflowDependencies) {
 		...controls,
 		async recover() {
 			await store.write((db) => {
+				for (const binding of workflowSchedulesInTransaction(db, scope)) {
+					if (
+						apps.storedApp(db, binding.workflowId)?.workflowRevision ===
+						binding.revision
+					)
+						continue;
+					const schedule = scheduler.getInTransaction(db, binding.scheduleId);
+					if (schedule && ["active", "paused"].includes(schedule.state))
+						scheduler.cancelInTransaction(db, schedule.id, schedule.revision);
+					unlinkWorkflowScheduleInTransaction(
+						db,
+						scope,
+						binding.workflowId,
+						binding.scheduleId,
+					);
+				}
 				for (const item of activeWorkflowRunsInTransaction(db).filter(
 					(item) => item.scope === scope,
 				)) {
@@ -451,13 +468,27 @@ function createWorkflowProgress(
 		if (!schema) return fail(db, run, "workflow_schema_unavailable");
 		const value = schema.parse(outputs[publish.from]);
 		if (publish.kind === "dataset") {
+			const receipts = agents.workflowOutputsInTransaction(
+				db,
+				run.parentId,
+				source,
+				"receipt",
+			);
+			const provenance = (
+				receipts?.[publish.from] as { provenance?: unknown } | undefined
+			)?.provenance;
 			finishWorkflowInTransaction(
 				db,
 				scope,
 				run.runId,
 				"completed",
 				run.version,
-				{ kind: "dataset", value },
+				{
+					kind: "dataset",
+					value,
+					observedAt: new Date(now()).toISOString(),
+					...(provenance ? { provenance } : {}),
+				},
 			);
 			return;
 		}
@@ -525,7 +556,13 @@ function createWorkflowView(scope: string, scheduler: SchedulerService) {
 					)
 				: null;
 		const result = (previous?.result ?? latest?.result) as
-			{ kind?: string; value?: unknown } | undefined;
+			| {
+					kind?: string;
+					value?: unknown;
+					observedAt?: string;
+					provenance?: unknown;
+			  }
+			| undefined;
 		const binding = workflowScheduleInTransaction(db, scope, app.appId);
 		const schedule = binding
 			? scheduler.getInTransaction(db, binding.schedule_id)
@@ -539,6 +576,14 @@ function createWorkflowView(scope: string, scheduler: SchedulerService) {
 				schedule,
 			},
 			data: result?.kind === "dataset" ? result.value : null,
+			dataContext:
+				result?.kind === "dataset"
+					? {
+							inputs: (previous ?? latest)?.inputs ?? {},
+							observedAt: result.observedAt,
+							provenance: result.provenance,
+						}
+					: null,
 		};
 	};
 }

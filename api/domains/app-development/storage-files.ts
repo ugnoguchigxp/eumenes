@@ -152,6 +152,27 @@ export function createAppStorageFiles(
 		return join(dir, "app.sqlite");
 	}
 	return {
+		preparedRevision(id: string, previous: number) {
+			const dir = directory(id);
+			if (!dir) {
+				if (previous === 0) return 0;
+				throw new Error("app_storage_file_missing");
+			}
+			const filename = file(id);
+			if (!assertRegular(filename)) {
+				if (previous === 0) return 0;
+				throw new Error("app_storage_file_missing");
+			}
+			const db = new Database(filename, { create: false, readonly: true });
+			try {
+				const current = version(db);
+				if (current !== previous && current !== previous + 1)
+					throw new Error("app_storage_revision_conflict");
+				return current;
+			} finally {
+				db.close();
+			}
+		},
 		async initialize(
 			id: string,
 			previous: number,

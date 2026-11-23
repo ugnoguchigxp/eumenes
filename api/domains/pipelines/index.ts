@@ -42,4 +42,5 @@ export {
 	unlinkWorkflowScheduleInTransaction,
 	workflowCheckpointsInTransaction,
 	workflowScheduleInTransaction,
+	workflowSchedulesInTransaction,
 } from "./service/workflow-progress";

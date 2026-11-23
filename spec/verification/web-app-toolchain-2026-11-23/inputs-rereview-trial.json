@@ -1,0 +1,239 @@
+{
+  "recordedAt": "2026-11-23T14:39:20.430Z",
+  "gitHead": "c4c029b596adb6008637dad6585db9e94b68273c",
+  "scope": "W11–W16 source snapshot, including previous W01–W07 inputs. Shared files contain unrelated work. No whole-worktree freeze.",
+  "files": [
+    {
+      "path": "api/application/app-development/app-creation.live.test.ts",
+      "sha256": "fae2a4da875c3aa9cc1e4f157d04d8237f45ec43333fcce58dba5675d4d7a5e7"
+    },
+    {
+      "path": "api/application/app-development/app-development-adapter.ts",
+      "sha256": "b65594bd036944a601e018c5f1106fd7a8b43deee0afaaedcd00f79c835647de"
+    },
+    {
+      "path": "api/application/app-development/app-development-source.ts",
+      "sha256": "8387bf06139338debc7300cbb3c0424c4c490e9fc6ca84b5ad0cbe2777a0262c"
+    },
+    {
+      "path": "api/application/app-development/app-development.fixture.ts",
+      "sha256": "bd95258db0e17a6be7ef18a76eba3bbca2c62bd8d18e5392e749146d2133a756"
+    },
+    {
+      "path": "api/application/app-development/app-development.test.ts",
+      "sha256": "6703186bb47461771e6c973185b077b5329d597887b82d19f558c58990c151fc"
+    },
+    {
+      "path": "api/application/app-development/app-generation-contract.test.ts",
+      "sha256": "5b627cf193de1f6ecbea459339d7a90fb24b962cc52d47637e15948d46ad6ff6"
+    },
+    {
+      "path": "api/application/app-development/app-lifecycle.test.ts",
+      "sha256": "c5f70a4ab1c5a7d1350a7dd435962c06d3d082ef2b62654b41e77b8b33c3e976"
+    },
+    {
+      "path": "api/application/app-development/app-preview.ts",
+      "sha256": "eedfc56d6f479af2d5b02419f93f13443d673bfe93092710ce50149f5c19f3b3"
+    },
+    {
+      "path": "api/application/app-development/app-records.fixture.ts",
+      "sha256": "883365df06405aa4affc7241dc0f5350747853cb633f5d8a86bd5d9338682519"
+    },
+    {
+      "path": "api/application/app-development/app-request-context.ts",
+      "sha256": "7d68907526ae691cf9293c06648e7708b28992fa57048663fc55effcbfaa49b5"
+    },
+    {
+      "path": "api/application/app-development/app-save-recovery.test.ts",
+      "sha256": "ac42d42f1be4ef4fd9c32dced0dc472a69dd765b34b933b4d41eb351cf3b1bbd"
+    },
+    {
+      "path": "api/application/app-development/runtime.ts",
+      "sha256": "6aa164900442212382cd4938d3d259e3722d6eb1381a9ba46aeb9aad3cd8199c"
+    },
+    {
+      "path": "api/application/app-development/save-recovery.ts",
+      "sha256": "1ba5910e8b3a7e5e37dccdb4725499062d6eb3c5b1084e253103e1bdd3f7c66a"
+    },
+    {
+      "path": "api/application/app-development/storage-recovery.test.ts",
+      "sha256": "dcd981cf56b570685105b80bdec1a95bcfb2321ccecccdb39124494c6ee59e72"
+    },
+    {
+      "path": "api/application/app-development/storage-runtime.ts",
+      "sha256": "a0334f6b10bd51de3c575405f4613cf2ad1a7a77fb67b92756614d51c868ea77"
+    },
+    {
+      "path": "api/application/app-development/workflow-controls.ts",
+      "sha256": "96e843371d59e0a6ea2b20b452413907fc55d36495cc92dceb207e20651cdee9"
+    },
+    {
+      "path": "api/application/app-development/workflow-operations.ts",
+      "sha256": "11c0510aca530ba35ad5033caa1a48bcd7bcea5b7a2b7b46a702842df31738ec"
+    },
+    {
+      "path": "api/application/app-development/workflow-web-records.ts",
+      "sha256": "05b5e9b992cf57d56ccf644c0cef8a8a56d2ad3f387644b8822db830e834be4f"
+    },
+    {
+      "path": "api/application/pipelines/workflow-authoring.test.ts",
+      "sha256": "c2cb870dcbbe8ea8bb30a86504311396c429e7059b3dc10fc8a0f4087e9ffc31"
+    },
+    {
+      "path": "api/application/pipelines/workflow-authoring.ts",
+      "sha256": "ea47bd5beff5c32bf8dcabbf64536a90616ceccf40cf08e9935fc6fb72716aed"
+    },
+    {
+      "path": "api/application/pipelines/workflow-execution-source.ts",
+      "sha256": "83a9958a7e21057103c393cce412e1dd02c65ed6f3cb210c61d82b33c9e2d065"
+    },
+    {
+      "path": "api/application/scheduler/scheduler-diagnostics.ts",
+      "sha256": "7184ee2e38971fd64b43c0b6878377661424e1477fe6b75cb7ad60c4dda1b3f1"
+    },
+    {
+      "path": "api/domains/agent-runtime/service/execution-access.ts",
+      "sha256": "6a3f0364e1d77e632c381975f36ccff4dc80367f0b48d62b537748b1de1e75b2"
+    },
+    {
+      "path": "api/domains/app-development/index.ts",
+      "sha256": "aeee51f20ef4704e8e41cf5d2ef81757f49c3a4e6c138fca0d685d81a777e4ec"
+    },
+    {
+      "path": "api/domains/app-development/request-context.ts",
+      "sha256": "1b70c0a63e6cd89ffb090748fe54d157dce5482625934f0b55060ab47064b849"
+    },
+    {
+      "path": "api/domains/app-development/storage-lifecycle.ts",
+      "sha256": "09cda4bbef6e791e4fecabacf90e787321348db3f0de696ac4205ff376aab11d"
+    },
+    {
+      "path": "api/domains/app-development/test/legacy.fixture.ts",
+      "sha256": "5045acad6d01997e3b6c345a4bdaea5176660f2afea140c6c85edce89a278808"
+    },
+    {
+      "path": "api/domains/app-development/test/request-context.test.ts",
+      "sha256": "8564fbdb98235453a6333191c15ca747a5d6756ad1ed050f20014868bb205be7"
+    },
+    {
+      "path": "api/domains/app-development/test/web-evidence.test.ts",
+      "sha256": "ec267eb1995436e79c3aefa388c5b1924df7ece06a2b96435fa3c6639da1a2c4"
+    },
+    {
+      "path": "api/domains/app-development/web-evidence.ts",
+      "sha256": "2ce01ff25961991be18f5f1819744582d2c279b4bdb4c22b8d1f26ca1dac56bd"
+    },
+    {
+      "path": "api/domains/capabilities/bundles/app-development.bundle.json",
+      "sha256": "171826e7ef2df0273d8f8a4cb723a7f172d9232bca0ba3ba897f0b89c454f2f3"
+    },
+    {
+      "path": "api/domains/conversation/repository/index.ts",
+      "sha256": "0f2e7b4067767179da1a2d44d3450ebebb56aba9614ffe511efe18144b164aec"
+    },
+    {
+      "path": "api/domains/conversation/service/index.ts",
+      "sha256": "8edec971f4e8606f17c59a9fc1e3a0297c19bde8919e16a581058882bebd239d"
+    },
+    {
+      "path": "api/domains/dialogue/service/specialist-host.ts",
+      "sha256": "2afc128548414deb0515a8f5cd962f8c2ad41650967aeceda68c2f64e02d4482"
+    },
+    {
+      "path": "api/domains/dialogue/service/specialist-source.ts",
+      "sha256": "4c2e7e6bf7789dd01697de5f45609e205ca35cc27c1c43bc5589ff2c20b00e3e"
+    },
+    {
+      "path": "api/domains/larm/test/native-decision.test.ts",
+      "sha256": "41a4bd122d8b40ee538aa78e892ee93431f4cc1b3c75fd9b58e37b8e3a60a6f1"
+    },
+    {
+      "path": "api/domains/pipelines/index.ts",
+      "sha256": "5f33102b6d6bb62576f7b6bfc44ebbdc8c49b72a103eec63439f637abc693cc7"
+    },
+    {
+      "path": "api/domains/pipelines/service/workflow-definition.ts",
+      "sha256": "e3b372848564ad07c459c2003cb6ef116fb2d9dae17ebcbc34fe9195be3e62ad"
+    },
+    {
+      "path": "api/domains/pipelines/service/workflow-progress.ts",
+      "sha256": "c0b2a0ca25f19eaa7a4f7198c69db451148fb30b6ea40cd3f2d75f5ac0dc535d"
+    },
+    {
+      "path": "api/domains/pipelines/test/workflow-definition.test.ts",
+      "sha256": "e3ab9a263e0e907d9b1309db7e05876ae80d102379c07abf013c2848f91b38c5"
+    },
+    {
+      "path": "api/domains/tool-runtime/contracts/adapters.ts",
+      "sha256": "579e47b387b626603fdab93e3ff707514d74d7f17ca8044145d56ca457362c2e"
+    },
+    {
+      "path": "api/domains/tool-runtime/service/action-requests.ts",
+      "sha256": "0de9a70f16858c21b1f97778e9ece942dce77a1cc2ac77bfd0b9d2bd9dba5429"
+    },
+    {
+      "path": "api/domains/ui-compositions/index.ts",
+      "sha256": "aae8203a2e22cfd91f673d4b304097f613121c18e139b7991db9235525501b3a"
+    },
+    {
+      "path": "api/domains/ui-compositions/service/workflow-inputs.ts",
+      "sha256": "5c78ebdf2feeb20f33753630d11c8e85d692f7bf9915a62f9f40c7b3da4f083c"
+    },
+    {
+      "path": "api/domains/ui-compositions/test/workflow-inputs.test.ts",
+      "sha256": "efe9b89bf59ffe7d359a6a0a0f84fe85480b6f09a74a217f120e6d1bd5835f7b"
+    },
+    {
+      "path": "packages/artifact-ui/src/event-contracts.ts",
+      "sha256": "297041cc00242d5e98bd0178e7500fa8b6ea0443ba33d501491845626023d644"
+    },
+    {
+      "path": "packages/artifact-ui/src/ui-studio-components.tsx",
+      "sha256": "42f065219f411723d0200945a474a47c72a9c3d143d7ee24343dc1a687ed0536"
+    },
+    {
+      "path": "packages/artifact-ui/src/ui-studio-contracts.ts",
+      "sha256": "21c2666425b45e3d9b0d5f0d908aaea67284547a8ed374bd6598f9b648ff49a1"
+    },
+    {
+      "path": "packages/artifact-ui/src/ui-studio-preview.test.ts",
+      "sha256": "a3b2c92effcd07728aac5c5aeb962b94c57b8a7092b86e27d0550658c776adcd"
+    },
+    {
+      "path": "packages/artifact-ui/src/ui-studio-preview.ts",
+      "sha256": "6b982149fcaa87e41bc0714a13db94621acc36192b360d2ae9c0fcc73c625837"
+    },
+    {
+      "path": "packages/artifact-ui/src/ui-studio-render-preview.tsx",
+      "sha256": "7f6f07437e0f85a05963e4cb8d7477111f7d29194b7f7107afda7b49a0106ead"
+    },
+    {
+      "path": "packages/artifact-ui/src/ui-studio-source.test.tsx",
+      "sha256": "69b2b63d4f4f60418ca5e195228c4e76c663ed1ecf70087750bdc6e634131116"
+    },
+    {
+      "path": "packages/artifact-ui/src/ui-studio-status.tsx",
+      "sha256": "e145e9a2dc690d0783fc1d33c4d4554be0c1dd05e664387c842bbf4ffbd8faec"
+    },
+    {
+      "path": "scripts/app-development-fixture-server.ts",
+      "sha256": "70645951154de09e5c589d60c32a36d5d65e3431a9aac0578857c84e3b9d3d15"
+    },
+    {
+      "path": "scripts/domains.ts",
+      "sha256": "794011e54d550b64b8f7c9ef164a6663d758e1252f71081dfe5c29bdbdd8ac7c"
+    },
+    {
+      "path": "tests/browser/app-development.spec.ts",
+      "sha256": "b8428e43e943ae6bc4e2f5d29b8105d85d15c540c7af50f2762ac674c9891685"
+    },
+    {
+      "path": "web/src/domains/ui-compositions/toolchain-adapter.test.tsx",
+      "sha256": "a03060d41c1ffe261733c134a8bd65748d8006c014e627e55d47cbb4d993b7a7"
+    },
+    {
+      "path": "web/src/domains/ui-compositions/toolchain-adapter.tsx",
+      "sha256": "6542a598be3bf80bfa495298a921d43b66314392001f7e1c321dd7868d1f0782"
+    }
+  ]
+}

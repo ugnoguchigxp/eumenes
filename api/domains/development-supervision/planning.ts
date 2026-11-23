@@ -220,6 +220,8 @@ export function adoptDesign(
 	prepared: SupervisionDesignPreparation,
 	guides: SupervisionNote[],
 ) {
+	if (parent.source.origin === "goal") return;
+	const source = parent.source;
 	if (prepared.kind !== "ready") {
 		planningHeld(parent, prepared.reason);
 		return;
@@ -231,7 +233,7 @@ export function adoptDesign(
 		prepared.evidence.some(
 			(evidence) =>
 				!allowed.includes(hash(evidence)) ||
-				!host.research.validEvidenceInTransaction(db, parent.source, evidence),
+				!host.research.validEvidenceInTransaction(db, source, evidence),
 		)
 	) {
 		planningHeld(parent, "設計に使った出典を確認できません。");
@@ -239,7 +241,7 @@ export function adoptDesign(
 	}
 	const binding = {
 		parentId: parent.id,
-		conversationId: parent.source.conversationId,
+		conversationId: source.conversationId,
 		sourceRunId: parent.source.runId,
 		generation: parent.generation,
 		revision: (parent.designs.at(-1)?.revision ?? 0) + 1,

@@ -9,6 +9,7 @@ import type {
 	SupervisionWorkspaceEvidence,
 } from "./contracts";
 import { type Judgement, type Proposal } from "./decisions";
+import { earlierGoalEdit, rememberGoalEdit } from "./goal-edits";
 import { recordQuestion } from "./questions";
 import {
 	grantOf,
@@ -56,6 +57,7 @@ export function plannedTask(
 }
 
 export function scopeOf(parent: Parent, task: Task): SupervisionScope {
+	if (parent.goalScope) return parent.goalScope;
 	const { mode, readablePaths, writablePaths, checks } = task.proposal;
 	return {
 		...parent.workspace,
@@ -83,6 +85,7 @@ export function allowedScope(
 		(proposal.mode === "edit" && !proposal.writablePaths.length)
 	)
 		return false;
+	if (parent.goalScope) return true;
 	const quote = proposal.authorityQuote.trim();
 	return (
 		!!quote &&
@@ -183,14 +186,15 @@ function dispatch(
 		}
 		return;
 	}
+	const requiresDesign = !parent.goalScope || parent.goalScope.mode === "edit";
 	if (
-		!task.designRevision ||
+		(requiresDesign && !task.designRevision) ||
 		parent.pendingTaskId === task.id ||
 		task.dispatchFailed
 	)
 		return;
 	const design = designFor(host, db, parent, task.designRevision);
-	if (!design) {
+	if (!design && requiresDesign) {
 		finishTask(task, "interrupted", "設計書または設計の根拠を確認できません。");
 		return;
 	}
@@ -216,7 +220,12 @@ function dispatch(
 		);
 		return;
 	}
-	const workspace = host.workspace.inspectInTransaction(db, scope);
+	const workspace = host.workspace.inspectInTransaction(
+		db,
+		scope,
+		undefined,
+		earlierGoalEdit(db, parent, scope),
+	);
 	if (workspace.reason) {
 		if (workspace.blockerRef)
 			workHold(task, workspace.reason, workspace.blockerRef);
@@ -228,9 +237,15 @@ function dispatch(
 		task.before = null;
 		return;
 	}
-	const target = host.child.targetInTransaction(db);
+	const target = host.child.targetInTransaction(
+		db,
+		!!parent.goalScope,
+		parent.goalScope?.workspaceRef,
+	);
 	if (!target) {
-		workHold(task, "Claude Code の受付を確認できません。");
+		if (parent.goalScope)
+			finishTask(task, "failed", "Claude Code の受付を確認できません。");
+		else workHold(task, "Claude Code の受付を確認できません。");
 		return;
 	}
 	if (parent.childCalls >= parent.limits.children) {
@@ -247,7 +262,7 @@ function dispatch(
 		schedule("capture", task);
 		return;
 	}
-	const request = `${design.markdown}\n\n## 作業範囲\n${task.proposal.instruction}\n\n## 受入条件\n${task.proposal.acceptance.map((item) => `- ${item}`).join("\n")}`;
+	const request = `${design ? design.markdown + "\n\n" : ""}## 作業範囲\n${task.proposal.instruction}\n\n## 受入条件\n${task.proposal.acceptance.map((item) => `- ${item}`).join("\n")}`;
 	const previous = task.grantRef;
 	try {
 		db.transaction(() => {
@@ -256,11 +271,13 @@ function dispatch(
 				kind: "claude",
 				request,
 				scope: { ...scope, baselineInputDigest: task.before!.inputDigest },
-				design: {
-					revision: task.designRevision!,
-					documentId: design.documentId,
-					digest: design.digest,
-				},
+				design: design
+					? {
+							revision: task.designRevision!,
+							documentId: design.documentId,
+							digest: design.digest,
+						}
+					: null,
 				task,
 			});
 			task.grantRef = grant.source.delegation.grantRef;
@@ -350,6 +367,41 @@ export function inspectTask(
 			grant.released = true;
 			saveGrant(db, grant);
 		}
+		if (parent.goalScope && grant.scope.mode !== "edit") {
+			const observed = goalEvidenceOf(grant, child);
+			const failed = observed.find(
+				({ kind, passed }) => kind === "check" && passed === false,
+			);
+			if (failed || child.view.status !== "completed") {
+				task.evidence = observed;
+				finishTask(
+					task,
+					"failed",
+					failed
+						? [
+								failed.exitCode === undefined
+									? null
+									: `終了コード ${failed.exitCode}`,
+								failed.stderr ? "標準エラー " + failed.stderr : failed.text,
+							]
+								.filter(Boolean)
+								.join("\n")
+						: (child.view.result?.summary ?? task.reason),
+					observed.map(({ ref }) => ref),
+				);
+				return;
+			}
+			if (!task.designRevision) {
+				task.evidence = observed;
+				finishTask(
+					task,
+					observed.length ? "completed" : "partial",
+					child.view.result?.summary ?? task.reason,
+					observed.map(({ ref }) => ref),
+				);
+				return;
+			}
+		}
 		task.phase = "evaluate";
 		task.state = child.view.status === "completed" ? "running" : "held";
 		task.reason =
@@ -426,6 +478,23 @@ export function evidenceOf(grant: Grant, child: SupervisionChildObservation) {
 	);
 }
 
+function goalEvidenceOf(grant: Grant, child: SupervisionChildObservation) {
+	const evidence = new Map(
+		evidenceOf(grant, child).map((item) => [item.ref, item]),
+	);
+	for (const check of child.diagnosticChecks ?? []) {
+		if (
+			check.kind === "check" &&
+			check.passed === false &&
+			check.check &&
+			check.targetRevision === grant.scope.targetRevision &&
+			grant.scope.checks.some((allowed) => hash(allowed) === hash(check.check))
+		)
+			evidence.set(check.ref, check);
+	}
+	return [...evidence.values()];
+}
+
 export function applyJudgement(
 	parent: Parent,
 	task: Task,
@@ -435,7 +504,8 @@ export function applyJudgement(
 	decision: Judgement,
 ) {
 	const evidence = evidenceOf(grant, child);
-	task.evidence = evidence;
+	task.evidence = parent.goalScope ? goalEvidenceOf(grant, child) : evidence;
+	rememberGoalEdit(parent, task, grant, observation, evidence);
 	if (decision.action === "finish") {
 		const outcome =
 			child.view.status === "cancelled" || child.view.status === "interrupted"
@@ -459,6 +529,10 @@ export function applyJudgement(
 		return;
 	}
 	if (decision.action === "replan") {
+		if (parent.goalScope) {
+			finishTask(task, "partial", decision.reason, refs);
+			return;
+		}
 		const fingerprint = hash([
 			observation.inputDigest,
 			cited

@@ -12,7 +12,11 @@ import {
 } from "../../capabilities";
 import type { InferencePort } from "../../inference";
 import { createQueue, migrations as queueMigrations } from "../../queue";
-import type { ExecutionSource, ExecutionView } from "../../tool-runtime";
+import type {
+	ExecutionSource,
+	ExecutionView,
+	OwnedExecutionView,
+} from "../../tool-runtime";
 import {
 	createDevelopmentSupervision,
 	migrations,
@@ -96,6 +100,9 @@ export async function fixture(
 	request = "Read the source, fix the source, and run the regression check.",
 	researchEnabled = false,
 	approvedRequest?: string,
+	goal?: SupervisionHost["goal"],
+	workspace?: SupervisionHost["workspace"],
+	extraMigrations: Parameters<typeof openStore>[1] = [],
 ) {
 	const folder = mkdtempSync(
 		join(tmpdir(), "eumenes-development-supervision-"),
@@ -165,6 +172,7 @@ export async function fixture(
 		return { ...input, action, ...extra };
 	}
 	const host: SupervisionHost = {
+		...(goal ? { goal } : {}),
 		validSourceInTransaction: (_db, input) =>
 			available && hash(input) === hash(source),
 		confirmedRequestInTransaction: (_db, input, id, text) =>
@@ -189,7 +197,7 @@ export async function fixture(
 			return true;
 		},
 		revokeInTransaction() {},
-		workspace: {
+		workspace: workspace ?? {
 			inTransaction: () => ({ workspaceRef: "test", targetRevision: "base" }),
 			authorizeInTransaction: () => true,
 			inspectInTransaction(_db, scope, workId) {
@@ -247,6 +255,8 @@ export async function fixture(
 						}
 					: null,
 			startInTransaction(db, kind, start) {
+				if (start.source.conversationId === null)
+					throw new Error("test_conversation_required");
 				expect(
 					service.authorizeInTransaction(db, auth(start, "start"))?.kind,
 				).toBe(kind);
@@ -334,15 +344,18 @@ export async function fixture(
 		child: {
 			targetInTransaction: () => target,
 			startInTransaction(db, input) {
-				expect(
-					service.authorizeInTransaction(db, auth(input, "start"))?.scope
-						.targetRevision,
-				).toBe("base");
-				expect(input.request.startsWith(designText)).toBe(true);
+				const grant = service.authorizeInTransaction(db, auth(input, "start"));
+				expect(grant).not.toBeNull();
+				if (!input.source.goal) {
+					expect(grant?.scope.targetRevision).toBe("base");
+					expect(input.request.startsWith(designText)).toBe(true);
+				}
 				const id = crypto.randomUUID();
-				const view: ExecutionView = {
+				const view: OwnedExecutionView = {
 					id,
-					conversationId: input.source.conversationId,
+					...(input.source.goal
+						? { conversationId: null, goal: input.source.goal }
+						: { conversationId: input.source.conversationId }),
 					request: input.request,
 					revision: 0,
 					status: "deciding",
@@ -415,6 +428,7 @@ export async function fixture(
 		store = openStore(path, [
 			...capabilityMigrations,
 			...queueMigrations,
+			...extraMigrations,
 			...migrations,
 		]);
 		queue = createQueue(store, {

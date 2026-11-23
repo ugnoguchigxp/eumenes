@@ -520,6 +520,13 @@ export function createGoalsService(
 		listForStewardInTransaction: listGoalsForSteward,
 		/** Adopted goals for context: priority high first, then most recently revised. */
 		adoptedForContextInTransaction: adoptedGoalsForContext,
+		originInTransaction(db: Database, access: GoalAccess, id: string) {
+			const revision = goalRevisionOf(db, id, access);
+			const goal = revision && getGoal(db, id);
+			return goal
+				? { source: goal.source, messageIds: messageIdsOfGoals(db, [id]) }
+				: null;
+		},
 		/** What `forgetGoalsInTransaction` would delete; writes nothing. */
 		resolveForgetInTransaction: resolveGoalForget,
 		/** The immediate stage of a forget: out of every listing now, deleted by `forgetGoalsInTransaction`. */

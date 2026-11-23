@@ -4,7 +4,28 @@ import { canonicalJson, sha256Hex } from "../../infrastructure/digest";
 import { decodeLlmJson } from "../../infrastructure/llm-json";
 import type { Migration } from "../../infrastructure/sqlite";
 import { appStorage, storageScreenBinding } from "./storage-contract";
-import { createStorageLifecycle, storageMigration } from "./storage-lifecycle";
+export {
+	webEvidenceContract,
+	webCitations,
+	webRecordModelSchema,
+	verifiedWebRecords,
+	type WebEvidenceContract,
+} from "./web-evidence";
+import {
+	createStorageLifecycle,
+	storageMigration,
+	storageRecoveryMigration,
+} from "./storage-lifecycle";
+import {
+	requestContextMigration,
+	saveRequestContext,
+	type AppRequestContext,
+} from "./request-context";
+export {
+	requestUrls,
+	type AppRequestContext,
+	type AppRequestSource,
+} from "./request-context";
 
 export {
 	AppStorageDefinitionError,
@@ -60,6 +81,8 @@ CREATE TABLE app_development_web_routes (
 );`,
 	},
 	storageMigration,
+	requestContextMigration,
+	storageRecoveryMigration,
 ];
 
 export const appDraft = z
@@ -136,6 +159,7 @@ type WorkRow = {
 	conversation_id: string | null;
 	busy_run_id: string | null;
 	rejected_json: string | null;
+	request_context_json: string | null;
 };
 type Version = {
 	appId: string;
@@ -147,6 +171,7 @@ type Version = {
 	screenRevision: number | null;
 	request: string | null;
 	conversationId: string | null;
+	requestContext?: AppRequestContext | null;
 };
 const work = (db: Database, scope: string, id: string) =>
 	db
@@ -186,6 +211,7 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 			savedRevision: row.saved_revision,
 			draft,
 			request: row.request,
+			requestContext: parsed<AppRequestContext>(row.request_context_json),
 			conversationId: row.conversation_id,
 			rejected: parsed<unknown>(row.rejected_json),
 			busy: row.busy_run_id !== null,
@@ -268,6 +294,7 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 					now(),
 				],
 			);
+			saveRequestContext(db, scope, id, saved?.requestContext ?? null);
 			return state(db, load(db, id));
 		},
 		state(db: Database, id: string) {
@@ -306,6 +333,7 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 			input: {
 				revision: number;
 				value: unknown;
+				requestContext?: AppRequestContext;
 				turn?: {
 					sessionId: string;
 					runId: string;
@@ -339,6 +367,8 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 					id,
 				],
 			);
+			if (input.requestContext)
+				saveRequestContext(db, scope, id, input.requestContext);
 			return { revision: row.revision + 1 };
 		},
 		reject(
@@ -390,6 +420,7 @@ export function createAppDevelopment(scope: string, now = Date.now) {
 				screenRevision: input.screenRevision,
 				request: row.request,
 				conversationId: row.conversation_id,
+				requestContext: parsed<AppRequestContext>(row.request_context_json),
 			};
 			db.run("INSERT INTO app_development_versions VALUES(?,?,?,?,?,?,?,?)", [
 				scope,

@@ -166,3 +166,13 @@ export function markWorkflowPublicationCheckInTransaction(
 		).changes === 1
 	);
 }
+export function workflowSchedulesInTransaction(db: Database, scope: string) {
+	return db
+		.query<
+			{ workflowId: string; revision: number; scheduleId: string },
+			[string]
+		>(
+			"SELECT workflow_id AS workflowId,definition_revision AS revision,schedule_id AS scheduleId FROM workflow_schedules WHERE scope=? AND active=1",
+		)
+		.all(scope);
+}

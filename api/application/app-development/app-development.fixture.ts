@@ -1,4 +1,5 @@
 import { expect } from "bun:test";
+import { runRespond } from "eumenes-agency";
 import {
 	type createLiveLarm,
 	liveLarmSettings,
@@ -16,8 +17,21 @@ import { searchThenDelegate } from "../toolchain/conversation-script.fixture";
 import { harness } from "../toolchain/toolchain.fixture";
 import type { HarnessOptions } from "../toolchain/toolchain-harness-options.fixture";
 import { workflowRefs } from "./workflow-operations";
+import { defaults } from "../../domains/settings";
+import { agencyReplyParts } from "../agency/system-context";
 
-export const artifact = "artifact:app-development.studio@2";
+// The normal production conversation's instruction builder and response loop, without background agency work.
+const liveConversation: NonNullable<HarnessOptions["conversationAgent"]> = {
+	system: () =>
+		agencyReplyParts({ ...defaults({}).agency, emotion: false }, false),
+	handsWork: () => true,
+	async respond(input) {
+		const reply = await runRespond({ ...input, emotion: false });
+		return { text: reply.text, ended: reply.ended };
+	},
+};
+
+export const artifact = "artifact:app-development.studio@4";
 export const name = "eumenes_fixture";
 export const date = "2026-11-09";
 export const movie = "検証映画 & 続編";
@@ -180,6 +194,7 @@ export async function fixture(input: {
 	};
 	live?: {
 		model: ReturnType<typeof createLiveLarm>;
+		acquisition?: NonNullable<HarnessOptions["acquisition"]>;
 		archive?: ArchivePort;
 		destination?: { namespace: string; path: string };
 	};
@@ -206,6 +221,7 @@ export async function fixture(input: {
 		...(realModel
 			? {
 					model: input.live!.model,
+					conversationAgent: liveConversation,
 					liveRouting: true,
 					inferenceOptions: { token: resolveLarmToken(process.env) },
 				}
@@ -217,7 +233,7 @@ export async function fixture(input: {
 			: {}),
 		markdown: input.live?.archive ?? archive,
 		acquisition: input.live
-			? createWebAcquisition()
+			? (input.live.acquisition ?? createWebAcquisition())
 			: input.webFixture?.acquisition,
 		timerNow: input.timerNow,
 		discoveryTarget: () => "develop_app",
@@ -225,7 +241,10 @@ export async function fixture(input: {
 			searchThenDelegate(
 				(candidate) => candidate.id === "app.develop",
 				input.request,
-				{ announcement: "アプリの制作を始めます。", impact: "create" },
+				{
+					announcement: "アプリの制作を始めます。",
+					impact: "create",
+				},
 			)(messages),
 		reviewSubagent: input.reviewSubagent,
 		specialist:
@@ -437,9 +456,17 @@ export async function fixture(input: {
 			})
 		).json();
 		const finished = await h.dialogue.waitForTerminal(run.id, {
-			timeoutMs: input.live ? 180000 : 8000,
+			timeoutMs: input.live ? 20 * 60 * 1000 : 8000,
 		});
-		expect(finished?.status, JSON.stringify(finished)).toBe("completed");
+		expect(
+			finished?.status,
+			JSON.stringify({
+				id: finished?.id,
+				status: finished?.status,
+				error: finished?.error,
+				jobId: finished?.jobId,
+			}),
+		).toBe("completed");
 	};
 	const create = async (maxRepairs = 1) => {
 		await propose(input.request);
@@ -466,6 +493,10 @@ export async function fixture(input: {
 			);
 			({ work } = (await source()).data);
 		}
+		return confirm();
+	};
+	const confirm = async () => {
+		const { work } = (await source()).data;
 		expect(
 			work?.confirmation,
 			JSON.stringify({
@@ -480,7 +511,12 @@ export async function fixture(input: {
 			digest: work.confirmation.digest,
 		});
 		const id = saved.result.resultRefs[0].id as string;
-		await waitFor(async () => (await source(id)).data.viewing?.id === id);
+		await waitFor(async () => {
+			const viewing = (await source(id)).data.viewing;
+			return (
+				viewing?.id === id && viewing.savedRevision === work.savedRevision + 1
+			);
+		});
 		expect((await source(id)).data.history).toContainEqual(
 			expect.objectContaining({ id }),
 		);
@@ -511,6 +547,7 @@ export async function fixture(input: {
 		source,
 		action,
 		propose,
+		confirm,
 		create,
 		completed,
 		documents,

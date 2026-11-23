@@ -1,12 +1,14 @@
 import type { ExecutionResult, ExecutionView } from "../tool-runtime";
-import type { SupervisedRow } from "./contracts";
+import type { GoalSupervisionReceipt, SupervisedRow } from "./contracts";
 import type { Parent, Task } from "./state";
 
 export function rows(parent: Parent): SupervisedRow[] {
+	if (parent.source.origin === "goal") return [];
+	const conversationId = parent.source.conversationId;
 	return parent.tasks.map((task) => {
 		const base = {
 			parentId: parent.id,
-			conversationId: parent.source.conversationId,
+			conversationId,
 			workspaceRef: parent.workspace.workspaceRef,
 			taskId: task.id,
 			title: task.proposal.title,
@@ -34,6 +36,8 @@ export function rows(parent: Parent): SupervisedRow[] {
 }
 
 export function executionView(parent: Parent): ExecutionView {
+	if (parent.source.origin === "goal")
+		throw new Error("supervision_owner_mismatch");
 	const summary = parent.tasks
 		.map(({ proposal, reason }) => `${proposal.title} · ${reason}`)
 		.join("\n");
@@ -47,17 +51,7 @@ export function executionView(parent: Parent): ExecutionView {
 		conversationId: parent.source.conversationId,
 		request: parent.request,
 		revision: parent.revision,
-		status:
-			parent.result?.status ??
-			(parent.question
-				? "waiting_user"
-				: parent.stop
-					? "stopping"
-					: parent.phase === "active"
-						? "waiting_child"
-						: parent.phase === "plan"
-							? "deciding"
-							: "queued"),
+		status: statusOf(parent),
 		deadline: parent.deadline,
 		result: parent.result,
 		question: parent.question,
@@ -69,6 +63,32 @@ export function executionView(parent: Parent): ExecutionView {
 				(design ? `\n[設計書](${design})` : ""),
 			observedAt: parent.observedAt,
 		},
+	};
+}
+
+function statusOf(parent: Parent): ExecutionView["status"] {
+	if (parent.result) return parent.result.status;
+	if (parent.question) return "waiting_user";
+	if (parent.stop) return "stopping";
+	if (parent.phase === "active") return "waiting_child";
+	if (parent.phase === "plan") return "deciding";
+	return "queued";
+}
+
+export function goalReceipt(parent: Parent): GoalSupervisionReceipt {
+	if (parent.source.origin !== "goal")
+		throw new Error("supervision_owner_mismatch");
+	return {
+		ownerWorkId: parent.id,
+		ownerRevision: parent.revision,
+		status: statusOf(parent),
+		result: parent.result,
+		question: parent.question,
+		questionReleased: parent.goalQuestionReleased === true,
+		evidence: parent.tasks.flatMap(({ readEvidence, evidence }) => [
+			...readEvidence,
+			...evidence,
+		]),
 	};
 }
 

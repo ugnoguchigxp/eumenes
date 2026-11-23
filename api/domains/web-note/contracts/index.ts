@@ -2,6 +2,7 @@ import type {
 	ExecutionResult,
 	ExecutionSource,
 	ExecutionView,
+	GoalExecutionSource,
 	SupervisedExecutionSource,
 	ToolchainExecutionPort,
 } from "../../tool-runtime";
@@ -9,7 +10,7 @@ import type { Database } from "bun:sqlite";
 
 /** What the research note task keeps of one run (the row's `data_json`). */
 export type HostState = {
-	source: ExecutionSource;
+	source: ExecutionSource | GoalExecutionSource;
 	request: string;
 	toolchainRevisionId: string;
 	bindingRevisionId: string;
@@ -96,4 +97,19 @@ export type SourcePort = Pick<
 			eventId: string,
 		): boolean;
 	};
+};
+
+export type GoalWebNoteReceipt = {
+	ownerWorkId: string;
+	ownerRevision: number;
+	status: ExecutionView["status"];
+	result: ExecutionResult | null;
+};
+export type GoalWebNoteOwner = {
+	authorityInTransaction(db: Database, source: GoalExecutionSource): boolean;
+	observeInTransaction(
+		db: Database,
+		source: GoalExecutionSource,
+		receipt: GoalWebNoteReceipt,
+	): void;
 };

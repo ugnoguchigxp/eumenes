@@ -14,6 +14,7 @@ import type {
 	SupervisionHost,
 	SupervisionScope,
 	SupervisionWorkspaceEvidence,
+	SupervisionOwnedEdit,
 } from "./contracts";
 import {
 	captureInference,
@@ -24,6 +25,7 @@ import {
 	notesOf,
 	planWork,
 } from "./decisions";
+import { earlierGoalEdit } from "./goal-edits";
 import { adoptDesign, applyPlan, planningHeld } from "./planning";
 import { grantOf, grantsOf, parentOf, parents } from "./repository";
 import type { Grant, Parent, Task } from "./state";
@@ -111,7 +113,11 @@ type Prepared = { host: SupervisionHost; parent: Parent } & (
 			capabilities: { research: readonly string[]; skillSmith: boolean };
 	  }
 	| { kind: "design" }
-	| { kind: "capture"; scope: SupervisionScope }
+	| {
+			kind: "capture";
+			scope: SupervisionScope;
+			inherited?: SupervisionOwnedEdit;
+	  }
 	| {
 			kind: "judge";
 			requestId: string;
@@ -211,7 +217,13 @@ export function registerJobs({
 				if (scope)
 					return {
 						status: "ready",
-						input: { kind, host, parent, scope } satisfies Prepared,
+						input: {
+							kind,
+							host,
+							parent,
+							scope,
+							inherited: earlierGoalEdit(db, parent, scope),
+						} satisfies Prepared,
 					};
 				return { status: "stale", reason: "supervision_scope_unavailable" };
 			}
@@ -308,15 +320,16 @@ export function registerJobs({
 					};
 				case "design": {
 					const plan = parent.plan!;
-					const guides = plan.guideQuery
-						? (
-								(await host.research.skillSmith?.(
-									plan.guideQuery,
-									parent.source,
-									signal,
-								)) ?? []
-							).slice(0, 4)
-						: [];
+					const guides =
+						plan.guideQuery && parent.source.origin !== "goal"
+							? (
+									(await host.research.skillSmith?.(
+										plan.guideQuery,
+										parent.source,
+										signal,
+									)) ?? []
+								).slice(0, 4)
+							: [];
 					const notes = [...notesOf(parent), ...guides];
 					return {
 						kind,
@@ -331,7 +344,12 @@ export function registerJobs({
 				case "capture":
 					return {
 						kind,
-						output: await host.workspace.capture(input.scope, signal),
+						output: await host.workspace.capture(
+							input.scope,
+							signal,
+							undefined,
+							input.inherited,
+						),
 					};
 				case "judge": {
 					const { task, child } = input;
@@ -396,6 +414,7 @@ export function registerJobs({
 				);
 				if (selected) selected.ceiling = next.output.mode;
 				else parent.ceiling = next.output.mode;
+				if (parent.source.origin === "goal") return "stale";
 				parent.context = (
 					host.research.contextInTransaction?.(
 						db,

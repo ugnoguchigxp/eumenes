@@ -16,11 +16,18 @@ CREATE TABLE web_note_runs (
 CREATE INDEX web_note_runs_active ON web_note_runs(state, deadline);
 `,
 	},
+	{
+		id: "web-note/0002-owner",
+		after: ["web-note/0001-runs"],
+		sql: `ALTER TABLE web_note_runs RENAME COLUMN conversation_id TO owner_key;
+ALTER TABLE web_note_runs ADD COLUMN owner_kind TEXT NOT NULL DEFAULT 'conversation' CHECK(owner_kind IN ('conversation','goal'));`,
+	},
 ];
 
 export type RunRow = {
 	id: string;
-	conversation_id: string;
+	owner_key: string;
+	owner_kind: "conversation" | "goal";
 	state: ExecutionStatus;
 	revision: number;
 	deadline: number;

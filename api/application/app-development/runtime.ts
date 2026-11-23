@@ -75,13 +75,16 @@ export function createAppDevelopmentRuntime(deps: {
 				DialogueService,
 				| "specialistExecutionSourceInTransaction"
 				| "specialistSessionLiveInTransaction"
+				| "specialistMessageSourceInTransaction"
+				| "specialistHandoffReferencesInTransaction"
+				| "specialistOriginalRequestSourcesInTransaction"
 		  >
 		| undefined;
 	const authority = createWorkflowExecutionAuthority({
 		now,
 		authorized(db, saved, run) {
 			return (
-				!!apps.app(db, run.workflowId) &&
+				apps.app(db, run.workflowId)?.workflowRevision === run.revision &&
 				saved.value.grant?.authorityDigest ===
 					grantDigest(saved.value.definition.publish.kind) &&
 				(saved.value.definition.publish.kind === "dataset" || !!destination())
@@ -109,6 +112,35 @@ export function createAppDevelopmentRuntime(deps: {
 		turn: (db, runId, sessionId) =>
 			dialogue?.specialistExecutionSourceInTransaction(db, runId, sessionId) ??
 			null,
+		requestEvidence: (db, conversationId, messageId) =>
+			dialogue?.specialistMessageSourceInTransaction(
+				db,
+				conversationId,
+				messageId,
+			) ?? null,
+		legacyEvidence: (db, work) =>
+			work.savedRevision > 0 &&
+			!work.requestContext &&
+			work.conversationId &&
+			work.request
+				? (dialogue?.specialistOriginalRequestSourcesInTransaction(
+						db,
+						work.conversationId,
+						work.request,
+					) ?? [])
+				: [],
+		handoffEvidence: (db, sessionId, conversationId) =>
+			(
+				dialogue?.specialistHandoffReferencesInTransaction(db, sessionId) ?? []
+			).flatMap((ref) => {
+				if (ref.kind !== "message") return [];
+				const source = dialogue?.specialistMessageSourceInTransaction(
+					db,
+					conversationId,
+					ref.id,
+				);
+				return source && source.digest === ref.digest ? [source] : [];
+			}),
 		sessionLive: (db, sessionId) =>
 			dialogue?.specialistSessionLiveInTransaction(db, sessionId) ?? false,
 		context: () => operations?.operationInfo(),
@@ -213,6 +245,8 @@ export function createAppDevelopmentRuntime(deps: {
 				validInTransaction: workflow.validDocument,
 				async writeLocal(input, signal) {
 					signal.throwIfAborted();
+					if (!("conversationId" in input))
+						throw new Error("markdown_owner_mismatch");
 					if (!scratch) throw new Error("scratch_unavailable");
 					const item = await scratch.put({
 						id: input.id,

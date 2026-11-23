@@ -1,0 +1,48 @@
+{
+  "inputHash": "84934c514e08b8cab6d83cfea6c111f887b6addb3e34bd07ff1e083a12ceba7a",
+  "bundleHash": "171826e7ef2df0273d8f8a4cb723a7f172d9232bca0ba3ba897f0b89c454f2f3",
+  "harnessHash": "bd95258db0e17a6be7ef18a76eba3bbca2c62bd8d18e5392e749146d2133a756",
+  "conversationSystem": "agencyReplyParts/defaults/no-background-agenda",
+  "cases": [
+    "records",
+    "list",
+    "journal"
+  ],
+  "observations": [
+    {
+      "kind": "records",
+      "iteration": 1,
+      "status": "failed",
+      "phase": "create",
+      "elapsedMs": 294207
+    }
+  ],
+  "passed": 0,
+  "status": "failed",
+  "requiredPasses": 9,
+  "notAttempted": 8,
+  "failedRunId": "23e8ff7e-3315-451f-95ed-eda262105e58",
+  "trialRevisions": {
+    "skill": 9,
+    "package": 11,
+    "binding": 13,
+    "toolchain": 14,
+    "artifact": 4
+  },
+  "failure": {
+    "phase": "create",
+    "reason": "chat_stream_incomplete",
+    "finishReason": "length",
+    "streamFailure": "output_limit",
+    "maxTokens": 16144,
+    "completionTokens": 16144,
+    "reasoningChars": 42201
+  },
+  "selectedAfterTrial": {
+    "skill": 8,
+    "package": 12,
+    "binding": 14,
+    "toolchain": 15,
+    "artifact": 4
+  }
+}

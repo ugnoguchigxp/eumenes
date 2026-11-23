@@ -329,8 +329,19 @@ export async function collectAgendaResults(host: ResultHost) {
 					})
 				: null;
 			// Freeze the full body in the same transaction as adoption, before bounding the checkpoint preview.
-			if (note && deps.noteDocuments)
-				note = withNoteDocument(note, startNoteDocument(deps, db, c.id, note));
+			if (note && deps.noteDocuments) {
+				const id = startNoteDocument(deps, db, c.id, note);
+				deps.goalResearchNoteInTransaction?.(db, {
+					id,
+					conversationId: c.id,
+					title: note.title,
+					summary: note.summary,
+					markdown: note.markdown,
+					refs: ticket.refs,
+					sources: ticket.inputs,
+				});
+				note = withNoteDocument(note, id);
+			}
 			const good = note !== null;
 			const p = patchOf();
 			p.tickets = p.tickets.filter((t) => t.id !== ticket.id);

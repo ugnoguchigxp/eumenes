@@ -3,6 +3,7 @@ import {
 	isStandardExecutionSource,
 	isSupervisedExecutionSource,
 	type ExecutionView,
+	type OwnedExecutionView,
 } from "../tool-runtime";
 import { codingCanonicalJSON } from "../coding";
 import type {
@@ -15,10 +16,31 @@ import type {
 import { terminal } from "./repository";
 
 export const newId = () => crypto.randomUUID();
+export function workWorkspace(
+	host: Host,
+	work: Pick<Work, "source" | "supervision">,
+) {
+	const authorization = work.supervision?.authorization;
+	return authorization &&
+		isSupervisedExecutionSource(work.source) &&
+		work.source.goal
+		? (host.goalWorkspace?.(authorization.workspaceRef) ?? host.workspace)
+		: host.workspace;
+}
+
 export function view(work: Work): ExecutionView {
+	const source = work.source;
+	if (source.conversationId === null) throw new Error("claude_owner_mismatch");
+	return { ...commonView(work), conversationId: source.conversationId };
+}
+export function supervisedView(work: Work): OwnedExecutionView {
+	return work.source.conversationId === null
+		? { ...commonView(work), conversationId: null, goal: work.source.goal }
+		: view(work);
+}
+function commonView(work: Work): Omit<ExecutionView, "conversationId"> {
 	return {
 		id: work.id,
-		conversationId: work.source.conversationId,
 		request: work.request,
 		revision: work.revision,
 		deadline: work.deadline,
@@ -42,6 +64,7 @@ export function closeQuestion(db: Database, host: Host, work: Work) {
 	work.question = null;
 	work.questionFromRunner = false;
 	work.pendingRunnerQuestion = null;
+	delete work.parkedQuestionExecutionId;
 }
 
 export function escalatePendingQuestion(work: Work, prompt?: string) {
@@ -105,7 +128,7 @@ export function finish(
 	work.effect = null;
 	work.decisionId = null;
 	if (work.holdsWorkspace) {
-		host.workspace.release(
+		workWorkspace(host, work).release(
 			db,
 			work.id,
 			!work.executionId || work.stop === "confirmed",
@@ -155,6 +178,7 @@ export function acceptObservation(
 	host: Host,
 	work: Work,
 	observation: Observation | null,
+	now = Date.now(),
 ) {
 	const effect = work.effect;
 	if (observation && observation.executionId !== work.executionId) return false;
@@ -192,7 +216,7 @@ export function acceptObservation(
 			// The runner refused before executing. A new plan may use the freed slot.
 			work.effect = null;
 			work.executionId = null;
-			host.workspace.release(db, work.id, true, supervised.lease);
+			workWorkspace(host, work).release(db, work.id, true, supervised.lease);
 			work.holdsWorkspace = false;
 		}
 		return true;
@@ -220,7 +244,14 @@ export function acceptObservation(
 		work.executionId = null;
 		work.effect = null;
 		work.stopAt = undefined;
-		if (effect.reason === "amend") {
+		if (effect.reason === "question_wait" && work.question) {
+			work.observation = observation;
+			work.questionFromRunner = false;
+			work.status = "waiting_user";
+			workWorkspace(host, work).release(db, work.id, true, supervised?.lease);
+			work.holdsWorkspace = false;
+			work.notice = newId();
+		} else if (effect.reason === "amend") {
 			work.status = "deciding";
 			work.observation = null;
 		} else
@@ -294,6 +325,15 @@ export function acceptObservation(
 					? "Claude Code の追加操作について利用者の許可を待っています。"
 					: "Claude Code からの質問に対する利用者の回答を待っています。";
 			work.notice = newId();
+			if (
+				work.executionId &&
+				isSupervisedExecutionSource(work.source) &&
+				work.source.goal
+			) {
+				work.parkedQuestionExecutionId = work.executionId;
+				work.effect = { kind: "stop", id: newId(), reason: "question_wait" };
+				work.stopAt = now;
+			}
 		}
 	} else if (observation.state === "unknown") {
 		work.stop = "unconfirmed";
@@ -471,6 +511,20 @@ export function applyDecision(
 			return;
 		}
 		case "ask_user":
+			if (
+				!work.executionId &&
+				work.holdsWorkspace &&
+				isSupervisedExecutionSource(work.source) &&
+				work.source.goal
+			) {
+				workWorkspace(host, work).release(
+					db,
+					work.id,
+					true,
+					work.supervision?.lease,
+				);
+				work.holdsWorkspace = false;
+			}
 			work.status = "waiting_user";
 			work.question = {
 				id: newId(),
@@ -584,8 +638,10 @@ export function authorityCurrent(
 			host.validSourceInTransaction(db, work.source);
 	return (
 		valid &&
-		work.references.every((reference) =>
-			host.validReferenceInTransaction(db, work.source, reference),
+		work.references.every(
+			(reference) =>
+				work.source.conversationId !== null &&
+				host.validReferenceInTransaction(db, work.source, reference),
 		)
 	);
 }

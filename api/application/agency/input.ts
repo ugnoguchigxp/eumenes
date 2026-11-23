@@ -3,6 +3,93 @@ import type { AgencyHostDeps } from "./host-types";
 import type { Database } from "bun:sqlite";
 import { sha256Hex } from "../../infrastructure/digest";
 import { currentRef } from "./always-on-recall";
+import { touchesSuppressedTerm } from "../../domains/memory";
+import { PRINCIPAL, PROFILE_SCOPE } from "../../domains/memory/contracts";
+
+export const recordPrefix = "agency-record:";
+export type AgencyRecordInputDeps = Pick<
+	AgencyHostDeps,
+	"continuity" | "conversation"
+> & {
+	agendaGoals?: Pick<
+		NonNullable<AgencyHostDeps["agendaGoals"]>,
+		"store" | "sourceMessageIds"
+	>;
+	memory: Pick<AgencyHostDeps["memory"], "suppressionsInTransaction">;
+};
+function recordInput(
+	deps: AgencyRecordInputDeps,
+	db: Database,
+	prefix: "goal" | "plan",
+	id: string,
+) {
+	const alive = (text: string) =>
+		!touchesSuppressedTerm(
+			deps.memory.suppressionsInTransaction(db).terms,
+			text,
+		);
+	if (prefix === "goal") {
+		const goals = deps.agendaGoals;
+		const access = { principal: PRINCIPAL, scopeKeys: [PROFILE_SCOPE] };
+		const goal = goals?.store.currentGoalInTransaction(db, access, id);
+		const ids = goals?.sourceMessageIds?.(db, id);
+		if (
+			!goal ||
+			goal.status !== "adopted" ||
+			!ids?.length ||
+			!alive(goal.desiredState)
+		)
+			return null;
+		return {
+			messages: ids,
+			items: [],
+			stamp: [prefix, id, goal.revision, goal.scopeKey],
+		};
+	}
+	const plan = deps.continuity.plans
+		.listInTransaction(db)
+		.find((entry) => entry.id === id);
+	if (!plan || !plan.evidence.length || !alive(plan.text)) return null;
+	for (const evidence of plan.evidence) {
+		const source = deps.conversation.sourceInTransaction(
+			db,
+			evidence.messageId,
+		);
+		if (
+			source.state !== "available" ||
+			source.message.conversationId !== evidence.conversationId
+		)
+			return null;
+	}
+	return {
+		messages: plan.evidence.map(({ messageId }) => messageId),
+		items: plan.memoryItemIds,
+		stamp: [prefix, id, plan.revision, plan.conversationId],
+	};
+}
+
+export function staleRecordInputs(
+	deps: AgencyRecordInputDeps,
+	db: Database,
+	sources: readonly string[],
+) {
+	return sources.filter((source) => {
+		if (!source.startsWith(recordPrefix)) return false;
+		try {
+			const raw: unknown = JSON.parse(source.slice(recordPrefix.length));
+			if (!Array.isArray(raw)) return true;
+			const [kind, id] = raw;
+			if ((kind !== "goal" && kind !== "plan") || typeof id !== "string")
+				return true;
+			const current = recordInput(deps, db, kind, id);
+			return (
+				!current || source !== recordPrefix + JSON.stringify(current.stamp)
+			);
+		} catch {
+			return true;
+		}
+	});
+}
 
 export const fixedInput = (value: unknown): InputContext => ({
 	sources: [`host-config:${sha256Hex(JSON.stringify(value))}`],
@@ -16,6 +103,7 @@ export function staleInputSources(
 	return [
 		...(deps.memory.referenceInputs?.staleInTransaction(db, sources) ?? []),
 		...(deps.state?.staleSourcesInTransaction(db, sources) ?? []),
+		...staleRecordInputs(deps, db, sources),
 	];
 }
 
@@ -49,7 +137,8 @@ export function currentInput(
 	return (
 		(!deps.memory.referenceInputs ||
 			deps.memory.referenceInputs.isCurrentInTransaction(db, input)) &&
-		!deps.state?.staleSourcesInTransaction(db, input.sources).length
+		!deps.state?.staleSourcesInTransaction(db, input.sources).length &&
+		!staleRecordInputs(deps, db, input.sources).length
 	);
 }
 
@@ -87,6 +176,26 @@ export function referencedInput(
 				});
 			} else if (note) note.refs.forEach(visit);
 			else complete = false;
+		} else if (base.startsWith("goal:") || base.startsWith("plan:")) {
+			const kind = base.startsWith("goal:") ? "goal" : "plan";
+			const record = recordInput(deps, db, kind, base.slice(kind.length + 1));
+			if (!record) {
+				complete = false;
+				return;
+			}
+			for (const id of record.messages) {
+				const source = deps.conversation.sourceInTransaction(db, id);
+				if (
+					source.state !== "available" ||
+					deps.memory.isBlockedInTransaction?.(db, id)
+				) {
+					complete = false;
+					continue;
+				}
+				messageIds.add(id);
+			}
+			record.items.forEach((id) => itemIds.add(id));
+			retained.push(recordPrefix + JSON.stringify(record.stamp));
 		} else if (!base.startsWith("profile:")) messageIds.add(base);
 	};
 	refs.forEach(visit);

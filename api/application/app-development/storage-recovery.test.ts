@@ -230,3 +230,141 @@ test("storage lifecycle replays after interruption before creation, after migrat
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("reopening is guarded against active jobs and replays after unpublished files were removed", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "app-reopen-recovery-"));
+	const database = join(dir, "main.sqlite"),
+		root = join(dir, "app-storage");
+	const apps = createAppDevelopment("owner"),
+		files = createAppStorageFiles(root, compileJsonSchemaSubset);
+	const plan = storagePlan(draft)!;
+	const open = () => {
+		const store = openStore(database, migrations),
+			queue = createQueue(store, { pollMs: 10 });
+		const runtime = createAppStorageRuntime({
+			store,
+			queue,
+			apps,
+			root,
+			workflow: () => ({ stopForDeletion() {} }),
+			publish: () => {
+				throw new Error("reopen_must_not_publish");
+			},
+		});
+		return {
+			store,
+			queue,
+			runtime,
+			async close() {
+				await queue.close();
+				await store.close();
+			},
+		};
+	};
+	let h = open();
+	const get = (id: string) => h.store.read((db) => apps.storage.get(db, id)!);
+	try {
+		const work = await h.store.write((db) => {
+			const opened = apps.open(db, {
+				sessionId: crypto.randomUUID(),
+				targetRef: null,
+			});
+			apps.commit(db, opened.workRef, { revision: 0, value: draft });
+			const w = apps.draft(db, opened.workRef);
+			h.runtime.save(db, w.appId, crypto.randomUUID(), {
+				workRef: w.id,
+				expectedRevision: w.revision,
+				expectedSavedRevision: 0,
+				digest: "approval",
+				plan,
+			});
+			apps.storage.error(
+				db,
+				apps.storage.get(db, w.appId)!,
+				"app_storage_setup_failed",
+			);
+			return w;
+		});
+		const ticket = () => ({
+			appId: work.appId,
+			operationId: get(work.appId).operationId!,
+			stateRevision: get(work.appId).stateRevision,
+			digest: "approval",
+		});
+		await expect(
+			h.store.write((db) =>
+				h.runtime.reopen(db, ticket(), crypto.randomUUID()),
+			),
+		).rejects.toThrow("app_operation_pending");
+		const before = get(work.appId),
+			oldJob = before.jobId!;
+		await files.initialize(before.storageId!, 0, 1, plan);
+		await h.store.write((db) =>
+			h.queue.cancelInTransaction(db, oldJob, "fixture_stop"),
+		);
+		const approval = ticket();
+		await expect(
+			h.store.write((db) =>
+				h.runtime.reopen(
+					db,
+					{ ...approval, stateRevision: approval.stateRevision - 1 },
+					crypto.randomUUID(),
+				),
+			),
+		).rejects.toThrow("app_storage_retry_conflict");
+		await expect(
+			h.store.write((db) =>
+				h.runtime.reopen(
+					db,
+					{ ...approval, digest: "changed" },
+					crypto.randomUUID(),
+				),
+			),
+		).rejects.toThrow("revision_conflict");
+		await h.store.write((db) =>
+			h.runtime.reopen(db, approval, crypto.randomUUID()),
+		);
+		const entry = get(work.appId);
+		// Interrupt after the irreversible file removal, before the owner transaction settles it.
+		files.remove(entry.storageId!);
+		await h.close();
+		h = open();
+		await h.queue.recover();
+		await h.runtime.recover();
+		h.queue.start();
+		await waitFor(() => get(work.appId).state === "active");
+		expect(get(work.appId)).toMatchObject({
+			storageId: null,
+			storageRevision: 0,
+			jobId: null,
+			operationId: null,
+			saveJson: null,
+			reopening: 0,
+		});
+		expect(h.store.read((db) => apps.storedApp(db, work.appId))).toBeNull();
+		expect(
+			h.store.read((db) => h.queue.getInTransaction(db, oldJob)?.state),
+		).toBe("cancelled");
+		await expect(
+			h.store.write((db) => h.runtime.retry(db, approval, crypto.randomUUID())),
+		).rejects.toThrow("app_storage_retry_conflict");
+		await h.store.write((db) => apps.end(db, work.id, "discard"));
+		expect(h.store.read((db) => apps.state(db, work.id))).toBeNull();
+		const id = crypto.randomUUID();
+		await files.initialize(id, 0, 1, plan);
+		expect(files.preparedRevision(id, 1)).toBe(1);
+		await files.initialize(id, 1, 2, plan);
+		expect(files.preparedRevision(id, 1)).toBe(2);
+		await files.initialize(id, 2, 3, plan);
+		expect(() => files.preparedRevision(id, 1)).toThrow(
+			"app_storage_revision_conflict",
+		);
+		files.remove(id);
+		expect(() => files.preparedRevision(id, 1)).toThrow(
+			"app_storage_file_missing",
+		);
+	} finally {
+		await h.close();
+		rmSync(dir, { recursive: true, force: true });
+	}
+});

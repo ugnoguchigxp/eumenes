@@ -136,23 +136,51 @@ export function supervisionWorkspace(
 			throw new Error("supervision_workspace_path_invalid");
 		return path;
 	}
-	function existingEdits(scope: SupervisionScope) {
+	function existingEdits(
+		scope: SupervisionScope,
+		owned: readonly string[] = [],
+	) {
 		if (scope.mode !== "edit") return false;
 		// The runner bounds Write/Edit by file. It cannot reserve just the user's existing hunks.
 		const paths = scope.writablePaths.map((path) =>
 			relative(root, scopedPath(path)),
 		);
+		const ownedPaths = new Set(
+			owned.map((path) => relative(root, scopedPath(path))),
+		);
+		if (!paths.length) return false;
+		const staged = git(root, [
+			"--literal-pathspecs",
+			"diff",
+			"--cached",
+			"--name-only",
+			"-z",
+			"--",
+			...paths,
+		]);
+		const untracked = git(root, [
+			"--literal-pathspecs",
+			"ls-files",
+			"--others",
+			"--exclude-standard",
+			"-z",
+			"--",
+			...paths,
+		]);
+		const changed = git(root, [
+			"--literal-pathspecs",
+			"diff",
+			"--name-only",
+			"-z",
+			"--no-renames",
+			"HEAD",
+			"--",
+			...paths,
+		]);
 		return (
-			paths.length > 0 &&
-			!!git(root, [
-				"--literal-pathspecs",
-				"status",
-				"--porcelain=v1",
-				"-z",
-				"--untracked-files=all",
-				"--",
-				...paths,
-			])
+			!!staged ||
+			!!untracked ||
+			changed.split("\0").some((path) => path && !ownedPaths.has(path))
 		);
 	}
 	function resolveScope(input: SupervisionScope): SupervisionScope | null {
@@ -221,12 +249,12 @@ export function supervisionWorkspace(
 			const levels = ["design", "read", "verify", "edit"];
 			return (
 				levels.indexOf(scope.mode) <= levels.indexOf(ceiling) &&
-				!!design.digest &&
+				!!design?.digest &&
 				resolveScope(scope) !== null &&
 				scope.targetRevision === revision()
 			);
 		},
-		inspectInTransaction(db, scope, workId) {
+		inspectInTransaction(db, scope, workId, inherited) {
 			const guards = readWorkspaceGuards(db, scope.workspaceRef);
 			const owned =
 				workId &&
@@ -253,7 +281,13 @@ export function supervisionWorkspace(
 					entry !== owned &&
 					(entry.mode === "exclusive" || entry.mode === slot),
 			);
-			if (!workId && !busy && existingEdits(scope))
+			const ownedPaths =
+				inherited &&
+				inherited.after.targetRevision === scope.targetRevision &&
+				inherited.after.inputDigest === claudeInputDigest(scope.readablePaths)
+					? inherited.paths
+					: [];
+			if (!workId && !busy && existingEdits(scope, ownedPaths))
 				return {
 					released,
 					reason:
@@ -264,18 +298,25 @@ export function supervisionWorkspace(
 				? { released, reason: slot === "read" ? "読取り枠待ち" : "編集枠待ち" }
 				: { released };
 		},
-		async capture(scope, signal, baseline) {
+		async capture(scope, signal, baseline, inherited) {
 			signal.throwIfAborted();
 			const frozen = resolveScope(scope);
 			if (!frozen) throw new Error("supervision_scope_unavailable");
 			const inputDigest = claudeInputDigest(frozen.readablePaths);
 			if (!inputDigest) throw new Error("supervision_input_unavailable");
 			const targetRevision = revision();
-			const clearAtStart = !!baseline || !existingEdits(frozen);
 			const snapshotId =
 				scope.mode === "edit"
 					? await outsideChanges(root, frozen.writablePaths, signal)
 					: undefined;
+			const owned =
+				inherited &&
+				inherited.after.targetRevision === targetRevision &&
+				inherited.after.inputDigest === inputDigest &&
+				inherited.after.snapshotId === snapshotId
+					? inherited.paths
+					: [];
+			const clearAtStart = !!baseline || !existingEdits(frozen, owned);
 			return {
 				targetRevision,
 				inputDigest,

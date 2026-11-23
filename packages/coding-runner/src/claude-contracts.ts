@@ -95,6 +95,8 @@ export const claudeEvidence = z.strictObject({
 	text: z.string().max(1_024),
 	path: path.optional(),
 	passed: z.boolean().optional(),
+	exitCode: z.number().int().min(0).max(255).optional(),
+	stderr: z.string().max(1024).optional(),
 	check: claudeCheck.optional(),
 });
 export const claudeObservation = z.strictObject({

@@ -93,10 +93,15 @@ function compactParameters(
  */
 export function goalReplyInstructions(
 	messages: ReplyMessage[],
+	registeredWork = false,
 ): ReplyMessage[] {
 	const [system, ...rest] = messages;
 	if (!system || system.role !== "system") return messages;
-	const rules = systemContext("dialogue.contexts.agency.goal-reply", {});
+	const rules =
+		systemContext("dialogue.contexts.agency.goal-reply", {}) +
+		(registeredWork
+			? "\n" + systemContext("dialogue.contexts.agency.goal-work", {})
+			: "");
 	return [{ ...system, content: `${system.content}\n\n${rules}` }, ...rest];
 }
 
@@ -112,7 +117,7 @@ export function goalReplyTools(
 			if (!spec) return tool;
 			return {
 				...tool,
-				description: spec.description,
+				description: args[4] ? tool.description : spec.description,
 				parameters: compactParameters(tool.parameters, spec.props),
 			};
 		}),

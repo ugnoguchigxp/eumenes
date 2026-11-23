@@ -143,6 +143,88 @@ test("the source view shows the canonical text as given, not a re-serialization"
 	expect(code(container)).toBe(source);
 });
 
+test("a failed app save offers a version-bound retry rather than claiming it is saved", async () => {
+	const retrySave = {
+		appId: "app-1",
+		operationId: "save-1",
+		stateRevision: 4,
+		digest: "a".repeat(64),
+	};
+	const h = await mountStudio(
+		snapshotOf({
+			appDevelopment: true,
+			work: work({
+				storageState: "initializing",
+				storageError: "app_storage_path_invalid",
+				retrySave,
+			}),
+		}),
+	);
+	expect(h.container.textContent).toContain("保存先の準備に失敗しました");
+	await press(h.container, "保存を再試行");
+	expect(h.dispatch.mock.calls.at(-1)?.[0]).toMatchObject({
+		action: "ui-retry-save",
+		values: { ...retrySave, stateRevision: "4" },
+	});
+	await h.render(
+		snapshotOf({
+			appDevelopment: true,
+			work: work({ storageState: "initializing", storageError: null }),
+		}),
+	);
+	expect(h.container.textContent).not.toContain("保存を再試行");
+});
+
+test("save recovery follows the displayed app and sends the exact ticket", async () => {
+	const ticket = {
+		appId: "app-B",
+		operationId: "save-B",
+		stateRevision: 4,
+		digest: "b".repeat(64),
+	};
+	const failed = work({
+		storageState: "initializing",
+		storageError: "app_storage_setup_failed",
+		retrySave: ticket,
+		reopenSave: ticket,
+	});
+	const h = await mountStudio(
+		snapshotOf({
+			appDevelopment: true,
+			work: failed,
+			viewing: { id: "app-A", title: "作品A", definition, savedRevision: 1 },
+		}),
+	);
+	expect(h.container.textContent).not.toContain("保存を再試行");
+	expect(h.container.textContent).not.toContain("下書きに戻す");
+	await h.render(snapshotOf({ appDevelopment: true, work: failed }));
+	await press(h.container, "下書きに戻す");
+	expect(h.dispatch.mock.calls.at(-1)?.[0]).toMatchObject({
+		action: "ui-reopen-save",
+		values: { ...ticket, stateRevision: "4" },
+	});
+	await h.render(
+		snapshotOf({
+			appDevelopment: true,
+			work: work({ storageState: "initializing", storageReopening: true }),
+		}),
+	);
+	expect(h.container.textContent).toContain("下書きに戻しています");
+	await h.render(
+		snapshotOf({
+			appDevelopment: true,
+			work: work({
+				storageState: "initializing",
+				storageError: "app_storage_file_missing",
+				storageReopening: true,
+				reopenSave: ticket,
+			}),
+		}),
+	);
+	expect(h.container.textContent).not.toContain("保存を再試行");
+	expect(buttonOf(h.container, "下書きに戻す")).toBeTruthy();
+});
+
 test("the lines changed from the previous revision are marked and removed lines are indicated", async () => {
 	const { container } = await mountStudio(
 		snapshotOf({
