@@ -26,7 +26,7 @@ const invalid = (c: Context) =>
 const options = { code: "invalid_terminal_input" };
 
 export function registerTerminals(app: Hono, service: TerminalsService) {
-	app.get("/api/terminals", (c) => c.json(service.list()));
+	app.get("/api/terminals", (c) => c.json(service.screens()));
 	app.post("/api/terminals", async (c) => {
 		const parsed = await parseJsonBody(c, terminalStartSchema, options);
 		if (!parsed.ok) return parsed.response;
@@ -96,6 +96,9 @@ export function registerTerminals(app: Hono, service: TerminalsService) {
 	app.get("/api/terminals/:id/output", (c) => {
 		const id = idOf(c);
 		if (!id) return invalid(c);
-		return service.stream(id, c.req.raw.signal);
+		return (
+			service.watchStream(id, c.req.raw.signal) ??
+			service.stream(id, c.req.raw.signal)
+		);
 	});
 }

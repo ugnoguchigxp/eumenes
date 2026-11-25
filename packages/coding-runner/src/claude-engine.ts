@@ -42,6 +42,8 @@ export type ClaudeEngineInput = {
 	): boolean;
 	onSession(id: string): void;
 	onToolActivity?(tool: string): void;
+	/** Claude's own words between tool calls (the main thread only), for the person watching the run. */
+	onNarration?(text: string): void;
 	onEvidence(
 		ref: string,
 		observation: string,
@@ -180,6 +182,13 @@ export async function runClaudeExecution(
 		for await (const event of stream) {
 			if (event.type === "system" && event.subtype === "init")
 				input.onSession(event.session_id);
+			if (event.type === "assistant" && event.parent_tool_use_id === null) {
+				const said = event.message.content
+					.flatMap((block) => (block.type === "text" ? [block.text] : []))
+					.join("\n")
+					.trim();
+				if (said) input.onNarration?.(said);
+			}
 			if (event.type === "result") {
 				const ok = event.subtype === "success" && !event.is_error;
 				const detail =

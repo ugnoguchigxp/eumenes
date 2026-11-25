@@ -65,22 +65,34 @@ export const terminalsWebAdapter: WebArtifactAdapter = {
 			[client, reload, notify],
 		);
 		const data = list.data;
+		// Decided once, when the screen first reads the list: finished read-only panes alone still
+		// open a terminal, a running one is what to watch (its end must not start one later).
+		const startNeeded = useRef<boolean | null>(null);
+		if (data && startNeeded.current === null)
+			startNeeded.current = !data.sessions.some(
+				(s) => !s.readOnly || s.status === "running",
+			);
 		const resource: TerminalsResource | undefined = data && {
 			kind: "terminal-workspace",
 			revision: data.revision,
 			available: data.available,
+			startNeeded: startNeeded.current ?? false,
 			sessions: data.sessions.map((s) => ({
 				id: s.id,
 				title: s.title,
 				...(s.owner.startsWith("kanban:") ? { heading: s.title } : {}),
+				...(s.readOnly
+					? { heading: "Claude Code（専任担当）", readOnly: true }
+					: {}),
 				status: s.status,
 				run: s.run,
 				...(s.status === "exited"
 					? {
 							statusMessage:
-								s.exitCode === null || s.exitCode === undefined
+								s.statusMessage ??
+								(s.exitCode === null || s.exitCode === undefined
 									? "停止しました"
-									: `終了コード ${s.exitCode}`,
+									: `終了コード ${s.exitCode}`),
 						}
 					: {}),
 			})),

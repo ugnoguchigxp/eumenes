@@ -245,6 +245,9 @@ export async function createHostToolchain(
 		},
 	);
 	loadedCapabilities = toolchain.capabilities;
+	// The works handed to Claude Code show on the Claude Code screen, read-only.
+	if (toolchain.claudeCode)
+		terminals.configureWatch(toolchain.claudeCode.watch);
 	return {
 		toolchain: { ...toolchain, shell, terminals, kanban, kanbanRuns },
 		links: {

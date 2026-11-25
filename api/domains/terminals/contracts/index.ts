@@ -9,8 +9,11 @@ export type TerminalActivity = "working" | "idle" | "waiting";
 export type TerminalSessionView = {
 	id: string;
 	title: string;
-	/** Whose session this is: the conversation's direct requests or one Kanban card. */
-	owner: SessionOwner;
+	/**
+	 * Whose session this is: the conversation's direct requests or one Kanban card; `claude-task:`
+	 * is a read-only pane of a work the conversation handed to Claude Code.
+	 */
+	owner: SessionOwner | `claude-task:${string}`;
 	mode: SessionMode;
 	status: TerminalStatus;
 	/** Advances on every (re)start; a new run starts with an empty screen. */
@@ -22,6 +25,10 @@ export type TerminalSessionView = {
 	exitCode?: number | null;
 	startedAt: string;
 	endedAt?: string;
+	/** Only shows a run: no input and no restart. */
+	readOnly?: boolean;
+	/** How the run ended, in the host's words, where an exit code does not say it. */
+	statusMessage?: string;
 };
 
 export type TerminalSessionsView = {
@@ -60,6 +67,10 @@ export const terminalSessionViewSchema = z.strictObject({
 	exitCode: z.number().int().nullable().optional(),
 	startedAt: z.string(),
 	endedAt: z.string().optional(),
+	/** A pane that only shows a run (the work the conversation handed to Claude Code): no input, no restart. */
+	readOnly: z.boolean().optional(),
+	/** How the run ended, in the host's words, where an exit code does not say it. */
+	statusMessage: z.string().max(40).optional(),
 });
 export const terminalSessionsViewSchema = z.strictObject({
 	available: z.boolean(),

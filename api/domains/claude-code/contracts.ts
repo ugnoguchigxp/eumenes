@@ -65,6 +65,7 @@ export type {
 	ClaudeEvidence,
 	ClaudeLease,
 	ClaudeEventsResponse,
+	ClaudeNarrationResponse,
 } from "../coding";
 import type {
 	ClaudeObservation as Observation,
@@ -73,6 +74,7 @@ import type {
 	ClaudeEvidence,
 	ClaudeLease,
 	ClaudeEventsResponse,
+	ClaudeNarrationResponse,
 } from "../coding";
 export interface Runner {
 	ready(): boolean;
@@ -80,6 +82,8 @@ export interface Runner {
 	start(operation: Start): Promise<Observation>;
 	inspect(id: string): Promise<Observation | null>;
 	events?(id: string, after: number): Promise<ClaudeEventsResponse>;
+	/** Claude's own words of an execution (a runner without it shows the tool events only). */
+	narration?(id: string, after: number): Promise<ClaudeNarrationResponse>;
 	reply(
 		id: string,
 		operationId: string,
@@ -213,6 +217,10 @@ export type Work = {
 		| null;
 	executionId: string | null;
 	previousId: string | null;
+	/** Every execution started for this work, oldest first (absent on works saved before it was kept). */
+	executionIds?: string[];
+	/** When the work was accepted (absent on works saved before it was kept). */
+	startedAt?: number;
 	answers: { messageId: string; question: string; answer: string }[];
 	amendments: { messageId: string; text: string }[];
 	notice: string | null;

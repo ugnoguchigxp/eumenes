@@ -25,6 +25,7 @@ import {
 	workWorkspace,
 } from "./lifecycle";
 import { pending, read, save, terminal } from "./repository";
+import { createWatch } from "./watch";
 
 export { migrations } from "./repository";
 export {
@@ -44,6 +45,8 @@ type Deps = {
 	inference: InferencePort;
 	runner?: Runner;
 	goalRunners?: ReadonlyMap<string, Runner>;
+	/** The working folder: the watch pane shows paths inside it relative to it. */
+	root?: string;
 	now?: () => number;
 };
 
@@ -79,6 +82,7 @@ export function createClaudeCode({
 	inference,
 	runner,
 	goalRunners,
+	root,
 	now = Date.now,
 }: Deps) {
 	let host: Host | undefined;
@@ -336,6 +340,7 @@ export function createClaudeCode({
 	return {
 		task,
 		supervised,
+		watch: createWatch({ store, runnerFor, root, now }),
 		onAvailabilityChange(listener: () => void) {
 			availabilityListeners.add(listener);
 			return () => {

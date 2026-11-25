@@ -27,6 +27,7 @@ export type {
 	ClaudeLease,
 	ClaudeQuestion,
 	ClaudeEventsResponse,
+	ClaudeNarrationResponse,
 	ClaudeDaemonConfig,
 } from "../../../packages/coding-runner/src/contracts";
 export { claudeAuthorization } from "../../../packages/coding-runner/src/contracts";

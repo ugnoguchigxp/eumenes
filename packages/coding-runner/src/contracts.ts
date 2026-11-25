@@ -27,6 +27,7 @@ export type {
 	ClaudeLease,
 	ClaudeQuestion,
 	ClaudeEventsResponse,
+	ClaudeNarrationResponse,
 	ClaudeDaemonConfig,
 } from "./claude-contracts";
 export { claudeInputDigest } from "./claude-input-digest";

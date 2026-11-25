@@ -476,6 +476,7 @@ export async function createToolchain(
 		inference,
 		runner: options.claudeRunner,
 		goalRunners: options.goalClaudeRunners,
+		root: process.cwd(),
 	});
 	const history = createToolchainHistory(store);
 	const reads = createReadPorts(

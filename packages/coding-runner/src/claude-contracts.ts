@@ -80,6 +80,17 @@ export const claudeEventsResponse = z.strictObject({
 	),
 	next: z.number().int().nonnegative(),
 });
+/** Claude's own words of one execution, each placed after the tool event it followed (`afterSeq`). */
+export const claudeNarrationResponse = z.strictObject({
+	items: z.array(
+		z.strictObject({
+			n: z.number().int().positive(),
+			afterSeq: z.number().int().nonnegative(),
+			text: z.string().max(2_000),
+		}),
+	),
+	next: z.number().int().nonnegative(),
+});
 export const claudeDaemonConfigSchema = z.strictObject({
 	root: path,
 	workspace: path,
@@ -197,6 +208,11 @@ export const claudeRequest = z.discriminatedUnion("operation", [
 		id: z.uuid(),
 		after: z.number().int().nonnegative().max(1_000_000),
 	}),
+	z.strictObject({
+		operation: z.literal("narration"),
+		id: z.uuid(),
+		after: z.number().int().nonnegative().max(1_000_000),
+	}),
 ]);
 export type ClaudeStart = z.infer<typeof claudeStart>;
 export type ClaudeObservation = z.infer<typeof claudeObservation>;
@@ -207,4 +223,5 @@ export type ClaudeEvidence = z.infer<typeof claudeEvidence>;
 export type ClaudeLease = z.infer<typeof claudeLease>;
 export type ClaudeQuestion = z.infer<typeof claudeQuestion>;
 export type ClaudeEventsResponse = z.infer<typeof claudeEventsResponse>;
+export type ClaudeNarrationResponse = z.infer<typeof claudeNarrationResponse>;
 export type ClaudeDaemonConfig = z.infer<typeof claudeDaemonConfigSchema>;

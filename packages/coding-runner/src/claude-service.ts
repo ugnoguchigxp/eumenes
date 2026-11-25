@@ -22,6 +22,7 @@ import {
 	optionalJson,
 	privateDirectory,
 } from "./storage";
+import { readNarration, recordNarration } from "./claude-narration";
 
 type Receipt = {
 	spec: Pick<
@@ -256,6 +257,8 @@ export class ClaudeService {
 				return this.start(input.spec);
 			case "events":
 				return this.events(input.id, input.after);
+			case "narration":
+				return readNarration(join(this.root, input.id), input.after);
 			case "stop": {
 				const saved = this.read(input.id);
 				const tombstone = this.tombstone(input.id);
@@ -420,6 +423,7 @@ export class ClaudeService {
 		input: ReturnType<Prepare>,
 		active: Active,
 	) {
+		let narrated = 0;
 		try {
 			const result = await this.engine(
 				{
@@ -443,6 +447,8 @@ export class ClaudeService {
 					},
 					onEvidence: (seq, text, fact) =>
 						this.recordEvidence(saved, Number(seq), text, fact),
+					onNarration: (text) =>
+						recordNarration(this.root, saved, ++narrated, text),
 					ask: (question, signal) => {
 						if (active.answer || signal.aborted) return Promise.resolve(null);
 						this.update(saved, {

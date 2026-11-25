@@ -89,3 +89,123 @@ test("the terminal start action explains a workspace conflict", async () => {
 		cache.clear();
 	}
 });
+
+test("a work handed to Claude Code shows read-only and is what the screen watches instead of starting a terminal", async () => {
+	const artifact: AdapterHostContext["artifact"] = {
+		kind: "artifact",
+		id: "terminals.workspace",
+		revision: 2,
+		title: "Claude Code",
+		variants: [
+			{
+				id: "standard",
+				label: "標準",
+				definition: { view: "terminal-workspace", source: "terminals" },
+			},
+		],
+		defaultVariant: "standard",
+		sourceBindings: [
+			{
+				source: "terminals",
+				adapterRef: "adapter:terminals@1",
+				query: "query:terminals.sessions@1",
+				target: "none",
+			},
+		],
+		actionBindings: [],
+	};
+	const pane = (status: "running" | "exited") => ({
+		id: "33333333-3333-4333-8333-333333333333",
+		title: "背景色の実装",
+		owner: "claude-task:33333333-3333-4333-8333-333333333333",
+		mode: "work" as const,
+		status,
+		run: 1,
+		startedAt: "2026-11-25T11:48:49.000Z",
+		readOnly: true,
+		...(status === "exited" ? { statusMessage: "完了" } : {}),
+	});
+	const client = createClient("http://127.0.0.1:8787", "fixture-token");
+	const source = vi.spyOn(client, "toolchainArtifactSource");
+	const render = () => {
+		const cache = new QueryClient();
+		const hook = renderHook(
+			() =>
+				terminalsWebAdapter.useArtifact({
+					client,
+					artifact,
+					artifactRevisionId: "artifact:terminals.workspace@2",
+					targetRef: undefined,
+					setTargetRef() {},
+					visible: true,
+					catalog: [],
+					documentFields: {},
+					documentFieldsReady: true,
+					drafts: {},
+					notify() {},
+				}),
+			{
+				wrapper: ({ children }: PropsWithChildren) => (
+					<QueryClientProvider client={cache}>{children}</QueryClientProvider>
+				),
+			},
+		);
+		return { ...hook, cache };
+	};
+	const resource = (snapshot: Record<string, unknown>) =>
+		snapshot.terminals as {
+			startNeeded?: boolean;
+			sessions: Array<Record<string, unknown>>;
+		};
+
+	source.mockResolvedValue({
+		revision: 0,
+		data: {
+			available: true,
+			revision: 0,
+			sessions: [pane("running")],
+			requests: 1,
+			limit: 4,
+		},
+	});
+	const running = render();
+	try {
+		await waitFor(() =>
+			expect(running.result.current.phase.kind).toBe("ready"),
+		);
+		const shown = resource(running.result.current.snapshot);
+		expect(shown.startNeeded).toBe(false);
+		expect(shown.sessions[0]).toMatchObject({
+			heading: "Claude Code（専任担当）",
+			readOnly: true,
+			status: "running",
+		});
+	} finally {
+		running.unmount();
+		running.cache.clear();
+	}
+
+	// Only finished works: opening the screen still starts a terminal, as before.
+	source.mockResolvedValue({
+		revision: 1,
+		data: {
+			available: true,
+			revision: 1,
+			sessions: [pane("exited")],
+			requests: 1,
+			limit: 4,
+		},
+	});
+	const finished = render();
+	try {
+		await waitFor(() =>
+			expect(finished.result.current.phase.kind).toBe("ready"),
+		);
+		const shown = resource(finished.result.current.snapshot);
+		expect(shown.startNeeded).toBe(true);
+		expect(shown.sessions[0]).toMatchObject({ statusMessage: "完了" });
+	} finally {
+		finished.unmount();
+		finished.cache.clear();
+	}
+});

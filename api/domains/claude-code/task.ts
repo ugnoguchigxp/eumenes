@@ -84,6 +84,7 @@ export function createTaskPort({
 			status: "queued",
 			summary: "依頼を受け付けました。",
 			observedAt: at,
+			startedAt: at,
 			memo: "",
 			question: null,
 			questionFromRunner: false,

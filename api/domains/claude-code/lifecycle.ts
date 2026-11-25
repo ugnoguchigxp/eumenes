@@ -438,6 +438,11 @@ export function applyDecision(
 					instruction += heading + addition;
 			}
 			work.executionId = newId();
+			// A work saved before the history was kept starts it from its last execution.
+			work.executionIds = [
+				...(work.executionIds ?? (work.previousId ? [work.previousId] : [])),
+				work.executionId,
+			];
 			work.executions++;
 			work.turnsUsedBeforeExecution = work.turnsReserved;
 			work.turnsReserved += maxTurns;

@@ -54,7 +54,12 @@ export function createTerminalsAdapter(
 		TerminalsService,
 		"available" | "list" | "enqueueInTransaction" | "requestInTransaction"
 	> &
-		Partial<Pick<TerminalsService, "cancelQueuedInTransaction" | "stop">>,
+		Partial<
+			Pick<
+				TerminalsService,
+				"cancelQueuedInTransaction" | "stop" | "screensInTransaction"
+			>
+		>,
 ): DomainAdapter {
 	function result(
 		receipt: ClaudeCodeReceipt,
@@ -199,9 +204,10 @@ export function createTerminalsAdapter(
 					)
 				: null;
 		},
-		sourceInTransaction(_tx, query, targetRef) {
+		sourceInTransaction(tx, query, targetRef) {
 			if (query !== SESSIONS || targetRef !== undefined) return null;
-			const list = terminals.list();
+			// The screen shows the works handed to Claude Code too, read-only.
+			const list = terminals.screensInTransaction?.(tx) ?? terminals.list();
 			return { revision: list.revision, data: list };
 		},
 		targetInput: () => ({}),

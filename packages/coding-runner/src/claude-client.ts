@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { RUNNER_FILE_MAX_BYTES } from "./contracts";
 import {
 	claudeEventsResponse,
+	claudeNarrationResponse,
 	claudeObservation,
 	type ClaudeLease,
 	type ClaudeRequest,
@@ -90,6 +91,11 @@ export function claudeRunnerClient(socketPath: string, workspace: string) {
 		async events(id: string, after: number) {
 			return claudeEventsResponse.parse(
 				await call({ operation: "events", id, after }),
+			);
+		},
+		async narration(id: string, after: number) {
+			return claudeNarrationResponse.parse(
+				await call({ operation: "narration", id, after }),
 			);
 		},
 		async stop(

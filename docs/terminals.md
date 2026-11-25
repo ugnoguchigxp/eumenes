@@ -12,6 +12,24 @@
 
 公開版は `artifact:terminals.workspace@2`。名称「ターミナル」で見出し・追加・閉じるを持っていた `@1` は bundle から外し、登録済み DB には旧 revision のデータとして残る（`@2` が公開される）。
 
+## 専任担当の作業を見守る（読み取り専用ペイン）
+
+2026年11月25日。会話から Claude Code に頼んだ作業（`claude-code.request@7` 以降、専任担当が SDK runner を監督する方式。[設計](../spec/claude-code-task-terminal-view-2026-11-25.md)）は、PTY ではなく画面の無い runner で動く。その経過を、この画面に **読み取り専用のペイン** として並べる。
+
+| 項目 | 動作 |
+| --- | --- |
+| 並ぶもの | 手動の端末・Kanban のペインの後ろに、会話から頼んだ作業（`claude_code_work` のうち監督つきの目標実行を除くもの）。進行中のものすべてと、終わったもの直近3件 |
+| 見出し | 「Claude Code（専任担当）」と依頼の1行目。終わると状態欄に「完了・一部完了・失敗・取消・中断」 |
+| 流れる行 | 受付・依頼文、`▶ 実行 n`、Claude の説明（`Claude: …`）、コマンド（`$ …`）と出力の先頭6行、読んだ・編集したファイル（`· Read` / `✎ Edit`）、`■ 実行 n 終了（終了理由・ターン数）`、担当のメモと判断（`担当メモ:` / `担当:`）、質問（`？ …（会話で答えてください）`）、最後に `━━ 完了: 結果の要約` |
+| 操作 | 入力・再起動はできない。止める・条件を変える・質問に答えるは会話から |
+| 開くとき | 新しい作業を受け付けると、この画面が自動で開く（一覧の `requests` が増えるため）。進行中のペインがあるときは、開いても手動の Claude Code を起動しない |
+| 正本 | runner の記録（`data/claude-code-runner/<実行ID>/event-<n>.json` のツール記録と、`text-<n>.json` の Claude の説明）と、claude-code の仕事の状態。ペイン用の状態は持たず、開くたびに記録から書き直す |
+
+- Claude の説明は runner の `narration` 操作で読む（ツール記録とは別。専任担当の判断の入力には入らない）。古い runner（この操作を持たないもの）ではツール記録だけを表示する。
+- 一覧 `GET /api/terminals` と画面の source（`query:terminals.sessions@1`）はペインを含む。会話の snapshot と作業場所の排他は `list()`（PTY のセッションだけ）を使い、ペインを含まない。
+- ペインの id は仕事の id、`owner` は `claude-task:<仕事の id>`、`readOnly: true`。出力は `/api/terminals/:id/output` で同じ server-sent events 形式。
+- 2026-11-25 より前に始まった仕事は実行の履歴（`executionIds`）を持たないため、直近の2実行までしか表示しない。
+
 ## 作業依頼（会話からの直接依頼と Kanban の土台）
 
 Claude Code への依頼は、PTY に直接書かずに **作業依頼表（SQLite の `terminal_requests`）** に保存し、commit した後に送信器が送る。会話からの依頼は `claude-code.request`（write）が呼び出し側の writer transaction の中で `enqueueInTransaction`（`owner: direct`、`mode: work`、`target: current` か `new`）を呼ぶだけで、PTY には何も書かない。Kanban（計画 [P2b](../spec/kanban-claude-code-plan-2026-10-14.md)）は同じ公開操作を `owner: kanban:<cardId>` で使う。

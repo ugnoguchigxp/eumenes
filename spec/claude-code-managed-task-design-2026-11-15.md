@@ -371,7 +371,7 @@ task bindingの `tools: []` は維持する。内部packageのツール解決は
 
 既存公開入口の `minImpact: modify_existing` と共通の実行承認経路を維持する。受理済みの権限を作業へ引き継ぎ、通常の編集・試験ごとに開始時と同じ確認を繰り返さない。新しい対象や権限へ広がる場合だけ、その差分を確認する。
 
-新taskをPTY画面に誤って結び付けない。旧 `terminals.workspace` は手動操作用として残す。初期版の利用者向け表示は既存のTODO、質問、通知とwork照会で満たす。詳細画面を追加するときは、ownerの同じqueryを使うOpenUI Artifactとし、別の状態正本や専用IDEを作らない。
+新taskをPTY画面に誤って結び付けない（入力を送れる画面にしない）。旧 `terminals.workspace` は手動操作用として残す。経過は、利用者の要望（2026-11-25）により `terminals.workspace` に読み取り専用のペインとして表示する。正本はrunnerの記録とownerの状態で、別の状態正本や専用IDEを作らない（[見守りペインの設計](claude-code-task-terminal-view-2026-11-25.md)）。
 
 ### 10.2 共通側の改修
 

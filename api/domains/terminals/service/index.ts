@@ -25,6 +25,9 @@ import {
 } from "./sessions";
 import { createWorkspaceSessions, releaseDirectWorkspace } from "./workspace";
 import type { Runtime, Session, TerminalSize, TerminalsOptions } from "./types";
+import { createWatchPanes } from "./watch-panes";
+
+export type { TerminalWatchPort } from "./watch-panes";
 
 const log = getLogger("terminals");
 
@@ -141,31 +144,43 @@ export function createTerminals(options: TerminalsOptions = {}) {
 		return toView(row, flight?.files ?? row.files);
 	};
 
+	function list(): TerminalSessionsView {
+		return {
+			available: command !== null,
+			revision,
+			limit: rt.limit,
+			requests: rt.sent,
+			sessions: sessions.all().map(sessionView),
+		};
+	}
+	const panes = createWatchPanes({
+		store: options.store,
+		list,
+		changed: rt.changed,
+		resize: sessions.resize,
+	});
+
 	return {
 		...createWorkspaceSessions(rt, sessions),
 		available: () => command !== null,
 		/** Requests can be tracked and saved on this host. */
 		trackable: rt.trackable,
-		list(): TerminalSessionsView {
-			return {
-				available: command !== null,
-				revision,
-				limit: rt.limit,
-				requests: rt.sent,
-				sessions: sessions.all().map(sessionView),
-			};
-		},
+		list,
+		configureWatch: panes.configureWatch,
+		screensInTransaction: panes.screensInTransaction,
+		screens: panes.screens,
 		start: (request: { title?: string } & TerminalSize): TerminalSessionView =>
 			sessionView(sessions.open(request)),
 		restart: (id: string, size: TerminalSize): TerminalSessionView =>
 			sessionView(sessions.restart(id, size)),
 		input: sessions.input,
-		resize: sessions.resize,
+		resize: panes.resize,
 		/**
 		 * The session's output as server-sent events (see `outputStream`), up to
 		 * `streamsPerSession` watchers at once.
 		 */
 		stream: sessions.stream,
+		watchStream: panes.watchStream,
 		/** Checks a hook's token for the session's current run before its body is read. */
 		verifyHook: (id: string, token: string) => void verifyHook(id, token),
 		/**
@@ -291,6 +306,7 @@ export function createTerminals(options: TerminalsOptions = {}) {
 			rt.closing = true;
 			clearInterval(sweep);
 			unsubscribe?.();
+			panes.close();
 			if (!options.workspace) return sessions.closeAll();
 			shutdown = (async () => {
 				try {

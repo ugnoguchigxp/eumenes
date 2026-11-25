@@ -10,6 +10,7 @@ type Activity = "working" | "idle" | "waiting" | undefined;
  * request over (the request count grows), and sounds a chime when a session finishes its work or
  * starts waiting for the person. What was already so when the page loaded does neither.
  * Kanban task sessions never chime here: their results arrive as Kanban notices, which sound once.
+ * Nor do the read-only panes of works handed to Claude Code: the conversation reports those.
  */
 export function useClaudeCodeArtifacts(
 	client: EumenesClient,
@@ -36,7 +37,11 @@ export function useClaudeCodeArtifacts(
 		const previous = activities.current;
 		const next = new Map(
 			data.sessions
-				.filter((s) => !s.owner.startsWith("kanban:"))
+				.filter(
+					(s) =>
+						!s.owner.startsWith("kanban:") &&
+						!s.owner.startsWith("claude-task:"),
+				)
 				.map((s) => [`${s.id}:${s.run}`, s.activity]),
 		);
 		activities.current = next;

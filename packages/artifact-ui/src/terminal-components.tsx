@@ -19,6 +19,8 @@ export type TerminalSessionResource = {
 	run: number;
 	statusMessage?: string;
 	restartable?: boolean;
+	/** Only shows a run (a work handed to Claude Code): no typing, no restart. */
+	readOnly?: boolean;
 };
 export type TerminalsResource = {
 	kind: "terminal-workspace";
@@ -127,10 +129,10 @@ export function TerminalWorkspaceView({
 							status: session.status,
 							statusMessage: session.statusMessage,
 							output: connection.output,
-							onInput: connection.input,
+							onInput: session.readOnly ? undefined : connection.input,
 							onResize: connection.resize,
 							onRestart:
-								session.restartable === false
+								session.readOnly || session.restartable === false
 									? undefined
 									: () => {
 											void action.send("terminal-restart", { id: session.id });
